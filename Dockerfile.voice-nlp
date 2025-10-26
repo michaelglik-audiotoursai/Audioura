@@ -1,0 +1,12 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements-voice-nlp.txt .
+RUN pip install -r requirements-voice-nlp.txt
+
+COPY voice_nlp_service.py .
+
+EXPOSE 5020
+
+CMD ["python", "voice_nlp_service.py"]

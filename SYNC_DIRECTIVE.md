@@ -1,0 +1,1 @@
+Directive: Always modify files ONLY in the local directory at c:\Users\micha\eclipse-workspace\AudioTours\development\ first, then copy these modified files to the Docker containers. Never modify files directly in the containers.

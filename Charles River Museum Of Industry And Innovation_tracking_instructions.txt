@@ -1,0 +1,58 @@
+Charles River Multiple Tours:
+https://charles-river-museum-audio-tour-1.netlify.app/
+https://charles-river-museum-audio-tour-2.netlify.app/
+Testing: PASSED
+
+Manual deploys
+
+Published at 2:30 PM.
+
+Project configuration
+Add database
+
+
+=== TRACKING SETUP INSTRUCTIONS ===
+
+To track usage of your audio tour, follow these steps:
+
+1. Create a new Google Sheet:
+   - Go to https://sheets.google.com
+   - Create a new spreadsheet
+   - Name it "Charles River Museum Of Industry And Innovation Usage Tracking"
+   - Note the spreadsheet ID from the URL (the long string between /d/ and /edit)
+	1t1rPDZS3piRycchyyENXLEdq2HI4UcaFGJaDuxAyAP0
+
+2. Create a Google Apps Script:
+   - In your spreadsheet, click Extensions > Apps Script
+   - Delete any code in the editor
+   - Copy and paste the code from the file: C:\Users\micha\eclipse-workspace\AudioTours\development\tour_tracking_script.gs
+   - Replace the empty spreadsheetId with your spreadsheet ID
+   - Save the project (name it "Audio Tour Tracking")
+   - Click Deploy > New deployment
+   - Select "Web app" as the type
+   - Set "Who has access" to "Anyone"
+   - Click "Deploy"
+   - Copy the Web app URL
+
+Deployment ID: AKfycbypnzlcYigdguOPOSoUyht8FugEWbBXtwf5LPlUT2f_7KppMStp6uJ4zjW3ImwYIih_qQ
+Web app URL: https://script.google.com/macros/s/AKfycbypnzlcYigdguOPOSoUyht8FugEWbBXtwf5LPlUT2f_7KppMStp6uJ4zjW3ImwYIih_qQ/exec
+
+For multiple tours tracking in the same spreadsheet:
+Deployment ID: AKfycbwlfImGnubmVIZya3fJlnLeHI62ZTLotVi9BjlVJILJVwJ2TeLOcO540p8n0-qlO4zj
+Web app URL: https://script.google.com/macros/s/AKfycbwlfImGnubmVIZya3fJlnLeHI62ZTLotVi9BjlVJILJVwJ2TeLOcO540p8n0-qlO4zj/exec
+
+
+3. Update your HTML file:
+   - Open e3fa531b-04cd-48a2-8738-c024364e5fb7_tracked.html in a text editor
+   - Find the line with "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"
+   - Replace it with your Web app URL
+   - Save the file
+
+4. Share your HTML file:
+   - Upload to a web hosting service
+   - Share the link with your audience
+   - Each time someone opens the tour, you'll get a record in your spreadsheet
+   - You'll see their name, when they opened it, and which audio files they played
+
+Your tour ID is: e3fa531b-04cd-48a2-8738-c024364e5fb7
+This ID is used to identify this specific tour in the tracking data.

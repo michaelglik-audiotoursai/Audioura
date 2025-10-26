@@ -1,0 +1,8 @@
+{
+  "name": "decordova_indoor_permanent_collection Audio Tour",
+  "short_name": "Audio Tour",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2c3e50"
+}

@@ -1,0 +1,935 @@
+Microsoft Windows [Version 10.0.26100.6899]
+(c) Microsoft Corporation. All rights reserved.
+
+C:\Users\micha>cd c:\Users\micha\eclipse-workspace\AudioTours\development
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git push origin master --tags
+Enumerating objects: 3014, done.
+Counting objects: 100% (3014/3014), done.
+Delta compression using up to 22 threads
+Compressing objects: 100% (2927/2927), done.
+error: RPC failed; HTTP 500 curl 22 The requested URL returned error: 500
+send-pack: unexpected disconnect while reading sideband packet
+Writing objects: 100% (2964/2964), 2.30 GiB | 12.74 MiB/s, done.
+Total 2964 (delta 1336), reused 0 (delta 0), pack-reused 0 (from 0)
+fatal: the remote end hung up unexpectedly
+Everything up-to-date
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git push origin master --tags
+Enumerating objects: 3014, done.
+Counting objects: 100% (3014/3014), done.
+Delta compression using up to 22 threads
+Compressing objects: 100% (2927/2927), done.
+error: RPC failed; HTTP 500 curl 22 The requested URL returned error: 500
+send-pack: unexpected disconnect while reading sideband packet
+Writing objects: 100% (2964/2964), 2.30 GiB | 12.79 MiB/s, done.
+Total 2964 (delta 1336), reused 0 (delta 0), pack-reused 0 (from 0)
+fatal: the remote end hung up unexpectedly
+Everything up-to-date
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git rev-list --objects --all | sort -k 2 > allfiles.txt
+Input file specified two times.
+
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git rev-list --objects --all > allfiles.txt
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>sort allfiles.txt /o allfiles_sorted.txt
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>allfiles.txt
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>allfiles_sorted.txt
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>allfiles_sorted.txt
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>dir .gitignore
+ Volume in drive C is OS
+ Volume Serial Number is 482D-D2A0
+
+ Directory of c:\Users\micha\eclipse-workspace\AudioTours\development
+
+10/14/2025  01:21 PM               770 .gitignore
+               1 File(s)            770 bytes
+               0 Dir(s)  1,282,822,139,904 bytes free
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>notepad .gitignore
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git rm -r --cached tours/
+fatal: pathspec 'tours/' did not match any files
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git ls-files '*.wav'
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git ls-files '*.mp3'
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git ls-files '*.zip'
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git ls-files '*.lock'
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git ls-files '*.flutter-plugins'
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git ls-files '*.packages'
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git ls-files '*.APK'
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git ls-files '*.html'
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git push origin master --tags
+Enumerating objects: 3014, done.
+Counting objects: 100% (3014/3014), done.
+Delta compression using up to 22 threads
+Compressing objects: 100% (2927/2927), done.
+error: RPC failed; HTTP 500 curl 22 The requested URL returned error: 500
+send-pack: unexpected disconnect while reading sideband packet
+Writing objects: 100% (2964/2964), 2.30 GiB | 12.56 MiB/s, done.
+Total 2964 (delta 1337), reused 0 (delta 0), pack-reused 0 (from 0)
+fatal: the remote end hung up unexpectedly
+Everything up-to-date
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git push origin master --tags
+Enumerating objects: 3014, done.
+Counting objects: 100% (3014/3014), done.
+Delta compression using up to 22 threads
+Compressing objects: 100% (2927/2927), done.
+error: RPC failed; HTTP 500 curl 22 The requested URL returned error: 500
+send-pack: unexpected disconnect while reading sideband packet
+Writing objects: 100% (2964/2964), 2.30 GiB | 12.10 MiB/s, done.
+Total 2964 (delta 1337), reused 0 (delta 0), pack-reused 0 (from 0)
+fatal: the remote end hung up unexpectedly
+Everything up-to-date
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git rm -r --cached APK_BUILDS/
+rm 'APK_BUILDS/OwlAudio.png'
+rm 'APK_BUILDS/OwlWithHeadphones.png'
+rm 'APK_BUILDS/TestingAppImage.png'
+rm 'APK_BUILDS/app-debug.apk'
+rm 'APK_BUILDS/app-debug_v1.1.20.4.apk'
+rm 'APK_BUILDS/app-debug_v1.2.2.16.apk'
+rm 'APK_BUILDS/app-debug_v1.2.2.19.apk'
+rm 'APK_BUILDS/app-release.apk'
+rm 'APK_BUILDS/app-release_v1.0.0.149.apk'
+rm 'APK_BUILDS/flying owl.png'
+rm 'APK_BUILDS/openart-image_hw9_GS_b_1755545813460_raw.jpg'
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git commit -m "Stop tracking APK files in APK_BUILDS directory"
+[master 5c09786] Stop tracking APK files in APK_BUILDS directory
+ 11 files changed, 0 insertions(+), 0 deletions(-)
+ delete mode 100644 APK_BUILDS/OwlAudio.png
+ delete mode 100644 APK_BUILDS/OwlWithHeadphones.png
+ delete mode 100644 APK_BUILDS/TestingAppImage.png
+ delete mode 100644 APK_BUILDS/app-debug.apk
+ delete mode 100644 APK_BUILDS/app-debug_v1.1.20.4.apk
+ delete mode 100644 APK_BUILDS/app-debug_v1.2.2.16.apk
+ delete mode 100644 APK_BUILDS/app-debug_v1.2.2.19.apk
+ delete mode 100644 APK_BUILDS/app-release.apk
+ delete mode 100644 APK_BUILDS/app-release_v1.0.0.149.apk
+ delete mode 100644 APK_BUILDS/flying owl.png
+ delete mode 100644 APK_BUILDS/openart-image_hw9_GS_b_1755545813460_raw.jpg
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git push origin master
+Enumerating objects: 3015, done.
+Counting objects: 100% (3015/3015), done.
+Delta compression using up to 22 threads
+Compressing objects: 100% (2928/2928), done.
+error: RPC failed; HTTP 500 curl 22 The requested URL returned error: 500
+send-pack: unexpected disconnect while reading sideband packet
+Writing objects: 100% (2965/2965), 2.30 GiB | 12.34 MiB/s, done.
+Total 2965 (delta 1336), reused 0 (delta 0), pack-reused 0 (from 0)
+fatal: the remote end hung up unexpectedly
+Everything up-to-date
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git config --global http.postBuffer 524288000
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git push origin master --tags
+Enumerating objects: 3016, done.
+Counting objects: 100% (3016/3016), done.
+Delta compression using up to 22 threads
+Compressing objects: 100% (2929/2929), done.
+error: RPC failed; HTTP 500 curl 22 The requested URL returned error: 500
+send-pack: unexpected disconnect while reading sideband packet
+Writing objects: 100% (2966/2966), 2.30 GiB | 12.24 MiB/s, done.
+Total 2966 (delta 1336), reused 0 (delta 0), pack-reused 0 (from 0)
+fatal: the remote end hung up unexpectedly
+Everything up-to-date
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git ls-files '*.apk'
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git rev-list --objects --all | \
+'\' is not recognized as an internal or external command,
+operable program or batch file.
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)' | \
+'\' is not recognized as an internal or external command,
+operable program or batch file.
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>sort -k3 -n | tail -20
+Input file specified two times.
+
+'tail' is not recognized as an internal or external command,
+operable program or batch file.
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git rev-list --objects --all | git cat-file --batch-check="%(objecttype) %(objectname) %(objectsize) %(rest)" | sort /R /+3 | more
+blob fff5a7d62417fcbec9461a45300c4e42e11db3d4 53465 audio_tour_app/lib/screens/tour_generator_screen.dart
+blob ffd2ae08f116677102a2edd49781339057abed06 3000652 charles_river_museum_of_industry_and_innovation/audio_6_electrical_innovations.wav
+blob ffcf71b69f2423490f8a89dcefefd26f9a5ba1fb 2332 tours/boston_common_boston_ma_walking_0542ad01/audio_3.txt
+blob ffaf7e89d9fda7e284cc4d0b5b17c8fcd716274e 10804 map_delivery/app.py.backup_20250730_122625
+blob ff72d46844f9e22737ce69883b06148a429f64c6 721816 tours/clark_art_institute_in_williamstown_massachusetts_museum_34bab4d5/audio_3.mp3
+blob ff71f7941c5f69a20660914bd68f3931ef5e91ec 18359 audio_tour_app/lib/screens/home_screen.dart
+blob ff6f6edc60b98752f3f1f14c2428c883845bc50e 435 charles_river_museum_of_industry_and_innovation_shared_tracking.json
+blob ff68502308b04e3f98e595db3a580d0f3e288b4d 2749365 tours/enfield_public_library_enfield_connecticut_tour_netlify.zip
+blob ff61b82452ee5a0ef727ccc72231b47fc53e6842 2180 tours/clark_art_institute_in_williamstown_massachusetts_museum_6dd7e8bf/audio_4.txt
+blob ff037be2c99549789b904d38b5786efa018b23f8 7961 open_ai_generated_charles_river_museum_of_industry_and_innovation/index.html
+blob fef951c7ee859e38cd19d2da1de4b4d7111b2900 502 restart_map_delivery.bat
+blob fef340b79ed7a48210ab1f494baddc5adda8bdaf 42228 tour_editing_phase2_final.py
+blob feed23052c0e2052fa65f7574f8be334bb40b92e 35697 audio_tour_app/lib/screens/my_tours_screen.dart
+blob febd3e44d8a8abfee701899a9977712293b6ace4 388 audio_tour_app/lib/config/api_config.dart
+blob feaf53317c5a48090efdc49c867a73a0cefba580 2367 tours/sveriges_dep├Ñbibliotek_national_repository_library_sweden_se-901_78_ume├Ñ_sweden_museum_f1f99587/audio_1.txt
+blob fe8712fa29390275de901fd284a20dd47e20c431 1276 fix_keystore.sh
+blob fe730945a01f64a61e2235dbe3f45b08f7729182 462 audio_tour_app/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@2x.png
+blob fe71cd70c2e69314732215f5c1712ffe8675a23e 13337 tours/American_wing_in_MFA__Boston_MA__museum_tour_20250925_222202.txt
+blob fe6ef8923379eb908094348172ee28c3a48def4a 30778 tour_orchestrator_service.py.bak_fix2
+blob fe6322d21231f1898dafe27ecd7a7fa86777e8b8 770 tours/enfield_public_library_enfield_connecticut_tour_netlify/manifest.json
+blob fe53a2511f20d853c9b90883812ce4de5d2c3857 827 audio_tour_app/pubspec.yaml
+blob fe36b608e20607e715b7aaa6c14a2a08653d639a 9405 audio_tour_app/lib/screens/voice_methods.dart
+blob fe1597df76bbed99eccdf18ba9920e8939cd724b 2276 tours/sveriges_dep├Ñbibliotek_national_repository_library_sweden_se-901_78_ume├Ñ_sweden_museum_0dd1affc/audio_7.txt
+blob fe070f7e141213cdc79466d3c6631d314c1ce705 73571 audio_tour_app/lib/screens/edit_stop_screen.dart
+blob fde03791e468d18e121919c6ed2791a71ecc041f 1713 fix_tour_orchestrator_file.py
+blob fddd514b20bd8b82b154cb8345aaf97fa5216f28 386 audio_tour_app/android/gradle.properties
+blob fddc30da019305ca5f465045471b50acd617eae1 8884 audio_tour_app/lib/services/tour_editing_service.dart
+blob fdc5eaf72ac29ad4763152a948696ec2c771c9ef 3248314 tours/harvard_museum_cambridge_ma_tour_netlify.zip
+blob fdc28cd525f9977d2fcd6ee842402fb07b879303 782 setup_audio_tours_table.sql
+blob fdbbe3c6faf84dd2761c7fe7a7678df0587528ab 759832 tours/clark_art_institute_in_williamstown_massachusetts_museum_34bab4d5/audio_4.mp3
+blob fd97d0a4f2055cce6939a5919695ceb0ad611aaa 4089292 decordova_indoor_permanent_collection/audio_3_new_england_voices_dehner_mazur_selvage.wav
+blob fd7e5905a68871995906a040062df6444cae9f1f 6007 import_tours_to_db.py
+blob fd78ce40eedb0fe822da887e486efc6175dc761b 25534 tour_orchestrator_service.py.bak_logging
+blob fd3c8efebe6551e341452245dd3c789ea777bd2c 40545 newsletter_processor_service.py
+blob fd2447d910cb6b7006a329ff40d0ad6c300f8371 857752 tours/sveriges_dep├Ñbibliotek_national_repository_library_sweden_se-901_78_ume├Ñ_sweden_museum_1680bb1d/audio_7.mp3
+blob fd1d291ce2392d849554328fa1394dbcc7dbcb14 728 tours/test_tour_1_newton_ma_tour_netlify/manifest.json
+blob fd0db46a6ff230fee533c23e6a063f14698c3c65 788 audio_tour_app/pubspec.yaml
+blob fd01a47fd3c2d3cb2f031bb0f9aa77e446b5c299 8233956 tours/hammond_castle_museum_near_boston_ma_tour_netlify/index.htmlblob fced94b4f4dc1fd7809946a6e924a61fc002e862 8640728 tours/mcmullen_museum_of_art_boston_ma__museum_3d0d1427/index.htmlblob fcdcced4f1552ff16b21df4dc2d2debfb9085554 965 modify_tour_orchestrator_for_coordinates.bat
+blob fcce59a89c07fa7ed91146c75a6774908e299d66 2112 tours/maria_magdalena_paintings_in_the_mfa_boston_massachusetts_museum_25566a6f/index.html
+blob fcbea9d4746cd3f671371a063936223b74426141 695464 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_1955fcb3/audio_2.mp3
+blob fcb75458413bc58c262fee6e128451d68712ebb4 684 pubspec_android_simple.yaml
+blob fcaf4bda9fd8746c677ae8fc9045048ed5e7fe76 17674 news_generator_service.py
+blob fca7b85dbbbc7d4666d61fdd7dc9b94e98190fe4 2181768 tours/Macsherry Library_568b482d.zip
+blob fc76d404e78760f2cd5d9a4c3e9760aec5029159 1670224 tours/chatham_public_library_chatham_new_york_tour_netlify/index.html
+blob fc6374c08c71d2ddcda413db432138049bf77837 21505 tours/Hammond_Castle_Museum__Gloucester_MA_museum_tour_20250715_040811.txt
+blob fc472b9baf23cdbd3bd5c191fb60a8f005f80c1c 720376 tours/boston_common_boston_ma_walking_0542ad01/audio_10.mp3
+blob fc4526dff0f45d187ff4280c20a286c8bfd877c3 2100 tours/clark_art_institute_in_williamstown_massachusetts_museum_34bab4d5/audio_3.txt
+blob fc148c52225e15aa561f8c9a9b002243d53e6414 797 audio_tour_app/pubspec.yaml
+blob fbba52a22216737d225ab763c9e077a0a0559e3d 2062 open_ai_generated_charles_river_museum_of_industry_and_innovation/audio_10_industrial_revolution_artifacts.txt
+blob fbb7dbaba815cfd2a9e6e5fff0d1b7634de0d44d 59913 audio_tour_app/lib/screens/edit_stop_screen.dart
+blob fb8e65fa2f026e7063fffebac04eabd86e79e3c2 566 step1_extend_existing_app.bat
+blob fb734fee0329447deaad4471a9fbd704bc12b194 722 tours/test_museum_boston_tour_netlify/manifest.json
+blob fb69e9050e43ded5bee7a4ea8e634bcbe36badd2 78554 audio_tour_app/lib/screens/edit_stop_screen.dart
+blob fb5aa42931b7db9668b7d1a076b706d62c132c63 1674 audio_tour_app/android/app/build.gradle.kts
+blob fb4f2dbd3d65d2971051e0087edcba1ca1f0d044 761272 tours/boston_common_boston_ma_walking_0542ad01/audio_6.mp3
+blob fb3de6ae5c8f13fa2efb4935b57368450f5027fe 671 decardoba_outdoor_sculpture_park/manifest.json
+blob fb3890d03fee3d771b9ae2edbedb7eedb9872b27 6591 tours/Test_Museum_museum_tour_20250714_031222.txt
+blob fb2d7c00afbcb13363840c1cf6f4d3be2d11406e 2562236 tours/lenox_library_lenox_ma_tour_netlify.zip
+blob fb20021e6eff4e293f4eef9c95dfcb3d3e974bcc 8004328 tours/jackson_homestead_and_museum_newton_ma_tour_netlify/index.html
+blob fb111a198aff7ef10c54d8ab96fc8ea66bb42550 2278 tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_ab7a8581/audio_1.txt
+blob fb06a800f476a26f03c41b1b24c0f4e26129d83f 844648 tours/sveriges_dep├Ñbibliotek_national_repository_library_sweden_se-901_78_ume├Ñ_sweden_museum_aeadef77/audio_7.mp3
+blob fade108163cb6bd57c7f0bb183d93c18a0a681e7 39388 newsletter_processor_service.py
+blob fac3f842c3c92d19ecdea43f89a3c9b6ad915abb 6498316 openaiapi_generated_tour_for_decordova_sculpture_park/audio_8_tryst_by_nancy_holt_1978.wav
+blob fabdda217532953c7c08aee6a44335bf175f1278 408 deploy_connectivity_check.bat
+blob fa803179fecc3f799cf029aa37a37030e7fe764c 788 audio_tour_app/pubspec.yaml
+blob fa757a044f07bc387df45f7ec000e823422c7434 5247 audio_tour_app/lib/services/tour_status_service.dart
+blob fa656a0050d0db0ec84c6b47f5c23adab67a3e15 1912000 tours/test_tour_netlify_deploy_234f8135.zip
+blob fa60161c4ec948286328864163c21cb10b36e3ce 2738 USER_TRACKING_FIX_SUMMARY.md
+blob fa49ef7adce28e4992666abfdbbb7986511f2954 2546 tours/boston_common_boston_ma_walking_0542ad01/audio_1.txt
+blob fa3d4aa5ef1dde6c842c3b62a9cbf0ac93000393 412 test_with_logs.bat
+blob fa3b93b2e6de45238c09d57708ed124353da2aa1 3104644 tours/walking_tour_along_brookline_avenue_boston_ma__walking_519f4659/index.html
+blob fa0b357c4f4a29c3de7c5abfa47ba9ea8e52dd92 184 audio_tour_app/devtools_options.yaml
+blob fa027666bc01feb0d4caf439ea62242366c903fa 11488 tours/Boston_Library_Tour__Boston__MA_museum_tour_20251001_011732.txt
+blob f9ee333393b8fa956ccc405d86e2e2af64a83a28 40885 audio_tour_app/lib/screens/tour_generator_screen.dart
+blob f9e0c7c45105826160522bced7ba86e8bdeb407e 6564050 tours/modern_art_at_mfa_boston_ma__museum_92fc4e3f.zip
+blob f9b9bbd01f29e3440713fc5b7044d13897385533 6832 tours/walking_tour_around_Sudbury_Massachusetts_walking_tour_20250805_173906.txt
+blob f9b4b3e8b933635a4d8c981e3f2180f5f24300d1 789928 tours/boston_common_boston_ma_walking_0542ad01/audio_3.mp3
+blob f9b0d7c5ea15f194be85eb6ee8e6721a87ff4644 226 audio_tour_app/ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
+blob f9adb8df9513a23760de58addfe9abc9adb832ce 40722 audio_tour_app/lib/screens/tour_generator_screen.dart
+blob f9a9c021be52d39aeea044c2a0f668e49cc9408c 768 tours/walking_tour_around_sudbury_massachusetts_walking_a8602ebd/manifest.json
+blob f9a44dce1cfdc2c012ba33b8585be3384ff80349 2475 audio_tour_app/lib/services/native_voice_service.dart
+blob f993601e4cf75b654b186b06c42b7525f0404944 237 Dockerfile.background-article-processor
+blob f99158541d093b34f46dbbce6318e4311a9ca7a6 229 SYNC_DIRECTIVE.md
+blob f98eb27b2c8ef77d3c02f5524fb074c6ed5b4731 21531 tours/please_generate_MFA_broad_audio_tour__Boston_MA__museum_tour_20250715_023818.txt
+blob f97a858558a8a6607501dfe8fd3d825974fae026 2259 tours/boston_library_tour_boston_ma_museum_1d0d0de1/audio_3.txt
+blob f971b1771433ae8f5bef43d4d79aad62e407274d 826360 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_1955fcb3/audio_1.mp3
+blob f9706558be3575480d8dd672b32bec7cfd7ebb35 41541 audio_tour_app/lib/screens/home_screen.dart
+blob f962809152558d848a15ca8c4e0dc9bb1fbe1076 918 audio_tour_app/lib/main.dart
+blob f93a4460f0b280c12d3dd13bd058b1f097040b1e 306 tours/needham_public_library_needham_ma_museum_36db5ae6/index.html
+blob f925120dc669d8abcce83c6490ed53ad3480030a 881 build_voice_mic_only_apk.bat
+blob f917a39b46317abb3f963f7726aec840298786f8 1768 debug_tour_orchestrator.py
+blob f90c353badf3a5454343cc6ea7753bf3e2516a0d 3819933 tours/walking_tour_along_commonwealth_ave._boston_ma_tour_netlify_deploy_b48c5f23.zip
+blob f8eef0d53d3714658711cafb1009f865528efb1e 6209004 open_ai_generated_charles_river_museum_of_industry_and_innovation/audio_9_boston_manufacturing_company_waterwheel_replica.wav
+blob f8cf00619257b2453ca974c50238dee3a5a6b052 1612 audio_tour_app/lib/main.dart
+blob f87e51e1f25136dc70efb8a14194a41022471c61 797 audio_tour_app/pubspec.yaml
+blob f860be6baa563d18cf4447e52fe5fcbd5eb5fbae 788 audio_tour_app/pubspec.yaml
+blob f85964b14529bbd5760041032315bfee3af14472 27747 modified_generate_tour_text.py
+blob f8243379a056e2a0caf3bec2c67205504fa343ae 18 _redirects
+blob f7fb3837d1e1703a63fbc61c903218221516c19c 2235 charles_river_museum_of_industry_and_innovation/audio_13_precision_instruments_measuring_the_invisible.txt
+blob f7b17d179f9f61bdb6d53f9786875039c8ac169e 795 audio_tour_app/pubspec.yaml
+blob f79f9c5fe579ba7a9ed9c9102508b86701e66a2c 9420 audio_tour_app/lib/services/background_tour_monitor.dart
+blob f78f046c9e27c9fcc572bd9a51067000fbe7a661 26825 news_generator_service.py
+blob f778c34bfdc95a2f9b7b2460b59d63c9b5a5b34a 21288 tours/southborough_Massachusetts_museum_tour_20250722_180418.txt
+blob f768a41a28e5e082199271af6279a4b1c73f040b 20333 tours/walking_tour_near_Funway_Park__tewksbury_Massachusetts_walking_tour_20250822_194757.txt
+blob f7522157265ca6d131c4d18d19122793681b6c2c 66712 audio_tour_app/lib/screens/edit_stop_screen.dart
+blob f748cafbda813e46d7aff98a79a1b99185f82e84 1540746 decardoba_outdoor_sculpture_park/audio_9_lesley_dill_little_red_ri-- More  -- ^C^C
+c:\Users\micha\eclipse-workspace\AudioTours\development>git rm -r --cached tours/
+fatal: pathspec 'tours/' did not match any files
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git ls-files | findstr /i "^tours\\"
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git rev-list --objects --all | git cat-file --batch-check="%(objecttype) %(objectname) %(rest)" | findstr /i "\.apk"
+blob 40970b2bfb1954ce5ecd8def807bbf33aa821b50 app-release-autotest.apk
+blob 5e396e6f6c2795bbefeb3cad60ae1f9d4cd529cf app-release-dev.apk
+blob 0cb75c2daadc4702dae20b92e184d356600cae52 APK_BUILDS/app-debug.apk
+blob 0598847bdce68be61fd95ab85d7693283b306d47 APK_BUILDS/app-debug_v1.1.20.4.apk
+blob 0bd74f4876bded1504b3725df07eea20971a4c43 APK_BUILDS/app-debug_v1.2.2.16.apk
+blob 185ba329b054d97e7410ea975685ebee3f187792 APK_BUILDS/app-debug_v1.2.2.19.apk
+blob 6e9fc197316e8b333a7ad40ac8ffeb9db007f79e APK_BUILDS/app-release.apk
+blob 2187ae62c2e0debcbe0171e8f6e77c7429fc2795 APK_BUILDS/app-release_v1.0.0.149.apk
+blob b2bd08283946cf8b4fe53fe292c106ffc92b841f app-release-dev.apk
+blob 8344c10a892251095dc8100837db452d64b689e8 app-release-dev.apk
+blob 79fb85b726ee0196f281cdf338aa1c1e0191ce53 app-release-dev.apk
+blob 517bedcd34f39d0eb7a0464d16120205cb78d893 app-release-dev.apk
+blob f480c31d4a2750253efb1e57dda1032029ca0e28 app-release-dev.apk
+blob 7f03ef5ce6dba56ed36aa3f990f556e223914170 app-release-dev.apk
+blob 6ae283db275314ca874fb83aa784e8b904828fd4 app-release-dev.apk
+blob 9453f8de4c975f447e5715e2ae8ec78f8e7384df app-release-dev.apk
+blob df633c1279e1fe0e6f2359382bd9d391bb3a326d app-release-dev.apk
+blob dacc19f808aed11212770f17736be2941e926100 app-release-dev.apk
+blob 7d18cdd76ca8069424d1a35da6d81b0ac99c6522 app-release-dev.apk
+blob 1f9b674665b15f6d1fd5445eef108b93201279e1 app-release-dev.apk
+blob 0c91598317b7f3aad671c8f0ceeffa6d3a44af90 app-release-dev.apk
+blob 2e91ce339e17df92806c98b0a00993481836cea4 app-release-dev.apk
+blob a1d7b5138098ea22807c0bd904b6673aefc369be app-release-dev.apk
+blob 8a37672ac8100311e39770cd130212d13d98be13 app-release-dev.apk
+blob aa229c00523d7812605f8efa2906e75401611b6c app-release-dev.apk
+blob 02b9a441cba87da1d1542cf2ed7dfb28fdb1dddb app-release-dev.apk
+blob c5ebc2b7abaa9e6c7127fcd006777cb19c03ca27 app-release-dev.apk
+blob 72e3dd425c0f8cc4f06cc78152336b908824d213 app-release-dev.apk
+blob d73980147eacecd1605cd4e49372beb172483c30 app-release-dev.apk
+blob 2f3528378db3590ac2fcc9fdce357c70d6549df7 app-release-dev.apk
+blob 6b48541aee0fc214e30ef01404ae39894de77bf7 app-release-dev.apk
+blob 43f765e0c2dc17444b7fdb99989dd12dbb693c06 app-release-dev.apk
+blob b22a0341cf36500001550c5be550834881de29f3 app-release-dev.apk
+blob 1a7bce7dc47dc5eed41c063b6c79b53c5648227c app-release-dev.apk
+blob b711d99cbb6acec541331807bd5b288b0c498be4 app-release-dev.apk
+blob aef00202704e20e1ebd497d2c799b6d4028fedab app-release-dev.apk
+blob de546a0723c6fee46c2a9ba17d0d9c61f977bdc6 app-release-dev.apk
+blob 4c01dcb1ce6a814b0f39844f1970192404caae5e app-release-dev.apk
+blob 54cf37f272eac42f3bbb9a05c779dd692e4d91fa app-release-dev.apk
+blob b6c58af238d6c438bfa9f414b4bb15e49b44e3fc app-release-dev.apk
+blob 0c26ad3086ce7303d7b09546faeccc89d85421d1 app-release-dev.apk
+blob 9230497b7785d7a24444efe8a16c85d42dd954b9 app-release-dev.apk
+blob ee3775ce6bfb1df8f3bef75fae7a85396000b1b6 app-release-dev.apk
+blob 95e37547d5b4530ea481713563e094dfeae9f274 app-release-dev.apk
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git filter-repo --path APK_BUILDS --invert-paths
+git: 'filter-repo' is not a git command. See 'git --help'.
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git rev-list --objects --all | git cat-file --batch-check="%(objecttype) %(objectname) %(rest)" | findstr /i "\.mp3"
+blob 7bdf71976d36274834bcbe438b7ea388cc81f767 audio_tour_app/assets/tours/Sample_Boston_Tour_Test/audio_1.mp3
+blob 36e1e6b54c1deaddaa831faa37c6e3e55095af84 audio_tour_app/assets/tours/Sample_Boston_Tour_Test/audio_2.mp3
+blob b5cca4b788496bc5940fd305869c3efeaefd0015 charles_river_museum_of_industry_and_innovation/audio_10_water_power_exhibit_the_river_that_drove_industry.mp3
+blob 1d259d593a5c7da2568a6adf8f0cb752799a5b97 charles_river_museum_of_industry_and_innovation/audio_11_women_in_industry.mp3
+blob 7093ee59dc016edc189197bcdcf1598b67abe081 charles_river_museum_of_industry_and_innovation/audio_12_transportation_innovations_from_horse_to_horsepower.mp3
+blob 17edc74929beb43482c6e3cb504f500790f3595d charles_river_museum_of_industry_and_innovation/audio_13_precision_instruments_measuring_the_invisible.mp3
+blob cc5c9c27cd0dce8f612627de2c83d120977a88ab charles_river_museum_of_industry_and_innovation/audio_14_clock_tower_mechanics_the_pulse_of_the_factory.mp3
+blob a36c0592315fbbef4df337869e28419c9fb0e951 charles_river_museum_of_industry_and_innovation/audio_15_special_exhibitions_local_genius_on_display.mp3
+blob d5859f91aba0ba7336c396d287e8b2d5f03d2cc6 charles_river_museum_of_industry_and_innovation/audio_16_tour_reflection_farewell.mp3
+blob d31575d4fb2ffe04eb5b30596fae340927d102c6 charles_river_museum_of_industry_and_innovation/audio_1_museum_entrance_and_historic_site_introduction.mp3
+blob 57ac4f74c4282feeab68de76f3cc35c33a20dede charles_river_museum_of_industry_and_innovation/audio_2_the_waltham_watch_company_exhibit.mp3
+blob 9a29be26a20e69b48b4c910c35a9e9d380fecece charles_river_museum_of_industry_and_innovation/audio_3_steam_power_and_the_age_of_machinery.mp3
+blob ab461099352112cd2341d42952b9216f2caa6e08 charles_river_museum_of_industry_and_innovation/audio_4_textile_innovations_the_birth_of_the_american_factory.mp3
+blob ed1d92cd900cbd94f22a4a6acf3e3405deed0124 charles_river_museum_of_industry_and_innovation/audio_5_invention_and_innovation.mp3
+blob a38b79d615e4db93f092c3d03071878caa50140f charles_river_museum_of_industry_and_innovation/audio_6_electrical_innovations.mp3
+blob 210278bf7475c9005f2e0e0891c2f72900ad7599 charles_river_museum_of_industry_and_innovation/audio_7_innovation_lab_modern_invention_gallery.mp3
+blob a5cc4661f5aec4adb1f886d23d4f2dc96aa0eb6b charles_river_museum_of_industry_and_innovation/audio_8_early_entertainment_technology.mp3
+blob 9fabbd92e6c456e8ad984c66c45aa20dad61df3f charles_river_museum_of_industry_and_innovation/audio_9_tools_of_innovation_blacksmithing_and_machining.mp3
+blob f536c7bd866eb3d66adf49338fa5d2c116eb1c02 decardoba_outdoor_sculpture_park/audio_1_jim_dine_two_big_black_hearts.mp3
+blob 8574f5a51f6a508adff5d853c694d16387997d24 decardoba_outdoor_sculpture_park/audio_3_sol_lewitt_tower_dc.mp3
+blob 066c2e122f6241b44103e58a5f8c5af1a9e028ef decardoba_outdoor_sculpture_park/audio_4_ursula_von_rydingsvard_bronze_bowl_with_lace.mp3
+blob 41fb949f72b730704166c3c971bd7022ace3e3bc decardoba_outdoor_sculpture_park/audio_5_paul_matisse_musical_fence.mp3
+blob 27d7f84d7fd54dbedc1c458906d4fa0ad088a649 decardoba_outdoor_sculpture_park/audio_6_nancy_winship_milliken_pine_sharks.mp3
+blob e18de2b91d9551417aca9a630c2f552893bde0c0 decardoba_outdoor_sculpture_park/audio_7_george_sherwood_dancing_with_the_spheres.mp3
+blob 6562cca11b5c7faf2a90431cd45cefc3f42d7d01 decardoba_outdoor_sculpture_park/audio_8_jean_michel_othoniel_e_mc.mp3
+blob f748cafbda813e46d7aff98a79a1b99185f82e84 decardoba_outdoor_sculpture_park/audio_9_lesley_dill_little_red_riding_hood_and_other_stories.mp3
+blob 2d5e852a15e4cd11593dbdfead9a08bcf3960651 decordova_indoor_permanent_collection/audio_1_museum_entrance_orientation.mp3
+blob d3e932af536a8fc8f083823019c1821848a6f365 decordova_indoor_permanent_collection/audio_2_photography_gallery_harold_edgerton_ellen_carey.mp3
+blob 064ab27fc6582d5b87318759de73166ff99db128 decordova_indoor_permanent_collection/audio_3_new_england_voices_dehner_mazur_selvage.mp3
+blob 36139bcdbb9d6950b5a02dab5ed47fec85407fb0 decordova_indoor_permanent_collection/audio_4_sculpture_and_space_lewitt_oppenheimer.mp3
+blob 1c285ee30ea987ede12bc369df90776c344faf73 decordova_indoor_permanent_collection/audio_5_video_art_new_media_oursler_lucier.mp3
+blob 0133fa247f7fb9bc0c317fd3797193e0420f60aa decordova_indoor_permanent_collection/audio_6_rooftop_gallery_takenaga_phillips_agha.mp3
+blob dad003c58b3c35ec769856479a029e4a984c7dd0 decordova_indoor_permanent_collection/audio_7_material_transformations_booker_park_lugo.mp3
+blob 336abdd36afad6926bd2a58eb381ce8ba64a93a4 decordova_indoor_permanent_collection/audio_8_emerging_voices_hobbs_da_corte.mp3
+blob 580afe13028872e2877a1695503dd86436cc4a5b land_portal_tour_decordova/audio_1_living_crystals_and_the_great_acceleration_dawn_redwood_tree.mp3
+blob e27be67534113362cd4a593ce12d9c10eec74bd1 land_portal_tour_decordova/audio_2_water_bodies_and_pumps_water_infrastructure_and_the_body.mp3
+blob 4b6b78215162308a9f317913716ed21baa179ffe land_portal_tour_decordova/audio_3_ghost_forest_and_ghost_barn_vanished_trees_and_stone_remains.mp3
+blob 48b44fec0e1184bf8847ef7c12481044b12f4c02 land_portal_tour_decordova/audio_4_old_amphitheater_becomes_earth_and_water_bowl.mp3
+blob e71aff67bd6edb8b9943cf1e71abb32a4d088164 land_portal_tour_decordova/audio_5_grandpa_oak_and_the_soil_skeleton.mp3
+blob 9732d0c2d689cd978e14862ded0be4ce06c29889 land_portal_tour_decordova/audio_6_glacier_dance.mp3
+blob 8235d7e618adb6c56de121d719db37a58d85a3da land_portal_tour_decordova/audio_7_you_were_the_center_of_a_mountain.mp3
+blob 389663882679cf8e0ca5f7db7c3113ac0b1b6983 land_portal_tour_decordova/audio_8_becoming_the_portal.mp3
+blob 2f9cc3d11ab9265e9b639644d04533a9a9db2ec7 open_ai_generated_charles_river_museum_of_industry_and_innovation/audio_10_industrial_revolution_artifacts.mp3
+blob 165e37803ea31ad1bbe5871419fe5f4b05656199 open_ai_generated_charles_river_museum_of_industry_and_innovation/audio_1_1_textile_machinery_collection.mp3
+blob 0c1c565f0accbfe528ed4c128a89cff77a721ab8 open_ai_generated_charles_river_museum_of_industry_and_innovation/audio_2_waltham_watch_company_artifacts.mp3
+blob 67732d3f4474c38bb66b273f1355c291d5f9c712 open_ai_generated_charles_river_museum_of_industry_and_innovation/audio_3_boston_manufacturing_company_model.mp3
+blob 8c76a9522f1069cc1a5c8f38736a67ef3c5d9a2c open_ai_generated_charles_river_museum_of_industry_and_innovation/audio_4_francis_cabot_lowell_portrait.mp3
+blob 6d56666550c8b49cbc4a9c6ed5312681be76916c open_ai_generated_charles_river_museum_of_industry_and_innovation/audio_5_waltham_lowell_system_timeline.mp3
+blob b307da13208c880238c61a28594ed265ef8ff921 open_ai_generated_charles_river_museum_of_industry_and_innovation/audio_6_waltham_fire_department_exhibit.mp3
+blob 49299b0a292c1c3ed73705711679fad120032849 open_ai_generated_charles_river_museum_of_industry_and_innovation/audio_7_metz_company_fire_engine.mp3
+blob 5333b3fb1147938a1d9d7b81540ed569b7cc947b open_ai_generated_charles_river_museum_of_industry_and_innovation/audio_8_waltham_telegraph_and_morse_code_collection.mp3
+blob 62bf71495514ba5b10a114a77d2204bebba0c602 open_ai_generated_charles_river_museum_of_industry_and_innovation/audio_9_boston_manufacturing_company_waterwheel_replica.mp3
+blob c01e48cd448388fbf09d0dcee20c361ed993d821 openaiapi_generated_tour_for_decordova_sculpture_park/audio_10_wind_and_water_by_ursula_von_rydingsvard_2008.mp3
+blob bb0662cdd2e39f6f76d076b76b8f1bd12025dc95 openaiapi_generated_tour_for_decordova_sculpture_park/audio_11_decordova_sphinx_by_jim_dine_1992.mp3
+blob 8cc451b01c5f44eb5aa01ac849174947f0768832 openaiapi_generated_tour_for_decordova_sculpture_park/audio_1_1_lincoln_by_toshiko_takaezu_1991.mp3
+blob 2f82f7c8714a7c5152292a3806ab05124b75ccb9 openaiapi_generated_tour_for_decordova_sculpture_park/audio_2_frog_pond_by_roy_lichtenstein_1999.mp3
+blob ede909095f0b04aa46a763e171c72964dc73ef2a openaiapi_generated_tour_for_decordova_sculpture_park/audio_3_monochrome_ii_by_nigel_hall_1997.mp3
+blob c9ea1dcf5abc1a916eb627b6eef67fd631292763 openaiapi_generated_tour_for_decordova_sculpture_park/audio_4_yellow_moon_by_mark_di_suvero_1997.mp3
+blob c5e00b614b13e1306b7ac76218a3285447739a7e openaiapi_generated_tour_for_decordova_sculpture_park/audio_5_untitled_three_dancing_figures_by_keith_haring_1989.mp3
+blob cb04be492a49fd8d4a8ce00c1856118e805883fe openaiapi_generated_tour_for_decordova_sculpture_park/audio_6_fletcher_benton_folded_square_alphabet_g_by_fletcher_benton_2014.mp3
+blob 41b0ab681e003b1681a67c644d636a9d85dc0894 openaiapi_generated_tour_for_decordova_sculpture_park/audio_7_black_cube_by_sol_lewitt_1992.mp3
+blob 67d340078011e137103a28f1c1ba059c04b05822 openaiapi_generated_tour_for_decordova_sculpture_park/audio_8_tryst_by_nancy_holt_1978.mp3
+blob 2e8b159082442b6e70467cab588decd89372ab2d openaiapi_generated_tour_for_decordova_sculpture_park/audio_9_juggler_by_john_kearney_2008.mp3
+blob 55d8191f1b2f85eaaf2527954545c705d10577af openaiapi_generated_tour_path_2_for_decordova_sculpture_park/audio_1_lines_by_george_rickey_three_1965_1966.mp3
+blob b5b0095d574a47718b0b666dee461210fa0d0e63 openaiapi_generated_tour_path_2_for_decordova_sculpture_park/audio_2_x_by_william_tucker_horse_1987.mp3
+blob bd67e8f7015864ea124c47f68a60531c72a9c076 openaiapi_generated_tour_path_2_for_decordova_sculpture_park/audio_3_museum_by_robert_schelling_time_at_the_2002.mp3
+blob 7810b8be0f186d229a3effbe25b65d575e31789c openaiapi_generated_tour_path_2_for_decordova_sculpture_park/audio_4_presence_by_john_wilson_eternal_1987.mp3
+blob 6266a4cf3ede0fd28590f3ab8ccf496d0fea09ad openaiapi_generated_tour_path_2_for_decordova_sculpture_park/audio_5_goose_by_kitty_wales_feral_2005.mp3
+blob 689ab85850176056e5b408154b20f546f256cdc3 openaiapi_generated_tour_path_2_for_decordova_sculpture_park/audio_6_otter_by_rona_pondick_2002_2005.mp3
+blob 8d044adea5c4074da1115319aba0ff9aacb954d7 openaiapi_generated_tour_path_2_for_decordova_sculpture_park/audio_7_presence_by_beverly_pepper_silent_1982.mp3
+blob 2b91bb8c23b111f40a485c97ac1de8a107d73af2 openaiapi_generated_tour_path_2_for_decordova_sculpture_park/audio_8_venusvine_by_richard_rosenblum_1990.mp3
+blob b7946a9bb17c91ea9620c21cfbbaeb27d2388711 test_long.mp3
+blob 2a42eb6b409a2aa23acab14b4eb24763d6949ed4 test_polly.mp3
+blob 6346d169fd54ecce595fef640b7c53f4019dd8a7 test_polly2.mp3
+blob d2607ed0c8964cffc726abc6ba70f56830dff3fd west_newton_historic_village_and_industrial_route/audio_1_west_newton_square_and_railroad_station.mp3
+blob 3e8913db3f4449f5d3396ff058046511bd284e41 west_newton_historic_village_and_industrial_route/audio_2_second_church_in_newton.mp3
+blob 11c6ef36c3a614fc6d4f13d9e5f6c861bea636f4 west_newton_historic_village_and_industrial_route/audio_3_jackson_homestead_and_museum.mp3
+blob f46da9206d91efdf61d97ea63e88cf3908d99b60 west_newton_historic_village_and_industrial_route/audio_4_site_of_newton_cotton_factory.mp3
+blob 5e22bf3311e69f820a685cc05d23e21caafb2798 west_newton_historic_village_and_industrial_route/audio_5_myrtle_baptist_church_and_cemetery.mp3
+blob edd683c06183e71c1c67ef0fff7c17dabf87694e west_newton_historic_village_and_industrial_route/audio_6_nathaniel_allen_house.mp3
+blob 80b1580a02d0bb58aef71447c422de50eb6bbdac west_newton_historic_village_and_industrial_route/audio_7_site_of_new_england_hospital_for_women_and_children_temporary_campus.mp3
+blob 57d856eb471816acbafb30947e2a473a3a23f257 west_newton_historic_village_and_industrial_route/audio_8_west_newton_branch_library_closed.mp3
+blob f1f46d7d11ce0a505985dae7b77971fdc1803e32 tours/across_boundaries_across_barriers_fruitlands_museum_harvard_massachusetts_tour_ce270d47/audio_1.mp3
+blob 2b6d436c9c7bc0d968762c99f5ac74e3009e103e tours/adams_center_free_libraryadams_center_ny_museum_f49e6f95/audio_1.mp3
+blob d34148c55de836220dd8d5cceaa39943b49873a5 tours/adams_center_free_libraryadams_center_ny_museum_f49e6f95/audio_2.mp3
+blob d7232f282ca1bca0b973977b5215787ec4ce9a3d tours/adams_center_free_libraryadams_center_ny_museum_f49e6f95/audio_3.mp3
+blob 35c7847bde77a481ab292fef627f9ebe34c63658 tours/american_wing_in_mfa_boston_ma__museum_272f3f80/audio_1.mp3
+blob ded6dfcffefd1361049073741f58fba60447b6f4 tours/american_wing_in_mfa_boston_ma__museum_272f3f80/audio_2.mp3
+blob a67c2b05d9d8d8e0b3deb6ac340f07f3c79984f6 tours/american_wing_in_mfa_boston_ma__museum_272f3f80/audio_3.mp3
+blob 4c93c75e2156820064453f234343736e9b6148c3 tours/american_wing_in_mfa_boston_ma__museum_272f3f80/audio_4.mp3
+blob 0a728f7988a71028c125d856ea1f7b9934e4c840 tours/american_wing_in_mfa_boston_ma__museum_272f3f80/audio_5.mp3
+blob 629418d36a77a6487bae33896f125db5b96b259a tours/american_wing_in_mfa_boston_ma__museum_272f3f80/audio_6.mp3
+blob 1dd7a943b4fef529ccbca15c6334da750e876b7b tours/best_still_life_painters_and_paintings_at_mfa_boston_massachusetts__museum_9c3571d7/audio_1.mp3
+blob 93fa02271cc29a5db6b39afcc9bed644401fad91 tours/best_still_life_painters_and_paintings_at_mfa_boston_massachusetts__museum_9c3571d7/audio_2.mp3
+blob e002b9c830fe44924ba08cfc8751adff22e1fc3f tours/best_still_life_painters_and_paintings_at_mfa_boston_massachusetts__museum_9c3571d7/audio_3.mp3
+blob bb7966f6f68ed5ecf49a407b3af77955fc993f10 tours/best_still_life_painters_and_paintings_at_mfa_boston_massachusetts__museum_9c3571d7/audio_4.mp3
+blob 70a32210b138262df3e93adc3706855c442c24bb tours/best_still_life_painters_and_paintings_at_mfa_boston_massachusetts__museum_9c3571d7/audio_5.mp3
+blob c397c219b8ca09e37521759ff544c85e17d0c9cd tours/best_still_life_painters_and_paintings_at_mfa_boston_massachusetts__museum_9c3571d7/audio_6.mp3
+blob ae52a7ad3f9701bf581ca9f7870abc4880577d16 tours/boston_common_boston_ma_walking_0542ad01/audio_1.mp3
+blob fc472b9baf23cdbd3bd5c191fb60a8f005f80c1c tours/boston_common_boston_ma_walking_0542ad01/audio_10.mp3
+blob 2711cea4e60bd21e7663386d9252ec73f552e403 tours/boston_common_boston_ma_walking_0542ad01/audio_2.mp3
+blob f9b4b3e8b933635a4d8c981e3f2180f5f24300d1 tours/boston_common_boston_ma_walking_0542ad01/audio_3.mp3
+blob c68c2b91b3f921fcbb9e007a68bc17935655b2ea tours/boston_common_boston_ma_walking_0542ad01/audio_4.mp3
+blob 8e90a9eea61699987977affe32c63ed99487674d tours/boston_common_boston_ma_walking_0542ad01/audio_5.mp3
+blob fb4f2dbd3d65d2971051e0087edcba1ca1f0d044 tours/boston_common_boston_ma_walking_0542ad01/audio_6.mp3
+blob 99fc08075a02c732f4bec2c893a1f55f7d1fd8f2 tours/boston_common_boston_ma_walking_0542ad01/audio_7.mp3
+blob 932d8227f6a52003d1a2b6c1d371d919b4148734 tours/boston_common_boston_ma_walking_0542ad01/audio_8.mp3
+blob d92af7b1e01f17a4675fc8d4422b4d5083682c46 tours/boston_common_boston_ma_walking_0542ad01/audio_9.mp3
+blob a1343636232efc5d0af89ee3a27b2e4a0df9a6ca tours/boston_library_tour_boston_ma_museum_1d0d0de1/audio_1.mp3
+blob 5ba2cf3337b259b1a99d2fe489caf2d62810e1f2 tours/boston_library_tour_boston_ma_museum_1d0d0de1/audio_2.mp3
+blob 6e5b3eed005e0ad3b16c17a955974db8331e0379 tours/boston_library_tour_boston_ma_museum_1d0d0de1/audio_3.mp3
+blob b5c590a84333e15fa35f306ce11bc0e45a412e85 tours/boston_library_tour_boston_ma_museum_1d0d0de1/audio_4.mp3
+blob 7d6f06de050dd3867c7d79c94d2f30158bec6028 tours/boston_library_tour_boston_ma_museum_1d0d0de1/audio_5.mp3
+blob cdd7c861f85a2885eed406974cbb05c1bd2dda16 tours/clark_art_institute_in_williamstown_massachusetts_museum_34bab4d5/audio_1.mp3
+blob d0de5011daeb148eb9faf7479cb897fbe742b788 tours/clark_art_institute_in_williamstown_massachusetts_museum_34bab4d5/audio_2.mp3
+blob ff72d46844f9e22737ce69883b06148a429f64c6 tours/clark_art_institute_in_williamstown_massachusetts_museum_34bab4d5/audio_3.mp3
+blob fdbbe3c6faf84dd2761c7fe7a7678df0587528ab tours/clark_art_institute_in_williamstown_massachusetts_museum_34bab4d5/audio_4.mp3
+blob 86aa98b659dff2bb0f5109e2c955355a3eff139a tours/clark_art_institute_in_williamstown_massachusetts_museum_34bab4d5/audio_5.mp3
+blob 4fb9ea923479b57b50a8422a9b4611fe148121bd tours/clark_art_institute_in_williamstown_massachusetts_museum_34bab4d5/audio_6.mp3
+blob b859aadd2252c2165774813efa56438fd7dee474 tours/clark_art_institute_in_williamstown_massachusetts_museum_34bab4d5/audio_7.mp3
+blob 71c4332e0d1d91996ee4b4ae07d5d3fc638abc22 tours/clark_art_institute_in_williamstown_massachusetts_museum_34bab4d5/audio_8.mp3
+blob a8e4eaf84148811c1235b716e20c1b77894b0f9c tours/clark_art_institute_in_williamstown_massachusetts_museum_34bab4d5/audio_9.mp3
+blob 0459aec41037c57446ed93118cfc072bfe558fa5 tours/clark_art_institute_in_williamstown_massachusetts_museum_6dd7e8bf/audio_1.mp3
+blob d61ddce11adac5d681545e35c9f8df873174bb01 tours/clark_art_institute_in_williamstown_massachusetts_museum_6dd7e8bf/audio_2.mp3
+blob ce6ddf14bfa588fd1732f20a723956073c9b9bbd tours/clark_art_institute_in_williamstown_massachusetts_museum_6dd7e8bf/audio_3.mp3
+blob 363ef343a3b0f30ac96cd758a84200a9032b66fa tours/clark_art_institute_in_williamstown_massachusetts_museum_6dd7e8bf/audio_4.mp3
+blob 04a61d57f6b379713b84fd1a90736f3c715fd907 tours/clark_art_institute_in_williamstown_massachusetts_museum_6dd7e8bf/audio_5.mp3
+blob 08e3956c22aecc9a8a7d3ce1dd1933fa00072315 tours/clark_art_institute_in_williamstown_massachusetts_museum_6dd7e8bf/audio_6.mp3
+blob 0f773d7e6eac6e43b9cd3c14e0bba75ab5e5c7da tours/clark_art_institute_in_williamstown_massachusetts_museum_6dd7e8bf/audio_7.mp3
+blob 55c28955760f14944a8f4e6389a6d115f812df00 tours/crosby_public_library_antwerp_ny_museum_6e0406a3/audio_1.mp3
+blob 4e1dfeaf383dc16228eed59273bd86e7d40a2fcb tours/crosby_public_library_antwerp_ny_museum_6e0406a3/audio_2.mp3
+blob 2be26ddded8c41489b58bb6f75fa7059a9b30be1 tours/crosby_public_library_antwerp_ny_museum_6e0406a3/audio_3.mp3
+blob b2c9e4b0e63b7127b041e14210cb69dfec009eaf tours/crosby_public_library_antwerp_ny_museum_6e0406a3/audio_4.mp3
+blob f637270e9f4b98e334a4064c45205bdac18f7b41 tours/crosby_public_library_antwerp_ny_museum_fe887a79/audio_2.mp3
+blob f971b1771433ae8f5bef43d4d79aad62e407274d tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_1955fcb3/audio_1.mp3
+blob fcbea9d4746cd3f671371a063936223b74426141 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_1955fcb3/audio_2.mp3
+blob e1643192ebe2041ac530daa946798f137cfcd288 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_1955fcb3/audio_3.mp3
+blob c7a57df6b59d556c6db99aa375cbf0ecd1990a96 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_1955fcb3/audio_4.mp3
+blob 400df09b8894c8c9cb8ec921f7e6d47d4b74f395 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_2345890f/audio_1.mp3
+blob d701c093bcb6a1ac25506bab6f4e3c3a35f59b03 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_2345890f/audio_3.mp3
+blob f3274bcac4bf2e57b9a0e74cb081fddf572c8ec5 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_2bd534ee/audio_3.mp3
+blob 7d72e16823424a242f9e6c0df59480018b67f298 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_2bd534ee/audio_4.mp3
+blob 9cafec30ca0beba3538d1323297ad75e9d54bb69 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_4ba4f06e/audio_1.mp3
+blob 691995858d158de406f1bfcee00dba661b78f41a tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_4ba4f06e/audio_2.mp3
+blob 777e1e6c9fb646cfdc1af5695e976b75b69b0445 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_4ba4f06e/audio_3.mp3
+blob cf0d542261d9f92b6725520b032d1dd427098eed tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_4ba4f06e/audio_4.mp3
+blob bcb670c8ed5ce4c4966a80031df661e46a0c19a6 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_65371e24/audio_3.mp3
+blob 4f15aee07f85a48aeaeb124ca820c27102a54f10 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_7dc3500f/audio_3.mp3
+blob f51c3d6dd76363dee5a972cc39f93487bc8c4b37 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_8952554b/audio_4.mp3
+blob db780b0a3c3665b734a15076984ba5725b138526 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_8e9ef2cf/audio_3.mp3
+blob 2c35ef3cc368a446485be93f1476ad1afccf780c tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_8e9ef2cf/audio_4.mp3
+blob ec2d4bf2018ba83dcc3361895444c3138b9171e3 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_ac8798e7/audio_3.mp3
+blob 47cd19984ac2ef4cbe4754416d17403bbb3f482b tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_adc54fd8/audio_5.mp3
+blob 5d1b713084a295e6487bfe2910f3fdbb3aacb5da tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_dcedcb97/audio_1.mp3
+blob 0581440c28ef79126c7d5ce0e5cae61b7ab23f9c tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_f9cb95e3/audio_3.mp3
+blob 0809e53d0e302e17c02be946fc94d53a8223017f tours/framingham_public_library_framingham_ma__museum_099b148e/audio_1.mp3
+blob ddf58db035676253947a4ab86a7fb322ca73a4bb tours/framingham_public_library_framingham_ma__museum_099b148e/audio_2.mp3
+blob 91e75594aaa7baa2069c50fe990488fe56bc9496 tours/framingham_public_library_framingham_ma__museum_099b148e/audio_3.mp3
+blob ea3e15e44bdc74379385ec287e2078ffb543defd tours/framingham_public_library_framingham_ma__museum_099b148e/audio_4.mp3
+blob ca6bd93b14438eeb68301bd76efef827bb3b2f36 tours/framingham_public_library_framingham_ma__museum_099b148e/audio_5.mp3
+blob 669f4d86299c226137eea6a9426de8ee71a5b124 tours/framingham_public_library_framingham_ma__museum_989ba115/audio_2.mp3
+blob bff88376875cff0dc65cc4796140b91324a68bae tours/macsherry_libraryalexandria_bay_ny_museum_c84e953c/audio_1.mp3
+blob dde13f85bbb579a0c859b6bfd9220f64a8616d6f tours/macsherry_libraryalexandria_bay_ny_museum_c84e953c/audio_2.mp3
+blob f644f9826ae21f5be297438f66dbc0c0e92a051b tours/macsherry_libraryalexandria_bay_ny_museum_c84e953c/audio_3.mp3
+blob 7a38647ff28081cca4571e50a4bcfd4886c6a044 tours/maria_magdalena_paintings_in_the_mfa_boston_massachusetts_museum_25566a6f/audio_1.mp3
+blob 32282052d4229628ab9960fce3e43ec76e5518fe tours/maria_magdalena_paintings_in_the_mfa_boston_massachusetts_museum_25566a6f/audio_2.mp3
+blob b27492f6c3f2eb7846585d067604713775f533b7 tours/maria_magdalena_paintings_in_the_mfa_boston_massachusetts_museum_25566a6f/audio_3.mp3
+blob 1a5c24525bb3669f0d51cfbd63c0a8c966ccccb5 tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_09e7886c/audio_1.mp3
+blob f547b34f09c4f757e1e6456cd7021eee8b30f538 tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_09e7886c/audio_2.mp3
+blob ee020be1d894c37745647650ef180d74879b4dcf tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_09e7886c/audio_3.mp3
+blob 0a03ad87d041454467e9026fe276bc71bce3486c tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_09e7886c/audio_4.mp3
+blob 792c46ef2e4b4ba1ff7c3b026e44d4cfbde543eb tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_09e7886c/audio_6.mp3
+blob c737a92951582382c7c57b82e404fb28d571d920 tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_93b053dd/audio_1.mp3
+blob 785196da8c690a46dddc68a8ccd83d4b1052af54 tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_93b053dd/audio_2.mp3
+blob d46aba620405990d1d79cd2373d24b7942278f1c tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_93b053dd/audio_3.mp3
+blob aeeb222d2078b4d4ce311d966c95585bcc0a3cf7 tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_93b053dd/audio_4.mp3
+blob 99bb6f27e5c53f8a21cd994f0d09fb49e72cbba8 tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_ab7a8581/audio_1.mp3
+blob f0e4a25f4d3f1f6f05195450728b5dbd94f4a71e tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_ab7a8581/audio_2.mp3
+blob f6d20a8d3577af2b2aafe09ae811c508536e4099 tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_ab7a8581/audio_3.mp3
+blob a2b0f6388cfad11244aa9fd05bc82a93ac1feda0 tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_ab7a8581/audio_4.mp3
+blob 6c79c7b7655b3bd2da1726742659792c12d16bd0 tours/needham_public_library_needham_ma_museum_36db5ae6/audio_1.mp3
+blob 2781fbfbc97bf3f6e2964bc46655835a98e405a2 tours/needham_public_library_needham_ma_museum_36db5ae6/audio_2.mp3
+blob 7f6f8c967524359b4de0161feb6b65eaaaa12334 tours/newton_free_library_newton_ma_museum_9bae8daf/audio_1.mp3
+blob 2b939be960f4510916d28892fce31f4d62234ea9 tours/newton_free_library_newton_ma_museum_9bae8daf/audio_2.mp3
+blob 77bcefa78bca9e3aa6889eb68cb8a76c765e0014 tours/newton_free_library_newton_ma_museum_9bae8daf/audio_3.mp3
+blob 301cf91ae96b05dda2c35fb5ec1f5be52babd490 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_0dd1affc/audio_1.mp3
+blob ee2542cd7a9d4279ae3878257d1a6044175c172a tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_0dd1affc/audio_2.mp3
+blob e82c8ba5af28b5a049764f1428ae6ec69be29b1c tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_0dd1affc/audio_3.mp3
+blob a284c8ab82f011a28ba81667461a40379da68dce tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_0dd1affc/audio_4.mp3
+blob 99a2a7890bf61db504a1e33cfb0b0519108504ea tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_0dd1affc/audio_5.mp3
+blob f12ffab167cf9cdc92e18be34a1150d73950e093 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_0dd1affc/audio_6.mp3
+blob 6725a872d6c41420c8dc6320d26bee56d1c8a8d4 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_0dd1affc/audio_7.mp3
+blob dc80bb1cd34638129127e634ca1b1ff7c6aafecb tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1680bb1d/audio_1.mp3
+blob 370b7b657dbf79271478a88d94ead24994b1d012 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1680bb1d/audio_2.mp3
+blob d6c447ba96da4e9ccd7b9d7bbacdf64ceb778ee4 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1680bb1d/audio_4.mp3
+blob b3054f6a3c640e4ada2b7ad0c8ee6c9511a16dc7 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1680bb1d/audio_5.mp3
+blob bfcadd94c64b976b120278dbb2c56d17b7739875 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1680bb1d/audio_6.mp3
+blob fd2447d910cb6b7006a329ff40d0ad6c300f8371 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1680bb1d/audio_7.mp3
+blob b967754cb943242864b46ae9c681ec663e214033 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1b80b0cf/audio_1.mp3
+blob 8fbe83a2371ef87fc33e26663275d656f310897e tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1b80b0cf/audio_2.mp3
+blob cf815fae41b93a53c39346173b6d7a95d9033b18 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1b80b0cf/audio_4.mp3
+blob 1c59831362b2340f4550d0f9eafe12219d2eb754 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1b80b0cf/audio_5.mp3
+blob 5e057336a2a57520eb14f92659d6acc541f0dc59 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1b80b0cf/audio_6.mp3
+blob 5ff775ac9002d38abab23aae08a9b1e1e8c87bbe tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1b80b0cf/audio_7.mp3
+blob 0681feb186e231c5248f3fa6cdbaaa3dd050d672 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_2b759b0b/audio_1.mp3
+blob d423561c695e0bc09c1b41a2211588a9f77b7016 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_2b759b0b/audio_2.mp3
+blob 64f6e920c969ba0b29ce408ebe9ed9d17d361d2d tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_2b759b0b/audio_3.mp3
+blob 8dd5b328cf7cbed8a051e19756be2b0e73917f1e tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_2b759b0b/audio_4.mp3
+blob 986dffe02f4f9778bfd58aaa2e2c07be7faf6061 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_2b759b0b/audio_5.mp3
+blob 21dba1d711e3cb9ead57fbc7de4ef330d98f5850 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_2b759b0b/audio_6.mp3
+blob 72a19c6943832cef3e47f56145f2b20c21fac75f tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_3da7351e/audio_1.mp3
+blob 7208507bdc8cdf11f21a0baea584c56563fa17d2 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_3da7351e/audio_2.mp3
+blob cc6a486250162ce958da07e4220c7ff1b99ffcbe tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_3da7351e/audio_4.mp3
+blob 430031434edcc0b2591c9f971b916d4f989325b5 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_3da7351e/audio_5.mp3
+blob e0559cd94e7ba40d105cd61f06bef62162691a70 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_3da7351e/audio_6.mp3
+blob 2d7a174413af7028469675390607fff536282458 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_3da7351e/audio_7.mp3
+blob 56ea16d51f91fb202998118d1a9d57e6ee904e2f tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_56dc14e3/audio_1.mp3
+blob 68c2be774af1b67daf63ca1fec5813711872ad35 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_56dc14e3/audio_2.mp3
+blob 41f4ff92b211739182f55f288e401f2b8949941b tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_56dc14e3/audio_4.mp3
+blob 20561cceefd3e5bccc41ca80c0e0c34353db2a54 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_56dc14e3/audio_5.mp3
+blob e3ca083310e41a338c17d5939654a1fe3400d856 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_56dc14e3/audio_6.mp3
+blob e0f56e50270b0fac4e7ab2bf79fa6f6fa28dc83d tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_56dc14e3/audio_7.mp3
+blob bc8f2e2226b9142812ee764ff244a54ff769d32d tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_57a255db/audio_1.mp3
+blob 39ec96391dacdd6cd9632d8e9c2e0048bce824cf tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_57a255db/audio_2.mp3
+blob 8191b5b4372dbfeef7760013022f05ee3acfdf46 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_57a255db/audio_4.mp3
+blob b0b2dfe65c4a150a11b9ba663d9211bcce833e2a tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_57a255db/audio_5.mp3
+blob db4fb7efd972560d59562cc7320d8be999ac3cb0 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_57a255db/audio_6.mp3
+blob ddc9b6f6857a0a2b7c979eef03a0fb18f82cbc2a tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_57a255db/audio_7.mp3
+blob 5932ed289a8b7a407d23a66b27742e89c80a176e tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_71b81b75/audio_1.mp3
+blob a5f524f8daf09da369cd4d1ba208462181be05fe tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_71b81b75/audio_2.mp3
+blob 74ee5b645ce73f5862b8cd8e507902fa6c5576b5 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_71b81b75/audio_3.mp3
+blob 5ab764cb6cf8dfcf56f1a5c181c228888036c030 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_71b81b75/audio_4.mp3
+blob 528a17043ae83268f9269c1c0d6c7ab28219c5b0 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_71b81b75/audio_5.mp3
+blob 12c6cd6c4fca3b5f19579bdfa70c9c49be3dd9ee tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_71b81b75/audio_6.mp3
+blob b846b3e9dba632009e43f3e1a501d157032229d8 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_aeadef77/audio_1.mp3
+blob 043c4e918ee73663bb267e63696ffb39c9d32f56 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_aeadef77/audio_2.mp3
+blob 18c63c9389f04a022e4a988571ba6ee40715bba5 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_aeadef77/audio_4.mp3
+blob cc9b59d91595040452f6bd33803e1dfaf96fb3e5 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_aeadef77/audio_5.mp3
+blob 304d0b1a75a8a35b6464555d7ae51b73725df167 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_aeadef77/audio_6.mp3
+blob fb06a800f476a26f03c41b1b24c0f4e26129d83f tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_aeadef77/audio_7.mp3
+blob 5ff498364504004552ff20f18809f54ee106478a tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_b0ddb24c/audio_1.mp3
+blob 2dad0f7b99aaee1ee268aaec4179d9ff8bfe1acd tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_b0ddb24c/audio_2.mp3
+blob f4ed890db52626815ceca9fff55c6e9a88b51226 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_b0ddb24c/audio_4.mp3
+blob 06a4a4bb2cb83d93baa505e592d784d70c3e9b30 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_b0ddb24c/audio_5.mp3
+blob 6bcf9e88c62aa4c968a9609fb79b67396b7aa1b0 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_b0ddb24c/audio_6.mp3
+blob 2fe21ad31bbac1f7093720166d4da3f21a5cad90 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_b0ddb24c/audio_7.mp3
+blob 672a9f91a0504cc283bec8f27c85ad5ba9fc5c79 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_e1bc93d6/audio_1.mp3
+blob 51b5de0fdd3a2a2d006cb2baa796f63f93bd34b7 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_e1bc93d6/audio_2.mp3
+blob c50dc3d56cd6dcaaa933f2f2df74070d829bbc71 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_e1bc93d6/audio_4.mp3
+blob 80e74e323dda2f9f223f41bc44a6c0d3257a2e51 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_e1bc93d6/audio_5.mp3
+blob 25c963ec7301ab8db3db97b76ccf727023b5de37 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_e1bc93d6/audio_6.mp3
+blob 50920ef5cc672ae8ae838b09672db9647061f0fa tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_e1bc93d6/audio_7.mp3
+blob f470d89c600291dd4a12b4f26b3ed31cc5488288 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_f1f99587/audio_1.mp3
+blob 079db2f5e1c441643fda2169131123d0ecc2e039 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_f1f99587/audio_2.mp3
+blob ba22c4afae0021c5518acd0e376e23b59840cc89 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_f1f99587/audio_4.mp3
+blob 6f216b93bc3d3978e8df6e5faee36ca90aa07c9a tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_f1f99587/audio_5.mp3
+blob 31411431c83bc3f26bba719a4910b2145413b506 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_f1f99587/audio_6.mp3
+blob d2a631aa1a14d03617a14951aba690104d1498d8 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_f1f99587/audio_7.mp3
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>pip install git-filter-repo
+Defaulting to user installation because normal site-packages is not writeable
+Collecting git-filter-repo
+  Downloading git_filter_repo-2.47.0-py3-none-any.whl.metadata (31 kB)
+Downloading git_filter_repo-2.47.0-py3-none-any.whl (76 kB)
+Installing collected packages: git-filter-repo
+  WARNING: The script git-filter-repo.exe is installed in 'C:\Users\micha\AppData\Roaming\Python\Python313\Scripts' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+Successfully installed git-filter-repo-2.47.0
+
+[notice] A new release of pip is available: 25.1.1 -> 25.2
+[notice] To update, run: python.exe -m pip install --upgrade pip
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git filter-repo --invert-paths --path-glob '*.mp3'
+git: 'filter-repo' is not a git command. See 'git --help'.
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>set PATH=%PATH%;C:\Users\micha\AppData\Roaming\Python\Python313\Scripts
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git filter-repo --version
+a40bce548d2c
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git filter-repo --invert-paths --path-glob '*.mp3'
+Aborting: Refusing to destructively overwrite repo history since
+this does not look like a fresh clone.
+  (expected freshly packed repo)
+Please operate on a fresh clone instead.  If you want to proceed
+anyway, use --force.
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git filter-repo --force --invert-paths --path-glob '*.mp3'
+NOTICE: Removing 'origin' remote; see 'Why is my origin removed?'
+        in the manual if you want to push back there.
+        (was https://github.com/michaelglik-audiotoursai/Audio-Tours.git)
+Parsed 320 commits
+New history written in 0.60 seconds; now repacking/cleaning...
+Repacking your repo and cleaning out old unneeded objects
+HEAD is now at 5c09786 Stop tracking APK files in APK_BUILDS directory
+Rewrote the stash.
+Enumerating objects: 4774, done.
+Counting objects: 100% (4774/4774), done.
+Delta compression using up to 22 threads
+Compressing objects: 100% (3500/3500), done.
+Writing objects: 100% (4774/4774), done.
+Total 4774 (delta 2358), reused 1833 (delta 1170), pack-reused 0 (from 0)
+Removing duplicate objects: 100% (256/256), done.
+Completely finished after 226.12 seconds.
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git remote add origin https://github.com/michaelglik-audiotoursai/Audio-Tours.git
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git remote -v
+origin  https://github.com/michaelglik-audiotoursai/Audio-Tours.git (fetch)
+origin  https://github.com/michaelglik-audiotoursai/Audio-Tours.git (push)
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git branch
+* master
+  voice-fix-safe
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git push origin master --force
+Enumerating objects: 3015, done.
+Counting objects: 100% (3015/3015), done.
+Delta compression using up to 22 threads
+Compressing objects: 100% (1611/1611), done.
+error: RPC failed; HTTP 500 curl 22 The requested URL returned error: 500
+send-pack: unexpected disconnect while reading sideband packet
+Writing objects: 100% (2965/2965), 2.30 GiB | 33.63 MiB/s, done.
+Total 2965 (delta 1343), reused 2937 (delta 1317), pack-reused 0 (from 0)
+fatal: the remote end hung up unexpectedly
+Everything up-to-date
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git rev-list --objects --all | grep '.mp3'
+'grep' is not recognized as an internal or external command,
+operable program or batch file.
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git rev-list --objects --all | findstr ".mp3"
+7bdf71976d36274834bcbe438b7ea388cc81f767 audio_tour_app/assets/tours/Sample_Boston_Tour_Test/audio_1.mp3
+36e1e6b54c1deaddaa831faa37c6e3e55095af84 audio_tour_app/assets/tours/Sample_Boston_Tour_Test/audio_2.mp3
+294050d01a60f8a743365192791ef359f6c505ea build_mp3.py
+d3797a3a9881e86af05a5b768061548549a3caf2 build_mp3_simple.py
+b5cca4b788496bc5940fd305869c3efeaefd0015 charles_river_museum_of_industry_and_innovation/audio_10_water_power_exhibit_the_river_that_drove_industry.mp3
+1d259d593a5c7da2568a6adf8f0cb752799a5b97 charles_river_museum_of_industry_and_innovation/audio_11_women_in_industry.mp3
+7093ee59dc016edc189197bcdcf1598b67abe081 charles_river_museum_of_industry_and_innovation/audio_12_transportation_innovations_from_horse_to_horsepower.mp3
+17edc74929beb43482c6e3cb504f500790f3595d charles_river_museum_of_industry_and_innovation/audio_13_precision_instruments_measuring_the_invisible.mp3
+cc5c9c27cd0dce8f612627de2c83d120977a88ab charles_river_museum_of_industry_and_innovation/audio_14_clock_tower_mechanics_the_pulse_of_the_factory.mp3
+a36c0592315fbbef4df337869e28419c9fb0e951 charles_river_museum_of_industry_and_innovation/audio_15_special_exhibitions_local_genius_on_display.mp3
+d5859f91aba0ba7336c396d287e8b2d5f03d2cc6 charles_river_museum_of_industry_and_innovation/audio_16_tour_reflection_farewell.mp3
+d31575d4fb2ffe04eb5b30596fae340927d102c6 charles_river_museum_of_industry_and_innovation/audio_1_museum_entrance_and_historic_site_introduction.mp3
+57ac4f74c4282feeab68de76f3cc35c33a20dede charles_river_museum_of_industry_and_innovation/audio_2_the_waltham_watch_company_exhibit.mp3
+9a29be26a20e69b48b4c910c35a9e9d380fecece charles_river_museum_of_industry_and_innovation/audio_3_steam_power_and_the_age_of_machinery.mp3
+ab461099352112cd2341d42952b9216f2caa6e08 charles_river_museum_of_industry_and_innovation/audio_4_textile_innovations_the_birth_of_the_american_factory.mp3
+ed1d92cd900cbd94f22a4a6acf3e3405deed0124 charles_river_museum_of_industry_and_innovation/audio_5_invention_and_innovation.mp3
+a38b79d615e4db93f092c3d03071878caa50140f charles_river_museum_of_industry_and_innovation/audio_6_electrical_innovations.mp3
+210278bf7475c9005f2e0e0891c2f72900ad7599 charles_river_museum_of_industry_and_innovation/audio_7_innovation_lab_modern_invention_gallery.mp3
+a5cc4661f5aec4adb1f886d23d4f2dc96aa0eb6b charles_river_museum_of_industry_and_innovation/audio_8_early_entertainment_technology.mp3
+9fabbd92e6c456e8ad984c66c45aa20dad61df3f charles_river_museum_of_industry_and_innovation/audio_9_tools_of_innovation_blacksmithing_and_machining.mp3
+f536c7bd866eb3d66adf49338fa5d2c116eb1c02 decardoba_outdoor_sculpture_park/audio_1_jim_dine_two_big_black_hearts.mp3
+8574f5a51f6a508adff5d853c694d16387997d24 decardoba_outdoor_sculpture_park/audio_3_sol_lewitt_tower_dc.mp3
+066c2e122f6241b44103e58a5f8c5af1a9e028ef decardoba_outdoor_sculpture_park/audio_4_ursula_von_rydingsvard_bronze_bowl_with_lace.mp3
+41fb949f72b730704166c3c971bd7022ace3e3bc decardoba_outdoor_sculpture_park/audio_5_paul_matisse_musical_fence.mp3
+27d7f84d7fd54dbedc1c458906d4fa0ad088a649 decardoba_outdoor_sculpture_park/audio_6_nancy_winship_milliken_pine_sharks.mp3
+e18de2b91d9551417aca9a630c2f552893bde0c0 decardoba_outdoor_sculpture_park/audio_7_george_sherwood_dancing_with_the_spheres.mp3
+6562cca11b5c7faf2a90431cd45cefc3f42d7d01 decardoba_outdoor_sculpture_park/audio_8_jean_michel_othoniel_e_mc.mp3
+f748cafbda813e46d7aff98a79a1b99185f82e84 decardoba_outdoor_sculpture_park/audio_9_lesley_dill_little_red_riding_hood_and_other_stories.mp3
+2d5e852a15e4cd11593dbdfead9a08bcf3960651 decordova_indoor_permanent_collection/audio_1_museum_entrance_orientation.mp3
+d3e932af536a8fc8f083823019c1821848a6f365 decordova_indoor_permanent_collection/audio_2_photography_gallery_harold_edgerton_ellen_carey.mp3
+064ab27fc6582d5b87318759de73166ff99db128 decordova_indoor_permanent_collection/audio_3_new_england_voices_dehner_mazur_selvage.mp3
+36139bcdbb9d6950b5a02dab5ed47fec85407fb0 decordova_indoor_permanent_collection/audio_4_sculpture_and_space_lewitt_oppenheimer.mp3
+1c285ee30ea987ede12bc369df90776c344faf73 decordova_indoor_permanent_collection/audio_5_video_art_new_media_oursler_lucier.mp3
+0133fa247f7fb9bc0c317fd3797193e0420f60aa decordova_indoor_permanent_collection/audio_6_rooftop_gallery_takenaga_phillips_agha.mp3
+dad003c58b3c35ec769856479a029e4a984c7dd0 decordova_indoor_permanent_collection/audio_7_material_transformations_booker_park_lugo.mp3
+336abdd36afad6926bd2a58eb381ce8ba64a93a4 decordova_indoor_permanent_collection/audio_8_emerging_voices_hobbs_da_corte.mp3
+580afe13028872e2877a1695503dd86436cc4a5b land_portal_tour_decordova/audio_1_living_crystals_and_the_great_acceleration_dawn_redwood_tree.mp3
+e27be67534113362cd4a593ce12d9c10eec74bd1 land_portal_tour_decordova/audio_2_water_bodies_and_pumps_water_infrastructure_and_the_body.mp3
+4b6b78215162308a9f317913716ed21baa179ffe land_portal_tour_decordova/audio_3_ghost_forest_and_ghost_barn_vanished_trees_and_stone_remains.mp3
+48b44fec0e1184bf8847ef7c12481044b12f4c02 land_portal_tour_decordova/audio_4_old_amphitheater_becomes_earth_and_water_bowl.mp3
+e71aff67bd6edb8b9943cf1e71abb32a4d088164 land_portal_tour_decordova/audio_5_grandpa_oak_and_the_soil_skeleton.mp3
+9732d0c2d689cd978e14862ded0be4ce06c29889 land_portal_tour_decordova/audio_6_glacier_dance.mp3
+8235d7e618adb6c56de121d719db37a58d85a3da land_portal_tour_decordova/audio_7_you_were_the_center_of_a_mountain.mp3
+389663882679cf8e0ca5f7db7c3113ac0b1b6983 land_portal_tour_decordova/audio_8_becoming_the_portal.mp3
+2f9cc3d11ab9265e9b639644d04533a9a9db2ec7 open_ai_generated_charles_river_museum_of_industry_and_innovation/audio_10_industrial_revolution_artifacts.mp3
+165e37803ea31ad1bbe5871419fe5f4b05656199 open_ai_generated_charles_river_museum_of_industry_and_innovation/audio_1_1_textile_machinery_collection.mp3
+0c1c565f0accbfe528ed4c128a89cff77a721ab8 open_ai_generated_charles_river_museum_of_industry_and_innovation/audio_2_waltham_watch_company_artifacts.mp3
+67732d3f4474c38bb66b273f1355c291d5f9c712 open_ai_generated_charles_river_museum_of_industry_and_innovation/audio_3_boston_manufacturing_company_model.mp3
+8c76a9522f1069cc1a5c8f38736a67ef3c5d9a2c open_ai_generated_charles_river_museum_of_industry_and_innovation/audio_4_francis_cabot_lowell_portrait.mp3
+6d56666550c8b49cbc4a9c6ed5312681be76916c open_ai_generated_charles_river_museum_of_industry_and_innovation/audio_5_waltham_lowell_system_timeline.mp3
+b307da13208c880238c61a28594ed265ef8ff921 open_ai_generated_charles_river_museum_of_industry_and_innovation/audio_6_waltham_fire_department_exhibit.mp3
+49299b0a292c1c3ed73705711679fad120032849 open_ai_generated_charles_river_museum_of_industry_and_innovation/audio_7_metz_company_fire_engine.mp3
+5333b3fb1147938a1d9d7b81540ed569b7cc947b open_ai_generated_charles_river_museum_of_industry_and_innovation/audio_8_waltham_telegraph_and_morse_code_collection.mp3
+62bf71495514ba5b10a114a77d2204bebba0c602 open_ai_generated_charles_river_museum_of_industry_and_innovation/audio_9_boston_manufacturing_company_waterwheel_replica.mp3
+c01e48cd448388fbf09d0dcee20c361ed993d821 openaiapi_generated_tour_for_decordova_sculpture_park/audio_10_wind_and_water_by_ursula_von_rydingsvard_2008.mp3
+bb0662cdd2e39f6f76d076b76b8f1bd12025dc95 openaiapi_generated_tour_for_decordova_sculpture_park/audio_11_decordova_sphinx_by_jim_dine_1992.mp3
+8cc451b01c5f44eb5aa01ac849174947f0768832 openaiapi_generated_tour_for_decordova_sculpture_park/audio_1_1_lincoln_by_toshiko_takaezu_1991.mp3
+2f82f7c8714a7c5152292a3806ab05124b75ccb9 openaiapi_generated_tour_for_decordova_sculpture_park/audio_2_frog_pond_by_roy_lichtenstein_1999.mp3
+ede909095f0b04aa46a763e171c72964dc73ef2a openaiapi_generated_tour_for_decordova_sculpture_park/audio_3_monochrome_ii_by_nigel_hall_1997.mp3
+c9ea1dcf5abc1a916eb627b6eef67fd631292763 openaiapi_generated_tour_for_decordova_sculpture_park/audio_4_yellow_moon_by_mark_di_suvero_1997.mp3
+c5e00b614b13e1306b7ac76218a3285447739a7e openaiapi_generated_tour_for_decordova_sculpture_park/audio_5_untitled_three_dancing_figures_by_keith_haring_1989.mp3
+cb04be492a49fd8d4a8ce00c1856118e805883fe openaiapi_generated_tour_for_decordova_sculpture_park/audio_6_fletcher_benton_folded_square_alphabet_g_by_fletcher_benton_2014.mp3
+41b0ab681e003b1681a67c644d636a9d85dc0894 openaiapi_generated_tour_for_decordova_sculpture_park/audio_7_black_cube_by_sol_lewitt_1992.mp3
+67d340078011e137103a28f1c1ba059c04b05822 openaiapi_generated_tour_for_decordova_sculpture_park/audio_8_tryst_by_nancy_holt_1978.mp3
+2e8b159082442b6e70467cab588decd89372ab2d openaiapi_generated_tour_for_decordova_sculpture_park/audio_9_juggler_by_john_kearney_2008.mp3
+55d8191f1b2f85eaaf2527954545c705d10577af openaiapi_generated_tour_path_2_for_decordova_sculpture_park/audio_1_lines_by_george_rickey_three_1965_1966.mp3
+b5b0095d574a47718b0b666dee461210fa0d0e63 openaiapi_generated_tour_path_2_for_decordova_sculpture_park/audio_2_x_by_william_tucker_horse_1987.mp3
+bd67e8f7015864ea124c47f68a60531c72a9c076 openaiapi_generated_tour_path_2_for_decordova_sculpture_park/audio_3_museum_by_robert_schelling_time_at_the_2002.mp3
+7810b8be0f186d229a3effbe25b65d575e31789c openaiapi_generated_tour_path_2_for_decordova_sculpture_park/audio_4_presence_by_john_wilson_eternal_1987.mp3
+6266a4cf3ede0fd28590f3ab8ccf496d0fea09ad openaiapi_generated_tour_path_2_for_decordova_sculpture_park/audio_5_goose_by_kitty_wales_feral_2005.mp3
+689ab85850176056e5b408154b20f546f256cdc3 openaiapi_generated_tour_path_2_for_decordova_sculpture_park/audio_6_otter_by_rona_pondick_2002_2005.mp3
+8d044adea5c4074da1115319aba0ff9aacb954d7 openaiapi_generated_tour_path_2_for_decordova_sculpture_park/audio_7_presence_by_beverly_pepper_silent_1982.mp3
+2b91bb8c23b111f40a485c97ac1de8a107d73af2 openaiapi_generated_tour_path_2_for_decordova_sculpture_park/audio_8_venusvine_by_richard_rosenblum_1990.mp3
+b7946a9bb17c91ea9620c21cfbbaeb27d2388711 test_long.mp3
+2a42eb6b409a2aa23acab14b4eb24763d6949ed4 test_polly.mp3
+6346d169fd54ecce595fef640b7c53f4019dd8a7 test_polly2.mp3
+d2607ed0c8964cffc726abc6ba70f56830dff3fd west_newton_historic_village_and_industrial_route/audio_1_west_newton_square_and_railroad_station.mp3
+3e8913db3f4449f5d3396ff058046511bd284e41 west_newton_historic_village_and_industrial_route/audio_2_second_church_in_newton.mp3
+11c6ef36c3a614fc6d4f13d9e5f6c861bea636f4 west_newton_historic_village_and_industrial_route/audio_3_jackson_homestead_and_museum.mp3
+f46da9206d91efdf61d97ea63e88cf3908d99b60 west_newton_historic_village_and_industrial_route/audio_4_site_of_newton_cotton_factory.mp3
+5e22bf3311e69f820a685cc05d23e21caafb2798 west_newton_historic_village_and_industrial_route/audio_5_myrtle_baptist_church_and_cemetery.mp3
+edd683c06183e71c1c67ef0fff7c17dabf87694e west_newton_historic_village_and_industrial_route/audio_6_nathaniel_allen_house.mp3
+80b1580a02d0bb58aef71447c422de50eb6bbdac west_newton_historic_village_and_industrial_route/audio_7_site_of_new_england_hospital_for_women_and_children_temporary_campus.mp3
+57d856eb471816acbafb30947e2a473a3a23f257 west_newton_historic_village_and_industrial_route/audio_8_west_newton_branch_library_closed.mp3
+f1f46d7d11ce0a505985dae7b77971fdc1803e32 tours/across_boundaries_across_barriers_fruitlands_museum_harvard_massachusetts_tour_ce270d47/audio_1.mp3
+2b6d436c9c7bc0d968762c99f5ac74e3009e103e tours/adams_center_free_libraryadams_center_ny_museum_f49e6f95/audio_1.mp3
+d34148c55de836220dd8d5cceaa39943b49873a5 tours/adams_center_free_libraryadams_center_ny_museum_f49e6f95/audio_2.mp3
+d7232f282ca1bca0b973977b5215787ec4ce9a3d tours/adams_center_free_libraryadams_center_ny_museum_f49e6f95/audio_3.mp3
+35c7847bde77a481ab292fef627f9ebe34c63658 tours/american_wing_in_mfa_boston_ma__museum_272f3f80/audio_1.mp3
+ded6dfcffefd1361049073741f58fba60447b6f4 tours/american_wing_in_mfa_boston_ma__museum_272f3f80/audio_2.mp3
+a67c2b05d9d8d8e0b3deb6ac340f07f3c79984f6 tours/american_wing_in_mfa_boston_ma__museum_272f3f80/audio_3.mp3
+4c93c75e2156820064453f234343736e9b6148c3 tours/american_wing_in_mfa_boston_ma__museum_272f3f80/audio_4.mp3
+0a728f7988a71028c125d856ea1f7b9934e4c840 tours/american_wing_in_mfa_boston_ma__museum_272f3f80/audio_5.mp3
+629418d36a77a6487bae33896f125db5b96b259a tours/american_wing_in_mfa_boston_ma__museum_272f3f80/audio_6.mp3
+1dd7a943b4fef529ccbca15c6334da750e876b7b tours/best_still_life_painters_and_paintings_at_mfa_boston_massachusetts__museum_9c3571d7/audio_1.mp3
+93fa02271cc29a5db6b39afcc9bed644401fad91 tours/best_still_life_painters_and_paintings_at_mfa_boston_massachusetts__museum_9c3571d7/audio_2.mp3
+e002b9c830fe44924ba08cfc8751adff22e1fc3f tours/best_still_life_painters_and_paintings_at_mfa_boston_massachusetts__museum_9c3571d7/audio_3.mp3
+bb7966f6f68ed5ecf49a407b3af77955fc993f10 tours/best_still_life_painters_and_paintings_at_mfa_boston_massachusetts__museum_9c3571d7/audio_4.mp3
+70a32210b138262df3e93adc3706855c442c24bb tours/best_still_life_painters_and_paintings_at_mfa_boston_massachusetts__museum_9c3571d7/audio_5.mp3
+c397c219b8ca09e37521759ff544c85e17d0c9cd tours/best_still_life_painters_and_paintings_at_mfa_boston_massachusetts__museum_9c3571d7/audio_6.mp3
+ae52a7ad3f9701bf581ca9f7870abc4880577d16 tours/boston_common_boston_ma_walking_0542ad01/audio_1.mp3
+fc472b9baf23cdbd3bd5c191fb60a8f005f80c1c tours/boston_common_boston_ma_walking_0542ad01/audio_10.mp3
+2711cea4e60bd21e7663386d9252ec73f552e403 tours/boston_common_boston_ma_walking_0542ad01/audio_2.mp3
+f9b4b3e8b933635a4d8c981e3f2180f5f24300d1 tours/boston_common_boston_ma_walking_0542ad01/audio_3.mp3
+c68c2b91b3f921fcbb9e007a68bc17935655b2ea tours/boston_common_boston_ma_walking_0542ad01/audio_4.mp3
+8e90a9eea61699987977affe32c63ed99487674d tours/boston_common_boston_ma_walking_0542ad01/audio_5.mp3
+fb4f2dbd3d65d2971051e0087edcba1ca1f0d044 tours/boston_common_boston_ma_walking_0542ad01/audio_6.mp3
+99fc08075a02c732f4bec2c893a1f55f7d1fd8f2 tours/boston_common_boston_ma_walking_0542ad01/audio_7.mp3
+932d8227f6a52003d1a2b6c1d371d919b4148734 tours/boston_common_boston_ma_walking_0542ad01/audio_8.mp3
+d92af7b1e01f17a4675fc8d4422b4d5083682c46 tours/boston_common_boston_ma_walking_0542ad01/audio_9.mp3
+a1343636232efc5d0af89ee3a27b2e4a0df9a6ca tours/boston_library_tour_boston_ma_museum_1d0d0de1/audio_1.mp3
+5ba2cf3337b259b1a99d2fe489caf2d62810e1f2 tours/boston_library_tour_boston_ma_museum_1d0d0de1/audio_2.mp3
+6e5b3eed005e0ad3b16c17a955974db8331e0379 tours/boston_library_tour_boston_ma_museum_1d0d0de1/audio_3.mp3
+b5c590a84333e15fa35f306ce11bc0e45a412e85 tours/boston_library_tour_boston_ma_museum_1d0d0de1/audio_4.mp3
+7d6f06de050dd3867c7d79c94d2f30158bec6028 tours/boston_library_tour_boston_ma_museum_1d0d0de1/audio_5.mp3
+cdd7c861f85a2885eed406974cbb05c1bd2dda16 tours/clark_art_institute_in_williamstown_massachusetts_museum_34bab4d5/audio_1.mp3
+d0de5011daeb148eb9faf7479cb897fbe742b788 tours/clark_art_institute_in_williamstown_massachusetts_museum_34bab4d5/audio_2.mp3
+ff72d46844f9e22737ce69883b06148a429f64c6 tours/clark_art_institute_in_williamstown_massachusetts_museum_34bab4d5/audio_3.mp3
+fdbbe3c6faf84dd2761c7fe7a7678df0587528ab tours/clark_art_institute_in_williamstown_massachusetts_museum_34bab4d5/audio_4.mp3
+86aa98b659dff2bb0f5109e2c955355a3eff139a tours/clark_art_institute_in_williamstown_massachusetts_museum_34bab4d5/audio_5.mp3
+4fb9ea923479b57b50a8422a9b4611fe148121bd tours/clark_art_institute_in_williamstown_massachusetts_museum_34bab4d5/audio_6.mp3
+b859aadd2252c2165774813efa56438fd7dee474 tours/clark_art_institute_in_williamstown_massachusetts_museum_34bab4d5/audio_7.mp3
+71c4332e0d1d91996ee4b4ae07d5d3fc638abc22 tours/clark_art_institute_in_williamstown_massachusetts_museum_34bab4d5/audio_8.mp3
+a8e4eaf84148811c1235b716e20c1b77894b0f9c tours/clark_art_institute_in_williamstown_massachusetts_museum_34bab4d5/audio_9.mp3
+0459aec41037c57446ed93118cfc072bfe558fa5 tours/clark_art_institute_in_williamstown_massachusetts_museum_6dd7e8bf/audio_1.mp3
+d61ddce11adac5d681545e35c9f8df873174bb01 tours/clark_art_institute_in_williamstown_massachusetts_museum_6dd7e8bf/audio_2.mp3
+ce6ddf14bfa588fd1732f20a723956073c9b9bbd tours/clark_art_institute_in_williamstown_massachusetts_museum_6dd7e8bf/audio_3.mp3
+363ef343a3b0f30ac96cd758a84200a9032b66fa tours/clark_art_institute_in_williamstown_massachusetts_museum_6dd7e8bf/audio_4.mp3
+04a61d57f6b379713b84fd1a90736f3c715fd907 tours/clark_art_institute_in_williamstown_massachusetts_museum_6dd7e8bf/audio_5.mp3
+08e3956c22aecc9a8a7d3ce1dd1933fa00072315 tours/clark_art_institute_in_williamstown_massachusetts_museum_6dd7e8bf/audio_6.mp3
+0f773d7e6eac6e43b9cd3c14e0bba75ab5e5c7da tours/clark_art_institute_in_williamstown_massachusetts_museum_6dd7e8bf/audio_7.mp3
+55c28955760f14944a8f4e6389a6d115f812df00 tours/crosby_public_library_antwerp_ny_museum_6e0406a3/audio_1.mp3
+4e1dfeaf383dc16228eed59273bd86e7d40a2fcb tours/crosby_public_library_antwerp_ny_museum_6e0406a3/audio_2.mp3
+2be26ddded8c41489b58bb6f75fa7059a9b30be1 tours/crosby_public_library_antwerp_ny_museum_6e0406a3/audio_3.mp3
+b2c9e4b0e63b7127b041e14210cb69dfec009eaf tours/crosby_public_library_antwerp_ny_museum_6e0406a3/audio_4.mp3
+f637270e9f4b98e334a4064c45205bdac18f7b41 tours/crosby_public_library_antwerp_ny_museum_fe887a79/audio_2.mp3
+f971b1771433ae8f5bef43d4d79aad62e407274d tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_1955fcb3/audio_1.mp3
+fcbea9d4746cd3f671371a063936223b74426141 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_1955fcb3/audio_2.mp3
+e1643192ebe2041ac530daa946798f137cfcd288 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_1955fcb3/audio_3.mp3
+c7a57df6b59d556c6db99aa375cbf0ecd1990a96 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_1955fcb3/audio_4.mp3
+400df09b8894c8c9cb8ec921f7e6d47d4b74f395 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_2345890f/audio_1.mp3
+d701c093bcb6a1ac25506bab6f4e3c3a35f59b03 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_2345890f/audio_3.mp3
+f3274bcac4bf2e57b9a0e74cb081fddf572c8ec5 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_2bd534ee/audio_3.mp3
+7d72e16823424a242f9e6c0df59480018b67f298 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_2bd534ee/audio_4.mp3
+9cafec30ca0beba3538d1323297ad75e9d54bb69 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_4ba4f06e/audio_1.mp3
+691995858d158de406f1bfcee00dba661b78f41a tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_4ba4f06e/audio_2.mp3
+777e1e6c9fb646cfdc1af5695e976b75b69b0445 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_4ba4f06e/audio_3.mp3
+cf0d542261d9f92b6725520b032d1dd427098eed tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_4ba4f06e/audio_4.mp3
+bcb670c8ed5ce4c4966a80031df661e46a0c19a6 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_65371e24/audio_3.mp3
+4f15aee07f85a48aeaeb124ca820c27102a54f10 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_7dc3500f/audio_3.mp3
+f51c3d6dd76363dee5a972cc39f93487bc8c4b37 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_8952554b/audio_4.mp3
+db780b0a3c3665b734a15076984ba5725b138526 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_8e9ef2cf/audio_3.mp3
+2c35ef3cc368a446485be93f1476ad1afccf780c tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_8e9ef2cf/audio_4.mp3
+ec2d4bf2018ba83dcc3361895444c3138b9171e3 tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_ac8798e7/audio_3.mp3
+47cd19984ac2ef4cbe4754416d17403bbb3f482b tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_adc54fd8/audio_5.mp3
+5d1b713084a295e6487bfe2910f3fdbb3aacb5da tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_dcedcb97/audio_1.mp3
+0581440c28ef79126c7d5ce0e5cae61b7ab23f9c tours/dorchester_road_regional_library_north_charleston_south_carolina_29418_museum_f9cb95e3/audio_3.mp3
+0809e53d0e302e17c02be946fc94d53a8223017f tours/framingham_public_library_framingham_ma__museum_099b148e/audio_1.mp3
+ddf58db035676253947a4ab86a7fb322ca73a4bb tours/framingham_public_library_framingham_ma__museum_099b148e/audio_2.mp3
+91e75594aaa7baa2069c50fe990488fe56bc9496 tours/framingham_public_library_framingham_ma__museum_099b148e/audio_3.mp3
+ea3e15e44bdc74379385ec287e2078ffb543defd tours/framingham_public_library_framingham_ma__museum_099b148e/audio_4.mp3
+ca6bd93b14438eeb68301bd76efef827bb3b2f36 tours/framingham_public_library_framingham_ma__museum_099b148e/audio_5.mp3
+669f4d86299c226137eea6a9426de8ee71a5b124 tours/framingham_public_library_framingham_ma__museum_989ba115/audio_2.mp3
+bff88376875cff0dc65cc4796140b91324a68bae tours/macsherry_libraryalexandria_bay_ny_museum_c84e953c/audio_1.mp3
+dde13f85bbb579a0c859b6bfd9220f64a8616d6f tours/macsherry_libraryalexandria_bay_ny_museum_c84e953c/audio_2.mp3
+f644f9826ae21f5be297438f66dbc0c0e92a051b tours/macsherry_libraryalexandria_bay_ny_museum_c84e953c/audio_3.mp3
+7a38647ff28081cca4571e50a4bcfd4886c6a044 tours/maria_magdalena_paintings_in_the_mfa_boston_massachusetts_museum_25566a6f/audio_1.mp3
+32282052d4229628ab9960fce3e43ec76e5518fe tours/maria_magdalena_paintings_in_the_mfa_boston_massachusetts_museum_25566a6f/audio_2.mp3
+b27492f6c3f2eb7846585d067604713775f533b7 tours/maria_magdalena_paintings_in_the_mfa_boston_massachusetts_museum_25566a6f/audio_3.mp3
+1a5c24525bb3669f0d51cfbd63c0a8c966ccccb5 tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_09e7886c/audio_1.mp3
+f547b34f09c4f757e1e6456cd7021eee8b30f538 tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_09e7886c/audio_2.mp3
+ee020be1d894c37745647650ef180d74879b4dcf tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_09e7886c/audio_3.mp3
+0a03ad87d041454467e9026fe276bc71bce3486c tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_09e7886c/audio_4.mp3
+792c46ef2e4b4ba1ff7c3b026e44d4cfbde543eb tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_09e7886c/audio_6.mp3
+c737a92951582382c7c57b82e404fb28d571d920 tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_93b053dd/audio_1.mp3
+785196da8c690a46dddc68a8ccd83d4b1052af54 tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_93b053dd/audio_2.mp3
+d46aba620405990d1d79cd2373d24b7942278f1c tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_93b053dd/audio_3.mp3
+aeeb222d2078b4d4ce311d966c95585bcc0a3cf7 tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_93b053dd/audio_4.mp3
+99bb6f27e5c53f8a21cd994f0d09fb49e72cbba8 tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_ab7a8581/audio_1.mp3
+f0e4a25f4d3f1f6f05195450728b5dbd94f4a71e tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_ab7a8581/audio_2.mp3
+f6d20a8d3577af2b2aafe09ae811c508536e4099 tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_ab7a8581/audio_3.mp3
+a2b0f6388cfad11244aa9fd05bc82a93ac1feda0 tours/missio_seminary_library_at_philadelphia_pennsylvania_19123_museum_ab7a8581/audio_4.mp3
+6c79c7b7655b3bd2da1726742659792c12d16bd0 tours/needham_public_library_needham_ma_museum_36db5ae6/audio_1.mp3
+2781fbfbc97bf3f6e2964bc46655835a98e405a2 tours/needham_public_library_needham_ma_museum_36db5ae6/audio_2.mp3
+7f6f8c967524359b4de0161feb6b65eaaaa12334 tours/newton_free_library_newton_ma_museum_9bae8daf/audio_1.mp3
+2b939be960f4510916d28892fce31f4d62234ea9 tours/newton_free_library_newton_ma_museum_9bae8daf/audio_2.mp3
+77bcefa78bca9e3aa6889eb68cb8a76c765e0014 tours/newton_free_library_newton_ma_museum_9bae8daf/audio_3.mp3
+301cf91ae96b05dda2c35fb5ec1f5be52babd490 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_0dd1affc/audio_1.mp3
+ee2542cd7a9d4279ae3878257d1a6044175c172a tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_0dd1affc/audio_2.mp3
+e82c8ba5af28b5a049764f1428ae6ec69be29b1c tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_0dd1affc/audio_3.mp3
+a284c8ab82f011a28ba81667461a40379da68dce tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_0dd1affc/audio_4.mp3
+99a2a7890bf61db504a1e33cfb0b0519108504ea tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_0dd1affc/audio_5.mp3
+f12ffab167cf9cdc92e18be34a1150d73950e093 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_0dd1affc/audio_6.mp3
+6725a872d6c41420c8dc6320d26bee56d1c8a8d4 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_0dd1affc/audio_7.mp3
+dc80bb1cd34638129127e634ca1b1ff7c6aafecb tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1680bb1d/audio_1.mp3
+370b7b657dbf79271478a88d94ead24994b1d012 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1680bb1d/audio_2.mp3
+d6c447ba96da4e9ccd7b9d7bbacdf64ceb778ee4 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1680bb1d/audio_4.mp3
+b3054f6a3c640e4ada2b7ad0c8ee6c9511a16dc7 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1680bb1d/audio_5.mp3
+bfcadd94c64b976b120278dbb2c56d17b7739875 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1680bb1d/audio_6.mp3
+fd2447d910cb6b7006a329ff40d0ad6c300f8371 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1680bb1d/audio_7.mp3
+b967754cb943242864b46ae9c681ec663e214033 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1b80b0cf/audio_1.mp3
+8fbe83a2371ef87fc33e26663275d656f310897e tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1b80b0cf/audio_2.mp3
+cf815fae41b93a53c39346173b6d7a95d9033b18 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1b80b0cf/audio_4.mp3
+1c59831362b2340f4550d0f9eafe12219d2eb754 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1b80b0cf/audio_5.mp3
+5e057336a2a57520eb14f92659d6acc541f0dc59 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1b80b0cf/audio_6.mp3
+5ff775ac9002d38abab23aae08a9b1e1e8c87bbe tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_1b80b0cf/audio_7.mp3
+0681feb186e231c5248f3fa6cdbaaa3dd050d672 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_2b759b0b/audio_1.mp3
+d423561c695e0bc09c1b41a2211588a9f77b7016 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_2b759b0b/audio_2.mp3
+64f6e920c969ba0b29ce408ebe9ed9d17d361d2d tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_2b759b0b/audio_3.mp3
+8dd5b328cf7cbed8a051e19756be2b0e73917f1e tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_2b759b0b/audio_4.mp3
+986dffe02f4f9778bfd58aaa2e2c07be7faf6061 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_2b759b0b/audio_5.mp3
+21dba1d711e3cb9ead57fbc7de4ef330d98f5850 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_2b759b0b/audio_6.mp3
+72a19c6943832cef3e47f56145f2b20c21fac75f tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_3da7351e/audio_1.mp3
+7208507bdc8cdf11f21a0baea584c56563fa17d2 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_3da7351e/audio_2.mp3
+cc6a486250162ce958da07e4220c7ff1b99ffcbe tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_3da7351e/audio_4.mp3
+430031434edcc0b2591c9f971b916d4f989325b5 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_3da7351e/audio_5.mp3
+e0559cd94e7ba40d105cd61f06bef62162691a70 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_3da7351e/audio_6.mp3
+2d7a174413af7028469675390607fff536282458 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_3da7351e/audio_7.mp3
+56ea16d51f91fb202998118d1a9d57e6ee904e2f tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_56dc14e3/audio_1.mp3
+68c2be774af1b67daf63ca1fec5813711872ad35 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_56dc14e3/audio_2.mp3
+41f4ff92b211739182f55f288e401f2b8949941b tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_56dc14e3/audio_4.mp3
+20561cceefd3e5bccc41ca80c0e0c34353db2a54 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_56dc14e3/audio_5.mp3
+e3ca083310e41a338c17d5939654a1fe3400d856 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_56dc14e3/audio_6.mp3
+e0f56e50270b0fac4e7ab2bf79fa6f6fa28dc83d tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_56dc14e3/audio_7.mp3
+bc8f2e2226b9142812ee764ff244a54ff769d32d tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_57a255db/audio_1.mp3
+39ec96391dacdd6cd9632d8e9c2e0048bce824cf tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_57a255db/audio_2.mp3
+8191b5b4372dbfeef7760013022f05ee3acfdf46 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_57a255db/audio_4.mp3
+b0b2dfe65c4a150a11b9ba663d9211bcce833e2a tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_57a255db/audio_5.mp3
+db4fb7efd972560d59562cc7320d8be999ac3cb0 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_57a255db/audio_6.mp3
+ddc9b6f6857a0a2b7c979eef03a0fb18f82cbc2a tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_57a255db/audio_7.mp3
+5932ed289a8b7a407d23a66b27742e89c80a176e tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_71b81b75/audio_1.mp3
+a5f524f8daf09da369cd4d1ba208462181be05fe tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_71b81b75/audio_2.mp3
+74ee5b645ce73f5862b8cd8e507902fa6c5576b5 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_71b81b75/audio_3.mp3
+5ab764cb6cf8dfcf56f1a5c181c228888036c030 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_71b81b75/audio_4.mp3
+528a17043ae83268f9269c1c0d6c7ab28219c5b0 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_71b81b75/audio_5.mp3
+12c6cd6c4fca3b5f19579bdfa70c9c49be3dd9ee tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_71b81b75/audio_6.mp3
+b846b3e9dba632009e43f3e1a501d157032229d8 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_aeadef77/audio_1.mp3
+043c4e918ee73663bb267e63696ffb39c9d32f56 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_aeadef77/audio_2.mp3
+18c63c9389f04a022e4a988571ba6ee40715bba5 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_aeadef77/audio_4.mp3
+cc9b59d91595040452f6bd33803e1dfaf96fb3e5 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_aeadef77/audio_5.mp3
+304d0b1a75a8a35b6464555d7ae51b73725df167 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_aeadef77/audio_6.mp3
+fb06a800f476a26f03c41b1b24c0f4e26129d83f tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_aeadef77/audio_7.mp3
+5ff498364504004552ff20f18809f54ee106478a tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_b0ddb24c/audio_1.mp3
+2dad0f7b99aaee1ee268aaec4179d9ff8bfe1acd tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_b0ddb24c/audio_2.mp3
+f4ed890db52626815ceca9fff55c6e9a88b51226 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_b0ddb24c/audio_4.mp3
+06a4a4bb2cb83d93baa505e592d784d70c3e9b30 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_b0ddb24c/audio_5.mp3
+6bcf9e88c62aa4c968a9609fb79b67396b7aa1b0 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_b0ddb24c/audio_6.mp3
+2fe21ad31bbac1f7093720166d4da3f21a5cad90 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_b0ddb24c/audio_7.mp3
+672a9f91a0504cc283bec8f27c85ad5ba9fc5c79 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_e1bc93d6/audio_1.mp3
+51b5de0fdd3a2a2d006cb2baa796f63f93bd34b7 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_e1bc93d6/audio_2.mp3
+c50dc3d56cd6dcaaa933f2f2df74070d829bbc71 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_e1bc93d6/audio_4.mp3
+80e74e323dda2f9f223f41bc44a6c0d3257a2e51 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_e1bc93d6/audio_5.mp3
+25c963ec7301ab8db3db97b76ccf727023b5de37 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_e1bc93d6/audio_6.mp3
+50920ef5cc672ae8ae838b09672db9647061f0fa tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_e1bc93d6/audio_7.mp3
+f470d89c600291dd4a12b4f26b3ed31cc5488288 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_f1f99587/audio_1.mp3
+079db2f5e1c441643fda2169131123d0ecc2e039 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_f1f99587/audio_2.mp3
+ba22c4afae0021c5518acd0e376e23b59840cc89 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_f1f99587/audio_4.mp3
+6f216b93bc3d3978e8df6e5faee36ca90aa07c9a tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_f1f99587/audio_5.mp3
+31411431c83bc3f26bba719a4910b2145413b506 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_f1f99587/audio_6.mp3
+d2a631aa1a14d03617a14951aba690104d1498d8 tours/sveriges_depåbibliotek_national_repository_library_sweden_se-901_78_umeå_sweden_museum_f1f99587/audio_7.mp3
+6af7cd060e9565156ce6d48f35e7587bfc1a287b build_mp3_simple.py
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>git push origin master --tags
+Enumerating objects: 3016, done.
+Counting objects: 100% (3016/3016), done.
+Delta compression using up to 22 threads
+Compressing objects: 100% (1612/1612), done.
+error: RPC failed; HTTP 500 curl 22 The requested URL returned error: 500
+send-pack: unexpected disconnect while reading sideband packet
+Writing objects: 100% (2966/2966), 2.30 GiB | 33.69 MiB/s, done.
+Total 2966 (delta 1342), reused 2939 (delta 1317), pack-reused 0 (from 0)
+fatal: the remote end hung up unexpectedly
+Everything up-to-date

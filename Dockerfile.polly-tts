@@ -1,0 +1,11 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+RUN pip install flask boto3
+
+COPY polly_tts_service.py .
+
+EXPOSE 5018
+
+CMD ["python", "polly_tts_service.py"]

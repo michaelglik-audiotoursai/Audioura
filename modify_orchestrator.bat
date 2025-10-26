@@ -1,0 +1,13 @@
+@echo off
+echo Modifying orchestrator to work without psycopg2...
+
+echo Running modify script...
+python modify_orchestrator.py
+
+echo Copying modified file to Docker container...
+docker cp tour_orchestrator_service.py development-tour-orchestrator-1:/app/tour_orchestrator_service.py
+
+echo Restarting tour orchestrator service...
+docker restart development-tour-orchestrator-1
+
+echo Done!

@@ -1,0 +1,29 @@
+name: audio_tour_app
+description: AI-powered audio tour generator with GPS, offline storage, and native features.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  http: ^1.1.0
+  shared_preferences: ^2.2.2
+  geolocator: ^10.1.0
+  permission_handler: ^11.0.1
+  path_provider: ^2.1.1
+  archive: ^3.4.9
+  audioplayers: ^5.2.1
+  sqflite: ^2.3.0
+  connectivity_plus: ^5.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true

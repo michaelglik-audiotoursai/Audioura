@@ -1,0 +1,50 @@
+name: Build Flutter APK
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+    
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.27.1'
+        channel: 'stable'
+    
+    - name: Get dependencies
+      run: |
+        cd audio_tour_app
+        flutter pub get
+    
+    - name: Setup debug keystore
+      run: |
+        mkdir -p ~/.android
+        echo "${{ secrets.DEBUG_KEYSTORE }}" | base64 -d > ~/.android/debug.keystore
+        # Verify keystore was created and is valid
+        ls -la ~/.android/debug.keystore
+        keytool -list -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey
+    
+    - name: Build APK
+      run: |
+        cd audio_tour_app
+        flutter build apk --debug
+    
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-debug-apk
+        path: audio_tour_app/build/app/outputs/flutter-apk/app-debug.apk

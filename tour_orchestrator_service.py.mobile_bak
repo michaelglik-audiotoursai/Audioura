@@ -1,0 +1,832 @@
+import os
+import sys
+import json
+import uuid
+import zipfile
+import shutil
+import time
+import threading
+import requests
+import traceback
+from datetime import datetime
+from flask import Flask, request, jsonify, send_file
+from flask_cors import CORS
+
+app = Flask(__name__)
+CORS(app)
+
+# Global variables
+TOURS_DIR = "/app/tours"  # Docker volume mount point
+ACTIVE_JOBS = {}  # Track running jobs
+
+def ensure_tours_directory():
+    """Ensure the tours directory exists."""
+    if not os.path.exists(TOURS_DIR):
+        os.makedirs(TOURS_DIR)
+        print(f"Created tours directory: {TOURS_DIR}")
+    else:
+        print(f"Tours directory exists: {TOURS_DIR}")
+
+def log_job_update(job_id, status, progress):
+    """Update and log the status of a job."""
+    if job_id in ACTIVE_JOBS:
+        ACTIVE_JOBS[job_id]["status"] = status
+        ACTIVE_JOBS[job_id]["progress"] = progress
+        print(f"JOB UPDATE [{job_id}]: Status={status}, Progress={progress}")
+    else:
+        print(f"WARNING: Attempted to update non-existent job: {job_id}")
+
+def store_audio_tour(tour_name, request_string, zip_path, lat, lng):
+    """Store the audio tour in the database."""
+    print(f"\n==== STORING AUDIO TOUR IN DATABASE: {datetime.now().isoformat()} ====")
+    print(f"Tour name: {tour_name}")
+    print(f"Request string: {request_string}")
+    print(f"ZIP path: {zip_path}")
+    print(f"Coordinates: lat={lat}, lng={lng}")
+    
+    try:
+        import psycopg2
+        # Connect to the database
+        print(f"Connecting to database...")
+        conn = psycopg2.connect(
+            host="postgres-2",
+            database="audiotours",
+            user="admin",
+            password="password123"
+        )
+        cur = conn.cursor()
+        print(f"Connected to database")
+        
+        # Check if audio_tours table exists
+        print(f"Checking if audio_tours table exists...")
+        cur.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'audio_tours'
+            )
+        """)
+        table_exists = cur.fetchone()[0]
+        print(f"Table exists: {table_exists}")
+        
+        if not table_exists:
+            # Create table if it doesn't exist
+            print(f"Creating audio_tours table...")
+            cur.execute("""
+                CREATE TABLE audio_tours (
+                    id SERIAL PRIMARY KEY,
+                    tour_name VARCHAR(255) NOT NULL,
+                    request_string TEXT NOT NULL,
+                    audio_tour BYTEA,
+                    number_requested INTEGER NOT NULL DEFAULT 0,
+                    lat DOUBLE PRECISION,
+                    lng DOUBLE PRECISION
+                )
+            """)
+            print("Created audio_tours table")
+            conn.commit()
+            has_audio_tour = True
+            has_lat = True
+            has_number_requested = True
+        else:
+            try:
+                # Check if audio_tour column exists
+                print(f"Checking if audio_tour column exists...")
+                cur.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'audio_tours' AND column_name = 'audio_tour'
+                """)
+                has_audio_tour = cur.fetchone() is not None
+                print(f"audio_tour column exists: {has_audio_tour}")
+                
+                # Check if lat/lng columns exist
+                print(f"Checking if lat column exists...")
+                cur.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'audio_tours' AND column_name = 'lat'
+                """)
+                has_lat = cur.fetchone() is not None
+                print(f"lat column exists: {has_lat}")
+                
+                # Check if number_requested column exists
+                print(f"Checking if number_requested column exists...")
+                cur.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'audio_tours' AND column_name = 'number_requested'
+                """)
+                has_number_requested = cur.fetchone() is not None
+                print(f"number_requested column exists: {has_number_requested}")
+                
+                # Add missing columns if needed
+                if not has_audio_tour:
+                    print(f"Adding audio_tour column...")
+                    cur.execute("ALTER TABLE audio_tours ADD COLUMN audio_tour BYTEA")
+                    print("Added audio_tour column")
+                
+                if not has_lat:
+                    print(f"Adding lat/lng columns...")
+                    cur.execute("ALTER TABLE audio_tours ADD COLUMN lat DOUBLE PRECISION")
+                    cur.execute("ALTER TABLE audio_tours ADD COLUMN lng DOUBLE PRECISION")
+                    print("Added lat/lng columns")
+                
+                if not has_number_requested:
+                    print(f"Adding number_requested column...")
+                    cur.execute("ALTER TABLE audio_tours ADD COLUMN number_requested INTEGER NOT NULL DEFAULT 0")
+                    print("Added number_requested column")
+                
+                conn.commit()
+                print(f"Table structure updated")
+            except Exception as e:
+                print(f"Error checking table structure: {e}")
+                print(f"Traceback: {traceback.format_exc()}")
+                conn.rollback()
+        
+        # Check if tour already exists
+        print(f"Checking if tour already exists...")
+        cur.execute(
+            "SELECT id FROM audio_tours WHERE tour_name = %s AND request_string = %s",
+            (tour_name, request_string)
+        )
+        existing_tour = cur.fetchone()
+        print(f"Existing tour: {existing_tour}")
+        
+        # Read the ZIP file as binary data
+        print(f"Reading ZIP file: {zip_path}")
+        print(f"File exists: {os.path.exists(zip_path)}")
+        print(f"File size: {os.path.getsize(zip_path) if os.path.exists(zip_path) else 'N/A'}")
+        with open(zip_path, "rb") as f:
+            zip_data = f.read()
+        print(f"Read {len(zip_data)} bytes from ZIP file")
+            
+        if existing_tour:
+            # Update existing tour
+            print(f"Updating existing tour...")
+            if has_audio_tour and has_lat and has_number_requested:
+                cur.execute(
+                    """
+                    UPDATE audio_tours 
+                    SET audio_tour = %s, number_requested = number_requested + 1, lat = %s, lng = %s
+                    WHERE id = %s
+                    """,
+                    (psycopg2.Binary(zip_data), lat, lng, existing_tour[0])
+                )
+            else:
+                # Fallback if columns don't exist
+                cur.execute(
+                    """
+                    UPDATE audio_tours 
+                    SET tour_name = %s, request_string = %s
+                    WHERE id = %s
+                    """,
+                    (tour_name, request_string, existing_tour[0])
+                )
+            print(f"Updated existing tour: {tour_name}")
+        else:
+            # Insert new tour
+            print(f"Inserting new tour...")
+            if has_audio_tour and has_lat and has_number_requested:
+                cur.execute(
+                    """
+                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng)
+                )
+            else:
+                # Fallback if columns don't exist
+                cur.execute(
+                    """
+                    INSERT INTO audio_tours (tour_name, request_string)
+                    VALUES (%s, %s)
+                    """,
+                    (tour_name, request_string)
+                )
+            print(f"Inserted new tour: {tour_name}")
+        
+        # Commit the transaction
+        print(f"Committing transaction...")
+        conn.commit()
+        print(f"Transaction committed")
+        
+        # Close cursor and connection
+        print(f"Closing database connection...")
+        cur.close()
+        conn.close()
+        print(f"Database connection closed")
+        
+        print(f"==== AUDIO TOUR STORED SUCCESSFULLY ====")
+        return True
+        
+    except Exception as e:
+        print(f"ERROR storing audio tour: {e}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return False
+
+def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=None, request_string=None):
+    """Orchestrate the complete tour generation pipeline asynchronously."""
+    print(f"\n==== ORCHESTRATE_TOUR_ASYNC STARTED: {datetime.now().isoformat()} ====")
+    print(f"Parameters:")
+    print(f"  job_id: {job_id}")
+    print(f"  location: {location}")
+    print(f"  tour_type: {tour_type}")
+    print(f"  total_stops: {total_stops}")
+    print(f"  user_id: {user_id}")
+    print(f"  request_string: {request_string}")
+    try:
+        ACTIVE_JOBS[job_id]["status"] = "processing"
+        ACTIVE_JOBS[job_id]["progress"] = "Starting complete tour generation pipeline..."
+        
+        # Step 1: Generate tour text
+        log_job_update(job_id, ACTIVE_JOBS[job_id]["status"], "Step 1/8: Generating tour text...")
+        generate_data = {
+            "location": location,
+            "tour_type": tour_type,
+            "total_stops": total_stops,
+            "include_coordinates": True  # Request coordinates
+        }
+        
+        print(f"Calling tour generator API: {datetime.now().isoformat()}")
+        print(f"Request data: {generate_data}")
+        response = requests.post(
+            "http://tour-generator:5000/generate",
+            headers={"Content-Type": "application/json"},
+            json=generate_data,
+            timeout=60
+        )
+        
+        print(f"Tour generator API response: {response.status_code}")
+        print(f"Response content: {response.text[:1000]}")
+        if response.status_code != 200:
+            raise Exception(f"Error generating tour: {response.text}")
+        
+        job_data = response.json()
+        job_id_1 = job_data["job_id"]
+        ACTIVE_JOBS[job_id]["text_job_id"] = job_id_1
+        print(f"Tour generator job ID: {job_id_1}")
+        
+        # Wait for text generation to complete
+        ACTIVE_JOBS[job_id]["progress"] = "Waiting for tour text generation..."
+        coordinates = None
+        poll_count = 0
+        while True:
+            poll_count += 1
+            print(f"Checking tour generator status: {datetime.now().isoformat()} (Poll #{poll_count})")
+            status_response = requests.get(f"http://tour-generator:5000/status/{job_id_1}", timeout=10)
+            print(f"Status response: {status_response.status_code}")
+            
+            if status_response.status_code == 200:
+                status_data = status_response.json()
+                print(f"Status data: {status_data}")
+                
+                if status_data["status"] == "completed":
+                    # Check if coordinates are available
+                    if "coordinates" in status_data:
+                        coordinates = status_data["coordinates"]
+                        print(f"Received coordinates from tour generator: {coordinates}")
+                    print(f"Tour text generation completed: {datetime.now().isoformat()}")
+                    break
+                elif status_data["status"] == "error":
+                    error_msg = f"Error in tour generation: {status_data.get('error', 'Unknown error')}"
+                    print(f"ERROR: {error_msg}")
+                    raise Exception(error_msg)
+                else:
+                    progress = status_data.get('progress', 'Processing...')
+                    print(f"Tour generation in progress: {progress}")
+                    ACTIVE_JOBS[job_id]["progress"] = f"Text generation: {progress}"
+                    time.sleep(10)
+            else:
+                error_msg = f"Error checking text generation status: {status_response.text}"
+                print(f"ERROR: {error_msg}")
+                raise Exception(error_msg)
+        
+        # Step 1.5: Get coordinates if not provided by tour generator
+        print("\n==== COORDINATES CHECK IN ORCHESTRATE_TOUR_ASYNC ====")
+        print(f"Coordinates from tour generator: {coordinates}")
+        if not coordinates or not isinstance(coordinates, list) or len(coordinates) < 2:
+            log_job_update(job_id, ACTIVE_JOBS[job_id]["status"], "Step 1.5/8: Getting geo coordinates...")
+            print(f"No coordinates received from tour generator, getting coordinates for: {location}")
+            
+            # Try to get coordinates using our function
+            print(f"Calling get_coordinates_direct for: {location}")
+            coords = get_coordinates_direct(location)
+            print(f"Result from get_coordinates_direct: {coords}")
+            if coords:
+                lat, lng = coords
+                coordinates = [lat, lng]
+                print(f"Using coordinates: {coordinates}")
+            else:
+                print(f"ERROR: Could not get coordinates for {location}")
+                # Use 0,0 as fallback
+                coordinates = [0, 0]
+                print(f"Using fallback coordinates: {coordinates}")
+        
+        # Step 2: Download tour text file
+        log_job_update(job_id, ACTIVE_JOBS[job_id]["status"], "Step 2/8: Downloading tour text file...")
+        safe_location = location.replace(' ', '_').replace(',', '').replace(':', '').replace('/', '_').replace('\\', '_').lower()
+        tour_filename = f"{safe_location}_tour.txt"
+        print(f"Tour filename: {tour_filename}")
+        
+        print(f"Downloading tour text file: {datetime.now().isoformat()}")
+        download_response = requests.get(f"http://tour-generator:5000/download/{job_id_1}", timeout=60)
+        print(f"Download response: {download_response.status_code}")
+        
+        if download_response.status_code == 200:
+            tour_file_path = os.path.join(TOURS_DIR, tour_filename)
+            print(f"Saving tour text to: {tour_file_path}")
+            with open(tour_file_path, 'wb') as f:
+                f.write(download_response.content)
+            print(f"Tour text saved: {len(download_response.content)} bytes")
+            print(f"File exists: {os.path.exists(tour_file_path)}")
+        else:
+            error_msg = f"Error downloading tour text file: {download_response.text}"
+            print(f"ERROR: {error_msg}")
+            raise Exception(error_msg)
+        
+        # Step 3: Upload to tour processor
+        log_job_update(job_id, ACTIVE_JOBS[job_id]["status"], "Step 3/8: Uploading to tour processor...")
+        print(f"Uploading to tour processor: {datetime.now().isoformat()}")
+        with open(tour_file_path, 'rb') as f:
+            files = {'file': f}
+            upload_response = requests.post("http://tour-processor:5001/upload", files=files, timeout=60)
+        
+        print(f"Upload response: {upload_response.status_code}")
+        print(f"Upload response content: {upload_response.text[:1000]}")
+        
+        if upload_response.status_code != 200:
+            error_msg = f"Error uploading file: {upload_response.text}"
+            print(f"ERROR: {error_msg}")
+            raise Exception(error_msg)
+        
+        # Step 4: Process tour
+        log_job_update(job_id, ACTIVE_JOBS[job_id]["status"], "Step 4/8: Processing tour (text → audio → HTML)...")
+        process_data = {"tour_file": tour_filename}
+        print(f"Processing tour: {datetime.now().isoformat()}")
+        print(f"Process data: {process_data}")
+        
+        process_response = requests.post(
+            "http://tour-processor:5001/process",
+            json=process_data,
+            timeout=60
+        )
+        
+        print(f"Process response: {process_response.status_code}")
+        print(f"Process response content: {process_response.text[:1000]}")
+        
+        if process_response.status_code != 200:
+            error_msg = f"Error processing tour: {process_response.text}"
+            print(f"ERROR: {error_msg}")
+            raise Exception(error_msg)
+        
+        processor_job_id = process_response.json()["job_id"]
+        ACTIVE_JOBS[job_id]["processor_job_id"] = processor_job_id
+        print(f"Processor job ID: {processor_job_id}")
+        
+        # Step 5: Wait for processing to complete
+        log_job_update(job_id, ACTIVE_JOBS[job_id]["status"], "Step 5/8: Waiting for audio processing...")
+        poll_count = 0
+        while True:
+            poll_count += 1
+            print(f"Checking processor status: {datetime.now().isoformat()} (Poll #{poll_count})")
+            status_response = requests.get(f"http://tour-processor:5001/status/{processor_job_id}", timeout=10)
+            print(f"Status response: {status_response.status_code}")
+            
+            if status_response.status_code == 200:
+                status_data = status_response.json()
+                print(f"Status data: {status_data}")
+                
+                if status_data["status"] == "completed":
+                    print(f"Tour processing completed: {datetime.now().isoformat()}")
+                    break
+                elif status_data["status"] == "error":
+                    error_msg = f"Error in tour processing: {status_data.get('error', 'Unknown error')}"
+                    print(f"ERROR: {error_msg}")
+                    raise Exception(error_msg)
+                else:
+                    progress = status_data.get('progress', 'Processing...')
+                    print(f"Tour processing in progress: {progress}")
+                    ACTIVE_JOBS[job_id]["progress"] = f"Audio processing: {progress}"
+                    time.sleep(10)
+            else:
+                error_msg = f"Error checking processing status: {status_response.text}"
+                print(f"ERROR: {error_msg}")
+                raise Exception(error_msg)
+        
+        # Step 6: Download processed tour
+        log_job_update(job_id, ACTIVE_JOBS[job_id]["status"], "Step 6/8: Downloading processed tour...")
+        print(f"Downloading processed tour: {datetime.now().isoformat()}")
+        download_response = requests.get(f"http://tour-processor:5001/download/{processor_job_id}", timeout=60)
+        print(f"Download response: {download_response.status_code}")
+        
+        if download_response.status_code == 200:
+            zip_filename = f"{safe_location}_{tour_type}_{job_id[:8]}.zip"
+            zip_path = os.path.join(TOURS_DIR, zip_filename)
+            print(f"Saving processed tour to: {zip_path}")
+            with open(zip_path, 'wb') as f:
+                f.write(download_response.content)
+            ACTIVE_JOBS[job_id]["output_zip"] = zip_filename
+            print(f"Processed tour saved: {len(download_response.content)} bytes")
+            print(f"File exists: {os.path.exists(zip_path)}")
+        else:
+            error_msg = f"Error downloading processed tour: {download_response.text}"
+            print(f"ERROR: {error_msg}")
+            raise Exception(error_msg)
+        
+        # Step 7: Extract ZIP file
+        log_job_update(job_id, ACTIVE_JOBS[job_id]["status"], "Step 7/8: Extracting tour package...")
+        extract_dir = f"{safe_location}_{tour_type}_{job_id[:8]}"
+        extract_path = os.path.join(TOURS_DIR, extract_dir)
+        print(f"Extracting ZIP file to: {extract_path}")
+        os.makedirs(extract_path, exist_ok=True)
+        
+        try:
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_path)
+            print(f"ZIP file extracted successfully")
+            print(f"Extracted files: {os.listdir(extract_path)}")
+        except Exception as e:
+            error_msg = f"Error extracting ZIP file: {e}"
+            print(f"ERROR: {error_msg}")
+            print(f"Traceback: {traceback.format_exc()}")
+            raise Exception(error_msg)
+        
+        ACTIVE_JOBS[job_id]["extract_dir"] = extract_dir
+        
+        # Step 8: Store in database
+        log_job_update(job_id, ACTIVE_JOBS[job_id]["status"], "Step 8/8: Storing tour in database...")
+        tour_name = f"{location} - {tour_type} Tour"
+        
+        # Extract coordinates
+        lat = None
+        lng = None
+        if coordinates and len(coordinates) >= 2:
+            lat = coordinates[0]
+            lng = coordinates[1]
+        
+        # Store in database
+        store_success = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng)
+        
+        if store_success:
+            print(f"Tour stored successfully with coordinates: lat={lat}, lng={lng}")
+        else:
+            print("Failed to store tour in database")
+        
+        # Complete
+        log_job_update(job_id, "completed", "Tour generation completed successfully!")
+        ACTIVE_JOBS[job_id]["netlify_ready"] = True
+        if coordinates:
+            ACTIVE_JOBS[job_id]["coordinates"] = coordinates
+        
+        print(f"==== ORCHESTRATE_TOUR_ASYNC COMPLETED: {datetime.now().isoformat()} ====")
+        
+    except Exception as e:
+        print(f"\n==== EXCEPTION IN ORCHESTRATE_TOUR_ASYNC: {datetime.now().isoformat()} ====")
+        print(f"Exception: {e}")
+        print(f"Exception type: {type(e).__name__}")
+        print(f"Traceback: {traceback.format_exc()}")
+        ACTIVE_JOBS[job_id]["status"] = "error"
+        ACTIVE_JOBS[job_id]["error"] = str(e)
+
+def track_user_tour(user_id, tour_id, request_string):
+    """Track a user's tour request in the user tracking service."""
+    print(f"\n==== TRACKING USER TOUR: {datetime.now().isoformat()} ====")
+    print(f"User ID: {user_id}")
+    print(f"Tour ID: {tour_id}")
+    print(f"Request string: {request_string}")
+    
+    try:
+        # Prepare data for the user tracking service
+        payload = {
+            "tour_request": {
+                "tour_id": tour_id,
+                "request_string": request_string
+            }
+        }
+        
+        # Call the user tracking service
+        print(f"Calling user tracking API for user {user_id}")
+        print(f"Payload: {payload}")
+        
+        response = requests.put(
+            f"http://user-api-2:5000/user/{user_id}",
+            json=payload,
+            timeout=10
+        )
+        
+        print(f"User tracking response: {response.status_code} - {response.text}")
+        
+        if response.status_code != 200:
+            print(f"ERROR: Failed to track user tour: {response.text}")
+            return False
+        
+        print(f"SUCCESS: User tour tracked successfully")
+        return True
+    except Exception as e:
+        print(f"ERROR: Exception tracking user tour: {e}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return False
+
+def get_coordinates_direct(location):
+    # Get coordinates directly from the coordinates-fromai service
+    import requests
+    import urllib.parse
+    
+    print(f"\n==== DIRECT COORDINATES REQUEST FOR: {location} ====")
+    print(f"Time: {datetime.now().isoformat()}")
+    
+    try:
+        # URL-encode the location
+        encoded_location = urllib.parse.quote(location)
+        
+        # Make the request to the coordinates-fromai service (internal port 5004)
+        url = f"http://coordinates-fromai:5004/coordinates/{encoded_location}"
+        print(f"Requesting URL: {url}")
+        
+        response = requests.get(url, timeout=60)
+        
+        print(f"Response status code: {response.status_code}")
+        print(f"Response time: {datetime.now().isoformat()}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response data: {data}")
+            
+            if "coordinates" in data and len(data["coordinates"]) >= 2:
+                lat, lng = data["coordinates"]
+                print(f"Received coordinates: lat={lat}, lng={lng}")
+                return (lat, lng)
+            else:
+                print(f"Invalid response format: {data}")
+                print(f"ERROR: Invalid response format from coordinates service")
+                return (0, 0)  # Return 0,0 as fallback
+        else:
+            print(f"Error response: {response.text}")
+            print(f"ERROR: Failed to get coordinates from service: {response.status_code}")
+            return (0, 0)  # Return 0,0 as fallback
+    except Exception as e:
+        print(f"ERROR: Exception while getting coordinates from coordinates-fromai service: {e}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return (0, 0)  # Return 0,0 as fallback
+
+# Direct function to call coordinates-fromai service
+def call_coordinates_service(location):
+    # Get coordinates directly from the coordinates-fromai service
+    import requests
+    import urllib.parse
+    
+    print(f"\n==== DIRECT CALL TO COORDINATES-FROMAI SERVICE ====")
+    print(f"Time: {datetime.now().isoformat()}")
+    print(f"Location: {location}")
+    
+    try:
+        # URL-encode the location
+        encoded_location = urllib.parse.quote(location)
+        
+        # Make the request to the coordinates-fromai service
+        url = f"http://coordinates-fromai:5004/coordinates/{encoded_location}"
+        print(f"Requesting URL: {url}")
+        
+        response = requests.get(url, timeout=60)
+        
+        print(f"Response status code: {response.status_code}")
+        print(f"Response time: {datetime.now().isoformat()}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Response data: {data}")
+            
+            if "coordinates" in data and len(data["coordinates"]) >= 2:
+                lat, lng = data["coordinates"]
+                print(f"Received coordinates: lat={lat}, lng={lng}")
+                return (lat, lng)
+            else:
+                print(f"Invalid response format: {data}")
+        else:
+            print(f"Error response: {response.text}")
+        
+        print(f"No coordinates found for {location}")
+        return None
+    except Exception as e:
+        print(f"Error getting coordinates from coordinates-fromai service: {e}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return None
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint."""
+    return jsonify({"status": "healthy", "service": "tour_orchestrator"})
+
+@app.route('/generate-complete-tour', methods=['POST'])
+def generate_complete_tour():
+    """Generate a complete tour from text to audio to web."""
+    print(f"\n==== INCOMING REQUEST: {datetime.now().isoformat()} ====")
+    print(f"Request method: {request.method}")
+    print(f"Request headers: {dict(request.headers)}")
+    print(f"Request data: {request.get_data(as_text=True)}")
+    print(f"Request JSON: {request.json if request.is_json else None}")
+    
+    if not request.is_json:
+        return jsonify({"error": "Request must be JSON"}), 400
+    
+    data = request.json
+    print(f"Received request data: {data}")
+    
+    location = data.get('location')
+    tour_type = data.get('tour_type')
+    total_stops = data.get('total_stops', 10)
+    user_id = data.get('user_id')
+    request_string = data.get('request_string')
+    
+    print(f"Extracted parameters:")
+    print(f"  location: {location}")
+    print(f"  tour_type: {tour_type}")
+    print(f"  total_stops: {total_stops}")
+    print(f"  user_id: {user_id}")
+    print(f"  request_string: {request_string}")
+    
+    if not location or not tour_type:
+        return jsonify({"error": "location and tour_type are required"}), 400
+    
+    try:
+        total_stops = int(total_stops)
+        if total_stops < 1 or total_stops > 50:
+            return jsonify({"error": "total_stops must be between 1 and 50"}), 400
+    except ValueError:
+        return jsonify({"error": "total_stops must be a valid integer"}), 400
+    
+    # Generate job ID
+    job_id = str(uuid.uuid4())
+    print(f"Generated job ID: {job_id}")
+    
+    # Initialize job tracking
+    ACTIVE_JOBS[job_id] = {
+        "status": "queued",
+        "progress": "Job queued for processing",
+        "location": location,
+        "tour_type": tour_type,
+        "total_stops": total_stops,
+        "user_id": user_id,
+        "request_string": request_string,
+        "created_at": datetime.now().isoformat()
+    }
+    
+    # Track user request immediately
+    print(f"Checking user tracking condition - user_id: '{user_id}', request_string: '{request_string}'")
+    if user_id and request_string:
+        try:
+            tour_id = f"tour_{job_id[:8]}"
+            print(f"Tracking user tour immediately - User: {user_id}, Tour: {tour_id}")
+            track_user_tour(user_id, tour_id, request_string)
+            ACTIVE_JOBS[job_id]["tour_id"] = tour_id
+            print(f"User tour tracking completed successfully")
+        except Exception as e:
+            print(f"ERROR: Failed to track user tour: {e}")
+            print(f"Traceback: {traceback.format_exc()}")
+    else:
+        print(f"User tracking skipped - user_id empty: {not user_id}, request_string empty: {not request_string}")
+    
+    # Start orchestration in background thread
+    print(f"Starting orchestration in background thread")
+    thread = threading.Thread(
+        target=orchestrate_tour_async,
+        args=(job_id, location, tour_type, total_stops, user_id, request_string)
+    )
+    thread.daemon = True
+    thread.start()
+    
+    print(f"Returning response: job_id={job_id}, status=queued")
+    return jsonify({"job_id": job_id, "status": "queued"})
+
+@app.route('/status/<job_id>', methods=['GET'])
+def get_job_status(job_id):
+    """Get job status."""
+    print(f"\n==== STATUS REQUEST: {datetime.now().isoformat()} ====")
+    print(f"Job ID: {job_id}")
+    
+    if job_id not in ACTIVE_JOBS:
+        print(f"Job not found: {job_id}")
+        return jsonify({"error": "Job not found"}), 404
+    
+    job = ACTIVE_JOBS[job_id]
+    response = {
+        "job_id": job_id,
+        "status": job["status"],
+        "progress": job["progress"],
+        "location": job["location"],
+        "tour_type": job["tour_type"],
+        "total_stops": job["total_stops"],
+        "created_at": job["created_at"]
+    }
+    
+    if job["status"] == "completed":
+        response["output_zip"] = job["output_zip"]
+        response["extract_dir"] = job["extract_dir"]
+        response["netlify_ready"] = job["netlify_ready"]
+        if "coordinates" in job:
+            response["coordinates"] = job["coordinates"]
+    elif job["status"] == "error":
+        response["error"] = job["error"]
+    
+    print(f"Returning status: {response}")
+    return jsonify(response)
+
+@app.route('/download/<job_id>', methods=['GET'])
+def download_tour(job_id):
+    """Download the complete tour package."""
+    print(f"\n==== DOWNLOAD REQUEST: {datetime.now().isoformat()} ====")
+    print(f"Job ID: {job_id}")
+    
+    if job_id not in ACTIVE_JOBS:
+        print(f"Job not found: {job_id}")
+        return jsonify({"error": "Job not found"}), 404
+    
+    job = ACTIVE_JOBS[job_id]
+    if job["status"] != "completed":
+        print(f"Job not completed: {job_id}")
+        return jsonify({"error": "Job not completed"}), 400
+    
+    zip_path = os.path.join(TOURS_DIR, job["output_zip"])
+    if not os.path.exists(zip_path):
+        print(f"File not found: {zip_path}")
+        return jsonify({"error": "File not found"}), 404
+    
+    print(f"Sending file: {zip_path}")
+    return send_file(zip_path, as_attachment=True, download_name=job["output_zip"])
+
+@app.route('/serve/<job_id>', methods=['GET'])
+def serve_tour_info(job_id):
+    """Get information about serving the tour."""
+    print(f"\n==== SERVE REQUEST: {datetime.now().isoformat()} ====")
+    print(f"Job ID: {job_id}")
+    
+    if job_id not in ACTIVE_JOBS:
+        print(f"Job not found: {job_id}")
+        return jsonify({"error": "Job not found"}), 404
+    
+    job = ACTIVE_JOBS[job_id]
+    if job["status"] != "completed":
+        print(f"Job not completed: {job_id}")
+        return jsonify({"error": "Job not completed"}), 400
+    
+    extract_path = os.path.join(TOURS_DIR, job["extract_dir"])
+    if not os.path.exists(extract_path):
+        print(f"Tour directory not found: {extract_path}")
+        return jsonify({"error": "Tour directory not found"}), 404
+    
+    response = {
+        "job_id": job_id,
+        "extract_dir": job["extract_dir"],
+        "local_path": extract_path,
+        "instructions": [
+            "1. Download the ZIP file using /download/{job_id}",
+            "2. Extract the ZIP file to your desired location",
+            "3. Serve the extracted directory with any web server",
+            "4. Or deploy the directory directly to Netlify"
+        ],
+        "netlify_ready": True
+    }
+    
+    # Add coordinates if available
+    if "coordinates" in job:
+        response["coordinates"] = job["coordinates"]
+    
+    print(f"Returning serve info: {response}")
+    return jsonify(response)
+
+@app.route('/jobs', methods=['GET'])
+def list_jobs():
+    """List all orchestration jobs."""
+    print(f"\n==== LIST JOBS REQUEST: {datetime.now().isoformat()} ====")
+    
+    jobs = []
+    for job_id, job_data in ACTIVE_JOBS.items():
+        job_info = {
+            "job_id": job_id,
+            "status": job_data["status"],
+            "location": job_data["location"],
+            "tour_type": job_data["tour_type"],
+            "total_stops": job_data["total_stops"],
+            "created_at": job_data["created_at"],
+            "progress": job_data.get("progress", "")
+        }
+        
+        # Add coordinates if available
+        if "coordinates" in job_data:
+            job_info["coordinates"] = job_data["coordinates"]
+        
+        jobs.append(job_info)
+    
+    print(f"Returning {len(jobs)} jobs")
+    return jsonify({"jobs": jobs})
+
+if __name__ == '__main__':
+    # Ensure tours directory exists
+    ensure_tours_directory()
+    
+    print(f"Starting Modified Tour Orchestrator Service: {datetime.now().isoformat()}")
+    print(f"Tours directory: {TOURS_DIR}")
+    print(f"Pipeline: Complete tour generation orchestration with database storage")
+    
+    # Run Flask app
+    app.run(host='0.0.0.0', port=5002, debug=True)

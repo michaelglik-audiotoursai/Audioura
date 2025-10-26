@@ -1,0 +1,11 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+RUN pip install flask psycopg2-binary requests beautifulsoup4
+
+COPY newsletter_processor_service.py .
+
+EXPOSE 5017
+
+CMD ["python", "newsletter_processor_service.py"]

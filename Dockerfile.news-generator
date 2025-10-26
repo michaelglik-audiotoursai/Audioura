@@ -1,0 +1,12 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements-news.txt .
+RUN pip install --no-cache-dir -r requirements-news.txt
+
+COPY news_generator_service.py .
+
+EXPOSE 5010
+
+CMD ["python", "news_generator_service.py"]

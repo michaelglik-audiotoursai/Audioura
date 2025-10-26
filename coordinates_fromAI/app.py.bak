@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+"""
+Coordinates from AI service.
+This service provides coordinates for locations using OpenAI API.
+"""
+from flask import Flask, jsonify, request
+import openai
+import os
+import re
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+# Create Flask app
+app = Flask(__name__)
+
+# Get OpenAI API key from environment variable
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+if not OPENAI_API_KEY:
+    logging.error("OPENAI_API_KEY environment variable not set")
+else:
+    openai.api_key = OPENAI_API_KEY
+    logging.info(f"OpenAI API key loaded: {OPENAI_API_KEY[:5]}...{OPENAI_API_KEY[-5:]}")
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint."""
+    return jsonify({"status": "healthy"})
+
+@app.route('/coordinates/<path:location>', methods=['GET'])
+def get_coordinates(location):
+    """Get coordinates for a location using OpenAI API."""
+    try:
+        logging.info(f"\n==== COORDINATES REQUEST: {location} ====\n")
+        
+        # Create a prompt that asks for coordinates
+        prompt = f"What are the latitude and longitude coordinates for {location}? Please respond with only the decimal coordinates in the format 'latitude, longitude' without any other text."
+        
+        # Use the OpenAI API to get coordinates
+        logging.info(f"Sending request to OpenAI API for: {location}")
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that provides precise geographic coordinates."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.2
+        )
+        
+        # Extract the coordinates from the response
+        coordinates_text = response.choices[0].message.content.strip()
+        logging.info(f"OpenAI response: {coordinates_text}")
+        
+        # Parse the coordinates
+        # Try to extract decimal numbers
+        numbers = re.findall(r'-?\d+\.\d+', coordinates_text)
+        if len(numbers) >= 2:
+            lat = float(numbers[0])
+            lng = float(numbers[1])
+            logging.info(f"Parsed coordinates: lat={lat}, lng={lng}")
+            return jsonify({"coordinates": [lat, lng]})
+        
+        # Try comma-separated format
+        parts = coordinates_text.split(",")
+        if len(parts) >= 2:
+            try:
+                lat = float(parts[0].strip())
+                lng = float(parts[1].strip())
+                logging.info(f"Parsed coordinates: lat={lat}, lng={lng}")
+                return jsonify({"coordinates": [lat, lng]})
+            except ValueError:
+                pass
+        
+        # If we get here, parsing failed
+        logging.error(f"Failed to parse coordinates from: {coordinates_text}")
+        return jsonify({"error": "Failed to parse coordinates"}), 400
+    except Exception as e:
+        logging.error(f"Error getting coordinates: {e}")
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == '__main__':
+    logging.info("Starting Coordinates from AI Service...")
+    app.run(host='0.0.0.0', port=5004, debug=True)

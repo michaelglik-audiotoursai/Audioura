@@ -1,0 +1,120 @@
+version: '3.8'
+
+services:
+  postgres-2:
+    image: postgres:13
+    container_name: development-postgres-2-1
+    environment:
+      POSTGRES_DB: audiotours
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  tour-processor:
+    build: .
+    container_name: development-tour-processor-1
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./tours:/app/tours
+    command: python tour_generation_service.py
+
+  tour-orchestrator:
+    build: .
+    container_name: development-tour-orchestrator-1
+    ports:
+      - "5002:5002"
+    volumes:
+      - ./tours:/app/tours
+    command: python tour_orchestrator_service.py
+
+  map-delivery:
+    build: .
+    container_name: development-map-delivery-1
+    ports:
+      - "5005:5005"
+    volumes:
+      - ./tours:/app/tours
+    command: python map_delivery_service.py
+
+  coordinates:
+    build: .
+    container_name: development-coordinates-1
+    ports:
+      - "5006:5006"
+    command: python coordinates_service.py
+
+  treats:
+    build: .
+    container_name: development-treats-1
+    ports:
+      - "5007:5007"
+    command: python treats_service.py
+
+  news-generator:
+    build: .
+    container_name: news-generator-1
+    ports:
+      - "5010:5010"
+    command: python news_generator_service.py
+
+  news-processor:
+    build: .
+    container_name: news-processor-1
+    ports:
+      - "5011:5011"
+    command: python news_processor_service.py
+
+  news-orchestrator:
+    build: .
+    container_name: news-orchestrator-1
+    ports:
+      - "5012:5012"
+    command: python news_orchestrator_service.py
+
+  newsletter-processor:
+    build: .
+    container_name: newsletter-processor-1
+    ports:
+      - "5017:5017"
+    command: python newsletter_processor_service.py
+
+  polly-tts:
+    build: .
+    container_name: polly-tts-1
+    ports:
+      - "5018:5018"
+    command: python polly_tts_service.py
+
+  tour-editing:
+    build: .
+    container_name: tour-editing-1
+    ports:
+      - "5020:5020"
+    volumes:
+      - ./tours:/app/tours
+    command: python tour_editing_simple.py
+
+  tour-generation-modernized:
+    build: .
+    container_name: tour-generation-modernized-1
+    ports:
+      - "5021:5021"
+    volumes:
+      - ./tours:/app/tours
+    command: python tour_generation_modernized.py
+
+  tour-editing-phase2:
+    build: .
+    container_name: tour-editing-phase2-1
+    ports:
+      - "5022:5022"
+    volumes:
+      - ./tours:/app/tours
+    command: python tour_editing_phase2.py
+
+volumes:
+  postgres_data:

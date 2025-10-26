@@ -1,0 +1,38 @@
+
+SETUP INSTRUCTIONS FOR SHARED TRACKING:
+
+1. Create a new Google Spreadsheet
+2. Note the spreadsheet ID from the URL (the long string between /d/ and /edit)
+3. Go to Extensions > Apps Script
+4. Replace the default code with the contents of 'shared_tracking_script.gs'
+5. Save the script (Ctrl+S)
+6. Click "Deploy" > "New deployment"
+7. Choose type: "Web app"
+8. Execute as: "Me"
+9. Who has access: "Anyone"
+10. Click "Deploy"
+11. Copy the web app URL
+12. Use this URL as the tracking_url parameter
+
+The script will automatically:
+- Create tabs for each tour (if use_tabs=True)
+- Or use a single "AllTours" sheet (if use_tabs=False)
+- Add appropriate headers
+- Track all usage data with tour identification
+
+================
+
+Enter tour directory name: charles_river_museum_of_industry_and_innovation
+Enter Google Sheet ID: 19va1J4gJhqT20jybeXealIEKp9PTpJpCMok5vImghMU
+Enter tracking URL (press Enter to use default): https://script.google.com/macros/s/AKfycbwlfImGnubmVIZya3fJlnLeHI62ZTLotVi9BjlVJILJVwJ2TeLOcO540p8n0-qlO4zj/exec
+Use separate tabs for each tour? (y/n, default: n): n
+Found 16 audio files
+
+Shared tracked app created successfully!
+HTML file: C:\Users\micha\eclipse-workspace\AudioTours\development\charles_river_museum_of_industry_and_innovation_shared_tracked.html
+Tour ID: 6efde704-7f36-4274-a5d3-cc30dbeed636
+Sheet ID: 19va1J4gJhqT20jybeXealIEKp9PTpJpCMok5vImghMU
+Sheet Name: AllTours
+
+Google Apps Script created: C:\Users\micha\eclipse-workspace\AudioTours\development\shared_tracking_script.gs
+Setup instructions: C:\Users\micha\eclipse-workspace\AudioTours\development\shared_tracking_setup.txt

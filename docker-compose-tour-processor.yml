@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  tour-processor:
+    build:
+      context: .
+      dockerfile: Dockerfile.tour-processor
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./tours:/app/tours
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

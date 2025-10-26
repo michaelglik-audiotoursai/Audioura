@@ -1,0 +1,44 @@
+version: '3.8'
+services:
+  mock-server:
+    build:
+      context: ./mock-server
+      dockerfile: Dockerfile
+    ports:
+      - "5004:5004"
+    environment:
+      - FLASK_ENV=development
+    volumes:
+      - ./mock-server:/app
+    command: python mock_server.py
+
+  # Keep existing services but make them optional
+  tour-generator:
+    image: development-tour-generator
+    ports:
+      - "5000:5000"
+    profiles: ["full"]
+    
+  tour-processor:
+    image: development-tour-processor
+    ports:
+      - "5001:5001"
+    profiles: ["full"]
+    
+  tour-orchestrator:
+    image: development-tour-orchestrator
+    ports:
+      - "5002:5002"
+    profiles: ["full"]
+    
+  user-api:
+    image: development-user-api-2
+    ports:
+      - "5003:5000"
+    profiles: ["full"]
+    
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5433:5432"
+    profiles: ["full"]

@@ -1,0 +1,21 @@
+services:
+  tour-orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.orchestrator
+    ports:
+      - "5002:5002"
+    volumes:
+      - ./tours:/app/tours
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - development_default
+
+networks:
+  development_default:
+    external: true

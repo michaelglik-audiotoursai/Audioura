@@ -1,0 +1,35 @@
+name: audio_tour_app
+description: AI-powered audio tour generator for Android
+publish_to: 'none'
+version: 1.0.0+154
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  http: ^1.1.0
+  shared_preferences: ^2.2.2
+  path_provider: ^2.1.1
+  archive: ^3.4.9
+  webview_flutter: ^4.4.2
+  flutter_local_notifications: ^17.2.2
+  permission_handler: ^11.0.1
+  geolocator: ^10.1.0
+  device_info_plus: ^10.1.0
+  package_info_plus: ^8.0.0
+  mapbox_gl: ^0.16.0
+  flutter_dotenv: ^5.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - .env
+    - assets/images/

@@ -1,0 +1,13 @@
+@echo off
+echo Updating services with new features...
+
+echo Copying modified generate_tour_text_service.py...
+copy /Y modified_generate_tour_text_service.py generate_tour_text_service.py
+
+echo Copying modified tour_orchestrator_service.py...
+copy /Y modified_tour_orchestrator_service.py tour_orchestrator_service.py
+
+echo Restarting services...
+docker-compose restart tour-generator tour-orchestrator
+
+echo Done!

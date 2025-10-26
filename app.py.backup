@@ -1,0 +1,53 @@
+
+@app.route('/coordinates/<location>', methods=['GET'])
+def get_coordinates(location):
+    """Get coordinates for a location using OpenAI API."""
+    try:
+        # Log the request
+        print(f"\n==== COORDINATES REQUEST: {location} ====\n")
+        
+        # Create a prompt that asks for coordinates
+        prompt = f"What are the latitude and longitude coordinates for {location}? Please respond with only the decimal coordinates in the format 'latitude, longitude' without any other text."
+        
+        # Use the OpenAI API to get coordinates
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that provides precise geographic coordinates."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.2
+        )
+        
+        # Extract the coordinates from the response
+        coordinates_text = response.choices[0].message.content.strip()
+        print(f"OpenAI response: {coordinates_text}")
+        
+        # Parse the coordinates
+        import re
+        
+        # Try to extract decimal numbers
+        numbers = re.findall(r'-?\d+\.\d+', coordinates_text)
+        if len(numbers) >= 2:
+            lat = float(numbers[0])
+            lng = float(numbers[1])
+            print(f"Parsed coordinates: lat={lat}, lng={lng}")
+            return jsonify({"coordinates": [lat, lng]})
+        
+        # Try comma-separated format
+        parts = coordinates_text.split(",")
+        if len(parts) >= 2:
+            try:
+                lat = float(parts[0].strip())
+                lng = float(parts[1].strip())
+                print(f"Parsed coordinates: lat={lat}, lng={lng}")
+                return jsonify({"coordinates": [lat, lng]})
+            except ValueError:
+                pass
+        
+        # If we get here, parsing failed
+        print(f"Failed to parse coordinates from: {coordinates_text}")
+        return jsonify({"error": "Failed to parse coordinates"}), 400
+    except Exception as e:
+        print(f"Error getting coordinates: {e}")
+        return jsonify({"error": str(e)}), 500

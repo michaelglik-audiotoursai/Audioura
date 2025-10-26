@@ -1,0 +1,41 @@
+@echo off
+REM Script to apply a minimal fix to the tour orchestrator service
+
+echo.
+echo ===== Minimal Fix for Tour Orchestrator =====
+echo.
+echo This script will:
+echo 1. Add a direct function to call the coordinates-fromai service
+echo 2. Replace the coordinates check with a direct call
+echo.
+echo Press any key to continue or Ctrl+C to cancel...
+pause > nul
+
+python fix_minimal.py
+
+if %ERRORLEVEL% EQU 0 (
+  echo.
+  echo ===== Restarting Tour Orchestrator Service =====
+  echo.
+  docker-compose restart tour-orchestrator
+  
+  echo.
+  echo ===== Success! =====
+  echo.
+  echo The tour orchestrator service has been fixed and restarted.
+  echo.
+  echo To test it, generate a tour from the mobile app for a location like:
+  echo "Boston Public Library, Boston, MA"
+  echo.
+  echo Then check the logs:
+  echo docker-compose logs tour-orchestrator
+  echo docker-compose logs coordinates-fromai
+  echo.
+  echo And check the database:
+  echo docker exec -it development-postgres-2-1 psql -U admin -d audiotours -c "SELECT tour_name, lat, lng FROM audio_tours ORDER BY id DESC LIMIT 5;"
+) else (
+  echo.
+  echo ===== Error =====
+  echo.
+  echo Failed to fix the tour orchestrator service.
+)

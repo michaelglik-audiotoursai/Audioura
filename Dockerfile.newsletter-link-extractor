@@ -1,0 +1,12 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements-newsletter.txt .
+RUN pip install -r requirements-newsletter.txt
+
+COPY newsletter_link_extractor_service.py .
+
+EXPOSE 5014
+
+CMD ["python", "newsletter_link_extractor_service.py"]

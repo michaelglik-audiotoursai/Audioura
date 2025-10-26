@@ -1,0 +1,332 @@
+#!/usr/bin/env python3
+"""
+Map Delivery Service - Provides map data and nearby tours
+"""
+import os
+import json
+import psycopg2
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+import math
+
+app = Flask(__name__)
+CORS(app)
+
+def get_db_connection():
+    """Get a connection to the database."""
+    return psycopg2.connect(
+        host="postgres-2",
+        port=5432,
+        database="audiotours",
+        user="admin",
+        password="password123"
+    )
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint."""
+    return jsonify({
+        "status": "healthy", 
+        "service": "map_delivery",
+        "description": "Map data and nearby tours service"
+    })
+
+@app.route('/nearby-tours', methods=['GET'])
+def nearby_tours():
+    """Get tours and treats near a location within a radius."""
+    lat = float(request.args.get('lat', 42.3601))
+    lng = float(request.args.get('lng', -71.0589))
+    return _get_nearby_data(lat, lng)
+
+@app.route('/tours-near/<lat>/<lng>', methods=['GET'])
+def tours_near(lat, lng):
+    """Get tours and treats near a location within a radius (path params)."""
+    try:
+        lat = float(lat)
+        lng = float(lng)
+        return _get_nearby_data(lat, lng)
+    except ValueError:
+        return jsonify({'error': 'Invalid coordinates'}), 400
+
+def _get_nearby_data(lat, lng):
+    """Get tours and treats near a location within a radius."""
+    try:
+        radius = float(request.args.get('radius', 10.0))  # Default 10 miles
+        
+        # Convert miles to degrees (approximate)
+        # 1 degree of latitude = ~69 miles
+        # 1 degree of longitude = ~55 miles at Boston's latitude
+        lat_radius = radius / 69.0
+        lng_radius = radius / (math.cos(math.radians(lat)) * 69.0)
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Query database for tours within radius
+        tour_query = """
+        SELECT id, tour_name, request_string, lat, lng, created_at
+        FROM audio_tours
+        WHERE lat IS NOT NULL AND lng IS NOT NULL
+          AND lat BETWEEN %s AND %s
+          AND lng BETWEEN %s AND %s
+        ORDER BY created_at DESC
+        """
+        
+        cur.execute(
+            tour_query,
+            (lat - lat_radius, lat + lat_radius, lng - lng_radius, lng + lng_radius)
+        )
+        
+        tours = []
+        for row in cur.fetchall():
+            tour_id, tour_name, request_string, tour_lat, tour_lng, created_at = row
+            
+            # Calculate actual distance in miles
+            dlat = math.radians(tour_lat - lat)
+            dlng = math.radians(tour_lng - lng)
+            a = (math.sin(dlat/2) * math.sin(dlat/2) + 
+                 math.cos(math.radians(lat)) * math.cos(math.radians(tour_lat)) * 
+                 math.sin(dlng/2) * math.sin(dlng/2))
+            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+            distance = 3959 * c  # Earth radius in miles
+            
+            # Only include tours within the actual radius
+            if distance <= radius:
+                tours.append({
+                    "id": tour_id,
+                    "name": tour_name,
+                    "title": tour_name,
+                    "request_string": request_string,
+                    "lat": tour_lat,
+                    "lng": tour_lng,
+                    "distance_km": round(distance * 1.60934, 2),  # Convert miles to km
+                    "popularity": 1,
+                    "created": created_at.isoformat() if created_at else None,
+                    "path": f"/tours/{tour_id}",
+                    "type": "tour"
+                })
+        
+        # Query database for treats within radius
+        treat_query = """
+        SELECT id, ad_name, ad_text, lat, lng, link_to_vendor, ad_image
+        FROM treats
+        WHERE lat IS NOT NULL AND lng IS NOT NULL
+          AND lat BETWEEN %s AND %s
+          AND lng BETWEEN %s AND %s
+        ORDER BY id DESC
+        """
+        
+        cur.execute(
+            treat_query,
+            (lat - lat_radius, lat + lat_radius, lng - lng_radius, lng + lng_radius)
+        )
+        
+        treats = []
+        for row in cur.fetchall():
+            treat_id, ad_name, ad_text, treat_lat, treat_lng, link_to_vendor, ad_image = row
+            
+            # Calculate actual distance in miles
+            dlat = math.radians(treat_lat - lat)
+            dlng = math.radians(treat_lng - lng)
+            a = (math.sin(dlat/2) * math.sin(dlat/2) + 
+                 math.cos(math.radians(lat)) * math.cos(math.radians(treat_lat)) * 
+                 math.sin(dlng/2) * math.sin(dlng/2))
+            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+            distance = 3959 * c  # Earth radius in miles
+            
+            # Only include treats within the actual radius
+            if distance <= radius:
+                treat_item = {
+                    "id": f"treat_{treat_id}",
+                    "name": ad_name,
+                    "title": ad_name,
+                    "request_string": ad_text,
+                    "lat": treat_lat,
+                    "lng": treat_lng,
+                    "distance_km": round(distance * 1.60934, 2),  # Convert miles to km
+                    "popularity": 0,
+                    "link_to_vendor": link_to_vendor,
+                    "type": "treat"
+                }
+                
+                # Add base64 encoded image if available
+                if ad_image:
+                    import base64
+                    treat_item['image_base64'] = base64.b64encode(ad_image).decode('utf-8')
+                else:
+                    treat_item['image_base64'] = None
+                    
+                treats.append(treat_item)
+        
+        cur.close()
+        conn.close()
+        
+        # Combine tours and treats
+        all_items = tours + treats
+        
+        return jsonify({
+            "center": {"lat": lat, "lng": lng},
+            "radius": radius,
+            "tours": all_items  # Keep same field name for compatibility
+        })
+        
+    except Exception as e:
+        print(f"Error getting nearby tours and treats: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/tour-info/<int:tour_id>', methods=['GET'])
+def get_tour_info(tour_id):
+    """Get information about a specific tour."""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Query for tour information
+        cur.execute(
+            "SELECT id, tour_name, request_string, lat, lng FROM audio_tours WHERE id = %s",
+            (tour_id,)
+        )
+        
+        row = cur.fetchone()
+        if not row:
+            cur.close()
+            conn.close()
+            return jsonify({'error': 'Tour not found'}), 404
+        
+        tour_id, tour_name, request_string, lat, lng = row
+        
+        cur.close()
+        conn.close()
+        
+        return jsonify({
+            'id': tour_id,
+            'name': tour_name,
+            'request_string': request_string,
+            'lat': lat,
+            'lng': lng
+        })
+        
+    except Exception as e:
+        print(f"Error getting tour info: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/download-tour/<int:tour_id>', methods=['GET'])
+def download_tour(tour_id):
+    """Download a specific tour as a ZIP file."""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Query for tour data including the audio_tour BYTEA field
+        cur.execute(
+            "SELECT id, tour_name, audio_tour FROM audio_tours WHERE id = %s",
+            (tour_id,)
+        )
+        
+        row = cur.fetchone()
+        if not row:
+            cur.close()
+            conn.close()
+            return jsonify({'error': 'Tour not found'}), 404
+        
+        tour_id, tour_name, audio_tour_data = row
+        
+        cur.close()
+        conn.close()
+        
+        if not audio_tour_data:
+            return jsonify({'error': 'Tour data not available'}), 404
+        
+        # Return the ZIP file data
+        from flask import Response
+        return Response(
+            audio_tour_data,
+            mimetype='application/zip',
+            headers={
+                'Content-Disposition': f'attachment; filename="{tour_name}.zip"',
+                'Content-Type': 'application/zip'
+            }
+        )
+        
+    except Exception as e:
+        print(f"Error downloading tour: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/tour-info/<int:tour_id>', methods=['GET'])
+def get_tour_info(tour_id):
+    """Get information about a specific tour."""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        cur.execute(
+            "SELECT id, tour_name, request_string, lat, lng FROM audio_tours WHERE id = %s",
+            (tour_id,)
+        )
+        
+        row = cur.fetchone()
+        if not row:
+            cur.close()
+            conn.close()
+            return jsonify({'error': 'Tour not found'}), 404
+        
+        tour_id, tour_name, request_string, lat, lng = row
+        
+        cur.close()
+        conn.close()
+        
+        return jsonify({
+            'id': tour_id,
+            'name': tour_name,
+            'request_string': request_string,
+            'lat': lat,
+            'lng': lng
+        })
+        
+    except Exception as e:
+        print(f"Error getting tour info: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/download-tour/<int:tour_id>', methods=['GET'])
+def download_tour(tour_id):
+    """Download a specific tour as a ZIP file."""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        cur.execute(
+            "SELECT id, tour_name, audio_tour FROM audio_tours WHERE id = %s",
+            (tour_id,)
+        )
+        
+        row = cur.fetchone()
+        if not row:
+            cur.close()
+            conn.close()
+            return jsonify({'error': 'Tour not found'}), 404
+        
+        tour_id, tour_name, audio_tour_data = row
+        
+        cur.close()
+        conn.close()
+        
+        if not audio_tour_data:
+            return jsonify({'error': 'Tour data not available'}), 404
+        
+        from flask import Response
+        return Response(
+            audio_tour_data,
+            mimetype='application/zip',
+            headers={
+                'Content-Disposition': f'attachment; filename="{tour_name}.zip"',
+                'Content-Type': 'application/zip'
+            }
+        )
+        
+    except Exception as e:
+        print(f"Error downloading tour: {e}")
+        return jsonify({'error': str(e)}), 500
+
+if __name__ == '__main__':
+    print("Starting Map Delivery Service...")
+    app.run(host='0.0.0.0', port=5005, debug=True)

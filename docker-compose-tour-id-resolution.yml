@@ -1,0 +1,17 @@
+services:
+  tour-id-resolution:
+    image: tour-id-resolution:latest
+    container_name: tour-id-resolution-1
+    ports:
+      - "5025:5025"
+    volumes:
+      - ./tours:/app/tours:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - development_default
+    restart: unless-stopped
+
+networks:
+  development_default:
+    external: true

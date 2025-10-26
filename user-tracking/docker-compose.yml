@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: audiotours
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - development_default
+
+  user-api:
+    build: .
+    ports:
+      - "5003:5000"
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgresql://admin:password123@postgres:5432/audiotours
+    networks:
+      - development_default
+
+volumes:
+  postgres_data:
+
+networks:
+  development_default:
+    external: true

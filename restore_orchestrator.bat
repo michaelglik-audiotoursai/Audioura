@@ -1,0 +1,16 @@
+@echo off
+echo Restoring original orchestrator file...
+
+echo Running restore script...
+python restore_orchestrator.py
+
+echo Copying original file to Docker container...
+docker cp tour_orchestrator_service.py development-tour-orchestrator-1:/app/tour_orchestrator_service.py
+
+echo Installing psycopg2 in Docker container...
+docker exec -i development-tour-orchestrator-1 pip install --no-cache-dir psycopg2-binary
+
+echo Restarting tour orchestrator service...
+docker restart development-tour-orchestrator-1
+
+echo Done!

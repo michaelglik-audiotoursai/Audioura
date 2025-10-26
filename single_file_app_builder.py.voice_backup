@@ -1,0 +1,322 @@
+"""
+Fixed version of single_file_app_builder.py with proper voice control audio initialization
+"""
+import os
+import sys
+import glob
+import base64
+
+def create_single_file_app(tour_directory):
+    """Create a single HTML file with embedded audio. Works in current directory."""
+    current_dir = os.getcwd()
+    print(f"DEBUG: single_file_app_builder working in: {current_dir}")
+    print(f"DEBUG: Looking for directory: {tour_directory}")
+    
+    # Check if tour directory exists in current directory
+    tour_dir = os.path.join(current_dir, tour_directory)
+    if not os.path.exists(tour_dir):
+        print(f"Error: Tour directory '{tour_directory}' not found in {current_dir}")
+        return None
+    
+    # Find all MP3 files
+    mp3_files = glob.glob(os.path.join(tour_dir, "audio_*.mp3"))
+    if not mp3_files:
+        print(f"Error: No audio files found in {tour_dir}")
+        return None
+    
+    print(f"Found {len(mp3_files)} audio files")
+    
+    # Sort files by stop number
+    def get_stop_number(filename):
+        basename = os.path.basename(filename)
+        try:
+            # Handle audio_1.mp3 format
+            if '_' in basename:
+                number_part = basename.split('_')[1].split('.')[0]  # Get number before .mp3
+                return int(number_part)
+            else:
+                return 0
+        except (ValueError, IndexError):
+            return 0
+    
+    mp3_files.sort(key=get_stop_number)
+    
+    # Create title from directory name
+    title = tour_directory.replace("_", " ").title()
+    
+    # Start building HTML content
+    html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title}</title>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }}
+        .header {{
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }}
+        .tour-container {{
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }}
+        .tour-item {{
+            background-color: white;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }}
+        .tour-title {{
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }}
+        audio {{
+            width: 100%;
+        }}
+        .offline-notice {{
+            background-color: #4CAF50;
+            color: white;
+            text-align: center;
+            padding: 10px;
+            margin-bottom: 20px;
+        }}
+        .loading {{
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #666;
+        }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{title}</h1>
+    </div>
+    
+    <div class="tour-container">
+        <div class="offline-notice">
+            This app works offline! Save it to your home screen.
+        </div>
+        
+        <div id="audio-container">
+            <div class="loading">Loading audio files...</div>
+        </div>
+    </div>
+
+    <script>
+        // Audio data in base64 format
+        const audioData = [
+"""
+    
+    # Add each audio file as base64 data
+    for mp3_file in mp3_files:
+        basename = os.path.basename(mp3_file)
+        # Extract stop number and name
+        parts = basename.replace('.mp3', '').split('_')
+        if len(parts) >= 2:
+            stop_num = parts[1]
+            name = ' '.join(parts[2:]).replace('_', ' ').title() if len(parts) > 2 else f"Audio {stop_num}"
+        else:
+            stop_num = "1"
+            name = "Audio"
+        stop_title = f"Stop {stop_num}: {name}"
+        
+        # Read MP3 file as base64
+        with open(mp3_file, 'rb') as f:
+            mp3_data = base64.b64encode(f.read()).decode('utf-8')
+        
+        # Add to HTML
+        html_content += f"""            {{
+                title: "{stop_title}",
+                data: "data:audio/mpeg;base64,{mp3_data}"
+            }},
+"""
+    
+    # Remove the last comma
+    html_content = html_content.rstrip(",\n") + "\n"
+    
+    # Complete the HTML with FIXED voice control functions
+    html_content += """        ];
+        
+        let audioElements = [];
+        let currentStopIndex = 0;
+        let audioInitialized = false;
+        
+        // Initialize audio context on first user interaction
+        function initializeAudioContext() {
+            if (!audioInitialized && audioElements.length > 0) {
+                // Try to load and prepare first audio element
+                audioElements.forEach((audio, index) => {
+                    audio.load();
+                    // Set volume to ensure it's audible
+                    audio.volume = 1.0;
+                });
+                audioInitialized = true;
+                console.log("Audio context initialized");
+            }
+        }
+        
+        // Pause all audio elements
+        function pauseAllAudio() {
+            audioElements.forEach(audio => {
+                if (!audio.paused) {
+                    audio.pause();
+                }
+            });
+        }
+        
+        // Mobile app integration - FIXED functions for voice control
+        window.playAudio = function() {
+            initializeAudioContext();
+            if (audioElements[currentStopIndex]) {
+                const audio = audioElements[currentStopIndex];
+                pauseAllAudio();
+                // Small delay to ensure pause completes
+                setTimeout(() => {
+                    audio.play().catch(e => console.log("Play error:", e));
+                }, 50);
+                return "Playing Audio";
+            }
+            return "No audio to play";
+        };
+        
+        window.pauseAudio = function() {
+            if (audioElements[currentStopIndex]) {
+                audioElements[currentStopIndex].pause();
+                return "Audio Paused";
+            }
+            return "No audio to pause";
+        };
+        
+        window.nextStop = function() {
+            initializeAudioContext();
+            if (currentStopIndex < audioElements.length - 1) {
+                pauseAllAudio();
+                currentStopIndex++;
+                const audio = audioElements[currentStopIndex];
+                // Small delay to ensure pause completes
+                setTimeout(() => {
+                    audio.play().catch(e => console.log("Play error:", e));
+                }, 50);
+                return "Next Stop";
+            }
+            return "Already at last stop";
+        };
+        
+        window.previousStop = function() {
+            initializeAudioContext();
+            if (currentStopIndex > 0) {
+                pauseAllAudio();
+                currentStopIndex--;
+                const audio = audioElements[currentStopIndex];
+                // Small delay to ensure pause completes
+                setTimeout(() => {
+                    audio.play().catch(e => console.log("Play error:", e));
+                }, 50);
+                return "Previous Stop";
+            }
+            return "Already at first stop";
+        };
+        
+        window.repeatStop = function() {
+            initializeAudioContext();
+            if (audioElements[currentStopIndex]) {
+                const audio = audioElements[currentStopIndex];
+                pauseAllAudio();
+                audio.currentTime = 0;
+                // Small delay to ensure pause completes
+                setTimeout(() => {
+                    audio.play().catch(e => console.log("Play error:", e));
+                }, 50);
+                return "Repeating Stop";
+            }
+            return "No audio to repeat";
+        };
+        
+        // Create audio elements
+        document.addEventListener('DOMContentLoaded', function() {
+            const container = document.getElementById('audio-container');
+            container.innerHTML = ''; // Remove loading message
+            
+            audioData.forEach((item, index) => {
+                const tourItem = document.createElement('div');
+                tourItem.className = 'tour-item';
+                
+                const titleDiv = document.createElement('div');
+                titleDiv.className = 'tour-title';
+                titleDiv.textContent = item.title;
+                
+                const audio = document.createElement('audio');
+                audio.controls = true;
+                audio.preload = 'metadata';
+                
+                const source = document.createElement('source');
+                source.src = item.data;
+                source.type = 'audio/mpeg';
+                
+                audio.appendChild(source);
+                
+                tourItem.appendChild(titleDiv);
+                tourItem.appendChild(audio);
+                container.appendChild(tourItem);
+                
+                // Store reference
+                audioElements.push(audio);
+                
+                // Initialize audio context on first manual interaction
+                audio.addEventListener('play', function() {
+                    initializeAudioContext();
+                    currentStopIndex = index;
+                    // Pause other audio when one starts playing
+                    audioElements.forEach((otherAudio, otherIndex) => {
+                        if (otherIndex !== index && !otherAudio.paused) {
+                            otherAudio.pause();
+                        }
+                    });
+                });
+                
+                // Handle loading events
+                audio.addEventListener('loadedmetadata', function() {
+                    console.log(`Audio ${index + 1} metadata loaded`);
+                });
+                
+                audio.addEventListener('canplaythrough', function() {
+                    console.log(`Audio ${index + 1} ready to play`);
+                });
+            });
+            
+            // Initialize audio context on any user interaction
+            document.addEventListener('click', initializeAudioContext, { once: true });
+            document.addEventListener('touchstart', initializeAudioContext, { once: true });
+        });
+    </script>
+</body>
+</html>
+"""
+    
+    # Save the HTML file in current directory
+    output_file = f"{tour_directory}_single_file.html"
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(html_content)
+    
+    print(f"DEBUG: Created single file: {output_file}")
+    return output_file
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        tour_dir = sys.argv[1]
+    else:
+        tour_dir = input("Enter tour directory name: ")
+    
+    create_single_file_app(tour_dir)

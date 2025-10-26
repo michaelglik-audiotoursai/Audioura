@@ -1,0 +1,13 @@
+@echo off
+echo Fixing syntax error...
+
+echo Running fix script...
+python fix_syntax_error.py
+
+echo Copying fixed file to Docker container...
+docker cp tour_orchestrator_service.py development-tour-orchestrator-1:/app/tour_orchestrator_service.py
+
+echo Restarting tour orchestrator service...
+docker restart development-tour-orchestrator-1
+
+echo Done!

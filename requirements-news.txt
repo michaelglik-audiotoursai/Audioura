@@ -1,0 +1,5 @@
+Flask==2.3.3
+psycopg2-binary==2.9.7
+gTTS==2.3.2
+pydub==0.25.1
+requests==2.31.0

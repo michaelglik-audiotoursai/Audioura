@@ -1,0 +1,8 @@
+flask==1.1.4
+flask-cors==3.0.10
+requests==2.28.1
+openai==0.27.0
+werkzeug==1.0.1
+markupsafe==1.1.1
+itsdangerous==1.1.0
+jinja2==2.11.3

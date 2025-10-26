@@ -1,0 +1,103 @@
+AUDIOTOURS SERVICE STRUCTURE ANALYSIS
+=====================================
+
+CURRENT INCONSISTENT STRUCTURE:
+-------------------------------
+
+ROOT DIRECTORY SERVICES (inconsistent naming):
+├── tour_orchestrator_service.py    → runs as tour_orchestrator_service.py
+├── generate_tour_text_service.py   → runs as generate_tour_text_service.py  
+├── tour_generation_service.py      → runs as tour_generation_service.py
+└── treats_service.py               → COPIED TO app.py, runs as app.py
+
+SUBDIRECTORY SERVICES (consistent app.py naming):
+├── ./user-tracking/app.py          → runs as app.py
+├── ./tour-update-service/app.py    → runs as app.py (assumed)
+├── ./coordinates_fromAI/app.py     → runs as app.py
+├── ./voice_control/app.py          → runs as app.py (assumed)
+└── ./map_delivery/app.py           → runs as app.py
+
+INCONSISTENCY PROBLEMS:
+----------------------
+
+1. NAMING CONFUSION:
+   - Root services: descriptive names (tour_orchestrator_service.py)
+   - Subdirectory services: generic name (app.py)
+   - treats_service.py gets renamed to app.py during build
+
+2. DUPLICATE FILES:
+   - map_delivery_service.py (root, complete implementation)
+   - ./map_delivery/app.py (subdirectory, incomplete)
+   - This caused the 404 error!
+
+3. MAINTENANCE ISSUES:
+   - Hard to know which file is the "real" source
+   - Easy to edit wrong file
+   - Inconsistent update procedures
+
+DOCKER BEST PRACTICES:
+---------------------
+
+STANDARD PRACTICE: Use app.py as entry point
+├── Consistent across all services
+├── Clear entry point identification
+├── Easier container management
+└── Industry standard for Flask/Python services
+
+RECOMMENDED STRUCTURE:
+---------------------
+
+OPTION 1 - All Subdirectories (RECOMMENDED):
+./tour-orchestrator/app.py
+./tour-generator/app.py
+./tour-processor/app.py
+./map-delivery/app.py
+./treats/app.py
+./user-tracking/app.py
+./coordinates-fromai/app.py
+./voice-control/app.py
+
+OPTION 2 - All Root Files:
+tour_orchestrator_service.py
+tour_generator_service.py
+tour_processor_service.py
+map_delivery_service.py
+treats_service.py
+user_tracking_service.py
+coordinates_service.py
+voice_control_service.py
+
+WHY SUBDIRECTORIES ARE BETTER:
+------------------------------
+✓ Each service has its own requirements.txt
+✓ Service-specific configuration files
+✓ Cleaner root directory
+✓ Easier to package/deploy individual services
+✓ Better separation of concerns
+✓ Standard microservices pattern
+
+CURRENT PROBLEM ROOT CAUSE:
+---------------------------
+The map-delivery service has TWO source files:
+1. map_delivery_service.py (root, complete, has download endpoints)
+2. ./map_delivery/app.py (subdirectory, incomplete, missing endpoints)
+
+Docker uses #2, but #1 has the working code!
+
+IMMEDIATE FIX:
+-------------
+Copy map_delivery_service.py → ./map_delivery/app.py
+
+LONG-TERM SOLUTION:
+------------------
+1. Standardize all services to use subdirectory/app.py structure
+2. Move all root service files to subdirectories
+3. Update all Dockerfiles to use consistent pattern
+4. Remove duplicate files
+
+MIGRATION PLAN:
+--------------
+Phase 1: Fix immediate issue (map-delivery)
+Phase 2: Migrate remaining root services to subdirectories
+Phase 3: Update docker-compose.yml build contexts
+Phase 4: Clean up duplicate files

@@ -1,0 +1,233 @@
+# Master Docker Compose - All AudioTours Services with Auto-Start
+# Usage: docker-compose -f docker-compose-master.yml up -d
+
+services:
+  # Core Tour Services
+  tour-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile.generator
+    ports:
+      - "5000:5000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./tours:/app/tours
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  tour-orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.orchestrator
+    ports:
+      - "5002:5002"
+    volumes:
+      - ./tours:/app/tours
+    restart: unless-stopped
+    depends_on:
+      - tour-generator
+      - user-api-2
+      - coordinates-fromai
+
+  tour-processor:
+    build:
+      context: .
+      dockerfile: Dockerfile.tour-processor
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./tours:/app/tours
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Database
+  postgres-2:
+    image: postgres:15-alpine
+    container_name: development-postgres-2-1
+    environment:
+      POSTGRES_DB: audiotours
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Support Services
+  user-api-2:
+    build: ./user-tracking
+    ports:
+      - "5003:5000"
+    depends_on:
+      - postgres-2
+    environment:
+      DATABASE_URL: postgresql://admin:password123@postgres-2:5432/audiotours
+    restart: unless-stopped
+    
+  tour-update:
+    build: ./tour-update-service
+    ports:
+      - "5004:5001"
+    depends_on:
+      - postgres-2
+    environment:
+      DATABASE_URL: postgresql://admin:password123@postgres-2:5432/audiotours
+    restart: unless-stopped
+
+  coordinates-fromai:
+    build: ./coordinates_fromAI
+    ports:
+      - "5006:5004"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      
+  map-delivery:
+    build: ./map_delivery
+    ports:
+      - "5005:5005"
+    depends_on:
+      - postgres-2
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      
+  treats:
+    build:
+      context: .
+      dockerfile: Dockerfile.treats
+    ports:
+      - "5007:5006"
+    depends_on:
+      - postgres-2
+    restart: unless-stopped
+    volumes:
+      - ./treats_service.py:/app/app.py
+      
+  voice-control:
+    build: ./voice_control
+    ports:
+      - "5008:5008"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5008/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # News Services
+  news-generator-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.news-generator
+    container_name: news-generator-1
+    ports:
+      - "5010:5010"
+    environment:
+      - DB_HOST=development-postgres-2-1
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+    restart: unless-stopped
+    depends_on:
+      - postgres-2
+    
+  news-processor-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.news-processor
+    container_name: news-processor-1
+    ports:
+      - "5011:5011"
+    environment:
+      - DB_HOST=development-postgres-2-1
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+    restart: unless-stopped
+    depends_on:
+      - postgres-2
+
+  news-orchestrator-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.news-orchestrator
+    container_name: news-orchestrator-1
+    ports:
+      - "5012:5012"
+    environment:
+      - DB_HOST=development-postgres-2-1
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+    restart: unless-stopped
+    depends_on:
+      - postgres-2
+
+  # Newsletter Services (NEW)
+  newsletter-link-extractor:
+    build:
+      context: .
+      dockerfile: Dockerfile.newsletter-link-extractor
+    container_name: newsletter-link-extractor-1
+    ports:
+      - "5014:5000"
+    environment:
+      - FLASK_ENV=production
+    restart: unless-stopped
+
+  background-article-processor:
+    build:
+      context: .
+      dockerfile: Dockerfile.background-article-processor
+    container_name: background-article-processor-1
+    ports:
+      - "5015:5000"
+    environment:
+      - FLASK_ENV=production
+    depends_on:
+      - postgres-2
+      - news-orchestrator-1
+    restart: unless-stopped
+
+  simple-news-search:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple-news-search
+    container_name: simple-news-search-1
+    ports:
+      - "5016:5000"
+    environment:
+      - FLASK_ENV=production
+    depends_on:
+      - postgres-2
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  default:
+    name: development_default
+    external: true

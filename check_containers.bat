@@ -1,0 +1,3 @@
+@echo off
+echo Checking Docker containers...
+docker ps

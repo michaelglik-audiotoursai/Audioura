@@ -1,0 +1,67 @@
+AUDIOTOURS DOCKER SERVICES TO LOCAL FILES MAPPING
+==================================================
+
+DOCKER SERVICES OVERVIEW:
+-------------------------
+Service Name          Port    Container Name                    Local Source
+tour-generator        5000    development-tour-generator-1      generate_tour_text_service.py
+tour-orchestrator     5002    development-tour-orchestrator-1   tour_orchestrator_service.py
+tour-processor        5001    development-tour-processor-1      tour_generation_service.py
+user-api-2            5003    development-user-api-2-1          ./user-tracking/
+tour-update           5004    development-tour-update-1         ./tour-update-service/
+map-delivery          5005    development-map-delivery-1        ./map_delivery/app.py
+coordinates-fromai    5006    development-coordinates-fromai-1  ./coordinates_fromAI/
+treats                5007    development-treats-1              treats_service.py
+voice-control         5008    development-voice-control-1       ./voice_control/
+postgres-2            5433    development-postgres-2-1          (database)
+
+FILE MAPPING DETAILS:
+--------------------
+
+BUILD-TIME COPIES (files copied during docker build):
+├── tour_orchestrator_service.py ──→ development-tour-orchestrator-1:/app/
+├── generate_tour_text_service.py ─→ development-tour-generator-1:/app/
+├── tour_generation_service.py ────→ development-tour-processor-1:/app/
+└── ./map_delivery/app.py ─────────→ development-map-delivery-1:/app/app.py
+
+RUNTIME VOLUME MOUNTS (live file sync):
+├── ./tours/ ←─────────────────────→ /app/tours (shared by multiple services)
+└── ./treats_service.py ───────────→ development-treats-1:/app/app.py
+
+SUBDIRECTORY BUILDS (entire folder copied):
+├── ./user-tracking/ ──────────────→ development-user-api-2-1:/app/
+├── ./tour-update-service/ ────────→ development-tour-update-1:/app/
+├── ./coordinates_fromAI/ ─────────→ development-coordinates-fromai-1:/app/
+└── ./voice_control/ ──────────────→ development-voice-control-1:/app/
+
+MAP-DELIVERY SERVICE ISSUE:
+---------------------------
+PROBLEM: Mobile app gets 404 error on http://192.168.0.217:5005/download-tour/6
+
+ROOT CAUSE ANALYSIS:
+├── Docker service uses: ./map_delivery/app.py
+├── But complete service is in: ./map_delivery_service.py
+├── Missing endpoints in ./map_delivery/app.py:
+│   ├── /download-tour/<int:tour_id>
+│   └── /tour-info/<int:tour_id>
+└── These endpoints exist in ./map_delivery_service.py
+
+SOLUTION:
+1. Copy ./map_delivery_service.py to ./map_delivery/app.py
+2. Update container: docker cp ./map_delivery/app.py development-map-delivery-1:/app/app.py
+3. Restart service: docker restart development-map-delivery-1
+
+HOW TO UPDATE SERVICES:
+-----------------------
+For BUILD-TIME services (most services):
+1. Edit local file in development directory
+2. Copy to container: docker cp local_file container_name:/app/file
+3. Restart container: docker restart container_name
+
+For VOLUME-MOUNTED services (treats only):
+1. Edit local file - changes are immediate (no restart needed)
+
+For SUBDIRECTORY services:
+1. Edit files in subdirectory
+2. Rebuild container: docker-compose build service_name
+3. Restart: docker-compose up -d service_name

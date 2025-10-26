@@ -1,0 +1,21 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements-tour-id-resolution.txt .
+RUN pip install --no-cache-dir -r requirements-tour-id-resolution.txt
+
+# Copy service file
+COPY tour_id_resolution_service.py .
+
+# Create tours directory
+RUN mkdir -p /app/tours
+
+EXPOSE 5025
+
+CMD ["python", "tour_id_resolution_service.py"]

@@ -1,0 +1,50 @@
+services:
+  news-generator-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.news-generator
+    container_name: news-generator-1
+    ports:
+      - "5010:5010"
+    environment:
+      - DB_HOST=development-postgres-2-1
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+    restart: unless-stopped
+    
+  news-processor-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.news-processor
+    container_name: news-processor-1
+    ports:
+      - "5011:5011"
+    environment:
+      - DB_HOST=development-postgres-2-1
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+    restart: unless-stopped
+
+  news-orchestrator-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.news-orchestrator
+    container_name: news-orchestrator-1
+    ports:
+      - "5012:5012"
+    environment:
+      - DB_HOST=development-postgres-2-1
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+    restart: unless-stopped
+
+networks:
+  default:
+    name: development_default
+    external: true

@@ -1,0 +1,16 @@
+c:\Users\micha\eclipse-workspace\AudioTours\development>curl -X POST -F "file=@armstrong_kelley_park_from_service_1.txt" http://localhost:5001/upload
+{"filename":"armstrong_kelley_park_from_service_1.txt","message":"File uploaded successfully","size":11624}
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>curl -X POST http://localhost:5001/process -H "Content-Type: application/json" -d "{\"tour_file\": \"armstrong_kelley_park_from_service_1.txt\"}"
+{"job_id":"2f7d7b55-5d1e-43df-bb10-daaa583c3d01","status":"queued"}
+
+curl -X POST http://localhost:5000/generate -H "Content-Type: application/json" -d "{ \"location\": \"\'a good many hands\' Shaker Communities Woven through Word, Image Object at Fruitlands Museum, Harvard, Massachusetts\",  \"tour_type\": \"exhibit\",  \"total_stops\": 25 }"
+
+
+curl -X POST http://localhost:5000/generate -H "Content-Type: application/json" -d "{ \"location\": \"Fruitlands Museum, Harvard, Massachusetts\",  \"tour_type\": \"exhibit\",  \"total_stops\": 25 }"
+
+curl -o "C:\Users\micha\eclipse-workspace\AudioTours\development\fruitlands_museum_tour.txt" http://localhost:5000/download/2459d4ff-9b24-4a21-9f1d-92eb7c223cf3
+
+c:\Users\micha\eclipse-workspace\AudioTours\development>curl -X POST -F "file=@fruitlands_museum_tour.txt" http://localhost:5001/upload
+c:\Users\micha\eclipse-workspace\AudioTours\development>curl -X POST http://localhost:5001/process -H "Content-Type: application/json" -d "{\"tour_file\": \"fruitlands_museum_tour.txt\"}"
+c:\Users\micha\eclipse-workspace\AudioTours\development>curl -o "C:\Users\micha\eclipse-workspace\AudioTours\development\fruitlands_museum_tour.zip" http://localhost:5001/download/fc0f2e51-8de8-4d1c-a376-2f5b32655fd5

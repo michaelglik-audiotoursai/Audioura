@@ -1,0 +1,82 @@
+openapi: 3.0.0
+info:
+  title: Audio Tour API
+  version: 1.0.0
+paths:
+  /tours:
+    get:
+      summary: Get all tours
+      responses:
+        '200':
+          description: List of tours
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tour'
+    post:
+      summary: Create new tour
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTourRequest'
+      responses:
+        '201':
+          description: Tour created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tour'
+  /tours/{id}:
+    get:
+      summary: Get tour by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Tour details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tour'
+components:
+  schemas:
+    Tour:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        location:
+          type: string
+        stops:
+          type: array
+          items:
+            $ref: '#/components/schemas/Stop'
+    Stop:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        audio_url:
+          type: string
+        description:
+          type: string
+    CreateTourRequest:
+      type: object
+      properties:
+        location:
+          type: string
+        tour_type:
+          type: string
+        total_stops:
+          type: integer

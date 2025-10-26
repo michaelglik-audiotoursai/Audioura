@@ -1,0 +1,3 @@
+@echo off
+echo Checking Docker container logs...
+docker logs development-user-api-2-1
