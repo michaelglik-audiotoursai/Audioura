@@ -36,7 +36,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   List<Map<String, dynamic>> _backgroundTours = [];
   String _appMode = 'Tours'; // Default to Tours mode
   String _contentType = 'Article'; // Article or Newsletter
-  List<Map<String, dynamic>> _selectedStops = []; // For map-based tour creation
+
 
   
   @override
@@ -676,56 +676,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
               ],
             ),
             const SizedBox(height: 20),
-            // Point Stops on Map button (Tours mode only)
-            if (_appMode == 'Tours') ...[
-              ElevatedButton.icon(
-                onPressed: _isGenerating ? null : _openMapStopSelector,
-                icon: const Icon(Icons.map),
-                label: const Text('Point Stops on Map'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF9b59b6),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Show selected stops if any
-              if (_selectedStops.isNotEmpty) ...[
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.purple.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.purple.shade200),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Selected Stops (${_selectedStops.length}):',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF9b59b6),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      ..._selectedStops.asMap().entries.map((entry) {
-                        final index = entry.key;
-                        final stop = entry.value;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: Text(
-                            '${index + 1}. ${stop['name']}',
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-            ],
+
             Row(
               children: [
                 Expanded(
