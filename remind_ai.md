@@ -4,14 +4,21 @@
 ### 🏗️ **Project Structure**
 ```
 c:\Users\micha\eclipse-workspace\AudioTours\development\
-├── audio_tour_app/                    # Flutter Mobile App
+├── audio_tour_app/                    # Flutter Mobile App (Audioura)
 │   ├── lib/screens/                   # UI Screens
 │   ├── lib/services/                  # Mobile Services
-│   └── pubspec.yaml                   # Version: 1.2.5+214
+│   └── pubspec.yaml                   # Version: 1.2.7+5
 ├── Docker Services (Microservices)
 ├── Database: PostgreSQL (development-postgres-2-1)
-└── GitHub Repo: Audio-Tours (Tag: v1.2.2.104)
+└── GitHub Repo: Audioura (Tag: 1.2.7.5)
 ```
+
+### 🌿 **CURRENT BRANCH: Newsletters**
+- **Active Branch**: `Newsletters` (for newsletter development)
+- **Base**: Created from main at v1.2.7+5
+- **Purpose**: Newsletter feature development
+- **GitHub**: https://github.com/michaelglik-audiotoursai/Audioura/tree/Newsletters
+- **⚠️ CRITICAL**: All commits must go to Newsletters branch, NOT main
 
 ### 🐳 **Docker Services Architecture**
 ```bash
@@ -31,15 +38,18 @@ newsletter-processor-1:5017            # Newsletter crawling & processing
 polly-tts-1:5018                      # Amazon Polly TTS (replaces gTTS)
 ```
 
-### 📱 **Mobile App (Flutter)**
+### 📱 **Mobile App (Flutter) - AUDIOURA REBRAND**
 - **Location**: `c:\Users\micha\eclipse-workspace\AudioTours\development\audio_tour_app\`
-- **Current Version**: 1.2.5+214
+- **Current Version**: 1.2.7+5
+- **App Name**: "Audioura App"
+- **Package Name**: `com.audioura.app` (changed from com.audiotours.dev)
 - **Modes**: Tours (default) / Audio (news/newsletters)
 - **Key Features**: Voice control, auto-download, error handling
 - **CRITICAL BUILD LIMITATION**: ❌ **Cannot build mobile app in Windows**
 - **Build Process**: Must use Ubuntu client in Oracle Virtual Box
 - **Build Command**: `bash build_flutter_clean.sh`
-- **APK Output**: `app-release-dev.apk` in development directory
+- **APK Output**: `audioura-dev.apk` in development directory (changed from app-release-dev.apk)
+- **App Icon**: Uses `Audioura_2.png` with ImageMagick auto-resizing
 
 ### 🗄️ **Database Schema (PostgreSQL)**
 ```sql
@@ -55,13 +65,15 @@ newsletters(id, url, name, created_at)
 newsletters_article_link(newsletter_id, article_requests_id)
 ```
 
-### 🔧 **Recent Major Changes (v1.2.5+214 - REQ-016)**
-1. **Complete Tour Editing**: Add/delete/reorder stops with bulk save operations
-2. **Clean State Logic**: Handles add+modify, modify+delete, add+delete scenarios
-3. **"Moved" UI Indicators**: Purple indicators with swap icons for reordered stops
-4. **UUID Tour Support**: Fixed critical issue where new tours couldn't be edited
-5. **Automatic Tour Refresh**: Downloads updated tours after editing using version API
-6. **Voice Control Compatibility**: Sequential audio file naming (audio_1.mp3, audio_2.mp3)
+### 🔧 **Recent Major Changes (v1.2.7+5 - AUDIOURA REBRAND)**
+1. **Complete Rebrand**: AudioTours → Audioura
+2. **Package Name Change**: `com.audiotours.dev` → `com.audioura.app`
+3. **New App Icon**: `Audioura_2.png` with larger microphone/headphones
+4. **APK Rename**: `app-release-dev.apk` → `audioura-dev.apk`
+5. **Build Script Updates**: Auto-installs ImageMagick, proper icon resizing
+6. **Adaptive Icon Removed**: Disabled to use PNG icons directly
+7. **Complete Tour Editing**: Add/delete/reorder stops (from REQ-016)
+8. **Voice Control**: Fixed and working (ISSUE-009 resolved)
 
 ### 🎯 **Current Issues & Solutions**
 - **REQ-016 Tour Editing**: ✅ Complete implementation with clean state logic
@@ -78,16 +90,17 @@ newsletters_article_link(newsletter_id, article_requests_id)
 3. **Restart containers**: `docker restart container_name`
 4. **Update version numbers** in pubspec.yaml
 5. **CRITICAL: ALWAYS COMMIT TO GIT** after each working change
-6. **Commit & tag**: `git tag v1.2.6.XXX`
+6. **Commit & tag**: `git tag 1.2.7.XXX` and push to main branch
 
 ### 📱 **Mobile App Build & Test Workflow**
 **IMPORTANT**: Amazon-Q cannot build mobile apps in Windows environment
 
 #### Build Process:
-1. **Update version** in `pubspec.yaml`: `version: 1.2.5+XXX`
+1. **Update version** in `pubspec.yaml`: `version: 1.2.7+XXX`
 2. **Switch to Ubuntu VM** (Oracle Virtual Box)
-3. **Run build script**: `bash build_flutter_clean.sh`
-4. **APK location**: `app-release-dev.apk` in development directory
+3. **Copy updated script**: `cp /media/sf_audiotours/build_flutter_clean.sh ~/build_flutter_clean.sh`
+4. **Run build script**: `bash build_flutter_clean.sh`
+5. **APK location**: `audioura-dev.apk` in development directory
 
 #### Testing Process:
 1. **Install APK** on Android device
@@ -103,16 +116,29 @@ newsletters_article_link(newsletter_id, article_requests_id)
 4. **CRITICAL**: Voice control should now work (ISSUE-009 FIXED)
 5. **Check**: Audio elements have proper id="audio1" attributes
 
-### 🔥 **MANDATORY GIT WORKFLOW - NEVER SKIP THIS**
+### 🔥 **MANDATORY GIT WORKFLOW - NEWSLETTERS BRANCH**
 **ALWAYS commit changes to Git after each successful modification. This prevents losing functionality if files get corrupted.**
 
-**Standard commit sequence:**
+**⚠️ CRITICAL: Currently on Newsletters branch - DO NOT commit to main!**
+
+**Newsletter Development Workflow:**
 ```bash
+git checkout Newsletters  # Ensure on correct branch
 git add audio_tour_app/lib/screens/home_screen.dart
 git add audio_tour_app/pubspec.yaml  
 git add audio_tour_app/lib/main.dart
 git add *.py  # Add any modified services
-git commit -m "v1.2.2+XXX - [Description of changes]"
+git commit -m "Newsletter: [Description of changes]"
+git push origin Newsletters  # Push to Newsletters branch
+```
+
+**When Newsletter Development Complete:**
+```bash
+git checkout main
+git merge Newsletters
+git push origin main
+git tag "1.2.8.XXX"  # New version after merge
+git push origin "1.2.8.XXX"
 ```
 
 **Use safe_commit.bat to avoid long filename issues:**
@@ -157,10 +183,11 @@ cd audio_tour_app && flutter build apk --release
 - **Navigation**: Uses `available_tours` list in SharedPreferences
 
 ### 📊 **Version Management**
-- **Mobile App**: pubspec.yaml version field (1.2.2+105)
+- **Mobile App**: pubspec.yaml version field (1.2.7+5)
 - **Services**: SERVICE_VERSION constants in Python files
-- **GitHub**: Tags for major releases (v1.2.2.104)
+- **GitHub**: Tags for major releases (1.2.7.5)
 - **Sync Rule**: All versions must match for reproducibility
+- **Latest Tag**: 1.2.7.5 (Audioura rebrand complete)
 
 ### 🔄 **Recovery Steps**
 1. **Check Git status first**: `git status` and `git log --oneline -10`
@@ -185,9 +212,12 @@ cd audio_tour_app && flutter build apk --release
 - **Service sync**: Copy to containers AND commit to Git
 - **Version tracking**: Update version numbers with each commit
 
-### 🎯 **Next Priorities**
-- **CRITICAL**: Test ISSUE-009 voice control fix on newly generated tours
-- Verify "Next Step", "Play", "Pause" commands work in modified tours
-- Confirm HTML audio elements have proper id attributes
-- Complete REQ-016 validation with working voice commands
-- Mobile app UI/UX refinements for tour editing
+### 🎯 **Current Status & Priorities**
+- ✅ **Audioura Rebrand**: Complete (v1.2.7+5)
+- ✅ **Voice Control**: Fixed and working (ISSUE-009 resolved)
+- ✅ **Tour Editing**: Complete implementation (REQ-016)
+- ✅ **GitHub Tag**: 1.2.7.5 pushed with APK backup
+- ✅ **Newsletters Branch**: Created and active for development
+- 🔄 **CURRENT FOCUS**: Newsletter feature development
+- 🔄 **Branch Status**: Working on Newsletters branch
+- 🔄 **Future**: Map-based tour recording (design complete in communication layer)
