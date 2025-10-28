@@ -31,7 +31,7 @@ else
 fi
 
 echo "Copying Audioura app icon with proper sizing..."
-OWL_IMAGE="$SOURCE_DIR/APK_BUILDS/Audioura_2.png"
+OWL_IMAGE="$SOURCE_DIR/APK_BUILDS/Audioura_3.png"
 ICON_DIR="$WORK_DIR/audio_tour_app/android/app/src/main/res"
 
 # Install ImageMagick if not available

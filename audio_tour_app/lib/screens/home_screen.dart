@@ -1367,8 +1367,12 @@ class _HomeScreenState extends State<HomeScreen> {
   
   Future<void> _processNewsletter(int newsletterId, String name) async {
     try {
+      await DebugLogHelper.addDebugLog('NEWSLETTER: Starting _processNewsletter with ID: $newsletterId, Name: $name');
+      
       final prefs = await SharedPreferences.getInstance();
       final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
+      
+      await DebugLogHelper.addDebugLog('NEWSLETTER: Using server IP: $serverIp');
       
       showDialog(
         context: context,
@@ -1384,11 +1388,20 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
       
+      final requestUrl = 'http://$serverIp:5017/get_articles_by_newsletter_id';
+      final requestBody = {'newsletter_id': newsletterId};
+      
+      await DebugLogHelper.addDebugLog('NEWSLETTER: Making POST request to: $requestUrl');
+      await DebugLogHelper.addDebugLog('NEWSLETTER: Request body: ${json.encode(requestBody)}');
+      
       final response = await http.post(
-        Uri.parse('http://$serverIp:5017/get_articles_by_newsletter_id'),
+        Uri.parse(requestUrl),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({'newsletter_id': newsletterId}),
+        body: json.encode(requestBody),
       ).timeout(Duration(seconds: 30));
+      
+      await DebugLogHelper.addDebugLog('NEWSLETTER: Response status: ${response.statusCode}');
+      await DebugLogHelper.addDebugLog('NEWSLETTER: Response body: ${response.body}');
       
       Navigator.pop(context);
       
@@ -1396,24 +1409,43 @@ class _HomeScreenState extends State<HomeScreen> {
         final data = json.decode(response.body);
         final articles = List<Map<String, dynamic>>.from(data['articles'] ?? []);
         
+        await DebugLogHelper.addDebugLog('NEWSLETTER: Successfully parsed ${articles.length} articles');
+        
         if (articles.isEmpty) {
+          await DebugLogHelper.addDebugLog('NEWSLETTER: No articles found in newsletter');
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('No articles found in this newsletter edition')),
           );
           return;
         }
         
+        await DebugLogHelper.addDebugLog('NEWSLETTER: Showing article selection dialog');
         _showArticleSelectionDialog(articles, newsletterId, name);
       } else {
-        final error = json.decode(response.body)['error'] ?? 'Failed to load articles';
+        final errorBody = response.body;
+        await DebugLogHelper.addDebugLog('NEWSLETTER: Server error - Status: ${response.statusCode}, Body: $errorBody');
+        
+        String errorMessage;
+        try {
+          final errorData = json.decode(errorBody);
+          errorMessage = errorData['error'] ?? 'Failed to load articles';
+          await DebugLogHelper.addDebugLog('NEWSLETTER: Parsed error message: $errorMessage');
+        } catch (parseError) {
+          errorMessage = 'Server error: ${response.statusCode}';
+          await DebugLogHelper.addDebugLog('NEWSLETTER: Could not parse error response: $parseError');
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $error'),
+            content: Text('Error: $errorMessage'),
             backgroundColor: Colors.red,
           ),
         );
       }
     } catch (e) {
+      await DebugLogHelper.addDebugLog('NEWSLETTER: Exception in _processNewsletter: $e');
+      await DebugLogHelper.addDebugLog('NEWSLETTER: Exception type: ${e.runtimeType}');
+      
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -2187,8 +2219,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final name = newsletter['name'] ?? 'Unknown Newsletter';
     final url = newsletter['url'] ?? '';
     final createdAt = newsletter['created_at'] ?? '';
-    final newsletterId = newsletter['id'] ?? 0;
+    final newsletterId = newsletter['newsletter_id'] ?? 0;
     final articleCount = newsletter['article_count'] ?? 0;
+    
+    // Debug logging for newsletter card data
+    DebugLogHelper.addDebugLog('NEWSLETTER_CARD: Building card for newsletter: $name');
+    DebugLogHelper.addDebugLog('NEWSLETTER_CARD: Newsletter ID: $newsletterId');
+    DebugLogHelper.addDebugLog('NEWSLETTER_CARD: Full newsletter data: ${json.encode(newsletter)}');
     
     String dateStr = '';
     if (createdAt.isNotEmpty) {
@@ -2259,10 +2296,16 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           child: IconButton(
             icon: Icon(Icons.play_arrow, color: Colors.white, size: 24),
-            onPressed: () => _processNewsletter(newsletterId, name),
+            onPressed: () {
+              DebugLogHelper.addDebugLog('NEWSLETTER_CARD: Play button pressed for newsletter: $name (ID: $newsletterId)');
+              _processNewsletter(newsletterId, name);
+            },
           ),
         ),
-        onTap: () => _processNewsletter(newsletterId, name),
+        onTap: () {
+          DebugLogHelper.addDebugLog('NEWSLETTER_CARD: Card tapped for newsletter: $name (ID: $newsletterId)');
+          _processNewsletter(newsletterId, name);
+        },
       ),
     );
   }
