@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Newsletter Processor Service - RESTORED with Enhanced Apple Podcasts URL Extraction
-Combines original functionality with new comprehensive widget detection
+Newsletter Processor Service - Enhanced with comprehensive widget detection and universal duplicate checking
 """
 import os
 import sys
@@ -51,7 +50,7 @@ def clean_url(url):
         return str(url) if url else ''
 
 def extract_all_clickable_urls(soup, base_url):
-    """ENHANCED: Extract URLs from all clickable HTML elements"""
+    """Extract URLs from all clickable HTML elements"""
     urls = []
     
     # 1. Standard <a> links
@@ -94,137 +93,107 @@ def health_check():
 
 @app.route('/newsletters_v2', methods=['GET'])
 def get_newsletters_v2():
-    """RESTORED: Get all newsletters with dates and article counts"""
+    """Get available newsletters for mobile app - matches expected format"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
+        # Get newsletters with article counts (only those with articles)
         cursor.execute("""
-            SELECT n.id, n.url, n.type, n.created_at, COUNT(na.article_id) as article_count
+            SELECT n.id, n.url, n.type, n.created_at, COUNT(nal.article_requests_id) as article_count
             FROM newsletters n
-            JOIN newsletters_article_link nal ON n.id = nal.newsletters_id
-            JOIN article_requests ar ON nal.article_requests_id = ar.article_id
-            JOIN news_audios na ON ar.article_id = na.article_id
-            WHERE ar.status = 'finished'
+            LEFT JOIN newsletters_article_link nal ON n.id = nal.newsletters_id
             GROUP BY n.id, n.url, n.type, n.created_at
+            HAVING COUNT(nal.article_requests_id) > 0
             ORDER BY n.created_at DESC
+            LIMIT 20
         """)
         
         newsletters = []
         for row in cursor.fetchall():
-            # Extract domain name from URL for display
-            url = row[1]
+            newsletter_id, url, newsletter_type, created_at, article_count = row
+            
+            # Extract domain name for display
             try:
-                parsed = urlparse(url)
-                domain_name = parsed.netloc.replace('www.', '')
-                # Extract issue/title from path
-                path_parts = [p for p in parsed.path.split('/') if p]
-                title_part = path_parts[-1] if path_parts else 'Newsletter'
-                if 'issue-' in title_part:
-                    issue_num = title_part.split('issue-')[1].split('-')[0]
-                    display_name = f"{domain_name} Issue-{issue_num}"
-                else:
-                    display_name = f"{domain_name} ({row[2] or 'Newsletter'})"
+                from urllib.parse import urlparse
+                domain = urlparse(url).netloc
+                if domain.startswith('www.'):
+                    domain = domain[4:]
+                name = f"{domain} ({newsletter_type})"
             except:
-                display_name = url
+                name = f"Newsletter {newsletter_id} ({newsletter_type})"
             
             newsletters.append({
-                'newsletter_id': row[0],
-                'url': row[1],
-                'name': display_name,
-                'created_at': row[3].isoformat() if row[3] else None,
-                'date': row[3].strftime('%B %d, %Y') if row[3] else 'Unknown Date',
-                'type': row[2] or 'Others',
-                'article_count': row[4]
+                "newsletter_id": newsletter_id,
+                "name": name,
+                "url": url,
+                "type": newsletter_type,
+                "created_at": created_at.isoformat() if created_at else None,
+                "article_count": article_count
             })
         
         cursor.close()
         conn.close()
         
         return jsonify({
-            "status": "success",
             "newsletters": newsletters
         })
         
     except Exception as e:
-        logging.error(f"Error getting newsletters v2: {e}")
-        return jsonify({"error": str(e)}), 500
+        logging.error(f"Error getting newsletters_v2: {e}")
+        return jsonify({
+            "error": f"Failed to get newsletters: {str(e)}"
+        }), 500
 
-@app.route('/get_articles_by_newsletter_id', methods=['POST'])
+@app.route('/get_articles_by_newsletter_id', methods=['GET'])
 def get_articles_by_newsletter_id():
-    """RESTORED: Get articles by newsletter ID"""
+    """Get articles for a specific newsletter - matches mobile app expectation"""
     try:
-        data = request.get_json()
-        newsletter_id = data.get('newsletter_id')
-        
+        newsletter_id = request.args.get('newsletter_id')
         if not newsletter_id:
-            return jsonify({"error": "newsletter_id is required"}), 400
-        
-        logging.info(f"Getting articles for newsletter ID: {newsletter_id}")
+            return jsonify({"error": "newsletter_id parameter required"}), 400
         
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Get articles with audio for this specific newsletter
+        # Get articles for this newsletter
         cursor.execute("""
-            SELECT ar.article_id, ar.request_string, ar.url, ar.created_at, ar.status, ar.article_type
-            FROM article_requests ar
-            JOIN newsletters_article_link nal ON ar.article_id = nal.article_requests_id
-            JOIN news_audios na ON ar.article_id = na.article_id
-            WHERE nal.newsletters_id = %s AND ar.status = 'finished'
+            SELECT ar.article_id, ar.request_string, ar.status, na.article_name, ar.created_at
+            FROM newsletters_article_link nal
+            JOIN article_requests ar ON nal.article_requests_id = ar.article_id
+            LEFT JOIN news_audios na ON ar.article_id = na.article_id
+            WHERE nal.newsletters_id = %s
             ORDER BY ar.created_at DESC
         """, (newsletter_id,))
         
         articles = []
         for row in cursor.fetchall():
-            article_id, title, url, created_at, status, article_type = row
-            
-            # Extract author from title if available
-            author = 'Unknown Author'
-            clean_title = title
-            
-            if ' - ' in title:
-                parts = title.split(' - ')
-                if len(parts) >= 2:
-                    clean_title = parts[0].strip()
-                    author = parts[1].strip()
-            elif ' by ' in title.lower():
-                by_index = title.lower().find(' by ')
-                if by_index > 0:
-                    clean_title = title[:by_index].strip()
-                    author = title[by_index + 4:].strip()
-            
-            # Format date
-            try:
-                formatted_date = created_at.strftime('%B %d, %Y')
-            except:
-                formatted_date = 'Unknown Date'
-            
+            article_id, title, status, audio_name, created_at = row
             articles.append({
-                'article_id': article_id,
-                'title': clean_title,
-                'author': author,
-                'date': formatted_date,
-                'url': url,
-                'status': status,
-                'article_type': article_type or 'Others'
+                "article_id": article_id,
+                "title": title or audio_name or "Untitled Article",
+                "status": "completed" if status == "finished" else status,
+                "created_at": created_at.isoformat() if created_at else None,
+                "has_audio": audio_name is not None
             })
         
         cursor.close()
         conn.close()
         
         return jsonify({
-            "status": "success",
-            "articles": articles
+            "articles": articles,
+            "newsletter_id": newsletter_id,
+            "total_count": len(articles)
         })
         
     except Exception as e:
-        logging.error(f"Error getting articles by newsletter ID: {e}")
-        return jsonify({"error": str(e)}), 500
+        logging.error(f"Error getting articles for newsletter {newsletter_id}: {e}")
+        return jsonify({
+            "error": f"Failed to get articles: {str(e)}"
+        }), 500
 
 @app.route('/process_newsletter', methods=['POST'])
 def process_newsletter():
-    """ENHANCED: Process newsletter with Apple Podcasts URL extraction"""
     try:
         data = request.get_json()
         newsletter_url = data.get('newsletter_url')
@@ -283,9 +252,10 @@ def process_newsletter():
         all_urls = extract_all_clickable_urls(soup, newsletter_url)
         logging.info(f"Found {len(all_urls)} total clickable URLs")
         
-        # Filter for article URLs - prioritize podcast URLs
+        # Filter for article URLs
         article_urls = []
         for url in all_urls:
+            # Simple article detection - prioritize podcast URLs
             if ('podcasts.apple.com' in url and '?i=' in url) or 'open.spotify.com/episode' in url:
                 article_urls.append({
                     'url': url,
