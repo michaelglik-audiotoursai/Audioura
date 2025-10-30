@@ -40,11 +40,21 @@ def get_spotify_episode_content(episode_id):
         
         response = requests.get(episode_url, headers=headers, timeout=10, allow_redirects=True)
         
-        logging.info(f"Spotify response status: {response.status_code}, final URL: {response.url}")
+        logging.info(f"Spotify response status: {response.status_code}, final URL: {response.url}, content length: {len(response.text)}")
         
         if response.status_code == 200:
             # Extract content from HTML
             content = response.text
+            
+            # Check if we got an authentication/not found page
+            if 'Couldn\'t find that podcast' in content or 'Sign up to get unlimited' in content:
+                logging.warning("Spotify returned authentication/not found page")
+                return {
+                    'title': 'Spotify Episode (Authentication Required)',
+                    'description': 'This episode requires Spotify authentication to access',
+                    'content': 'EPISODE_TITLE: Spotify Episode (Authentication Required)\n\nEPISODE_DESCRIPTION: This episode requires Spotify authentication to access',
+                    'auth_required': True
+                }
             
             # Try to extract episode title and description from HTML
             title_match = re.search(r'<title[^>]*>([^<]+)</title>', content)
@@ -122,24 +132,55 @@ def process_spotify_url(spotify_url):
             from browser_automation import extract_spotify_with_browser
             browser_result = extract_spotify_with_browser(spotify_url)
             
-            if browser_result.get('success') and len(browser_result.get('content', '')) >= 100:
-                logging.info(f"Browser automation SUCCESS: {len(browser_result['content'])} chars")
-                return browser_result
+            if browser_result.get('success'):
+                content = browser_result.get('content', '')
+                full_text_length = browser_result.get('full_text_length', 0)
+                
+                logging.info(f"Browser automation extracted {full_text_length} chars of text")
+                
+                # Check if we got Spotify's authentication/not found page
+                if 'Couldn\'t find that podcast' in content or 'Sign up to get unlimited' in content:
+                    logging.warning("Spotify episode requires authentication or is not publicly accessible")
+                    return {
+                        "error": "Spotify episode requires authentication or is not publicly accessible",
+                        "error_type": "authentication_required",
+                        "extracted_text_length": full_text_length,
+                        "note": "Browser automation working (extracted {full_text_length} chars), but content not accessible"
+                    }
+                
+                # Check content quality
+                if len(content) >= 100:
+                    logging.info(f"Browser automation SUCCESS: {len(content)} chars of quality content")
+                    return browser_result
+                else:
+                    logging.warning(f"Browser automation returned insufficient content: {len(content)} chars")
             else:
-                logging.warning(f"Browser automation also failed: {browser_result.get('error', 'Insufficient content')}")
+                logging.warning(f"Browser automation failed: {browser_result.get('error', 'Unknown error')}")
         except Exception as e:
             logging.error(f"Browser automation error: {e}")
     
     # Return regular scraping result (even if insufficient)
     if episode_data:
-        return {
-            "success": True,
-            "title": episode_data['title'],
-            "content": episode_data['content'],
-            "description": episode_data['description']
-        }
+        content_length = len(episode_data.get('content', ''))
+        if content_length >= 100:
+            return {
+                "success": True,
+                "title": episode_data['title'],
+                "content": episode_data['content'],
+                "description": episode_data['description']
+            }
+        else:
+            return {
+                "error": f"Insufficient content extracted: {content_length} bytes (minimum 100 required)",
+                "error_type": "insufficient_content",
+                "title": episode_data['title'],
+                "content_length": content_length
+            }
     
-    return {"error": "Could not extract episode content from Spotify"}
+    return {
+        "error": "Could not extract episode content from Spotify",
+        "error_type": "extraction_failed"
+    }
 
 if __name__ == "__main__":
     # Test with the URL from the issue

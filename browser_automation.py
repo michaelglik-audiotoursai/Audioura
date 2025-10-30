@@ -37,7 +37,7 @@ class BrowserAutomation:
             self.driver = None
     
     def extract_spotify_content(self, spotify_url):
-        """Extract Spotify episode content using browser automation"""
+        """Extract Spotify episode content using browser automation with getText() focus"""
         if not self.driver:
             return {"error": "Browser not initialized"}
         
@@ -47,6 +47,73 @@ class BrowserAutomation:
             
             # Wait for page to load and content to appear
             time.sleep(5)
+            
+            # Extract all text content using getText() equivalent
+            try:
+                full_text = self.driver.find_element(By.TAG_NAME, "body").text
+                logging.info(f"Extracted full page text: {len(full_text)} characters")
+                
+                # Save text content for analysis
+                episode_id = spotify_url.split('/episode/')[-1].split('?')[0]
+                text_filename = f"/app/spotify_text_{episode_id}.txt"
+                with open(text_filename, 'w', encoding='utf-8') as f:
+                    f.write(full_text)
+                logging.info(f"Saved text content to {text_filename}")
+                
+                # Check if we got rich episode content (not just login page)
+                if "Episode Description" in full_text and len(full_text) > 3000:
+                    logging.info("Rich episode content detected - extracting detailed information")
+                    
+                    # Extract episode title from page title
+                    page_title = self.driver.title
+                    if " - " in page_title and "Podcast on Spotify" in page_title:
+                        episode_title = page_title.split(" - ")[0].strip()
+                    else:
+                        episode_title = "Spotify Episode"
+                    
+                    # Extract episode description and details from full text
+                    lines = [line.strip() for line in full_text.split('\n') if line.strip()]
+                    
+                    # Find episode description section
+                    description_start = -1
+                    for i, line in enumerate(lines):
+                        if "Episode Description" in line:
+                            description_start = i + 1
+                            break
+                    
+                    episode_description = ""
+                    if description_start > 0 and description_start < len(lines):
+                        # Collect description lines until we hit a section break
+                        desc_lines = []
+                        for i in range(description_start, min(description_start + 20, len(lines))):
+                            line = lines[i]
+                            if line in ["See all episodes", "More episodes like this", "Show all"]:
+                                break
+                            if len(line) > 20:  # Only substantial content
+                                desc_lines.append(line)
+                        episode_description = " ".join(desc_lines)
+                    
+                    # If no description found, extract from the main content area
+                    if not episode_description:
+                        # Look for substantial content blocks
+                        substantial_lines = [line for line in lines if len(line) > 100]
+                        if substantial_lines:
+                            episode_description = substantial_lines[0]
+                    
+                    logging.info(f"Extracted rich content: Title='{episode_title}', Description={len(episode_description)} chars")
+                    
+                    return {
+                        "success": True,
+                        "title": episode_title,
+                        "description": episode_description,
+                        "content": f"EPISODE_TITLE: {episode_title}\n\nEPISODE_DESCRIPTION: {episode_description}",
+                        "full_text_length": len(full_text),
+                        "content_type": "rich_episode_content"
+                    }
+                
+            except Exception as e:
+                logging.error(f"Failed to extract text content: {e}")
+                full_text = ""
             
             # Try multiple selectors for episode title and description
             title_selectors = [
@@ -67,7 +134,7 @@ class BrowserAutomation:
             title = "Spotify Episode"
             description = ""
             
-            # Extract title
+            # Extract title using getText()
             for selector in title_selectors:
                 try:
                     element = self.driver.find_element(By.CSS_SELECTOR, selector)
@@ -78,7 +145,7 @@ class BrowserAutomation:
                 except:
                     continue
             
-            # Extract description
+            # Extract description using getText()
             for selector in description_selectors:
                 try:
                     elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
@@ -93,17 +160,13 @@ class BrowserAutomation:
                 except:
                     continue
             
-            # If no description found, try getting all text content
-            if not description:
-                try:
-                    body_text = self.driver.find_element(By.TAG_NAME, "body").text
-                    # Look for substantial text blocks
-                    paragraphs = [p.strip() for p in body_text.split('\n') if len(p.strip()) > 100]
-                    if paragraphs:
-                        description = paragraphs[0]
-                        logging.info(f"Extracted description from body text: {len(description)} chars")
-                except:
-                    pass
+            # If no description found, extract from full text
+            if not description and full_text:
+                # Look for substantial text blocks in full text
+                lines = [line.strip() for line in full_text.split('\n') if len(line.strip()) > 100]
+                if lines:
+                    description = lines[0]
+                    logging.info(f"Extracted description from full text: {len(description)} chars")
             
             # Clean title
             clean_title = title.replace(' | Podcast on Spotify', '').replace(' - Spotify', '').strip()
@@ -114,12 +177,14 @@ class BrowserAutomation:
             content = f"EPISODE_TITLE: {clean_title}\n\nEPISODE_DESCRIPTION: {description}"
             
             logging.info(f"Browser extraction result: Title='{clean_title}', Description={len(description)} chars")
+            logging.info(f"Full text length: {len(full_text)} chars")
             
             return {
                 "success": True,
                 "title": clean_title,
                 "description": description,
-                "content": content
+                "content": content,
+                "full_text_length": len(full_text)
             }
             
         except Exception as e:
@@ -208,3 +273,19 @@ def extract_dynamic_content(url):
     """Extract dynamic content from any URL"""
     browser = get_browser()
     return browser.extract_dynamic_content(url)
+
+def test_spotify_text_extraction(spotify_url):
+    """Test function to extract and analyze Spotify text content"""
+    browser = get_browser()
+    result = browser.extract_spotify_content(spotify_url)
+    
+    if result.get('success'):
+        print(f"✅ Text extraction successful!")
+        print(f"Title: {result['title']}")
+        print(f"Description length: {len(result['description'])} chars")
+        print(f"Full text length: {result.get('full_text_length', 0)} chars")
+        print(f"Content preview: {result['content'][:200]}...")
+    else:
+        print(f"❌ Text extraction failed: {result.get('error')}")
+    
+    return result
