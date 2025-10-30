@@ -82,13 +82,51 @@ def generate_short_title(original_title, article_type):
     logging.info(f"Fallback short title: {fallback_title}")
     return fallback_title
 
+def clean_text_for_polly(text):
+    """Clean text thoroughly before sending to Polly TTS to control costs"""
+    if not text:
+        return ""
+    
+    import re
+    
+    # Remove HTML tags completely
+    text = re.sub(r'<[^>]+>', '', text)
+    
+    # Remove URLs to reduce TTS costs
+    text = re.sub(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', '[URL]', text)
+    
+    # Remove email addresses
+    text = re.sub(r'\S+@\S+', '[EMAIL]', text)
+    
+    # Remove excessive whitespace
+    text = re.sub(r'\s+', ' ', text)
+    
+    # Remove control characters
+    text = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', text)
+    
+    # Limit to 5000 characters per TTS call to control costs
+    if len(text) > 5000:
+        text = text[:5000] + "... Content truncated for cost control."
+        logging.warning(f"Text truncated to 5000 characters for Polly cost control")
+    
+    return text.strip()
+
 def generate_audio_with_polly(text, output_path):
-    """Generate audio using Polly TTS service"""
+    """Generate audio using Polly TTS service with cost controls"""
     try:
+        # Clean text before sending to Polly
+        clean_text = clean_text_for_polly(text)
+        
+        if not clean_text:
+            logging.error("No clean text available for TTS")
+            raise Exception("No clean text for TTS")
+        
+        logging.info(f"Sending {len(clean_text)} clean characters to Polly (original: {len(text)})")
+        
         response = requests.post(
             'http://polly-tts-1:5018/synthesize',
             json={
-                'text': text,
+                'text': clean_text,
                 'voice_id': 'Joanna',
                 'output_format': 'mp3'
             },
@@ -98,7 +136,7 @@ def generate_audio_with_polly(text, output_path):
         if response.status_code == 200:
             with open(output_path, 'wb') as f:
                 f.write(response.content)
-            logging.info(f"Polly TTS successful: {len(text)} chars -> {output_path}")
+            logging.info(f"Polly TTS successful: {len(clean_text)} chars -> {output_path}")
             return True
         else:
             logging.error(f"Polly failed with status {response.status_code}: {response.text}")

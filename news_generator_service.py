@@ -483,8 +483,20 @@ def process_article(article_id):
         elif isinstance(article_text, bytes):
             article_text = article_text.decode('utf-8')
         
-        # 1. Extract title and author first (to identify boundaries)
-        title, author = extract_title_author(article_text)
+        # 1. Check if we have a clean title from RSS processor (Apple Podcasts/Spotify)
+        # RSS processors provide clean titles that should be preserved
+        if (request_string and 
+            ('EPISODE_TITLE:' in article_text or 
+             'podcasts.apple.com' in str(article_text) or 
+             'spotify.com' in str(article_text))):
+            # Use the clean title from RSS processor
+            title = request_string
+            author = ""  # RSS processors don't extract authors
+            logging.info(f"Using RSS processor title: '{title}'")
+        else:
+            # Extract title and author from article content (standard web scraping)
+            title, author = extract_title_author(article_text)
+            logging.info(f"Extracted title from content: '{title}'")
         
         # 2. Clean article using title as boundary marker
         cleaned_text = clean_article_with_title_boundary(article_text, title)
@@ -504,7 +516,16 @@ def process_article(article_id):
         logging.info(f"Article {article_id} classified as: {article_type}")
         
         # Create final content with summary and full article
-        final_title = f"{title}" + (f" by {author}" if author else "")
+        # For RSS content, don't add author since it's already clean
+        if ('EPISODE_TITLE:' in article_text or 
+            'podcasts.apple.com' in str(article_text) or 
+            'spotify.com' in str(article_text)):
+            final_title = title  # Keep RSS title clean
+            logging.info(f"Using clean RSS title: '{final_title}'")
+        else:
+            final_title = f"{title}" + (f" by {author}" if author else "")
+            logging.info(f"Using extracted title with author: '{final_title}'")
+        
         processed_text = f"Summary: {summary}\n\nFull Article: {cleaned_text}"
         
         # Update article with processed text, title, major points, type, and status

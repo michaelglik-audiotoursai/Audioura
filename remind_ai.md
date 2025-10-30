@@ -165,6 +165,10 @@ docker cp file.py container:/app/file.py    # Deploy changes
 # Database Access
 docker exec development-postgres-2-1 psql -U admin -d audiotours -c "SELECT * FROM table;"
 
+# Newsletter Cleanup (for testing)
+python cleanup_newsletter_simple.py --list                    # List recent newsletters
+python cleanup_newsletter_simple.py --url "newsletter-url"    # Delete newsletter + all articles
+
 # Mobile App
 cd audio_tour_app && flutter build apk --release
 ```
@@ -212,12 +216,41 @@ cd audio_tour_app && flutter build apk --release
 - **Service sync**: Copy to containers AND commit to Git
 - **Version tracking**: Update version numbers with each commit
 
+### 🧹 **Newsletter Cleanup Utility**
+**Purpose**: Delete newsletters and all connected articles for testing enhanced processing
+
+**File**: `cleanup_newsletter_simple.py`
+**Usage**:
+```bash
+# List recent newsletters with IDs and article counts
+python cleanup_newsletter_simple.py --list
+
+# Delete specific newsletter and ALL connected articles
+python cleanup_newsletter_simple.py --url "https://newsletter-url-here"
+
+# Example: Clean Guy Raz newsletter for retesting
+python cleanup_newsletter_simple.py --url "https://guyraz.substack.com/p/10-lessons-from-chip-and-joanna-gaines"
+```
+
+**What it deletes**:
+- Newsletter entry from `newsletters` table
+- All linked articles from `article_requests` table  
+- All audio files from `news_audios` table
+- All link records from `newsletters_article_link` table
+
+**Use cases**:
+- Testing enhanced newsletter processing
+- Clearing daily limits for retesting
+- Database cleanup after failed processing
+- Removing test data
+
 ### 🎯 **Current Status & Priorities**
 - ✅ **Audioura Rebrand**: Complete (v1.2.7+5)
 - ✅ **Voice Control**: Fixed and working (ISSUE-009 resolved)
 - ✅ **Tour Editing**: Complete implementation (REQ-016)
 - ✅ **GitHub Tag**: 1.2.7.5 pushed with APK backup
 - ✅ **Newsletters Branch**: Created and active for development
+- ✅ **ISSUE-052**: Newsletter Apple Podcasts URL extraction resolved
 - 🔄 **CURRENT FOCUS**: Newsletter feature development
 - 🔄 **Branch Status**: Working on Newsletters branch
 - 🔄 **Future**: Map-based tour recording (design complete in communication layer)
