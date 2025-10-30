@@ -274,6 +274,50 @@ def extract_dynamic_content(url):
     browser = get_browser()
     return browser.extract_dynamic_content(url)
 
+def extract_newsletter_content_with_browser(url):
+    """Universal newsletter content extraction for any technology"""
+    browser = get_browser()
+    
+    if not browser.driver:
+        return {"error": "Browser not initialized"}
+    
+    try:
+        logging.info(f"Loading newsletter URL with browser: {url}")
+        browser.driver.get(url)
+        time.sleep(5)
+        
+        # Extract full text content
+        full_text = browser.driver.find_element(By.TAG_NAME, "body").text
+        page_title = browser.driver.title
+        
+        # Detect content type and extract accordingly
+        if 'spotify.com' in url:
+            return browser.extract_spotify_content(url)
+        elif 'podcasts.apple.com' in url:
+            # Apple Podcasts handling
+            return {
+                "success": True,
+                "title": page_title,
+                "content": f"PODCAST_TITLE: {page_title}\n\nPODCAST_CONTENT: {full_text[:1000]}",
+                "content_type": "apple_podcasts"
+            }
+        else:
+            # Generic newsletter/article content
+            lines = [line.strip() for line in full_text.split('\n') if len(line.strip()) > 50]
+            substantial_content = ' '.join(lines[:10])  # First 10 substantial lines
+            
+            return {
+                "success": True,
+                "title": page_title,
+                "content": f"ARTICLE_TITLE: {page_title}\n\nARTICLE_CONTENT: {substantial_content}",
+                "content_type": "generic_article",
+                "full_text_length": len(full_text)
+            }
+            
+    except Exception as e:
+        logging.error(f"Universal browser extraction error for {url}: {e}")
+        return {"error": f"Browser extraction failed: {str(e)}"}
+
 def test_spotify_text_extraction(spotify_url):
     """Test function to extract and analyze Spotify text content"""
     browser = get_browser()
