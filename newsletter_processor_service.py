@@ -297,19 +297,128 @@ def process_newsletter():
         
         soup = BeautifulSoup(response.content, 'html.parser')
         
-        # ENHANCED: Extract URLs from all clickable HTML elements
+        # ENHANCED: Extract main newsletter content FIRST
+        article_urls = []
+        
+        # 1. MAIN NEWSLETTER ARTICLE - Extract newsletter content itself
+        try:
+            # Enhanced content extraction for Substack newsletters
+            main_content = ""
+            
+            # Try Substack-specific selectors first
+            substack_selectors = [
+                '.available-content .body.markup',  # Substack main content
+                '.post-content .body.markup',
+                'article .body.markup',
+                '.single-post .body.markup'
+            ]
+            
+            for selector in substack_selectors:
+                try:
+                    element = soup.select_one(selector)
+                    if element:
+                        # Get text content, clean it up
+                        text = element.get_text(separator=' ', strip=True)
+                        if len(text) > 200:  # Substantial content
+                            main_content = text
+                            logging.info(f"Found Substack content with selector '{selector}': {len(text)} chars")
+                            break
+                except Exception as e:
+                    logging.debug(f"Selector '{selector}' failed: {e}")
+                    continue
+            
+            # Fallback to generic selectors
+            if not main_content:
+                generic_selectors = [
+                    'article',
+                    '.post-content',
+                    '.newsletter-content', 
+                    '.entry-content',
+                    'main',
+                    '[role="main"]'
+                ]
+                
+                for selector in generic_selectors:
+                    try:
+                        element = soup.select_one(selector)
+                        if element:
+                            # Get text content, clean it up
+                            text = element.get_text(separator=' ', strip=True)
+                            if len(text) > 200:  # Substantial content
+                                main_content = text
+                                logging.info(f"Found generic content with selector '{selector}': {len(text)} chars")
+                                break
+                    except Exception as e:
+                        logging.debug(f"Generic selector '{selector}' failed: {e}")
+                        continue
+            
+            # Last resort: try body text but filter out navigation/headers
+            if not main_content:
+                try:
+                    body_text = soup.get_text(separator=' ', strip=True)
+                    # Remove common navigation/header text patterns
+                    lines = body_text.split('\n')
+                    content_lines = []
+                    
+                    for line in lines:
+                        line = line.strip()
+                        # Skip short lines, navigation, headers, footers
+                        if (len(line) > 50 and 
+                            not any(skip in line.lower() for skip in [
+                                'subscribe', 'sign in', 'menu', 'navigation', 'footer',
+                                'privacy', 'terms', 'cookie', 'newsletter', 'substack'
+                            ])):
+                            content_lines.append(line)
+                            if len(content_lines) >= 10:  # Limit to first 10 substantial lines
+                                break
+                    
+                    if content_lines:
+                        main_content = ' '.join(content_lines)
+                        logging.info(f"Extracted body text content: {len(main_content)} chars")
+                except Exception as e:
+                    logging.error(f"Body text extraction failed: {e}")
+            
+            # Add main newsletter article if substantial content found
+            if main_content and len(main_content) >= 100:
+                # Extract title from page
+                page_title = soup.title.string if soup.title else "Newsletter Article"
+                clean_title = page_title.replace(' | Substack', '').replace(' - Newsletter', '').strip()
+                
+                # Ensure we don't duplicate title in content
+                if main_content.startswith(clean_title):
+                    # Remove title from beginning of content
+                    main_content = main_content[len(clean_title):].strip()
+                    logging.info(f"Removed duplicate title from content start")
+                
+                article_urls.append({
+                    'url': newsletter_url,
+                    'clean_url': clean_url(newsletter_url),
+                    'title': clean_title,
+                    'content': main_content,  # Pre-extracted content
+                    'date': datetime.now(),
+                    'is_main_article': True
+                })
+                logging.info(f"Added MAIN newsletter article: '{clean_title}' ({len(main_content)} chars)")
+                logging.info(f"Content preview: {main_content[:200]}...")
+            else:
+                logging.warning(f"Main newsletter content insufficient: {len(main_content) if main_content else 0} chars")
+                
+        except Exception as e:
+            logging.error(f"Error extracting main newsletter content: {e}")
+        
+        # 2. LINKED ARTICLES - Extract URLs from all clickable HTML elements
         all_urls = extract_all_clickable_urls(soup, newsletter_url)
         logging.info(f"Found {len(all_urls)} total clickable URLs")
         
         # Filter for article URLs - prioritize podcast URLs
-        article_urls = []
         for url in all_urls:
             if ('podcasts.apple.com' in url and '?i=' in url) or 'open.spotify.com/episode' in url:
                 article_urls.append({
                     'url': url,
                     'clean_url': clean_url(url),
                     'title': 'Podcast Episode',
-                    'date': datetime.now()
+                    'date': datetime.now(),
+                    'is_main_article': False
                 })
         
         # Limit articles
@@ -323,25 +432,54 @@ def process_newsletter():
             try:
                 logging.info(f"Processing article {i}/{len(article_urls)}: {article['url']}")
                 
-                # UNIVERSAL DUPLICATE CHECK
-                cursor.execute("SELECT article_id FROM article_requests WHERE url = %s", (article['clean_url'],))
-                existing_article = cursor.fetchone()
-                
-                if existing_article:
-                    # Link existing article to newsletter
-                    cursor.execute(
-                        "INSERT INTO newsletters_article_link (newsletters_id, article_requests_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-                        (newsletter_id, existing_article[0])
-                    )
-                    conn.commit()
-                    articles_created += 1
-                    logging.info(f"Linked existing article to newsletter: {article['title']}")
+                # ENHANCED DUPLICATE CHECK with transaction safety
+                try:
+                    cursor.execute("SELECT article_id FROM article_requests WHERE url = %s", (article['clean_url'],))
+                    existing_article = cursor.fetchone()
+                    
+                    if existing_article:
+                        # Link existing article to newsletter (many-to-many relationship)
+                        cursor.execute(
+                            "INSERT INTO newsletters_article_link (newsletters_id, article_requests_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                            (newsletter_id, existing_article[0])
+                        )
+                        conn.commit()
+                        articles_created += 1
+                        logging.info(f"✅ LINKED existing article to newsletter: {article['title']} (ID: {existing_article[0]})")
+                        continue
+                except Exception as e:
+                    # Rollback this article's transaction and continue with next
+                    conn.rollback()
+                    logging.error(f"Error linking existing article: {e}")
+                    failed_articles.append({"url": article['url'], "error": f"Link error: {str(e)[:100]}"})
                     continue
                 
                 # Process new article
                 article_content = ""
                 
-                if 'podcasts.apple.com' in article['url']:
+                # Check if this is the main newsletter article with pre-extracted content
+                if article.get('is_main_article') and article.get('content'):
+                    # Format main newsletter content without title duplication
+                    content = article['content']
+                    
+                    # Ensure content doesn't start with the title
+                    title_words = article['title'].lower().split()[:5]  # First 5 words of title
+                    content_start = content.lower()[:100]  # First 100 chars of content
+                    
+                    # If content starts with title words, it might be duplicated
+                    if len(title_words) >= 3 and all(word in content_start for word in title_words[:3]):
+                        # Try to find where actual content starts after title
+                        sentences = content.split('. ')
+                        if len(sentences) > 1:
+                            # Skip first sentence if it's likely the title
+                            content = '. '.join(sentences[1:]).strip()
+                            logging.info(f"Removed likely title duplication from content start")
+                    
+                    article_content = f"NEWSLETTER: {article['title']}\n\nCONTENT: {content}"
+                    logging.info(f"Using pre-extracted main newsletter content: {len(article_content)} bytes")
+                    logging.info(f"Final content preview: {article_content[:300]}...")
+                    
+                elif 'podcasts.apple.com' in article['url']:
                     logging.info(f"Processing Apple Podcasts URL: {article['url']}")
                     apple_result = process_apple_podcasts_url(article['url'])
                     if apple_result.get('success'):
@@ -370,63 +508,113 @@ def process_newsletter():
                         failed_articles.append({"url": article['url'], "error": f"Spotify: {error_msg}"})
                         continue
                 
-                # Content validation with detailed logging
+                # ENHANCED Content validation with detailed logging
                 content_length = len(article_content) if article_content else 0
                 logging.info(f"Content validation: {content_length} bytes (minimum: 100)")
                 
+                # Strict validation - reject short content
                 if not article_content or content_length < 100:
-                    error_msg = f"Insufficient content: {content_length} bytes (minimum 100 required)"
-                    logging.warning(f"CONTENT REJECTED: {error_msg}")
+                    error_msg = f"REJECTED: Insufficient content: {content_length} bytes (minimum 100 required)"
+                    logging.error(f"CONTENT VALIDATION FAILED: {error_msg}")
                     failed_articles.append({"url": article['url'], "error": error_msg})
                     continue
                 
-                logging.info(f"Content validation PASSED: {content_length} bytes")
+                # Additional quality checks
+                if len(article_content.strip()) < 100:
+                    error_msg = f"REJECTED: Content too short after trimming: {len(article_content.strip())} bytes"
+                    logging.error(f"CONTENT VALIDATION FAILED: {error_msg}")
+                    failed_articles.append({"url": article['url'], "error": error_msg})
+                    continue
                 
-                # Create article via orchestrator
-                logging.info(f"Sending to orchestrator: Title='{article['title']}', Content={len(article_content)} bytes")
+                # Check for generic/error content
+                generic_indicators = ["Your Library", "Sign up to get unlimited", "Couldn't find that podcast"]
+                if any(indicator in article_content for indicator in generic_indicators):
+                    error_msg = f"REJECTED: Generic/error content detected"
+                    logging.error(f"CONTENT VALIDATION FAILED: {error_msg}")
+                    failed_articles.append({"url": article['url'], "error": error_msg})
+                    continue
                 
-                orchestrator_response = requests.post(
-                    'http://news-orchestrator-1:5012/generate-news',
-                    json={
-                        'article_text': article_content,
-                        'request_string': article['title'],
-                        'secret_id': user_id,
-                        'major_points_count': 4
-                    },
-                    timeout=180,
-                    headers={'Content-Type': 'application/json; charset=utf-8'}
-                )
+                logging.info(f"✅ CONTENT VALIDATION PASSED: {content_length} bytes - HIGH QUALITY")
                 
-                logging.info(f"Orchestrator response: Status={orchestrator_response.status_code}")
-                
-                if orchestrator_response.status_code == 200:
-                    result = orchestrator_response.json()
-                    article_id = result['article_id']
-                    logging.info(f"Orchestrator SUCCESS: Created article_id={article_id}")
+                # Create article via orchestrator with transaction safety
+                try:
+                    logging.info(f"Sending to orchestrator: Title='{article['title']}', Content={len(article_content)} bytes")
                     
-                    # Update with original URL (preserve episode parameters) and link to newsletter
-                    cursor.execute(
-                        "UPDATE article_requests SET url = %s WHERE article_id = %s",
-                        (article['url'], article_id)
+                    orchestrator_response = requests.post(
+                        'http://news-orchestrator-1:5012/generate-news',
+                        json={
+                            'article_text': article_content,
+                            'request_string': article['title'],
+                            'secret_id': user_id,
+                            'major_points_count': 4
+                        },
+                        timeout=180,
+                        headers={'Content-Type': 'application/json; charset=utf-8'}
                     )
-                    cursor.execute(
-                        "INSERT INTO newsletters_article_link (newsletters_id, article_requests_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-                        (newsletter_id, article_id)
-                    )
-                    conn.commit()
-                    articles_created += 1
-                    logging.info(f"Successfully created and linked article {article_id}")
-                else:
-                    try:
-                        error_response = orchestrator_response.json()
-                        error_detail = error_response.get('error', 'Unknown orchestrator error')
-                    except:
-                        error_detail = f"HTTP {orchestrator_response.status_code}"
                     
-                    logging.error(f"Orchestrator FAILED: {error_detail}")
-                    failed_articles.append({"url": article['url'], "error": f"Orchestrator: {error_detail}"})
+                    logging.info(f"Orchestrator response: Status={orchestrator_response.status_code}")
+                    
+                    if orchestrator_response.status_code == 200:
+                        result = orchestrator_response.json()
+                        article_id = result['article_id']
+                        logging.info(f"Orchestrator SUCCESS: Created article_id={article_id}")
+                        
+                        # Update with original URL (preserve episode parameters) and link to newsletter
+                        try:
+                            cursor.execute(
+                                "UPDATE article_requests SET url = %s WHERE article_id = %s",
+                                (article['url'], article_id)
+                            )
+                            cursor.execute(
+                                "INSERT INTO newsletters_article_link (newsletters_id, article_requests_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                                (newsletter_id, article_id)
+                            )
+                            conn.commit()
+                            articles_created += 1
+                            logging.info(f"✅ CREATED and linked new article {article_id}")
+                        except Exception as db_error:
+                            # Handle potential duplicate URL constraint violation
+                            conn.rollback()
+                            logging.warning(f"Database constraint violation for {article['url']}: {db_error}")
+                            
+                            # Try to link to existing article instead
+                            try:
+                                cursor.execute("SELECT article_id FROM article_requests WHERE url = %s", (article['url'],))
+                                existing_article = cursor.fetchone()
+                                if existing_article:
+                                    cursor.execute(
+                                        "INSERT INTO newsletters_article_link (newsletters_id, article_requests_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                                        (newsletter_id, existing_article[0])
+                                    )
+                                    conn.commit()
+                                    articles_created += 1
+                                    logging.info(f"✅ RECOVERED: Linked existing article {existing_article[0]} after constraint violation")
+                                else:
+                                    failed_articles.append({"url": article['url'], "error": f"DB constraint: {str(db_error)[:100]}"})
+                            except Exception as recovery_error:
+                                logging.error(f"Recovery failed: {recovery_error}")
+                                failed_articles.append({"url": article['url'], "error": f"Recovery failed: {str(recovery_error)[:100]}"})
+                    else:
+                        try:
+                            error_response = orchestrator_response.json()
+                            error_detail = error_response.get('error', 'Unknown orchestrator error')
+                        except:
+                            error_detail = f"HTTP {orchestrator_response.status_code}"
+                        
+                        logging.error(f"Orchestrator FAILED: {error_detail}")
+                        failed_articles.append({"url": article['url'], "error": f"Orchestrator: {error_detail}"})
+                        
+                except Exception as orchestrator_error:
+                    conn.rollback()
+                    logging.error(f"Orchestrator request failed: {orchestrator_error}")
+                    failed_articles.append({"url": article['url'], "error": f"Request failed: {str(orchestrator_error)[:100]}"})
                     
             except Exception as e:
+                # Ensure transaction is rolled back on any error
+                try:
+                    conn.rollback()
+                except:
+                    pass
                 failed_articles.append({"url": article['url'], "error": str(e)[:100]})
                 logging.error(f"Error processing article {article['url']}: {e}")
         
