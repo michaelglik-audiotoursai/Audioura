@@ -429,27 +429,35 @@ def process_newsletter():
         failed_articles = []
         
         for i, article in enumerate(article_urls, 1):
+            # Use separate connection for each article to prevent transaction cascade failures
+            article_conn = None
+            article_cursor = None
+            
             try:
                 logging.info(f"Processing article {i}/{len(article_urls)}: {article['url']}")
                 
-                # ENHANCED DUPLICATE CHECK with transaction safety
+                # Create separate connection for this article
+                article_conn = get_db_connection()
+                article_cursor = article_conn.cursor()
+                
+                # ENHANCED DUPLICATE CHECK with individual transaction
                 try:
-                    cursor.execute("SELECT article_id FROM article_requests WHERE url = %s", (article['clean_url'],))
-                    existing_article = cursor.fetchone()
+                    article_cursor.execute("SELECT article_id FROM article_requests WHERE url = %s", (article['clean_url'],))
+                    existing_article = article_cursor.fetchone()
                     
                     if existing_article:
                         # Link existing article to newsletter (many-to-many relationship)
-                        cursor.execute(
+                        article_cursor.execute(
                             "INSERT INTO newsletters_article_link (newsletters_id, article_requests_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
                             (newsletter_id, existing_article[0])
                         )
-                        conn.commit()
+                        article_conn.commit()
                         articles_created += 1
                         logging.info(f"✅ LINKED existing article to newsletter: {article['title']} (ID: {existing_article[0]})")
                         continue
                 except Exception as e:
                     # Rollback this article's transaction and continue with next
-                    conn.rollback()
+                    article_conn.rollback()
                     logging.error(f"Error linking existing article: {e}")
                     failed_articles.append({"url": article['url'], "error": f"Link error: {str(e)[:100]}"})
                     continue
@@ -561,32 +569,32 @@ def process_newsletter():
                         
                         # Update with original URL (preserve episode parameters) and link to newsletter
                         try:
-                            cursor.execute(
+                            article_cursor.execute(
                                 "UPDATE article_requests SET url = %s WHERE article_id = %s",
                                 (article['url'], article_id)
                             )
-                            cursor.execute(
+                            article_cursor.execute(
                                 "INSERT INTO newsletters_article_link (newsletters_id, article_requests_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
                                 (newsletter_id, article_id)
                             )
-                            conn.commit()
+                            article_conn.commit()
                             articles_created += 1
                             logging.info(f"✅ CREATED and linked new article {article_id}")
                         except Exception as db_error:
                             # Handle potential duplicate URL constraint violation
-                            conn.rollback()
+                            article_conn.rollback()
                             logging.warning(f"Database constraint violation for {article['url']}: {db_error}")
                             
                             # Try to link to existing article instead
                             try:
-                                cursor.execute("SELECT article_id FROM article_requests WHERE url = %s", (article['url'],))
-                                existing_article = cursor.fetchone()
+                                article_cursor.execute("SELECT article_id FROM article_requests WHERE url = %s", (article['url'],))
+                                existing_article = article_cursor.fetchone()
                                 if existing_article:
-                                    cursor.execute(
+                                    article_cursor.execute(
                                         "INSERT INTO newsletters_article_link (newsletters_id, article_requests_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
                                         (newsletter_id, existing_article[0])
                                     )
-                                    conn.commit()
+                                    article_conn.commit()
                                     articles_created += 1
                                     logging.info(f"✅ RECOVERED: Linked existing article {existing_article[0]} after constraint violation")
                                 else:
@@ -605,18 +613,32 @@ def process_newsletter():
                         failed_articles.append({"url": article['url'], "error": f"Orchestrator: {error_detail}"})
                         
                 except Exception as orchestrator_error:
-                    conn.rollback()
+                    if article_conn:
+                        article_conn.rollback()
                     logging.error(f"Orchestrator request failed: {orchestrator_error}")
                     failed_articles.append({"url": article['url'], "error": f"Request failed: {str(orchestrator_error)[:100]}"})
                     
             except Exception as e:
                 # Ensure transaction is rolled back on any error
-                try:
-                    conn.rollback()
-                except:
-                    pass
+                if article_conn:
+                    try:
+                        article_conn.rollback()
+                    except:
+                        pass
                 failed_articles.append({"url": article['url'], "error": str(e)[:100]})
                 logging.error(f"Error processing article {article['url']}: {e}")
+            finally:
+                # Always close article connection
+                if article_cursor:
+                    try:
+                        article_cursor.close()
+                    except:
+                        pass
+                if article_conn:
+                    try:
+                        article_conn.close()
+                    except:
+                        pass
         
         # Clean up if no articles created
         if articles_created == 0:
@@ -635,6 +657,7 @@ def process_newsletter():
                 "failed_articles": failed_articles[:3]
             })
         
+        # Main connection commit and cleanup
         conn.commit()
         cursor.close()
         conn.close()
