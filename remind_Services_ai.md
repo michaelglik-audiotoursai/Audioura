@@ -242,4 +242,38 @@ Result: 9/9 articles created (0 failures)
 - No generic/error content ✅
 ```
 
-**Next Focus**: Mobile app integration testing with enhanced newsletter processing and many-to-many article linking
+### 🚨 **CRITICAL BUG DISCOVERED: News Generator Content Truncation**
+**Date**: 2025-11-04
+**Issue**: MailChimp newsletter main article contains only "Full Article" instead of 3,588 bytes of content
+**Root Cause**: News generator service has aggressive content truncation that deletes ALL MailChimp content
+
+**Debugging Evidence**:
+- Newsletter processor correctly extracts 3,588 bytes of MailChimp content ✅
+- Content sent to orchestrator successfully ✅
+- News generator receives content but truncates it to 0 bytes ❌
+- Final result: "Summary:" and "Full Article:" placeholders only ❌
+
+**Specific Log Evidence**:
+```
+INFO:root:Found article end marker at line 0: 'Follow.*?on Instagram'
+INFO:root:Article truncated at end marker: 3476 -> 0 characters
+INFO:root:Article cleaned: 3588 -> 0 characters
+INFO:root:Generated 0 major points (requested 4)
+```
+
+**Problem**: News generator has end marker pattern `Follow.*?on Instagram` that matches MailChimp newsletter social media links and deletes entire content
+
+**MailChimp Content Structure**:
+- Contains: "Former Mayor Setti Warren dead at 55", "Decision Day: What to know as you head to the polls", "Newton's food pantries prepare for surge ahead of November SNAP cuts"
+- Ends with: "Follow us on Facebook . Follow us on Instagram ."
+- This triggers end marker and deletes ALL content
+
+**Required Fix**: Modify news generator to exclude MailChimp newsletter content from aggressive truncation
+- **File**: `news_generator_service.py` or similar
+- **Solution**: Add exception for NEWSLETTER content type or modify end marker pattern
+- **Test Article ID**: `e8372029-a421-48a8-8e40-e58a9f2ced9e`
+
+**Status**: 🔴 CRITICAL - Main article content completely lost in processing pipeline
+**Priority**: IMMEDIATE - This affects all MailChimp newsletters
+
+**Next Focus**: Fix news generator content truncation bug for MailChimp newsletters
