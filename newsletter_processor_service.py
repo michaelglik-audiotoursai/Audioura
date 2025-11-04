@@ -305,7 +305,9 @@ def process_newsletter():
             # Enhanced content extraction for Substack newsletters
             main_content = ""
             
-            # Try Substack-specific selectors first
+            # Try platform-specific selectors first
+            
+            # 1. Substack selectors
             substack_selectors = [
                 '.available-content .body.markup',  # Substack main content
                 '.post-content .body.markup',
@@ -317,15 +319,66 @@ def process_newsletter():
                 try:
                     element = soup.select_one(selector)
                     if element:
-                        # Get text content, clean it up
                         text = element.get_text(separator=' ', strip=True)
-                        if len(text) > 200:  # Substantial content
+                        if len(text) > 200:
                             main_content = text
                             logging.info(f"Found Substack content with selector '{selector}': {len(text)} chars")
                             break
                 except Exception as e:
                     logging.debug(f"Selector '{selector}' failed: {e}")
                     continue
+            
+            # 2. MailChimp selectors
+            if not main_content and ('mailchi.mp' in newsletter_url or 'mailchimp' in str(soup).lower()):
+                mailchimp_selectors = [
+                    '.bodyContainer',
+                    '#templateBody', 
+                    '.mcnTextContent',
+                    '.templateContainer'
+                ]
+                
+                for selector in mailchimp_selectors:
+                    try:
+                        elements = soup.select(selector)
+                        if elements:
+                            combined_text = ""
+                            for element in elements:
+                                text = element.get_text(separator=' ', strip=True)
+                                combined_text += text + " "
+                            
+                            if len(combined_text) > 200:
+                                main_content = combined_text.strip()
+                                logging.info(f"Found MailChimp content with selector '{selector}': {len(main_content)} chars")
+                                break
+                    except Exception as e:
+                        logging.debug(f"MailChimp selector '{selector}' failed: {e}")
+                        continue
+            
+            # 3. Email newsletter selectors (Boston Globe, etc.)
+            if not main_content and ('view.email' in newsletter_url or 'email.' in newsletter_url):
+                email_selectors = [
+                    'table[role="presentation"]',
+                    'td[class*="content"]',
+                    '.email-content',
+                    '.message-body'
+                ]
+                
+                for selector in email_selectors:
+                    try:
+                        elements = soup.select(selector)
+                        if elements:
+                            combined_text = ""
+                            for element in elements:
+                                text = element.get_text(separator=' ', strip=True)
+                                combined_text += text + " "
+                            
+                            if len(combined_text) > 200:
+                                main_content = combined_text.strip()
+                                logging.info(f"Found email content with selector '{selector}': {len(main_content)} chars")
+                                break
+                    except Exception as e:
+                        logging.debug(f"Email selector '{selector}' failed: {e}")
+                        continue
             
             # Fallback to generic selectors
             if not main_content:
@@ -410,8 +463,9 @@ def process_newsletter():
         all_urls = extract_all_clickable_urls(soup, newsletter_url)
         logging.info(f"Found {len(all_urls)} total clickable URLs")
         
-        # Filter for article URLs - prioritize podcast URLs
+        # Filter for article URLs - prioritize podcast URLs and news articles
         for url in all_urls:
+            # Podcast URLs (high priority)
             if ('podcasts.apple.com' in url and '?i=' in url) or 'open.spotify.com/episode' in url:
                 article_urls.append({
                     'url': url,
@@ -420,6 +474,17 @@ def process_newsletter():
                     'date': datetime.now(),
                     'is_main_article': False
                 })
+            # News article URLs (medium priority)
+            elif any(domain in url for domain in ['bostonglobe.com', 'nytimes.com', 'washingtonpost.com', 'reuters.com', 'ap.org']):
+                # Skip if it's just the main domain or subscription pages
+                if not any(skip in url.lower() for skip in ['/subscribe', '/login', '/account', '/newsletter']):
+                    article_urls.append({
+                        'url': url,
+                        'clean_url': clean_url(url),
+                        'title': 'News Article',
+                        'date': datetime.now(),
+                        'is_main_article': False
+                    })
         
         # Limit articles
         article_urls = article_urls[:max_articles]
@@ -485,7 +550,12 @@ def process_newsletter():
                     
                     article_content = f"NEWSLETTER: {article['title']}\n\nCONTENT: {content}"
                     logging.info(f"Using pre-extracted main newsletter content: {len(article_content)} bytes")
-                    logging.info(f"Final content preview: {article_content[:300]}...")
+                    # Handle Unicode encoding issues in preview
+                    try:
+                        preview = article_content[:300].encode('ascii', 'ignore').decode('ascii')
+                        logging.info(f"Final content preview: {preview}...")
+                    except:
+                        logging.info(f"Final content preview: [Content contains special characters - {len(article_content)} bytes]")
                     
                 elif 'podcasts.apple.com' in article['url']:
                     logging.info(f"Processing Apple Podcasts URL: {article['url']}")
@@ -509,11 +579,73 @@ def process_newsletter():
                         article_content = spotify_result['content']
                         article['title'] = spotify_result['title']
                         logging.info(f"Spotify SUCCESS: Title='{article['title']}', Content={len(article_content)} bytes")
-                        logging.info(f"Spotify content preview: {article_content[:200]}...")
+                        try:
+                            preview = spotify_result['content'][:200].encode('ascii', 'ignore').decode('ascii')
+                            logging.info(f"Spotify content preview: {preview}...")
+                        except:
+                            logging.info(f"Spotify content preview: [Content contains special characters]")
                     else:
                         error_msg = spotify_result.get('error', 'Unknown Spotify error')
                         logging.error(f"Spotify FAILED: {error_msg}")
                         failed_articles.append({"url": article['url'], "error": f"Spotify: {error_msg}"})
+                        continue
+                        
+                else:
+                    # Generic news article processing
+                    logging.info(f"Processing news article URL: {article['url']}")
+                    try:
+                        article_response = requests.get(article['url'], headers=headers, timeout=10)
+                        if article_response.status_code == 200:
+                            article_soup = BeautifulSoup(article_response.content, 'html.parser')
+                            
+                            # Extract article content using common selectors
+                            content_selectors = [
+                                'article',
+                                '.article-content',
+                                '.story-content', 
+                                '.entry-content',
+                                '.post-content',
+                                '[data-testid="article-body"]',
+                                '.article-body',
+                                'main'
+                            ]
+                            
+                            article_text = ""
+                            for selector in content_selectors:
+                                try:
+                                    element = article_soup.select_one(selector)
+                                    if element:
+                                        text = element.get_text(separator=' ', strip=True)
+                                        if len(text) > 200:
+                                            article_text = text
+                                            logging.info(f"Found article content with selector '{selector}': {len(text)} chars")
+                                            break
+                                except Exception as e:
+                                    continue
+                            
+                            # Extract title
+                            article_title = article['title']
+                            title_element = article_soup.select_one('h1') or article_soup.select_one('title')
+                            if title_element:
+                                extracted_title = title_element.get_text(strip=True)
+                                if len(extracted_title) > 5:
+                                    article_title = extracted_title
+                            
+                            if article_text and len(article_text) > 200:
+                                article_content = f"ARTICLE: {article_title}\n\nCONTENT: {article_text}"
+                                article['title'] = article_title
+                                logging.info(f"News article SUCCESS: Title='{article_title}', Content={len(article_content)} bytes")
+                            else:
+                                logging.error(f"News article FAILED: Insufficient content ({len(article_text)} chars)")
+                                failed_articles.append({"url": article['url'], "error": f"Insufficient content: {len(article_text)} chars"})
+                                continue
+                        else:
+                            logging.error(f"News article FAILED: HTTP {article_response.status_code}")
+                            failed_articles.append({"url": article['url'], "error": f"HTTP {article_response.status_code}"})
+                            continue
+                    except Exception as e:
+                        logging.error(f"News article processing failed: {e}")
+                        failed_articles.append({"url": article['url'], "error": f"Processing failed: {str(e)[:50]}"})
                         continue
                 
                 # ENHANCED Content validation with detailed logging
@@ -535,7 +667,7 @@ def process_newsletter():
                     continue
                 
                 # Check for generic/error content
-                generic_indicators = ["Your Library", "Sign up to get unlimited", "Couldn't find that podcast"]
+                generic_indicators = ["Your Library", "Sign up to get unlimited", "Couldn't find that podcast", "Subscribe to continue reading", "Please log in", "404 Not Found"]
                 if any(indicator in article_content for indicator in generic_indicators):
                     error_msg = f"REJECTED: Generic/error content detected"
                     logging.error(f"CONTENT VALIDATION FAILED: {error_msg}")
