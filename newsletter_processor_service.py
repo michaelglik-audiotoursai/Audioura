@@ -283,19 +283,90 @@ def process_newsletter():
         newsletter_id = cursor.fetchone()[0]
         conn.commit()
         
-        # Fetch and parse newsletter
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
-        response = requests.get(newsletter_url, headers=headers, timeout=10)
+        # Enhanced headers for better compatibility
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none'
+        }
         
-        if response.status_code != 200:
-            return jsonify({
-                "status": "error",
-                "message": f"Failed to access newsletter: HTTP {response.status_code}",
-                "articles_found": 0,
-                "articles_created": 0
-            })
+        # Check if this is a protected site that needs browser automation
+        use_browser = any(domain in newsletter_url for domain in ['quora.com', 'medium.com'])
         
-        soup = BeautifulSoup(response.content, 'html.parser')
+        if use_browser:
+            logging.info(f"Using browser automation for protected site: {newsletter_url}")
+            try:
+                from browser_automation import extract_newsletter_content_with_browser
+                browser_result = extract_newsletter_content_with_browser(newsletter_url)
+                
+                if browser_result.get('success'):
+                    # Create a mock response for browser-extracted content
+                    response_content = f"<html><head><title>{browser_result['title']}</title></head><body><div class='main-content'>{browser_result['content']}</div></body></html>"
+                    soup = BeautifulSoup(response_content, 'html.parser')
+                    logging.info(f"Browser automation SUCCESS: Extracted {len(browser_result['content'])} chars")
+                else:
+                    error_msg = f"Browser automation failed: {browser_result.get('error', 'Unknown error')}"
+                    logging.error(error_msg)
+                    return jsonify({
+                        "status": "error",
+                        "message": error_msg,
+                        "error_type": "browser_automation_failed",
+                        "articles_found": 0,
+                        "articles_created": 0
+                    })
+            except Exception as e:
+                error_msg = f"Browser automation error: {str(e)}"
+                logging.error(error_msg)
+                return jsonify({
+                    "status": "error",
+                    "message": error_msg,
+                    "error_type": "browser_automation_error",
+                    "articles_found": 0,
+                    "articles_created": 0
+                })
+        else:
+            # Standard HTTP request for non-protected sites
+            try:
+                response = requests.get(newsletter_url, headers=headers, timeout=10)
+            except requests.exceptions.RequestException as e:
+                error_msg = f"Network error accessing newsletter: {str(e)}"
+                logging.error(error_msg)
+                return jsonify({
+                    "status": "error",
+                    "message": error_msg,
+                    "error_type": "network_error",
+                    "articles_found": 0,
+                    "articles_created": 0
+                })
+            
+            if response.status_code == 403:
+                error_msg = f"Access Denied: {urlparse(newsletter_url).netloc} is blocking automated access (HTTP 403 Forbidden). This site uses anti-scraping protection that prevents our newsletter processor from accessing the content."
+                logging.error(error_msg)
+                return jsonify({
+                    "status": "error",
+                    "message": error_msg,
+                    "error_type": "access_denied",
+                    "articles_found": 0,
+                    "articles_created": 0
+                })
+            elif response.status_code != 200:
+                error_msg = f"Failed to access newsletter: HTTP {response.status_code}"
+                logging.error(error_msg)
+                return jsonify({
+                    "status": "error",
+                    "message": error_msg,
+                    "error_type": "http_error",
+                    "articles_found": 0,
+                    "articles_created": 0
+                })
+            
+            soup = BeautifulSoup(response.content, 'html.parser')
         
         # ENHANCED: Extract main newsletter content FIRST
         article_urls = []
@@ -451,39 +522,58 @@ def process_newsletter():
                     'date': datetime.now(),
                     'is_main_article': True
                 })
-                logging.info(f"Added MAIN newsletter article: '{clean_title}' ({len(main_content)} chars)")
-                logging.info(f"Content preview: {main_content[:200]}...")
+                logging.info(f"🔍 DEBUG: Added MAIN newsletter article: '{clean_title}' ({len(main_content)} chars)")
+                logging.info(f"🔍 DEBUG: Main article content preview: {main_content[:200]}...")
+                logging.info(f"🔍 DEBUG: Main article will be processed as article with is_main_article=True")
             else:
                 logging.warning(f"Main newsletter content insufficient: {len(main_content) if main_content else 0} chars")
                 
         except Exception as e:
             logging.error(f"Error extracting main newsletter content: {e}")
         
-        # 2. LINKED ARTICLES - Extract URLs from all clickable HTML elements
-        all_urls = extract_all_clickable_urls(soup, newsletter_url)
-        logging.info(f"Found {len(all_urls)} total clickable URLs")
+        # 2. LINKED ARTICLES - Enhanced Pattern Recognition
+        from newsletter_pattern_detector import detect_newsletter_patterns
         
-        # Filter for article URLs - prioritize podcast URLs and news articles
+        # Use pattern recognition to find articles
+        pattern_articles = detect_newsletter_patterns(soup, newsletter_url)
+        logging.info(f"Pattern recognition found {len(pattern_articles)} articles")
+        
+        # Add pattern-detected articles
+        for article in pattern_articles:
+            article_urls.append({
+                'url': article['url'],
+                'clean_url': clean_url(article['url']),
+                'title': article['title'],
+                'date': datetime.now(),
+                'is_main_article': False,
+                'pattern': article['pattern'],
+                'summary': article.get('summary', '')
+            })
+        
+        # Fallback: Extract URLs from all clickable HTML elements (for missed patterns)
+        all_urls = extract_all_clickable_urls(soup, newsletter_url)
+        logging.info(f"Fallback extraction found {len(all_urls)} total clickable URLs")
+        
+        # Add any missed news articles from known domains
+        existing_urls = {article['url'] for article in article_urls}
         for url in all_urls:
-            # Podcast URLs (high priority)
-            if ('podcasts.apple.com' in url and '?i=' in url) or 'open.spotify.com/episode' in url:
-                article_urls.append({
-                    'url': url,
-                    'clean_url': clean_url(url),
-                    'title': 'Podcast Episode',
-                    'date': datetime.now(),
-                    'is_main_article': False
-                })
-            # News article URLs (medium priority)
-            elif any(domain in url for domain in ['bostonglobe.com', 'nytimes.com', 'washingtonpost.com', 'reuters.com', 'ap.org']):
-                # Skip if it's just the main domain or subscription pages
-                if not any(skip in url.lower() for skip in ['/subscribe', '/login', '/account', '/newsletter']):
+            if url in existing_urls:
+                continue
+                
+            # News article URLs from known domains
+            if any(domain in url for domain in [
+                'bostonglobe.com', 'nytimes.com', 'washingtonpost.com', 'reuters.com', 'ap.org',
+                'newtonbeacon.org', 'boston.com', 'wbur.org', 'wcvb.com', 'nbcboston.com'
+            ]):
+                # Skip subscription/navigation pages
+                if not any(skip in url.lower() for skip in ['/subscribe', '/login', '/account', '/newsletter', '/events/community/add']):
                     article_urls.append({
                         'url': url,
                         'clean_url': clean_url(url),
                         'title': 'News Article',
                         'date': datetime.now(),
-                        'is_main_article': False
+                        'is_main_article': False,
+                        'pattern': 'fallback_domain'
                     })
         
         # Limit articles
@@ -511,14 +601,24 @@ def process_newsletter():
                     existing_article = article_cursor.fetchone()
                     
                     if existing_article:
-                        # Link existing article to newsletter (many-to-many relationship)
+                        # Check if already linked to this newsletter to prevent duplicates
                         article_cursor.execute(
-                            "INSERT INTO newsletters_article_link (newsletters_id, article_requests_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                            "SELECT 1 FROM newsletters_article_link WHERE newsletters_id = %s AND article_requests_id = %s",
                             (newsletter_id, existing_article[0])
                         )
-                        article_conn.commit()
-                        articles_created += 1
-                        logging.info(f"✅ LINKED existing article to newsletter: {article['title']} (ID: {existing_article[0]})")
+                        already_linked = article_cursor.fetchone()
+                        
+                        if not already_linked:
+                            # Link existing article to newsletter (many-to-many relationship)
+                            article_cursor.execute(
+                                "INSERT INTO newsletters_article_link (newsletters_id, article_requests_id) VALUES (%s, %s)",
+                                (newsletter_id, existing_article[0])
+                            )
+                            article_conn.commit()
+                            articles_created += 1
+                            logging.info(f"✅ LINKED existing article to newsletter: {article['title']} (ID: {existing_article[0]})")
+                        else:
+                            logging.info(f"⚠️ SKIPPED duplicate link: {article['title']} already linked to newsletter")
                         continue
                 except Exception as e:
                     # Rollback this article's transaction and continue with next
@@ -532,12 +632,18 @@ def process_newsletter():
                 
                 # Check if this is the main newsletter article with pre-extracted content
                 if article.get('is_main_article') and article.get('content'):
+                    logging.info(f"🔍 DEBUG: Processing MAIN ARTICLE - is_main_article={article.get('is_main_article')}, has_content={bool(article.get('content'))}")
+                    logging.info(f"🔍 DEBUG: Original extracted content length: {len(article.get('content', ''))} chars")
+                    
                     # Format main newsletter content without title duplication
                     content = article['content']
+                    logging.info(f"🔍 DEBUG: Content before title deduplication: {len(content)} chars")
+                    logging.info(f"🔍 DEBUG: Content preview (first 200 chars): {content[:200]}...")
                     
                     # Ensure content doesn't start with the title
                     title_words = article['title'].lower().split()[:5]  # First 5 words of title
                     content_start = content.lower()[:100]  # First 100 chars of content
+                    logging.info(f"🔍 DEBUG: Title words for deduplication check: {title_words}")
                     
                     # If content starts with title words, it might be duplicated
                     if len(title_words) >= 3 and all(word in content_start for word in title_words[:3]):
@@ -546,18 +652,21 @@ def process_newsletter():
                         if len(sentences) > 1:
                             # Skip first sentence if it's likely the title
                             content = '. '.join(sentences[1:]).strip()
-                            logging.info(f"Removed likely title duplication from content start")
+                            logging.info(f"🔍 DEBUG: Removed likely title duplication - new length: {len(content)} chars")
                     
                     article_content = f"NEWSLETTER: {article['title']}\n\nCONTENT: {content}"
-                    logging.info(f"Using pre-extracted main newsletter content: {len(article_content)} bytes")
+                    logging.info(f"🔍 DEBUG: Final formatted article_content length: {len(article_content)} bytes")
+                    logging.info(f"🔍 DEBUG: Using pre-extracted main newsletter content: {len(article_content)} bytes")
+                    
                     # Handle Unicode encoding issues in preview
                     try:
                         preview = article_content[:300].encode('ascii', 'ignore').decode('ascii')
-                        logging.info(f"Final content preview: {preview}...")
-                    except:
-                        logging.info(f"Final content preview: [Content contains special characters - {len(article_content)} bytes]")
+                        logging.info(f"🔍 DEBUG: Final content preview (ASCII): {preview}...")
+                    except Exception as preview_error:
+                        logging.info(f"🔍 DEBUG: Preview error: {preview_error} - Content length: {len(article_content)} bytes")
+                        logging.info(f"🔍 DEBUG: Raw content sample: {repr(article_content[:100])}")
                     
-                elif 'podcasts.apple.com' in article['url']:
+                elif article.get('pattern') == 'podcast' or 'podcasts.apple.com' in article['url']:
                     logging.info(f"Processing Apple Podcasts URL: {article['url']}")
                     apple_result = process_apple_podcasts_url(article['url'])
                     if apple_result.get('success'):
@@ -570,7 +679,7 @@ def process_newsletter():
                         failed_articles.append({"url": article['url'], "error": f"Apple Podcasts: {error_msg}"})
                         continue
                         
-                elif 'open.spotify.com/episode' in article['url']:
+                elif article.get('pattern') == 'podcast' or 'open.spotify.com/episode' in article['url']:
                     logging.info(f"Processing Spotify URL: {article['url']}")
                     spotify_result = process_spotify_url(article['url'])
                     logging.info(f"Spotify result keys: {list(spotify_result.keys()) if spotify_result else 'None'}")
@@ -591,62 +700,92 @@ def process_newsletter():
                         continue
                         
                 else:
-                    # Generic news article processing
-                    logging.info(f"Processing news article URL: {article['url']}")
-                    try:
-                        article_response = requests.get(article['url'], headers=headers, timeout=10)
-                        if article_response.status_code == 200:
-                            article_soup = BeautifulSoup(article_response.content, 'html.parser')
+                    # Check if this needs browser automation (Quora, protected sites)
+                    if any(domain in article['url'] for domain in ['quora.com', 'medium.com']) or 'jokesfunnystories.quora.com' in article['url']:
+                        logging.info(f"Processing protected site with browser automation: {article['url']}")
+                        try:
+                            from browser_automation import extract_newsletter_content_with_browser
+                            browser_result = extract_newsletter_content_with_browser(article['url'])
                             
-                            # Extract article content using common selectors
-                            content_selectors = [
-                                'article',
-                                '.article-content',
-                                '.story-content', 
-                                '.entry-content',
-                                '.post-content',
-                                '[data-testid="article-body"]',
-                                '.article-body',
-                                'main'
-                            ]
-                            
-                            article_text = ""
-                            for selector in content_selectors:
-                                try:
-                                    element = article_soup.select_one(selector)
-                                    if element:
-                                        text = element.get_text(separator=' ', strip=True)
-                                        if len(text) > 200:
-                                            article_text = text
-                                            logging.info(f"Found article content with selector '{selector}': {len(text)} chars")
-                                            break
-                                except Exception as e:
-                                    continue
-                            
-                            # Extract title
-                            article_title = article['title']
-                            title_element = article_soup.select_one('h1') or article_soup.select_one('title')
-                            if title_element:
-                                extracted_title = title_element.get_text(strip=True)
-                                if len(extracted_title) > 5:
-                                    article_title = extracted_title
-                            
-                            if article_text and len(article_text) > 200:
-                                article_content = f"ARTICLE: {article_title}\n\nCONTENT: {article_text}"
-                                article['title'] = article_title
-                                logging.info(f"News article SUCCESS: Title='{article_title}', Content={len(article_content)} bytes")
+                            if browser_result.get('success'):
+                                article_content = f"ARTICLE: {browser_result['title']}\n\nCONTENT: {browser_result['content']}"
+                                article['title'] = browser_result['title']
+                                logging.info(f"Browser automation SUCCESS: Title='{article['title']}', Content={len(article_content)} bytes")
                             else:
-                                logging.error(f"News article FAILED: Insufficient content ({len(article_text)} chars)")
-                                failed_articles.append({"url": article['url'], "error": f"Insufficient content: {len(article_text)} chars"})
+                                error_msg = browser_result.get('error', 'Browser automation failed')
+                                logging.error(f"Browser automation FAILED: {error_msg}")
+                                failed_articles.append({"url": article['url'], "error": f"Browser automation: {error_msg}"})
                                 continue
-                        else:
-                            logging.error(f"News article FAILED: HTTP {article_response.status_code}")
-                            failed_articles.append({"url": article['url'], "error": f"HTTP {article_response.status_code}"})
+                        except Exception as e:
+                            logging.error(f"Browser automation error: {e}")
+                            failed_articles.append({"url": article['url'], "error": f"Browser automation error: {str(e)[:50]}"})
                             continue
-                    except Exception as e:
-                        logging.error(f"News article processing failed: {e}")
-                        failed_articles.append({"url": article['url'], "error": f"Processing failed: {str(e)[:50]}"})
-                        continue
+                    else:
+                        # Generic news article processing
+                        logging.info(f"Processing news article URL: {article['url']}")
+                        try:
+                            article_response = requests.get(article['url'], headers=headers, timeout=10)
+                            
+                            if article_response.status_code == 403:
+                                error_msg = f"Access denied: {urlparse(article['url']).netloc} blocks automated access (HTTP 403)"
+                                logging.error(error_msg)
+                                failed_articles.append({"url": article['url'], "error": error_msg})
+                                continue
+                            elif article_response.status_code == 200:
+                                article_soup = BeautifulSoup(article_response.content, 'html.parser')
+                                
+                                # Extract article content using common selectors + Newton Beacon specific
+                                content_selectors = [
+                                    'article',
+                                    '.article-content',
+                                    '.story-content', 
+                                    '.entry-content',
+                                    '.post-content',
+                                    '[data-testid="article-body"]',
+                                    '.article-body',
+                                    'main',
+                                    '.content',
+                                    '.single-post-content',
+                                    '.post-body'
+                                ]
+                                
+                                article_text = ""
+                                for selector in content_selectors:
+                                    try:
+                                        element = article_soup.select_one(selector)
+                                        if element:
+                                            text = element.get_text(separator=' ', strip=True)
+                                            if len(text) > 200:
+                                                article_text = text
+                                                logging.info(f"Found article content with selector '{selector}': {len(text)} chars")
+                                                break
+                                    except Exception as e:
+                                        continue
+                                
+                                # Extract title
+                                article_title = article['title']
+                                title_element = article_soup.select_one('h1') or article_soup.select_one('title')
+                                if title_element:
+                                    extracted_title = title_element.get_text(strip=True)
+                                    if len(extracted_title) > 5:
+                                        article_title = extracted_title
+                                
+                                if article_text and len(article_text) > 200:
+                                    article_content = f"ARTICLE: {article_title}\n\nCONTENT: {article_text}"
+                                    article['title'] = article_title
+                                    logging.info(f"News article SUCCESS: Title='{article_title}', Content={len(article_content)} bytes")
+                                else:
+                                    logging.error(f"News article FAILED: Insufficient content ({len(article_text)} chars)")
+                                    failed_articles.append({"url": article['url'], "error": f"Insufficient content: {len(article_text)} chars"})
+                                    continue
+                            else:
+                                logging.error(f"News article FAILED: HTTP {article_response.status_code}")
+                                failed_articles.append({"url": article['url'], "error": f"HTTP {article_response.status_code}"})
+                                continue
+                        except Exception as e:
+                            logging.error(f"News article processing failed: {e}")
+                            failed_articles.append({"url": article['url'], "error": f"Processing failed: {str(e)[:50]}"})
+                            continue
                 
                 # ENHANCED Content validation with detailed logging
                 content_length = len(article_content) if article_content else 0
@@ -678,29 +817,42 @@ def process_newsletter():
                 
                 # Create article via orchestrator with transaction safety
                 try:
-                    logging.info(f"Sending to orchestrator: Title='{article['title']}', Content={len(article_content)} bytes")
+                    logging.info(f"🔍 DEBUG: About to send to orchestrator - Title='{article['title']}', Content={len(article_content)} bytes")
+                    logging.info(f"🔍 DEBUG: Is main article: {article.get('is_main_article', False)}")
+                    
+                    # Log the exact payload being sent
+                    payload = {
+                        'article_text': article_content,
+                        'request_string': article['title'],
+                        'secret_id': user_id,
+                        'major_points_count': 4
+                    }
+                    logging.info(f"🔍 DEBUG: Orchestrator payload - request_string length: {len(payload['request_string'])}, article_text length: {len(payload['article_text'])}")
+                    logging.info(f"🔍 DEBUG: Orchestrator payload preview - article_text first 200 chars: {payload['article_text'][:200]}...")
                     
                     orchestrator_response = requests.post(
                         'http://news-orchestrator-1:5012/generate-news',
-                        json={
-                            'article_text': article_content,
-                            'request_string': article['title'],
-                            'secret_id': user_id,
-                            'major_points_count': 4
-                        },
+                        json=payload,
                         timeout=180,
                         headers={'Content-Type': 'application/json; charset=utf-8'}
                     )
                     
-                    logging.info(f"Orchestrator response: Status={orchestrator_response.status_code}")
+                    logging.info(f"🔍 DEBUG: Orchestrator response: Status={orchestrator_response.status_code}")
                     
                     if orchestrator_response.status_code == 200:
                         result = orchestrator_response.json()
                         article_id = result['article_id']
-                        logging.info(f"Orchestrator SUCCESS: Created article_id={article_id}")
+                        logging.info(f"🔍 DEBUG: Orchestrator SUCCESS: Created article_id={article_id}")
+                        logging.info(f"🔍 DEBUG: Orchestrator response keys: {list(result.keys())}")
+                        
+                        # Log what was actually stored in the database
+                        if article.get('is_main_article'):
+                            logging.info(f"🔍 DEBUG: MAIN ARTICLE CREATED - ID: {article_id}")
+                            logging.info(f"🔍 DEBUG: This should contain the MailChimp newsletter content!")
                         
                         # Update with original URL (preserve episode parameters) and link to newsletter
                         try:
+                            logging.info(f"🔍 DEBUG: Updating article {article_id} with URL: {article['url']}")
                             article_cursor.execute(
                                 "UPDATE article_requests SET url = %s WHERE article_id = %s",
                                 (article['url'], article_id)
@@ -711,7 +863,13 @@ def process_newsletter():
                             )
                             article_conn.commit()
                             articles_created += 1
-                            logging.info(f"✅ CREATED and linked new article {article_id}")
+                            
+                            if article.get('is_main_article'):
+                                logging.info(f"🔍 DEBUG: ✅ MAIN ARTICLE SUCCESSFULLY CREATED AND LINKED - ID: {article_id}")
+                                logging.info(f"🔍 DEBUG: Main article URL: {article['url']}")
+                                logging.info(f"🔍 DEBUG: Main article should now be available for download!")
+                            else:
+                                logging.info(f"✅ CREATED and linked new article {article_id}")
                         except Exception as db_error:
                             # Handle potential duplicate URL constraint violation
                             article_conn.rollback()
@@ -738,16 +896,27 @@ def process_newsletter():
                         try:
                             error_response = orchestrator_response.json()
                             error_detail = error_response.get('error', 'Unknown orchestrator error')
-                        except:
+                            logging.info(f"🔍 DEBUG: Orchestrator error response: {error_response}")
+                        except Exception as json_error:
                             error_detail = f"HTTP {orchestrator_response.status_code}"
+                            logging.info(f"🔍 DEBUG: Could not parse orchestrator error response: {json_error}")
+                            logging.info(f"🔍 DEBUG: Raw orchestrator response: {orchestrator_response.text[:500]}")
                         
-                        logging.error(f"Orchestrator FAILED: {error_detail}")
+                        if article.get('is_main_article'):
+                            logging.error(f"🔍 DEBUG: ❌ MAIN ARTICLE ORCHESTRATOR FAILED: {error_detail}")
+                        else:
+                            logging.error(f"Orchestrator FAILED: {error_detail}")
                         failed_articles.append({"url": article['url'], "error": f"Orchestrator: {error_detail}"})
                         
                 except Exception as orchestrator_error:
                     if article_conn:
                         article_conn.rollback()
-                    logging.error(f"Orchestrator request failed: {orchestrator_error}")
+                    
+                    if article.get('is_main_article'):
+                        logging.error(f"🔍 DEBUG: ❌ MAIN ARTICLE ORCHESTRATOR REQUEST FAILED: {orchestrator_error}")
+                        logging.error(f"🔍 DEBUG: Main article content length was: {len(article_content)} bytes")
+                    else:
+                        logging.error(f"Orchestrator request failed: {orchestrator_error}")
                     failed_articles.append({"url": article['url'], "error": f"Request failed: {str(orchestrator_error)[:100]}"})
                     
             except Exception as e:
@@ -757,8 +926,13 @@ def process_newsletter():
                         article_conn.rollback()
                     except:
                         pass
+                
+                if article.get('is_main_article'):
+                    logging.error(f"🔍 DEBUG: ❌ MAIN ARTICLE PROCESSING FAILED: {e}")
+                    logging.error(f"🔍 DEBUG: Main article URL: {article.get('url', 'Unknown')}")
+                else:
+                    logging.error(f"Error processing article {article['url']}: {e}")
                 failed_articles.append({"url": article['url'], "error": str(e)[:100]})
-                logging.error(f"Error processing article {article['url']}: {e}")
             finally:
                 # Always close article connection
                 if article_cursor:
@@ -793,6 +967,10 @@ def process_newsletter():
         conn.commit()
         cursor.close()
         conn.close()
+        
+        # Check if main article was processed
+        main_article_found = any(article.get('is_main_article') for article in article_urls)
+        logging.info(f"🔍 DEBUG: Main article was in processing list: {main_article_found}")
         
         logging.info(f"FINAL RESULTS: Found={len(article_urls)}, Created={articles_created}, Failed={len(failed_articles)}")
         if failed_articles:
