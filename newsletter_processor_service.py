@@ -302,14 +302,13 @@ def process_newsletter():
         if use_browser:
             logging.info(f"Using browser automation for protected site: {newsletter_url}")
             try:
-                from browser_automation import extract_newsletter_content_with_browser
-                browser_result = extract_newsletter_content_with_browser(newsletter_url)
+                from browser_automation import extract_full_newsletter_with_browser
+                browser_result = extract_full_newsletter_with_browser(newsletter_url)
                 
                 if browser_result.get('success'):
-                    # Create a mock response for browser-extracted content
-                    response_content = f"<html><head><title>{browser_result['title']}</title></head><body><div class='main-content'>{browser_result['content']}</div></body></html>"
-                    soup = BeautifulSoup(response_content, 'html.parser')
-                    logging.info(f"Browser automation SUCCESS: Extracted {len(browser_result['content'])} chars")
+                    # Use the original HTML structure for pattern detection
+                    soup = BeautifulSoup(browser_result['html_content'], 'html.parser')
+                    logging.info(f"Browser automation SUCCESS: Extracted HTML with {len(browser_result['html_content'])} chars")
                 else:
                     error_msg = f"Browser automation failed: {browser_result.get('error', 'Unknown error')}"
                     logging.error(error_msg)
@@ -475,6 +474,32 @@ def process_newsletter():
                     except Exception as e:
                         logging.debug(f"Generic selector '{selector}' failed: {e}")
                         continue
+            
+            # Quora-specific content extraction for newsletters
+            if not main_content and 'quora.com' in newsletter_url:
+                try:
+                    # Get all text content from body with line breaks preserved
+                    body_text = soup.get_text(separator='\n', strip=True)
+                    lines = [line.strip() for line in body_text.split('\n') if line.strip()]
+                    
+                    # Filter and collect substantial story content
+                    content_lines = []
+                    for line in lines:
+                        if (len(line) > 30 and 
+                            not any(skip in line.lower() for skip in [
+                                'sign in', 'log in', 'follow space', 'apply to beco',
+                                'moderator', 'contributor', 'navigation', 'menu'
+                            ]) and
+                            not line.startswith('http')):
+                            content_lines.append(line)
+                            if len(content_lines) >= 15:  # Get more content for newsletters
+                                break
+                    
+                    if content_lines:
+                        main_content = '\n\n'.join(content_lines)
+                        logging.info(f"Extracted Quora newsletter content: {len(main_content)} chars")
+                except Exception as e:
+                    logging.error(f"Quora content extraction failed: {e}")
             
             # Last resort: try body text but filter out navigation/headers
             if not main_content:

@@ -274,28 +274,99 @@ def extract_dynamic_content(url):
     browser = get_browser()
     return browser.extract_dynamic_content(url)
 
-def extract_newsletter_content_with_browser(url):
-    """Universal newsletter content extraction for any technology"""
+def extract_full_newsletter_with_browser(url):
+    """Extract full HTML structure for pattern detection while bypassing protection"""
     browser = get_browser()
     
     if not browser.driver:
         return {"error": "Browser not initialized"}
     
     try:
+        # Enhanced Chrome options for stealth
+        chrome_options = Options()
+        chrome_options.add_argument('--headless')
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument('--window-size=1920,1080')
+        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        chrome_options.add_experimental_option('useAutomationExtension', False)
+        chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+        
+        # Create new driver for protected sites
+        temp_driver = webdriver.Chrome(options=chrome_options)
+        temp_driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        
         logging.info(f"Loading newsletter URL with browser: {url}")
-        browser.driver.get(url)
+        temp_driver.get(url)
+        
+        # Wait for content to load
+        time.sleep(5)
+        
+        # Get full HTML source
+        html_content = temp_driver.page_source
+        page_title = temp_driver.title
+        
+        # Clean up temporary driver
+        temp_driver.quit()
+        
+        return {
+            "success": True,
+            "title": page_title,
+            "html_content": html_content,
+            "content_type": "full_html"
+        }
+            
+    except Exception as e:
+        logging.error(f"Full HTML extraction error for {url}: {e}")
+        return {"error": f"HTML extraction failed: {str(e)}"}
+
+def extract_newsletter_content_with_browser(url):
+    """Universal newsletter content extraction for any technology including Quora"""
+    browser = get_browser()
+    
+    if not browser.driver:
+        return {"error": "Browser not initialized"}
+    
+    try:
+        # Enhanced Chrome options for stealth
+        chrome_options = Options()
+        chrome_options.add_argument('--headless')
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument('--window-size=1920,1080')
+        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        chrome_options.add_experimental_option('useAutomationExtension', False)
+        chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+        
+        # Create new driver with enhanced options for protected sites
+        if 'quora.com' in url or 'medium.com' in url:
+            temp_driver = webdriver.Chrome(options=chrome_options)
+            temp_driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            driver = temp_driver
+        else:
+            driver = browser.driver
+        
+        logging.info(f"Loading newsletter URL with browser: {url}")
+        driver.get(url)
+        
+        # Wait for content to load
         time.sleep(5)
         
         # Extract full text content
-        full_text = browser.driver.find_element(By.TAG_NAME, "body").text
-        page_title = browser.driver.title
+        full_text = driver.find_element(By.TAG_NAME, "body").text
+        page_title = driver.title
         
         # Detect content type and extract accordingly
         if 'spotify.com' in url:
-            return browser.extract_spotify_content(url)
+            result = browser.extract_spotify_content(url)
+        elif 'quora.com' in url:
+            result = extract_quora_content(driver, url)
         elif 'podcasts.apple.com' in url:
-            # Apple Podcasts handling
-            return {
+            result = {
                 "success": True,
                 "title": page_title,
                 "content": f"PODCAST_TITLE: {page_title}\n\nPODCAST_CONTENT: {full_text[:1000]}",
@@ -306,17 +377,90 @@ def extract_newsletter_content_with_browser(url):
             lines = [line.strip() for line in full_text.split('\n') if len(line.strip()) > 50]
             substantial_content = ' '.join(lines[:10])  # First 10 substantial lines
             
-            return {
+            result = {
                 "success": True,
                 "title": page_title,
                 "content": f"ARTICLE_TITLE: {page_title}\n\nARTICLE_CONTENT: {substantial_content}",
                 "content_type": "generic_article",
                 "full_text_length": len(full_text)
             }
+        
+        # Clean up temporary driver
+        if 'quora.com' in url or 'medium.com' in url:
+            temp_driver.quit()
+        
+        return result
             
     except Exception as e:
         logging.error(f"Universal browser extraction error for {url}: {e}")
         return {"error": f"Browser extraction failed: {str(e)}"}
+
+def extract_quora_content(driver, url):
+    """Extract content from Quora pages"""
+    try:
+        # Wait for Quora content to load
+        WebDriverWait(driver, 10).until(
+            EC.any_of(
+                EC.presence_of_element_located((By.CSS_SELECTOR, ".q-text")),
+                EC.presence_of_element_located((By.CSS_SELECTOR, "[data-testid='answer_content']")),
+                EC.presence_of_element_located((By.CSS_SELECTOR, ".spacing_log_answer_content"))
+            )
+        )
+        
+        # Extract title
+        title = "Quora Content"
+        try:
+            title_selectors = [
+                "h1",
+                ".q-text.qu-dynamicFontSize--xlarge",
+                "[data-testid='question_title']"
+            ]
+            for selector in title_selectors:
+                title_elem = driver.find_element(By.CSS_SELECTOR, selector)
+                if title_elem and title_elem.text.strip():
+                    title = title_elem.text.strip()
+                    break
+        except:
+            pass
+        
+        # Extract content
+        content_parts = []
+        content_selectors = [
+            ".q-text",
+            "[data-testid='answer_content']",
+            ".spacing_log_answer_content",
+            ".q-box.qu-pt--medium"
+        ]
+        
+        for selector in content_selectors:
+            try:
+                elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                for elem in elements[:5]:  # Limit to first 5 elements
+                    text = elem.text.strip()
+                    if len(text) > 50 and text not in content_parts:
+                        content_parts.append(text)
+            except:
+                continue
+        
+        content = "\n\n".join(content_parts)
+        
+        if len(content) < 100:
+            # Fallback: get all text content
+            content = driver.find_element(By.TAG_NAME, "body").text
+        
+        return {
+            'success': True,
+            'title': title,
+            'content': content,
+            'url': url
+        }
+        
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f'Quora extraction failed: {str(e)}',
+            'url': url
+        }
 
 def test_spotify_text_extraction(spotify_url):
     """Test function to extract and analyze Spotify text content"""
