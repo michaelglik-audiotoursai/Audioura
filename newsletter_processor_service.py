@@ -31,6 +31,72 @@ def get_db_connection():
         port=os.getenv('DB_PORT', '5433')
     )
 
+def is_binary_content(text):
+    """Detect if content contains binary data that would cause Unicode errors"""
+    if not text or not isinstance(text, str):
+        return True
+    
+    try:
+        # Check for null bytes (common in binary)
+        if '\x00' in text:
+            return True
+        
+        # Check for excessive non-printable characters
+        printable_chars = sum(1 for c in text if c.isprintable() or c.isspace())
+        total_chars = len(text)
+        
+        if total_chars > 0:
+            printable_ratio = printable_chars / total_chars
+            if printable_ratio < 0.7:  # Less than 70% printable = likely binary
+                return True
+        
+        # Check for common binary patterns
+        binary_patterns = [
+            '\ufffd',  # Unicode replacement character
+            '\u0000',  # Null character
+            '\u0001',  # Start of heading
+            '\u0002',  # Start of text
+        ]
+        
+        for pattern in binary_patterns:
+            if pattern in text:
+                return True
+        
+        # Try to encode as UTF-8 to catch encoding issues
+        text.encode('utf-8')
+        
+        return False
+        
+    except (UnicodeError, UnicodeEncodeError, UnicodeDecodeError):
+        return True
+    except Exception:
+        return True
+
+def clean_text_content(text):
+    """Clean and validate text content, removing binary contamination"""
+    if not text or not isinstance(text, str):
+        return ""
+    
+    try:
+        # Remove null bytes and other problematic characters
+        cleaned = text.replace('\x00', '').replace('\ufffd', '')
+        
+        # Remove non-printable characters except common whitespace
+        cleaned = ''.join(c for c in cleaned if c.isprintable() or c in '\n\r\t ')
+        
+        # Normalize whitespace
+        cleaned = ' '.join(cleaned.split())
+        
+        # Final validation
+        if is_binary_content(cleaned):
+            return ""
+        
+        return cleaned.strip()
+        
+    except Exception as e:
+        logging.error(f"Error cleaning text content: {e}")
+        return ""
+
 def clean_url(url):
     """Remove query parameters for uniqueness check, but preserve Apple Podcasts episode IDs"""
     try:
@@ -389,10 +455,15 @@ def process_newsletter():
                 try:
                     element = soup.select_one(selector)
                     if element:
+                        # Remove problematic elements that might contain binary data
+                        for tag in element.find_all(['script', 'style', 'img', 'svg', 'canvas', 'object', 'embed']):
+                            tag.decompose()
+                        
                         text = element.get_text(separator=' ', strip=True)
-                        if len(text) > 200:
-                            main_content = text
-                            logging.info(f"Found Substack content with selector '{selector}': {len(text)} chars")
+                        cleaned_text = clean_text_content(text)
+                        if len(cleaned_text) > 200 and not is_binary_content(cleaned_text):
+                            main_content = cleaned_text
+                            logging.info(f"Found Substack content with selector '{selector}': {len(cleaned_text)} chars")
                             break
                 except Exception as e:
                     logging.debug(f"Selector '{selector}' failed: {e}")
@@ -414,7 +485,9 @@ def process_newsletter():
                             combined_text = ""
                             for element in elements:
                                 text = element.get_text(separator=' ', strip=True)
-                                combined_text += text + " "
+                                cleaned_text = clean_text_content(text)
+                                if cleaned_text and not is_binary_content(cleaned_text):
+                                    combined_text += cleaned_text + " "
                             
                             if len(combined_text) > 200:
                                 main_content = combined_text.strip()
@@ -465,11 +538,16 @@ def process_newsletter():
                     try:
                         element = soup.select_one(selector)
                         if element:
+                            # Remove problematic elements that might contain binary data
+                            for tag in element.find_all(['script', 'style', 'img', 'svg', 'canvas', 'object', 'embed']):
+                                tag.decompose()
+                            
                             # Get text content, clean it up
                             text = element.get_text(separator=' ', strip=True)
-                            if len(text) > 200:  # Substantial content
-                                main_content = text
-                                logging.info(f"Found generic content with selector '{selector}': {len(text)} chars")
+                            cleaned_text = clean_text_content(text)
+                            if len(cleaned_text) > 200 and not is_binary_content(cleaned_text):  # Substantial content
+                                main_content = cleaned_text
+                                logging.info(f"Found generic content with selector '{selector}': {len(cleaned_text)} chars")
                                 break
                     except Exception as e:
                         logging.debug(f"Generic selector '{selector}' failed: {e}")
@@ -532,6 +610,11 @@ def process_newsletter():
                 # Extract title from page
                 page_title = soup.title.string if soup.title else "Newsletter Article"
                 clean_title = page_title.replace(' | Substack', '').replace(' - Newsletter', '').strip()
+                
+                # Clean title of binary content
+                clean_title = clean_text_content(clean_title)
+                if not clean_title or is_binary_content(clean_title):
+                    clean_title = "Newsletter Article"
                 
                 # Ensure we don't duplicate title in content
                 if main_content.startswith(clean_title):
@@ -679,7 +762,14 @@ def process_newsletter():
                             content = '. '.join(sentences[1:]).strip()
                             logging.info(f"🔍 DEBUG: Removed likely title duplication - new length: {len(content)} chars")
                     
-                    article_content = f"NEWSLETTER: {article['title']}\n\nCONTENT: {content}"
+                    # Clean and validate content before formatting
+                    cleaned_content = clean_text_content(content)
+                    if is_binary_content(cleaned_content):
+                        logging.error(f"🔍 DEBUG: BINARY CONTENT DETECTED - Rejecting article")
+                        failed_articles.append({"url": article['url'], "error": "Binary content detected"})
+                        continue
+                    
+                    article_content = f"NEWSLETTER: {article['title']}\n\nCONTENT: {cleaned_content}"
                     logging.info(f"🔍 DEBUG: Final formatted article_content length: {len(article_content)} bytes")
                     logging.info(f"🔍 DEBUG: Using pre-extracted main newsletter content: {len(article_content)} bytes")
                     
@@ -796,7 +886,14 @@ def process_newsletter():
                                         article_title = extracted_title
                                 
                                 if article_text and len(article_text) > 200:
-                                    article_content = f"ARTICLE: {article_title}\n\nCONTENT: {article_text}"
+                                    # Clean and validate article text
+                                    cleaned_article_text = clean_text_content(article_text)
+                                    if is_binary_content(cleaned_article_text):
+                                        logging.error(f"News article FAILED: Binary content detected")
+                                        failed_articles.append({"url": article['url'], "error": "Binary content detected"})
+                                        continue
+                                    
+                                    article_content = f"ARTICLE: {article_title}\n\nCONTENT: {cleaned_article_text}"
                                     article['title'] = article_title
                                     logging.info(f"News article SUCCESS: Title='{article_title}', Content={len(article_content)} bytes")
                                 else:
