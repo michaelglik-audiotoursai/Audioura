@@ -456,20 +456,7 @@ def process_newsletter():
                     "articles_created": 0
                 })
             
-            # CRITICAL FIX: Use response.text instead of response.content to avoid encoding issues
-            # response.content can have binary contamination, response.text handles encoding properly
-            try:
-                soup = BeautifulSoup(response.text, 'html.parser')
-                logging.info(f"Successfully parsed HTML with response.text ({len(response.text)} chars)")
-            except Exception as parse_error:
-                logging.error(f"HTML parsing failed: {parse_error}")
-                return jsonify({
-                    "status": "error",
-                    "message": f"HTML parsing failed: {str(parse_error)}",
-                    "error_type": "html_parsing_error",
-                    "articles_found": 0,
-                    "articles_created": 0
-                })
+            soup = BeautifulSoup(response.content, 'html.parser')
         
         # ENHANCED: Extract main newsletter content FIRST
         article_urls = []
@@ -885,14 +872,7 @@ def process_newsletter():
                                 failed_articles.append({"url": article['url'], "error": error_msg})
                                 continue
                             elif article_response.status_code == 200:
-                                # CRITICAL FIX: Use response.text to avoid binary contamination
-                                try:
-                                    article_soup = BeautifulSoup(article_response.text, 'html.parser')
-                                    logging.info(f"Successfully parsed article HTML ({len(article_response.text)} chars)")
-                                except Exception as parse_error:
-                                    logging.error(f"Article HTML parsing failed: {parse_error}")
-                                    failed_articles.append({"url": article['url'], "error": f"HTML parsing: {str(parse_error)[:50]}"})
-                                    continue
+                                article_soup = BeautifulSoup(article_response.content, 'html.parser')
                                 
                                 # Extract article content using common selectors + Newton Beacon specific
                                 content_selectors = [

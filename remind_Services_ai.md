@@ -445,8 +445,8 @@ Once pattern identified:
 - ✅ `browser_automation.py` - Full HTML extraction function
 - ✅ `newsletter_processor_service.py` - Enhanced Quora content extraction
 
-**Last Updated**: 2025-11-06 - BINARY CONTENT BUG ROOT CAUSE IDENTIFIED ⚠️
-**Status**: CRITICAL BUG - Root cause found in HTML content extraction, partial fix deployed
+**Last Updated**: 2025-11-06 - BINARY CONTENT BUG INVESTIGATION CONTINUES ⚠️
+**Status**: CRITICAL BUG - Initial hypothesis disproven, issue persists with both response.content and response.text
 
 ### 🚨 **CRITICAL BUG: Binary Content Contamination - ROOT CAUSE IDENTIFIED**
 **Date**: 2025-11-06
@@ -456,17 +456,17 @@ Once pattern identified:
 - Article titles showing binary characters: `AgH $+춬B(k97la}<E"} 9ý|,47APe_ƮʗD>`
 - News generator receiving corrupted content
 
-**ROOT CAUSE IDENTIFIED**:
-- ✅ **HTTP Response Encoding**: Fixed - Changed from `response.content` to `response.text` in BeautifulSoup
-- ❌ **HTML Content Extraction**: STILL FAILING - Binary data in extracted text from HTML elements
-- **Issue Location**: `element.get_text()` method returning binary-contaminated strings
-- **Evidence**: Newsletter processor logs show binary characters in content preview
+**INVESTIGATION UPDATE**:
+- ❌ **HTTP Response Theory**: DISPROVEN - Both `response.content` and `response.text` produce same binary contamination
+- ❌ **BeautifulSoup Theory**: DISPROVEN - Issue persists regardless of parsing method
+- ❌ **Content Extraction Theory**: DISPROVEN - Problem occurs even with working version's code
+- **New Evidence**: Regression comparison shows binary contamination happens with identical code
 
 **Investigation Results**:
-- **HTTP Layer**: ✅ FIXED - Using `response.text` resolves encoding issues
-- **HTML Parsing**: ✅ FIXED - BeautifulSoup parsing works correctly
-- **Content Extraction**: ❌ FAILING - `get_text()` method produces binary data
-- **Pipeline Impact**: Binary contamination occurs before orchestrator/generator services
+- **Regression Analysis**: ✅ COMPLETE - Compared working vs broken versions
+- **HTTP Layer**: ❌ NOT THE ISSUE - Both methods fail identically
+- **HTML Parsing**: ❌ NOT THE ISSUE - Same BeautifulSoup usage as working version
+- **Pipeline Impact**: Binary contamination occurs somewhere in orchestrator/generator pipeline
 
 **Partial Fix Deployed**:
 - ✅ `newsletter_processor_service.py` - HTTP response encoding fix
@@ -474,8 +474,9 @@ Once pattern identified:
 - ❌ **Still Needed**: Fix for HTML element text extraction
 
 **Next Steps**:
-1. Investigate why `element.get_text()` returns binary data
-2. Implement alternative text extraction method
-3. Add encoding normalization after text extraction
+1. ✅ COMPLETE - Regression analysis shows newsletter processor is not the issue
+2. 🔄 INVESTIGATE - News orchestrator or generator services causing contamination
+3. 🔄 CHECK - Database encoding or storage issues
+4. 🔄 ANALYZE - When exactly binary contamination is introduced in pipeline
 
 **Priority**: HIGH - Affects all newsletter processing, partial fix reduces but doesn't eliminate issue
