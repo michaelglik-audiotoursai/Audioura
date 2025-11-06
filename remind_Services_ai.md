@@ -445,5 +445,34 @@ Once pattern identified:
 - ✅ `browser_automation.py` - Full HTML extraction function
 - ✅ `newsletter_processor_service.py` - Enhanced Quora content extraction
 
-**Last Updated**: 2025-11-05 - QUORA ENHANCED PROCESSING COMPLETE ✅
-**Status**: PRODUCTION SUCCESS - Full Quora newsletter support with 5-article extraction
+**Last Updated**: 2025-11-06 - BINARY CONTENT BUG INVESTIGATION ⚠️
+**Status**: CRITICAL BUG IDENTIFIED - Binary content contamination in newsletter processing
+
+### 🚨 **CRITICAL BUG: Binary Content Contamination**
+**Date**: 2025-11-06
+**Issue**: Newsletter processing extracting binary data instead of text, causing Unicode encoding errors
+**Symptoms**: 
+- PostgreSQL errors: "unsupported Unicode escape sequence", "\u0000 cannot be converted to text"
+- Article titles showing binary characters: `AgH $+춬B(k97la}<E"} 9ý|,47APe_ƮʗD>`
+- News generator receiving corrupted content
+
+**Root Cause Analysis**:
+- ✅ **Newsletter Processor**: Enhanced with binary content filtering and HTML element removal
+- ✅ **Content Extraction**: Added aggressive binary detection (80% printable threshold)
+- ✅ **HTML Filtering**: Remove script/style/img/svg elements before text extraction
+- ❌ **Still Failing**: Binary content passing through all filters
+
+**Investigation Status**:
+- **Confirmed Regression**: Previously working newsletters now show binary content
+- **Pipeline Analysis**: Issue appears to be in content extraction from HTML, not orchestrator/generator
+- **Filters Applied**: Multiple layers of binary detection and cleaning implemented
+- **Next Steps**: Need to investigate HTML parsing library or response encoding issues
+
+**Files Enhanced**:
+- ✅ `newsletter_processor_service.py` - Binary content detection and filtering
+- ✅ Enhanced `is_binary_content()` function with aggressive detection
+- ✅ HTML element filtering to avoid binary-containing elements
+- ✅ Payload validation before sending to orchestrator
+
+**Workaround**: Binary content filtering prevents database crashes but doesn't solve root cause
+**Priority**: HIGH - Affects all newsletter processing
