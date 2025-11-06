@@ -41,13 +41,25 @@ def is_binary_content(text):
         if '\x00' in text:
             return True
         
-        # Check for excessive non-printable characters
-        printable_chars = sum(1 for c in text if c.isprintable() or c.isspace())
-        total_chars = len(text)
+        # Check for excessive non-printable characters (more aggressive)
+        printable_chars = 0
+        control_chars = 0
         
+        for c in text:
+            if c.isprintable() or c.isspace():
+                printable_chars += 1
+            elif ord(c) < 32 and c not in '\n\r\t':  # Control characters
+                control_chars += 1
+        
+        total_chars = len(text)
         if total_chars > 0:
             printable_ratio = printable_chars / total_chars
-            if printable_ratio < 0.7:  # Less than 70% printable = likely binary
+            control_ratio = control_chars / total_chars
+            
+            # More aggressive detection
+            if printable_ratio < 0.8:  # Less than 80% printable = likely binary
+                return True
+            if control_ratio > 0.1:  # More than 10% control chars = likely binary
                 return True
         
         # Check for common binary patterns
@@ -61,6 +73,19 @@ def is_binary_content(text):
         for pattern in binary_patterns:
             if pattern in text:
                 return True
+        
+        # Check for suspicious character sequences (new)
+        suspicious_count = 0
+        for i in range(len(text) - 1):
+            c1, c2 = text[i], text[i + 1]
+            # Look for patterns like random chars followed by symbols
+            if (not c1.isalnum() and not c1.isspace() and 
+                not c2.isalnum() and not c2.isspace() and
+                c1 != c2):  # Different non-alphanumeric chars in sequence
+                suspicious_count += 1
+        
+        if total_chars > 0 and suspicious_count / total_chars > 0.3:  # 30% suspicious = binary
+            return True
         
         # Try to encode as UTF-8 to catch encoding issues
         text.encode('utf-8')
@@ -950,7 +975,21 @@ def process_newsletter():
                         'major_points_count': 4
                     }
                     logging.info(f"🔍 DEBUG: Orchestrator payload - request_string length: {len(payload['request_string'])}, article_text length: {len(payload['article_text'])}")
-                    logging.info(f"🔍 DEBUG: Orchestrator payload preview - article_text first 200 chars: {payload['article_text'][:200]}...")
+                    # Check if payload contains binary content before sending
+                    if is_binary_content(payload['article_text']):
+                        logging.error(f"🔍 DEBUG: BINARY CONTENT DETECTED IN PAYLOAD - REJECTING")
+                        failed_articles.append({"url": article['url'], "error": "Binary content in payload"})
+                        continue
+                    
+                    try:
+                        # Test encoding before sending
+                        payload['article_text'].encode('utf-8')
+                        preview = payload['article_text'][:200].encode('ascii', 'ignore').decode('ascii')
+                        logging.info(f"🔍 DEBUG: Orchestrator payload preview - article_text first 200 chars: {preview}...")
+                    except Exception as encoding_error:
+                        logging.error(f"🔍 DEBUG: ENCODING ERROR IN PAYLOAD: {encoding_error}")
+                        failed_articles.append({"url": article['url'], "error": f"Encoding error: {str(encoding_error)}"})
+                        continue
                     
                     orchestrator_response = requests.post(
                         'http://news-orchestrator-1:5012/generate-news',
