@@ -206,6 +206,9 @@ class _NewsPlayerScreenState extends State<NewsPlayerScreen> {
           case 'previous_article':
             await _navigateToPreviousArticle();
             return;
+          case 'navigate_to_listen_page':
+            await _navigateToListenPage();
+            return;
           case 'pause_for_listening':
             jsCommand = '(function() { document.querySelectorAll("audio").forEach(a => a.pause()); return "All audio paused for listening"; })()';
             break;
@@ -544,6 +547,26 @@ class _NewsPlayerScreenState extends State<NewsPlayerScreen> {
       await DebugLogHelper.addDebugLog('NEWS VOICE: Next article error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
+  Future<void> _navigateToListenPage() async {
+    try {
+      await DebugLogHelper.addDebugLog('NEWS VOICE: Navigating to Listen Page');
+      
+      // Pause current audio before leaving
+      if (webController != null) {
+        await webController!.evaluateJavascript(source: 'window.pauseAudio()');
+      }
+      
+      // Navigate back to Listen Page (My News Screen)
+      Navigator.pop(context);
+      
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('NEWS VOICE: Navigate to Listen Page error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error returning to Listen Page: $e')),
       );
     }
   }

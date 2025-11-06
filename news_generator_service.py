@@ -201,14 +201,10 @@ def clean_article_with_title_boundary(text, title):
     return clean_text
 
 def find_article_end(text):
-    """Find where the actual article content ends"""
+    """Find where the actual article content ends - IMPROVED ALGORITHM"""
     import logging
     
-    # Skip end marker detection for newsletter content (already cleaned by newsletter processor)
-    if any(marker in text for marker in ['Daily Rip', 'Stocktwits', 'Newsletter', 'beehiiv']):
-        logging.info("Newsletter content detected - skipping end marker detection")
-        return text
-    
+    # Improved end marker detection - only truncate if we have substantial content before the marker
     end_markers = [
         r'Follow.*?on Instagram',
         r'sign up for.*?newsletter',
@@ -228,15 +224,30 @@ def find_article_end(text):
     ]
     
     lines = text.split('\n')
+    total_lines = len(lines)
+    
     for i, line in enumerate(lines):
         for marker in end_markers:
             if re.search(marker, line, re.IGNORECASE):
-                logging.info(f"Found article end marker at line {i}: '{marker}' in '{line[:50]}...'")
-                result = '\n'.join(lines[:i]).strip()
-                logging.info(f"Article truncated at end marker: {len(text)} -> {len(result)} characters")
-                return result
+                # CRITICAL FIX: Only truncate if we have substantial content before the marker
+                # AND the marker appears in the last 20% of the content
+                content_before = '\n'.join(lines[:i]).strip()
+                
+                # Safety checks:
+                # 1. Must have at least 500 characters of content before marker
+                # 2. Marker must be in last 20% of lines (likely promotional footer)
+                # 3. Don't truncate if marker is in first 80% (likely part of actual content)
+                
+                if (len(content_before) >= 500 and 
+                    i >= (total_lines * 0.8)):
+                    logging.info(f"Found end marker at line {i}/{total_lines} (last 20%): '{marker}' - truncating")
+                    logging.info(f"Article truncated: {len(text)} -> {len(content_before)} characters")
+                    return content_before
+                else:
+                    logging.info(f"Found end marker at line {i}/{total_lines} but NOT truncating - marker too early or insufficient content before it")
+                    logging.info(f"Content before marker: {len(content_before)} chars, Position: {i/total_lines*100:.1f}% through text")
     
-    logging.info("No article end markers found, keeping full text")
+    logging.info("No valid end markers found for truncation, keeping full text")
     return text
 
 def extract_major_points(text, max_points):

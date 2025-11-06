@@ -129,6 +129,13 @@ class VoiceControlServiceNews {
                cmd.contains('least major points')) {
       await DebugLogHelper.addDebugLog('VOICE NEWS: LIST MAJOR TOPICS command detected');
       onVoiceCommand?.call('list_major_topics', null, 'Listing major topics');
+    } else if (cmd.contains('go to listen page') || cmd.contains('listen page') || 
+               cmd.contains('back to listen page') || cmd.contains('return to listen') ||
+               cmd.contains('return to listen page') || cmd.contains('back to article list') ||
+               cmd.contains('article list') || cmd.contains('show all articles') ||
+               cmd.contains('all articles')) {
+      await DebugLogHelper.addDebugLog('VOICE NEWS: NAVIGATE TO LISTEN PAGE command detected');
+      onVoiceCommand?.call('navigate_to_listen_page', null, 'Going to Listen Page');
     } else if (cmd.contains('what are my options') || cmd.contains('what are my commands') || 
                cmd.contains('list commands') || cmd.contains('list options') || 
                cmd.contains('what can i say') || cmd.contains('what can i ask') ||
