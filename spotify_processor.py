@@ -42,6 +42,17 @@ def get_spotify_episode_content(episode_id):
         
         logging.info(f"Spotify response status: {response.status_code}, final URL: {response.url}, content length: {len(response.text)}")
         
+        # DEBUG: Save raw HTML response for analysis
+        with open('debug_spotify_raw_response.html', 'w', encoding='utf-8', errors='replace') as f:
+            f.write(f"URL: {episode_url}\n")
+            f.write(f"Status: {response.status_code}\n")
+            f.write(f"Final URL: {response.url}\n")
+            f.write(f"Content Length: {len(response.text)}\n")
+            f.write(f"\n=== RAW HTML ===\n")
+            f.write(response.text)
+        
+        logging.info(f"DEBUG: Raw HTML saved to debug_spotify_raw_response.html")
+        
         if response.status_code == 200:
             # Extract content from HTML
             content = response.text
@@ -90,12 +101,22 @@ def get_spotify_episode_content(episode_id):
             clean_title = title.replace(' | Podcast on Spotify', '').replace(' - Spotify', '').strip()
             clean_description = description.strip()
             
+            # Format content with clear title separation like Apple Podcasts processor
+            formatted_content = f"EPISODE_TITLE: {clean_title}\n\nEPISODE_DESCRIPTION: {clean_description}"
+            
+            # DEBUG: Save extraction details
+            with open('debug_spotify_extraction.txt', 'w', encoding='utf-8') as f:
+                f.write(f"=== SPOTIFY CONTENT EXTRACTION DEBUG ===\n")
+                f.write(f"Original title: {title}\n")
+                f.write(f"Clean title: {clean_title}\n")
+                f.write(f"Original description: {description}\n")
+                f.write(f"Clean description: {clean_description}\n")
+                f.write(f"Formatted content: {formatted_content}\n")
+            
             # Log what we extracted
             logging.info(f"Extracted title: '{clean_title}' ({len(clean_title)} chars)")
             logging.info(f"Extracted description: '{clean_description[:100]}...' ({len(clean_description)} chars)")
-            
-            # Format content with clear title separation like Apple Podcasts processor
-            formatted_content = f"EPISODE_TITLE: {clean_title}\n\nEPISODE_DESCRIPTION: {clean_description}"
+            logging.info(f"DEBUG: Extraction details saved to debug_spotify_extraction.txt")
             
             return {
                 'title': clean_title,
