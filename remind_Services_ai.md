@@ -447,8 +447,41 @@ Once pattern identified:
 - ✅ `browser_automation.py` - Full HTML extraction function
 - ✅ `newsletter_processor_service.py` - Enhanced Quora content extraction
 
-**Last Updated**: 2025-11-07 - URL ROUTING REGRESSION FIXED ✅
-**Status**: ✅ **LISTEN BUTTONS WORKING** - All 8 Listen buttons processed correctly
+**Last Updated**: 2025-11-07 - COMPREHENSIVE TEST LIBRARY + ROOT CAUSE IDENTIFIED ✅
+**Status**: 🔧 **NEWS PROCESSOR BUG FOUND** - Content truncated during final processing
+
+### 🧪 **COMPREHENSIVE TEST LIBRARY IMPLEMENTED**
+**Date**: 2025-11-07
+**Achievement**: Built complete testing framework for all newsletter processors
+**Status**: ✅ **DEPLOYED** - Full end-to-end testing with root cause identification
+
+**Test Components Created**:
+- `test_spotify_processing.py` - End-to-end Spotify URL processing test
+- `test_apple_processing.py` - End-to-end Apple Podcasts URL processing test  
+- `test_suite_runner.py` - Orchestrates all tests with JSON reporting
+- `auto_test_services.md` - Complete testing guide for Amazon-Q agents
+
+**Test Architecture**:
+```
+1. Database Cleanup → 2. Processor Test → 3. Orchestrator Test → 4. Database Verification
+```
+
+**Debug File Generation**:
+- Processor output JSON files
+- Orchestrator input/output payloads
+- Raw HTML responses (Spotify)
+- Final database content verification
+- Error logs and troubleshooting data
+
+**Test Results - ROOT CAUSE IDENTIFIED**:
+- ✅ **Spotify Processor**: Works in container (7,719 chars extracted)
+- ✅ **Apple Podcasts Processor**: Works perfectly (1,499 chars extracted)
+- ✅ **Orchestrator**: Receives content correctly (HTTP 200)
+- ✅ **News Generator**: Processes content correctly (1,499 → 2,153 chars)
+- ❌ **News Processor**: **OVERWRITES CONTENT WITH TITLE-ONLY** (2,153 → 51 chars)
+
+**Critical Discovery**:
+News processor marks articles as "finished" but overwrites full processed content with title-only during final update. This is the regression source.
 
 ### ✅ **URL ROUTING REGRESSION - FIXED**
 **Date**: 2025-11-07
@@ -523,8 +556,30 @@ curl -X GET "http://localhost:5012/download/ee944614-e0b7-45cc-85e3-01625d42932d
 **Transaction Isolation**: Individual database connections prevent cascade failures
 **Pattern Recognition**: MailChimp newsletters extract 8+ articles (233% improvement)
 
+### 🔧 **CRITICAL BUG IDENTIFIED: News Processor Content Overwrite**
+**Date**: 2025-11-07
+**Issue**: News processor overwrites full processed content with title-only during "finished" status update
+**Root Cause**: Binary content detection regression modified news processor update logic
+**Evidence**: 
+- Orchestrator receives: 1,499 chars ✅
+- News generator processes: 1,499 → 2,153 chars ✅  
+- News processor stores: 2,153 → 51 chars (title only) ❌
+
+**Container Services Added**:
+- No new containers added - used existing services
+- Enhanced existing containers with Selenium + Chrome
+- Test users created in database: `test_user_spotify`, `test_user_apple`
+
+**Files Added to Repository**:
+- `test_spotify_processing.py` - Comprehensive Spotify testing
+- `test_apple_processing.py` - Comprehensive Apple Podcasts testing
+- `test_suite_runner.py` - Test orchestration and reporting
+- `auto_test_services.md` - Testing documentation for Amazon-Q agents
+
 **Current Status**: 
 - ✅ **Main Article**: Guy Raz newsletter processing FULLY WORKING with complete 9,124-character content
 - ✅ **Listen Button Detection**: All 8 Listen buttons (4 Spotify + 4 Apple) correctly detected and processed
-- ❌ **Listen Button Content**: Processors returning minimal content instead of rich episode data
-- 🔄 **Next Priority**: Fix Spotify and Apple Podcasts content extraction quality
+- ✅ **Processors Working**: Both Spotify (container) and Apple Podcasts extract quality content
+- ✅ **Test Library**: Complete end-to-end testing framework deployed
+- ❌ **News Processor Bug**: Overwrites processed content with title-only during final update
+- 🔄 **Next Priority**: Fix news processor content preservation during "finished" status update
