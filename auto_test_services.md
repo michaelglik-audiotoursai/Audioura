@@ -253,13 +253,63 @@ The test system is designed to provide complete visibility into the newsletter p
 
 ## ZIP File Access and Verification
 
+### Newsletter Technology URLs + ZIP Downloads for Comparison
+
+#### **1. Spotify Podcast Episodes**
+**Browser URL**: `https://open.spotify.com/episode/3VJHfEUYl7tHUll4vfu1D3?si=e01TiIuARxqSIqVnaaaYVQ`
+**ZIP Download**: 
+```bash
+curl -X GET "http://localhost:5012/download/1eb74f38-828b-407d-813f-92e368dd51be" -o "spotify_enhanced.zip"
+```
+**Test URL**: `https://open.spotify.com/episode/5aYNEkTiA5B3rYEQsvMJUr?si=02TAenI7TXK1GHc6RENr5A`
+
+#### **2. Apple Podcasts Processing**
+**Browser URL**: `https://podcasts.apple.com/us/podcast/babylist-natalie-gordon-how-a-new-mom-used-nap-time/id1150510297?i=1000733348575`
+**ZIP Download**:
+```bash
+curl -X GET "http://localhost:5012/download/c599b5bb-9c2f-41d0-a39a-470196826283" -o "apple_podcasts.zip"
+curl -X GET "http://localhost:5012/download/faf2bda6-d963-474d-a6c7-a6316a51c847" -o "apple_podcasts_2.zip"
+```
+
+#### **3. MailChimp Newsletter Platform**
+**Browser URL**: `https://mailchi.mp/bostonglobe.com/todaysheadlines-6057237`
+**ZIP Download**:
+```bash
+curl -X GET "http://localhost:5012/download/66a8e139-a1ff-4c27-aee7-cb844dffc178" -o "mailchimp_newsletter.zip"
+```
+
+#### **4. Substack Newsletter Platform (Guy Raz)**
+**Browser URLs**:
+- `https://guyraz.substack.com/p/the-babylist-playbook-how-one-mom`
+- `https://guyraz.substack.com/p/10-lessons-from-chip-and-joanna-gaines`
+- `https://guyraz.substack.com/p/how-to-turn-a-small-struggling-business`
+
+**ZIP Downloads**:
+```bash
+curl -X GET "http://localhost:5012/download/dbf1839a-841b-4fea-bf30-41cd7143c7d0" -o "guy_raz_babylist.zip"
+curl -X GET "http://localhost:5012/download/e6be8eaf-1a44-4c74-b8c1-53cd07a8e889" -o "guy_raz_wayfair.zip"
+```
+
+#### **5. Quora Newsletter Platform**
+**Browser URLs**:
+- `https://jokesfunnystories.quora.com/What-was-your-worst-experience-being-desperate-to-pee-during-a-formal-event`
+- `https://jokesfunnystories.quora.com/What-s-the-most-fascinating-local-legend-or-folktale-from-your-hometown`
+- `https://www.quora.com/profile/Bala-Senthil-Kumar`
+
+**ZIP Downloads**:
+```bash
+curl -X GET "http://localhost:5012/download/f5bdcc8d-55e3-403d-8536-790704ba6806" -o "quora_funny_story.zip"
+curl -X GET "http://localhost:5012/download/2d10f1bd-8dd4-4959-8b1a-ed82da4ca51c" -o "quora_local_legend.zip"
+curl -X GET "http://localhost:5012/download/5d1358f7-7610-46cb-b2ee-d3d385032916" -o "quora_cricket.zip"
+```
+
 ### How to Access ZIP Files for Verification
 
 #### Step 1: Get Article ID
 ```bash
 # From test output, or query database for recent articles
 docker exec development-postgres-2-1 psql -U admin -d audiotours -c "
-SELECT article_id, request_string, finished_at 
+SELECT article_id, request_string, url, finished_at 
 FROM article_requests 
 WHERE status = 'finished' 
 ORDER BY finished_at DESC LIMIT 5;"
@@ -287,6 +337,22 @@ open extracted_article/index.html  # macOS
 start extracted_article/index.html  # Windows
 ```
 
+### Comparison Process
+1. **Open browser URLs** to see original content
+2. **Download ZIP files** using curl commands above
+3. **Extract and compare**:
+```bash
+unzip spotify_enhanced.zip -d spotify_extracted/
+unzip guy_raz_babylist.zip -d guyraz_extracted/
+unzip quora_funny_story.zip -d quora_extracted/
+
+# Compare original vs processed content
+cat spotify_extracted/audiotours_search_content.txt
+cat guyraz_extracted/audiotours_search_content.txt
+```
+
+4. **Check audio quality**: Play MP3 files to verify enhanced pronunciation (no "underscore" or HTML entities)
+
 ### Manual ZIP Download Test
 ```bash
 # Get article_id from test output
@@ -305,6 +371,33 @@ unzip -l "test_${ARTICLE_ID}.zip"
 # - audio-99.mp3 (full article)
 # - audio-help.mp3 (voice commands)
 # - audiotours_search_content.txt (full text)
+```
+
+### Get Fresh Article IDs
+```bash
+# Run tests to generate new articles
+python test_suite_runner.py
+python test_newsletter_technologies.py
+
+# Query for latest results by technology
+docker exec development-postgres-2-1 psql -U admin -d audiotours -c "
+SELECT 
+    ar.article_id, 
+    ar.request_string,
+    ar.url,
+    ar.finished_at,
+    CASE 
+        WHEN ar.url LIKE '%spotify%' THEN 'Spotify'
+        WHEN ar.url LIKE '%apple%' OR ar.url LIKE '%podcasts%' THEN 'Apple Podcasts'
+        WHEN ar.url LIKE '%mailchi%' THEN 'MailChimp'
+        WHEN ar.url LIKE '%substack%' OR ar.url LIKE '%guyraz%' THEN 'Substack (Guy Raz)'
+        WHEN ar.url LIKE '%quora%' THEN 'Quora'
+        ELSE 'Other'
+    END as technology
+FROM article_requests ar 
+WHERE ar.status = 'finished' 
+AND ar.finished_at > NOW() - INTERVAL '24 hours'
+ORDER BY ar.finished_at DESC;"
 ```
 
 ### Automated ZIP Verification
