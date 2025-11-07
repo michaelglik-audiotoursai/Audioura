@@ -98,12 +98,49 @@ def main():
     
     print(f"\nDetailed report saved to: {report_file}")
     
+    # Show download commands for successful tests
+    if passed > 0:
+        print("\n" + "=" * 60)
+        print("ZIP FILE DOWNLOAD COMMANDS FOR SUCCESSFUL TESTS")
+        print("=" * 60)
+        
+        # Get recent test article IDs from database
+        try:
+            import psycopg2
+            conn = psycopg2.connect(
+                host='localhost', database='audiotours', user='admin', 
+                password='password123', port='5433'
+            )
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT article_id, request_string 
+                FROM article_requests 
+                WHERE status = 'finished' 
+                AND finished_at > NOW() - INTERVAL '10 minutes'
+                ORDER BY finished_at DESC LIMIT 3
+            """)
+            recent_articles = cursor.fetchall()
+            
+            for i, (article_id, title) in enumerate(recent_articles, 1):
+                tech_name = "apple_podcasts" if "apple" in title.lower() else "spotify" if "spotify" in title.lower() else "test"
+                print(f"{i}. {title[:50]}...")
+                print(f'   curl -X GET "http://localhost:5012/download/{article_id}" -o "{tech_name}_test.zip"')
+                print(f'   unzip -l {tech_name}_test.zip\n')
+            
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            print(f"Could not retrieve recent article IDs: {e}")
+    
     # List debug files created
     debug_files = [f for f in os.listdir('.') if f.startswith('debug_')]
     if debug_files:
         print(f"\nDebug files created:")
         for file in debug_files:
             print(f"  - {file}")
+    
+    print("\nNOTE: Test cleanup removes old articles to prevent storage growth.")
+    print("Each test run creates new articles but cleans up previous test data.")
     
     return total - passed  # Return number of failures for exit code
 

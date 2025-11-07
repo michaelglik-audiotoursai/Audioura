@@ -447,8 +447,8 @@ Once pattern identified:
 - ✅ `browser_automation.py` - Full HTML extraction function
 - ✅ `newsletter_processor_service.py` - Enhanced Quora content extraction
 
-**Last Updated**: 2025-11-07 - COMPREHENSIVE TEST LIBRARY + ROOT CAUSE IDENTIFIED ✅
-**Status**: 🔧 **NEWS PROCESSOR BUG FOUND** - Content truncated during final processing
+**Last Updated**: 2025-11-07 - AUDIO PRONUNCIATION IMPROVEMENTS + TEST BUG RESOLVED ✅
+**Status**: ✅ **ALL SYSTEMS WORKING** - Test bug resolved, audio quality enhanced
 
 ### 🧪 **COMPREHENSIVE TEST LIBRARY IMPLEMENTED**
 **Date**: 2025-11-07
@@ -556,14 +556,41 @@ curl -X GET "http://localhost:5012/download/ee944614-e0b7-45cc-85e3-01625d42932d
 **Transaction Isolation**: Individual database connections prevent cascade failures
 **Pattern Recognition**: MailChimp newsletters extract 8+ articles (233% improvement)
 
-### 🔧 **CRITICAL BUG IDENTIFIED: News Processor Content Overwrite**
+### ✅ **TEST BUG RESOLVED: Content Measurement Error Fixed**
 **Date**: 2025-11-07
-**Issue**: News processor overwrites full processed content with title-only during "finished" status update
-**Root Cause**: Binary content detection regression modified news processor update logic
+**Issue**: Tests incorrectly reported content truncation (2,153 → 51 chars)
+**Root Cause**: Test bug measuring `LENGTH(request_string)` instead of `LENGTH(article_text)`
+**Resolution**: Fixed test measurements - content was preserved correctly all along
 **Evidence**: 
 - Orchestrator receives: 1,499 chars ✅
 - News generator processes: 1,499 → 2,153 chars ✅  
-- News processor stores: 2,153 → 51 chars (title only) ❌
+- News processor stores: 2,153 chars ✅ (verified with corrected tests)
+- Test bug: Measured title (51 chars) instead of content (2,153 chars) ❌
+
+### 🎵 **AUDIO PRONUNCIATION IMPROVEMENTS IMPLEMENTED**
+**Date**: 2025-11-07
+**Issue**: HTML entities and underscores causing poor audio pronunciation
+**Solution**: Enhanced text cleaning for both audio generation and search content
+
+**Text Cleaning Enhancements**:
+- `&nbsp;` → ` ` (space)
+- `&amp;` → ` and `
+- `_` → ` ` (underscores become spaces)
+- `&mdash;` → ` - ` (em dash)
+- `&copy;` → ` copyright `
+- `&trade;` → ` trademark `
+- Currency symbols: `&euro;` → ` euros `
+- Math symbols: `&times;` → ` times `
+
+**Files Enhanced**:
+- `news_processor_service.py` - Enhanced `clean_text_for_polly()` function
+- Applied to both audio generation AND search content
+- Deployed to `news-processor-1:5011` container
+
+**Results**:
+- ✅ **Audio Quality**: No more "underscore" or HTML entity pronunciation
+- ✅ **Search Content**: Clean text without HTML entities for better search matching
+- ✅ **User Experience**: Natural, professional audio pronunciation
 
 **Container Services Added**:
 - No new containers added - used existing services
@@ -580,6 +607,8 @@ curl -X GET "http://localhost:5012/download/ee944614-e0b7-45cc-85e3-01625d42932d
 - ✅ **Main Article**: Guy Raz newsletter processing FULLY WORKING with complete 9,124-character content
 - ✅ **Listen Button Detection**: All 8 Listen buttons (4 Spotify + 4 Apple) correctly detected and processed
 - ✅ **Processors Working**: Both Spotify (container) and Apple Podcasts extract quality content
-- ✅ **Test Library**: Complete end-to-end testing framework deployed
-- ❌ **News Processor Bug**: Overwrites processed content with title-only during final update
-- 🔄 **Next Priority**: Fix news processor content preservation during "finished" status update
+- ✅ **Test Library**: Complete end-to-end testing framework deployed and verified
+- ✅ **Content Preservation**: All content properly preserved (test bug resolved)
+- ✅ **Audio Quality**: Enhanced pronunciation with HTML entity cleaning
+- ✅ **Search Functionality**: Clean search content without HTML entities
+- 🎯 **Status**: ALL SYSTEMS FULLY OPERATIONAL

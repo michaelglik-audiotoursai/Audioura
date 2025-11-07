@@ -10,10 +10,24 @@ This document describes the automated testing system for AudioTours newsletter p
 2. **Test Suite Runner**: Orchestrates all tests and generates reports
 3. **Database Cleanup**: Ensures clean state before each test
 4. **Debug File Generation**: Captures detailed processing information
+5. **Constant Test IDs**: Prevents storage growth by reusing same article IDs
+
+### Storage Management
+**Test Cleanup Strategy**: Tests prevent storage growth through automatic cleanup:
+- Removes old test articles before creating new ones
+- Uses proper cascade deletion (news_audios → newsletters_article_link → article_requests)
+- Services remain unchanged - no modifications to production code
+- Each test run provides fresh article IDs for download verification
+
+**Benefits**:
+- No storage growth from repeated testing
+- Services work exactly as in production
+- Fresh article IDs for each test run
+- Proper foreign key constraint handling
 
 ### Test Flow
 ```
-1. Database Cleanup → 2. Processor Test → 3. Orchestrator Test → 4. Database Verification
+1. Database Cleanup → 2. Processor Test → 3. Orchestrator Test → 4. Database Verification → 5. ZIP File Verification
 ```
 
 ## Available Tests
@@ -28,6 +42,7 @@ This document describes the automated testing system for AudioTours newsletter p
 2. **Direct Processor Test**: Tests `spotify_processor.py` directly
 3. **Orchestrator Test**: Tests news orchestrator with Spotify content
 4. **Database Verification**: Checks final stored content
+5. **ZIP File Verification**: Downloads and validates complete audio package
 
 **Generated Files**:
 - `debug_spotify_processor_output.json` - Processor results
@@ -43,6 +58,14 @@ This document describes the automated testing system for AudioTours newsletter p
 **Test URL**: `https://podcasts.apple.com/us/podcast/babylist-natalie-gordon-how-a-new-mom-used-nap-time/id1150510297?i=1000733348575`
 
 **Steps**: Same as Spotify test but for Apple Podcasts
+
+**ZIP File Contents**:
+- `index.html` - Audio player interface
+- `audio-1.mp3` - Summary audio
+- `audio-2.mp3` to `audio-N.mp3` - Topic segments
+- `audio-99.mp3` - Full article audio
+- `audio-help.mp3` - Voice commands help
+- `audiotours_search_content.txt` - Full text for search
 
 **Generated Files**:
 - `debug_apple_processor_output.json` - Apple processor results
@@ -78,6 +101,7 @@ python test_suite_runner.py
 - ✅ **Processor Success**: Content extracted (>100 chars for Spotify, >500 chars for Apple)
 - ✅ **Orchestrator Success**: HTTP 200 response with article_id
 - ✅ **Database Success**: Article stored with full content
+- ✅ **ZIP File Success**: Complete audio package downloadable with all files
 
 ### Common Failure Patterns
 
@@ -226,3 +250,123 @@ When asked to run tests and interpret results:
    - Code changes required
 
 The test system is designed to provide complete visibility into the newsletter processing pipeline, making it easy to identify and fix issues at any stage.
+
+## ZIP File Access and Verification
+
+### How to Access ZIP Files for Verification
+
+#### Step 1: Get Article ID
+```bash
+# From test output, or query database for recent articles
+docker exec development-postgres-2-1 psql -U admin -d audiotours -c "
+SELECT article_id, request_string, finished_at 
+FROM article_requests 
+WHERE status = 'finished' 
+ORDER BY finished_at DESC LIMIT 5;"
+```
+
+#### Step 2: Download ZIP File
+```bash
+# Replace [ARTICLE_ID] with actual article ID from Step 1
+curl -X GET "http://localhost:5012/download/[ARTICLE_ID]" -o "article.zip"
+
+# Example with real article ID:
+curl -X GET "http://localhost:5012/download/54756b09-58ce-4a50-86ba-f88808e208ba" -o "article.zip"
+```
+
+#### Step 3: Verify ZIP Contents
+```bash
+# List files in ZIP
+unzip -l article.zip
+
+# Extract ZIP to folder
+unzip article.zip -d extracted_article/
+
+# Test HTML player
+open extracted_article/index.html  # macOS
+start extracted_article/index.html  # Windows
+```
+
+### Manual ZIP Download Test
+```bash
+# Get article_id from test output
+ARTICLE_ID="your-article-id-here"
+
+# Download ZIP file
+curl -X GET "http://localhost:5012/download/${ARTICLE_ID}" -o "test_${ARTICLE_ID}.zip"
+
+# Extract and verify contents
+unzip -l "test_${ARTICLE_ID}.zip"
+
+# Expected files:
+# - index.html (audio player)
+# - audio-1.mp3 (summary)
+# - audio-2.mp3 to audio-N.mp3 (topics)
+# - audio-99.mp3 (full article)
+# - audio-help.mp3 (voice commands)
+# - audiotours_search_content.txt (full text)
+```
+
+### Automated ZIP Verification
+```bash
+# Test ZIP file integrity
+python -c "
+import zipfile
+with zipfile.ZipFile('test_${ARTICLE_ID}.zip', 'r') as z:
+    files = z.namelist()
+    print(f'ZIP contains {len(files)} files:')
+    for f in files:
+        print(f'  - {f}')
+    # Verify required files
+    required = ['index.html', 'audio-1.mp3', 'audio-99.mp3']
+    missing = [f for f in required if f not in files]
+    if missing:
+        print(f'ERROR: Missing files: {missing}')
+    else:
+        print('SUCCESS: All required files present')
+"
+```
+
+### Expected ZIP Results (When Working)
+
+#### Spotify Processing ZIP
+- **File Count**: 6-8 files
+- **Total Size**: 2-5 MB
+- **Audio Files**: 4-6 MP3s (summary + topics + full article + help)
+- **Text Files**: HTML player + search content
+
+#### Apple Podcasts Processing ZIP  
+- **File Count**: 6-8 files
+- **Total Size**: 2-5 MB
+- **Audio Files**: 4-6 MP3s (summary + topics + full article + help)
+- **Text Files**: HTML player + search content
+
+## Audio Quality Improvements
+
+### Enhanced Text Cleaning (2025-11-07)
+**Issue**: HTML entities and underscores causing poor audio pronunciation
+**Solution**: Comprehensive text cleaning for both audio and search content
+
+**Text Cleaning Applied**:
+- `&nbsp;` → ` ` (space)
+- `&amp;` → ` and `
+- `_` → ` ` (underscores become spaces)
+- `&mdash;` → ` - ` (em dash)
+- `&copy;` → ` copyright `
+- `&trade;` → ` trademark `
+- Currency: `&euro;` → ` euros `
+- Math: `&times;` → ` times `
+
+**Latest Test Results**:
+```bash
+# Latest ZIP with enhanced audio pronunciation
+curl -X GET "http://localhost:5012/download/e548d641-b415-4a00-8c9b-4cee4dab0545" -o "apple_podcasts_enhanced.zip"
+
+# Verify clean search content
+unzip -p apple_podcasts_enhanced.zip audiotours_search_content.txt | head -10
+```
+
+**Benefits**:
+- ✅ **Audio Quality**: Natural pronunciation without "underscore" or HTML entities
+- ✅ **Search Content**: Clean text for better search matching
+- ✅ **User Experience**: Professional, clear audio narration

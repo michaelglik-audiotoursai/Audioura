@@ -83,11 +83,52 @@ def generate_short_title(original_title, article_type):
     return fallback_title
 
 def clean_text_for_polly(text):
-    """Clean text thoroughly before sending to Polly TTS to control costs"""
+    """Clean text thoroughly before sending to Polly TTS to control costs and improve pronunciation"""
     if not text:
         return ""
     
     import re
+    import html
+    
+    # First decode HTML entities
+    text = html.unescape(text)
+    
+    # Replace common HTML entities with audio-friendly text
+    html_entities = {
+        '&nbsp;': ' ',
+        '&amp;': ' and ',
+        '&lt;': ' less than ',
+        '&gt;': ' greater than ',
+        '&quot;': '"',
+        '&apos;': "'",
+        '&copy;': ' copyright ',
+        '&reg;': ' registered trademark ',
+        '&trade;': ' trademark ',
+        '&mdash;': ' - ',
+        '&ndash;': ' - ',
+        '&bull;': ' - ',
+        '&hellip;': '...',
+        '&cent;': ' cents ',
+        '&pound;': ' pounds ',
+        '&euro;': ' euros ',
+        '&yen;': ' yen ',
+        '&times;': ' times ',
+        '&divide;': ' divided by ',
+        '&plusmn;': ' plus or minus ',
+        '&ne;': ' not equal to ',
+        '&pi;': ' pi ',
+        '&sum;': ' sum ',
+        '&infin;': ' infinity ',
+        '&ensp;': ' ',
+        '&emsp;': ' ',
+        '&thinsp;': ' '
+    }
+    
+    for entity, replacement in html_entities.items():
+        text = text.replace(entity, replacement)
+    
+    # Replace underscores with spaces for better pronunciation
+    text = text.replace('_', ' ')
     
     # Remove HTML tags completely
     text = re.sub(r'<[^>]+>', '', text)
@@ -98,7 +139,7 @@ def clean_text_for_polly(text):
     # Remove email addresses
     text = re.sub(r'\S+@\S+', '[EMAIL]', text)
     
-    # Remove excessive whitespace
+    # Clean up multiple spaces
     text = re.sub(r'\s+', ' ', text)
     
     # Remove control characters
@@ -281,12 +322,14 @@ def process_audio(article_id):
             logging.info("Full article audio generated with Polly")
             audio_files.append(("audio-99.mp3", "Full Article"))
             
-            # Create search content file for full-text search
+            # Create search content file for full-text search (clean HTML entities)
             search_content_path = os.path.join(temp_dir, "audiotours_search_content.txt")
             search_content = f"{request_string}\n\n{summary_text}\n\n{full_text}"
+            # Clean search content for better text matching
+            clean_search_content = clean_text_for_polly(search_content)
             with open(search_content_path, 'w', encoding='utf-8') as f:
-                f.write(search_content)
-            logging.info("Search content file created")
+                f.write(clean_search_content)
+            logging.info("Search content file created with cleaned text for better search matching")
             
             # Generate AI short title only if original title exceeds 12 words
             title_words = len(request_string.split())

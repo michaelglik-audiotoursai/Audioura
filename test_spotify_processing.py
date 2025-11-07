@@ -13,6 +13,8 @@ from datetime import datetime
 TEST_SPOTIFY_URL = "https://open.spotify.com/episode/5aYNEkTiA5B3rYEQsvMJUr?si=02TAenI7TXK1GHc6RENr5A"
 TEST_USER_ID = "test_user_spotify"
 
+# Test cleanup prevents storage growth by removing old test articles
+
 def get_db_connection():
     return psycopg2.connect(
         host=os.getenv('DB_HOST', 'localhost'),
@@ -23,30 +25,19 @@ def get_db_connection():
     )
 
 def cleanup_existing_articles():
-    """Remove any existing articles with this URL"""
+    """Clean up test articles to maintain constant storage"""
     print("=== STEP 1: Database Cleanup ===")
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        cursor.execute("SELECT article_id, request_string FROM article_requests WHERE url = %s", (TEST_SPOTIFY_URL,))
-        existing = cursor.fetchall()
+        # Clean up test articles with proper cascade deletion
+        cursor.execute("DELETE FROM news_audios WHERE article_id IN (SELECT article_id FROM article_requests WHERE url = %s)", (TEST_SPOTIFY_URL,))
+        cursor.execute("DELETE FROM newsletters_article_link WHERE article_requests_id IN (SELECT article_id FROM article_requests WHERE url = %s)", (TEST_SPOTIFY_URL,))
+        cursor.execute("DELETE FROM article_requests WHERE url = %s", (TEST_SPOTIFY_URL,))
         
-        if existing:
-            print(f"Found {len(existing)} existing articles to delete:")
-            for article_id, title in existing:
-                print(f"  - {article_id}: {title[:50]}...")
-            
-            # Delete from news_audios first (foreign key constraint)
-            for article_id, _ in existing:
-                cursor.execute("DELETE FROM news_audios WHERE article_id = %s", (article_id,))
-                cursor.execute("DELETE FROM newsletters_article_link WHERE article_requests_id = %s", (article_id,))
-            
-            cursor.execute("DELETE FROM article_requests WHERE url = %s", (TEST_SPOTIFY_URL,))
-            conn.commit()
-            print(f"SUCCESS: Deleted {len(existing)} existing articles")
-        else:
-            print("SUCCESS: No existing articles found")
+        conn.commit()
+        print("SUCCESS: Cleaned up test articles")
         
         cursor.close()
         conn.close()
@@ -156,8 +147,8 @@ def test_final_article_content():
         cursor = conn.cursor()
         
         cursor.execute("""
-            SELECT article_id, request_string, LENGTH(request_string) as content_length, 
-                   LEFT(request_string, 200) as content_preview, status
+            SELECT article_id, request_string, LENGTH(article_text) as content_length, 
+                   LEFT(CONVERT_FROM(article_text, 'UTF8'), 200) as content_preview, status
             FROM article_requests 
             WHERE url = %s 
             ORDER BY created_at DESC 
@@ -177,8 +168,11 @@ def test_final_article_content():
             print(f"  Preview: {preview}...")
             
             # Save full content to file
-            cursor.execute("SELECT request_string FROM article_requests WHERE article_id = %s", (article_id,))
-            full_content = cursor.fetchone()[0]
+            cursor.execute("SELECT article_text FROM article_requests WHERE article_id = %s", (article_id,))
+            article_bytes = cursor.fetchone()[0]
+            if hasattr(article_bytes, 'tobytes'):
+                article_bytes = article_bytes.tobytes()
+            full_content = article_bytes.decode('utf-8')
             
             with open('debug_final_article_content.txt', 'w', encoding='utf-8') as f:
                 f.write(f"Article ID: {article_id}\n")
@@ -220,7 +214,17 @@ def main():
     
     print("\n" + "=" * 50)
     print("SPOTIFY TEST COMPLETE")
-    print("Check debug files for detailed analysis:")
+    
+    # Show download command if orchestrator succeeded
+    if orchestrator_result and orchestrator_result.get('article_id'):
+        article_id = orchestrator_result['article_id']
+        print("\nZIP FILE DOWNLOAD COMMAND:")
+        print(f'curl -X GET "http://localhost:5012/download/{article_id}" -o "spotify_test.zip"')
+        print("\nVERIFY ZIP CONTENTS:")
+        print("unzip -l spotify_test.zip")
+        print("\nNOTE: Test cleanup prevents storage growth by removing old test articles.")
+    
+    print("\nCheck debug files for detailed analysis:")
     print("  - debug_spotify_processor_output.json")
     print("  - debug_orchestrator_input.json")
     print("  - debug_orchestrator_output.json")
