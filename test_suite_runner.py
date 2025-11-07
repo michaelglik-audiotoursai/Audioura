@@ -49,6 +49,8 @@ def main():
     tests = [
         ("Spotify Processing", "test_spotify_processing.py"),
         ("Apple Podcasts Processing", "test_apple_processing.py"),
+        ("System Health Check", "test_system_health.py"),
+        ("ZIP Quality Verification", "test_zip_quality.py"),
         # Add more tests here as needed
     ]
     
