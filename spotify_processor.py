@@ -146,11 +146,51 @@ def process_spotify_url(spotify_url):
     # Try regular scraping first
     episode_data = get_spotify_episode_content(episode_id)
     
-    # If regular scraping fails or returns insufficient content, try browser automation
+    # If regular scraping fails or returns insufficient content, try browser automation with content expansion
     if not episode_data or len(episode_data.get('content', '')) < 100:
-        logging.info("Regular scraping failed, trying browser automation...")
+        logging.info("Regular scraping failed, trying browser automation with content expansion...")
         try:
             from browser_automation import extract_spotify_with_browser
+            from content_expander import expand_content_for_platform
+            
+            browser_result = extract_spotify_with_browser(spotify_url)
+            
+            # If browser automation succeeded, try to expand any truncated content
+            if browser_result.get('success'):
+                try:
+                    from browser_automation import get_browser
+                    browser = get_browser()
+                    if browser and browser.driver:
+                        expansion_result = expand_content_for_platform(browser.driver, spotify_url)
+                        if expansion_result.get('content_expanded'):
+                            logging.info(f"Content expanded: {expansion_result['initial_length']} → {expansion_result['final_length']} chars")
+                            
+                            # Re-extract content after expansion
+                            from selenium.webdriver.common.by import By
+                            expanded_text = browser.driver.find_element(By.TAG_NAME, "body").text
+                            
+                            # Update browser result with expanded content
+                            if len(expanded_text) > len(browser_result.get('content', '')):
+                                # Extract episode info from expanded content
+                                lines = [line.strip() for line in expanded_text.split('\n') if line.strip()]
+                                
+                                # Find episode description in expanded content
+                                description_lines = []
+                                for i, line in enumerate(lines):
+                                    if len(line) > 100 and 'Episode Description' not in line:
+                                        description_lines.append(line)
+                                        if len(description_lines) >= 3:  # Get first few substantial lines
+                                            break
+                                
+                                if description_lines:
+                                    expanded_description = ' '.join(description_lines)
+                                    browser_result['content'] = f"EPISODE_TITLE: {browser_result.get('title', 'Spotify Episode')}\n\nEPISODE_DESCRIPTION: {expanded_description}"
+                                    browser_result['description'] = expanded_description
+                                    browser_result['expanded'] = True
+                                    logging.info(f"Updated content with expanded description: {len(expanded_description)} chars")
+                except Exception as e:
+                    logging.warning(f"Content expansion failed: {e}")
+            
             browser_result = extract_spotify_with_browser(spotify_url)
             
             if browser_result.get('success'):

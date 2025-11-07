@@ -37,7 +37,7 @@ class BrowserAutomation:
             self.driver = None
     
     def extract_spotify_content(self, spotify_url):
-        """Extract Spotify episode content using browser automation with getText() focus"""
+        """Extract Spotify episode content using browser automation with Show More expansion"""
         if not self.driver:
             return {"error": "Browser not initialized"}
         
@@ -47,6 +47,12 @@ class BrowserAutomation:
             
             # Wait for page to load and content to appear
             time.sleep(5)
+            
+            # Try to expand "Show more" buttons to get full content
+            self._expand_show_more_buttons()
+            
+            # Wait for expanded content to load
+            time.sleep(2)
             
             # Extract all text content using getText() equivalent
             try:
@@ -244,6 +250,123 @@ class BrowserAutomation:
         except Exception as e:
             logging.error(f"Dynamic content extraction error for {url}: {e}")
             return {"error": f"Dynamic extraction failed: {str(e)}"}
+    
+    def _expand_show_more_buttons(self):
+        """Click all 'Show more', 'Read more', 'See more' buttons to expand content"""
+        if not self.driver:
+            return
+        
+        # Common selectors for expandable content buttons
+        expand_selectors = [
+            # Spotify specific
+            'button[aria-label*="Show more"]',
+            'button[aria-label*="show more"]', 
+            'button:contains("Show more")',
+            'button:contains("... Show more")',
+            '[data-testid*="show-more"]',
+            '[data-testid*="expand"]',
+            
+            # Generic expand buttons
+            'button:contains("Read more")',
+            'button:contains("See more")',
+            'button:contains("View more")',
+            'button:contains("More")',
+            'a:contains("Show more")',
+            'a:contains("Read more")',
+            
+            # CSS class patterns
+            '.show-more',
+            '.read-more', 
+            '.expand-button',
+            '.more-button',
+            '[class*="show-more"]',
+            '[class*="read-more"]',
+            '[class*="expand"]'
+        ]
+        
+        buttons_clicked = 0
+        
+        for selector in expand_selectors:
+            try:
+                # Handle :contains() pseudo-selector manually
+                if ':contains(' in selector:
+                    text_to_find = selector.split(':contains("')[1].split('")')[0]
+                    base_selector = selector.split(':contains(')[0]
+                    
+                    elements = self.driver.find_elements(By.CSS_SELECTOR, base_selector)
+                    for element in elements:
+                        if text_to_find.lower() in element.text.lower():
+                            try:
+                                self.driver.execute_script("arguments[0].click();", element)
+                                buttons_clicked += 1
+                                logging.info(f"Clicked expand button: {element.text[:30]}...")
+                                time.sleep(1)  # Wait for content to expand
+                            except Exception as e:
+                                logging.debug(f"Failed to click element: {e}")
+                else:
+                    # Regular CSS selector
+                    elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    for element in elements:
+                        try:
+                            if element.is_displayed() and element.is_enabled():
+                                self.driver.execute_script("arguments[0].click();", element)
+                                buttons_clicked += 1
+                                logging.info(f"Clicked expand button with selector: {selector}")
+                                time.sleep(1)  # Wait for content to expand
+                        except Exception as e:
+                            logging.debug(f"Failed to click element with selector {selector}: {e}")
+                            
+            except Exception as e:
+                logging.debug(f"Selector {selector} not found or failed: {e}")
+                continue
+        
+        if buttons_clicked > 0:
+            logging.info(f"Successfully expanded {buttons_clicked} content sections")
+            time.sleep(2)  # Additional wait for all content to load
+        else:
+            logging.info("No expandable content buttons found")
+    
+    def _expand_newsletter_content(self):
+        """Expand newsletter-specific content like article previews"""
+        if not self.driver:
+            return
+        
+        # Newsletter-specific expand patterns
+        newsletter_selectors = [
+            # MailChimp
+            'a[href*="Read full story"]',
+            'a:contains("Read full story")',
+            'a:contains("Continue reading")',
+            
+            # Substack
+            'a:contains("Read more")',
+            '.read-more-link',
+            
+            # General newsletter patterns
+            'a:contains("View full article")',
+            'a:contains("Read complete story")',
+            '[class*="read-more"]',
+            '[class*="continue-reading"]'
+        ]
+        
+        for selector in newsletter_selectors:
+            try:
+                if ':contains(' in selector:
+                    text_to_find = selector.split(':contains("')[1].split('")')[0]
+                    base_selector = selector.split(':contains(')[0]
+                    
+                    elements = self.driver.find_elements(By.CSS_SELECTOR, base_selector)
+                    for element in elements:
+                        if text_to_find.lower() in element.text.lower():
+                            logging.info(f"Found newsletter expand link: {element.text}")
+                            # Don't click - just log for pattern recognition
+                else:
+                    elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    for element in elements:
+                        logging.info(f"Found newsletter expand element: {element.get_attribute('href') or element.text}")
+                        
+            except Exception as e:
+                logging.debug(f"Newsletter selector {selector} failed: {e}")
     
     def close(self):
         """Close browser driver"""
