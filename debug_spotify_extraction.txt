@@ -1,0 +1,8 @@
+=== SPOTIFY CONTENT EXTRACTION DEBUG ===
+Original title: Spotify – Web Player
+Clean title: Spotify – Web Player
+Original description: 
+Clean description: 
+Formatted content: EPISODE_TITLE: Spotify – Web Player
+
+EPISODE_DESCRIPTION: 

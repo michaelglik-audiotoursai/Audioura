@@ -1,0 +1,32 @@
+{
+  "summary": {
+    "total_tests": 3,
+    "passed": 0,
+    "failed": 3,
+    "success_rate": 0.0,
+    "timestamp": "2025-11-07T11:22:24.449167"
+  },
+  "results": [
+    {
+      "name": "Guy Raz Substack",
+      "url": "https://guyraz.substack.com/p/10-lessons-from-chip-and-joanna-gaines",
+      "success": false,
+      "articles_created": 0,
+      "expected": 8
+    },
+    {
+      "name": "Boston Globe MailChimp",
+      "url": "https://mailchi.mp/bostonglobe.com/todaysheadlines-6057237",
+      "success": false,
+      "articles_created": 0,
+      "expected": 5
+    },
+    {
+      "name": "Quora Newsletter",
+      "url": "https://jokesfunnystories.quora.com/?__nsrc__=4&__snid3__=92061427717",
+      "success": false,
+      "articles_created": 0,
+      "expected": 3
+    }
+  ]
+}

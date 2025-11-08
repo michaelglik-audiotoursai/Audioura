@@ -52,19 +52,42 @@ def generate_news():
         conn = get_db_connection()
         cursor = conn.cursor()
         
+        # DEBUG: Log content before encoding
+        logging.info(f"🔍 ORCHESTRATOR DEBUG: Storing article {article_id}")
+        logging.info(f"🔍 Original article_text length: {len(article_text)} chars")
+        logging.info(f"🔍 Article_text preview: {article_text[:200]}...")
+        
+        # Encode to UTF-8 bytes
+        utf8_bytes = article_text.encode('utf-8')
+        logging.info(f"🔍 UTF-8 encoded length: {len(utf8_bytes)} bytes")
+        
         # Create article request
         cursor.execute("""
             INSERT INTO article_requests 
             (article_id, secret_id, request_string, article_text, status, created_at, started_at)
             VALUES (%s, %s, %s, %s, 'started', %s, %s)
-        """, (article_id, secret_id, request_string, article_text.encode('utf-8'), 
+        """, (article_id, secret_id, request_string, utf8_bytes, 
               datetime.now(), datetime.now()))
+        
+        # DEBUG: Verify what was stored
+        cursor.execute("SELECT article_text FROM article_requests WHERE article_id = %s", (article_id,))
+        stored_bytes = cursor.fetchone()[0]
+        if hasattr(stored_bytes, 'tobytes'):
+            stored_bytes = stored_bytes.tobytes()
+        else:
+            stored_bytes = bytes(stored_bytes)
+        
+        stored_text = stored_bytes.decode('utf-8')
+        logging.info(f"🔍 Stored and retrieved length: {len(stored_text)} chars")
+        logging.info(f"🔍 Storage integrity check: {stored_text == article_text}")
+        logging.info(f"🔍 Retrieved preview: {stored_text[:200]}...")
         
         conn.commit()
         cursor.close()
         conn.close()
         
         # Call news generator service
+        logging.info(f"🔍 ORCHESTRATOR: About to call generator for {article_id}")
         logging.info(f'Calling news generator for article {article_id} with {major_points_count} major points')
         generator_response = requests.post(
             f'http://news-generator-1:5010/process-article/{article_id}',

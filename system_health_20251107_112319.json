@@ -1,0 +1,80 @@
+{
+  "timestamp": "2025-11-07T11:23:19.423740",
+  "services": [
+    {
+      "name": "Newsletter Processor",
+      "status": "ONLINE",
+      "code": 200
+    },
+    {
+      "name": "News Orchestrator",
+      "status": "ONLINE",
+      "code": 200
+    },
+    {
+      "name": "News Generator",
+      "status": "ONLINE",
+      "code": 200
+    },
+    {
+      "name": "News Processor",
+      "status": "ONLINE",
+      "code": 200
+    },
+    {
+      "name": "Polly TTS",
+      "status": "ONLINE",
+      "code": 200
+    },
+    {
+      "name": "Tour Orchestrator",
+      "status": "ONLINE",
+      "code": 200
+    },
+    {
+      "name": "Tour Processor",
+      "status": "ONLINE",
+      "code": 200
+    },
+    {
+      "name": "Map Delivery",
+      "status": "ONLINE",
+      "code": 200
+    },
+    {
+      "name": "Coordinates",
+      "status": "ONLINE",
+      "code": 200
+    },
+    {
+      "name": "Treats",
+      "status": "ONLINE",
+      "code": 200
+    }
+  ],
+  "components": [
+    {
+      "name": "Database",
+      "working": true
+    },
+    {
+      "name": "Audio Generation",
+      "working": true
+    },
+    {
+      "name": "Recent Processing",
+      "working": true
+    },
+    {
+      "name": "Pattern Recognition",
+      "working": true
+    }
+  ],
+  "overall_health": 1.0,
+  "summary": {
+    "services_online": 10,
+    "total_services": 10,
+    "components_working": 4,
+    "total_components": 4
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "summary": {
+    "total_tests": 2,
+    "passed": 2,
+    "failed": 0,
+    "success_rate": 100.0,
+    "timestamp": "2025-11-07T10:03:37.576597"
+  },
+  "results": [
+    {
+      "test_name": "Spotify Processing",
+      "script": "test_spotify_processing.py",
+      "exit_code": 0,
+      "stdout": "SPOTIFY PROCESSING COMPREHENSIVE TEST\n==================================================\n=== STEP 1: Database Cleanup ===\nSUCCESS: No existing articles found\n\n=== STEP 2: Direct Spotify Processor Test ===\nTesting URL: https://open.spotify.com/episode/5aYNEkTiA5B3rYEQsvMJUr?si=02TAenI7TXK1GHc6RENr5A\nSUCCESS: Spotify processor result saved to debug_spotify_processor_output.json\nResult keys: ['error', 'error_type']\nFAILED: Could not extract episode content from Spotify\nFAILED: Error type: extraction_failed\n\n=== STEP 3: News Orchestrator Test ===\n\n=== STEP 2: Direct Spotify Processor Test ===\nTesting URL: https://open.spotify.com/episode/5aYNEkTiA5B3rYEQsvMJUr?si=02TAenI7TXK1GHc6RENr5A\nSUCCESS: Spotify processor result saved to debug_spotify_processor_output.json\nResult keys: ['error', 'error_type']\nFAILED: Could not extract episode content from Spotify\nFAILED: Error type: extraction_failed\nERROR: Cannot test orchestrator - Spotify processor failed\n\n=== STEP 4: Final Article Content Check ===\nERROR: No article found in database\n\n==================================================\nSPOTIFY TEST COMPLETE\nCheck debug files for detailed analysis:\n  - debug_spotify_processor_output.json\n  - debug_orchestrator_input.json\n  - debug_orchestrator_output.json\n  - debug_final_article_content.txt\n",
+      "stderr": "ERROR:root:Spotify episode extraction error: cannot access local variable 'formatted_content' where it is not associated with a value\nERROR:root:Browser automation error: No module named 'selenium'\nERROR:root:Spotify episode extraction error: cannot access local variable 'formatted_content' where it is not associated with a value\nERROR:root:Browser automation error: No module named 'selenium'\n",
+      "success": true,
+      "timestamp": "2025-11-07T10:03:31.201026"
+    },
+    {
+      "test_name": "Apple Podcasts Processing",
+      "script": "test_apple_processing.py",
+      "exit_code": 0,
+      "stdout": "APPLE PODCASTS PROCESSING COMPREHENSIVE TEST\n==================================================\n=== STEP 1: Database Cleanup ===\nFound 1 existing articles to delete:\n  - b69209b4-66be-473a-940d-6d5acf1a9082: Advice Line with Tariq Farid of Edible Arrangement...\nERROR: Database cleanup error: update or delete on table \"article_requests\" violates foreign key constraint \"news_audios_article_id_fkey\" on table \"news_audios\"\nDETAIL:  Key (article_id)=(b69209b4-66be-473a-940d-6d5acf1a9082) is still referenced from table \"news_audios\".\n\n\n=== STEP 2: Direct Apple Podcasts Processor Test ===\nTesting URL: https://podcasts.apple.com/us/podcast/babylist-natalie-gordon-how-a-new-mom-used-nap-time/id1150510297?i=1000733348575\nSUCCESS: Apple processor result saved to debug_apple_processor_output.json\nResult keys: ['success', 'title', 'content', 'description', 'pub_date']\nSUCCESS: Title='Advice Line with Tariq Farid of Edible Arrangements'\nSUCCESS: Content length: 1499 chars\nSUCCESS: Content preview: EPISODE_TITLE: Advice Line with Tariq Farid of Edible Arrangements EPISODE_DESCRIPTION: Tariq Farid the founder of Edible Arrangements joins Guy on the Advice Line to answer questions from three early...\n\n=== STEP 3: News Orchestrator Test ===\n\n=== STEP 2: Direct Apple Podcasts Processor Test ===\nTesting URL: https://podcasts.apple.com/us/podcast/babylist-natalie-gordon-how-a-new-mom-used-nap-time/id1150510297?i=1000733348575\nSUCCESS: Apple processor result saved to debug_apple_processor_output.json\nResult keys: ['success', 'title', 'content', 'description', 'pub_date']\nSUCCESS: Title='Advice Line with Tariq Farid of Edible Arrangements'\nSUCCESS: Content length: 1499 chars\nSUCCESS: Content preview: EPISODE_TITLE: Advice Line with Tariq Farid of Edible Arrangements EPISODE_DESCRIPTION: Tariq Farid the founder of Edible Arrangements joins Guy on the Advice Line to answer questions from three early...\nSUCCESS: Orchestrator input saved to debug_apple_orchestrator_input.json\nInput - Title: 'Advice Line with Tariq Farid of Edible Arrangements'\nInput - Content length: 1499 chars\nSUCCESS: Orchestrator response status: 200\nSUCCESS: Orchestrator output saved to debug_apple_orchestrator_output.json\nSUCCESS: Created article_id: f2b05050-dd12-43f9-b56f-14273e569470\n\n=== STEP 4: Final Article Content Check ===\nSUCCESS: Found article in database:\n  Article ID: b69209b4-66be-473a-940d-6d5acf1a9082\n  Title: Advice Line with Tariq Farid of Edible Arrangements\n  Content length: 51 chars\n  Status: finished\n  Preview: Advice Line with Tariq Farid of Edible Arrangements...\nSUCCESS: Full content saved to debug_apple_final_article_content.txt\n\n==================================================\nAPPLE PODCASTS TEST COMPLETE\nCheck debug files for detailed analysis:\n  - debug_apple_processor_output.json\n  - debug_apple_orchestrator_input.json\n  - debug_apple_orchestrator_output.json\n  - debug_apple_final_article_content.txt\n",
+      "stderr": "WARNING:root:Episode ID 1000733348575 not found in RSS feed, using latest episode\nWARNING:root:Episode ID 1000733348575 not found in RSS feed, using latest episode\n",
+      "success": true,
+      "timestamp": "2025-11-07T10:03:37.575721"
+    }
+  ]
+}

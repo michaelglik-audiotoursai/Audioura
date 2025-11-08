@@ -1,0 +1,9 @@
+{
+  "articles_created": 10,
+  "articles_failed": 0,
+  "articles_found": 10,
+  "failed_articles": [],
+  "message": "Newsletter processed: 10/10 articles created",
+  "newsletter_id": 156,
+  "status": "success"
+}

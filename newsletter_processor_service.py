@@ -357,37 +357,49 @@ def process_newsletter():
         newsletter_url = data.get('newsletter_url')
         user_id = data.get('user_id')
         max_articles = data.get('max_articles', 15)
+        test_mode = data.get('test_mode', False)  # Bypass daily limits for testing
         
         logging.info(f"Processing newsletter: {newsletter_url}")
         
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Check daily limit
-        today = datetime.now().date()
-        clean_newsletter_url = clean_url(newsletter_url)
+        # Check daily limit (skip in test mode)
+        if not test_mode:
+            today = datetime.now().date()
+            clean_newsletter_url = clean_url(newsletter_url)
+            
+            cursor.execute(
+                "SELECT id, created_at FROM newsletters WHERE url = %s ORDER BY created_at DESC LIMIT 1",
+                (clean_newsletter_url,)
+            )
+            existing = cursor.fetchone()
+            
+            if existing:
+                last_processed_date = existing[1].date()
+                if last_processed_date == today:
+                    cursor.close()
+                    conn.close()
+                    return jsonify({
+                        "status": "error",
+                        "message": "Newsletter already processed today. Each newsletter can only be processed once per day.",
+                        "error_type": "daily_limit_reached"
+                    }), 400
+        else:
+            clean_newsletter_url = clean_url(newsletter_url)
+            logging.info("TEST MODE: Bypassing daily limit check")
         
-        cursor.execute(
-            "SELECT id, created_at FROM newsletters WHERE url = %s ORDER BY created_at DESC LIMIT 1",
-            (clean_newsletter_url,)
-        )
-        existing = cursor.fetchone()
+        # Create newsletter entry (with test suffix in test mode)
+        newsletter_url_for_db = clean_newsletter_url
+        if test_mode:
+            # Add timestamp to make unique for testing
+            import time
+            newsletter_url_for_db = f"{clean_newsletter_url}?test_mode={int(time.time())}"
+            logging.info(f"TEST MODE: Using unique URL for database: {newsletter_url_for_db}")
         
-        if existing:
-            last_processed_date = existing[1].date()
-            if last_processed_date == today:
-                cursor.close()
-                conn.close()
-                return jsonify({
-                    "status": "error",
-                    "message": "Newsletter already processed today. Each newsletter can only be processed once per day.",
-                    "error_type": "daily_limit_reached"
-                }), 400
-        
-        # Create newsletter entry
         cursor.execute(
             "INSERT INTO newsletters (url, type) VALUES (%s, %s) RETURNING id",
-            (clean_newsletter_url, 'Newsletter')
+            (newsletter_url_for_db, 'Newsletter')
         )
         newsletter_id = cursor.fetchone()[0]
         conn.commit()

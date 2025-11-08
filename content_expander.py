@@ -49,9 +49,9 @@ class ContentExpander:
     def _expand_spotify_content(driver):
         """Expand Spotify-specific truncated content"""
         spotify_selectors = [
-            # Spotify episode description expansion
+            # Spotify episode description expansion - Updated selectors
             'button[aria-label*="Show more"]',
-            'button[aria-label*="show more"]',
+            'button[aria-label*="show more"]', 
             'button[data-testid*="show-more"]',
             'button[data-testid*="expand"]',
             '[data-testid="show-more-button"]',
@@ -59,10 +59,18 @@ class ContentExpander:
             # Episode description area
             '[data-testid="episode-description"] button',
             '[class*="episode-description"] button',
+            '[class*="description"] button',
             
-            # Generic Spotify buttons with "more" text
-            'button:has-text("Show more")',
-            'button:has-text("... Show more")',
+            # Text-based detection (most reliable)
+            'button:contains("Show more")',
+            'button:contains("... Show more")',
+            'span:contains("Show more")',
+            'div:contains("Show more")',
+            
+            # Fallback patterns
+            'button[class*="show"]',
+            'button[class*="more"]',
+            'button[class*="expand"]'
         ]
         
         return ContentExpander._click_expand_buttons(driver, spotify_selectors, "Spotify")
@@ -138,20 +146,28 @@ class ContentExpander:
         
         for selector in selectors:
             try:
-                # Handle :has-text() pseudo-selector (convert to contains)
-                if ':has-text(' in selector:
-                    text_to_find = selector.split(':has-text("')[1].split('")')[0]
-                    base_selector = selector.split(':has-text(')[0]
+                # Handle text-based selectors
+                if ':has-text(' in selector or ':contains(' in selector:
+                    if ':has-text(' in selector:
+                        text_to_find = selector.split(':has-text("')[1].split('")')[0]
+                        base_selector = selector.split(':has-text(')[0]
+                    else:  # :contains(
+                        text_to_find = selector.split(':contains("')[1].split('")')[0]
+                        base_selector = selector.split(':contains(')[0]
                     
                     elements = driver.find_elements(By.CSS_SELECTOR, base_selector)
                     for element in elements:
                         try:
-                            if text_to_find.lower() in element.text.lower():
+                            element_text = element.text.lower()
+                            if text_to_find.lower() in element_text:
                                 if element.is_displayed() and element.is_enabled():
+                                    logging.info(f"{category}: Found expandable element: '{element.text[:50]}...'")
+                                    driver.execute_script("arguments[0].scrollIntoView(true);", element)
+                                    time.sleep(0.5)
                                     driver.execute_script("arguments[0].click();", element)
                                     clicked_count += 1
-                                    logging.info(f"{category}: Expanded content - {element.text[:50]}...")
-                                    time.sleep(1)
+                                    logging.info(f"{category}: Successfully expanded content")
+                                    time.sleep(2)  # Wait for content to load
                         except Exception as e:
                             logging.debug(f"Failed to click {category} element: {e}")
                 else:
@@ -163,10 +179,13 @@ class ContentExpander:
                                 # Check if it's actually an expand button
                                 element_text = element.text.lower()
                                 if any(keyword in element_text for keyword in ['more', 'expand', 'read', 'show', 'see']):
+                                    logging.info(f"{category}: Found expand button: '{element.text[:30]}...' with selector {selector}")
+                                    driver.execute_script("arguments[0].scrollIntoView(true);", element)
+                                    time.sleep(0.5)
                                     driver.execute_script("arguments[0].click();", element)
                                     clicked_count += 1
-                                    logging.info(f"{category}: Expanded content with selector {selector}")
-                                    time.sleep(1)
+                                    logging.info(f"{category}: Successfully clicked expand button")
+                                    time.sleep(2)  # Wait for content to load
                         except Exception as e:
                             logging.debug(f"Failed to click {category} element with {selector}: {e}")
                             
@@ -192,22 +211,28 @@ class ContentExpander:
             "... Show more",
             "... Read more", 
             "... See more",
-            "...",
             "Show more",
             "Read more",
             "Continue reading",
             "[Show more]",
-            "(more)"
+            "(more)",
+            "See full episode description",
+            "View full description"
         ]
         
         try:
             page_text = driver.find_element(By.TAG_NAME, "body").text
+            found_indicators = []
             for indicator in truncation_indicators:
                 if indicator in page_text:
-                    logging.info(f"Detected truncated content: '{indicator}'")
-                    return True
+                    found_indicators.append(indicator)
+            
+            if found_indicators:
+                logging.info(f"Detected truncated content indicators: {found_indicators}")
+                return True
             return False
-        except:
+        except Exception as e:
+            logging.debug(f"Error detecting truncated content: {e}")
             return False
 
 def expand_content_for_platform(driver, url):
@@ -237,8 +262,19 @@ def expand_content_for_platform(driver, url):
     # Check if content appears truncated
     is_truncated = ContentExpander.detect_truncated_content(driver)
     
-    # Expand content
-    expanded_count = ContentExpander.expand_all_content(driver, platform_hint)
+    # Expand content (try multiple times if needed)
+    expanded_count = 0
+    max_attempts = 3
+    
+    for attempt in range(max_attempts):
+        attempt_count = ContentExpander.expand_all_content(driver, platform_hint)
+        expanded_count += attempt_count
+        
+        if attempt_count == 0:
+            break  # No more content to expand
+        
+        logging.info(f"Expansion attempt {attempt + 1}: {attempt_count} sections expanded")
+        time.sleep(1)  # Wait between attempts
     
     # Get final content length
     final_length = ContentExpander.get_expanded_content_length(driver)

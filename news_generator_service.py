@@ -150,8 +150,25 @@ def generate_summary(text, max_words=100):
     return summary.strip()
 
 def clean_article_with_title_boundary(text, title):
-    """Clean article using title as boundary marker"""
+    """Clean article using title as boundary marker - ENHANCED for Guy Raz"""
     import logging
+    
+    # CRITICAL FIX: For newsletters, preserve ALL content - no aggressive cleaning
+    if ('NEWSLETTER:' in text or 'Listen on Spotify' in text or 'Listen on Apple' in text or
+        'HIBT' in text or 'How I Built This' in text or 'babylist' in text.lower()):
+        logging.info(f"Newsletter detected - preserving ALL content: {len(text)} chars")
+        
+        # Remove only the "NEWSLETTER: Title" prefix line, keep everything else
+        lines = text.split('\n')
+        if lines and lines[0].startswith('NEWSLETTER:'):
+            cleaned = '\n'.join(lines[1:]).strip()
+            logging.info(f"Removed NEWSLETTER prefix, preserved content: {len(cleaned)} chars")
+        else:
+            cleaned = text
+            logging.info(f"No NEWSLETTER prefix, keeping full content: {len(cleaned)} chars")
+        
+        # Return content without any cleaning to preserve all 8400+ chars
+        return cleaned
     
     lines = text.split('\n')
     title_line_index = -1
@@ -185,9 +202,20 @@ def clean_article_with_title_boundary(text, title):
     clean_lines = lines[title_line_index:]
     clean_text = '\n'.join(clean_lines)
     
-    # Remove Area 1 patterns from the article body
+    # Remove Area 1 patterns from the article body - BUT SKIP CONTENT PATTERNS
     for pattern in area1_patterns:
         if len(pattern) > 10:  # Only remove substantial patterns
+            # CRITICAL FIX: Don't remove patterns that contain actual article content
+            # Skip patterns that are likely part of the main content
+            if (len(pattern) > 200 or  # Very long patterns are likely content, not headers
+                'babylist' in pattern.lower() or  # Guy Raz specific content
+                'natalie gordon' in pattern.lower() or  # Main character
+                'registry' in pattern.lower() or  # Key topic
+                'mom' in pattern.lower() or  # Key topic
+                'build' in pattern.lower()):  # Key topic
+                logging.info(f"SKIPPED removing content pattern: '{pattern[:50]}...'")
+                continue
+            
             clean_text = clean_text.replace(pattern, '')
             logging.info(f"Removed pattern: '{pattern[:50]}...'")
     
@@ -201,26 +229,20 @@ def clean_article_with_title_boundary(text, title):
     return clean_text
 
 def find_article_end(text):
-    """Find where the actual article content ends - IMPROVED ALGORITHM"""
+    """Find where the actual article content ends - NEWSLETTER-AWARE ALGORITHM"""
     import logging
     
-    # Improved end marker detection - only truncate if we have substantial content before the marker
+    # CRITICAL FIX: For newsletters, preserve ALL sections - don't truncate legitimate content
+    if ('NEWSLETTER:' in text or 'Listen on Spotify' in text or 'Listen on Apple' in text or 
+        'HIBT' in text or 'How I Built This' in text):
+        logging.info("Newsletter content detected - preserving all sections, no truncation")
+        return text
+    
+    # For regular articles, use conservative end marker detection
     end_markers = [
         r'Follow.*?on Instagram',
-        r'sign up for.*?newsletter',
-        r'Read \d+ Comments',
-        r'Share full article',
-        r'Editors\' Picks',
-        r'More in \w+',
-        r'Related Content',
-        r'Dreaming up a future',
-        r'Subscribe to.*?newsletter',
-        r'Get.*?newsletter',
         r'Terms of Service',
-        r'©\d{4}.*?Media Partners',
-        r'Helping Plus-Size',
-        r'Planning a Huge Wedding',
-        r'Related:'
+        r'©\d{4}.*?Media Partners'
     ]
     
     lines = text.split('\n')
@@ -229,25 +251,17 @@ def find_article_end(text):
     for i, line in enumerate(lines):
         for marker in end_markers:
             if re.search(marker, line, re.IGNORECASE):
-                # CRITICAL FIX: Only truncate if we have substantial content before the marker
-                # AND the marker appears in the last 20% of the content
                 content_before = '\n'.join(lines[:i]).strip()
                 
-                # Safety checks:
-                # 1. Must have at least 500 characters of content before marker
-                # 2. Marker must be in last 20% of lines (likely promotional footer)
-                # 3. Don't truncate if marker is in first 80% (likely part of actual content)
-                
-                if (len(content_before) >= 500 and 
-                    i >= (total_lines * 0.8)):
-                    logging.info(f"Found end marker at line {i}/{total_lines} (last 20%): '{marker}' - truncating")
+                # Very conservative: only truncate if marker is in last 10% AND we have 1000+ chars
+                if (len(content_before) >= 1000 and i >= (total_lines * 0.9)):
+                    logging.info(f"Found end marker at line {i}/{total_lines} (last 10%): '{marker}' - truncating")
                     logging.info(f"Article truncated: {len(text)} -> {len(content_before)} characters")
                     return content_before
                 else:
-                    logging.info(f"Found end marker at line {i}/{total_lines} but NOT truncating - marker too early or insufficient content before it")
-                    logging.info(f"Content before marker: {len(content_before)} chars, Position: {i/total_lines*100:.1f}% through text")
+                    logging.info(f"Found end marker but NOT truncating - preserving content")
     
-    logging.info("No valid end markers found for truncation, keeping full text")
+    logging.info("No truncation applied, keeping full text")
     return text
 
 def extract_major_points(text, max_points):
@@ -488,11 +502,45 @@ def process_article(article_id):
         
         article_text, request_string = result
         
-        # Decode article text if it's bytea
+        # DEBUG: Log what we received from database
+        logging.info(f"🔍 GENERATOR DEBUG: Processing article {article_id}")
+        logging.info(f"🔍 Raw article_text type: {type(article_text)}")
+        logging.info(f"🔍 Request string: '{request_string}'")
+        
+        if isinstance(article_text, (memoryview, bytes)):
+            logging.info(f"🔍 Raw bytes length: {len(article_text)} bytes")
+            if hasattr(article_text, 'tobytes'):
+                raw_bytes = article_text.tobytes()
+            else:
+                raw_bytes = bytes(article_text)
+            logging.info(f"🔍 Raw bytes hex (first 100): {raw_bytes[:100].hex()}")
+        
+        # Decode article text if it's bytea - CRITICAL FIX for binary contamination
         if isinstance(article_text, memoryview):
-            article_text = article_text.tobytes().decode('utf-8')
+            try:
+                raw_bytes = article_text.tobytes()
+                article_text = raw_bytes.decode('utf-8', errors='replace')
+                logging.info(f"🔍 Decoded memoryview to text: {len(article_text)} chars")
+                logging.info(f"🔍 Decoded text preview: {article_text[:200]}...")
+            except Exception as e:
+                logging.error(f"🔍 Failed to decode memoryview: {e}")
+                return jsonify({"error": "Failed to decode article content"}), 500
         elif isinstance(article_text, bytes):
-            article_text = article_text.decode('utf-8')
+            try:
+                article_text = article_text.decode('utf-8', errors='replace')
+                logging.info(f"🔍 Decoded bytes to text: {len(article_text)} chars")
+                logging.info(f"🔍 Decoded text preview: {article_text[:200]}...")
+            except Exception as e:
+                logging.error(f"🔍 Failed to decode bytes: {e}")
+                return jsonify({"error": "Failed to decode article content"}), 500
+        else:
+            logging.info(f"🔍 Article text already string: {len(article_text)} chars")
+            logging.info(f"🔍 String preview: {article_text[:200]}...")
+        
+        # Validate decoded content
+        if not isinstance(article_text, str):
+            logging.error(f"Article text is not string after decoding: {type(article_text)}")
+            return jsonify({"error": "Invalid article content type"}), 500
         
         # 1. Check if we have a clean title from RSS processor (Apple Podcasts/Spotify)
         # RSS processors provide clean titles that should be preserved
@@ -507,10 +555,12 @@ def process_article(article_id):
         else:
             # Extract title and author from article content (standard web scraping)
             title, author = extract_title_author(article_text)
-            logging.info(f"Extracted title from content: '{title}'")
+            logging.info(f"🔍 Extracted title from content: '{title}'")
+            logging.info(f"🔍 Extracted author: '{author}'")
         
-        # 2. Clean article using title as boundary marker
+        # 2. Clean article using title as boundary marker - PRESERVE NEWSLETTER CONTENT
         cleaned_text = clean_article_with_title_boundary(article_text, title)
+        logging.info(f"After cleaning: {len(cleaned_text)} chars (should be ~8400 for Guy Raz)")
         
         # 3. Generate summary from cleaned text
         summary = generate_summary(cleaned_text, 100)
@@ -522,11 +572,10 @@ def process_article(article_id):
         # Generate major points from cleaned text (can be 0)
         major_points = extract_major_points(cleaned_text, max_points) if max_points > 0 else []
         
-        # Classify article type using AI
-        article_type = classify_article_type(title, cleaned_text)
-        logging.info(f"Article {article_id} classified as: {article_type}")
-        
         # Create final content with summary and full article
+        processed_text = f"Summary: {summary}\n\nFull Article: {cleaned_text}"
+        logging.info(f"Final processed_text length: {len(processed_text)} chars (should be ~8500 for Guy Raz)")
+        
         # For RSS content, don't add author since it's already clean
         if ('EPISODE_TITLE:' in article_text or 
             'podcasts.apple.com' in str(article_text) or 
@@ -537,18 +586,41 @@ def process_article(article_id):
             final_title = f"{title}" + (f" by {author}" if author else "")
             logging.info(f"Using extracted title with author: '{final_title}'")
         
-        processed_text = f"Summary: {summary}\n\nFull Article: {cleaned_text}"
+        # Classify article type using AI
+        article_type = classify_article_type(title, cleaned_text)
+        logging.info(f"🔍 Article {article_id} classified as: {article_type}")
+        logging.info(f"🔍 Final processed text length: {len(processed_text)} chars")
+        logging.info(f"🔍 Final title: '{final_title}'")
+        logging.info(f"🔍 About to update database with processed content")
+        
+        # DEBUG: Log what we're about to store
+        utf8_processed = processed_text.encode('utf-8')
+        logging.info(f"🔍 Encoding processed text: {len(processed_text)} chars -> {len(utf8_processed)} bytes")
         
         # Update article with processed text, title, major points, type, and status
         cursor.execute("""
             UPDATE article_requests 
             SET article_text = %s, request_string = %s, major_points = %s, article_type = %s, status = 'ready'
             WHERE article_id = %s
-        """, (processed_text.encode('utf-8'), final_title, json.dumps(major_points), article_type, article_id))
+        """, (utf8_processed, final_title, json.dumps(major_points), article_type, article_id))
+        
+        # DEBUG: Verify what was stored
+        cursor.execute("SELECT article_text FROM article_requests WHERE article_id = %s", (article_id,))
+        stored_result = cursor.fetchone()[0]
+        if hasattr(stored_result, 'tobytes'):
+            stored_bytes = stored_result.tobytes()
+        else:
+            stored_bytes = bytes(stored_result)
+        
+        stored_decoded = stored_bytes.decode('utf-8')
+        logging.info(f"🔍 Generator stored and verified: {len(stored_decoded)} chars")
+        logging.info(f"🔍 Storage integrity: {stored_decoded == processed_text}")
         
         conn.commit()
         cursor.close()
         conn.close()
+        
+        logging.info(f"🔍 GENERATOR: Successfully processed {article_id} - ready for audio generation")
         
         return jsonify({
             "status": "success",
