@@ -1,0 +1,187 @@
+Version 1.2.8.17
+[22:28:54] HOME: Loading cached newsletters
+[22:28:54] HOME: Loaded 40 cached newsletters
+[22:28:54] HOME: Loading newsletters from http://192.168.0.217:5017/newsletters_v2
+[22:28:54] HOME: Secure encryption initialized - old keys cleared
+[22:28:54] HOME: Newsletter response status: 200
+[22:28:54] HOME: Loaded 40 newsletters from server
+[22:28:54] HOME: Cached 40 newsletters
+[22:28:55] NEWSLETTER_CARD: Building card for newsletter: guyraz.substack.com (Newsletter)
+[22:28:55] NEWSLETTER_CARD: Newsletter ID: 174
+[22:28:55] NEWSLETTER_CARD: Full newsletter data: {"article_count":1,"created_at":"2025-11-11T04:45:02.829768","date":"November 11, 2025","name":"guyraz.substack.com (Newsletter)","newsletter_id":174,"type":"Newsletter","url":"https://guyraz.substack.com/p/10-lessons-from-chip-and-joanna-gaines?test_mode=1762836302"}
+[22:28:55] NEWSLETTER_CARD: Building card for newsletter: guyraz.substack.com (Newsletter)
+[22:28:55] NEWSLETTER_CARD: Newsletter ID: 173
+[22:28:55] NEWSLETTER_CARD: Full newsletter data: {"article_count":1,"created_at":"2025-11-11T04:16:00.062169","date":"November 11, 2025","name":"guyraz.substack.com (Newsletter)","newsletter_id":173,"type":"Newsletter","url":"https://guyraz.substack.com/p/10-lessons-from-chip-and-joanna-gaines?test_mode=1762834560"}
+[22:28:55] NEWSLETTER_CARD: Building card for newsletter: guyraz.substack.com (Newsletter)
+[22:28:55] NEWSLETTER_CARD: Newsletter ID: 172
+[22:28:55] NEWSLETTER_CARD: Full newsletter data: {"article_count":1,"created_at":"2025-11-11T04:13:29.990575","date":"November 11, 2025","name":"guyraz.substack.com (Newsletter)","newsletter_id":172,"type":"Newsletter","url":"https://guyraz.substack.com/p/10-lessons-from-chip-and-joanna-gaines?test_mode=1762834409"}
+[22:28:55] NEWSLETTER_CARD: Building card for newsletter: mailchi.mp (Newsletter)
+[22:28:55] NEWSLETTER_CARD: Newsletter ID: 170
+[22:28:55] NEWSLETTER_CARD: Full newsletter data: {"article_count":1,"created_at":"2025-11-10T23:06:25.789648","date":"November 10, 2025","name":"mailchi.mp (Newsletter)","newsletter_id":170,"type":"Newsletter","url":"https://mailchi.mp/bostonglobe/trendlines-trumps-obesity-drug-deal-test?test_mode=1762815985"}
+[22:28:55] NEWSLETTER_CARD: Building card for newsletter: mailchi.mp (Newsletter)
+[22:28:55] NEWSLETTER_CARD: Newsletter ID: 169
+[22:28:55] NEWSLETTER_CARD: Full newsletter data: {"article_count":9,"created_at":"2025-11-10T22:10:30.152231","date":"November 10, 2025","name":"mailchi.mp (Newsletter)","newsletter_id":169,"type":"Newsletter","url":"https://mailchi.mp/bostonglobe/trendlines-trumps-obesity-drug-deal-has-lots-of-unknowns"}
+[22:28:55] NEWSLETTER_CARD: Building card for newsletter: view.email.bostonglobe.com (Newsletter)
+[22:28:55] NEWSLETTER_CARD: Newsletter ID: 168
+[22:28:55] NEWSLETTER_CARD: Full newsletter data: {"article_count":4,"created_at":"2025-11-10T06:21:26.884210","date":"November 10, 2025","name":"view.email.bostonglobe.com (Newsletter)","newsletter_id":168,"type":"Newsletter","url":"https://view.email.bostonglobe.com/"}
+[22:28:55] NEWSLETTER_CARD: Building card for newsletter: guyraz.substack.com (Newsletter)
+[22:28:55] NEWSLETTER_CARD: Newsletter ID: 164
+[22:28:55] NEWSLETTER_CARD: Full newsletter data: {"article_count":10,"created_at":"2025-11-10T05:51:21.648460","date":"November 10, 2025","name":"guyraz.substack.com (Newsletter)","newsletter_id":164,"type":"Newsletter","url":"https://guyraz.substack.com/p/10-lessons-from-chip-and-joanna-gaines"}
+[22:28:55] NEWSLETTER_CARD: Building card for newsletter: mailchi.mp (Newsletter)
+[22:28:55] NEWSLETTER_CARD: Newsletter ID: 163
+[22:28:55] NEWSLETTER_CARD: Full newsletter data: {"article_count":8,"created_at":"2025-11-08T17:25:36.930057","date":"November 08, 2025","name":"mailchi.mp (Newsletter)","newsletter_id":163,"type":"Newsletter","url":"https://mailchi.mp/cd2f9f419c04/friday-news-decoding-the-office-space-market-mystery-10346496"}
+[22:28:55] NEWSLETTER_CARD: Building card for newsletter: jokesfunnystories.quora.com (Newsletter)
+[22:28:55] NEWSLETTER_CARD: Newsletter ID: 162
+[22:28:55] NEWSLETTER_CARD: Full newsletter data: {"article_count":3,"created_at":"2025-11-07T19:59:57.685410","date":"November 07, 2025","name":"jokesfunnystories.quora.com (Newsletter)","newsletter_id":162,"type":"Newsletter","url":"https://jokesfunnystories.quora.com/"}
+[22:28:55] NEWSLETTER_CARD: Building card for newsletter: guyraz.substack.com (Newsletter)
+[22:28:55] NEWSLETTER_CARD: Newsletter ID: 155
+[22:28:55] NEWSLETTER_CARD: Full newsletter data: {"article_count":7,"created_at":"2025-11-07T04:25:01.596126","date":"November 07, 2025","name":"guyraz.substack.com (Newsletter)","newsletter_id":155,"type":"Newsletter","url":"https://guyraz.substack.com/p/the-babylist-playbook-how-one-mom"}
+[22:28:55] NEWSLETTER_CARD: Building card for newsletter: mailchi.mp (Newsletter)
+[22:28:55] NEWSLETTER_CARD: Newsletter ID: 112
+[22:28:55] NEWSLETTER_CARD: Full newsletter data: {"article_count":5,"created_at":"2025-11-05T15:23:42.068206","date":"November 05, 2025","name":"mailchi.mp (Newsletter)","newsletter_id":112,"type":"Newsletter","url":"https://mailchi.mp/cb820171cc62/newton-has-decided-election-night-2025-results"}
+[22:28:55] NEWSLETTER_CARD: Building card for newsletter: mailchi.mp (Newsletter)
+[22:28:55] NEWSLETTER_CARD: Newsletter ID: 111
+[22:28:55] NEWSLETTER_CARD: Full newsletter data: {"article_count":8,"created_at":"2025-11-05T01:51:28.564536","date":"November 05, 2025","name":"mailchi.mp (Newsletter)","newsletter_id":111,"type":"Newsletter","url":"https://mailchi.mp/cffaa0a1186b/friday-news-decoding-the-office-space-market-mystery-10346462"}
+[22:29:01] NEWSLETTER_CARD: Play button pressed for newsletter: mailchi.mp (Newsletter) (ID: 169)
+[22:29:01] NEWSLETTER: Processing existing newsletter with URL workflow: https://mailchi.mp/bostonglobe/trendlines-trumps-obesity-drug-deal-has-lots-of-unknowns
+[22:29:01] NEWSLETTER: No encryption key found, processing newsletter URL to get key
+[22:29:01] NEWSLETTER: Making POST request to: http://192.168.0.217:5017/process_newsletter
+[22:29:53] NEWSLETTER: Starting _processNewsletter with ID: 169, Name: mailchi.mp (Newsletter)
+[22:29:53] NEWSLETTER: Using server IP: 192.168.0.217
+[22:29:53] NEWSLETTER: Making POST request to: http://192.168.0.217:5017/get_articles_by_newsletter_id
+[22:29:53] NEWSLETTER: Request body: {"newsletter_id":169}
+[22:29:53] NEWSLETTER: Response status: 200
+[22:29:53] NEWSLETTER: Response body: {
+  "articles": [
+    {
+      "article_id": "a6725c3a-a7cf-4e32-adea-4668dab70a17",
+      "article_type": "Education and Learning",
+      "author": "Nov. 18. If the hospitals close",
+      "date": "November 10, 2025",
+      "status": "finished",
+      "subscription_domain": "bostonglobe.com",
+      "subscription_required": true,
+      "title": "reach temporary deal to keep Roger Williams, Fatima hospitals open",
+      "url": "https://www.bostonglobe.com/2025/11/07/metro/ri-roger-williams-fatima-hospitals-prospect-november-agreement/?s_campaign=trendlines:newsletter"
+    },
+    {
+      "article_id": "9e6fcaec-58d4-4d94-9225-e412c492fd0a",
+      "article_type": "Technology",
+      "author": "Mass General Brigham",
+      "date": "November 10, 2025",
+      "status": "finished",
+      "subscription_domain": "bostonglobe.com",
+      "subscription_required": true,
+      "title": "ARTICLE: In Trump\u2019s Bizarro World, kneecapping Harvard will make America great again",
+      "url": "https://www.bostonglobe.com/2025/05/28/business/harvard-trump-economy/?s_campaign=trendlines:newsletter"
+    },
+    {
+      "article_id": "948e1fec-a7e7-4125-bfaf-cfef5d0fc453",
+      "article_type": "Technology",
+      "author": "LiveIntent",
+      "date": "November 10, 2025",
+      "status": "finished",
+      "subscription_domain": null,
+      "subscription_required": false,
+      "title": "Some of the online ads you are served may be based on the content of the page you\u2019re visiting, some may be based on registration information you provide, and other ads may be customized based on predictions about your interests generated from your visits to other web sites",
+      "url": "https://sli.bostonglobe.com/click?s=879318&li=edc9659bce&e=glikfamily@gmail.com&p=d33d7e1de3&stpe=static"
+    },
+    {
+      "article_id": "e9c105b6-6271-4104-8564-b7dfa15c411d",
+      "article_type": "Lifestyle and Entertainment",
+      "author": "Unknown Author",
+      "date": "November 10, 2025",
+      "status": "finished",
+      "subscription_domain": "bostonglobe.com",
+      "subscription_required": true,
+      "title": "Investigations Obituaries Death Notices Games & Puzzles Align Crossword Mini Crossword KenKen Sudoku Word Flower Business Technology Economy Housing Real Estate Biotech The Fine Print Bold Types Politics Money, Power, Inequality Climate Spotlight Opinion Ideas Columns and Op-eds Editorials Letters Cartoons Say More podcast New Hampshire Business Politics Education Crime Health Commentary Rhode Island Things to Do Rhode Island Podcast RI Food & Dining Politics Business Arts Crime World COVID Globe Magazine Miss Conduct Dinner with Cupid Perspective Connections Lifestyle A Beautiful Resistance Food & Dining Comics Crossword Games Travel Pop Culture Relationships Love Letters The Big Day Real Estate Arts Books Movies Music Television Visual Arts Performing Arts Cars Real Estate Events News tips Search ePaper Podcasts email Created with Sketch",
+      "url": "https://www.bostonglobe.com/about/staff-list/columnist/larry-edelman/?s_campaign=trendlines:newsletter"
+    },
+    {
+      "article_id": "85fd2b45-c517-44e5-a877-a45a53a11fc8",
+      "article_type": "News and Politics",
+      "author": "Wolf",
+      "date": "November 10, 2025",
+      "status": "finished",
+      "subscription_domain": "bostonglobe.com",
+      "subscription_required": true,
+      "title": "ARTICLE: Boston judge, warning of \u2018existential threat\u2019 to democracy in searing essay, resigns",
+      "url": "https://www.bostonglobe.com/2025/11/09/nation/federal-judge-resigns-trump-administration/?s_campaign=trendlines:newsletter"
+    },
+    {
+      "article_id": "4142d89b-b3f2-4d7f-97dd-032f3ce1186b",
+      "article_type": "Lifestyle and Entertainment",
+      "author": "others to crack the business",
+      "date": "November 10, 2025",
+      "status": "finished",
+      "subscription_domain": "bostonglobe.com",
+      "subscription_required": true,
+      "title": "ARTICLE: Disney signs Boston-based DraftKings as ESPN\u2019s new sports-betting partner",
+      "url": "https://www.bostonglobe.com/2025/11/06/business/disney-draftkings-espn-sports-betting/?s_campaign=trendlines:newsletter"
+    },
+    {
+      "article_id": "28cdc0ba-eb64-4528-ad8e-2a477267f97b",
+      "article_type": "Education and Learning",
+      "author": "the Trump administration to rein in soaring drug prices in its efforts to address cost-of-living concerns among voters. Pfizer and AstraZeneca recently agreed to lower the cost of prescription drugs for Medicaid after an executive order in May set a deadline for drugmakers to electively lower prices or face new limits on what the government will pay. As with the other deals",
+      "date": "November 10, 2025",
+      "status": "finished",
+      "subscription_domain": "bostonglobe.com",
+      "subscription_required": true,
+      "title": "ARTICLE: Trump unveils deal to expand coverage and lower costs on obesity drugs",
+      "url": "https://www.bostonglobe.com/2025/11/06/business/trump-glp-prices-lilly-novo/?s_campaign=trendlines:newsletter"
+    },
+    {
+      "article_id": "996d9749-a934-42c9-aa32-34530df77655",
+      "article_type": "News and Politics",
+      "author": "the Trump administration since the shutdown began on Oct. 1 and would ensure that federal workers receive back pay. Senate Majority Leader John Thune quickly endorsed the deal and called an immediate vote to begin the process of approving it as the shutdown continued to disrupt flights nationwide",
+      "date": "November 10, 2025",
+      "status": "finished",
+      "subscription_domain": "bostonglobe.com",
+      "subscription_required": true,
+      "title": "ARTICLE: Senate takes first step toward ending the government shutdown",
+      "url": "https://www.bostonglobe.com/2025/11/09/nation/government-shutdown-40th-day-senators-work/?s_campaign=trendlines:newsletter"
+    },
+    {
+      "article_id": "38d5e7d0-2d97-4bab-8dc2-ed4f8f3f4863",
+      "article_type": "News and Politics",
+      "author": "Larry Edelman",
+      "date": "November 10, 2025",
+      "status": "finished",
+      "subscription_domain": null,
+      "subscription_required": false,
+      "title": "JoNel Aleccia/Associated Press Medicare coverage: limited eligibility and uncertain access Medicare, the government-run health insurance for seniors, doesn\u2019t cover GLP-1s for weight loss, with an exception for people who also have conditions like heart problems or sleep apnea",
+      "url": "https://mailchi.mp/bostonglobe/trendlines-trumps-obesity-drug-deal-has-lots-of-unknowns?e=a4f20567f8"
+    }
+  ],
+  "server_public_key": "0x581efd62213962de713420d12794ae421bf9e2fe0830584a3284199cbadbec06a0e9986f2530390e9f1da771548a6fbdd0028e434b6430b224fdbb6fe0983a904a3e7ae74a3440a2db097ae097a784b91eed5e30b63214a4885577847f000623de317827481bdd43a8ee9dcc3dab04820782c85fad656b9624b821ae2e6e7c39621b592873e3b796eb2d52c6869fe40672c3a7f556cce80f4c96c798962eab0cfade6d5cc956d4d54225e7776c23f46ccd1e5426b7079ad4ae046c1a945d20a6eb525225cfff9b29c3f88ef2480b9f5de93a793b4c438e391029756db384a687467023eb97ccf837674756e37911d7974acf733c29144bac7e58b1c67a91c510",
+  "status": "success"
+}
+
+[22:29:53] SUBSCRIPTION: Performing Diffie-Hellman key exchange
+[22:29:53] SUBSCRIPTION: Key exchange successful
+[22:29:53] SUBSCRIPTION: Client public key: 908b058b7a6db6fdbb290f873d46181cd477d1c565b43e5c70f9f0d2b82c566db2d67858c65d55466fa17ecc4e77b69104ffc658ddbd052ce3da5b8be4b1cf30d4ff6691bf15e9988c17656cb6bed9da837a81ae44036a2f9121dd65a3d36fea89f46edb314764305944eeead3fed4967a2b124c6235e1a38d849f41dd1cb267ca7da5561b307365a1b862ca31661ae982b9ab046307b906e9f9fae04cce01a2061b0b99011f2c1832258a663572e5ab1d3e2f3526d83d9efb79766d1d71cebaa9d7b51d1b1eb850e38b4c7b48412a1fc6b1016c01b551c024ae0b548686420690c000e55e92c9f5cc3e39eb161624515433e37a0f1cd4263526891326e859bf
+[22:29:53] NEWSLETTER: Successfully parsed 9 articles
+[22:29:53] NEWSLETTER: Showing article selection dialog
+[22:30:37] CREDENTIAL_DEBUG: Username input: "glikfamily@gmail.com" (length: 20)
+[22:30:37] CREDENTIAL_DEBUG: Password input: "Eight2Four" (length: 10)
+[22:30:37] CREDENTIAL_DEBUG: Username isEmpty: false
+[22:30:37] CREDENTIAL_DEBUG: Password isEmpty: false
+[22:30:37] SUBSCRIPTION_DIALOG: Submitting credentials for article: 9e6fcaec-58d4-4d94-9225-e412c492fd0a
+[22:30:37] CREDENTIAL_DEBUG: About to encrypt - Username: "glikfamily@gmail.com", Password: "Eight2Four"
+[22:30:37] SUBSCRIPTION: Starting credential submission for article: 9e6fcaec-58d4-4d94-9225-e412c492fd0a
+[22:30:37] SUBSCRIPTION: Submitting to: http://192.168.0.217:5017/submit_credentials
+[22:30:37] SUBSCRIPTION: Request body: {"article_id":"9e6fcaec-58d4-4d94-9225-e412c492fd0a","mobile_public_key":"908b058b7a6db6fdbb290f873d46181cd477d1c565b43e5c70f9f0d2b82c566db2d67858c65d55466fa17ecc4e77b69104ffc658ddbd052ce3da5b8be4b1cf30d4ff6691bf15e9988c17656cb6bed9da837a81ae44036a2f9121dd65a3d36fea89f46edb314764305944eeead3fed4967a2b124c6235e1a38d849f41dd1cb267ca7da5561b307365a1b862ca31661ae982b9ab046307b906e9f9fae04cce01a2061b0b99011f2c1832258a663572e5ab1d3e2f3526d83d9efb79766d1d71cebaa9d7b51d1b1eb850e38b4c7b48412a1fc6b1016c01b551c024ae0b548686420690c000e55e92c9f5cc3e39eb161624515433e37a0f1cd4263526891326e859bf","encrypted_username":"QH2a9a1y7OtMgcmqyUopWU3iauEoe7EZjLyYqpyBjLIsaih6eVVI24Gj9IMkjMZH","encrypted_password":"4IGiAwEZPLMbiPjMPDhUj/XGU0ecsYEQK1Jxe6RRdac=","device_id":"USER-281301397","domain":"bostonglobe.com"}
+[22:30:37] SUBSCRIPTION: Response status: 200
+[22:30:37] SUBSCRIPTION: Response body: {
+  "article_id": "9e6fcaec-58d4-4d94-9225-e412c492fd0a",
+  "article_title": "ARTICLE: In Trump\u2019s Bizarro World, kneecapping Harvard will make America great again by Mass General Brigham",
+  "message": "Credentials submitted successfully for bostonglobe.com",
+  "newsletter_id": 169,
+  "status": "success",
+  "subscription_domain": "bostonglobe.com"
+}
+
+[22:30:37] SUBSCRIPTION: Credential submission successful
+[22:30:46] Checking user: USER-281301397
+[22:30:46] Testing connectivity to: 192.168.0.217
+[22:30:46] ✅ Server connectivity: OK

@@ -13,6 +13,10 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:math';
 import '../screens/debug_log_viewer_screen.dart';
+import '../services/subscription_service.dart';
+import '../services/subscription_encryption_service.dart';
+import '../services/device_service.dart';
+import '../widgets/subscription_credential_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -46,7 +50,18 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _initializeSecureEncryption();
     _loadAppMode();
+  }
+  
+  Future<void> _initializeSecureEncryption() async {
+    try {
+      // Force secure key regeneration to clear any old insecure keys
+      await SubscriptionEncryptionService.forceSecureKeyRegeneration();
+      await DebugLogHelper.addDebugLog('HOME: Secure encryption initialized - old keys cleared');
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('HOME: Error initializing secure encryption: $e');
+    }
   }
   
   Future<void> _loadAppMode() async {
@@ -1313,6 +1328,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadNewsletters() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      
+      // Load cached newsletters first
+      await _loadCachedNewsletters();
+      
       final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
       
       await DebugLogHelper.addDebugLog('HOME: Loading newsletters from http://$serverIp:5017/newsletters_v2');
@@ -1329,6 +1348,10 @@ class _HomeScreenState extends State<HomeScreen> {
         final newsletters = List<Map<String, dynamic>>.from(data['newsletters'] ?? []);
         await DebugLogHelper.addDebugLog('HOME: Loaded ${newsletters.length} newsletters from server');
         
+        // Cache the newsletters
+        await prefs.setString('cached_newsletters', json.encode(newsletters));
+        await DebugLogHelper.addDebugLog('HOME: Cached ${newsletters.length} newsletters');
+        
         setState(() {
           _newsletters = newsletters;
           _isLoading = false;
@@ -1336,32 +1359,217 @@ class _HomeScreenState extends State<HomeScreen> {
       } else {
         await DebugLogHelper.addDebugLog('HOME: Newsletter server error: ${response.statusCode}');
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Server error: ${response.statusCode}. Please try again later.'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        // Only show error if no cached data is available
+        if (_newsletters.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Server error: ${response.statusCode}. Showing cached newsletters.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
         
         setState(() {
-          _newsletters = [];
           _isLoading = false;
         });
       }
     } catch (e) {
       await DebugLogHelper.addDebugLog('HOME: Newsletter loading error: $e');
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('No connection. Please check network and try again.'),
-          backgroundColor: Colors.red,
+      // Only show error if no cached data is available
+      if (_newsletters.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('No connection. Showing cached newsletters.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+  
+  Future<void> _loadCachedNewsletters() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedNewsletters = prefs.getString('cached_newsletters');
+      
+      if (cachedNewsletters != null) {
+        await DebugLogHelper.addDebugLog('HOME: Loading cached newsletters');
+        final newsletters = List<Map<String, dynamic>>.from(json.decode(cachedNewsletters));
+        
+        setState(() {
+          _newsletters = newsletters;
+        });
+        
+        await DebugLogHelper.addDebugLog('HOME: Loaded ${newsletters.length} cached newsletters');
+      }
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('HOME: Error loading cached newsletters: $e');
+    }
+  }
+  
+  Future<void> _processNewsletterWithUrl(String newsletterUrl, int existingId, String name) async {
+    try {
+      await DebugLogHelper.addDebugLog('NEWSLETTER: Processing existing newsletter with URL workflow: $newsletterUrl');
+      
+      // Check if we already have encryption key for this device
+      final hasKey = await SubscriptionService.hasEncryptionKey();
+      
+      if (!hasKey) {
+        await DebugLogHelper.addDebugLog('NEWSLETTER: No encryption key found, processing newsletter URL to get key');
+        
+        final prefs = await SharedPreferences.getInstance();
+        final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
+        final deviceId = await DeviceService.getUserId();
+        
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 20),
+                Expanded(child: Text('Getting encryption key...')),
+              ],
+            ),
+          ),
+        );
+        
+        final requestUrl = 'http://$serverIp:5017/process_newsletter';
+        final requestBody = {
+          'newsletter_url': newsletterUrl,
+          'user_id': deviceId,
+          'max_articles': 10,
+        };
+        
+        await DebugLogHelper.addDebugLog('NEWSLETTER: Making POST request to: $requestUrl');
+        
+        final response = await http.post(
+          Uri.parse(requestUrl),
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode(requestBody),
+        ).timeout(Duration(seconds: 60));
+        
+        Navigator.pop(context);
+        
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          final deviceEncryptionKey = data['device_encryption_key'];
+          
+          if (deviceEncryptionKey != null) {
+            await SubscriptionService.handleKeyExchange(deviceEncryptionKey);
+            await DebugLogHelper.addDebugLog('NEWSLETTER: Encryption key obtained and stored');
+          }
+        }
+      } else {
+        await DebugLogHelper.addDebugLog('NEWSLETTER: Encryption key already available');
+      }
+      
+      // Now get article details
+      await _processNewsletter(existingId, name);
+      
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('NEWSLETTER: Exception in _processNewsletterWithUrl: $e');
+      
+      // Fallback to direct article processing
+      await _processNewsletter(existingId, name);
+    }
+  }
+  
+  Future<void> _processNewsletterUrl(String newsletterUrl) async {
+    try {
+      await DebugLogHelper.addDebugLog('NEWSLETTER: Starting newsletter URL processing: $newsletterUrl');
+      
+      final prefs = await SharedPreferences.getInstance();
+      final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
+      final deviceId = await DeviceService.getUserId();
+      
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 20),
+              Expanded(child: Text('Processing newsletter...')),
+            ],
+          ),
         ),
       );
       
-      setState(() {
-        _newsletters = [];
-        _isLoading = false;
-      });
+      final requestUrl = 'http://$serverIp:5017/process_newsletter';
+      final requestBody = {
+        'newsletter_url': newsletterUrl,
+        'user_id': deviceId,
+        'max_articles': 10,
+      };
+      
+      await DebugLogHelper.addDebugLog('NEWSLETTER: Making POST request to: $requestUrl');
+      await DebugLogHelper.addDebugLog('NEWSLETTER: Request body: ${json.encode(requestBody)}');
+      
+      final response = await http.post(
+        Uri.parse(requestUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(requestBody),
+      ).timeout(Duration(seconds: 60));
+      
+      await DebugLogHelper.addDebugLog('NEWSLETTER: Response status: ${response.statusCode}');
+      await DebugLogHelper.addDebugLog('NEWSLETTER: Response body: ${response.body}');
+      
+      Navigator.pop(context);
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        
+        if (data['status'] == 'success') {
+          final newsletterId = data['newsletter_id'];
+          final articlesCreated = data['articles_created'] ?? 0;
+          final articlesRequiringSubscription = data['articles_requiring_subscription'] ?? 0;
+          final deviceEncryptionKey = data['device_encryption_key'];
+          
+          // Perform key exchange
+          final serverPublicKey = data['server_public_key'];
+          if (serverPublicKey != null) {
+            await SubscriptionService.handleKeyExchange(serverPublicKey);
+          }
+          
+          // Show processing results
+          String message = 'Newsletter processed: $articlesCreated articles created';
+          if (articlesRequiringSubscription > 0) {
+            message += ', $articlesRequiringSubscription require subscription';
+          }
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: Colors.green,
+            ),
+          );
+          
+          // Now get article details  
+          await _processNewsletter(newsletterId, 'Newsletter');
+        } else {
+          throw Exception(data['message'] ?? 'Newsletter processing failed');
+        }
+      } else {
+        throw Exception('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('NEWSLETTER: Exception in _processNewsletterUrl: $e');
+      
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error processing newsletter: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
   
@@ -1408,6 +1616,30 @@ class _HomeScreenState extends State<HomeScreen> {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final articles = List<Map<String, dynamic>>.from(data['articles'] ?? []);
+        
+        // Handle Diffie-Hellman key exchange if server public key present
+        final serverPublicKey = data['server_public_key'];
+        if (serverPublicKey != null) {
+          await SubscriptionService.handleKeyExchange(serverPublicKey);
+        } else {
+          // Check if there are subscription articles without server_public_key
+          final hasSubscriptionArticles = articles.any((article) => article['subscription_required'] == true);
+          if (hasSubscriptionArticles) {
+            await DebugLogHelper.addDebugLog('NEWSLETTER: ERROR - Articles require subscription but no server_public_key provided by Services');
+            await DebugLogHelper.addDebugLog('NEWSLETTER: Services must include server_public_key when returning subscription articles');
+            
+            // Show user-friendly message about subscription feature status
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Subscription articles detected but encryption keys not available. Subscription features temporarily unavailable.'),
+                  backgroundColor: Colors.orange,
+                  duration: Duration(seconds: 4),
+                ),
+              );
+            }
+          }
+        }
         
         await DebugLogHelper.addDebugLog('NEWSLETTER: Successfully parsed ${articles.length} articles');
         
@@ -1639,211 +1871,205 @@ class _HomeScreenState extends State<HomeScreen> {
           final screenHeight = MediaQuery.of(context).size.height;
           final availableHeight = screenHeight - keyboardHeight - 200; // Reserve space for title and actions
           
-          return AlertDialog(
-            title: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Expanded(child: Text('Select Articles')),
-                    IconButton(
-                      icon: Icon(Icons.search, size: 20),
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: Text('Search Articles'),
-                            content: TextField(
-                              controller: searchController,
-                              decoration: InputDecoration(
-                                hintText: 'microsoft profit -speculation',
-                                helperText: 'Include terms, exclude with -term',
-                              ),
-                              autofocus: true,
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () {
-                                  searchController.clear();
-                                  setDialogState(() {
-                                    searchQuery = '';
-                                  });
-                                  Navigator.pop(context);
-                                },
-                                child: Text('Clear'),
-                              ),
-                              ElevatedButton(
-                                onPressed: () {
-                                  setDialogState(() {
-                                    searchQuery = searchController.text;
-                                  });
-                                  Navigator.pop(context);
-                                },
-                                child: Text('Search'),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
+          return Dialog(
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.9,
+              height: MediaQuery.of(context).size.height * 0.8,
+              child: Column(
+                children: [
+                  // Header
+                  Container(
+                    padding: EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
                     ),
-                    PopupMenuButton<String>(
-                      icon: Icon(Icons.filter_list, size: 20),
-                      onSelected: (String value) {
-                        setDialogState(() {
-                          dialogFilter = value;
-                        });
-                      },
-                      itemBuilder: (BuildContext context) {
-                        return _articleTypes.map((String type) {
-                          return PopupMenuItem<String>(
-                            value: type,
-                            child: Row(
+                    child: Column(
+                      children: [
+                        Text(
+                          'Select Articles',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'Found ${articles.length} articles from $newsletterName',
+                          style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Select All / Clear All buttons
+                  Container(
+                    padding: EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              setDialogState(() {
+                                for (int i = 0; i < selectedArticles.length; i++) {
+                                  selectedArticles[i] = true;
+                                }
+                              });
+                            },
+                            child: Text('Select All'),
+                          ),
+                        ),
+                        SizedBox(width: 16),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              setDialogState(() {
+                                for (int i = 0; i < selectedArticles.length; i++) {
+                                  selectedArticles[i] = false;
+                                }
+                              });
+                            },
+                            child: Text('Clear All'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Article list
+                  Expanded(
+                    child: ListView.builder(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: articles.length,
+                      itemBuilder: (context, index) {
+                        final article = articles[index];
+                        final title = article['title'] ?? 'Untitled Article';
+                        final author = article['author'] ?? 'Unknown Author';
+                        final subscriptionRequired = article['subscription_required'] ?? false;
+                        final subscriptionDomain = article['subscription_domain'] ?? '';
+                        
+                        if (subscriptionRequired) {
+                          return Container(
+                            margin: EdgeInsets.only(bottom: 12),
+                            padding: EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade50,
+                              border: Border.all(color: Colors.orange.shade200),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(
-                                  dialogFilter == type ? Icons.check : Icons.radio_button_unchecked,
-                                  size: 16,
+                                Row(
+                                  children: [
+                                    Icon(Icons.lock, color: Colors.orange, size: 16),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'SUBSCRIPTION REQUIRED',
+                                      style: TextStyle(
+                                        color: Colors.orange.shade700,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    Spacer(),
+                                    ElevatedButton(
+                                      onPressed: () => _showCredentialDialog(article, subscriptionDomain, title),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.orange,
+                                        foregroundColor: Colors.white,
+                                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                      ),
+                                      child: Text('Enter Credentials', style: TextStyle(fontSize: 10)),
+                                    ),
+                                  ],
                                 ),
-                                SizedBox(width: 8),
-                                Text(type, style: TextStyle(fontSize: 12)),
+                                SizedBox(height: 8),
+                                Text(
+                                  title,
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'By: $author • Domain: $subscriptionDomain',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                ),
                               ],
                             ),
                           );
-                        }).toList();
+                        } else {
+                          return Container(
+                            margin: EdgeInsets.only(bottom: 12),
+                            child: CheckboxListTile(
+                              value: selectedArticles[index],
+                              onChanged: (bool? value) {
+                                setDialogState(() {
+                                  selectedArticles[index] = value ?? false;
+                                });
+                              },
+                              title: Text(
+                                title,
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: Text(
+                                'By: $author',
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                              ),
+                              controlAffinity: ListTileControlAffinity.leading,
+                            ),
+                          );
+                        }
                       },
                     ),
-                  ],
-                ),
-                if (searchQuery.isNotEmpty)
-                  Padding(
-                    padding: EdgeInsets.only(top: 8),
-                    child: Text(
-                      'Search: "$searchQuery"',
-                      style: TextStyle(fontSize: 12, color: Colors.blue),
+                  ),
+                  
+                  // Bottom buttons
+                  Container(
+                    padding: EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.vertical(bottom: Radius.circular(8)),
                     ),
-                  ),
-              ],
-            ),
-            content: Container(
-              width: double.maxFinite,
-              height: availableHeight > 200 ? availableHeight : 200,
-              child: Column(
-                children: [
-                  Text(
-                    dialogFilter == 'All' 
-                      ? 'Found ${articles.length} articles from $newsletterName'
-                      : 'Showing ${filteredArticles.length} "$dialogFilter" articles from $newsletterName',
-                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                  ),
-                  SizedBox(height: 16),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: filteredArticles.length,
-                      itemBuilder: (context, index) {
-                        final article = filteredArticles[index];
-                        final originalIndex = articles.indexOf(article);
-                        final title = article['title'] ?? 'Untitled Article';
-                        final author = article['author'] ?? 'Unknown Author';
-                        final date = article['date'] ?? 'Unknown Date';
-                        final articleType = article['article_type'] ?? 'Others';
-                        
-                        return CheckboxListTile(
-                          value: selectedArticles[originalIndex],
-                          onChanged: (bool? value) {
-                            setDialogState(() {
-                              selectedArticles[originalIndex] = value ?? false;
-                            });
-                          },
-                          title: Text(
-                            title,
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: Text('Cancel'),
                           ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: _getTypeColor(articleType),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      articleType,
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      'By: $author',
-                                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              Text(
-                                'Date: $date',
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                              ),
-                            ],
+                        ),
+                        SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              final selected = <Map<String, dynamic>>[];
+                              for (int i = 0; i < articles.length; i++) {
+                                if (selectedArticles[i]) {
+                                  selected.add(articles[i]);
+                                }
+                              }
+                              
+                              Navigator.pop(context);
+                              
+                              if (selected.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('No articles selected')),
+                                );
+                                return;
+                              }
+                              
+                              _processSelectedArticles(selected, newsletterId);
+                            },
+                            child: Text('Add Selected (${selectedArticles.where((s) => s).length})'),
                           ),
-                          dense: true,
-                        );
-                      },
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () {
-                  setDialogState(() {
-                    // Only select articles that are currently visible (filtered)
-                    for (final article in filteredArticles) {
-                      final originalIndex = articles.indexOf(article);
-                      if (originalIndex >= 0) {
-                        selectedArticles[originalIndex] = true;
-                      }
-                    }
-                  });
-                },
-                child: Text('Select All (${filteredArticles.length})'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  final selected = <Map<String, dynamic>>[];
-                  for (int i = 0; i < articles.length; i++) {
-                    if (selectedArticles[i]) {
-                      selected.add(articles[i]);
-                    }
-                  }
-                  
-                  Navigator.pop(context);
-                  
-                  if (selected.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('No articles selected')),
-                    );
-                    return;
-                  }
-                  
-                  _processSelectedArticles(selected, newsletterId);
-                },
-                child: Text('Add Selected (${selectedArticles.where((s) => s).length})'),
-              ),
-            ],
           );
         },
       ),
@@ -2057,6 +2283,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               }).toList();
             },
+          ),
+          IconButton(
+            icon: Icon(Icons.add),
+            onPressed: _showNewsletterUrlDialog,
+            tooltip: 'Process Newsletter URL',
           ),
           IconButton(
             icon: Icon(Icons.refresh),
@@ -2298,14 +2529,201 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.play_arrow, color: Colors.white, size: 24),
             onPressed: () {
               DebugLogHelper.addDebugLog('NEWSLETTER_CARD: Play button pressed for newsletter: $name (ID: $newsletterId)');
-              _processNewsletter(newsletterId, name);
+              _processNewsletterWithUrl(url, newsletterId, name);
             },
           ),
         ),
         onTap: () {
           DebugLogHelper.addDebugLog('NEWSLETTER_CARD: Card tapped for newsletter: $name (ID: $newsletterId)');
-          _processNewsletter(newsletterId, name);
+          _processNewsletterWithUrl(url, newsletterId, name);
         },
+      ),
+    );
+  }
+  
+  Widget _buildSubscriptionArticleTile(Map<String, dynamic> article, String title, String author, String date, String articleType, String subscriptionDomain) {
+    return ListTile(
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: Colors.orange.shade100,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.orange.shade300),
+        ),
+        child: Icon(Icons.lock, color: Colors.orange.shade700, size: 20),
+      ),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.orange,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'SUBSCRIPTION REQUIRED',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 4),
+          Text(
+            title,
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                decoration: BoxDecoration(
+                  color: _getTypeColor(articleType),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  articleType,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'By: $author',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
+              ),
+            ],
+          ),
+          Text(
+            'Domain: $subscriptionDomain',
+            style: TextStyle(fontSize: 12, color: Colors.orange.shade700, fontWeight: FontWeight.w500),
+          ),
+          Text(
+            'Date: $date',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+          ),
+        ],
+      ),
+      trailing: ElevatedButton(
+        onPressed: () => _showCredentialDialog(article, subscriptionDomain, title),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.orange,
+          foregroundColor: Colors.white,
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        ),
+        child: Text(
+          'Enter\nCredentials',
+          style: TextStyle(fontSize: 10),
+          textAlign: TextAlign.center,
+        ),
+      ),
+      dense: true,
+    );
+  }
+  
+  void _showCredentialDialog(Map<String, dynamic> article, String domain, String title) {
+    showDialog(
+      context: context,
+      builder: (context) => SubscriptionCredentialDialog(
+        articleId: article['article_id'] ?? '',
+        domain: domain,
+        articleTitle: title,
+        onSuccess: () {
+          // Optionally refresh the newsletter list or show success message
+        },
+      ),
+    );
+  }
+  
+  void _showNewsletterUrlDialog() {
+    final TextEditingController controller = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Process Newsletter URL'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                hintText: 'https://mailchi.mp/bostonglobe/...',
+                labelText: 'Newsletter URL',
+                helperText: 'Enter the full newsletter URL to process',
+              ),
+              maxLines: 3,
+              autofocus: true,
+            ),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info, color: Colors.blue.shade600, size: 16),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'This will process the newsletter and generate encryption keys for subscription articles.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.blue.shade700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final url = controller.text.trim();
+              if (url.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Please enter a newsletter URL'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+              
+              Navigator.pop(context);
+              await _processNewsletterUrl(url);
+            },
+            child: Text('Process'),
+          ),
+        ],
       ),
     );
   }

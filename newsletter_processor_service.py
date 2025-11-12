@@ -17,9 +17,19 @@ import time
 import json
 from apple_podcasts_processor import process_apple_podcasts_url
 from spotify_processor import process_spotify_url
+from subscription_detector import SubscriptionDetector
+from dh_service_simple import (
+    generate_server_keypair, store_server_private_key, 
+    calculate_shared_secret, derive_aes_key, store_device_aes_key,
+    get_server_private_key_by_newsletter, decrypt_credentials_with_mobile_key,
+    get_newsletter_id_from_article
+)
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
+
+# Initialize subscription detector
+subscription_detector = SubscriptionDetector()
 
 # Database connection
 def get_db_connection():
@@ -292,9 +302,10 @@ def get_articles_by_newsletter_id():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Get articles with audio for this specific newsletter
+        # Get articles with audio for this specific newsletter (including subscription info)
         cursor.execute("""
-            SELECT ar.article_id, ar.request_string, ar.url, ar.created_at, ar.status, ar.article_type
+            SELECT ar.article_id, ar.request_string, ar.url, ar.created_at, ar.status, ar.article_type,
+                   ar.subscription_required, ar.subscription_domain
             FROM article_requests ar
             JOIN newsletters_article_link nal ON ar.article_id = nal.article_requests_id
             JOIN news_audios na ON ar.article_id = na.article_id
@@ -304,7 +315,7 @@ def get_articles_by_newsletter_id():
         
         articles = []
         for row in cursor.fetchall():
-            article_id, title, url, created_at, status, article_type = row
+            article_id, title, url, created_at, status, article_type, subscription_required, subscription_domain = row
             
             # Extract author from title if available
             author = 'Unknown Author'
@@ -334,16 +345,54 @@ def get_articles_by_newsletter_id():
                 'date': formatted_date,
                 'url': url,
                 'status': status,
-                'article_type': article_type or 'Others'
+                'article_type': article_type or 'Others',
+                'subscription_required': subscription_required or False,
+                'subscription_domain': subscription_domain
             })
         
         cursor.close()
         conn.close()
         
-        return jsonify({
+        # Generate or use existing server public key based on two conditions
+        server_public_key = None
+        has_subscription_articles = any(article.get('subscription_required') for article in articles)
+        
+        if has_subscription_articles:
+            try:
+                from dh_service_simple import get_server_private_key_by_newsletter, generate_server_keypair, store_server_private_key, DH_GENERATOR, DH_PRIME
+                
+                # Check if server key already exists
+                existing_key = get_server_private_key_by_newsletter(newsletter_id)
+                
+                if existing_key:
+                    # Use existing server key
+                    server_public_key_int = pow(DH_GENERATOR, existing_key, DH_PRIME)
+                    server_public_key = hex(server_public_key_int)
+                    
+                    logging.info(f"Using existing server key for newsletter {newsletter_id}")
+                else:
+                    # BOTH conditions met: subscription required AND no keys exist - GENERATE NEW
+                    server_private_key, server_public_key_int = generate_server_keypair()
+                    store_server_private_key(newsletter_id, server_private_key)
+                    server_public_key = hex(server_public_key_int)
+                    
+                    logging.info(f"Generated new server key for newsletter {newsletter_id}")
+                    
+            except Exception as e:
+                logging.error(f"Error with server key for newsletter {newsletter_id}: {e}")
+        else:
+            logging.info(f"No subscription articles found for newsletter {newsletter_id}, no key needed")
+        
+        response_data = {
             "status": "success",
             "articles": articles
-        })
+        }
+        
+        # Include server public key if generated
+        if server_public_key:
+            response_data["server_public_key"] = server_public_key
+        
+        return jsonify(response_data)
         
     except Exception as e:
         logging.error(f"Error getting articles by newsletter ID: {e}")
@@ -775,9 +824,7 @@ def process_newsletter():
                     'date': datetime.now(),
                     'is_main_article': True
                 })
-                logging.info(f"🔍 DEBUG: Added MAIN newsletter article: '{clean_title}' ({len(main_content)} chars)")
-                logging.info(f"🔍 DEBUG: Main article content preview: {main_content[:200]}...")
-                logging.info(f"🔍 DEBUG: Main article will be processed as article with is_main_article=True")
+                logging.info(f"Added main newsletter article: '{clean_title}' ({len(main_content)} chars)")
             else:
                 logging.warning(f"Main newsletter content insufficient: {len(main_content) if main_content else 0} chars")
                 
@@ -834,7 +881,9 @@ def process_newsletter():
         logging.info(f"Processing {len(article_urls)} articles")
         
         articles_created = 0
+        articles_requiring_subscription = 0
         failed_articles = []
+        device_encryption_key = None
         
         for i, article in enumerate(article_urls, 1):
             # Use separate connection for each article to prevent transaction cascade failures
@@ -1078,6 +1127,20 @@ def process_newsletter():
                             failed_articles.append({"url": article['url'], "error": f"Processing failed: {str(e)[:50]}"})
                             continue
                 
+                # SUBSCRIPTION DETECTION - Stage 1
+                is_subscription_required = False
+                subscription_domain = None
+                
+                try:
+                    is_subscription_required, subscription_domain = subscription_detector.detect_subscription_requirement(
+                        article['url'], article_content
+                    )
+                    if is_subscription_required:
+                        articles_requiring_subscription += 1
+                        logging.info(f"Subscription required detected for {subscription_domain}")
+                except Exception as e:
+                    logging.error(f"Subscription detection error: {e}")
+                
                 # ENHANCED Content validation with detailed logging
                 content_length = len(article_content) if article_content else 0
                 logging.info(f"Content validation: {content_length} bytes (minimum: 100)")
@@ -1146,11 +1209,11 @@ def process_newsletter():
                         result = orchestrator_response.json()
                         article_id = result['article_id']
                         
-                        # Update with original URL (preserve episode parameters) and link to newsletter
+                        # Update with original URL and subscription info, then link to newsletter
                         try:
                             article_cursor.execute(
-                                "UPDATE article_requests SET url = %s WHERE article_id = %s",
-                                (article['url'], article_id)
+                                "UPDATE article_requests SET url = %s, subscription_required = %s, subscription_domain = %s WHERE article_id = %s",
+                                (article['url'], is_subscription_required, subscription_domain, article_id)
                             )
                             article_cursor.execute(
                                 "INSERT INTO newsletters_article_link (newsletters_id, article_requests_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
@@ -1242,6 +1305,24 @@ def process_newsletter():
                 "failed_articles": failed_articles[:3]
             })
         
+        # Generate Diffie-Hellman server key pair for secure key exchange (Stage 1)
+        server_public_key = None
+        if articles_created > 0 and user_id:
+            try:
+                # Generate server DH key pair
+                server_private_key, server_public_key_int = generate_server_keypair()
+                
+                # Store server private key for this newsletter session
+                store_server_private_key(newsletter_id, server_private_key)
+                
+                # Convert to hex for transmission
+                server_public_key = hex(server_public_key_int)
+                
+                logging.info(f"Generated DH server key pair for newsletter {newsletter_id}")
+                
+            except Exception as e:
+                logging.error(f"Error generating DH server key pair: {e}")
+        
         # Main connection commit and cleanup
         conn.commit()
         cursor.close()
@@ -1254,15 +1335,24 @@ def process_newsletter():
         if failed_articles:
             logging.info(f"Failed articles summary: {[f['error'] for f in failed_articles[:5]]}")
         
-        return jsonify({
+        # Build response with subscription information (Stage 1)
+        response_data = {
             "status": "success",
             "newsletter_id": newsletter_id,
             "articles_found": len(article_urls),
             "articles_created": articles_created,
+            "articles_requiring_subscription": articles_requiring_subscription,
             "articles_failed": len(failed_articles),
             "failed_articles": failed_articles[:3],
-            "message": f"Newsletter processed: {articles_created}/{len(article_urls)} articles created"
-        })
+            "message": f"Newsletter processed: {articles_created} articles created, {articles_requiring_subscription} require subscription"
+        }
+        
+        # Include server public key for DH key exchange if available
+        if server_public_key:
+            response_data["server_public_key"] = server_public_key
+
+        
+        return jsonify(response_data)
         
     except Exception as e:
         logging.error(f"Error processing newsletter: {e}")
@@ -1270,6 +1360,223 @@ def process_newsletter():
             "status": "error",
             "message": f"Processing failed: {str(e)}",
             "error_type": "general_error"
+        }), 500
+
+@app.route('/submit_credentials', methods=['POST'])
+def submit_credentials():
+    """Submit encrypted credentials using mobile public key for DH decryption"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields per protocol
+        required_fields = ['article_id', 'device_id', 'mobile_public_key', 'encrypted_username', 'encrypted_password', 'domain']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({
+                    "status": "error",
+                    "message": f"Missing required field: {field}"
+                }), 400
+        
+        article_id = data['article_id']
+        device_id = data['device_id']
+        mobile_public_key = data['mobile_public_key']
+        encrypted_username = data['encrypted_username']
+        encrypted_password = data['encrypted_password']
+        domain = data['domain']
+        
+        logging.info(f"Receiving credentials for article {article_id} from device {device_id} for domain {domain}")
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Verify article exists and requires subscription
+        cursor.execute("""
+            SELECT subscription_required, subscription_domain, request_string 
+            FROM article_requests 
+            WHERE article_id = %s
+        """, (article_id,))
+        
+        article_info = cursor.fetchone()
+        if not article_info:
+            cursor.close()
+            conn.close()
+            return jsonify({
+                "status": "error",
+                "message": "Article not found"
+            }), 404
+        
+        subscription_required, subscription_domain, article_title = article_info
+        
+        if not subscription_required:
+            cursor.close()
+            conn.close()
+            return jsonify({
+                "status": "error",
+                "message": "Article does not require subscription"
+            }), 400
+        
+        # Get newsletter_id for this article to find server private key
+        newsletter_id = get_newsletter_id_from_article(article_id)
+        if not newsletter_id:
+            cursor.close()
+            conn.close()
+            return jsonify({
+                "status": "error",
+                "message": "Cannot find newsletter for this article"
+            }), 400
+        
+        # Test decryption with mobile public key (verify protocol works)
+        try:
+            decryption_result = decrypt_credentials_with_mobile_key(
+                newsletter_id, mobile_public_key, encrypted_username, encrypted_password
+            )
+            logging.info(f"Decryption test successful: AES key derived {decryption_result['aes_key'][:16]}...")
+        except Exception as e:
+            cursor.close()
+            conn.close()
+            return jsonify({
+                "status": "error",
+                "message": f"Decryption failed: {str(e)}"
+            }), 400
+        
+        # Decrypt credentials immediately and store decrypted values
+        decryption_result = decrypt_credentials_with_mobile_key(
+            newsletter_id, mobile_public_key, encrypted_username, encrypted_password
+        )
+        
+        if not decryption_result.get('success'):
+            cursor.close()
+            conn.close()
+            return jsonify({
+                "status": "error",
+                "message": f"Decryption failed: {decryption_result.get('error', 'Unknown error')}"
+            }), 400
+        
+        # Store decrypted credentials (overwrite existing for same device/domain)
+        cursor.execute("""
+            INSERT INTO user_subscription_credentials 
+            (device_id, article_id, domain, decrypted_username, decrypted_password)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (device_id, domain) 
+            DO UPDATE SET 
+                article_id = EXCLUDED.article_id,
+                decrypted_username = EXCLUDED.decrypted_username,
+                decrypted_password = EXCLUDED.decrypted_password,
+                created_at = NOW()
+        """, (device_id, article_id, domain, decryption_result['username'], decryption_result['password']))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        logging.info(f"Credentials stored successfully for article {article_id}, domain {domain}")
+        
+        return jsonify({
+            "status": "success",
+            "message": f"Credentials submitted successfully for {domain}",
+            "article_id": article_id,
+            "article_title": article_title,
+            "subscription_domain": domain,
+            "newsletter_id": newsletter_id
+        })
+        
+    except Exception as e:
+        logging.error(f"Error submitting credentials: {e}")
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to submit credentials: {str(e)}"
+        }), 500
+
+@app.route('/decrypt_credentials', methods=['POST'])
+def decrypt_credentials_endpoint():
+    """Decrypt stored credentials using mobile public key (for testing/verification)"""
+    try:
+        data = request.get_json()
+        device_id = data.get('device_id')
+        
+        if not device_id:
+            return jsonify({
+                "status": "error",
+                "message": "Missing device_id"
+            }), 400
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get stored credentials for this device with mobile public key
+        cursor.execute("""
+            SELECT article_id, domain, mobile_public_key, encrypted_username, encrypted_password
+            FROM user_subscription_credentials 
+            WHERE device_id = %s
+            ORDER BY created_at DESC
+        """, (device_id,))
+        
+        credentials = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        if not credentials:
+            return jsonify({
+                "status": "error",
+                "message": "No credentials found for device"
+            }), 404
+        
+        decrypted_credentials = []
+        
+        for article_id, domain, mobile_public_key, enc_username, enc_password in credentials:
+            try:
+                # Get newsletter_id for this article
+                newsletter_id = get_newsletter_id_from_article(article_id)
+                if not newsletter_id:
+                    decrypted_credentials.append({
+                        "domain": domain,
+                        "article_id": article_id,
+                        "error": "Newsletter not found for article"
+                    })
+                    continue
+                
+                # Test decryption with mobile public key
+                decryption_result = decrypt_credentials_with_mobile_key(
+                    newsletter_id, mobile_public_key, enc_username, enc_password
+                )
+                
+                if decryption_result.get('success'):
+                    decrypted_credentials.append({
+                        "domain": domain,
+                        "article_id": article_id,
+                        "newsletter_id": newsletter_id,
+                        "username": decryption_result['username'],
+                        "password": decryption_result['password'],
+                        "aes_key_derived": decryption_result['aes_key'][:16] + "...",
+                        "status": "success"
+                    })
+                else:
+                    decrypted_credentials.append({
+                        "domain": domain,
+                        "article_id": article_id,
+                        "newsletter_id": newsletter_id,
+                        "error": decryption_result.get('error', 'Unknown error'),
+                        "aes_key_derived": decryption_result.get('aes_key', 'N/A')[:16] + "..."
+                    })
+                
+            except Exception as e:
+                decrypted_credentials.append({
+                    "domain": domain,
+                    "article_id": article_id,
+                    "error": f"Decryption failed: {str(e)}"
+                })
+        
+        return jsonify({
+            "status": "success",
+            "device_id": device_id,
+            "credentials": decrypted_credentials
+        })
+        
+    except Exception as e:
+        logging.error(f"Error decrypting credentials: {e}")
+        return jsonify({
+            "status": "error",
+            "message": f"Decryption failed: {str(e)}"
         }), 500
 
 if __name__ == '__main__':
