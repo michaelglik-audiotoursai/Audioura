@@ -490,8 +490,8 @@ Once pattern identified:
 - ✅ `browser_automation.py` - Full HTML extraction function
 - ✅ `newsletter_processor_service.py` - Enhanced Quora content extraction
 
-**Last Updated**: 2025-11-12 - ENCRYPTION/DECRYPTION DEBUGGING IN PROGRESS 🔧
-**Status**: 🔧 **DEBUGGING ENCRYPTION COMPATIBILITY** - Mobile app implementation verified, services decryption needs fixing
+**Last Updated**: 2025-11-13 - PHASE 2 DEPLOYED, BOSTON GLOBE AUTHENTICATION NEEDED ⚠️
+**Status**: 🔧 **CRITICAL PRIORITY: Complex Authentication System for Boston Globe**
 
 ## 🚀 **POST-COMPACTION RECOVERY CONTEXT**
 **If chat history is compacted, read @remind_ai.md and this file to continue development**
@@ -586,45 +586,79 @@ POST /submit_credentials
 - **Testing framework**: Complete test library with 100% system health verification
 - **Key files**: `dh_service_simple.py`, `newsletter_processor_service.py`, `subscription_detector.py`
 
-### **CURRENT DEBUGGING STATUS - ENCRYPTION/DECRYPTION COMPATIBILITY**
-**Date**: 2025-11-12
-**Issue**: Services getting "Invalid username padding: 225" error when decrypting mobile app credentials
-**Root Cause**: Mobile app and services calculating different shared secrets or AES keys
-**Mobile App Status**: ✅ Implementation verified 100% correct per MOBILE_ENCRYPTION_RESPONSE_TO_SERVICES.md
-**Services Status**: 🔧 AES decryption implemented but key derivation mismatch
+### 🔧 **PHASE 2 SUBSCRIPTION ENHANCEMENT - BOSTON GLOBE AUTHENTICATION CRITICAL**
+**Date**: 2025-11-13
+**Status**: ⚠️ **BLOCKED: Complex Authentication System Required**
+**Issue**: Browser automation cannot handle Boston Globe's JavaScript-heavy login system
+**Priority**: CRITICAL - Premium content extraction depends on working authentication
 
-#### **CONFIRMED TEST DATA**
-- **Newsletter Used**: 169 (confirmed from logs, not 174)
-- **Server Public Key Sent**: `581efd62213962de713420d12794ae421bf9e2fe0830584a3284199cbadbec06a0e9986f2530390e9f1da771548a6fbdd0028e434b6430b224fdbb6fe0983a904a3e7ae74a3440a2db097ae097a784b91eed5e30b63214a4885577847f000623de317827481bdd43a8ee9dcc3dab04820782c85fad656b9624b821ae2e6e7c39621b592873e3b796eb2d52c6869fe40672c3a7f556cce80f4c96c798962eab0cfade6d5cc956d4d54225e7776c23f46ccd1e5426b7079ad4ae046c1a945d20a6eb525225cfff9b29c3f88ef2480b9f5de93a793b4c438e391029756db384a687467023eb97ccf837674756e37911d7974acf733c29144bac7e58b1c67a91c510`
-- **Mobile Public Key**: `6249147f629130e026ab6732ba525088d15564df5e6e1b262d0fe1fe0899341e11472d92ca4db8e7d1ce89f367a41e0f2fed2d8f481d750a129dc80c2f630b6f409333ede85d667ec581cf0d5a9f3e3b9a9c8dc708ec522ee2176f79cb0e53b6255281f8de761f282fa11e0ad91d35bd39ec1afa0f63cf1cdf55f7cc765f4c1ef163f7c187f5d731f65440635129dbef204a609d345fbd5efd4642d9f54756dc52df18d9a204a197f9877699efbd3419c95ad59e8cd1ed423d5d6736d7ceca88e6382558effa6180f1182568252307a15943af05bd9a98c1a916aa744a71a6ffe950d091ce7a0aaa98a16edb3314b19dd18f2a584f7eb397eeba4c245c291293`
-- **Encrypted Username**: `JhTbwH1+aAY+KYo2878Yo2e0n9Uhrt2LHfY/98c6RW55VpeQl6YjNJF65GDAWtHW`
-- **Encrypted Password**: `9kXyhBG0Nu6zZqE7DCgeJj9IIvYDwFPYMM5KtrTdOnE=`
-- **Server Private Key**: Newsletter 169: `1855699527122823605301096117990787629509201203106440200973732878362536081808`
+#### **COMPREHENSIVE VERIFICATION RESULTS**
+**Test 1 - Newsletter 169 (Existing Newsletter)**:
+- ✅ **Credentials Decrypted**: `glikfamily@gmail.com` / `Eight2Four`
+- ✅ **Fresh Mobile Session**: Different mobile public key per session
+- ✅ **Successful Storage**: Decrypted credentials stored in database
 
-#### **SERVICES CALCULATION RESULTS**
-- **Shared Secret**: `3762477069636953956559424100898320143859022925256195687386863078032361213008173244107944089943861176552806558425157514172569702072656212561349421261158103160273454504594177832185503414414971059251643814484175013393715545539661384786630028762451668816276540801546905413807694713643885293003863423320100614142340260595739978424638664522636049724119099413911233436862543951251175395364748637752258192104549537639221205360987260316478232551110065836309596830702310726996511206773538895083194928687959931073052527669247996814657638444833775842280370249845984079412173120928606400366783709916329545429272059107987278601649`
-- **Shared Secret Bytes**: `1dcdf79c437021405a0b26e87c2a2e5061510fa584990c5f582ad144fe040f4c65d2a8b2c7f34d29534aba507ea1e214bab9f89a3f8c5da4bb2c6a8feae9f8f6807e824b6e538cc6a93b00b834cff7ae50ac7dd3d6585f0b62d60d7df4edfef329d81fd469dd11e6b41be62d7dd8cb6ce2f0f9576961ffb5f9017cfc11a4ca2492c974512f3a84f178cabf6d16ea55d5a2bda096e9a0e557a2df29cca13bcd9d0fd5632a88bf18c5706e19028914cde557e36aab145d6fd5a85baec67b47a4b50a88990a7b6e247f14cf387aaafa7c311d496364ca2fdb09d3e479e2dfa8af09fa24dda8186ab7d25bbdd228ba4d23b5367cc3fe7532dc0257dfffd78e811db1`
-- **AES Key**: `dde7c33d9b5887b44f414df7ab3db3e1`
-- **Decryption Result**: Invalid padding (225) - indicates wrong AES key
+**Test 2 - Newsletter 169 (Different Credentials)**:
+- ✅ **Credentials Decrypted**: `michael.glik@iname.com` / `abra-kadabra7`
+- ✅ **Credential Overwrite**: Same device/domain updated existing record
+- ✅ **Different AES Key**: New encryption context (`8c27c9e4458ca3a7...`)
 
-#### **CRITICAL DEBUGGING NEEDED**
-Mobile App Amazon-Q must provide exact values for comparison:
-1. **Shared Secret** (decimal) calculated by mobile app
-2. **Shared Secret Bytes** (hex) from _bigIntToFullBytes method
-3. **AES Key** (hex) from SHA-256 first 16 bytes
-4. **Original plaintext** username and password for verification
+**Test 3 - Newsletter 176 (New MailChimp Newsletter)**:
+- ✅ **Credentials Decrypted**: `kapusta@yahoo.com` / `soup8kusniy`
+- ✅ **Fresh Server Keys**: New DH key pair generated for new newsletter
+- ✅ **Cross-Newsletter Independence**: Different server keys per newsletter
+- ✅ **Different AES Key**: New encryption context (`33a8cc851dbb0eed...`)
 
-#### **SERVICES IMPLEMENTATION STATUS**
-- ✅ **AES Decryption**: Implemented with cryptography library
-- ✅ **PKCS7 Padding**: Proper removal implemented
-- ✅ **Base64 Decoding**: IV + ciphertext extraction working
-- ❌ **Key Derivation**: Mismatch with mobile app calculation
+#### **ARCHITECTURE VERIFIED**
+- ✅ **Newsletter Server Keys**: Stored in database by newsletter_id
+- ✅ **Mobile Public Keys**: Ephemeral, sent with each request (not stored)
+- ✅ **Immediate Decryption**: Credentials decrypted upon receipt
+- ✅ **Secure Storage**: Only decrypted credentials stored in database
+- ✅ **Perfect Forward Secrecy**: Fresh mobile key pairs each session
 
-#### **NEXT STEPS**
-1. Mobile App Amazon-Q provides exact calculation values
-2. Compare shared secret calculation step-by-step
-3. Identify where mobile/services calculations diverge
-4. Fix services implementation to match mobile exactly
+#### **SECURITY IMPLEMENTATION COMPLETE**
+- ✅ **RFC 3526 Group 14**: 2048-bit Diffie-Hellman parameters
+- ✅ **AES-128-CBC**: Proper encryption with PKCS7 padding
+- ✅ **SHA-256 Key Derivation**: Full entropy AES key generation
+- ✅ **Mobile Public Key Protocol**: Hex format without 0x prefix
+- ✅ **Newsletter-Based Sessions**: Server keys stored by newsletter_id
+
+#### **STAGE 1 APIS COMPLETE**
+```bash
+# Newsletter processing (returns server public key for DH)
+POST /process_newsletter
+# Response includes: "server_public_key": "16f719e9af3f7f82a05f..."
+
+# Article list (includes subscription fields)
+POST /get_articles_by_newsletter_id
+# Response includes: "subscription_required": true, "subscription_domain": "bostonglobe.com"
+
+# Credential submission (mobile public key + encrypted data)
+POST /submit_credentials
+# Decrypts immediately and stores decrypted credentials
+```
+
+#### **DATABASE SCHEMA COMPLETE**
+- ✅ **newsletter_server_keys**: Server DH key pairs by newsletter_id
+- ✅ **user_subscription_credentials**: Decrypted credentials by device_id/domain
+- ✅ **article_requests**: subscription_required and subscription_domain fields
+
+#### **CRITICAL BLOCKER IDENTIFIED**
+**File**: `BOSTON_GLOBE_AUTHENTICATION_CRITICAL.md` - Complete analysis and solution plan
+
+**Immediate Action Required**:
+1. **Enhanced Browser Automation**: Implement JavaScript-aware authentication
+2. **Third-Party Auth Handling**: Navigate auth.bostonglobe.com authentication flow  
+3. **Anti-Bot Evasion**: Enhanced stealth techniques for complex login systems
+4. **Premium Content Extraction**: Extract subscription articles after successful login
+
+**Test Credentials Available**: `glikfamily@gmail.com` / `Eight2Four`
+**User Assistance**: Available for real browser testing and verification
+
+**Phase 2 Status**:
+- ✅ **Core Infrastructure**: Subscription detection, credential storage, smart delivery working
+- ❌ **Authentication**: Boston Globe login system blocks browser automation
+- ❌ **Premium Content**: Cannot extract subscription articles despite valid credentials
 
 ### 🎯 **COMPREHENSIVE TEST LIBRARY ACHIEVEMENT**
 **Date**: 2025-11-07
