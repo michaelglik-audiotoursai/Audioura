@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.testing
+    container_name: test-runner-1
+    ports:
+      - "5099:5099"
+    volumes:
+      - .:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - PYTHONPATH=/app
+      - DATABASE_URL=postgresql://admin:password@development-postgres-2-1:5432/audiotours
+    networks:
+      - development_default
+    depends_on:
+      - development-postgres-2-1
+    command: python3 -m pytest tests/ -v --tb=short
+
+networks:
+  development_default:
+    external: true
