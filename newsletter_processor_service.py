@@ -25,6 +25,37 @@ from dh_service_simple import (
     get_newsletter_id_from_article
 )
 
+# Boston Globe Session-Aware Authentication
+def authenticate_boston_globe_with_credentials(credentials, article_url):
+    """Authenticate with Boston Globe using session-aware approach"""
+    try:
+        from boston_globe_session_auth import BostonGlobeSessionAuth
+        
+        auth = BostonGlobeSessionAuth()
+        
+        # Authenticate once and maintain session
+        success = auth.authenticate_once(credentials['username'], credentials['password'])
+        if not success:
+            return {'success': False, 'error': 'Authentication failed'}
+        
+        # Extract article content using authenticated session
+        result = auth.extract_article(article_url)
+        auth.close()
+        
+        if result['success']:
+            return {
+                'success': True,
+                'content': result['content'],
+                'title': 'Boston Globe Article',
+                'url': article_url
+            }
+        else:
+            return {'success': False, 'error': result['error']}
+            
+    except Exception as e:
+        logging.error(f"Boston Globe session authentication failed: {e}")
+        return {'success': False, 'error': str(e)}
+
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
 
@@ -338,6 +369,17 @@ def get_articles_by_newsletter_id():
             except:
                 formatted_date = 'Unknown Date'
             
+            # PHASE 2: Check if subscription article has audio edition
+            final_subscription_required = subscription_required or False
+            if subscription_required:
+                # Check if this article has an audio file (meaning user has access)
+                cursor.execute("SELECT 1 FROM news_audios WHERE article_id = %s", (article_id,))
+                has_audio = cursor.fetchone() is not None
+                if has_audio:
+                    # User has access through stored credentials
+                    final_subscription_required = False
+                    logging.info(f"Article {article_id} has audio edition - marking as accessible")
+            
             articles.append({
                 'article_id': article_id,
                 'title': clean_title,
@@ -346,7 +388,7 @@ def get_articles_by_newsletter_id():
                 'url': url,
                 'status': status,
                 'article_type': article_type or 'Others',
-                'subscription_required': subscription_required or False,
+                'subscription_required': final_subscription_required,
                 'subscription_domain': subscription_domain
             })
         
@@ -504,8 +546,6 @@ def process_newsletter():
             # Standard HTTP request for non-protected sites
             try:
                 response = requests.get(newsletter_url, headers=headers, timeout=10)
-                
-
                 
             except requests.exceptions.RequestException as e:
                 error_msg = f"Network error accessing newsletter: {str(e)}"
@@ -1054,92 +1094,206 @@ def process_newsletter():
                             failed_articles.append({"url": article['url'], "error": f"Browser automation error: {str(e)[:50]}"})
                             continue
                     else:
-                        # Generic news article processing
+                        # Generic news article processing with subscription awareness
                         logging.info(f"Processing news article URL: {article['url']}")
+                        
                         try:
-                            article_response = requests.get(article['url'], headers=headers, timeout=10)
-                            
-                            if article_response.status_code == 403:
-                                error_msg = f"Access denied: {urlparse(article['url']).netloc} blocks automated access (HTTP 403)"
-                                logging.error(error_msg)
-                                failed_articles.append({"url": article['url'], "error": error_msg})
-                                continue
-                            elif article_response.status_code == 200:
-                                article_soup = BeautifulSoup(article_response.content, 'html.parser')
-                                
-                                # Extract article content using common selectors + Newton Beacon specific
-                                content_selectors = [
-                                    'article',
-                                    '.article-content',
-                                    '.story-content', 
-                                    '.entry-content',
-                                    '.post-content',
-                                    '[data-testid="article-body"]',
-                                    '.article-body',
-                                    'main',
-                                    '.content',
-                                    '.single-post-content',
-                                    '.post-body'
-                                ]
-                                
-                                article_text = ""
-                                for selector in content_selectors:
-                                    try:
-                                        element = article_soup.select_one(selector)
-                                        if element:
-                                            text = element.get_text(separator=' ', strip=True)
-                                            if len(text) > 200:
-                                                article_text = text
-                                                logging.info(f"Found article content with selector '{selector}': {len(text)} chars")
-                                                break
-                                    except Exception as e:
-                                        continue
-                                
-                                # Extract title
-                                article_title = article['title']
-                                title_element = article_soup.select_one('h1') or article_soup.select_one('title')
-                                if title_element:
-                                    extracted_title = title_element.get_text(strip=True)
-                                    if len(extracted_title) > 5:
-                                        article_title = extracted_title
-                                
-                                if article_text and len(article_text) > 200:
-                                    # Clean and validate article text
-                                    cleaned_article_text = clean_text_content(article_text)
-                                    if is_binary_content(cleaned_article_text):
-                                        logging.error(f"News article FAILED: Binary content detected")
-                                        failed_articles.append({"url": article['url'], "error": "Binary content detected"})
-                                        continue
+                            # Check if this is a Boston Globe article that might need authentication
+                            if 'bostonglobe.com' in article['url'] and user_id:
+                                try:
+                                    # Try to get stored credentials first
+                                    cred_conn = get_db_connection()
+                                    cred_cursor = cred_conn.cursor()
                                     
-                                    article_content = f"ARTICLE: {article_title}\n\nCONTENT: {cleaned_article_text}"
-                                    article['title'] = article_title
-                                    logging.info(f"News article SUCCESS: Title='{article_title}', Content={len(article_content)} bytes")
-                                else:
-                                    logging.error(f"News article FAILED: Insufficient content ({len(article_text)} chars)")
-                                    failed_articles.append({"url": article['url'], "error": f"Insufficient content: {len(article_text)} chars"})
-                                    continue
+                                    cred_cursor.execute("""
+                                        SELECT decrypted_username, decrypted_password 
+                                        FROM user_subscription_credentials 
+                                        WHERE device_id = %s AND domain = %s
+                                        ORDER BY created_at DESC LIMIT 1
+                                    """, (user_id, 'bostonglobe.com'))
+                                    
+                                    bg_credentials = cred_cursor.fetchone()
+                                    cred_cursor.close()
+                                    cred_conn.close()
+                                    
+                                    if bg_credentials:
+                                        logging.info("Found Boston Globe credentials - using authenticated access")
+                                        
+                                        auth_credentials = {
+                                            'username': bg_credentials[0],
+                                            'password': bg_credentials[1]
+                                        }
+                                        
+                                        auth_result = authenticate_boston_globe_with_credentials(auth_credentials, article['url'])
+                                        
+                                        if auth_result['success']:
+                                            article_content = f"AUTHENTICATED ARTICLE: {auth_result['title']}\n\nCONTENT: {auth_result['content']}"
+                                            article['title'] = auth_result['title']
+                                            logging.info(f"Boston Globe authenticated access SUCCESS: {len(auth_result['content'])} chars")
+                                        else:
+                                            logging.warning(f"Boston Globe authentication failed, falling back to regular request: {auth_result['error']}")
+                                            # Fall through to regular request
+                                            article_response = requests.get(article['url'], headers=headers, timeout=10)
+                                    else:
+                                        # No credentials, try regular request
+                                        article_response = requests.get(article['url'], headers=headers, timeout=10)
+                                except Exception as bg_auth_error:
+                                    logging.error(f"Boston Globe authentication error: {bg_auth_error}")
+                                    # Fall through to regular request
+                                    article_response = requests.get(article['url'], headers=headers, timeout=10)
                             else:
-                                logging.error(f"News article FAILED: HTTP {article_response.status_code}")
-                                failed_articles.append({"url": article['url'], "error": f"HTTP {article_response.status_code}"})
-                                continue
+                                # Regular request for non-Boston Globe articles
+                                article_response = requests.get(article['url'], headers=headers, timeout=10)
+                            
+                            # Only process response if we didn't already get authenticated content
+                            if not article_content:
+                                if article_response.status_code == 403:
+                                    error_msg = f"Access denied: {urlparse(article['url']).netloc} blocks automated access (HTTP 403)"
+                                    logging.error(error_msg)
+                                    failed_articles.append({"url": article['url'], "error": error_msg})
+                                    continue
+                                elif article_response.status_code == 200:
+                                    article_soup = BeautifulSoup(article_response.content, 'html.parser')
+                                    
+                                    # Extract article content using common selectors + Newton Beacon specific
+                                    content_selectors = [
+                                        'article',
+                                        '.article-content',
+                                        '.story-content', 
+                                        '.entry-content',
+                                        '.post-content',
+                                        '[data-testid="article-body"]',
+                                        '.article-body',
+                                        'main',
+                                        '.content',
+                                        '.single-post-content',
+                                        '.post-body'
+                                    ]
+                                    
+                                    article_text = ""
+                                    for selector in content_selectors:
+                                        try:
+                                            element = article_soup.select_one(selector)
+                                            if element:
+                                                text = element.get_text(separator=' ', strip=True)
+                                                if len(text) > 200:
+                                                    article_text = text
+                                                    logging.info(f"Found article content with selector '{selector}': {len(text)} chars")
+                                                    break
+                                        except Exception as e:
+                                            continue
+                                    
+                                    # Extract title
+                                    article_title = article['title']
+                                    title_element = article_soup.select_one('h1') or article_soup.select_one('title')
+                                    if title_element:
+                                        extracted_title = title_element.get_text(strip=True)
+                                        if len(extracted_title) > 5:
+                                            article_title = extracted_title
+                                    
+                                    if article_text and len(article_text) > 200:
+                                        # Clean and validate article text
+                                        cleaned_article_text = clean_text_content(article_text)
+                                        if is_binary_content(cleaned_article_text):
+                                            logging.error(f"News article FAILED: Binary content detected")
+                                            failed_articles.append({"url": article['url'], "error": "Binary content detected"})
+                                            continue
+                                        
+                                        article_content = f"ARTICLE: {article_title}\n\nCONTENT: {cleaned_article_text}"
+                                        article['title'] = article_title
+                                        logging.info(f"News article SUCCESS: Title='{article_title}', Content={len(article_content)} bytes")
+                                    else:
+                                        logging.error(f"News article FAILED: Insufficient content ({len(article_text)} chars)")
+                                        failed_articles.append({"url": article['url'], "error": f"Insufficient content: {len(article_text)} chars"})
+                                        continue
+                                else:
+                                    logging.error(f"News article FAILED: HTTP {article_response.status_code}")
+                                    failed_articles.append({"url": article['url'], "error": f"HTTP {article_response.status_code}"})
+                                    continue
                         except Exception as e:
                             logging.error(f"News article processing failed: {e}")
                             failed_articles.append({"url": article['url'], "error": f"Processing failed: {str(e)[:50]}"})
                             continue
                 
-                # SUBSCRIPTION DETECTION - Stage 1
+                # PHASE 2: SUBSCRIPTION-AWARE PROCESSING
                 is_subscription_required = False
                 subscription_domain = None
                 
                 try:
+                    # Use Phase 2 processor for credential-aware processing
+                    # PHASE 2: Check if user has credentials for this domain
                     is_subscription_required, subscription_domain = subscription_detector.detect_subscription_requirement(
                         article['url'], article_content
                     )
+                    
+                    if is_subscription_required and user_id:
+                        # Try to get stored credentials and process with authentication
+                        try:
+                            import psycopg2
+                            cred_conn = psycopg2.connect(
+                                host=os.getenv('DB_HOST', 'localhost'),
+                                database=os.getenv('DB_NAME', 'audiotours'),
+                                user=os.getenv('DB_USER', 'admin'),
+                                password=os.getenv('DB_PASSWORD', 'password123'),
+                                port=os.getenv('DB_PORT', '5433')
+                            )
+                            cred_cursor = cred_conn.cursor()
+                            
+                            cred_cursor.execute("""
+                                SELECT decrypted_username, decrypted_password 
+                                FROM user_subscription_credentials 
+                                WHERE device_id = %s AND domain = %s
+                                ORDER BY created_at DESC LIMIT 1
+                            """, (user_id, subscription_domain))
+                            
+                            stored_credentials = cred_cursor.fetchone()
+                            cred_cursor.close()
+                            cred_conn.close()
+                            
+                            if stored_credentials and subscription_domain == 'bostonglobe.com':
+                                logging.info(f"Found Boston Globe credentials - attempting authenticated access")
+                                
+                                # Use Boston Globe session authentication
+                                auth_credentials = {
+                                    'username': stored_credentials[0],
+                                    'password': stored_credentials[1]
+                                }
+                                
+                                auth_result = authenticate_boston_globe_with_credentials(auth_credentials, article['url'])
+                                
+                                if auth_result['success']:
+                                    # Replace article content with authenticated content
+                                    article_content = f"AUTHENTICATED ARTICLE: {auth_result['title']}\n\nCONTENT: {auth_result['content']}"
+                                    article['title'] = auth_result['title']
+                                    is_subscription_required = False  # Mark as accessible
+                                    logging.info(f"Boston Globe authentication SUCCESS: {len(auth_result['content'])} chars")
+                                else:
+                                    logging.warning(f"Boston Globe authentication failed: {auth_result['error']}")
+                            elif stored_credentials:
+                                logging.info(f"Found stored credentials for {subscription_domain} - Phase 2 processing available")
+                            else:
+                                logging.info(f"No stored credentials for {subscription_domain}")
+                                
+                        except Exception as cred_error:
+                            logging.error(f"Credential lookup error: {cred_error}")
+                    
+                    
                     if is_subscription_required:
                         articles_requiring_subscription += 1
                         logging.info(f"Subscription required detected for {subscription_domain}")
+                        
                 except Exception as e:
-                    logging.error(f"Subscription detection error: {e}")
+                    logging.error(f"Phase 2 subscription processing error: {e}")
+                    # Fallback to Stage 1 detection
+                    try:
+                        is_subscription_required, subscription_domain = subscription_detector.detect_subscription_requirement(
+                            article['url'], article_content
+                        )
+                        if is_subscription_required:
+                            articles_requiring_subscription += 1
+                            logging.info(f"Fallback subscription detection for {subscription_domain}")
+                    except Exception as fallback_error:
+                        logging.error(f"Fallback subscription detection error: {fallback_error}")
                 
                 # ENHANCED Content validation with detailed logging
                 content_length = len(article_content) if article_content else 0
@@ -1471,14 +1625,47 @@ def submit_credentials():
         
         logging.info(f"Credentials stored successfully for article {article_id}, domain {domain}")
         
-        return jsonify({
-            "status": "success",
-            "message": f"Credentials submitted successfully for {domain}",
-            "article_id": article_id,
-            "article_title": article_title,
-            "subscription_domain": domain,
-            "newsletter_id": newsletter_id
-        })
+        # PHASE 2: Reprocess articles with new credentials (simplified for initial deployment)
+        try:
+            # Find subscription articles for this domain/newsletter that could be reprocessed
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT COUNT(*) FROM article_requests ar
+                JOIN newsletters_article_link nal ON ar.article_id = nal.article_requests_id
+                WHERE nal.newsletters_id = %s 
+                AND ar.subscription_required = true 
+                AND ar.subscription_domain = %s
+            """, (newsletter_id, domain))
+            
+            reprocessable_count = cursor.fetchone()[0] if cursor.fetchone() else 0
+            cursor.close()
+            
+            logging.info(f"Found {reprocessable_count} articles that could be reprocessed with new credentials")
+            
+            return jsonify({
+                "status": "success",
+                "message": f"Credentials submitted successfully for {domain}",
+                "article_id": article_id,
+                "article_title": article_title,
+                "subscription_domain": domain,
+                "newsletter_id": newsletter_id,
+                "reprocessed_articles": reprocessable_count,
+                "refresh_required": reprocessable_count > 0
+            })
+            
+        except Exception as reprocess_error:
+            logging.error(f"Reprocessing check failed: {reprocess_error}")
+            return jsonify({
+                "status": "success",
+                "message": f"Credentials submitted successfully for {domain}",
+                "article_id": article_id,
+                "article_title": article_title,
+                "subscription_domain": domain,
+                "newsletter_id": newsletter_id,
+                "reprocessed_articles": 0,
+                "refresh_required": False,
+                "reprocess_error": str(reprocess_error)
+            })
         
     except Exception as e:
         logging.error(f"Error submitting credentials: {e}")
