@@ -131,7 +131,59 @@ def download_news(article_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Get news article from database
+        # SECURITY FIX: Check if article requires subscription and validate credentials
+        cursor.execute("""
+            SELECT ar.subscription_required, ar.subscription_domain, ar.request_string
+            FROM article_requests ar
+            WHERE ar.article_id = %s
+        """, (article_id,))
+        
+        subscription_info = cursor.fetchone()
+        if not subscription_info:
+            cursor.close()
+            conn.close()
+            return jsonify({"error": "Article not found"}), 404
+        
+        subscription_required, subscription_domain, article_title = subscription_info
+        
+        # CRITICAL SECURITY CHECK: Validate subscription credentials if required
+        if subscription_required and subscription_domain:
+            # Get user_id from request parameters or headers
+            user_id = request.args.get('user_id') or request.headers.get('X-User-ID')
+            
+            if not user_id:
+                cursor.close()
+                conn.close()
+                logging.warning(f"SECURITY BLOCK: No user_id provided for subscription article {article_id}")
+                return jsonify({
+                    "error": "Subscription required",
+                    "message": f"This article requires a subscription to {subscription_domain}. Please provide credentials.",
+                    "subscription_domain": subscription_domain,
+                    "article_title": article_title
+                }), 403
+            
+            # Check if user has VERIFIED credentials for this domain
+            cursor.execute("""
+                SELECT 1 FROM user_subscription_credentials 
+                WHERE device_id = %s AND domain = %s AND verified_at IS NOT NULL
+            """, (user_id, subscription_domain))
+            
+            has_verified_credentials = cursor.fetchone() is not None
+            
+            if not has_verified_credentials:
+                cursor.close()
+                conn.close()
+                logging.warning(f"SECURITY BLOCK: User {user_id} has no verified credentials for {subscription_domain} - article {article_id}")
+                return jsonify({
+                    "error": "Subscription required",
+                    "message": f"This article requires verified credentials for {subscription_domain}. Please submit valid subscription credentials.",
+                    "subscription_domain": subscription_domain,
+                    "article_title": article_title
+                }), 403
+            
+            logging.info(f"SECURITY PASS: User {user_id} has verified credentials for {subscription_domain} - allowing access to article {article_id}")
+        
+        # Get news article from database (only after security validation)
         cursor.execute("""
             SELECT news_article, article_name, article_type 
             FROM news_audios 
@@ -140,6 +192,8 @@ def download_news(article_id):
         
         result = cursor.fetchone()
         if not result:
+            cursor.close()
+            conn.close()
             return jsonify({"error": "News article not found"}), 404
         
         news_article, article_name, article_type = result
@@ -148,7 +202,7 @@ def download_news(article_id):
         cursor.close()
         conn.close()
         
-        # Return ZIP file
+        # Return ZIP file (only after successful authorization)
         return send_file(
             io.BytesIO(news_article),
             mimetype='application/zip',
