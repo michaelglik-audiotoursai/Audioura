@@ -1,0 +1,209 @@
+Version 1.2.8+44
+[17:19:58] NEWSLETTER_CARD: Building card for newsletter: mailchi.mp (Newsletter)
+[17:19:58] NEWSLETTER_CARD: Newsletter ID: 189
+[17:19:58] NEWSLETTER_CARD: Full newsletter data: {"article_count":10,"created_at":"2025-11-18T02:40:53.262216","date":"November 18, 2025","name":"mailchi.mp (Newsletter)","newsletter_id":189,"type":"Newsletter","url":"https://mailchi.mp/bostonglobe.com/starting-point-harvard-under-pressure"}
+[17:19:58] NEWSLETTER_CARD: Building card for newsletter: mailchi.mp (Newsletter)
+[17:19:58] NEWSLETTER_CARD: Newsletter ID: 188
+[17:19:58] NEWSLETTER_CARD: Full newsletter data: {"article_count":10,"created_at":"2025-11-17T15:16:59.450751","date":"November 17, 2025","name":"mailchi.mp (Newsletter)","newsletter_id":188,"type":"Newsletter","url":"https://mailchi.mp/bostonglobe.com/starting-point-harvard-under-pressure"}
+[17:19:58] NEWSLETTER_CARD: Building card for newsletter: mailchi.mp Issue-is
+[17:19:58] NEWSLETTER_CARD: Newsletter ID: 187
+[17:19:58] NEWSLETTER_CARD: Full newsletter data: {"article_count":1,"created_at":"2025-11-14T16:31:42.698368","date":"November 14, 2025","name":"mailchi.mp Issue-is","newsletter_id":187,"type":"Newsletter","url":"https://mailchi.mp/bostonglobe.com/starting-point-trumps-epstein-issue-is-back"}
+[17:19:58] NEWSLETTER_CARD: Building card for newsletter: click.kit-mail6.com (Newsletter)
+[17:19:58] NEWSLETTER_CARD: Newsletter ID: 184
+[17:19:58] NEWSLETTER_CARD: Full newsletter data: {"article_count":1,"created_at":"2025-11-13T19:17:13.497458","date":"November 13, 2025","name":"click.kit-mail6.com (Newsletter)","newsletter_id":184,"type":"Newsletter","url":"https://click.kit-mail6.com/zlu5e07zw7u7ugp82oh6fwogmg00a6h35dnl/qvh8h7hr3ox962tg/aHR0cHM6Ly9kb3dubG9hZC5maWxla2l0Y2RuLmNvbS9kL2diaDFjZFl0M2I0cEJXenRDRmV2WmIvMllUaUVFdk50dlVmZGY2blNMbVQ5RA=="}
+[17:19:58] NEWSLETTER_CARD: Building card for newsletter: mailchi.mp Issue-is
+[17:19:58] NEWSLETTER_CARD: Newsletter ID: 183
+[17:19:58] NEWSLETTER_CARD: Full newsletter data: {"article_count":10,"created_at":"2025-11-13T17:54:44.762336","date":"November 13, 2025","name":"mailchi.mp Issue-is","newsletter_id":183,"type":"Newsletter","url":"https://mailchi.mp/bostonglobe.com/starting-point-trumps-epstein-issue-is-back"}
+[17:19:58] NEWSLETTER_CARD: Building card for newsletter: guyraz.substack.com (Newsletter)
+[17:19:58] NEWSLETTER_CARD: Newsletter ID: 182
+[17:19:58] NEWSLETTER_CARD: Full newsletter data: {"article_count":8,"created_at":"2025-11-13T17:34:13.446559","date":"November 13, 2025","name":"guyraz.substack.com (Newsletter)","newsletter_id":182,"type":"Newsletter","url":"https://guyraz.substack.com/p/10-lessons-from-chip-and-joanna-gaines"}
+[17:19:58] NEWSLETTER_CARD: Building card for newsletter: view.email.bostonglobe.com (Newsletter)
+[17:19:58] NEWSLETTER_CARD: Newsletter ID: 181
+[17:19:58] NEWSLETTER_CARD: Full newsletter data: {"article_count":4,"created_at":"2025-11-13T17:22:20.476889","date":"November 13, 2025","name":"view.email.bostonglobe.com (Newsletter)","newsletter_id":181,"type":"Newsletter","url":"https://view.email.bostonglobe.com/"}
+[17:19:58] NEWSLETTER_CARD: Building card for newsletter: mailchi.mp (Newsletter)
+[17:19:58] NEWSLETTER_CARD: Newsletter ID: 179
+[17:19:58] NEWSLETTER_CARD: Full newsletter data: {"article_count":6,"created_at":"2025-11-13T03:55:25.105491","date":"November 13, 2025","name":"mailchi.mp (Newsletter)","newsletter_id":179,"type":"Newsletter","url":"https://mailchi.mp/bostonglobe/trendlines-trumps-obesity-drug-deal-has-lots-of-unknowns?test_mode=1763006125"}
+[17:19:58] NEWSLETTER_CARD: Building card for newsletter: mailchi.mp (Newsletter)
+[17:19:58] NEWSLETTER_CARD: Newsletter ID: 178
+[17:19:58] NEWSLETTER_CARD: Full newsletter data: {"article_count":1,"created_at":"2025-11-13T03:51:47.540995","date":"November 13, 2025","name":"mailchi.mp (Newsletter)","newsletter_id":178,"type":"Newsletter","url":"https://mailchi.mp/bostonglobe/trendlines-trumps-obesity-drug-deal-has-lots-of-unknowns?test_mode=1763005907"}
+[17:19:58] NEWSLETTER_CARD: Building card for newsletter: mailchi.mp (Newsletter)
+[17:19:58] NEWSLETTER_CARD: Newsletter ID: 177
+[17:19:58] NEWSLETTER_CARD: Full newsletter data: {"article_count":1,"created_at":"2025-11-13T03:41:00.394347","date":"November 13, 2025","name":"mailchi.mp (Newsletter)","newsletter_id":177,"type":"Newsletter","url":"https://mailchi.mp/bostonglobe/trendlines-trumps-obesity-drug-deal-has-lots-of-unknowns?test_mode=1763005260"}
+[17:19:58] NEWSLETTER_CARD: Building card for newsletter: mailchi.mp (Newsletter)
+[17:19:58] NEWSLETTER_CARD: Newsletter ID: 176
+[17:19:58] NEWSLETTER_CARD: Full newsletter data: {"article_count":9,"created_at":"2025-11-12T05:06:26.973714","date":"November 12, 2025","name":"mailchi.mp (Newsletter)","newsletter_id":176,"type":"Newsletter","url":"https://mailchi.mp/bostonglobe.com/starting-point-a-tea-party-for-democrats"}
+[17:19:58] NEWSLETTER_CARD: Building card for newsletter: mailchi.mp (Newsletter)
+[17:19:58] NEWSLETTER_CARD: Newsletter ID: 175
+[17:19:58] NEWSLETTER_CARD: Full newsletter data: {"article_count":6,"created_at":"2025-11-12T03:29:00.485549","date":"November 12, 2025","name":"mailchi.mp (Newsletter)","newsletter_id":175,"type":"Newsletter","url":"https://mailchi.mp/bostonglobe/trendlines-trumps-obesity-drug-deal-has-lots-of-unknowns"}
+[17:20:03] NEWSLETTER_CARD: Play button pressed for newsletter: mailchi.mp (Newsletter) (ID: 188)
+[17:20:03] NEWSLETTER: Processing existing newsletter with URL workflow: https://mailchi.mp/bostonglobe.com/starting-point-harvard-under-pressure
+[17:20:03] NEWSLETTER: No encryption key found, processing newsletter URL to get key
+[17:20:03] NEWSLETTER: Making POST request to: http://192.168.0.217:5017/process_newsletter
+[17:20:03] NEWSLETTER: Starting _processNewsletter with ID: 188, Name: mailchi.mp (Newsletter)
+[17:20:03] NEWSLETTER: Using server IP: 192.168.0.217
+[17:20:03] NEWSLETTER: Making POST request to: http://192.168.0.217:5017/get_articles_by_newsletter_id
+[17:20:03] NEWSLETTER: Request body: {"newsletter_id":188}
+[17:20:03] NEWSLETTER: Response status: 200
+[17:20:03] NEWSLETTER: Response body: {
+  "articles": [
+    {
+      "article_id": "7ea553dd-af55-4d20-a2fc-246704af2983",
+      "article_type": "News and Politics",
+      "author": "the Commerce Department \u201cyet another retaliatory effort targeting Harvard for defending its rights and freedom.\u201d A new tax rate affecting a small group of the country\u2019s wealthiest universities will take effect in 2026. Harvard will be on the hook to pay hundreds of millions more in taxes on its $53 billion endowment",
+      "date": "November 17, 2025",
+      "status": "finished",
+      "subscription_domain": "bostonglobe.com",
+      "subscription_required": false,
+      "title": "AUTHENTICATED ARTICLE: Boston Globe Article",
+      "url": "https://www.bostonglobe.com/2025/09/05/metro/trump-administration-harvard-updates/?s_campaign=spoint:newsletter"
+    },
+    {
+      "article_id": "6b4bf988-2aee-4ac6-8ab1-efe251f0f961",
+      "article_type": "News and Politics",
+      "author": "Andrew Nguyen and Kris Hooks",
+      "date": "November 17, 2025",
+      "status": "finished",
+      "subscription_domain": "bostonglobe.com",
+      "subscription_required": true,
+      "title": "ARTICLE: We asked 150 Bostonians about wealth and financial security",
+      "url": "https://www.bostonglobe.com/2025/11/17/metro/boston-residents-discuss-wealth/?s_campaign=spoint:newsletter"
+    },
+    {
+      "article_id": "73420bb2-b1b7-42ae-abd9-f6c4c7beb64a",
+      "article_type": "News and Politics",
+      "author": "Unknown Author",
+      "date": "November 17, 2025",
+      "status": "finished",
+      "subscription_domain": "bostonglobe.com",
+      "subscription_required": false,
+      "title": "Speaking to the Greater Boston Chamber of Commerce in the Seaport offices of law firm Nutter, McClennen & Fish, Neal called the record-length shutdown an \u201cunfortunate outcome\u201d but said the health care subsidies at the crux of the Republican-Democrat dispute were worth fighting for",
+      "url": "https://www.bostonglobe.com/2025/11/16/business/richie-neal-shutdown-health-care/?s_campaign=spoint:newsletter"
+    },
+    {
+      "article_id": "5689d1da-4582-4088-94d0-75e64ef2be0e",
+      "article_type": "Others",
+      "author": "the lessons he\u2019s learned on his record-setting quest. Cooper read the drafts and offered suggestions.) When they tell the story of their friendship",
+      "date": "November 17, 2025",
+      "status": "finished",
+      "subscription_domain": "bostonglobe.com",
+      "subscription_required": false,
+      "title": "AUTHENTICATED ARTICLE: Boston Globe Article",
+      "url": "https://www.bostonglobe.com/2025/11/16/metro/pull-up-champions/?s_campaign=spoint:newsletter"
+    },
+    {
+      "article_id": "06edc181-dd10-4e02-aea3-c4c6ddca53a7",
+      "article_type": "Technology",
+      "author": "Boston local and Boswords founder John Lieb",
+      "date": "November 17, 2025",
+      "status": "finished",
+      "subscription_domain": "bostonglobe.com",
+      "subscription_required": true,
+      "title": "ARTICLE: Mini Crossword Puzzle | The Boston Globe",
+      "url": "https://www.bostonglobe.com/games/mini-crossword/?s_campaign=spoint:newsletter"
+    },
+    {
+      "article_id": "d908370a-a697-4e6e-b320-1c4f3e074012",
+      "article_type": "News and Politics",
+      "author": "sculptor Sergey Eylanbekov. He also created the city\u2019s statues of John Hancock",
+      "date": "November 17, 2025",
+      "status": "finished",
+      "subscription_domain": "bostonglobe.com",
+      "subscription_required": false,
+      "title": "AUTHENTICATED ARTICLE: Boston Globe Article",
+      "url": "https://www.bostonglobe.com/2025/11/15/metro/new-park-dedication-quincy/?s_campaign=spoint:newsletter"
+    },
+    {
+      "article_id": "a92bce7b-6b38-4292-aa24-6a40be689e0c",
+      "article_type": "News and Politics",
+      "author": "Representative David Muradian of Grafton to allow gamblers to use their phones to place bets on poker",
+      "date": "November 17, 2025",
+      "status": "finished",
+      "subscription_domain": "bostonglobe.com",
+      "subscription_required": false,
+      "title": "AUTHENTICATED ARTICLE: Boston Globe Article",
+      "url": "https://www.bostonglobe.com/2025/11/16/business/wynn-encore-draftkings-online-gambling/?s_campaign=spoint:newsletter"
+    },
+    {
+      "article_id": "8c62d355-ee84-4b08-88a2-4edc6dbf3476",
+      "article_type": "Business and Investment",
+      "author": "their response",
+      "date": "November 17, 2025",
+      "status": "finished",
+      "subscription_domain": "bostonglobe.com",
+      "subscription_required": false,
+      "title": "AUTHENTICATED ARTICLE: Boston Globe Article",
+      "url": "https://www.bostonglobe.com/2025/11/16/lifestyle/friend-stole-my-partner/?s_campaign=spoint:newsletter"
+    },
+    {
+      "article_id": "47021642-fc11-4c59-9bcf-cd5772da9883",
+      "article_type": "News and Politics",
+      "author": "the federal government created a great deal of anxiety and fear",
+      "date": "November 17, 2025",
+      "status": "finished",
+      "subscription_domain": "bostonglobe.com",
+      "subscription_required": false,
+      "title": "AUTHENTICATED ARTICLE: Boston Globe Article",
+      "url": "https://www.bostonglobe.com/2025/11/15/metro/boston-pass-out-turkeys/?s_campaign=spoint:newsletter"
+    },
+    {
+      "article_id": "4ac2e27b-345c-4bb1-a65f-b02eef7d5fa7",
+      "article_type": "News and Politics",
+      "author": "freezing billions of dollars in federal research funding. This season\u2019s final episode dropped over the weekend",
+      "date": "November 17, 2025",
+      "status": "finished",
+      "subscription_domain": null,
+      "subscription_required": false,
+      "title": "President Trump, faced with the likelihood that many House Republicans will vote this week to force his administration to release documents related to the sex offender Jeffrey Epstein, reversed course and said they should do so because \u201cwe have nothing to hide",
+      "url": "https://mailchi.mp/bostonglobe.com/starting-point-harvard-under-pressure?e=a4f20567f8"
+    }
+  ],
+  "server_public_key": "0x848c4185e75b03387d1b150fef64daac67472bd0050e352ce83ae45123d2bf3b7e68a9f4b5093ad731f2baf3c8c4e43523c2744640c4b2d23d21826a7499cf79e91059942cc5aa5e3192053ee2289057533fef2cda647b70adc09e1ec3cd96048e017959d3fd27f54c377a9cea75fe38c5f6166a648ec6f6d57d6c8b99fe4bb933a064d067a6b147112bb167ccaf0d3a731aa9a9d3d7062096d40f00bce10c89cdab0b09b4025ed182b1eb43977a1e392d91dcea40cc73060b739e772bf03796fbcbc73935191011311d953fa28aacbed611f00c11c96001351aa09297b42bedd7edaa78ac70bddb2006550960fd6255a65b11756589e07484a9c602dd60bb26",
+  "status": "success"
+}
+
+[17:20:03] SUBSCRIPTION: Performing Diffie-Hellman key exchange
+[17:20:03] SUBSCRIPTION: Key exchange successful
+[17:20:03] SUBSCRIPTION: Client public key: cee8576abd4eaf8654f9f8c3b260456babcdde0c4adb0f9256d7b7b7ebe3c1fa56f395a97e927c4382b19c71ef9bbae9ff0726c63b652cdb25299ec640a48fbab562d7ca29f2d383b90721aa36ff3be24f151f21bab8672190d89d219bfc9a75c294a4929254599727c06a2a4bf292fe9e87f63d4015c5c16ea6f4886c3df82da78235b9fe0519f8446bd98705588bad1267f000e59ef397917171f2bfa32ad3858cb6f4eb9798a9263b3c50b5b63d2853907fbaa2054de3f8d02a57814ce6f7ee881ae7afd4dc48fc7de21473ab8cb01b46790d9ae8cfa54d61975323b138c18e2f5d68bcd0dde97ff67add7669f9e2aa03cc7a50bc2da21133290bddfc9c20
+[17:20:03] NEWSLETTER: Successfully parsed 10 articles
+[17:20:03] NEWSLETTER: Showing article selection dialog
+[17:20:40] CREDENTIAL_DEBUG: Username input: "glikfamily@gmail.com" (length: 20)
+[17:20:40] CREDENTIAL_DEBUG: Password input: "Eight2Four" (length: 10)
+[17:20:40] CREDENTIAL_DEBUG: Username isEmpty: false
+[17:20:40] CREDENTIAL_DEBUG: Password isEmpty: false
+[17:20:40] SUBSCRIPTION_DIALOG: Submitting credentials for article: 6b4bf988-2aee-4ac6-8ab1-efe251f0f961
+[17:20:40] CREDENTIAL_DEBUG: About to encrypt - Username: "glikfamily@gmail.com", Password: "Eight2Four"
+[17:20:40] SUBSCRIPTION: Starting credential submission for article: 6b4bf988-2aee-4ac6-8ab1-efe251f0f961
+[17:20:40] SUBSCRIPTION: About to call encryptCredentials
+[17:20:40] SUBSCRIPTION: Calling SubscriptionEncryptionService.encryptCredentials with username="glikfamily@gmail.com", password="Eight2Four", domain="bostonglobe.com"
+[17:20:40] SUBSCRIPTION: Testing class accessibility...
+[17:20:40] SUBSCRIPTION: Test method result: test_success
+[17:20:40] SUBSCRIPTION: Testing encryptCredentials method call...
+[17:20:40] SUBSCRIPTION: encryptCredentials returned: true
+[17:20:40] SUBSCRIPTION: Encryption successful, keys: [encrypted_username, encrypted_password, domain]
+[17:20:40] SUBSCRIPTION: Credentials encrypted successfully
+[17:20:40] SUBSCRIPTION: Including newsletter_id: 188 for consistent decryption
+[17:20:40] SUBSCRIPTION: Submitting to: http://192.168.0.217:5017/submit_credentials
+[17:20:40] SUBSCRIPTION: Request body: {"article_id":"6b4bf988-2aee-4ac6-8ab1-efe251f0f961","mobile_public_key":"cee8576abd4eaf8654f9f8c3b260456babcdde0c4adb0f9256d7b7b7ebe3c1fa56f395a97e927c4382b19c71ef9bbae9ff0726c63b652cdb25299ec640a48fbab562d7ca29f2d383b90721aa36ff3be24f151f21bab8672190d89d219bfc9a75c294a4929254599727c06a2a4bf292fe9e87f63d4015c5c16ea6f4886c3df82da78235b9fe0519f8446bd98705588bad1267f000e59ef397917171f2bfa32ad3858cb6f4eb9798a9263b3c50b5b63d2853907fbaa2054de3f8d02a57814ce6f7ee881ae7afd4dc48fc7de21473ab8cb01b46790d9ae8cfa54d61975323b138c18e2f5d68bcd0dde97ff67add7669f9e2aa03cc7a50bc2da21133290bddfc9c20","encrypted_username":"Fniqezep+LL7A/nCx2V3I5PTylbu9n2cp9j8/7byjp6Ymr3ubRkIOPJy4fM49EoA","encrypted_password":"Gar7impGlaDuLqR50VnhrRP6Acm7LmW2GFsDDSSw+Jc=","device_id":"USER-281301397","domain":"bostonglobe.com","newsletter_id":188}
+[17:20:46] SUBSCRIPTION: Response status: 200
+[17:20:46] SUBSCRIPTION: Response body: {
+  "article_id": "6b4bf988-2aee-4ac6-8ab1-efe251f0f961",
+  "article_title": "ARTICLE: We asked 150 Bostonians about wealth and financial security by Andrew Nguyen and Kris Hooks",
+  "consolidation_result": {
+    "action": "new_user",
+    "device_id": "USER-281301397",
+    "domain": "bostonglobe.com",
+    "message": "Credentials stored for new user on bostonglobe.com"
+  },
+  "message": "Credentials submitted successfully for bostonglobe.com",
+  "newsletter_id": 188,
+  "refresh_required": false,
+  "reprocess_error": "connection already closed",
+  "reprocessed_articles": 0,
+  "status": "success",
+  "subscription_domain": "bostonglobe.com"
+}
+
+[17:20:46] SUBSCRIPTION: Credential submission successful
+[17:21:10] Checking user: USER-281301397
+[17:21:10] Testing connectivity to: 192.168.0.217
+[17:21:11] ✅ Server connectivity: OK

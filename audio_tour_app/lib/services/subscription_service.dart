@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'subscription_encryption_service.dart';
-import 'credential_storage_service.dart';
-import 'subscription_article_storage.dart';
+// import 'credential_storage_service.dart';  // TEMPORARILY DISABLED - CAUSING ENCRYPTION CONFLICT
+// import 'subscription_article_storage.dart';  // TEMPORARILY DISABLED - CAUSING ENCRYPTION CONFLICT
 import '../screens/debug_log_viewer_screen.dart';
 
 class CredentialResponse {
@@ -130,15 +130,15 @@ class SubscriptionService {
         final data = json.decode(response.body);
         final credentialResponse = CredentialResponse.fromJson(data);
         
-        // Phase 3: Store credentials locally if successful
-        if (credentialResponse.status == 'success') {
-          await CredentialStorageService.storeCredentials(
-            domain: domain,
-            username: username,
-            password: password,
-          );
-          await DebugLogHelper.addDebugLog('SUBSCRIPTION: Credentials stored locally for domain: $domain');
-        }
+        // Phase 3: Store credentials locally if successful (DISABLED - IMPORT CONFLICT)
+        // if (credentialResponse.status == 'success') {
+        //   await CredentialStorageService.storeCredentials(
+        //     domain: domain,
+        //     username: username,
+        //     password: password,
+        //   );
+        //   await DebugLogHelper.addDebugLog('SUBSCRIPTION: Credentials stored locally for domain: $domain');
+        // }
         
         await DebugLogHelper.addDebugLog('SUBSCRIPTION: Credential submission ${credentialResponse.status == 'success' ? 'successful' : 'failed'}');
         return credentialResponse;
@@ -213,62 +213,64 @@ class SubscriptionService {
     return SubscriptionEncryptionService.getDiffieHellmanParameters();
   }
   
-  /// Phase 3: Check if article is available locally
-  static Future<bool> isArticleStoredLocally(String articleId) async {
-    return await SubscriptionArticleStorage.isArticleStored(articleId);
-  }
+  // PHASE 3 METHODS TEMPORARILY DISABLED - IMPORT CONFLICT PREVENTING ENCRYPTION
   
-  /// Phase 3: Get stored article path for offline access
-  static Future<String?> getStoredArticlePath(String articleId) async {
-    return await SubscriptionArticleStorage.getArticlePath(articleId);
-  }
+  // /// Phase 3: Check if article is available locally
+  // static Future<bool> isArticleStoredLocally(String articleId) async {
+  //   return await SubscriptionArticleStorage.isArticleStored(articleId);
+  // }
   
-  /// Phase 3: Store subscription article after successful download
-  static Future<bool> storeSubscriptionArticle({
-    required String articleId,
-    required String title,
-    required String domain,
-    required List<int> zipBytes,
-    required String author,
-    required String articleType,
-  }) async {
-    return await SubscriptionArticleStorage.storeArticle(
-      articleId: articleId,
-      title: title,
-      domain: domain,
-      zipBytes: zipBytes,
-      author: author,
-      articleType: articleType,
-    );
-  }
+  // /// Phase 3: Get stored article path for offline access
+  // static Future<String?> getStoredArticlePath(String articleId) async {
+  //   return await SubscriptionArticleStorage.getArticlePath(articleId);
+  // }
   
-  /// Phase 3: Get stored credentials for auto-retry
-  static Future<Map<String, String>?> getStoredCredentials(String domain) async {
-    return await CredentialStorageService.getCredentials(domain);
-  }
+  // /// Phase 3: Store subscription article after successful download
+  // static Future<bool> storeSubscriptionArticle({
+  //   required String articleId,
+  //   required String title,
+  //   required String domain,
+  //   required List<int> zipBytes,
+  //   required String author,
+  //   required String articleType,
+  // }) async {
+  //   return await SubscriptionArticleStorage.storeArticle(
+  //     articleId: articleId,
+  //     title: title,
+  //     domain: domain,
+  //     zipBytes: zipBytes,
+  //     author: author,
+  //     articleType: articleType,
+  //   );
+  // }
   
-  /// Phase 3: Check if credentials exist for domain
-  static Future<bool> hasStoredCredentials(String domain) async {
-    return await CredentialStorageService.hasCredentials(domain);
-  }
+  // /// Phase 3: Get stored credentials for auto-retry
+  // static Future<Map<String, String>?> getStoredCredentials(String domain) async {
+  //   return await CredentialStorageService.getCredentials(domain);
+  // }
   
-  /// Phase 3: Get subscription storage statistics
-  static Future<Map<String, dynamic>> getSubscriptionStats() async {
-    final articleStats = await SubscriptionArticleStorage.getStorageStats();
-    final credentialStats = await CredentialStorageService.getCredentialStats();
-    
-    return {
-      'articles': articleStats,
-      'credentials': credentialStats,
-    };
-  }
+  // /// Phase 3: Check if credentials exist for domain
+  // static Future<bool> hasStoredCredentials(String domain) async {
+  //   return await CredentialStorageService.hasCredentials(domain);
+  // }
   
-  /// Phase 3: Clean up expired articles and credentials
-  static Future<Map<String, int>> performCleanup() async {
-    final expiredArticles = await SubscriptionArticleStorage.cleanupExpiredArticles();
-    
-    return {
-      'expired_articles_removed': expiredArticles,
-    };
-  }
+  // /// Phase 3: Get subscription storage statistics
+  // static Future<Map<String, dynamic>> getSubscriptionStats() async {
+  //   final articleStats = await SubscriptionArticleStorage.getStorageStats();
+  //   final credentialStats = await CredentialStorageService.getCredentialStats();
+  //   
+  //   return {
+  //     'articles': articleStats,
+  //     'credentials': credentialStats,
+  //   };
+  // }
+  
+  // /// Phase 3: Clean up expired articles and credentials
+  // static Future<Map<String, int>> performCleanup() async {
+  //   final expiredArticles = await SubscriptionArticleStorage.cleanupExpiredArticles();
+  //   
+  //   return {
+  //     'expired_articles_removed': expiredArticles,
+  //   };
+  // }
 }
