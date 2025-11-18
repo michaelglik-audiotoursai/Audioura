@@ -24,6 +24,8 @@ from dh_service_simple import (
     get_server_private_key_by_newsletter, decrypt_credentials_with_mobile_key,
     get_newsletter_id_from_article
 )
+from user_consolidation_service import user_consolidation_service
+from credential_verification_service import credential_verification_service
 
 # Boston Globe Session-Aware Authentication
 def authenticate_boston_globe_with_credentials(credentials, article_url):
@@ -324,6 +326,7 @@ def get_articles_by_newsletter_id():
     try:
         data = request.get_json()
         newsletter_id = data.get('newsletter_id')
+        user_id = data.get('user_id')  # CRITICAL: Get user_id for access control
         
         if not newsletter_id:
             return jsonify({"error": "newsletter_id is required"}), 400
@@ -369,16 +372,29 @@ def get_articles_by_newsletter_id():
             except:
                 formatted_date = 'Unknown Date'
             
-            # PHASE 2: Check if subscription article has audio edition
+            # SECURITY FIX: Check if user has VERIFIED credentials for subscription articles
             final_subscription_required = subscription_required or False
-            if subscription_required:
-                # Check if this article has an audio file (meaning user has access)
-                cursor.execute("SELECT 1 FROM news_audios WHERE article_id = %s", (article_id,))
-                has_audio = cursor.fetchone() is not None
-                if has_audio:
-                    # User has access through stored credentials
-                    final_subscription_required = False
-                    logging.info(f"Article {article_id} has audio edition - marking as accessible")
+            if subscription_required and subscription_domain:
+                # Get user_id from request data
+                user_id = data.get('user_id')
+                if user_id:
+                    # Check if user has VERIFIED credentials for this domain
+                    cursor.execute("""
+                        SELECT 1 FROM user_subscription_credentials 
+                        WHERE device_id = %s AND domain = %s AND verified_at IS NOT NULL
+                    """, (user_id, subscription_domain))
+                    has_verified_credentials = cursor.fetchone() is not None
+                    
+                    if has_verified_credentials:
+                        # User has verified credentials - mark as accessible
+                        final_subscription_required = False
+                        logging.info(f"User {user_id} has VERIFIED credentials for {subscription_domain} - marking article {article_id} as accessible")
+                    else:
+                        # User has no verified credentials - keep as subscription required
+                        logging.info(f"User {user_id} has NO verified credentials for {subscription_domain} - article {article_id} requires subscription")
+                else:
+                    # No user_id provided - keep as subscription required
+                    logging.info(f"No user_id provided - article {article_id} requires subscription")
             
             articles.append({
                 'article_id': article_id,
@@ -1537,6 +1553,7 @@ def submit_credentials():
         encrypted_username = data['encrypted_username']
         encrypted_password = data['encrypted_password']
         domain = data['domain']
+        newsletter_id = data.get('newsletter_id')  # Optional - fallback to lookup if not provided
         
         logging.info(f"Receiving credentials for article {article_id} from device {device_id} for domain {domain}")
         
@@ -1569,15 +1586,19 @@ def submit_credentials():
                 "message": "Article does not require subscription"
             }), 400
         
-        # Get newsletter_id for this article to find server private key
-        newsletter_id = get_newsletter_id_from_article(article_id)
+        # Get newsletter_id - use provided value or fallback to lookup
         if not newsletter_id:
-            cursor.close()
-            conn.close()
-            return jsonify({
-                "status": "error",
-                "message": "Cannot find newsletter for this article"
-            }), 400
+            newsletter_id = get_newsletter_id_from_article(article_id)
+            if not newsletter_id:
+                cursor.close()
+                conn.close()
+                return jsonify({
+                    "status": "error",
+                    "message": "Cannot find newsletter for this article"
+                }), 400
+            logging.info(f"Using fallback newsletter_id lookup: {newsletter_id}")
+        else:
+            logging.info(f"Using provided newsletter_id: {newsletter_id}")
         
         # Test decryption with mobile public key (verify protocol works)
         try:
@@ -1606,16 +1627,30 @@ def submit_credentials():
                 "message": f"Decryption failed: {decryption_result.get('error', 'Unknown error')}"
             }), 400
         
-        # Store decrypted credentials (overwrite existing for same device/domain)
+        # SECURITY FIX: Verify credentials are actually valid before storing
+        verification_result = credential_verification_service.verify_credentials_for_domain(
+            device_id, domain, decryption_result['username'], decryption_result['password']
+        )
+        
+        if not verification_result['valid']:
+            cursor.close()
+            conn.close()
+            return jsonify({
+                "status": "error",
+                "message": f"Invalid credentials for {domain}: {verification_result['error']}"
+            }), 400
+        
+        # Store decrypted credentials only if verification succeeds
         cursor.execute("""
             INSERT INTO user_subscription_credentials 
-            (device_id, article_id, domain, decrypted_username, decrypted_password)
-            VALUES (%s, %s, %s, %s, %s)
+            (device_id, article_id, domain, decrypted_username, decrypted_password, verified_at)
+            VALUES (%s, %s, %s, %s, %s, NOW())
             ON CONFLICT (device_id, domain) 
             DO UPDATE SET 
                 article_id = EXCLUDED.article_id,
                 decrypted_username = EXCLUDED.decrypted_username,
                 decrypted_password = EXCLUDED.decrypted_password,
+                verified_at = NOW(),
                 created_at = NOW()
         """, (device_id, article_id, domain, decryption_result['username'], decryption_result['password']))
         
@@ -1623,7 +1658,21 @@ def submit_credentials():
         cursor.close()
         conn.close()
         
-        logging.info(f"Credentials stored successfully for article {article_id}, domain {domain}")
+        logging.info(f"Verified and stored credentials for article {article_id}, domain {domain}")
+        
+        # PHASE 3: Handle user consolidation based on credential matching
+        try:
+            consolidation_result = user_consolidation_service.handle_credential_submission_with_consolidation(
+                device_id, domain, decryption_result['username'], decryption_result['password']
+            )
+            logging.info(f"Consolidation result: {consolidation_result['action']}")
+        except Exception as consolidation_error:
+            logging.error(f"Consolidation processing failed: {consolidation_error}")
+            consolidation_result = {
+                "action": "error",
+                "message": f"Consolidation failed: {str(consolidation_error)}",
+                "error": str(consolidation_error)
+            }
         
         # PHASE 2: Reprocess articles with new credentials (simplified for initial deployment)
         try:
@@ -1642,7 +1691,7 @@ def submit_credentials():
             
             logging.info(f"Found {reprocessable_count} articles that could be reprocessed with new credentials")
             
-            return jsonify({
+            response_data = {
                 "status": "success",
                 "message": f"Credentials submitted successfully for {domain}",
                 "article_id": article_id,
@@ -1650,12 +1699,15 @@ def submit_credentials():
                 "subscription_domain": domain,
                 "newsletter_id": newsletter_id,
                 "reprocessed_articles": reprocessable_count,
-                "refresh_required": reprocessable_count > 0
-            })
+                "refresh_required": reprocessable_count > 0,
+                "consolidation_result": consolidation_result
+            }
+            
+            return jsonify(response_data)
             
         except Exception as reprocess_error:
             logging.error(f"Reprocessing check failed: {reprocess_error}")
-            return jsonify({
+            response_data = {
                 "status": "success",
                 "message": f"Credentials submitted successfully for {domain}",
                 "article_id": article_id,
@@ -1664,14 +1716,41 @@ def submit_credentials():
                 "newsletter_id": newsletter_id,
                 "reprocessed_articles": 0,
                 "refresh_required": False,
-                "reprocess_error": str(reprocess_error)
-            })
+                "reprocess_error": str(reprocess_error),
+                "consolidation_result": consolidation_result
+            }
+            
+            return jsonify(response_data)
         
     except Exception as e:
         logging.error(f"Error submitting credentials: {e}")
         return jsonify({
             "status": "error",
             "message": f"Failed to submit credentials: {str(e)}"
+        }), 500
+
+@app.route('/get_user_consolidation_status/<device_id>', methods=['GET'])
+def get_user_consolidation_status(device_id):
+    """Get consolidation status for a device - Phase 3 endpoint"""
+    try:
+        if not device_id:
+            return jsonify({
+                "status": "error",
+                "message": "Device ID is required"
+            }), 400
+        
+        consolidation_status = user_consolidation_service.get_consolidated_user_status(device_id)
+        
+        return jsonify({
+            "status": "success",
+            "consolidation_status": consolidation_status
+        })
+        
+    except Exception as e:
+        logging.error(f"Error getting consolidation status: {e}")
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to get consolidation status: {str(e)}"
         }), 500
 
 @app.route('/decrypt_credentials', methods=['POST'])
