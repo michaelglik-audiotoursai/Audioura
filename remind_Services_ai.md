@@ -490,8 +490,8 @@ Once pattern identified:
 - ✅ `browser_automation.py` - Full HTML extraction function
 - ✅ `newsletter_processor_service.py` - Enhanced Quora content extraction
 
-**Last Updated**: 2025-11-17 - CRITICAL SECURITY VULNERABILITY FIXED ✅
-**Status**: ✅ **SECURITY FIX DEPLOYED + PHASE 3 COMPLETE + BUG #2 ANALYSIS COMPLETE**
+**Last Updated**: 2025-11-18 - DECRYPTION BUG FIXED + ALL SYSTEMS OPERATIONAL ✅
+**Status**: ✅ **DECRYPTION FIX DEPLOYED + SECURITY FIXES COMPLETE + MOBILE APP v1.2.8+42 TESTED**
 
 ### ✅ **PHASE 3 USER CONSOLIDATION IMPLEMENTED**
 **Date**: 2025-11-17
@@ -510,6 +510,29 @@ Once pattern identified:
 - **Solution**: Real-time credential verification using Boston Globe authentication
 - **Result**: Fake credentials now rejected with HTTP 400 error
 - **Access Control**: Only users with verified credentials get premium access
+
+### 🔧 **DECRYPTION BUG FIXED - NEWSLETTER_ID CONSISTENCY**
+**Date**: 2025-11-18
+**Issue**: "Invalid username padding: 180" error during credential submission
+**Status**: ✅ **RESOLVED** - Non-deterministic newsletter_id lookup fixed
+
+#### **Root Cause Analysis**
+- **Problem**: Article `6b4bf988-2aee-4ac6-8ab1-efe251f0f961` linked to both newsletters 188 and 189
+- **Mobile App Session**: Used newsletter_id 189 (correct server private key)
+- **Credential Submission**: `get_newsletter_id_from_article()` returned newsletter_id 188 (wrong server private key)
+- **Result**: Different shared secrets → different AES keys → decryption failure with "padding: 180" error
+
+#### **Solution Implemented**
+- **Services Fix**: `/submit_credentials` now accepts optional `newsletter_id` parameter
+- **Mobile App Fix**: v1.2.8+42 includes `newsletter_id` in credential submission requests
+- **Backward Compatible**: Works with and without `newsletter_id` parameter
+- **Deterministic**: Same newsletter_id used for key exchange and decryption
+
+#### **Test Results**
+- ✅ **Mobile App v1.2.8+42**: Successfully submits credentials with newsletter_id
+- ✅ **Services Decryption**: Works correctly with consistent newsletter_id
+- ✅ **End-to-End Flow**: Complete subscription workflow operational
+- ✅ **Debugging Cleanup**: All temporary debug files removed
 
 ### 🚨 **CRITICAL SECURITY VULNERABILITY FIXED**
 **Date**: 2025-11-17
@@ -639,16 +662,18 @@ c:\Users\micha\eclipse-workspace\AudioTours\development\
 - ✅ **Anti-bot evasion**: Bypasses JavaScript-heavy login detection
 - ✅ **Real-world tested**: Works with user's actual credentials and article URL
 
-### **CURRENT STATUS SUMMARY - PHASE 3 COMPLETE + ALL SYSTEMS OPERATIONAL**
+### **CURRENT STATUS SUMMARY - ALL CRITICAL ISSUES RESOLVED + PRODUCTION READY**
 - ✅ **Newsletter Processing**: 100% operational with all technologies (Spotify, Apple Podcasts, MailChimp, Substack, Quora)
 - ✅ **Boston Globe Authentication**: ✅ **FULLY WORKING** - 7,563 chars extracted from premium articles
 - ✅ **Phase 3 User Consolidation**: ✅ **IMPLEMENTED** - Device merging with credential matching
-- ✅ **Security Vulnerability Fixed**: ✅ **RESOLVED** - Credential verification prevents fake credentials
+- ✅ **Security Vulnerability Fixed**: ✅ **RESOLVED** - Server-side authorization prevents subscription bypass
+- ✅ **Decryption Bug Fixed**: ✅ **RESOLVED** - Consistent newsletter_id usage prevents padding errors
 - ✅ **Secure Encryption**: RFC 3526 Group 14 DH + full entropy AES key derivation (2048-bit security)
-- ✅ **Mobile App Integration**: v1.2.8+25 with subscription workflow working
+- ✅ **Mobile App Integration**: v1.2.8+42 with complete subscription workflow working
 - ✅ **System Health**: 100% across all 10 microservices
 - ✅ **ZIP File Delivery**: ✅ **VERIFIED** - Complete content delivered to mobile app
 - ✅ **Bug #2 Analysis**: ✅ **COMPLETE** - Issue identified as mobile app ZIP parsing problem
+- ✅ **Production Testing**: ✅ **PASSED** - End-to-end subscription workflow verified working
 
 ### **DIFFIE-HELLMAN SECURITY UPGRADE - COMPLETE IMPLEMENTATION**
 **Date Completed**: November 11, 2025
