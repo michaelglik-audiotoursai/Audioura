@@ -16,7 +16,10 @@ import '../screens/debug_log_viewer_screen.dart';
 import '../services/subscription_service.dart';
 import '../services/subscription_encryption_service.dart';
 import '../services/device_service.dart';
+import '../services/credential_storage_service.dart';
+import '../services/subscription_article_storage.dart';
 import '../widgets/subscription_credential_dialog.dart';
+import '../services/subscription_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -56,9 +59,9 @@ class _HomeScreenState extends State<HomeScreen> {
   
   Future<void> _initializeSecureEncryption() async {
     try {
-      // Force secure key regeneration to clear any old insecure keys
-      await SubscriptionEncryptionService.forceSecureKeyRegeneration();
-      await DebugLogHelper.addDebugLog('HOME: Secure encryption initialized - old keys cleared');
+      // Check if we have a valid encryption key, don't clear unnecessarily
+      final hasKey = await SubscriptionEncryptionService.hasStoredKey();
+      await DebugLogHelper.addDebugLog('HOME: Secure encryption initialized - has key: $hasKey');
     } catch (e) {
       await DebugLogHelper.addDebugLog('HOME: Error initializing secure encryption: $e');
     }
@@ -1558,7 +1561,19 @@ class _HomeScreenState extends State<HomeScreen> {
           throw Exception(data['message'] ?? 'Newsletter processing failed');
         }
       } else {
-        throw Exception('Server error: ${response.statusCode}');
+        // Parse server error message for user-friendly display
+        String userMessage = 'Server error: ${response.statusCode}';
+        try {
+          final errorData = json.decode(response.body);
+          if (errorData['message'] != null) {
+            userMessage = errorData['message'];
+          } else if (errorData['error'] != null) {
+            userMessage = errorData['error'];
+          }
+        } catch (parseError) {
+          // Keep default message if parsing fails
+        }
+        throw Exception(userMessage);
       }
     } catch (e) {
       await DebugLogHelper.addDebugLog('NEWSLETTER: Exception in _processNewsletterUrl: $e');
@@ -1724,6 +1739,8 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       
       int addedCount = 0;
+      int failedCount = 0;
+      List<String> failureReasons = [];
       
       // Remove duplicates from selected articles and filter out existing ones
       final uniqueSelected = <String, Map<String, dynamic>>{};
@@ -1738,74 +1755,207 @@ class _HomeScreenState extends State<HomeScreen> {
         try {
           final articleId = article['article_id'];
           final title = article['title'];
+          final subscriptionDomain = article['subscription_domain'];
+          
+          await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: Starting download for article: $articleId ($title)');
+          
+          // Get device ID for secure download request
+          final deviceId = await DeviceService.getUserId();
           
           final downloadResponse = await http.get(
-            Uri.parse('http://$serverIp:5012/download/$articleId'),
+            Uri.parse('http://$serverIp:5012/download/$articleId?user_id=$deviceId'),
             headers: {'Content-Type': 'application/json'},
           ).timeout(Duration(seconds: 30));
           
+          await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: Download response for $articleId: ${downloadResponse.statusCode}, ${downloadResponse.bodyBytes.length} bytes');
+          
           if (downloadResponse.statusCode == 200) {
-            final appDir = await getApplicationDocumentsDirectory();
-            final truncatedTitle = title.length > 50 ? title.substring(0, 50) : title;
-            final safeName = truncatedTitle.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
-            final articleDir = Directory('${appDir.path}/news/${safeName}_$articleId');
-            await articleDir.create(recursive: true);
+            // Phase 3: Check if this is a subscription article and store appropriately
+            final isSubscriptionArticle = subscriptionDomain != null && subscriptionDomain.isNotEmpty;
             
-            final zipFile = File('${articleDir.path}/article.zip');
-            await zipFile.writeAsBytes(downloadResponse.bodyBytes);
-            
-            final archive = ZipDecoder().decodeBytes(downloadResponse.bodyBytes);
-            for (final file in archive) {
-              if (file.isFile) {
-                final extractedFile = File('${articleDir.path}/${file.name}');
-                await extractedFile.create(recursive: true);
-                await extractedFile.writeAsBytes(file.content as List<int>);
+            if (isSubscriptionArticle) {
+              // Store as subscription article with enhanced metadata
+              final stored = await SubscriptionService.storeSubscriptionArticle(
+                articleId: articleId,
+                title: title,
+                domain: subscriptionDomain,
+                zipBytes: downloadResponse.bodyBytes,
+                author: article['author'] ?? 'Unknown Author',
+                articleType: article['article_type'] ?? 'Others',
+              );
+              
+              if (stored) {
+                // Get the actual storage path for subscription articles
+                final storedPath = await SubscriptionService.getStoredArticlePath(articleId);
+                await DebugLogHelper.addDebugLog('SUBSCRIPTION_DOWNLOAD: Article $articleId stored at path: $storedPath');
+                
+                // Add to regular news list with actual path
+                final articleData = {
+                  'title': title,
+                  'path': storedPath, // Use fallback path
+                  'created': DateTime.now().toIso8601String(),
+                  'original_request': title,
+                  'article_id': articleId,
+                  'article_type': article['article_type'] ?? 'Others',
+                  'subscription_domain': subscriptionDomain,
+                  'is_subscription': true,
+                };
+                
+                savedNews.add(json.encode(articleData));
+                addedCount++;
+                await DebugLogHelper.addDebugLog('SUBSCRIPTION_DOWNLOAD: Added subscription article to saved_news: $title');
+              } else {
+                failedCount++;
+                failureReasons.add('$title: Failed to store subscription article locally');
+                await DebugLogHelper.addDebugLog('SUBSCRIPTION_DOWNLOAD: Failed to store subscription article: $title');
               }
+            } else {
+              // Regular article processing (existing logic)
+              final appDir = await getApplicationDocumentsDirectory();
+              final truncatedTitle = title.length > 50 ? title.substring(0, 50) : title;
+              final safeName = truncatedTitle.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+              final articleDir = Directory('${appDir.path}/news/${safeName}_$articleId');
+              await articleDir.create(recursive: true);
+              
+              final zipFile = File('${articleDir.path}/article.zip');
+              await zipFile.writeAsBytes(downloadResponse.bodyBytes);
+              
+              final archive = ZipDecoder().decodeBytes(downloadResponse.bodyBytes);
+              await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: ZIP contains ${archive.length} files for article: $articleId');
+              
+              for (final file in archive) {
+                if (file.isFile) {
+                  final extractedFile = File('${articleDir.path}/${file.name}');
+                  await extractedFile.create(recursive: true);
+                  await extractedFile.writeAsBytes(file.content as List<int>);
+                  await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: Extracted ${file.name} (${file.content.length} bytes) for article: $articleId');
+                }
+              }
+              
+              // Extract and save text content for search
+              try {
+                final textFile = File('${articleDir.path}/audiotours_search_content.txt');
+                String textContent = '';
+                
+                // Try to extract text from index.html
+                final indexFile = File('${articleDir.path}/index.html');
+                if (await indexFile.exists()) {
+                  final htmlContent = await indexFile.readAsString();
+                  await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: index.html content length for $articleId: ${htmlContent.length} chars');
+                  
+                  // Simple text extraction - remove HTML tags
+                  textContent = htmlContent
+                      .replaceAll(RegExp(r'<[^>]*>'), ' ')
+                      .replaceAll(RegExp(r'\s+'), ' ')
+                      .trim();
+                  
+                  await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: Extracted text content length for $articleId: ${textContent.length} chars');
+                  if (textContent.length > 0) {
+                    await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: Text preview for $articleId: ${textContent.substring(0, textContent.length > 200 ? 200 : textContent.length)}...');
+                  }
+                } else {
+                  await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: index.html not found for article: $articleId');
+                }
+                
+                await textFile.writeAsString(textContent);
+                await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: Saved search content file for $articleId: ${textContent.length} chars');
+              } catch (e) {
+                await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: Text extraction failed for $articleId: $e');
+              }
+              
+              final articleData = {
+                'title': title,
+                'path': articleDir.path,
+                'created': DateTime.now().toIso8601String(),
+                'original_request': title,
+                'article_id': articleId,
+                'article_type': article['article_type'] ?? 'Others',
+              };
+              
+              savedNews.add(json.encode(articleData));
+              addedCount++;
             }
-            
-            // Extract and save text content for search
+          } else if (downloadResponse.statusCode == 403) {
+            // Handle subscription required (new security fix)
+            failedCount++;
             try {
-              final textFile = File('${articleDir.path}/audiotours_search_content.txt');
-              String textContent = '';
+              final errorData = json.decode(downloadResponse.body);
+              final errorMessage = errorData['error'] ?? 'Subscription required';
+              final domain = errorData['subscription_domain'] ?? subscriptionDomain;
               
-              // Try to extract text from index.html
-              final indexFile = File('${articleDir.path}/index.html');
-              if (await indexFile.exists()) {
-                final htmlContent = await indexFile.readAsString();
-                // Simple text extraction - remove HTML tags
-                textContent = htmlContent
-                    .replaceAll(RegExp(r'<[^>]*>'), ' ')
-                    .replaceAll(RegExp(r'\s+'), ' ')
-                    .trim();
+              if (domain != null && domain.isNotEmpty) {
+                failureReasons.add('$title: Subscription required for $domain. Please enter valid credentials.');
+              } else {
+                failureReasons.add('$title: $errorMessage');
               }
-              
-              await textFile.writeAsString(textContent);
             } catch (e) {
-              // Continue if text extraction fails
+              failureReasons.add('$title: Subscription required - please enter credentials');
             }
-            
-            final articleData = {
-              'title': title,
-              'path': articleDir.path,
-              'created': DateTime.now().toIso8601String(),
-              'original_request': title,
-              'article_id': articleId,
-              'article_type': article['article_type'] ?? 'Others',
-            };
-            
-            savedNews.add(json.encode(articleData));
-            addedCount++;
+          } else {
+            // Handle other download failures
+            failedCount++;
+            try {
+              final errorData = json.decode(downloadResponse.body);
+              final errorMessage = errorData['error'] ?? 'Download failed';
+              failureReasons.add('$title: $errorMessage');
+            } catch (e) {
+              failureReasons.add('$title: Server error ${downloadResponse.statusCode}');
+            }
           }
         } catch (e) {
-          // Continue with next article
+          failedCount++;
+          final title = article['title'] ?? 'Unknown Article';
+          failureReasons.add('$title: Network error - ${e.toString()}');
         }
       }
       
       await prefs.setStringList('saved_news', savedNews);
       Navigator.pop(context);
       
+      // Show detailed results with error handling
+      String message = '$addedCount articles added to Listen page';
+      Color backgroundColor = Colors.green;
+      
+      if (failedCount > 0) {
+        message += ', $failedCount failed';
+        backgroundColor = Colors.orange;
+        
+        // Show detailed error dialog
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Download Results'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('✅ $addedCount articles downloaded successfully'),
+                if (failedCount > 0) ...[
+                  SizedBox(height: 8),
+                  Text('❌ $failedCount articles failed:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  SizedBox(height: 4),
+                  ...failureReasons.map((reason) => Padding(
+                    padding: EdgeInsets.only(left: 8, bottom: 4),
+                    child: Text('• $reason', style: TextStyle(fontSize: 12)),
+                  )),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$addedCount articles added to Listen page!')),
+        SnackBar(
+          content: Text(message),
+          backgroundColor: backgroundColor,
+        ),
       );
       
       // Refresh newsletters to show the new one
@@ -1821,11 +1971,30 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
   
-  void _showArticleSelectionDialog(List<Map<String, dynamic>> articles, int newsletterId, String newsletterName) {
+  void _showArticleSelectionDialog(List<Map<String, dynamic>> articles, int newsletterId, String newsletterName) async {
     List<bool> selectedArticles = List.filled(articles.length, false);
     String dialogFilter = 'All';
     String searchQuery = '';
     TextEditingController searchController = TextEditingController();
+    Set<String> subscribedDomains = <String>{}; // Track domains with credentials
+    Map<String, bool> articleStorageStatus = {}; // Track local storage status
+    
+    // Phase 3: Check for stored credentials and local storage (DISABLED - BUILD ERROR)
+    for (final article in articles) {
+      final articleId = article['article_id'] ?? '';
+      final subscriptionDomain = article['subscription_domain'] ?? '';
+      
+      if (subscriptionDomain.isNotEmpty) {
+        final hasCredentials = await CredentialStorageService.hasCredentials(subscriptionDomain);
+        if (hasCredentials) {
+          subscribedDomains.add(subscriptionDomain);
+        }
+      }
+      
+      // Check if article is stored locally
+      final isStoredLocally = await SubscriptionService.isArticleStoredLocally(articleId);
+      articleStorageStatus[articleId] = isStoredLocally;
+    }
     
     showDialog(
       context: context,
@@ -1944,14 +2113,17 @@ class _HomeScreenState extends State<HomeScreen> {
                         final author = article['author'] ?? 'Unknown Author';
                         final subscriptionRequired = article['subscription_required'] ?? false;
                         final subscriptionDomain = article['subscription_domain'] ?? '';
+                        final isSubscribed = subscribedDomains.contains(subscriptionDomain);
+                        final articleId = article['article_id'] ?? '';
+                        final isStoredLocally = articleStorageStatus[articleId] ?? false;
                         
-                        if (subscriptionRequired) {
+                        if (subscriptionRequired && !isSubscribed) {
                           return Container(
                             margin: EdgeInsets.only(bottom: 12),
                             padding: EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: Colors.orange.shade50,
-                              border: Border.all(color: Colors.orange.shade200),
+                              color: Colors.red.shade50,
+                              border: Border.all(color: Colors.red.shade200),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Column(
@@ -1959,25 +2131,48 @@ class _HomeScreenState extends State<HomeScreen> {
                               children: [
                                 Row(
                                   children: [
-                                    Icon(Icons.lock, color: Colors.orange, size: 16),
+                                    Icon(Icons.error, color: Colors.red, size: 16),
                                     SizedBox(width: 8),
                                     Text(
                                       'SUBSCRIPTION REQUIRED',
                                       style: TextStyle(
-                                        color: Colors.orange.shade700,
+                                        color: Colors.red.shade700,
                                         fontWeight: FontWeight.bold,
                                         fontSize: 12,
                                       ),
                                     ),
                                     Spacer(),
                                     ElevatedButton(
-                                      onPressed: () => _showCredentialDialog(article, subscriptionDomain, title),
+                                      onPressed: () async {
+                                        final response = await showDialog<CredentialResponse>(
+                                          context: context,
+                                          builder: (context) => SubscriptionCredentialDialog(
+                                            articleId: article['article_id'] ?? '',
+                                            domain: subscriptionDomain,
+                                            articleTitle: title,
+                                            newsletterId: newsletterId, // Pass newsletter_id for consistent decryption
+                                          ),
+                                        );
+                                        
+                                        if (response != null && response.status == 'success') {
+                                          setDialogState(() {
+                                            subscribedDomains.add(subscriptionDomain);
+                                          });
+                                        }
+                                      },
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.orange,
+                                        backgroundColor: Colors.red,
                                         foregroundColor: Colors.white,
                                         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                                       ),
-                                      child: Text('Enter Credentials', style: TextStyle(fontSize: 10)),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.error, size: 12),
+                                          SizedBox(width: 4),
+                                          Text('Enter Credentials', style: TextStyle(fontSize: 10)),
+                                        ],
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -1996,9 +2191,15 @@ class _HomeScreenState extends State<HomeScreen> {
                               ],
                             ),
                           );
-                        } else {
+                        } else if (subscriptionRequired && isSubscribed) {
+                          // Subscribed article - green with open lock, show if stored locally
                           return Container(
                             margin: EdgeInsets.only(bottom: 12),
+                            decoration: isStoredLocally ? BoxDecoration(
+                              color: Colors.green.shade50,
+                              border: Border.all(color: Colors.green.shade200),
+                              borderRadius: BorderRadius.circular(8),
+                            ) : null,
                             child: CheckboxListTile(
                               value: selectedArticles[index],
                               onChanged: (bool? value) {
@@ -2006,14 +2207,67 @@ class _HomeScreenState extends State<HomeScreen> {
                                   selectedArticles[index] = value ?? false;
                                 });
                               },
-                              title: Text(
-                                title,
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
+                              title: Row(
+                                children: [
+                                  Icon(Icons.lock_open, color: Colors.green, size: 16),
+                                  SizedBox(width: 8),
+                                  if (isStoredLocally) ...[
+                                    Icon(Icons.download_done, color: Colors.blue, size: 14),
+                                    SizedBox(width: 4),
+                                  ],
+                                  Expanded(
+                                    child: Text(
+                                      title,
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.green.shade700),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
                               ),
                               subtitle: Text(
-                                'By: $author',
+                                'By: $author • Subscribed to $subscriptionDomain${isStoredLocally ? ' • Stored locally' : ''}',
+                                style: TextStyle(fontSize: 12, color: Colors.green.shade600),
+                              ),
+                              controlAffinity: ListTileControlAffinity.leading,
+                            ),
+                          );
+                        } else {
+                          // Free article - show if stored locally
+                          return Container(
+                            margin: EdgeInsets.only(bottom: 12),
+                            decoration: isStoredLocally ? BoxDecoration(
+                              color: Colors.blue.shade50,
+                              border: Border.all(color: Colors.blue.shade200),
+                              borderRadius: BorderRadius.circular(8),
+                            ) : null,
+                            child: CheckboxListTile(
+                              value: selectedArticles[index],
+                              onChanged: (bool? value) {
+                                setDialogState(() {
+                                  selectedArticles[index] = value ?? false;
+                                });
+                              },
+                              title: Row(
+                                children: [
+                                  Icon(Icons.thumb_up, color: Colors.black, size: 16),
+                                  SizedBox(width: 8),
+                                  if (isStoredLocally) ...[
+                                    Icon(Icons.download_done, color: Colors.blue, size: 14),
+                                    SizedBox(width: 4),
+                                  ],
+                                  Expanded(
+                                    child: Text(
+                                      title,
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              subtitle: Text(
+                                'By: $author${isStoredLocally ? ' • Stored locally' : ''}',
                                 style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                               ),
                               controlAffinity: ListTileControlAffinity.leading,
@@ -2640,18 +2894,21 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
   
-  void _showCredentialDialog(Map<String, dynamic> article, String domain, String title) {
-    showDialog(
+  void _showCredentialDialog(Map<String, dynamic> article, String domain, String title, [Function(String)? onCredentialSuccess]) async {
+    final response = await showDialog<CredentialResponse>(
       context: context,
       builder: (context) => SubscriptionCredentialDialog(
         articleId: article['article_id'] ?? '',
         domain: domain,
         articleTitle: title,
-        onSuccess: () {
-          // Optionally refresh the newsletter list or show success message
-        },
+        newsletterId: null, // No newsletter_id available in this context
       ),
     );
+    
+    // Phase 2: Update article status from "Subscription Required" to "Subscribed"
+    if (response != null && response.status == 'success' && onCredentialSuccess != null) {
+      onCredentialSuccess(domain);
+    }
   }
   
   void _showNewsletterUrlDialog() {

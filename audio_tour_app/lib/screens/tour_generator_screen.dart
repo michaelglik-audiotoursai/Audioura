@@ -1116,6 +1116,29 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       return;
     }
     
+    // Fix Issue 1: Validate article content is not just URLs
+    if (_contentType == 'Article') {
+      // Check if input is primarily URLs (more than 50% URL-like content)
+      final lines = inputText.split('\n').where((line) => line.trim().isNotEmpty).toList();
+      int urlLines = 0;
+      for (final line in lines) {
+        if (line.trim().startsWith('http://') || line.trim().startsWith('https://') || line.trim().startsWith('www.')) {
+          urlLines++;
+        }
+      }
+      
+      if (urlLines > lines.length * 0.5 || (lines.length <= 3 && urlLines > 0)) {
+        _showError('For article processing, please paste the actual article text, not URLs.\n\nFor URL processing, please select "Newsletter" type instead.');
+        return;
+      }
+      
+      // Additional check for very short content that might be just URLs
+      if (inputText.length < 100 && (inputText.contains('http') || inputText.contains('www.'))) {
+        _showError('Article text seems too short or contains URLs.\n\nPlease paste the full article content, not just the URL.');
+        return;
+      }
+    }
+    
     setState(() {
       _isGenerating = true;
       _progress = _contentType == 'Article' ? 'Starting article generation...' : 'Processing newsletter links...';
@@ -1347,12 +1370,20 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         'original_request': actualTitle,
         'path': path,
         'created': DateTime.now().toIso8601String(),
+        'article_id': articleId, // Fix Issue 2: Add article_id field for consistency
+        'article_type': 'Others', // Add article type
       };
       
-      await DebugLogHelper.addDebugLog('NEWS: Saved article info - ID: $articleId, Path: $path');
+      await DebugLogHelper.addDebugLog('NEWS: Saving article info - ID: $articleId, Path: $path');
+      await DebugLogHelper.addDebugLog('NEWS: Article info: ${jsonEncode(articleInfo)}');
       
       news.add(jsonEncode(articleInfo));
       await prefs.setStringList('saved_news', news);
+      
+      // Fix Issue 2: Verify the article was saved
+      final savedNews = prefs.getStringList('saved_news') ?? [];
+      await DebugLogHelper.addDebugLog('NEWS: Article saved successfully. Total saved articles: ${savedNews.length}');
+      await DebugLogHelper.addDebugLog('NEWS: Last saved article: ${savedNews.isNotEmpty ? savedNews.last : "none"}');
       
     } catch (e) {
       print('Error saving news info: $e');

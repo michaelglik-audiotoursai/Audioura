@@ -8,6 +8,7 @@ class SubscriptionCredentialDialog extends StatefulWidget {
   final String domain;
   final String articleTitle;
   final VoidCallback? onSuccess;
+  final int? newsletterId; // Add newsletter_id for consistent decryption
 
   const SubscriptionCredentialDialog({
     super.key,
@@ -15,6 +16,7 @@ class SubscriptionCredentialDialog extends StatefulWidget {
     required this.domain,
     required this.articleTitle,
     this.onSuccess,
+    this.newsletterId, // Optional newsletter_id parameter
   });
 
   @override
@@ -209,19 +211,20 @@ class _SubscriptionCredentialDialogState extends State<SubscriptionCredentialDia
       
       final deviceId = await DeviceService.getUserId();
       
-      final success = await SubscriptionService.submitCredentials(
+      final response = await SubscriptionService.submitCredentials(
         articleId: widget.articleId,
         username: username,
         password: password,
         deviceId: deviceId,
         domain: widget.domain,
+        newsletterId: widget.newsletterId, // Pass newsletter_id for consistent decryption
       );
 
       if (mounted) {
-        Navigator.pop(context);
+        Navigator.pop(context, response);
         await Future.delayed(Duration(milliseconds: 100));
         
-        if (success) {
+        if (response != null && response.status == 'success') {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Successfully entered credentials for ${widget.domain}'),
@@ -235,9 +238,10 @@ class _SubscriptionCredentialDialogState extends State<SubscriptionCredentialDia
           );
           widget.onSuccess?.call();
         } else {
+          final errorMessage = response?.message ?? 'Encryption keys not available. Please try again later.';
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failure to send credentials for processing: Encryption keys not available. Please try again later.'),
+              content: Text('Failure to send credentials for processing: $errorMessage'),
               backgroundColor: Colors.red,
               action: SnackBarAction(
                 label: 'Retry',
@@ -285,6 +289,7 @@ class _SubscriptionCredentialDialogState extends State<SubscriptionCredentialDia
         domain: widget.domain,
         articleTitle: widget.articleTitle,
         onSuccess: widget.onSuccess,
+        newsletterId: widget.newsletterId,
       ),
     );
   }
