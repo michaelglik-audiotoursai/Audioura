@@ -490,8 +490,8 @@ Once pattern identified:
 - ✅ `browser_automation.py` - Full HTML extraction function
 - ✅ `newsletter_processor_service.py` - Enhanced Quora content extraction
 
-**Last Updated**: 2025-11-18 - DECRYPTION BUG FIXED + ALL SYSTEMS OPERATIONAL ✅
-**Status**: ✅ **DECRYPTION FIX DEPLOYED + SECURITY FIXES COMPLETE + MOBILE APP v1.2.8+42 TESTED**
+**Last Updated**: 2025-11-19 - GOOGLE REDIRECT NEWSLETTER INVESTIGATION REQUIRED ⚠️
+**Status**: ✅ **ALL SYSTEMS OPERATIONAL + GOOGLE REDIRECT ISSUE IDENTIFIED**
 
 ### ✅ **PHASE 3 USER CONSOLIDATION IMPLEMENTED**
 **Date**: 2025-11-17
@@ -585,6 +585,33 @@ Once pattern identified:
 
 ## 🚀 **POST-COMPACTION RECOVERY CONTEXT**
 **If chat history is compacted, read @remind_ai.md and this file to continue development**
+
+### 🎯 **IMMEDIATE TASK AFTER COMPACTION**
+**Priority**: HIGH - Newsletter Visibility Investigation
+**Issue**: Google redirect newsletter not appearing in mobile app
+
+#### **Problem Details**
+- **Newsletter URL**: `https://share.google/rvjfEQXtogJjFU1Wx`
+- **Redirect Target**: `https://www.prnewswire.com/apac/news-releases/nyse-content-advisory-11-wall-street-welcomes-27-countries-for-international-day-302619466.html`
+- **Services Status**: ✅ Newsletter processed successfully (ID: 190, Article ID: 818c4f67-fa92-43eb-95f9-b8297e04cbdb)
+- **Database Status**: ✅ Article created and linked, ZIP file available (1.4MB)
+- **Mobile App Issue**: Newsletter not visible in mobile app home page
+
+#### **Investigation Steps Required**
+1. **Check Mobile App Newsletter Requests**: Look at logs to find what request mobile app produces to get newsletters (if any)
+2. **Verify Services Response**: If mobile app made request, did services reply with JSON containing the latest newsletter with URL `https://share.google/rvjfEQXtogJjFU1Wx`
+3. **Redirect Handling Analysis**: Services processed original Google URL instead of following redirect to PR Newswire - may have missed additional article links
+4. **Pattern Recognition**: PR Newswire page likely contains many more article links that weren't extracted
+
+#### **Expected Findings**
+- Mobile app may not be fetching latest newsletters correctly
+- Services may need enhanced redirect following for better content extraction
+- Newsletter 190 should be visible in mobile app if services are responding correctly
+
+#### **Download Command for Testing**
+```bash
+curl -X GET "http://localhost:5012/download/818c4f67-fa92-43eb-95f9-b8297e04cbdb" -o "nyse_article.zip"
+```
 
 ### ✅ **COMPLETED: Newsletter Service Syntax Error Fixed**
 - **Issue**: ✅ **RESOLVED** - Fixed syntax error on line 1214 in `newsletter_processor_service.py`
