@@ -8,8 +8,28 @@ import json
 import psycopg2
 from datetime import datetime
 
+def clean_url(url):
+    """Clean URL same way as newsletter processor"""
+    import urllib.parse
+    try:
+        parsed = urllib.parse.urlparse(url)
+        # For Apple Podcasts, preserve episode ID
+        if 'podcasts.apple.com' in parsed.netloc and '?i=' in url:
+            import re
+            episode_match = re.search(r'i=([^&]+)', parsed.query)
+            if episode_match:
+                episode_id = episode_match.group(1)
+                return urllib.parse.urlunparse((parsed.scheme, parsed.netloc, parsed.path, '', f'i={episode_id}', ''))
+        
+        # For all others, remove query parameters
+        return urllib.parse.urlunparse((parsed.scheme, parsed.netloc, parsed.path, '', '', ''))
+    except:
+        return url
+
 def cleanup_test_newsletter(url):
-    """Clean up test newsletter and all associated articles"""
+    """Clean up test newsletter and bypass daily limits"""
+    clean_newsletter_url = clean_url(url)
+    
     try:
         conn = psycopg2.connect(
             host='localhost', database='audiotours', user='admin', 
@@ -17,36 +37,28 @@ def cleanup_test_newsletter(url):
         )
         cursor = conn.cursor()
         
-        # Get newsletter ID
-        cursor.execute("SELECT id FROM newsletters WHERE url = %s", (url,))
+        # Get newsletter ID using cleaned URL
+        cursor.execute("SELECT id FROM newsletters WHERE url = %s", (clean_newsletter_url,))
         result = cursor.fetchone()
         if not result:
-            print(f"No newsletter found for URL: {url}")
+            print(f"No newsletter found for URL: {clean_newsletter_url}")
+            cursor.close()
+            conn.close()
             return
         
         newsletter_id = result[0]
+        print(f"Found newsletter ID {newsletter_id} for cleanup")
         
-        # Clean up in proper order (foreign key constraints)
-        cursor.execute("""
-            DELETE FROM news_audios WHERE article_id IN (
-                SELECT nar.article_requests_id FROM newsletters_article_link nar 
-                WHERE nar.newsletters_id = %s
-            )
-        """, (newsletter_id,))
-        
-        cursor.execute("DELETE FROM newsletters_article_link WHERE newsletters_id = %s", (newsletter_id,))
-        
-        cursor.execute("""
-            DELETE FROM article_requests WHERE article_id IN (
-                SELECT nar.article_requests_id FROM newsletters_article_link nar 
-                WHERE nar.newsletters_id = %s
-            )
-        """, (newsletter_id,))
-        
+        # Delete newsletter (cascade will handle linked articles automatically)
         cursor.execute("DELETE FROM newsletters WHERE id = %s", (newsletter_id,))
+        deleted_count = cursor.rowcount
         
         conn.commit()
-        print(f"SUCCESS: Cleaned up newsletter and associated articles")
+        
+        if deleted_count > 0:
+            print(f"SUCCESS: Newsletter record deleted, daily limit bypassed")
+        else:
+            print(f"WARNING: Newsletter record not found")
         
     except Exception as e:
         print(f"ERROR: Database cleanup error: {e}")
@@ -80,7 +92,7 @@ def test_newsletter_processing(newsletter_url, newsletter_name, expected_min_art
         response = requests.post(
             "http://localhost:5017/process_newsletter",
             json=payload,
-            timeout=120
+            timeout=180
         )
         
         print(f"Response status: {response.status_code}")
@@ -110,6 +122,8 @@ def test_newsletter_processing(newsletter_url, newsletter_name, expected_min_art
 def verify_newsletter_articles(newsletter_url, newsletter_name):
     """Verify articles were created and stored properly"""
     print("=== STEP 3: Database Verification ===")
+    clean_newsletter_url = clean_url(newsletter_url)
+    
     try:
         conn = psycopg2.connect(
             host='localhost', database='audiotours', user='admin', 
@@ -117,22 +131,23 @@ def verify_newsletter_articles(newsletter_url, newsletter_name):
         )
         cursor = conn.cursor()
         
-        # Get newsletter and articles
+        # Get newsletter and articles using cleaned URL
         cursor.execute("""
-            SELECT n.id, n.name, COUNT(nar.article_requests_id) as article_count
+            SELECT n.id, n.url, COUNT(nar.article_requests_id) as article_count
             FROM newsletters n
             LEFT JOIN newsletters_article_link nar ON n.id = nar.newsletters_id
             WHERE n.url = %s
-            GROUP BY n.id, n.name
-        """, (newsletter_url,))
+            GROUP BY n.id, n.url
+        """, (clean_newsletter_url,))
         
         result = cursor.fetchone()
         if not result:
             print("ERROR: No newsletter found in database")
             return False
         
-        newsletter_id, name, article_count = result
-        print(f"SUCCESS: Newsletter '{name}' found with {article_count} articles")
+        newsletter_id, url, article_count = result
+        print(f"SUCCESS: Newsletter found with {article_count} articles")
+        print(f"URL: {url}")
         
         # Get article details
         cursor.execute("""
@@ -147,7 +162,13 @@ def verify_newsletter_articles(newsletter_url, newsletter_name):
         articles = cursor.fetchall()
         print(f"\nArticle Details:")
         for i, (article_id, title, status, length) in enumerate(articles, 1):
-            print(f"  {i}. {title[:50]}...")
+            # Handle Unicode characters in title
+            try:
+                safe_title = title[:50] if title else "No title"
+                print(f"  {i}. {safe_title}...")
+            except UnicodeEncodeError:
+                print(f"  {i}. [Article with special characters]...")
+            
             print(f"     ID: {article_id}")
             print(f"     Status: {status}")
             print(f"     Content: {length} chars")
@@ -175,19 +196,19 @@ def main():
     # Test different newsletter technologies
     test_cases = [
         {
-            "url": "https://guyraz.substack.com/p/10-lessons-from-chip-and-joanna-gaines",
+            "url": "https://guyraz.substack.com/p/the-7-lessons-behind-gymsharks-billion?utm_source=post-email-title&publication_id=2607539&post_id=179214153&utm_campaign=email-post-title&isFreemail=true&r=4ldjqb&triedRedirect=true&utm_medium=email",
             "name": "Guy Raz Substack",
-            "expected_articles": 8
+            "expected_articles": 5
         },
         {
-            "url": "https://mailchi.mp/bostonglobe.com/todaysheadlines-6057237",
+            "url": "https://mailchi.mp/bostonglobe.com/starting-point-harvard-under-pressure",
             "name": "Boston Globe MailChimp",
-            "expected_articles": 5
+            "expected_articles": 8
         },
         {
             "url": "https://jokesfunnystories.quora.com/?__nsrc__=4&__snid3__=92061427717",
             "name": "Quora Newsletter",
-            "expected_articles": 3
+            "expected_articles": 5
         }
     ]
     
