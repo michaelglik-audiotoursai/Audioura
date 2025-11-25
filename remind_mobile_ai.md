@@ -6,99 +6,104 @@
 4. **Location**: `C:\\Users\\micha\\eclipse-workspace\\AudioTours\\development\\audio_tour_app\\`
 5. **Communication**: Use `c:\\Users\\micha\\eclipse-workspace\\amazon-q-communications\\audiotours\\requirements\\`
 
+## 🚨 **POST-COMPACTION RECOVERY PROTOCOL**
+**When chat history is compacted, user will ask you to read @remind_ai.md and @remind_mobile_ai.md**
+**Your Response**: "I've read both reminder files and I'm ready to continue fixing bugs. What's the current issue?"
+**Context Recovery**: Both files contain complete project context, current status, and debugging protocols
+
 ## CURRENT PROJECT STATUS - LATEST UPDATE
 **Project**: Audioura Mobile App Development
-**Version**: v1.2.8+42 (Services Decryption Bug Fix + Build Error Fixed)
+**Version**: v1.2.8+96 (Systematic Feature Restoration - Complex Subtitle Test)
 **Branch**: Newsletters (`git push origin Newsletters`)
 **Icon**: Audioura_3.png
-**Status**: ✅ **ENCRYPTION WORKING** - Services decryption bug fix implemented, build errors resolved
+**Status**: ✅ **SCROLL BUG SOLVED** - Root cause identified, systematic restoration in progress
 
-### 🔐 ENCRYPTION IMPLEMENTATION - VERIFIED SECURE
-**Method**: RFC 3526 Diffie-Hellman (2048-bit) → SHA-256 full entropy → AES-128-CBC
-**Key Derivation**: `SHA-256(shared_secret_bytes)[:16]`
-**Shared Secret**: `mobile_public_key^server_private_key mod P`
-**Format**: `Base64(IV + AES-CBC-encrypted-data)`
-**Byte Conversion**: `_bigIntToFullBytes()` - no truncation, full entropy
+### 🚨 **CRITICAL WORKFLOW RULE**
+**⚠️ NEVER CHANGE CODE WITHOUT APPROVAL**: Always propose plan first, get user approval, then implement
+**Workflow**: Analyze → Propose Plan → Get Approval → Implement → User Tests
 
-### ✅ PHASE 2: REVISED IMPLEMENTATION COMPLETE
-**Stage 1**: ✅ Secure encryption and credential submission working
-**Phase 2**: ✅ Visual status management and error handling implemented
-**Key Features Implemented**:
-1. **Visual Status System**: Red/error → Green/open lock transitions
-2. **Multi-domain Support**: Can add credentials for multiple domains in one session
-3. **No Automatic Refresh**: User stays in dialog, no processing delays
-4. **Detailed Error Handling**: Specific failure reasons during article download
-5. **Stateful Dialog**: Remembers credential status across domains
-6. **Color-coded Articles**: Black/thumbs up (free), Red/error (subscription required), Green/open lock (subscribed)
+## SCROLL BUG BREAKTHROUGH - v1.2.8+95 ✅
+**MAJOR DISCOVERY**: Root cause was **complex ListView widget structure**, NOT scroll physics or filtering!
+
+**Root Cause Identified**:
+- **Complex ListTile widgets** in Articles ListView interfered with Flutter's scroll calculations
+- **FutureBuilder in title**: Async operations during scroll
+- **Conditional Checkbox/Column in leading**: Complex conditional widgets
+- **Nested Column in subtitle**: Multiple conditional elements
+
+**Working Solution (v1.2.8+95)**:
+- ✅ **Simple Icon leading** (like Tours ListView)
+- ✅ **Simple Text title** (no FutureBuilder)
+- ✅ **Simple Text subtitle** (no complex Column)
+- ✅ **Perfect scrolling** in both directions
+
+**Current Phase - Systematic Restoration**:
+**v1.2.8+96**: Testing complex subtitle restoration
+**Next Steps**: Restore features one by one to identify exact breaking point
+1. Complex subtitle → FutureBuilder title → Complex leading → Selection mode → Scroll listener → Filtering
+
+## CRITICAL DEBUGGING LIMITATION - MOBILE APPS
+**❌ NO CONSOLE/FILE PRINTING**: Mobile apps cannot use `print()`, console.log, or file writing for debugging
+**✅ ONLY MOBILE APP LOGS WORK**: Use `DebugLogHelper.addDebugLog()` for all debugging output
+**Debug Access**: Mobile app logs are accessible through the app's debug interface
+**Never Use**: `print()`, `console.log()`, file writing, or any console-based debugging
+**Always Use**: `DebugLogHelper.addDebugLog('message')` for mobile debugging
 
 ## KEY FILES - CURRENT STATE
-- `lib/services/subscription_encryption_service.dart` - **SECURE**: Full entropy DH + AES-128-CBC encryption (working)
-- `lib/services/subscription_service.dart` - Enhanced with newsletter_id parameter for consistent decryption
-- `lib/widgets/subscription_credential_dialog.dart` - Updated with newsletter_id support
-- `lib/screens/home_screen.dart` - **PHASE 2**: Visual status management + Phase 3 imports disabled
-- `pubspec.yaml` - Version 1.2.8+42
+**Main File**: `lib/screens/my_tours_screen.dart` - Contains both Tours and Articles ListView
+- **Tours Mode**: `_buildToursView()` - Simple, untouched, working perfectly
+- **Articles Mode**: `_buildNewsView()` - Has scroll listener, debug UI, navigation reset logic
+- **Scroll Logic**: `_setupScrollListener()` - Tracks scroll position and triggers navigation reset
+- **Debug Variables**: `_currentVisibleIndex`, `_hasScrolledDown` for tracking state
 
-## PHASE 2 WORKFLOW - IMPLEMENTED
-**Revised Based on User Q&A Feedback**:
-1. **Credential Submission** → Visual status change (Red → Green)
-2. **Stay in Dialog** → User can add credentials for multiple domains
-3. **No Automatic Refresh** → No processing delays or automatic updates
-4. **Error Handling** → Only during article download with specific failure reasons
-5. **Visual Indicators**: Black/thumbs up (free), Red/error (subscription), Green/open lock (subscribed)
+**Version**: `pubspec.yaml` - Currently v1.2.8+96
 
-## LATEST SESSION WORK - SERVICES DECRYPTION BUG RESOLVED (v1.2.8+42)
-**🎉 SUCCESS**: Encryption bug resolved and Services decryption fix implemented
-**Root Cause Identified**: Non-deterministic newsletter_id lookup causing key mismatch
-**Mobile Fix**: Added newsletter_id parameter to ensure consistent key usage
-**Security Status**: 🔒 **SECURE** - End-to-end encryption working correctly
+## SYSTEMATIC RESTORATION PROTOCOL
+**Feature Restoration Order**:
+1. **v1.2.8+96**: Complex subtitle (Column with article type + original request)
+2. **v1.2.8+97**: FutureBuilder title (async title loading)
+3. **v1.2.8+98**: Complex leading (Column with icon + type badge)
+4. **v1.2.8+99**: Selection mode (Checkbox leading)
+5. **v1.2.8+100**: Scroll listener + yellow highlight
+6. **v1.2.8+101**: Filtering logic
 
-**Resolution Timeline**:
-- ✅ **v1.2.8+41**: Fixed mobile encryption by removing Phase 3 import conflicts
-- ✅ **Services Analysis**: Identified newsletter_id inconsistency between key exchange and decryption
-- ✅ **Services Fix**: Updated /submit_credentials to accept newsletter_id parameter
-- ✅ **v1.2.8+42**: Mobile app updated to include newsletter_id + fixed build errors (Map<String, dynamic>)
-
-**Current Status**: v1.2.8+43 with Phase 3 functionality restored - encryption working, build errors resolved, full subscription features enabled
-
-## PHASE 3 SUBSCRIPTION FEATURES - FULLY RESTORED
-**Current Status**: Phase 3 functionality fully restored and enabled in v1.2.8+43
-**Phase 3 Complete Implementation**:
-1. ✅ **Credential Storage Service** (`credential_storage_service.dart`) → Secure local storage with flutter_secure_storage, 30-day expiry
-2. ✅ **Article Storage Service** (`subscription_article_storage.dart`) → Local caching with metadata, 500MB limit, 50 articles per domain
-3. ✅ **Enhanced Subscription Service** → Full integration with Phase 3 services, automatic credential storage
-4. ✅ **Visual Indicators** → Download icons and highlighting for locally stored articles in selection dialog
-5. ✅ **Management Screen** (`subscription_management_screen.dart`) → Complete dashboard with statistics, cleanup, domain management
-6. ✅ **Import Conflicts Resolved** → All Phase 3 imports re-enabled without breaking encryption functionality
-7. ✅ **Credential Auto-Storage** → Successful credentials automatically stored locally for future use
-8. ✅ **Local Article Detection** → Articles stored locally are properly detected and highlighted
-
-## IMMEDIATE NEXT STEPS - TESTING PHASE 3
-1. ✅ **Phase 3 Restoration Complete** → All imports and functionality re-enabled in v1.2.8+43
-2. 🔄 **Test v1.2.8+43** → Verify Phase 3 functionality works with encryption (build test required)
-3. 🔄 **Verify Credential Storage** → Test automatic credential storage after successful submission
-4. 🔄 **Test Article Caching** → Verify subscription articles are stored locally with metadata
-5. 🔄 **Visual Indicator Testing** → Confirm locally stored articles show download icons
-6. 🔄 **Management Screen Testing** → Test subscription management dashboard functionality
-7. 🔄 **End-to-End Workflow** → Complete subscription workflow from credential entry to offline access
+**Testing Protocol**:
+- Test each version individually
+- If scrolling breaks, that feature is the culprit
+- Implement scroll-safe version of breaking feature
+- Continue restoration until all features work with perfect scrolling
 
 ## CRITICAL REMINDERS
 - ❌ **NEVER attempt APK build in Windows** - Always requires Ubuntu VM
 - 🌿 **All commits go to Newsletters branch** - NOT main branch
-- 🔐 **Security**: Mobile app uses secure full entropy method (RFC 3526 DH + AES-128-CBC)
-- ✅ **Stage 1**: Subscription encryption and credential submission working
-- 🔄 **Next**: Implement Phase 2 features (article download, status, storage)
+- 🎵 **Tours Mode Protected**: Never modify `_buildToursView()` - it works perfectly
+- 📱 **Audio Mode Only**: All scroll fixes apply only to `_buildNewsView()`
+- 🔄 **Version Management**: Only increment version for functional changes, not build fixes
 
 ## Post-Compaction Recovery Instructions
 **When chat history is compacted, read both @remind_ai.md and @remind_mobile_ai.md to get complete context**
 
 ### IMMEDIATE CONTEXT AFTER COMPACTION:
-- **✅ SUCCESS**: Encryption, decryption, and build bugs ALL RESOLVED - subscription feature working
-- **Root Cause Found**: Phase 3 import conflicts prevented encryptCredentials + newsletter_id mismatch + type mismatch in requestBody
-- **Mobile Fix Applied**: Removed conflicting imports (v1.2.8+41) + added newsletter_id parameter + fixed Map<String, dynamic> (v1.2.8+42)
-- **Services Fix**: Updated /submit_credentials endpoint to accept newsletter_id for consistent decryption
-- **Current Status**: v1.2.8+42 with working encryption, Services decryption fix, and build errors resolved
-- **Key Achievement**: End-to-end secure credential submission functional + APK builds successfully
-- **Files Modified**: All subscription services updated with newsletter_id support, import conflict resolution, and type fixes
-- **Build Status**: v1.2.8+42 builds successfully - ready for testing complete credential workflow
-- **Priority**: Test complete workflow and restore Phase 3 features (local storage, caching, management)
-- **Next Step**: Verify v1.2.8+42 works end-to-end, then incrementally re-enable Phase 3 imports and functionality
+- **Current Status**: v1.2.8+96 systematic feature restoration in progress
+- **Breakthrough**: Complex ListView widgets were the root cause, not scroll physics
+- **Working Base**: v1.2.8+95 with simplified ListView structure scrolls perfectly
+- **Current Test**: v1.2.8+96 testing complex subtitle restoration
+- **Restoration Plan**: Add features incrementally to identify exact breaking point
+- **Next Phase**: Complete feature restoration with scroll-safe implementations
+- **⚠️ CRITICAL**: Always get approval before making any code changes
+
+## ENCRYPTION IMPLEMENTATION - VERIFIED SECURE
+**Method**: RFC 3526 Diffie-Hellman (2048-bit) → SHA-256 full entropy → AES-128-CBC
+**Status**: ✅ Working correctly in Phase 2 implementation
+**Files**: subscription_encryption_service.dart, subscription_service.dart, subscription_credential_dialog.dart
+
+## PHASE 2 SUBSCRIPTION SYSTEM - COMPLETE
+**Status**: ✅ Visual status management and error handling implemented
+**Features**: Red/error → Green/open lock transitions, multi-domain support, enhanced article status
+**Ready For**: Phase 3 integration when scroll bugs are resolved
+
+## BUILD & TEST WORKFLOW
+**Build Process**: Ubuntu VM required - `bash build_flutter_clean.sh`
+**Test Protocol**: Install APK → Test scroll behavior → Report results with debug info
+**Debug Feedback**: Use yellow highlight and manual refresh to describe exact behavior
+**Version Control**: Newsletters branch, increment version only for functional changes

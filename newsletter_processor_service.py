@@ -131,6 +131,49 @@ def is_binary_content(text):
     except Exception:
         return True
 
+def is_english_content(text):
+    """Detect if content is primarily English to avoid processing non-English content"""
+    if not text or len(text) < 50:
+        return True  # Allow short content through
+    
+    try:
+        # Count English characters vs non-English characters
+        english_chars = sum(1 for c in text if ord(c) < 128)  # ASCII range
+        total_chars = len(text)
+        
+        if total_chars == 0:
+            return True
+        
+        english_ratio = english_chars / total_chars
+        
+        # If less than 70% ASCII characters, likely non-English
+        if english_ratio < 0.7:
+            logging.info(f"Non-English content detected: {english_ratio:.2%} ASCII characters")
+            return False
+        
+        # Check for common non-English patterns
+        non_english_patterns = [
+            r'[\u4e00-\u9fff]',  # Chinese characters
+            r'[\u3040-\u309f]',  # Hiragana
+            r'[\u30a0-\u30ff]',  # Katakana
+            r'[\uac00-\ud7af]',  # Korean
+            r'[\u0400-\u04ff]',  # Cyrillic
+            r'[\u0590-\u05ff]',  # Hebrew
+            r'[\u0600-\u06ff]',  # Arabic
+        ]
+        
+        import re
+        for pattern in non_english_patterns:
+            if re.search(pattern, text):
+                logging.info(f"Non-English script detected: {pattern}")
+                return False
+        
+        return True
+        
+    except Exception as e:
+        logging.error(f"Error detecting language: {e}")
+        return True  # Default to allowing content
+
 def clean_text_content(text):
     """Enhanced clean and validate text content, removing binary contamination"""
     if not text or not isinstance(text, str):
@@ -182,6 +225,218 @@ def clean_text_content(text):
     except Exception as e:
         logging.error(f"Error cleaning text content: {e}")
         return ""
+
+def analyze_content_quality(soup, url):
+    """Analyze content quality and detect ads/solicitations - ENHANCED for PR Newswire"""
+    try:
+        # Extract main content with enhanced selectors for news sites
+        content_selectors = [
+            'article', '.post-content', '.entry-content', 'main', '[role="main"]',
+            '.article-content', '.story-content', '.news-content', '.press-release-content',
+            '.release-body', '.article-body', '.content-body', '.story-body'
+        ]
+        
+        # PR Newswire specific selectors - CRITICAL FIX
+        if 'prnewswire.com' in url:
+            content_selectors = [
+                '.release-body',
+                '.news-release-text', 
+                '.release-content',
+                '.press-release-content',
+                '[data-module="ArticleBody"]',
+                '.article-wrap .content',
+                '.news-release-content'
+            ] + content_selectors
+            logging.info(f"Using PR Newswire specific selectors for {url}")
+        
+        main_content = ""
+        
+        for selector in content_selectors:
+            element = soup.select_one(selector)
+            if element:
+                # Remove ads, scripts, and navigation
+                for tag in element.find_all(['script', 'style', 'nav', 'header', 'footer', 'aside']):
+                    tag.decompose()
+                main_content = element.get_text(separator=' ', strip=True)
+                logging.info(f"Found content with selector '{selector}': {len(main_content)} chars")
+                break
+        
+        # Enhanced fallback for PR Newswire and news sites
+        if not main_content or len(main_content) < 1000:
+            # Try to extract all paragraphs for comprehensive content
+            paragraphs = soup.find_all('p')
+            if paragraphs:
+                paragraph_texts = [p.get_text(separator=' ', strip=True) for p in paragraphs]
+                # For PR Newswire, include shorter paragraphs (they have structured content)
+                min_length = 30 if 'prnewswire.com' in url else 50
+                substantial_paragraphs = [p for p in paragraph_texts if len(p) > min_length]
+                
+                if substantial_paragraphs:
+                    combined_content = ' '.join(substantial_paragraphs)
+                    # Use combined content if it's significantly longer
+                    if len(combined_content) > len(main_content):
+                        main_content = combined_content
+                        logging.info(f"Enhanced paragraph extraction: {len(substantial_paragraphs)} paragraphs, {len(main_content)} chars")
+        
+        # Additional PR Newswire content extraction strategies
+        if 'prnewswire.com' in url and len(main_content) < 2000:
+            try:
+                # Try div-based content extraction
+                content_divs = soup.find_all('div', class_=lambda x: x and any(term in x.lower() for term in ['content', 'body', 'text', 'release']))
+                for div in content_divs:
+                    div_text = div.get_text(separator=' ', strip=True)
+                    if len(div_text) > len(main_content):
+                        main_content = div_text
+                        logging.info(f"PR Newswire div extraction: {len(main_content)} chars")
+                        break
+                
+                # Try section-based extraction
+                if len(main_content) < 2000:
+                    sections = soup.find_all('section')
+                    for section in sections:
+                        section_text = section.get_text(separator=' ', strip=True)
+                        if len(section_text) > len(main_content) and 'NYSE' in section_text:
+                            main_content = section_text
+                            logging.info(f"PR Newswire section extraction: {len(main_content)} chars")
+                            break
+            except Exception as pr_error:
+                logging.error(f"PR Newswire enhanced extraction failed: {pr_error}")
+        
+        # Quality metrics
+        content_length = len(main_content)
+        word_count = len(main_content.split())
+        
+        # Detect advertisements
+        ad_indicators = [
+            'subscribe now', 'sign up', 'register', 'login required', 'premium content',
+            'advertisement', 'sponsored', 'click here', 'buy now', 'special offer',
+            'limited time', 'act now', 'free trial', 'upgrade to premium'
+        ]
+        
+        ad_score = sum(1 for indicator in ad_indicators if indicator in main_content.lower())
+        
+        # Detect solicitations
+        solicitation_indicators = [
+            'donate', 'support us', 'become a member', 'join our newsletter',
+            'follow us', 'share this', 'like us on', 'subscribe to our',
+            'get updates', 'stay informed', 'never miss'
+        ]
+        
+        solicitation_score = sum(1 for indicator in solicitation_indicators if indicator in main_content.lower())
+        
+        # Calculate quality score
+        quality_score = content_length
+        quality_score -= (ad_score * 200)  # Penalize ads heavily
+        quality_score -= (solicitation_score * 100)  # Penalize solicitations
+        
+        # Bonus for substantial content
+        if word_count > 100:
+            quality_score += 500
+        if word_count > 500:
+            quality_score += 1000
+        
+        # Extra bonus for PR Newswire content (high-quality press releases)
+        if 'prnewswire.com' in url and content_length > 2000:
+            quality_score += 2000
+            logging.info(f"PR Newswire quality bonus applied: +2000")
+        
+        return {
+            'content_length': content_length,
+            'word_count': word_count,
+            'ad_score': ad_score,
+            'solicitation_score': solicitation_score,
+            'quality_score': quality_score,
+            'content_preview': main_content[:200] + '...' if len(main_content) > 200 else main_content
+        }
+        
+    except Exception as e:
+        logging.error(f"Error analyzing content quality for {url}: {e}")
+        return {
+            'content_length': 0,
+            'word_count': 0,
+            'ad_score': 10,  # Assume worst case on error
+            'solicitation_score': 10,
+            'quality_score': -1000,
+            'content_preview': 'Error analyzing content'
+        }
+
+def intelligent_redirect_analysis(url, max_redirects=3):
+    """Intelligently decide whether to follow redirects based on content quality"""
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate'
+        }
+        
+        # Get original content
+        try:
+            original_response = requests.get(url, headers=headers, timeout=10)
+            if original_response.status_code != 200:
+                logging.warning(f"Original URL returned {original_response.status_code}, will try redirect")
+                original_quality = {'quality_score': -1000}  # Force redirect attempt
+            else:
+                original_soup = BeautifulSoup(original_response.content, 'html.parser')
+                original_quality = analyze_content_quality(original_soup, url)
+                logging.info(f"Original content quality: {original_quality['quality_score']} (length: {original_quality['content_length']}, ads: {original_quality['ad_score']})")
+        except Exception as e:
+            logging.error(f"Error fetching original content: {e}")
+            original_quality = {'quality_score': -1000}  # Force redirect attempt
+        
+        # Check for redirects - use GET with allow_redirects=True to follow complete chain
+        try:
+            # Follow complete redirect chain to final destination
+            redirect_response = requests.get(url, headers=headers, allow_redirects=True, timeout=15)
+            final_redirect_url = redirect_response.url
+            
+            if final_redirect_url == url:
+                logging.info(f"No redirect detected for {url}")
+                return url  # No redirect, use original
+            
+            logging.info(f"Redirect chain detected: {url} -> {final_redirect_url}")
+            redirect_url = final_redirect_url
+            
+            # Use the redirect response content (already fetched)
+            if redirect_response.status_code != 200:
+                logging.warning(f"Redirect URL returned {redirect_response.status_code}, using original")
+                return url
+            
+            redirect_soup = BeautifulSoup(redirect_response.content, 'html.parser')
+            redirect_quality = analyze_content_quality(redirect_soup, redirect_url)
+            
+            logging.info(f"Redirect content quality: {redirect_quality['quality_score']} (length: {redirect_quality['content_length']}, ads: {redirect_quality['ad_score']})")
+            
+            # Decision logic
+            quality_improvement = redirect_quality['quality_score'] - original_quality['quality_score']
+            
+            # Don't follow if redirect has high ad/solicitation scores
+            if redirect_quality['ad_score'] > 3 or redirect_quality['solicitation_score'] > 3:
+                logging.info(f"Redirect rejected: High ad/solicitation score (ads: {redirect_quality['ad_score']}, solicitations: {redirect_quality['solicitation_score']})")
+                return url
+            
+            # Follow if significant quality improvement
+            if quality_improvement > 1000:
+                logging.info(f"Redirect accepted: Significant quality improvement (+{quality_improvement})")
+                return redirect_url
+            
+            # Follow if redirect has much more content and low ad score
+            if (redirect_quality['content_length'] > original_quality['content_length'] * 2 and 
+                redirect_quality['ad_score'] <= 1):
+                logging.info(f"Redirect accepted: Much more content ({redirect_quality['content_length']} vs {original_quality['content_length']}) with low ads")
+                return redirect_url
+            
+            # Don't follow otherwise
+            logging.info(f"Redirect rejected: Quality improvement insufficient (+{quality_improvement})")
+            return url
+            
+        except Exception as e:
+            logging.error(f"Error analyzing redirect: {e}")
+            return url  # Use original on error
+        
+    except Exception as e:
+        logging.error(f"Error in intelligent redirect analysis: {e}")
+        return url
 
 def clean_url(url):
     """Remove query parameters for uniqueness check, but preserve Apple Podcasts episode IDs"""
@@ -282,19 +537,55 @@ def get_newsletters_v2():
         
         newsletters = []
         for row in cursor.fetchall():
-            # Extract domain name from URL for display
+            # Enhanced newsletter naming with source emphasis
             url = row[1]
             try:
                 parsed = urlparse(url)
                 domain_name = parsed.netloc.replace('www.', '')
-                # Extract issue/title from path
                 path_parts = [p for p in parsed.path.split('/') if p]
-                title_part = path_parts[-1] if path_parts else 'Newsletter'
-                if 'issue-' in title_part:
-                    issue_num = title_part.split('issue-')[1].split('-')[0]
-                    display_name = f"{domain_name} Issue-{issue_num}"
+                
+                # Enhanced MailChimp naming - emphasize the actual source
+                if 'mailchi.mp' in domain_name:
+                    # Extract the actual publisher from the path
+                    if 'bostonglobe' in url:
+                        publisher = 'Boston Globe'
+                        # Extract newsletter name from path
+                        if 'starting-point' in url:
+                            newsletter_name = 'Starting Point'
+                        elif 'trendlines' in url:
+                            newsletter_name = 'Trendlines'
+                        elif 'the-boston-globe-today' in url:
+                            newsletter_name = 'Today'
+                        else:
+                            newsletter_name = 'Newsletter'
+                        display_name = f"{publisher} {newsletter_name} (MailChimp)"
+                    else:
+                        # Generic MailChimp handling for other publishers
+                        display_name = f"MailChimp Newsletter ({domain_name})"
+                
+                # Enhanced Constant Contact naming
+                elif 'constantcontact' in domain_name or 'ctctcdn' in domain_name:
+                    display_name = f"Newsletter (Constant Contact)"
+                
+                # Enhanced email service naming
+                elif 'view.email.' in domain_name:
+                    # Extract publisher from subdomain
+                    if 'bostonglobe' in domain_name:
+                        display_name = "Boston Globe Email"
+                    else:
+                        publisher = domain_name.replace('view.email.', '').replace('.com', '')
+                        display_name = f"{publisher.title()} Email"
+                
+                # Standard domain-based naming
                 else:
-                    display_name = f"{domain_name} ({row[2] or 'Newsletter'})"
+                    # Extract issue/title from path
+                    title_part = path_parts[-1] if path_parts else 'Newsletter'
+                    if 'issue-' in title_part:
+                        issue_num = title_part.split('issue-')[1].split('-')[0]
+                        display_name = f"{domain_name} Issue-{issue_num}"
+                    else:
+                        display_name = f"{domain_name} ({row[2] or 'Newsletter'})"
+                        
             except:
                 display_name = url
             
@@ -468,6 +759,13 @@ def process_newsletter():
         
         logging.info(f"Processing newsletter: {newsletter_url}")
         
+        # Intelligently analyze redirects and decide whether to follow
+        processing_url = intelligent_redirect_analysis(newsletter_url)
+        if processing_url != newsletter_url:
+            logging.info(f"Intelligent redirect decision: Using {processing_url} for processing")
+        else:
+            logging.info(f"Using original URL for processing: {newsletter_url}")
+        
         conn = get_db_connection()
         cursor = conn.cursor()
         
@@ -526,13 +824,13 @@ def process_newsletter():
         
         # Check if this is a protected site that needs browser automation
         # REMOVED Guy Raz from browser automation - binary detection is now fixed
-        use_browser = any(domain in newsletter_url for domain in ['quora.com', 'medium.com'])
+        use_browser = any(domain in processing_url for domain in ['quora.com', 'medium.com'])
         
         if use_browser:
-            logging.info(f"Using browser automation for protected site: {newsletter_url}")
+            logging.info(f"Using browser automation for protected site: {processing_url}")
             try:
                 from browser_automation import extract_full_newsletter_with_browser
-                browser_result = extract_full_newsletter_with_browser(newsletter_url)
+                browser_result = extract_full_newsletter_with_browser(processing_url)
                 
                 if browser_result.get('success'):
                     # Use the original HTML structure for pattern detection
@@ -561,7 +859,7 @@ def process_newsletter():
         else:
             # Standard HTTP request for non-protected sites
             try:
-                response = requests.get(newsletter_url, headers=headers, timeout=10)
+                response = requests.get(processing_url, headers=headers, timeout=10)
                 
             except requests.exceptions.RequestException as e:
                 error_msg = f"Network error accessing newsletter: {str(e)}"
@@ -575,7 +873,7 @@ def process_newsletter():
                 })
             
             if response.status_code == 403:
-                error_msg = f"Access Denied: {urlparse(newsletter_url).netloc} is blocking automated access (HTTP 403 Forbidden). This site uses anti-scraping protection that prevents our newsletter processor from accessing the content."
+                error_msg = f"Access Denied: {urlparse(processing_url).netloc} is blocking automated access (HTTP 403 Forbidden). This site uses anti-scraping protection that prevents our newsletter processor from accessing the content."
                 logging.error(error_msg)
                 return jsonify({
                     "status": "error",
@@ -606,63 +904,112 @@ def process_newsletter():
         
         # 1. MAIN NEWSLETTER ARTICLE - Extract newsletter content itself
         try:
-            # Enhanced content extraction for Substack newsletters
+            # Enhanced content extraction for newsletters - use processing_url for detection
             main_content = ""
             
             # Try platform-specific selectors first
             
-            # 1. Substack selectors
-            substack_selectors = [
-                '.available-content .body.markup',  # Substack main content
-                '.post-content .body.markup',
-                'article .body.markup',
-                '.single-post .body.markup'
-            ]
-            
-            for selector in substack_selectors:
-                try:
-                    element = soup.select_one(selector)
-                    if element:
-                        # Remove problematic elements that might contain binary data
-                        for tag in element.find_all(['script', 'style', 'img', 'svg', 'canvas', 'object', 'embed']):
-                            tag.decompose()
-                        
-                        # Enhanced text extraction for Guy Raz newsletter
-                        text = element.get_text(separator=' ', strip=True)
-                        
-                        # Convert Unicode characters to ASCII equivalents for better TTS
-                        if 'guyraz.substack.com' in newsletter_url:
-                            text = text.replace(''', "'").replace(''', "'").replace('"', '"').replace('"', '"').replace('—', '-').replace('–', '-')
-                            logging.info(f"Guy Raz Unicode replacement applied: {len(text)} chars")
-                        
-
-                        
-                        cleaned_text = clean_text_content(text)
-                        
-
-                        
-                        # Binary detection AFTER Unicode replacement
-                        if is_binary_content(cleaned_text):
-                            logging.warning(f"Binary content detected after cleaning, skipping this selector")
-                            continue
-                        
-                        # Enhanced validation
-                        if len(cleaned_text) > 200 and not is_binary_content(cleaned_text):
-                            # Additional word structure validation
-                            words = cleaned_text.split()
-                            valid_words = sum(1 for word in words if len(word) > 1 and any(c.isalnum() for c in word))
-                            if len(words) > 0 and (valid_words / len(words)) > 0.5:
+            # 1. PR Newswire selectors - CRITICAL FIX for main content extraction
+            if 'prnewswire.com' in processing_url:
+                prnewswire_selectors = [
+                    '.release-body',
+                    '.news-release-text', 
+                    '.release-content',
+                    '.press-release-content',
+                    '[data-module="ArticleBody"]',
+                    '.article-wrap .content',
+                    '.news-release-content'
+                ]
+                
+                for selector in prnewswire_selectors:
+                    try:
+                        element = soup.select_one(selector)
+                        if element:
+                            # Remove problematic elements
+                            for tag in element.find_all(['script', 'style', 'img', 'svg', 'canvas', 'object', 'embed']):
+                                tag.decompose()
+                            
+                            text = element.get_text(separator=' ', strip=True)
+                            cleaned_text = clean_text_content(text)
+                            
+                            if not is_binary_content(cleaned_text) and len(cleaned_text) > 200:
                                 main_content = cleaned_text
-                                logging.info(f"Found Substack content with selector '{selector}': {len(cleaned_text)} chars, {valid_words}/{len(words)} valid words")
+                                logging.info(f"Found PR Newswire content with selector '{selector}': {len(cleaned_text)} chars")
                                 break
-                            else:
-                                logging.warning(f"Content failed word validation: {valid_words}/{len(words)} valid words")
-                except Exception as e:
-                    logging.debug(f"Selector '{selector}' failed: {e}")
-                    continue
+                    except Exception as e:
+                        logging.debug(f"PR Newswire selector '{selector}' failed: {e}")
+                        continue
+                
+                # Enhanced paragraph extraction for PR Newswire if selectors didn't work
+                if not main_content or len(main_content) < 2000:
+                    try:
+                        paragraphs = soup.find_all('p')
+                        if paragraphs:
+                            paragraph_texts = [p.get_text(separator=' ', strip=True) for p in paragraphs]
+                            # Include shorter paragraphs for PR Newswire (structured content)
+                            substantial_paragraphs = [p for p in paragraph_texts if len(p) > 30]
+                            
+                            if substantial_paragraphs:
+                                combined_content = ' '.join(substantial_paragraphs)
+                                if len(combined_content) > len(main_content):
+                                    main_content = combined_content
+                                    logging.info(f"PR Newswire paragraph extraction: {len(substantial_paragraphs)} paragraphs, {len(main_content)} chars")
+                    except Exception as pr_error:
+                        logging.error(f"PR Newswire paragraph extraction failed: {pr_error}")
             
-            # 2. MailChimp selectors
-            if not main_content and ('mailchi.mp' in newsletter_url or 'mailchimp' in str(soup).lower()):
+            # 2. Substack selectors
+            if not main_content:
+                substack_selectors = [
+                    '.available-content .body.markup',  # Substack main content
+                    '.post-content .body.markup',
+                    'article .body.markup',
+                    '.single-post .body.markup'
+                ]
+                
+                for selector in substack_selectors:
+                    try:
+                        element = soup.select_one(selector)
+                        if element:
+                            # Remove problematic elements that might contain binary data
+                            for tag in element.find_all(['script', 'style', 'img', 'svg', 'canvas', 'object', 'embed']):
+                                tag.decompose()
+                            
+                            # Enhanced text extraction for Guy Raz newsletter
+                            text = element.get_text(separator=' ', strip=True)
+                            
+                            # Convert Unicode characters to ASCII equivalents for better TTS
+                            if 'guyraz.substack.com' in processing_url:
+                                text = text.replace(''', "'").replace(''', "'").replace('"', '"').replace('"', '"').replace('—', '-').replace('–', '-')
+                                logging.info(f"Guy Raz Unicode replacement applied: {len(text)} chars")
+                            
+
+                            
+                            cleaned_text = clean_text_content(text)
+                            
+
+                            
+                            # Binary detection AFTER Unicode replacement
+                            if is_binary_content(cleaned_text):
+                                logging.warning(f"Binary content detected after cleaning, skipping this selector")
+                                continue
+                            
+                            # Enhanced validation
+                            if len(cleaned_text) > 200 and not is_binary_content(cleaned_text):
+                                # Additional word structure validation
+                                words = cleaned_text.split()
+                                valid_words = sum(1 for word in words if len(word) > 1 and any(c.isalnum() for c in word))
+                                if len(words) > 0 and (valid_words / len(words)) > 0.5:
+                                    main_content = cleaned_text
+                                    logging.info(f"Found Substack content with selector '{selector}': {len(cleaned_text)} chars, {valid_words}/{len(words)} valid words")
+                                    break
+                                else:
+                                    logging.warning(f"Content failed word validation: {valid_words}/{len(words)} valid words")
+                    except Exception as e:
+                        logging.debug(f"Selector '{selector}' failed: {e}")
+                        continue
+            
+            # 3. MailChimp selectors
+            if not main_content and ('mailchi.mp' in processing_url or 'mailchimp' in str(soup).lower()):
                 mailchimp_selectors = [
                     '.bodyContainer',
                     '#templateBody', 
@@ -689,8 +1036,8 @@ def process_newsletter():
                         logging.debug(f"MailChimp selector '{selector}' failed: {e}")
                         continue
             
-            # 3. Email newsletter selectors (Boston Globe, etc.)
-            if not main_content and ('view.email' in newsletter_url or 'email.' in newsletter_url):
+            # 4. Email newsletter selectors (Boston Globe, etc.)
+            if not main_content and ('view.email' in processing_url or 'email.' in processing_url):
                 email_selectors = [
                     'table[role="presentation"]',
                     'td[class*="content"]',
@@ -738,7 +1085,7 @@ def process_newsletter():
                             text = element.get_text(separator=' ', strip=True)
                             
                             # Convert Unicode characters to ASCII equivalents for better TTS
-                            if 'guyraz.substack.com' in newsletter_url:
+                            if 'guyraz.substack.com' in processing_url:
                                 text = text.replace(''', "'").replace(''', "'").replace('"', '"').replace('"', '"').replace('—', '-').replace('–', '-')
                                 logging.info(f"Guy Raz Unicode replacement applied (generic): {len(text)} chars")
                             
@@ -757,7 +1104,7 @@ def process_newsletter():
                         continue
             
             # Guy Raz specific fallback: Extract from page title and meta description
-            if not main_content and 'guyraz.substack.com' in newsletter_url:
+            if not main_content and 'guyraz.substack.com' in processing_url:
                 try:
                     logging.info("Guy Raz fallback: Extracting from title and meta description")
                     
@@ -804,7 +1151,7 @@ def process_newsletter():
                     logging.info(f"Guy Raz final fallback: Using minimal description")
             
             # Quora-specific content extraction for newsletters
-            if not main_content and 'quora.com' in newsletter_url:
+            if not main_content and 'quora.com' in processing_url:
                 try:
                     # Get all text content from body with line breaks preserved
                     body_text = soup.get_text(separator='\n', strip=True)
@@ -873,8 +1220,8 @@ def process_newsletter():
                     logging.info(f"Removed duplicate title from content start")
                 
                 article_urls.append({
-                    'url': newsletter_url,
-                    'clean_url': clean_url(newsletter_url),
+                    'url': processing_url,  # Use redirected URL, not original
+                    'clean_url': clean_url(processing_url),
                     'title': clean_title,
                     'content': main_content,  # Pre-extracted content
                     'date': datetime.now(),
@@ -890,8 +1237,8 @@ def process_newsletter():
         # 2. LINKED ARTICLES - Enhanced Pattern Recognition
         from newsletter_pattern_detector import detect_newsletter_patterns
         
-        # Use pattern recognition to find articles
-        pattern_articles = detect_newsletter_patterns(soup, newsletter_url)
+        # Use pattern recognition to find articles - use processing_url for better pattern detection
+        pattern_articles = detect_newsletter_patterns(soup, processing_url)
         logging.info(f"Pattern recognition found {len(pattern_articles)} articles")
         
         # Add pattern-detected articles
@@ -907,34 +1254,95 @@ def process_newsletter():
             })
         
         # Fallback: Extract URLs from all clickable HTML elements (for missed patterns)
-        all_urls = extract_all_clickable_urls(soup, newsletter_url)
+        all_urls = extract_all_clickable_urls(soup, processing_url)
         logging.info(f"Fallback extraction found {len(all_urls)} total clickable URLs")
         
-        # Add any missed news articles from known domains
+        # Enhanced URL filtering for PR Newswire and related articles
         existing_urls = {article['url'] for article in article_urls}
         for url in all_urls:
             if url in existing_urls:
                 continue
                 
-            # News article URLs from known domains
-            if any(domain in url for domain in [
-                'bostonglobe.com', 'nytimes.com', 'washingtonpost.com', 'reuters.com', 'ap.org',
-                'newtonbeacon.org', 'boston.com', 'wbur.org', 'wcvb.com', 'nbcboston.com'
+            # Skip internal/navigation URLs
+            if any(skip in url.lower() for skip in [
+                '/subscribe', '/login', '/account', '/newsletter', '/events/community/add',
+                'javascript:', 'mailto:', '#', '/search', '/contact', '/about', '/privacy',
+                '/terms', '/cookie', '/rss', '/feed', 'facebook.com', 'twitter.com', 'linkedin.com'
             ]):
-                # Skip subscription/navigation pages
-                if not any(skip in url.lower() for skip in ['/subscribe', '/login', '/account', '/newsletter', '/events/community/add']):
-                    article_urls.append({
-                        'url': url,
-                        'clean_url': clean_url(url),
-                        'title': 'News Article',
-                        'date': datetime.now(),
-                        'is_main_article': False,
-                        'pattern': 'fallback_domain'
-                    })
+                continue
+            
+            # News article URLs from known domains
+            news_domains = [
+                'bostonglobe.com', 'nytimes.com', 'washingtonpost.com', 'reuters.com', 'ap.org',
+                'newtonbeacon.org', 'boston.com', 'wbur.org', 'wcvb.com', 'nbcboston.com',
+                'bloomberg.com', 'wsj.com', 'cnbc.com', 'marketwatch.com', 'fortune.com'
+            ]
+            
+            # Company/investor URLs that might have valuable content
+            company_domains = [
+                'investor.', 'investors.', 'ir.', '/investor-relations', '/press-release',
+                '/news-release', '/press/', '/news/', '/media/'
+            ]
+            
+            # PR Newswire related content
+            pr_indicators = [
+                'prnewswire.com', 'businesswire.com', 'globenewswire.com', 'marketwatch.com/press-release'
+            ]
+            
+            is_relevant = False
+            article_type = 'News Article'
+            
+            # Check for news domains
+            if any(domain in url for domain in news_domains):
+                is_relevant = True
+                article_type = 'News Article'
+            
+            # Check for company/investor content
+            elif any(indicator in url.lower() for indicator in company_domains):
+                is_relevant = True
+                article_type = 'Company News'
+            
+            # Check for PR/press release content
+            elif any(indicator in url for indicator in pr_indicators):
+                is_relevant = True
+                article_type = 'Press Release'
+            
+            # For PR Newswire pages, also check for related company links
+            elif 'prnewswire.com' in processing_url and len(url) > 50:
+                # Look for substantial URLs that might be company pages or related content
+                parsed_url = urlparse(url)
+                if (parsed_url.netloc and 
+                    not parsed_url.netloc.endswith('.png') and 
+                    not parsed_url.netloc.endswith('.jpg') and
+                    len(parsed_url.path) > 5):
+                    is_relevant = True
+                    article_type = 'Related Content'
+            
+            # Skip non-English URLs to prevent processing costs
+            if '/kr/' in url or '/zh/' in url or '/ja/' in url or '/es/' in url or '/fr/' in url or '/de/' in url:
+                continue
+                
+            if is_relevant:
+                article_urls.append({
+                    'url': url,
+                    'clean_url': clean_url(url),
+                    'title': article_type,
+                    'date': datetime.now(),
+                    'is_main_article': False,
+                    'pattern': 'enhanced_fallback',
+                    'article_type': article_type
+                })
+                
+                # Limit to prevent too many articles
+                if len(article_urls) >= max_articles:
+                    break
         
-        # Limit articles
-        article_urls = article_urls[:max_articles]
-        logging.info(f"Processing {len(article_urls)} articles")
+        # Limit articles but ensure main article is first
+        main_articles = [a for a in article_urls if a.get('is_main_article')]
+        other_articles = [a for a in article_urls if not a.get('is_main_article')]
+        article_urls = main_articles + other_articles[:max_articles-len(main_articles)]
+        
+        logging.info(f"Processing {len(article_urls)} articles: {len(main_articles)} main + {len(other_articles[:max_articles-len(main_articles)])} additional")
         
         articles_created = 0
         articles_requiring_subscription = 0
@@ -1329,6 +1737,13 @@ def process_newsletter():
                     failed_articles.append({"url": article['url'], "error": error_msg})
                     continue
                 
+                # CRITICAL: English language validation to prevent TTS costs for non-English content
+                if not is_english_content(article_content):
+                    error_msg = f"REJECTED: Non-English content detected - avoiding TTS costs"
+                    logging.error(f"LANGUAGE VALIDATION FAILED: {error_msg}")
+                    failed_articles.append({"url": article['url'], "error": error_msg})
+                    continue
+                
                 # Check for generic/error content
                 generic_indicators = ["Your Library", "Sign up to get unlimited", "Couldn't find that podcast", "Subscribe to continue reading", "Please log in", "404 Not Found"]
                 if any(indicator in article_content for indicator in generic_indicators):
@@ -1337,7 +1752,7 @@ def process_newsletter():
                     failed_articles.append({"url": article['url'], "error": error_msg})
                     continue
                 
-                logging.info(f"✅ CONTENT VALIDATION PASSED: {content_length} bytes - HIGH QUALITY")
+                logging.info(f"✅ CONTENT VALIDATION PASSED: {content_length} bytes - HIGH QUALITY ENGLISH CONTENT")
                 
                 # Create article via orchestrator with transaction safety
                 try:

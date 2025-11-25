@@ -14,6 +14,7 @@ class MyNewsScreen extends StatefulWidget {
 
 class _MyNewsScreenState extends State<MyNewsScreen> {
   List<Map<String, dynamic>> _news = [];
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -26,8 +27,10 @@ class _MyNewsScreenState extends State<MyNewsScreen> {
     final news = prefs.getStringList('saved_news') ?? [];
     
     setState(() {
-      _news = news.map((article) => jsonDecode(article) as Map<String, dynamic>).toList().reversed.toList();
+      _news = news.map((article) => jsonDecode(article) as Map<String, dynamic>).toList();
     });
+    
+
   }
   
   Future<void> _deleteNews(int index) async {
@@ -82,6 +85,12 @@ class _MyNewsScreenState extends State<MyNewsScreen> {
   }
 
   @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -98,6 +107,9 @@ class _MyNewsScreenState extends State<MyNewsScreen> {
               ),
             )
           : ListView.builder(
+              controller: _scrollController,
+              physics: const ClampingScrollPhysics(),
+              reverse: true,
               itemCount: _news.length,
               itemBuilder: (context, index) {
                 final article = _news[index];

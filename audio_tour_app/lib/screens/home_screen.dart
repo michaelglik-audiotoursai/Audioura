@@ -19,7 +19,6 @@ import '../services/device_service.dart';
 // import '../services/credential_storage_service.dart';  // TEMPORARILY DISABLED - CAUSING BUILD ERRORS
 // import '../services/subscription_article_storage.dart';  // TEMPORARILY DISABLED - CAUSING BUILD ERRORS
 import '../widgets/subscription_credential_dialog.dart';
-import '../services/subscription_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -1790,7 +1789,27 @@ class _HomeScreenState extends State<HomeScreen> {
               if (stored) {
                 // Get the actual storage path for subscription articles (DISABLED - BUILD ERROR)
                 // final storedPath = await SubscriptionService.getStoredArticlePath(articleId);
-                final storedPath = 'subscription:$articleId'; // Temporary fallback
+                // Fix: Create proper directory path for subscription articles
+                final appDir = await getApplicationDocumentsDirectory();
+                final truncatedTitle = title.length > 50 ? title.substring(0, 50) : title;
+                final safeName = truncatedTitle.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+                final subscriptionDir = Directory('${appDir.path}/subscription/${safeName}_$articleId');
+                await subscriptionDir.create(recursive: true);
+                
+                // Extract ZIP to proper directory
+                final zipFile = File('${subscriptionDir.path}/article.zip');
+                await zipFile.writeAsBytes(downloadResponse.bodyBytes);
+                
+                final archive = ZipDecoder().decodeBytes(downloadResponse.bodyBytes);
+                for (final file in archive) {
+                  if (file.isFile) {
+                    final extractedFile = File('${subscriptionDir.path}/${file.name}');
+                    await extractedFile.create(recursive: true);
+                    await extractedFile.writeAsBytes(file.content as List<int>);
+                  }
+                }
+                
+                final storedPath = subscriptionDir.path;
                 await DebugLogHelper.addDebugLog('SUBSCRIPTION_DOWNLOAD: Article $articleId stored at path: $storedPath');
                 
                 // Add to regular news list with actual path
@@ -2122,7 +2141,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         final articleId = article['article_id'] ?? '';
                         final isStoredLocally = articleStorageStatus[articleId] ?? false;
                         
+                        // Phase 2: Detect previously authenticated articles
+                        final isPreviouslyAuthenticated = title.startsWith('AUTHENTICATED ARTICLE:');
+                        final isSubscriptionArticle = subscriptionRequired || isPreviouslyAuthenticated;
+                        
                         if (subscriptionRequired && !isSubscribed) {
+                          // Show subscription required for NEW subscription articles only
                           return Container(
                             margin: EdgeInsets.only(bottom: 12),
                             padding: EdgeInsets.all(16),
@@ -2146,40 +2170,49 @@ class _HomeScreenState extends State<HomeScreen> {
                                         fontSize: 12,
                                       ),
                                     ),
-                                    Spacer(),
-                                    ElevatedButton(
-                                      onPressed: () async {
-                                        final response = await showDialog<CredentialResponse>(
-                                          context: context,
-                                          builder: (context) => SubscriptionCredentialDialog(
-                                            articleId: article['article_id'] ?? '',
-                                            domain: subscriptionDomain,
-                                            articleTitle: title,
-                                            newsletterId: newsletterId, // Pass newsletter_id for consistent decryption
+                                  ],
+                                ),
+                                SizedBox(height: 8),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    onPressed: () async {
+                                      // Ensure domain is available for previously authenticated articles
+                                      final dialogDomain = subscriptionDomain.isNotEmpty ? subscriptionDomain : 'bostonglobe.com';
+                                      
+                                      final response = await showDialog<CredentialResponse>(
+                                        context: context,
+                                        builder: (context) => SubscriptionCredentialDialog(
+                                          articleId: article['article_id'] ?? '',
+                                          domain: dialogDomain,
+                                          articleTitle: title,
+                                          newsletterId: newsletterId, // Pass newsletter_id for consistent decryption
+                                        ),
+                                      );
+                                      
+                                      // Phase 2: Update visual status after successful credential submission
+                                      if (response != null && response.status == 'success') {
+                                        setDialogState(() {
+                                          subscribedDomains.add(dialogDomain);
+                                        });
+                                        
+                                        // Show success message
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Credentials accepted for $dialogDomain'),
+                                            backgroundColor: Colors.green,
+                                            duration: Duration(seconds: 2),
                                           ),
                                         );
-                                        
-                                        if (response != null && response.status == 'success') {
-                                          setDialogState(() {
-                                            subscribedDomains.add(subscriptionDomain);
-                                          });
-                                        }
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.red,
-                                        foregroundColor: Colors.white,
-                                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.error, size: 12),
-                                          SizedBox(width: 4),
-                                          Text('Enter Credentials', style: TextStyle(fontSize: 10)),
-                                        ],
-                                      ),
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                      foregroundColor: Colors.white,
+                                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                     ),
-                                  ],
+                                    child: Text('Enter Credentials'),
+                                  ),
                                 ),
                                 SizedBox(height: 8),
                                 Text(
@@ -2196,8 +2229,49 @@ class _HomeScreenState extends State<HomeScreen> {
                               ],
                             ),
                           );
-                        } else if (subscriptionRequired && isSubscribed) {
-                          // Subscribed article - green with open lock, show if stored locally
+                        } else if (isPreviouslyAuthenticated) {
+                          // Previously authenticated article - green with premium indicator
+                          return Container(
+                            margin: EdgeInsets.only(bottom: 12),
+                            decoration: isStoredLocally ? BoxDecoration(
+                              color: Colors.green.shade50,
+                              border: Border.all(color: Colors.green.shade200),
+                              borderRadius: BorderRadius.circular(8),
+                            ) : null,
+                            child: CheckboxListTile(
+                              value: selectedArticles[index],
+                              onChanged: (bool? value) {
+                                setDialogState(() {
+                                  selectedArticles[index] = value ?? false;
+                                });
+                              },
+                              title: Row(
+                                children: [
+                                  Icon(Icons.verified, color: Colors.green, size: 16),
+                                  SizedBox(width: 8),
+                                  if (isStoredLocally) ...[
+                                    Icon(Icons.download_done, color: Colors.blue, size: 14),
+                                    SizedBox(width: 4),
+                                  ],
+                                  Expanded(
+                                    child: Text(
+                                      title,
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.green.shade700),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              subtitle: Text(
+                                'By: $author • Premium Content (Authenticated)${isStoredLocally ? ' • Stored locally' : ''}',
+                                style: TextStyle(fontSize: 12, color: Colors.green.shade600),
+                              ),
+                              controlAffinity: ListTileControlAffinity.leading,
+                            ),
+                          );
+                        } else if (isSubscriptionArticle && isSubscribed) {
+                          // Newly subscribed article - green with open lock, show if stored locally
                           return Container(
                             margin: EdgeInsets.only(bottom: 12),
                             decoration: isStoredLocally ? BoxDecoration(
@@ -2626,7 +2700,7 @@ class _HomeScreenState extends State<HomeScreen> {
       try {
         final dateA = DateTime.parse(a['created_at'] ?? '');
         final dateB = DateTime.parse(b['created_at'] ?? '');
-        return dateB.compareTo(dateA);
+        return dateB.compareTo(dateA); // This should put newest first
       } catch (e) {
         return 0;
       }
@@ -2712,10 +2786,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final newsletterId = newsletter['newsletter_id'] ?? 0;
     final articleCount = newsletter['article_count'] ?? 0;
     
-    // Debug logging for newsletter card data
-    DebugLogHelper.addDebugLog('NEWSLETTER_CARD: Building card for newsletter: $name');
-    DebugLogHelper.addDebugLog('NEWSLETTER_CARD: Newsletter ID: $newsletterId');
-    DebugLogHelper.addDebugLog('NEWSLETTER_CARD: Full newsletter data: ${json.encode(newsletter)}');
+
     
     String dateStr = '';
     if (createdAt.isNotEmpty) {
@@ -2787,13 +2858,11 @@ class _HomeScreenState extends State<HomeScreen> {
           child: IconButton(
             icon: Icon(Icons.play_arrow, color: Colors.white, size: 24),
             onPressed: () {
-              DebugLogHelper.addDebugLog('NEWSLETTER_CARD: Play button pressed for newsletter: $name (ID: $newsletterId)');
               _processNewsletterWithUrl(url, newsletterId, name);
             },
           ),
         ),
         onTap: () {
-          DebugLogHelper.addDebugLog('NEWSLETTER_CARD: Card tapped for newsletter: $name (ID: $newsletterId)');
           _processNewsletterWithUrl(url, newsletterId, name);
         },
       ),

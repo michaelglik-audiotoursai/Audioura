@@ -22,6 +22,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
   List<Map<String, dynamic>> _tours = [];
   List<Map<String, dynamic>> _news = [];
   List<Map<String, dynamic>> _filteredNews = [];
+  Map<String, String> _displayTitles = {}; // Pre-loaded display titles
   String _appMode = 'Tours';
   String _selectedTypeFilter = 'All';
   final List<String> _articleTypes = [
@@ -40,12 +41,33 @@ class _MyToursScreenState extends State<MyToursScreen> {
   SpeechToText _speechToText = SpeechToText();
   bool _speechEnabled = false;
   bool _isListening = false;
+  int _currentVisibleIndex = 0;
+  double _previousScrollPosition = 0.0;
 
+  final ScrollController _scrollController = ScrollController();
+  
+  void _manualRefresh() {
+    Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => MyToursScreen()),
+        );
+      }
+    });
+  }
+  
   @override
   void initState() {
     super.initState();
     _loadAppMode();
     _setupVoiceCommands();
+    _setupScrollListener();
+  }
+  
+  void _setupScrollListener() {
+    // SCROLL LISTENER DISABLED - not essential for core functionality
+    DebugLogHelper.addDebugLog('SCROLL: Listener disabled - not needed for core functionality');
   }
   
   void _setupVoiceCommands() async {
@@ -199,8 +221,13 @@ class _MyToursScreenState extends State<MyToursScreen> {
     
     setState(() {
       _news = newsMap.values.toList().reversed.toList();
-      _applyNewsFilter();
     });
+    
+    // Pre-load all display titles to avoid async operations during scroll
+    await _preloadDisplayTitles();
+    
+    // Always apply filter to ensure _filteredNews is properly populated
+    await _applyNewsFilter();
   }
   
   void _toggleSelectionMode() {
@@ -891,6 +918,47 @@ class _MyToursScreenState extends State<MyToursScreen> {
             onPressed: _isListening ? _stopListening : _startVoiceSearch,
             tooltip: _isListening ? 'Stop Listening' : 'Voice Search',
           ),
+          IconButton(
+            icon: Icon(Icons.help_outline),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text('🎤 Voice Commands Help'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Voice Search Examples:', style: TextStyle(fontWeight: FontWeight.bold)),
+                      SizedBox(height: 8),
+                      Text('• "Find articles about Boston"'),
+                      Text('• "Show me podcast articles"'),
+                      Text('• "Articles mentioning Microsoft"'),
+                      Text('• "Technology articles but not Apple"'),
+                      SizedBox(height: 12),
+                      Text('Search Tips:', style: TextStyle(fontWeight: FontWeight.bold)),
+                      SizedBox(height: 8),
+                      Text('• Include terms: "profit growth"'),
+                      Text('• Exclude terms: "profit -loss"'),
+                      Text('• Exact phrases: ""artificial intelligence""'),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text('Got it'),
+                    ),
+                  ],
+                ),
+              );
+            },
+            tooltip: 'Voice Commands Help',
+          ),
+          IconButton(
+            icon: Icon(Icons.refresh),
+            onPressed: _manualRefresh,
+            tooltip: 'Manual Refresh (Test Navigation Reset)',
+          ),
           if (_filteredNews.isNotEmpty)
             IconButton(
               icon: Icon(Icons.checklist),
@@ -909,19 +977,17 @@ class _MyToursScreenState extends State<MyToursScreen> {
                 style: TextStyle(fontSize: 18, color: Colors.grey),
               ),
             )
-          : NotificationListener<ScrollNotification>(
-              onNotification: (ScrollNotification scrollInfo) {
-                // Disable pull-to-refresh when scrolling up to prevent interference
-                return true;
-              },
-              child: ListView.builder(
-                itemCount: _filteredNews.length,
-                itemBuilder: (context, index) {
+          : ListView.builder(
+              // controller: _scrollController, // Disabled - not essential
+              itemCount: _filteredNews.length,
+              itemBuilder: (context, index) {
                 final article = _filteredNews[index];
                 final articleType = article['article_type'] ?? 'Others';
+                final isCurrentlyVisible = index == _currentVisibleIndex;
                 
                 return Card(
                   margin: const EdgeInsets.all(8),
+                  // color: isCurrentlyVisible ? Colors.yellow.shade100 : null, // Disabled - not essential
                   child: ListTile(
                     leading: _isSelectionMode ? Checkbox(
                       value: _selectedArticles[index],
@@ -951,12 +1017,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
                         ),
                       ],
                     ),
-                    title: FutureBuilder<String>(
-                      future: _getDisplayTitle(article),
-                      builder: (context, snapshot) {
-                        return Text(snapshot.data ?? article['title']);
-                      },
-                    ),
+                    title: Text(_displayTitles[article['article_id']] ?? article['title']),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -1008,7 +1069,6 @@ class _MyToursScreenState extends State<MyToursScreen> {
                 );
               },
             ),
-          ),
     );
   }
   
@@ -1130,7 +1190,31 @@ class _MyToursScreenState extends State<MyToursScreen> {
     }
   }
   
+  Future<void> _preloadDisplayTitles() async {
+    final Map<String, String> titles = {};
+    
+    for (final article in _news) {
+      final articleId = article['article_id'] ?? '';
+      if (articleId.isNotEmpty) {
+        try {
+          final shortTitleFile = File('${article['path']}/audiotours_short_title.txt');
+          if (await shortTitleFile.exists()) {
+            final shortTitle = await shortTitleFile.readAsString();
+            titles[articleId] = shortTitle.trim();
+          }
+        } catch (e) {
+          // Ignore errors and fall back to original title
+        }
+      }
+    }
+    
+    setState(() {
+      _displayTitles = titles;
+    });
+  }
+  
   Future<String> _getDisplayTitle(Map<String, dynamic> article) async {
+    // Keep this method for compatibility but it's no longer used in ListView
     try {
       final shortTitleFile = File('${article['path']}/audiotours_short_title.txt');
       if (await shortTitleFile.exists()) {
