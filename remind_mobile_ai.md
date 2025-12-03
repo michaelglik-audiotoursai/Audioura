@@ -13,10 +13,10 @@
 
 ## CURRENT PROJECT STATUS - LATEST UPDATE
 **Project**: Audioura Mobile App Development
-**Version**: v1.2.8+106 (TOUR STOP COUNT FIX + WEB PLATFORM SUPPORT)
+**Version**: v1.2.8+107 (BACKEND STOP COUNT INTEGRATION)
 **Branch**: Newsletters (`git push origin Newsletters`)
 **Icon**: Audioura_3.png
-**Status**: ✅ **WEB PLATFORM + ACCURATE STOP COUNTS** - Tours work on Ubuntu Firefox, show real stop counts
+**Status**: ✅ **BACKEND INTEGRATION READY** - Mobile app prefers backend stop count, fallback to ZIP analysis
 
 ### 🚨 **CRITICAL WORKFLOW RULE**
 **⚠️ NEVER CHANGE CODE WITHOUT APPROVAL**: Always propose plan first, get user approval, then implement
@@ -89,13 +89,13 @@
 **When chat history is compacted, read both @remind_ai.md and @remind_mobile_ai.md to get complete context**
 
 ### IMMEDIATE CONTEXT AFTER COMPACTION:
-- **Current Status**: v1.2.8+106 - TOUR STOP COUNT FIX + WEB PLATFORM SUPPORT ✅
+- **Current Status**: v1.2.8+107 - BACKEND STOP COUNT INTEGRATION ✅
 - **Android Functionality**: 100% UNCHANGED - all features work identically
-- **Web Functionality**: NEW - Tours now work in Ubuntu Firefox with blob URLs
-- **Stop Count Issue**: IDENTIFIED - Backend should provide stop count, not mobile app
-- **Temporary Fix**: Mobile app counts stops from ZIP content as fallback
-- **Git Tagged**: v1.2.8.106 committed and tagged for permanent reference
-- **NEXT ACTIONS**: 1) Create Services requirement for stop count API, 2) Update mobile code to prefer backend data
+- **Web Functionality**: WORKING - Tours work in Ubuntu Firefox with blob URLs
+- **Stop Count Solution**: IMPLEMENTED - Mobile app prefers backend data, ZIP analysis fallback
+- **Requirement Created**: REQ-017 for Services Amazon-Q to add `stops_count` field
+- **Mobile Code Updated**: Checks `resolutionData['stops_count']` first, then ZIP analysis
+- **NEXT ACTIONS**: Services Amazon-Q implements REQ-017, then test both scenarios
 - **⚠️ CRITICAL**: Always get approval before making any code changes
 
 ## ENCRYPTION IMPLEMENTATION - VERIFIED SECURE
@@ -129,29 +129,30 @@
 - Uses `data:text/html;base64,content` URLs for playback
 - Bypasses browser security restrictions
 
-## TOUR STOP COUNT ARCHITECTURE ISSUE - v1.2.8+106 🔄
-**PROBLEM IDENTIFIED**: Mobile app calculates stop count instead of receiving from backend
-**ROOT CAUSE**: Tour resolution API missing `stops_count` field
-**CURRENT WORKAROUND**: Mobile app counts stops from ZIP content (inefficient)
+## TOUR STOP COUNT ARCHITECTURE - v1.2.8+107 ✅
+**SOLUTION IMPLEMENTED**: Mobile app now prefers backend-provided stop count
+**REQUIREMENT CREATED**: REQ-017 for Services Amazon-Q to add `stops_count` field
+**MOBILE CODE UPDATED**: Checks for backend data first, ZIP analysis as fallback
 
-**PROPER ARCHITECTURE**:
-- ✅ **Backend knows stop count** when creating tours
-- ❌ **Backend doesn't provide** stop count in resolution API
-- ❌ **Mobile app recalculates** what backend already knows
+**CURRENT IMPLEMENTATION**:
+- ✅ **Mobile app checks** `resolutionData['stops_count']` from backend
+- ✅ **Fallback logic** analyzes ZIP content if backend count unavailable
+- ✅ **Proper logging** shows which method was used
+- ✅ **Requirement document** created for Services Amazon-Q
 
-**NEXT ACTIONS POST-COMPACTION**:
-1. **Create requirement** for Services Amazon-Q to add `stops_count` to `/tour/{id}/resolve` API
-2. **Update mobile code** to prefer backend-provided count, fallback to ZIP analysis
-3. **Test both scenarios** - with and without backend stop count
+**NEXT ACTIONS**:
+1. **Services Amazon-Q** implements REQ-017 to add `stops_count` to resolution API
+2. **Test with backend data** once Services implements the field
+3. **Verify fallback works** for legacy tours without backend count
 
-**API Enhancement Needed**:
+**API Enhancement (REQ-017)**:
 ```json
 {
   "status": "success",
   "edit_tour_id": "386e41c5",
   "tour_name": "Test Tour",
   "editable": true,
-  "stops_count": 3,  // ← Services Amazon-Q should add this
+  "stops_count": 3,  // ← Services Amazon-Q to implement
   "has_separate_audio_files": false
 }
 ```

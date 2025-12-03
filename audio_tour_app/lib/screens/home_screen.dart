@@ -1226,6 +1226,7 @@ class _HomeScreenState extends State<HomeScreen> {
       String editTourId;
       String baseTourName = 'Downloaded Tour';
       bool isEditable = false;
+      int? backendStopsCount; // Backend-provided stop count
       
       if (resolutionResponse.statusCode == 200) {
         try {
@@ -1236,8 +1237,9 @@ class _HomeScreenState extends State<HomeScreen> {
             editTourId = resolutionData['edit_tour_id'] ?? tourId.toString();
             baseTourName = resolutionData['tour_name'] ?? 'Downloaded Tour';
             isEditable = resolutionData['editable'] ?? false;
+            backendStopsCount = resolutionData['stops_count']; // Get backend stop count
             
-            await DebugLogHelper.addDebugLog('HOME: Resolved - Edit ID: $editTourId, Name: $baseTourName, Editable: $isEditable');
+            await DebugLogHelper.addDebugLog('HOME: Resolved - Edit ID: $editTourId, Name: $baseTourName, Editable: $isEditable, Backend Stops: $backendStopsCount');
           } else {
             throw Exception('Resolution failed: ${resolutionData['message']}');
           }
@@ -1351,8 +1353,15 @@ class _HomeScreenState extends State<HomeScreen> {
       
       await DebugLogHelper.addDebugLog('HOME: SAVE - Creating tour data object');
       
-      // Count actual stops from tour content
-      int actualStops = await _countTourStops(zipBytes);
+      // Use backend stop count if available, otherwise analyze ZIP content
+      int actualStops;
+      if (backendStopsCount != null && backendStopsCount > 0) {
+        actualStops = backendStopsCount;
+        await DebugLogHelper.addDebugLog('HOME: Using backend-provided stop count: $actualStops');
+      } else {
+        actualStops = await _countTourStops(zipBytes);
+        await DebugLogHelper.addDebugLog('HOME: Backend stop count not available, analyzed ZIP content: $actualStops stops');
+      }
       
       // Add to saved tours list with edit tour ID (only store tour_id)
       final tourData = {
