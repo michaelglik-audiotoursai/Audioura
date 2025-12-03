@@ -75,35 +75,29 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
           if (snapshot.hasData) {
             return InAppWebView(
               initialUrlRequest: URLRequest(url: WebUri(snapshot.data!)),
-              initialOptions: InAppWebViewGroupOptions(
-                crossPlatform: InAppWebViewOptions(
-                  javaScriptEnabled: true,
-                  mediaPlaybackRequiresUserGesture: false, // CRITICAL: Enable audio autoplay
-                  useShouldOverrideUrlLoading: false,
-                  useOnLoadResource: false,
-                ),
-                android: AndroidInAppWebViewOptions(
-                  useHybridComposition: true,
-                  allowContentAccess: true,
-                  allowFileAccess: true,
-                ),
-                ios: IOSInAppWebViewOptions(
-                  allowsInlineMediaPlayback: true,
-                  allowsAirPlayForMediaPlayback: true,
-                ),
+              initialSettings: InAppWebViewSettings(
+                javaScriptEnabled: true,
+                mediaPlaybackRequiresUserGesture: false, // CRITICAL: Enable audio autoplay
+                useShouldOverrideUrlLoading: false,
+                useOnLoadResource: false,
+                useHybridComposition: true,
+                allowContentAccess: true,
+                allowFileAccess: true,
+                allowsInlineMediaPlayback: true,
+                allowsAirPlayForMediaPlayback: true,
               ),
               onWebViewCreated: (InAppWebViewController controller) async {
                 _controller = controller;
                 webController = controller;
                 await DebugLogHelper.addDebugLog('VOICE: InAppWebView created, controller set');
               },
-              onLoadStop: (InAppWebViewController controller, Uri? url) async {
+              onLoadStop: (InAppWebViewController controller, WebUri? url) async {
                 await DebugLogHelper.addDebugLog('VOICE: WebView loaded: $url');
                 await DebugLogHelper.addDebugLog('VOICE: Getting tour info');
                 getTourInfo();
               },
-              onLoadError: (InAppWebViewController controller, Uri? url, int code, String message) {
-                DebugLogHelper.addDebugLog('VOICE: WebView load error: $code - $message for URL: $url');
+              onReceivedError: (InAppWebViewController controller, WebResourceRequest request, WebResourceError error) {
+                DebugLogHelper.addDebugLog('VOICE: WebView load error: ${error.description} for URL: ${request.url}');
               },
             );
           } else {
