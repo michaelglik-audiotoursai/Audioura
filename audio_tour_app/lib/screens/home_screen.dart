@@ -1351,12 +1351,15 @@ class _HomeScreenState extends State<HomeScreen> {
       
       await DebugLogHelper.addDebugLog('HOME: SAVE - Creating tour data object');
       
+      // Count actual stops from tour content
+      int actualStops = await _countTourStops(zipBytes);
+      
       // Add to saved tours list with edit tour ID (only store tour_id)
       final tourData = {
         'title': finalTourName,
         'path': tourDirPath,
         'created': DateTime.now().toIso8601String(),
-        'stops': '10',
+        'stops': actualStops.toString(),
         'original_request': baseTourName,
         'tour_id': editTourId,  // Store edit tour ID, not download ID
         'editable': isEditable,
@@ -3177,6 +3180,48 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+  
+  // Count actual stops from tour ZIP content
+  Future<int> _countTourStops(List<int> zipBytes) async {
+    try {
+      final archive = ZipDecoder().decodeBytes(zipBytes);
+      
+      // Look for tour.json file which contains tour structure
+      for (final file in archive) {
+        if (file.name == 'tour.json' && file.isFile) {
+          final jsonContent = String.fromCharCodes(file.content as List<int>);
+          final tourData = json.decode(jsonContent);
+          
+          // Count stops from tour data structure
+          if (tourData['stops'] != null && tourData['stops'] is List) {
+            return (tourData['stops'] as List).length;
+          }
+          
+          // Fallback: count audio files (each stop has an MP3)
+          int audioCount = 0;
+          for (final audioFile in archive) {
+            if (audioFile.name.endsWith('.mp3') && audioFile.isFile) {
+              audioCount++;
+            }
+          }
+          return audioCount > 0 ? audioCount : 10; // Default to 10 if no audio files
+        }
+      }
+      
+      // Fallback: count MP3 files
+      int audioCount = 0;
+      for (final file in archive) {
+        if (file.name.endsWith('.mp3') && file.isFile) {
+          audioCount++;
+        }
+      }
+      
+      return audioCount > 0 ? audioCount : 10; // Default to 10 if no audio files found
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('HOME: Error counting tour stops: $e');
+      return 10; // Default fallback
+    }
   }
   
   Color _getTypeColor(String type) {
