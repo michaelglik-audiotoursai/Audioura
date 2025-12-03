@@ -1,0 +1,82 @@
+[
+  {
+    "name": "nyt-a",
+    "value": "DiJUPap-Z0v6OfqgCZbMNv",
+    "domain": ".nytimes.com",
+    "path": "/",
+    "secure": true,
+    "httpOnly": false
+  },
+  {
+    "name": "nyt-gdpr",
+    "value": "0",
+    "domain": ".nytimes.com",
+    "path": "/",
+    "secure": true,
+    "httpOnly": false
+  },
+  {
+    "name": "nyt-us",
+    "value": "1",
+    "domain": ".nytimes.com",
+    "path": "/",
+    "secure": true,
+    "httpOnly": false
+  },
+  {
+    "name": "nyt-geo",
+    "value": "US",
+    "domain": ".nytimes.com",
+    "path": "/",
+    "secure": true,
+    "httpOnly": false
+  },
+  {
+    "name": "nyt-auth-method",
+    "value": "username",
+    "domain": ".nytimes.com",
+    "path": "/",
+    "secure": true,
+    "httpOnly": false
+  },
+  {
+    "name": "nyt-purr",
+    "value": "cfshcfhshckfhdfhhgah2taaa",
+    "domain": ".nytimes.com",
+    "path": "/",
+    "secure": true,
+    "httpOnly": false
+  },
+  {
+    "name": "_pin_unauth",
+    "value": "dWlkPU1XUXpPVFUwWVRJdE4yTTJOeTAwTnpreExXRXhaVGt0WXpabU9HTmxOR0ZpT0Rkag",
+    "domain": ".nytimes.com",
+    "path": "/",
+    "secure": true,
+    "httpOnly": false
+  },
+  {
+    "name": "nyt-b-sid",
+    "value": "c7ZX-7Bf7whMXvIi-cb8qd5D",
+    "domain": ".nytimes.com",
+    "path": "/",
+    "secure": true,
+    "httpOnly": false
+  },
+  {
+    "name": "nyt-traceid",
+    "value": "0000000000000000011a4e9beace74c9",
+    "domain": ".nytimes.com",
+    "path": "/",
+    "secure": true,
+    "httpOnly": false
+  },
+  {
+    "name": "nyt-jkidd",
+    "value": "uid",
+    "domain": ".nytimes.com",
+    "path": "/",
+    "secure": true,
+    "httpOnly": false
+  }
+]

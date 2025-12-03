@@ -63,6 +63,161 @@ def extract_article_summary_near_button(button_element):
     
     return ""
 
+def detect_email_newsletter_pattern(soup, base_url):
+    """Detect generic email newsletter patterns with Read Now buttons and clickable titles"""
+    articles = []
+    
+    # Look for email newsletter structures (table-based layouts)
+    email_containers = soup.find_all(['table', 'div'], attrs={
+        'role': 'presentation',
+        'class': lambda x: x and any(term in x.lower() for term in ['email', 'newsletter', 'content', 'article'])
+    }) or soup.find_all(['td', 'div'], class_=lambda x: x and 'content' in x.lower())
+    
+    if not email_containers:
+        # Fallback: look for any table-based structure
+        email_containers = soup.find_all('table')
+    
+    for container in email_containers:
+        # Find "Read Now" / "Read More" buttons and clickable titles
+        read_buttons = container.find_all('a', string=lambda text: text and any(
+            phrase in text.lower() for phrase in ['read now', 'read more', 'continue reading', 'full story', 'read full']
+        ))
+        
+        # Also look for buttons with these patterns in href or nearby text
+        if not read_buttons:
+            read_buttons = container.find_all('a', href=True)
+            read_buttons = [btn for btn in read_buttons if btn.get_text(strip=True) and any(
+                phrase in btn.get_text(strip=True).lower() for phrase in ['read', 'more', 'continue', 'full']
+            )]
+        
+        for button in read_buttons:
+            href = button.get('href', '')
+            if not href.startswith('http'):
+                continue
+                
+            # Find associated article content near this button
+            article_info = extract_article_info_near_element(button)
+            
+            if article_info['title'] and len(article_info['title']) > 10:
+                articles.append({
+                    'url': href,
+                    'title': article_info['title'],
+                    'summary': article_info['summary'],
+                    'pattern': 'email_newsletter_button'
+                })
+                logging.info(f"Found email newsletter article: {article_info['title'][:50]}... -> {href}")
+    
+    # Also look for clickable headlines (common in email newsletters)
+    clickable_headlines = soup.find_all('a', href=True)
+    for headline in clickable_headlines:
+        href = headline.get('href', '')
+        if not href.startswith('http'):
+            continue
+            
+        headline_text = headline.get_text(strip=True)
+        
+        # Skip if it's clearly navigation, social media, or subscription links
+        if any(skip in href.lower() for skip in [
+            'unsubscribe', 'manage', 'preferences', 'facebook.com', 'twitter.com', 
+            'linkedin.com', 'instagram.com', 'subscribe', 'signup'
+        ]):
+            continue
+            
+        # Look for substantial headlines (likely article titles)
+        if (len(headline_text) > 20 and len(headline_text) < 200 and 
+            not any(skip in headline_text.lower() for skip in [
+                'click here', 'read more', 'subscribe', 'follow us', 'unsubscribe'
+            ])):
+            
+            # Check if this looks like a news headline
+            if any(indicator in headline_text.lower() for indicator in [
+                'trump', 'biden', 'congress', 'senate', 'house', 'president', 'governor',
+                'election', 'vote', 'poll', 'campaign', 'political', 'government',
+                'economy', 'market', 'stock', 'business', 'company', 'ceo',
+                'health', 'medical', 'hospital', 'doctor', 'patient',
+                'school', 'student', 'teacher', 'education', 'university',
+                'police', 'court', 'judge', 'trial', 'lawsuit', 'crime'
+            ]) or len(headline_text.split()) >= 5:  # Or substantial multi-word headlines
+                
+                # Get summary from nearby content
+                summary = extract_summary_near_element(headline)
+                
+                articles.append({
+                    'url': href,
+                    'title': headline_text,
+                    'summary': summary,
+                    'pattern': 'email_newsletter_headline'
+                })
+                logging.info(f"Found clickable headline: {headline_text[:50]}... -> {href}")
+    
+    return articles
+
+def extract_article_info_near_element(element):
+    """Extract article title and summary from content near a button/link element"""
+    title = ""
+    summary = ""
+    
+    # Look in parent containers for article content
+    for parent in [element.parent, element.parent.parent if element.parent else None]:
+        if not parent:
+            continue
+            
+        # Find potential titles (headings, strong text, larger text)
+        title_elements = parent.find_all(['h1', 'h2', 'h3', 'h4', 'strong', 'b']) + \
+                        parent.find_all('a', href=True)
+        
+        for title_elem in title_elements:
+            if title_elem == element:  # Skip the button itself
+                continue
+                
+            title_text = title_elem.get_text(strip=True)
+            if len(title_text) > 10 and len(title_text) < 200:
+                title = title_text
+                break
+        
+        # Find summary text (paragraphs, divs with substantial content)
+        text_elements = parent.find_all(['p', 'div', 'span'])
+        summary_parts = []
+        
+        for text_elem in text_elements:
+            text = text_elem.get_text(strip=True)
+            if (len(text) > 30 and len(text) < 500 and 
+                text != title and 
+                not any(skip in text.lower() for skip in ['read more', 'click here', 'unsubscribe'])):
+                summary_parts.append(text)
+                if len(' '.join(summary_parts)) > 200:
+                    break
+        
+        if summary_parts:
+            summary = ' '.join(summary_parts)[:300]  # Limit summary length
+            break
+    
+    return {'title': title, 'summary': summary}
+
+def extract_summary_near_element(element):
+    """Extract summary text near a headline element"""
+    summary = ""
+    
+    # Look for summary in siblings or parent content
+    parent = element.parent
+    if parent:
+        # Get all text from parent, excluding the headline
+        parent_text = parent.get_text(separator=' ', strip=True)
+        headline_text = element.get_text(strip=True)
+        
+        # Remove headline from parent text to get summary
+        if headline_text in parent_text:
+            summary = parent_text.replace(headline_text, '').strip()
+            # Take first sentence or reasonable chunk
+            if len(summary) > 100:
+                sentences = summary.split('. ')
+                if sentences and len(sentences[0]) > 30:
+                    summary = sentences[0] + '.'
+                else:
+                    summary = summary[:150] + '...'
+    
+    return summary
+
 def detect_newsletter_patterns(soup, newsletter_url):
     """Main pattern detection function - detects all newsletter patterns"""
     all_articles = []
@@ -79,12 +234,18 @@ def detect_newsletter_patterns(soup, newsletter_url):
         all_articles.extend(mailchimp_articles)
         logging.info(f"MailChimp pattern detected: {len(mailchimp_articles)} button articles found")
     
-    # 3. Generic "Read more" pattern (for other newsletters)
+    # 3. Email newsletter pattern (generic - for Boston Globe, NY Times, etc.)
+    elif any(indicator in newsletter_url for indicator in ['view.email.', 'email.', 'newsletter.', 'messaging-custom-newsletters']):
+        email_articles = detect_email_newsletter_pattern(soup, newsletter_url)
+        all_articles.extend(email_articles)
+        logging.info(f"Email newsletter pattern detected: {len(email_articles)} articles found")
+    
+    # 4. Generic "Read more" pattern (fallback for other newsletters)
     else:
         generic_articles = detect_generic_read_more_pattern(soup, newsletter_url)
         all_articles.extend(generic_articles)
     
-    # 4. Podcast pattern (always check for all newsletters)
+    # 5. Podcast pattern (always check for all newsletters)
     podcast_articles = detect_podcast_pattern(soup, newsletter_url)
     all_articles.extend(podcast_articles)
     

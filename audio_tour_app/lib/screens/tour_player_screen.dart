@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'dart:async';
 import 'voice_methods.dart';
 import 'debug_log_viewer_screen.dart';
+import '../services/web_file_service.dart';
 
 class TourPlayerScreen extends StatefulWidget {
   final String tourPath;
@@ -38,6 +40,20 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
   void _initializeWebView() {
     // InAppWebView will be initialized in the build method
   }
+  
+  Future<String> _getIndexUrl() async {
+    if (kIsWeb) {
+      // Web platform: use blob URL
+      final blobUrl = await WebFileService.getTourFilePath(widget.tourPath, 'index.html');
+      await DebugLogHelper.addDebugLog('TOUR_PLAYER: Using web blob URL: $blobUrl');
+      return blobUrl;
+    } else {
+      // Mobile platform: use file URL
+      final fileUrl = 'file://${widget.tourPath}/index.html';
+      await DebugLogHelper.addDebugLog('TOUR_PLAYER: Using mobile file URL: $fileUrl');
+      return fileUrl;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,8 +69,48 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
           ),
         ],
       ),
-      body: InAppWebView(
-        initialUrlRequest: URLRequest(url: WebUri('file://${widget.tourPath}/index.html')),
+      body: FutureBuilder<String>(
+        future: _getIndexUrl(),
+        builder: (context, snapshot) {
+          if (snapshot.hasData) {
+            return InAppWebView(
+              initialUrlRequest: URLRequest(url: WebUri(snapshot.data!)),
+              initialOptions: InAppWebViewGroupOptions(
+                crossPlatform: InAppWebViewOptions(
+                  javaScriptEnabled: true,
+                  mediaPlaybackRequiresUserGesture: false, // CRITICAL: Enable audio autoplay
+                  useShouldOverrideUrlLoading: false,
+                  useOnLoadResource: false,
+                ),
+                android: AndroidInAppWebViewOptions(
+                  useHybridComposition: true,
+                  allowContentAccess: true,
+                  allowFileAccess: true,
+                ),
+                ios: IOSInAppWebViewOptions(
+                  allowsInlineMediaPlayback: true,
+                  allowsAirPlayForMediaPlayback: true,
+                ),
+              ),
+              onWebViewCreated: (InAppWebViewController controller) async {
+                _controller = controller;
+                webController = controller;
+                await DebugLogHelper.addDebugLog('VOICE: InAppWebView created, controller set');
+              },
+              onLoadStop: (InAppWebViewController controller, Uri? url) async {
+                await DebugLogHelper.addDebugLog('VOICE: WebView loaded: $url');
+                await DebugLogHelper.addDebugLog('VOICE: Getting tour info');
+                getTourInfo();
+              },
+              onLoadError: (InAppWebViewController controller, Uri? url, int code, String message) {
+                DebugLogHelper.addDebugLog('VOICE: WebView load error: $code - $message for URL: $url');
+              },
+            );
+          } else {
+            return Center(child: CircularProgressIndicator());
+          }
+        },
+      ),
         initialOptions: InAppWebViewGroupOptions(
           crossPlatform: InAppWebViewOptions(
             javaScriptEnabled: true,

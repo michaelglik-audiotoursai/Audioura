@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:archive/archive.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -1200,8 +1201,17 @@ class _HomeScreenState extends State<HomeScreen> {
       final prefs = await SharedPreferences.getInstance();
       await DebugLogHelper.addDebugLog('HOME: SAVE - Got SharedPreferences');
       
-      final appDir = await getApplicationDocumentsDirectory();
-      await DebugLogHelper.addDebugLog('HOME: SAVE - Got app directory: ${appDir.path}');
+      String appDirPath;
+      if (kIsWeb) {
+        // Web platform: use SharedPreferences for storage
+        appDirPath = 'web_storage';
+        await DebugLogHelper.addDebugLog('HOME: SAVE - Using web storage (SharedPreferences)');
+      } else {
+        // Mobile platform: use path_provider
+        final appDir = await getApplicationDocumentsDirectory();
+        appDirPath = appDir.path;
+        await DebugLogHelper.addDebugLog('HOME: SAVE - Got app directory: $appDirPath');
+      }
       
       // Get tour resolution info first
       final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
@@ -1274,42 +1284,83 @@ class _HomeScreenState extends State<HomeScreen> {
       
       // Create tour directory using edit tour ID (reuse edit tour logic)
       final safeName = finalTourName.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
-      final tourDir = Directory('${appDir.path}/tours/${safeName}_$editTourId');
-      await tourDir.create(recursive: true);
-      await DebugLogHelper.addDebugLog('HOME: SAVE - Created directory with edit ID: ${tourDir.path}');
+      String tourDirPath;
       
-      // Save ZIP file
-      final zipFile = File('${tourDir.path}/tour.zip');
-      await zipFile.writeAsBytes(zipBytes);
-      await DebugLogHelper.addDebugLog('HOME: SAVE - Saved ZIP file');
-      
-      // Extract ZIP file
-      await DebugLogHelper.addDebugLog('HOME: SAVE - Starting ZIP extraction');
-      final archive = ZipDecoder().decodeBytes(zipBytes);
-      await DebugLogHelper.addDebugLog('HOME: SAVE - ZIP decoded, ${archive.length} files');
-      
-      for (final file in archive) {
-        final filename = file.name;
-        if (file.isFile) {
-          final data = file.content as List<int>;
-          final extractedFile = File('${tourDir.path}/$filename');
-          await extractedFile.create(recursive: true);
-          await extractedFile.writeAsBytes(data);
-        }
+      if (kIsWeb) {
+        // Web platform: store in SharedPreferences with unique key
+        tourDirPath = 'web_tours/${safeName}_$editTourId';
+        await DebugLogHelper.addDebugLog('HOME: SAVE - Using web storage path: $tourDirPath');
+      } else {
+        // Mobile platform: create actual directory
+        final tourDir = Directory('$appDirPath/tours/${safeName}_$editTourId');
+        await tourDir.create(recursive: true);
+        tourDirPath = tourDir.path;
+        await DebugLogHelper.addDebugLog('HOME: SAVE - Created directory with edit ID: $tourDirPath');
       }
-      await DebugLogHelper.addDebugLog('HOME: SAVE - ZIP extraction completed');
+      
+      if (kIsWeb) {
+        // Web platform: store ZIP as base64 in SharedPreferences
+        final zipBase64 = base64Encode(zipBytes);
+        await prefs.setString('tour_zip_${safeName}_$editTourId', zipBase64);
+        await DebugLogHelper.addDebugLog('HOME: SAVE - Saved ZIP to SharedPreferences (${zipBytes.length} bytes)');
+        
+        // Extract and store individual files in SharedPreferences
+        await DebugLogHelper.addDebugLog('HOME: SAVE - Starting web ZIP extraction');
+        final archive = ZipDecoder().decodeBytes(zipBytes);
+        await DebugLogHelper.addDebugLog('HOME: SAVE - ZIP decoded, ${archive.length} files');
+        
+        for (final file in archive) {
+          final filename = file.name;
+          if (file.isFile) {
+            final data = file.content as List<int>;
+            final fileBase64 = base64Encode(data);
+            await prefs.setString('tour_file_${safeName}_${editTourId}_$filename', fileBase64);
+            
+            // Store MIME type for proper blob creation
+            String mimeType = 'application/octet-stream';
+            if (filename.endsWith('.html')) mimeType = 'text/html';
+            else if (filename.endsWith('.mp3')) mimeType = 'audio/mpeg';
+            else if (filename.endsWith('.json')) mimeType = 'application/json';
+            
+            await prefs.setString('tour_file_${safeName}_${editTourId}_${filename}_mime', mimeType);
+          }
+        }
+        await DebugLogHelper.addDebugLog('HOME: SAVE - Web ZIP extraction completed');
+      } else {
+        // Mobile platform: save ZIP file and extract normally
+        final zipFile = File('$tourDirPath/tour.zip');
+        await zipFile.writeAsBytes(zipBytes);
+        await DebugLogHelper.addDebugLog('HOME: SAVE - Saved ZIP file');
+        
+        // Extract ZIP file
+        await DebugLogHelper.addDebugLog('HOME: SAVE - Starting ZIP extraction');
+        final archive = ZipDecoder().decodeBytes(zipBytes);
+        await DebugLogHelper.addDebugLog('HOME: SAVE - ZIP decoded, ${archive.length} files');
+        
+        for (final file in archive) {
+          final filename = file.name;
+          if (file.isFile) {
+            final data = file.content as List<int>;
+            final extractedFile = File('$tourDirPath/$filename');
+            await extractedFile.create(recursive: true);
+            await extractedFile.writeAsBytes(data);
+          }
+        }
+        await DebugLogHelper.addDebugLog('HOME: SAVE - ZIP extraction completed');
+      }
       
       await DebugLogHelper.addDebugLog('HOME: SAVE - Creating tour data object');
       
       // Add to saved tours list with edit tour ID (only store tour_id)
       final tourData = {
         'title': finalTourName,
-        'path': tourDir.path,
+        'path': tourDirPath,
         'created': DateTime.now().toIso8601String(),
         'stops': '10',
         'original_request': baseTourName,
         'tour_id': editTourId,  // Store edit tour ID, not download ID
         'editable': isEditable,
+        'is_web_storage': kIsWeb, // Flag to indicate storage type
       };
       
       await DebugLogHelper.addDebugLog('HOME: SAVE - Adding to saved tours list');
@@ -1318,7 +1369,7 @@ class _HomeScreenState extends State<HomeScreen> {
       await DebugLogHelper.addDebugLog('HOME: SAVE - Saving to SharedPreferences');
       await prefs.setStringList('saved_tours', savedTours);
       
-      await DebugLogHelper.addDebugLog('HOME: Tour saved to My Tours: $finalTourName at ${tourDir.path}');
+      await DebugLogHelper.addDebugLog('HOME: Tour saved to My Tours: $finalTourName at $tourDirPath');
       await DebugLogHelper.addDebugLog('HOME: SAVE - _saveTourToMyTours COMPLETED');
       
     } catch (e) {
@@ -1790,26 +1841,47 @@ class _HomeScreenState extends State<HomeScreen> {
                 // Get the actual storage path for subscription articles (DISABLED - BUILD ERROR)
                 // final storedPath = await SubscriptionService.getStoredArticlePath(articleId);
                 // Fix: Create proper directory path for subscription articles
-                final appDir = await getApplicationDocumentsDirectory();
                 final truncatedTitle = title.length > 50 ? title.substring(0, 50) : title;
                 final safeName = truncatedTitle.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
-                final subscriptionDir = Directory('${appDir.path}/subscription/${safeName}_$articleId');
-                await subscriptionDir.create(recursive: true);
+                String storedPath;
                 
-                // Extract ZIP to proper directory
-                final zipFile = File('${subscriptionDir.path}/article.zip');
-                await zipFile.writeAsBytes(downloadResponse.bodyBytes);
-                
-                final archive = ZipDecoder().decodeBytes(downloadResponse.bodyBytes);
-                for (final file in archive) {
-                  if (file.isFile) {
-                    final extractedFile = File('${subscriptionDir.path}/${file.name}');
-                    await extractedFile.create(recursive: true);
-                    await extractedFile.writeAsBytes(file.content as List<int>);
+                if (kIsWeb) {
+                  // Web platform: store in SharedPreferences
+                  storedPath = 'web_subscription/${safeName}_$articleId';
+                  
+                  // Store ZIP in SharedPreferences
+                  final zipBase64 = base64Encode(downloadResponse.bodyBytes);
+                  await prefs.setString('subscription_zip_${safeName}_$articleId', zipBase64);
+                  
+                  // Extract and store individual files
+                  final archive = ZipDecoder().decodeBytes(downloadResponse.bodyBytes);
+                  for (final file in archive) {
+                    if (file.isFile) {
+                      final fileBase64 = base64Encode(file.content as List<int>);
+                      await prefs.setString('subscription_file_${safeName}_${articleId}_${file.name}', fileBase64);
+                    }
                   }
+                } else {
+                  // Mobile platform: create actual directory
+                  final appDir = await getApplicationDocumentsDirectory();
+                  final subscriptionDir = Directory('${appDir.path}/subscription/${safeName}_$articleId');
+                  await subscriptionDir.create(recursive: true);
+                  
+                  // Extract ZIP to proper directory
+                  final zipFile = File('${subscriptionDir.path}/article.zip');
+                  await zipFile.writeAsBytes(downloadResponse.bodyBytes);
+                  
+                  final archive = ZipDecoder().decodeBytes(downloadResponse.bodyBytes);
+                  for (final file in archive) {
+                    if (file.isFile) {
+                      final extractedFile = File('${subscriptionDir.path}/${file.name}');
+                      await extractedFile.create(recursive: true);
+                      await extractedFile.writeAsBytes(file.content as List<int>);
+                    }
+                  }
+                  
+                  storedPath = subscriptionDir.path;
                 }
-                
-                final storedPath = subscriptionDir.path;
                 await DebugLogHelper.addDebugLog('SUBSCRIPTION_DOWNLOAD: Article $articleId stored at path: $storedPath');
                 
                 // Add to regular news list with actual path
@@ -1822,6 +1894,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   'article_type': article['article_type'] ?? 'Others',
                   'subscription_domain': subscriptionDomain,
                   'is_subscription': true,
+                  'is_web_storage': kIsWeb,
                 };
                 
                 savedNews.add(json.encode(articleData));
@@ -1834,65 +1907,112 @@ class _HomeScreenState extends State<HomeScreen> {
               }
             } else {
               // Regular article processing (existing logic)
-              final appDir = await getApplicationDocumentsDirectory();
               final truncatedTitle = title.length > 50 ? title.substring(0, 50) : title;
               final safeName = truncatedTitle.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
-              final articleDir = Directory('${appDir.path}/news/${safeName}_$articleId');
-              await articleDir.create(recursive: true);
+              String articleDirPath;
               
-              final zipFile = File('${articleDir.path}/article.zip');
-              await zipFile.writeAsBytes(downloadResponse.bodyBytes);
+              if (kIsWeb) {
+                // Web platform: use SharedPreferences storage
+                articleDirPath = 'web_news/${safeName}_$articleId';
+              } else {
+                // Mobile platform: create actual directory
+                final appDir = await getApplicationDocumentsDirectory();
+                final articleDir = Directory('${appDir.path}/news/${safeName}_$articleId');
+                await articleDir.create(recursive: true);
+                articleDirPath = articleDir.path;
+              }
               
-              final archive = ZipDecoder().decodeBytes(downloadResponse.bodyBytes);
-              await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: ZIP contains ${archive.length} files for article: $articleId');
-              
-              for (final file in archive) {
-                if (file.isFile) {
-                  final extractedFile = File('${articleDir.path}/${file.name}');
-                  await extractedFile.create(recursive: true);
-                  await extractedFile.writeAsBytes(file.content as List<int>);
-                  await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: Extracted ${file.name} (${file.content.length} bytes) for article: $articleId');
+              if (kIsWeb) {
+                // Web platform: store in SharedPreferences
+                final zipBase64 = base64Encode(downloadResponse.bodyBytes);
+                await prefs.setString('article_zip_${safeName}_$articleId', zipBase64);
+                
+                final archive = ZipDecoder().decodeBytes(downloadResponse.bodyBytes);
+                await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: ZIP contains ${archive.length} files for article: $articleId');
+                
+                for (final file in archive) {
+                  if (file.isFile) {
+                    final fileBase64 = base64Encode(file.content as List<int>);
+                    await prefs.setString('article_file_${safeName}_${articleId}_${file.name}', fileBase64);
+                    await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: Stored ${file.name} (${file.content.length} bytes) for article: $articleId');
+                  }
+                }
+              } else {
+                // Mobile platform: save files normally
+                final zipFile = File('$articleDirPath/article.zip');
+                await zipFile.writeAsBytes(downloadResponse.bodyBytes);
+                
+                final archive = ZipDecoder().decodeBytes(downloadResponse.bodyBytes);
+                await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: ZIP contains ${archive.length} files for article: $articleId');
+                
+                for (final file in archive) {
+                  if (file.isFile) {
+                    final extractedFile = File('$articleDirPath/${file.name}');
+                    await extractedFile.create(recursive: true);
+                    await extractedFile.writeAsBytes(file.content as List<int>);
+                    await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: Extracted ${file.name} (${file.content.length} bytes) for article: $articleId');
+                  }
                 }
               }
               
               // Extract and save text content for search
               try {
-                final textFile = File('${articleDir.path}/audiotours_search_content.txt');
                 String textContent = '';
                 
-                // Try to extract text from index.html
-                final indexFile = File('${articleDir.path}/index.html');
-                if (await indexFile.exists()) {
-                  final htmlContent = await indexFile.readAsString();
-                  await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: index.html content length for $articleId: ${htmlContent.length} chars');
-                  
-                  // Simple text extraction - remove HTML tags
-                  textContent = htmlContent
-                      .replaceAll(RegExp(r'<[^>]*>'), ' ')
-                      .replaceAll(RegExp(r'\s+'), ' ')
-                      .trim();
-                  
-                  await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: Extracted text content length for $articleId: ${textContent.length} chars');
-                  if (textContent.length > 0) {
-                    await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: Text preview for $articleId: ${textContent.substring(0, textContent.length > 200 ? 200 : textContent.length)}...');
+                if (kIsWeb) {
+                  // Web platform: extract from stored files
+                  final indexHtmlKey = 'article_file_${safeName}_${articleId}_index.html';
+                  final indexHtmlBase64 = prefs.getString(indexHtmlKey);
+                  if (indexHtmlBase64 != null) {
+                    final htmlBytes = base64Decode(indexHtmlBase64);
+                    final htmlContent = String.fromCharCodes(htmlBytes);
+                    await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: index.html content length for $articleId: ${htmlContent.length} chars');
+                    
+                    // Simple text extraction - remove HTML tags
+                    textContent = htmlContent
+                        .replaceAll(RegExp(r'<[^>]*>'), ' ')
+                        .replaceAll(RegExp(r'\s+'), ' ')
+                        .trim();
                   }
+                  
+                  // Store search content in SharedPreferences
+                  await prefs.setString('article_search_${safeName}_$articleId', textContent);
                 } else {
-                  await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: index.html not found for article: $articleId');
+                  // Mobile platform: extract from files
+                  final indexFile = File('$articleDirPath/index.html');
+                  if (await indexFile.exists()) {
+                    final htmlContent = await indexFile.readAsString();
+                    await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: index.html content length for $articleId: ${htmlContent.length} chars');
+                    
+                    // Simple text extraction - remove HTML tags
+                    textContent = htmlContent
+                        .replaceAll(RegExp(r'<[^>]*>'), ' ')
+                        .replaceAll(RegExp(r'\s+'), ' ')
+                        .trim();
+                  } else {
+                    await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: index.html not found for article: $articleId');
+                  }
+                  
+                  final textFile = File('$articleDirPath/audiotours_search_content.txt');
+                  await textFile.writeAsString(textContent);
                 }
                 
-                await textFile.writeAsString(textContent);
-                await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: Saved search content file for $articleId: ${textContent.length} chars');
+                await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: Saved search content for $articleId: ${textContent.length} chars');
+                if (textContent.length > 0) {
+                  await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: Text preview for $articleId: ${textContent.substring(0, textContent.length > 200 ? 200 : textContent.length)}...');
+                }
               } catch (e) {
                 await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: Text extraction failed for $articleId: $e');
               }
               
               final articleData = {
                 'title': title,
-                'path': articleDir.path,
+                'path': articleDirPath,
                 'created': DateTime.now().toIso8601String(),
                 'original_request': title,
                 'article_id': articleId,
                 'article_type': article['article_type'] ?? 'Others',
+                'is_web_storage': kIsWeb,
               };
               
               savedNews.add(json.encode(articleData));

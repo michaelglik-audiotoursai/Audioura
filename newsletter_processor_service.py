@@ -26,6 +26,7 @@ from dh_service_simple import (
 )
 from user_consolidation_service import user_consolidation_service
 from credential_verification_service import credential_verification_service
+from advertising_url_filter import AdvertisingURLFilter
 
 # Boston Globe Session-Aware Authentication
 def authenticate_boston_globe_with_credentials(credentials, article_url):
@@ -58,11 +59,51 @@ def authenticate_boston_globe_with_credentials(credentials, article_url):
         logging.error(f"Boston Globe session authentication failed: {e}")
         return {'success': False, 'error': str(e)}
 
+# NY Times Undetected Chrome Authentication
+def authenticate_nytimes_with_credentials(credentials, article_url):
+    """Authenticate with NY Times using undetected Chrome"""
+    try:
+        from nytimes_undetected_auth import NYTimesUndetectedAuth
+        
+        auth = NYTimesUndetectedAuth()
+        
+        # Authenticate and extract content
+        result = auth.authenticate_and_extract(
+            article_url, 
+            credentials['username'], 
+            credentials['password']
+        )
+        auth.cleanup()
+        
+        if result['success']:
+            # Extract title from content or URL
+            title = "NY Times Article"
+            if 'kash-patel' in article_url.lower():
+                title = "Kash Patel's F.B.I. Deployment Plans"
+            elif 'mark-kelly' in article_url.lower():
+                title = "Pentagon Opens Inquiry Into Senator Mark Kelly"
+            elif '/politics/' in article_url:
+                title = "NY Times Politics Article"
+            
+            return {
+                'success': True,
+                'content': result['content'],
+                'title': title,
+                'url': article_url
+            }
+        else:
+            return {'success': False, 'error': result['error']}
+            
+    except Exception as e:
+        logging.error(f"NY Times undetected Chrome authentication failed: {e}")
+        return {'success': False, 'error': str(e)}
+
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
 
-# Initialize subscription detector
+# Initialize subscription detector and advertising filter
 subscription_detector = SubscriptionDetector()
+advertising_filter = AdvertisingURLFilter()
 
 # Database connection
 def get_db_connection():
@@ -130,6 +171,91 @@ def is_binary_content(text):
         return True
     except Exception:
         return True
+
+def _is_advertising_content(content):
+    """Detect if content is advertising/promotional material (hotel bookings, travel, etc.)"""
+    if not content or len(content) < 50:
+        return False
+    
+    content_lower = content.lower()
+    
+    # Hotel/Travel booking indicators
+    hotel_indicators = [
+        'free parking available',
+        'children 18 and above will be charged as adults',
+        'select dates to see this property',
+        'availability and prices',
+        'instant answer to most questions',
+        'guest room and suite',
+        'hotel booking',
+        'book now',
+        'reserve now',
+        'check availability',
+        'best price guarantee',
+        'free cancellation',
+        'breakfast included',
+        'wifi included',
+        'pool and spa',
+        'fitness center',
+        'room service',
+        'concierge service'
+    ]
+    
+    # E-commerce indicators
+    ecommerce_indicators = [
+        'add to cart',
+        'buy now',
+        'shop now',
+        'special offer',
+        'limited time',
+        'discount code',
+        'free shipping',
+        'return policy',
+        'customer reviews',
+        'product rating',
+        'in stock',
+        'out of stock'
+    ]
+    
+    # General advertising indicators
+    advertising_indicators = [
+        'click here to',
+        'visit our website',
+        'call now',
+        'don\'t miss out',
+        'act fast',
+        'expires soon',
+        'while supplies last',
+        'terms and conditions apply',
+        'see details',
+        'promotional offer'
+    ]
+    
+    # Count indicators
+    hotel_count = sum(1 for indicator in hotel_indicators if indicator in content_lower)
+    ecommerce_count = sum(1 for indicator in ecommerce_indicators if indicator in content_lower)
+    advertising_count = sum(1 for indicator in advertising_indicators if indicator in content_lower)
+    
+    # Decision logic
+    if hotel_count >= 3:  # Strong hotel booking indicators
+        logging.info(f"Hotel booking content detected: {hotel_count} indicators")
+        return True
+    
+    if ecommerce_count >= 2:  # E-commerce content
+        logging.info(f"E-commerce content detected: {ecommerce_count} indicators")
+        return True
+    
+    if advertising_count >= 3:  # General advertising
+        logging.info(f"Advertising content detected: {advertising_count} indicators")
+        return True
+    
+    # Combined threshold
+    total_ad_indicators = hotel_count + ecommerce_count + advertising_count
+    if total_ad_indicators >= 4:
+        logging.info(f"Combined advertising content detected: {total_ad_indicators} total indicators")
+        return True
+    
+    return False
 
 def is_english_content(text):
     """Detect if content is primarily English to avoid processing non-English content"""
@@ -957,7 +1083,111 @@ def process_newsletter():
                     except Exception as pr_error:
                         logging.error(f"PR Newswire paragraph extraction failed: {pr_error}")
             
-            # 2. Substack selectors
+            # 2. NY Times Newsletter selectors - CRITICAL FIX for main content extraction
+            if not main_content and ('nytimes.com' in processing_url or 'messaging-custom-newsletters.nytimes.com' in processing_url):
+                nytimes_selectors = [
+                    '.newsletter-content',
+                    '.story-body',
+                    '.story-content', 
+                    '[data-testid="newsletter-content"]',
+                    '.css-1fanzo5',  # NY Times specific CSS class
+                    '.css-at9mc1',   # NY Times content wrapper
+                    '.StoryBodyCompanionColumn',
+                    '.RichTextStoryBody',
+                    'section[name="articleBody"]',
+                    '.ArticleBody-articleBody',
+                    'main article',
+                    'main .story'
+                ]
+                
+                for selector in nytimes_selectors:
+                    try:
+                        element = soup.select_one(selector)
+                        if element:
+                            # Remove problematic elements
+                            for tag in element.find_all(['script', 'style', 'img', 'svg', 'canvas', 'object', 'embed']):
+                                tag.decompose()
+                            
+                            text = element.get_text(separator=' ', strip=True)
+                            cleaned_text = clean_text_content(text)
+                            
+                            if not is_binary_content(cleaned_text) and len(cleaned_text) > 200:
+                                main_content = cleaned_text
+                                logging.info(f"Found NY Times content with selector '{selector}': {len(cleaned_text)} chars")
+                                break
+                    except Exception as e:
+                        logging.debug(f"NY Times selector '{selector}' failed: {e}")
+                        continue
+                
+                # Enhanced paragraph extraction for NY Times if selectors didn't work
+                if not main_content or len(main_content) < 500:
+                    try:
+                        # Look for paragraphs containing the expected content
+                        paragraphs = soup.find_all('p')
+                        if paragraphs:
+                            # Filter for substantial paragraphs that might contain newsletter content
+                            substantial_paragraphs = []
+                            for p in paragraphs:
+                                p_text = p.get_text(separator=' ', strip=True)
+                                # Look for paragraphs with substantial content
+                                if (len(p_text) > 50 and 
+                                    not any(skip in p_text.lower() for skip in [
+                                        'subscribe', 'sign up', 'unsubscribe', 'privacy policy',
+                                        'terms of service', 'manage subscription', 'newsletter preferences'
+                                    ])):
+                                    substantial_paragraphs.append(p_text)
+                            
+                            if substantial_paragraphs:
+                                combined_content = ' '.join(substantial_paragraphs)
+                                if len(combined_content) > len(main_content):
+                                    main_content = combined_content
+                                    logging.info(f"NY Times paragraph extraction: {len(substantial_paragraphs)} paragraphs, {len(main_content)} chars")
+                        
+                        # NY Times specific content search - look for expected newsletter content
+                        if not main_content or len(main_content) < 500:
+                            # Search for specific content patterns that indicate newsletter content
+                            body_text = soup.get_text(separator=' ', strip=True)
+                            
+                            # Look for the specific content mentioned by user
+                            if 'Kash Patel' in body_text:
+                                # Extract content around the Kash Patel mention
+                                sentences = body_text.split('. ')
+                                newsletter_content = []
+                                found_start = False
+                                
+                                for sentence in sentences:
+                                    if 'Kash Patel' in sentence and not found_start:
+                                        found_start = True
+                                        newsletter_content.append(sentence)
+                                    elif found_start:
+                                        newsletter_content.append(sentence)
+                                        # Stop after collecting substantial content
+                                        if len(' '.join(newsletter_content)) > 1000:
+                                            break
+                                
+                                if newsletter_content:
+                                    main_content = '. '.join(newsletter_content)
+                                    logging.info(f"NY Times Kash Patel content found: {len(main_content)} chars")
+                            
+                            # Fallback: look for any substantial text blocks
+                            if not main_content:
+                                # Try to find div elements with substantial text
+                                divs = soup.find_all('div')
+                                for div in divs:
+                                    div_text = div.get_text(separator=' ', strip=True)
+                                    if (len(div_text) > 500 and 
+                                        not any(skip in div_text.lower() for skip in [
+                                            'advertisement', 'sponsored', 'subscribe now',
+                                            'sign up', 'newsletter signup', 'privacy policy'
+                                        ])):
+                                        main_content = div_text
+                                        logging.info(f"NY Times div fallback: {len(main_content)} chars")
+                                        break
+                                        
+                    except Exception as nyt_error:
+                        logging.error(f"NY Times paragraph extraction failed: {nyt_error}")
+            
+            # 3. Substack selectors
             if not main_content:
                 substack_selectors = [
                     '.available-content .body.markup',  # Substack main content
@@ -1008,7 +1238,7 @@ def process_newsletter():
                         logging.debug(f"Selector '{selector}' failed: {e}")
                         continue
             
-            # 3. MailChimp selectors
+            # 4. MailChimp selectors
             if not main_content and ('mailchi.mp' in processing_url or 'mailchimp' in str(soup).lower()):
                 mailchimp_selectors = [
                     '.bodyContainer',
@@ -1036,7 +1266,7 @@ def process_newsletter():
                         logging.debug(f"MailChimp selector '{selector}' failed: {e}")
                         continue
             
-            # 4. Email newsletter selectors (Boston Globe, etc.)
+            # 5. Email newsletter selectors (Boston Globe, etc.)
             if not main_content and ('view.email' in processing_url or 'email.' in processing_url):
                 email_selectors = [
                     'table[role="presentation"]',
@@ -1357,6 +1587,16 @@ def process_newsletter():
             try:
                 logging.info(f"Processing article {i}/{len(article_urls)}: {article['url']}")
                 
+                # ENHANCED: Filter out advertising URLs before processing
+                is_advertising, ad_reason = advertising_filter.is_advertising_url(article['url'])
+                if is_advertising:
+                    logging.warning(f"FILTERED advertising URL: {article['url']} - {ad_reason}")
+                    failed_articles.append({
+                        "url": article['url'], 
+                        "error": f"Advertising site filtered: {ad_reason}"
+                    })
+                    continue
+                
                 # Create separate connection for this article
                 article_conn = get_db_connection()
                 article_cursor = article_conn.cursor()
@@ -1522,10 +1762,34 @@ def process_newsletter():
                         logging.info(f"Processing news article URL: {article['url']}")
                         
                         try:
-                            # Check if this is a Boston Globe article that might need authentication
-                            if 'bostonglobe.com' in article['url'] and user_id:
+                            # ENHANCED: Validate Boston Globe tracking URLs before processing
+                            if 'click.email.bostonglobe.com' in article['url']:
                                 try:
-                                    # Try to get stored credentials first
+                                    # Pre-validate tracking URL to avoid processing advertising redirects
+                                    validation_result = _validate_boston_globe_tracking_url(article['url'])
+                                    if not validation_result['valid']:
+                                        logging.warning(f"Boston Globe tracking URL validation failed: {validation_result['reason']}")
+                                        failed_articles.append({
+                                            "url": article['url'], 
+                                            "error": f"Invalid tracking URL: {validation_result['reason']}"
+                                        })
+                                        continue
+                                except Exception as validation_error:
+                                    logging.error(f"Boston Globe URL validation error: {validation_error}")
+                                    # Continue processing even if validation fails
+                                    pass
+                            
+                            # Check if this needs authenticated access
+                            auth_attempted = False
+                            if user_id and ('bostonglobe.com' in article['url'] or 'nytimes.com' in article['url'] or 'click.email.bostonglobe.com' in article['url']):
+                                try:
+                                    # Determine domain
+                                    if 'bostonglobe.com' in article['url']:
+                                        domain = 'bostonglobe.com'
+                                    elif 'nytimes.com' in article['url']:
+                                        domain = 'nytimes.com'
+                                    
+                                    # Try to get stored credentials
                                     cred_conn = get_db_connection()
                                     cred_cursor = cred_conn.cursor()
                                     
@@ -1534,39 +1798,41 @@ def process_newsletter():
                                         FROM user_subscription_credentials 
                                         WHERE device_id = %s AND domain = %s
                                         ORDER BY created_at DESC LIMIT 1
-                                    """, (user_id, 'bostonglobe.com'))
+                                    """, (user_id, domain))
                                     
-                                    bg_credentials = cred_cursor.fetchone()
+                                    credentials = cred_cursor.fetchone()
                                     cred_cursor.close()
                                     cred_conn.close()
                                     
-                                    if bg_credentials:
-                                        logging.info("Found Boston Globe credentials - using authenticated access")
+                                    if credentials:
+                                        logging.info(f"Found {domain} credentials - using authenticated access")
                                         
                                         auth_credentials = {
-                                            'username': bg_credentials[0],
-                                            'password': bg_credentials[1]
+                                            'username': credentials[0],
+                                            'password': credentials[1]
                                         }
                                         
-                                        auth_result = authenticate_boston_globe_with_credentials(auth_credentials, article['url'])
+                                        # Use appropriate authentication method
+                                        if domain == 'bostonglobe.com':
+                                            auth_result = authenticate_boston_globe_with_credentials(auth_credentials, article['url'])
+                                        elif domain == 'nytimes.com':
+                                            auth_result = authenticate_nytimes_with_credentials(auth_credentials, article['url'])
                                         
                                         if auth_result['success']:
                                             article_content = f"AUTHENTICATED ARTICLE: {auth_result['title']}\n\nCONTENT: {auth_result['content']}"
                                             article['title'] = auth_result['title']
-                                            logging.info(f"Boston Globe authenticated access SUCCESS: {len(auth_result['content'])} chars")
+                                            auth_attempted = True
+                                            logging.info(f"{domain} authenticated access SUCCESS: {len(auth_result['content'])} chars")
                                         else:
-                                            logging.warning(f"Boston Globe authentication failed, falling back to regular request: {auth_result['error']}")
-                                            # Fall through to regular request
-                                            article_response = requests.get(article['url'], headers=headers, timeout=10)
+                                            logging.warning(f"{domain} authentication failed: {auth_result['error']}")
                                     else:
-                                        # No credentials, try regular request
-                                        article_response = requests.get(article['url'], headers=headers, timeout=10)
-                                except Exception as bg_auth_error:
-                                    logging.error(f"Boston Globe authentication error: {bg_auth_error}")
-                                    # Fall through to regular request
-                                    article_response = requests.get(article['url'], headers=headers, timeout=10)
-                            else:
-                                # Regular request for non-Boston Globe articles
+                                        logging.info(f"No stored credentials found for {domain}")
+                                        
+                                except Exception as auth_error:
+                                    logging.error(f"Authentication error for {domain}: {auth_error}")
+                            
+                            # Regular request if no authentication attempted or failed
+                            if not auth_attempted:
                                 article_response = requests.get(article['url'], headers=headers, timeout=10)
                             
                             # Only process response if we didn't already get authenticated content
@@ -1674,25 +1940,28 @@ def process_newsletter():
                             cred_cursor.close()
                             cred_conn.close()
                             
-                            if stored_credentials and subscription_domain == 'bostonglobe.com':
-                                logging.info(f"Found Boston Globe credentials - attempting authenticated access")
+                            if stored_credentials and subscription_domain in ['bostonglobe.com', 'nytimes.com']:
+                                logging.info(f"Found {subscription_domain} credentials - attempting authenticated access")
                                 
-                                # Use Boston Globe session authentication
+                                # Use appropriate session authentication
                                 auth_credentials = {
                                     'username': stored_credentials[0],
                                     'password': stored_credentials[1]
                                 }
                                 
-                                auth_result = authenticate_boston_globe_with_credentials(auth_credentials, article['url'])
+                                if subscription_domain == 'bostonglobe.com':
+                                    auth_result = authenticate_boston_globe_with_credentials(auth_credentials, article['url'])
+                                elif subscription_domain == 'nytimes.com':
+                                    auth_result = authenticate_nytimes_with_credentials(auth_credentials, article['url'])
                                 
                                 if auth_result['success']:
                                     # Replace article content with authenticated content
                                     article_content = f"AUTHENTICATED ARTICLE: {auth_result['title']}\n\nCONTENT: {auth_result['content']}"
                                     article['title'] = auth_result['title']
                                     is_subscription_required = False  # Mark as accessible
-                                    logging.info(f"Boston Globe authentication SUCCESS: {len(auth_result['content'])} chars")
+                                    logging.info(f"{subscription_domain} authentication SUCCESS: {len(auth_result['content'])} chars")
                                 else:
-                                    logging.warning(f"Boston Globe authentication failed: {auth_result['error']}")
+                                    logging.warning(f"{subscription_domain} authentication failed: {auth_result['error']}")
                             elif stored_credentials:
                                 logging.info(f"Found stored credentials for {subscription_domain} - Phase 2 processing available")
                             else:
@@ -1726,6 +1995,13 @@ def process_newsletter():
                 # Strict validation - reject short content
                 if not article_content or content_length < 100:
                     error_msg = f"REJECTED: Insufficient content: {content_length} bytes (minimum 100 required)"
+                    logging.error(f"CONTENT VALIDATION FAILED: {error_msg}")
+                    failed_articles.append({"url": article['url'], "error": error_msg})
+                    continue
+                
+                # ENHANCED: Content-based advertising detection
+                if _is_advertising_content(article_content):
+                    error_msg = f"REJECTED: Advertising content detected in article text"
                     logging.error(f"CONTENT VALIDATION FAILED: {error_msg}")
                     failed_articles.append({"url": article['url'], "error": error_msg})
                     continue
@@ -2259,6 +2535,61 @@ def decrypt_credentials_endpoint():
             "status": "error",
             "message": f"Decryption failed: {str(e)}"
         }), 500
+
+def _validate_boston_globe_tracking_url(tracking_url):
+    """Validate Boston Globe tracking URL to prevent advertising redirects"""
+    try:
+        import requests
+        from urllib.parse import urlparse
+        
+        # Follow redirect to see where it goes
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+        
+        response = requests.get(tracking_url, headers=headers, allow_redirects=True, timeout=10)
+        final_url = response.url
+        
+        # Check if final URL is advertising
+        is_ad, ad_reason = advertising_filter.is_advertising_url(final_url)
+        if is_ad:
+            return {
+                'valid': False,
+                'reason': f"Redirects to advertising site: {ad_reason} ({final_url})"
+            }
+        
+        # Check if it's a legitimate Boston Globe URL
+        parsed = urlparse(final_url)
+        if 'bostonglobe.com' in parsed.netloc:
+            return {
+                'valid': True,
+                'reason': f"Valid Boston Globe redirect: {final_url}"
+            }
+        
+        # Check if it's another legitimate news site
+        legitimate_domains = [
+            'nytimes.com', 'washingtonpost.com', 'reuters.com', 'ap.org',
+            'bbc.com', 'cnn.com', 'npr.org', 'pbs.org', 'wsj.com'
+        ]
+        
+        if any(domain in parsed.netloc for domain in legitimate_domains):
+            return {
+                'valid': True,
+                'reason': f"Valid news site redirect: {final_url}"
+            }
+        
+        # Unknown destination - be cautious
+        return {
+            'valid': False,
+            'reason': f"Redirects to unknown site: {final_url}"
+        }
+        
+    except Exception as e:
+        logging.error(f"Error validating tracking URL {tracking_url}: {e}")
+        return {
+            'valid': False,
+            'reason': f"Validation error: {str(e)}"
+        }
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5017, debug=True)

@@ -13,6 +13,13 @@ from datetime import datetime
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 
+# ARCHITECTURAL NOTE: Directory Cleanup Policy
+# - ZIP files are the PRIMARY storage format in database
+# - Directories are TEMPORARY for processing/extraction only
+# - After successful ZIP storage in database, directories are cleaned up
+# - This prevents storage bloat and maintains clean architecture
+# - Tour resolution service handles ZIP files, not directories
+
 # Configure unbuffered logging
 import sys
 sys.stdout.reconfigure(line_buffering=True)
@@ -469,8 +476,23 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         
         if store_success:
             print(f"Tour stored successfully with coordinates: lat={lat}, lng={lng}")
+            
+            # Clean up extraction directory after successful database storage
+            # ZIP file is now the primary storage, directory is no longer needed
+            if os.path.exists(extract_path):
+                try:
+                    print(f"Cleaning up extraction directory: {extract_path}")
+                    shutil.rmtree(extract_path)
+                    print(f"Successfully cleaned up directory: {extract_dir}")
+                    print(f"Storage optimization: Directory removed, ZIP file remains as primary storage")
+                except Exception as cleanup_error:
+                    print(f"Warning: Could not clean up extraction directory: {cleanup_error}")
+                    print(f"Directory will remain: {extract_path}")
+            else:
+                print(f"Extraction directory not found for cleanup: {extract_path}")
         else:
             print("Failed to store tour in database")
+            print(f"Keeping extraction directory due to database storage failure: {extract_path}")
         
         # Complete
         log_job_update(job_id, "completed", "MODERNIZED tour generation completed! Tour now has separate MP3 and TXT files for editing.")

@@ -59,21 +59,22 @@ def find_edit_tour_id(download_id):
             words = tour_name.replace(',', ' ').replace('-', ' ').split()
             keywords = [w for w in words if len(w) > 3][:3]
         
-        # Find matching directory with UUID
+        # Find matching ZIP file with UUID
         for item in tours_dir.iterdir():
-            if item.is_dir():
+            if item.is_file() and item.name.endswith('.zip'):
                 item_name_lower = item.name.lower()
-                # Check if directory matches keywords and has UUID pattern
+                # Check if file matches keywords and has UUID pattern
                 if keywords and all(keyword in item_name_lower for keyword in keywords[:2]):
-                    # Extract UUID from directory name (last part after underscore)
-                    parts = item.name.split('_')
+                    # Extract UUID from filename (last part before .zip)
+                    name_without_ext = item.stem
+                    parts = name_without_ext.split('_')
                     if len(parts) > 1:
                         uuid_part = parts[-1]
                         # Check if it looks like UUID (8+ chars, alphanumeric)
                         if len(uuid_part) >= 8 and uuid_part.replace('-', '').isalnum():
                             return {
                                 'edit_tour_id': uuid_part,
-                                'directory_name': item.name,
+                                'directory_name': name_without_ext,
                                 'full_path': str(item)
                             }
         
@@ -84,18 +85,15 @@ def find_edit_tour_id(download_id):
         return None
 
 def check_tour_editability(tour_path):
-    """Check if tour has separate audio files (editable format)"""
+    """Check if tour ZIP file exists (simplified check)"""
     try:
-        tour_dir = Path(tour_path)
-        if not tour_dir.exists():
-            return False
-            
-        # Check for separate audio files (new format)
-        audio_files = list(tour_dir.glob("audio_*.mp3"))
-        text_files = list(tour_dir.glob("audio_*.txt"))
-        
-        # Editable if has separate audio and text files
-        return len(audio_files) > 0 and len(text_files) > 0
+        tour_file = Path(tour_path)
+        # For ZIP files, just check if file exists and is reasonable size
+        if tour_file.exists() and tour_file.is_file() and tour_file.suffix == '.zip':
+            file_size = tour_file.stat().st_size
+            # Consider editable if ZIP file is larger than 1MB (has content)
+            return file_size > 1024 * 1024
+        return False
         
     except Exception:
         return False
