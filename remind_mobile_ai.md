@@ -13,10 +13,10 @@
 
 ## CURRENT PROJECT STATUS - LATEST UPDATE
 **Project**: Audioura Mobile App Development
-**Version**: v1.2.8+104 (WEB PLATFORM SUPPORT ADDED)
+**Version**: v1.2.8+106 (TOUR STOP COUNT FIX + WEB PLATFORM SUPPORT)
 **Branch**: Newsletters (`git push origin Newsletters`)
 **Icon**: Audioura_3.png
-**Status**: ✅ **WEB PLATFORM COMPATIBILITY** - Tours now work on Ubuntu Firefox with blob URLs
+**Status**: ✅ **WEB PLATFORM + ACCURATE STOP COUNTS** - Tours work on Ubuntu Firefox, show real stop counts
 
 ### 🚨 **CRITICAL WORKFLOW RULE**
 **⚠️ NEVER CHANGE CODE WITHOUT APPROVAL**: Always propose plan first, get user approval, then implement
@@ -61,7 +61,7 @@
 - **Scroll Logic**: `_setupScrollListener()` - Tracks scroll position and triggers navigation reset
 - **Debug Variables**: `_currentVisibleIndex`, `_hasScrolledDown` for tracking state
 
-**Version**: `pubspec.yaml` - Currently v1.2.8+104
+**Version**: `pubspec.yaml` - Currently v1.2.8+106
 
 ## SCROLL-SAFE IMPLEMENTATION - v1.2.8+102 ✅
 **Final Working Features**:
@@ -89,12 +89,13 @@
 **When chat history is compacted, read both @remind_ai.md and @remind_mobile_ai.md to get complete context**
 
 ### IMMEDIATE CONTEXT AFTER COMPACTION:
-- **Current Status**: v1.2.8+104 - WEB PLATFORM SUPPORT ADDED ✅
+- **Current Status**: v1.2.8+106 - TOUR STOP COUNT FIX + WEB PLATFORM SUPPORT ✅
 - **Android Functionality**: 100% UNCHANGED - all features work identically
 - **Web Functionality**: NEW - Tours now work in Ubuntu Firefox with blob URLs
-- **Platform Detection**: Uses `kIsWeb` to provide different storage/playback methods
-- **Git Tagged**: v1.2.8.104 committed and tagged for permanent reference
-- **Ready For**: Testing on both Android and Ubuntu platforms
+- **Stop Count Issue**: IDENTIFIED - Backend should provide stop count, not mobile app
+- **Temporary Fix**: Mobile app counts stops from ZIP content as fallback
+- **Git Tagged**: v1.2.8.106 committed and tagged for permanent reference
+- **NEXT ACTIONS**: 1) Create Services requirement for stop count API, 2) Update mobile code to prefer backend data
 - **⚠️ CRITICAL**: Always get approval before making any code changes
 
 ## ENCRYPTION IMPLEMENTATION - VERIFIED SECURE
@@ -128,10 +129,37 @@
 - Uses `data:text/html;base64,content` URLs for playback
 - Bypasses browser security restrictions
 
+## TOUR STOP COUNT ARCHITECTURE ISSUE - v1.2.8+106 🔄
+**PROBLEM IDENTIFIED**: Mobile app calculates stop count instead of receiving from backend
+**ROOT CAUSE**: Tour resolution API missing `stops_count` field
+**CURRENT WORKAROUND**: Mobile app counts stops from ZIP content (inefficient)
+
+**PROPER ARCHITECTURE**:
+- ✅ **Backend knows stop count** when creating tours
+- ❌ **Backend doesn't provide** stop count in resolution API
+- ❌ **Mobile app recalculates** what backend already knows
+
+**NEXT ACTIONS POST-COMPACTION**:
+1. **Create requirement** for Services Amazon-Q to add `stops_count` to `/tour/{id}/resolve` API
+2. **Update mobile code** to prefer backend-provided count, fallback to ZIP analysis
+3. **Test both scenarios** - with and without backend stop count
+
+**API Enhancement Needed**:
+```json
+{
+  "status": "success",
+  "edit_tour_id": "386e41c5",
+  "tour_name": "Test Tour",
+  "editable": true,
+  "stops_count": 3,  // ← Services Amazon-Q should add this
+  "has_separate_audio_files": false
+}
+```
+
 ## BUILD & TEST WORKFLOW
 **Build Process**: Ubuntu VM required - `bash build_flutter_clean.sh`
 **Test Protocol**: 
-- **Android**: Install APK → Verify tours work identically to v1.2.8+102/103
-- **Ubuntu**: Test web demo → Verify tours now display and play content
+- **Android**: Install APK → Verify tours work identically + show correct stop counts
+- **Ubuntu**: Test web demo → Verify tours display content + correct stop counts
 **Debug Feedback**: Use mobile app logs and browser console for debugging
 **Version Control**: Newsletters branch, increment version only for functional changes
