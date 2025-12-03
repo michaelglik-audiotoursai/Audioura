@@ -98,6 +98,39 @@ def check_tour_editability(tour_path):
     except Exception:
         return False
 
+def count_tour_stops_from_zip(zip_path):
+    """Count tour stops from ZIP file content"""
+    try:
+        import zipfile
+        
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            # Method 1: Count audio files (most reliable)
+            audio_files = [f for f in zip_ref.namelist() if f.endswith('.mp3') and not f.startswith('__MACOSX/')]
+            if audio_files:
+                return len(audio_files)
+            
+            # Method 2: Look for tour.json structure
+            try:
+                with zip_ref.open('tour.json') as f:
+                    import json
+                    tour_data = json.load(f)
+                    if 'stops' in tour_data and isinstance(tour_data['stops'], list):
+                        return len(tour_data['stops'])
+            except (KeyError, json.JSONDecodeError):
+                pass
+            
+            # Method 3: Count audio_*.mp3 pattern
+            audio_pattern_files = [f for f in zip_ref.namelist() if f.startswith('audio_') and f.endswith('.mp3')]
+            if audio_pattern_files:
+                return len(audio_pattern_files)
+        
+        # Default fallback
+        return 10
+        
+    except Exception as e:
+        print(f"Error counting stops from ZIP {zip_path}: {e}")
+        return 10  # Default fallback
+
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({
@@ -152,12 +185,16 @@ def resolve_tour_id(download_id):
         # Check editability
         is_editable = check_tour_editability(edit_info['full_path'])
         
+        # Count stops from ZIP file
+        stops_count = count_tour_stops_from_zip(edit_info['full_path'])
+        
         return jsonify({
             "status": "success",
             "download_id": int(download_id),
             "edit_tour_id": edit_info['edit_tour_id'],
             "tour_name": tour_name,
             "editable": is_editable,
+            "stops_count": stops_count,
             "has_separate_audio_files": is_editable,
             "download_url": f"/tour/{download_id}/download",
             "directory_name": edit_info['directory_name']

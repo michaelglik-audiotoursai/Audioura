@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class DebugLogViewerScreen extends StatefulWidget {
@@ -138,6 +139,17 @@ class DebugLogHelper {
     }
     
     await prefs.setStringList('debug_logs', logs);
-    print(message); // Also print to console
+    
+    // Platform-specific console logging (ISSUE-006 fix)
+    if (kIsWeb) {
+      // WEB: Only log ERROR level messages to prevent console flooding
+      if (message.contains('[ERROR]') || message.contains('Error') || message.contains('Failed')) {
+        print('[$timestamp] $message');
+      }
+      // Skip all other logs on web to prevent performance issues
+    } else {
+      // MOBILE: Full logging as before
+      print(message);
+    }
   }
 }
