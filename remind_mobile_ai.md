@@ -83,6 +83,7 @@
 - 🎵 **Tours Mode Protected**: Never modify `_buildToursView()` - it works perfectly
 - 📱 **Audio Mode Only**: All scroll fixes apply only to `_buildNewsView()`
 - 🔄 **Version Management**: Only increment version for functional changes, not build fixes
+- ⚠️ **BUILD ERROR RULE**: NEVER increment version numbers when fixing build errors - only increment for new features/functionality
 
 ## Post-Compaction Recovery Instructions
 **When chat history is compacted, read both @remind_ai.md and @remind_mobile_ai.md to get complete context**
