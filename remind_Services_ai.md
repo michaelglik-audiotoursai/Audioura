@@ -169,13 +169,39 @@ docker exec development-postgres-2-1 psql -U admin -d audiotours -c "SELECT url,
 - **Git Workflow**: All commits go to Newsletters branch, NOT main
 - **Container Ports**: Only one service can use port 5017 at a time
 
-### 🔄 **Recovery Instructions**
-If chat history is lost, read this file and:
-1. **Guy Raz Issue**: Binary detection incorrectly flags clean 8,414-char content, uses 262-char fallback
-2. **Test Files Available**: All pipeline tests prove each step works correctly in isolation
-3. **Real Content**: `extracted_content_guy_raz_substack.txt` has 8,414 chars of clean Guy Raz content
-4. **Solution**: Fix `is_binary_content()` in `newsletter_processor_service.py` or use browser automation
-5. **Debug Evidence**: Orchestrator logs show 262 bytes (fallback) not 8,414 bytes (real content)
+### 🔄 **POST-COMPACTION RECOVERY INSTRUCTIONS**
+**If chat history is compacted, read @remind_ai.md and @remind_Services_ai.md to continue development**
+
+**Current System Status**:
+- ✅ **All Services Operational**: 10/10 containers running (100% health)
+- ✅ **Tour Resolution Fixed**: Tour ID 5 and all legacy tours working
+- ✅ **Directory Cleanup**: Automatic cleanup implemented, 657 MB saved
+- ✅ **REQ-017 Implemented**: Tour stops count API for modern tours
+- ✅ **REQ-018 Implemented**: CORS headers for web platform support
+- ✅ **Newsletter Technologies**: 7/8 working (NY Times blocked by DataDome)
+
+**Ready for Development**:
+- **Git Workflow**: All changes committed to appropriate branches
+- **Container Deployment**: All services updated and restarted
+- **Testing Framework**: Complete test suite available
+- **Documentation**: All requirements and fixes documented
+
+**Key Commands**:
+```bash
+# System health check
+python test_system_health.py
+
+# Newsletter processing test
+curl -X POST "http://localhost:5017/process_newsletter" -H "Content-Type: application/json" -d '{"newsletter_url": "URL", "user_id": "USER-ID", "max_articles": 10}'
+
+# Tour resolution test
+curl -X GET "http://localhost:5025/tour/39/resolve"
+
+# Container management
+docker ps
+docker restart container_name
+docker cp file.py container:/app/
+```
 
 ### 📈 **Progress Tracking**
 - **Phase 1**: Newsletter basic functionality ✅ COMPLETE
@@ -492,8 +518,8 @@ Once pattern identified:
 - ✅ `tour_id_resolution_service.py` - Fixed to handle ZIP files instead of directories
 - ✅ `cleanup_host_directories.py` - Legacy directory cleanup utility (657 MB saved)
 
-**Last Updated**: 2025-12-03 - TOUR ID 5 REGRESSION FIXED + LEGACY CLEANUP COMPLETE ✅
-**Status**: ✅ **SYSTEM OPERATIONAL** | ✅ **TOUR RESOLUTION FIXED** | ✅ **LEGACY DIRECTORIES CLEANED**
+**Last Updated**: 2025-12-04 - ALL CRITICAL SYSTEMS OPERATIONAL ✅
+**Status**: ✅ **SYSTEM OPERATIONAL** | ✅ **TOUR RESOLUTION FIXED** | ✅ **LEGACY DIRECTORIES CLEANED** | ✅ **REQ-017 IMPLEMENTED** | ✅ **REQ-018 CORS FIXED**
 
 ### 🎯 **EXECUTIVE SUMMARY**
 **System Health**: 100% (all issues resolved) ✅
@@ -755,6 +781,45 @@ dir tours\*.zip | find /c ".zip"  # Should show 450+ ZIP files (unchanged)
 - **Issue**: Google redirect newsletter extracting only 1 paragraph instead of 11 paragraphs
 - **Root Cause**: Missing PR Newswire specific content selectors in `analyze_content_quality()`
 - **Solution**: Added PR Newswire selectors (`.release-body`, `.news-release-text`, etc.)
+
+### ✅ **REQ-017 TOUR STOPS COUNT API - IMPLEMENTED (2025-12-04)**
+**Issue**: Mobile app analyzing ZIP files to count tour stops - inefficient
+**Solution**: Backend now provides `stops_count` field for modern tours
+**Status**: ✅ **DEPLOYED** - Tour resolution service enhanced
+
+**Implementation Details**:
+- **Modern Tours**: Include `stops_count` field based on MP3 file count
+- **Legacy Tours**: Field omitted, mobile app continues existing logic
+- **Performance**: Eliminates mobile ZIP analysis overhead
+- **Architecture**: Backend is authoritative source for tour metadata
+
+**Files Modified**:
+- ✅ `tour_id_resolution_service.py` - Added `count_mp3_files_from_zip()` function
+- ✅ Container: `tour-id-resolution-1:5025` - Deployed and restarted
+
+**Test Results**:
+- **Tour ID 5 (Old)**: No `stops_count` field (mobile app handles) ✅
+- **Tour ID 39 (Modern)**: `"stops_count": 10` (backend provides) ✅
+
+### ✅ **REQ-018 WEB CORS SUPPORT - IMPLEMENTED (2025-12-04)**
+**Issue**: Web platform CORS policy blocking user API requests
+**Solution**: Added CORS headers to all user API endpoints
+**Status**: ✅ **DEPLOYED** - Web platform connectivity restored
+
+**Implementation Details**:
+- **CORS Headers**: `Access-Control-Allow-Origin: *` for all responses
+- **OPTIONS Handling**: Preflight requests handled for all endpoints
+- **Zero Mobile Impact**: Mobile apps ignore CORS headers completely
+- **Web Platform**: Ubuntu Server testing now works
+
+**Files Modified**:
+- ✅ `user_api_with_cors.py` - Created with CORS support
+- ✅ Container: `development-user-api-2-1:5003` - Deployed and restarted
+
+**Test Results**:
+- **Health Endpoint**: Returns CORS headers ✅
+- **User Endpoint**: Handles OPTIONS preflight ✅
+- **Web Connectivity**: CORS blocking resolved ✅
 - **Result**: 1,564 bytes → 4,593 bytes (194% content improvement)
 - **Files Modified**: `newsletter_processor_service.py` - enhanced content extraction
 
