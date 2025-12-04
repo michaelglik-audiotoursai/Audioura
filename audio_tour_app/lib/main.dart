@@ -16,7 +16,7 @@ class MainScreenWithTreatsTab extends StatelessWidget {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  print('=== AUDIOTOURS DEV v1.2.2+148 STARTING ===');
+  print('=== AUDIOTOURS DEV v1.2.8+114 STARTING ===');
   
   // Clear old article cache to fix 404 errors
   try {
