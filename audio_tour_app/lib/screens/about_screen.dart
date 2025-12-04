@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'dart:convert';
+import 'dart:io' show Platform;
 
 import 'debug_log_viewer_screen.dart';
 
@@ -55,33 +57,49 @@ class _AboutScreenState extends State<AboutScreen> {
       // Get or create user ID
       String? userId = prefs.getString('user_id');
       if (userId == null) {
-        final deviceInfo = DeviceInfoPlugin();
-        final androidInfo = await deviceInfo.androidInfo;
-        userId = _generateUserId(androidInfo);
+        if (kIsWeb) {
+          userId = 'WEB-USER-${DateTime.now().millisecondsSinceEpoch}';
+        } else {
+          final deviceInfo = DeviceInfoPlugin();
+          final androidInfo = await deviceInfo.androidInfo;
+          userId = _generateUserId(androidInfo);
+        }
         await prefs.setString('user_id', userId);
       }
-      
-      final deviceInfo = DeviceInfoPlugin();
-      final androidInfo = await deviceInfo.androidInfo;
       
       // Load saved server IP
       final savedIp = prefs.getString('server_ip') ?? '192.168.0.217';
       
-      await DebugLogHelper.addDebugLog('Checking user: $userId');
+      await DebugLogHelper.addDebugLog('ABOUT: Checking user: $userId');
       
       // Test server connectivity
       await _testServerConnectivity();
+      
+      // Platform-specific device info
+      String deviceModel = 'Unknown Device';
+      String osVersion = 'Unknown OS';
+      
+      if (kIsWeb) {
+        deviceModel = 'Web Browser';
+        osVersion = 'Web Platform';
+      } else if (Platform.isAndroid) {
+        final deviceInfo = DeviceInfoPlugin();
+        final androidInfo = await deviceInfo.androidInfo;
+        deviceModel = '${androidInfo.brand} ${androidInfo.model}';
+        osVersion = 'Android ${androidInfo.version.release}';
+      }
       
       setState(() {
         _appVersion = packageInfo.version;
         _buildNumber = packageInfo.buildNumber;
         _userId = userId!;
-        _deviceModel = '${androidInfo.brand} ${androidInfo.model}';
-        _androidVersion = 'Android ${androidInfo.version.release}';
+        _deviceModel = deviceModel;
+        _androidVersion = osVersion;
         _currentServerIp = savedIp;
         _serverIpController.text = savedIp;
       });
     } catch (e) {
+      await DebugLogHelper.addDebugLog('ABOUT: Error loading app info: $e');
       setState(() {
         _appVersion = 'Error loading';
         _buildNumber = 'Error loading';
