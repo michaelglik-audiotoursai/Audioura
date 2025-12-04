@@ -49,19 +49,16 @@ class WebLogger extends PlatformLogger {
   Future<void> log(String message) async {
     final timestamp = DateTime.now().toString().substring(11, 19);
     
-    // Block binary data and long messages
-    if (message.length > 100 || 
-        message.contains('base64') || 
-        message.contains('data:')) {
-      return; // Skip completely
+    // Block binary data and very long messages
+    if (message.contains('base64') || 
+        message.contains('data:') ||
+        message.length > 500) {
+      return; // Skip binary data and massive messages
     }
     
-    // Only ERROR level messages to console
-    if (message.contains('[ERROR]') || 
-        message.contains('Error') || 
-        message.contains('Failed')) {
-      print('[$timestamp] ${message.substring(0, message.length > 100 ? 100 : message.length)}');
-    }
+    // Log all non-binary messages to console (truncated)
+    final truncatedMessage = message.length > 100 ? message.substring(0, 100) + '...' : message;
+    print('[$timestamp] $truncatedMessage');
     
     // No storage on web platform
   }
