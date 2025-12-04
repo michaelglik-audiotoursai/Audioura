@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/platform_logger.dart';
 
@@ -20,10 +21,24 @@ class _DebugLogViewerScreenState extends State<DebugLogViewerScreen> {
   }
 
   Future<void> _loadDebugLogs() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _debugLogs = prefs.getStringList('debug_logs') ?? [];
-    });
+    if (kIsWeb) {
+      // Web platform: Show message about console logs
+      setState(() {
+        _debugLogs = [
+          '[INFO] Web Platform Debug Logs',
+          '[INFO] Logs are displayed in browser console (F12)',
+          '[INFO] WebLogger prevents storage quota issues',
+          '[INFO] Check browser console for real-time logs',
+          '[INFO] Press F12 → Console tab to view logs',
+        ];
+      });
+    } else {
+      // Mobile platform: Load from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        _debugLogs = prefs.getStringList('debug_logs') ?? [];
+      });
+    }
   }
 
   Future<void> _copyAllLogs() async {
