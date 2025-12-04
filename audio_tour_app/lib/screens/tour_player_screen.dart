@@ -45,7 +45,7 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
     if (kIsWeb) {
       // Web platform: use blob URL
       final blobUrl = await WebFileService.getTourFilePath(widget.tourPath, 'index.html');
-      await DebugLogHelper.addDebugLog('TOUR_PLAYER: Using web blob URL: $blobUrl');
+      await DebugLogHelper.addDebugLog('TOUR_PLAYER: Using web blob URL (${blobUrl.length} chars)');
       return blobUrl;
     } else {
       // Mobile platform: use file URL

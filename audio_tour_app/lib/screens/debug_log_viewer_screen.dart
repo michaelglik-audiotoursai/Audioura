@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/platform_logger.dart';
 
 class DebugLogViewerScreen extends StatefulWidget {
   const DebugLogViewerScreen({super.key});
@@ -127,29 +127,9 @@ class _DebugLogViewerScreenState extends State<DebugLogViewerScreen> {
 
 // Helper class for adding debug logs from anywhere in the app
 class DebugLogHelper {
+  static final PlatformLogger _logger = PlatformLogger.instance;
+  
   static Future<void> addDebugLog(String message) async {
-    final prefs = await SharedPreferences.getInstance();
-    final logs = prefs.getStringList('debug_logs') ?? [];
-    final timestamp = DateTime.now().toString().substring(11, 19);
-    logs.add('[$timestamp] $message');
-    
-    // Keep only last 75 logs
-    if (logs.length > 75) {
-      logs.removeAt(0);
-    }
-    
-    await prefs.setStringList('debug_logs', logs);
-    
-    // Platform-specific console logging (ISSUE-006 fix)
-    if (kIsWeb) {
-      // WEB: Only log ERROR level messages to prevent console flooding
-      if (message.contains('[ERROR]') || message.contains('Error') || message.contains('Failed')) {
-        print('[$timestamp] $message');
-      }
-      // Skip all other logs on web to prevent performance issues
-    } else {
-      // MOBILE: Full logging as before
-      print(message);
-    }
+    await _logger.log(message);
   }
 }
