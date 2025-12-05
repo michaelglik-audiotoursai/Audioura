@@ -10,8 +10,7 @@ import requests
 import traceback
 import re
 from datetime import datetime
-from flask import Flask, request, jsonify, send_file
-from flask_cors import CORS
+from flask import Flask, request, jsonify, send_file, make_response
 
 # ARCHITECTURAL NOTE: Directory Cleanup Policy
 # - ZIP files are the PRIMARY storage format in database
@@ -25,7 +24,28 @@ import sys
 sys.stdout.reconfigure(line_buffering=True)
 
 app = Flask(__name__)
-CORS(app)
+
+# CORS headers for web platform support
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    return response
+
+@app.after_request
+def after_request(response):
+    return add_cors_headers(response)
+
+# Handle preflight OPTIONS requests
+@app.route('/health', methods=['OPTIONS'])
+@app.route('/generate-complete-tour', methods=['OPTIONS'])
+@app.route('/status/<job_id>', methods=['OPTIONS'])
+@app.route('/download/<job_id>', methods=['OPTIONS'])
+@app.route('/serve/<job_id>', methods=['OPTIONS'])
+@app.route('/jobs', methods=['OPTIONS'])
+def handle_options(*args, **kwargs):
+    response = make_response()
+    return add_cors_headers(response)
 
 def sanitize_input(input_text):
     """Sanitize user input for security and filesystem safety"""
@@ -476,6 +496,31 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         
         if store_success:
             print(f"Tour stored successfully with coordinates: lat={lat}, lng={lng}")
+            
+            # Update tour_requests status to completed
+            if user_id and 'tour_id' in ACTIVE_JOBS[job_id]:
+                tour_id = ACTIVE_JOBS[job_id]['tour_id']
+                print(f"Updating tour_requests status for tour_id: {tour_id}")
+                try:
+                    update_data = {
+                        'tour_id': tour_id,
+                        'status': 'completed',
+                        'finished_at': datetime.now().isoformat()
+                    }
+                    update_response = requests.post(
+                        "http://development-tour-update-1:5001/update",
+                        headers={"Content-Type": "application/json"},
+                        json=update_data,
+                        timeout=10
+                    )
+                    if update_response.status_code == 200:
+                        print(f"Successfully updated tour_requests status for {tour_id}")
+                    else:
+                        print(f"Failed to update tour_requests status: {update_response.text}")
+                except Exception as update_error:
+                    print(f"Error updating tour_requests status: {update_error}")
+            else:
+                print(f"No tour_id available for tour_requests update (user_id: {user_id})")
             
             # Clean up extraction directory after successful database storage
             # ZIP file is now the primary storage, directory is no longer needed
