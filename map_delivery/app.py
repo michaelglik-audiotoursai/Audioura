@@ -10,8 +10,7 @@ import math
 import traceback
 from io import BytesIO
 from datetime import datetime
-from flask import Flask, request, jsonify, send_file
-from flask_cors import CORS
+from flask import Flask, request, jsonify, send_file, make_response
 
 # Configure unbuffered logging
 sys.stdout.reconfigure(line_buffering=True)
@@ -19,7 +18,27 @@ print(f"\n==== MAP DELIVERY SERVICE STARTING: {datetime.now().isoformat()} ===="
 sys.stdout.flush()
 
 app = Flask(__name__)
-CORS(app)
+
+# CORS headers for web platform support
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    return response
+
+@app.after_request
+def after_request(response):
+    return add_cors_headers(response)
+
+# Handle preflight OPTIONS requests
+@app.route('/health', methods=['OPTIONS'])
+@app.route('/tours-near/<lat>/<lng>', methods=['OPTIONS'])
+@app.route('/download-tour/<int:tour_id>', methods=['OPTIONS'])
+@app.route('/tour-info/<int:tour_id>', methods=['OPTIONS'])
+@app.route('/search-tours', methods=['OPTIONS'])
+def handle_options(*args, **kwargs):
+    response = make_response()
+    return add_cors_headers(response)
 
 # Log all incoming requests
 @app.before_request
@@ -66,7 +85,7 @@ def health_check():
 
 @app.route('/tours-near/<lat>/<lng>', methods=['GET'])
 def get_tours_near_location(lat, lng):
-    """Get tours near a specific location"""
+    """Get tours near a specific location with multi-language support"""
     print(f"Getting tours near lat={lat}, lng={lng}")
     sys.stdout.flush()
     
@@ -75,29 +94,33 @@ def get_tours_near_location(lat, lng):
         lat = float(lat)
         lng = float(lng)
         radius_km = float(request.args.get('radius', 50))
-        print(f"Search radius: {radius_km} km")
+        languages = request.args.get('languages', 'en').split('|')
+        print(f"Search radius: {radius_km} km, languages: {languages}")
         sys.stdout.flush()
         
         conn = get_db_connection()
         cur = conn.cursor()
         
-        cur.execute("""
-            SELECT id, tour_name, request_string, lat, lng, number_requested
+        # Get tours in requested languages
+        language_placeholders = ','.join(['%s'] * len(languages))
+        cur.execute(f"""
+            SELECT id, tour_name, request_string, lat, lng, number_requested, language, original_tour_id
             FROM audio_tours 
             WHERE lat IS NOT NULL AND lng IS NOT NULL
-        """)
+            AND language IN ({language_placeholders})
+        """, languages)
         
         tours = cur.fetchall()
-        nearby_tours = []
+        tours_by_language = {lang: [] for lang in languages}
         
         for tour in tours:
-            tour_id, tour_name, request_string, tour_lat, tour_lng, requests = tour
+            tour_id, tour_name, request_string, tour_lat, tour_lng, requests, language, original_id = tour
             
             if tour_lat and tour_lng:
                 distance = calculate_distance(lat, lng, tour_lat, tour_lng)
                 
                 if distance <= radius_km:
-                    nearby_tours.append({
+                    tour_data = {
                         'id': tour_id,
                         'name': tour_name,
                         'request_string': request_string,
@@ -105,22 +128,30 @@ def get_tours_near_location(lat, lng):
                         'lng': tour_lng,
                         'distance_km': round(distance, 2),
                         'popularity': requests,
-                        'type': 'walking_tour'
-                    })
+                        'type': 'walking_tour',
+                        'language': language,
+                        'original_tour_id': original_id
+                    }
+                    tours_by_language[language].append(tour_data)
         
-        nearby_tours.sort(key=lambda x: x['distance_km'])
+        # Sort tours by distance within each language
+        for lang in tours_by_language:
+            tours_by_language[lang].sort(key=lambda x: x['distance_km'])
+        
         cur.close()
         conn.close()
         
-        print(f"Found {len(nearby_tours)} tours within {radius_km} km")
+        total_tours = sum(len(tours) for tours in tours_by_language.values())
+        print(f"Found {total_tours} tours within {radius_km} km across {len(languages)} languages")
         sys.stdout.flush()
         
         return jsonify({
-            'tours': nearby_tours,
+            'tours_by_language': tours_by_language,
             'center_lat': lat,
             'center_lng': lng,
             'radius_km': radius_km,
-            'count': len(nearby_tours)
+            'languages': languages,
+            'total_count': total_tours
         })
         
     except Exception as e:
@@ -130,8 +161,10 @@ def get_tours_near_location(lat, lng):
 
 @app.route('/download-tour/<int:tour_id>', methods=['GET'])
 def download_tour(tour_id):
-    """Download a tour zip file by ID"""
-    print(f"Downloading tour ID: {tour_id}")
+    """Download a tour zip file by ID with multi-language support"""
+    languages = request.args.get('languages', 'en').split('|')
+    user_id = request.args.get('user_id', 'anonymous')
+    print(f"Downloading tour ID: {tour_id}, languages: {languages}, user: {user_id}")
     sys.stdout.flush()
     
     try:

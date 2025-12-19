@@ -116,5 +116,15 @@ services:
       - ./tours:/app/tours
     command: python tour_editing_phase2.py
 
+  translation-service:
+    build: ./translation-service
+    container_name: translation-service-1
+    ports:
+      - "5030:5030"
+    environment:
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+
 volumes:
   postgres_data:
