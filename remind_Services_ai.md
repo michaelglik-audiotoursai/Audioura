@@ -216,8 +216,8 @@ docker cp file.py container:/app/
 - **Phase 8**: Guy Raz content truncation fix ✅ COMPLETE
 - **Phase 9**: Mobile app integration ✅ READY FOR TESTING
 
-**Last Updated**: 2025-11-04 - CRITICAL CONTENT TRUNCATION BUG FIXED ✅
-**Status**: CRITICAL BUG - Root cause identified in Guy Raz newsletter HTML content extraction, solution ready
+**Last Updated**: 2025-12-19 - TRANSLATION PROJECT INITIATED ✅
+**Status**: ✅ **ALL SYSTEMS OPERATIONAL** | 🚀 **NEW PROJECT: TRANSLATION SERVICE**
 
 ### 🌐 **PLATFORM-SPECIFIC NEWSLETTER SUPPORT ADDED**
 **Date**: 2025-11-04
@@ -684,6 +684,75 @@ curl -X GET "http://localhost:5012/download/84fe530c-21ec-4e80-adf0-1d7a23e2b9f1
 - ✅ **No Regression**: Existing technologies continue working perfectly
 - ✅ **Enhanced User Experience**: More articles available for all email newsletters
 - ✅ **Cost Controlled**: 15-article default limit maintains budget constraints
+
+## 🌍 **NEW PROJECT: TRANSLATION SERVICE (2025-12-19)**
+**Objective**: Add multi-language support to AudioTours without modifying existing services
+**Status**: 🚀 **PHASE 1 READY** - Architecture complete, database schema prepared
+
+### **Translation Project Overview**
+- **Target Languages**: Spanish, French, German, Russian, Chinese (Simplified)
+- **Architecture**: Post-processing translation of ZIP files with mobile language preferences
+- **Database Strategy**: Add language fields to existing tables (no separate translation tables)
+- **API Enhancement**: Multi-language support (`?languages=en|es|ru`)
+- **Cost Estimate**: $31-296/month depending on usage
+- **Timeline**: 4 weeks total implementation
+
+### **Phase 1: Database Schema Updates (Week 1)**
+**Services Amazon-Q Responsibilities**:
+- Add `language` field to: `audio_tours`, `article_requests`, `news_audios`, `tour_requests`
+- Add `original_tour_id`/`original_article_id` for linking translations
+- Create `supported_languages` configuration table
+- Create translation service container (Port 5030)
+- Implement AWS Translate + Polly integration
+
+### **Translation Service Architecture**
+```
+New Translation Microservice (Port 5030)
+├── Text Translation (AWS Translate API)
+├── Audio Translation (AWS Polly Multi-Language TTS)
+├── ZIP File Processing (Extract → Translate → Rebuild)
+└── Database Management (Translated content storage)
+```
+
+### **User Experience Workflow**
+1. **Home Page**: User selects tour, chooses languages (es|fr|de)
+2. **Translation Request**: App calls `/download/tour123?languages=es|fr|de`
+3. **Translation Progress**: "Translating tour into Spanish, French, German..."
+4. **Parallel Translation**: All 3 languages translated simultaneously
+5. **Listen Page**: User sees tabs for English, Spanish, French, German
+
+### **Mobile App Integration Points**
+- **Language Selection**: Multi-select on Home, Generate, Listen pages (NOT Settings)
+- **API Calls**: Enhanced with `?languages=en|es|ru` parameter
+- **Translation Progress**: Progress indicators during translation
+- **Voice Control**: Extended to support language selection
+
+### **Cost Analysis**
+- **AWS Translate**: $15 per 1M characters
+- **AWS Polly**: $4 per 1M characters
+- **Per Tour** (5 languages): ~$1.86
+- **Per Article** (5 languages): ~$0.60
+- **Monthly Estimates**: $31 (light) to $296 (heavy usage)
+
+### **Implementation Status**
+- ✅ **Architecture Document**: Complete for all Amazon-Q teams
+- ✅ **Database Schema**: Designed and ready for implementation
+- ✅ **Cost Analysis**: Detailed cost projections completed
+- ✅ **Mobile App Scope**: Communication document created
+- 🔄 **Phase 1**: Ready to begin database schema updates
+
+### **Key Files Created**
+- `TRANSLATION_PROJECT_ARCHITECTURE.md` - Complete architecture for all teams
+- `translation_cost_analysis.md` - Detailed cost projections
+- `translation_architecture_updated.md` - Technical implementation details
+- Communication documents for Mobile App Amazon-Q review
+
+### **Next Steps**
+1. **Git Tag Verification**: Confirm latest tag for code check-in
+2. **Phase 1 Implementation**: Database schema updates
+3. **Translation Service Creation**: New Docker container (Port 5030)
+4. **AWS Integration**: Translate + Polly API setup
+5. **Mobile App Coordination**: UI/UX planning for language selection
 
 ### ✅ **TOUR ID 5 REGRESSION FIXED + LEGACY CLEANUP + DIRECTORY CLEANUP IMPLEMENTATION (2025-12-03)**
 **Issue**: Tour ID 5 failing with "EDIT_ID_NOT_FOUND" error preventing tour downloads from saving to "My Tours"
