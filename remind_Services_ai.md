@@ -176,17 +176,18 @@ docker exec development-postgres-2-1 psql -U admin -d audiotours -c "SELECT url,
 
 **Current System Status**:
 - ✅ **All Services Operational**: 10/10 containers running (100% health)
+- ✅ **Tour Content Storage**: Complete implementation with database + ZIP hybrid approach
+- ✅ **Translation Service**: Deployed and ready for Russian tour translation
 - ✅ **Tour Resolution Fixed**: Tour ID 5 and all legacy tours working
 - ✅ **Directory Cleanup**: Automatic cleanup implemented, 657 MB saved
-- ✅ **REQ-017 Implemented**: Tour stops count API for modern tours
-- ✅ **REQ-018 Implemented**: CORS headers for web platform support
 - ✅ **Newsletter Technologies**: 7/8 working (NY Times blocked by DataDome)
 
 **Ready for Development**:
-- **Git Workflow**: All changes committed to appropriate branches
-- **Container Deployment**: All services updated and restarted
-- **Testing Framework**: Complete test suite available
-- **Documentation**: All requirements and fixes documented
+- ✅ **Tour Translation**: New tours automatically store content for translation
+- ✅ **Russian Audio**: AWS Polly Tatyana voice ready for natural pronunciation
+- ✅ **Error Handling**: Graceful messages for 81 old tours without content
+- ✅ **Testing Framework**: Complete test commands available
+- ✅ **Documentation**: Full implementation guide created
 
 **Key Commands**:
 ```bash
@@ -216,8 +217,144 @@ docker cp file.py container:/app/
 - **Phase 8**: Guy Raz content truncation fix ✅ COMPLETE
 - **Phase 9**: Mobile app integration ✅ READY FOR TESTING
 
-**Last Updated**: 2025-12-19 - TRANSLATION PROJECT INITIATED ✅
-**Status**: ✅ **ALL SYSTEMS OPERATIONAL** | 🚀 **NEW PROJECT: TRANSLATION SERVICE**
+**Last Updated**: 2025-12-21 - RUSSIAN TOUR TRANSLATION COMPLETE ✅
+**Status**: ✅ **RUSSIAN TRANSLATION READY FOR MOBILE APP** - Complete Russian tour translation with audio and text
+
+### 🎯 **CURRENT FOCUS: Russian Tour Translation - IMPLEMENTATION COMPLETE**
+- **Achievement**: Complete Russian tour translation system working
+- **Status**: All phases implemented, deployed, and tested successfully
+- **Services**: Tour Orchestrator enhanced (5002), Translation Service deployed (5030)
+
+### ✅ **RUSSIAN TOUR TRANSLATION - COMPLETE SUCCESS**
+**Date**: 2025-12-21
+**Problem Solved**: Translation service now creates mobile-compatible Russian tours
+**Root Cause**: Previous translation created custom HTML instead of preserving original structure
+**Solution**: Mobile-compatible ZIP creation preserving original HTML with Russian audio/text
+
+#### **Russian Translation Results - VERIFIED WORKING**
+- ✅ **Test Tour**: Durant-Kenrick House and Grounds in Newton, MA (Tour ID 99 → 106)
+- ✅ **Russian Audio**: All 4 stops with AWS Polly Tatyana voice (6.5MB ZIP)
+- ✅ **Russian HTML Text**: All titles and headings translated:
+  - "Durant-Kenrick House..." → "Дом и территория Дюранта-Кенрика..."
+  - "The Durant-Kenrick House: Audio 1" → "Дом Дюранта-Кенрика: Аудио 1"
+  - "The Formal Garden: Audio 2" → "Формальный сад: Аудио 2"
+  - "The Summer House: Audio 3" → "Летний домик: Аудио 3"
+  - "The Ice House: Audio 4" → "Ледяной домик: Аудио 4"
+- ✅ **Russian Text Files**: Full Russian content in tour_content.txt and audio_#.txt files
+- ✅ **Mobile Compatible**: Preserves original HTML structure for voice control
+- ✅ **Download Ready**: `curl -X GET "http://localhost:5002/download/106" -o "russian_tour.zip"`
+
+#### **Translation Service Architecture - COMPLETE**
+- ✅ **Content-Based Translation**: Uses stored tour content from database
+- ✅ **Audio Replacement**: Replaces all audio elements with Russian narration
+- ✅ **HTML Text Translation**: Translates all visible text content
+- ✅ **File Structure**: Creates Russian tour_content.txt and audio_#.txt files
+- ✅ **Mobile Compatibility**: Maintains original HTML structure and voice control IDs
+
+#### **Translation Workflow - TESTED AND WORKING**
+```bash
+# Generate English tour with content storage
+curl -X POST http://localhost:5002/generate-complete-tour \
+  -H 'Content-Type: application/json' \
+  -d '{"location":"Durant-Kenrick House and Grounds in Newton, MA","tour_type":"walking","total_stops":4}'
+
+# Translate to Russian
+curl -X POST http://localhost:5030/translate-with-audio \
+  -H 'Content-Type: application/json' \
+  -d '{"content_id":99,"content_type":"tour","languages":["ru"]}'
+
+# Download Russian tour
+curl -X GET "http://localhost:5002/download/106" -o "russian_tour.zip"
+```
+
+### ✅ **TOUR CONTENT STORAGE AND TRANSLATION - COMPLETE IMPLEMENTATION**
+**Date**: 2025-12-21
+**Problem Solved**: Translation service could only access UI text instead of actual tour narration
+**Root Cause**: Original ChatGPT content was lost after tour processing - never stored in database
+**Solution**: Hybrid approach (database + ZIP) to preserve and translate actual tour content
+
+#### **Phase 1: Database Schema Enhancement - COMPLETE ✅**
+```sql
+-- Added to audio_tours table
+ALTER TABLE audio_tours ADD COLUMN tour_content TEXT;
+ALTER TABLE audio_tours ADD COLUMN content_language VARCHAR(10) DEFAULT 'en';
+ALTER TABLE audio_tours ADD COLUMN original_tour_id INTEGER REFERENCES audio_tours(id);
+```
+- ✅ **Database Schema**: Updated with tour content storage columns
+- ✅ **Performance Indexes**: Created for language and original tour linking
+- ✅ **Backward Compatibility**: Existing tours continue working
+
+#### **Phase 2: Tour Generation Enhancement - COMPLETE ✅**
+**File**: `tour_orchestrator_service.py`
+- ✅ **Content Capture**: Reads original tour text file before cleanup
+- ✅ **Database Storage**: Stores ChatGPT content in `tour_content` column
+- ✅ **ZIP Enhancement**: Adds `tour_content.txt` to ZIP files for redundancy
+- ✅ **Deployed**: Enhanced service running on development-tour-orchestrator-1:5002
+
+#### **Phase 3: Translation Service Enhancement - COMPLETE ✅**
+**File**: `translation_service.py`
+- ✅ **Content-Based Translation**: Uses stored tour content instead of HTML extraction
+- ✅ **Stop Splitting**: `_split_tour_content_into_stops()` using same logic as tour generation
+- ✅ **Russian Audio**: AWS Polly Tatyana voice for natural Russian pronunciation
+- ✅ **ZIP Creation**: `_create_translated_zip()` with embedded translated audio
+- ✅ **Deployed**: Translation service running on translation-service-1:5030
+
+#### **Phase 4: Existing Tours Handling - COMPLETE ✅**
+- ✅ **Analysis**: 81 existing tours without stored content identified
+- ✅ **Graceful Error**: Clear message "This is an old tour, please create a new tour instead"
+- ✅ **Fallback Method**: Old ZIP extraction method for tours without stored content
+- ✅ **User Experience**: Clear guidance for users with old tours
+
+### 🎯 **TRANSLATION QUALITY IMPROVEMENT**
+**Before Implementation**:
+- Translation Input: "Shopping Tour Describing Stores And Restaurants At Chestnut Hill Ma Tour" (title only)
+- Audio Quality: English audio with Russian UI text
+
+**After Implementation**:
+- Translation Input: "Welcome to Stop 1, the Chestnut Hill Mall. Here you'll find over 100 stores including..." (actual tour narration)
+- Audio Quality: Full Russian audio with AWS Polly Tatyana voice
+
+### 🧪 **TESTING WORKFLOW READY**
+#### **Test 1: Generate New Tour (with content storage)**
+```bash
+curl -X POST http://localhost:5002/generate-complete-tour \
+  -H 'Content-Type: application/json' \
+  -d '{"location":"Durant-Kenrick House and Grounds in Newton, MA","tour_type":"walking","total_stops":4}'
+```
+
+#### **Test 2: Verify Content Storage**
+```bash
+docker exec development-postgres-2-1 psql -U admin -d audiotours \
+  -c "SELECT id, tour_name, LENGTH(tour_content) as content_length FROM audio_tours WHERE tour_content IS NOT NULL ORDER BY id DESC LIMIT 5;"
+```
+
+#### **Test 3: Test Russian Translation**
+```bash
+curl -X POST http://localhost:5030/translate-with-audio \
+  -H 'Content-Type: application/json' \
+  -d '{"content_id":TOUR_ID,"content_type":"tour","languages":["ru"]}'
+```
+
+#### **Test 4: Test Error Handling (Old Tour)**
+```bash
+curl -X POST http://localhost:5030/translate-with-audio \
+  -H 'Content-Type: application/json' \
+  -d '{"content_id":1,"content_type":"tour","languages":["ru"]}'
+```
+
+### 🔧 **SERVICES DEPLOYED AND READY**
+- ✅ **Tour Orchestrator**: development-tour-orchestrator-1:5002 (enhanced with content storage)
+- ✅ **Translation Service**: translation-service-1:5030 (new service for multi-language support)
+- ✅ **Database Schema**: Enhanced with tour_content, content_language, original_tour_id columns
+- ✅ **Error Handling**: Graceful degradation for 81 existing tours without content
+
+### 📋 **IMPLEMENTATION BENEFITS ACHIEVED**
+- ✅ **High-Quality Translation**: Actual tour narration vs UI text only
+- ✅ **Russian Audio**: Natural pronunciation with AWS Polly Tatyana voice
+- ✅ **Future Search**: Tour content available for search functionality
+- ✅ **Scalability**: Ready for Spanish, French, German, Chinese translations
+- ✅ **Backward Compatibility**: Old tours continue working with clear error messages
+- ✅ **Hybrid Storage**: Database + ZIP redundancy for reliability
 
 ### 🌐 **PLATFORM-SPECIFIC NEWSLETTER SUPPORT ADDED**
 **Date**: 2025-11-04
@@ -685,8 +822,113 @@ curl -X GET "http://localhost:5012/download/84fe530c-21ec-4e80-adf0-1d7a23e2b9f1
 - ✅ **Enhanced User Experience**: More articles available for all email newsletters
 - ✅ **Cost Controlled**: 15-article default limit maintains budget constraints
 
-## 🌍 **NEW PROJECT: TRANSLATION SERVICE (2025-12-19)**
-**Objective**: Add multi-language support to AudioTours without modifying existing services
+## 🔍 **TOUR GENERATION PROCESS ANALYSIS - COMPLETE UNDERSTANDING (2025-12-21)**
+**Objective**: Understand where actual tour content is stored for translation purposes
+**Status**: ✅ **PROCESS FULLY MAPPED** - Critical discovery about tour content storage
+
+### 📋 **COMPLETE TOUR GENERATION WORKFLOW DISCOVERED**
+
+#### **Step 1: User Request Processing**
+- **Input**: User phrase like "Shopping tour describing stores and restaurants at Chestnut Hill, MA"
+- **Service**: Tour Orchestrator (`tour_orchestrator_service.py:5002`)
+- **Action**: Sanitizes input, generates job ID, calls tour generator
+
+#### **Step 2: ChatGPT API Tour Generation** 
+- **Service**: Tour Generator (`development-tour-generator-1:5000`)
+- **Process**: Sends user phrase + desired stops to ChatGPT API
+- **Output**: **COMPLETE TOUR TEXT FILE** (e.g., `chestnut_hill_shopping_tour.txt`)
+- **Content**: Full tour narration with "Stop 1:", "Stop 2:", etc. sections
+- **🔑 CRITICAL**: This text file contains ALL the actual tour content that needs translation
+
+#### **Step 3: Tour Text Processing**
+- **Service**: Tour Generation Service (`tour_generation_service.py:5001`)
+- **Script**: `break_text_to_pois_fixed.py`
+- **Process**: Splits tour text file into individual stop files (`stop_01.txt`, `stop_02.txt`, etc.)
+- **🔑 CRITICAL**: Each stop file contains the actual narration text for that stop
+
+#### **Step 4: Audio Generation**
+- **Script**: `build_mp3.py`
+- **Process**: Reads each `stop_XX.txt` file and generates MP3 using AWS Polly
+- **Output**: Individual MP3 files (`stop_01.mp3`, `stop_02.mp3`, etc.)
+
+#### **Step 5: Web Page Creation**
+- **Script**: `build_web_page_fixed.py`
+- **Process**: Creates `index.html` with embedded base64 audio data from MP3 files
+- **🔑 CRITICAL**: This is where the text content gets embedded as base64 audio data URLs
+
+#### **Step 6: ZIP Creation and Database Storage**
+- **Service**: Tour Orchestrator
+- **Process**: Creates ZIP file containing `index.html`, `manifest.json`, `service-worker.js`
+- **Database**: Stores ZIP in `audio_tours.audio_tour` column as BYTEA
+- **🔑 CRITICAL**: Original tour text files are NOT stored in database - only ZIP with embedded audio
+
+### ❌ **CRITICAL DISCOVERY: TOUR CONTENT NOT STORED IN DATABASE**
+**Problem Identified**: The actual tour narration text (ChatGPT-generated content) is:
+- ✅ Generated by ChatGPT API and saved as `.txt` file
+- ✅ Processed into individual stop text files
+- ✅ Converted to MP3 audio files
+- ✅ Embedded as base64 audio data in HTML
+- ❌ **NOT STORED IN DATABASE** - only the final ZIP with embedded audio
+- ❌ **LOST AFTER PROCESSING** - original text files are cleaned up
+
+### 🚨 **TRANSLATION CHALLENGE IDENTIFIED**
+**Current Translation Service Issue**: 
+- ✅ Can extract embedded base64 audio data from HTML
+- ❌ **Cannot ACCESS ORIGINAL TEXT** - only has title/UI text, not actual tour content
+- ❌ **Cannot TRANSLATE TOUR NARRATION** - the actual ChatGPT-generated content is lost
+
+**Example of Missing Content**:
+- **Available for Translation**: "Shopping Tour Describing Stores And Restaurants At Chestnut Hill Ma Tour" (title)
+- **Missing for Translation**: "Welcome to Stop 1, the Chestnut Hill Mall. Here you'll find over 100 stores including..." (actual tour content)
+
+### 🔧 **SOLUTION REQUIRED: TOUR CONTENT PRESERVATION**
+**Two Implementation Options**:
+
+#### **Option A: Database Schema Enhancement (Recommended)**
+1. **Add `tour_content` TEXT column** to `audio_tours` table
+2. **Add `tour_content.txt` file** to ZIP package alongside HTML/audio files
+3. **Store original ChatGPT text** in both database and ZIP for redundancy
+4. **Translation service enhancement** to use stored tour content for proper translation
+
+### 📊 **IMPLEMENTATION PLAN - HYBRID APPROACH (DATABASE + ZIP)**
+
+#### **Phase 1: Database Schema Update**
+```sql
+-- Add tour content storage to existing table
+ALTER TABLE audio_tours ADD COLUMN tour_content TEXT;
+ALTER TABLE audio_tours ADD COLUMN content_language VARCHAR(10) DEFAULT 'en';
+```
+
+#### **Phase 2: Tour Generation Enhancement**
+**Files**: `tour_orchestrator_service.py`, `tour_generation_service.py`
+**Enhancement**: 
+1. **Read original tour text file** before cleanup in tour orchestrator
+2. **Store tour content** in `tour_content` database column
+3. **Add `tour_content.txt`** to ZIP package for redundancy
+4. **Preserve original text** for future translation and search functionality
+
+#### **Phase 3: Translation Service Enhancement**
+**File**: `translation_service.py`
+**Enhancement**: Modify `translate_zip_audio()` method to:
+1. **Extract tour content** from database `tour_content` column OR `tour_content.txt` from ZIP
+2. **Split into stops** using same logic as `break_text_to_pois_fixed.py`
+3. **Translate each stop** using AWS Translate
+4. **Generate Russian audio** for each translated stop using AWS Polly Tatyana voice
+5. **Replace embedded audio data** in HTML with Russian audio
+6. **Store translated tour** with Russian content in database
+7. **Add translated `tour_content_ru.txt`** to ZIP for future reference
+
+#### **Phase 4: Search Enhancement (Future)**
+**Benefit**: With `tour_content` stored, can implement tour search functionality similar to newsletters
+**Implementation**: Search through actual tour narration content, not just titles
+
+### 🔑 **KEY INSIGHT CONFIRMED**
+**The translation service was working correctly** - the issue is that it only had access to UI text ("Shopping Tour...") instead of the actual tour narration content ("Welcome to Stop 1, the Chestnut Hill Mall..."). 
+
+**Solution**: Store the original ChatGPT-generated tour content in both database and ZIP so the translation service can access and translate the actual tour narration, not just the title.
+
+**Last Updated**: 2025-12-21 - TOUR CONTENT STORAGE ANALYSIS COMPLETE ✅
+**Status**: ✅ **READY FOR IMPLEMENTATION** - Database + ZIP hybrid approach designed for tour content preservation and translation
 **Status**: 🚀 **PHASE 1 READY** - Architecture complete, database schema prepared
 
 ### **Translation Project Overview**

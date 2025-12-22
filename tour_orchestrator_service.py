@@ -100,13 +100,14 @@ def log_job_update(job_id, status, progress):
     else:
         print(f"WARNING: Attempted to update non-existent job: {job_id}")
 
-def store_audio_tour(tour_name, request_string, zip_path, lat, lng):
-    """Store the audio tour in the database."""
+def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None):
+    """Store the audio tour in the database with original tour content."""
     print(f"\n==== STORING AUDIO TOUR IN DATABASE: {datetime.now().isoformat()} ====")
     print(f"Tour name: {tour_name}")
     print(f"Request string: {request_string}")
     print(f"ZIP path: {zip_path}")
     print(f"Coordinates: lat={lat}, lng={lng}")
+    print(f"Tour content length: {len(tour_content) if tour_content else 0} characters")
     
     try:
         import psycopg2
@@ -207,6 +208,16 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng):
                 print(f"Traceback: {traceback.format_exc()}")
                 conn.rollback()
         
+        # Check if tour_content column exists
+        print(f"Checking if tour_content column exists...")
+        cur.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'audio_tours' AND column_name = 'tour_content'
+        """)
+        has_tour_content = cur.fetchone() is not None
+        print(f"tour_content column exists: {has_tour_content}")
+        
         # Check if tour already exists
         print(f"Checking if tour already exists...")
         cur.execute(
@@ -227,7 +238,16 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng):
         if existing_tour:
             # Update existing tour
             print(f"Updating existing tour...")
-            if has_audio_tour and has_lat and has_number_requested:
+            if has_audio_tour and has_lat and has_number_requested and has_tour_content:
+                cur.execute(
+                    """
+                    UPDATE audio_tours 
+                    SET audio_tour = %s, number_requested = number_requested + 1, lat = %s, lng = %s, tour_content = %s
+                    WHERE id = %s
+                    """,
+                    (psycopg2.Binary(zip_data), lat, lng, tour_content, existing_tour[0])
+                )
+            elif has_audio_tour and has_lat and has_number_requested:
                 cur.execute(
                     """
                     UPDATE audio_tours 
@@ -250,7 +270,15 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng):
         else:
             # Insert new tour
             print(f"Inserting new tour...")
-            if has_audio_tour and has_lat and has_number_requested:
+            if has_audio_tour and has_lat and has_number_requested and has_tour_content:
+                cur.execute(
+                    """
+                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng, tour_content, content_language)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, tour_content, 'en')
+                )
+            elif has_audio_tour and has_lat and has_number_requested:
                 cur.execute(
                     """
                     INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng)
@@ -480,7 +508,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         
         ACTIVE_JOBS[job_id]["extract_dir"] = extract_dir
         
-        # Step 5: Store in database
+        # Step 5: Store in database with original tour content
         log_job_update(job_id, ACTIVE_JOBS[job_id]["status"], "Step 5/5: Storing modernized tour in database...")
         tour_name = f"{location} - {tour_type} Tour"
         
@@ -491,8 +519,33 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             lat = coordinates[0]
             lng = coordinates[1]
         
-        # Store in database
-        store_success = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng)
+        # Read original tour content from the text file for translation purposes
+        tour_content = None
+        if tour_file:
+            tour_file_path = os.path.join(TOURS_DIR, tour_file)
+            if os.path.exists(tour_file_path):
+                try:
+                    with open(tour_file_path, 'r', encoding='utf-8') as f:
+                        tour_content = f.read()
+                    print(f"Successfully read tour content: {len(tour_content)} characters")
+                    
+                    # Also add tour_content.txt to the ZIP file for redundancy
+                    try:
+                        with zipfile.ZipFile(zip_path, 'a') as zipf:
+                            zipf.writestr('tour_content.txt', tour_content.encode('utf-8'))
+                        print(f"Added tour_content.txt to ZIP file")
+                    except Exception as zip_error:
+                        print(f"Warning: Could not add tour_content.txt to ZIP: {zip_error}")
+                        
+                except Exception as read_error:
+                    print(f"Warning: Could not read tour content from {tour_file_path}: {read_error}")
+            else:
+                print(f"Warning: Tour file not found: {tour_file_path}")
+        else:
+            print(f"Warning: No tour file available for content extraction")
+        
+        # Store in database with tour content
+        store_success = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content)
         
         if store_success:
             print(f"Tour stored successfully with coordinates: lat={lat}, lng={lng}")
@@ -808,27 +861,82 @@ def download_tour(job_id):
     print(f"\n==== DOWNLOAD REQUEST: {datetime.now().isoformat()} ====")
     print(f"Job ID: {job_id}")
     
-    if job_id not in ACTIVE_JOBS:
-        print(f"Job not found: {job_id}")
+    # First try to find in active jobs (for recently generated tours)
+    if job_id in ACTIVE_JOBS:
+        job = ACTIVE_JOBS[job_id]
+        if job["status"] != "completed":
+            print(f"Job not completed: {job_id}")
+            return jsonify({"error": "Job not completed"}), 400
+        
+        zip_path = os.path.join(TOURS_DIR, job["output_zip"])
+        if os.path.exists(zip_path):
+            # Sanitize filename by removing newlines and other problematic characters
+            safe_filename = job["output_zip"].replace('\n', '_').replace('\r', '_').replace('/', '_').replace('\\', '_').replace(':', '_').replace('*', '_').replace('?', '_').replace('"', '_').replace('<', '_').replace('>', '_').replace('|', '_')
+            
+            print(f"Sending file from active jobs: {zip_path}")
+            return send_file(zip_path, as_attachment=True, attachment_filename=safe_filename)
+    
+    # Try to find in database (for translated tours or older tours)
+    try:
+        tour_id = int(job_id)
+        print(f"Looking for tour ID {tour_id} in database")
+        
+        import psycopg2
+        import io
+        
+        # Connect to database
+        conn = psycopg2.connect(
+            host="postgres-2",
+            database="audiotours",
+            user="admin",
+            password="password123"
+        )
+        cur = conn.cursor()
+        
+        # Get tour from database
+        cur.execute(
+            "SELECT tour_name, audio_tour FROM audio_tours WHERE id = %s",
+            (tour_id,)
+        )
+        result = cur.fetchone()
+        
+        if result:
+            tour_name, zip_data = result
+            print(f"Found tour in database: {tour_name}")
+            print(f"ZIP data size: {len(zip_data)} bytes")
+            
+            # Create a safe filename
+            safe_filename = f"tour_{tour_id}.zip"
+            
+            # Create BytesIO object from the binary data
+            zip_buffer = io.BytesIO(zip_data)
+            zip_buffer.seek(0)
+            
+            print(f"Sending tour from database: {safe_filename}")
+            
+            # Close database connection
+            cur.close()
+            conn.close()
+            
+            return send_file(
+                zip_buffer,
+                as_attachment=True,
+                attachment_filename=safe_filename,
+                mimetype='application/zip'
+            )
+        else:
+            print(f"Tour ID {tour_id} not found in database")
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Tour not found"}), 404
+            
+    except ValueError:
+        # job_id is not a number, only check active jobs
+        print(f"Job ID is not numeric: {job_id}")
         return jsonify({"error": "Job not found"}), 404
-    
-    job = ACTIVE_JOBS[job_id]
-    if job["status"] != "completed":
-        print(f"Job not completed: {job_id}")
-        return jsonify({"error": "Job not completed"}), 400
-    
-    zip_path = os.path.join(TOURS_DIR, job["output_zip"])
-    if not os.path.exists(zip_path):
-        print(f"File not found: {zip_path}")
-        return jsonify({"error": "File not found"}), 404
-    
-    # Sanitize filename by removing newlines and other problematic characters
-    safe_filename = job["output_zip"].replace('\n', '_').replace('\r', '_').replace('/', '_').replace('\\', '_').replace(':', '_').replace('*', '_').replace('?', '_').replace('"', '_').replace('<', '_').replace('>', '_').replace('|', '_')
-    
-    print(f"Sending file: {zip_path}")
-    print(f"Original filename: {repr(job['output_zip'])}")
-    print(f"Sanitized filename: {repr(safe_filename)}")
-    return send_file(zip_path, as_attachment=True, attachment_filename=safe_filename)
+    except Exception as e:
+        print(f"Database error: {e}")
+        return jsonify({"error": "Database error"}), 500
 
 @app.route('/serve/<job_id>', methods=['GET'])
 def serve_tour_info(job_id):
