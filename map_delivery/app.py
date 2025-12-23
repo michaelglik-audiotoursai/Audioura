@@ -85,7 +85,7 @@ def health_check():
 
 @app.route('/tours-near/<lat>/<lng>', methods=['GET'])
 def get_tours_near_location(lat, lng):
-    """Get tours near a specific location with multi-language support"""
+    """Get tours near a specific location - all languages for map display"""
     print(f"Getting tours near lat={lat}, lng={lng}")
     sys.stdout.flush()
     
@@ -94,24 +94,23 @@ def get_tours_near_location(lat, lng):
         lat = float(lat)
         lng = float(lng)
         radius_km = float(request.args.get('radius', 50))
-        languages = request.args.get('languages', 'en').split('|')
-        print(f"Search radius: {radius_km} km, languages: {languages}")
+        print(f"Search radius: {radius_km} km")
         sys.stdout.flush()
         
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Get tours in requested languages
-        language_placeholders = ','.join(['%s'] * len(languages))
-        cur.execute(f"""
-            SELECT id, tour_name, request_string, lat, lng, number_requested, language, original_tour_id
+        # Get only English/original tours for map display (no translations)
+        cur.execute("""
+            SELECT id, tour_name, request_string, lat, lng, number_requested, content_language, original_tour_id
             FROM audio_tours 
             WHERE lat IS NOT NULL AND lng IS NOT NULL
-            AND language IN ({language_placeholders})
-        """, languages)
+            AND (content_language = 'en' OR content_language IS NULL)
+            AND original_tour_id IS NULL
+        """)
         
         tours = cur.fetchall()
-        tours_by_language = {lang: [] for lang in languages}
+        tours_list = []
         
         for tour in tours:
             tour_id, tour_name, request_string, tour_lat, tour_lng, requests, language, original_id = tour
@@ -129,29 +128,26 @@ def get_tours_near_location(lat, lng):
                         'distance_km': round(distance, 2),
                         'popularity': requests,
                         'type': 'walking_tour',
-                        'language': language,
+                        'language': language or 'en',
                         'original_tour_id': original_id
                     }
-                    tours_by_language[language].append(tour_data)
+                    tours_list.append(tour_data)
         
-        # Sort tours by distance within each language
-        for lang in tours_by_language:
-            tours_by_language[lang].sort(key=lambda x: x['distance_km'])
+        # Sort tours by distance
+        tours_list.sort(key=lambda x: x['distance_km'])
         
         cur.close()
         conn.close()
         
-        total_tours = sum(len(tours) for tours in tours_by_language.values())
-        print(f"Found {total_tours} tours within {radius_km} km across {len(languages)} languages")
+        print(f"Found {len(tours_list)} tours within {radius_km} km")
         sys.stdout.flush()
         
         return jsonify({
-            'tours_by_language': tours_by_language,
+            'tours': tours_list,
             'center_lat': lat,
             'center_lng': lng,
             'radius_km': radius_km,
-            'languages': languages,
-            'total_count': total_tours
+            'total_count': len(tours_list)
         })
         
     except Exception as e:
@@ -196,7 +192,9 @@ def download_tour(tour_id):
         cur.close()
         conn.close()
         
-        safe_name = request_string.replace(' ', '_').lower()
+        safe_name = request_string.encode('ascii', 'ignore').decode('ascii').replace(' ', '_').lower()
+        if not safe_name:  # If all characters were non-ASCII
+            safe_name = f"tour_{tour_id}"
         filename = f"{safe_name}_tour.zip"
         
         print(f"Sending tour file: {filename}")
