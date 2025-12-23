@@ -321,7 +321,542 @@ class TranslationService:
                     
         except Exception as e:
             logging.error(f"ZIP audio translation error: {e}")
-            return zip_data  # Return original on error
+            return original_zip_data  # Return original on error
+    
+    def translate_article(self, original_article_id, target_language):
+        """Translate a newsletter article with audio generation matching English structure"""
+        conn = self.get_db_connection()
+        try:
+            cursor = conn.cursor()
+            
+            # Get original article with major_points
+            cursor.execute(
+                "SELECT article_id, article_text, request_string, url, article_type, created_at, major_points FROM article_requests WHERE article_id = %s", 
+                (original_article_id,)
+            )
+            original_article = cursor.fetchone()
+            if not original_article:
+                logging.error(f"Original article {original_article_id} not found")
+                return None
+            
+            article_text = original_article[1]  # article_text column
+            major_points = original_article[6]  # major_points column
+            
+            # Convert memoryview to string if needed
+            if isinstance(article_text, memoryview):
+                article_text = article_text.tobytes().decode('utf-8')
+            elif isinstance(article_text, bytes):
+                article_text = article_text.decode('utf-8')
+            
+            if not article_text or len(article_text.strip()) < 50:
+                logging.error(f"Article {original_article_id} has insufficient content for translation")
+                return None
+            
+            logging.info(f"Translating article with {len(article_text)} characters")
+            
+            # Check if translation already exists
+            cursor.execute(
+                "SELECT article_id FROM article_requests WHERE original_article_id = %s AND content_language = %s",
+                (original_article_id, target_language)
+            )
+            existing = cursor.fetchone()
+            if existing:
+                logging.info(f"Translation already exists: {existing[0]}")
+                return existing[0]
+            
+            # Parse major points if available
+            topics = []
+            if major_points:
+                try:
+                    if isinstance(major_points, list):
+                        topics = major_points
+                    else:
+                        topics = json.loads(major_points)
+                    logging.info(f"Found {len(topics)} topics for translation")
+                except Exception as e:
+                    logging.error(f"Failed to parse major_points: {e}")
+                    topics = []
+            
+            # Translate article content and title
+            translated_title = self.translate_text(original_article[2], target_language)  # request_string (title)
+            translated_content = self.translate_text(article_text, target_language)
+            
+            # Translate each topic
+            translated_topics = []
+            for i, topic in enumerate(topics):
+                try:
+                    translated_topic = {
+                        'summary': self.translate_text(topic.get('summary', ''), target_language),
+                        'audio_text': self.translate_text(topic.get('audio_text', ''), target_language),
+                        'segment_id': topic.get('segment_id', i),
+                        'short_title': self.translate_text(topic.get('short_title', f'Topic {i+1}'), target_language)
+                    }
+                    translated_topics.append(translated_topic)
+                    logging.info(f"Translated topic {i+1}: {translated_topic['short_title']}")
+                except Exception as e:
+                    logging.error(f"Error translating topic {i+1}: {e}")
+                    translated_topics.append(topic)  # Keep original on error
+            
+            # Create mobile-compatible ZIP matching English structure exactly
+            translated_zip_data = self._create_english_structure_zip(
+                translated_title, translated_content, translated_topics, target_language
+            )
+            
+            # Generate new article ID
+            new_article_id = str(uuid.uuid4())
+            
+            # Store translated article in article_requests table
+            translated_url = f"{original_article[3]}?lang={target_language}"
+            
+            cursor.execute("""
+                INSERT INTO article_requests (article_id, article_text, request_string, url, 
+                                            article_type, status, created_at, 
+                                            content_language, original_article_id, major_points)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                new_article_id, translated_content, translated_title, translated_url,
+                original_article[4], 'finished', original_article[5],
+                target_language, original_article_id, json.dumps(translated_topics)
+            ))
+            
+            # Store in news_audios table for download
+            cursor.execute("""
+                INSERT INTO news_audios (article_id, article_name, news_article, number_requested, article_type)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (
+                new_article_id, translated_title, translated_zip_data, 1, original_article[4] or 'Others'
+            ))
+            
+            conn.commit()
+            
+            logging.info(f"Created translated article {new_article_id} in {target_language} with {len(translated_topics)} topics")
+            return new_article_id
+            
+        except Exception as e:
+            logging.error(f"Article translation error: {e}")
+            import traceback
+            logging.error(f"Traceback: {traceback.format_exc()}")
+            conn.rollback()
+            return None
+        finally:
+            conn.close()
+    
+    def _create_english_structure_zip(self, title, content, topics, target_language):
+        """Create ZIP matching exact English article structure with multiple MP3 files"""
+        import tempfile
+        import os
+        
+        try:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                audio_files = []
+                
+                # Split content into summary and full text (matching English format)
+                parts = content.split('\n\nFull Article:', 1)
+                if len(parts) == 2:
+                    summary_text = parts[0].replace('Summary: ', '')
+                    full_text = parts[1]
+                else:
+                    sentences = content.split('. ')
+                    summary_text = '. '.join(sentences[:2]) + '.' if len(sentences) > 2 else content[:200] + '...'
+                    full_text = content
+                
+                # Generate summary audio (audio_1.mp3)
+                summary_audio = self.generate_audio(f"Article Summary: {summary_text}", target_language)
+                if summary_audio:
+                    summary_file = os.path.join(temp_dir, 'audio_1.mp3')
+                    with open(summary_file, 'wb') as f:
+                        f.write(summary_audio)
+                    audio_files.append(('audio_1.mp3', 'Summary'))
+                
+                # Generate topic audios (audio-1.mp3, audio-2.mp3, etc.)
+                for i, topic in enumerate(topics):
+                    try:
+                        topic_text = topic.get('audio_text', topic.get('summary', f'Topic {i+1}'))
+                        topic_audio = self.generate_audio(topic_text, target_language)
+                        if topic_audio:
+                            segment_id = topic.get('segment_id', i)
+                            audio_filename = f'audio-{segment_id + 1}.mp3'
+                            audio_path = os.path.join(temp_dir, audio_filename)
+                            with open(audio_path, 'wb') as f:
+                                f.write(topic_audio)
+                            audio_files.append((audio_filename, topic.get('short_title', f'Topic {i+1}')))
+                            logging.info(f"Generated {audio_filename} for topic: {topic.get('short_title', f'Topic {i+1}')}")
+                    except Exception as e:
+                        logging.error(f"Error generating audio for topic {i+1}: {e}")
+                
+                # Generate topics list audio (audio-topics.mp3)
+                if topics:
+                    topics_text = "Here are the major topics covered in this article: "
+                    for i, topic in enumerate(topics, 1):
+                        short_title = topic.get('short_title', f'Topic {i}')
+                        topics_text += f"{short_title}. "
+                    topics_text += "You can ask me to play any of these topics by saying 'Play topic' followed by the number."
+                    
+                    topics_audio = self.generate_audio(topics_text, target_language)
+                    if topics_audio:
+                        topics_file = os.path.join(temp_dir, 'audio-topics.mp3')
+                        with open(topics_file, 'wb') as f:
+                            f.write(topics_audio)
+                        audio_files.append(('audio-topics.mp3', 'Topics List'))
+                
+                # Generate help audio (audio-help.mp3)
+                help_text = """Here are the voice commands you can use: 
+                Say 'Play' to start or resume audio. Say 'Pause' to stop audio. 
+                Say 'Next topic' or 'Previous topic' to navigate between sections. 
+                Say 'Forward 10 seconds' or 'Backward 5 seconds' to skip within audio. 
+                Say 'Repeat' to restart current audio from beginning. 
+                Say 'Play topic' followed by a number or topic name to jump to specific sections. 
+                Say 'Play summary' for article summary or 'Play full article' for complete text. 
+                Say 'List major topics' to hear all available sections. 
+                Say 'Next article' or 'Previous article' to switch between articles. 
+                You can also say 'What are my options' anytime to hear this help again."""
+                
+                help_audio = self.generate_audio(help_text, target_language)
+                if help_audio:
+                    help_file = os.path.join(temp_dir, 'audio-help.mp3')
+                    with open(help_file, 'wb') as f:
+                        f.write(help_audio)
+                    audio_files.append(('audio-help.mp3', 'Help Commands'))
+                
+                # Generate full article audio (audio-99.mp3)
+                full_audio = self.generate_audio(f"Full Article: {full_text}", target_language)
+                if full_audio:
+                    full_file = os.path.join(temp_dir, 'audio-99.mp3')
+                    with open(full_file, 'wb') as f:
+                        f.write(full_audio)
+                    audio_files.append(('audio-99.mp3', 'Full Article'))
+                
+                # Create HTML file matching English structure
+                html_content = self._create_english_format_html(title, summary_text, full_text, topics, audio_files, target_language)
+                html_file = os.path.join(temp_dir, 'index.html')
+                with open(html_file, 'w', encoding='utf-8') as f:
+                    f.write(html_content)
+                
+                # Create search content file
+                search_file = os.path.join(temp_dir, 'audiotours_search_content.txt')
+                search_content = f"{title}\n\n{summary_text}\n\n{full_text}"
+                with open(search_file, 'w', encoding='utf-8') as f:
+                    f.write(search_content)
+                
+                # Create short title if needed
+                title_words = len(title.split())
+                if title_words > 12:
+                    short_title = ' '.join(title.split()[:12]) + '...'
+                    short_title_file = os.path.join(temp_dir, 'audiotours_short_title.txt')
+                    with open(short_title_file, 'w', encoding='utf-8') as f:
+                        f.write(short_title)
+                
+                # Create ZIP file with same structure as English
+                zip_path = os.path.join(temp_dir, 'article.zip')
+                with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                    zipf.write(html_file, 'index.html')
+                    zipf.write(search_file, 'audiotours_search_content.txt')
+                    if title_words > 12:
+                        zipf.write(short_title_file, 'audiotours_short_title.txt')
+                    for audio_file, _ in audio_files:
+                        audio_path = os.path.join(temp_dir, audio_file)
+                        if os.path.exists(audio_path):
+                            zipf.write(audio_path, audio_file)
+                
+                # Read ZIP data
+                with open(zip_path, 'rb') as f:
+                    zip_data = f.read()
+                
+                logging.info(f"Created Russian article ZIP ({len(zip_data)} bytes) with {len(audio_files)} audio files matching English structure")
+                return zip_data
+                
+        except Exception as e:
+            logging.error(f"Error creating English structure ZIP: {e}")
+            return None
+    
+    def _create_english_format_html(self, title, summary_text, full_text, topics, audio_files, target_language):
+        """Generate HTML matching exact English article format"""
+        
+        # Create sections for each audio file
+        audio_sections = ""
+        for i, (audio_file, section_title) in enumerate(audio_files):
+            # Determine proper audio ID based on file structure
+            if audio_file == "audio_1.mp3":
+                audio_id = "audio_1"
+                section_class = "summary"
+            elif audio_file == "audio-topics.mp3":
+                audio_id = "audio-topics"
+                # Hide topics list from UI - voice-only access
+                audio_sections += f'<audio id="{audio_id}" preload="metadata" style="display:none;"><source src="{audio_file}" type="audio/mpeg"></audio>'
+                continue
+            elif audio_file == "audio-help.mp3":
+                audio_id = "audio-help"
+                # Hide help commands from UI - voice-only access
+                audio_sections += f'<audio id="{audio_id}" preload="metadata" style="display:none;"><source src="{audio_file}" type="audio/mpeg"></audio>'
+                continue
+            elif audio_file == "audio-99.mp3":
+                audio_id = "audio-99"
+                section_class = "full-article"
+            else:
+                # Extract number from filename like audio-1.mp3, audio-2.mp3, etc.
+                try:
+                    if "-" in audio_file:
+                        audio_num = audio_file.split("-")[1].split(".")[0]
+                        audio_id = f"audio-{audio_num}"
+                    else:
+                        audio_num = audio_file.split("_")[1].split(".")[0] if "_" in audio_file else str(i+1)
+                        audio_id = f"audio-{audio_num}"
+                    section_class = "topic-section"
+                except IndexError as e:
+                    logging.error(f"Error parsing audio filename {audio_file}: {e}")
+                    audio_id = f"audio-{i+1}"
+                    section_class = "topic-section"
+            
+            audio_sections += f'''
+        <div class="section {section_class}">
+            <h2>{section_title}</h2>
+            <audio id="{audio_id}" controls preload="metadata">
+                <source src="{audio_file}" type="audio/mpeg">
+            </audio>
+        </div>'''
+        
+        # Create HTML with exact English structure and JavaScript
+        html = f'''<!DOCTYPE html>
+<html lang="{target_language}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title}</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 20px; }}
+        .article-container {{ max-width: 800px; margin: 0 auto; }}
+        audio {{ width: 100%; margin: 20px 0; }}
+        .section {{ margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }}
+        .summary {{ background-color: #f0f8ff; }}
+        .topic-section {{ background-color: #f5f5f5; }}
+        .full-article {{ background-color: #f9f9f9; }}
+    </style>
+</head>
+<body>
+    <div class="article-container">
+        <h1>{title}</h1>
+        {audio_sections}
+    </div>
+    
+    <script>
+        let currentIndex = 0;
+        let audioElements = [];
+        let currentAudio = null;
+        let autoPlayEnabled = true;
+        let timerVariable = 0;
+        let timeOutParameterGlobal = 100;
+        let listIsBeingRead = false;
+        
+        function safeSetTimeout(func, timeout) {{
+            if (timerVariable < 1) {{
+                timerVariable++;
+                setTimeout(() => {{
+                    timerVariable--;
+                    timeOutParameterGlobal = 100;
+                    func();
+                }}, timeout);
+                return "DEBUG: Timer set for " + timeout + "ms";
+            }}
+            return "DEBUG: Timer blocked (active=" + timerVariable + ")";
+        }}
+        
+        document.addEventListener('DOMContentLoaded', function() {{
+            audioElements = Array.from(document.querySelectorAll('audio'));
+            if (audioElements.length > 0) {{
+                currentAudio = audioElements[0];
+                safeSetTimeout(() => playAudioByIndex(0), 1000);
+            }}
+            
+            audioElements.forEach((audio, index) => {{
+                audio.addEventListener('play', function() {{
+                    audioElements.forEach((otherAudio, otherIndex) => {{
+                        if (otherIndex !== index && !otherAudio.paused) {{
+                            otherAudio.pause();
+                            otherAudio.currentTime = 0;
+                        }}
+                    }});
+                    currentIndex = index;
+                    currentAudio = audio;
+                }});
+                
+                audio.addEventListener('ended', function() {{
+                    if (autoPlayEnabled && index < audioElements.length - 1) {{
+                        let nextIndex = index + 1;
+                        while (nextIndex < audioElements.length && audioElements[nextIndex].style.display === 'none') {{
+                            nextIndex++;
+                        }}
+                        if (nextIndex < audioElements.length) {{
+                            safeSetTimeout(() => playAudioByIndex(nextIndex), 500);
+                        }}
+                    }}
+                }});
+            }});
+        }});
+        
+        function playAudioByIndex(index) {{
+            audioElements.forEach(audio => {{
+                audio.pause();
+                audio.currentTime = 0;
+            }});
+            
+            if (index >= 0 && index < audioElements.length) {{
+                currentIndex = index;
+                currentAudio = audioElements[index];
+                currentAudio.play();
+                return true;
+            }}
+            return false;
+        }}
+        
+        window.playAudio = function() {{
+            if (currentAudio) {{
+                currentAudio.play();
+                return "DEBUG: Playing currentAudio (index=" + currentIndex + ", id=" + currentAudio.id + ")";
+            }}
+            return "ERROR: No currentAudio set";
+        }};
+        
+        window.pauseAudio = function() {{
+            audioElements.forEach(audio => {{
+                audio.pause();
+            }});
+            return "DEBUG: All audio paused (currentIndex=" + currentIndex + ", time preserved)";
+        }};
+        
+        window.resetVoiceControlState = function() {{
+            listIsBeingRead = false;
+            audioElements.forEach(audio => {{
+                audio.pause();
+            }});
+            return "DEBUG: Voice control state reset (listIsBeingRead=false, time preserved)";
+        }};
+        
+        window.playPoint = function(pointNumber) {{
+            const topicAudio = document.getElementById('audio-' + (pointNumber + 1));
+            if (topicAudio) {{
+                const topicIndex = Array.from(audioElements).indexOf(topicAudio);
+                if (topicIndex >= 0) {{
+                    return playAudioByIndex(topicIndex) ? 'Playing topic ' + pointNumber : 'Failed to play topic';
+                }}
+            }}
+            return 'Topic ' + pointNumber + ' not found';
+        }};
+        
+        window.seekForward = function(seconds) {{
+            if (currentAudio) {{
+                const maxTime = currentAudio.duration || 0;
+                currentAudio.currentTime = Math.min(maxTime, currentAudio.currentTime + seconds);
+                if (currentAudio.paused) {{
+                    currentAudio.play();
+                }}
+                return "DEBUG: Seeked forward " + seconds + "s to " + currentAudio.currentTime.toFixed(1) + "s";
+            }}
+            return "ERROR: No current audio";
+        }};
+        
+        window.seekBackward = function(seconds) {{
+            if (currentAudio) {{
+                currentAudio.currentTime = Math.max(0, currentAudio.currentTime - seconds);
+                if (currentAudio.paused) {{
+                    currentAudio.play();
+                }}
+                return "DEBUG: Seeked backward " + seconds + "s to " + currentAudio.currentTime.toFixed(1) + "s";
+            }}
+            return "ERROR: No current audio";
+        }};
+        
+        window.listPoints = function() {{
+            audioElements.forEach(audio => {{
+                audio.pause();
+            }});
+            
+            const topicsAudio = document.getElementById('audio-topics');
+            if (topicsAudio) {{
+                topicsAudio.currentTime = 0;
+                listIsBeingRead = true;
+                topicsAudio.addEventListener('ended', function() {{
+                    listIsBeingRead = false;
+                }}, {{ once: true }});
+                
+                topicsAudio.play();
+                return "DEBUG: Playing topics list (listIsBeingRead=true, duration=" + (topicsAudio.duration || 'unknown') + "s, other audio times preserved)";
+            }}
+            return "ERROR: Topics list not found";
+        }};
+        
+        window.isListBeingRead = function() {{
+            return listIsBeingRead ? "true" : "false";
+        }};
+        
+        window.getTopicsAudioDuration = function() {{
+            const topicsAudio = document.getElementById('audio-topics');
+            return topicsAudio ? (topicsAudio.duration || 0).toString() : "0";
+        }};
+        
+        window.showHelp = function() {{
+            audioElements.forEach(audio => {{
+                audio.pause();
+            }});
+            
+            const helpAudio = document.getElementById('audio-help');
+            if (helpAudio) {{
+                helpAudio.currentTime = 0;
+                helpAudio.play();
+                return "DEBUG: Playing help commands (duration=" + (helpAudio.duration || 'unknown') + "s)";
+            }}
+            return "ERROR: Help audio not found";
+        }};
+        
+        window.playFullArticle = function() {{
+            const fullArticleAudio = document.getElementById('audio-99');
+            if (fullArticleAudio) {{
+                const fullIndex = Array.from(audioElements).indexOf(fullArticleAudio);
+                if (fullIndex >= 0) {{
+                    return playAudioByIndex(fullIndex) ? 'Playing full article' : 'Failed to play full article';
+                }}
+            }}
+            return 'Full article not found';
+        }};
+        
+        window.repeatTopic = function() {{
+            if (currentAudio) {{
+                currentAudio.currentTime = 0;
+                return "DEBUG: Reset currentAudio to 0s (index=" + currentIndex + ", id=" + currentAudio.id + ")";
+            }}
+            return "ERROR: No currentAudio to repeat";
+        }};
+        
+        window.nextTopic = function() {{
+            let nextIndex = currentIndex + 1;
+            while (nextIndex < audioElements.length && audioElements[nextIndex].style.display === 'none') {{
+                nextIndex++;
+            }}
+            
+            if (nextIndex < audioElements.length) {{
+                currentIndex = nextIndex;
+                currentAudio = audioElements[currentIndex];
+                return "DEBUG: Advanced to next (index=" + currentIndex + ", id=" + currentAudio.id + ")";
+            }}
+            return "ERROR: No next topic available";
+        }};
+        
+        window.previousTopic = function() {{
+            let prevIndex = currentIndex - 1;
+            while (prevIndex >= 0 && audioElements[prevIndex].style.display === 'none') {{
+                prevIndex--;
+            }}
+            
+            if (prevIndex >= 0) {{
+                currentIndex = prevIndex;
+                currentAudio = audioElements[currentIndex];
+                return "DEBUG: Moved to previous (index=" + currentIndex + ", id=" + currentAudio.id + ")";
+            }}
+            return "ERROR: No previous topic available";
+        }};
+    </script>
+</body>
+</html>'''
+        return html
     def _split_tour_content_into_stops(self, tour_content):
         """Split tour content into individual stops using the same logic as tour generation"""
         import re
@@ -770,8 +1305,10 @@ def translate_content_with_audio():
             
         if content_type == 'tour':
             translated_id = translation_service.translate_tour_with_audio(content_id, lang)
-        else:
+        elif content_type == 'article':
             translated_id = translation_service.translate_article(content_id, lang)
+        else:
+            translated_id = None
         
         if translated_id:
             results[lang] = {'status': 'translated', 'id': translated_id}
@@ -782,6 +1319,7 @@ def translate_content_with_audio():
         'status': 'completed',
         'translations': results
     })
+@app.route('/translate', methods=['POST', 'OPTIONS'])
 def translate_content():
     if request.method == 'OPTIONS':
         return make_response()
