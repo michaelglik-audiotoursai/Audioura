@@ -241,14 +241,197 @@ docker cp file.py container:/app/
 - **Phase 8**: Guy Raz content truncation fix ✅ COMPLETE
 - **Phase 9**: Mobile app integration ✅ READY FOR TESTING
 
-**Last Updated**: 2025-12-22 - TRANSLATION + TOURS API COMPLETE IMPLEMENTATION ✅
-**Status**: ✅ **TOUR + NEWSLETTER TRANSLATION + TOURS API FULLY OPERATIONAL** - Complete multi-language support + mobile app compatibility
+**Last Updated**: 2025-12-25 - VOICE COMMAND PRESERVATION IMPLEMENTED ✅
+**Status**: ✅ **TRANSLATION SYSTEM FULLY OPERATIONAL** - All language support working + voice commands stay in English
 
-### 🎯 **CURRENT STATUS: All Systems Operational - COMPLETE ✅**
-- **Achievement**: Translation systems + Tours API issues resolved
-- **Implementation**: Translation service (5030) + Map delivery (5005) fully operational
-- **Mobile App**: All API compatibility issues resolved
-- **Testing**: All systems verified working with mobile app integration
+### 🎯 **CURRENT STATUS: TRANSLATION FEATURE COMPLETE + VOICE COMMANDS FIXED ✅**
+- **Achievement**: Complete translation system for tours and articles implemented
+- **Implementation**: All services enhanced with multi-language support
+- **Mobile App Integration**: Correct architecture documented for mobile app fixes
+- **Critical Bugs**: All translation service bugs identified and resolved
+- **Voice Commands**: ✅ **NEW** - English voice commands preserved in all translations
+
+### ✅ **LATEST ENHANCEMENT - VOICE COMMAND PRESERVATION**
+**Date**: 2025-12-25
+**Objective**: ✅ **COMPLETED** - Keep voice commands in English while translating content
+
+#### **Voice Command Preservation - IMPLEMENTED ✅**
+- ✅ **Root Issue**: Voice commands were being translated ("Play" → "Играть" in Russian)
+- ✅ **Mobile App Problem**: App couldn't interpret translated voice commands
+- ✅ **Solution Applied**: Enhanced translation service with voice command preservation
+- ✅ **Commands Preserved**: "Play", "Pause", "Next topic", "Previous topic", "Repeat", "Forward 10 seconds", "Backward 5 seconds", "Play topic", "Play summary", "Play full article", "List major topics", "Next article", "Previous article", "What are my options"
+- ✅ **Implementation**: Added `preserve_voice_commands=True` parameter to help and topics audio generation
+- ✅ **Result**: Russian/French articles now have English voice commands but translated content
+- ✅ **Deployed**: translation-service-1:5030 updated and restarted
+
+### ✅ **LATEST CRITICAL BUG FIXES - DECEMBER 2024**
+**Date**: 2025-12-24
+**Objective**: ✅ **COMPLETED** - Fixed critical translation service bugs preventing article translation
+
+#### **CRITICAL BUG 4: Database Schema Constraint Violation - RESOLVED ✅**
+**Date**: 2025-12-24 16:29 (Mobile App Test)
+- ✅ **Root Cause**: Multiple VARCHAR(255) constraints in database tables preventing translation storage
+- ✅ **Issue**: Translation service creating Russian/French content but failing to store due to field length limits
+- ✅ **Tables Fixed**: `article_requests` and `news_audios` tables
+- ✅ **Fields Updated**: 
+  - `article_requests.article_id`: VARCHAR(255) → TEXT
+  - `article_requests.original_article_id`: VARCHAR(255) → TEXT  
+  - `article_requests.url`: VARCHAR(1000) → TEXT
+  - `article_requests.secret_id`: VARCHAR(255) → TEXT
+  - `article_requests.subscription_domain`: VARCHAR(255) → TEXT
+  - `news_audios.article_id`: VARCHAR(255) → TEXT
+  - `news_audios.article_name`: VARCHAR(255) → TEXT
+  - `news_audios.original_article_id`: VARCHAR(255) → TEXT
+- ✅ **Result**: Translation service now successfully creates translated articles
+- ✅ **Test Verification**: Russian article ID `86b5c0c0-150b-424c-869e-aee0f6d54b6e` created successfully
+- ✅ **Mobile App Impact**: Mobile app v1.2.9+11 now receives actual translated content instead of English fallbacks
+
+#### **CRITICAL BUG 1: German Translation Response Parsing - RESOLVED ✅**
+- ✅ **Root Cause**: News orchestrator parsing wrong field name from translation service response
+- ✅ **Issue**: Expected `translated_article_ids` but service returned `translations`
+- ✅ **Fix Applied**: Updated response parsing in `news_orchestrator_service.py`
+- ✅ **Result**: German (and all language) translations now work correctly
+- ✅ **Deployed**: news-orchestrator-1:5012
+
+#### **CRITICAL BUG 2: Translation Service Database Constraint Violation - RESOLVED ✅**
+- ✅ **Root Cause**: URL constraint violation when original article URL is None
+- ✅ **Issue**: `duplicate key value violates unique constraint "article_requests_url_key"`
+- ✅ **Fix Applied**: Enhanced URL generation logic in `translation_service.py`
+- ✅ **Result**: Russian/French article translations now store properly in database
+- ✅ **Deployed**: translation-service-1:5030
+
+#### **CRITICAL BUG 3: Russian Article Content Duplication - RESOLVED ✅**
+- ✅ **Root Cause**: Russian "Full Article" audio included both summary and full content
+- ✅ **Issue**: English articles properly separated summary vs full article, Russian did not
+- ✅ **Fix Applied**: Enhanced content separation logic in translation service
+- ✅ **Result**: Russian articles now match English structure exactly
+- ✅ **Deployed**: translation-service-1:5030
+
+### 📊 **TRANSLATION SYSTEM STATUS - FULLY OPERATIONAL**
+- ✅ **Tour Translation**: Working for all languages (ru, es, fr, de, zh)
+- ✅ **Article Translation**: Working for all languages with proper caching
+- ✅ **Translation Caching**: Prevents duplicate AWS costs - reuses existing translations
+- ✅ **Content Quality**: Russian articles match English structure (11-file ZIP format)
+- ✅ **Audio Quality**: AWS Polly voices for all languages (Tatyana for Russian, etc.)
+- ✅ **Database Integration**: Proper storage with content_language and original_id linking
+
+### 🔧 **SERVICES ARCHITECTURE - PRODUCTION READY**
+- ✅ **Tour Orchestrator**: development-tour-orchestrator-1:5002 (language parameter + auto-translation)
+- ✅ **News Orchestrator**: news-orchestrator-1:5012 (download with language support + fixed parsing)
+- ✅ **Translation Service**: translation-service-1:5030 (internal-only + constraint fixes)
+- ✅ **Newsletter Processor**: newsletter-processor-1:5017 (English article generation)
+
+### 📱 **MOBILE APP INTEGRATION STATUS**
+- ✅ **Services Ready**: All translation services working and tested
+- ✅ **Database Schema Fixed**: All VARCHAR(255) constraints resolved - translation storage working
+- ✅ **Translation Service Working**: Russian/French articles now created successfully
+- ✅ **Mobile App Testing**: v1.2.9+11 confirmed receiving translated ZIP files (2.2MB each)
+- ✅ **Architecture Documented**: Complete integration guides created for Mobile App Amazon-Q
+- ✅ **Communication Layer**: Issue analysis documents created in requirements folder
+- ❌ **Mobile App Display Issue**: App showing English titles instead of translated content (mobile app parsing issue)
+
+### 🧪 **TESTING VERIFICATION COMMANDS**
+```bash
+# Test Russian tour generation
+curl -X POST http://localhost:5002/generate-complete-tour \
+  -H "Content-Type: application/json" \
+  -d '{"location": "Newton Center", "tour_type": "walking", "total_stops": 3, "language": "ru"}'
+
+# Test Russian article translation (now working)
+curl -X POST http://localhost:5030/translate-with-audio \
+  -H "Content-Type: application/json" \
+  -d '{"content_id": "19c81027-2ef1-4c03-94a0-dd0c3571a5f6", "content_type": "article", "languages": ["ru"]}'
+# Expected result: {"status": "completed", "translations": {"ru": {"id": "86b5c0c0-150b-424c-869e-aee0f6d54b6e", "status": "translated"}}}
+
+# Test Russian article download
+curl -X GET "http://localhost:5012/download/ARTICLE-ID?language=ru" -o "russian_article.zip"
+
+# Test German article download (previously broken, now fixed)
+curl -X GET "http://localhost:5012/download/ARTICLE-ID?language=de" -o "german_article.zip"
+
+# Verify translation caching (should reuse existing translations)
+curl -X GET "http://localhost:5012/download/ARTICLE-ID?language=ru" -o "cached_russian.zip"
+```
+
+### 📋 **COMMUNICATION DOCUMENTS CREATED**
+- `SERVICES_ANALYSIS_ARTICLE_GENERATION_WORKFLOW_ISSUES.md` - Initial mobile app issue analysis
+- `SERVICES_UPDATE_ARTICLE_GENERATION_ISSUES_RESOLVED.md` - Services fixes confirmation
+- `SERVICES_RESPONSE_ISSUE_007_008_ARCHITECTURE.md` - Mobile app architecture correction
+- `SERVICES_TRANSLATION_ARCHITECTURE_CORRECTED.md` - Complete integration guide
+
+### ⚠️ **MOBILE APP ACTION ITEMS REMAINING**
+1. ✅ **Translation Service Fixed**: Database schema constraints resolved - services now working
+2. ✅ **Multi-Language Download Working**: Mobile app successfully downloading Russian/French ZIP files (2.2MB each)
+3. ✅ **Language Suffix Storage Working**: Articles stored with `_ru`, `_fr` suffixes correctly
+4. ❌ **Content Display Issue**: Mobile app showing English titles instead of translated content from ZIP files
+5. ❌ **Title Extraction**: Mobile app needs to extract translated titles from ZIP content instead of reusing original English titles
+
+### 🎯 **TRANSLATION FEATURE DEVELOPMENT - COMPLETE**
+**Services Amazon-Q Responsibilities**: ✅ ALL COMPLETE
+- Translation service implementation ✅
+- Multi-language tour generation ✅
+- Multi-language article download ✅
+- Database schema enhancements ✅
+- AWS Translate/Polly integration ✅
+- Translation caching system ✅
+- Critical bug fixes ✅
+- Mobile app integration documentation ✅
+
+**Mobile App Amazon-Q Responsibilities**: ❌ PENDING
+- Multi-language download workflow implementation
+- Language-specific article storage
+- Multiple article display in Listen page
+- Auto-play functionality verification
+
+### ✅ **ISSUE-004 & ISSUE-005 RESOLUTION - COMPLETE IMPLEMENTATION**
+**Date**: 2025-12-23
+**Objective**: ✅ **COMPLETED** - Fixed tour generation language support + mobile app architecture
+**Architecture**: ✅ **CORRECTED** - Mobile app uses proper service workflow, not direct translation calls
+
+#### **ISSUE-004: Tour Generation Language Support - RESOLVED ✅**
+- ✅ **Tour Orchestrator Enhanced**: Added language parameter support to `/generate-complete-tour`
+- ✅ **Auto-Translation**: Tours automatically translated when non-English language requested
+- ✅ **Database Integration**: Uses existing translation service (5030) internally
+- ✅ **Mobile Compatibility**: Returns proper tour ID for requested language
+- ✅ **Validation**: Supports en, ru, es, fr, de, zh languages
+
+#### **ISSUE-005: Mobile App Architecture Correction - RESOLVED ✅**
+- ✅ **Root Cause Identified**: Mobile app was incorrectly calling translation service directly
+- ✅ **Correct Architecture Implemented**: 
+  - Mobile app gets English article list from newsletter service
+  - Mobile app requests Russian article via download service with `?language=ru`
+  - Download service calls translation service internally
+  - Mobile app receives translated article ZIP
+- ✅ **Translation Service**: Remains internal-only (services-to-services)
+- ✅ **Download Service Enhanced**: Added language parameter support to `/download/<article_id>`
+
+#### **Implementation Details - COMPLETED ✅**
+1. ✅ **Tour Orchestrator Service**: Enhanced with language parameter + auto-translation
+2. ✅ **News Orchestrator Service**: Enhanced download endpoint with translation support
+3. ✅ **Newsletter Processor**: Unchanged - always creates English articles only
+4. ✅ **Translation Service**: Remains internal - called by other services, not mobile app
+5. ✅ **Mobile App Workflow**: Corrected to use proper service architecture
+
+#### **Correct Mobile App Workflow - IMPLEMENTED ✅**
+```
+1. Mobile app: POST /process_newsletter (creates English articles)
+2. Mobile app: POST /get_articles_by_newsletter_id (gets English article list)
+3. Mobile app: GET /download/<article_id>?language=ru (requests Russian version)
+4. Download service: Calls translation service internally if needed
+5. Mobile app: Receives Russian article ZIP
+```
+
+#### **Services Enhanced - DEPLOYED ✅**
+- ✅ **Tour Orchestrator**: development-tour-orchestrator-1:5002 (language support + auto-translation)
+- ✅ **News Orchestrator**: news-orchestrator-1:5012 (download with language support)
+- ✅ **Translation Service**: translation-service-1:5030 (internal use only)
+- ✅ **Newsletter Processor**: newsletter-processor-1:5017 (unchanged - English only)
+
+#### **Testing Results - VERIFIED WORKING ✅**
+- ✅ **Tour Generation**: `POST /generate-complete-tour` with `language: "ru"` parameter working
+- ✅ **Article Download**: `GET /download/<id>?language=ru` parameter working
+- ✅ **Translation Service**: Internal calls working, mobile app blocked from direct access
+- ✅ **Architecture**: Mobile app uses correct service workflow
 
 ### ✅ **NEWSLETTER TRANSLATION - COMPLETE IMPLEMENTATION**
 **Date**: 2025-12-22

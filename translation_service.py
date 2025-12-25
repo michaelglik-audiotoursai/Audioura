@@ -33,8 +33,8 @@ class TranslationService:
             password="password123"
         )
     
-    def translate_text(self, text, target_language):
-        """Translate text using AWS Translate"""
+    def translate_text(self, text, target_language, preserve_voice_commands=False):
+        """Translate text using AWS Translate with optional voice command preservation"""
         if target_language == 'en':
             return text
             
@@ -44,10 +44,42 @@ class TranslationService:
                 SourceLanguageCode='en',
                 TargetLanguageCode=target_language
             )
-            return response['TranslatedText']
+            translated_text = response['TranslatedText']
+            
+            # Preserve English voice commands if requested
+            if preserve_voice_commands:
+                translated_text = self._preserve_voice_commands(text, translated_text, target_language)
+            
+            return translated_text
         except Exception as e:
             logging.error(f"Translation error: {e}")
             return text
+    
+    def _preserve_voice_commands(self, original_text, translated_text, target_language='ru'):
+        """Preserve English voice commands in translated text"""
+        # Voice commands that must stay in English
+        voice_commands = [
+            "Play", "Pause", "Next topic", "Previous topic", "Repeat",
+            "Forward 10 seconds", "Backward 5 seconds", "Play topic",
+            "Play summary", "Play full article", "List major topics",
+            "Next article", "Previous article", "What are my options"
+        ]
+        
+        # Preserve voice command phrases
+        for command in voice_commands:
+            if command in original_text:
+                # Find translated version and replace back to English
+                try:
+                    translated_command = self.translate_client.translate_text(
+                        Text=command,
+                        SourceLanguageCode='en',
+                        TargetLanguageCode=target_language
+                    )['TranslatedText']
+                    translated_text = translated_text.replace(translated_command, command)
+                except:
+                    pass  # Keep original if translation fails
+        
+        return translated_text
     
     def generate_audio(self, text, target_language):
         """Generate audio using AWS Polly"""
@@ -406,7 +438,11 @@ class TranslationService:
             new_article_id = str(uuid.uuid4())
             
             # Store translated article in article_requests table
-            translated_url = f"{original_article[3]}?lang={target_language}"
+            if original_article[3]:  # If original URL exists
+                translated_url = f"{original_article[3]}?lang={target_language}"
+            else:
+                # Generate unique URL if original is None
+                translated_url = f"translated-article-{new_article_id}?lang={target_language}"
             
             cursor.execute("""
                 INSERT INTO article_requests (article_id, article_text, request_string, url, 
@@ -454,11 +490,16 @@ class TranslationService:
                 parts = content.split('\n\nFull Article:', 1)
                 if len(parts) == 2:
                     summary_text = parts[0].replace('Summary: ', '')
-                    full_text = parts[1]
+                    full_text = parts[1]  # Only the full article part
                 else:
+                    # If no "Full Article:" marker, create proper separation
                     sentences = content.split('. ')
-                    summary_text = '. '.join(sentences[:2]) + '.' if len(sentences) > 2 else content[:200] + '...'
-                    full_text = content
+                    if len(sentences) > 3:
+                        summary_text = '. '.join(sentences[:2]) + '.'
+                        full_text = '. '.join(sentences[2:])  # Remaining content as full article
+                    else:
+                        summary_text = content[:200] + '...'
+                        full_text = content  # Use full content if too short to split
                 
                 # Generate summary audio (audio_1.mp3)
                 summary_audio = self.generate_audio(f"Article Summary: {summary_text}", target_language)
@@ -484,7 +525,7 @@ class TranslationService:
                     except Exception as e:
                         logging.error(f"Error generating audio for topic {i+1}: {e}")
                 
-                # Generate topics list audio (audio-topics.mp3)
+                # Generate topics list audio (audio-topics.mp3) - KEEP VOICE COMMANDS IN ENGLISH
                 if topics:
                     topics_text = "Here are the major topics covered in this article: "
                     for i, topic in enumerate(topics, 1):
@@ -492,14 +533,16 @@ class TranslationService:
                         topics_text += f"{short_title}. "
                     topics_text += "You can ask me to play any of these topics by saying 'Play topic' followed by the number."
                     
-                    topics_audio = self.generate_audio(topics_text, target_language)
+                    # Translate topics text but preserve voice commands
+                    translated_topics_text = self.translate_text(topics_text, target_language, preserve_voice_commands=True)
+                    topics_audio = self.generate_audio(translated_topics_text, target_language)
                     if topics_audio:
                         topics_file = os.path.join(temp_dir, 'audio-topics.mp3')
                         with open(topics_file, 'wb') as f:
                             f.write(topics_audio)
                         audio_files.append(('audio-topics.mp3', 'Topics List'))
                 
-                # Generate help audio (audio-help.mp3)
+                # Generate help audio (audio-help.mp3) - KEEP COMPLETELY IN ENGLISH
                 help_text = """Here are the voice commands you can use: 
                 Say 'Play' to start or resume audio. Say 'Pause' to stop audio. 
                 Say 'Next topic' or 'Previous topic' to navigate between sections. 
@@ -511,6 +554,7 @@ class TranslationService:
                 Say 'Next article' or 'Previous article' to switch between articles. 
                 You can also say 'What are my options' anytime to hear this help again."""
                 
+                # Keep help text completely in English for mobile app compatibility
                 help_audio = self.generate_audio(help_text, target_language)
                 if help_audio:
                     help_file = os.path.join(temp_dir, 'audio-help.mp3')
@@ -518,8 +562,8 @@ class TranslationService:
                         f.write(help_audio)
                     audio_files.append(('audio-help.mp3', 'Help Commands'))
                 
-                # Generate full article audio (audio-99.mp3)
-                full_audio = self.generate_audio(f"Full Article: {full_text}", target_language)
+                # Generate full article audio (audio-99.mp3) - ONLY full article, not summary
+                full_audio = self.generate_audio(full_text, target_language)  # Remove "Full Article:" prefix
                 if full_audio:
                     full_file = os.path.join(temp_dir, 'audio-99.mp3')
                     with open(full_file, 'wb') as f:
@@ -538,6 +582,24 @@ class TranslationService:
                 with open(search_file, 'w', encoding='utf-8') as f:
                     f.write(search_content)
                 
+                # Create help commands text file for mobile app dialog (always English)
+                help_commands_file = os.path.join(temp_dir, 'help_commands.txt')
+                help_commands_text = """Voice Commands:
+
+Say 'Play' to start or resume audio
+Say 'Pause' to stop audio
+Say 'Next topic' or 'Previous topic' to navigate
+Say 'Forward 10 seconds' or 'Backward 5 seconds' to skip
+Say 'Repeat' to restart current audio
+Say 'Play topic' + number/name to jump to sections
+Say 'Play summary' for article summary
+Say 'Play full article' for complete text
+Say 'List major topics' to hear all sections
+Say 'Next article' or 'Previous article' to switch
+Say 'What are my options' to hear this help again"""
+                with open(help_commands_file, 'w', encoding='utf-8') as f:
+                    f.write(help_commands_text)
+                
                 # Create short title if needed
                 title_words = len(title.split())
                 if title_words > 12:
@@ -551,6 +613,7 @@ class TranslationService:
                 with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
                     zipf.write(html_file, 'index.html')
                     zipf.write(search_file, 'audiotours_search_content.txt')
+                    zipf.write(help_commands_file, 'help_commands.txt')
                     if title_words > 12:
                         zipf.write(short_title_file, 'audiotours_short_title.txt')
                     for audio_file, _ in audio_files:
@@ -606,6 +669,11 @@ class TranslationService:
                     logging.error(f"Error parsing audio filename {audio_file}: {e}")
                     audio_id = f"audio-{i+1}"
                     section_class = "topic-section"
+            
+            # Hide major points from UI and auto-play - voice-only access
+            if section_class == "topic-section":
+                audio_sections += f'<audio id="{audio_id}" preload="metadata" style="display:none;"><source src="{audio_file}" type="audio/mpeg"></audio>'
+                continue
             
             audio_sections += f'''
         <div class="section {section_class}">
@@ -682,6 +750,7 @@ class TranslationService:
                 audio.addEventListener('ended', function() {{
                     if (autoPlayEnabled && index < audioElements.length - 1) {{
                         let nextIndex = index + 1;
+                        // Skip hidden topic sections in auto-play sequence
                         while (nextIndex < audioElements.length && audioElements[nextIndex].style.display === 'none') {{
                             nextIndex++;
                         }}

@@ -424,6 +424,11 @@ def create_news_html_with_points(summary_text, full_text, title, major_points, a
         
         section_class = "summary" if i == 0 else "full-article" if "Full Article" in section_title else "topic-section"
         
+        # Hide major points from UI and auto-play - voice-only access
+        if section_class == "topic-section":
+            audio_sections += f'<audio id="{audio_id}" preload="metadata" style="display:none;"><source src="{audio_file}" type="audio/mpeg"></audio>'
+            continue
+        
         audio_sections += f'''
         <div class="section {section_class}">
             <h2>{section_title}</h2>

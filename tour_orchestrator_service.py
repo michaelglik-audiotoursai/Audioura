@@ -316,7 +316,7 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         print(f"Traceback: {traceback.format_exc()}")
         return False
 
-def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=None, request_string=None):
+def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=None, request_string=None, language='en'):
     """Orchestrate the complete tour generation pipeline asynchronously."""
     print(f"\n==== ORCHESTRATE_TOUR_ASYNC STARTED: {datetime.now().isoformat()} ====")
     print(f"Parameters:")
@@ -326,6 +326,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
     print(f"  total_stops: {total_stops}")
     print(f"  user_id: {user_id}")
     print(f"  request_string: {request_string}")
+    print(f"  language: {language}")
     try:
         ACTIVE_JOBS[job_id]["status"] = "processing"
         ACTIVE_JOBS[job_id]["progress"] = "Starting complete tour generation pipeline..."
@@ -550,6 +551,70 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         if store_success:
             print(f"Tour stored successfully with coordinates: lat={lat}, lng={lng}")
             
+            # Get the tour ID from database for potential translation
+            english_tour_id = None
+            if language != 'en':
+                try:
+                    import psycopg2
+                    conn = psycopg2.connect(
+                        host="postgres-2",
+                        database="audiotours",
+                        user="admin",
+                        password="password123"
+                    )
+                    cur = conn.cursor()
+                    cur.execute(
+                        "SELECT id FROM audio_tours WHERE tour_name = %s AND request_string = %s ORDER BY id DESC LIMIT 1",
+                        (tour_name, request_string or location)
+                    )
+                    result = cur.fetchone()
+                    if result:
+                        english_tour_id = result[0]
+                        print(f"English tour ID for translation: {english_tour_id}")
+                    cur.close()
+                    conn.close()
+                except Exception as db_error:
+                    print(f"Warning: Could not get tour ID for translation: {db_error}")
+            
+            # If non-English language requested, translate the tour
+            if language != 'en' and english_tour_id:
+                print(f"\n==== TRANSLATING TOUR TO {language.upper()} ====")
+                try:
+                    translation_data = {
+                        "content_id": english_tour_id,
+                        "content_type": "tour",
+                        "languages": [language]
+                    }
+                    
+                    print(f"Calling translation service with data: {translation_data}")
+                    translation_response = requests.post(
+                        "http://translation-service-1:5030/translate-with-audio",
+                        headers={"Content-Type": "application/json"},
+                        json=translation_data,
+                        timeout=120
+                    )
+                    
+                    if translation_response.status_code == 200:
+                        translation_result = translation_response.json()
+                        translated_tour_id = translation_result.get('translated_tour_ids', {}).get(language)
+                        
+                        if translated_tour_id:
+                            print(f"Translation successful! Translated tour ID: {translated_tour_id}")
+                            ACTIVE_JOBS[job_id]["translated_tour_id"] = translated_tour_id
+                            ACTIVE_JOBS[job_id]["final_tour_id"] = translated_tour_id
+                        else:
+                            print(f"Warning: Translation completed but no tour ID returned")
+                            ACTIVE_JOBS[job_id]["final_tour_id"] = english_tour_id
+                    else:
+                        print(f"Translation failed: {translation_response.status_code} - {translation_response.text}")
+                        ACTIVE_JOBS[job_id]["final_tour_id"] = english_tour_id
+                        
+                except Exception as translation_error:
+                    print(f"Translation error: {translation_error}")
+                    ACTIVE_JOBS[job_id]["final_tour_id"] = english_tour_id
+            else:
+                ACTIVE_JOBS[job_id]["final_tour_id"] = english_tour_id or "unknown"
+            
             # Update tour_requests status to completed
             if user_id and 'tour_id' in ACTIVE_JOBS[job_id]:
                 tour_id = ACTIVE_JOBS[job_id]['tour_id']
@@ -593,8 +658,13 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             print(f"Keeping extraction directory due to database storage failure: {extract_path}")
         
         # Complete
-        log_job_update(job_id, "completed", "MODERNIZED tour generation completed! Tour now has separate MP3 and TXT files for editing.")
+        final_message = f"Tour generation completed in {language.upper()}!"
+        if language != 'en' and 'translated_tour_id' in ACTIVE_JOBS[job_id]:
+            final_message += f" Translated tour ID: {ACTIVE_JOBS[job_id]['translated_tour_id']}"
+        
+        log_job_update(job_id, "completed", final_message)
         ACTIVE_JOBS[job_id]["netlify_ready"] = True
+        ACTIVE_JOBS[job_id]["language"] = language
         if coordinates:
             ACTIVE_JOBS[job_id]["coordinates"] = coordinates
         
@@ -758,6 +828,7 @@ def generate_complete_tour():
     total_stops = data.get('total_stops', 10)
     user_id = sanitize_input(data.get('user_id'))
     request_string = sanitize_input(data.get('request_string'))
+    language = data.get('language', 'en')  # Default to English
     
     print(f"Extracted parameters:")
     print(f"  location: {location}")
@@ -765,6 +836,12 @@ def generate_complete_tour():
     print(f"  total_stops: {total_stops}")
     print(f"  user_id: {user_id}")
     print(f"  request_string: {request_string}")
+    print(f"  language: {language}")
+    
+    # Validate language parameter
+    supported_languages = ['en', 'ru', 'es', 'fr', 'de', 'zh']
+    if language not in supported_languages:
+        return jsonify({"error": f"Unsupported language: {language}. Supported: {supported_languages}"}), 400
     
     if not location or not tour_type:
         return jsonify({"error": "location and tour_type are required"}), 400
@@ -790,6 +867,7 @@ def generate_complete_tour():
         "total_stops": total_stops,
         "user_id": user_id,
         "request_string": request_string,
+        "language": language,
         "created_at": datetime.now().isoformat()
     }
     
@@ -813,14 +891,14 @@ def generate_complete_tour():
     sys.stdout.flush()
     thread = threading.Thread(
         target=orchestrate_tour_async,
-        args=(job_id, location, tour_type, total_stops, user_id, request_string)
+        args=(job_id, location, tour_type, total_stops, user_id, request_string, language)
     )
     thread.daemon = True
     thread.start()
     
-    print(f"Returning response: job_id={job_id}, status=queued")
+    print(f"Returning response: job_id={job_id}, status=queued, language={language}")
     sys.stdout.flush()
-    return jsonify({"job_id": job_id, "status": "queued"})
+    return jsonify({"job_id": job_id, "status": "queued", "language": language})
 
 @app.route('/status/<job_id>', methods=['GET'])
 def get_job_status(job_id):
@@ -849,6 +927,10 @@ def get_job_status(job_id):
         response["netlify_ready"] = job["netlify_ready"]
         if "coordinates" in job:
             response["coordinates"] = job["coordinates"]
+        if "final_tour_id" in job:
+            response["final_tour_id"] = job["final_tour_id"]
+        if "translated_tour_id" in job:
+            response["translated_tour_id"] = job["translated_tour_id"]
     elif job["status"] == "error":
         response["error"] = job["error"]
     

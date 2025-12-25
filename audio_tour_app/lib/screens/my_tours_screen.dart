@@ -205,22 +205,23 @@ class _MyToursScreenState extends State<MyToursScreen> {
     final prefs = await SharedPreferences.getInstance();
     final news = prefs.getStringList('saved_news') ?? [];
     
-    // Convert and remove duplicates based on article_id
-    final newsMap = <String, Map<String, dynamic>>{};
+    await DebugLogHelper.addDebugLog('LISTEN: Loading ${news.length} articles from storage');
+    
+    // Convert articles without duplicate removal - keep all language variants
+    final articles = <Map<String, dynamic>>[];
     for (final articleJson in news) {
       try {
         final article = jsonDecode(articleJson) as Map<String, dynamic>;
-        final articleId = article['article_id'] ?? '';
-        if (articleId.isNotEmpty && !newsMap.containsKey(articleId)) {
-          newsMap[articleId] = article;
-        }
+        articles.add(article);
       } catch (e) {
-        print('Error parsing article: $e');
+        await DebugLogHelper.addDebugLog('LISTEN: Error parsing article: $e');
       }
     }
     
+    await DebugLogHelper.addDebugLog('LISTEN: Successfully loaded ${articles.length} articles (all languages)');
+    
     setState(() {
-      _news = newsMap.values.toList().reversed.toList();
+      _news = articles.reversed.toList();
     });
     
     // Pre-load all display titles to avoid async operations during scroll

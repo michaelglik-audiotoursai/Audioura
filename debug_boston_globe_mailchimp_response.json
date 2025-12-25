@@ -1,0 +1,11 @@
+{
+  "articles_created": 9,
+  "articles_failed": 0,
+  "articles_found": 10,
+  "articles_requiring_subscription": 8,
+  "failed_articles": [],
+  "message": "Newsletter processed: 9 articles created, 8 require subscription",
+  "newsletter_id": 253,
+  "server_public_key": "0xa6fb509ec7893e575ef108d6fb44d06b60f909373fde7a10bdd634c720fc60fdce102852b135299e1eba0c4714e00c2781975f75619ff56f1664ab4497f3a5ac4acd15cb6e1b7b1af0ef1a592014b280e8a254b351cdce4e580a2da1f6c2fbd35a68a5ffe04c0de9e444ced383b8ca212233a4d583dc4723a2530c9ca3d9d0a565c0654365b34675bfd10717f9d4151713e8bb696b81051ebce7c8aa325c8a8bb816398746e05c740e1ee921f00e85714677bf6df9d285b30c11326730171b363c6816480259570115cfd620d4e1b082b89d2a1a5a38639f00dcac77ee19163c0f7b6821ee3d960406966c79b597617278b6b2f80e93cbb82c22068cde5a319",
+  "status": "success"
+}

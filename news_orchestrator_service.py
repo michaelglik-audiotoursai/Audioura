@@ -128,10 +128,69 @@ def generate_news():
 @app.route('/download/<article_id>', methods=['GET'])
 def download_news(article_id):
     try:
+        # Get language parameter from query string
+        language = request.args.get('language', 'en')
+        
+        # Validate language parameter
+        supported_languages = ['en', 'ru', 'es', 'fr', 'de', 'zh']
+        if language not in supported_languages:
+            return jsonify({"error": f"Unsupported language: {language}. Supported: {supported_languages}"}), 400
+        
+        logging.info(f"Download request for article {article_id} in language: {language}")
+        
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # SECURITY FIX: Check if article requires subscription and validate credentials
+        # If non-English language requested, check for existing translation or create one
+        final_article_id = article_id
+        if language != 'en':
+            logging.info(f"Non-English language requested: {language}")
+            
+            # Check if translation already exists
+            cursor.execute(
+                "SELECT article_id FROM article_requests WHERE original_article_id = %s AND content_language = %s",
+                (article_id, language)
+            )
+            existing_translation = cursor.fetchone()
+            
+            if existing_translation:
+                final_article_id = existing_translation[0]
+                logging.info(f"Found existing {language} translation: {final_article_id}")
+            else:
+                # Create translation using translation service
+                try:
+                    translation_data = {
+                        "content_id": article_id,
+                        "content_type": "article",
+                        "languages": [language]
+                    }
+                    
+                    logging.info(f"Calling translation service for article {article_id} -> {language}")
+                    translation_response = requests.post(
+                        "http://translation-service-1:5030/translate-with-audio",
+                        headers={"Content-Type": "application/json"},
+                        json=translation_data,
+                        timeout=120
+                    )
+                    
+                    if translation_response.status_code == 200:
+                        translation_result = translation_response.json()
+                        # Fix: Use correct field name from translation service response
+                        translation_info = translation_result.get('translations', {}).get(language, {})
+                        translated_article_id = translation_info.get('id')
+                        
+                        if translated_article_id:
+                            final_article_id = translated_article_id
+                            logging.info(f"Translation successful! Using translated article: {final_article_id}")
+                        else:
+                            logging.warning(f"Translation completed but no article ID returned, using English version")
+                    else:
+                        logging.error(f"Translation failed: {translation_response.status_code} - {translation_response.text}")
+                        logging.info(f"Falling back to English version")
+                        
+                except Exception as translation_error:
+                    logging.error(f"Translation error: {translation_error}")
+                    logging.info(f"Falling back to English version")
         cursor.execute("""
             SELECT ar.subscription_required, ar.subscription_domain, ar.request_string
             FROM article_requests ar
@@ -183,12 +242,12 @@ def download_news(article_id):
             
             logging.info(f"SECURITY PASS: User {user_id} has verified credentials for {subscription_domain} - allowing access to article {article_id}")
         
-        # Get news article from database (only after security validation)
+        # Get news article from database (use final_article_id which may be translated)
         cursor.execute("""
             SELECT news_article, article_name, article_type 
             FROM news_audios 
             WHERE article_id = %s
-        """, (article_id,))
+        """, (final_article_id,))
         
         result = cursor.fetchone()
         if not result:
@@ -202,12 +261,12 @@ def download_news(article_id):
         cursor.close()
         conn.close()
         
-        # Return ZIP file (only after successful authorization)
+        # Return ZIP file (use final_article_id for filename to distinguish translations)
         return send_file(
             io.BytesIO(news_article),
             mimetype='application/zip',
             as_attachment=True,
-            download_name=f'{article_id}.zip'
+            download_name=f'{final_article_id}.zip'
         )
         
     except Exception as e:
