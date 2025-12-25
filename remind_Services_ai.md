@@ -241,27 +241,40 @@ docker cp file.py container:/app/
 - **Phase 8**: Guy Raz content truncation fix ✅ COMPLETE
 - **Phase 9**: Mobile app integration ✅ READY FOR TESTING
 
-**Last Updated**: 2025-12-25 - VOICE COMMAND PRESERVATION IMPLEMENTED ✅
-**Status**: ✅ **TRANSLATION SYSTEM FULLY OPERATIONAL** - All language support working + voice commands stay in English
+**Last Updated**: 2025-12-25 - VOICE COMMAND PRESERVATION + HELP DIALOG FIX ✅
+**Status**: ✅ **TRANSLATION SYSTEM FULLY OPERATIONAL** - All language support working + voice commands stay in English + help dialog fixed
+**Git Tag**: 1.2.9.18 (synchronized with Mobile App)
 
-### 🎯 **CURRENT STATUS: TRANSLATION FEATURE COMPLETE + VOICE COMMANDS FIXED ✅**
+### 🎯 **CURRENT STATUS: TRANSLATION FEATURE COMPLETE + UI FIXES ✅**
 - **Achievement**: Complete translation system for tours and articles implemented
 - **Implementation**: All services enhanced with multi-language support
 - **Mobile App Integration**: Correct architecture documented for mobile app fixes
 - **Critical Bugs**: All translation service bugs identified and resolved
-- **Voice Commands**: ✅ **NEW** - English voice commands preserved in all translations
+- **Voice Commands**: ✅ English voice commands preserved in all translations
+- **Help Dialog**: ✅ Fixed grey page display issue in non-English languages
 
-### ✅ **LATEST ENHANCEMENT - VOICE COMMAND PRESERVATION**
+### ✅ **LATEST ENHANCEMENTS - DECEMBER 2025**
 **Date**: 2025-12-25
-**Objective**: ✅ **COMPLETED** - Keep voice commands in English while translating content
+**Git Tag**: 1.2.9.18 (Services + Mobile App synchronized)
+**Objective**: ✅ **COMPLETED** - Voice command preservation + help dialog display fix
 
-#### **Voice Command Preservation - IMPLEMENTED ✅**
+#### **Enhancement 1: Voice Command Preservation - IMPLEMENTED ✅**
 - ✅ **Root Issue**: Voice commands were being translated ("Play" → "Играть" in Russian)
 - ✅ **Mobile App Problem**: App couldn't interpret translated voice commands
 - ✅ **Solution Applied**: Enhanced translation service with voice command preservation
 - ✅ **Commands Preserved**: "Play", "Pause", "Next topic", "Previous topic", "Repeat", "Forward 10 seconds", "Backward 5 seconds", "Play topic", "Play summary", "Play full article", "List major topics", "Next article", "Previous article", "What are my options"
 - ✅ **Implementation**: Added `preserve_voice_commands=True` parameter to help and topics audio generation
 - ✅ **Result**: Russian/French articles now have English voice commands but translated content
+- ✅ **Deployed**: translation-service-1:5030 updated and restarted
+
+#### **Enhancement 2: Help Dialog Display Fix - IMPLEMENTED ✅**
+- ✅ **Root Issue**: Help dialog showed grey page with no text in Russian/French languages
+- ✅ **Mobile App Problem**: Translated help text contained special characters that couldn't render
+- ✅ **Solution Applied**: Keep help text completely in English + add clean text file
+- ✅ **Files Added**: `help_commands.txt` with clean English text in all translated article ZIPs
+- ✅ **Audio Preserved**: Help audio still plays in target language for voice users
+- ✅ **Result**: Consistent help dialog display across all languages
+- ✅ **Communication**: Created `SERVICES_HELP_DIALOG_FIX.md` for Mobile App integration
 - ✅ **Deployed**: translation-service-1:5030 updated and restarted
 
 ### ✅ **LATEST CRITICAL BUG FIXES - DECEMBER 2024**
@@ -365,6 +378,26 @@ curl -X GET "http://localhost:5012/download/ARTICLE-ID?language=ru" -o "cached_r
 3. ✅ **Language Suffix Storage Working**: Articles stored with `_ru`, `_fr` suffixes correctly
 4. ❌ **Content Display Issue**: Mobile app showing English titles instead of translated content from ZIP files
 5. ❌ **Title Extraction**: Mobile app needs to extract translated titles from ZIP content instead of reusing original English titles
+
+### 📝 **VERSION SYNCHRONIZATION - 1.2.9.18**
+**Date**: 2025-12-25
+**Coordination**: Services Amazon-Q + Mobile App Amazon-Q synchronized release
+**Git Tag**: 1.2.9.18 (both services and mobile app)
+
+**Services Changes (1.2.9.18)**:
+- ✅ Voice command preservation in translation service
+- ✅ Help dialog display fix with help_commands.txt
+- ✅ Enhanced translation service with mobile app compatibility
+- ✅ Communication documents created for integration
+
+**Mobile App Changes (1.2.9.18)**:
+- ✅ Help dialog integration with clean English text
+- ✅ Voice command compatibility with preserved English commands
+- ✅ Multi-language support enhancements
+- ✅ Translation workflow improvements
+
+**APK Status**: Ready for build with synchronized codebase
+**Testing**: Voice commands + help dialog working in all languages
 
 ### 🎯 **TRANSLATION FEATURE DEVELOPMENT - COMPLETE**
 **Services Amazon-Q Responsibilities**: ✅ ALL COMPLETE
