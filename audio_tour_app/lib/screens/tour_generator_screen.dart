@@ -13,10 +13,12 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/tour_status_service.dart';
 import '../services/background_tour_monitor.dart';
+import '../services/translation_service.dart';
 
 import '../screens/debug_log_viewer_screen.dart';
 import '../screens/tour_player_screen.dart';
 import '../screens/news_player_screen.dart';
+import '../widgets/language_selector.dart';
 import 'main_screen.dart';
 
 class TourGeneratorScreen extends StatefulWidget {
@@ -36,6 +38,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   List<Map<String, dynamic>> _backgroundTours = [];
   String _appMode = 'Tours'; // Default to Tours mode
   String _contentType = 'Article'; // Article or Newsletter
+  List<String> _selectedLanguages = ['en']; // Language selection
 
 
   
@@ -110,7 +113,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     setState(() {
       _appMode = prefs.getString('app_mode') ?? 'Tours';
       if (_appMode == 'Audio') {
-        _stopCountController.text = '4'; // Default for Audio mode
+        _stopCountController.text = '0'; // Default for Audio mode (major points)
       }
     });
   }
@@ -193,6 +196,15 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       Map<String, dynamic> tourData = _parseTourRequest(sanitizedInput);
       tourData['total_stops'] = stopCount; // Add custom stop count
       
+      // Add language parameter for tour generation
+      if (_selectedLanguages.isNotEmpty && !_selectedLanguages.contains('en')) {
+        // If only non-English languages selected, use the first one
+        tourData['language'] = _selectedLanguages.first;
+      } else if (_selectedLanguages.length > 1) {
+        // If multiple languages including English, generate in English first
+        tourData['language'] = 'en';
+      }
+      
       // Step 1: Start tour generation
       final response = await http.post(
         Uri.parse('$_apiBaseUrl/generate-complete-tour'),
@@ -211,7 +223,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       await TourStatusService.trackTourRequest(sanitizedInput, jobId, stopCount: stopCount);
       
       // Step 2: Poll for completion and auto-download
-      await _pollAndAutoDownload(jobId, tourData['location']);
+      await _pollAndAutoDownload(jobId, tourData['location'], _selectedLanguages);
       
     } catch (error) {
       print('DETAILED ERROR: $error');
@@ -223,7 +235,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     }
   }
 
-  Future<void> _pollAndAutoDownload(String jobId, String location) async {
+  Future<void> _pollAndAutoDownload(String jobId, String location, [List<String>? languages]) async {
     const int maxAttempts = 90; // 15 minutes timeout
     int attempts = 0;
     
@@ -249,7 +261,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
             });
             
             // Auto-download, extract, and play
-            await _autoDownloadAndPlay(jobId, location);
+            await _autoDownloadAndPlay(jobId, location, languages);
             
             // Update tour request status to completed AFTER download
             // This ensures we don't mark it complete until we've actually downloaded it
@@ -284,15 +296,37 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     });
   }
 
-  Future<void> _autoDownloadAndPlay(String jobId, String location) async {
+  Future<void> _autoDownloadAndPlay(String jobId, String location, [List<String>? languages]) async {
     try {
-      // Step 1: Download ZIP file
+      // Get final tour ID from status (CRITICAL FIX)
+      setState(() {
+        _progress = 'Getting final tour ID...';
+      });
+      
+      final statusResponse = await http.get(
+        Uri.parse('$_apiBaseUrl/status/$jobId'),
+      );
+      
+      if (statusResponse.statusCode != 200) {
+        throw Exception('Failed to get tour status');
+      }
+      
+      final statusData = jsonDecode(statusResponse.body);
+      final finalTourId = statusData['final_tour_id'];
+      
+      if (finalTourId == null) {
+        throw Exception('No final_tour_id in status response');
+      }
+      
+      await DebugLogHelper.addDebugLog('TOUR: Using final_tour_id: $finalTourId (not job_id: $jobId)');
+      
+      // Download using final_tour_id (CRITICAL FIX)
       setState(() {
         _progress = 'Downloading tour files...';
       });
       
       final response = await http.get(
-        Uri.parse('$_apiBaseUrl/download/$jobId'),
+        Uri.parse('$_apiBaseUrl/download/$finalTourId'),
       );
       
       if (response.statusCode != 200) {
@@ -311,7 +345,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         _progress = 'Extracting tour files...';
       });
       
-      final zipPath = '${toursDir.path}/${jobId}.zip';
+      final zipPath = '${toursDir.path}/${finalTourId}.zip';
       final zipFile = File(zipPath);
       await zipFile.writeAsBytes(response.bodyBytes);
       
@@ -319,7 +353,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       final bytes = await zipFile.readAsBytes();
       final archive = ZipDecoder().decodeBytes(bytes);
       
-      final extractPath = '${toursDir.path}/${jobId}';
+      final extractPath = '${toursDir.path}/${finalTourId}';
       final extractDir = Directory(extractPath);
       if (await extractDir.exists()) {
         await extractDir.delete(recursive: true);
@@ -339,8 +373,8 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       // Step 5: Delete ZIP file
       await zipFile.delete();
       
-      // Step 6: Save tour info
-      await _saveTourInfo(jobId, location, extractPath);
+      // Step 6: Save tour info using final_tour_id
+      await _saveTourToMyTours(finalTourId.toString(), response.bodyBytes, location);
       
       // Step 7: Auto-navigate to tour player
       setState(() {
@@ -370,6 +404,38 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     }
   }
 
+  Future<void> _saveTourToMyTours(String jobId, List<int> zipBytes, String location) async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final toursDir = Directory('${directory.path}/tours');
+      if (!await toursDir.exists()) {
+        await toursDir.create(recursive: true);
+      }
+      
+      final extractPath = '${toursDir.path}/${jobId}';
+      final extractDir = Directory(extractPath);
+      if (await extractDir.exists()) {
+        await extractDir.delete(recursive: true);
+      }
+      await extractDir.create(recursive: true);
+      
+      final archive = ZipDecoder().decodeBytes(zipBytes);
+      for (final file in archive) {
+        final filename = file.name;
+        if (file.isFile) {
+          final data = file.content as List<int>;
+          final extractedFile = File('${extractDir.path}/$filename');
+          await extractedFile.create(recursive: true);
+          await extractedFile.writeAsBytes(data);
+        }
+      }
+      
+      await _saveTourInfo(jobId, location, extractPath);
+    } catch (e) {
+      throw e;
+    }
+  }
+  
   Future<void> _saveTourInfo(String jobId, String location, String path) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -638,6 +704,32 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
                     ),
                   ),
             const SizedBox(height: 16),
+            // Language Selection for Tours mode
+            if (_appMode == 'Tours') ...[
+              LanguageSelector(
+                selectedLanguages: _selectedLanguages,
+                onLanguagesChanged: (languages) {
+                  setState(() {
+                    _selectedLanguages = languages;
+                  });
+                },
+                showEnglishNote: !_selectedLanguages.contains('en'),
+              ),
+              const SizedBox(height: 16),
+            ],
+            // Language Selection for Audio mode (Articles only)
+            if (_appMode == 'Audio' && _contentType == 'Article') ...[
+              LanguageSelector(
+                selectedLanguages: _selectedLanguages,
+                onLanguagesChanged: (languages) {
+                  setState(() {
+                    _selectedLanguages = languages;
+                  });
+                },
+                showEnglishNote: !_selectedLanguages.contains('en'),
+              ),
+              const SizedBox(height: 16),
+            ],
 
             Row(
               children: [
@@ -843,6 +935,15 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     try {
       Map<String, dynamic> tourData = _parseTourRequest(sanitizedInput);
       tourData['total_stops'] = stopCount; // Add custom stop count
+      
+      // Add language parameter for tour generation
+      if (_selectedLanguages.isNotEmpty && !_selectedLanguages.contains('en')) {
+        // If only non-English languages selected, use the first one
+        tourData['language'] = _selectedLanguages.first;
+      } else if (_selectedLanguages.length > 1) {
+        // If multiple languages including English, generate in English first
+        tourData['language'] = 'en';
+      }
       
       // Print debug info
       print('Generating background tour: ${tourData['location']}');
@@ -1150,16 +1251,23 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       final userId = prefs.getString('user_id') ?? 'anonymous';
       
       if (_contentType == 'Article') {
-        // Original article processing
+        // Original article processing with language parameter
+        final requestBody = {
+          'article_text': inputText,
+          'request_string': 'News Article',
+          'secret_id': userId,
+          'major_points_count': int.parse(_stopCountController.text),
+        };
+        
+        // Add language parameter if non-English languages selected
+        if (_selectedLanguages.isNotEmpty && !_selectedLanguages.contains('en')) {
+          requestBody['language'] = _selectedLanguages.first;
+        }
+        
         final response = await http.post(
           Uri.parse('http://$serverIp:5012/generate-news'),
           headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'article_text': inputText,
-            'request_string': 'News Article',
-            'secret_id': userId,
-            'major_points_count': int.parse(_stopCountController.text),
-          }),
+          body: jsonEncode(requestBody),
         );
 
         if (response.statusCode != 200) {
@@ -1169,7 +1277,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         final result = jsonDecode(response.body);
         final articleId = result['article_id'];
         
-        await _pollNewsAndAutoDownload(articleId, serverIp);
+        await _pollNewsAndAutoDownload(articleId, serverIp, _selectedLanguages);
         
       } else {
         // Newsletter processing
@@ -1186,7 +1294,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     }
   }
   
-  Future<void> _pollNewsAndAutoDownload(String articleId, String serverIp) async {
+  Future<void> _pollNewsAndAutoDownload(String articleId, String serverIp, [List<String>? languages]) async {
     const int maxAttempts = 60; // 10 minutes timeout
     int attempts = 0;
     
@@ -1211,7 +1319,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
             });
             
             // Auto-download and play
-            await _downloadAndSaveNews(articleId, serverIp);
+            await _downloadAndSaveNews(articleId, serverIp, languages);
             
           } else if (statusData['status'] == 'error' || statusData['status'] == 'failed') {
             timer.cancel();
@@ -1240,7 +1348,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     });
   }
   
-  Future<void> _downloadAndSaveNews(String articleId, String serverIp) async {
+  Future<void> _downloadAndSaveNews(String articleId, String serverIp, [List<String>? languages]) async {
     try {
       setState(() {
         _progress = 'Downloading article...';
@@ -1248,86 +1356,131 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       
       await DebugLogHelper.addDebugLog('NEWS: Starting download for article $articleId from $serverIp:5012');
       
-      final response = await http.get(
-        Uri.parse('http://$serverIp:5012/download/$articleId'),
-      );
+      // Download for each selected language
+      final languagesToDownload = languages ?? ['en'];
+      String lastSuccessfulPath = '';
+      Map<String, int> languageFileSizes = {};
+      List<String> translationFailures = [];
+      int successCount = 0;
       
-      await DebugLogHelper.addDebugLog('NEWS: Download response status: ${response.statusCode}');
-      await DebugLogHelper.addDebugLog('NEWS: Download response size: ${response.bodyBytes.length} bytes');
-      
-      if (response.statusCode != 200) {
-        throw Exception('Failed to download article');
-      }
-      
-      final directory = await getApplicationDocumentsDirectory();
-      final newsDir = Directory('${directory.path}/news');
-      if (!await newsDir.exists()) {
-        await newsDir.create(recursive: true);
-      }
-      
-      final zipPath = '${newsDir.path}/${articleId}.zip';
-      final zipFile = File(zipPath);
-      await zipFile.writeAsBytes(response.bodyBytes);
-      
-      await DebugLogHelper.addDebugLog('NEWS: ZIP file saved to: $zipPath');
-      await DebugLogHelper.addDebugLog('NEWS: ZIP file size: ${await zipFile.length()} bytes');
-      
-      final bytes = await zipFile.readAsBytes();
-      final archive = ZipDecoder().decodeBytes(bytes);
-      
-      await DebugLogHelper.addDebugLog('NEWS: ZIP archive contains ${archive.length} files');
-      
-      final extractPath = '${newsDir.path}/${articleId}';
-      final extractDir = Directory(extractPath);
-      if (await extractDir.exists()) {
-        await extractDir.delete(recursive: true);
-        await DebugLogHelper.addDebugLog('NEWS: Deleted existing directory: $extractPath');
-      }
-      await extractDir.create(recursive: true);
-      await DebugLogHelper.addDebugLog('NEWS: Created extract directory: $extractPath');
-      
-      for (final file in archive) {
-        final filename = file.name;
-        await DebugLogHelper.addDebugLog('NEWS: Processing archive file: $filename');
-        if (file.isFile) {
-          final data = file.content as List<int>;
-          final extractedFile = File('${extractDir.path}/$filename');
-          await extractedFile.create(recursive: true);
-          await extractedFile.writeAsBytes(data);
-          await DebugLogHelper.addDebugLog('NEWS: Extracted file: ${extractedFile.path} (${data.length} bytes)');
+      for (final language in languagesToDownload) {
+        await DebugLogHelper.addDebugLog('NEWS: Downloading article $articleId in language: $language');
+        
+        String downloadUrl = 'http://$serverIp:5012/download/$articleId';
+        if (language != 'en') {
+          downloadUrl += '?language=$language';
+          await DebugLogHelper.addDebugLog('NEWS: Adding language parameter: $language');
+        }
+        
+        await DebugLogHelper.addDebugLog('NEWS: Download URL: $downloadUrl');
+        
+        final response = await http.get(Uri.parse(downloadUrl));
+        
+        await DebugLogHelper.addDebugLog('NEWS: Download response status for $language: ${response.statusCode}');
+        await DebugLogHelper.addDebugLog('NEWS: Download response size for $language: ${response.bodyBytes.length} bytes');
+        
+        if (response.statusCode != 200) {
+          await DebugLogHelper.addDebugLog('NEWS: Download failed for $language: ${response.statusCode}');
+          translationFailures.add('$language: HTTP ${response.statusCode}');
+          continue; // Skip this language, try next
+        }
+        
+        // Store file size for this language
+        languageFileSizes[language] = response.bodyBytes.length;
+        
+        // Check for duplicate content by comparing file sizes between languages
+        bool isDuplicate = false;
+        String duplicateWith = '';
+        if (language != 'en' && languageFileSizes.length > 1) {
+          // Compare with other languages to detect duplicates
+          for (final otherLang in languageFileSizes.keys) {
+            if (otherLang != language && languageFileSizes[otherLang] == response.bodyBytes.length) {
+              await DebugLogHelper.addDebugLog('NEWS: ❌ SERVICES TRANSLATION FAILED - $language article has identical size to $otherLang (${response.bodyBytes.length} bytes)');
+              await DebugLogHelper.addDebugLog('NEWS: Skipping duplicate article creation for $language');
+              isDuplicate = true;
+              duplicateWith = otherLang;
+              break;
+            }
+          }
+        }
+        
+        if (isDuplicate) {
+          translationFailures.add('$language: Identical content to $duplicateWith (Services translation failed)');
+          continue; // Skip creating duplicate article
+        }
+        
+        await DebugLogHelper.addDebugLog('NEWS: ✅ SERVICES TRANSLATION SUCCESS - $language article size: ${response.bodyBytes.length} bytes (unique)');
+        
+        // Save article for this language
+        final extractPath = await _saveNewsLanguageVersion(articleId, response.bodyBytes, language);
+        if (extractPath.isNotEmpty) {
+          lastSuccessfulPath = extractPath;
+          successCount++;
         }
       }
-      
-      await zipFile.delete();
-      await DebugLogHelper.addDebugLog('NEWS: ZIP file deleted, extraction complete');
-      
-      // Verify index.html exists
-      final indexFile = File('${extractDir.path}/index.html');
-      final indexExists = await indexFile.exists();
-      await DebugLogHelper.addDebugLog('NEWS: index.html exists: $indexExists');
-      if (indexExists) {
-        final indexSize = await indexFile.length();
-        await DebugLogHelper.addDebugLog('NEWS: index.html size: $indexSize bytes');
-      }
-      
-      await _saveNewsInfo(articleId, extractPath);
       
       setState(() {
         _isGenerating = false;
         _progress = '';
       });
       
-      _showSuccess('News article ready!');
+      // Show results with translation failures
+      if (translationFailures.isNotEmpty) {
+        await DebugLogHelper.addDebugLog('NEWS: ❌ TRANSLATION FAILURES: ${translationFailures.join(", ")}');
+        
+        String message = '$successCount articles created successfully';
+        if (translationFailures.length == 1) {
+          message += '\n1 translation failed: ${translationFailures.first}';
+        } else {
+          message += '\n${translationFailures.length} translations failed';
+        }
+        
+        // Show detailed error dialog
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('⚠️ Translation Issues Detected'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('✅ $successCount articles created successfully'),
+                SizedBox(height: 8),
+                Text('❌ Translation failures:', style: TextStyle(fontWeight: FontWeight.bold)),
+                SizedBox(height: 4),
+                ...translationFailures.map((failure) => Padding(
+                  padding: EdgeInsets.only(left: 8, bottom: 4),
+                  child: Text('• $failure', style: TextStyle(fontSize: 12)),
+                )),
+                SizedBox(height: 8),
+                Text('Services Amazon-Q needs to fix the translation service.', 
+                     style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('OK'),
+              ),
+            ],
+          ),
+        );
+        
+        _showError(message);
+      } else {
+        _showSuccess('News article ready!');
+      }
+      
       _tourRequestController.clear();
       
-      // Auto-navigate to news player (like tours do)
-      if (mounted) {
-        await DebugLogHelper.addDebugLog('NEWS: Auto-opening news article');
+      // Auto-navigate to the last successfully saved article
+      if (mounted && lastSuccessfulPath.isNotEmpty) {
+        await DebugLogHelper.addDebugLog('NEWS: Auto-opening news article at: $lastSuccessfulPath');
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => NewsPlayerScreen(
-              articlePath: extractPath,
+              articlePath: lastSuccessfulPath,
               articleTitle: 'News Article',
             ),
           ),
@@ -1344,13 +1497,98 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     }
   }
   
-  Future<void> _saveNewsInfo(String articleId, String path) async {
+  Future<String> _saveNewsLanguageVersion(String articleId, List<int> zipBytes, String language) async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final newsDir = Directory('${directory.path}/news');
+      if (!await newsDir.exists()) {
+        await newsDir.create(recursive: true);
+      }
+      
+      // Create unique path for each language
+      final languageSuffix = language != 'en' ? '_$language' : '';
+      final extractPath = '${newsDir.path}/${articleId}$languageSuffix';
+      final extractDir = Directory(extractPath);
+      
+      if (await extractDir.exists()) {
+        await extractDir.delete(recursive: true);
+      }
+      await extractDir.create(recursive: true);
+      
+      await DebugLogHelper.addDebugLog('NEWS: Created extract directory: $extractPath');
+      
+      final archive = ZipDecoder().decodeBytes(zipBytes);
+      for (final file in archive) {
+        final filename = file.name;
+        await DebugLogHelper.addDebugLog('NEWS: Processing archive file: $filename');
+        if (file.isFile) {
+          final data = file.content as List<int>;
+          final extractedFile = File('${extractDir.path}/$filename');
+          await extractedFile.create(recursive: true);
+          await extractedFile.writeAsBytes(data);
+          await DebugLogHelper.addDebugLog('NEWS: Extracted file: ${extractedFile.path} (${data.length} bytes)');
+        }
+      }
+      
+      await DebugLogHelper.addDebugLog('NEWS: ZIP extraction complete for $language');
+      
+      // Verify index.html exists
+      final indexFile = File('${extractDir.path}/index.html');
+      final indexExists = await indexFile.exists();
+      await DebugLogHelper.addDebugLog('NEWS: index.html exists: $indexExists');
+      if (indexExists) {
+        final indexSize = await indexFile.length();
+        await DebugLogHelper.addDebugLog('NEWS: index.html size: $indexSize bytes');
+      }
+      
+      await _saveNewsInfo(articleId, extractPath, 'News Article', language);
+      
+      return extractPath;
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('NEWS: Error saving $language version: $e');
+      return '';
+    }
+  }
+  
+  Future<void> _saveNewsToMyNews(String articleId, List<int> zipBytes, String title) async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final newsDir = Directory('${directory.path}/news');
+      if (!await newsDir.exists()) {
+        await newsDir.create(recursive: true);
+      }
+      
+      final extractPath = '${newsDir.path}/${articleId}';
+      final extractDir = Directory(extractPath);
+      if (await extractDir.exists()) {
+        await extractDir.delete(recursive: true);
+      }
+      await extractDir.create(recursive: true);
+      
+      final archive = ZipDecoder().decodeBytes(zipBytes);
+      for (final file in archive) {
+        final filename = file.name;
+        if (file.isFile) {
+          final data = file.content as List<int>;
+          final extractedFile = File('${extractDir.path}/$filename');
+          await extractedFile.create(recursive: true);
+          await extractedFile.writeAsBytes(data);
+        }
+      }
+      
+      await _saveNewsInfo(articleId, extractPath, title);
+    } catch (e) {
+      throw e;
+    }
+  }
+  
+  Future<void> _saveNewsInfo(String articleId, String path, [String? customTitle, String? language]) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final news = prefs.getStringList('saved_news') ?? [];
       
       // Get the actual title from the generated article
-      String actualTitle = 'News Article';
+      String actualTitle = customTitle ?? 'News Article';
       try {
         final indexFile = File('$path/index.html');
         if (await indexFile.exists()) {
@@ -1364,23 +1602,28 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         await DebugLogHelper.addDebugLog('Error extracting title: $e');
       }
       
+      // Add language suffix to title if not English
+      final displayTitle = language != null && language != 'en' ? '$actualTitle ($language)' : actualTitle;
+      final uniqueArticleId = language != null && language != 'en' ? '${articleId}_$language' : articleId;
+      
       final articleInfo = {
-        'id': articleId,
-        'title': actualTitle,
+        'id': uniqueArticleId,
+        'title': displayTitle,
         'original_request': actualTitle,
         'path': path,
         'created': DateTime.now().toIso8601String(),
-        'article_id': articleId, // Fix Issue 2: Add article_id field for consistency
-        'article_type': 'Others', // Add article type
+        'article_id': uniqueArticleId,
+        'article_type': 'Others',
+        'language': language ?? 'en',
       };
       
-      await DebugLogHelper.addDebugLog('NEWS: Saving article info - ID: $articleId, Path: $path');
+      await DebugLogHelper.addDebugLog('NEWS: Saving article info - ID: $uniqueArticleId, Path: $path');
       await DebugLogHelper.addDebugLog('NEWS: Article info: ${jsonEncode(articleInfo)}');
       
       news.add(jsonEncode(articleInfo));
       await prefs.setStringList('saved_news', news);
       
-      // Fix Issue 2: Verify the article was saved
+      // Verify the article was saved
       final savedNews = prefs.getStringList('saved_news') ?? [];
       await DebugLogHelper.addDebugLog('NEWS: Article saved successfully. Total saved articles: ${savedNews.length}');
       await DebugLogHelper.addDebugLog('NEWS: Last saved article: ${savedNews.isNotEmpty ? savedNews.last : "none"}');

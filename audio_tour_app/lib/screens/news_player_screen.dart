@@ -571,8 +571,40 @@ class _NewsPlayerScreenState extends State<NewsPlayerScreen> {
     }
   }
 
-  void _showHelpDialog(String helpJsonString) {
+  void _showHelpDialog(String helpJsonString) async {
     try {
+      // Option 1: Try to read help_commands.txt file first (Services fix)
+      final helpFile = File('${widget.articlePath}/help_commands.txt');
+      if (await helpFile.exists()) {
+        final helpText = await helpFile.readAsString();
+        await DebugLogHelper.addDebugLog('NEWS: Using help_commands.txt file for help dialog');
+        
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text('Voice Commands'),
+              content: SingleChildScrollView(
+                child: Text(
+                  helpText,
+                  style: TextStyle(fontSize: 14),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text('Close'),
+                ),
+              ],
+            );
+          },
+        );
+        return;
+      }
+      
+      await DebugLogHelper.addDebugLog('NEWS: help_commands.txt not found, trying JSON parsing');
+      
+      // Fallback: Try to parse JSON from HTML (original method)
       final helpData = json.decode(helpJsonString.replaceAll('"', '"'));
       
       showDialog(
@@ -615,12 +647,33 @@ class _NewsPlayerScreenState extends State<NewsPlayerScreen> {
         },
       );
     } catch (e) {
-      // Fallback simple dialog
+      await DebugLogHelper.addDebugLog('NEWS: Help dialog error: $e, using hardcoded fallback');
+      
+      // Option 2: Hardcoded English help text (final fallback)
+      const String fallbackHelpText = '''Voice Commands:
+
+Say 'Play' to start or resume audio
+Say 'Pause' to stop audio
+Say 'Next topic' or 'Previous topic' to navigate
+Say 'Forward 10 seconds' or 'Backward 5 seconds' to skip
+Say 'Repeat' to restart current audio
+Say 'Play topic' + number/name to jump to sections
+Say 'Play summary' for article summary
+Say 'Play full article' for complete text
+Say 'List major topics' to hear all sections
+Say 'Next article' or 'Previous article' to switch
+Say 'What are my options' to hear this help again''';
+      
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
           title: Text('Voice Commands'),
-          content: Text('Say "What are my options" to hear all available voice commands.'),
+          content: SingleChildScrollView(
+            child: Text(
+              fallbackHelpText,
+              style: TextStyle(fontSize: 14),
+            ),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),

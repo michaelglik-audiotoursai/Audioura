@@ -64,6 +64,11 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
         foregroundColor: Colors.white,
         actions: [
           IconButton(
+            icon: Icon(Icons.help_outline),
+            onPressed: _showTourHelpDialog,
+            tooltip: 'Voice Commands Help',
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => _controller?.reload(),
           ),
@@ -95,6 +100,39 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                 await DebugLogHelper.addDebugLog('VOICE: WebView loaded: $url');
                 await DebugLogHelper.addDebugLog('VOICE: Getting tour info');
                 getTourInfo();
+                
+                // Auto-start tour playback
+                await Future.delayed(Duration(milliseconds: 2000)); // Wait longer for page to fully load
+                try {
+                  await controller.evaluateJavascript(source: """
+                    console.log('Attempting auto-start...');
+                    if (typeof startTour === 'function') {
+                      console.log('Found startTour function, calling it');
+                      startTour();
+                    } else {
+                      console.log('No startTour function, trying audio1');
+                      var audio1 = document.getElementById('audio1');
+                      if (audio1) {
+                        console.log('Found audio1 element, playing');
+                        audio1.play().then(() => {
+                          console.log('Audio1 started successfully');
+                        }).catch(e => {
+                          console.log('Audio1 play failed:', e);
+                        });
+                      } else {
+                        console.log('No audio1 element found');
+                        var firstAudio = document.querySelector('audio');
+                        if (firstAudio) {
+                          console.log('Found first audio element, playing');
+                          firstAudio.play();
+                        }
+                      }
+                    }
+                  """);
+                  await DebugLogHelper.addDebugLog('TOUR_PLAYER: Auto-start command executed');
+                } catch (e) {
+                  await DebugLogHelper.addDebugLog('TOUR_PLAYER: Auto-start failed: $e');
+                }
               },
               onReceivedError: (InAppWebViewController controller, WebResourceRequest request, WebResourceError error) {
                 DebugLogHelper.addDebugLog('VOICE: WebView load error: ${error.description} for URL: ${request.url}');
@@ -115,6 +153,70 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
       ),
     );
   }
-
+  void _showTourHelpDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('🎤 Tour Voice Commands'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Audio Control:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                SizedBox(height: 4),
+                Text('• Say "Play" to start or resume audio'),
+                Text('• Say "Pause" to stop audio'),
+                Text('• Say "Repeat" to restart current stop'),
+                SizedBox(height: 12),
+                Text(
+                  'Navigation:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                SizedBox(height: 4),
+                Text('• Say "Next stop" to move forward'),
+                Text('• Say "Previous stop" to move back'),
+                Text('• Say "Go to stop [number]" to jump to specific stop'),
+                SizedBox(height: 12),
+                Text(
+                  'Seeking:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                SizedBox(height: 4),
+                Text('• Say "Forward 10 seconds" to skip ahead'),
+                Text('• Say "Backward 5 seconds" to skip back'),
+                SizedBox(height: 12),
+                Text(
+                  'Tour Switching:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                SizedBox(height: 4),
+                Text('• Say "Next tour" to switch tours'),
+                Text('• Say "Previous tour" to go back'),
+                SizedBox(height: 12),
+                Text(
+                  'Activation:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blue),
+                ),
+                SizedBox(height: 4),
+                Text('• Press microphone button or triple-press volume buttons'),
+                Text('• Speak clearly after the beep'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
 }

@@ -17,9 +17,11 @@ import '../screens/debug_log_viewer_screen.dart';
 import '../services/subscription_service.dart';
 import '../services/subscription_encryption_service.dart';
 import '../services/device_service.dart';
+import '../services/translation_service.dart';
 // import '../services/credential_storage_service.dart';  // TEMPORARILY DISABLED - CAUSING BUILD ERRORS
 // import '../services/subscription_article_storage.dart';  // TEMPORARILY DISABLED - CAUSING BUILD ERRORS
 import '../widgets/subscription_credential_dialog.dart';
+import '../widgets/language_selector.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -40,6 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _locationHistory = [];
   List<Map<String, dynamic>> _newsletters = [];
   String _selectedTypeFilter = 'All';
+  List<String> _selectedLanguages = ['en'];
   final List<String> _articleTypes = [
     'All',
     'News and Politics',
@@ -563,31 +566,50 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     } else {
-      // Show download dialog for tours
+      // Show download dialog for tours with language selection
+      List<String> selectedLanguages = ['en'];
+      
       showDialog(
         context: context,
-        builder: (context) => AlertDialog(
-          title: Text(item['name']),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Distance: ${item['distance_km']} km'),
-              Text('Downloads: ${item['popularity']}'),
-              SizedBox(height: 10),
-              Text(item['request_string']),
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: Text(item['name']),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Distance: ${item['distance_km']} km'),
+                Text('Downloads: ${item['popularity']}'),
+                SizedBox(height: 10),
+                Text(item['request_string']),
+                SizedBox(height: 16),
+                Text('Select Languages:', style: TextStyle(fontWeight: FontWeight.bold)),
+                SizedBox(height: 8),
+                LanguageSelector(
+                  selectedLanguages: selectedLanguages,
+                  onLanguagesChanged: (languages) {
+                    setDialogState(() {
+                      selectedLanguages = languages;
+                    });
+                  },
+                  showEnglishNote: !selectedLanguages.contains('en'),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Close'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _downloadSingleTour(item['id'], selectedLanguages);
+                },
+                child: Text('Download Tour'),
+              ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Close'),
-            ),
-            ElevatedButton(
-              onPressed: () => _downloadTour(item['id']),
-              child: Text('Download Tour'),
-            ),
-          ],
         ),
       );
     }
@@ -645,6 +667,7 @@ class _HomeScreenState extends State<HomeScreen> {
   
   void _showMultipleTourDialog(List tours) {
     List<bool> selectedTours = List.filled(tours.length, false);
+    List<String> selectedLanguages = ['en'];
     
     showDialog(
       context: context,
@@ -653,9 +676,19 @@ class _HomeScreenState extends State<HomeScreen> {
           title: Text('Select Tours (${tours.length} available)'),
           content: Container(
             width: double.maxFinite,
-            height: MediaQuery.of(context).size.height * 0.4,
+            height: MediaQuery.of(context).size.height * 0.5,
             child: Column(
               children: [
+                LanguageSelector(
+                  selectedLanguages: selectedLanguages,
+                  onLanguagesChanged: (languages) {
+                    setDialogState(() {
+                      selectedLanguages = languages;
+                    });
+                  },
+                  showEnglishNote: !selectedLanguages.contains('en'),
+                ),
+                SizedBox(height: 16),
                 Row(
                   children: [
                     Expanded(
@@ -732,7 +765,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   }
                 }
                 if (selected.isNotEmpty) {
-                  _downloadMultipleTours(selected);
+                  _downloadMultipleTours(selected, selectedLanguages);
                 }
               },
               child: Text('Download Selected (${selectedTours.where((s) => s).length})'),
@@ -743,7 +776,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
   
-  Future<void> _downloadMultipleTours(List<Map<String, dynamic>> tours) async {
+  Future<void> _downloadMultipleTours(List<Map<String, dynamic>> tours, [List<String>? languages]) async {
     // Check which tours are already downloaded
     final prefs = await SharedPreferences.getInstance();
     final savedTours = prefs.getStringList('saved_tours') ?? [];
@@ -780,7 +813,7 @@ class _HomeScreenState extends State<HomeScreen> {
     int successCount = 0;
     for (final tour in toursToDownload) {
       try {
-        await _downloadSingleTour(tour['id']);
+        await _downloadSingleTour(tour['id'], languages);
         successCount++;
       } catch (e) {
         // Continue with next tour
@@ -967,20 +1000,83 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
   
-  Future<void> _downloadSingleTour(int tourId) async {
+  Future<void> _downloadSingleTour(int tourId, [List<String>? languages]) async {
     final prefs = await SharedPreferences.getInstance();
     final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
-    final url = 'http://$serverIp:5005/download-tour/$tourId';
     
-    final response = await http.get(
-      Uri.parse(url),
-      headers: {'Content-Type': 'application/json'},
-    ).timeout(Duration(seconds: 120));
-
-    if (response.statusCode == 200) {
-      await _saveTourToMyTours(tourId, response.bodyBytes);
-    } else {
-      throw Exception('Failed to download tour: ${response.statusCode}');
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Expanded(child: Text('Downloading tour...')),
+          ],
+        ),
+      ),
+    );
+    
+    try {
+      // Always download English version first
+      final url = 'http://$serverIp:5005/download-tour/$tourId';
+      final response = await http.get(Uri.parse(url)).timeout(Duration(seconds: 120));
+      if (response.statusCode == 200) {
+        await _saveTourToMyTours(tourId, response.bodyBytes);
+      } else {
+        throw Exception('Failed to download tour: ${response.statusCode}');
+      }
+      
+      // If languages specified, request translation from Services
+      if (languages != null && languages.isNotEmpty) {
+        final nonEnglishLanguages = languages.where((lang) => lang != 'en').toList();
+        if (nonEnglishLanguages.isNotEmpty) {
+          Navigator.pop(context); // Close download dialog
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              content: Row(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 20),
+                  Expanded(child: Text('Requesting translation to ${nonEnglishLanguages.join(", ")}...')),
+                ],
+              ),
+            ),
+          );
+          
+          // Send language parameter to Services for tour generation
+          // Services should handle translation internally
+          await DebugLogHelper.addDebugLog('HOME: Requesting tour translation for languages: ${nonEnglishLanguages.join(", ")}');
+          
+          Navigator.pop(context); // Close translation dialog
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Translation request sent to Services. Check Services Amazon-Q for implementation status.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      } else {
+        Navigator.pop(context); // Close download dialog
+      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Tour downloaded successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error downloading tour: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
   
@@ -1765,7 +1861,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
   
-  Future<void> _processSelectedArticles(List<Map<String, dynamic>> selectedArticles, int newsletterId) async {
+  Future<void> _processSelectedArticles(List<Map<String, dynamic>> selectedArticles, int newsletterId, [List<String>? languages]) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
@@ -1778,13 +1874,15 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               CircularProgressIndicator(),
               SizedBox(width: 20),
-              Expanded(child: Text('Adding ${selectedArticles.length} articles to Listen page...')),
+              Expanded(child: Text('Downloading ${selectedArticles.length} articles in ${languages?.length ?? 1} language(s)...\nTotal: ${selectedArticles.length * (languages?.length ?? 1)} downloads')),
             ],
           ),
         ),
       );
       
       final savedNews = prefs.getStringList('saved_news') ?? [];
+      await DebugLogHelper.addDebugLog('ARTICLE_PROCESS: Starting with ${savedNews.length} existing articles in storage');
+      
       final existingArticleIds = <String>{};
       
       // Get existing article IDs to avoid duplicates
@@ -1821,242 +1919,18 @@ class _HomeScreenState extends State<HomeScreen> {
           
           await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: Starting download for article: $articleId ($title)');
           
-          // Get device ID for secure download request
-          final deviceId = await DeviceService.getUserId();
-          
-          final downloadResponse = await http.get(
-            Uri.parse('http://$serverIp:5012/download/$articleId?user_id=$deviceId'),
-            headers: {'Content-Type': 'application/json'},
-          ).timeout(Duration(seconds: 30));
-          
-          await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: Download response for $articleId: ${downloadResponse.statusCode}, ${downloadResponse.bodyBytes.length} bytes');
-          
-          if (downloadResponse.statusCode == 200) {
-            // Phase 3: Check if this is a subscription article and store appropriately
-            final isSubscriptionArticle = subscriptionDomain != null && subscriptionDomain.isNotEmpty;
-            
-            if (isSubscriptionArticle) {
-              // Store as subscription article with enhanced metadata (DISABLED - BUILD ERROR)
-              // final stored = await SubscriptionService.storeSubscriptionArticle(
-              //   articleId: articleId,
-              //   title: title,
-              //   domain: subscriptionDomain,
-              //   zipBytes: downloadResponse.bodyBytes,
-              //   author: article['author'] ?? 'Unknown Author',
-              //   articleType: article['article_type'] ?? 'Others',
-              // );
-              
-              // Temporary: Always treat as stored for now
-              final stored = true;
-              
-              if (stored) {
-                // Get the actual storage path for subscription articles (DISABLED - BUILD ERROR)
-                // final storedPath = await SubscriptionService.getStoredArticlePath(articleId);
-                // Fix: Create proper directory path for subscription articles
-                final truncatedTitle = title.length > 50 ? title.substring(0, 50) : title;
-                final safeName = truncatedTitle.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
-                String storedPath;
-                
-                if (kIsWeb) {
-                  // Web platform: store in SharedPreferences
-                  storedPath = 'web_subscription/${safeName}_$articleId';
-                  
-                  // Store ZIP in SharedPreferences
-                  final zipBase64 = base64Encode(downloadResponse.bodyBytes);
-                  await prefs.setString('subscription_zip_${safeName}_$articleId', zipBase64);
-                  
-                  // Extract and store individual files
-                  final archive = ZipDecoder().decodeBytes(downloadResponse.bodyBytes);
-                  for (final file in archive) {
-                    if (file.isFile) {
-                      final fileBase64 = base64Encode(file.content as List<int>);
-                      await prefs.setString('subscription_file_${safeName}_${articleId}_${file.name}', fileBase64);
-                    }
-                  }
-                } else {
-                  // Mobile platform: create actual directory
-                  final appDir = await getApplicationDocumentsDirectory();
-                  final subscriptionDir = Directory('${appDir.path}/subscription/${safeName}_$articleId');
-                  await subscriptionDir.create(recursive: true);
-                  
-                  // Extract ZIP to proper directory
-                  final zipFile = File('${subscriptionDir.path}/article.zip');
-                  await zipFile.writeAsBytes(downloadResponse.bodyBytes);
-                  
-                  final archive = ZipDecoder().decodeBytes(downloadResponse.bodyBytes);
-                  for (final file in archive) {
-                    if (file.isFile) {
-                      final extractedFile = File('${subscriptionDir.path}/${file.name}');
-                      await extractedFile.create(recursive: true);
-                      await extractedFile.writeAsBytes(file.content as List<int>);
-                    }
-                  }
-                  
-                  storedPath = subscriptionDir.path;
-                }
-                await DebugLogHelper.addDebugLog('SUBSCRIPTION_DOWNLOAD: Article $articleId stored at path: $storedPath');
-                
-                // Add to regular news list with actual path
-                final articleData = {
-                  'title': title,
-                  'path': storedPath, // Use fallback path
-                  'created': DateTime.now().toIso8601String(),
-                  'original_request': title,
-                  'article_id': articleId,
-                  'article_type': article['article_type'] ?? 'Others',
-                  'subscription_domain': subscriptionDomain,
-                  'is_subscription': true,
-                  'is_web_storage': kIsWeb,
-                };
-                
-                savedNews.add(json.encode(articleData));
-                addedCount++;
-                await DebugLogHelper.addDebugLog('SUBSCRIPTION_DOWNLOAD: Added subscription article to saved_news: $title');
-              } else {
-                failedCount++;
-                failureReasons.add('$title: Failed to store subscription article locally');
-                await DebugLogHelper.addDebugLog('SUBSCRIPTION_DOWNLOAD: Failed to store subscription article: $title');
-              }
-            } else {
-              // Regular article processing (existing logic)
-              final truncatedTitle = title.length > 50 ? title.substring(0, 50) : title;
-              final safeName = truncatedTitle.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
-              String articleDirPath;
-              
-              if (kIsWeb) {
-                // Web platform: use SharedPreferences storage
-                articleDirPath = 'web_news/${safeName}_$articleId';
-              } else {
-                // Mobile platform: create actual directory
-                final appDir = await getApplicationDocumentsDirectory();
-                final articleDir = Directory('${appDir.path}/news/${safeName}_$articleId');
-                await articleDir.create(recursive: true);
-                articleDirPath = articleDir.path;
-              }
-              
-              if (kIsWeb) {
-                // Web platform: store in SharedPreferences
-                final zipBase64 = base64Encode(downloadResponse.bodyBytes);
-                await prefs.setString('article_zip_${safeName}_$articleId', zipBase64);
-                
-                final archive = ZipDecoder().decodeBytes(downloadResponse.bodyBytes);
-                await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: ZIP contains ${archive.length} files for article: $articleId');
-                
-                for (final file in archive) {
-                  if (file.isFile) {
-                    final fileBase64 = base64Encode(file.content as List<int>);
-                    await prefs.setString('article_file_${safeName}_${articleId}_${file.name}', fileBase64);
-                    await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: Stored ${file.name} (${file.content.length} bytes) for article: $articleId');
-                  }
-                }
-              } else {
-                // Mobile platform: save files normally
-                final zipFile = File('$articleDirPath/article.zip');
-                await zipFile.writeAsBytes(downloadResponse.bodyBytes);
-                
-                final archive = ZipDecoder().decodeBytes(downloadResponse.bodyBytes);
-                await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: ZIP contains ${archive.length} files for article: $articleId');
-                
-                for (final file in archive) {
-                  if (file.isFile) {
-                    final extractedFile = File('$articleDirPath/${file.name}');
-                    await extractedFile.create(recursive: true);
-                    await extractedFile.writeAsBytes(file.content as List<int>);
-                    await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: Extracted ${file.name} (${file.content.length} bytes) for article: $articleId');
-                  }
-                }
-              }
-              
-              // Extract and save text content for search
-              try {
-                String textContent = '';
-                
-                if (kIsWeb) {
-                  // Web platform: extract from stored files
-                  final indexHtmlKey = 'article_file_${safeName}_${articleId}_index.html';
-                  final indexHtmlBase64 = prefs.getString(indexHtmlKey);
-                  if (indexHtmlBase64 != null) {
-                    final htmlBytes = base64Decode(indexHtmlBase64);
-                    final htmlContent = String.fromCharCodes(htmlBytes);
-                    await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: index.html content length for $articleId: ${htmlContent.length} chars');
-                    
-                    // Simple text extraction - remove HTML tags
-                    textContent = htmlContent
-                        .replaceAll(RegExp(r'<[^>]*>'), ' ')
-                        .replaceAll(RegExp(r'\s+'), ' ')
-                        .trim();
-                  }
-                  
-                  // Store search content in SharedPreferences
-                  await prefs.setString('article_search_${safeName}_$articleId', textContent);
-                } else {
-                  // Mobile platform: extract from files
-                  final indexFile = File('$articleDirPath/index.html');
-                  if (await indexFile.exists()) {
-                    final htmlContent = await indexFile.readAsString();
-                    await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: index.html content length for $articleId: ${htmlContent.length} chars');
-                    
-                    // Simple text extraction - remove HTML tags
-                    textContent = htmlContent
-                        .replaceAll(RegExp(r'<[^>]*>'), ' ')
-                        .replaceAll(RegExp(r'\s+'), ' ')
-                        .trim();
-                  } else {
-                    await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: index.html not found for article: $articleId');
-                  }
-                  
-                  final textFile = File('$articleDirPath/audiotours_search_content.txt');
-                  await textFile.writeAsString(textContent);
-                }
-                
-                await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: Saved search content for $articleId: ${textContent.length} chars');
-                if (textContent.length > 0) {
-                  await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: Text preview for $articleId: ${textContent.substring(0, textContent.length > 200 ? 200 : textContent.length)}...');
-                }
-              } catch (e) {
-                await DebugLogHelper.addDebugLog('ARTICLE_EXTRACT: Text extraction failed for $articleId: $e');
-              }
-              
-              final articleData = {
-                'title': title,
-                'path': articleDirPath,
-                'created': DateTime.now().toIso8601String(),
-                'original_request': title,
-                'article_id': articleId,
-                'article_type': article['article_type'] ?? 'Others',
-                'is_web_storage': kIsWeb,
-              };
-              
-              savedNews.add(json.encode(articleData));
-              addedCount++;
-            }
-          } else if (downloadResponse.statusCode == 403) {
-            // Handle subscription required (new security fix)
-            failedCount++;
-            try {
-              final errorData = json.decode(downloadResponse.body);
-              final errorMessage = errorData['error'] ?? 'Subscription required';
-              final domain = errorData['subscription_domain'] ?? subscriptionDomain;
-              
-              if (domain != null && domain.isNotEmpty) {
-                failureReasons.add('$title: Subscription required for $domain. Please enter valid credentials.');
-              } else {
-                failureReasons.add('$title: $errorMessage');
-              }
-            } catch (e) {
-              failureReasons.add('$title: Subscription required - please enter credentials');
-            }
-          } else {
-            // Handle other download failures
-            failedCount++;
-            try {
-              final errorData = json.decode(downloadResponse.body);
-              final errorMessage = errorData['error'] ?? 'Download failed';
-              failureReasons.add('$title: $errorMessage');
-            } catch (e) {
-              failureReasons.add('$title: Server error ${downloadResponse.statusCode}');
+          // Handle translation if languages specified - Services handles this internally
+          if (languages != null && languages.isNotEmpty) {
+            final nonEnglishLanguages = languages.where((lang) => lang != 'en').toList();
+            if (nonEnglishLanguages.isNotEmpty) {
+              await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: Language selection: ${nonEnglishLanguages.join(", ")} - Services will handle translation internally');
+              // Services will handle translation when we download with language parameter
             }
           }
+          
+          // Download for all selected languages
+          await _downloadAndSaveArticle(articleId, title, article, languages);
+          addedCount++;
         } catch (e) {
           failedCount++;
           final title = article['title'] ?? 'Unknown Article';
@@ -2064,11 +1938,15 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
       
-      await prefs.setStringList('saved_news', savedNews);
+      // CRITICAL: Reload saved_news after all downloads complete
+      final finalSavedNews = prefs.getStringList('saved_news') ?? [];
+      await DebugLogHelper.addDebugLog('ARTICLE_PROCESS: Completed with ${finalSavedNews.length} total articles in storage');
+      
       Navigator.pop(context);
       
       // Show detailed results with error handling
-      String message = '$addedCount articles added to Listen page';
+      final totalDownloads = addedCount * (languages?.length ?? 1);
+      String message = '$totalDownloads articles added to Listen page';
       Color backgroundColor = Colors.green;
       
       if (failedCount > 0) {
@@ -2084,7 +1962,7 @@ class _HomeScreenState extends State<HomeScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('✅ $addedCount articles downloaded successfully'),
+                Text('✅ $totalDownloads articles downloaded successfully'),
                 if (failedCount > 0) ...[
                   SizedBox(height: 8),
                   Text('❌ $failedCount articles failed:', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -2126,6 +2004,136 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
   
+  Future<void> _downloadAndSaveArticle(String articleId, String title, Map<String, dynamic> article, [List<String>? languages]) async {
+    final prefs = await SharedPreferences.getInstance();
+    final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
+    final deviceId = await DeviceService.getUserId();
+    final subscriptionDomain = article['subscription_domain'];
+    
+    // Download for each selected language
+    final languagesToDownload = languages ?? ['en'];
+    int englishFileSize = 0;
+    
+    for (final language in languagesToDownload) {
+      await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: Downloading article $articleId in language: $language');
+      
+      String downloadUrl = 'http://$serverIp:5012/download/$articleId?user_id=$deviceId';
+      if (language != 'en') {
+        downloadUrl += '&language=$language';
+        await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: Adding language parameter: $language');
+      }
+      
+      await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: Download URL: $downloadUrl');
+      
+      final downloadResponse = await http.get(
+        Uri.parse(downloadUrl),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(Duration(seconds: 30));
+      
+      await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: Response status for $language: ${downloadResponse.statusCode}');
+      
+      if (downloadResponse.statusCode != 200) {
+        await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: Download failed for $language: ${downloadResponse.statusCode}');
+        continue; // Skip this language, try next
+      }
+      
+      await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: Successfully downloaded article in $language (${downloadResponse.bodyBytes.length} bytes)');
+      
+      // Store English file size for comparison
+      if (language == 'en') {
+        englishFileSize = downloadResponse.bodyBytes.length;
+      }
+      
+      // CRITICAL: Check if Services returned translated content
+      if (language != 'en' && downloadResponse.bodyBytes.length > 0) {
+        if (englishFileSize > 0 && downloadResponse.bodyBytes.length == englishFileSize) {
+          await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: ❌ SERVICES TRANSLATION FAILED - $language article has identical size to English ($englishFileSize bytes)');
+          await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: Skipping duplicate article creation for $language');
+          continue; // Skip creating duplicate article
+        } else {
+          await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: ✅ SERVICES TRANSLATION SUCCESS - $language article size: ${downloadResponse.bodyBytes.length} bytes (different from English: $englishFileSize bytes)');
+        }
+      }
+      
+      await _saveArticleToDevice(articleId, title, article, downloadResponse.bodyBytes, language);
+    }
+  }
+  
+  Future<void> _saveArticleToDevice(String articleId, String title, Map<String, dynamic> article, List<int> zipBytes, String language) async {
+    final prefs = await SharedPreferences.getInstance();
+    final subscriptionDomain = article['subscription_domain'];
+    
+    final savedNews = prefs.getStringList('saved_news') ?? [];
+    final isSubscriptionArticle = subscriptionDomain != null && subscriptionDomain.isNotEmpty;
+    
+    final truncatedTitle = title.length > 50 ? title.substring(0, 50) : title;
+    final safeName = truncatedTitle.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+    
+    // Create unique path for each language
+    final languageSuffix = language != 'en' ? '_$language' : '';
+    String articleDirPath;
+    
+    if (kIsWeb) {
+      articleDirPath = isSubscriptionArticle ? 'web_subscription/${safeName}_${articleId}$languageSuffix' : 'web_news/${safeName}_${articleId}$languageSuffix';
+      final zipBase64 = base64Encode(zipBytes);
+      await prefs.setString('${isSubscriptionArticle ? "subscription" : "article"}_zip_${safeName}_${articleId}$languageSuffix', zipBase64);
+      
+      final archive = ZipDecoder().decodeBytes(zipBytes);
+      for (final file in archive) {
+        if (file.isFile) {
+          final fileBase64 = base64Encode(file.content as List<int>);
+          await prefs.setString('${isSubscriptionArticle ? "subscription" : "article"}_file_${safeName}_${articleId}${languageSuffix}_${file.name}', fileBase64);
+        }
+      }
+    } else {
+      final appDir = await getApplicationDocumentsDirectory();
+      final articleDir = Directory('${appDir.path}/${isSubscriptionArticle ? "subscription" : "news"}/${safeName}_${articleId}$languageSuffix');
+      await articleDir.create(recursive: true);
+      articleDirPath = articleDir.path;
+      
+      final zipFile = File('$articleDirPath/article.zip');
+      await zipFile.writeAsBytes(zipBytes);
+      
+      final archive = ZipDecoder().decodeBytes(zipBytes);
+      for (final file in archive) {
+        if (file.isFile) {
+          final extractedFile = File('$articleDirPath/${file.name}');
+          await extractedFile.create(recursive: true);
+          await extractedFile.writeAsBytes(file.content as List<int>);
+        }
+      }
+    }
+    
+    final displayTitle = language != 'en' ? '$title ($language)' : title;
+    
+    await DebugLogHelper.addDebugLog('ARTICLE_SAVE: Creating article with ID: ${articleId}$languageSuffix, Title: $displayTitle');
+    
+    final articleData = {
+      'title': displayTitle,
+      'path': articleDirPath,
+      'created': DateTime.now().toIso8601String(),
+      'original_request': title,
+      'article_id': '${articleId}$languageSuffix',
+      'article_type': article['article_type'] ?? 'Others',
+      'language': language,
+      'is_web_storage': kIsWeb,
+    };
+    
+    if (isSubscriptionArticle) {
+      articleData['subscription_domain'] = subscriptionDomain;
+      articleData['is_subscription'] = true;
+    }
+    
+    savedNews.add(json.encode(articleData));
+    await prefs.setStringList('saved_news', savedNews);
+    
+    // CRITICAL: Verify article was actually saved
+    final verifyNews = prefs.getStringList('saved_news') ?? [];
+    await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: Verified storage - now ${verifyNews.length} articles total');
+    
+    await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: Saved article "$displayTitle" to Listen page');
+  }
+  
   void _showArticleSelectionDialog(List<Map<String, dynamic>> articles, int newsletterId, String newsletterName) async {
     List<bool> selectedArticles = List.filled(articles.length, false);
     String dialogFilter = 'All';
@@ -2133,6 +2141,7 @@ class _HomeScreenState extends State<HomeScreen> {
     TextEditingController searchController = TextEditingController();
     Set<String> subscribedDomains = <String>{}; // Track domains with credentials
     Map<String, bool> articleStorageStatus = {}; // Track local storage status
+    List<String> selectedLanguages = ['en']; // Language selection for articles
     
     // Phase 3: Check for stored credentials and local storage (DISABLED - BUILD ERROR)
     for (final article in articles) {
@@ -2227,32 +2236,46 @@ class _HomeScreenState extends State<HomeScreen> {
                   // Select All / Clear All buttons
                   Container(
                     padding: EdgeInsets.all(16),
-                    child: Row(
+                    child: Column(
                       children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              setDialogState(() {
-                                for (int i = 0; i < selectedArticles.length; i++) {
-                                  selectedArticles[i] = true;
-                                }
-                              });
-                            },
-                            child: Text('Select All'),
-                          ),
+                        LanguageSelector(
+                          selectedLanguages: selectedLanguages,
+                          onLanguagesChanged: (languages) {
+                            setDialogState(() {
+                              selectedLanguages = languages;
+                            });
+                          },
+                          showEnglishNote: !selectedLanguages.contains('en'),
                         ),
-                        SizedBox(width: 16),
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {
-                              setDialogState(() {
-                                for (int i = 0; i < selectedArticles.length; i++) {
-                                  selectedArticles[i] = false;
-                                }
-                              });
-                            },
-                            child: Text('Clear All'),
-                          ),
+                        SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  setDialogState(() {
+                                    for (int i = 0; i < selectedArticles.length; i++) {
+                                      selectedArticles[i] = true;
+                                    }
+                                  });
+                                },
+                                child: Text('Select All'),
+                              ),
+                            ),
+                            SizedBox(width: 16),
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () {
+                                  setDialogState(() {
+                                    for (int i = 0; i < selectedArticles.length; i++) {
+                                      selectedArticles[i] = false;
+                                    }
+                                  });
+                                },
+                                child: Text('Clear All'),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -2524,7 +2547,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 return;
                               }
                               
-                              _processSelectedArticles(selected, newsletterId);
+                              _processSelectedArticles(selected, newsletterId, selectedLanguages);
                             },
                             child: Text('Add Selected (${selectedArticles.where((s) => s).length})'),
                           ),
@@ -2802,16 +2825,23 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
   
-  List<Map<String, dynamic>> _getFilteredNewsletters() {
+  Future<List<Map<String, dynamic>>> _getFilteredNewsletters() async {
     final now = DateTime.now();
     final oneMonthAgo = now.subtract(Duration(days: 30));
     
+    await DebugLogHelper.addDebugLog('HOME: Filtering ${_newsletters.length} newsletters - date filter: after ${oneMonthAgo.toIso8601String()}');
+    
     // Filter by type and date, limit to 12 latest
-    var filtered = _newsletters.where((newsletter) {
+    final filtered = <Map<String, dynamic>>[];
+    
+    for (final newsletter in _newsletters) {
       // Filter by type
       if (_selectedTypeFilter != 'All') {
         final newsletterType = newsletter['type'] ?? 'Others';
-        if (newsletterType != _selectedTypeFilter) return false;
+        if (newsletterType != _selectedTypeFilter) {
+          await DebugLogHelper.addDebugLog('HOME: Newsletter ${newsletter['name']} filtered out by type: $newsletterType != $_selectedTypeFilter');
+          continue;
+        }
       }
       
       // Filter by date (last 30 days)
@@ -2819,13 +2849,22 @@ class _HomeScreenState extends State<HomeScreen> {
       if (createdAt != null) {
         try {
           final date = DateTime.parse(createdAt);
-          return date.isAfter(oneMonthAgo);
+          final isAfterFilter = date.isAfter(oneMonthAgo);
+          if (!isAfterFilter) {
+            await DebugLogHelper.addDebugLog('HOME: Newsletter ${newsletter['name']} filtered out by date: $createdAt is before $oneMonthAgo');
+            continue;
+          }
         } catch (e) {
-          return true; // Include if date parsing fails
+          await DebugLogHelper.addDebugLog('HOME: Newsletter ${newsletter['name']} date parse error: $e, including anyway');
         }
+      } else {
+        await DebugLogHelper.addDebugLog('HOME: Newsletter ${newsletter['name']} has no created_at, including anyway');
       }
-      return true;
-    }).toList();
+      
+      filtered.add(newsletter);
+    }
+    
+    await DebugLogHelper.addDebugLog('HOME: After filtering: ${filtered.length} newsletters remain');
     
     // Sort by date (newest first) and limit to 12
     filtered.sort((a, b) {
@@ -2838,11 +2877,26 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     });
     
-    return filtered.take(12).toList();
+    final result = filtered.take(12).toList();
+    await DebugLogHelper.addDebugLog('HOME: Final result: ${result.length} newsletters after sorting and limiting to 12');
+    
+    // Log the newsletter IDs for debugging
+    for (final newsletter in result) {
+      await DebugLogHelper.addDebugLog('HOME: Newsletter in final list: ID=${newsletter['newsletter_id']}, Name=${newsletter['name']}, Date=${newsletter['created_at']}');
+    }
+    
+    return result;
   }
   
   Widget _buildNewsletterSections() {
-    final newsletters = _getFilteredNewsletters();
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _getFilteredNewsletters(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return Center(child: CircularProgressIndicator());
+        }
+        
+        final newsletters = snapshot.data!;
     if (newsletters.isEmpty) {
       return Center(
         child: Column(
@@ -2871,7 +2925,8 @@ class _HomeScreenState extends State<HomeScreen> {
         final createdAt = DateTime.parse(newsletter['created_at'] ?? '');
         final createdDate = DateTime(createdAt.year, createdAt.month, createdAt.day);
         
-        if (createdDate.isAtSameMomentAs(today)) {
+        // Treat future dates as today (handles timezone/clock differences)
+        if (createdDate.isAtSameMomentAs(today) || createdAt.isAfter(now)) {
           todayNewsletters.add(newsletter);
         } else if (createdAt.isAfter(weekAgo)) {
           weekNewsletters.add(newsletter);
@@ -2883,13 +2938,15 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
     
-    return ListView(
-      padding: EdgeInsets.all(16),
-      children: [
-        if (todayNewsletters.isNotEmpty) ..._buildSection('Today', todayNewsletters),
-        if (weekNewsletters.isNotEmpty) ..._buildSection('This Week', weekNewsletters),
-        if (monthNewsletters.isNotEmpty) ..._buildSection('This Month', monthNewsletters),
-      ],
+        return ListView(
+          padding: EdgeInsets.all(16),
+          children: [
+            if (todayNewsletters.isNotEmpty) ..._buildSection('Today', todayNewsletters),
+            if (weekNewsletters.isNotEmpty) ..._buildSection('This Week', weekNewsletters),
+            if (monthNewsletters.isNotEmpty) ..._buildSection('This Month', monthNewsletters),
+          ],
+        );
+      },
     );
   }
   
