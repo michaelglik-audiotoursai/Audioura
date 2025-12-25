@@ -171,64 +171,52 @@ docker exec development-postgres-2-1 psql -U admin -d audiotours -c "SELECT url,
 - **Git Workflow**: All commits go to Newsletters branch, NOT main
 - **Container Ports**: Only one service can use port 5017 at a time
 
-### 🔄 **POST-COMPACTION RECOVERY INSTRUCTIONS - NEWSLETTER TRANSLATION READY**
+### 🔄 **POST-COMPACTION RECOVERY INSTRUCTIONS - VOICE COMMANDS + HELP DIALOG COMPLETE**
 **If chat history is compacted, read @remind_ai.md and @remind_Services_ai.md to continue development**
 
-**Current System Status - ALL SYSTEMS OPERATIONAL**:
+**Current System Status - ALL SYSTEMS OPERATIONAL + UI FIXES COMPLETE**:
 - ✅ **All Services Online**: 10/10 containers running (100% health)
-- ✅ **Tour Translation**: Complete Russian translation system working (Tour ID 99 → 106)
-- ✅ **Newsletter Processing**: 66.7% success rate across 3 technologies (Boston Globe, Quora working)
-- ✅ **Translation Service**: Deployed (5030) and ready for newsletter article translation
-- ✅ **Testing Framework**: Complete test suite for newsletters and tours
+- ✅ **Translation System**: Complete Russian/French translation working (all bugs resolved)
+- ✅ **Voice Commands**: English voice commands preserved in all languages (v1.2.9.18)
+- ✅ **Help Dialog**: Grey page display issue fixed with help_commands.txt (v1.2.9.18)
+- ✅ **Newsletter Processing**: 66.7% success rate across 3 technologies
+- ✅ **Git Synchronization**: Tag 1.2.9.18 aligned with Mobile App
 
-**Ready for Newsletter Translation Development**:
-- ✅ **Translation Service**: translation-service-1:5030 working for tours, ready for articles
-- ✅ **Newsletter Content**: Articles stored with full text in article_requests.article_text
-- ✅ **AWS Services**: Translate + Polly configured and working
-- ✅ **Mobile Compatibility**: ZIP creation approach proven working for tours
-- ✅ **Database Schema**: Ready for content_language and original_article_id columns
+**Latest Enhancements Completed (v1.2.9.18)**:
+- ✅ **Voice Command Preservation**: All voice commands stay in English while content translates
+- ✅ **Help Dialog Fix**: Added clean help_commands.txt file to prevent character encoding issues
+- ✅ **Mobile App Compatibility**: Communication documents created for integration
+- ✅ **Translation Service**: Enhanced with preserve_voice_commands parameter
 
-**Newsletter Translation Implementation Commands**:
+**Key Implementation Commands**:
 ```bash
-# Test newsletter processing (working)
-python test_newsletter_technologies.py
-
-# Process newsletter to get articles
-curl -X POST "http://localhost:5017/process_newsletter" \
-  -H "Content-Type: application/json" \
-  -d '{"newsletter_url": "https://mailchi.mp/bostonglobe.com/starting-point-harvard-under-pressure", "user_id": "test_user", "max_articles": 10}'
-
-# Translate article (to be implemented)
-curl -X POST "http://localhost:5030/translate-with-audio" \
+# Test voice command preservation
+curl -X POST http://localhost:5030/translate-with-audio \
   -H "Content-Type: application/json" \
   -d '{"content_id": "ARTICLE-ID", "content_type": "article", "languages": ["ru"]}'
 
-# Download translated article (to be implemented)
-curl -X GET "http://localhost:5012/download/TRANSLATED-ARTICLE-ID" -o "russian_article.zip"
-```
+# Test help dialog fix (check for help_commands.txt in ZIP)
+curl -X GET "http://localhost:5012/download/ARTICLE-ID?language=ru" -o "russian_article.zip"
 
-**Key Implementation Files**:
-- `translation_service.py` - Extend with article translation support
-- `test_newsletter_technologies.py` - Add translation testing
-- Database schema - Add content_language, original_article_id to article_requests
-- Mobile-compatible ZIP creation for translated articles
-
-**Key Commands**:
-```bash
 # System health check
 python test_system_health.py
-
-# Newsletter processing test
-curl -X POST "http://localhost:5017/process_newsletter" -H "Content-Type: application/json" -d '{"newsletter_url": "URL", "user_id": "USER-ID", "max_articles": 10}'
-
-# Tour resolution test
-curl -X GET "http://localhost:5025/tour/39/resolve"
 
 # Container management
 docker ps
 docker restart container_name
 docker cp file.py container:/app/
 ```
+
+**Services Architecture - Production Ready**:
+- ✅ **Translation Service**: translation-service-1:5030 (voice commands + help dialog fixes)
+- ✅ **Tour Orchestrator**: development-tour-orchestrator-1:5002 (language parameter support)
+- ✅ **News Orchestrator**: news-orchestrator-1:5012 (download with language support)
+- ✅ **Newsletter Processor**: newsletter-processor-1:5017 (English article generation)
+
+**Communication Layer Documents**:
+- `SERVICES_HELP_DIALOG_FIX.md` - Help dialog integration guide for Mobile App
+- `SERVICES_TRANSLATION_ARCHITECTURE_CORRECTED.md` - Complete integration architecture
+- All documents in: `c:\Users\micha\eclipse-workspace\amazon-q-communications\audiotours\requirements\`
 
 ### 📈 **Progress Tracking**
 - **Phase 1**: Newsletter basic functionality ✅ COMPLETE
