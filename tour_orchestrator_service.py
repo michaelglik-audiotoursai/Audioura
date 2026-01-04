@@ -553,28 +553,27 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             
             # Get the tour ID from database for potential translation
             english_tour_id = None
-            if language != 'en':
-                try:
-                    import psycopg2
-                    conn = psycopg2.connect(
-                        host="postgres-2",
-                        database="audiotours",
-                        user="admin",
-                        password="password123"
-                    )
-                    cur = conn.cursor()
-                    cur.execute(
-                        "SELECT id FROM audio_tours WHERE tour_name = %s AND request_string = %s ORDER BY id DESC LIMIT 1",
-                        (tour_name, request_string or location)
-                    )
-                    result = cur.fetchone()
-                    if result:
-                        english_tour_id = result[0]
-                        print(f"English tour ID for translation: {english_tour_id}")
-                    cur.close()
-                    conn.close()
-                except Exception as db_error:
-                    print(f"Warning: Could not get tour ID for translation: {db_error}")
+            try:
+                import psycopg2
+                conn = psycopg2.connect(
+                    host="postgres-2",
+                    database="audiotours",
+                    user="admin",
+                    password="password123"
+                )
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT id FROM audio_tours WHERE tour_name = %s AND request_string = %s ORDER BY id DESC LIMIT 1",
+                    (tour_name, request_string or location)
+                )
+                result = cur.fetchone()
+                if result:
+                    english_tour_id = result[0]
+                    print(f"English tour ID for translation: {english_tour_id}")
+                cur.close()
+                conn.close()
+            except Exception as db_error:
+                print(f"Warning: Could not get tour ID for translation: {db_error}")
             
             # If non-English language requested, translate the tour
             if language != 'en' and english_tour_id:
@@ -596,14 +595,21 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                     
                     if translation_response.status_code == 200:
                         translation_result = translation_response.json()
-                        translated_tour_id = translation_result.get('translated_tour_ids', {}).get(language)
+                        print(f"Translation service response: {translation_result}")
                         
-                        if translated_tour_id:
-                            print(f"Translation successful! Translated tour ID: {translated_tour_id}")
-                            ACTIVE_JOBS[job_id]["translated_tour_id"] = translated_tour_id
-                            ACTIVE_JOBS[job_id]["final_tour_id"] = translated_tour_id
+                        # Check for translations field in response
+                        translations = translation_result.get('translations', {})
+                        if language in translations:
+                            translated_tour_id = translations[language].get('id')
+                            if translated_tour_id:
+                                print(f"Translation successful! Translated tour ID: {translated_tour_id}")
+                                ACTIVE_JOBS[job_id]["translated_tour_id"] = translated_tour_id
+                                ACTIVE_JOBS[job_id]["final_tour_id"] = translated_tour_id
+                            else:
+                                print(f"Warning: Translation completed but no tour ID in response")
+                                ACTIVE_JOBS[job_id]["final_tour_id"] = english_tour_id
                         else:
-                            print(f"Warning: Translation completed but no tour ID returned")
+                            print(f"Warning: Language {language} not found in translation response")
                             ACTIVE_JOBS[job_id]["final_tour_id"] = english_tour_id
                     else:
                         print(f"Translation failed: {translation_response.status_code} - {translation_response.text}")
@@ -611,7 +617,11 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                         
                 except Exception as translation_error:
                     print(f"Translation error: {translation_error}")
+                    print(f"Translation traceback: {traceback.format_exc()}")
                     ACTIVE_JOBS[job_id]["final_tour_id"] = english_tour_id
+            elif language != 'en':
+                print(f"Warning: Cannot translate - no English tour ID found")
+                ACTIVE_JOBS[job_id]["final_tour_id"] = "unknown"
             else:
                 ACTIVE_JOBS[job_id]["final_tour_id"] = english_tour_id or "unknown"
             
