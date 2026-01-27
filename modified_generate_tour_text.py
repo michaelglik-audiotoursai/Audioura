@@ -48,7 +48,7 @@ For each POI, include:
 2. Artist/creator name
 3. Year created or acquired (if known)
 4. Directions within the museum from the previous exhibit (for the first POI, provide directions from the main entrance)
-5. GPS coordinates (REQUIRED for the first POI - museum entrance)
+5. GPS coordinates (ONLY for the first POI - museum entrance coordinates)
 
 Format your response as a numbered list:
 
@@ -58,16 +58,17 @@ Format your response as a numbered list:
 
 2. [Name of Exhibit 2] by [Artist 2], [Year]
    Directions from previous: [Detailed directions from previous exhibit to reach this one]
-   Coordinates: [Latitude, Longitude] (if known)
+   (No coordinates needed - indoor navigation)
 
 ... and so on.
 
 IMPORTANT:
 - Include only real, significant exhibits or artworks that would be featured in a museum tour
+- Create a logical path through the museum - avoid going between floors unnecessarily
+- Plan the route to minimize backtracking (e.g., complete one floor before moving to another)
 - Provide specific, detailed directions between each exhibit within the museum
 - ALWAYS mention the name of the destination exhibit in the directions
-- Make sure the route forms a logical path through the museum
-- ALWAYS provide accurate GPS coordinates for the first POI (museum entrance)
+- ONLY provide GPS coordinates for the first POI (museum entrance) - indoor exhibits don't need coordinates
 """
     
     elif tour_category == 'specialized':
