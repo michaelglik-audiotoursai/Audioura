@@ -72,6 +72,13 @@ HOME: Newsletter in final list: ID=261, Name=[NAME], Date=[DATE]
 - **Commands**: Audio control (Play/Pause/Repeat), Navigation (Next/Previous stop), Seeking (Forward/Backward), Tour switching, Activation methods
 - **UI**: Help button in tour player app bar with comprehensive categorized command list
 
+### ✅ **GIT COMMIT STATUS v1.2.9.18**:
+1. **Commit Hash**: 174fdce - "v1.2.9+18: Voice Commands Help Dialogs Complete"
+2. **Files Committed**: 7 mobile app files (screens, services, widgets, pubspec.yaml)
+3. **Git Tag**: 1.2.9.18 created and pushed to repository
+4. **Branch**: Newsletters branch - ready for APK build
+5. **Recovery Ready**: Sources and version aligned for APK resuscitation
+
 ### 🔄 **NEXT STEPS AFTER COMPACTION**:
 1. **Mobile App Amazon-Q**: Read both reminder files to understand current project status
 2. **Continue development**: Address any new issues or feature requests
@@ -84,6 +91,7 @@ HOME: Newsletter in final list: ID=261, Name=[NAME], Date=[DATE]
 **Branch**: Newsletters (`git push origin Newsletters`)
 **Icon**: Audioura_3.png
 **Status**: ✅ **MOBILE APP WORKING** - ✅ **VOICE CONTROL HELP COMPLETE**
+**Git Tag**: ✅ **1.2.9.18 COMMITTED & PUSHED** - Sources and APK aligned for recovery
 
 ### 🚨 **CRITICAL WORKFLOW RULE**
 **⚠️ NEVER CHANGE CODE WITHOUT APPROVAL**: Always propose plan first, get user approval, then implement
@@ -233,6 +241,7 @@ HOME: Newsletter in final list: ID=261, Name=[NAME], Date=[DATE]
 
 ### IMMEDIATE CONTEXT AFTER COMPACTION:
 - **Current Status**: v1.2.9+18 - VOICE COMMANDS HELP DIALOGS COMPLETE ✅
+- **Git Status**: ✅ **COMMITTED & TAGGED** - Tag 1.2.9.18 pushed to repository
 - **Translation Support**: 6 languages (en, ru, es, fr, de, zh) with proper API integration
 - **Mobile App Fixes**: Language parameters added to tour/article generation, direct translation calls removed
 - **UI Components**: Language selector widget integrated in Home and Generate screens
@@ -242,6 +251,7 @@ HOME: Newsletter in final list: ID=261, Name=[NAME], Date=[DATE]
 - **Newsletter Fixes**: Date section logic fixed, major points default changed to 0
 - **Help Dialog Fix**: Non-English language encoding issues resolved
 - **Build Status**: Ready for build with all latest features
+- **Recovery Status**: ✅ **APK & SOURCES ALIGNED** - Tag 1.2.9.18 available for resuscitation
 - **⚠️ CRITICAL**: Always get approval before making any code changes
 
 ## CURRENT BUILD ISSUE - RESOLVED ✅
