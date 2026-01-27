@@ -171,32 +171,47 @@ docker exec development-postgres-2-1 psql -U admin -d audiotours -c "SELECT url,
 - **Git Workflow**: All commits go to Newsletters branch, NOT main
 - **Container Ports**: Only one service can use port 5017 at a time
 
-### 🔄 **POST-COMPACTION RECOVERY INSTRUCTIONS - VOICE COMMANDS + HELP DIALOG COMPLETE**
+### 🔄 **POST-COMPACTION RECOVERY INSTRUCTIONS - TOUR TYPE DETECTION SYSTEM COMPLETE**
 **If chat history is compacted, read @remind_ai.md and @remind_Services_ai.md to continue development**
 
-**Current System Status - ALL SYSTEMS OPERATIONAL + UI FIXES COMPLETE**:
+**Current System Status - ALL SYSTEMS OPERATIONAL + TOUR TYPE DETECTION IMPLEMENTED**:
 - ✅ **All Services Online**: 10/10 containers running (100% health)
 - ✅ **Translation System**: Complete Russian/French translation working (all bugs resolved)
 - ✅ **Voice Commands**: English voice commands preserved in all languages (v1.2.9.18)
 - ✅ **Help Dialog**: Grey page display issue fixed with help_commands.txt (v1.2.9.18)
+- ✅ **Tour Type Detection**: 3 intelligent templates implemented with GPS optimization (v2026-01-27)
+- ✅ **Language Parameter**: Russian tour generation working correctly
 - ✅ **Newsletter Processing**: 66.7% success rate across 3 technologies
-- ✅ **Git Synchronization**: Tag 1.2.9.18 aligned with Mobile App
+- ✅ **Git Status**: Latest commit 37c1e5f (GPS optimization and path planning)
 
-**Latest Enhancements Completed (v1.2.9.18)**:
-- ✅ **Voice Command Preservation**: All voice commands stay in English while content translates
-- ✅ **Help Dialog Fix**: Added clean help_commands.txt file to prevent character encoding issues
-- ✅ **Mobile App Compatibility**: Communication documents created for integration
-- ✅ **Translation Service**: Enhanced with preserve_voice_commands parameter
+**Latest Major Enhancement - TOUR TYPE DETECTION SYSTEM (2026-01-27)**:
+- ✅ **Intelligent Templates**: Walking, Museum, and Specialized tour templates
+- ✅ **GPS Optimization**: Smart coordinate strategy based on tour type
+- ✅ **Path Planning**: Logical routing to minimize backtracking
+- ✅ **Mobile App Ready**: GPS strategy optimized for mapping and navigation
+- ✅ **Deployed**: development-tour-generator-1:5000 with enhanced AI prompts
+
+**Tour Type Categories**:
+1. **Walking Tours** (cities, downtown, neighborhoods) → GPS for all POIs + street landmarks
+2. **Museum Tours** (museum, gallery, MFA) → GPS for entrance only + floor-by-floor routing
+3. **Specialized Tours** (book, movie, film, botanical) → GPS for all POIs + theme locations
 
 **Key Implementation Commands**:
 ```bash
-# Test voice command preservation
-curl -X POST http://localhost:5030/translate-with-audio \
+# Test walking tour (GPS for all POIs)
+curl -X POST http://localhost:5000/generate \
   -H "Content-Type: application/json" \
-  -d '{"content_id": "ARTICLE-ID", "content_type": "article", "languages": ["ru"]}'
+  -d '{"location": "Newton Center downtown", "tour_type": "historical", "total_stops": 3}'
 
-# Test help dialog fix (check for help_commands.txt in ZIP)
-curl -X GET "http://localhost:5012/download/ARTICLE-ID?language=ru" -o "russian_article.zip"
+# Test museum tour (GPS for entrance only)
+curl -X POST http://localhost:5000/generate \
+  -H "Content-Type: application/json" \
+  -d '{"location": "Isabella Stewart Gardner Museum", "tour_type": "art", "total_stops": 4}'
+
+# Test Russian tour generation (language parameter working)
+curl -X POST http://localhost:5002/generate-complete-tour \
+  -H "Content-Type: application/json" \
+  -d '{"location": "Newton Center", "tour_type": "walking", "total_stops": 3, "language": "ru"}'
 
 # System health check
 python test_system_health.py
