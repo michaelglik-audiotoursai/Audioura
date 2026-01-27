@@ -9,6 +9,132 @@ import requests
 from datetime import datetime
 import re
 
+def detect_tour_type(location, tour_type):
+    """
+    Detect the appropriate tour template based on location and tour_type.
+    
+    Returns: 'walking', 'museum', or 'specialized'
+    """
+    location_lower = location.lower()
+    tour_type_lower = tour_type.lower()
+    
+    # Museum indicators
+    museum_keywords = ['museum', 'gallery', 'mfa', 'moma', 'exhibition', 'collection', 'art center', 'cultural center']
+    if any(keyword in location_lower for keyword in museum_keywords):
+        return 'museum'
+    
+    # Specialized tour indicators
+    specialized_keywords = ['book', 'movie', 'film', 'botanical', 'garden', 'park', 'novel', 'story', 'literary', 'filming']
+    if any(keyword in tour_type_lower for keyword in specialized_keywords):
+        return 'specialized'
+    
+    # Walking tour indicators (default for cities, neighborhoods)
+    walking_keywords = ['city', 'downtown', 'neighborhood', 'district', 'street', 'avenue', 'center', 'town']
+    if any(keyword in location_lower for keyword in walking_keywords):
+        return 'walking'
+    
+    # Default to walking tour
+    return 'walking'
+
+def get_tour_template(tour_category, location, tour_type, total_stops):
+    """
+    Get the appropriate AI prompt template based on tour category.
+    """
+    if tour_category == 'museum':
+        return f"""For a museum tour of {location} focusing on {tour_type}, please provide information about {total_stops} significant exhibits or artworks.
+
+For each POI, include:
+1. Name of the exhibit/artwork
+2. Artist/creator name
+3. Year created or acquired (if known)
+4. Directions within the museum from the previous exhibit (for the first POI, provide directions from the main entrance)
+5. GPS coordinates (REQUIRED for the first POI - museum entrance)
+
+Format your response as a numbered list:
+
+1. [Name of Exhibit 1] by [Artist 1], [Year]
+   Directions from entrance: [Detailed directions from the main entrance to reach this exhibit]
+   Coordinates: [Latitude, Longitude]
+
+2. [Name of Exhibit 2] by [Artist 2], [Year]
+   Directions from previous: [Detailed directions from previous exhibit to reach this one]
+   Coordinates: [Latitude, Longitude] (if known)
+
+... and so on.
+
+IMPORTANT:
+- Include only real, significant exhibits or artworks that would be featured in a museum tour
+- Provide specific, detailed directions between each exhibit within the museum
+- ALWAYS mention the name of the destination exhibit in the directions
+- Make sure the route forms a logical path through the museum
+- ALWAYS provide accurate GPS coordinates for the first POI (museum entrance)
+"""
+    
+    elif tour_category == 'specialized':
+        return f"""For a specialized tour of {location} based on {tour_type}, please provide information about {total_stops} significant locations related to this theme.
+
+For each POI, include:
+1. Name of the location
+2. Connection to {tour_type} (scenes, inspiration, historical relevance)
+3. Significance in the context of {tour_type}
+4. Directions from the previous location (for the first POI, provide directions from a central starting point)
+5. GPS coordinates (REQUIRED for the first POI)
+
+Format your response as a numbered list:
+
+1. [Location Name 1]
+   Connection to {tour_type}: [How this location relates to the theme]
+   Directions from start: [Detailed directions to reach this location]
+   Coordinates: [Latitude, Longitude]
+
+2. [Location Name 2]
+   Connection to {tour_type}: [How this location relates to the theme]
+   Directions from previous: [Detailed directions from previous location]
+   Coordinates: [Latitude, Longitude] (if known)
+
+... and so on.
+
+IMPORTANT:
+- Include only locations directly related to {tour_type}
+- Provide behind-the-scenes information and cultural context
+- ALWAYS mention the name of the destination location in the directions
+- Make sure the route forms a logical path between theme-related locations
+- ALWAYS provide accurate GPS coordinates for the first POI
+"""
+    
+    else:  # walking tour (default)
+        return f"""For a walking tour of {location} focusing on {tour_type}, please provide information about {total_stops} significant landmarks, historical sites, or points of interest.
+
+For each POI, include:
+1. Name of the landmark/location
+2. Historical significance or interesting facts
+3. Year built/established (if known)
+4. Walking directions from the previous location (for the first POI, provide directions from a central starting point)
+5. GPS coordinates (REQUIRED for the first POI)
+
+Format your response as a numbered list:
+
+1. [Landmark Name 1], [Year built/established]
+   Historical significance: [Brief description of importance]
+   Directions from start: [Detailed walking directions to reach this landmark]
+   Coordinates: [Latitude, Longitude]
+
+2. [Landmark Name 2], [Year built/established]
+   Historical significance: [Brief description of importance]
+   Directions from previous: [Detailed walking directions from previous landmark]
+   Coordinates: [Latitude, Longitude] (if known)
+
+... and so on.
+
+IMPORTANT:
+- Include only real, significant landmarks and historical sites
+- Focus on street-level locations visible to pedestrians
+- Provide specific, detailed walking directions between each landmark
+- ALWAYS mention the name of the destination landmark in the directions
+- Make sure the route forms a logical walking path through {location}
+- ALWAYS provide accurate GPS coordinates for the first POI
+"""
+
 def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
     """
     Generate audio tour text using OpenAI API with geo coordinates.
@@ -43,38 +169,15 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
     total_tokens = 0
     total_cost = 0
     
-    # PHASE 1: Get POI information and directions WITH COORDINATES
-    print(f"\nPHASE 1: Getting information for {total_stops} POIs and directions between them...")
+    # PHASE 1: Detect tour type and get appropriate template
+    tour_category = detect_tour_type(location, tour_type)
+    print(f"\nDetected tour category: {tour_category.upper()}")
+    print(f"Using {tour_category} template for {location} - {tour_type}")
     
-    poi_info_prompt = f"""For a walking tour of {location} focusing on {tour_type}, please provide information about {total_stops} significant exhibits or points of interest.
-
-For each POI, include:
-1. Name of the exhibit/artwork
-2. Artist/creator name
-3. Year the museum acquired it (if known)
-4. Directions to reach this POI from the previous one (for the first POI, provide directions from the main entrance)
-5. GPS coordinates (REQUIRED for the first POI, optional for others)
-
-Format your response as a numbered list:
-
-1. [Name of POI 1] by [Artist 1], [Year acquired]
-   Directions from entrance: [Detailed directions from the main entrance to reach POI 1 by name]
-   Coordinates: [Latitude, Longitude]
-
-2. [Name of POI 2] by [Artist 2], [Year acquired]
-   Directions from previous: [Detailed directions from POI 1 to reach POI 2 by name]
-   Coordinates: [Latitude, Longitude] (if known)
-
-... and so on.
-
-IMPORTANT:
-- Include only real, significant exhibits or artworks that would be featured in a tour
-- Provide specific, detailed directions between each POI
-- ALWAYS mention the name of the destination POI in the directions (e.g., "...until you reach 'The Grand Sculpture'" instead of "...until you reach the sculpture")
-- Make sure the route forms a logical walking path through {location}
-- If you don't know the exact year acquired, you can provide an estimate or the creation year
-- ALWAYS provide accurate GPS coordinates for the first POI (this is required)
-"""
+    # PHASE 2: Get POI information and directions WITH COORDINATES
+    print(f"\nPHASE 2: Getting information for {total_stops} POIs and directions between them...")
+    
+    poi_info_prompt = get_tour_template(tour_category, location, tour_type, total_stops)
     
     poi_info_data = {
         "model": "gpt-3.5-turbo",
@@ -357,8 +460,8 @@ ONLY provide the coordinates, nothing else."""
                 "coordinates": ""
             })
     
-    # PHASE 2: Generate detailed descriptions for each POI
-    print(f"\nPHASE 2: Generating detailed descriptions for each POI...")
+    # PHASE 3: Generate detailed descriptions for each POI
+    print(f"\nPHASE 3: Generating detailed descriptions for each POI...")
     
     for poi in poi_list:
         stop_num = poi["stop_number"]
@@ -458,8 +561,8 @@ DO NOT include directions to the next stop - these will be added separately.
         # Add a small delay to avoid rate limits
         time.sleep(1)
     
-    # PHASE 3: Assemble the complete tour
-    print(f"\nPHASE 3: Assembling the complete tour...")
+    # PHASE 4: Assemble the complete tour
+    print(f"\nPHASE 4: Assembling the complete tour...")
     
     # Create a better title that doesn't duplicate information
     if tour_type.lower() in location.lower():
