@@ -665,6 +665,64 @@ class _HomeScreenState extends State<HomeScreen> {
     return earthRadius * c;
   }
   
+  String _getTourTypeIcon(String? type) {
+    switch (type) {
+      case 'walking_tour': return '🚶';
+      case 'museum_tour': return '🏛️';
+      case 'shopping_tour': return '🛍️';
+      case 'art_tour': return '🎨';
+      case 'food_tour': return '🍽️';
+      case 'history_tour': return '📚';
+      default: return '🗺️';
+    }
+  }
+  
+  String _getTourTypeName(String? type) {
+    switch (type) {
+      case 'walking_tour': return 'Walking';
+      case 'museum_tour': return 'Museum';
+      case 'shopping_tour': return 'Shopping';
+      case 'art_tour': return 'Art';
+      case 'food_tour': return 'Food';
+      case 'history_tour': return 'History';
+      default: return 'Tour';
+    }
+  }
+  
+  String _getLanguageName(String? language) {
+    switch (language) {
+      case 'en': return 'English';
+      case 'es': return 'Spanish';
+      case 'fr': return 'French';
+      case 'de': return 'German';
+      case 'ru': return 'Russian';
+      case 'zh': return 'Chinese';
+      default: return language?.toUpperCase() ?? 'EN';
+    }
+  }
+  
+  String _getTourOriginLabel(Map<String, dynamic> tour) {
+    final originalTourId = tour['original_tour_id'];
+    final language = tour['language'] ?? 'en';
+    
+    if (originalTourId != null) {
+      return 'Custom';
+    } else if (language != 'en') {
+      return 'Translation';
+    } else {
+      return 'Official';
+    }
+  }
+  
+  Color _getTourOriginColor(String label) {
+    switch (label) {
+      case 'Official': return Colors.blue;
+      case 'Custom': return Colors.orange;
+      case 'Translation': return Colors.green;
+      default: return Colors.grey;
+    }
+  }
+  
   void _showMultipleTourDialog(List tours) {
     List<bool> selectedTours = List.filled(tours.length, false);
     List<String> selectedLanguages = ['en'];
@@ -731,15 +789,68 @@ class _HomeScreenState extends State<HomeScreen> {
                             selectedTours[index] = value ?? false;
                           });
                         },
-                        title: Text(
-                          tour['name'],
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                        title: Row(
+                          children: [
+                            Text(
+                              _getTourTypeIcon(tour['type']),
+                              style: TextStyle(fontSize: 16),
+                            ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                tour['name'],
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            Container(
+                              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: _getTourOriginColor(_getTourOriginLabel(tour)),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                _getTourOriginLabel(tour),
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Distance: ${tour['distance_km']} km'),
-                            Text('Downloads: ${tour['popularity']}'),
+                            SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Text(
+                                  '${_getTourTypeName(tour['type'])} • ${tour['distance_km']} km • ${tour['popularity']} downloads',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Icon(Icons.language, size: 14, color: Colors.blue.shade600),
+                                SizedBox(width: 4),
+                                Text(
+                                  _getLanguageName(tour['language']),
+                                  style: TextStyle(fontSize: 12, color: Colors.blue.shade600, fontWeight: FontWeight.w500),
+                                ),
+                                if (tour['stops_count'] != null) ...[
+                                  SizedBox(width: 12),
+                                  Icon(Icons.location_on, size: 14, color: Colors.green.shade600),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    '${tour['stops_count']} stops',
+                                    style: TextStyle(fontSize: 12, color: Colors.green.shade600, fontWeight: FontWeight.w500),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ],
                         ),
                         dense: true,
