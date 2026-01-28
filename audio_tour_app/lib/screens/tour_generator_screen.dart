@@ -212,8 +212,28 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         body: jsonEncode(tourData),
       );
 
+      await DebugLogHelper.addDebugLog('TOUR_REQUEST: Response status: ${response.statusCode}');
+      await DebugLogHelper.addDebugLog('TOUR_REQUEST: Response body: ${response.body}');
+
       if (response.statusCode != 200) {
-        throw Exception('Failed to start tour generation');
+        String errorMessage = 'Failed to start tour generation';
+        
+        try {
+          final errorData = jsonDecode(response.body);
+          if (errorData['user_message'] != null) {
+            errorMessage = errorData['user_message'];
+          } else if (errorData['error'] != null) {
+            errorMessage = errorData['error'];
+          } else if (errorData['message'] != null) {
+            errorMessage = errorData['message'];
+          }
+        } catch (e) {
+          // Use default message if JSON parsing fails
+          errorMessage = 'Server error: ${response.statusCode}';
+        }
+        
+        await DebugLogHelper.addDebugLog('TOUR_REQUEST_ERROR: $errorMessage');
+        throw Exception(errorMessage);
       }
 
       Map<String, dynamic> result = jsonDecode(response.body);
@@ -272,10 +292,47 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
             // This ensures we don't mark it complete until we've actually downloaded it
             await TourStatusService.updateTourStatus(jobId, 'completed');
             
-          } else if (status['status'] == 'error') {
+          } else if (status['status'] == 'error' || status['status'] == 'failed') {
             timer.cancel();
             await TourStatusService.updateTourStatus(jobId, 'failed');
-            throw Exception(status['error'] ?? 'Tour generation failed');
+            
+            // Extract detailed error information from Services
+            String errorMessage = 'Tour generation failed';
+            String userFriendlyMessage = 'Unable to generate tour. Please try again.';
+            
+            if (status['error'] != null) {
+              errorMessage = status['error'].toString();
+            }
+            
+            if (status['user_message'] != null) {
+              userFriendlyMessage = status['user_message'].toString();
+            } else if (status['error_type'] != null) {
+              // Handle specific error types from Services
+              switch (status['error_type']) {
+                case 'knowledge_validation_failed':
+                  userFriendlyMessage = 'Unable to find sufficient information about this location. Please try a more specific or well-known location.';
+                  break;
+                case 'location_not_found':
+                  userFriendlyMessage = 'Location not found. Please check the spelling and try a more specific address.';
+                  break;
+                case 'insufficient_content':
+                  userFriendlyMessage = 'Not enough information available to create a tour for this location. Please try a different location.';
+                  break;
+                case 'service_unavailable':
+                  userFriendlyMessage = 'Tour generation service is temporarily unavailable. Please try again in a few minutes.';
+                  break;
+                default:
+                  userFriendlyMessage = status['error_type'].toString().replaceAll('_', ' ');
+              }
+            }
+            
+            // Log detailed error for debugging
+            await DebugLogHelper.addDebugLog('TOUR_ERROR: Services returned error - Type: ${status['error_type']}, Message: $errorMessage');
+            await DebugLogHelper.addDebugLog('TOUR_ERROR: Full status response: ${jsonEncode(status)}');
+            
+            // Show user-friendly error to user
+            throw Exception(userFriendlyMessage);
+            
           } else if (attempts >= maxAttempts) {
             timer.cancel();
             await TourStatusService.updateTourStatus(jobId, 'timeout');
