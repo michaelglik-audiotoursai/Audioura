@@ -477,7 +477,6 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       }
       
       // Check for audio files
-      final extractDir = Directory(extractPath);
       final files = await extractDir.list().toList();
       final audioFiles = files.where((file) => file.path.endsWith('.mp3')).toList();
       
