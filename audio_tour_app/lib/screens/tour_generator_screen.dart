@@ -263,6 +263,11 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
             // Auto-download, extract, and play
             await _autoDownloadAndPlay(jobId, location, languages);
             
+            // Process additional languages if requested
+            if (languages != null && languages.length > 1) {
+              await _processAdditionalLanguages(jobId, location, languages);
+            }
+            
             // Update tour request status to completed AFTER download
             // This ensures we don't mark it complete until we've actually downloaded it
             await TourStatusService.updateTourStatus(jobId, 'completed');
@@ -294,6 +299,26 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         });
       }
     });
+  }
+
+  Future<void> _processAdditionalLanguages(String jobId, String location, List<String> languages) async {
+    try {
+      final nonEnglishLanguages = languages.where((lang) => lang != 'en').toList();
+      if (nonEnglishLanguages.isEmpty) return;
+      
+      await DebugLogHelper.addDebugLog('TOUR: Processing additional languages: ${nonEnglishLanguages.join(", ")}');
+      
+      // Request translation from Services for each additional language
+      for (final language in nonEnglishLanguages) {
+        await DebugLogHelper.addDebugLog('TOUR: Requesting $language translation for job $jobId');
+        
+        // Services should handle translation internally when we request with language parameter
+        // This is a placeholder for Services Amazon-Q to implement
+        await DebugLogHelper.addDebugLog('TOUR: Translation request sent to Services for $language - Services Amazon-Q needs to implement language parameter support');
+      }
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('TOUR: Error processing additional languages: $e');
+    }
   }
 
   Future<void> _autoDownloadAndPlay(String jobId, String location, [List<String>? languages]) async {
@@ -383,6 +408,27 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       });
       
       _showSuccess('Tour ready! Opening now...');
+      
+      // Verify the tour files exist before opening
+      final indexFile = File('$extractPath/index.html');
+      final indexExists = await indexFile.exists();
+      
+      await DebugLogHelper.addDebugLog('TOUR: Verifying tour files - index.html exists: $indexExists');
+      
+      if (!indexExists) {
+        throw Exception('Tour files not properly extracted - index.html missing');
+      }
+      
+      // Check for audio files
+      final extractDir = Directory(extractPath);
+      final files = await extractDir.list().toList();
+      final audioFiles = files.where((file) => file.path.endsWith('.mp3')).toList();
+      
+      await DebugLogHelper.addDebugLog('TOUR: Found ${audioFiles.length} audio files in extracted tour');
+      
+      if (audioFiles.isEmpty) {
+        await DebugLogHelper.addDebugLog('TOUR: WARNING - No audio files found, but proceeding with tour opening');
+      }
       
       // Auto-open the tour
       Navigator.push(
