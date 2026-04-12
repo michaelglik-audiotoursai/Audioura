@@ -1,4 +1,5 @@
-  
+part of 'edit_tour_screen.dart'; 
+
   Future<void> _saveAllChanges() async {
     SaveContextLogger.addMessage('_saveAllChanges method started');
     SaveContextLogger.addMessage('Processing ${_stops.length} stops');
@@ -21,7 +22,7 @@
           SnackBar(
             content: Text('A tour must have at least one stop. Cannot delete all stops.'),
             backgroundColor: Colors.red,
-            duration: Duration(seconds: 4),
+            duration: const Duration(seconds: 4),
           ),
         );
         return;
@@ -106,7 +107,7 @@
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('API SUCCESS: ${result['message'] ?? 'Tour saved'}'),
-            duration: Duration(seconds: 2),
+            duration: const Duration(seconds: 2),
             backgroundColor: Colors.green,
           ),
         );
@@ -125,7 +126,7 @@
         SnackBar(
           content: Text('Save failed: $e'),
           backgroundColor: Colors.red,
-          duration: Duration(seconds: 6),
+          duration: const Duration(seconds: 6),
         ),
       );
     } finally {
@@ -182,7 +183,7 @@
         SnackBar(
           content: Text('Download failed: $e'),
           backgroundColor: Colors.red,
-          duration: Duration(seconds: 5),
+          duration: const Duration(seconds: 5),
         ),
       );
     }
