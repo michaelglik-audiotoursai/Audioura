@@ -11,65 +11,29 @@
 
 ### **STEP 1: Verify Git Repository Structure Exists**
 
-**Command to Execute**:
+**Simple Commands to Execute**:
 ```bash
+cd ~/Development/AudioTours && git pull origin Newsletters
 cd ~/Development/AudioTours/development
-echo "=== STEP 1: GIT REPOSITORY VERIFICATION ===" > step1_results.txt
-echo "Checking if setup guide created proper structure..." >> step1_results.txt
-echo "" >> step1_results.txt
-echo "1. Checking ~/Development/AudioTours directory:" >> step1_results.txt
-if [ -d ~/Development/AudioTours ]; then
-    echo "✅ ~/Development/AudioTours EXISTS" >> step1_results.txt
-else
-    echo "❌ ~/Development/AudioTours MISSING" >> step1_results.txt
-fi
-echo "" >> step1_results.txt
-echo "2. Checking Git repository status:" >> step1_results.txt
-if [ -d ~/Development/AudioTours/.git ]; then
-    echo "✅ Git repository EXISTS" >> step1_results.txt
-    cd ~/Development/AudioTours
-    echo "Current branch:" >> development/step1_results.txt
-    git branch >> development/step1_results.txt 2>&1
-else
-    echo "❌ Git repository MISSING" >> step1_results.txt
-fi
-echo "" >> ~/Development/AudioTours/development/step1_results.txt
-echo "3. Checking development subdirectory:" >> ~/Development/AudioTours/development/step1_results.txt
-if [ -d ~/Development/AudioTours/development ]; then
-    echo "✅ development/ subdirectory EXISTS" >> ~/Development/AudioTours/development/step1_results.txt
-    echo "Contents:" >> ~/Development/AudioTours/development/step1_results.txt
-    ls -la ~/Development/AudioTours/development/ >> ~/Development/AudioTours/development/step1_results.txt 2>&1
-else
-    echo "❌ development/ subdirectory MISSING" >> ~/Development/AudioTours/development/step1_results.txt
-fi
-echo "" >> ~/Development/AudioTours/development/step1_results.txt
-echo "4. Checking Flutter app directory:" >> ~/Development/AudioTours/development/step1_results.txt
-if [ -d ~/Development/AudioTours/development/audio_tour_app ]; then
-    echo "✅ audio_tour_app/ EXISTS" >> ~/Development/AudioTours/development/step1_results.txt
-    echo "Flutter files present:" >> ~/Development/AudioTours/development/step1_results.txt
-    ls -la ~/Development/AudioTours/development/audio_tour_app/pubspec.yaml >> ~/Development/AudioTours/development/step1_results.txt 2>&1
-    ls -la ~/Development/AudioTours/development/audio_tour_app/lib/ >> ~/Development/AudioTours/development/step1_results.txt 2>&1
-    ls -la ~/Development/AudioTours/development/audio_tour_app/ios/ >> ~/Development/AudioTours/development/step1_results.txt 2>&1
-else
-    echo "❌ audio_tour_app/ MISSING" >> ~/Development/AudioTours/development/step1_results.txt
-fi
-echo "" >> ~/Development/AudioTours/development/step1_results.txt
-echo "STEP 1 VERIFICATION COMPLETED" >> ~/Development/AudioTours/development/step1_results.txt
+bash step1_verify.sh
 ```
 
 **What This Does**:
-- Checks if `~/Development/AudioTours` exists (from setup guide Step 10)
-- Verifies Git repository is properly cloned
-- Confirms `development/` subdirectory structure
-- Validates Flutter app directory exists
-- Reports current Git branch status
-- Creates complete diagnostic report
+- Pulls latest changes from Git repository
+- Navigates to development directory
+- Runs verification script that checks:
+  - If `~/Development/AudioTours` exists (from setup guide Step 10)
+  - Verifies Git repository is properly cloned
+  - Confirms `development/` subdirectory structure
+  - Validates Flutter app directory exists
+  - Reports current Git branch status
+  - Creates complete diagnostic report in `step1_results.txt`
 
 **Your Job**: 
 1. **Pull latest changes**: `cd ~/Development/AudioTours && git pull origin Newsletters`
 2. **Navigate to development directory**: `cd ~/Development/AudioTours/development`
-3. Copy/paste the command below into Mac Mini terminal
-4. Press Enter and wait for completion
+3. **Execute verification script**: `bash step1_verify.sh`
+4. Wait for "STEP 1 VERIFICATION COMPLETED" message
 5. Switch back to Windows laptop
 6. Tell iOS Amazon-Q "Step 1 done"
 
