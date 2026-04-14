@@ -33,9 +33,22 @@ bash step1_verify.sh
 1. **Pull latest changes**: `cd ~/Development/AudioTours && git pull origin Newsletters`
 2. **Navigate to development directory**: `cd ~/Development/AudioTours/development`
 3. **Execute verification script**: `bash step1_verify.sh`
-4. Wait for "STEP 1 VERIFICATION COMPLETED" message
-5. Switch back to Windows laptop
-6. Tell iOS Amazon-Q "Step 1 done"
+4. **Check for completion**: Look for "STEP 1 VERIFICATION COMPLETED" message
+5. **Verify results were created**: `cat step1_results.txt`
+6. Switch back to Windows laptop
+7. Tell iOS Amazon-Q "Step 1 done"
+
+**If Something Goes Wrong**:
+- **Script permission denied**: Run `chmod +x step1_verify.sh` then try again
+- **Git pull fails**: Check network connection, try again
+- **Directory not found**: Run `pwd` to see where you are, then `ls -la` to see what's there
+- **No results file**: Run `ls -la step1_results.txt` to check if it was created
+- **Any other error**: Note the exact error message and report it when you tell iOS Amazon-Q "Step 1 done"
+
+**What You Should See**:
+- Git pull should show "Already up to date" or list updated files
+- Script should run without errors and show the completion message
+- `cat step1_results.txt` should show ✅ or ❌ for each verification check
 
 ---
 
@@ -65,16 +78,36 @@ bash step1_verify.sh
 ## COMMUNICATION PROTOCOL
 
 ### **Mac Mini Process**:
-1. Execute the exact command shown
-2. Wait for "STEP 1 VERIFICATION COMPLETED" message
-3. Switch to Windows laptop
-4. Tell iOS Amazon-Q "Step 1 done"
+1. Open `mac_mini_assignments.md` 
+2. Execute the exact commands shown
+3. Follow troubleshooting steps if needed
+4. Verify results file was created
+5. Switch to Windows laptop
+6. Tell iOS Amazon-Q "Step 1 done" (include any error messages)
 
 ### **iOS Amazon-Q Process**:
 1. Read step1_results.txt from project directory
 2. Analyze what exists vs. what's missing
 3. Provide appropriate next step command
 4. Continue until Flutter compilation testing
+
+### **Troubleshooting Commands** (if needed):
+```bash
+# Check current location
+pwd
+
+# See what files are there
+ls -la
+
+# Check Git status
+git status
+
+# Make script executable
+chmod +x step1_verify.sh
+
+# View results file
+cat step1_results.txt
+```
 
 ### **File Structure Expected**:
 ```
