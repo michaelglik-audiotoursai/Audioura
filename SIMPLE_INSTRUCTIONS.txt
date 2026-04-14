@@ -1,0 +1,14 @@
+MAC MINI INSTRUCTIONS:
+
+1. cd ~/Development/AudioTours
+2. git pull origin Newsletters  
+3. cd development
+4. bash run_step1.sh
+
+This script will:
+- Run all verification checks
+- Log everything to step1_execution.txt
+- Commit results to Git automatically
+- Push to GitHub so iOS Amazon-Q can read results
+
+When done, switch to Windows and tell iOS Amazon-Q "Step 1 done"
