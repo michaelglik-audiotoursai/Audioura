@@ -66,10 +66,12 @@ echo "STEP 1 VERIFICATION COMPLETED" >> ~/Development/AudioTours/development/ste
 - Creates complete diagnostic report
 
 **Your Job**: 
-1. Copy/paste the command into Mac Mini terminal
-2. Press Enter and wait for completion
-3. Switch back to Windows laptop
-4. Tell iOS Amazon-Q "Step 1 done"
+1. **Pull latest changes**: `cd ~/Development/AudioTours && git pull origin Newsletters`
+2. **Navigate to development directory**: `cd ~/Development/AudioTours/development`
+3. Copy/paste the command below into Mac Mini terminal
+4. Press Enter and wait for completion
+5. Switch back to Windows laptop
+6. Tell iOS Amazon-Q "Step 1 done"
 
 ---
 
