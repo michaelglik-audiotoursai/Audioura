@@ -1,0 +1,19 @@
+STEP 1 COMMANDS FOR MAC MINI:
+
+1. cd ~/Development/AudioTours && git pull origin Newsletters
+2. cd ~/Development/AudioTours/development
+3. bash step1_verify.sh
+4. cat step1_results.txt
+
+TROUBLESHOOTING (if needed):
+- If script permission denied: chmod +x step1_verify.sh
+- If directory not found: pwd then ls -la
+- If git pull fails: check network, try again
+
+WHAT YOU SHOULD SEE:
+- Git pull shows "Already up to date" or lists files
+- Script runs and shows "STEP 1 VERIFICATION COMPLETED"
+- cat command shows checkmarks or X marks for each test
+
+WHEN DONE:
+Switch to Windows laptop and tell iOS Amazon-Q "Step 1 done"
