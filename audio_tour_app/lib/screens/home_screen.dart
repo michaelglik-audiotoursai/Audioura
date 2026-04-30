@@ -171,9 +171,22 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       await DebugLogHelper.addDebugLog('HOME: Requesting location permission');
       
-      var permission = await Permission.location.request();
-      if (permission != PermissionStatus.granted) {
-        await DebugLogHelper.addDebugLog('HOME: Location permission denied');
+      // Check current permission status
+      LocationPermission permission = await Geolocator.checkPermission();
+      
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          await DebugLogHelper.addDebugLog('HOME: Location permission denied');
+          setState(() {
+            _userLocation = LatLng(42.3601, -71.0589);
+          });
+          return;
+        }
+      }
+      
+      if (permission == LocationPermission.deniedForever) {
+        await DebugLogHelper.addDebugLog('HOME: Location permission denied forever');
         setState(() {
           _userLocation = LatLng(42.3601, -71.0589);
         });

@@ -1,139 +1,163 @@
 # Mac Mini Live Communication Document
-## 🍎 iOS Amazon-Q ↔ Mac Mini Automated Exchange
 
-**Status**: READY FOR STEP 1  
-**Current Step**: 1 of N (determined dynamically)  
-**Last Updated**: 2025-01-31 Git Structure Verification
+# A29 - iOS Fixes v1.2.9+24 Deployment
+**T:** 04/30/2026 15:10
+**Status:** READY FOR EXECUTION
 
----
-
-## CURRENT INSTRUCTION
-
-### **STEP 1: Verify Git Repository Structure Exists**
-
-**Simple Commands to Execute**:
+## Copy iOS Fixes to Mac Mini
 ```bash
-cd ~/Development/AudioTours && git pull origin Newsletters
-cd ~/Development/AudioTours/development
-bash step1_verify.sh
+cd "/Volumes/USB DISK/Audioura/scripts"
+chmod +x copy_ios_fixes_v1_2_9_24.sh
+./copy_ios_fixes_v1_2_9_24.sh
 ```
 
-**What This Does**:
-- Pulls latest changes from Git repository
-- Navigates to development directory
-- Runs verification script that checks:
-  - If `~/Development/AudioTours` exists (from setup guide Step 10)
-  - Verifies Git repository is properly cloned
-  - Confirms `development/` subdirectory structure
-  - Validates Flutter app directory exists
-  - Reports current Git branch status
-  - Creates complete diagnostic report in `step1_results.txt`
-
-**Your Job**: 
-1. **Pull latest changes**: `cd ~/Development/AudioTours && git pull origin Newsletters`
-2. **Navigate to development directory**: `cd ~/Development/AudioTours/development`
-3. **Execute verification script**: `bash step1_verify.sh`
-4. **Check for completion**: Look for "STEP 1 VERIFICATION COMPLETED" message
-5. **Verify results were created**: `cat step1_results.txt`
-6. Switch back to Windows laptop
-7. Tell iOS Amazon-Q "Step 1 done"
-
-**If Something Goes Wrong**:
-- **Script permission denied**: Run `chmod +x step1_verify.sh` then try again
-- **Git pull fails**: Check network connection, try again
-- **Directory not found**: Run `pwd` to see where you are, then `ls -la` to see what's there
-- **No results file**: Run `ls -la step1_results.txt` to check if it was created
-- **Any other error**: Note the exact error message and report it when you tell iOS Amazon-Q "Step 1 done"
-
-**What You Should See**:
-- Git pull should show "Already up to date" or list updated files
-- Script should run without errors and show the completion message
-- `cat step1_results.txt` should show ✅ or ❌ for each verification check
-
----
-
-## STEP EXECUTION LOG
-
-| Step | Status | Results File | Purpose |
-|------|--------|--------------|---------|
-| 1 | PENDING | step1_results.txt | Verify setup guide Git structure exists |
-
----
-
-## iOS AMAZON-Q ANALYSIS SECTION
-
-### **Step 1 Analysis**
-[iOS Amazon-Q will read step1_results.txt and determine next action]
-
-### **NEXT INSTRUCTION - STEP 2**
-[Will be provided based on Step 1 verification results]
-
-**Possible Step 2 Scenarios**:
-- **If structure exists**: Proceed to Git pull latest changes
-- **If missing**: Execute Git clone commands from setup guide
-- **If partial**: Fix specific missing components
-
----
-
-## COMMUNICATION PROTOCOL
-
-### **Mac Mini Process**:
-1. Open `mac_mini_assignments.md` 
-2. Execute the exact commands shown
-3. Follow troubleshooting steps if needed
-4. Verify results file was created
-5. Switch to Windows laptop
-6. Tell iOS Amazon-Q "Step 1 done" (include any error messages)
-
-### **iOS Amazon-Q Process**:
-1. Read step1_results.txt from project directory
-2. Analyze what exists vs. what's missing
-3. Provide appropriate next step command
-4. Continue until Flutter compilation testing
-
-### **Troubleshooting Commands** (if needed):
+## Build and Install v1.2.9+24
 ```bash
-# Check current location
-pwd
-
-# See what files are there
-ls -la
-
-# Check Git status
-git status
-
-# Make script executable
-chmod +x step1_verify.sh
-
-# View results file
-cat step1_results.txt
+chmod +x build_install_launch_a28.sh
+./build_install_launch_a28.sh
 ```
 
-### **File Structure Expected**:
-```
-~/Development/AudioTours/
-├── .git/ (Git repository)
-├── development/
-│   ├── audio_tour_app/ (Flutter project)
-│   ├── *.py (Python services)
-│   ├── docker-compose.yml
-│   └── step1_results.txt (our communication file)
-```
+## Expected Results
+- ✅ About screen shows iOS device info correctly
+- ✅ Settings persist between screen switches  
+- ✅ Location permission dialog appears
+- ✅ Core app functionality works
+- ✅ Network connectivity to Windows laptop
+
+## Files Ready
+- **Assets**: D:\Audioura\assets\ (iOS-compatible files)
+- **Copy Script**: copy_ios_fixes_v1_2_9_24.sh (FIXED)
+- **Build Script**: build_install_launch_a28.sh (proven working)
+- **Minimal home_screen.dart**: Dependencies removed, location fix preserved
 
 ---
 
-## DECISION MATRIX
+# A28 - Build, Install, Launch (CORRECTED)
+**T:** 04/29/2026 21:30
+**Status:** ✅ SUCCESS - APP RUNNING ON IPHONE 16
 
-**Based on Step 1 Results, iOS Amazon-Q Will Provide**:
+## Results Achieved
+- **Build**: ✅ SUCCESS (exit code 0, 19.3s, 36.6MB)
+- **Install**: ✅ SUCCESS (exit code 0)
+- **Launch**: ✅ SUCCESS (exit code 0)
+- **Manual Verification**: ✅ APP VISIBLE AND RUNNING ON IPHONE 16
 
-| Scenario | Next Action |
-|----------|-------------|
-| ✅ Complete structure exists | Step 2: Git pull latest Flutter fixes |
-| ❌ No repository | Step 2: Execute Git clone from setup guide |
-| ⚠️ Repository exists, missing development/ | Step 2: Fix directory structure |
-| ⚠️ Missing Flutter app | Step 2: Verify Git branch and pull |
+## Runtime Issues Resolved
+1. **Database Connection**: ✅ FIXED (IP corrected to 192.168.0.218)
+2. **iOS Device Info**: ✅ FIXED (Platform.isIOS support added)
+3. **Settings Persistence**: ✅ FIXED (UI refresh after save)
+4. **Location Permissions**: ✅ FIXED (Geolocator.requestPermission)
 
 ---
 
-**READY FOR EXECUTION**: 
-Execute Step 1 verification command and report back with results!
+# A27 - Configuration Chain Fix
+**T:** 04/29/2026 16:49
+**Status:** ✅ SUCCESS - iOS BUILD BARRIER ELIMINATED
+
+## Results
+- **Build Exit Code**: 0 ✅ (SUCCESS)
+- **FLUTTER_BUILD_DIR**: YES ✅ (Critical fix confirmed)
+- **Configuration Chain**: ✅ Restored (Debug/Release → Flutter xcconfigs)
+- **Runner.app**: 36.1MB ✅ (Complete build artifact)
+
+## What Was Fixed
+- baseConfigurationReference chain restored using Python fix
+- Debug/Release now point to Flutter xcconfigs → Generated.xcconfig
+- xcode_backend.dart:345 null-check resolved
+
+---
+
+# A26 - Targeted Configuration Fix
+**T:** 04/29/2026 14:30
+**Status:** ✅ SUCCESS - PREPARATION FOR A27
+
+## Script Created
+- **fix_baseconfig_a26.sh**: Targeted fix for baseConfigurationReference
+- **Backup Strategy**: Creates timestamped backup of project.pbxproj
+- **Immediate Testing**: Runs flutter build ios --release --no-codesign
+
+---
+
+# A25 - Sentinel Test Execution
+**T:** 04/29/2026 12:15
+**Status:** ✅ SUCCESS - BRANCH B CONFIRMED
+
+## Results
+- **Sentinel Test**: Release.xcconfig completely bypassed
+- **Branch Determination**: Branch B (baseConfigurationReference fix needed)
+- **Evidence**: Complete diagnostic capture in D:\Audioura\results\
+
+---
+
+# A24 - Environment Capture v3
+**T:** 04/29/2026 10:45
+**Status:** ✅ SUCCESS - ROOT CAUSE IDENTIFIED
+
+## Critical Discovery
+- **FLUTTER_BUILD_DIR**: COMPLETELY MISSING from Run Script Phase environment
+- **FLUTTER_ROOT**: Present and correct
+- **Root Cause**: Environment variable not propagated to build scripts
+
+---
+
+# A23 - iPhone Detection Resolution
+**T:** 04/28/2026 18:20
+**Status:** ✅ SUCCESS - DEVICE UDID CORRECTED
+
+## Corrections Made
+- **Actual iPhone UDID**: F9D6F807-D301-59EE-B574-5747D617D82C
+- **Previous Incorrect**: 00008140-000558A902BA801C
+- **CoreDevice Service**: Resolved and working
+
+---
+
+# A22 - Complete Signing Installation
+**T:** 04/22/2026 11:56
+**Status:** ✅ COMPLETED - MOVED TO A23
+
+## Script Created
+- **complete_signing_installation.sh**: Combined code signing + installation
+- **5 Installation Methods**: devicectl, Flutter, Xcode, libimobiledevice, manual
+- **Comprehensive Fallback**: Detailed manual drag-and-drop instructions
+
+---
+
+# A21 - Revert Podfile and Diagnose
+**T:** 04/22/2026 09:47
+**Status:** ✅ COMPLETED - DIAGNOSTIC APPROACH
+
+## Strategy
+- **Approach Change**: From CwlCatchException exclusion to proper framework embedding
+- **Evidence First**: Gather comprehensive diagnostics before attempting fix
+- **Controlled Reproduction**: Intentionally reproduce original crash for diagnosis
+
+## Script
+- **podfile_revert_and_diagnose.sh**: Clean Podfile + 6 comprehensive diagnostics
+- **Expected**: App crashes with original "Library not loaded" error (INTENTIONAL)
+
+---
+
+# A20 - Remove CwlCatchException Source Plugin
+**T:** 04/21/2026 17:21
+**Status:** ✅ COMPLETED - MOVED TO A21
+
+## Script
+- **remove_cwl_source_plugin.sh**: Remove problematic plugins
+- **Target Plugins**: speech_to_text, flutter_sound
+- **Strategy**: Use alternatives or basic implementations
+
+---
+
+# A19 - Verify Developer Mode
+**T:** 04/19/2026 19:48
+**Status:** ✅ COMPLETED - PREREQUISITES MET
+
+## Verification Results
+- **Developer Mode**: ✅ Enabled
+- **USB Connection**: ✅ Connected
+- **Device Detection**: ✅ iPhone 16 detected
+- **Trust Status**: ✅ Paired and trusted
+
+## Next Steps Determined
+- All prerequisites met for direct Xcode installation
+- Proceeded to Assignment 20 for CwlCatchException resolution

@@ -32,6 +32,10 @@
 	<string>This app needs speech recognition for voice commands</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app needs microphone access for voice commands</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Audioura needs location access to find nearby tours and provide location-based audio experiences.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Audioura uses location to deliver contextual tour content and find nearby points of interest.</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

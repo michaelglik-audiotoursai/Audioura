@@ -59,10 +59,16 @@ class _AboutScreenState extends State<AboutScreen> {
       if (userId == null) {
         if (kIsWeb) {
           userId = 'WEB-USER-${DateTime.now().millisecondsSinceEpoch}';
-        } else {
+        } else if (Platform.isAndroid) {
           final deviceInfo = DeviceInfoPlugin();
           final androidInfo = await deviceInfo.androidInfo;
           userId = _generateUserId(androidInfo);
+        } else if (Platform.isIOS) {
+          final deviceInfo = DeviceInfoPlugin();
+          final iosInfo = await deviceInfo.iosInfo;
+          userId = _generateUserId(iosInfo);
+        } else {
+          userId = 'UNKNOWN-USER-${DateTime.now().millisecondsSinceEpoch}';
         }
         await prefs.setString('user_id', userId);
       }
@@ -87,6 +93,11 @@ class _AboutScreenState extends State<AboutScreen> {
         final androidInfo = await deviceInfo.androidInfo;
         deviceModel = '${androidInfo.brand} ${androidInfo.model}';
         osVersion = 'Android ${androidInfo.version.release}';
+      } else if (Platform.isIOS) {
+        final deviceInfo = DeviceInfoPlugin();
+        final iosInfo = await deviceInfo.iosInfo;
+        deviceModel = '${iosInfo.name} ${iosInfo.model}';
+        osVersion = 'iOS ${iosInfo.systemVersion}';
       }
       
       setState(() {
@@ -110,9 +121,16 @@ class _AboutScreenState extends State<AboutScreen> {
     }
   }
 
-  String _generateUserId(AndroidDeviceInfo androidInfo) {
-    final deviceId = '${androidInfo.brand}-${androidInfo.model}-${androidInfo.id}'.hashCode.abs();
-    return 'USER-${deviceId.toString().padLeft(8, '0')}';
+  String _generateUserId(dynamic deviceInfo) {
+    String deviceId;
+    if (Platform.isAndroid) {
+      deviceId = '${deviceInfo.brand}-${deviceInfo.model}-${deviceInfo.id}'.hashCode.abs().toString();
+    } else if (Platform.isIOS) {
+      deviceId = '${deviceInfo.name}-${deviceInfo.model}-${deviceInfo.identifierForVendor}'.hashCode.abs().toString();
+    } else {
+      deviceId = 'WEB-${DateTime.now().millisecondsSinceEpoch}';
+    }
+    return 'USER-${deviceId.padLeft(8, '0')}';
   }
 
   @override
@@ -427,12 +445,17 @@ class _AboutScreenState extends State<AboutScreen> {
       _currentServerIp = newIp;
     });
     
+    await DebugLogHelper.addDebugLog('ABOUT: Server IP saved to: $newIp');
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Server IP updated to: $newIp'),
         backgroundColor: Colors.green,
       ),
     );
+    
+    // Reload app info to refresh the display
+    await _loadAppInfo();
   }
 
   Widget _buildInfoRow(String label, String value) {
