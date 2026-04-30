@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
@@ -9,19 +10,22 @@ class DeviceService {
     String? userId = prefs.getString('user_id');
     
     if (userId == null) {
-      // Generate new user ID if not exists
       final deviceInfo = DeviceInfoPlugin();
-      final androidInfo = await deviceInfo.androidInfo;
-      userId = _generateUserId(androidInfo);
+      if (Platform.isIOS) {
+        final iosInfo = await deviceInfo.iosInfo;
+        userId = _generateUserIdFromString('${iosInfo.name}-${iosInfo.model}-${iosInfo.identifierForVendor}');
+      } else {
+        final androidInfo = await deviceInfo.androidInfo;
+        userId = _generateUserIdFromString('${androidInfo.brand}-${androidInfo.model}-${androidInfo.id}');
+      }
       await prefs.setString('user_id', userId);
     }
     
     return userId;
   }
   
-  /// Generate user ID from device info
-  static String _generateUserId(AndroidDeviceInfo androidInfo) {
-    final deviceId = '${androidInfo.brand}-${androidInfo.model}-${androidInfo.id}'.hashCode.abs();
+  static String _generateUserIdFromString(String input) {
+    final deviceId = input.hashCode.abs();
     return 'USER-${deviceId.toString().padLeft(8, '0')}';
   }
 }
