@@ -299,17 +299,28 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
             // Extract detailed error information from Services
             String errorMessage = 'Tour generation failed';
             String userFriendlyMessage = 'Unable to generate tour. Please try again.';
+            List<String> suggestions = [];
             
             if (status['error'] != null) {
               errorMessage = status['error'].toString();
             }
             
-            if (status['user_message'] != null) {
+            // Check for user_error field with detailed information
+            if (status['user_error'] != null) {
+              final userError = status['user_error'];
+              if (userError['message'] != null) {
+                userFriendlyMessage = userError['message'].toString();
+              }
+              if (userError['suggestions'] != null && userError['suggestions'] is List) {
+                suggestions = List<String>.from(userError['suggestions']);
+              }
+            } else if (status['user_message'] != null) {
               userFriendlyMessage = status['user_message'].toString();
             } else if (status['error_type'] != null) {
               // Handle specific error types from Services
               switch (status['error_type']) {
                 case 'knowledge_validation_failed':
+                case 'ai_knowledge_insufficient':
                   userFriendlyMessage = 'Unable to find sufficient information about this location. Please try a more specific or well-known location.';
                   break;
                 case 'location_not_found':
@@ -330,8 +341,14 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
             await DebugLogHelper.addDebugLog('TOUR_ERROR: Services returned error - Type: ${status['error_type']}, Message: $errorMessage');
             await DebugLogHelper.addDebugLog('TOUR_ERROR: Full status response: ${jsonEncode(status)}');
             
-            // Show user-friendly error to user
-            throw Exception(userFriendlyMessage);
+            // Show user-friendly error dialog instead of just throwing exception
+            setState(() {
+              _isGenerating = false;
+              _progress = '';
+            });
+            
+            _showServicesErrorDialog(userFriendlyMessage, suggestions);
+            return;
             
           } else if (attempts >= maxAttempts) {
             timer.cancel();
@@ -619,6 +636,62 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     return count > 0 ? '$baseTitle (v${count + 1})' : baseTitle;
   }
 
+  void _showServicesErrorDialog(String message, List<String> suggestions) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.red, size: 28),
+            SizedBox(width: 8),
+            Text('Tour Generation Failed'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                message,
+                style: const TextStyle(fontSize: 16),
+              ),
+              if (suggestions.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                const Text(
+                  'Suggestions:',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
+                ),
+                const SizedBox(height: 8),
+                ...suggestions.map((suggestion) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    '• $suggestion',
+                    style: const TextStyle(fontSize: 14, color: Colors.blue),
+                  ),
+                )),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Clear the input and let user try again
+              _tourRequestController.clear();
+            },
+            child: const Text('Try Again', style: TextStyle(color: Colors.blue)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showError(String message) {
     print('ERROR: $message');
     ScaffoldMessenger.of(context).showSnackBar(
@@ -670,7 +743,9 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         backgroundColor: const Color(0xFF2c3e50),
         foregroundColor: Colors.white,
       ),
-      body: SingleChildScrollView(
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -783,19 +858,27 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
                     maxLines: 3,
                     enabled: !_isGenerating,
                     keyboardType: TextInputType.multiline,
-                    decoration: const InputDecoration(
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => FocusScope.of(context).unfocus(),
+                    decoration: InputDecoration(
                       hintText: 'Enter up to 3 newsletter URLs (one per line):\n\nhttps://thedailyrip.stocktwits.com/\nhttps://morningbrew.com/daily\nhttps://example.com/newsletter',
                       border: OutlineInputBorder(),
                       filled: true,
                       fillColor: Colors.white,
                       contentPadding: EdgeInsets.all(12),
                       helperText: 'Up to 3 URLs, one per line. Each will be processed for up to 10 articles.',
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.keyboard_hide),
+                        onPressed: () => FocusScope.of(context).unfocus(),
+                      ),
                     ),
                   )
                 : TextField(
                     controller: _tourRequestController,
                     maxLines: 3,
                     enabled: !_isGenerating,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => FocusScope.of(context).unfocus(),
                     decoration: InputDecoration(
                       hintText: _appMode == 'Audio' 
                         ? 'Paste your article here...\n\nExample:\n"The Grenadian Voice: Latest News - Prime Minister announces new economic policies affecting local businesses..."' 
@@ -803,6 +886,10 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
                       border: const OutlineInputBorder(),
                       filled: true,
                       fillColor: Colors.white,
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.keyboard_hide),
+                        onPressed: () => FocusScope.of(context).unfocus(),
+                      ),
                     ),
                   ),
             const SizedBox(height: 16),
@@ -998,6 +1085,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
             ],
           ],
         ),
+      ),
       ),
     );
   }
