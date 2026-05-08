@@ -937,7 +937,7 @@ class _HomeScreenState extends State<HomeScreen> {
     int successCount = 0;
     for (final tour in toursToDownload) {
       try {
-        await _downloadSingleTour(tour['id'], languages);
+        await _downloadSingleTourSilent(tour['id'], languages);
         successCount++;
       } catch (e) {
         // Continue with next tour
@@ -1124,6 +1124,27 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
   
+  // Silent version used by _downloadMultipleTours - caller manages the dialog.
+  Future<void> _downloadSingleTourSilent(int tourId, [List<String>? languages]) async {
+    final prefs = await SharedPreferences.getInstance();
+    final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
+
+    final url = 'http://$serverIp:5005/download-tour/$tourId';
+    final response = await http.get(Uri.parse(url)).timeout(Duration(seconds: 120));
+    if (response.statusCode == 200) {
+      await _saveTourToMyTours(tourId, response.bodyBytes);
+    } else {
+      throw Exception('Failed to download tour: ${response.statusCode}');
+    }
+
+    if (languages != null) {
+      final nonEnglish = languages.where((l) => l != 'en').toList();
+      if (nonEnglish.isNotEmpty) {
+        await DebugLogHelper.addDebugLog('HOME: Requesting tour translation for languages: ${nonEnglish.join(", ")}');
+      }
+    }
+  }
+
   Future<void> _downloadSingleTour(int tourId, [List<String>? languages]) async {
     final prefs = await SharedPreferences.getInstance();
     final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';

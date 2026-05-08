@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'dart:async';
 import '../services/voice_control_service.dart';
 import 'debug_log_viewer_screen.dart';
@@ -13,6 +14,7 @@ mixin VoiceMethods<T extends StatefulWidget> on State<T> {
   InAppWebViewController? webController;
 
   Future<void> initializeVoiceControl() async {
+    await voiceService.requestMicPermissionOnFirstLaunch();
     await voiceService.initialize();
     voiceService.onVoiceCommand = handleVoiceCommand;
   }
@@ -202,6 +204,29 @@ mixin VoiceMethods<T extends StatefulWidget> on State<T> {
           await DebugLogHelper.addDebugLog('VOICE: Pause for listening error: $e');
         }
         break;
+      case 'mic_permission_denied':
+        await DebugLogHelper.addDebugLog('VOICE: Showing mic permission settings dialog');
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text('Microphone Access Required'),
+            content: Text('Audioura needs microphone access for voice commands.\n\nPlease go to Settings > Audioura > Microphone and enable it.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  openAppSettings();
+                },
+                child: Text('Open Settings'),
+              ),
+            ],
+          ),
+        );
+        return;
       case 'initialize':
         await DebugLogHelper.addDebugLog('VOICE: Initializing audio context');
         try {

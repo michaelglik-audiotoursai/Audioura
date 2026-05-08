@@ -27,19 +27,39 @@ class VoiceControlService {
   
   Function(String action, int? stopNumber, String message)? onVoiceCommand;
 
+  // Returns true if microphone permission is granted, false if permanently denied.
+  // Call this before any mic-dependent action (mic button, triple-click).
+  Future<bool> checkAndRequestMicPermission() async {
+    final status = await Permission.microphone.status;
+    if (status.isGranted) return true;
+    if (status.isPermanentlyDenied) return false;
+    final result = await Permission.microphone.request();
+    return result.isGranted;
+  }
+
+  // Call this once on first app launch (via SharedPreferences flag) to show the system permission dialog.
+  Future<void> requestMicPermissionOnFirstLaunch() async {
+    final prefs = await SharedPreferences.getInstance();
+    final alreadyAsked = prefs.getBool('mic_permission_asked') ?? false;
+    if (alreadyAsked) return;
+    await prefs.setBool('mic_permission_asked', true);
+    final status = await Permission.microphone.status;
+    if (!status.isGranted && !status.isPermanentlyDenied) {
+      final result = await Permission.microphone.request();
+      await DebugLogHelper.addDebugLog('VOICE: First-launch mic permission request result: $result');
+    }
+  }
+
   Future<void> initialize() async {
     if (_isInitialized) return;
     
     try {
-      // Check microphone permission
+      // Log current permission status only — do NOT request here.
+      // Permission is requested on first launch via requestMicPermissionOnFirstLaunch().
+      // On subsequent uses, startVoiceListening() handles denied/permanentlyDenied.
       try {
         final micPermission = await Permission.microphone.status;
-        await DebugLogHelper.addDebugLog('VOICE: Microphone permission: $micPermission');
-        
-        if (!micPermission.isGranted) {
-          final result = await Permission.microphone.request();
-          await DebugLogHelper.addDebugLog('VOICE: Microphone permission request result: $result');
-        }
+        await DebugLogHelper.addDebugLog('VOICE: Microphone permission status: $micPermission');
       } catch (e) {
         await DebugLogHelper.addDebugLog('VOICE: Permission check error: $e');
       }
@@ -90,7 +110,24 @@ class VoiceControlService {
   }
 
   void startVoiceListening() async {
-    if (!_speechEnabled || _isListening) {
+    // Do NOT use permission_handler here — it caches permanentlyDenied and never
+    // re-reads from iOS even after the user enables mic in Settings.
+    // Instead, re-initialize speech_to_text which talks to iOS natively each time.
+    try {
+      _speechEnabled = await _speechToText.initialize();
+      await DebugLogHelper.addDebugLog('VOICE: speech_to_text re-init result: $_speechEnabled');
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('VOICE: speech_to_text re-init error: $e');
+      _speechEnabled = false;
+    }
+
+    if (!_speechEnabled) {
+      await DebugLogHelper.addDebugLog('VOICE: Mic not available after re-init - sending to Settings');
+      onVoiceCommand?.call('mic_permission_denied', null, 'Microphone access required. Please enable it in Settings > Audioura > Microphone.');
+      return;
+    }
+
+    if (_isListening) {
       onVoiceCommand?.call('play', null, 'Playing audio (fallback)');
       return;
     }
