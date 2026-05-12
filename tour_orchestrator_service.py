@@ -509,6 +509,32 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         
         ACTIVE_JOBS[job_id]["extract_dir"] = extract_dir
         
+        # COUNT ASSERTION: ZIP must have exactly total_stops audio files
+        expected_stops = ACTIVE_JOBS[job_id].get("total_stops")
+        audio_files_in_zip = []
+        try:
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                audio_files_in_zip = [
+                    n for n in zip_ref.namelist()
+                    if re.fullmatch(r'audio_\d+\.mp3', n)
+                ]
+            actual_stops = len(audio_files_in_zip)
+        except Exception as count_err:
+            print(f"WARNING: Could not verify stop count in ZIP: {count_err}")
+            actual_stops = None
+        
+        print(f"STOP COUNT VERIFICATION: expected={expected_stops}, actual={actual_stops}, files={sorted(audio_files_in_zip)}")
+        ACTIVE_JOBS[job_id]["expected_stops"] = expected_stops
+        ACTIVE_JOBS[job_id]["actual_stops"] = actual_stops
+        
+        if actual_stops is not None and actual_stops != expected_stops:
+            warning_msg = (
+                f"STOP COUNT MISMATCH: requested {expected_stops} stops, "
+                f"delivered {actual_stops}. Job {job_id}."
+            )
+            print(f"ERROR: {warning_msg}")
+            ACTIVE_JOBS[job_id]["stop_count_warning"] = warning_msg
+        
         # Step 5: Store in database with original tour content
         log_job_update(job_id, ACTIVE_JOBS[job_id]["status"], "Step 5/5: Storing modernized tour in database...")
         tour_name = f"{location} - {tour_type} Tour"
@@ -932,6 +958,12 @@ def get_job_status(job_id):
             response["final_tour_id"] = job["final_tour_id"]
         if "translated_tour_id" in job:
             response["translated_tour_id"] = job["translated_tour_id"]
+        if "expected_stops" in job:
+            response["expected_stops"] = job["expected_stops"]
+        if "actual_stops" in job:
+            response["actual_stops"] = job["actual_stops"]
+        if "stop_count_warning" in job:
+            response["stop_count_warning"] = job["stop_count_warning"]
     elif job["status"] == "error":
         response["error"] = job["error"]
     
