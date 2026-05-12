@@ -860,7 +860,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
 
         print(f"\nGenerating description for Stop {stop_num}: {poi_name} by {artist}, {year}...")
 
-        description_prompt = f"""Create a detailed description for Stop {stop_num}: {poi_name} by {artist}, {year} in a walking tour of {location} focusing on {tour_type}.
+        description_prompt = f"""Create a detailed description for {poi_name} in a walking tour of {location} focusing on {tour_type}.
 
 Start with an orientation section that explains where the visitor should position themselves to best view and appreciate this exhibit.
 
@@ -960,8 +960,8 @@ DO NOT include directions to the next stop - these will be added separately.
         artist = poi["artist"]
         year = poi["year"]
         orientation = poi.get("orientation", "Position yourself to best view this location.")
-        # Strip any "Stop N: Name" prefix the AI may have embedded in the orientation text
-        orientation = re.sub(r'^Stop\s+\d+:\s*\S.*?[,.]?\s*', '', orientation, count=1, flags=re.IGNORECASE).strip()
+        # Strip any "Stop N:" prefix the AI may have echoed into the orientation text
+        orientation = re.sub(r'^Stop\s+\d+:\s*', '', orientation, count=1, flags=re.IGNORECASE).strip()
         if not orientation:
             orientation = "Position yourself to best view this location."
         description = poi.get("description", f"[Description for {poi_name} could not be generated.]")
