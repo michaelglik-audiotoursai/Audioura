@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 import 'package:permission_handler/permission_handler.dart';
@@ -69,7 +70,7 @@ class _EditStopScreenState extends State<EditStopScreen> {
     if (widget.stopData['recording_parts'] != null) {
       _recordingParts = List<String>.from(widget.stopData['recording_parts']);
       // Remove await from non-async initState method
-      DebugLogHelper.addDebugLog('EDIT_STOP: Restored ${_recordingParts.length} existing recording parts');
+      unawaited(DebugLogHelper.addDebugLog('EDIT_STOP: Restored ${_recordingParts.length} existing recording parts')); // sync init
     }
     
     // Initialize audio source based on stop state
@@ -2191,7 +2192,7 @@ class _EditStopScreenState extends State<EditStopScreen> {
     if (confirmed == true) {
       widget.stopData['action'] = 'delete';
       
-      DebugLogHelper.addDebugLog('USER_ACTION: Marked stop ${widget.stopData['stop_number']} for deletion');
+      unawaited(DebugLogHelper.addDebugLog('USER_ACTION: Marked stop ${widget.stopData['stop_number']} for deletion')); // sync callback
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -2385,7 +2386,7 @@ class _EditStopScreenState extends State<EditStopScreen> {
                                                 _selectedAudioSource = value;
                                               });
                                               _loadSelectedAudio();
-                                              DebugLogHelper.addDebugLog('DROPDOWN: Selected $value');
+                                              unawaited(DebugLogHelper.addDebugLog('DROPDOWN: Selected $value')); // sync callback
                                             }
                                           },
                                         ),

@@ -67,7 +67,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
   
   void _setupScrollListener() {
     // SCROLL LISTENER DISABLED - not essential for core functionality
-    DebugLogHelper.addDebugLog('SCROLL: Listener disabled - not needed for core functionality');
+    unawaited(DebugLogHelper.addDebugLog('SCROLL: Listener disabled - not needed for core functionality')); // sync callback, cannot await
   }
   
   void _setupVoiceCommands() async {
@@ -610,12 +610,34 @@ class _MyToursScreenState extends State<MyToursScreen> {
   Future<void> _loadTours() async {
     final prefs = await SharedPreferences.getInstance();
     final tours = prefs.getStringList('saved_tours') ?? [];
-    
+
+    await DebugLogHelper.addDebugLog('LISTEN: Loading ${tours.length} tours from storage');
+
+    final parsed = <Map<String, dynamic>>[];
+    for (final tourJson in tours) {
+      try {
+        final tour = jsonDecode(tourJson) as Map<String, dynamic>;
+        if (tour['title'] is! String || tour['path'] is! String || tour['created'] is! String) {
+          await DebugLogHelper.addDebugLog('LISTEN: Skipping tour with invalid field types: ${tour.keys.toList()}');
+          continue;
+        }
+        parsed.add(tour);
+      } catch (e) {
+        await DebugLogHelper.addDebugLog('LISTEN: Skipping corrupt tour entry: $e');
+      }
+    }
+
+    await DebugLogHelper.addDebugLog('LISTEN: Loaded ${parsed.length} valid tours (${tours.length - parsed.length} skipped)');
+
+    if (parsed.length != tours.length) {
+      await prefs.setStringList('saved_tours', parsed.map((t) => json.encode(t)).toList());
+      await DebugLogHelper.addDebugLog('LISTEN: Pruned ${tours.length - parsed.length} corrupt entries from saved_tours');
+    }
+
     setState(() {
-      _tours = tours.map((tour) => jsonDecode(tour) as Map<String, dynamic>).toList().reversed.toList();
+      _tours = parsed.reversed.toList();
     });
-    
-    // Save available tours list for voice navigation
+
     final tourInfoList = _tours.map((tour) => '${tour['title']}|${tour['path']}').toList();
     await prefs.setStringList('available_tours', tourInfoList);
   }

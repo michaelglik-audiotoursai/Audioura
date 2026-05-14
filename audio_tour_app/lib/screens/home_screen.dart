@@ -18,6 +18,7 @@ import '../services/subscription_service.dart';
 import '../services/subscription_encryption_service.dart';
 import '../services/device_service.dart';
 import '../services/translation_service.dart';
+import '../config.dart';
 // import '../services/credential_storage_service.dart';  // TEMPORARILY DISABLED - CAUSING BUILD ERRORS
 // import '../services/subscription_article_storage.dart';  // TEMPORARILY DISABLED - CAUSING BUILD ERRORS
 import '../widgets/subscription_credential_dialog.dart';
@@ -309,7 +310,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
+      final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
       final url = 'http://$serverIp:5005/tours-near/${searchLocation.latitude}/${searchLocation.longitude}?radius=50';
       
       await DebugLogHelper.addDebugLog('HOME: Requesting tours from: $url');
@@ -935,22 +936,38 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     
     int successCount = 0;
+    int translationSuccessCount = 0;
+    final Map<String, List<String>> failuresByTour = {};
     for (final tour in toursToDownload) {
       try {
-        await _downloadSingleTourSilent(tour['id'], languages);
+        final failures = await _downloadSingleTourSilent(tour['id'], languages);
         successCount++;
+        final nonEnglish = (languages ?? []).where((l) => l != 'en').toList();
+        translationSuccessCount += nonEnglish.length - failures.length;
+        if (failures.isNotEmpty) {
+          failuresByTour[tour['name'] ?? 'Tour ${tour['id']}'] = failures;
+        }
       } catch (e) {
         // Continue with next tour
       }
     }
-    
-    Navigator.pop(context);
-    
+
+    if (!mounted) return;
+    if (Navigator.canPop(context)) Navigator.pop(context);
+
     String message;
     if (successCount > 0) {
-      message = '$successCount tours downloaded and now are available on your Listen Page';
+      final tourWord = successCount == 1 ? 'tour' : 'tours';
+      if (translationSuccessCount > 0) {
+        message = '$successCount $tourWord downloaded with $translationSuccessCount translation${translationSuccessCount == 1 ? '' : 's'}';
+      } else {
+        message = '$successCount $tourWord downloaded and now are available on your Listen Page';
+      }
       if (alreadyDownloaded > 0) {
         message += ' ($alreadyDownloaded were already downloaded)';
+      }
+      if (failuresByTour.isNotEmpty) {
+        message += '. Some translations failed: ' + failuresByTour.entries.map((e) => '${e.key}: ${e.value.join(", ")}').join('; ');
       }
     } else {
       message = 'No new tours downloaded';
@@ -958,7 +975,8 @@ class _HomeScreenState extends State<HomeScreen> {
         message += ' - all selected tours were already available';
       }
     }
-    
+
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -1033,7 +1051,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     try {
-      final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
+      final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
       final url = 'http://$serverIp:5005/download-tour/$tourId';
       
       await DebugLogHelper.addDebugLog('HOME: Downloading from: $url');
@@ -1125,9 +1143,98 @@ class _HomeScreenState extends State<HomeScreen> {
   }
   
   // Silent version used by _downloadMultipleTours - caller manages the dialog.
-  Future<void> _downloadSingleTourSilent(int tourId, [List<String>? languages]) async {
+  // Handles both response shapes:
+  // Shape A (ISSUE-058 spec): {"translated_tour_ids": {"ru": 168}}
+  // Shape B (actual server):  {"translations": {"ru": {"id": 168, "status": "translated"}}}
+  Map<String, dynamic>? _extractTranslatedIds(Map<String, dynamic> result) {
+    if (result.containsKey('translated_tour_ids')) {
+      return result['translated_tour_ids'] as Map<String, dynamic>?;
+    }
+    final translations = result['translations'] as Map<String, dynamic>?;
+    if (translations == null) return null;
+    return translations.map((lang, val) {
+      final id = val is Map ? val['id'] : val;
+      return MapEntry(lang, id);
+    });
+  }
+
+  // Resolves the editTourId for a given download ID by calling the resolution endpoint.
+  // Used to populate parent_tour_id on translated tours.
+  Future<String> _resolveParentEditTourId(int downloadTourId, SharedPreferences prefs) async {
+    final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
+    try {
+      final resp = await http.get(Uri.parse('http://$serverIp:5025/tour/$downloadTourId/resolve'));
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body);
+        return (data['edit_tour_id'] ?? '').toString();
+      }
+    } catch (_) {}
+    return '';
+  }
+
+  // M8: Shared translation download logic used by both _downloadSingleTour
+  // and _downloadSingleTourSilent. Returns list of language codes that failed.
+  // English must already be saved before calling this.
+  Future<List<String>> _downloadTranslatedVersions(
+    int tourId,
+    List<String> languages,
+    String serverIp,
+    String parentEditTourId,
+  ) async {
+    final failures = <String>[];
+    final nonEnglish = languages.where((l) => l != 'en').toList();
+    if (nonEnglish.isEmpty) return failures;
+
+    try {
+      await DebugLogHelper.addDebugLog('HOME: Requesting tour translation for languages: ${nonEnglish.join(", ")}');
+      final result = await TranslationService.translateTour(tourId: tourId, languages: nonEnglish);
+
+      if (result['status'] == 'completed') {
+        final translatedIds = _extractTranslatedIds(result);
+        if (translatedIds != null) {
+          for (final lang in nonEnglish) {
+            final translatedId = translatedIds[lang];
+            if (translatedId == null) {
+              failures.add(lang);
+              await DebugLogHelper.addDebugLog('HOME: Translation service did not return ID for $lang');
+              continue;
+            }
+            try {
+              final translatedUrl = 'http://$serverIp:5005/download-tour/$translatedId';
+              final translatedResponse = await http.get(Uri.parse(translatedUrl)).timeout(Duration(seconds: 120));
+              if (translatedResponse.statusCode == 200) {
+                final prefs = await SharedPreferences.getInstance();
+                final appDir = await getApplicationDocumentsDirectory();
+                await _saveTourToMyToursTranslated(translatedId, translatedResponse.bodyBytes, appDir.path, prefs, parentEditTourId, lang);
+                await DebugLogHelper.addDebugLog('HOME: Saved translated tour ($lang) ID: $translatedId');
+              } else {
+                failures.add(lang);
+                await DebugLogHelper.addDebugLog('HOME: Failed to download translated tour ($lang): ${translatedResponse.statusCode}');
+              }
+            } catch (e) {
+              failures.add(lang);
+              await DebugLogHelper.addDebugLog('HOME: Error saving translated tour ($lang): $e');
+            }
+          }
+        } else {
+          for (final lang in nonEnglish) failures.add(lang);
+          await DebugLogHelper.addDebugLog('HOME: Translation service returned unrecognized response shape');
+        }
+      } else {
+        for (final lang in nonEnglish) failures.add(lang);
+        await DebugLogHelper.addDebugLog('HOME: Translation failed: ${result["message"]}');
+      }
+    } catch (e) {
+      for (final lang in nonEnglish) failures.add(lang);
+      await DebugLogHelper.addDebugLog('HOME: Translation block error: $e');
+      // English is already saved — do not rethrow
+    }
+    return failures;
+  }
+
+  Future<List<String>> _downloadSingleTourSilent(int tourId, [List<String>? languages]) async {
     final prefs = await SharedPreferences.getInstance();
-    final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
+    final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
 
     final url = 'http://$serverIp:5005/download-tour/$tourId';
     final response = await http.get(Uri.parse(url)).timeout(Duration(seconds: 120));
@@ -1137,17 +1244,17 @@ class _HomeScreenState extends State<HomeScreen> {
       throw Exception('Failed to download tour: ${response.statusCode}');
     }
 
-    if (languages != null) {
-      final nonEnglish = languages.where((l) => l != 'en').toList();
-      if (nonEnglish.isNotEmpty) {
-        await DebugLogHelper.addDebugLog('HOME: Requesting tour translation for languages: ${nonEnglish.join(", ")}');
-      }
-    }
+    if (languages == null) return [];
+    final nonEnglish = languages.where((l) => l != 'en').toList();
+    if (nonEnglish.isEmpty) return [];
+
+    final parentEditTourId = await _resolveParentEditTourId(tourId, prefs);
+    return await _downloadTranslatedVersions(tourId, nonEnglish, serverIp, parentEditTourId);
   }
 
   Future<void> _downloadSingleTour(int tourId, [List<String>? languages]) async {
     final prefs = await SharedPreferences.getInstance();
-    final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
+    final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
     
     showDialog(
       context: context,
@@ -1172,12 +1279,15 @@ class _HomeScreenState extends State<HomeScreen> {
       } else {
         throw Exception('Failed to download tour: ${response.statusCode}');
       }
-      
+
+      if (!mounted) return;
+
       // If languages specified, request translation from Services
+      final List<String> translationFailures = [];
       if (languages != null && languages.isNotEmpty) {
         final nonEnglishLanguages = languages.where((lang) => lang != 'en').toList();
         if (nonEnglishLanguages.isNotEmpty) {
-          Navigator.pop(context); // Close download dialog
+          if (Navigator.canPop(context)) Navigator.pop(context); // Close download dialog
           showDialog(
             context: context,
             barrierDismissible: false,
@@ -1191,31 +1301,40 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           );
-          
-          // Send language parameter to Services for tour generation
-          // Services should handle translation internally
-          await DebugLogHelper.addDebugLog('HOME: Requesting tour translation for languages: ${nonEnglishLanguages.join(", ")}');
-          
-          Navigator.pop(context); // Close translation dialog
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Translation request sent to Services. Check Services Amazon-Q for implementation status.'),
-              backgroundColor: Colors.orange,
-            ),
-          );
+
+          final parentEditTourId = await _resolveParentEditTourId(tourId, prefs);
+          final failures = await _downloadTranslatedVersions(tourId, nonEnglishLanguages, serverIp, parentEditTourId);
+          translationFailures.addAll(failures);
+
+          if (!mounted) return;
+          if (Navigator.canPop(context)) Navigator.pop(context); // Close translation dialog
+        } else {
+          if (Navigator.canPop(context)) Navigator.pop(context); // Close download dialog
         }
       } else {
-        Navigator.pop(context); // Close download dialog
+        if (Navigator.canPop(context)) Navigator.pop(context); // Close download dialog
       }
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Tour downloaded successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+
+      if (!mounted) return;
+      if (translationFailures.isEmpty) {
+        final nonEnglish = (languages ?? []).where((l) => l != 'en').toList();
+        final msg = nonEnglish.isEmpty
+            ? 'Tour downloaded successfully!'
+            : 'Tour downloaded with ${nonEnglish.length} translation${nonEnglish.length == 1 ? '' : 's'} (${nonEnglish.join(", ")})';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg), backgroundColor: Colors.green),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('English downloaded; ${translationFailures.join(", ")} translation failed.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
     } catch (e) {
-      Navigator.pop(context);
+      if (!mounted) return;
+      if (Navigator.canPop(context)) Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error downloading tour: $e'),
@@ -1385,7 +1504,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<List<Map<String, dynamic>>> _searchTours(String query) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
+      final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
       
       // Convert wildcard pattern to regex
       final regexPattern = query.replaceAll('*', '.*');
@@ -1435,7 +1554,49 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _saveTourToMyTours(int tourId, List<int> zipBytes) async {
+  // Saves a translated tour directly without backend resolution (translated tours have no edit_tour_id)
+  Future<void> _saveTourToMyToursTranslated(int tourId, List<int> zipBytes, String appDirPath, SharedPreferences prefs, String parentEditTourId, String lang) async {
+    final archive = ZipDecoder().decodeBytes(zipBytes);
+    String tourName = 'Translated Tour $tourId';
+    // Try to extract tour name from ZIP manifest
+    for (final file in archive) {
+      if (file.name.endsWith('manifest.json') || file.name.endsWith('tour.json')) {
+        try {
+          final data = json.decode(utf8.decode(file.content as List<int>));
+          tourName = data['tour_name'] ?? data['name'] ?? tourName;
+          break;
+        } catch (_) {}
+      }
+    }
+    final safeName = tourName.replaceAll(RegExp(r'[^\w]'), '_').replaceAll(RegExp(r'_+'), '_').toLowerCase();
+    final dirName = '${safeName}_${lang}_$tourId';
+    final tourDir = Directory('$appDirPath/tours/$dirName');
+    await tourDir.create(recursive: true);
+    for (final file in archive) {
+      if (!file.isFile) continue;
+      final outFile = File('${tourDir.path}/${file.name}');
+      await outFile.parent.create(recursive: true);
+      await outFile.writeAsBytes(file.content as List<int>);
+    }
+    final actualStops = await _countTourStops(zipBytes);
+    final savedTours = prefs.getStringList('saved_tours') ?? [];
+    final tourData = {
+      'title': tourName,
+      'path': tourDir.path,
+      'created': DateTime.now().toIso8601String(),
+      'stops': actualStops.toString(),
+      'original_request': tourName,
+      'tour_id': tourId.toString(),
+      'editable': false,
+      'is_translation': true,
+      'parent_tour_id': parentEditTourId.isEmpty ? null : parentEditTourId,
+    };
+    savedTours.add(json.encode(tourData));
+    await prefs.setStringList('saved_tours', savedTours);
+    await DebugLogHelper.addDebugLog('HOME: Saved translated tour $tourId as: $tourName');
+  }
+
+  Future<void> _saveTourToMyTours(int tourId, List<int> zipBytes, {bool isTranslation = false}) async {
     try {
       await DebugLogHelper.addDebugLog('HOME: SAVE - Starting _saveTourToMyTours');
       
@@ -1455,9 +1616,12 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       
       // Get tour resolution info first
-      final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
+      final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
       await DebugLogHelper.addDebugLog('HOME: Resolving tour ID for download ID: $tourId');
       
+      assert(!isTranslation,
+          '_saveTourToMyTours should not be called with isTranslation: true after M8; '
+          'use _saveTourToMyToursTranslated directly via _downloadTranslatedVersions');
       final resolutionResponse = await http.get(
         Uri.parse('http://$serverIp:5025/tour/$tourId/resolve'),
       );
@@ -1627,7 +1791,7 @@ class _HomeScreenState extends State<HomeScreen> {
       
     } catch (e) {
       await DebugLogHelper.addDebugLog('HOME: Error saving tour to My Tours: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -1638,7 +1802,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // Load cached newsletters first
       await _loadCachedNewsletters();
       
-      final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
+      final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
       
       await DebugLogHelper.addDebugLog('HOME: Loading newsletters from http://$serverIp:5017/newsletters_v2');
       
@@ -1729,7 +1893,7 @@ class _HomeScreenState extends State<HomeScreen> {
         await DebugLogHelper.addDebugLog('NEWSLETTER: No encryption key found, processing newsletter URL to get key');
         
         final prefs = await SharedPreferences.getInstance();
-        final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
+        final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
         final deviceId = await DeviceService.getUserId();
         
         showDialog(
@@ -1792,7 +1956,7 @@ class _HomeScreenState extends State<HomeScreen> {
       await DebugLogHelper.addDebugLog('NEWSLETTER: Starting newsletter URL processing: $newsletterUrl');
       
       final prefs = await SharedPreferences.getInstance();
-      final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
+      final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
       final deviceId = await DeviceService.getUserId();
       
       showDialog(
@@ -1896,7 +2060,7 @@ class _HomeScreenState extends State<HomeScreen> {
       await DebugLogHelper.addDebugLog('NEWSLETTER: Starting _processNewsletter with ID: $newsletterId, Name: $name');
       
       final prefs = await SharedPreferences.getInstance();
-      final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
+      final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
       
       await DebugLogHelper.addDebugLog('NEWSLETTER: Using server IP: $serverIp');
       
@@ -2009,7 +2173,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _processSelectedArticles(List<Map<String, dynamic>> selectedArticles, int newsletterId, [List<String>? languages]) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
+      final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
       
       showDialog(
         context: context,
@@ -2151,7 +2315,7 @@ class _HomeScreenState extends State<HomeScreen> {
   
   Future<void> _downloadAndSaveArticle(String articleId, String title, Map<String, dynamic> article, [List<String>? languages]) async {
     final prefs = await SharedPreferences.getInstance();
-    final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
+    final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
     final deviceId = await DeviceService.getUserId();
     final subscriptionDomain = article['subscription_domain'];
     
@@ -3416,6 +3580,7 @@ class _HomeScreenState extends State<HomeScreen> {
               audioCount++;
             }
           }
+          if (audioCount == 0) await DebugLogHelper.addDebugLog('HOME: Falling back to default stop count of 10 (no tour.json stops, no MP3s)');
           return audioCount > 0 ? audioCount : 10; // Default to 10 if no audio files
         }
       }
@@ -3428,6 +3593,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
       
+      if (audioCount == 0) await DebugLogHelper.addDebugLog('HOME: Falling back to default stop count of 10 (no MP3s found in ZIP)');
       return audioCount > 0 ? audioCount : 10; // Default to 10 if no audio files found
     } catch (e) {
       await DebugLogHelper.addDebugLog('HOME: Error counting tour stops: $e');

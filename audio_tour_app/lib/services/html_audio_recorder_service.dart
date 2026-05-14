@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -381,7 +382,7 @@ class HtmlAudioRecorderService {
           _isRecording = false;
           _isPaused = false;
           
-          DebugLogHelper.addDebugLog('HTML_RECORDER: Recording complete - ${data['size']} bytes, ${_recordingDuration}s');
+          unawaited(DebugLogHelper.addDebugLog('HTML_RECORDER: Recording complete - ${data['size']} bytes, ${_recordingDuration}s')); // JS callback
         },
       );
       
@@ -391,7 +392,7 @@ class HtmlAudioRecorderService {
           final error = args[0] as String;
           _isRecording = false;
           _isPaused = false;
-          DebugLogHelper.addDebugLog('HTML_RECORDER: Recording failed - $error');
+          unawaited(DebugLogHelper.addDebugLog('HTML_RECORDER: Recording failed - $error')); // JS callback
         },
       );
       
@@ -406,7 +407,7 @@ class HtmlAudioRecorderService {
         handlerName: 'onError',
         callback: (args) {
           final error = args[0] as String;
-          DebugLogHelper.addDebugLog('HTML_RECORDER: Error - $error');
+          unawaited(DebugLogHelper.addDebugLog('HTML_RECORDER: Error - $error')); // JS callback
         },
       );
       

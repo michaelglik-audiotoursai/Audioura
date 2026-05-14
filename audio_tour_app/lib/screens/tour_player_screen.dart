@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'dart:async';
 import 'voice_methods.dart';
 import 'debug_log_viewer_screen.dart';
-import '../services/web_file_service.dart';
 
 class TourPlayerScreen extends StatefulWidget {
   final String tourPath;
@@ -42,17 +40,10 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
   }
   
   Future<String> _getIndexUrl() async {
-    if (kIsWeb) {
-      // Web platform: use blob URL
-      final blobUrl = await WebFileService.getTourFilePath(widget.tourPath, 'index.html');
-      await DebugLogHelper.addDebugLog('TOUR_PLAYER: Using web blob URL (${blobUrl.length} chars)');
-      return blobUrl;
-    } else {
-      // Mobile platform: use file URL
-      final fileUrl = 'file://${widget.tourPath}/index.html';
-      await DebugLogHelper.addDebugLog('TOUR_PLAYER: Using mobile file URL: $fileUrl');
-      return fileUrl;
-    }
+    // Mobile platform only: use file URL
+    final fileUrl = 'file://${widget.tourPath}/index.html';
+    await DebugLogHelper.addDebugLog('TOUR_PLAYER: Using mobile file URL: $fileUrl');
+    return fileUrl;
   }
 
   @override
@@ -135,7 +126,7 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                 }
               },
               onReceivedError: (InAppWebViewController controller, WebResourceRequest request, WebResourceError error) {
-                DebugLogHelper.addDebugLog('VOICE: WebView load error: ${error.description} for URL: ${request.url}');
+                unawaited(DebugLogHelper.addDebugLog('VOICE: WebView load error: ${error.description} for URL: ${request.url}')); // WebView callback
               },
             );
           } else {

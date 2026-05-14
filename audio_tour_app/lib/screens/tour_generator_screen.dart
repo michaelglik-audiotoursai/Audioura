@@ -13,6 +13,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/tour_status_service.dart';
 import '../services/background_tour_monitor.dart';
+import '../config.dart';
 import '../services/translation_service.dart';
 
 import '../screens/debug_log_viewer_screen.dart';
@@ -196,15 +197,6 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       Map<String, dynamic> tourData = _parseTourRequest(sanitizedInput);
       tourData['total_stops'] = stopCount; // Add custom stop count
       
-      // Add language parameter for tour generation
-      if (_selectedLanguages.isNotEmpty && !_selectedLanguages.contains('en')) {
-        // If only non-English languages selected, use the first one
-        tourData['language'] = _selectedLanguages.first;
-      } else if (_selectedLanguages.length > 1) {
-        // If multiple languages including English, generate in English first
-        tourData['language'] = 'en';
-      }
-      
       // Step 1: Start tour generation
       final response = await http.post(
         Uri.parse('$_apiBaseUrl/generate-complete-tour'),
@@ -281,11 +273,34 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
             });
             
             // Auto-download, extract, and play
-            await _autoDownloadAndPlay(jobId, location, languages);
+            final nonEnglish = (languages ?? []).where((l) => l != 'en').toList();
+            final wantsEnglish = languages == null || languages.isEmpty || languages.contains('en');
+            final finalTourId = await _autoDownloadAndPlay(jobId, location, languages, wantsEnglish);
             
             // Process additional languages if requested
-            if (languages != null && languages.length > 1) {
-              await _processAdditionalLanguages(jobId, location, languages);
+            if (finalTourId != null && nonEnglish.isNotEmpty) {
+              final translatedPath = await _processAdditionalLanguages(finalTourId, languages!);
+              // Remove English fallback if user didn't want it and translation succeeded
+              if (!wantsEnglish && translatedPath != null) {
+                await _removeTourFromSavedTours(finalTourId);
+                // Navigate to translated tour now that it's ready
+                if (mounted) {
+                  setState(() { _isGenerating = false; _progress = ''; });
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => TourPlayerScreen(
+                        tourPath: translatedPath,
+                        tourTitle: location,
+                      ),
+                    ),
+                  );
+                }
+              }
+              // C2: clear progress label if translation failed and user didn't want English
+              else if (!wantsEnglish && translatedPath == null) {
+                if (mounted) setState(() { _isGenerating = false; _progress = ''; });
+              }
             }
             
             // Update tour request status to completed AFTER download
@@ -375,27 +390,140 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     });
   }
 
-  Future<void> _processAdditionalLanguages(String jobId, String location, List<String> languages) async {
+  Future<String?> _processAdditionalLanguages(int finalTourId, List<String> languages) async {
+    final nonEnglish = languages.where((l) => l != 'en').toList();
+    if (nonEnglish.isEmpty) return null;
+
+    await DebugLogHelper.addDebugLog('TOUR: Requesting translations for: ${nonEnglish.join(", ")}');
+    final saved = <String>[];
+    final failed = <String>[];
+    String? firstSavedPath;
     try {
-      final nonEnglishLanguages = languages.where((lang) => lang != 'en').toList();
-      if (nonEnglishLanguages.isEmpty) return;
-      
-      await DebugLogHelper.addDebugLog('TOUR: Processing additional languages: ${nonEnglishLanguages.join(", ")}');
-      
-      // Request translation from Services for each additional language
-      for (final language in nonEnglishLanguages) {
-        await DebugLogHelper.addDebugLog('TOUR: Requesting $language translation for job $jobId');
-        
-        // Services should handle translation internally when we request with language parameter
-        // This is a placeholder for Services Amazon-Q to implement
-        await DebugLogHelper.addDebugLog('TOUR: Translation request sent to Services for $language - Services Amazon-Q needs to implement language parameter support');
+      final result = await TranslationService.translateTour(tourId: finalTourId, languages: nonEnglish);
+      if (result['status'] != 'completed') {
+        await DebugLogHelper.addDebugLog('TOUR: Translation failed: ${result["message"]}');
+        failed.addAll(nonEnglish);
+        return null;
+      }
+
+      // Extract translated IDs (handles both response shapes)
+      Map<String, dynamic>? translatedIds;
+      if (result.containsKey('translated_tour_ids')) {
+        translatedIds = result['translated_tour_ids'] as Map<String, dynamic>?;
+      } else if (result['translations'] != null) {
+        final t = result['translations'] as Map<String, dynamic>;
+        translatedIds = t.map((lang, val) => MapEntry(lang, val is Map ? val['id'] : val));
+      }
+      if (translatedIds == null) {
+        await DebugLogHelper.addDebugLog('TOUR: Unrecognized translation response shape');
+        failed.addAll(nonEnglish);
+        return null;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
+      final appDir = await getApplicationDocumentsDirectory();
+
+      for (final lang in nonEnglish) {
+        final translatedId = translatedIds[lang];
+        if (translatedId == null) {
+          await DebugLogHelper.addDebugLog('TOUR: No translated ID returned for $lang');
+          failed.add(lang);
+          continue;
+        }
+        try {
+          final url = 'http://$serverIp:5005/download-tour/$translatedId';
+          final resp = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 120));
+          if (resp.statusCode == 200) {
+            await _saveTourToMyToursTranslated(translatedId, resp.bodyBytes, appDir.path, prefs, lang);
+            await DebugLogHelper.addDebugLog('TOUR: Saved translated tour ($lang) ID: $translatedId');
+            saved.add(lang);
+            if (firstSavedPath == null) {
+              final latestTours = prefs.getStringList('saved_tours') ?? [];
+              if (latestTours.isNotEmpty) {
+                try { firstSavedPath = jsonDecode(latestTours.last)['path'] as String?; } catch (_) {}
+              }
+            }
+          } else {
+            await DebugLogHelper.addDebugLog('TOUR: Download failed for $lang: ${resp.statusCode}');
+            failed.add(lang);
+          }
+        } catch (e) {
+          await DebugLogHelper.addDebugLog('TOUR: Error saving translated tour ($lang): $e');
+          failed.add(lang);
+        }
       }
     } catch (e) {
-      await DebugLogHelper.addDebugLog('TOUR: Error processing additional languages: $e');
+      await DebugLogHelper.addDebugLog('TOUR: Translation block error: $e');
+      for (final lang in nonEnglish) {
+        if (!saved.contains(lang) && !failed.contains(lang)) failed.add(lang);
+      }
+    } finally {
+      if (mounted) {
+        if (failed.isEmpty && saved.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('${saved.map((l) => l.toUpperCase()).join(", ")} version added to My Tours.'),
+            backgroundColor: Colors.green,
+          ));
+        } else if (failed.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(saved.isEmpty
+                ? 'Translation unavailable for ${failed.map((l) => l.toUpperCase()).join(", ")}. Only English added.'
+                : 'Translated ${saved.map((l) => l.toUpperCase()).join(", ")}; failed ${failed.map((l) => l.toUpperCase()).join(", ")}.'),
+            backgroundColor: Colors.orange,
+          ));
+        }
+      }
     }
+    return firstSavedPath;
   }
 
-  Future<void> _autoDownloadAndPlay(String jobId, String location, [List<String>? languages]) async {
+  Future<void> _saveTourToMyToursTranslated(dynamic tourId, List<int> zipBytes, String appDirPath, SharedPreferences prefs, String lang) async {
+    final archive = ZipDecoder().decodeBytes(zipBytes);
+    String tourName = 'Translated Tour $tourId';
+    for (final file in archive) {
+      if (file.name.endsWith('manifest.json') || file.name.endsWith('tour.json')) {
+        try {
+          final data = jsonDecode(utf8.decode(file.content as List<int>));
+          tourName = data['tour_name'] ?? data['name'] ?? tourName;
+          break;
+        } catch (_) {}
+      }
+    }
+    final safeName = tourName.replaceAll(RegExp(r'[^\w]'), '_').replaceAll(RegExp(r'_+'), '_').toLowerCase();
+    final dirName = '${safeName}_${lang}_$tourId';
+    final tourDir = Directory('$appDirPath/tours/$dirName');
+    await tourDir.create(recursive: true);
+    for (final file in archive) {
+      if (!file.isFile) continue;
+      final outFile = File('${tourDir.path}/${file.name}');
+      await outFile.parent.create(recursive: true);
+      await outFile.writeAsBytes(file.content as List<int>);
+    }
+    // Count stops
+    int stops = 0;
+    for (final file in archive) {
+      if (file.isFile && file.name.endsWith('.mp3')) stops++;
+    }
+    if (stops == 0) stops = 10;
+
+    final savedTours = prefs.getStringList('saved_tours') ?? [];
+    savedTours.add(jsonEncode({
+      'title': tourName,
+      'path': tourDir.path,
+      'created': DateTime.now().toIso8601String(),
+      'stops': stops.toString(),
+      'original_request': tourName,
+      'tour_id': tourId.toString(),
+      'editable': false,
+      'is_translation': true,
+      'parent_tour_id': null,
+    }));
+    await prefs.setStringList('saved_tours', savedTours);
+    await DebugLogHelper.addDebugLog('TOUR: Saved translated tour $tourId ($lang) as: $tourName');
+  }
+
+  Future<int?> _autoDownloadAndPlay(String jobId, String location, [List<String>? languages, bool wantsEnglish = true]) async {
     try {
       // Get final tour ID from status (CRITICAL FIX)
       setState(() {
@@ -416,6 +544,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       if (finalTourId == null) {
         throw Exception('No final_tour_id in status response');
       }
+      final finalTourIdInt = int.tryParse(finalTourId.toString());
       
       await DebugLogHelper.addDebugLog('TOUR: Using final_tour_id: $finalTourId (not job_id: $jobId)');
       
@@ -472,16 +601,16 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       // Step 5: Delete ZIP file
       await zipFile.delete();
       
-      // Step 6: Save tour info using final_tour_id
+      // Step 6: Save English tour unconditionally as fallback (removed if translation succeeds)
       await _saveTourToMyTours(finalTourId.toString(), response.bodyBytes, location);
       
       // Step 7: Auto-navigate to tour player
       setState(() {
-        _isGenerating = false;
-        _progress = '';
+        _isGenerating = !wantsEnglish;  // keep spinner running until translation finishes
+        if (wantsEnglish) _progress = '';
       });
       
-      _showSuccess('Tour ready! Opening now...');
+      if (wantsEnglish) _showSuccess('Tour ready! Opening now...');
       
       // Verify the tour files exist before opening
       final indexFile = File('$extractPath/index.html');
@@ -503,16 +632,22 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         await DebugLogHelper.addDebugLog('TOUR: WARNING - No audio files found, but proceeding with tour opening');
       }
       
-      // Auto-open the tour
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => TourPlayerScreen(
-            tourPath: extractPath,
-            tourTitle: location,
+      // Auto-open the tour — only if user wanted English (or no translation requested)
+      if (wantsEnglish) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TourPlayerScreen(
+              tourPath: extractPath,
+              tourTitle: location,
+            ),
           ),
-        ),
-      );
+        );
+      } else {
+        await DebugLogHelper.addDebugLog('TOUR: Suppressing English auto-play — waiting for translation');
+        setState(() { _progress = 'Preparing translation...'; });
+      }
+      return finalTourIdInt;
       
     } catch (error) {
       _showError('Failed to download tour: $error');
@@ -520,7 +655,19 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         _isGenerating = false;
         _progress = '';
       });
+      return null;
     }
+  }
+
+  Future<void> _removeTourFromSavedTours(int tourId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final tours = prefs.getStringList('saved_tours') ?? [];
+    final before = tours.length;
+    tours.removeWhere((t) {
+      try { return jsonDecode(t)['tour_id'] == tourId.toString(); } catch (_) { return false; }
+    });
+    await prefs.setStringList('saved_tours', tours);
+    await DebugLogHelper.addDebugLog('TOUR: Removed English fallback (tour_id $tourId) — ${before - tours.length} entry pruned');
   }
 
   Future<void> _saveTourToMyTours(String jobId, List<int> zipBytes, String location) async {
@@ -583,12 +730,14 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       String uniqueTitle = _generateUniqueTitle(location, tours);
       
       final tourInfo = {
-        'id': jobId,
+        'tour_id': jobId,
         'title': uniqueTitle,
         'original_request': location,
         'path': path,
         'created': DateTime.now().toIso8601String(),
         'stops': _stopCountController.text,
+        'editable': false,
+        'is_translation': false,
         'lat': lat,
         'lng': lng,
       };
@@ -1125,15 +1274,6 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     try {
       Map<String, dynamic> tourData = _parseTourRequest(sanitizedInput);
       tourData['total_stops'] = stopCount; // Add custom stop count
-      
-      // Add language parameter for tour generation
-      if (_selectedLanguages.isNotEmpty && !_selectedLanguages.contains('en')) {
-        // If only non-English languages selected, use the first one
-        tourData['language'] = _selectedLanguages.first;
-      } else if (_selectedLanguages.length > 1) {
-        // If multiple languages including English, generate in English first
-        tourData['language'] = 'en';
-      }
       
       // Print debug info
       print('Generating background tour: ${tourData['location']}');
