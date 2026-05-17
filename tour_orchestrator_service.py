@@ -527,7 +527,20 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         ACTIVE_JOBS[job_id]["expected_stops"] = expected_stops
         ACTIVE_JOBS[job_id]["actual_stops"] = actual_stops
         
-        if actual_stops is not None and actual_stops != expected_stops:
+        if actual_stops == 0 or actual_stops is None:
+            error_msg = (
+                f"Tour generation produced no audio files. "
+                f"Expected {expected_stops} stops, got {actual_stops}. Job {job_id}."
+            )
+            print(f"ERROR: {error_msg}")
+            ACTIVE_JOBS[job_id]["status"] = "error"
+            ACTIVE_JOBS[job_id]["error"] = error_msg
+            try:
+                os.remove(zip_path)
+            except Exception:
+                pass
+            return  # Do not store in database, do not trigger translation
+        elif actual_stops is not None and actual_stops != expected_stops:
             warning_msg = (
                 f"STOP COUNT MISMATCH: requested {expected_stops} stops, "
                 f"delivered {actual_stops}. Job {job_id}."

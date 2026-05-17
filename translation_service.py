@@ -8,13 +8,14 @@ from flask import Flask, request, jsonify, make_response
 import boto3
 import zipfile
 import io
+import re
 import uuid
 import psycopg2
 import logging
 from concurrent.futures import ThreadPoolExecutor
 import os
 import json
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -33,6 +34,62 @@ class TranslationService:
             password="password123"
         )
     
+    # Only these two labels must stay in English — mobile app parses them by exact string match.
+    # All other labels (Type/Specialty, Orientation, etc.) should be translated normally.
+    _METADATA_LABELS = ['Coordinates', 'Address']
+
+    # Compiled pattern for stripping translated metadata label lines from .txt body.
+    # Matches any line whose first word(s) correspond to a _METADATA_LABELS key followed
+    # by any non-word separator (covers ASCII ':', full-width '\uff1a', French '\xa0:', etc.)
+    _TRANSLATED_LABEL_RE = re.compile(
+        r'^\s*\S+\W.*$',  # placeholder — built dynamically per-label in _restore_metadata_labels
+        re.IGNORECASE
+    )
+
+    def _restore_metadata_labels(self, original_text, translated_text, target_language):
+        """Prepend original English Coordinates/Address lines to the top of the translated stop.
+        Mobile app parses these fields by exact English string match to place map pins.
+        Prepending is language-agnostic: no regex on translated text, works for any language
+        including RTL scripts (Arabic, Hebrew) and any future AWS Translate separator variants
+        (e.g. French non-breaking space \xa0 before colon). Saves 2 AWS Translate calls per stop.
+        The translated label lines (e.g. Coordonnees\xa0:) are stripped from the body so the
+        .txt file does not contain duplicate coordinate entries."""
+        if target_language == 'en':
+            return translated_text
+        english_lines = []
+        for label in self._METADATA_LABELS:
+            m = re.search(
+                rf'^({re.escape(label)}\s*:.*)$',
+                original_text, re.IGNORECASE | re.MULTILINE
+            )
+            if m:
+                english_lines.append(m.group(1).strip())
+        if not english_lines:
+            return translated_text
+        # Strip translated equivalents from body to avoid duplicate entries.
+        # We match lines that start with the same word-count prefix as the English label
+        # followed by any non-word separator — covers all known AWS Translate variants.
+        body_lines = translated_text.split('\n')
+        label_word_counts = [len(label.split()) for label in self._METADATA_LABELS]
+        def _is_translated_metadata(line):
+            stripped = line.strip()
+            for wc in label_word_counts:
+                words = stripped.split()
+                if len(words) > wc:
+                    prefix = ' '.join(words[:wc])
+                    remainder = stripped[len(prefix):].lstrip()
+                    if remainder and not remainder[0].isalnum():
+                        # Check the English label is NOT present (don't strip the prepended lines)
+                        if not any(
+                            re.match(rf'^{re.escape(lbl)}\s*:', stripped, re.IGNORECASE)
+                            for lbl in self._METADATA_LABELS
+                        ):
+                            return True
+            return False
+        clean_body = [l for l in body_lines if not _is_translated_metadata(l)]
+        # Prepend English lines at the very top — unconditionally first, no dependency on line order
+        return '\n'.join(english_lines + clean_body)
+
     def translate_text(self, text, target_language, preserve_voice_commands=False):
         """Translate text using AWS Translate with optional voice command preservation"""
         if target_language == 'en':
@@ -124,6 +181,16 @@ class TranslationService:
             
             if not tour_content:
                 logging.warning(f"No tour content found for tour {original_tour_id}, falling back to ZIP extraction")
+                # Verify ZIP has actual audio before attempting fallback
+                try:
+                    import io as _io
+                    with zipfile.ZipFile(_io.BytesIO(bytes(original_zip_data))) as _z:
+                        audio_files_in_zip = [n for n in _z.namelist() if n.startswith('audio_') and n.endswith('.mp3')]
+                    if not audio_files_in_zip:
+                        logging.error(f"Tour {original_tour_id} ZIP has no audio files and no tour_content — cannot translate")
+                        return None
+                except Exception:
+                    pass
                 return self._translate_tour_from_zip(original_tour, target_language)
             
             logging.info(f"Using stored tour content: {len(tour_content)} characters")
@@ -146,20 +213,26 @@ class TranslationService:
             tour_stops = self._split_tour_content_into_stops(tour_content)
             logging.info(f"Split tour content into {len(tour_stops)} stops")
             
-            # Translate each stop
+            # Translate each stop, then restore English metadata labels
             translated_stops = []
+            tts_texts = []  # nav-stripped English text translated separately for audio
             for i, stop_text in enumerate(tour_stops):
                 try:
                     translated_stop = self.translate_text(stop_text, target_language)
+                    translated_stop = self._restore_metadata_labels(stop_text, translated_stop, target_language)
                     translated_stops.append(translated_stop)
+                    # Strip nav fields in English BEFORE translating for TTS
+                    tts_text = self.translate_text(self._strip_nav_fields_for_tts(stop_text), target_language)
+                    tts_texts.append(tts_text)
                     logging.info(f"Translated stop {i+1}/{len(tour_stops)}")
                 except Exception as e:
                     logging.error(f"Error translating stop {i+1}: {e}")
                     translated_stops.append(stop_text)  # Keep original on error
+                    tts_texts.append(stop_text)
             
             # Generate audio for each translated stop
             translated_audio_files = []
-            for i, translated_text in enumerate(translated_stops):
+            for i, translated_text in enumerate(tts_texts):
                 try:
                     audio_bytes = self.generate_audio(translated_text, target_language)
                     if audio_bytes:
@@ -209,9 +282,7 @@ class TranslationService:
         """Translate audio content in ZIP file - extracts and replaces embedded base64 audio data"""
         import tempfile
         import os
-        import re
         import base64
-        from bs4 import BeautifulSoup
         
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -926,9 +997,37 @@ Say 'What are my options' to hear this help again"""
 </body>
 </html>'''
         return html
+    # Fields that should not be spoken aloud — same set as Fix A in tour_generation_modernized.py
+    _NAV_FIELD_PREFIXES = [
+        'Address:', 'Coordinates:', 'Type/Specialty:', 'Specific Examples:',
+        'Operational Details:'
+    ]
+
+    def _strip_nav_fields_for_tts(self, stop_text):
+        """Remove structured metadata lines from stop text before sending to Polly.
+        Keeps: Name, Orientation (full), and all narrative paragraphs.
+        Strips: Address, Coordinates, Type/Specialty, Specific Examples, Operational Details."""
+        lines = stop_text.split('\n')
+        clean_lines = []
+        skip_next_blank = False
+        for line in lines:
+            stripped = line.strip()
+            is_nav = any(
+                re.match(rf'^{re.escape(prefix)}', stripped, re.IGNORECASE)
+                for prefix in self._NAV_FIELD_PREFIXES
+            )
+            if is_nav:
+                skip_next_blank = True
+                continue
+            if skip_next_blank and stripped == '':
+                skip_next_blank = False
+                continue
+            skip_next_blank = False
+            clean_lines.append(line)
+        return '\n'.join(clean_lines).strip()
+
     def _split_tour_content_into_stops(self, tour_content):
         """Split tour content into individual stops using the same logic as tour generation"""
-        import re
         
         # Split content by stops using regex pattern
         stops = re.split(r'\n\s*Stop\s+(\d+):', tour_content)
@@ -979,8 +1078,6 @@ Say 'What are my options' to hear this help again"""
         import tempfile
         import os
         import base64
-        import re
-        from bs4 import BeautifulSoup
         
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -1044,64 +1141,62 @@ Say 'What are my options' to hear this help again"""
                 # Replace embedded audio data with translated audio
                 updated_html = str(soup)
                 
-                # If no embedded audio found, try to find audio elements and add Russian audio
+                # Detect modernized ZIP format: separate audio_N.mp3 files (not embedded base64)
+                existing_mp3s = sorted([f for f in os.listdir(extract_dir) if re.match(r'audio_\d+\.mp3', f)])
+                is_modernized_format = len(existing_mp3s) > 0
+
                 if not audio_matches and audio_files:
-                    logging.info("No embedded audio found, looking for audio elements to replace")
-                    
-                    # Find audio elements in the HTML
-                    audio_elements = soup.find_all('audio')
-                    logging.info(f"Found {len(audio_elements)} audio elements")
-                    
-                    # Replace audio elements with Russian audio
-                    for i, (audio_elem, translated_audio_bytes) in enumerate(zip(audio_elements, audio_files)):
-                        if translated_audio_bytes:
-                            try:
-                                # Encode translated audio as base64
-                                translated_audio_b64 = base64.b64encode(translated_audio_bytes).decode('utf-8')
-                                translated_data_url = f'data:audio/mp3;base64,{translated_audio_b64}'
-                                
-                                # Find or create source element
-                                source_elem = audio_elem.find('source')
-                                if source_elem:
-                                    source_elem['src'] = translated_data_url
-                                else:
-                                    # Create new source element
-                                    new_source = soup.new_tag('source', src=translated_data_url, type='audio/mpeg')
-                                    audio_elem.insert(0, new_source)
-                                
-                                logging.info(f"Replaced audio element {i+1} with Russian audio")
-                                
-                            except Exception as e:
-                                logging.error(f"Error replacing audio element {i+1}: {e}")
-                    
-                    updated_html = str(soup)
-                    
-                    # Translate visible text content in HTML
-                    soup = BeautifulSoup(updated_html, 'html.parser')
-                    
-                    logging.info("Starting HTML text translation")
-                    
-                    # Translate all text content that should be in Russian
-                    translated_count = 0
-                    for p in soup.find_all('p'):
-                        if p.get_text().strip() and len(p.get_text().strip()) > 5:
-                            original_text = p.get_text().strip()
-                            translated_text = self.translate_text(original_text, target_language)
-                            p.string = translated_text
-                            translated_count += 1
-                            logging.info(f"Translated paragraph {translated_count}: {original_text[:50]}... -> {translated_text[:50]}...")
-                    
-                    for tag in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
-                        for h in soup.find_all(tag):
-                            if h.get_text().strip():
-                                original_text = h.get_text().strip()
-                                translated_text = self.translate_text(original_text, target_language)
-                                h.string = translated_text
+                    if is_modernized_format:
+                        # Modernized format: overwrite audio_1.mp3, audio_2.mp3 ... with translated Polly bytes
+                        logging.info(f"Modernized ZIP format detected ({len(existing_mp3s)} mp3 files). Replacing with translated audio.")
+                        for i, translated_audio_bytes in enumerate(audio_files):
+                            mp3_filename = f'audio_{i+1}.mp3'
+                            mp3_path = os.path.join(extract_dir, mp3_filename)
+                            if translated_audio_bytes:
+                                with open(mp3_path, 'wb') as f:
+                                    f.write(translated_audio_bytes)
+                                logging.info(f"Wrote translated audio to {mp3_filename}")
+                            else:
+                                logging.warning(f"No translated audio for stop {i+1}, keeping original {mp3_filename}")
+                        # BUG 1 FIX: Translate HTML text (h1–h6, p) — audio replacement above
+                        # only swaps MP3 files; the HTML visible text was left in English.
+                        # Use h.clear() + h.append(NavigableString(...)) instead of h.string =
+                        # so headings with nested tags (e.g. <h3><span>…</span>) are handled safely.
+                        translated_count = 0
+                        for tag in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                            for h in soup.find_all(tag):
+                                text = h.get_text().strip()
+                                if text:
+                                    h.clear()
+                                    h.append(NavigableString(self.translate_text(text, target_language)))
+                                    translated_count += 1
+                        for p in soup.find_all('p'):
+                            text = p.get_text().strip()
+                            if text and len(text) > 5:
+                                p.clear()
+                                p.append(NavigableString(self.translate_text(text, target_language)))
                                 translated_count += 1
-                                logging.info(f"Translated heading: {original_text} -> {translated_text}")
-                    
-                    logging.info(f"Completed HTML text translation: {translated_count} elements translated")
-                    updated_html = str(soup)
+                        logging.info(f"Translated {translated_count} HTML text elements in modernized ZIP")
+                        updated_html = str(soup)
+                    else:
+                        # Legacy format without embedded audio — translate HTML text only
+                        logging.info("No embedded audio and no separate mp3 files found, translating HTML text only")
+                        translated_count = 0
+                        for p in soup.find_all('p'):
+                            text = p.get_text().strip()
+                            if text and len(text) > 5:
+                                p.clear()
+                                p.append(NavigableString(self.translate_text(text, target_language)))
+                                translated_count += 1
+                        for tag in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                            for h in soup.find_all(tag):
+                                text = h.get_text().strip()
+                                if text:
+                                    h.clear()
+                                    h.append(NavigableString(self.translate_text(text, target_language)))
+                                    translated_count += 1
+                        logging.info(f"Translated {translated_count} HTML elements")
+                        updated_html = str(soup)
                     
                 else:
                     # Original method for embedded base64 audio
@@ -1154,8 +1249,8 @@ Say 'What are my options' to hear this help again"""
                     with open(content_file, 'w', encoding='utf-8') as f:
                         f.write(tour_content_text)
                     
-                    # Create individual Russian stop files
-                    for i, translated_stop in enumerate(translated_stops):
+                    # Create individual translated stop text files (1-indexed to match audio_N.mp3)
+                    for i, translated_stop in enumerate(translated_stops, 1):
                         stop_file = os.path.join(extract_dir, f'audio_{i}.txt')
                         with open(stop_file, 'w', encoding='utf-8') as f:
                             f.write(translated_stop)

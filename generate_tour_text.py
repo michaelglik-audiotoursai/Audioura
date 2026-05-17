@@ -9,7 +9,9 @@ import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from enhanced_tour_templates_fixed import get_enhanced_tour_template, validate_enhanced_poi_knowledge
 from poi_inclusion_exceptions import should_include_in_restaurant_tour, should_include_in_walking_tour
-from tour_type_detector import detect_tour_type
+# NOTE: tour_type_detector.detect_tour_type() is intentionally NOT used here.
+# The local _classify_tour_category() below (two-arg version returning lowercase category)
+# serves a different purpose from the imported one (one-arg, returns CONTEXTUAL/OPERATIONAL).
 from enhanced_prompt_generator import generate_enhanced_prompt
 from datetime import datetime
 import re
@@ -25,23 +27,29 @@ Request: "{user_request}"
 
 Please provide ONLY a JSON response with these fields:
 {{
-    "poi_type": "specific type of locations requested (e.g., restaurants, shops, stores, museums, book locations, movie filming sites, etc.)",
+    "poi_type": "specific type of locations requested (e.g., restaurants, shops, stores, museums, book locations, movie filming sites, etc.) — IMPORTANT: poi_type must always be a single string, never a JSON array. If multiple types are detected, combine them with 'or' — e.g. 'restaurants or museums'.",
     "location": "geographic area",
     "theme_type": "BOOK/MOVIE/PRODUCT/STANDARD - identify if this is a themed tour",
     "theme_name": "name of book, movie, or specific product if applicable",
     "requirements": "any specific criteria mentioned",
     "business_hours_relevant": true/false,
     "accessibility_mentioned": true/false,
-    "needs_research": true/false
+    "needs_research": true/false,
+    "venue_name": "The full official name of the institution ONLY when the ENTIRE tour is bounded by one specific building or campus (e.g. a single museum, historic house, gallery, or library). Use the institution's complete official name including suffixes like 'Museum', 'Gallery', 'Library' — never a shortened nickname (e.g. 'Museum of Fine Arts, Boston' not 'MFA'). Return null if the tour spans a city, district, neighborhood, multiple venues, or any open-ended area. If you are unsure whether the request names a specific bounded institution or just a region, return null."
 }}
 
 Examples:
-- "Tour of restaurants in North End, Boston" → poi_type: "restaurants", theme_type: "STANDARD"
-- "Walking tour based on Tomorrow and Tomorrow and Tomorrow book" → poi_type: "book locations", theme_type: "BOOK", theme_name: "Tomorrow, and Tomorrow, and Tomorrow"
-- "Harry Potter filming locations in Boston" → poi_type: "filming locations", theme_type: "MOVIE", theme_name: "Harry Potter"
-- "Fancy cheese shops in Cambridge" → poi_type: "cheese shops", theme_type: "PRODUCT", theme_name: "fancy cheese"
-- "Stores selling vintage vinyl records" → poi_type: "record stores", theme_type: "PRODUCT", theme_name: "vintage vinyl records"
-- "Bookstores mentioned in Little Women" → poi_type: "bookstores", theme_type: "BOOK", theme_name: "Little Women"
+- "Tour of restaurants in North End, Boston" → poi_type: "restaurants", theme_type: "STANDARD", venue_name: null
+- "Walking tour based on Tomorrow and Tomorrow and Tomorrow book" → poi_type: "book locations", theme_type: "BOOK", theme_name: "Tomorrow, and Tomorrow, and Tomorrow", venue_name: null
+- "Harry Potter filming locations in Boston" → poi_type: "filming locations", theme_type: "MOVIE", theme_name: "Harry Potter", venue_name: null
+- "Fancy cheese shops in Cambridge" → poi_type: "cheese shops", theme_type: "PRODUCT", theme_name: "fancy cheese", venue_name: null
+- "Jackson Homestead and Museum Newton, MA" → poi_type: "museum exhibits", theme_type: "STANDARD", venue_name: "Jackson Homestead and Museum"
+- "Tour inside the MFA Boston" → poi_type: "museum exhibits", theme_type: "STANDARD", venue_name: "Museum of Fine Arts, Boston"
+- "Tour of the Met" → poi_type: "museum exhibits", theme_type: "STANDARD", venue_name: "The Metropolitan Museum of Art"
+- "Walking tour in Newton, MA" → poi_type: "landmarks", theme_type: "STANDARD", venue_name: null
+- "Restaurant tour in Newton Center" → poi_type: "restaurants", theme_type: "STANDARD", venue_name: null
+- "Cambridge museums tour" → poi_type: "museums", theme_type: "STANDARD", venue_name: null
+- "Boston Museum of Science and surroundings" → poi_type: "science exhibits", theme_type: "STANDARD", venue_name: null
 """
 
     headers = {
@@ -56,7 +64,7 @@ Examples:
             {"role": "user", "content": intent_prompt}
         ],
         "temperature": 0.3,
-        "max_tokens": 200
+        "max_tokens": 400
     }
     
     try:
@@ -133,6 +141,8 @@ def validate_poi_knowledge(poi_list, intent, location, api_key):
     # Standard validation for regular tours
     if generic_count > len(poi_list) / 2:
         poi_type = intent.get('poi_type', 'locations') if intent else 'locations'
+        if isinstance(poi_type, list):
+            poi_type = " or ".join(poi_type)
         return False, f"Insufficient data available for {poi_type} in {location}. Please try a different location or POI type."
     
     if fictional_count > 0:
@@ -190,7 +200,7 @@ Example: For "Paul Revere House" and poi_type "restaurant":
         print(f"POI verification error: {e}")
         return {"matches": True, "reason": "verification failed", "confidence": "low"}
 
-def detect_tour_type(location, tour_type):
+def _classify_tour_category(location, tour_type):
     """
     Detect the appropriate tour template based on location and tour_type.
     
@@ -211,7 +221,7 @@ def detect_tour_type(location, tour_type):
     
     # Specialized tour indicators
     specialized_keywords = ['book', 'movie', 'film', 'botanical', 'garden', 'park', 'novel', 'story', 'literary', 'filming']
-    if any(keyword in tour_type_lower for keyword in specialized_keywords):
+    if any(keyword in location_lower or keyword in tour_type_lower for keyword in specialized_keywords):
         return 'specialized'
     
     # Walking tour indicators (default for cities, neighborhoods)
@@ -222,6 +232,111 @@ def detect_tour_type(location, tour_type):
     # Default to walking tour
     return 'walking'
 
+
+
+def _validate_museum_stop_descriptions(poi_list, venue_name, headers):
+    """
+    PHASE 5.5 — Post-description guard for single-venue museum tours.
+
+    Cheap pre-filter first (zero API cost): stops whose name contains an
+    institutional marker word but shares fewer than 2 words with venue_name
+    are flagged as suspect and sent to OpenAI for confirmation.  Stops that
+    don't look like external institutions pass through without an API call.
+
+    Stop index 0 (the venue itself) is always kept unconditionally — this
+    guarantees at least one correct stop even if everything else is removed.
+
+    Returns the filtered poi_list (original order preserved).
+    """
+    if not poi_list:
+        return poi_list
+
+    _INSTITUTION_MARKERS = {
+        'museum', 'gallery', 'institute', 'society',
+        'foundation', 'university', 'college', 'library'
+    }
+    # Stop words excluded from overlap count so common words don't mask different institutions
+    _OVERLAP_STOP_WORDS = {'the', 'of', 'and', 'in', 'at', 'a', 'an', 'for'}
+
+    def _is_suspect(stop_name):
+        """True if stop_name looks like a different institution than venue_name."""
+        name_words = set(re.findall(r'[a-z]+', stop_name.lower()))
+        if not (name_words & _INSTITUTION_MARKERS):
+            return False  # no institutional marker — probably a room/exhibit
+        # Exclude stop words AND the institutional marker itself from the overlap count
+        # so that "Newton and Museum of History" doesn't share {and, museum} with
+        # "Jackson Homestead and Museum" and slip through as non-suspect.
+        name_content = name_words - _OVERLAP_STOP_WORDS - _INSTITUTION_MARKERS
+        venue_content = set(re.findall(r'[a-z]+', venue_name.lower())) - _OVERLAP_STOP_WORDS - _INSTITUTION_MARKERS
+        substantive_overlap = (name_content & venue_content) - _INSTITUTION_MARKERS
+        return len(substantive_overlap) < 1  # < 1 shared substantive word — suspect
+
+    def _check_one(poi):
+        name = poi.get('name', '')
+        description = poi.get('description', '') or ''
+        snippet = description[:600]
+        prompt = (
+            f"You are a fact-checker for museum audio tours.\n"
+            f"The tour is for the venue: '{venue_name}'.\n"
+            f"Stop name: '{name}'\n"
+            f"Description snippet:\n{snippet}\n\n"
+            f"Question: Does this description refer to content (a room, gallery, exhibit, "
+            f"collection, or area) that is physically located INSIDE '{venue_name}'?\n"
+            f"Or does it describe a DIFFERENT institution or a fabricated/non-existent exhibit?\n\n"
+            "Respond ONLY with valid JSON:\n"
+            '{"inside_venue": true/false, "confidence": "high/medium/low", "reason": "<brief>"}'
+        )
+        data = {
+            "model": "gpt-3.5-turbo",
+            "messages": [
+                {"role": "system", "content": "You are a fact-checker. Respond only with valid JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.1,
+            "max_tokens": 60,
+        }
+        try:
+            resp = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers=headers,
+                data=json.dumps(data),
+            )
+            if resp.status_code != 200:
+                return poi, True, "low", f"API error {resp.status_code} — keeping stop"
+            result = resp.json()["choices"][0]["message"]["content"]
+            parsed = json.loads(result)
+            return poi, parsed.get("inside_venue", True), parsed.get("confidence", "low"), parsed.get("reason", "")
+        except Exception as e:
+            return poi, True, "low", f"check error: {e}"
+
+    # Stop 0 is always the venue itself — keep unconditionally (guarantees graceful degradation)
+    first_stop = poi_list[0]
+    candidates = poi_list[1:]  # only check stops 1..N
+
+    # Split candidates into suspect (needs OpenAI check) and clean (pass through)
+    suspect = [p for p in candidates if _is_suspect(p.get('name', ''))]
+    clean = [p for p in candidates if not _is_suspect(p.get('name', ''))]
+    print(f"   Pre-filter: {len(clean)} clean, {len(suspect)} suspect (will call OpenAI for suspect only)")
+
+    # Run OpenAI checks only on suspect stops (parallel)
+    checked_survivors = []
+    if suspect:
+        with ThreadPoolExecutor(max_workers=min(len(suspect), 5)) as executor:
+            futures = {executor.submit(_check_one, poi): poi for poi in suspect}
+            results = [future.result() for future in as_completed(futures)]
+        results.sort(key=lambda x: suspect.index(x[0]))
+        for poi, inside_venue, confidence, reason in results:
+            if inside_venue or confidence == "low":
+                status = "OK" if inside_venue else "OK (low-confidence, keeping)"
+                print(f"   {status} '{poi['name']}' — {reason}")
+                checked_survivors.append(poi)
+            else:
+                print(f"   X  REMOVED '{poi['name']}' — not inside venue: {reason}")
+
+    # Reassemble in original order: stop 0 always first, then clean + checked survivors
+    all_survivors = clean + checked_survivors
+    all_survivors.sort(key=lambda p: poi_list.index(p))
+    return [first_stop] + all_survivors
 
 
 def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
@@ -280,7 +395,19 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
     
     # PHASE 1: Analyze user intent with AI
     print(f"\nPHASE 1: Analyzing tour intent with AI...")
-    user_request = f"{tour_type} {location}"
+    # BUG 2 FIX: Mobile app hardcodes tour_type="museum" for ALL requests.
+    # Check whether LOCATION ALONE encodes the real category (e.g. "restaurant tour
+    # in Newton, MA"). If so, suppress the mobile-injected tour_type so GPT doesn't
+    # return museum cafes instead of standalone restaurants.
+    # Passing "" as tour_type ensures the category comes only from the location string,
+    # not from the (potentially wrong) mobile-supplied tour_type.
+    _pre_category = _classify_tour_category(location, "")
+    if _pre_category in ('restaurant', 'walking', 'specialized'):
+        # Location string already encodes the real intent — don't prepend tour_type
+        user_request = location
+        print(f"  [Bug2Fix] tour_type='{tour_type}' suppressed for intent analysis (pre_category='{_pre_category}'); using location only")
+    else:
+        user_request = f"{tour_type} {location}"
     intent = analyze_tour_intent(user_request, api_key)
     
     if intent:
@@ -290,16 +417,46 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
         print(f"   Requirements: {intent.get('requirements')}")
         print(f"   Business Hours Relevant: {intent.get('business_hours_relevant')}")
         print(f"   Accessibility Mentioned: {intent.get('accessibility_mentioned')}")
+        print(f"   Venue Name: {intent.get('venue_name')}")
+
+        # Sanity-check venue_name: require word-overlap with prefix matching to handle
+        # abbreviations ("Met" ↔ "Metropolitan") and word-order differences.
+        # Stop words only (NOT institutional markers) are excluded — institutional markers
+        # are kept so "museum" in venue vs location can count as a match.
+        _SANITY_STOP_WORDS = {
+            'the', 'of', 'and', 'in', 'on', 'at', 'to', 'a', 'an',
+            'for', 'with', 'by', 'from', 'or', 'tour', 'tours',
+            'inside', 'visit', 'walk', 'walking'
+        }
+        def _venue_matches_location(venue_name_s, location_s):
+            def content_words(s):
+                return [w for w in re.findall(r'[a-z]+', s.lower())
+                        if len(w) >= 3 and w not in _SANITY_STOP_WORDS]
+            v = content_words(venue_name_s)
+            l = content_words(location_s)
+            if not v or not l:
+                return True  # can't judge — permissive
+            for vw in v:
+                for lw in l:
+                    if vw == lw or vw.startswith(lw) or lw.startswith(vw):
+                        return True
+            return False
+        raw_venue = intent.get('venue_name')
+        if raw_venue and not _venue_matches_location(raw_venue, location):
+            print(f"  [venue_name sanity] '{raw_venue}' has no word overlap with '{location}' — discarding")
+            intent['venue_name'] = None
+        elif raw_venue:
+            print(f"  [venue_name sanity] '{raw_venue}' OK")
         
         # Use intelligent tour category detection
         tour_category = 'intelligent'
     else:
         print("⚠️ Intent analysis failed, using fallback detection")
         intent = None
-        tour_category = detect_tour_type(location, tour_type)
+        tour_category = _classify_tour_category(location, tour_type)
     
     # PHASE 2: Detect tour type and get appropriate template
-    tour_category = detect_tour_type(location, tour_type)
+    tour_category = _classify_tour_category(location, tour_type)
     print(f"\nDetected tour category: {tour_category.upper()}")
     print(f"Using {tour_category} template for {location} - {tour_type}")
     
@@ -341,7 +498,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
 
     def _verify_against_intent(stops):
         """Run PHASE 4 type verification in parallel. Returns (survivors, excluded_count)."""
-        if not (intent and intent.get('poi_type') and tour_category not in ('walking',)):
+        if not (intent and intent.get('poi_type') and tour_category not in ('walking', 'museum')):
             return list(stops), 0
         if not stops:
             return [], 0
@@ -349,7 +506,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
         print(f"   PHASE 4: Verifying {len(stops)} POI(s) against type '{intent['poi_type']}' (parallel)...")
 
         def _verify_one(poi):
-            return poi, verify_poi_matches_type(poi["name"], intent["poi_type"], api_key)
+            poi_type_val = intent["poi_type"]
+            if isinstance(poi_type_val, list):
+                poi_type_val = " or ".join(poi_type_val)
+            return poi, verify_poi_matches_type(poi["name"], poi_type_val, api_key)
 
         results = []
         with ThreadPoolExecutor(max_workers=min(len(stops), 5)) as executor:
@@ -398,14 +558,19 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
 
     # Determine poi_type hint for prompts
     if intent and intent.get('poi_type'):
-        poi_type_hint = intent['poi_type']
+        raw = intent['poi_type']
+        poi_type_hint = " or ".join(raw) if isinstance(raw, list) else raw
     else:
         poi_type_hint = f"{tour_type} stops"
 
     if tour_type.lower() in location.lower():
         user_request = location
     else:
-        user_request = f"{tour_type} {location}"
+        # BUG 2 FIX: if location alone encodes the category, don't prepend tour_type
+        if _pre_category in ('restaurant', 'walking', 'specialized'):
+            user_request = location
+        else:
+            user_request = f"{tour_type} {location}"
 
     api_call_logger.log("GENERATING_PROMPT", {
         "location": location,
@@ -415,13 +580,48 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
 
     # -------- PHASE 3A: names + addresses only --------
     print(f"\nPHASE 3A: Fetching {total_stops} candidate POI(s) for {location}...")
+
+    # Museum single-venue constraint: use venue_name from PHASE 1 intent (Claude option b).
+    # intent['venue_name'] is set by GPT when the request is for a tour inside a single
+    # named institution. Falls back to regex strip for robustness if intent is unavailable.
+    _museum_venue_constraint = ""
+    _museum_venue_name = ""
+    if tour_category == 'museum':
+        # Prefer PHASE 1 intent result (most accurate, handles all formats).
+        # IMPORTANT: only apply the single-venue constraint when intent explicitly provides
+        # a venue_name. If intent is None (API failure) OR intent returned venue_name: null
+        # (multi-venue / city-wide request), do NOT fall back to regex — the mobile app
+        # hardcodes tour_type="museum" so tour_category=='museum' even for city-wide museum
+        # tours where a single-venue constraint would be wrong.
+        if intent and intent.get('venue_name'):
+            _museum_venue_name = intent['venue_name'].strip()
+            print(f"  [Museum constraint] Venue from intent='{_museum_venue_name}'")
+        else:
+            # intent is None (API error) or venue_name is null (multi-venue / city-wide).
+            # Skip the constraint entirely — do not apply a fabricated venue name.
+            _museum_venue_name = ""
+            print(f"  [Museum constraint] No venue_name from intent — single-venue constraint skipped")
+        if _museum_venue_name:
+            _museum_venue_constraint = (
+                f"\nCRITICAL CONSTRAINT — THIS IS A SINGLE-VENUE MUSEUM TOUR:\n"
+                f"- ALL {total_stops} stops MUST be rooms, galleries, exhibits, or areas physically "
+                f"located INSIDE '{_museum_venue_name}'.\n"
+                f"- Do NOT suggest any other museums, institutions, or locations outside this building.\n"
+                f"- Each stop name should be a specific gallery, room, exhibit, or collection within "
+                f"'{_museum_venue_name}' (e.g. 'East Wing Gallery', 'Underground Railroad Exhibit').\n"
+                f"- If you are unsure whether a specific exhibit currently exists at '{_museum_venue_name}', "
+                f"use well-known permanent collections or named galleries that are verifiably part of this venue.\n"
+                f"- NEVER fabricate exhibit names or claim exhibits exist that you cannot verify."
+            )
+
     phase_3a_prompt = (
         f"You are a knowledgeable local guide for {location}.\n"
         f"List exactly {total_stops} specific, real, well-known {poi_type_hint} relevant to: {user_request}.\n\n"
         "Requirements:\n"
         "- Use REAL, SPECIFIC names of actual establishments or landmarks.\n"
         "- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.\n"
-        "- Include a complete street address with ZIP code where applicable.\n\n"
+        "- Include a complete street address with ZIP code where applicable.\n"
+        + _museum_venue_constraint + "\n\n"
         "Return ONLY a JSON array, no other text, no markdown fences:\n"
         '[{"name": "...", "address": "..."}, ...]'
     )
@@ -506,8 +706,11 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
         for p in poi_list:
             print(f"   - {p['name']}" + (f" @ {p['address']}" if p['address'] else ""))
 
-        # -------- PHASE 4.5: knowledge validation --------
+        # -------- PHASE 4.5: knowledge validation (names + descriptions) --------
         print(f"\nPHASE 4.5: Validating AI knowledge for {location}...")
+        # NOTE: at this point descriptions are not yet generated (PHASE 5 is later).
+        # validate_enhanced_poi_knowledge checks names now; descriptions are validated
+        # again after PHASE 5 via _validate_museum_stop_descriptions() for museum tours.
         knowledge_valid, knowledge_message = validate_enhanced_poi_knowledge(poi_list, intent, location)
         if not knowledge_valid:
             print(f"X Knowledge validation failed: {knowledge_message}")
@@ -517,8 +720,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
         # Snapshot before PHASE 4
         poi_list_before_verification = list(poi_list)
 
-        # -------- PHASE 4: parallel type verification (skipped for walking) --------
-        if intent and intent.get('poi_type') and tour_category not in ('walking',):
+        # -------- PHASE 4: parallel type verification (skipped for walking + museum) --------
+        # Museum tours: every stop is a room/exhibit inside a known venue — type verification
+        # provides no signal and the wrong stops in the hallucination bug all passed it anyway.
+        if intent and intent.get('poi_type') and tour_category not in ('walking', 'museum'):
             print(f"\nPHASE 4: Verifying POIs match requested type '{intent['poi_type']}' (parallel)...")
             poi_list, excluded_count = _verify_against_intent(poi_list)
             if excluded_count > 0:
@@ -940,8 +1145,24 @@ DO NOT include directions to the next stop - these will be added separately.
             total_tokens += tokens_used
             total_cost += call_cost
     
+    # -------- PHASE 5.5: post-description validation for museum tours --------
+    # Fix 4 (Claude session 7): second validate_enhanced_poi_knowledge() call for ALL tour types.
+    # At this point descriptions are populated — the fictional-content patterns now have text to match.
+    print(f"\nPHASE 5.5a: Post-description knowledge validation (all tour types)...")
+    knowledge_valid2, knowledge_message2 = validate_enhanced_poi_knowledge(poi_list, intent, location)
+    if not knowledge_valid2:
+        print(f"X Post-description validation failed: {knowledge_message2}")
+        return None, None, (None, None)
+    print(f"OK Post-description validation passed: {knowledge_message2}")
+
+    if tour_category == 'museum' and _museum_venue_name:
+        print(f"\nPHASE 5.5b: Validating descriptions are inside '{_museum_venue_name}'...")
+        poi_list = _validate_museum_stop_descriptions(poi_list, _museum_venue_name, headers)
+        # Stop 0 is always kept by _validate_museum_stop_descriptions, so len >= 1
+        print(f"OK PHASE 5.5b: {len(poi_list)} stop(s) passed venue description validation")
+
     # PHASE 6: Assemble the complete tour
-    print(f"\nPHASE 4: Assembling the complete tour...")
+    print(f"\nPHASE 6: Assembling the complete tour...")
     
     # Create a better title that doesn't duplicate information
     if tour_type.lower() in location.lower():
@@ -980,8 +1201,11 @@ DO NOT include directions to the next stop - these will be added separately.
         if poi.get("address"):
             poi_content += f"Address: {poi['address']}\n\n"
         
-        # Add coordinates if available (first stop only)
-        if i == 0 and poi.get("coordinates"):
+        # Add coordinates if available
+        # Museum tours: first stop only (all exhibits in same building)
+        # All other tours: every stop (different geo locations need map pins)
+        coords_eligible = (tour_category == 'museum' and i == 0) or (tour_category != 'museum')
+        if coords_eligible and poi.get("coordinates"):
             poi_content += f"Coordinates: {poi['coordinates']}\n\n"
         
         # Add type/specialty if available

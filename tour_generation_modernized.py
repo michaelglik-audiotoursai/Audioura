@@ -2,9 +2,10 @@
 Modernized Tour Generation Service - Separate MP3/TXT Files
 Implements REQ-001: Tour ZIP Structure Modernization
 """
-SERVICE_VERSION = "1.2.5.176"
+SERVICE_VERSION = "1.2.5.177"
 
 import os
+import re
 import json
 import uuid
 import zipfile
@@ -14,6 +15,21 @@ from datetime import datetime
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import threading
+
+# Labels stripped from TTS audio (kept in .txt files for mobile app parsing)
+# Matches all 5 structured metadata fields — same set as translation_service._NAV_FIELD_PREFIXES
+_NAV_LABEL_RE = re.compile(
+    r'^\s*(Address|Coordinates|Type/Specialty|Specific Examples|Operational Details)\s*:',
+    re.IGNORECASE | re.MULTILINE
+)
+
+def _strip_nav_fields_for_tts(text):
+    """Remove structured metadata lines before sending to Polly.
+    Keeps: stop name, Orientation, and all narrative paragraphs.
+    Strips: Address, Coordinates, Type/Specialty, Specific Examples, Operational Details.
+    The .txt files are written from the original text and remain unchanged."""
+    lines = text.split('\n')
+    return '\n'.join(l for l in lines if not _NAV_LABEL_RE.match(l))
 
 app = Flask(__name__)
 CORS(app)
@@ -283,7 +299,7 @@ def generate_modernized_tour_async(job_id, tour_file_path):
                 tts_response = requests.post(
                     "http://polly-tts-1:5018/synthesize",
                     headers={"Content-Type": "application/json"},
-                    json={"text": text_content, "voice": "Joanna"},
+                    json={"text": _strip_nav_fields_for_tts(text_content), "voice": "Joanna"},
                     timeout=30
                 )
                 
