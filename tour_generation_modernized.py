@@ -70,6 +70,12 @@ def create_modernized_tour_zip(tour_data, job_id):
     
     return zip_filename
 
+_COORDINATES_RE = re.compile(r'^Coordinates:\s*[-\d.]+\s*,\s*[-\d.]+', re.IGNORECASE | re.MULTILINE)
+
+def _stop_has_coordinates(stop_text):
+    """Return True if the stop text contains a Coordinates: line with valid lat,lng."""
+    return bool(_COORDINATES_RE.search(stop_text))
+
 def generate_html_with_external_audio(tour_data):
     """Generate HTML that references external MP3 files"""
     tour_name = tour_data.get('tour_name', 'Audio Tour')
@@ -85,19 +91,38 @@ def generate_html_with_external_audio(tour_data):
         body {{ font-family: Arial, sans-serif; margin: 20px; }}
         .audio-item {{ margin: 20px 0; padding: 15px; border: 1px solid #ccc; }}
         audio {{ width: 100%; }}
+        .map-btn {{ background: #2c3e50; border: none; border-radius: 50%; width: 36px; height: 36px;
+                    cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+                    margin-left: 8px; vertical-align: middle; }}
     </style>
 </head>
 <body>
-    <h1>{tour_name.replace('_', ' ').title()}</h1>'''
+    <h1>{tour_name.replace('_', ' ').title()}</h1>
+    <script>
+        function openMap(stopNum) {{
+            if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler) {{
+                window.flutter_inappwebview.callHandler('openMap', {{stop: stopNum}});
+            }}
+        }}
+    </script>'''
     
     for i, text in enumerate(stops, 1):
         # Extract stop title from text content
         lines = text.split('\n')
         stop_title = lines[0].strip() if lines else f"Stop {i}"
         
+        map_button = ''
+        if _stop_has_coordinates(text):
+            map_button = f'''<button class="map-btn" onclick="openMap({i})" title="View on map">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="white">
+                <path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/>
+            </svg>
+        </button>'''
+        
         html += f'''
     <div class="audio-item">
         <h3>{stop_title}: Audio {i}</h3>
+        {map_button}
         <audio id="audio-{i-1}" controls preload="metadata">
             <source src="audio_{i}.mp3" type="audio/mpeg">
             Your browser does not support the audio element.
