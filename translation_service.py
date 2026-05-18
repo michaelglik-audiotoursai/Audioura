@@ -1280,7 +1280,14 @@ Say 'What are my options' to hear this help again"""
             return original_zip_data  # Return original on error
     
     def _generate_translated_html(self, tour_name, translated_stops, audio_files, target_language):
-        """Generate HTML with embedded translated audio data"""
+        """Generate HTML with embedded translated audio data.
+
+        NOTE (2026-05-18): Dead code — no callers in the codebase as of commit 792487c.
+        The legacy fallback _translate_tour_from_zip() uses translate_zip_audio() instead.
+        Kept to keep the A#55 merge diff focused; slated for removal in a post-merge
+        cleanup commit. Map-button logic here is defensive — correct if ever called,
+        but currently unreachable.
+        """
         import base64
         
         html = f'''<!DOCTYPE html>
@@ -1323,11 +1330,7 @@ Say 'What are my options' to hear this help again"""
             # Map button — only if stop has coordinates
             map_button = ''
             if re.search(r'^Coordinates:\s*[-\d.]+\s*,\s*[-\d.]+', stop_text, re.IGNORECASE | re.MULTILINE):
-                map_button = f'''<button class="map-btn" onclick="openMap({i+1})" title="View on map">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="white">
-                <path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/>
-            </svg>
-        </button>'''
+                map_button = f'<button class="map-btn" onclick="openMap({i+1})" title="View on map">🗺</button>'
             
             # Create audio data URL if audio is available
             audio_element = ""

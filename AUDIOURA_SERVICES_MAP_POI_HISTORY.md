@@ -118,7 +118,11 @@ See `services_response_a55_android_compat.md` for the full cross-platform notes 
 
 ### State of fixes after Session 11
 
-Nothing deployed yet. Services-side changes to `tour_generation_modernized.py` and `translation_service.py` are pending until OQ-1 (legacy tour strategy) is resolved. If Option C is chosen, services side has nothing to do beyond confirming `Coordinates:` stays English in translated `audio_N.txt` files (already true since Session 6).
+A#55 implemented on `Tours_Step_Maps` (commits 600e0cd, 792487c, and follow-up).
+Buttons baked into `index.html` per Option B (OQ-1 RESOLVED). SVG replaced with
+`🗺` emoji to fix BeautifulSoup `viewBox` lowercasing bug in translated tours.
+Pending: iOS regex confirmation (Issue 4), Android scope confirmation (Issue 2).
+Not yet merged to `Newsletters`.
 
 ---
 
