@@ -14,9 +14,8 @@
 - **ALWAYS** prefix every reply with "🔧 SERVICES AMAZON-Q -"
 - **GIT RULE**: Do NOT commit until user confirms mobile testing passed
 - **BRANCH**: `Tours_Step_Maps` (branched from `Newsletters` at `ad3b5be`)
-- **MERGE TARGET**: `Newsletters` (when A#55 complete and tested)
-- **LAST GIT COMMIT**: `7cbc486` — "A#55 third-pass: font-size:20px line-height:1 on .map-btn for emoji sizing parity with original SVG"
-- **DEPLOYED + COMMITTED**: A#56 tour-type icons in `tour_generation_modernized.py` v1.2.5.178
+- **MERGE TARGET**: `Newsletters` (when A#55+A#56 complete and tested)
+- **LAST GIT COMMIT**: `705e85f` — "A#56: Tour-type icons; ISSUE-059 double-button root cause confirmed + iOS doc; remind updated"
 - **WORKFLOW**: Blanket approval given for all service changes — implement without waiting
 
 ---
@@ -103,7 +102,7 @@ standalone maintenance session after Tours_Step_Maps is merged and mobile testin
 | `generate_tour_text.py` | `development-tour-generator-1:5000` | `ad3b5be` | Sessions 2–10 changes |
 | `generate_tour_text_service.py` | `development-tour-generator-1:5000` | unchanged | Flask wrapper |
 | `tour_orchestrator_service.py` | `development-tour-orchestrator-1:5002` | `ad3b5be` | Session 5 guards |
-| `tour_generation_modernized.py` | `tour-generation-modernized-1:5021` | `7cbc486`+A#56 | A#55 map buttons + A#56 tour-type icons |
+| `tour_generation_modernized.py` | `tour-generation-modernized-1:5021` | `705e85f` | A#55 map buttons + A#56 tour-type icons |
 | `translation_service.py` | `translation-service-1:5030` | `7cbc486` | A#55 map buttons + stop-count warning |
 | `enhanced_tour_templates_fixed.py` | `development-tour-generator-1:5000` | `ad3b5be` | Sessions 7+9 hallucination patterns |
 | `AUDIOURA_SERVICES_MAP_POI_HISTORY.md` | local only | `792487c` | OQ-1 resolved (Option B) |
@@ -216,7 +215,7 @@ walking: 🚶  restaurant: 🍴  museum: 🏛️  specialized: 🗺  default: �
 ```
 
 **Claude.AI review doc**: `claude_review_a56_tour_type_icons.md`
-**Status**: Deployed to container, pending Claude.AI review + mobile test + commit.
+**Status**: Committed `705e85f`, deployed to container. Pending Claude.AI review + mobile test.
 
 ---
 
