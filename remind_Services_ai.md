@@ -15,7 +15,7 @@
 - **GIT RULE**: Do NOT commit until user confirms mobile testing passed
 - **BRANCH**: `Tours_Step_Maps` (branched from `Newsletters` at `ad3b5be`)
 - **MERGE TARGET**: `Newsletters` (when A#55+A#56 complete and tested)
-- **LAST GIT COMMIT**: `705e85f` — "A#56: Tour-type icons; ISSUE-059 double-button root cause confirmed + iOS doc; remind updated"
+- **LAST GIT COMMIT**: `4e2699d` — "A#56 Claude review fixes: explicit specialized=map, None guard, FE0F on map emoji (v1.2.5.179)"
 - **WORKFLOW**: Blanket approval given for all service changes — implement without waiting
 
 ---
@@ -102,7 +102,7 @@ standalone maintenance session after Tours_Step_Maps is merged and mobile testin
 | `generate_tour_text.py` | `development-tour-generator-1:5000` | `ad3b5be` | Sessions 2–10 changes |
 | `generate_tour_text_service.py` | `development-tour-generator-1:5000` | unchanged | Flask wrapper |
 | `tour_orchestrator_service.py` | `development-tour-orchestrator-1:5002` | `ad3b5be` | Session 5 guards |
-| `tour_generation_modernized.py` | `tour-generation-modernized-1:5021` | `705e85f` | A#55 map buttons + A#56 tour-type icons |
+| `tour_generation_modernized.py` | `tour-generation-modernized-1:5021` | `4e2699d` | A#55 map buttons + A#56 tour-type icons (Claude review applied) |
 | `translation_service.py` | `translation-service-1:5030` | `7cbc486` | A#55 map buttons + stop-count warning |
 | `enhanced_tour_templates_fixed.py` | `development-tour-generator-1:5000` | `ad3b5be` | Sessions 7+9 hallucination patterns |
 | `AUDIOURA_SERVICES_MAP_POI_HISTORY.md` | local only | `792487c` | OQ-1 resolved (Option B) |
@@ -191,16 +191,27 @@ the injected button sits below it.
 _TOUR_CATEGORY_RE = re.compile(r'-\s*(walking|restaurant|museum|specialized)\s+Tour', re.IGNORECASE)
 
 def _tour_icon_for_name(tour_name):
+    """Return tour-type emoji based on category embedded in tour title.
+    Pass the tour title string, never a stop body."""
+    if not tour_name:
+        return '🗺️'
     m = _TOUR_CATEGORY_RE.search(tour_name)
     if not m:
-        return '🗺'
+        return '🗺️'
     cat = m.group(1).lower()
-    return {'walking': '🚶', 'restaurant': '🍴', 'museum': '🏛️'}.get(cat, '🗺')
+    return {'walking': '🚶', 'restaurant': '🍴', 'museum': '🏛️', 'specialized': '🗺️'}.get(cat, '🗺️')
 
 # In generate_html_with_external_audio(), per-stop:
 icon = _tour_icon_for_name(tour_name)
 map_button = f'<button class="map-btn" onclick="openMap({i})" title="View on map">{icon}</button>'
 ```
+
+**Claude review (claude_response_a56_tour_type_icons.md) — all items applied:**
+- Q2: `'specialized': '🗺️'` explicit in dict ✅
+- Q3: `if not tour_name: return '🗺️'` None guard ✅
+- Q4: FE0F variation selector on all `🗺️` instances ✅
+- Q1/Q5: no code change needed, confirmed correct ✅
+- Docstring: "Pass the tour title, never a stop body" ✅
 
 **Data flow**: `tour_category` is NOT passed as a separate field. It is embedded in the
 tour title as `"- walking Tour"` / `"- museum Tour"` etc. by `generate_tour_text.py`.
@@ -215,7 +226,7 @@ walking: 🚶  restaurant: 🍴  museum: 🏛️  specialized: 🗺  default: �
 ```
 
 **Claude.AI review doc**: `claude_review_a56_tour_type_icons.md`
-**Status**: Committed `705e85f`, deployed to container. Pending Claude.AI review + mobile test.
+**Status**: Committed `4e2699d`, deployed to container. Claude review complete — all items applied. Pending mobile test.
 
 ---
 
@@ -346,4 +357,4 @@ git push origin Tours_Step_Maps
 | 9 | Four bugs: substring→word-overlap; regex fallback removed; museum excluded from verify; stop-word exclusion; per-pattern logging |
 | 10 | _venue_matches_location(); _is_suspect threshold <1; file truncation recovery; e2e test tour 259 |
 | 11 (A#55) | Per-stop map buttons in index.html; 3 Claude review passes; SVG→emoji; OQ-1 resolved; double-button issue found; tour-type icons requested |
-| 12 (A#56) | Tour-type icons: 🚶/🍴/🏛️/🗺; _TOUR_CATEGORY_RE + _tour_icon_for_name(); parses category from tour title; translation survives for free; Claude.AI review doc created |
+| 12 (A#56) | Tour-type icons: 🚶/🍴/🏛️/🗺️; _TOUR_CATEGORY_RE + _tour_icon_for_name(); parses category from tour title; translation survives for free; Claude review applied (None guard, FE0F, explicit specialized, docstring) |
