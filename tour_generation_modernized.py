@@ -92,6 +92,7 @@ def generate_html_with_external_audio(tour_data):
         .audio-item {{ margin: 20px 0; padding: 15px; border: 1px solid #ccc; }}
         audio {{ width: 100%; }}
         .map-btn {{ background: #2c3e50; border: none; border-radius: 50%; width: 36px; height: 36px;
+                    font-size: 20px; line-height: 1;
                     cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
                     margin-left: 8px; vertical-align: middle; }}
     </style>

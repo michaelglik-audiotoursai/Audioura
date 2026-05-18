@@ -1305,6 +1305,7 @@ Say 'What are my options' to hear this help again"""
         audio {{ width: 100%; margin-top: 10px; }}
         .language-indicator {{ background: #3498db; color: white; padding: 5px 10px; border-radius: 15px; font-size: 12px; }}
         .map-btn {{ background: #2c3e50; border: none; border-radius: 50%; width: 36px; height: 36px;
+                    font-size: 20px; line-height: 1;
                     cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
                     margin-left: 8px; vertical-align: middle; }}
     </style>
