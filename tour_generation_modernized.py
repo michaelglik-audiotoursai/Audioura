@@ -2,7 +2,7 @@
 Modernized Tour Generation Service - Separate MP3/TXT Files
 Implements REQ-001: Tour ZIP Structure Modernization
 """
-SERVICE_VERSION = "1.2.5.178"
+SERVICE_VERSION = "1.2.5.179"
 
 import os
 import re
@@ -78,12 +78,15 @@ def _stop_has_coordinates(stop_text):
     return bool(_COORDINATES_RE.search(stop_text))
 
 def _tour_icon_for_name(tour_name):
-    """Return tour-type emoji based on category embedded in tour title."""
+    """Return tour-type emoji based on category embedded in tour title.
+    Pass the tour title string, never a stop body."""
+    if not tour_name:
+        return '🗺️'
     m = _TOUR_CATEGORY_RE.search(tour_name)
     if not m:
-        return '🗺'
+        return '🗺️'
     cat = m.group(1).lower()
-    return {'walking': '🚶', 'restaurant': '🍴', 'museum': '🏛️'}.get(cat, '🗺')
+    return {'walking': '🚶', 'restaurant': '🍴', 'museum': '🏛️', 'specialized': '🗺️'}.get(cat, '🗺️')
 
 def generate_html_with_external_audio(tour_data):
     """Generate HTML that references external MP3 files"""
