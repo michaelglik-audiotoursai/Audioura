@@ -1149,6 +1149,8 @@ Say 'What are my options' to hear this help again"""
                     if is_modernized_format:
                         # Modernized format: overwrite audio_1.mp3, audio_2.mp3 ... with translated Polly bytes
                         logging.info(f"Modernized ZIP format detected ({len(existing_mp3s)} mp3 files). Replacing with translated audio.")
+                        if len(audio_files) != len(existing_mp3s):
+                            logging.warning(f"Stop count mismatch: {len(audio_files)} translated stops vs {len(existing_mp3s)} original mp3s — some stops may keep English audio")
                         for i, translated_audio_bytes in enumerate(audio_files):
                             mp3_filename = f'audio_{i+1}.mp3'
                             mp3_path = os.path.join(extract_dir, mp3_filename)
