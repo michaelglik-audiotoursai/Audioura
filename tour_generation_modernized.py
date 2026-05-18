@@ -2,7 +2,7 @@
 Modernized Tour Generation Service - Separate MP3/TXT Files
 Implements REQ-001: Tour ZIP Structure Modernization
 """
-SERVICE_VERSION = "1.2.5.177"
+SERVICE_VERSION = "1.2.5.178"
 
 import os
 import re
@@ -71,10 +71,19 @@ def create_modernized_tour_zip(tour_data, job_id):
     return zip_filename
 
 _COORDINATES_RE = re.compile(r'^Coordinates:\s*[-\d.]+\s*,\s*[-\d.]+', re.IGNORECASE | re.MULTILINE)
+_TOUR_CATEGORY_RE = re.compile(r'-\s*(walking|restaurant|museum|specialized)\s+Tour', re.IGNORECASE)
 
 def _stop_has_coordinates(stop_text):
     """Return True if the stop text contains a Coordinates: line with valid lat,lng."""
     return bool(_COORDINATES_RE.search(stop_text))
+
+def _tour_icon_for_name(tour_name):
+    """Return tour-type emoji based on category embedded in tour title."""
+    m = _TOUR_CATEGORY_RE.search(tour_name)
+    if not m:
+        return '🗺'
+    cat = m.group(1).lower()
+    return {'walking': '🚶', 'restaurant': '🍴', 'museum': '🏛️'}.get(cat, '🗺')
 
 def generate_html_with_external_audio(tour_data):
     """Generate HTML that references external MP3 files"""
@@ -114,7 +123,8 @@ def generate_html_with_external_audio(tour_data):
         
         map_button = ''
         if _stop_has_coordinates(text):
-            map_button = f'<button class="map-btn" onclick="openMap({i})" title="View on map">🗺</button>'
+            icon = _tour_icon_for_name(tour_name)
+            map_button = f'<button class="map-btn" onclick="openMap({i})" title="View on map">{icon}</button>'
         
         html += f'''
     <div class="audio-item">

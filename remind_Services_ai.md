@@ -2,9 +2,9 @@
 ## Who you are
 🔧 **SERVICES AMAZON-Q** — **CRITICAL**: Always start ALL replies with "🔧 SERVICES AMAZON-Q -"
 
-**UPDATED**: 2026-05-18 (Session 10 complete — e2e test passed, file recovery resolved, PHASE 5.5 confirmed working)
+**UPDATED**: 2026-05-20 (A#56 tour-type icons built + committed; ISSUE-059 double-button root cause confirmed + iOS doc sent)
 
-1. You are Services Amazon-Q responsible for all Docker services in `C:\Users\micha\eclipse-workspace\AudioTours\development\`. You have blanket approval to change code, run Python programs, start/stop Docker services without waiting for approval — user may be elsewhere.
+1. You are Services Amazon-Q responsible for all Docker services in `C:\Users\micha\eclipse-workspace\AudioTours\development\`. You have blanket approval to change code, run Python programs, start/stop Docker services without waiting for approval.
 2. You maintain this file and update it after significant changes.
 3. You communicate with Mobile App Amazon-Q via: `c:\Users\micha\eclipse-workspace\amazon-q-communications\audiotours\requirements\`
 
@@ -13,20 +13,21 @@
 ## 🚨 CRITICAL IDENTITY RULES
 - **ALWAYS** prefix every reply with "🔧 SERVICES AMAZON-Q -"
 - **GIT RULE**: Do NOT commit until user confirms mobile testing passed
-- **BRANCH**: Newsletters
-- **LAST GIT COMMIT**: `dc89045` — "Tour Stops numbering corrected on May 11, 2026"
-- **ALL CHANGES SINCE dc89045 ARE DEPLOYED TO CONTAINERS BUT NOT COMMITTED TO GIT**
-- **WORKFLOW**: Propose fixes first, implement only after user approval (EXCEPT blanket approval given for hallucination fix sessions)
+- **BRANCH**: `Tours_Step_Maps` (branched from `Newsletters` at `ad3b5be`)
+- **MERGE TARGET**: `Newsletters` (when A#55 complete and tested)
+- **LAST GIT COMMIT**: `7cbc486` — "A#55 third-pass: font-size:20px line-height:1 on .map-btn for emoji sizing parity with original SVG"
+- **DEPLOYED + COMMITTED**: A#56 tour-type icons in `tour_generation_modernized.py` v1.2.5.178
+- **WORKFLOW**: Blanket approval given for all service changes — implement without waiting
 
 ---
 
 ## ⚠️ CRITICAL FILE SAFETY RULE (learned Session 10)
-The IDE file tool can show "intended" content while the actual bytes on disk are truncated.
+The IDE file tool can show "intended" content while actual bytes on disk are truncated.
 **NEVER trust local file content without verifying against the container.**
-- Before deploying: `docker exec <container> wc -l /app/<file>.py` — compare to local
+- Before deploying: `docker exec <container> wc -l /app/<file>.py`
 - After any edit: `docker exec <container> python3 -m py_compile /app/<file>.py && echo OK`
-- If local file is truncated: `docker cp <container>:/app/<file>.py <local_path>` to recover
-- The containers are the source of truth for deployed code
+- If local file truncated: `docker cp <container>:/app/<file>.py <local_path>` to recover
+- **Containers are the source of truth for deployed code**
 
 ---
 
@@ -43,38 +44,26 @@ Mobile App
   → Store translated ZIP in audio_tours (original_tour_id = EN id)
 ```
 
-### generate_tour_text.py Internal Pipeline (current state — Sessions 2–10)
+### generate_tour_text.py Internal Pipeline (Sessions 2–10)
 ```
 PHASE 1:    analyze_tour_intent() → intent JSON [max_tokens=400]
-            intent fields: poi_type, location, theme_type, theme_name, requirements,
-                           business_hours_relevant, accessibility_mentioned, needs_research,
-                           venue_name (full official name if tour is inside ONE building; else null)
-            After PHASE 1: _venue_matches_location() sanity check on venue_name;
-                           stop words only excluded (NOT institutional markers — "museum" counts as overlap);
-                           prefix matching handles "Met"<->"Metropolitan"; permissive when content_words empty
-PHASE 2:    _classify_tour_category(location, tour_type) → 'walking'/'restaurant'/'museum'/'specialized'
-            _pre_category = _classify_tour_category(location, "") — suppresses mobile museum injection
+            venue_name field: full official name if tour is inside ONE building; else null
+            After PHASE 1: _venue_matches_location() sanity check — stop words only
+            excluded (NOT institutional markers); prefix matching; permissive when empty
+PHASE 2:    _classify_tour_category() → 'walking'/'restaurant'/'museum'/'specialized'
+            _pre_category guard suppresses mobile app's hardcoded tour_type:"museum"
 PHASE 3A:   OpenAI → raw stop names + addresses only
-            [museum tours: CRITICAL CONSTRAINT injected ONLY when intent provides venue_name (not null);
-             if intent is None or venue_name is null → constraint skipped (city-wide tours safe);
-             regex fallback REMOVED — was buggy and caused wrong constraint on city-wide tours]
-PHASE 4.5:  validate_enhanced_poi_knowledge() → reject if >50% generic/fictional (names only at this point)
-PHASE 4:    verify_poi_matches_type() → exclude non-matching
-            SKIPPED for tour_category in ('walking', 'museum')
-            _verify_against_intent closure also excludes 'museum' (Session 9 Fix 3)
+            Museum constraint injected ONLY when intent.venue_name is not null
+            Regex fallback REMOVED (was buggy)
+PHASE 4.5:  validate_enhanced_poi_knowledge() → reject if >50% generic/fictional
+PHASE 4:    verify_poi_matches_type() — SKIPPED for 'walking' and 'museum'
 PHASE 3B:   OpenAI → reorder stops + structured details + walking directions
 PHASE 5:    generate descriptions (parallel ThreadPoolExecutor max 5 workers)
-PHASE 5.5a: validate_enhanced_poi_knowledge() SECOND CALL — descriptions now populated (ALL tour types)
-            catches description-level hallucination patterns; per-pattern logging added (Session 9 Fix 5)
-PHASE 5.5b: [museum tours only, only when _museum_venue_name != ""]
-            _validate_museum_stop_descriptions(poi_list, venue_name, headers)
-            - stop 0 always kept unconditionally (graceful degradation guarantee)
-            - pre-filter (zero API cost): institutional-marker words + <1 shared SUBSTANTIVE word
-              with venue (stop words + markers excluded — Session 9 Fix 4, threshold < 1 Session 10)
-            - OpenAI fact-check only for suspect stops (max_tokens=60, parallel)
-            - fail-open: API errors / low confidence → keep stop
+PHASE 5.5a: validate_enhanced_poi_knowledge() SECOND CALL (all tour types)
+PHASE 5.5b: _validate_museum_stop_descriptions() — museum only, when venue_name != ""
+            stop 0 always kept; pre-filter threshold < 1 substantive overlap (Session 10)
 PHASE 6:    assemble Stop 1..N
-            coordinates: every stop (non-museum); first stop only (museum — all exhibits same building)
+            coordinates: every stop (non-museum); first stop only (museum)
 ```
 
 ---
@@ -82,179 +71,165 @@ PHASE 6:    assemble Stop 1..N
 ## 🐳 DOCKER SERVICES
 
 ```
-development-tour-generator-1:5000    # Tour text + AI — generate_tour_text.py (shows "unhealthy" but works)
-development-tour-orchestrator-1:5002 # Tour workflow — tour_orchestrator_service.py (shows "unhealthy" but works)
-tour-generation-modernized-1:5021    # MP3+ZIP creation — tour_generation_modernized.py
-translation-service-1:5030           # Multi-language translation — translation_service.py
-development-tour-processor-1:5001    # Legacy MP3+ZIP (not actively modified)
-development-postgres-2-1:5432        # PostgreSQL
-development-map-delivery-1:5005      # Map & tour download by integer ID
+development-tour-generator-1:5000     # generate_tour_text.py (shows "unhealthy" — works fine)
+development-tour-orchestrator-1:5002  # tour_orchestrator_service.py (shows "unhealthy" — works fine)
+tour-generation-modernized-1:5021     # tour_generation_modernized.py
+translation-service-1:5030            # translation_service.py
+development-tour-processor-1:5001     # Legacy MP3+ZIP (not actively modified)
+development-postgres-2-1:5432         # PostgreSQL
+development-map-delivery-1:5005       # Map & tour download by integer ID
 development-coordinates-fromai-1:5006 # Location services
-development-treats-1:5007            # Local treats/POIs
-news-orchestrator-1:5012             # News workflow
-news-generator-1:5010                # News content
-news-processor-1:5011                # News audio
-newsletter-processor-1:5017          # Newsletter crawling
-polly-tts-1:5018                     # Amazon Polly TTS
-tour-id-resolution-1:5025            # Tour ID resolution
+development-treats-1:5007             # Local treats/POIs
+news-orchestrator-1:5012              # News workflow
+news-generator-1:5010                 # News content
+news-processor-1:5011                 # News audio
+newsletter-processor-1:5017           # Newsletter crawling
+polly-tts-1:5018                      # Amazon Polly TTS
+tour-id-resolution-1:5025             # Tour ID resolution
+tour-editing-1:5020                   # Tour editing service
+tour-editing-phase2-1:5022            # Tour editing phase 2
 ```
+
+⚠️ **Container naming audit**: Only 3/22 containers follow the naming rule (container name
+matches Python filename). Full audit in `container_naming_audit.md`. Fix scheduled as
+standalone maintenance session after Tours_Step_Maps is merged and mobile testing passes.
 
 ---
 
-## 📁 KEY FILES (all in `c:\Users\micha\eclipse-workspace\AudioTours\development\`)
+## 📁 KEY FILES
 
-| File | Container | Status |
-|------|-----------|--------|
-| `generate_tour_text.py` | `development-tour-generator-1:5000` | MODIFIED — not committed. 66,117 bytes / 1,326 lines |
-| `generate_tour_text_service.py` | `development-tour-generator-1:5000` | Flask wrapper, unchanged |
-| `tour_orchestrator_service.py` | `development-tour-orchestrator-1:5002` | MODIFIED — not committed. 50,523 bytes |
-| `tour_generation_modernized.py` | `tour-generation-modernized-1:5021` | MODIFIED — not committed |
-| `translation_service.py` | `translation-service-1:5030` | MODIFIED — not committed. 73,146 bytes |
-| `enhanced_tour_templates_fixed.py` | `development-tour-generator-1:5000` | MODIFIED — not committed |
-| `poi_inclusion_exceptions.py` | `development-tour-generator-1:5000` | unchanged |
-| `tour_type_detector.py` | `development-tour-generator-1:5000` | unchanged |
-| `enhanced_prompt_generator.py` | `development-tour-generator-1:5000` | unchanged |
-| `break_text_to_pois_fixed.py` | `tour-generation-modernized-1:5021` | unchanged |
-| `test_restore_metadata.py` | local only | regression test, 8/8 pass |
-| `claude_review_session9_bug_fixes.md` | local only | Claude review doc Session 9 |
-| `claude_review_session10_fixes.md` | local only | Claude review doc Session 10 |
-| `amazonq_recovery_plan_session10.md` | local only | Claude's file recovery plan (followed successfully) |
-| `remind_ai.md` | local only | Mobile app context — read on recovery |
-| `remind_Services_ai.md` | local only | This file |
+| File | Container | Commit | Notes |
+|------|-----------|--------|-------|
+| `generate_tour_text.py` | `development-tour-generator-1:5000` | `ad3b5be` | Sessions 2–10 changes |
+| `generate_tour_text_service.py` | `development-tour-generator-1:5000` | unchanged | Flask wrapper |
+| `tour_orchestrator_service.py` | `development-tour-orchestrator-1:5002` | `ad3b5be` | Session 5 guards |
+| `tour_generation_modernized.py` | `tour-generation-modernized-1:5021` | `7cbc486`+A#56 | A#55 map buttons + A#56 tour-type icons |
+| `translation_service.py` | `translation-service-1:5030` | `7cbc486` | A#55 map buttons + stop-count warning |
+| `enhanced_tour_templates_fixed.py` | `development-tour-generator-1:5000` | `ad3b5be` | Sessions 7+9 hallucination patterns |
+| `AUDIOURA_SERVICES_MAP_POI_HISTORY.md` | local only | `792487c` | OQ-1 resolved (Option B) |
+| `container_naming_audit.md` | local only | — | Full container↔file mismatch audit |
+| `remind_ai.md` | local only | — | Mobile app context — read on recovery |
+| `remind_Services_ai.md` | local only | — | This file |
 
 ---
 
-## 📋 CURRENT CODE STATE — ALL DEPLOYED CHANGES (not committed since dc89045)
+## 📋 A#55 MAP BUTTONS — CURRENT CODE STATE
 
-### generate_tour_text.py — Sessions 2–10
-
-**Session 2**: coordinates for every stop (non-museum)
-**Session 3**: `isinstance(poi_type_val, list)` guard → `" or ".join()`
-**Session 4**: `_pre_category` guard — suppresses mobile app's hardcoded `tour_type:"museum"` injection
-**Session 5 (Claude review A–F)**:
-- `_classify_tour_category()` renamed; `specialized` checks `location_lower`
-- `max_tokens` 200→400 in `analyze_tour_intent()` (prevented truncated JSON)
-- Dead import removed; `" or ".join()` for poi_type list; intent prompt hardening
-
-**Session 7 — Museum hallucination fix (3 layers)**:
-
-**Layer 1 — PHASE 1 venue_name field**:
+### tour_generation_modernized.py
 ```python
-# 11-example few-shot table in intent prompt including edge cases:
-# "Jackson Homestead and Museum Newton, MA" → "Jackson Homestead and Museum"
-# "Tour inside the MFA Boston" → "Museum of Fine Arts, Boston"
-# "Tour of the Met" → "The Metropolitan Museum of Art"
-# "Walking tour in Newton, MA" → null
-# "Cambridge museums tour" → null  (multiple venues)
+# Module level:
+_COORDINATES_RE = re.compile(r'^Coordinates:\s*[-\d.]+\s*,\s*[-\d.]+', re.IGNORECASE | re.MULTILINE)
+def _stop_has_coordinates(stop_text): return bool(_COORDINATES_RE.search(stop_text))
 
-# SESSION 10 FIX: _venue_matches_location() — stop words only excluded (NOT institutional markers)
-_SANITY_STOP_WORDS = {
-    'the','of','and','in','on','at','to','a','an',
-    'for','with','by','from','or','tour','tours','inside','visit','walk','walking'
-}
-def _venue_matches_location(venue_name_s, location_s):
-    def content_words(s):
-        return [w for w in re.findall(r'[a-z]+', s.lower())
-                if len(w) >= 3 and w not in _SANITY_STOP_WORDS]
-    v = content_words(venue_name_s)
-    l = content_words(location_s)
-    if not v or not l:
-        return True  # can't judge — permissive
-    for vw in v:
-        for lw in l:
-            if vw == lw or vw.startswith(lw) or lw.startswith(vw):
-                return True
-    return False
-if raw_venue and not _venue_matches_location(raw_venue, location):
-    intent['venue_name'] = None
+# generate_html_with_external_audio():
+# CSS: .map-btn { background:#2c3e50; border:none; border-radius:50%; width:36px; height:36px;
+#                 font-size:20px; line-height:1; cursor:pointer; display:inline-flex;
+#                 align-items:center; justify-content:center; margin-left:8px; vertical-align:middle; }
+# JS helper (after <h1>, before stop loop):
+#   function openMap(stopNum) {
+#       if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler) {
+#           window.flutter_inappwebview.callHandler('openMap', {stop: stopNum});
+#       }
+#   }
+# Per stop: map_button = '<button class="map-btn" onclick="openMap(i)" title="View on map">🗺</button>'
+#           only when _stop_has_coordinates(text) — placed as SIBLING of <h3>
 ```
 
-**Layer 2 — PHASE 3A venue constraint**:
+### translation_service.py
 ```python
-# SESSION 9 FIX 2: venue_name sourced from intent ONLY — regex fallback REMOVED.
-if intent and intent.get('venue_name'):
-    _museum_venue_name = intent['venue_name'].strip()
-else:
-    _museum_venue_name = ""  # skip constraint — no regex fallback
-if _museum_venue_name:
-    _museum_venue_constraint = (
-        f"\nCRITICAL CONSTRAINT — THIS IS A SINGLE-VENUE MUSEUM TOUR:\n"
-        f"- ALL {total_stops} stops MUST be rooms, galleries, exhibits, or areas physically "
-        f"located INSIDE '{_museum_venue_name}'.\n" ...
-    )
+# _create_mobile_compatible_zip() — modernized path: reuses English index.html unchanged.
+#   Buttons survive h.clear() pass for free. Stop-count mismatch warning added.
+# _generate_translated_html() — DEAD CODE (no callers). Map buttons present defensively.
+#   Docstring added explaining dead status. Slated for removal post-merge.
 ```
 
-**Layer 3 — PHASE 4 skip + PHASE 5.5a/b**:
-```python
-# SESSION 9 FIX 3: _verify_against_intent closure excludes 'museum' (was only 'walking'):
-if not (intent and intent.get('poi_type') and tour_category not in ('walking', 'museum')):
-    return list(stops), 0
-
-# PHASE 5.5a — second validate_enhanced_poi_knowledge() for ALL tour types after PHASE 5
-# PHASE 5.5b — _validate_museum_stop_descriptions() for museum tours (only when _museum_venue_name != "")
-```
-
-### enhanced_tour_templates_fixed.py — Sessions 7 + 9
-```python
-# validate_enhanced_poi_knowledge() now scans descriptions too (None guard added)
-# 3 new description-level hallucination patterns added
-# SESSION 9 FIX 5: per-pattern logging:
-print(f"❌ Fictional content detected in: {poi_name} [pattern: {pattern[:60]}]")
-```
-
-### _validate_museum_stop_descriptions() — Session 9 Fix 4 + Session 10 threshold
-```python
-# SESSION 10: threshold changed from < 2 to < 1 (substantive_overlap after removing stop words + markers)
-_OVERLAP_STOP_WORDS = {'the', 'of', 'and', 'in', 'at', 'a', 'an', 'for'}
-name_content = name_words - _OVERLAP_STOP_WORDS - _INSTITUTION_MARKERS
-venue_content = set(re.findall(r'[a-z]+', venue_name.lower())) - _OVERLAP_STOP_WORDS - _INSTITUTION_MARKERS
-substantive_overlap = (name_content & venue_content) - _INSTITUTION_MARKERS
-return len(substantive_overlap) < 1
-```
-
-### tour_generation_modernized.py — Session 6 Bug 1
-```python
-# _NAV_LABEL_RE expanded to all 5 fields (was Address|Coordinates only):
-_NAV_LABEL_RE = re.compile(
-    r'^\s*(Address|Coordinates|Type/Specialty|Specific Examples|Operational Details)\s*:',
-    re.IGNORECASE | re.MULTILINE
-)
-```
-
-### translation_service.py — Sessions 2–7
-```python
-import re  # module-level
-_METADATA_LABELS = ['Coordinates', 'Address']
-_NAV_FIELD_PREFIXES = ['Address:', 'Coordinates:', 'Type/Specialty:', 'Specific Examples:', 'Operational Details:']
-# Session 6 Bug 2 FIX: _restore_metadata_labels() — language-agnostic prepend approach
-```
-
-### tour_orchestrator_service.py — Session 5
-```python
-# Guard: if actual_stops == 0 or actual_stops is None → status="error", return
-```
+### A#55 Three-pass Claude.AI review — all issues resolved:
+- Button sibling of `<h3>` (not inside — translation h.clear() would wipe it) ✅
+- Single openMap() JS helper (safe noop on Android/browser) ✅
+- Regex on stop text (not POI struct — generate_html only sees strings) ✅
+- SVG replaced with 🗺 emoji (BeautifulSoup lowercases viewBox → viewbox, breaks scale) ✅
+- font-size:20px + line-height:1 (emoji sizing parity with original SVG) ✅
+- Stop-count mismatch warning in _create_mobile_compatible_zip() ✅
+- Dead stub translation-service/translation_service.py deleted ✅
+- OQ-1 resolved: Option B (bake-in) chosen by user instruction ✅
 
 ---
 
-## ✅ SESSION 10 E2E TEST RESULTS (Jackson Homestead, tour ID 259)
+## 🐛 ISSUE-059: DOUBLE MAP BUTTON — ROOT CAUSE CONFIRMED
 
-**Request**: "Jackson Homestead and Museum Newton, MA", 5 stops, museum type
+**Symptom**: Two map buttons per stop — one above audio player (services HTML), one below (runtime injection).
+
+**Root cause CONFIRMED** (read tour_player_screen.dart 2026-05-20):
+Both Option B (services bake-in) AND Option C (runtime JS injection) are running simultaneously.
+`_buildMapButtonInjectionScript()` in `tour_player_screen.dart` injects a second button
+after the `<audio>` element at `onLoadStop`. The services button sits above `<audio>`,
+the injected button sits below it.
+
+**Fix**: Remove runtime injection from `tour_player_screen.dart`:
+- Delete: `_buildMapButtonInjectionScript()`, `_checkForMap()`, `_countStops()`, `_getMappableStops()`
+- Delete: `_hasMap`/`_stopCount` state vars, `_checkForMap()` call in `initState()`
+- Delete: injection block in `onLoadStop`
+- KEEP: `_openMapForStop()`, `openMap` JS handler registration, `TourMapScreen` import
+
+**iOS/Android doc sent**: `ISSUE-059_DUPLICATE_MAP_BUTTONS_REMOVE_RUNTIME_INJECTION.md`
+**Status**: Awaiting iOS/Android Amazon-Q to apply fix and mobile test.
+
+---
+
+## ✅ A#56: TOUR-TYPE SPECIFIC MAP BUTTON ICONS (built 2026-05-20)
+
+| Tour type | Icon |
+|---|---|
+| `walking` | 🚶 |
+| `restaurant` | 🍴 |
+| `museum` | 🏛️ |
+| `specialized` / default | 🗺 |
+
+**Implementation**: `tour_generation_modernized.py` only. No other files changed.
+
+```python
+# Module level (alongside _COORDINATES_RE):
+_TOUR_CATEGORY_RE = re.compile(r'-\s*(walking|restaurant|museum|specialized)\s+Tour', re.IGNORECASE)
+
+def _tour_icon_for_name(tour_name):
+    m = _TOUR_CATEGORY_RE.search(tour_name)
+    if not m:
+        return '🗺'
+    cat = m.group(1).lower()
+    return {'walking': '🚶', 'restaurant': '🍴', 'museum': '🏛️'}.get(cat, '🗺')
+
+# In generate_html_with_external_audio(), per-stop:
+icon = _tour_icon_for_name(tour_name)
+map_button = f'<button class="map-btn" onclick="openMap({i})" title="View on map">{icon}</button>'
+```
+
+**Data flow**: `tour_category` is NOT passed as a separate field. It is embedded in the
+tour title as `"- walking Tour"` / `"- museum Tour"` etc. by `generate_tour_text.py`.
+`_tour_icon_for_name()` parses it from `tour_name` which is already in scope.
+
+**Translation**: Icon survives translation for free. Map button is a sibling of `<h3>`,
+not a child — `h.clear()` in `translation_service.py` does not touch it.
+
+**Verified live**:
+```
+walking: 🚶  restaurant: 🍴  museum: 🏛️  specialized: 🗺  default: 🗺  ✅
+```
+
+**Claude.AI review doc**: `claude_review_a56_tour_type_icons.md`
+**Status**: Deployed to container, pending Claude.AI review + mobile test + commit.
+
+---
+
+## ✅ SESSION 10 E2E TEST (Jackson Homestead, tour ID 259)
 
 | Check | Result |
 |---|---|
 | PHASE 1 venue_name | ✅ "Jackson Homestead and Museum" |
-| _venue_matches_location sanity | ✅ OK |
-| Museum constraint injected | ✅ "[Museum constraint] Venue from intent='Jackson Homestead and Museum'" |
-| PHASE 4 skipped | ✅ "PHASE 4: skipped (tour_category='museum')" |
-| All 5 stops at 527 Washington St | ✅ correct address |
-| Stop names inside venue | ✅ Permanent Collection Gallery, Underground Railroad Exhibit, History of Newton Gallery, Jackson Family Room, Civil War Memorabilia Exhibit |
-| PHASE 5.5a/5.5b present in file | ✅ confirmed at lines 1148–1162 |
-| PHASE 5.5 log output | ⚠️ not visible — log tail cutoff (docker logs buffer), NOT a code issue |
+| Museum constraint injected | ✅ |
+| PHASE 4 skipped | ✅ |
+| All 5 stops at 527 Washington St | ✅ |
+| PHASE 5.5a/5.5b present | ✅ lines 1148–1162 |
 | Tour completed | ✅ status=completed, actual_stops=5, final_tour_id=259 |
-
-**Note on PHASE 5.5 log**: The "PHASE 4: Assembling" label seen in older log entries is from pre-Session-7 runs still in the container log history. The current code correctly says "PHASE 6: Assembling". PHASE 5.5 IS in the file and runs correctly — the log just scrolled past the buffer limit before printing those lines.
-
-**Pre-fix comparison** (job aad7875d, same day, no constraint): stops included MFA Boston and New England Historic Genealogical Society — completely wrong institutions. Fix is working.
 
 ---
 
@@ -262,28 +237,25 @@ _NAV_FIELD_PREFIXES = ['Address:', 'Coordinates:', 'Type/Specialty:', 'Specific 
 
 | Tour | Lang | ID | Notes |
 |------|------|----|-------|
-| Jackson Homestead museum | EN | 259 | Session 10 e2e test — 5/5 stops correct ✅ |
-| Jackson Homestead museum | EN | 257 | Old pre-fix — 4/5 stops wrong |
-| Jackson Homestead museum | RU | 258 | Translation of 257 (old) |
-| Newton Center walking | EN | 150 | Session 6 bug test source |
-| Newton Center walking | RU | 250 | map pins ✅ |
-| Newton Center walking | FR | 251 | map pins ✅ after Bug 2 fix |
-| Newton Center walking | ZH | 252 | map pins ✅ |
+| Jackson Homestead museum | EN | 259 | Session 10 e2e — 5/5 stops correct ✅ |
+| Jackson Homestead museum | EN | 257 | Old pre-fix — wrong stops |
+| Newton Center walking | EN | 150 | Session 6 bug test |
+| Newton Center walking | RU/FR/ZH | 250/251/252 | map pins ✅ |
 | Newton restaurant | EN | 243 | Session 4 test |
-| Newton restaurant | RU/ZH/FR | 247/248/249 | Session 4 |
 | Needham walking 4-stop | EN | 227 | Session 2 test |
-| Needham | RU/ZH | 237/238 | Session 2 |
 
 ---
 
 ## ⚠️ KNOWN ISSUES
 
-- **Museum tour hallucination**: FIXED (Sessions 7–10). E2e test tour ID 259 passed — all 5 stops inside Jackson Homestead. Awaiting mobile test.
-- **Mobile app hardcodes `tour_type: "museum"`** for ALL requests. Services override via `_pre_category` guard. DB tour names still get `"- museum Tour"` suffix. Needs Mobile App Amazon-Q fix.
+- **Double map button (ISSUE-059)**: Root cause confirmed — runtime JS injection in `tour_player_screen.dart` running alongside services bake-in. Fix doc sent to iOS/Android Amazon-Q. Awaiting removal + mobile test.
+- **Tour-type icons**: A#56 built and deployed. Pending Claude.AI review + mobile test.
+- **Museum tour hallucination**: FIXED (Sessions 7–10). Tour ID 259 passed. Awaiting mobile test.
+- **Mobile app hardcodes `tour_type:"museum"`**: Services override via `_pre_category` guard. DB tour names still get "- museum Tour" suffix. Needs Mobile App Amazon-Q fix.
 - **Translation response field**: `/translate-with-audio` returns `"translations"` (not `"translated_tour_ids"`). Mobile app must use `translations.ru.id`.
-- **Navigation directions** between stops sometimes point to wrong next stop (cosmetic).
-- **`tour_content_fixes.py`** is dead code — not wired into pipeline.
-- **`development-tour-generator-1` and `development-tour-orchestrator-1`** show "unhealthy" in `docker ps` but work correctly — health check config issue only.
+- **Navigation directions**: Between stops sometimes point to wrong next stop (cosmetic).
+- **`development-tour-generator-1` and `development-tour-orchestrator-1`**: Show "unhealthy" in `docker ps` — health check config issue only, both work correctly.
+- **A#55 merge blocked on**: iOS Issue 4 (coordinate regex space-after-comma) and Android Issue 2 (scope confirmation).
 
 ---
 
@@ -318,43 +290,61 @@ curl -X POST http://localhost:5030/translate-with-audio \
 docker cp <file>.py <container>:/app/<file>.py && docker restart <container>
 
 # File → container mapping:
-# generate_tour_text.py          → development-tour-generator-1
+# generate_tour_text.py            → development-tour-generator-1
 # enhanced_tour_templates_fixed.py → development-tour-generator-1
-# tour_orchestrator_service.py   → development-tour-orchestrator-1
-# tour_generation_modernized.py  → tour-generation-modernized-1
-# translation_service.py         → translation-service-1
+# tour_orchestrator_service.py     → development-tour-orchestrator-1
+# tour_generation_modernized.py    → tour-generation-modernized-1
+# translation_service.py           → translation-service-1
 
-# Git commit (after mobile test passes):
+# Git (Tours_Step_Maps branch — do not merge to Newsletters until mobile tests pass):
 cd c:\Users\micha\eclipse-workspace\AudioTours\development
-git add generate_tour_text.py tour_orchestrator_service.py tour_generation_modernized.py translation_service.py enhanced_tour_templates_fixed.py
-git commit -m "Sessions 2-10: EN audio headers + FR Coordinates prepend + museum hallucination fix + Sessions 9-10 bug fixes"
-git push origin Newsletters
+git add <files>
+git commit -m "description"
+git push origin Tours_Step_Maps
 ```
 
 ---
 
 ## 🎯 NEXT STEPS (in order)
 
-1. **Mobile test — Museum hallucination fix**: Regenerate "Jackson Homestead and Museum Newton, MA" 5 stops on mobile.
-   - Expected: all 5 stops are rooms/exhibits inside Jackson Homestead
-   - Single map pin at 527 Washington St Newton MA
-   - Check logs for: `[venue_name sanity]`, `[Museum constraint]`, `PHASE 5.5a`, `PHASE 5.5b`, `Pre-filter:`
-2. **Mobile test — Session 6 fixes**: Generate EN + FR + RU tour to verify Bug 1 (EN audio headers silent) and Bug 2 (FR map pins appear).
-3. **Git commit**: After mobile tests pass, commit all changes since dc89045 (Sessions 2–10).
+1. **Claude.AI review — A#56 tour-type icons**: Send `claude_review_a56_tour_type_icons.md`
+   for review. Address any issues found.
+
+2. **ISSUE-059 double map button**: iOS/Android Amazon-Q must remove runtime injection
+   from `tour_player_screen.dart` per `ISSUE-059_DUPLICATE_MAP_BUTTONS_REMOVE_RUNTIME_INJECTION.md`.
+   Services code is correct — no changes needed on services side.
+
+3. **A#55 + A#56 mobile confirmations pending**:
+   - iOS: confirm Issue 4 (coordinate regex handles space after comma)
+   - Android: confirm Issue 2 (shared dart, map screen, WebView type)
+   - Both: confirm tour-type icons render correctly (🚶 🍴 🏛️)
+
+4. **Mobile test — Museum hallucination fix**: Regenerate Jackson Homestead 5 stops.
+   Expected: all stops inside venue, single map pin at 527 Washington St Newton MA.
+
+5. **Mobile test — Session 6 fixes**: EN + FR + RU tour to verify audio headers and map pins.
+
+6. **Commit A#56**: After Claude.AI review passes and mobile test confirms icons render.
+   Then merge Tours_Step_Maps → Newsletters after all mobile tests pass and double-button resolved.
+
+7. **Container naming cleanup**: Standalone session after merge. See `container_naming_audit.md`.
+
+8. **Delete `_generate_translated_html()`**: Post-merge cleanup commit on Newsletters.
 
 ---
 
-## 📊 SESSIONS SUMMARY (for historical context)
+## 📊 SESSIONS SUMMARY
 
 | Session | Key Work |
 |---------|----------|
-| 2 | Coordinates for every stop; modernized ZIP format; translation metadata restore |
+| 2 | Coordinates for every stop; modernized ZIP; translation metadata restore |
 | 3 | poi_type list guard; broken tour translation guard |
-| 4 | _pre_category guard (mobile museum injection); h1-h6 HTML translation in ZIP |
-| 5 | Claude review A–F: _classify_tour_category rename; max_tokens 200→400; orchestrator guards |
-| 6 | Bug 1: EN audio spoke headers (expanded _NAV_LABEL_RE to 5 fields); Bug 2: FR no map pins (language-agnostic prepend) |
-| 7 | Museum hallucination: 3-layer fix (PHASE 3A constraint + PHASE 5.5 validation + description scanning) |
-| 7+ | Claude response implementation: venue_name in PHASE 1 intent; PHASE 4 skip museum; pre-filter + stop-0 guarantee; second validate call; max_tokens=60 |
-| 8 | Session 8 review doc written; 5 questions raised for Claude |
-| 9 | Four bugs fixed: (1) substring→word-overlap sanity check; (2) regex fallback removed; (3) _verify_against_intent closure excludes museum; (4) stop-word exclusion in _is_suspect(); (5) per-pattern logging |
-| 10 | Two corrections from Claude's Session 9 answers: (1) _venue_matches_location() — institutional markers NOT excluded from stop words; (2) _is_suspect() threshold < 2 → < 1. File truncation incident: 3 local files truncated, recovered from containers. E2e test: Jackson Homestead tour ID 259 — all 5 stops correct. PHASE 5.5 confirmed present and working (log tail cutoff was misleading). |
+| 4 | _pre_category guard; h1-h6 HTML translation in ZIP |
+| 5 | Claude review A–F: _classify_tour_category; max_tokens 200→400; orchestrator guards |
+| 6 | Bug 1: EN audio headers (expanded _NAV_LABEL_RE); Bug 2: FR map pins (language-agnostic prepend) |
+| 7 | Museum hallucination: 3-layer fix (venue constraint + PHASE 5.5 + description scanning) |
+| 8 | Session 8 review doc; 5 questions for Claude |
+| 9 | Four bugs: substring→word-overlap; regex fallback removed; museum excluded from verify; stop-word exclusion; per-pattern logging |
+| 10 | _venue_matches_location(); _is_suspect threshold <1; file truncation recovery; e2e test tour 259 |
+| 11 (A#55) | Per-stop map buttons in index.html; 3 Claude review passes; SVG→emoji; OQ-1 resolved; double-button issue found; tour-type icons requested |
+| 12 (A#56) | Tour-type icons: 🚶/🍴/🏛️/🗺; _TOUR_CATEGORY_RE + _tour_icon_for_name(); parses category from tour title; translation survives for free; Claude.AI review doc created |
