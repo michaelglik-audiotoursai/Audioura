@@ -15,7 +15,7 @@
 - **GIT RULE**: Do NOT commit until user confirms mobile testing passed
 - **BRANCH**: `Tours_Step_Maps` (branched from `Newsletters` at `ad3b5be`)
 - **MERGE TARGET**: `Newsletters` (when A#55+A#56 complete and tested)
-- **LAST GIT COMMIT**: `ed1acad` — "Session 14 Claude review: PHASE 3C neighborhood alias map + all-tokens-scan; move 3C before Part C; zero-stop guard; cluster coord detection; [:500] slice"
+- **LAST GIT COMMIT**: `158d505` — "Fix NameError: move _fetch_coords outside if missing_coords block so cluster detection can reference it"
 - **WORKFLOW**: Blanket approval given for all service changes — implement without waiting
 
 ---
@@ -111,7 +111,7 @@ standalone maintenance session after Tours_Step_Maps is merged and mobile testin
 
 | File | Container | Commit | Notes |
 |------|-----------|--------|-------|
-| `generate_tour_text.py` | `development-tour-generator-1:5000` | `ed1acad` | Sessions 2–10 + A#56 + PHASE 3C improved + coords cluster detection |
+| `generate_tour_text.py` | `development-tour-generator-1:5000` | `158d505` | Sessions 2–10 + A#56 + PHASE 3C improved + coords cluster detection + _fetch_coords scope fix |
 | `generate_tour_text_service.py` | `development-tour-generator-1:5000` | unchanged | Flask wrapper |
 | `tour_orchestrator_service.py` | `development-tour-orchestrator-1:5002` | `ad3b5be` | Session 5 guards |
 | `tour_generation_modernized.py` | `tour-generation-modernized-1:5021` | `ed1acad` | A#55 map buttons + A#56 tour-type icons v1.2.5.183 |
@@ -263,7 +263,7 @@ not a child — `h.clear()` in `translation_service.py` does not touch it.
 - **Double map button (ISSUE-059)**: ✅ Claude confirmed `_buildMapButtonInjectionScript` is already gone from `tour_player_screen.dart`. Duplicate-button bug resolved.
 - **Tour-type icons**: A#56 + Session 14 icon fix deployed `d5da0f4`. Pending mobile test with newly generated tours.
 - **PHASE 3C location guard**: deployed `ed1acad`. Improved: neighborhood alias map, all-tokens-scan, moved before Part C, zero-stop guard. Known limitation: international address support is best-effort (postcode stripping helps but not exhaustive).
-- **Coords cluster detection**: deployed `ed1acad`. Detects when >=50% of stops share same coordinate string and refetches.
+- **Coords cluster detection**: deployed `158d505`. Detects when >=50% of stops share same coordinate string and refetches. Fixed NameError: `_fetch_coords` was defined inside `if missing_coords:` block — moved outside so cluster detection can always reference it.
 - **Museum tour hallucination**: FIXED (Sessions 7–10). Tour ID 259 passed. Awaiting mobile test.
 - **Mobile app hardcodes `tour_type:"museum"`**: Services override via `_pre_category` guard. DB tour names still get "- museum Tour" suffix. Needs Mobile App Amazon-Q fix.
 - **Translation response field**: `/translate-with-audio` returns `"translations"` (not `"translated_tour_ids"`). Mobile app must use `translations.ru.id`.
