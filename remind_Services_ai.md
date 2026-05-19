@@ -2,7 +2,7 @@
 ## Who you are
 🔧 **SERVICES AMAZON-Q** — **CRITICAL**: Always start ALL replies with "🔧 SERVICES AMAZON-Q -"
 
-**UPDATED**: 2026-05-20 (Session 14 complete: PHASE 3C all-tokens-scan + alias map + len>=4 filter; forbidden_norms before PHASE 3C; Part C address check; _fetch_coords + _address_matches_location hoisted to module level; cluster detection; service wrapper None guard; button color; [:500] slice. All bugs A/B/C/X/Y/Z fixed. Final review doc: claude_review_final_session14.md)
+**UPDATED**: 2026-05-21 (Session 14 complete + Claude final review fixes: Q2 word-set subset check prevents Lynn/Lynnfield false-keeps + state+zip token filter; Q4 ValueError catch surfaces PHASE 3C zero-stop as None regardless of intent state. Commit e4ebcf1. All bugs A/B/C/X/Y/Z+Q2+Q4 fixed. Issue AA filed: York,ME vs New York,NY ambiguity — not blocking merge.)
 
 1. You are Services Amazon-Q responsible for all Docker services in `C:\Users\micha\eclipse-workspace\AudioTours\development\`. You have blanket approval to change code, run Python programs, start/stop Docker services without waiting for approval.
 2. You maintain this file and update it after significant changes.
@@ -15,7 +15,7 @@
 - **GIT RULE**: Do NOT commit until user confirms mobile testing passed
 - **BRANCH**: `Tours_Step_Maps` (branched from `Newsletters` at `ad3b5be`)
 - **MERGE TARGET**: `Newsletters` (when A#55+A#56 complete and tested)
-- **LAST GIT COMMIT**: `1e0c326` — "Fix Bug Z: move forbidden_norms init before PHASE 3C so PHASE 3C rejects flow into Part C"
+- **LAST GIT COMMIT**: `e4ebcf1` — "Fix Q2+Q4 from Claude final review: word-set subset check + ValueError catch"
 - **FINAL REVIEW DOC**: `claude_review_final_session14.md` — send this to Claude.AI for final review before merging `Tours_Step_Maps` → `Newsletters`
 - **WORKFLOW**: Blanket approval given for all service changes — implement without waiting
 
@@ -143,6 +143,10 @@ All changes landed on `Tours_Step_Maps`. Final review doc: `claude_review_final_
 | 9 | `generate_tour_text_service.py` | `445a6f3` | `if tour_text is None:` guard in service wrapper |
 | 10 | `tour_generation_modernized.py` | `445a6f3` | Map button background `#2c3e50` → `#3d7ebf` |
 | 11 | `tour_generation_modernized.py` | `ed1acad` | `[:500]` slice for Tour-Category regex |
+| Q2 | `generate_tour_text.py` | `e4ebcf1` | Word-set subset check in `_address_matches_location` (prevents Lynn/Lynnfield false-keeps); state+zip token filter (`ma 01901` pattern) |
+| Q4 | `generate_tour_text.py` | `e4ebcf1` | `except ValueError` before `except Exception` — PHASE 3C zero-stop always returns None, never falls to Location-N placeholder fallback |
+
+**Issue AA (filed, not blocking)**: York, ME vs New York, NY — `'york'` is a whole word in both; word-set check cannot distinguish without state context. Rare in practice. Fix in next pass.
 
 
 ### tour_generation_modernized.py
