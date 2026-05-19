@@ -2,7 +2,7 @@
 ## Who you are
 🔧 **SERVICES AMAZON-Q** — **CRITICAL**: Always start ALL replies with "🔧 SERVICES AMAZON-Q -"
 
-**UPDATED**: 2026-05-20 (A#56 post-Claude-review: header regex anchored, dead code deleted, review doc corrected)
+**UPDATED**: 2026-05-19 (Session 14: icon \A regex bug fixed; PHASE 3C location guard; coords fallback for all stops)
 
 1. You are Services Amazon-Q responsible for all Docker services in `C:\Users\micha\eclipse-workspace\AudioTours\development\`. You have blanket approval to change code, run Python programs, start/stop Docker services without waiting for approval.
 2. You maintain this file and update it after significant changes.
@@ -15,7 +15,7 @@
 - **GIT RULE**: Do NOT commit until user confirms mobile testing passed
 - **BRANCH**: `Tours_Step_Maps` (branched from `Newsletters` at `ad3b5be`)
 - **MERGE TARGET**: `Newsletters` (when A#55+A#56 complete and tested)
-- **LAST GIT COMMIT**: `cad46e9` — "A#56 post-review: anchor Tour-Category regex to file header, delete dead convert_old_tour_to_modernized(), correct review doc Boston Civil War row (v1.2.5.181)"
+- **LAST GIT COMMIT**: `470b88a` — "PHASE 3C: address-based location guard + coordinates fallback for all stops missing coords"
 - **WORKFLOW**: Blanket approval given for all service changes — implement without waiting
 
 ---
@@ -43,7 +43,7 @@ Mobile App
   → Store translated ZIP in audio_tours (original_tour_id = EN id)
 ```
 
-### generate_tour_text.py Internal Pipeline (Sessions 2–10)
+### generate_tour_text.py Internal Pipeline (Sessions 2–14)
 ```
 PHASE 1:    analyze_tour_intent() → intent JSON [max_tokens=400]
             venue_name field: full official name if tour is inside ONE building; else null
@@ -56,7 +56,11 @@ PHASE 3A:   OpenAI → raw stop names + addresses only
             Regex fallback REMOVED (was buggy)
 PHASE 4.5:  validate_enhanced_poi_knowledge() → reject if >50% generic/fictional
 PHASE 4:    verify_poi_matches_type() — SKIPPED for 'walking' and 'museum'
+Part C:     replacement loop (bounded 2 attempts) for stops below total_stops
 PHASE 3B:   OpenAI → reorder stops + structured details + walking directions
+PHASE 3C:   address-based location guard (Session 14) — city/state in address vs location
+            skipped for single-venue museum tours; rejected POIs → forbidden_norms
+Coords:     parallel fallback for any stop missing coordinates (Session 14)
 PHASE 5:    generate descriptions (parallel ThreadPoolExecutor max 5 workers)
 PHASE 5.5a: validate_enhanced_poi_knowledge() SECOND CALL (all tour types)
 PHASE 5.5b: _validate_museum_stop_descriptions() — museum only, when venue_name != ""
@@ -100,10 +104,10 @@ standalone maintenance session after Tours_Step_Maps is merged and mobile testin
 
 | File | Container | Commit | Notes |
 |------|-----------|--------|-------|
-| `generate_tour_text.py` | `development-tour-generator-1:5000` | `51cc93e` | Sessions 2–10 + A#56 Tour-Category header |
+| `generate_tour_text.py` | `development-tour-generator-1:5000` | `470b88a` | Sessions 2–10 + A#56 + PHASE 3C + coords fallback |
 | `generate_tour_text_service.py` | `development-tour-generator-1:5000` | unchanged | Flask wrapper |
 | `tour_orchestrator_service.py` | `development-tour-orchestrator-1:5002` | `ad3b5be` | Session 5 guards |
-| `tour_generation_modernized.py` | `tour-generation-modernized-1:5021` | `cad46e9` | A#55 map buttons + A#56 tour-type icons v1.2.5.181 |
+| `tour_generation_modernized.py` | `tour-generation-modernized-1:5021` | `d5da0f4` | A#55 map buttons + A#56 tour-type icons v1.2.5.182 |
 | `translation_service.py` | `translation-service-1:5030` | `7cbc486` | A#55 map buttons + stop-count warning |
 | `enhanced_tour_templates_fixed.py` | `development-tour-generator-1:5000` | `ad3b5be` | Sessions 7+9 hallucination patterns |
 | `AUDIOURA_SERVICES_MAP_POI_HISTORY.md` | local only | `792487c` | OQ-1 resolved (Option B) |
@@ -191,8 +195,8 @@ the injected button sits below it.
 complete_tour = tour_title + "\n" + f"Tour-Category: {tour_category}" + "\n\n"
 
 # tour_generation_modernized.py — parse_tour_content_to_modernized():
-# Anchored to start-of-string + 200-char slice: stop content can never false-positive
-category_match = re.search(r'\ATour-Category:\s*(\w+)', tour_content[:200], re.IGNORECASE)
+# [:200] slice + MULTILINE: header is on line 2, \A anchor was wrong (fixed d5da0f4 v1.2.5.182)
+category_match = re.search(r'^Tour-Category:\s*(\w+)', tour_content[:200], re.IGNORECASE | re.MULTILINE)
 tour_category = category_match.group(1).lower() if category_match else ''
 # returns {'tour_name': ..., 'tour_category': ..., 'text_content': ..., 'audio_files': []}
 
@@ -204,16 +208,17 @@ icon = _CATEGORY_ICONS.get(tour_data.get('tour_category', ''), '🗺️')
 **Root cause of original bug** (corrected per Claude §0 review):
 - **Waltham 🗺️**: Tour 270 pre-dates A#56 — its `index.html` has hardcoded 🗺. No `Tour-Category:` header. Will show 🚶 after regeneration.
 - **Boston Civil War 🏛️**: Pre-bugfix regex bug, NOT a classifier issue. Mobile hardcodes `tour_type="museum"`; PHASE 6 appended `"- Museum Tour"` to the title because the location doesn't contain "museum"; the old title-string regex matched "Museum" in that suffix. `_classify_tour_category()` actually returns `'walking'` for this location — the bugfix now respects that.
+- **Session 14 \A bug**: Claude Q1 recommended `\A` anchor — but `\A` means start-of-string, not start-of-line. Header is on line 2. Fixed to `^` + `MULTILINE` + `[:200]` slice.
 
-**Dead code removed**: `convert_old_tour_to_modernized()` deleted (`cad46e9`) — zero callers confirmed, already broken-by-omission (didn't return `tour_category`).
+**Dead code removed**: `convert_old_tour_to_modernized()` deleted (`cad46e9`) — zero callers confirmed.
 
 **Old tours** (pre-A#56): no `Tour-Category:` header → `tour_category = ''` → default 🗺️. Graceful.
 
 **Translation**: Icon survives translation for free. Map button is a sibling of `<h3>`,
 not a child — `h.clear()` in `translation_service.py` does not touch it.
 
-**Claude.AI review docs**: `claude_review_a56_icon_bugfix.md` + `claude_response_a56_icon_bugfix.md`
-**Status**: Committed `cad46e9`. Pending mobile test (regenerate walking + restaurant tours).
+**Claude.AI review docs**: `claude_review_a56_icon_bugfix.md` + `claude_response_a56_icon_bugfix.md` + `claude_review_session14_three_bugs.md`
+**Status**: Committed `d5da0f4`. Pending mobile test (regenerate walking + restaurant tours).
 **To see fix on existing tours**: delete tours 266 and 270 from DB and regenerate.
 
 ---
@@ -249,7 +254,9 @@ not a child — `h.clear()` in `translation_service.py` does not touch it.
 ## ⚠️ KNOWN ISSUES
 
 - **Double map button (ISSUE-059)**: ✅ Claude confirmed `_buildMapButtonInjectionScript` is already gone from `tour_player_screen.dart`. Duplicate-button bug resolved.
-- **Tour-type icons**: A#56 built and deployed `51cc93e`. Pending mobile test with newly generated tours.
+- **Tour-type icons**: A#56 + Session 14 icon fix deployed `d5da0f4`. Pending mobile test with newly generated tours.
+- **PHASE 3C location guard**: deployed `470b88a`. Known limitation: city substring check (not word-boundary) may reject valid "East Boston" stops in a "Boston, MA" tour. Pending Claude review Q3.
+- **Coords fallback**: deployed `470b88a`. Known issue: GPT sometimes returns same coords for all stops on a linear route. Duplicate detection not yet implemented. Pending Claude review Q7.
 - **Museum tour hallucination**: FIXED (Sessions 7–10). Tour ID 259 passed. Awaiting mobile test.
 - **Mobile app hardcodes `tour_type:"museum"`**: Services override via `_pre_category` guard. DB tour names still get "- museum Tour" suffix. Needs Mobile App Amazon-Q fix.
 - **Translation response field**: `/translate-with-audio` returns `"translations"` (not `"translated_tour_ids"`). Mobile app must use `translations.ru.id`.
@@ -348,3 +355,4 @@ git push origin Tours_Step_Maps
 | 11 (A#55) | Per-stop map buttons in index.html; 3 Claude review passes; SVG→emoji; OQ-1 resolved; double-button issue found; tour-type icons requested |
 | 12 (A#56) | Tour-type icons: 🚶/🍴/🏛️/🗺️; Tour-Category header written by generate_tour_text.py; direct dict lookup in tour_generation_modernized.py; Claude review applied; bug fix: title-string parsing was unreliable when tour_type in location |
 | 13 (A#56 post-review) | Claude review `cad46e9`: header regex anchored to \A+[:200] (Q1); dead `convert_old_tour_to_modernized()` deleted (Q5); review doc Boston Civil War row corrected (§0 — was classifier issue, actually title-regex bug) |
+| 14 (Session 14 bugs) | Bug 1: \A anchor broke icon regex on line 2 — fixed to ^+MULTILINE+[:200] (d5da0f4 v1.2.5.182). Bug 2: out-of-area stop — PHASE 3C address guard added (470b88a). Bug 3: missing map pin — coords fallback extended to all stops (470b88a). Claude review: `claude_review_session14_three_bugs.md` |
