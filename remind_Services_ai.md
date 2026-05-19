@@ -2,7 +2,7 @@
 ## Who you are
 🔧 **SERVICES AMAZON-Q** — **CRITICAL**: Always start ALL replies with "🔧 SERVICES AMAZON-Q -"
 
-**UPDATED**: 2026-05-20 (A#56 icon bug fixed — Tour-Category header in file; ISSUE-059 root cause confirmed + iOS doc sent)
+**UPDATED**: 2026-05-20 (A#56 post-Claude-review: header regex anchored, dead code deleted, review doc corrected)
 
 1. You are Services Amazon-Q responsible for all Docker services in `C:\Users\micha\eclipse-workspace\AudioTours\development\`. You have blanket approval to change code, run Python programs, start/stop Docker services without waiting for approval.
 2. You maintain this file and update it after significant changes.
@@ -15,7 +15,7 @@
 - **GIT RULE**: Do NOT commit until user confirms mobile testing passed
 - **BRANCH**: `Tours_Step_Maps` (branched from `Newsletters` at `ad3b5be`)
 - **MERGE TARGET**: `Newsletters` (when A#55+A#56 complete and tested)
-- **LAST GIT COMMIT**: `51cc93e` — "A#56 fix: tour_category written to file header by generate_tour_text.py, read directly by tour_generation_modernized.py"
+- **LAST GIT COMMIT**: `cad46e9` — "A#56 post-review: anchor Tour-Category regex to file header, delete dead convert_old_tour_to_modernized(), correct review doc Boston Civil War row (v1.2.5.181)"
 - **WORKFLOW**: Blanket approval given for all service changes — implement without waiting
 
 ---
@@ -103,7 +103,7 @@ standalone maintenance session after Tours_Step_Maps is merged and mobile testin
 | `generate_tour_text.py` | `development-tour-generator-1:5000` | `51cc93e` | Sessions 2–10 + A#56 Tour-Category header |
 | `generate_tour_text_service.py` | `development-tour-generator-1:5000` | unchanged | Flask wrapper |
 | `tour_orchestrator_service.py` | `development-tour-orchestrator-1:5002` | `ad3b5be` | Session 5 guards |
-| `tour_generation_modernized.py` | `tour-generation-modernized-1:5021` | `51cc93e` | A#55 map buttons + A#56 tour-type icons v1.2.5.180 |
+| `tour_generation_modernized.py` | `tour-generation-modernized-1:5021` | `cad46e9` | A#55 map buttons + A#56 tour-type icons v1.2.5.181 |
 | `translation_service.py` | `translation-service-1:5030` | `7cbc486` | A#55 map buttons + stop-count warning |
 | `enhanced_tour_templates_fixed.py` | `development-tour-generator-1:5000` | `ad3b5be` | Sessions 7+9 hallucination patterns |
 | `AUDIOURA_SERVICES_MAP_POI_HISTORY.md` | local only | `792487c` | OQ-1 resolved (Option B) |
@@ -191,7 +191,8 @@ the injected button sits below it.
 complete_tour = tour_title + "\n" + f"Tour-Category: {tour_category}" + "\n\n"
 
 # tour_generation_modernized.py — parse_tour_content_to_modernized():
-category_match = re.search(r'^Tour-Category:\s*(\w+)', tour_content, re.IGNORECASE | re.MULTILINE)
+# Anchored to start-of-string + 200-char slice: stop content can never false-positive
+category_match = re.search(r'\ATour-Category:\s*(\w+)', tour_content[:200], re.IGNORECASE)
 tour_category = category_match.group(1).lower() if category_match else ''
 # returns {'tour_name': ..., 'tour_category': ..., 'text_content': ..., 'audio_files': []}
 
@@ -200,18 +201,20 @@ _CATEGORY_ICONS = {'walking': '🚶', 'restaurant': '🍴', 'museum': '🏛️',
 icon = _CATEGORY_ICONS.get(tour_data.get('tour_category', ''), '🗺️')
 ```
 
-**Root cause of original bug**: `generate_tour_text.py` line 1168 skips the `- walking Tour`
-suffix when `tour_type` is already in `location` (e.g. "walking tour in Waltham, Ma").
-Title-string parsing was therefore unreliable. Fix: write `tour_category` explicitly into
-the file header so `tour_generation_modernized.py` reads the authoritative value directly.
+**Root cause of original bug** (corrected per Claude §0 review):
+- **Waltham 🗺️**: Tour 270 pre-dates A#56 — its `index.html` has hardcoded 🗺. No `Tour-Category:` header. Will show 🚶 after regeneration.
+- **Boston Civil War 🏛️**: Pre-bugfix regex bug, NOT a classifier issue. Mobile hardcodes `tour_type="museum"`; PHASE 6 appended `"- Museum Tour"` to the title because the location doesn't contain "museum"; the old title-string regex matched "Museum" in that suffix. `_classify_tour_category()` actually returns `'walking'` for this location — the bugfix now respects that.
+
+**Dead code removed**: `convert_old_tour_to_modernized()` deleted (`cad46e9`) — zero callers confirmed, already broken-by-omission (didn't return `tour_category`).
 
 **Old tours** (pre-A#56): no `Tour-Category:` header → `tour_category = ''` → default 🗺️. Graceful.
 
 **Translation**: Icon survives translation for free. Map button is a sibling of `<h3>`,
 not a child — `h.clear()` in `translation_service.py` does not touch it.
 
-**Claude.AI review doc**: `claude_review_a56_tour_type_icons.md`
-**Status**: Committed `51cc93e`. Pending mobile test (regenerate walking + restaurant tours).
+**Claude.AI review docs**: `claude_review_a56_icon_bugfix.md` + `claude_response_a56_icon_bugfix.md`
+**Status**: Committed `cad46e9`. Pending mobile test (regenerate walking + restaurant tours).
+**To see fix on existing tours**: delete tours 266 and 270 from DB and regenerate.
 
 ---
 
@@ -245,7 +248,7 @@ not a child — `h.clear()` in `translation_service.py` does not touch it.
 
 ## ⚠️ KNOWN ISSUES
 
-- **Double map button (ISSUE-059)**: Root cause confirmed — runtime JS injection in `tour_player_screen.dart` running alongside services bake-in. Fix doc sent to iOS/Android Amazon-Q. Awaiting removal + mobile test.
+- **Double map button (ISSUE-059)**: ✅ Claude confirmed `_buildMapButtonInjectionScript` is already gone from `tour_player_screen.dart`. Duplicate-button bug resolved.
 - **Tour-type icons**: A#56 built and deployed `51cc93e`. Pending mobile test with newly generated tours.
 - **Museum tour hallucination**: FIXED (Sessions 7–10). Tour ID 259 passed. Awaiting mobile test.
 - **Mobile app hardcodes `tour_type:"museum"`**: Services override via `_pre_category` guard. DB tour names still get "- museum Tour" suffix. Needs Mobile App Amazon-Q fix.
@@ -344,3 +347,4 @@ git push origin Tours_Step_Maps
 | 10 | _venue_matches_location(); _is_suspect threshold <1; file truncation recovery; e2e test tour 259 |
 | 11 (A#55) | Per-stop map buttons in index.html; 3 Claude review passes; SVG→emoji; OQ-1 resolved; double-button issue found; tour-type icons requested |
 | 12 (A#56) | Tour-type icons: 🚶/🍴/🏛️/🗺️; Tour-Category header written by generate_tour_text.py; direct dict lookup in tour_generation_modernized.py; Claude review applied; bug fix: title-string parsing was unreliable when tour_type in location |
+| 13 (A#56 post-review) | Claude review `cad46e9`: header regex anchored to \A+[:200] (Q1); dead `convert_old_tour_to_modernized()` deleted (Q5); review doc Boston Civil War row corrected (§0 — was classifier issue, actually title-regex bug) |
