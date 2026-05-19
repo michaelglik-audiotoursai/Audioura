@@ -2,7 +2,7 @@
 Modernized Tour Generation Service - Separate MP3/TXT Files
 Implements REQ-001: Tour ZIP Structure Modernization
 """
-SERVICE_VERSION = "1.2.5.179"
+SERVICE_VERSION = "1.2.5.180"
 
 import os
 import re
@@ -71,22 +71,11 @@ def create_modernized_tour_zip(tour_data, job_id):
     return zip_filename
 
 _COORDINATES_RE = re.compile(r'^Coordinates:\s*[-\d.]+\s*,\s*[-\d.]+', re.IGNORECASE | re.MULTILINE)
-_TOUR_CATEGORY_RE = re.compile(r'-\s*(walking|restaurant|museum|specialized)\s+Tour', re.IGNORECASE)
+_CATEGORY_ICONS = {'walking': '🚶', 'restaurant': '🍴', 'museum': '🏛️', 'specialized': '🗺️'}
 
 def _stop_has_coordinates(stop_text):
     """Return True if the stop text contains a Coordinates: line with valid lat,lng."""
     return bool(_COORDINATES_RE.search(stop_text))
-
-def _tour_icon_for_name(tour_name):
-    """Return tour-type emoji based on category embedded in tour title.
-    Pass the tour title string, never a stop body."""
-    if not tour_name:
-        return '🗺️'
-    m = _TOUR_CATEGORY_RE.search(tour_name)
-    if not m:
-        return '🗺️'
-    cat = m.group(1).lower()
-    return {'walking': '🚶', 'restaurant': '🍴', 'museum': '🏛️', 'specialized': '🗺️'}.get(cat, '🗺️')
 
 def generate_html_with_external_audio(tour_data):
     """Generate HTML that references external MP3 files"""
@@ -126,7 +115,7 @@ def generate_html_with_external_audio(tour_data):
         
         map_button = ''
         if _stop_has_coordinates(text):
-            icon = _tour_icon_for_name(tour_name)
+            icon = _CATEGORY_ICONS.get(tour_data.get('tour_category', ''), '🗺️')
             map_button = f'<button class="map-btn" onclick="openMap({i})" title="View on map">{icon}</button>'
         
         html += f'''
@@ -370,7 +359,11 @@ def parse_tour_content_to_modernized(tour_content):
     # Extract tour name from content
     tour_name_match = re.search(r'Step-by-Step Audio Guided Tour: (.+?)\n', tour_content)
     tour_name = tour_name_match.group(1) if tour_name_match else "Audio Tour"
-    
+
+    # Extract tour category written by generate_tour_text.py (e.g. "Tour-Category: walking")
+    category_match = re.search(r'^Tour-Category:\s*(\w+)', tour_content, re.IGNORECASE | re.MULTILINE)
+    tour_category = category_match.group(1).lower() if category_match else ''
+
     # Split content by stops
     stops = re.split(r'\n\s*Stop\s+(\d+):', tour_content)
     
@@ -393,6 +386,7 @@ def parse_tour_content_to_modernized(tour_content):
     
     return {
         "tour_name": tour_name,
+        "tour_category": tour_category,
         "text_content": text_content,
         "audio_files": []  # Will be filled by TTS
     }

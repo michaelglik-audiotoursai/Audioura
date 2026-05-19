@@ -1172,7 +1172,7 @@ DO NOT include directions to the next stop - these will be added separately.
         # Otherwise, create a title that incorporates the tour type naturally
         tour_title = f"Step-by-Step Audio Guided Tour: {location} - {tour_type.title()} Tour"
     
-    complete_tour = tour_title + "\n\n"
+    complete_tour = tour_title + "\n" + f"Tour-Category: {tour_category}" + "\n\n"
     
     # Add each POI with its description and directions
     for i, poi in enumerate(poi_list):
