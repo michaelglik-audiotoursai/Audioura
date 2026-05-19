@@ -45,17 +45,22 @@ def _address_matches_location(address, loc):
     if len(parts) < 2:
         return True
     loc_lower = loc.lower()
+    loc_words = set(re.findall(r'[a-z]+', loc_lower))
     # Strip postcode-looking tokens, UK-style postcodes, and short tokens (<=3 chars)
     # that are state/country codes (MA, UK, US) — they match too broadly.
     text_parts = [
         p for p in parts
         if len(p) >= 4
-        and not re.match(r'^\d{4,6}(\s*[a-z]{0,4})?$', p)
-        and not re.match(r'^[a-z]{1,2}\d{1,2}[a-z]?\s*\d[a-z]{2}$', p)
+        and not re.match(r'^\d{4,6}(\s*[a-z]{0,4})?$', p)          # pure zip: '02458', '02458-1234'
+        and not re.match(r'^[a-z]{1,2}\d{1,2}[a-z]?\s*\d[a-z]{2}$', p)  # UK postcode
+        and not re.match(r'^[a-z]{2}\s+\d{4,6}', p)                 # state+zip: 'ma 01901'
     ]
     for token in text_parts:
         effective = _NEIGHBORHOOD_TO_CITY.get(token, token)
-        if effective in loc_lower:
+        # Word-set subset check: all words in effective must appear as whole words in loc.
+        # Prevents 'lynn' matching 'lynnfield', 'york' matching 'new york' (reverse).
+        effective_words = set(re.findall(r'[a-z]+', effective))
+        if effective_words and effective_words.issubset(loc_words):
             return True
     return False
 
@@ -1130,6 +1135,12 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
                 print(f"   Directions: {snippet}")
         print("================================\n")
 
+    except ValueError as e:
+        # Explicit zero-stop signal from PHASE 3C — always surface as error regardless of intent.
+        # Must be caught BEFORE the generic Exception handler to prevent the last-resort
+        # fallback from producing a 'completed' tour full of 'Location N' placeholders.
+        print(f"X PHASE 3C rejected all stops: {e}")
+        return None, None, (None, None)
     except Exception as e:
         print(f"Error in PHASE 3A/3B pipeline: {str(e)}")
         import traceback
