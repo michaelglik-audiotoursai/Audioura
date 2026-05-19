@@ -2,7 +2,7 @@
 Modernized Tour Generation Service - Separate MP3/TXT Files
 Implements REQ-001: Tour ZIP Structure Modernization
 """
-SERVICE_VERSION = "1.2.5.180"
+SERVICE_VERSION = "1.2.5.181"
 
 import os
 import re
@@ -360,8 +360,10 @@ def parse_tour_content_to_modernized(tour_content):
     tour_name_match = re.search(r'Step-by-Step Audio Guided Tour: (.+?)\n', tour_content)
     tour_name = tour_name_match.group(1) if tour_name_match else "Audio Tour"
 
-    # Extract tour category written by generate_tour_text.py (e.g. "Tour-Category: walking")
-    category_match = re.search(r'^Tour-Category:\s*(\w+)', tour_content, re.IGNORECASE | re.MULTILINE)
+    # Extract tour category written by generate_tour_text.py (e.g. "Tour-Category: walking").
+    # Anchored to start-of-string and limited to first 200 chars so a stop description
+    # containing "Tour-Category:" mid-file can never produce a false positive.
+    category_match = re.search(r'\ATour-Category:\s*(\w+)', tour_content[:200], re.IGNORECASE)
     tour_category = category_match.group(1).lower() if category_match else ''
 
     # Split content by stops
@@ -391,45 +393,6 @@ def parse_tour_content_to_modernized(tour_content):
         "audio_files": []  # Will be filled by TTS
     }
 
-def convert_old_tour_to_modernized(tour_content, location, tour_type):
-    """Convert old tour format to modernized structure"""
-    # Parse the actual tour content from the working tour
-    import re
-    
-    # Extract tour name from content
-    tour_name_match = re.search(r'Step-by-Step Audio Guided Tour: (.+?)\n', tour_content)
-    tour_name = tour_name_match.group(1) if tour_name_match else f"{location} - {tour_type} Tour"
-    
-    # Split content by stops
-    stops = re.split(r'\n\s*Stop\s+(\d+):', tour_content)
-    
-    text_content = []
-    audio_files = []
-    
-    if len(stops) > 1:
-        stops = stops[1:]  # Remove title part
-        
-        # Process stops in pairs (number, content)
-        for i in range(0, len(stops), 2):
-            if i + 1 < len(stops):
-                stop_num = stops[i].strip()
-                stop_content = stops[i+1].strip()
-                
-                # Extract the actual stop title and content
-                lines = stop_content.split('\n')
-                if lines:
-                    stop_title = lines[0].strip()
-                    full_content = stop_content
-                    
-                    text_content.append(full_content)
-                    # Create placeholder audio data (will be replaced by actual TTS)
-                    audio_files.append(base64.b64encode(f"Audio content for {stop_title}".encode()).decode())
-    
-    return {
-        "tour_name": tour_name,
-        "text_content": text_content,
-        "audio_files": audio_files
-    }
 
 def process_modernized_tour_async(job_id, tour_data):
     """Process tour with modernized structure"""
