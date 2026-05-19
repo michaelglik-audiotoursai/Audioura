@@ -345,3 +345,57 @@ PHASE 3C logic for Dedham addresses was verified correct via debug script — `"
 | A | Bug fix | `tour_generation_modernized.py` | `445a6f3` | Map button background `#2c3e50` → `#3d7ebf` |
 | B | Bug fix | `generate_tour_text_service.py` | `445a6f3` | Service wrapper: added `if tour_text is None:` guard |
 | C | Bug fix | `generate_tour_text.py` | `158d505` | `_fetch_coords` moved outside `if missing_coords:` block |
+| X | Claude response fix | `generate_tour_text.py` | `7a4a969` | `len(p) >= 4` token filter + hoist `_address_matches_location` to module level |
+| Y | Claude response fix | `generate_tour_text.py` | `7a4a969` | Part C replacements now run through PHASE 3C address check |
+
+---
+
+## Part 3 — Claude.AI Response Fixes (commit `7a4a969`)
+
+Claude reviewed the rewritten doc and found two new issues in the all-tokens-scan implementation.
+
+### Issue X — State/country-code false-keeps in all-tokens scan
+
+**Problem:** The new all-tokens scan (Change 1) scans every comma-separated token after postcode stripping. Short trailing tokens — 2-letter state codes (`ma`, `ny`) and country codes (`uk`, `us`) — can substring-match the location string and cause wrong-city stops to pass the guard.
+
+| Address | Location | Expected | Actual (before fix) |
+|---|---|---|---|
+| `1 Strand, Manchester M1 2AB, UK` | `walking tour in London, UK` | REJECT | **KEEP** — `uk` matched |
+| `1 Main St, Worcester, MA, USA` | `walking tour in Boston, MA` | REJECT | **KEEP** — `ma` matched |
+
+**Fix:** Added `len(p) >= 4` filter to `text_parts`. Legitimate city names are almost always ≥4 chars. Two-letter state codes and country codes are excluded.
+
+```python
+text_parts = [
+    p for p in parts
+    if len(p) >= 4                                              # ← NEW: exclude MA, UK, US etc.
+    and not re.match(r'^\d{4,6}(\s*[a-z]{0,4})?$', p)
+    and not re.match(r'^[a-z]{1,2}\d{1,2}[a-z]?\s*\d[a-z]{2}$', p)
+]
+```
+
+---
+
+### Issue Y — Part C replacements bypassed PHASE 3C
+
+**Problem:** PHASE 3C was correctly moved before Part C (Change 3), so rejected stops feed into `forbidden_norms`. But the *new* stops fetched by Part C were only run through PHASE 4 type verification — not through the PHASE 3C address check. GPT could return different out-of-area stops (not on the forbidden list by name) and they would be accepted.
+
+**Fix:** Apply `_address_matches_location` inside Part C's acceptance block, after `_verify_against_intent`:
+
+```python
+# Verify the new stops too (same PHASE 4 logic)
+survived, _ = _verify_against_intent(new_stops)
+# Also apply PHASE 3C address check to replacements
+if tour_category != 'museum' or not _museum_venue_name:
+    survived = [p for p in survived if _address_matches_location(p.get('address', ''), location)]
+survived = survived[:needed]
+```
+
+This required hoisting `_address_matches_location` from inside the PHASE 3C `if` block to **module level** (alongside `_NEIGHBORHOOD_TO_CITY`) so both PHASE 3C and Part C can call it. This is the same pattern as the Bug C fix for `_fetch_coords`.
+
+---
+
+### Cosmetic cleanups (same commit `7a4a969`)
+
+- **Duplicate comment** at lines 1018–1019: `# -------- Coordinates fallback: request for any stop missing coordinates --------` appeared twice. One removed.
+- **Redundant `top_count > 1`** in cluster detection: `max(2, len(poi_list) // 2)` already guarantees `top_count >= 2`, so `top_count > 1` was always implied. Removed.
