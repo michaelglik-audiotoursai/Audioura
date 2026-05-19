@@ -2,7 +2,7 @@
 ## Who you are
 🔧 **SERVICES AMAZON-Q** — **CRITICAL**: Always start ALL replies with "🔧 SERVICES AMAZON-Q -"
 
-**UPDATED**: 2026-05-20 (Session 14 Claude review: PHASE 3C neighborhood alias map; all-tokens-scan; moved before Part C; zero-stop guard; cluster coord detection; [:500] slice)
+**UPDATED**: 2026-05-20 (Session 14 complete: PHASE 3C all-tokens-scan + alias map + len>=4 filter; forbidden_norms before PHASE 3C; Part C address check; _fetch_coords + _address_matches_location hoisted to module level; cluster detection; service wrapper None guard; button color; [:500] slice. All bugs A/B/C/X/Y/Z fixed. Final review doc: claude_review_final_session14.md)
 
 1. You are Services Amazon-Q responsible for all Docker services in `C:\Users\micha\eclipse-workspace\AudioTours\development\`. You have blanket approval to change code, run Python programs, start/stop Docker services without waiting for approval.
 2. You maintain this file and update it after significant changes.
@@ -15,7 +15,8 @@
 - **GIT RULE**: Do NOT commit until user confirms mobile testing passed
 - **BRANCH**: `Tours_Step_Maps` (branched from `Newsletters` at `ad3b5be`)
 - **MERGE TARGET**: `Newsletters` (when A#55+A#56 complete and tested)
-- **LAST GIT COMMIT**: `1e0c326` — "Fix Bug Z: move forbidden_norms init before PHASE 3C so PHASE 3C rejects flow into Part C (was NameError + silent wipe)"
+- **LAST GIT COMMIT**: `1e0c326` — "Fix Bug Z: move forbidden_norms init before PHASE 3C so PHASE 3C rejects flow into Part C"
+- **FINAL REVIEW DOC**: `claude_review_final_session14.md` — send this to Claude.AI for final review before merging `Tours_Step_Maps` → `Newsletters`
 - **WORKFLOW**: Blanket approval given for all service changes — implement without waiting
 
 ---
@@ -124,7 +125,25 @@ standalone maintenance session after Tours_Step_Maps is merged and mobile testin
 
 ---
 
-## 📋 A#55 MAP BUTTONS — CURRENT CODE STATE
+## 📋 SESSION 14 COMPLETE CHANGE SET
+
+All changes landed on `Tours_Step_Maps`. Final review doc: `claude_review_final_session14.md`.
+
+| # | File | Commit | What changed |
+|---|------|--------|--------------|
+| 1a | `generate_tour_text.py` | `ed1acad` | PHASE 3C: all-tokens-scan + `_NEIGHBORHOOD_TO_CITY` alias map |
+| 1b | `generate_tour_text.py` | `7a4a969` | `len(p) >= 4` filter + hoist `_address_matches_location` to module level |
+| 2 | `generate_tour_text.py` | `ed1acad` | Removed dead `state_token` branch |
+| 3 | `generate_tour_text.py` | `ed1acad` | Moved PHASE 3C before Part C |
+| 4 | `generate_tour_text.py` | `ed1acad` | Zero-stop guard after PHASE 3C |
+| 5 | `generate_tour_text.py` | `ed1acad` | Duplicate-coordinate cluster detection |
+| 6 | `generate_tour_text.py` | `158d505` | `_fetch_coords` hoisted outside `if missing_coords:` |
+| 7 | `generate_tour_text.py` | `7a4a969` | Part C replacements run through PHASE 3C address check |
+| 8 | `generate_tour_text.py` | `1e0c326` | `forbidden_norms` init moved before PHASE 3C |
+| 9 | `generate_tour_text_service.py` | `445a6f3` | `if tour_text is None:` guard in service wrapper |
+| 10 | `tour_generation_modernized.py` | `445a6f3` | Map button background `#2c3e50` → `#3d7ebf` |
+| 11 | `tour_generation_modernized.py` | `ed1acad` | `[:500]` slice for Tour-Category regex |
+
 
 ### tour_generation_modernized.py
 ```python
