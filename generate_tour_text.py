@@ -1019,37 +1019,36 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
         # -------- Coordinates fallback: request for any stop missing coordinates --------
         # PHASE 3B sometimes omits coordinates for one or more stops. Request them
         # individually (parallel) so every stop gets a map pin.
+        def _fetch_coords(poi):
+            prompt = (
+                f"Provide GPS coordinates for '{poi['name']}'"
+                + (f" at {poi['address']}" if poi.get('address') else f" in {location}")
+                + ".\nFormat: Latitude: [number]\nLongitude: [number]\nOnly coordinates, nothing else."
+            )
+            data = {
+                "model": "gpt-3.5-turbo",
+                "messages": [
+                    {"role": "system", "content": "You provide accurate GPS coordinates. Respond only with Latitude and Longitude lines."},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.3,
+                "max_tokens": 60,
+            }
+            try:
+                resp = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, data=json.dumps(data))
+                if resp.status_code == 200:
+                    text = resp.json()["choices"][0]["message"]["content"]
+                    lat_m = re.search(r'Latitude:\s*(-?\d+\.\d+)', text, re.IGNORECASE)
+                    lng_m = re.search(r'Longitude:\s*(-?\d+\.\d+)', text, re.IGNORECASE)
+                    if lat_m and lng_m:
+                        return poi, f"{lat_m.group(1)}, {lng_m.group(1)}", resp.json()["usage"]["total_tokens"]
+            except Exception as e:
+                print(f"   Coords fallback error for '{poi['name']}': {e}")
+            return poi, "", 0
+
         missing_coords = [p for p in poi_list if not p.get('coordinates')]
         if missing_coords:
             print(f"\nCoordinates fallback: requesting coords for {len(missing_coords)} stop(s) missing them...")
-
-            def _fetch_coords(poi):
-                prompt = (
-                    f"Provide GPS coordinates for '{poi['name']}'"
-                    + (f" at {poi['address']}" if poi.get('address') else f" in {location}")
-                    + ".\nFormat: Latitude: [number]\nLongitude: [number]\nOnly coordinates, nothing else."
-                )
-                data = {
-                    "model": "gpt-3.5-turbo",
-                    "messages": [
-                        {"role": "system", "content": "You provide accurate GPS coordinates. Respond only with Latitude and Longitude lines."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0.3,
-                    "max_tokens": 60,
-                }
-                try:
-                    resp = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, data=json.dumps(data))
-                    if resp.status_code == 200:
-                        text = resp.json()["choices"][0]["message"]["content"]
-                        lat_m = re.search(r'Latitude:\s*(-?\d+\.\d+)', text, re.IGNORECASE)
-                        lng_m = re.search(r'Longitude:\s*(-?\d+\.\d+)', text, re.IGNORECASE)
-                        if lat_m and lng_m:
-                            return poi, f"{lat_m.group(1)}, {lng_m.group(1)}", resp.json()["usage"]["total_tokens"]
-                except Exception as e:
-                    print(f"   Coords fallback error for '{poi['name']}': {e}")
-                return poi, "", 0
-
             with ThreadPoolExecutor(max_workers=min(len(missing_coords), 5)) as executor:
                 futures = {executor.submit(_fetch_coords, p): p for p in missing_coords}
                 for future in as_completed(futures):
