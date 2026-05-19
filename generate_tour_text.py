@@ -959,6 +959,85 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
         except Exception as e:
             print(f"! PHASE 3B exception: {e}; keeping PHASE 3A order")
 
+        # -------- PHASE 3C: address-based location guard --------
+        # For non-museum tours: verify each POI's address city/state matches the
+        # requested location. Great Meadows in Sudbury would be caught here even
+        # though it passed PHASE 4 (walking tours skip type verification).
+        # Museum tours with a single venue are skipped — all stops are inside one building.
+        if tour_category != 'museum' or not _museum_venue_name:
+            def _address_matches_location(address, loc):
+                """Return True if address city/state appears in the location string,
+                or if we cannot determine a mismatch (empty address, no city found)."""
+                if not address:
+                    return True  # no address — can't judge, keep
+                # Extract last two comma-separated tokens from address as "City, ST ZIP"
+                parts = [p.strip() for p in address.split(',')]
+                if len(parts) < 2:
+                    return True
+                # city is second-to-last, state+zip is last
+                city = parts[-2].lower()
+                state_zip = parts[-1].lower()
+                loc_lower = loc.lower()
+                # Accept if city OR state token appears in the location string
+                state_token = state_zip.split()[0] if state_zip.split() else ''
+                return city in loc_lower or (state_token and state_token in loc_lower and city in loc_lower)
+
+            location_rejects = [p for p in poi_list if not _address_matches_location(p.get('address', ''), location)]
+            if location_rejects:
+                for p in location_rejects:
+                    print(f"   PHASE 3C: REMOVED '{p['name']}' — address '{p['address']}' not in '{location}'")
+                    forbidden_norms.add(_normalize_name(p['name']))
+                poi_list = [p for p in poi_list if p not in location_rejects]
+                print(f"   PHASE 3C: {len(location_rejects)} out-of-area stop(s) removed; {len(poi_list)} remain")
+            else:
+                print(f"   PHASE 3C: all {len(poi_list)} stops pass location guard")
+
+        # -------- Coordinates fallback: request for any stop missing coordinates --------
+        # PHASE 3B sometimes omits coordinates for one or more stops. Request them
+        # individually (parallel) so every stop gets a map pin.
+        missing_coords = [p for p in poi_list if not p.get('coordinates')]
+        if missing_coords:
+            print(f"\nCoordinates fallback: requesting coords for {len(missing_coords)} stop(s) missing them...")
+
+            def _fetch_coords(poi):
+                prompt = (
+                    f"Provide GPS coordinates for '{poi['name']}'"
+                    + (f" at {poi['address']}" if poi.get('address') else f" in {location}")
+                    + ".\nFormat: Latitude: [number]\nLongitude: [number]\nOnly coordinates, nothing else."
+                )
+                data = {
+                    "model": "gpt-3.5-turbo",
+                    "messages": [
+                        {"role": "system", "content": "You provide accurate GPS coordinates. Respond only with Latitude and Longitude lines."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "temperature": 0.3,
+                    "max_tokens": 60,
+                }
+                try:
+                    resp = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, data=json.dumps(data))
+                    if resp.status_code == 200:
+                        text = resp.json()["choices"][0]["message"]["content"]
+                        lat_m = re.search(r'Latitude:\s*(-?\d+\.\d+)', text, re.IGNORECASE)
+                        lng_m = re.search(r'Longitude:\s*(-?\d+\.\d+)', text, re.IGNORECASE)
+                        if lat_m and lng_m:
+                            return poi, f"{lat_m.group(1)}, {lng_m.group(1)}", resp.json()["usage"]["total_tokens"]
+                except Exception as e:
+                    print(f"   Coords fallback error for '{poi['name']}': {e}")
+                return poi, "", 0
+
+            with ThreadPoolExecutor(max_workers=min(len(missing_coords), 5)) as executor:
+                futures = {executor.submit(_fetch_coords, p): p for p in missing_coords}
+                for future in as_completed(futures):
+                    poi, coords, tokens_used = future.result()
+                    if coords:
+                        poi['coordinates'] = coords
+                        total_tokens += tokens_used
+                        total_cost += tokens_used / 1000 * 0.002
+                        print(f"   Coords fallback OK '{poi['name']}': {coords}")
+                    else:
+                        print(f"   Coords fallback FAILED '{poi['name']}' — no map pin for this stop")
+
         # -------- Coordinates for the first POI (used by orchestrator) --------
         if poi_list and poi_list[0].get("coordinates"):
             try:
@@ -980,45 +1059,6 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
                     print(f"Extracted first POI coordinates: {first_poi_coordinates}")
             except Exception as e:
                 print(f"Error parsing first POI coordinates: {e}")
-
-        if first_poi_coordinates == (None, None) and poi_list:
-            print("No coordinates from PHASE 3B; requesting specifically for first POI...")
-            coords_prompt = (
-                f"Please provide the GPS coordinates (latitude and longitude) for "
-                f"{poi_list[0]['name']} at {location}.\n\n"
-                "Format your response as:\nLatitude: [number]\nLongitude: [number]\n\n"
-                "ONLY provide the coordinates, nothing else."
-            )
-            coords_data = {
-                "model": "gpt-3.5-turbo",
-                "messages": [
-                    {"role": "system", "content": "You are a helpful assistant that provides accurate GPS coordinates."},
-                    {"role": "user", "content": coords_prompt}
-                ],
-                "temperature": 0.3,
-                "max_tokens": 100,
-            }
-            try:
-                coords_response = requests.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers=headers,
-                    data=json.dumps(coords_data),
-                )
-                if coords_response.status_code == 200:
-                    coords_result = coords_response.json()
-                    coords_text = coords_result["choices"][0]["message"]["content"]
-                    tokens_used = coords_result["usage"]["total_tokens"]
-                    total_tokens += tokens_used
-                    total_cost += tokens_used / 1000 * 0.002
-
-                    lat_match = re.search(r'Latitude:\s*(-?\d+\.\d+)', coords_text, re.IGNORECASE)
-                    lng_match = re.search(r'Longitude:\s*(-?\d+\.\d+)', coords_text, re.IGNORECASE)
-                    if lat_match and lng_match:
-                        first_poi_coordinates = (float(lat_match.group(1)), float(lng_match.group(1)))
-                        poi_list[0]["coordinates"] = f"{first_poi_coordinates[0]}, {first_poi_coordinates[1]}"
-                        print(f"Extracted coordinates for first POI: {first_poi_coordinates}")
-            except Exception as e:
-                print(f"Error requesting coordinates: {e}")
 
         # Print extracted POI information
         print("\n=== Extracted POI Information ===")
