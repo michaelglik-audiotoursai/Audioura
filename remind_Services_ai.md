@@ -112,7 +112,7 @@ standalone maintenance session after Tours_Step_Maps is merged and mobile testin
 
 | File | Container | Commit | Notes |
 |------|-----------|--------|-------|
-| `generate_tour_text.py` | `development-tour-generator-1:5000` | `1e0c326` | Sessions 2–10 + A#56 + PHASE 3C improved + coords cluster detection + all Claude review fixes applied |
+| `generate_tour_text.py` | `development-tour-generator-1:5000` | `e4ebcf1` | Sessions 2–10 + A#56 + PHASE 3C improved + coords cluster detection + all Claude review fixes (Q2+Q4) applied |
 | `generate_tour_text_service.py` | `development-tour-generator-1:5000` | unchanged | Flask wrapper |
 | `tour_orchestrator_service.py` | `development-tour-orchestrator-1:5002` | `ad3b5be` | Session 5 guards |
 | `tour_generation_modernized.py` | `tour-generation-modernized-1:5021` | `ed1acad` | A#55 map buttons + A#56 tour-type icons v1.2.5.183 |
@@ -386,3 +386,4 @@ git push origin Tours_Step_Maps
 | 13 (A#56 post-review) | Claude review `cad46e9`: header regex anchored to \A+[:200] (Q1); dead `convert_old_tour_to_modernized()` deleted (Q5); review doc Boston Civil War row corrected (§0 — was classifier issue, actually title-regex bug) |
 | 14 (Session 14 bugs) | Bug 1: \A anchor broke icon regex on line 2 — fixed to ^+MULTILINE+[:200] (d5da0f4 v1.2.5.182). Bug 2: out-of-area stop — PHASE 3C address guard added (470b88a). Bug 3: missing map pin — coords fallback extended to all stops (470b88a). Claude review: `claude_review_session14_three_bugs.md` |
 | 14 review | Claude review applied (ed1acad v1.2.5.183): PHASE 3C neighborhood alias map + all-tokens-scan; moved before Part C; zero-stop guard; cluster coord detection; [:500] slice |
+| 14 final review | Claude final review (e4ebcf1): Q2 word-set subset check + state+zip token filter (Lynn/Lynnfield false-keeps fixed); Q4 `except ValueError` before `except Exception` (PHASE 3C zero-stop never falls to Location-N fallback). Issue AA filed (York,ME vs New York,NY — not blocking). Branch ready for merge. |
