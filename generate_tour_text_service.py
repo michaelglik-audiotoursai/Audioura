@@ -10,19 +10,12 @@ import tempfile
 from datetime import datetime
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
-
-# Configure unbuffered logging
-import sys
-import traceback
-sys.stdout.reconfigure(line_buffering=True)
-print("\n==== TOUR GENERATOR SERVICE STARTING ====")
-print(f"Time: {datetime.now().isoformat()}")
-sys.stdout.flush()
 import threading
 import re
 
-# Import the modified tour text generator
-from modified_generate_tour_text import generate_tour_text
+# Import the tour text generator
+from generate_tour_text import generate_tour_text
+import api_call_logger
 
 app = Flask(__name__)
 CORS(app)
@@ -39,6 +32,13 @@ def ensure_tours_directory():
 def generate_tour_async(job_id, location, tour_type, total_stops=10):
     """Generate tour text asynchronously."""
     try:
+        api_call_logger.log("GENERATOR_SERVICE_ASYNC_START", {
+            "job_id": job_id,
+            "location": location,
+            "tour_type": tour_type,
+            "total_stops": total_stops,
+        })
+        
         ACTIVE_JOBS[job_id]["status"] = "processing"
         ACTIVE_JOBS[job_id]["progress"] = "Starting tour text generation..."
         
@@ -46,13 +46,23 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10):
         with tempfile.NamedTemporaryFile(delete=False, suffix='.txt') as temp_file:
             temp_path = temp_file.name
         
-        # Generate the tour text
-        print(f"location: {location} MVG")
-        print(f"tour_type: {tour_type}")
-        print(f"temp_path: {temp_path}")
-        print(f"total_stops: {total_stops}")
-        sys.stdout.flush()
+        api_call_logger.log("CALLING_GENERATE_TOUR_TEXT_FUNCTION", {
+            "function": "generate_tour_text",
+            "location": location,
+            "tour_type": tour_type,
+            "total_stops": total_stops,
+            "log_file": api_call_logger.get_log_path(),
+        })
+        
+        # Generate the tour text - PASS total_stops parameter
         tour_text, _, coordinates = generate_tour_text(location, tour_type, temp_path, total_stops)
+        
+        if tour_text is None:
+            ACTIVE_JOBS[job_id]["status"] = "error"
+            ACTIVE_JOBS[job_id]["error"] = f"Tour generation failed for '{location}' — no stops could be generated (all filtered or knowledge insufficient)."
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+            return
         
         # Create a safe filename for the output
         safe_location = ''.join(c if c.isalnum() else '_' for c in location)
@@ -75,11 +85,6 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10):
         ACTIVE_JOBS[job_id]["coordinates"] = coordinates
         
     except Exception as e:
-        print(f"==== EXCEPTION IN generate_tour_async: {datetime.now().isoformat()} ====MVG^")
-        print(f"Exception: {e}")
-        print(f"Exception type: {type(e).__name__}")
-        print(f"Traceback: {traceback.format_exc()}")
-        sys.stdout.flush()
         ACTIVE_JOBS[job_id]["status"] = "error"
         ACTIVE_JOBS[job_id]["error"] = str(e)
 
@@ -99,6 +104,14 @@ def generate_tour():
     location = data.get('location')
     tour_type = data.get('tour_type')
     total_stops = data.get('total_stops', 10)
+    
+    api_call_logger.log("GENERATOR_SERVICE_RECEIVED_REQUEST", {
+        "raw_request_body": data,
+        "location": location,
+        "tour_type": tour_type,
+        "total_stops_raw": data.get('total_stops', '(not provided - will default to 10)'),
+        "total_stops_resolved": total_stops,
+    })
     
     if not location or not tour_type:
         return jsonify({"error": "location and tour_type are required"}), 400
@@ -122,9 +135,8 @@ def generate_tour():
         "total_stops": total_stops,
         "created_at": datetime.now().isoformat()
     }
-    print(f'ACTIVE_JOBS[{job_id}] = {json.dumps(ACTIVE_JOBS[job_id], indent=4)} MVG^')
-    sys.stdout.flush()
     
+    # Start generation in background thread
     thread = threading.Thread(
         target=generate_tour_async,
         args=(job_id, location, tour_type, total_stops)
@@ -173,10 +185,7 @@ def download_tour(job_id):
     output_path = os.path.join(TOURS_DIR, job["output_file"])
     if not os.path.exists(output_path):
         return jsonify({"error": "File not found"}), 404
-    attachmment_filleme_parameter=job["output_file"]
-    print(f"Sending file: {output_path} MVG^")
-    if attachmment_filleme_parameter:
-        print(f"job[\"output_file\"] as attachment_filename: {attachmment_filleme_parameter} MVG^")
+    
     return send_file(output_path, as_attachment=True, attachment_filename=job["output_file"])
 
 @app.route('/jobs', methods=['GET'])
