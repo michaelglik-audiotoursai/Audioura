@@ -777,6 +777,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
 
         excluded_names = {p["name"] for p in poi_list_before_verification if p not in poi_list}
 
+        # Build forbidden name set BEFORE PHASE 3C so PHASE 3C rejects flow into Part C.
+        # Part C uses this set to avoid re-fetching names already proposed or rejected.
+        forbidden_norms = set()
+        for p in poi_list_before_verification:
+            forbidden_norms.add(_normalize_name(p["name"]))
+        for p in poi_list:
+            forbidden_norms.add(_normalize_name(p["name"]))
+
         # -------- PHASE 3C: address-based location guard --------
         # Runs BEFORE Part C so rejected stops can be replaced by the replacement loop.
         # Museum tours with a single venue are skipped -- all stops are inside one building.
@@ -797,12 +805,6 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
         # -------- Part C: replacement loop (bounded) --------
         MAX_REPLACEMENT_ATTEMPTS = 2
         attempts = 0
-        # Build "forbidden" name set (normalized): everything ever proposed PLUS exclusions
-        forbidden_norms = set()
-        for p in poi_list_before_verification:
-            forbidden_norms.add(_normalize_name(p["name"]))
-        for p in poi_list:
-            forbidden_norms.add(_normalize_name(p["name"]))
 
         while len(poi_list) < total_stops and attempts < MAX_REPLACEMENT_ATTEMPTS:
             attempts += 1
