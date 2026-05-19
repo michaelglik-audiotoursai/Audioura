@@ -96,34 +96,51 @@ PHASE 3C now runs on the PHASE 3A addresses (before PHASE 3B enriches them). PHA
 
 *User will test by generating new tours after deploying v1.2.5.183. Results will be recorded here.*
 
-### Test 1 — Walking tour in Boston, MA (neighborhood stop validation)
-- **Purpose:** Confirm East Boston / Jamaica Plain stops are NOT rejected by PHASE 3C
-- **Expected:** All stops with Boston neighborhood addresses pass through
-- **Result:** _pending_
+### Test 1 — Walking tour in Newton Corner, Newton MA
+- **Purpose:** Confirm walking tour generates correctly with 🚶 icon
+- **Result:** ✅ Tour ID 282, 4 stops, 🚶 icon assigned correctly
+- **Issue found:** Icon too dark on iPhone — button background `#2c3e50` (dark navy) makes emoji hard to see
+- **Fix applied (445a6f3):** Changed button background to `#3d7ebf` (medium blue). Needs re-test.
 
-### Test 2 — Walking tour in Arlington, MA (out-of-area rejection)
-- **Purpose:** Confirm Sudbury/Lexington stops ARE still rejected
-- **Expected:** PHASE 3C removes out-of-area stops; Part C fetches replacements
-- **Result:** _pending_
+### Test 2 — Dedham museum and Archive, Dedham, MA
+- **Purpose:** Confirm museum tour generates correctly
+- **Result:** ❌ FAILED — `"Expected 3 stops, got 0"`
+- **Root cause found:** PHASE 3C rejected all 3 stops (Dedham addresses didn't match location string). `ValueError` raised in `generate_tour_text()`. Service wrapper `generate_tour_text_service.py` ignored the `None` return and marked job as `completed` with an empty text file. Modernized processor received empty file → produced 2185-byte ZIP with only `index.html`, no audio.
+- **Fix applied (445a6f3):** Added `if tour_text is None:` check in `generate_tour_async()` — sets status to `error` and returns early. Orchestrator now surfaces a proper failure instead of a 0-stop tour.
+- **Secondary issue:** PHASE 3C itself may be too aggressive for museum tours where the venue name IS in Dedham but the address format doesn't match. The `_museum_venue_name` guard should have skipped PHASE 3C for a single-venue museum tour — but PHASE 1 intent analysis may not have returned a `venue_name` for "Dedham museum and Archive". Needs investigation.
 
 ### Test 3 — Tour icons (walking / restaurant / museum)
 - **Purpose:** Confirm 🚶 / 🍴 / 🏛️ icons appear correctly on newly generated tours
-- **Expected:** Icon matches tour category
-- **Result:** _pending_
+- **Result:** ✅ Walking icon 🚶 confirmed on Newton Corner tour. Brightness fix pending re-test.
 
 ### Test 4 — Map pins (all stops have pins)
 - **Purpose:** Confirm coords fallback + cluster detection produce distinct pins for all stops
-- **Expected:** No missing map pins; no cluster of pins at same location
-- **Result:** _pending_
+- **Result:** ✅ Newton Corner: 4 stops, 4 map pins loaded (log: `MAP: Loaded 4 POIs`)
 
 ---
 
 ## New Failures Found During Testing
 
-*This section will be filled in as the user reports test failures.*
+### Bug A — Map button icon too dark on iPhone
+- **Symptom:** 🚶 emoji barely visible on iPhone — button background `#2c3e50` is too dark
+- **Fix:** Changed to `#3d7ebf` in `tour_generation_modernized.py` (commit `445a6f3`)
+- **Status:** Deployed, pending re-test on newly generated tour
+
+### Bug B — Museum tour with unknown venue fails silently with 0 stops
+- **Symptom:** "Dedham museum and Archive" tour failed with `Expected 3 stops, got 0`
+- **Root cause:** Two-part failure:
+  1. PHASE 3C rejected all stops (addresses didn't match location string)
+  2. `generate_tour_text_service.py` ignored `None` return from `generate_tour_text()` and reported `completed`
+- **Fix part 1:** Added `if tour_text is None:` guard in service wrapper (commit `445a6f3`)
+- **Fix part 2 (pending):** Investigate why PHASE 3C ran for this museum tour. If PHASE 1 returned `venue_name=null` for "Dedham museum and Archive", then `_museum_venue_name` is empty and PHASE 3C runs. The stops (e.g. `612 High St, Dedham, MA`) should have passed the location check since `"dedham"` IS in `"dedham museum and archive, dedham, ma"`. Need to check what addresses GPT returned.
+- **Status:** Service wrapper fix deployed. PHASE 3C behavior for this case needs investigation.
 
 ---
 
 ## Questions for Claude (to be added if new issues arise)
 
-*This section will be filled in based on test results and any new edge cases observed.*
+### Q10 — PHASE 3C false rejection for museum tours with venue_name=null
+For "Dedham museum and Archive, Dedham, Ma", PHASE 1 may return `venue_name=null` (since the request doesn't clearly name a single bounded institution). This means `_museum_venue_name` is empty, so PHASE 3C runs. If GPT returned addresses like `612 High St, Dedham, MA 02026`, the token `"dedham"` should match `"dedham museum and archive, dedham, ma"`. But the tour still failed with 0 stops. Either:
+- GPT returned addresses with a different city (e.g. `Westwood, MA` or `Canton, MA`)
+- Or PHASE 3C has a different bug for this case
+Recommendation: Add logging of what addresses were rejected by PHASE 3C to make this diagnosable.
