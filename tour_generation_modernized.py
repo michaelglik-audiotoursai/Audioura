@@ -2,7 +2,7 @@
 Modernized Tour Generation Service - Separate MP3/TXT Files
 Implements REQ-001: Tour ZIP Structure Modernization
 """
-SERVICE_VERSION = "1.2.5.182"
+SERVICE_VERSION = "1.2.5.183"
 
 import os
 import re
@@ -363,7 +363,7 @@ def parse_tour_content_to_modernized(tour_content):
     # Extract tour category written by generate_tour_text.py (e.g. "Tour-Category: walking").
     # Anchored to start-of-string and limited to first 200 chars so a stop description
     # containing "Tour-Category:" mid-file can never produce a false positive.
-    category_match = re.search(r'^Tour-Category:\s*(\w+)', tour_content[:200], re.IGNORECASE | re.MULTILINE)
+    category_match = re.search(r'^Tour-Category:\s*(\w+)', tour_content[:500], re.IGNORECASE | re.MULTILINE)
     tour_category = category_match.group(1).lower() if category_match else ''
 
     # Split content by stops

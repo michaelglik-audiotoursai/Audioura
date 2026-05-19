@@ -15,6 +15,22 @@ from poi_inclusion_exceptions import should_include_in_restaurant_tour, should_i
 from enhanced_prompt_generator import generate_enhanced_prompt
 from datetime import datetime
 import re
+from collections import Counter
+
+# PHASE 3C: neighborhood/borough -> canonical city map for address-based location guard.
+# Covers USPS city names that differ from the city users request tours in.
+_NEIGHBORHOOD_TO_CITY = {
+    # Boston neighborhoods with separate USPS city names
+    'east boston': 'boston', 'jamaica plain': 'boston', 'roxbury': 'boston',
+    'dorchester': 'boston', 'south boston': 'boston', 'mattapan': 'boston',
+    'brighton': 'boston', 'allston': 'boston', 'hyde park': 'boston',
+    'roslindale': 'boston', 'west roxbury': 'boston', 'charlestown': 'boston',
+    # NYC boroughs
+    'brooklyn': 'new york', 'queens': 'new york', 'bronx': 'new york', 'staten island': 'new york',
+    # Newton villages
+    'newton centre': 'newton', 'west newton': 'newton', 'newton corner': 'newton',
+    'newton highlands': 'newton', 'newtonville': 'newton',
+}
 
 def analyze_tour_intent(user_request, api_key):
     """
@@ -734,6 +750,46 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
 
         excluded_names = {p["name"] for p in poi_list_before_verification if p not in poi_list}
 
+        # -------- PHASE 3C: address-based location guard --------
+        # Runs BEFORE Part C so rejected stops can be replaced by the replacement loop.
+        # Museum tours with a single venue are skipped -- all stops are inside one building.
+        if tour_category != 'museum' or not _museum_venue_name:
+            def _address_matches_location(address, loc):
+                """Return True if any address token (after postcode stripping and
+                neighborhood aliasing) appears in the location string, or if we
+                cannot determine a mismatch (empty address, single token)."""
+                if not address:
+                    print(f"   PHASE 3C: WARN address empty -- cannot verify location")
+                    return True
+                parts = [p.strip().lower() for p in address.split(',')]
+                if len(parts) < 2:
+                    return True
+                loc_lower = loc.lower()
+                # Strip postcode-looking tokens (purely numeric or UK-style AB12 3CD)
+                text_parts = [
+                    p for p in parts
+                    if not re.match(r'^\d{4,6}(\s*[a-z]{0,4})?$', p)
+                    and not re.match(r'^[a-z]{1,2}\d{1,2}[a-z]?\s*\d[a-z]{2}$', p)
+                ]
+                for token in text_parts:
+                    effective = _NEIGHBORHOOD_TO_CITY.get(token, token)
+                    if effective in loc_lower:
+                        return True
+                return False
+
+            location_rejects = [p for p in poi_list if not _address_matches_location(p.get('address', ''), location)]
+            if location_rejects:
+                for p in location_rejects:
+                    print(f"   PHASE 3C: REMOVED '{p['name']}' -- address '{p['address']}' not in '{location}'")
+                    forbidden_norms.add(_normalize_name(p['name']))
+                poi_list = [p for p in poi_list if p not in location_rejects]
+                print(f"   PHASE 3C: {len(location_rejects)} out-of-area stop(s) removed; {len(poi_list)} remain")
+            else:
+                print(f"   PHASE 3C: all {len(poi_list)} stops pass location guard")
+
+            if len(poi_list) == 0:
+                raise ValueError(f"PHASE 3C rejected all stops for location '{location}'")
+
         # -------- Part C: replacement loop (bounded) --------
         MAX_REPLACEMENT_ATTEMPTS = 2
         attempts = 0
@@ -959,39 +1015,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
         except Exception as e:
             print(f"! PHASE 3B exception: {e}; keeping PHASE 3A order")
 
-        # -------- PHASE 3C: address-based location guard --------
-        # For non-museum tours: verify each POI's address city/state matches the
-        # requested location. Great Meadows in Sudbury would be caught here even
-        # though it passed PHASE 4 (walking tours skip type verification).
-        # Museum tours with a single venue are skipped — all stops are inside one building.
-        if tour_category != 'museum' or not _museum_venue_name:
-            def _address_matches_location(address, loc):
-                """Return True if address city/state appears in the location string,
-                or if we cannot determine a mismatch (empty address, no city found)."""
-                if not address:
-                    return True  # no address — can't judge, keep
-                # Extract last two comma-separated tokens from address as "City, ST ZIP"
-                parts = [p.strip() for p in address.split(',')]
-                if len(parts) < 2:
-                    return True
-                # city is second-to-last, state+zip is last
-                city = parts[-2].lower()
-                state_zip = parts[-1].lower()
-                loc_lower = loc.lower()
-                # Accept if city OR state token appears in the location string
-                state_token = state_zip.split()[0] if state_zip.split() else ''
-                return city in loc_lower or (state_token and state_token in loc_lower and city in loc_lower)
-
-            location_rejects = [p for p in poi_list if not _address_matches_location(p.get('address', ''), location)]
-            if location_rejects:
-                for p in location_rejects:
-                    print(f"   PHASE 3C: REMOVED '{p['name']}' — address '{p['address']}' not in '{location}'")
-                    forbidden_norms.add(_normalize_name(p['name']))
-                poi_list = [p for p in poi_list if p not in location_rejects]
-                print(f"   PHASE 3C: {len(location_rejects)} out-of-area stop(s) removed; {len(poi_list)} remain")
-            else:
-                print(f"   PHASE 3C: all {len(poi_list)} stops pass location guard")
-
+        # -------- Coordinates fallback: request for any stop missing coordinates --------
         # -------- Coordinates fallback: request for any stop missing coordinates --------
         # PHASE 3B sometimes omits coordinates for one or more stops. Request them
         # individually (parallel) so every stop gets a map pin.
@@ -1037,6 +1061,32 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
                         print(f"   Coords fallback OK '{poi['name']}': {coords}")
                     else:
                         print(f"   Coords fallback FAILED '{poi['name']}' — no map pin for this stop")
+
+        # -------- Duplicate-coordinate cluster detection --------
+        # GPT sometimes returns the same lat/lng for all stops on a linear route.
+        # If >=50% of stops share one coordinate string, clear them and re-run the fallback.
+        coord_counts = Counter(p.get('coordinates', '') for p in poi_list if p.get('coordinates'))
+        if coord_counts:
+            top_coord, top_count = coord_counts.most_common(1)[0]
+            if top_coord and top_count > 1 and top_count >= max(2, len(poi_list) // 2):
+                clustered = [p for p in poi_list if p.get('coordinates') == top_coord]
+                print(f"   Coords cluster detected: {top_count} stops share '{top_coord}', refetching...")
+                for p in clustered:
+                    p['coordinates'] = ''
+                missing_coords2 = [p for p in poi_list if not p.get('coordinates')]
+                if missing_coords2:
+                    with ThreadPoolExecutor(max_workers=min(len(missing_coords2), 5)) as executor:
+                        futures2 = {executor.submit(_fetch_coords, p): p for p in missing_coords2}
+                        for future in as_completed(futures2):
+                            poi, coords, tokens_used = future.result()
+                            if coords:
+                                poi['coordinates'] = coords
+                                total_tokens += tokens_used
+                                total_cost += tokens_used / 1000 * 0.002
+                                print(f"   Cluster refetch OK '{poi['name']}': {coords}")
+                            else:
+                                print(f"   Cluster refetch FAILED '{poi['name']}' -- no map pin")
+
 
         # -------- Coordinates for the first POI (used by orchestrator) --------
         if poi_list and poi_list[0].get("coordinates"):
