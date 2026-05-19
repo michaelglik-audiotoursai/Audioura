@@ -347,6 +347,7 @@ PHASE 3C logic for Dedham addresses was verified correct via debug script — `"
 | C | Bug fix | `generate_tour_text.py` | `158d505` | `_fetch_coords` moved outside `if missing_coords:` block |
 | X | Claude response fix | `generate_tour_text.py` | `7a4a969` | `len(p) >= 4` token filter + hoist `_address_matches_location` to module level |
 | Y | Claude response fix | `generate_tour_text.py` | `7a4a969` | Part C replacements now run through PHASE 3C address check |
+| Z | Bug fix | `generate_tour_text.py` | `1e0c326` | `forbidden_norms` init moved before PHASE 3C (was NameError + silent wipe of rejects) |
 
 ---
 
@@ -399,3 +400,48 @@ This required hoisting `_address_matches_location` from inside the PHASE 3C `if`
 
 - **Duplicate comment** at lines 1018–1019: `# -------- Coordinates fallback: request for any stop missing coordinates --------` appeared twice. One removed.
 - **Redundant `top_count > 1`** in cluster detection: `max(2, len(poi_list) // 2)` already guarantees `top_count >= 2`, so `top_count > 1` was always implied. Removed.
+
+---
+
+## Part 4 — Claude.AI Final Review Fix (commit `1e0c326`)
+
+### Bug Z — `forbidden_norms` initialized after PHASE 3C references it
+
+**Found by:** Claude.AI review of commit `7a4a969`
+**Commit:** `1e0c326`
+
+**Symptom:** Any tour where PHASE 3C rejects at least one stop crashes with `NameError: name 'forbidden_norms' is not defined`. The outer `except Exception` returns `None`, service wrapper reports `error`. Surface shape identical to Bug B — but caused by a different upstream defect.
+
+**Two failure modes from the same root cause:**
+1. **NameError** — line 788 (PHASE 3C reject path) calls `forbidden_norms.add()` but `forbidden_norms = set()` was at line 801 (Part C). PHASE 3C runs first, so the name is not yet defined.
+2. **Silent wipe** — even if the NameError were somehow avoided, line 801 `forbidden_norms = set()` would re-initialize the set to empty at the start of Part C, discarding all names PHASE 3C had added. Part C would then be free to re-fetch the same out-of-area names — silently defeating Change 3 from `ed1acad`.
+
+**Why it wasn't caught in testing:** Newton Corner and Dedham museum tours both passed PHASE 3C cleanly (all stops had correct addresses). The bug only fires when PHASE 3C actually rejects a stop. The Arlington walking tour test (added per Claude's recommendation) triggered it: `Great Meadows National Wildlife Refuge` at `73 Weir Hill Rd, Sudbury, MA` was correctly rejected.
+
+**Fix:** Moved `forbidden_norms = set()` and its two init loops from inside Part C to immediately before PHASE 3C. Deleted the duplicate initialization from Part C.
+
+```python
+# BEFORE (broken):
+# [PHASE 3C block]
+#     forbidden_norms.add(...)   ← line 788, NameError — not defined yet
+# [Part C block]
+#     forbidden_norms = set()    ← line 801, first assignment (too late)
+#     for p in poi_list_before_verification: forbidden_norms.add(...)
+#     for p in poi_list: forbidden_norms.add(...)
+
+# AFTER (fixed):
+#     forbidden_norms = set()    ← line 782, before PHASE 3C
+#     for p in poi_list_before_verification: forbidden_norms.add(...)
+#     for p in poi_list: forbidden_norms.add(...)
+# [PHASE 3C block]
+#     forbidden_norms.add(...)   ← line 796, set already exists ✓
+# [Part C block — no re-initialization]
+#     while len(poi_list) < total_stops ...
+```
+
+**Regression test confirmed:** Arlington walking tour (tour ID 287, 4/4 stops). Generator logs showed:
+```
+PHASE 3C: REMOVED 'Great Meadows National Wildlife Refuge' -- address '73 Weir Hill Rd, Sudbury, MA 01776' not in 'walking tour in Arlington, MA'
+PHASE 3C: 1 out-of-area stop(s) removed; 3 remain
+```
+Part C ran, fetched 1 replacement, final tour 4/4 stops — no NameError, no silent wipe.

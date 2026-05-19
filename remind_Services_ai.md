@@ -15,7 +15,7 @@
 - **GIT RULE**: Do NOT commit until user confirms mobile testing passed
 - **BRANCH**: `Tours_Step_Maps` (branched from `Newsletters` at `ad3b5be`)
 - **MERGE TARGET**: `Newsletters` (when A#55+A#56 complete and tested)
-- **LAST GIT COMMIT**: `7a4a969` — "Apply Claude review Issue X+Y: hoist _address_matches_location to module level, add len>=4 token filter, apply PHASE 3C check in Part C, remove duplicate comment + redundant top_count>1"
+- **LAST GIT COMMIT**: `1e0c326` — "Fix Bug Z: move forbidden_norms init before PHASE 3C so PHASE 3C rejects flow into Part C (was NameError + silent wipe)"
 - **WORKFLOW**: Blanket approval given for all service changes — implement without waiting
 
 ---
@@ -111,7 +111,7 @@ standalone maintenance session after Tours_Step_Maps is merged and mobile testin
 
 | File | Container | Commit | Notes |
 |------|-----------|--------|-------|
-| `generate_tour_text.py` | `development-tour-generator-1:5000` | `7a4a969` | Sessions 2–10 + A#56 + PHASE 3C improved + coords cluster detection + _fetch_coords scope fix + Issue X/Y fixes |
+| `generate_tour_text.py` | `development-tour-generator-1:5000` | `1e0c326` | Sessions 2–10 + A#56 + PHASE 3C improved + coords cluster detection + all Claude review fixes applied |
 | `generate_tour_text_service.py` | `development-tour-generator-1:5000` | unchanged | Flask wrapper |
 | `tour_orchestrator_service.py` | `development-tour-orchestrator-1:5002` | `ad3b5be` | Session 5 guards |
 | `tour_generation_modernized.py` | `tour-generation-modernized-1:5021` | `ed1acad` | A#55 map buttons + A#56 tour-type icons v1.2.5.183 |
