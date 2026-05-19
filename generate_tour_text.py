@@ -32,6 +32,33 @@ _NEIGHBORHOOD_TO_CITY = {
     'newton highlands': 'newton', 'newtonville': 'newton',
 }
 
+def _address_matches_location(address, loc):
+    """Return True if any address token (after postcode stripping, short-token filtering,
+    and neighborhood aliasing) appears in the location string, or if we cannot determine
+    a mismatch (empty address, single token).
+    Module-level so both PHASE 3C and Part C replacement checks can call it.
+    """
+    if not address:
+        print(f"   PHASE 3C: WARN address empty -- cannot verify location")
+        return True
+    parts = [p.strip().lower() for p in address.split(',')]
+    if len(parts) < 2:
+        return True
+    loc_lower = loc.lower()
+    # Strip postcode-looking tokens, UK-style postcodes, and short tokens (<=3 chars)
+    # that are state/country codes (MA, UK, US) — they match too broadly.
+    text_parts = [
+        p for p in parts
+        if len(p) >= 4
+        and not re.match(r'^\d{4,6}(\s*[a-z]{0,4})?$', p)
+        and not re.match(r'^[a-z]{1,2}\d{1,2}[a-z]?\s*\d[a-z]{2}$', p)
+    ]
+    for token in text_parts:
+        effective = _NEIGHBORHOOD_TO_CITY.get(token, token)
+        if effective in loc_lower:
+            return True
+    return False
+
 def analyze_tour_intent(user_request, api_key):
     """
     Enhanced AI-based intent analysis to detect specialized themes like books, movies, products.
@@ -754,29 +781,6 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
         # Runs BEFORE Part C so rejected stops can be replaced by the replacement loop.
         # Museum tours with a single venue are skipped -- all stops are inside one building.
         if tour_category != 'museum' or not _museum_venue_name:
-            def _address_matches_location(address, loc):
-                """Return True if any address token (after postcode stripping and
-                neighborhood aliasing) appears in the location string, or if we
-                cannot determine a mismatch (empty address, single token)."""
-                if not address:
-                    print(f"   PHASE 3C: WARN address empty -- cannot verify location")
-                    return True
-                parts = [p.strip().lower() for p in address.split(',')]
-                if len(parts) < 2:
-                    return True
-                loc_lower = loc.lower()
-                # Strip postcode-looking tokens (purely numeric or UK-style AB12 3CD)
-                text_parts = [
-                    p for p in parts
-                    if not re.match(r'^\d{4,6}(\s*[a-z]{0,4})?$', p)
-                    and not re.match(r'^[a-z]{1,2}\d{1,2}[a-z]?\s*\d[a-z]{2}$', p)
-                ]
-                for token in text_parts:
-                    effective = _NEIGHBORHOOD_TO_CITY.get(token, token)
-                    if effective in loc_lower:
-                        return True
-                return False
-
             location_rejects = [p for p in poi_list if not _address_matches_location(p.get('address', ''), location)]
             if location_rejects:
                 for p in location_rejects:
@@ -871,6 +875,9 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
 
                 # Verify the new stops too (same PHASE 4 logic)
                 survived, _ = _verify_against_intent(new_stops)
+                # Also apply PHASE 3C address check to replacements
+                if tour_category != 'museum' or not _museum_venue_name:
+                    survived = [p for p in survived if _address_matches_location(p.get('address', ''), location)]
                 survived = survived[:needed]
                 poi_list.extend(survived)
                 # forbid every attempted name so subsequent attempts diverge
@@ -1016,7 +1023,6 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
             print(f"! PHASE 3B exception: {e}; keeping PHASE 3A order")
 
         # -------- Coordinates fallback: request for any stop missing coordinates --------
-        # -------- Coordinates fallback: request for any stop missing coordinates --------
         # PHASE 3B sometimes omits coordinates for one or more stops. Request them
         # individually (parallel) so every stop gets a map pin.
         def _fetch_coords(poi):
@@ -1067,7 +1073,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
         coord_counts = Counter(p.get('coordinates', '') for p in poi_list if p.get('coordinates'))
         if coord_counts:
             top_coord, top_count = coord_counts.most_common(1)[0]
-            if top_coord and top_count > 1 and top_count >= max(2, len(poi_list) // 2):
+            if top_coord and top_count >= max(2, len(poi_list) // 2):
                 clustered = [p for p in poi_list if p.get('coordinates') == top_coord]
                 print(f"   Coords cluster detected: {top_count} stops share '{top_coord}', refetching...")
                 for p in clustered:
