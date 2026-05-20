@@ -2,7 +2,7 @@
 ## Who you are
 🔧 **SERVICES AMAZON-Q** — **CRITICAL**: Always start ALL replies with "🔧 SERVICES AMAZON-Q -"
 
-**UPDATED**: 2026-05-21 (Session 14 complete + Claude final review fixes: Q2 word-set subset check prevents Lynn/Lynnfield false-keeps + state+zip token filter; Q4 ValueError catch surfaces PHASE 3C zero-stop as None regardless of intent state. Commit e4ebcf1. All bugs A/B/C/X/Y/Z+Q2+Q4 fixed. Issue AA filed: York,ME vs New York,NY ambiguity — not blocking merge.)
+**UPDATED**: 2026-05-21 (Session 14 complete + Claude final review fixes Q2+Q4 applied. Claude code-improvements review received: trivial fixes scheduled next session; architectural items documented in PRE_PRODUCTION_BACKLOG. Logging requirements doc created. PROMPT_TEMPLATES architecture decision recorded.)
 
 1. You are Services Amazon-Q responsible for all Docker services in `C:\Users\micha\eclipse-workspace\AudioTours\development\`. You have blanket approval to change code, run Python programs, start/stop Docker services without waiting for approval.
 2. You maintain this file and update it after significant changes.
@@ -365,6 +365,54 @@ git push origin Tours_Step_Maps
 7. **Container naming cleanup**: Standalone session after merge. See `container_naming_audit.md`.
 
 8. **Delete `_generate_translated_html()`**: Post-merge cleanup commit on Newsletters.
+
+9. **Code improvements from `claude_response_code_improvements.md`** (next services session):
+   - 1.2: `debug=True` → env-var controlled (security)
+   - 1.3: `attachment_filename` → `download_name` (Flask 2.2 compat)
+   - 1.4: CORS restrict to orchestrator origin
+   - 2.2: Remove dead `tour_category = 'intelligent'` assignment
+   - 2.3: Centralise GPT pricing constant (current `0.002` is stale — actual ~`0.0015`)
+   - 2.5: Fix `[:500]` comment in `tour_generation_modernized.py` (says 200, code uses 500)
+   - 2.6: Last-resort fallback use `_new_poi()` instead of inline dict
+   - 3.3: Delete `_generate_translated_html()` dead code
+   - 3.4: Replace bare `except:` in `tour_generation_modernized.py:56`
+   - 3.6: Pull magic numbers into named constants
+   - 5.2: Add attribution comment to `_NEIGHBORHOOD_TO_CITY`
+
+---
+
+## 🏭 PRE-PRODUCTION BACKLOG (do NOT forget before paying customers)
+
+| Item | Source | Priority | Notes |
+|------|--------|----------|-------|
+| `ACTIVE_JOBS` lock + TTL + restart recovery | Claude 1.1 | HIGH | Container restart silently loses all in-flight jobs; mobile polls forever. Use TTLCache + threading.Lock + JSON snapshot on state transition. Own session. |
+| `MAX_TOTAL_STOPS` hard cap | Cost guard | HIGH | No upper bound on `total_stops` today. Bot/abuse could generate 50-stop tour = ~$0.20+. Add cap of 15 in service wrapper. |
+| Structured logging with job_id correlation | Claude 3.2 | HIGH | ~200 print() calls, no severity levels, no job_id. Interleaved tours undemultiplexable. See `LOGGING_REQUIREMENTS_PRE_PRODUCTION.md`. |
+| Category-aware PHASE 5 description prompts | Claude 2.7 | HIGH | Current prompt says "walking tour" + "artistic significance" for ALL categories. Architecture: `PROMPT_TEMPLATES` dict keyed by `tour_category` already planned. Slot exists — fill with story-driven prompts per category before launch. |
+| Cost tracking per tour | Claude 2.4 | MEDIUM | ~$0.012–$0.020/tour at current pricing. Not astronomical but needs visibility. Add rough estimate to job record using constant × total_stops. |
+| `_validate_museum_stop_descriptions` cost tracking | Claude 2.9 | MEDIUM | OpenAI calls in museum validation not counted in total_cost. Fix with 2.4. |
+| Word-boundary matching in `_classify_tour_category` | Claude 3.5 | LOW | `'cafe'` matches `'cafeteria'`; `'park'` matches `'parking lot'`. Switch to `\b` regex. Do after system test suite exists. |
+| System test matrix (replace unit tests) | Claude 4.1–4.3 | MEDIUM | Preferred over unit tests. See SYSTEM TEST MATRIX section below. |
+| Normalize line endings (CRLF→LF) | Claude 3.1 | LOW | Standalone commit on Newsletters after merge. `git add --renormalize .` |
+| Standardize PHASE header comments | Claude 5.1 | LOW | Documentation-only commit. |
+| DRY `user_request` Bug-2 logic | Claude 2.1 | LOW | Two copies at lines 444 and 614. Deferred — subtle difference in purpose. |
+
+---
+
+## 🧪 SYSTEM TEST MATRIX (preferred over unit tests)
+
+Manually generated tours that cover known edge cases. Re-run after any change to `generate_tour_text.py`.
+
+| Test | Location | Stops | What to verify |
+|------|----------|-------|----------------|
+| Walking happy path | Newton Center, MA | 4 | All stops in Newton; 🚶 icon; map pins present |
+| Restaurant tour | Newton, MA | 3 | 🍴 icon; PHASE 4 type-check runs; no museum stops |
+| Museum single-venue | Jackson Homestead, Newton MA | 5 | All stops at 527 Washington St; single map pin; 🏛️ icon |
+| PHASE 3C reject + Part C replace | Arlington, MA | 4 | Confirm out-of-area stop rejected; replacement in-area |
+| Cluster detection | Dedham Museum, MA | 3 | Cluster triggered; distinct coords after refetch |
+| Boston neighborhood alias | walking tour in Boston, MA | 3 | East Boston / Jamaica Plain addresses pass PHASE 3C |
+| Lynn vs Lynnfield (Q2) | Lynnfield, MA | 3 | No stops with Lynn, MA addresses slip through |
+| Zero-stop guard (Q4) | Nonsense location far from any city | 3 | Job status=error, not completed with Location N stops |
 
 ---
 
