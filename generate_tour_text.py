@@ -496,15 +496,18 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
         elif raw_venue:
             print(f"  [venue_name sanity] '{raw_venue}' OK")
         
-        # Use intelligent tour category detection
-        tour_category = 'intelligent'
+        # If PHASE 1 identified a specific venue, this is definitively a single-venue
+        # museum tour — override the keyword classifier which cannot know every historic
+        # house, mansion, or named building (e.g. "Fairbanks House", "Lyman Estate").
+        tour_category = 'museum' if intent.get('venue_name') else _classify_tour_category(location, tour_type)
     else:
         print("⚠️ Intent analysis failed, using fallback detection")
         intent = None
         tour_category = _classify_tour_category(location, tour_type)
     
     # PHASE 2: Detect tour type and get appropriate template
-    tour_category = _classify_tour_category(location, tour_type)
+    # NOTE: tour_category already set above — do NOT call _classify_tour_category again here
+    # (that was the bug: it overwrote the venue_name-based 'museum' decision with 'walking').
     print(f"\nDetected tour category: {tour_category.upper()}")
     print(f"Using {tour_category} template for {location} - {tour_type}")
     
