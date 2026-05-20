@@ -2,7 +2,7 @@
 ## Who you are
 🔧 **SERVICES AMAZON-Q** — **CRITICAL**: Always start ALL replies with "🔧 SERVICES AMAZON-Q -"
 
-**UPDATED**: 2026-05-21 (Session 15 complete: Fairbanks House bug fixed (1e9a718) + Claude review applied (2e5eff1): _EXPLICIT_NON_MUSEUM_TOUR_RE safety net, [S15] log lines, 4 negative PHASE 1 prompt examples. Next action: mobile test Fairbanks House fix.)
+**UPDATED**: 2026-05-21 (Session 16: S15 Claude reviews fully applied — 3 commits (1e9a718, 2e5eff1, 2e8347e). Needham museum tour tested successfully in EN+RU+ZH. In-tour map white-screen bug diagnosed: Flutter-side fitCamera degenerate-bounds on single-POI museum tours — fix is mobile-side only (tour_map_screen.dart), no services change needed. Last commit: 3f9d04e. Next action: mobile tests for Fairbanks House S15 fix + A#56 icons.)
 
 1. You are Services Amazon-Q responsible for all Docker services in `C:\Users\micha\eclipse-workspace\AudioTours\development\`. You have blanket approval to change code, run Python programs, start/stop Docker services without waiting for approval.
 2. You maintain this file and update it after significant changes.
@@ -15,9 +15,10 @@
 - **GIT RULE**: Do NOT commit until user confirms mobile testing passed
 - **BRANCH**: `Tours_Step_Maps` (branched from `Newsletters` at `ad3b5be`)
 - **MERGE TARGET**: `Newsletters` (when A#55+A#56 complete and tested)
-- **LAST GIT COMMIT**: `2e8347e` — "S15c: expand _EXPLICIT_NON_MUSEUM_TOUR_RE with pub crawl, bike, cycling, biking, shopping (Claude Q1 recommendation)"
-- **NEXT ACTION ON RECOVERY**: Mobile test — regenerate `"Fairbanks House Tour in Dedham, ma"` and confirm tour_category=museum, stops inside Fairbanks House only
-- **PREVIOUS REVIEW DOC**: `claude_review_final_session14.md` — session 14 changes (already reviewed by Claude)
+- **LAST GIT COMMIT**: `3f9d04e` — "Update remind_Services_ai.md: S15c commit 2e8347e"
+- **NEXT ACTION ON RECOVERY**: Mobile tests — (1) Fairbanks House S15 fix, (2) A#56 tour-type icons on walking+restaurant tours, (3) confirm Needham museum in-tour map white-screen fixed by mobile team
+- **PREVIOUS REVIEW DOCS**: `claude_review_session15_final.md` (S15 — fully reviewed + applied). `claude_review_final_session14.md` (S14 — fully reviewed + applied)
+- **IN-TOUR MAP WHITE SCREEN**: ISSUE-MAP-WS filed. Root cause: `_fitBounds()` in `tour_map_screen.dart` calls `fitCamera(CameraFit.bounds(...))` with single-point bounds when GPS not yet locked (museum tours have 1 POI). Fix: add `if (points.length == 1) { _mapController.move(points.first, 15); return; }` before `LatLngBounds.fromPoints()`. Mobile-side fix only — services output is correct. See `claude_response_needham_map_whitescreen.md`
 - **PRE-PRODUCTION CHECKLIST**: `REMINDER_LIST_BEFORE_PRODUCTION.md` — must-complete items before paying customers
 - **LOGGING REQUIREMENTS**: `LOGGING_REQUIREMENTS_PRE_PRODUCTION.md` — full spec for structured logging sprint
 - **WORKFLOW**: Blanket approval given for all service changes — implement without waiting
@@ -40,8 +41,10 @@ After chat compaction, read this file top to bottom. Then:
 1. The **NEXT ACTION ON RECOVERY** line above tells you exactly what to do first.
 2. Current branch is `Tours_Step_Maps`. Last commit is listed in CRITICAL IDENTITY RULES.
 3. All containers should be running — verify with `docker ps` if unsure.
-4. `generate_tour_text.py` is the primary file under active development.
+4. `generate_tour_text.py` is the primary file under active development (last touched commit `2e8347e`).
 5. Do NOT merge to `Newsletters` until mobile tests pass for A#55 + A#56 + S15 fixes.
+6. S15 changes are complete and Claude-reviewed. No further services changes pending for S15.
+7. In-tour map white screen (ISSUE-MAP-WS) is a mobile-side bug — no services action needed.
 
 ---
 
@@ -129,7 +132,7 @@ standalone maintenance session after Tours_Step_Maps is merged and mobile testin
 
 | File | Container | Commit | Notes |
 |------|-----------|--------|-------|
-| `generate_tour_text.py` | `development-tour-generator-1:5000` | `1e9a718` | Sessions 2–15: all fixes including Q2+Q4 + Fairbanks House museum category fix |
+| `generate_tour_text.py` | `development-tour-generator-1:5000` | `2e8347e` | Sessions 2–16: all fixes including Q2+Q4 + S15 Fairbanks House fix + S15b/c safety net |
 | `generate_tour_text_service.py` | `development-tour-generator-1:5000` | unchanged | Flask wrapper |
 | `tour_orchestrator_service.py` | `development-tour-orchestrator-1:5002` | `ad3b5be` | Session 5 guards |
 | `tour_generation_modernized.py` | `tour-generation-modernized-1:5021` | `ed1acad` | A#55 map buttons + A#56 tour-type icons v1.2.5.183 |
@@ -165,6 +168,8 @@ All changes landed on `Tours_Step_Maps`. Final review doc: `claude_review_final_
 | S15 | `generate_tour_text.py` | `1e9a718` | venue_name from PHASE 1 forces `tour_category='museum'`; removed unconditional `_classify_tour_category()` call at PHASE 2 that overwrote it |
 | S15b | `generate_tour_text.py` | `2e5eff1` | Claude review: `_EXPLICIT_NON_MUSEUM_TOUR_RE` safety net (prevents walking/restaurant requests with GPT-hallucinated venue_name from being misclassified as museum); `[S15]` log lines for both branches; 4 negative examples added to PHASE 1 prompt |
 | S15c | `generate_tour_text.py` | `2e8347e` | Claude final review Q1: expanded `_EXPLICIT_NON_MUSEUM_TOUR_RE` with `pub crawl`, `bike`, `cycling`, `biking`, `shopping`; 11/11 functional tests pass |
+
+**S15 is fully complete and Claude-reviewed. No further code changes pending for S15.**
 
 **Issue AA (filed, not blocking)**: York, ME vs New York, NY — `'york'` is a whole word in both; word-set check cannot distinguish without state context. Rare in practice. Fix in next pass.
 
@@ -363,14 +368,15 @@ git push origin Tours_Step_Maps
 
 ## 🎯 NEXT STEPS (in order)
 
-0. **⚡ FIRST: Generate `claude_review_session15.md`** — Claude.AI review doc for session 15 changes before merge. See NEXT ACTION ON RECOVERY above.
+0. **⚡ FIRST on recovery**: Check NEXT ACTION ON RECOVERY in CRITICAL IDENTITY RULES above.
 
-1. **Mobile test — Fairbanks House fix (S15)**: Regenerate `"Fairbanks House Tour in Dedham, ma"`. Confirm: tour_category=museum, single-venue constraint applied, stops are rooms/exhibits inside Fairbanks House (not separate buildings around Dedham).
+1. **Mobile test — Fairbanks House fix (S15)**: Regenerate `"Fairbanks House Tour in Dedham, ma"`. Confirm: `[S15] Forced tour_category=museum` in container log; stops are rooms/exhibits inside Fairbanks House only; 🏛️ icon.
 
-2. **Mobile test — A#56 tour-type icons**: Regenerate a walking tour and a restaurant tour.
-   Confirm 🚶 appears on walking, 🍴 on restaurant, 🏛️ on museum. Both EN and translated versions.
+2. **Mobile test — A#56 tour-type icons**: Regenerate a walking tour and a restaurant tour. Confirm 🚶 on walking, 🍴 on restaurant, 🏛️ on museum. Both EN and translated versions.
 
-2. **ISSUE-059 double map button**: iOS/Android Amazon-Q must remove runtime injection
+3. **ISSUE-MAP-WS — in-tour map white screen**: Mobile App Amazon-Q must apply `_fitBounds()` fix in `tour_map_screen.dart`. See ISSUE-MAP-WS section above. Services: no action.
+
+4. **ISSUE-059 double map button**: iOS/Android Amazon-Q must remove runtime injection
    from `tour_player_screen.dart` per `ISSUE-059_DUPLICATE_MAP_BUTTONS_REMOVE_RUNTIME_INJECTION.md`.
    Services code is correct — no changes needed on services side.
 
@@ -438,6 +444,35 @@ Manually generated tours that cover known edge cases. Re-run after any change to
 | Lynn vs Lynnfield (Q2) | Lynnfield, MA | 3 | No stops with Lynn, MA addresses slip through |
 | Zero-stop guard (Q4) | Nonsense location far from any city | 3 | Job status=error, not completed with Location N stops |
 | Historic house museum (S15) | Fairbanks House Tour in Dedham, ma | 4 | tour_category=museum; single-venue constraint; stops inside Fairbanks House only |
+| Needham museum EN+RU+ZH | Needham History Center & Museum, Needham, MA | 4 | tour_category=museum ✅; 3 languages ✅; in-tour map white screen ❌ (mobile bug ISSUE-MAP-WS) |
+
+---
+
+## 🐛 ISSUE-MAP-WS: IN-TOUR MAP WHITE SCREEN (museum tours)
+
+**Symptom**: Tapping 🏛️ map button inside tour player → white screen. "My Location" icon works. Listen-page map works.
+
+**Root cause** (confirmed by Claude, `claude_response_needham_map_whitescreen.md`):
+`TourMapScreen._fitBounds()` calls `fitCamera(CameraFit.bounds(...))` with degenerate single-point bounds when:
+- Museum tour has 1 POI (by design — only stop 0 gets coordinates)
+- GPS not yet locked when map opens (cold start)
+
+`LatLngBounds.fromPoints([singlePoint])` → zero-area bounds → `fitCamera` computes infinite zoom → white screen.
+
+**Why Listen-page works**: GPS already warm by the time user navigates there.
+**Why "My Location" works**: calls `_mapController.move()` directly, bypasses `fitCamera`.
+**Services output is correct**: coordinates in `audio_1.txt`, single map button on stop 1 only — all by design.
+
+**Fix (mobile-side only)** — `tour_map_screen.dart`, inside `addPostFrameCallback` block, before `LatLngBounds.fromPoints()`:
+```dart
+if (points.length == 1) {
+    _mapController.move(points.first, 15);
+    return;
+}
+```
+Also closes the symmetric Listen-page bug (same code path, less frequently triggered).
+
+**Status**: Awaiting Mobile App Amazon-Q to apply fix.
 
 ---
 
@@ -461,3 +496,4 @@ Manually generated tours that cover known edge cases. Re-run after any change to
 | 14 review | Claude review applied (ed1acad v1.2.5.183): PHASE 3C neighborhood alias map + all-tokens-scan; moved before Part C; zero-stop guard; cluster coord detection; [:500] slice |
 | 14 final review | Claude final review (e4ebcf1): Q2 word-set subset check + state+zip token filter (Lynn/Lynnfield false-keeps fixed); Q4 `except ValueError` before `except Exception` (PHASE 3C zero-stop never falls to Location-N fallback). Issue AA filed (York,ME vs New York,NY — not blocking). Branch ready for merge. |
 | 15 | Fairbanks House bug (1e9a718): `_classify_tour_category()` keyword list cannot detect historic houses/estates with no "museum" keyword. Fix: when PHASE 1 returns `venue_name`, force `tour_category='museum'` — GPT intent analysis is authoritative over keyword classifier. Removed dead `tour_category='intelligent'` assignment. Claude code-improvements review triaged: trivial fixes queued for next session; architectural items in REMINDER_LIST_BEFORE_PRODUCTION.md. |
+| 16 | S15 Claude reviews applied: 2e5eff1 (_EXPLICIT_NON_MUSEUM_TOUR_RE safety net + [S15] log lines + 4 negative PHASE 1 prompt examples) + 2e8347e (regex expanded: pub crawl, bike, cycling, biking, shopping — 11/11 tests pass). Needham History Center museum tour tested EN+RU+ZH — generation correct, in-tour map white screen found (ISSUE-MAP-WS). Diagnosed as Flutter fitCamera degenerate-bounds on single-POI museum tours — mobile-side fix only. |
