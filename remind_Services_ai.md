@@ -2,7 +2,7 @@
 ## Who you are
 🔧 **SERVICES AMAZON-Q** — **CRITICAL**: Always start ALL replies with "🔧 SERVICES AMAZON-Q -"
 
-**UPDATED**: 2026-05-21 (Session 14 complete + Claude final review fixes Q2+Q4 applied. Claude code-improvements review received: trivial fixes scheduled next session; architectural items documented in PRE_PRODUCTION_BACKLOG. Logging requirements doc created. PROMPT_TEMPLATES architecture decision recorded.)
+**UPDATED**: 2026-05-21 (Session 14 complete + Claude final review fixes Q2+Q4 applied. Claude code-improvements review received: trivial fixes scheduled next session; architectural items documented in REMINDER_LIST_BEFORE_PRODUCTION.md. Logging requirements doc created. PROMPT_TEMPLATES architecture decision recorded.)
 
 1. You are Services Amazon-Q responsible for all Docker services in `C:\Users\micha\eclipse-workspace\AudioTours\development\`. You have blanket approval to change code, run Python programs, start/stop Docker services without waiting for approval.
 2. You maintain this file and update it after significant changes.
@@ -17,6 +17,8 @@
 - **MERGE TARGET**: `Newsletters` (when A#55+A#56 complete and tested)
 - **LAST GIT COMMIT**: `e4ebcf1` — "Fix Q2+Q4 from Claude final review: word-set subset check + ValueError catch"
 - **FINAL REVIEW DOC**: `claude_review_final_session14.md` — send this to Claude.AI for final review before merging `Tours_Step_Maps` → `Newsletters`
+- **PRE-PRODUCTION CHECKLIST**: `REMINDER_LIST_BEFORE_PRODUCTION.md` — must-complete items before paying customers
+- **LOGGING REQUIREMENTS**: `LOGGING_REQUIREMENTS_PRE_PRODUCTION.md` — full spec for structured logging sprint
 - **WORKFLOW**: Blanket approval given for all service changes — implement without waiting
 
 ---
@@ -381,21 +383,21 @@ git push origin Tours_Step_Maps
 
 ---
 
-## 🏭 PRE-PRODUCTION BACKLOG (do NOT forget before paying customers)
+## 🏭 PRE-PRODUCTION BACKLOG
 
-| Item | Source | Priority | Notes |
-|------|--------|----------|-------|
-| `ACTIVE_JOBS` lock + TTL + restart recovery | Claude 1.1 | HIGH | Container restart silently loses all in-flight jobs; mobile polls forever. Use TTLCache + threading.Lock + JSON snapshot on state transition. Own session. |
-| `MAX_TOTAL_STOPS` hard cap | Cost guard | HIGH | No upper bound on `total_stops` today. Bot/abuse could generate 50-stop tour = ~$0.20+. Add cap of 15 in service wrapper. |
-| Structured logging with job_id correlation | Claude 3.2 | HIGH | ~200 print() calls, no severity levels, no job_id. Interleaved tours undemultiplexable. See `LOGGING_REQUIREMENTS_PRE_PRODUCTION.md`. |
-| Category-aware PHASE 5 description prompts | Claude 2.7 | HIGH | Current prompt says "walking tour" + "artistic significance" for ALL categories. Architecture: `PROMPT_TEMPLATES` dict keyed by `tour_category` already planned. Slot exists — fill with story-driven prompts per category before launch. |
-| Cost tracking per tour | Claude 2.4 | MEDIUM | ~$0.012–$0.020/tour at current pricing. Not astronomical but needs visibility. Add rough estimate to job record using constant × total_stops. |
-| `_validate_museum_stop_descriptions` cost tracking | Claude 2.9 | MEDIUM | OpenAI calls in museum validation not counted in total_cost. Fix with 2.4. |
-| Word-boundary matching in `_classify_tour_category` | Claude 3.5 | LOW | `'cafe'` matches `'cafeteria'`; `'park'` matches `'parking lot'`. Switch to `\b` regex. Do after system test suite exists. |
-| System test matrix (replace unit tests) | Claude 4.1–4.3 | MEDIUM | Preferred over unit tests. See SYSTEM TEST MATRIX section below. |
-| Normalize line endings (CRLF→LF) | Claude 3.1 | LOW | Standalone commit on Newsletters after merge. `git add --renormalize .` |
-| Standardize PHASE header comments | Claude 5.1 | LOW | Documentation-only commit. |
-| DRY `user_request` Bug-2 logic | Claude 2.1 | LOW | Two copies at lines 444 and 614. Deferred — subtle difference in purpose. |
+Full details in `REMINDER_LIST_BEFORE_PRODUCTION.md`. Summary:
+
+| Item | Priority | Notes |
+|------|----------|-------|
+| ACTIVE_JOBS lock + TTL + restart recovery | HIGH | Container restart loses all in-flight jobs silently |
+| MAX_TOTAL_STOPS cost guard (free=15, paid=30) | HIGH | No upper bound today; bot abuse risk |
+| Category-aware PHASE 5 prompts (PROMPT_TEMPLATES arch) | HIGH | Architecture now, content sprint before launch |
+| Structured logging + job_id correlation | HIGH | See `LOGGING_REQUIREMENTS_PRE_PRODUCTION.md` |
+| Auth, rate limiting, CORS, debug=False, HTTPS | HIGH | Before any public exposure |
+| `attachment_filename` → `download_name` (Flask 2.2) | MEDIUM | Trivial — next session |
+| Word-boundary matching in `_classify_tour_category` | LOW | After system test suite exists |
+| Normalize line endings (CRLF→LF) | LOW | Standalone commit after merge |
+| DRY `user_request` Bug-2 logic | LOW | Subtle difference in purpose — deferred |
 
 ---
 
