@@ -2,7 +2,7 @@
 ## Who you are
 🔧 **SERVICES AMAZON-Q** — **CRITICAL**: Always start ALL replies with "🔧 SERVICES AMAZON-Q -"
 
-**UPDATED**: 2026-05-21 (Session 14 complete + Claude final review fixes Q2+Q4 applied. Claude code-improvements review received: trivial fixes scheduled next session; architectural items documented in REMINDER_LIST_BEFORE_PRODUCTION.md. Logging requirements doc created. PROMPT_TEMPLATES architecture decision recorded.)
+**UPDATED**: 2026-05-21 (Session 15: Fairbanks House bug fixed — venue_name from PHASE 1 now forces museum category, removing unconditional classifier override at PHASE 2. Commit 1e9a718. Claude code-improvements review received and triaged. REMINDER_LIST_BEFORE_PRODUCTION.md + LOGGING_REQUIREMENTS_PRE_PRODUCTION.md created. Next action: generate Claude.AI review doc for session 15 changes.)
 
 1. You are Services Amazon-Q responsible for all Docker services in `C:\Users\micha\eclipse-workspace\AudioTours\development\`. You have blanket approval to change code, run Python programs, start/stop Docker services without waiting for approval.
 2. You maintain this file and update it after significant changes.
@@ -15,8 +15,9 @@
 - **GIT RULE**: Do NOT commit until user confirms mobile testing passed
 - **BRANCH**: `Tours_Step_Maps` (branched from `Newsletters` at `ad3b5be`)
 - **MERGE TARGET**: `Newsletters` (when A#55+A#56 complete and tested)
-- **LAST GIT COMMIT**: `e4ebcf1` — "Fix Q2+Q4 from Claude final review: word-set subset check + ValueError catch"
-- **FINAL REVIEW DOC**: `claude_review_final_session14.md` — send this to Claude.AI for final review before merging `Tours_Step_Maps` → `Newsletters`
+- **LAST GIT COMMIT**: `1e9a718` — "Fix: venue_name from PHASE 1 forces museum category; remove unconditional classifier override at PHASE 2 (Fairbanks House bug)"
+- **NEXT ACTION ON RECOVERY**: Generate `claude_review_session15.md` for Claude.AI review of session 15 changes before merging `Tours_Step_Maps` → `Newsletters`
+- **PREVIOUS REVIEW DOC**: `claude_review_final_session14.md` — session 14 changes (already reviewed by Claude)
 - **PRE-PRODUCTION CHECKLIST**: `REMINDER_LIST_BEFORE_PRODUCTION.md` — must-complete items before paying customers
 - **LOGGING REQUIREMENTS**: `LOGGING_REQUIREMENTS_PRE_PRODUCTION.md` — full spec for structured logging sprint
 - **WORKFLOW**: Blanket approval given for all service changes — implement without waiting
@@ -30,6 +31,17 @@ The IDE file tool can show "intended" content while actual bytes on disk are tru
 - After any edit: `docker exec <container> python3 -m py_compile /app/<file>.py && echo OK`
 - If local file truncated: `docker cp <container>:/app/<file>.py <local_path>` to recover
 - **Containers are the source of truth for deployed code**
+
+---
+
+## 🔄 SESSION RECOVERY INSTRUCTIONS
+
+After chat compaction, read this file top to bottom. Then:
+1. The **NEXT ACTION ON RECOVERY** line above tells you exactly what to do first.
+2. Current branch is `Tours_Step_Maps`. Last commit is listed in CRITICAL IDENTITY RULES.
+3. All containers should be running — verify with `docker ps` if unsure.
+4. `generate_tour_text.py` is the primary file under active development.
+5. Do NOT merge to `Newsletters` until mobile tests pass for A#55 + A#56 + S15 fixes.
 
 ---
 
@@ -52,8 +64,11 @@ PHASE 1:    analyze_tour_intent() → intent JSON [max_tokens=400]
             venue_name field: full official name if tour is inside ONE building; else null
             After PHASE 1: _venue_matches_location() sanity check — stop words only
             excluded (NOT institutional markers); prefix matching; permissive when empty
-PHASE 2:    _classify_tour_category() → 'walking'/'restaurant'/'museum'/'specialized'
+PHASE 2:    tour_category set here — NOT by calling _classify_tour_category() again
+            Rule (S15 fix): if PHASE 1 returned venue_name → tour_category='museum'
+            Otherwise: _classify_tour_category(location, tour_type)
             _pre_category guard suppresses mobile app's hardcoded tour_type:"museum"
+            (pre_category computed BEFORE PHASE 1 using location only, no tour_type)
 PHASE 3A:   OpenAI → raw stop names + addresses only
             Museum constraint injected ONLY when intent.venue_name is not null
             Regex fallback REMOVED (was buggy)
@@ -114,7 +129,7 @@ standalone maintenance session after Tours_Step_Maps is merged and mobile testin
 
 | File | Container | Commit | Notes |
 |------|-----------|--------|-------|
-| `generate_tour_text.py` | `development-tour-generator-1:5000` | `e4ebcf1` | Sessions 2–10 + A#56 + PHASE 3C improved + coords cluster detection + all Claude review fixes (Q2+Q4) applied |
+| `generate_tour_text.py` | `development-tour-generator-1:5000` | `1e9a718` | Sessions 2–15: all fixes including Q2+Q4 + Fairbanks House museum category fix |
 | `generate_tour_text_service.py` | `development-tour-generator-1:5000` | unchanged | Flask wrapper |
 | `tour_orchestrator_service.py` | `development-tour-orchestrator-1:5002` | `ad3b5be` | Session 5 guards |
 | `tour_generation_modernized.py` | `tour-generation-modernized-1:5021` | `ed1acad` | A#55 map buttons + A#56 tour-type icons v1.2.5.183 |
@@ -147,6 +162,7 @@ All changes landed on `Tours_Step_Maps`. Final review doc: `claude_review_final_
 | 11 | `tour_generation_modernized.py` | `ed1acad` | `[:500]` slice for Tour-Category regex |
 | Q2 | `generate_tour_text.py` | `e4ebcf1` | Word-set subset check in `_address_matches_location` (prevents Lynn/Lynnfield false-keeps); state+zip token filter (`ma 01901` pattern) |
 | Q4 | `generate_tour_text.py` | `e4ebcf1` | `except ValueError` before `except Exception` — PHASE 3C zero-stop always returns None, never falls to Location-N placeholder fallback |
+| S15 | `generate_tour_text.py` | `1e9a718` | venue_name from PHASE 1 forces `tour_category='museum'`; removed unconditional `_classify_tour_category()` call at PHASE 2 that overwrote it |
 
 **Issue AA (filed, not blocking)**: York, ME vs New York, NY — `'york'` is a whole word in both; word-set check cannot distinguish without state context. Rare in practice. Fix in next pass.
 
@@ -345,7 +361,11 @@ git push origin Tours_Step_Maps
 
 ## 🎯 NEXT STEPS (in order)
 
-1. **Mobile test — A#56 tour-type icons**: Regenerate a walking tour and a restaurant tour.
+0. **⚡ FIRST: Generate `claude_review_session15.md`** — Claude.AI review doc for session 15 changes before merge. See NEXT ACTION ON RECOVERY above.
+
+1. **Mobile test — Fairbanks House fix (S15)**: Regenerate `"Fairbanks House Tour in Dedham, ma"`. Confirm: tour_category=museum, single-venue constraint applied, stops are rooms/exhibits inside Fairbanks House (not separate buildings around Dedham).
+
+2. **Mobile test — A#56 tour-type icons**: Regenerate a walking tour and a restaurant tour.
    Confirm 🚶 appears on walking, 🍴 on restaurant, 🏛️ on museum. Both EN and translated versions.
 
 2. **ISSUE-059 double map button**: iOS/Android Amazon-Q must remove runtime injection
@@ -415,6 +435,7 @@ Manually generated tours that cover known edge cases. Re-run after any change to
 | Boston neighborhood alias | walking tour in Boston, MA | 3 | East Boston / Jamaica Plain addresses pass PHASE 3C |
 | Lynn vs Lynnfield (Q2) | Lynnfield, MA | 3 | No stops with Lynn, MA addresses slip through |
 | Zero-stop guard (Q4) | Nonsense location far from any city | 3 | Job status=error, not completed with Location N stops |
+| Historic house museum (S15) | Fairbanks House Tour in Dedham, ma | 4 | tour_category=museum; single-venue constraint; stops inside Fairbanks House only |
 
 ---
 
@@ -437,3 +458,4 @@ Manually generated tours that cover known edge cases. Re-run after any change to
 | 14 (Session 14 bugs) | Bug 1: \A anchor broke icon regex on line 2 — fixed to ^+MULTILINE+[:200] (d5da0f4 v1.2.5.182). Bug 2: out-of-area stop — PHASE 3C address guard added (470b88a). Bug 3: missing map pin — coords fallback extended to all stops (470b88a). Claude review: `claude_review_session14_three_bugs.md` |
 | 14 review | Claude review applied (ed1acad v1.2.5.183): PHASE 3C neighborhood alias map + all-tokens-scan; moved before Part C; zero-stop guard; cluster coord detection; [:500] slice |
 | 14 final review | Claude final review (e4ebcf1): Q2 word-set subset check + state+zip token filter (Lynn/Lynnfield false-keeps fixed); Q4 `except ValueError` before `except Exception` (PHASE 3C zero-stop never falls to Location-N fallback). Issue AA filed (York,ME vs New York,NY — not blocking). Branch ready for merge. |
+| 15 | Fairbanks House bug (1e9a718): `_classify_tour_category()` keyword list cannot detect historic houses/estates with no "museum" keyword. Fix: when PHASE 1 returns `venue_name`, force `tour_category='museum'` — GPT intent analysis is authoritative over keyword classifier. Removed dead `tour_category='intelligent'` assignment. Claude code-improvements review triaged: trivial fixes queued for next session; architectural items in REMINDER_LIST_BEFORE_PRODUCTION.md. |
