@@ -38,7 +38,8 @@ _NEIGHBORHOOD_TO_CITY = {
 # silently flipping the category and injecting a single-venue museum constraint.
 # Word-boundary anchored to avoid false positives ("touring" vs "tour").
 _EXPLICIT_NON_MUSEUM_TOUR_RE = re.compile(
-    r'\b(walking|restaurant|food|dining|culinary|self[- ]guided|architecture|architectural)'
+    r'\b(walking|restaurant|food|dining|culinary|self[- ]guided|architecture|architectural'
+    r'|pub\s+crawl|bike|cycling|biking|shopping)'
     r'\s+tour\b',
     re.IGNORECASE,
 )
