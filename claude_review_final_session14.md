@@ -12,6 +12,7 @@
 | `158d505` | Bug C: `_fetch_coords` scope fix |
 | `7a4a969` | Issue X: `len>=4` token filter; Issue Y: Part C address check + hoist `_address_matches_location` |
 | `1e0c326` | Bug Z: `forbidden_norms` init moved before PHASE 3C |
+| `e4ebcf1` | Q2: word-set subset check + state+zip token filter; Q4: `except ValueError` before `except Exception` |
 
 **Files changed:**
 - `generate_tour_text.py` → container `development-tour-generator-1:5000`
@@ -46,13 +47,14 @@ PHASE 6   → assemble Stop 1..N, write Tour-Category header
 
 ## Change 1 — `_address_matches_location` at module level with full token filtering
 
-**File:** `generate_tour_text.py` (lines 20–57)
-**Commits:** `ed1acad` (initial), `7a4a969` (len>=4 filter + hoist to module level)
+**File:** `generate_tour_text.py` (lines 20–65)
+**Commits:** `ed1acad` (initial), `7a4a969` (len>=4 filter + hoist to module level), `e4ebcf1` (word-set subset check + state+zip token filter)
 
 **History of this function:**
 - Original: extracted only `parts[-2]` as city — failed for Boston neighborhoods (USPS uses neighborhood name as city) and international addresses (postcode in city slot)
 - `ed1acad`: replaced with all-tokens-scan + `_NEIGHBORHOOD_TO_CITY` alias map + postcode stripping
 - `7a4a969`: added `len(p) >= 4` filter (state codes `ma`, `ny` and country codes `uk`, `us` were matching too broadly); hoisted from inside PHASE 3C `if` block to module level so Part C can also call it
+- `e4ebcf1` (Q2 fix): replaced `effective in loc_lower` substring check with word-set subset check (`effective_words.issubset(loc_words)`) — prevents `'lynn'` matching `'lynnfield'`, `'new york'` matching `'york'` (reverse direction); added state+zip combined token filter (`'ma 01901'` pattern was slipping through and `'ma'` was matching as a whole word in location strings)
 
 **Current code (deployed):**
 ```python
@@ -79,32 +81,37 @@ def _address_matches_location(address, loc):
     if len(parts) < 2:
         return True
     loc_lower = loc.lower()
+    loc_words = set(re.findall(r'[a-z]+', loc_lower))
     # Strip postcode-looking tokens, UK-style postcodes, and short tokens (<=3 chars)
     # that are state/country codes (MA, UK, US) — they match too broadly.
     text_parts = [
         p for p in parts
         if len(p) >= 4
-        and not re.match(r'^\d{4,6}(\s*[a-z]{0,4})?$', p)
-        and not re.match(r'^[a-z]{1,2}\d{1,2}[a-z]?\s*\d[a-z]{2}$', p)
+        and not re.match(r'^\d{4,6}(\s*[a-z]{0,4})?$', p)          # pure zip: '02458', '02458-1234'
+        and not re.match(r'^[a-z]{1,2}\d{1,2}[a-z]?\s*\d[a-z]{2}$', p)  # UK postcode
+        and not re.match(r'^[a-z]{2}\s+\d{4,6}', p)                 # state+zip: 'ma 01901'
     ]
     for token in text_parts:
         effective = _NEIGHBORHOOD_TO_CITY.get(token, token)
-        if effective in loc_lower:
+        # Word-set subset check: all words in effective must appear as whole words in loc.
+        # Prevents 'lynn' matching 'lynnfield', 'york' matching 'new york' (reverse).
+        effective_words = set(re.findall(r'[a-z]+', effective))
+        if effective_words and effective_words.issubset(loc_words):
             return True
     return False
 ```
 
-**Known limitation:** Alias map is a fixed list. Expand if new false-rejections are found.
+**Known limitation (Issue AA):** `York, ME` vs `New York, NY` — `'york'` is a whole word in both location strings; the word-set check cannot distinguish them without state context. Rare in practice. Filed for next pass.
 
 ---
 
 ## Change 2 — `forbidden_norms` initialized before PHASE 3C
 
-**File:** `generate_tour_text.py` (lines 780–786)
+**File:** `generate_tour_text.py` (lines 780–807)
 **Commits:** `ed1acad` (PHASE 3C moved before Part C), `1e0c326` (Bug Z: init moved before PHASE 3C)
 
 **History:** When `ed1acad` moved PHASE 3C before Part C, the `forbidden_norms = set()` initialization stayed inside Part C. This caused two failures:
-1. **NameError** — PHASE 3C's `.add()` at line 796 fired before `forbidden_norms` was defined at line 801
+1. **NameError** — PHASE 3C's `.add()` fired before `forbidden_norms` was defined
 2. **Silent wipe** — even if NameError were avoided, Part C's `forbidden_norms = set()` would discard all PHASE 3C rejects, allowing Part C to re-fetch the same out-of-area names
 
 **Current code (deployed):**
@@ -143,7 +150,7 @@ attempts = 0
 
 ## Change 3 — Part C replacements run through PHASE 3C address check
 
-**File:** `generate_tour_text.py` (lines 877–881)
+**File:** `generate_tour_text.py` (lines 877–884)
 **Commit:** `7a4a969`
 
 **Problem:** Part C fetched replacement stops and only ran them through PHASE 4 type verification. GPT could return different out-of-area stops (not on the forbidden list by name) and they would be accepted.
@@ -163,7 +170,7 @@ poi_list.extend(survived)
 
 ## Change 4 — `_fetch_coords` defined before `if missing_coords:` block
 
-**File:** `generate_tour_text.py` (lines 1028–1047)
+**File:** `generate_tour_text.py` (lines 1028–1053)
 **Commit:** `158d505`
 
 **Problem:** `_fetch_coords` was defined inside `if missing_coords:`. The cluster detection block below it references `_fetch_coords` unconditionally. When PHASE 3B returns complete coordinates, `missing_coords` is empty → `_fetch_coords` never defined → cluster detection crashes with `NameError`.
@@ -249,13 +256,85 @@ category_match = re.search(r'^Tour-Category:\s*(\w+)', tour_content[:500], re.IG
 
 ---
 
+## Change 8 — Word-set subset check in `_address_matches_location` (Q2 fix)
+
+**File:** `generate_tour_text.py` (lines 48–65)
+**Commit:** `e4ebcf1`
+
+**Problem (identified by Claude in previous review):** The original `effective in loc_lower` substring check caused false-keeps in two confirmed cases:
+- `'1 Main St, Lynn, MA 01901'` matched `'walking tour in Lynnfield, MA'` — `'lynn'` is a substring of `'lynnfield'`
+- `'1 Plaza, York, ME 03909'` matched `'walking tour in New York, NY'` — `'york'` is a substring of `'new york'`
+
+Root cause of the `'ma 01901'` bypass: the token `'ma 01901'` (state + space + zip) passed the existing postcode regex (which only matched pure digits), and `{'ma'}` was a whole word in the location string.
+
+**Two sub-fixes applied:**
+1. Added state+zip combined token filter: `not re.match(r'^[a-z]{2}\s+\d{4,6}', p)` strips `'ma 01901'`, `'ny 10001'`, etc.
+2. Replaced `effective in loc_lower` with word-set subset check: `effective_words.issubset(loc_words)` where `loc_words = set(re.findall(r'[a-z]+', loc_lower))` — requires all words of `effective` to appear as whole words in the location string.
+
+**Test results (all passing):**
+
+| Address | Location | Expected | Result |
+|---------|----------|----------|--------|
+| `1 Main St, Lynn, MA 01901` | `walking tour in Lynnfield, MA` | REJECT | ✅ REJECT |
+| `1 Main St, Lynnfield, MA` | `walking tour in Lynn, MA` | REJECT | ✅ REJECT |
+| `1 Way, New York, NY 10001` | `walking tour in York, ME` | REJECT | ✅ REJECT |
+| `1 Main St, Newton, MA 02458` | `walking tour in Newton, MA` | KEEP | ✅ KEEP |
+| `1 Way, Brooklyn, NY 11201` | `walking tour in New York, NY` | KEEP | ✅ KEEP |
+| `527 Washington St, Newton, MA 02458` | `museum tour in Newton, MA` | KEEP | ✅ KEEP |
+
+**Known limitation (Issue AA — not blocking):** `'1 Plaza, York, ME 03909'` vs `'walking tour in New York, NY'` — `'york'` is a whole word in both location strings. The word-set check cannot distinguish `York, ME` from `New York, NY` without state context. Rare in practice. Filed for next pass.
+
+---
+
+## Change 9 — `except ValueError` before `except Exception` (Q4 fix)
+
+**File:** `generate_tour_text.py` (lines 1138–1165)
+**Commit:** `e4ebcf1`
+
+**Problem (identified by Claude in previous review):** The `raise ValueError` zero-stop guard in PHASE 3C was caught by the outer `except Exception` block. That block has a last-resort fallback that synthesizes `total_stops` placeholder POIs named `"Location 1"`, `"Location 2"`, … when `intent is None`. This created a silent-failure path:
+
+1. `analyze_tour_intent()` fails (network error, rate limit) → `intent = None`
+2. PHASE 3A returns hallucinated out-of-area stops
+3. PHASE 3C rejects all of them → `raise ValueError`
+4. `except Exception` catches it → `if intent:` is False → falls through to placeholder fallback
+5. Tour marked `completed` with `"Location 1"` stops — the exact silent-failure shape Bug B aimed to eliminate
+
+**Fix:** Added `except ValueError as e:` before `except Exception`. The `ValueError` from PHASE 3C always returns `None` regardless of intent state. The last-resort fallback is preserved for genuine unknown exceptions when intent is also unavailable.
+
+**Current code (deployed):**
+```python
+    except ValueError as e:
+        # Explicit zero-stop signal from PHASE 3C — always surface as error regardless of intent.
+        # Must be caught BEFORE the generic Exception handler to prevent the last-resort
+        # fallback from producing a 'completed' tour full of 'Location N' placeholders.
+        print(f"X PHASE 3C rejected all stops: {e}")
+        return None, None, (None, None)
+    except Exception as e:
+        print(f"Error in PHASE 3A/3B pipeline: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        if intent:
+            poi_type = intent.get('poi_type', 'locations')
+            print(f"X Unable to generate tour: Insufficient data available for {poi_type} in {location}.")
+            return None, None, (None, None)
+        # Last-resort fallback (no intent): keep behaviour for robustness
+        for i in range(total_stops):
+            poi_list.append({
+                "stop_number": i + 1,
+                "name": f"Location {i + 1}",
+                ...
+            })
+```
+
+---
+
 ## Test Results
 
 | Tour | Result | Notes |
 |------|--------|-------|
 | Newton Corner walking, 4 stops | ✅ Tour ID 282 | 🚶 icon correct; button color fix pending mobile re-test |
 | Dedham Museum and Archive, 3 stops | ✅ Tour ID 284 | Cluster detection triggered + refetched; PHASE 5.5b validated stops inside venue |
-| Arlington walking, 4 stops | ✅ Tour ID 287 | PHASE 3C rejected Sudbury stop; Part C replaced it; `forbidden_norms` flowed correctly |
+| Arlington walking, 4 stops | ✅ Tour ID 287 | PHASE 3C rejected Sudbury stop; Part C replaced it; `forbidden_norms` flowed correctly (Bug Z regression) |
 
 ---
 
@@ -275,15 +354,21 @@ category_match = re.search(r'^Tour-Category:\s*(\w+)', tour_content[:500], re.IG
 | 9 | `generate_tour_text_service.py` | `445a6f3` | `if tour_text is None:` guard in service wrapper | `None` return silently produced empty ZIP marked `completed` |
 | 10 | `tour_generation_modernized.py` | `445a6f3` | Map button background `#2c3e50` → `#3d7ebf` | Dark navy made emoji icons invisible on iPhone |
 | 11 | `tour_generation_modernized.py` | `ed1acad` | `[:500]` slice for Tour-Category regex | `[:200]` too short for long tour titles |
+| Q2 | `generate_tour_text.py` | `e4ebcf1` | Word-set subset check + state+zip token filter in `_address_matches_location` | Substring check caused Lynn/Lynnfield false-keeps; `'ma 01901'` token bypassed state-code filter |
+| Q4 | `generate_tour_text.py` | `e4ebcf1` | `except ValueError` before `except Exception` | PHASE 3C zero-stop `ValueError` was swallowed by last-resort fallback when `intent is None` |
+
+---
+
+## Issue AA (filed, not blocking merge)
+
+`York, ME` vs `New York, NY` — `'york'` is a whole word in both location strings. The word-set subset check cannot distinguish them without state context (state abbreviation `'me'` is 2 chars, filtered out by `len(p) >= 4`). Failure mode: a stop in York, ME would pass the guard for a New York, NY tour. Rare in practice. Fix in next pass: add a `_KNOWN_SHORT_CITIES` whitelist or include state token in comparison when available.
 
 ---
 
 ## Questions for Claude
 
-1. Is the `len(p) >= 4` filter in `_address_matches_location` the right threshold? Are there any real city names under 4 characters that appear in US/UK tour requests that we should be aware of?
+1. **Q2 word-set check — multi-word neighborhood aliases:** The alias map maps multi-word keys like `'east boston'` to `'boston'`. After aliasing, `effective = 'boston'` and `effective_words = {'boston'}`. This correctly checks that `'boston'` appears as a whole word in the location. But the key lookup uses the full comma-separated token (e.g. `'east boston'`) — does this work correctly when the address has `'East Boston, MA 02128'` split by comma into `['east boston', 'ma 02128']`? Or could a multi-word neighborhood span two comma-separated parts and be missed?
 
-2. The `_address_matches_location` function uses substring matching (`effective in loc_lower`) rather than exact token matching. Could a city name that is a substring of another city name cause false-keeps? For example, would a stop in `"Lynn, MA"` pass a guard for `"Newton, MA"` because `"lynn"` is not in `"newton, ma"`? Or is there a case where it could go wrong?
+2. **Q4 — any other `ValueError` sources in the pipeline?** The new `except ValueError` handler catches ALL `ValueError`s raised inside the outer `try` block, not just the PHASE 3C zero-stop signal. Are there other places in the pipeline (PHASE 3B JSON parsing, coordinate extraction, etc.) that could raise `ValueError` and would now be incorrectly treated as a PHASE 3C rejection rather than falling through to the last-resort fallback?
 
-3. The cluster detection threshold is `top_count >= max(2, len(poi_list) // 2)`. For a 2-stop tour where both stops share the same coordinate, this triggers (2 >= max(2, 1) = 2). Is that the right behavior — should a 2-stop tour with matching coords always refetch both?
-
-4. The `raise ValueError` zero-stop guard is caught by the outer `except Exception` block. That block has a "last-resort fallback" that synthesizes placeholder POIs when `intent` is None. Is there a scenario where the zero-stop guard fires but `intent` is also None, causing the fallback to produce placeholder stops instead of surfacing an error?
+3. **Issue AA — is the `_KNOWN_SHORT_CITIES` whitelist approach the right fix?** The proposed fix is a set of known short city names (e.g. `{'rye', 'ely', 'ada'}`) that bypass the `len(p) >= 4` filter. Alternatively, we could include the state token in the comparison when it appears as a standalone comma-separated part (e.g. `'me'` from `'York, ME, 03909'`). Which approach is cleaner and less likely to introduce new edge cases?
