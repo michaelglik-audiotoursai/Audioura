@@ -32,6 +32,17 @@ _NEIGHBORHOOD_TO_CITY = {
     'newton highlands': 'newton', 'newtonville': 'newton',
 }
 
+# S15 safety net: if the location string explicitly names a non-museum tour type,
+# do NOT force museum category on the strength of venue_name alone.
+# Prevents GPT-hallucinated venue_names on walking/restaurant requests from
+# silently flipping the category and injecting a single-venue museum constraint.
+# Word-boundary anchored to avoid false positives ("touring" vs "tour").
+_EXPLICIT_NON_MUSEUM_TOUR_RE = re.compile(
+    r'\b(walking|restaurant|food|dining|culinary|self[- ]guided|architecture|architectural)'
+    r'\s+tour\b',
+    re.IGNORECASE,
+)
+
 def _address_matches_location(address, loc):
     """Return True if any address token (after postcode stripping, short-token filtering,
     and neighborhood aliasing) appears in the location string, or if we cannot determine
@@ -98,6 +109,10 @@ Examples:
 - "Restaurant tour in Newton Center" → poi_type: "restaurants", theme_type: "STANDARD", venue_name: null
 - "Cambridge museums tour" → poi_type: "museums", theme_type: "STANDARD", venue_name: null
 - "Boston Museum of Science and surroundings" → poi_type: "science exhibits", theme_type: "STANDARD", venue_name: null
+- "Walking tour starting at Faneuil Hall, Boston" → poi_type: "landmarks", theme_type: "STANDARD", venue_name: null
+- "Restaurant tour near the Prudential Center, Boston" → poi_type: "restaurants", theme_type: "STANDARD", venue_name: null
+- "Architecture tour around the Lyman Estate" → poi_type: "buildings", theme_type: "STANDARD", venue_name: null
+- "Self-guided tour of Beacon Hill" → poi_type: "landmarks", theme_type: "STANDARD", venue_name: null
 """
 
     headers = {
@@ -496,10 +511,18 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
         elif raw_venue:
             print(f"  [venue_name sanity] '{raw_venue}' OK")
         
-        # If PHASE 1 identified a specific venue, this is definitively a single-venue
-        # museum tour — override the keyword classifier which cannot know every historic
-        # house, mansion, or named building (e.g. "Fairbanks House", "Lyman Estate").
-        tour_category = 'museum' if intent.get('venue_name') else _classify_tour_category(location, tour_type)
+        # If PHASE 1 identified a specific venue AND the location string does not
+        # explicitly request a non-museum tour type, force museum category.
+        # Safety net (_EXPLICIT_NON_MUSEUM_TOUR_RE) prevents GPT-hallucinated venue_names
+        # on "walking tour starting at X" / "restaurant tour near X" requests from
+        # silently flipping the category. See S15 Claude review §3.
+        if intent.get('venue_name') and not _EXPLICIT_NON_MUSEUM_TOUR_RE.search(location):
+            tour_category = 'museum'
+            print(f"  [S15] Forced tour_category=museum from venue_name='{intent['venue_name']}'")
+        else:
+            if intent.get('venue_name'):
+                print(f"  [S15] venue_name='{intent['venue_name']}' overridden — location contains explicit non-museum phrase")
+            tour_category = _classify_tour_category(location, tour_type)
     else:
         print("⚠️ Intent analysis failed, using fallback detection")
         intent = None
