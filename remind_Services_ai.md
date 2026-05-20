@@ -15,7 +15,7 @@
 - **GIT RULE**: Do NOT commit until user confirms mobile testing passed
 - **BRANCH**: `Tours_Step_Maps` (branched from `Newsletters` at `ad3b5be`)
 - **MERGE TARGET**: `Newsletters` (when A#55+A#56 complete and tested)
-- **LAST GIT COMMIT**: `2e5eff1` — "S15 safety net: _EXPLICIT_NON_MUSEUM_TOUR_RE guard + [S15] log lines + 4 negative PHASE 1 prompt examples (Claude session 15 review)"
+- **LAST GIT COMMIT**: `2e8347e` — "S15c: expand _EXPLICIT_NON_MUSEUM_TOUR_RE with pub crawl, bike, cycling, biking, shopping (Claude Q1 recommendation)"
 - **NEXT ACTION ON RECOVERY**: Mobile test — regenerate `"Fairbanks House Tour in Dedham, ma"` and confirm tour_category=museum, stops inside Fairbanks House only
 - **PREVIOUS REVIEW DOC**: `claude_review_final_session14.md` — session 14 changes (already reviewed by Claude)
 - **PRE-PRODUCTION CHECKLIST**: `REMINDER_LIST_BEFORE_PRODUCTION.md` — must-complete items before paying customers
@@ -164,6 +164,7 @@ All changes landed on `Tours_Step_Maps`. Final review doc: `claude_review_final_
 | Q4 | `generate_tour_text.py` | `e4ebcf1` | `except ValueError` before `except Exception` — PHASE 3C zero-stop always returns None, never falls to Location-N placeholder fallback |
 | S15 | `generate_tour_text.py` | `1e9a718` | venue_name from PHASE 1 forces `tour_category='museum'`; removed unconditional `_classify_tour_category()` call at PHASE 2 that overwrote it |
 | S15b | `generate_tour_text.py` | `2e5eff1` | Claude review: `_EXPLICIT_NON_MUSEUM_TOUR_RE` safety net (prevents walking/restaurant requests with GPT-hallucinated venue_name from being misclassified as museum); `[S15]` log lines for both branches; 4 negative examples added to PHASE 1 prompt |
+| S15c | `generate_tour_text.py` | `2e8347e` | Claude final review Q1: expanded `_EXPLICIT_NON_MUSEUM_TOUR_RE` with `pub crawl`, `bike`, `cycling`, `biking`, `shopping`; 11/11 functional tests pass |
 
 **Issue AA (filed, not blocking)**: York, ME vs New York, NY — `'york'` is a whole word in both; word-set check cannot distinguish without state context. Rare in practice. Fix in next pass.
 
