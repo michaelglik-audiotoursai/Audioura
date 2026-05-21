@@ -136,7 +136,7 @@ Examples:
 - "Architecture tour around the Lyman Estate" → poi_type: "buildings", theme_type: "STANDARD", venue_name: null
 - "Self-guided tour of Beacon Hill" → poi_type: "landmarks", theme_type: "STANDARD", venue_name: null
 - "walking tour over Beacon St in Brookline, ma" → geographic_scope: "Beacon St, Brookline", scope_precision: "CORRIDOR"
-- "Fairbanks House Tour in Dedham, ma" → geographic_scope: "Fairbanks House", scope_precision: "BUILDING"
+- "Fairbanks House Tour in Dedham, ma" → venue_name: "Fairbanks House", geographic_scope: "Fairbanks House", scope_precision: "BUILDING"
 - "tour of the old mill district in Lowell" → geographic_scope: "the old mill district, Lowell", scope_precision: "DISTRICT"
 - "walking tour around the harbor in Gloucester" → geographic_scope: "the harbor waterfront, Gloucester", scope_precision: "DISTRICT"
 - "walking tour in Newton, MA" → geographic_scope: "Newton, MA", scope_precision: "CITY"
@@ -1093,12 +1093,6 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
                 return current_poi_list
 
         print(f"\nPHASE 3B: Requesting structured details and walking directions for {len(poi_list)} stop(s)...")
-        survivors_lines = [
-            f'- {p["name"]}' + (f' (Address: {p["address"]})' if p.get('address') else '')
-            for p in poi_list
-        ]
-        survivors_block = "\n".join(survivors_lines)
-
         api_call_logger.log("PHASE_3B_REQUEST", {
             "location": location,
             "stop_count": len(poi_list),
@@ -1188,7 +1182,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
             if len(pts_valid) >= 3:
                 legs = [_haversine_km(pts_valid[i][1], pts_valid[i+1][1]) for i in range(len(pts_valid) - 1)]
                 total_route_km = sum(legs)
-                medoid = min(pts_valid, key=lambda pc: sum(_haversine_km(pc[1], o[1]) for _, o in pts_valid))[1]
+                medoid = min(pts_valid, key=lambda pc: sum(_haversine_km(pc[1], o) for _, o in pts_valid))[1]
                 outliers = []
                 for i, leg in enumerate(legs):
                     if leg > WALKING_LEG_HARD_KM:
@@ -1200,7 +1194,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
                 # Dedupe (a stop can be flagged by two adjacent legs)
                 seen_ids = set()
                 outliers = [o for o in outliers if id(o) not in seen_ids and not seen_ids.add(id(o))]
-                if outliers and len(outliers) < len(poi_list):
+                if outliers and (len(poi_list) - len(outliers)) >= 2:
                     for p in outliers:
                         print(f"   GEO-CHECK: REMOVED '{p['name']}' — exceeds walking-tour distance limit")
                         forbidden_norms.add(_normalize_name(p['name']))
@@ -1280,8 +1274,6 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
                     if len(poi_list) > 1:
                         print(f"\nPHASE 3B (re-order after GEO-CHECK): {len(poi_list)} stop(s)...")
                         poi_list = _run_phase_3b(poi_list)
-                        for i_r, p_r in enumerate(poi_list):
-                            p_r['stop_number'] = i_r + 1
 
                 elif outliers:
                     print(f"   GEO-CHECK: all stops flagged — keeping original list (advisory only)")
