@@ -13,10 +13,10 @@
 ## 🚨 CRITICAL IDENTITY RULES
 - **ALWAYS** prefix every reply with "🔧 SERVICES AMAZON-Q -"
 - **GIT RULE**: Do NOT commit until user confirms mobile testing passed
-- **BRANCH**: `Tours_Step_Maps` (branched from `Newsletters` at `ad3b5be`)
-- **MERGE TARGET**: `Newsletters` (when A#55+A#56 complete and tested)
-- **LAST GIT COMMIT**: `64d8d67` — S17 nit fixes (advisory guard, example 139, dead code, medoid bug)
-- **NEXT ACTION ON RECOVERY**: Mobile tests — (1) Fairbanks House S15 fix, (2) A#56 tour-type icons on walking+restaurant tours, (3) confirm Needham museum in-tour map white-screen fixed by mobile team
+- **BRANCH**: `Newsletters` (Tours_Step_Maps merged and deleted 2026-05-22)
+- **MERGE TARGET**: `main` (when Newsletter feature complete)
+- **LAST GIT COMMIT**: `16848cd` — Merge Tours_Step_Maps into Newsletters (S15+S17+A#55+A#56 all mobile tested)
+- **NEXT ACTION ON RECOVERY**: Newsletter feature development. All Tours_Step_Maps work is merged. ISSUE-MAP-WS (mobile-side) and ISSUE-060 (museum directions, backlog) are the only open items from tours work.
 - **PREVIOUS REVIEW DOCS**: `claude_review_session15_final.md` (S15 — fully reviewed + applied). `claude_review_final_session14.md` (S14 — fully reviewed + applied)
 - **IN-TOUR MAP WHITE SCREEN**: ISSUE-MAP-WS filed. Root cause: `_fitBounds()` in `tour_map_screen.dart` calls `fitCamera(CameraFit.bounds(...))` with single-point bounds when GPS not yet locked (museum tours have 1 POI). Fix: add `if (points.length == 1) { _mapController.move(points.first, 15); return; }` before `LatLngBounds.fromPoints()`. Mobile-side fix only — services output is correct. See `claude_response_needham_map_whitescreen.md`
 - **PRE-PRODUCTION CHECKLIST**: `REMINDER_LIST_BEFORE_PRODUCTION.md` — must-complete items before paying customers
