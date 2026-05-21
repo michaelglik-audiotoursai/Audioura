@@ -2,7 +2,7 @@
 ## Who you are
 🔧 **SERVICES AMAZON-Q** — **CRITICAL**: Always start ALL replies with "🔧 SERVICES AMAZON-Q -"
 
-**UPDATED**: 2026-05-22 (Session 17 complete. A#60 mobile tests run. S17 fully implemented and Claude-approved. PHASE 3D removed. Fix A: geographic_scope+scope_precision in PHASE 1; scope constraint in PHASE 3A for CORRIDOR/DISTRICT. Fix B: compactness constraint in PHASE 3A (walking); sequential-closeness in PHASE 3B; _run_phase_3b() reusable; haversine GEO-CHECK advisory block. Claude nit fixes applied (advisory guard, example 139 venue_name, dead code, medoid o[1] bug). Tests passed: Beacon St CORRIDOR scope injected, GEO-CHECK all 5 stops within 0.07km max leg; Newton Center CITY no scope constraint, no false removals. Last commit: 64d8d67.)
+**UPDATED**: 2026-05-22 (REQ-PROMOTE implemented. Custom tour promote endpoint added to tour_editing_phase2.py. Smoke tests passed. Claude review doc written. Awaiting Claude review before git commit.) S17 fully implemented and Claude-approved. PHASE 3D removed. Fix A: geographic_scope+scope_precision in PHASE 1; scope constraint in PHASE 3A for CORRIDOR/DISTRICT. Fix B: compactness constraint in PHASE 3A (walking); sequential-closeness in PHASE 3B; _run_phase_3b() reusable; haversine GEO-CHECK advisory block. Claude nit fixes applied (advisory guard, example 139 venue_name, dead code, medoid o[1] bug). Tests passed: Beacon St CORRIDOR scope injected, GEO-CHECK all 5 stops within 0.07km max leg; Newton Center CITY no scope constraint, no false removals. Last commit: 64d8d67.)
 
 1. You are Services Amazon-Q responsible for all Docker services in `C:\Users\micha\eclipse-workspace\AudioTours\development\`. You have blanket approval to change code, run Python programs, start/stop Docker services without waiting for approval.
 2. You maintain this file and update it after significant changes.
@@ -15,8 +15,8 @@
 - **GIT RULE**: Do NOT commit until user confirms mobile testing passed
 - **BRANCH**: `Newsletters` (Tours_Step_Maps merged and deleted 2026-05-22)
 - **MERGE TARGET**: `main` (when Newsletter feature complete)
-- **LAST GIT COMMIT**: `16848cd` — Merge Tours_Step_Maps into Newsletters (S15+S17+A#55+A#56 all mobile tested)
-- **NEXT ACTION ON RECOVERY**: Newsletter feature development. All Tours_Step_Maps work is merged. ISSUE-MAP-WS (mobile-side) and ISSUE-060 (museum directions, backlog) are the only open items from tours work.
+- **LAST GIT COMMIT**: `d186033` — ISSUE-061 map_delivery is_translation fix
+- **NEXT ACTION ON RECOVERY**: REQ-PROMOTE — await Claude review of `claude_review_promote_endpoint.md`, apply nits, then git commit `tour_editing_phase2.py`. After that: Newsletter feature development.
 - **PREVIOUS REVIEW DOCS**: `claude_review_session15_final.md` (S15 — fully reviewed + applied). `claude_review_final_session14.md` (S14 — fully reviewed + applied)
 - **IN-TOUR MAP WHITE SCREEN**: ISSUE-MAP-WS filed. Root cause: `_fitBounds()` in `tour_map_screen.dart` calls `fitCamera(CameraFit.bounds(...))` with single-point bounds when GPS not yet locked (museum tours have 1 POI). Fix: add `if (points.length == 1) { _mapController.move(points.first, 15); return; }` before `LatLngBounds.fromPoints()`. Mobile-side fix only — services output is correct. See `claude_response_needham_map_whitescreen.md`
 - **PRE-PRODUCTION CHECKLIST**: `REMINDER_LIST_BEFORE_PRODUCTION.md` — must-complete items before paying customers
@@ -133,6 +133,8 @@ standalone maintenance session after Tours_Step_Maps is merged and mobile testin
 | File | Container | Commit | Notes |
 |------|-----------|--------|-------|
 | `generate_tour_text.py` | `development-tour-generator-1:5000` | `64d8d67` | Sessions 2–17 complete. S17: geographic_scope+scope_precision; scope+compactness constraints; _run_phase_3b(); GEO-CHECK haversine block |
+| `tour_editing_phase2.py` | `tour-editing-phase2-1:5022` | pending | REQ-PROMOTE: `/tour/<id>/promote` endpoint — promotes edited ZIP into audio_tours DB with name uniqueness check. Awaiting Claude review. |
+| `map_delivery/app.py` | `development-map-delivery-1:5005` | `d186033` | ISSUE-061: is_translation+parent_tour_id added to tour-info+search-tours; tours-near already excludes translations |
 | `tour_settings.py` | `development-tour-generator-1:5000` | `8a3b317` | WALKING_LEG_TARGET/HARD_KM, WALKING_TOTAL_HARD_KM, SPECIALIZED_LEG_HARD_KM, MAX_REPLACEMENT_ATTEMPTS |
 | `generate_tour_text_service.py` | `development-tour-generator-1:5000` | unchanged | Flask wrapper |
 | `tour_orchestrator_service.py` | `development-tour-orchestrator-1:5002` | `ad3b5be` | Session 5 guards |
@@ -377,11 +379,39 @@ git push origin Tours_Step_Maps
 
 ---
 
+## 🔧 REQ-PROMOTE: CUSTOM TOUR PROMOTE ENDPOINT
+
+**File**: `tour_editing_phase2.py` | **Container**: `tour-editing-phase2-1:5022` | **Status**: Deployed, awaiting Claude review
+
+**Problem solved**: `bulk-save` creates a ZIP on the container filesystem but never writes to `audio_tours` DB.
+Edited tours were invisible to all devices and untranslatable.
+
+**Endpoint**: `POST /tour/<tour_id>/promote`
+
+**Request**: `custom_name` (str, required, unique), `zip_base64` (str, required), `lat` (float), `lng` (float), `stops_count` (int), `tour_content` (str, optional)
+
+**Responses**:
+- `201` `{"status":"created","tour_id":<int>}` — new DB row, `creator_type='Custom'`, `original_tour_id=NULL`
+- `409` `{"status":"conflict","error_code":"NAME_EXISTS","existing_tour_id":<int>}` — name taken
+- `400` validation errors: `MISSING_NAME`, `NAME_TOO_LONG`, `MISSING_ZIP`, `MISSING_COORDS`, `INVALID_COORDS`, `INVALID_ZIP`
+
+**Uniqueness check**: `LOWER(tour_name) = LOWER(%s) AND original_tour_id IS NULL` — translations of same name are allowed
+
+**After promote**: mobile app uses returned `tour_id` with translation service and map delivery identically to any generated tour
+
+**Review doc**: `claude_review_promote_endpoint.md` — 5 questions for Claude
+
+**Smoke tests**: MISSING_NAME→400 ✅, unique name→201+id=303 ✅, duplicate→409+existing_id=303 ✅, DB row correct ✅, test row deleted ✅
+
+---
+
 ## 🎯 NEXT STEPS (in order)
 
 0. **⚡ FIRST on recovery**: Check NEXT ACTION ON RECOVERY in CRITICAL IDENTITY RULES above.
 
-1. **Mobile test — Fairbanks House fix (S15)**: Regenerate `"Fairbanks House Tour in Dedham, ma"`. Confirm: `[S15] Forced tour_category=museum` in container log; stops are rooms/exhibits inside Fairbanks House only; 🏛️ icon.
+1. **REQ-PROMOTE Claude review**: Send `claude_review_promote_endpoint.md` to Claude.AI. Apply any nits. Then git commit `tour_editing_phase2.py`.
+
+2. **Mobile test — Fairbanks House fix (S15)**: Regenerate `"Fairbanks House Tour in Dedham, ma"`. Confirm: `[S15] Forced tour_category=museum` in container log; stops are rooms/exhibits inside Fairbanks House only; 🏛️ icon.
 
 2. **Mobile test — A#56 tour-type icons**: Regenerate a walking tour and a restaurant tour. Confirm 🚶 on walking, 🍴 on restaurant, 🏛️ on museum. Both EN and translated versions.
 
