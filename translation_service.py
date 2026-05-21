@@ -1149,6 +1149,8 @@ Say 'What are my options' to hear this help again"""
                     if is_modernized_format:
                         # Modernized format: overwrite audio_1.mp3, audio_2.mp3 ... with translated Polly bytes
                         logging.info(f"Modernized ZIP format detected ({len(existing_mp3s)} mp3 files). Replacing with translated audio.")
+                        if len(audio_files) != len(existing_mp3s):
+                            logging.warning(f"Stop count mismatch: {len(audio_files)} translated stops vs {len(existing_mp3s)} original mp3s — some stops may keep English audio")
                         for i, translated_audio_bytes in enumerate(audio_files):
                             mp3_filename = f'audio_{i+1}.mp3'
                             mp3_path = os.path.join(extract_dir, mp3_filename)
@@ -1278,7 +1280,14 @@ Say 'What are my options' to hear this help again"""
             return original_zip_data  # Return original on error
     
     def _generate_translated_html(self, tour_name, translated_stops, audio_files, target_language):
-        """Generate HTML with embedded translated audio data"""
+        """Generate HTML with embedded translated audio data.
+
+        NOTE (2026-05-18): Dead code — no callers in the codebase as of commit 792487c.
+        The legacy fallback _translate_tour_from_zip() uses translate_zip_audio() instead.
+        Kept to keep the A#55 merge diff focused; slated for removal in a post-merge
+        cleanup commit. Map-button logic here is defensive — correct if ever called,
+        but currently unreachable.
+        """
         import base64
         
         html = f'''<!DOCTYPE html>
@@ -1295,9 +1304,20 @@ Say 'What are my options' to hear this help again"""
         .stop-content {{ margin: 15px 0; line-height: 1.6; }}
         audio {{ width: 100%; margin-top: 10px; }}
         .language-indicator {{ background: #3498db; color: white; padding: 5px 10px; border-radius: 15px; font-size: 12px; }}
+        .map-btn {{ background: #2c3e50; border: none; border-radius: 50%; width: 36px; height: 36px;
+                    font-size: 20px; line-height: 1;
+                    cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+                    margin-left: 8px; vertical-align: middle; }}
     </style>
 </head>
 <body>
+    <script>
+        function openMap(stopNum) {{
+            if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler) {{
+                window.flutter_inappwebview.callHandler('openMap', {{stop: stopNum}});
+            }}
+        }}
+    </script>
     <div class="tour-header">
         <h1>{tour_name}</h1>
         <span class="language-indicator">{target_language.upper()}</span>
@@ -1307,6 +1327,11 @@ Say 'What are my options' to hear this help again"""
             # Extract stop title from text content
             lines = stop_text.split('\n')
             stop_title = lines[0].strip() if lines else f"Stop {i+1}"
+            
+            # Map button — only if stop has coordinates
+            map_button = ''
+            if re.search(r'^Coordinates:\s*[-\d.]+\s*,\s*[-\d.]+', stop_text, re.IGNORECASE | re.MULTILINE):
+                map_button = f'<button class="map-btn" onclick="openMap({i+1})" title="View on map">🗺</button>'
             
             # Create audio data URL if audio is available
             audio_element = ""
@@ -1328,6 +1353,7 @@ Say 'What are my options' to hear this help again"""
             html += f'''
     <div class="audio-item">
         <h3 class="stop-title">{stop_title}</h3>
+        {map_button}
         <div class="stop-content">
             <p>{stop_text.replace(chr(10), '</p><p>')}</p>
         </div>{audio_element}

@@ -2,7 +2,7 @@
 Modernized Tour Generation Service - Separate MP3/TXT Files
 Implements REQ-001: Tour ZIP Structure Modernization
 """
-SERVICE_VERSION = "1.2.5.177"
+SERVICE_VERSION = "1.2.5.184"
 
 import os
 import re
@@ -70,6 +70,13 @@ def create_modernized_tour_zip(tour_data, job_id):
     
     return zip_filename
 
+_COORDINATES_RE = re.compile(r'^Coordinates:\s*[-\d.]+\s*,\s*[-\d.]+', re.IGNORECASE | re.MULTILINE)
+_CATEGORY_ICONS = {'walking': '🚶', 'restaurant': '🍴', 'museum': '🏛️', 'specialized': '🗺️'}
+
+def _stop_has_coordinates(stop_text):
+    """Return True if the stop text contains a Coordinates: line with valid lat,lng."""
+    return bool(_COORDINATES_RE.search(stop_text))
+
 def generate_html_with_external_audio(tour_data):
     """Generate HTML that references external MP3 files"""
     tour_name = tour_data.get('tour_name', 'Audio Tour')
@@ -85,19 +92,36 @@ def generate_html_with_external_audio(tour_data):
         body {{ font-family: Arial, sans-serif; margin: 20px; }}
         .audio-item {{ margin: 20px 0; padding: 15px; border: 1px solid #ccc; }}
         audio {{ width: 100%; }}
+        .map-btn {{ background: #3d7ebf; border: none; border-radius: 50%; width: 36px; height: 36px;
+                    font-size: 20px; line-height: 1;
+                    cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+                    margin-left: 8px; vertical-align: middle; }}
     </style>
 </head>
 <body>
-    <h1>{tour_name.replace('_', ' ').title()}</h1>'''
+    <h1>{tour_name.replace('_', ' ').title()}</h1>
+    <script>
+        function openMap(stopNum) {{
+            if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler) {{
+                window.flutter_inappwebview.callHandler('openMap', {{stop: stopNum}});
+            }}
+        }}
+    </script>'''
     
     for i, text in enumerate(stops, 1):
         # Extract stop title from text content
         lines = text.split('\n')
         stop_title = lines[0].strip() if lines else f"Stop {i}"
         
+        map_button = ''
+        if _stop_has_coordinates(text):
+            icon = _CATEGORY_ICONS.get(tour_data.get('tour_category', ''), '🗺️')
+            map_button = f'<button class="map-btn" onclick="openMap({i})" title="View on map">{icon}</button>'
+        
         html += f'''
     <div class="audio-item">
         <h3>{stop_title}: Audio {i}</h3>
+        {map_button}
         <audio id="audio-{i-1}" controls preload="metadata">
             <source src="audio_{i}.mp3" type="audio/mpeg">
             Your browser does not support the audio element.
@@ -335,7 +359,13 @@ def parse_tour_content_to_modernized(tour_content):
     # Extract tour name from content
     tour_name_match = re.search(r'Step-by-Step Audio Guided Tour: (.+?)\n', tour_content)
     tour_name = tour_name_match.group(1) if tour_name_match else "Audio Tour"
-    
+
+    # Extract tour category written by generate_tour_text.py (e.g. "Tour-Category: walking").
+    # Anchored to start-of-string and limited to first 200 chars so a stop description
+    # containing "Tour-Category:" mid-file can never produce a false positive.
+    category_match = re.search(r'^Tour-Category:\s*(\w+)', tour_content[:500], re.IGNORECASE | re.MULTILINE)
+    tour_category = category_match.group(1).lower() if category_match else ''
+
     # Split content by stops
     stops = re.split(r'\n\s*Stop\s+(\d+):', tour_content)
     
@@ -358,49 +388,11 @@ def parse_tour_content_to_modernized(tour_content):
     
     return {
         "tour_name": tour_name,
+        "tour_category": tour_category,
         "text_content": text_content,
         "audio_files": []  # Will be filled by TTS
     }
 
-def convert_old_tour_to_modernized(tour_content, location, tour_type):
-    """Convert old tour format to modernized structure"""
-    # Parse the actual tour content from the working tour
-    import re
-    
-    # Extract tour name from content
-    tour_name_match = re.search(r'Step-by-Step Audio Guided Tour: (.+?)\n', tour_content)
-    tour_name = tour_name_match.group(1) if tour_name_match else f"{location} - {tour_type} Tour"
-    
-    # Split content by stops
-    stops = re.split(r'\n\s*Stop\s+(\d+):', tour_content)
-    
-    text_content = []
-    audio_files = []
-    
-    if len(stops) > 1:
-        stops = stops[1:]  # Remove title part
-        
-        # Process stops in pairs (number, content)
-        for i in range(0, len(stops), 2):
-            if i + 1 < len(stops):
-                stop_num = stops[i].strip()
-                stop_content = stops[i+1].strip()
-                
-                # Extract the actual stop title and content
-                lines = stop_content.split('\n')
-                if lines:
-                    stop_title = lines[0].strip()
-                    full_content = stop_content
-                    
-                    text_content.append(full_content)
-                    # Create placeholder audio data (will be replaced by actual TTS)
-                    audio_files.append(base64.b64encode(f"Audio content for {stop_title}".encode()).decode())
-    
-    return {
-        "tour_name": tour_name,
-        "text_content": text_content,
-        "audio_files": audio_files
-    }
 
 def process_modernized_tour_async(job_id, tour_data):
     """Process tour with modernized structure"""
