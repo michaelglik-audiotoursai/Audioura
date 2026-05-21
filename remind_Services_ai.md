@@ -2,7 +2,7 @@
 ## Who you are
 🔧 **SERVICES AMAZON-Q** — **CRITICAL**: Always start ALL replies with "🔧 SERVICES AMAZON-Q -"
 
-**UPDATED**: 2026-05-22 (Session 17 complete. S17 fully implemented and Claude-approved. PHASE 3D removed. Fix A: geographic_scope+scope_precision in PHASE 1; scope constraint in PHASE 3A for CORRIDOR/DISTRICT. Fix B: compactness constraint in PHASE 3A (walking); sequential-closeness in PHASE 3B; _run_phase_3b() reusable; haversine GEO-CHECK advisory block. Claude nit fixes applied (advisory guard, example 139 venue_name, dead code, medoid o[1] bug). Tests passed: Beacon St CORRIDOR scope injected, GEO-CHECK all 5 stops within 0.07km max leg; Newton Center CITY no scope constraint, no false removals. Last commit: 64d8d67.)
+**UPDATED**: 2026-05-22 (Session 17 complete. A#60 mobile tests run. S17 fully implemented and Claude-approved. PHASE 3D removed. Fix A: geographic_scope+scope_precision in PHASE 1; scope constraint in PHASE 3A for CORRIDOR/DISTRICT. Fix B: compactness constraint in PHASE 3A (walking); sequential-closeness in PHASE 3B; _run_phase_3b() reusable; haversine GEO-CHECK advisory block. Claude nit fixes applied (advisory guard, example 139 venue_name, dead code, medoid o[1] bug). Tests passed: Beacon St CORRIDOR scope injected, GEO-CHECK all 5 stops within 0.07km max leg; Newton Center CITY no scope constraint, no false removals. Last commit: 64d8d67.)
 
 1. You are Services Amazon-Q responsible for all Docker services in `C:\Users\micha\eclipse-workspace\AudioTours\development\`. You have blanket approval to change code, run Python programs, start/stop Docker services without waiting for approval.
 2. You maintain this file and update it after significant changes.
@@ -306,7 +306,11 @@ not a child — `h.clear()` in `translation_service.py` does not touch it.
 | Newton Center walking | RU/FR/ZH | 250/251/252 | map pins ✅ |
 | Newton restaurant | EN | 243 | Session 4 test |
 | Needham walking 4-stop | EN | 227 | Session 2 test |
-| Beacon St Brookline walking | EN | TBD | S17 test — regenerate after PHASE 3D deployed; verify all stops on Beacon St corridor |
+| Beacon St Brookline walking | EN | 297 | S17 test — scope_precision=CORRIDOR ✅; 5 stops generated ✅; mobile map loaded 5 POIs ✅ |
+| Beacon St Brookline walking | RU | 298 | S17 test — translated ✅; saved to device ✅ |
+| Armenian Museum of America | EN | 299 | A#60 test — 6 stops, museum category ✅; 1 map POI ✅; directions exit-to-street (ISSUE-060) |
+| Armenian Museum of America | RU | 300 | A#60 test — translated ✅; saved to device ✅ |
+| Fairbanks House Dedham | EN | TBD | S15 test — tour_category=museum ✅; stops are named exhibits ✅; directions exit-to-street (ISSUE-060) |
 | Boston Civil War | EN | 266 | A#56 test — museum icon ✅ (correct classification) |
 | Waltham walking | EN | 270 | A#56 test — had 🗺️ bug (no Tour-Category header, old tour) |
 
@@ -316,6 +320,7 @@ not a child — `h.clear()` in `translation_service.py` does not touch it.
 
 - **Double map button (ISSUE-059)**: ✅ Claude confirmed `_buildMapButtonInjectionScript` is already gone from `tour_player_screen.dart`. Duplicate-button bug resolved.
 - **Tour-type icons**: A#56 + Session 14 icon fix deployed `d5da0f4`. Pending mobile test with newly generated tours.
+- **Museum directions exit-to-street (ISSUE-060)**: PHASE 3B direction prompt not museum-aware — tells visitor to walk to street even for single-venue indoor tours. Filed as backlog. Fix: inject venue_name + indoor-only constraint into PHASE 3B prompt when tour_category=museum. Not fixing in current release. See `ISSUE-060_MUSEUM_DIRECTIONS_EXIT_TO_STREET.md`.
 - **PHASE 3C location guard**: `7a4a969`. `_address_matches_location` hoisted to module level. `len(p) >= 4` token filter added (fixes state/country-code false-keeps — Issue X). Part C replacements now also run through PHASE 3C address check (Issue Y). Known limitation: alias map is a fixed list — expand if new false-rejections found.
 - **Museum tour hallucination**: FIXED (Sessions 7–10). Tour ID 259 passed. Awaiting mobile test.
 - **Mobile app hardcodes `tour_type:"museum"`**: Services override via `_pre_category` guard. DB tour names still get "- museum Tour" suffix. Needs Mobile App Amazon-Q fix.
