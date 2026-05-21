@@ -15,9 +15,9 @@
 - **GIT RULE**: Do NOT commit until user confirms mobile testing passed
 - **BRANCH**: `Tours_Step_Maps` (branched from `Newsletters` at `ad3b5be`)
 - **MERGE TARGET**: `Newsletters` (when A#55+A#56 complete and tested)
-- **LAST GIT COMMIT**: `3f9d04e` — "Update remind_Services_ai.md: S15c commit 2e8347e"
-- **PENDING COMMIT**: Session 17 PHASE 3D — awaiting Claude review response
-- **NEXT ACTION ON RECOVERY**: (1) Check if Claude response to `claude_review_session17.md` is available — if yes, apply and commit. (2) Mobile tests — Fairbanks House S15 fix, A#56 icons, Needham in-tour map white-screen.
+- **LAST GIT COMMIT**: `78363ad` — S17 review doc + remind update
+- **PENDING COMMIT**: Session 17 final implementation — awaiting Claude review of `claude_review_session17_final.md`
+- **NEXT ACTION ON RECOVERY**: (1) Check if Claude response to `claude_review_session17_final.md` is available — if yes, apply feedback and commit. (2) Mobile tests — Fairbanks House S15 fix, A#56 icons, Needham in-tour map white-screen.
 - **PREVIOUS REVIEW DOCS**: `claude_review_session15_final.md` (S15 — fully reviewed + applied). `claude_review_final_session14.md` (S14 — fully reviewed + applied)
 - **IN-TOUR MAP WHITE SCREEN**: ISSUE-MAP-WS filed. Root cause: `_fitBounds()` in `tour_map_screen.dart` calls `fitCamera(CameraFit.bounds(...))` with single-point bounds when GPS not yet locked (museum tours have 1 POI). Fix: add `if (points.length == 1) { _mapController.move(points.first, 15); return; }` before `LatLngBounds.fromPoints()`. Mobile-side fix only — services output is correct. See `claude_response_needham_map_whitescreen.md`
 - **PRE-PRODUCTION CHECKLIST**: `REMINDER_LIST_BEFORE_PRODUCTION.md` — must-complete items before paying customers
@@ -133,8 +133,8 @@ standalone maintenance session after Tours_Step_Maps is merged and mobile testin
 
 | File | Container | Commit | Notes |
 |------|-----------|--------|-------|
-| `generate_tour_text.py` | `development-tour-generator-1:5000` | pending S17 | Sessions 2–17: all fixes + PHASE 3D geographic relevance validation |
-| `tour_settings.py` | `development-tour-generator-1:5000` | pending S17 | New: configurable MAX_WALKING_TOUR_DISTANCE_KM, MAX_REPLACEMENT_ATTEMPTS |
+| `generate_tour_text.py` | `development-tour-generator-1:5000` | pending S17 | Sessions 2–17: PHASE 3D removed; geographic_scope+scope_precision in PHASE 1; scope+compactness constraints in PHASE 3A; _run_phase_3b() reusable; GEO-CHECK haversine block |
+| `tour_settings.py` | `development-tour-generator-1:5000` | pending S17 | WALKING_LEG_TARGET/HARD_KM, WALKING_TOTAL_HARD_KM, SPECIALIZED_LEG_HARD_KM, MAX_REPLACEMENT_ATTEMPTS |
 | `generate_tour_text_service.py` | `development-tour-generator-1:5000` | unchanged | Flask wrapper |
 | `tour_orchestrator_service.py` | `development-tour-orchestrator-1:5002` | `ad3b5be` | Session 5 guards |
 | `tour_generation_modernized.py` | `tour-generation-modernized-1:5021` | `ed1acad` | A#55 map buttons + A#56 tour-type icons v1.2.5.183 |
@@ -170,7 +170,7 @@ All changes landed on `Tours_Step_Maps`. Final review doc: `claude_review_final_
 | S15 | `generate_tour_text.py` | `1e9a718` | venue_name from PHASE 1 forces `tour_category='museum'`; removed unconditional `_classify_tour_category()` call at PHASE 2 that overwrote it |
 | S15b | `generate_tour_text.py` | `2e5eff1` | Claude review: `_EXPLICIT_NON_MUSEUM_TOUR_RE` safety net (prevents walking/restaurant requests with GPT-hallucinated venue_name from being misclassified as museum); `[S15]` log lines for both branches; 4 negative examples added to PHASE 1 prompt |
 | S15c | `generate_tour_text.py` | `2e8347e` | Claude final review Q1: expanded `_EXPLICIT_NON_MUSEUM_TOUR_RE` with `pub crawl`, `bike`, `cycling`, `biking`, `shopping`; 11/11 functional tests pass |
-| S17 | `generate_tour_text.py` + `tour_settings.py` | pending | PHASE 3D: `_validate_poi_geographic_relevance()` — single GPT batch call; rejects out-of-scope stops; targeted Part C replacement; PHASE 3B re-order of combined set. `tour_settings.py`: configurable distance + replacement constants. Triggered by Beacon St Brookline dispersal bug. |
+| S17 | `generate_tour_text.py` + `tour_settings.py` | pending | PHASE 3D removed (GPT-validates-GPT rejected by Claude). Replaced with: (A) geographic_scope+scope_precision fields in PHASE 1 intent; scope constraint injected into PHASE 3A for CORRIDOR/DISTRICT; compactness constraint for walking tours. (B) _run_phase_3b() reusable function; sequential-closeness line in PHASE 3B prompt; haversine GEO-CHECK block (advisory, never fatal); replacement with geo anchor + coord fetch + re-order. tour_settings.py: 5 named constants. Final review doc: claude_review_session17_final.md. |
 
 **S15 is fully complete and Claude-reviewed. No further code changes pending for S15.**
 **S17 is deployed to container, awaiting Claude review before git commit.**
@@ -505,4 +505,4 @@ Also closes the symmetric Listen-page bug (same code path, less frequently trigg
 | 14 final review | Claude final review (e4ebcf1): Q2 word-set subset check + state+zip token filter (Lynn/Lynnfield false-keeps fixed); Q4 `except ValueError` before `except Exception` (PHASE 3C zero-stop never falls to Location-N fallback). Issue AA filed (York,ME vs New York,NY — not blocking). Branch ready for merge. |
 | 15 | Fairbanks House bug (1e9a718): `_classify_tour_category()` keyword list cannot detect historic houses/estates with no "museum" keyword. Fix: when PHASE 1 returns `venue_name`, force `tour_category='museum'` — GPT intent analysis is authoritative over keyword classifier. Removed dead `tour_category='intelligent'` assignment. Claude code-improvements review triaged: trivial fixes queued for next session; architectural items in REMINDER_LIST_BEFORE_PRODUCTION.md. |
 | 16 | S15 Claude reviews applied: 2e5eff1 (_EXPLICIT_NON_MUSEUM_TOUR_RE safety net + [S15] log lines + 4 negative PHASE 1 prompt examples) + 2e8347e (regex expanded: pub crawl, bike, cycling, biking, shopping — 11/11 tests pass). Needham History Center museum tour tested EN+RU+ZH — generation correct, in-tour map white screen found (ISSUE-MAP-WS). Diagnosed as Flutter fitCamera degenerate-bounds on single-POI museum tours — mobile-side fix only. |
-| 17 | PHASE 3D geographic relevance validation. Triggered by Beacon St Brookline test: POIs off-route and too dispersed. New `_validate_poi_geographic_relevance()` — single GPT batch call after coords finalized; rejects out-of-scope stops; targeted Part C replacement; PHASE 3B re-order of combined set. New `tour_settings.py` with configurable constants. Claude review doc prepared. Awaiting Claude review. |
+| 17 | PHASE 3D removed (Claude spec superseded it). Implemented: geographic_scope+scope_precision in PHASE 1; scope constraint in PHASE 3A (CORRIDOR/DISTRICT); compactness constraint in PHASE 3A (walking); sequential-closeness in PHASE 3B; _run_phase_3b() reusable function; haversine GEO-CHECK (advisory, never fatal) with replacement+coord-fetch+re-order. tour_settings.py with 5 named constants. Final review doc prepared. Awaiting Claude approval. |

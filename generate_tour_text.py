@@ -16,6 +16,11 @@ from enhanced_prompt_generator import generate_enhanced_prompt
 from datetime import datetime
 import re
 from collections import Counter
+from math import radians, sin, cos, asin, sqrt
+from tour_settings import (
+    WALKING_LEG_TARGET_KM, WALKING_LEG_HARD_KM, WALKING_TOTAL_HARD_KM,
+    MAX_REPLACEMENT_ATTEMPTS,
+)
 
 # PHASE 3C: neighborhood/borough -> canonical city map for address-based location guard.
 # Covers USPS city names that differ from the city users request tours in.
@@ -43,6 +48,20 @@ _EXPLICIT_NON_MUSEUM_TOUR_RE = re.compile(
     r'\s+tour\b',
     re.IGNORECASE,
 )
+
+def _haversine_km(a, b):
+    """Straight-line distance in km between two (lat, lng) tuples."""
+    lat1, lon1 = a; lat2, lon2 = b
+    dlat, dlon = radians(lat2 - lat1), radians(lon2 - lon1)
+    h = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
+    return 2 * 6371.0 * asin(sqrt(h))
+
+
+def _parse_coords(s):
+    """Parse 'lat, lng' string into (float, float) or None."""
+    m = re.match(r'\s*(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)', s or '')
+    return (float(m.group(1)), float(m.group(2))) if m else None
+
 
 def _address_matches_location(address, loc):
     """Return True if any address token (after postcode stripping, short-token filtering,
@@ -95,7 +114,9 @@ Please provide ONLY a JSON response with these fields:
     "business_hours_relevant": true/false,
     "accessibility_mentioned": true/false,
     "needs_research": true/false,
-    "venue_name": "The full official name of the institution ONLY when the ENTIRE tour is bounded by one specific building or campus (e.g. a single museum, historic house, gallery, or library). Use the institution's complete official name including suffixes like 'Museum', 'Gallery', 'Library' — never a shortened nickname (e.g. 'Museum of Fine Arts, Boston' not 'MFA'). Return null if the tour spans a city, district, neighborhood, multiple venues, or any open-ended area. If you are unsure whether the request names a specific bounded institution or just a region, return null."
+    "venue_name": "The full official name of the institution ONLY when the ENTIRE tour is bounded by one specific building or campus (e.g. a single museum, historic house, gallery, or library). Use the institution's complete official name including suffixes like 'Museum', 'Gallery', 'Library' — never a shortened nickname (e.g. 'Museum of Fine Arts, Boston' not 'MFA'). Return null if the tour spans a city, district, neighborhood, multiple venues, or any open-ended area. If you are unsure whether the request names a specific bounded institution or just a region, return null.",
+    "geographic_scope": "The most specific bounded area the tour must stay within, in the user's own terms — a street or corridor, a square, a named district or quarter, a waterfront, a campus, a market, a cluster of blocks, or a single building. Copy the phrasing the request uses. If the request only names a whole city or town with no tighter anchor, return that city/town name. Never invent a tighter scope than the request states.",
+    "scope_precision": "One of exactly these four strings: BUILDING (one structure) | CORRIDOR (one street or strip) | DISTRICT (a neighbourhood, quarter, square, or named area) | CITY (a whole town with no tighter anchor given)."
 }}
 
 Examples:
@@ -114,6 +135,11 @@ Examples:
 - "Restaurant tour near the Prudential Center, Boston" → poi_type: "restaurants", theme_type: "STANDARD", venue_name: null
 - "Architecture tour around the Lyman Estate" → poi_type: "buildings", theme_type: "STANDARD", venue_name: null
 - "Self-guided tour of Beacon Hill" → poi_type: "landmarks", theme_type: "STANDARD", venue_name: null
+- "walking tour over Beacon St in Brookline, ma" → geographic_scope: "Beacon St, Brookline", scope_precision: "CORRIDOR"
+- "Fairbanks House Tour in Dedham, ma" → geographic_scope: "Fairbanks House", scope_precision: "BUILDING"
+- "tour of the old mill district in Lowell" → geographic_scope: "the old mill district, Lowell", scope_precision: "DISTRICT"
+- "walking tour around the harbor in Gloucester" → geographic_scope: "the harbor waterfront, Gloucester", scope_precision: "DISTRICT"
+- "walking tour in Newton, MA" → geographic_scope: "Newton, MA", scope_precision: "CITY"
 """
 
     headers = {
@@ -689,6 +715,31 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
                 f"- NEVER fabricate exhibit names or claim exhibits exist that you cannot verify."
             )
 
+    # -------- Scope + compactness constraints for PHASE 3A --------
+    _geo_scope = (intent.get('geographic_scope') or '').strip() if intent else ''
+    _scope_precision = (intent.get('scope_precision') or '').strip().upper() if intent else ''
+    _scope_constraint = ''
+    if _geo_scope and _scope_precision in ('CORRIDOR', 'DISTRICT'):
+        _scope_constraint = (
+            f"\nGEOGRAPHIC SCOPE — ALL stops MUST be located within: {_geo_scope}.\n"
+            f"- Do NOT include well-known landmarks elsewhere in the city just because "
+            f"they are famous — if it is outside {_geo_scope}, it does not belong.\n"
+        )
+        print(f"  [S17] scope_constraint injected: precision={_scope_precision}, scope='{_geo_scope}'")
+    else:
+        print(f"  [S17] no scope_constraint (precision='{_scope_precision}', scope='{_geo_scope}')")
+
+    _compactness_constraint = ''
+    if tour_category == 'walking':
+        _compactness_constraint = (
+            f"\nWALKING-TOUR COMPACTNESS — this is a walking tour:\n"
+            f"- All stops must form ONE compact cluster, close enough to walk between comfortably.\n"
+            f"- No stop should be more than a 10–15 minute walk (roughly {WALKING_LEG_TARGET_KM:.0f} km) "
+            f"from its nearest neighbour in the tour.\n"
+            f"- Prefer a tight set of stops in one walkable area over famous landmarks scattered "
+            f"across the city. A shorter, denser route is better than a long, spread-out one.\n"
+        )
+
     phase_3a_prompt = (
         f"You are a knowledgeable local guide for {location}.\n"
         f"List exactly {total_stops} specific, real, well-known {poi_type_hint} relevant to: {user_request}.\n\n"
@@ -696,8 +747,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
         "- Use REAL, SPECIFIC names of actual establishments or landmarks.\n"
         "- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.\n"
         "- Include a complete street address with ZIP code where applicable.\n"
-        + _museum_venue_constraint + "\n\n"
-        "Return ONLY a JSON array, no other text, no markdown fences:\n"
+        + _museum_venue_constraint
+        + _scope_constraint
+        + _compactness_constraint
+        + "\n\nReturn ONLY a JSON array, no other text, no markdown fences:\n"
         '[{"name": "...", "address": "..."}, ...]'
     )
     phase_3a_data = {
@@ -835,7 +888,6 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
                 raise ValueError(f"PHASE 3C rejected all stops for location '{location}'")
 
         # -------- Part C: replacement loop (bounded) --------
-        MAX_REPLACEMENT_ATTEMPTS = 2
         attempts = 0
 
         while len(poi_list) < total_stops and attempts < MAX_REPLACEMENT_ATTEMPTS:
@@ -935,126 +987,124 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
             p["stop_number"] = i + 1
 
         # -------- PHASE 3B: ordering + structured details + directions --------
-        print(f"\nPHASE 3B: Requesting structured details and walking directions for {len(poi_list)} stop(s)...")
-
-        survivors_lines = []
-        for p in poi_list:
-            line = f'- {p["name"]}'
-            if p.get("address"):
-                line += f' (Address: {p["address"]})'
-            survivors_lines.append(line)
-        survivors_block = "\n".join(survivors_lines)
-
-        phase_3b_prompt = (
-            f"For a tour of {location}, the following {len(poi_list)} stop(s) have been selected:\n"
-            f"{survivors_block}\n\n"
-            "Reorder them for an OPTIMAL walking route (minimise backtracking).\n"
-            "For each stop in the NEW order, provide all the JSON fields below.\n"
-            "For stop #1, 'directions_from_previous' should describe how to reach it from a reasonable arrival point (T station, parking, main street).\n"
-            "For subsequent stops, 'directions_from_previous' should be turn-by-turn walking directions from the IMMEDIATELY PREVIOUS stop in the new order.\n\n"
-            "Return ONLY a JSON array, no markdown fences, no commentary:\n"
-            "[\n"
-            "  {\n"
-            '    "name": "<must match one of the input names exactly>",\n'
-            '    "address": "<complete street address with ZIP>",\n'
-            '    "coordinates": "<lat, lng in decimal format>",\n'
-            '    "type_specialty": "<short type/specialty description>",\n'
-            '    "specific_examples": "<2-3 concrete examples of what visitors will see/experience>",\n'
-            '    "operational_details": "<hours, prices, reservations, busy times>",\n'
-            '    "directions_from_previous": "<turn-by-turn>"\n'
-            "  }\n"
-            "]"
-        )
-        phase_3b_data = {
-            "model": "gpt-3.5-turbo",
-            "messages": [
-                {"role": "system", "content": "You return ONLY a valid JSON array. No markdown, no commentary."},
-                {"role": "user", "content": phase_3b_prompt}
-            ],
-            "temperature": 0.5,
-            "max_tokens": 2000,
-        }
-        api_call_logger.log("PHASE_3B_REQUEST", {
-            "location": location,
-            "stop_count": len(poi_list),
-        })
-
-        try:
-            b_response = requests.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers=headers,
-                data=json.dumps(phase_3b_data),
+        # Extracted into _run_phase_3b() so it can be called again after geo-check replacements.
+        def _run_phase_3b(current_poi_list):
+            """Order stops, fill structured details, get directions. Returns updated poi_list."""
+            if len(current_poi_list) <= 1:
+                return current_poi_list
+            s_lines = [
+                f'- {p["name"]}' + (f' (Address: {p["address"]})' if p.get('address') else '')
+                for p in current_poi_list
+            ]
+            prompt = (
+                f"For a tour of {location}, the following {len(current_poi_list)} stop(s) have been selected:\n"
+                + "\n".join(s_lines) + "\n\n"
+                "Reorder them for an OPTIMAL walking route (minimise backtracking).\n"
+                "- Keep the overall route as short as possible; minimise the longest single leg "
+                "between any two consecutive stops.\n"
+                "For each stop in the NEW order, provide all the JSON fields below.\n"
+                "For stop #1, 'directions_from_previous' should describe how to reach it from a reasonable arrival point (T station, parking, main street).\n"
+                "For subsequent stops, 'directions_from_previous' should be turn-by-turn walking directions from the IMMEDIATELY PREVIOUS stop in the new order.\n\n"
+                "Return ONLY a JSON array, no markdown fences, no commentary:\n"
+                "[\n  {\n"
+                '    "name": "<must match one of the input names exactly>",\n'
+                '    "address": "<complete street address with ZIP>",\n'
+                '    "coordinates": "<lat, lng in decimal format>",\n'
+                '    "type_specialty": "<short type/specialty description>",\n'
+                '    "specific_examples": "<2-3 concrete examples of what visitors will see/experience>",\n'
+                '    "operational_details": "<hours, prices, reservations, busy times>",\n'
+                '    "directions_from_previous": "<turn-by-turn>"\n'
+                "  }\n]"
             )
-            if b_response.status_code != 200:
-                print(f"! PHASE 3B failed (status {b_response.status_code}); keeping PHASE 3A order, generic directions will be used.")
-            else:
-                b_result = b_response.json()
+            req_data = {
+                "model": "gpt-3.5-turbo",
+                "messages": [
+                    {"role": "system", "content": "You return ONLY a valid JSON array. No markdown, no commentary."},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.5,
+                "max_tokens": 2000,
+            }
+            nonlocal total_tokens, total_cost
+            try:
+                resp = requests.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers=headers,
+                    data=json.dumps(req_data),
+                )
+                if resp.status_code != 200:
+                    print(f"! PHASE 3B failed (status {resp.status_code}); keeping current order")
+                    return current_poi_list
+                b_result = resp.json()
                 b_text = b_result["choices"][0]["message"]["content"]
                 tokens_used = b_result["usage"]["total_tokens"]
                 total_tokens += tokens_used
                 total_cost += tokens_used / 1000 * 0.002
                 print(f"PHASE 3B API call cost: ${tokens_used / 1000 * 0.002:.4f} ({tokens_used} tokens)")
-
                 parsed = _parse_json_array_loose(b_text)
                 if not parsed or not isinstance(parsed, list):
-                    print(f"! PHASE 3B unparseable response; keeping PHASE 3A order, generic directions will be used.")
-                else:
-                    # Validation: canonicalize names, flag unknowns, append missing
-                    canonical_by_norm = {_normalize_name(p["name"]): p["name"] for p in poi_list}
-                    parsed_normalized = []
-                    unknown = []
-                    for entry in parsed:
-                        if not isinstance(entry, dict):
-                            continue
-                        norm = _normalize_name(entry.get("name", ""))
-                        if norm in canonical_by_norm:
-                            entry["name"] = canonical_by_norm[norm]
-                            parsed_normalized.append(entry)
-                        else:
-                            unknown.append(entry.get("name", ""))
-
-                    if unknown:
-                        print(f"! PHASE 3B introduced unknown names (ignored): {unknown}")
-
-                    if len(parsed_normalized) == 0:
-                        print(f"! PHASE 3B produced no recognisable entries; keeping PHASE 3A order")
+                    print(f"! PHASE 3B unparseable response; keeping current order")
+                    return current_poi_list
+                canonical_by_norm = {_normalize_name(p['name']): p for p in current_poi_list}
+                parsed_normalized = []
+                unknown = []
+                for entry in parsed:
+                    if not isinstance(entry, dict):
+                        continue
+                    norm = _normalize_name(entry.get('name', ''))
+                    if norm in canonical_by_norm:
+                        entry['name'] = canonical_by_norm[norm]['name']
+                        parsed_normalized.append(entry)
                     else:
-                        # Append any original POI that the AI dropped
-                        present_norms = {_normalize_name(e["name"]) for e in parsed_normalized}
-                        for orig in poi_list:
-                            if _normalize_name(orig["name"]) not in present_norms:
-                                print(f"! PHASE 3B dropped POI; re-appending at end: {orig['name']}")
-                                parsed_normalized.append({
-                                    "name": orig["name"],
-                                    "address": orig.get("address", ""),
-                                    "coordinates": "",
-                                    "type_specialty": "",
-                                    "specific_examples": "",
-                                    "operational_details": "",
-                                    "directions_from_previous": "",
-                                })
+                        unknown.append(entry.get('name', ''))
+                if unknown:
+                    print(f"! PHASE 3B introduced unknown names (ignored): {unknown}")
+                if not parsed_normalized:
+                    print(f"! PHASE 3B produced no recognisable entries; keeping current order")
+                    return current_poi_list
+                present_norms = {_normalize_name(e['name']) for e in parsed_normalized}
+                for orig in current_poi_list:
+                    if _normalize_name(orig['name']) not in present_norms:
+                        print(f"! PHASE 3B dropped POI; re-appending: {orig['name']}")
+                        parsed_normalized.append({
+                            'name': orig['name'], 'address': orig.get('address', ''),
+                            'coordinates': orig.get('coordinates', ''),
+                            'type_specialty': '', 'specific_examples': '',
+                            'operational_details': '', 'directions_from_previous': '',
+                        })
+                if len(parsed_normalized) > total_stops:
+                    parsed_normalized = parsed_normalized[:total_stops]
+                new_list = []
+                for idx, entry in enumerate(parsed_normalized):
+                    norm = _normalize_name(entry['name'])
+                    orig = canonical_by_norm.get(norm)
+                    merged = _new_poi(entry['name'], entry.get('address') or (orig.get('address') if orig else ''))
+                    merged['stop_number'] = idx + 1
+                    merged['directions'] = (entry.get('directions_from_previous') or '').strip()
+                    merged['coordinates'] = (entry.get('coordinates') or (orig.get('coordinates', '') if orig else '')).strip()
+                    merged['type_specialty'] = (entry.get('type_specialty') or '').strip()
+                    merged['specific_examples'] = (entry.get('specific_examples') or '').strip()
+                    merged['operational_details'] = (entry.get('operational_details') or '').strip()
+                    new_list.append(merged)
+                print(f"OK PHASE 3B: ordered {len(new_list)} stop(s) with structured details and directions")
+                return new_list
+            except Exception as e:
+                print(f"! PHASE 3B exception: {e}; keeping current order")
+                return current_poi_list
 
-                        # Cap to total_stops
-                        if len(parsed_normalized) > total_stops:
-                            parsed_normalized = parsed_normalized[:total_stops]
+        print(f"\nPHASE 3B: Requesting structured details and walking directions for {len(poi_list)} stop(s)...")
+        survivors_lines = [
+            f'- {p["name"]}' + (f' (Address: {p["address"]})' if p.get('address') else '')
+            for p in poi_list
+        ]
+        survivors_block = "\n".join(survivors_lines)
 
-                        # Merge: PHASE 3B order is authoritative
-                        new_poi_list = []
-                        for idx, entry in enumerate(parsed_normalized):
-                            norm = _normalize_name(entry["name"])
-                            orig = next((p for p in poi_list if _normalize_name(p["name"]) == norm), None)
-                            merged = _new_poi(entry["name"], entry.get("address") or (orig.get("address") if orig else ""))
-                            merged["stop_number"] = idx + 1
-                            merged["directions"] = (entry.get("directions_from_previous") or "").strip()
-                            merged["coordinates"] = (entry.get("coordinates") or "").strip()
-                            merged["type_specialty"] = (entry.get("type_specialty") or "").strip()
-                            merged["specific_examples"] = (entry.get("specific_examples") or "").strip()
-                            merged["operational_details"] = (entry.get("operational_details") or "").strip()
-                            new_poi_list.append(merged)
-                        poi_list = new_poi_list
-                        print(f"OK PHASE 3B: ordered {len(poi_list)} stop(s) with structured details and directions")
-        except Exception as e:
-            print(f"! PHASE 3B exception: {e}; keeping PHASE 3A order")
+        api_call_logger.log("PHASE_3B_REQUEST", {
+            "location": location,
+            "stop_count": len(poi_list),
+        })
+
+        poi_list = _run_phase_3b(poi_list)
 
         # -------- Coordinates fallback: request for any stop missing coordinates --------
         # PHASE 3B sometimes omits coordinates for one or more stops. Request them
@@ -1126,6 +1176,119 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
                             else:
                                 print(f"   Cluster refetch FAILED '{poi['name']}' -- no map pin")
 
+
+        # -------- Walking-compactness geometric verification --------
+        # Deterministic. Catches gross dispersion the PHASE 3A prompt missed.
+        # Straight-line distance is a guaranteed LOWER BOUND on walking distance, so a
+        # leg over the hard limit is unarguably too far to walk.
+        # ADVISORY: never raises ValueError, never removes all stops.
+        if tour_category == 'walking':
+            pts = [(p, _parse_coords(p.get('coordinates', ''))) for p in poi_list]
+            pts_valid = [(p, c) for p, c in pts if c]
+            if len(pts_valid) >= 3:
+                legs = [_haversine_km(pts_valid[i][1], pts_valid[i+1][1]) for i in range(len(pts_valid) - 1)]
+                total_route_km = sum(legs)
+                medoid = min(pts_valid, key=lambda pc: sum(_haversine_km(pc[1], o[1]) for _, o in pts_valid))[1]
+                outliers = []
+                for i, leg in enumerate(legs):
+                    if leg > WALKING_LEG_HARD_KM:
+                        a, b = pts_valid[i], pts_valid[i+1]
+                        farther = a[0] if _haversine_km(a[1], medoid) > _haversine_km(b[1], medoid) else b[0]
+                        outliers.append(farther)
+                if total_route_km > WALKING_TOTAL_HARD_KM and not outliers:
+                    outliers = [max(pts_valid, key=lambda pc: _haversine_km(pc[1], medoid))[0]]
+                # Dedupe (a stop can be flagged by two adjacent legs)
+                seen_ids = set()
+                outliers = [o for o in outliers if id(o) not in seen_ids and not seen_ids.add(id(o))]
+                if outliers and len(outliers) < len(poi_list):
+                    for p in outliers:
+                        print(f"   GEO-CHECK: REMOVED '{p['name']}' — exceeds walking-tour distance limit")
+                        forbidden_norms.add(_normalize_name(p['name']))
+                    poi_list = [p for p in poi_list if p not in outliers]
+                    print(f"   GEO-CHECK: {len(outliers)} dispersed stop(s) removed; {len(poi_list)} remain")
+
+                    # Fetch replacements for removed stops
+                    needed = total_stops - len(poi_list)
+                    if needed > 0:
+                        accepted_names = "; ".join(p['name'] for p in poi_list)
+                        scope_hint = f" located within {_geo_scope}" if _geo_scope else f" in {location}"
+                        forbidden_display = "; ".join(sorted(forbidden_norms))
+                        rep_prompt = (
+                            f"You are a knowledgeable local guide for {location}.\n"
+                            f"Suggest exactly {needed} additional specific, real, well-known {poi_type_hint}"
+                            f"{scope_hint}, close to these already-accepted stops: {accepted_names}.\n"
+                            f"DO NOT include any of these already-used or rejected names: {forbidden_display}.\n\n"
+                            "Requirements:\n"
+                            "- REAL, SPECIFIC names; never generic placeholders.\n"
+                            "- Complete street address with ZIP where applicable.\n"
+                            "- Must be within comfortable walking distance of the accepted stops.\n\n"
+                            "Return ONLY a JSON array, no other text:\n"
+                            '[{"name": "...", "address": "..."}, ...]'
+                        )
+                        rep_data = {
+                            "model": "gpt-3.5-turbo",
+                            "messages": [
+                                {"role": "system", "content": "You return ONLY a valid JSON array. No markdown, no commentary."},
+                                {"role": "user", "content": rep_prompt}
+                            ],
+                            "temperature": 0.7,
+                            "max_tokens": 500,
+                        }
+                        try:
+                            rep_resp = requests.post(
+                                "https://api.openai.com/v1/chat/completions",
+                                headers=headers,
+                                data=json.dumps(rep_data),
+                            )
+                            if rep_resp.status_code == 200:
+                                rep_tokens = rep_resp.json()["usage"]["total_tokens"]
+                                total_tokens += rep_tokens
+                                total_cost += rep_tokens / 1000 * 0.002
+                                new_candidates = _parse_json_array_loose(rep_resp.json()["choices"][0]["message"]["content"])
+                                if new_candidates and isinstance(new_candidates, list):
+                                    new_stops = []
+                                    for c in new_candidates:
+                                        if not isinstance(c, dict):
+                                            continue
+                                        name = (c.get('name') or '').strip()
+                                        if not name or _normalize_name(name) in forbidden_norms:
+                                            continue
+                                        new_stops.append(_new_poi(name, c.get('address') or ''))
+                                        forbidden_norms.add(_normalize_name(name))
+                                    poi_list.extend(new_stops[:needed])
+                                    print(f"   GEO-CHECK replacement: {min(len(new_stops), needed)} stop(s) added; total now {len(poi_list)}")
+                        except Exception as e:
+                            print(f"   GEO-CHECK replacement exception: {e}")
+
+                    # Fetch coordinates for any new stops that don't have them
+                    missing_geo = [p for p in poi_list if not p.get('coordinates')]
+                    if missing_geo:
+                        print(f"   GEO-CHECK: fetching coords for {len(missing_geo)} replacement stop(s)...")
+                        with ThreadPoolExecutor(max_workers=min(len(missing_geo), 5)) as executor:
+                            futures_geo = {executor.submit(_fetch_coords, p): p for p in missing_geo}
+                            for future in as_completed(futures_geo):
+                                poi_r, coords_r, tok_r = future.result()
+                                if coords_r:
+                                    poi_r['coordinates'] = coords_r
+                                    total_tokens += tok_r
+                                    total_cost += tok_r / 1000 * 0.002
+                                    print(f"   GEO-CHECK coords OK '{poi_r['name']}': {coords_r}")
+                                else:
+                                    print(f"   GEO-CHECK coords FAILED '{poi_r['name']}'")
+
+                    # Re-order the combined set (survivors + replacements)
+                    if len(poi_list) > 1:
+                        print(f"\nPHASE 3B (re-order after GEO-CHECK): {len(poi_list)} stop(s)...")
+                        poi_list = _run_phase_3b(poi_list)
+                        for i_r, p_r in enumerate(poi_list):
+                            p_r['stop_number'] = i_r + 1
+
+                elif outliers:
+                    print(f"   GEO-CHECK: all stops flagged — keeping original list (advisory only)")
+                else:
+                    print(f"   GEO-CHECK: all {len(poi_list)} stops within walking distance (max leg {max(legs):.2f} km, total {total_route_km:.2f} km)")
+            else:
+                print(f"   GEO-CHECK: skipped (fewer than 3 stops have coordinates)")
 
         # -------- Coordinates for the first POI (used by orchestrator) --------
         if poi_list and poi_list[0].get("coordinates"):
