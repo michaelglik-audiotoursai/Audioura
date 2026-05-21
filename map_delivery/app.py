@@ -239,7 +239,7 @@ def get_tour_info(tour_id):
         cur = conn.cursor()
         
         cur.execute("""
-            SELECT id, tour_name, request_string, lat, lng, number_requested
+            SELECT id, tour_name, request_string, lat, lng, number_requested, content_language, original_tour_id
             FROM audio_tours 
             WHERE id = %s
         """, (tour_id,))
@@ -251,9 +251,11 @@ def get_tour_info(tour_id):
             sys.stdout.flush()
             return jsonify({'error': 'Tour not found'}), 404
         
-        tour_id, tour_name, request_string, lat, lng, requests = result
+        tour_id, tour_name, request_string, lat, lng, requests, language, original_id = result
         cur.close()
         conn.close()
+        
+        is_translation = original_id is not None and (language and language != 'en')
         
         return jsonify({
             'id': tour_id,
@@ -262,7 +264,10 @@ def get_tour_info(tour_id):
             'lat': lat,
             'lng': lng,
             'downloads': requests,
-            'has_audio': True
+            'has_audio': True,
+            'language': language or 'en',
+            'is_translation': is_translation,
+            'parent_tour_id': original_id
         })
         
     except Exception as e:
@@ -289,7 +294,7 @@ def search_tours():
         sql_pattern = pattern.replace('.*', '%')
         
         cur.execute("""
-            SELECT id, tour_name, request_string, lat, lng, number_requested
+            SELECT id, tour_name, request_string, lat, lng, number_requested, content_language, original_tour_id
             FROM audio_tours 
             WHERE (tour_name ILIKE %s OR request_string ILIKE %s)
             AND lat IS NOT NULL AND lng IS NOT NULL
@@ -301,10 +306,11 @@ def search_tours():
         search_results = []
         
         for tour in tours:
-            tour_id, tour_name, request_string, tour_lat, tour_lng, requests = tour
+            tour_id, tour_name, request_string, tour_lat, tour_lng, requests, language, original_id = tour
             
             if tour_lat and tour_lng:
                 distance = calculate_distance(lat, lng, tour_lat, tour_lng)
+                is_translation = original_id is not None and (language and language != 'en')
                 
                 search_results.append({
                     'id': tour_id,
@@ -314,7 +320,10 @@ def search_tours():
                     'lng': tour_lng,
                     'distance_km': round(distance, 2),
                     'popularity': requests,
-                    'type': 'walking_tour'
+                    'type': 'walking_tour',
+                    'language': language or 'en',
+                    'is_translation': is_translation,
+                    'parent_tour_id': original_id
                 })
         
         # Sort by popularity first, then by distance
