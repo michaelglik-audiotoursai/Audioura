@@ -2,7 +2,7 @@
 Phase 2 Tour Editing Backend - REQ-016 Final Implementation
 Clean final state processing with complete tour generation
 """
-SERVICE_VERSION = "1.2.6.233"
+SERVICE_VERSION = "1.2.6.234"
 
 import os
 import json
@@ -22,6 +22,8 @@ from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import threading
 import time
+import boto3
+from psycopg2 import errors as pg_errors
 
 app = Flask(__name__)
 CORS(app)
@@ -30,6 +32,29 @@ TOURS_DIR = "/app/tours"
 POLLY_TTS_URL = "http://polly-tts-1:5018"
 MAX_AUDIO_SIZE_MB = int(os.getenv('CUSTOM_AUDIO_MAX_SIZE_MB', 5))
 MAX_AUDIO_SIZE = MAX_AUDIO_SIZE_MB * 1024 * 1024  # Convert to bytes
+
+# Language -> AWS Polly voice. Identical to translation_service.py VOICE_MAP.
+VOICE_MAP = {
+    'en': 'Joanna', 'es': 'Lucia', 'fr': 'Celine',
+    'de': 'Marlene', 'ru': 'Tatyana', 'zh': 'Zhiyu',
+}
+
+comprehend_client = boto3.client('comprehend', region_name='us-east-1')
+
+def _detect_text_language(text):
+    """Return dominant ISO language code of text, or None if too short / undetectable."""
+    cleaned = (text or '').strip()
+    if len(cleaned) < 25:
+        return None
+    try:
+        resp = comprehend_client.detect_dominant_language(Text=cleaned[:4900])
+        langs = resp.get('Languages', [])
+        if not langs:
+            return None
+        return langs[0]['LanguageCode'].split('-')[0]  # 'zh-TW' -> 'zh'
+    except Exception as e:
+        print(f"[LANG] detection failed: {e}")
+        return None  # fail open — do not block the save on a detector error
 
 def clean_markdown_formatting(text):
     """Remove markdown formatting characters that interfere with TTS"""
@@ -592,7 +617,29 @@ def save_custom_audio_from_base64(audio_data, tour_id, stop_number, user_id="def
             print(f"Custom audio save failed: {e}")
             return None, []
 
-def generate_audio_for_stop(tour_path, stop_number, text_content, tour_id=None, user_id=None, generate_flag=True, custom_audio_data=None, audio_parts=None):
+def _apply_custom_audio_file(custom_audio_path, dest_audio_file, stop_number):
+    """Copy a user-supplied custom-audio file into place.
+    On ANY failure, raise a JSON-encoded Exception — never fall back to TTS."""
+    if not custom_audio_path or not os.path.exists(custom_audio_path):
+        raise Exception(json.dumps({
+            "status": "error", "error_code": "CUSTOM_AUDIO_NOT_FOUND",
+            "stop_number": stop_number,
+            "message": f"The uploaded audio for Stop {stop_number} could not be found. "
+                       f"Please re-upload it and try again.",
+            "recoverable": True
+        }))
+    try:
+        shutil.copy2(custom_audio_path, dest_audio_file)
+    except Exception:
+        raise Exception(json.dumps({
+            "status": "error", "error_code": "CUSTOM_AUDIO_COPY_FAILED",
+            "stop_number": stop_number,
+            "message": f"The uploaded audio for Stop {stop_number} could not be saved. "
+                       f"Please re-upload it and try again.",
+            "recoverable": True
+        }))
+
+def generate_audio_for_stop(tour_path, stop_number, text_content, tour_id=None, user_id=None, generate_flag=True, custom_audio_data=None, audio_parts=None, content_language='en'):
     """Generate audio with flag coordination, format conversion, and multi-part support"""
     # Handle multi-part audio upload
     if audio_parts:
@@ -654,7 +701,7 @@ def generate_audio_for_stop(tour_path, stop_number, text_content, tour_id=None, 
     try:
         tts_response = requests.post(f"{POLLY_TTS_URL}/synthesize", json={
             "text": text_content,
-            "voice": "Joanna",
+            "voice_id": VOICE_MAP.get(content_language, 'Joanna'),
             "format": "mp3"
         }, timeout=30)
         
@@ -838,7 +885,7 @@ def create_clean_html(tour_path, final_stops):
     with open(html_file, 'w', encoding='utf-8') as f:
         f.write(html_content)
 
-def create_complete_tour_with_preservation(original_tour_path, final_stops_data, tour_id=None, original_stops_dict=None):
+def create_complete_tour_with_preservation(original_tour_path, final_stops_data, tour_id=None, original_stops_dict=None, content_language='en'):
     """Create complete tour with preservation of original audio files"""
     new_uuid = str(uuid.uuid4())
     new_uuid_prefix = new_uuid.split('-')[0]
@@ -886,10 +933,10 @@ def create_complete_tour_with_preservation(original_tour_path, final_stops_data,
                     print(f"PRESERVE: Copied audio {original_stop_num} -> {stop_number}")
                 else:
                     # Generate TTS if original audio missing
-                    generate_audio_for_stop(new_tour_path, stop_number, text_content, tour_id, None, True)
+                    generate_audio_for_stop(new_tour_path, stop_number, text_content, tour_id, None, True, content_language=content_language)
             else:
                 # Generate TTS if can't find original
-                generate_audio_for_stop(new_tour_path, stop_number, text_content, tour_id, None, True)
+                generate_audio_for_stop(new_tour_path, stop_number, text_content, tour_id, None, True, content_language=content_language)
         else:
             # Handle other actions (add, modify, etc.) with existing logic
             is_added = stop_data.get('is_added', False)
@@ -900,22 +947,16 @@ def create_complete_tour_with_preservation(original_tour_path, final_stops_data,
             audio_parts = stop_data.get('audio_parts')
             
             if audio_parts:
-                audio_result, warnings = generate_audio_for_stop(new_tour_path, stop_number, text_content, tour_id, None, True, None, audio_parts)
+                audio_result, warnings = generate_audio_for_stop(new_tour_path, stop_number, text_content, tour_id, None, True, None, audio_parts, content_language=content_language)
                 if warnings:
                     print(f"Multi-part audio warnings for stop {stop_number}: {warnings}")
             elif custom_audio_data:
-                generate_audio_for_stop(new_tour_path, stop_number, text_content, tour_id, None, True, custom_audio_data)
+                generate_audio_for_stop(new_tour_path, stop_number, text_content, tour_id, None, True, custom_audio_data, content_language=content_language)
             elif has_custom_audio_flag and custom_audio_path:
-                try:
-                    if os.path.exists(custom_audio_path):
-                        audio_file = new_tour_path / f"audio_{stop_number}.mp3"
-                        shutil.copy2(custom_audio_path, audio_file)
-                    else:
-                        generate_audio_for_stop(new_tour_path, stop_number, text_content, tour_id, None, True)
-                except Exception as e:
-                    generate_audio_for_stop(new_tour_path, stop_number, text_content, tour_id, None, True)
+                audio_file = new_tour_path / f"audio_{stop_number}.mp3"
+                _apply_custom_audio_file(custom_audio_path, audio_file, stop_number)
             elif is_added or generate_flag:
-                generate_audio_for_stop(new_tour_path, stop_number, text_content, tour_id, None, True)
+                generate_audio_for_stop(new_tour_path, stop_number, text_content, tour_id, None, True, content_language=content_language)
             else:
                 # Try to preserve existing audio by content match
                 original_audio_found = False
@@ -930,7 +971,7 @@ def create_complete_tour_with_preservation(original_tour_path, final_stops_data,
                                 break
                 
                 if not original_audio_found:
-                    generate_audio_for_stop(new_tour_path, stop_number, text_content, tour_id, None, True)
+                    generate_audio_for_stop(new_tour_path, stop_number, text_content, tour_id, None, True, content_language=content_language)
     
     # Copy other files from original tour (excluding audio/text files)
     for file_path in original_tour_path.rglob('*'):
@@ -1012,17 +1053,9 @@ def create_complete_tour(original_tour_path, final_stops_data, tour_id=None):
             print(f"REQ-022: Custom audio upload result for stop {stop_number}: {audio_result}")
         elif has_custom_audio_flag and custom_audio_path:
             # Custom audio via file path (REQ-022)
-            try:
-                if os.path.exists(custom_audio_path):
-                    audio_file = new_tour_path / f"audio_{stop_number}.mp3"
-                    shutil.copy2(custom_audio_path, audio_file)
-                    print(f"REQ-022: Copied custom audio from {custom_audio_path} for stop {stop_number}")
-                else:
-                    print(f"REQ-022: Custom audio path not found: {custom_audio_path}, generating TTS")
-                    generate_audio_for_stop(new_tour_path, stop_number, text_content, tour_id, None, True)
-            except Exception as e:
-                print(f"REQ-022: Error copying custom audio: {e}, generating TTS")
-                generate_audio_for_stop(new_tour_path, stop_number, text_content, tour_id, None, True)
+            audio_file = new_tour_path / f"audio_{stop_number}.mp3"
+            _apply_custom_audio_file(custom_audio_path, audio_file, stop_number)
+            print(f"REQ-022: Applied custom audio for stop {stop_number}")
         elif is_added:
             # New stops always generate audio
             generate_audio_for_stop(new_tour_path, stop_number, text_content, tour_id, None, True)
@@ -1073,6 +1106,7 @@ def create_complete_tour(original_tour_path, final_stops_data, tour_id=None):
 def bulk_save_stops(tour_id):
     """REQ-020: Bulk save with audio generation flag coordination"""
     data = request.json
+    content_language = (data.get('content_language') or 'en').strip().lower()
     stops = data.get('stops', [])
     
     print(f"\n==== REQ-022/023 DEBUG: RECEIVED REQUEST ====")
@@ -1267,10 +1301,33 @@ def bulk_save_stops(tour_id):
         
         print(f"RENUMBER: After - stops: {[s['stop_number'] for s in final_stops_data]}")
         
+        # Language validation: check TTS stops match content_language
+        for stop_data in final_stops_data:
+            action = stop_data.get('action', '')
+            if (stop_data.get('generate_audio_from_text', True)
+                    and action not in ('preserve', 'unchanged')
+                    and not stop_data.get('custom_audio_data')
+                    and not stop_data.get('audio_parts')
+                    and not stop_data.get('has_custom_audio')):
+                detected = _detect_text_language(stop_data['text_content'])
+                if detected is not None and detected != content_language:
+                    sn = stop_data['stop_number']
+                    print(f"[LANG_VALIDATE] LANGUAGE_MISMATCH stop={sn} expected={content_language} detected={detected}")
+                    return jsonify({
+                        'status': 'error', 'error_code': 'LANGUAGE_MISMATCH',
+                        'stop_number': sn,
+                        'expected_language': content_language,
+                        'detected_language': detected,
+                        'message': f'This tour is in {content_language}. The text for Stop {sn} '
+                                   f'appears to be in {detected}. Please write it '
+                                   f'in {content_language} and try again.',
+                        'recoverable': True
+                    }), 400
+        
         # CRITICAL FIX: Enhanced tour creation with preserved audio handling
         print(f"PRESERVE: Creating new tour with {len(final_stops_data)} total stops")
         try:
-            new_tour_info = create_complete_tour_with_preservation(tour_path, final_stops_data, tour_id, original_stops_dict)
+            new_tour_info = create_complete_tour_with_preservation(tour_path, final_stops_data, tour_id, original_stops_dict, content_language=content_language)
         except Exception as tour_e:
             error_str = str(tour_e)
             # Check if it's a JSON error from audio conversion
@@ -1458,6 +1515,137 @@ def download_tour_with_flags(tour_id):
                     zipf.write(file_path, arcname)
     
     return send_file(str(zip_path), as_attachment=True, download_name=f"{tour_path.name}.zip")
+
+@app.route('/tour/<tour_id>/promote', methods=['POST'])
+def promote_custom_tour(tour_id):
+    """REQ-PROMOTE: Promote a completed edited tour into audio_tours DB.
+
+    Receives the finished ZIP (base64), custom name, lat/lng, stops_count.
+    Enforces name uniqueness among original (non-translation) tours.
+    Returns the new integer DB id so the mobile app can use translation
+    and map-delivery services identically to any generated tour.
+
+    Request JSON:
+      custom_name   str   required  User-chosen display name (must be unique)
+      zip_base64    str   required  Base64-encoded ZIP bytes
+      lat           float required  Tour centre latitude
+      lng           float required  Tour centre longitude
+      stops_count   int   required  Number of stops in the edited tour
+      tour_content  str   optional  Plain-text stop content for future re-translation
+
+    Responses:
+      201  { "status": "created", "tour_id": <int> }
+      409  { "status": "conflict", "error_code": "NAME_EXISTS",
+             "existing_tour_id": <int>, "message": "..." }
+      400  { "status": "error", "error_code": "...", "message": "..." }
+      500  { "status": "error", "message": "..." }
+    """
+    data = request.json or {}
+    custom_name       = re.sub(r'\s+', ' ', (data.get('custom_name') or '')).strip()
+    zip_b64           = data.get('zip_base64', '')
+    lat               = data.get('lat')
+    lng               = data.get('lng')
+    stops_count       = data.get('stops_count')
+    tour_content      = data.get('tour_content', '')
+    content_language  = (data.get('content_language') or 'en').strip().lower()
+    derived_from_tour_id = data.get('derived_from_tour_id')
+
+    # --- input validation ---
+    if not custom_name:
+        return jsonify({'status': 'error', 'error_code': 'MISSING_NAME',
+                        'message': 'custom_name is required'}), 400
+    if len(custom_name) > 255:
+        return jsonify({'status': 'error', 'error_code': 'NAME_TOO_LONG',
+                        'message': 'custom_name must be 255 characters or fewer'}), 400
+    if not zip_b64:
+        return jsonify({'status': 'error', 'error_code': 'MISSING_ZIP',
+                        'message': 'zip_base64 is required'}), 400
+    if lat is None or lng is None:
+        return jsonify({'status': 'error', 'error_code': 'MISSING_COORDS',
+                        'message': 'lat and lng are required'}), 400
+    try:
+        lat = float(lat)
+        lng = float(lng)
+    except (TypeError, ValueError):
+        return jsonify({'status': 'error', 'error_code': 'INVALID_COORDS',
+                        'message': 'lat and lng must be numeric'}), 400
+    try:
+        zip_bytes = base64.b64decode(zip_b64)
+    except Exception:
+        return jsonify({'status': 'error', 'error_code': 'INVALID_ZIP',
+                        'message': 'zip_base64 could not be decoded'}), 400
+
+    print(f"[PROMOTE] tour_id={tour_id} custom_name={custom_name!r} "
+          f"lat={lat} lng={lng} stops={stops_count} zip={len(zip_bytes)}B")
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # --- uniqueness check (original tours only, case-insensitive) ---
+        cur.execute(
+            "SELECT id FROM audio_tours "
+            "WHERE LOWER(tour_name) = LOWER(%s) AND original_tour_id IS NULL",
+            (custom_name,)
+        )
+        existing = cur.fetchone()
+        if existing:
+            print(f"[PROMOTE] NAME_EXISTS: {custom_name!r} -> existing id={existing[0]}")
+            return jsonify({
+                'status': 'conflict',
+                'error_code': 'NAME_EXISTS',
+                'existing_tour_id': existing[0],
+                'message': f'A tour named "{custom_name}" already exists. '
+                           f'Please choose a different name.'
+            }), 409
+
+        # --- insert new row ---
+        try:
+            cur.execute("""
+                INSERT INTO audio_tours
+                    (tour_name, request_string, audio_tour, lat, lng,
+                     content_language, creator_type, stops_count, tour_content,
+                     original_tour_id, derived_from_tour_id, number_requested)
+                VALUES (%s, %s, %s, %s, %s, %s, 'Custom', %s, %s, NULL, %s, 0)
+                RETURNING id
+            """, (
+                custom_name,
+                f"[custom edit] {custom_name}",
+                zip_bytes,
+                lat, lng,
+                content_language,
+                stops_count,
+                tour_content or None,
+                derived_from_tour_id,
+            ))
+            new_id = cur.fetchone()[0]
+            conn.commit()
+        except pg_errors.UniqueViolation:
+            conn.rollback()
+            cur.execute(
+                "SELECT id FROM audio_tours WHERE LOWER(tour_name) = LOWER(%s) AND original_tour_id IS NULL",
+                (custom_name,)
+            )
+            row = cur.fetchone()
+            existing_id = row[0] if row else None
+            return jsonify({
+                'status': 'conflict', 'error_code': 'NAME_EXISTS',
+                'existing_tour_id': existing_id,
+                'message': f'A tour named "{custom_name}" already exists. Please choose a different name.'
+            }), 409
+        print(f"[PROMOTE] Created audio_tours id={new_id} name={custom_name!r} lang={content_language} derived_from={derived_from_tour_id}")
+        return jsonify({'status': 'created', 'tour_id': new_id}), 201
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"[PROMOTE] ERROR: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
 
 if __name__ == '__main__':
     os.makedirs(TOURS_DIR, exist_ok=True)
