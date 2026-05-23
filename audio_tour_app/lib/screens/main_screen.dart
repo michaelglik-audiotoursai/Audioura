@@ -19,14 +19,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   late int _selectedIndex;
-
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const TourGeneratorScreen(),
-    const MyToursScreen(),
-    const TreatsScreen(),
-    const AboutScreen(),
-  ];
+  int _listenTabVersion = 0;
 
   @override
   void initState() {
@@ -48,9 +41,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       BackgroundService.startBackgroundMonitoring();
-      
       // Refresh Home, My Tours, or Treats screen when app is resumed
       if (_selectedIndex == 0 || _selectedIndex == 2 || _selectedIndex == 3) {
+        if (_selectedIndex == 2) _listenTabVersion++; // NF10: force Listen reload on resume
         setState(() {});
       }
     }
@@ -58,42 +51,56 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   Future<void> _initializeNotifications() async {
     await NotificationService.initialize((NotificationResponse response) {
-      // Navigate to My Tours tab when notification is tapped
+      // Navigate to My Tours tab when a notification is tapped
       setState(() {
-        _selectedIndex = 2; // My Tours tab index (unchanged)
+        _listenTabVersion++; // NF11: force Listen reload (background-generated tour)
+        _selectedIndex = 2;
       });
     });
+  }
+
+  // Returns a FRESH widget on every build. Switching tabs swaps the body child
+  // to a different widget type, so Flutter disposes the outgoing screen's State
+  // and runs the incoming screen's initState. That re-run of initState is THE
+  // mechanism that makes Tours <-> Audio mode switching work: HomeScreen,
+  // TourGeneratorScreen, and MyToursScreen all re-read 'app_mode' from
+  // SharedPreferences in their initState/_loadAppMode.
+  //
+  // DO NOT wrap this in IndexedStack. IndexedStack keeps every screen mounted
+  // permanently, initState runs only once at launch, and a mode change made in
+  // the About tab is never picked up. That was the v1.2.9+59/+60 regression.
+  Widget _buildBody() {
+    switch (_selectedIndex) {
+      case 1:
+        return const TourGeneratorScreen();
+      case 2:
+        return MyToursScreen(key: ValueKey(_listenTabVersion));
+      case 3:
+        return const TreatsScreen();
+      case 4:
+        return const AboutScreen();
+      default:
+        return const HomeScreen();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_selectedIndex],
+      body: _buildBody(),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: _selectedIndex,
-        onTap: (index) => setState(() => _selectedIndex = index),
+        onTap: (index) {
+          if (index == 2) _listenTabVersion++;
+          setState(() => _selectedIndex = index);
+        },
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.add),
-            label: 'Generate Tour',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.library_music),
-            label: 'Listen',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.local_cafe),
-            label: 'Treats',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.info),
-            label: 'About',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.add), label: 'Generate Tour'),
+          BottomNavigationBarItem(icon: Icon(Icons.library_music), label: 'Listen'),
+          BottomNavigationBarItem(icon: Icon(Icons.local_cafe), label: 'Treats'),
+          BottomNavigationBarItem(icon: Icon(Icons.info), label: 'About'),
         ],
       ),
     );
