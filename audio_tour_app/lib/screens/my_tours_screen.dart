@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:path_provider/path_provider.dart';
 import '../screens/debug_log_viewer_screen.dart';
 
 import 'tour_player_screen.dart';
@@ -614,7 +615,15 @@ class _MyToursScreenState extends State<MyToursScreen> {
 
     await DebugLogHelper.addDebugLog('LISTEN: Loading ${tours.length} tours from storage');
 
+    // A#56: heal stale container paths. iOS reassigns the app container UUID on
+    // reinstall, so a tour's stored absolute path can point at an old container
+    // that is now outside the sandbox (white screen on playback). Re-anchor each
+    // path to the current Documents directory on load.
+    final docsDir = await getApplicationDocumentsDirectory();
+    const docsMarker = '/Documents/';
+
     final parsed = <Map<String, dynamic>>[];
+    int healed = 0;
     for (final tourJson in tours) {
       try {
         final tour = jsonDecode(tourJson) as Map<String, dynamic>;
@@ -622,10 +631,23 @@ class _MyToursScreenState extends State<MyToursScreen> {
           await DebugLogHelper.addDebugLog('LISTEN: Skipping tour with invalid field types: ${tour.keys.toList()}');
           continue;
         }
+        final storedPath = tour['path'] as String;
+        final mi = storedPath.indexOf(docsMarker);
+        if (mi != -1) {
+          final healedPath =
+              '${docsDir.path}/${storedPath.substring(mi + docsMarker.length)}';
+          if (healedPath != storedPath) {
+            tour['path'] = healedPath;
+            healed++;
+          }
+        }
         parsed.add(tour);
       } catch (e) {
         await DebugLogHelper.addDebugLog('LISTEN: Skipping corrupt tour entry: $e');
       }
+    }
+    if (healed > 0) {
+      await DebugLogHelper.addDebugLog('LISTEN: Healed $healed stale container path(s)');
     }
 
     await DebugLogHelper.addDebugLog('LISTEN: Loaded ${parsed.length} valid tours (${tours.length - parsed.length} skipped)');

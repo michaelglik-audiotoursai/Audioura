@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'dart:async';
 import 'voice_methods.dart';
@@ -40,8 +41,24 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
   }
   
   Future<String> _getIndexUrl() async {
-    // Mobile platform only: use file URL
-    final fileUrl = 'file://${widget.tourPath}/index.html';
+    // Mobile platform only: use file URL.
+    // A#56: heal stale container path. iOS reassigns the app container UUID on
+    // reinstall, so the stored tour path can point at an old container that is
+    // now outside the sandbox (white screen). Re-anchor it to the current
+    // Documents directory before building the file URL.
+    String tourPath = widget.tourPath;
+    const docsMarker = '/Documents/';
+    final mi = tourPath.indexOf(docsMarker);
+    if (mi != -1) {
+      final docsDir = await getApplicationDocumentsDirectory();
+      final healedPath =
+          '${docsDir.path}/${tourPath.substring(mi + docsMarker.length)}';
+      if (healedPath != tourPath) {
+        await DebugLogHelper.addDebugLog('TOUR_PLAYER: Healed stale container path');
+        tourPath = healedPath;
+      }
+    }
+    final fileUrl = 'file://$tourPath/index.html';
     await DebugLogHelper.addDebugLog('TOUR_PLAYER: Using mobile file URL: $fileUrl');
     return fileUrl;
   }
