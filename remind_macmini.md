@@ -6,7 +6,7 @@
 
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 **When chat history is compacted, user will ask you to read @remind_macmini.md**
-**Your Response**: "I've read my reminder file. Current status: A#72 complete (v1.2.9+63). Ready for next assignment. What should I execute?"
+**Your Response**: "I've read my reminder file. Current status: A#73 complete (v1.2.9+64). Ready for next assignment. What should I execute?"
 **To load assignments**: Read `/Volumes/USB DISK/Audioura/assignments/mac_mini_assignments.md` and execute the assignment at the top.
 
 ## 🎯 ROLE & RESPONSIBILITIES
@@ -17,14 +17,15 @@
 
 ## 📊 CURRENT STATUS
 **Date**: 2026-05-26
-**Last Completed**: A#72 — v1.2.9+63 (stale container path healing for news articles)
+**Last Completed**: A#73 — v1.2.9+64 (app icon brick-red background)
 **Branch**: Newsletters
 **Build Status**: ✅ iOS builds working on iPhone 16
-**Last Commit**: `b7e58fd` — pushed to origin/Newsletters
+**Last Commit**: `75f6016` — pushed to origin/Newsletters
 
 ### RECENT HISTORY:
 - **A#71** (v1.2.9+62): Fixed app name "Audioura" in Info.plist. Article white screen diagnosed as stale container paths (NOT WebView API). Committed app name fix + pubspec bump.
 - **A#72** (v1.2.9+63): Applied A#56 path-healing pattern to news articles. Two files changed: `my_news_screen.dart` (_loadNews heals paths) and `news_player_screen.dart` (FutureBuilder + _getIndexUrl heals path before WebView load). Tests passed — articles load, no white screen.
+- **A#73** (v1.2.9+64): App icon background changed from white to brick-red (#A93105). Original script had a bug (assumed transparent master, but master was white RGB). Fixed by replacing white pixels with brick-red. 15 icon variants regenerated. Required app deletion + reinstall for iOS icon cache.
 
 ## 🗂️ KEY FILE LOCATIONS (MAC MINI)
 - **Assignments**: `/Volumes/USB DISK/Audioura/assignments/mac_mini_assignments.md`
