@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
 import 'dart:convert';
 import 'dart:io';
 
 import 'news_player_screen.dart';
+import 'debug_log_viewer_screen.dart';
 
 class MyNewsScreen extends StatefulWidget {
   const MyNewsScreen({super.key});
@@ -25,12 +27,47 @@ class _MyNewsScreenState extends State<MyNewsScreen> {
   Future<void> _loadNews() async {
     final prefs = await SharedPreferences.getInstance();
     final news = prefs.getStringList('saved_news') ?? [];
-    
-    setState(() {
-      _news = news.map((article) => jsonDecode(article) as Map<String, dynamic>).toList();
-    });
-    
 
+    await DebugLogHelper.addDebugLog('NEWS: Loading ${news.length} articles from storage');
+
+    // A#72: heal stale container paths. iOS reassigns the app container UUID on
+    // reinstall, so an article's stored absolute path can point at an old
+    // container that is now outside the sandbox (white screen on playback).
+    // Re-anchor each path to the current Documents directory on load.
+    final docsDir = await getApplicationDocumentsDirectory();
+    const docsMarker = '/Documents/';
+
+    final parsed = <Map<String, dynamic>>[];
+    int healed = 0;
+    for (final articleJson in news) {
+      try {
+        final article = jsonDecode(articleJson) as Map<String, dynamic>;
+        final storedPath = article['path'];
+        if (storedPath is String) {
+          final mi = storedPath.indexOf(docsMarker);
+          if (mi != -1) {
+            final healedPath =
+                '${docsDir.path}/${storedPath.substring(mi + docsMarker.length)}';
+            if (healedPath != storedPath) {
+              article['path'] = healedPath;
+              healed++;
+            }
+          }
+        }
+        parsed.add(article);
+      } catch (e) {
+        await DebugLogHelper.addDebugLog('NEWS: Skipping corrupt article entry: $e');
+      }
+    }
+    if (healed > 0) {
+      await DebugLogHelper.addDebugLog('NEWS: Healed $healed stale container path(s)');
+    }
+
+    await DebugLogHelper.addDebugLog('NEWS: Loaded ${parsed.length} valid articles (${news.length - parsed.length} skipped)');
+
+    setState(() {
+      _news = parsed;
+    });
   }
   
   Future<void> _deleteNews(int index) async {

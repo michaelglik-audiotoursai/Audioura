@@ -1,7 +1,7 @@
 name: audio_tour_app_dev
 description: AudioTours Dev - AI-powered audio tour generator
 publish_to: 'none'
-version: 1.2.9+62
+version: 1.2.9+63
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
