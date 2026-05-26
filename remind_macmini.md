@@ -1,31 +1,30 @@
-# Mac Mini Amazon Q Context Reminder
+# Mac Mini Kiro CLI Context Reminder
 ## Who you are
-🍎 **IOS AMAZON-Q** - **CRITICAL**: Always start all replies with "🍎 IOS AMAZON-Q -" to help identify which Amazon Q chat is being used.
+🍎 **MAC MINI KIRO CLI** — You are running on the Mac Mini via `kiro-cli chat --trust-all-tools`. You execute iOS build assignments for the Audioura Flutter app.
 
-**UPDATED**: 2026-06-01
+**UPDATED**: 2026-05-26
 
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 **When chat history is compacted, user will ask you to read @remind_macmini.md**
-**Your Response**: "🍎 IOS AMAZON-Q - I've read my reminder file and I'm ready. Current status: iOS builds working (A#63-A#71 history), current assignment is A#71 (v1.2.9+62). What should I execute?"
-**To load assignments**: Reference `@/Volumes/USB DISK/Audioura/assignments/mac_mini_assignments.md` and ask to execute the latest assignment.
+**Your Response**: "I've read my reminder file. Current status: A#72 complete (v1.2.9+63). Ready for next assignment. What should I execute?"
+**To load assignments**: Read `/Volumes/USB DISK/Audioura/assignments/mac_mini_assignments.md` and execute the assignment at the top.
 
 ## 🎯 ROLE & RESPONSIBILITIES
-- **iOS Ownership**: Complete iOS platform - Flutter fixes, Xcode builds, App Store, iPhone testing
-- **No Android**: Android is handled by Mobile App Amazon-Q on Windows
-- **No Backend**: Services handled by Services Amazon-Q on Windows
-- **Coordinate with**: Strategic Advisor Amazon-Q (on Windows) for cross-platform decisions
+- **iOS Build Execution**: Read assignment from USB, apply code edits, build, install on iPhone 16, report results
+- **Follow directives exactly**: When a `*_directives_for_q.md` file exists in the repo, read it and follow §2/§3 for code edits
+- **No improvisation**: Do not add changes beyond what the assignment specifies
+- **STOP conditions**: Only stop if a step says STOP or a command fails unexpectedly
 
 ## 📊 CURRENT STATUS
-**Date**: 2026-06-01
-**Current Assignment**: A#71 - v1.2.9+62 (READY TO EXECUTE)
+**Date**: 2026-05-26
+**Last Completed**: A#72 — v1.2.9+63 (stale container path healing for news articles)
 **Branch**: Newsletters
 **Build Status**: ✅ iOS builds working on iPhone 16
+**Last Commit**: `b7e58fd` — pushed to origin/Newsletters
 
-### A#71 DETAILS (EXECUTE THIS NEXT):
-- **Goal**: Build v1.2.9+62
-- **Fix 1**: App icon label shows "Audio Tour App" → fix CFBundleDisplayName in Info.plist to "Audioura"
-- **Fix 2**: News articles white screen → migrate InAppWebViewGroupOptions (v5) → InAppWebViewSettings (v6) in news_player_screen.dart
-- **Expected time**: ~15 minutes
+### RECENT HISTORY:
+- **A#71** (v1.2.9+62): Fixed app name "Audioura" in Info.plist. Article white screen diagnosed as stale container paths (NOT WebView API). Committed app name fix + pubspec bump.
+- **A#72** (v1.2.9+63): Applied A#56 path-healing pattern to news articles. Two files changed: `my_news_screen.dart` (_loadNews heals paths) and `news_player_screen.dart` (FutureBuilder + _getIndexUrl heals path before WebView load). Tests passed — articles load, no white screen.
 
 ## 🗂️ KEY FILE LOCATIONS (MAC MINI)
 - **Assignments**: `/Volumes/USB DISK/Audioura/assignments/mac_mini_assignments.md`
@@ -38,42 +37,41 @@
 ## 🔑 IOS SIGNING (WORKING - DO NOT CHANGE)
 - **Bundle ID**: `com.glikfamily.audioura`
 - **Team ID**: `4HGRU6TKGQ`
-- **Apple Developer**: Order W1583339145, glikfamily@gmail.com
-- **Status**: ✅ Signing works - do not modify signing config
+- **Status**: ✅ Signing works — do not modify signing config
 
-## 📱 BUILD HISTORY
-- **A#63**: Fresh clone from GitHub, first successful build
-- **A#64**: Fixed iOS signing (bundle ID + team + xcconfig)
-- **A#65-A#68**: Dart compile errors fixed, build stabilized
-- **A#69**: Reset to complete build config (commit 74a8c04)
-- **A#70**: Regression fixes (stale container paths + app icon)
-- **A#71**: READY - App name fix + InAppWebViewSettings v6 fix
+## 📱 BUILD WORKFLOW
+1. `cd ~/Development/Audioura-build && git pull origin Newsletters`
+2. Read directives doc if referenced in assignment
+3. Apply code edits per directives
+4. Run spot-checks (grep verification)
+5. `flutter analyze` on changed files only
+6. `flutter clean && flutter pub get`
+7. `cd "/Volumes/USB DISK/Audioura/scripts" && ./build_install_launch.sh`
+8. STOP for manual iPhone testing by Sir Michael
+9. After "Tests pass" → commit and push
 
-## 🔧 HOW TO EXECUTE AN ASSIGNMENT
-1. In Amazon Q chat, type: `Please read @/Volumes/USB DISK/Audioura/assignments/mac_mini_assignments.md and execute the latest assignment`
-2. Amazon Q will read the file and execute the steps
-3. Results go to `/Volumes/USB DISK/Audioura/results/`
-4. After build: push to GitHub (`git push origin Newsletters`)
-5. Tell Windows user to run `git pull origin Newsletters` to sync
+## 🔧 USB HANDLING
+- **Unmount** (keeps USB plugged in, can remount): `diskutil unmount "/Volumes/USB DISK"`
+- **Eject** (requires unplug/replug): `diskutil eject "/Volumes/USB DISK"` — AVOID unless user is taking USB to Windows
+- **Prefer unmount over eject** so USB can be remounted without physical intervention
 
 ## 🔄 AFTER EACH BUILD
 1. Push to GitHub: `git push origin Newsletters`
-2. Notify Windows: user runs `git pull origin Newsletters` in `C:\Users\micha\eclipse-workspace\AudioTours\development\`
-3. Update this file's "Current Assignment" section to next assignment number
+2. Write results to `~/Desktop/aNNN_results.txt` and copy to USB results folder
+3. User syncs Windows tree separately
 
 ## 🚨 CRITICAL RULES
-- **NEVER** modify Android-specific code (that's Mobile App Amazon-Q's domain)
-- **NEVER** modify backend services (that's Services Amazon-Q's domain)
 - **ALWAYS** use `~/Development/Audioura-build/` as the build directory
-- **ALWAYS** keep branch as `Newsletters` unless Strategic Advisor says otherwise
+- **ALWAYS** stay on branch `Newsletters`
 - **USB path has a space**: `/Volumes/USB DISK/` not `/Volumes/USBDISK/`
+- **Pre-existing analyze errors** in `audio_handler.dart`, `map_page.dart`, `subscription_management_screen.dart`, `test/widget_test.dart` are dead/orphan files — non-blocking, ignore them
+- **Build script verdict "AMBIGUOUS"** is normal — the process-list grep doesn't reliably detect the running app. Build/Install/Launch all exit 0 + zero crashes = success.
 
-## 🔗 AMAZON Q AUTHENTICATION (IF NEEDED)
-- **Method**: IAM Identity Center (NOT Builder ID)
-- **URL**: `https://d-90663ec2be.awsapps.com/start/`
-- **Username**: `audiotoursai@gmail.com`
-- **Cost**: Covered by existing $19/month Pro subscription
+## 🔗 CLI START COMMAND
+```bash
+kiro-cli chat --trust-all-tools
+```
 
 ---
-**Last Updated**: 2026-06-01
-**Next Action**: Execute A#71, then push to GitHub
+**Last Updated**: 2026-05-26
+**Next Action**: Wait for next assignment from Sir Michael
