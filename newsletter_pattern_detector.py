@@ -4,6 +4,7 @@ Newsletter Pattern Recognition Library
 Detects and extracts articles from different newsletter patterns
 """
 from bs4 import BeautifulSoup
+from urllib.parse import urlparse, urljoin
 import re
 import logging
 
@@ -252,10 +253,10 @@ def detect_newsletter_patterns(soup, newsletter_url):
     return all_articles
 
 def detect_generic_read_more_pattern(soup, base_url):
-    """Detect generic 'Read more' patterns in any newsletter"""
+    """Detect generic 'Read more' patterns and blog/newsletter homepage article listings"""
     articles = []
     
-    # Look for links with "read more" type text
+    # --- Pattern A: Links with "read more" type text ---
     read_more_patterns = [
         r'read\s+more',
         r'continue\s+reading', 
@@ -280,7 +281,151 @@ def detect_generic_read_more_pattern(soup, base_url):
             })
             logging.info(f"Found generic read-more article: {href}")
     
+    # --- Pattern B: Blog/newsletter homepage with same-domain article links ---
+    # Detects pages that list multiple articles as linked cards (Ghost, WordPress, etc.)
+    if not articles:
+        blog_articles = detect_blog_homepage_pattern(soup, base_url)
+        articles.extend(blog_articles)
+    
     return articles
+
+def detect_blog_homepage_pattern(soup, base_url):
+    """
+    Detect blog/newsletter homepage pattern where the page lists multiple articles
+    from the same domain as linked cards with titles and summaries.
+    Common on Ghost, WordPress, Substack archive pages, and similar platforms.
+    """
+    articles = []
+    
+    parsed_base = urlparse(base_url)
+    base_domain = parsed_base.netloc.replace('www.', '')
+    
+    # Collect all links that point to the same domain (internal article links)
+    all_links = soup.find_all('a', href=True)
+    candidate_articles = []
+    
+    # Navigation/utility paths to skip
+    skip_paths = [
+        '/page/', '/tag/', '/author/', '/category/', '/about', '/contact',
+        '/subscribe', '/login', '/signup', '/account', '/search', '/privacy',
+        '/terms', '/rss', '/feed', '/sitemap', '/#', '/cdn-cgi/'
+    ]
+    
+    for link in all_links:
+        href = link.get('href', '')
+        
+        # Resolve relative URLs
+        full_url = urljoin(base_url, href)
+        parsed_href = urlparse(full_url)
+        link_domain = parsed_href.netloc.replace('www.', '')
+        
+        # Must be same domain
+        if link_domain != base_domain:
+            continue
+        
+        # Must have a meaningful path (not just the homepage)
+        path = parsed_href.path.rstrip('/')
+        if not path or path == '':
+            continue
+        
+        # Skip navigation/utility pages
+        if any(skip in path.lower() for skip in skip_paths):
+            continue
+        
+        # Get the link text content (title + possibly summary)
+        link_text = link.get_text(separator=' ', strip=True)
+        
+        # Must have substantial text (article title + possibly summary)
+        # A real article card typically has at least a multi-word title
+        if len(link_text) < 20:
+            continue
+        
+        # Skip if text looks like navigation
+        if link_text.lower() in ['home', 'about', 'contact', 'subscribe', 'sign in', 'see all']:
+            continue
+        
+        # Extract title: first sentence or line, typically the headline
+        # Many blog cards have format: "Title Summary text By Author —Date"
+        title = ''
+        summary = ''
+        
+        # Try to split title from summary
+        # Common patterns: title is in a child heading element
+        heading = link.find(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
+        if heading:
+            title = heading.get_text(strip=True)
+            # Summary is the remaining text
+            summary = link_text.replace(title, '').strip()
+        else:
+            # No heading — try splitting on "By " (author attribution) or date patterns
+            by_split = re.split(r'\s+By\s+', link_text, maxsplit=1)
+            if len(by_split) == 2 and len(by_split[0]) > 15:
+                # Everything before "By Author" is title+summary
+                content_part = by_split[0]
+            else:
+                content_part = link_text
+            
+            # Try to separate title from summary by looking for sentence boundaries
+            # Title is usually the first sentence/phrase
+            sentences = re.split(r'(?<=[.!?])\s+', content_part, maxsplit=1)
+            if len(sentences) >= 2 and len(sentences[0]) >= 15:
+                title = sentences[0]
+                summary = sentences[1][:200]
+            else:
+                # Use first ~80 chars as title
+                if len(content_part) > 80:
+                    # Try to break at a word boundary
+                    space_idx = content_part.rfind(' ', 0, 80)
+                    if space_idx > 30:
+                        title = content_part[:space_idx]
+                        summary = content_part[space_idx:].strip()[:200]
+                    else:
+                        title = content_part[:80]
+                        summary = content_part[80:].strip()[:200]
+                else:
+                    title = content_part
+        
+        # Clean up title
+        title = title.strip()
+        if not title or len(title) < 10:
+            continue
+        
+        # Remove date patterns from end of title (e.g., "—28 May 2026")
+        title = re.sub(r'\s*[—–-]\s*\d{1,2}\s+\w+\s+\d{4}\s*$', '', title).strip()
+        
+        candidate_articles.append({
+            'url': full_url,
+            'title': title,
+            'summary': summary.strip(),
+            'text_length': len(link_text),
+            'path': path
+        })
+    
+    # Deduplicate by URL path
+    seen_paths = set()
+    unique_candidates = []
+    for candidate in candidate_articles:
+        if candidate['path'] not in seen_paths:
+            seen_paths.add(candidate['path'])
+            unique_candidates.append(candidate)
+    
+    # Only treat as a blog homepage if we found multiple same-domain article links
+    # (a single link could just be a self-reference; 3+ suggests a listing page)
+    if len(unique_candidates) >= 3:
+        logging.info(f"Blog homepage pattern detected: {len(unique_candidates)} same-domain article links found on {base_domain}")
+        for candidate in unique_candidates:
+            articles.append({
+                'url': candidate['url'],
+                'title': candidate['title'],
+                'summary': candidate['summary'],
+                'pattern': 'blog_homepage'
+            })
+            logging.info(f"Found blog article: '{candidate['title'][:60]}...' -> {candidate['url']}")
+    else:
+        logging.info(f"Blog homepage pattern: Only {len(unique_candidates)} same-domain links found (need 3+), skipping")
+    
+    return articles
+
 
 def detect_quora_pattern(soup, base_url):
     """Detect Quora article links from newsletter content"""

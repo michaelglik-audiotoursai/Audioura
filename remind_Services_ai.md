@@ -2,7 +2,7 @@
 ## Who you are
 🔧 **SERVICES AMAZON-Q** — **CRITICAL**: Always start ALL replies with "🔧 SERVICES AMAZON-Q -"
 
-**UPDATED**: 2026-06-01 (ISSUE-AD-FILTER fixed and committed `1a7b4dc`: `ref=`/`referrer=` removed; switched to `parse_qs` key-based query matching (fixes entire class of false-positive bugs); test converted to assertions. 16/16 pass. NEXT ACTION: mobile testing — edit a stop, promote a tour, test duplicate name conflict. Then: enable mobile clients outside local WiFi.)
+**UPDATED**: 2026-05-28 (ISSUE-BLOG-PATTERN: `newsletter_pattern_detector.py` — added `detect_blog_homepage_pattern()` for Ghost/WordPress/blog homepages that list articles as linked cards without "read more" buttons. Fixes reloadnyc.com only returning 1 article instead of 12. Deployed and tested. NEXT ACTION: mobile testing — edit a stop, promote a tour, test duplicate name conflict. Then: enable mobile clients outside local WiFi.)
 
 1. You are Services Amazon-Q responsible for all Docker services in `C:\Users\micha\eclipse-workspace\AudioTours\development\`. You have blanket approval to change code, run Python programs, start/stop Docker services without waiting for approval.
 2. You maintain this file and update it after significant changes.
@@ -15,7 +15,7 @@
 - **GIT RULE**: Do NOT commit code until user confirms mobile testing passed
 - **BRANCH**: `Newsletters` (Tours_Step_Maps merged and deleted 2026-05-22)
 - **MERGE TARGET**: `main` (when Newsletter feature complete)
-- **LAST GIT COMMIT**: `1a7b4dc` — ISSUE-AD-FILTER: advertising_url_filter.py parse_qs fix + assertions
+- **LAST GIT COMMIT**: `fd10ad5` — ISSUE-BLOG-PATTERN: newsletter_pattern_detector.py blog homepage detection
 - **NEXT ACTION ON RECOVERY**: Verify containers running (`docker ps`), then proceed with mobile testing (v1.2.6.234). Smoke tests already passed 6/6. No pending code changes.
 - **WORKFLOW**: Blanket approval given for all service changes — implement without waiting
 
@@ -137,7 +137,9 @@ tour-editing-phase2-1:5022            # Tour editing phase 2 ← ACTIVE WORK
 | `claude_response_promote_endpoint_review.md` | local only | `61e883d` | Claude review of REQ-PROMOTE — all issues addressed |
 | `.env.example` | local only | — | Template for AWS credentials env vars (no real secrets) — commit to git |
 | `advertising_url_filter.py` | `newsletter-processor-1:5017` | `1a7b4dc` | ISSUE-AD-FILTER: `ref=`/`referrer=` removed; `parse_qs` key-based query matching; assertion-based tests. 16/16 pass. |
+| `newsletter_pattern_detector.py` | `newsletter-processor-1:5017` | `fd10ad5` | ISSUE-BLOG-PATTERN: added `detect_blog_homepage_pattern()` for Ghost/WordPress/blog homepages. Fixes reloadnyc.com 1→12 articles. |
 | `claude_review_advertising_filter_fix_2026_06_01.md` | local only | — | Claude review request for ISSUE-AD-FILTER fix |
+| `claude_review_blog_homepage_pattern_2026_05_28.md` | local only | — | Claude review request for ISSUE-BLOG-PATTERN fix |
 
 ---
 
@@ -200,6 +202,7 @@ Indexes:
 - **polly-tts `voice` vs `voice_id`**: ✅ Fixed in v1.2.6.234 — editing service now sends `voice_id`.
 - **`development-tour-generator-1` and `development-tour-orchestrator-1`**: Show "unhealthy" in `docker ps` — health check config issue only, both work correctly.
 - **ISSUE-AD-FILTER** (newsletter `ref=` false-positive): ✅ Fixed and committed `1a7b4dc` — switched to `parse_qs` key-based query parameter matching; eliminates entire class of substring false-positives (`?topic=offering`, `?q=promotion+news`, etc.). 16/16 assertion tests pass.
+- **ISSUE-BLOG-PATTERN** (blog homepage only returns 1 article): ✅ Fixed — added `detect_blog_homepage_pattern()` to `newsletter_pattern_detector.py`. Detects same-domain article card listings (Ghost, WordPress, etc.). reloadnyc.com now returns 12 articles instead of 1. Deployed to container.
 
 ---
 
@@ -252,4 +255,5 @@ Indexes:
 | ISSUE-061 | map_delivery translations excluded from tours-near; is_translation+parent_tour_id added |
 | REQ-PROMOTE | promote endpoint designed, smoke-tested, Claude-reviewed |
 | v1.2.6.234 | Language-aware editing (Parts A/B/C) complete — VOICE_MAP, content_language TTS, Comprehend lang detection, _apply_custom_audio_file, promote lineage+UniqueViolation. Smoke tests 6/6 pass. Committed fbfc8d2. Awaiting mobile test. |
-| 2026-06-01 | Git cleanup pass by Strategic Advisor. remind_Services_ai.md reconstructed. ISSUE-AD-FILTER: `advertising_url_filter.py` — `ref=`/`referrer=` removed; `parse_qs` key-based matching (Claude Q2); assertion tests (Claude Q4). Committed `1a7b4dc`. |}
+| 2026-06-01 | Git cleanup pass by Strategic Advisor. remind_Services_ai.md reconstructed. ISSUE-AD-FILTER: `advertising_url_filter.py` — `ref=`/`referrer=` removed; `parse_qs` key-based matching (Claude Q2); assertion tests (Claude Q4). Committed `1a7b4dc`. |
+| 2026-05-28 | ISSUE-BLOG-PATTERN: `newsletter_pattern_detector.py` — added `detect_blog_homepage_pattern()` for blog/newsletter homepages (Ghost, WordPress). Fixes reloadnyc.com returning 1 article instead of 12. Deployed to container. |}
