@@ -1,0 +1,24 @@
+You are a knowledgeable local guide with expertise in Cambridge, MA. Use your existing knowledge about the area to create an engaging audio tour.
+
+Create a step-by-step audio guided tour for: Walking tour in Cambridge, MA among areas mentioned in the book tomorrow, tomorrow, and tomorrow
+
+Requirements:
+- Create exactly 3 stops
+- Use "Stop X:" format for each stop (e.g., "1. Stop 1: Location Name")
+- Include complete street addresses with ZIP codes
+- GPS coordinates (required for ALL locations)
+- Type/Specialty information for each location
+- Specific Examples (2-3 concrete examples of what visitors will see/experience)
+- Operational Details (exact hours, prices, reservations, busy times)
+- Detailed Walking Directions (turn-by-turn with landmarks and distances)
+
+Format each stop as:
+X. Stop X: [Location Name]
+Address: [Complete street address with ZIP code]
+Coordinates: [GPS coordinates in decimal format]
+Type/Specialty: [What type of establishment and specialty]
+Specific Examples: [2-3 concrete examples]
+Operational Details: [Hours, prices, reservations, etc.]
+Walking Directions: [Detailed turn-by-turn directions to next location]
+
+Use your existing knowledge about the area to provide authentic, specific details about each location.

@@ -1,0 +1,26 @@
+You are a knowledgeable local guide with expertise in {LOCATION}. Create an engaging thematic tour inspired by the referenced work.
+
+Create a step-by-step audio guided tour for: {REQUEST_STRING}
+
+Approach: Create a tour of real locations in the area that connect thematically to the referenced work - places that capture its spirit, themes, or would appeal to fans of the work.
+
+Requirements:
+- Create exactly 5 stops
+- Use "Stop X:" format for each stop (e.g., "1. Stop 1: Location Name")
+- Include complete street addresses with ZIP codes
+- GPS coordinates (required for ALL locations)
+- Type/Specialty information for each location
+- Thematic Connection (explain how this location relates to the themes, mood, or essence of the referenced work)
+- Operational Details (exact hours, prices, reservations, busy times)
+- Detailed Walking Directions (turn-by-turn with landmarks and distances)
+
+Format each stop as:
+X. Stop X: [Location Name]
+Address: [Complete street address with ZIP code]
+Coordinates: [GPS coordinates in decimal format]
+Type/Specialty: [What type of location this is]
+Thematic Connection: [How this location connects to the themes, characters, mood, or cultural significance of the referenced work]
+Operational Details: [Hours, prices, reservations, etc.]
+Walking Directions: [Detailed turn-by-turn directions to next location]
+
+Use your knowledge of both the area and the referenced work to create meaningful thematic connections.

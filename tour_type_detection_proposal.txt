@@ -1,0 +1,70 @@
+# Tour Type Detection System - Enhanced Context for Reference Tours
+
+## Problem Analysis
+- **Current System**: Works well for operational tours (restaurants, museums)
+- **Gap**: Reference tours (books, movies, history) need richer contextual information
+- **Example**: "Porter Square T station mentioned in the book" needs specific quotes, scenes, character interactions
+
+## Proposed Solution: Dual Template System
+
+### Step 1: Tour Type Detection
+```python
+def detect_tour_type(request_string):
+    contextual_keywords = [
+        'book', 'novel', 'movie', 'film', 'podcast', 'historic figure', 
+        'history', 'mentioned in', 'featured in', 'inspired by',
+        'character', 'scene', 'episode', 'chapter'
+    ]
+    
+    operational_keywords = [
+        'restaurant', 'museum', 'gallery', 'shop', 'store', 'cafe',
+        'bakery', 'bar', 'pub', 'hotel', 'theater'
+    ]
+    
+    if any(keyword in request_string.lower() for keyword in contextual_keywords):
+        return "CONTEXTUAL"
+    elif any(keyword in request_string.lower() for keyword in operational_keywords):
+        return "OPERATIONAL"
+    else:
+        return "OPERATIONAL"  # Default to operational
+```
+
+### Step 2: Enhanced Templates
+
+#### Operational Template (Current - Keep As Is)
+- Focus: Hours, prices, specific offerings, operational details
+- Example: "Open Tuesday-Saturday 10:00 AM - 5:30 PM, admission $15"
+
+#### Contextual Template (New - Enhanced Context)
+- Focus: Detailed references, quotes, scenes, historical significance
+- Enhanced "Specific Examples" section with contextual depth
+
+### Step 3: Contextual Template Enhancement
+```
+Contextual References: [Detailed quotes, scenes, or historical context - 3-4 specific examples with rich detail]
+- Quote or scene from the source material
+- Character interactions or plot significance  
+- Historical context or cultural importance
+- Specific details about how location appears in source
+```
+
+## Example Enhancement for Cambridge Book Tour
+
+### Current (Generic):
+"The Porter Square T station with its distinctive underground escalator system mentioned in the book"
+
+### Enhanced (Contextual):
+"The Porter Square T station features prominently in Chapter 12 when Sam and Sadie meet after their argument, with the author describing 'the long descent on the escalator giving them time to rehearse what they would say to each other.' The distinctive underground escalator system becomes a metaphor for their relationship's ups and downs, and the station's multicultural atmosphere reflects the diverse gaming community they're trying to build."
+
+## Implementation Plan
+1. **Add tour type detection** to existing prompt generation
+2. **Create contextual template** alongside operational template  
+3. **Enhance AI prompting** for contextual tours to request specific quotes/scenes
+4. **Preserve existing functionality** for operational tours
+5. **Test with book/movie tours** to verify enhanced context
+
+## Benefits
+- ✅ **Preserves Current Success**: Restaurants, museums unchanged
+- ✅ **Enhances Reference Tours**: Rich contextual information
+- ✅ **Automatic Detection**: No manual configuration needed
+- ✅ **Scalable**: Works for any reference material (books, movies, podcasts)

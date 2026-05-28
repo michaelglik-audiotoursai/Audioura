@@ -1,0 +1,48 @@
+You are a knowledgeable local guide with expertise in restaurants in North End, Boston, MA. Use your existing knowledge about popular restaurants in North End, Boston, MA to create an informative tour.
+
+🚨 CRITICAL FORMATTING REQUIREMENTS - MUST BE FOLLOWED EXACTLY:
+1. MUST use "Stop X:" format for ALL stops (e.g., "Stop 1: The Corrib Pub")
+2. MUST include COMPLETE street address with ZIP code for EVERY stop
+3. MUST include GPS coordinates for the FIRST stop
+4. MUST include DETAILED turn-by-turn walking directions between ALL stops
+5. MUST use REAL, SPECIFIC business names (not "Restaurant 1", "Store 1", etc.)
+6. MUST include SPECIFIC operational details (exact hours, price ranges, specialties)
+7. MUST provide 2-3 CONCRETE EXAMPLES of what makes each business unique
+
+For a tour of restaurants in North End, Boston, MA, please provide information about 5 actual restaurants.
+
+FORMAT EACH STOP EXACTLY LIKE THIS:
+
+Stop 1: [REAL SPECIFIC business name - e.g., "The Corrib Pub"]
+Address: [COMPLETE street address with ZIP - e.g., "2030 Centre Street, West Roxbury, MA 02132"]
+Coordinates: [Latitude, Longitude - REQUIRED for first stop - e.g., "42.2796, -71.1708"]
+Type/Specialty: [What type of business and what they specialize in]
+Specific Examples: [2-3 CONCRETE examples - e.g., "Famous for their Guinness beef stew recipe from 1987, live Irish music every Friday with the O'Malley Brothers, and their signature fish and chips using Atlantic cod"]
+Operational Details: [EXACT hours, price range, reservations - e.g., "Open Mon-Thu 11:30 AM - 11:00 PM, Fri-Sat until 1:00 AM, entrees $15-28, no reservations needed"]
+Walking Directions: [DETAILED turn-by-turn directions - e.g., "From West Roxbury Center T station, exit onto Centre Street and walk north. Pass CVS Pharmacy on your right, continue 2 blocks to the intersection with Corey Street. The pub is on your right in a red brick building with green awning."]
+
+Stop 2: [REAL SPECIFIC business name - e.g., "Himalayan Bistro"]
+Address: [COMPLETE street address with ZIP - e.g., "1735 Centre Street, West Roxbury, MA 02132"]
+Type/Specialty: [What type of business and what they specialize in]
+Specific Examples: [2-3 CONCRETE examples - e.g., "Known for their authentic momos (Tibetan dumplings) made fresh daily, their spicy chicken curry with 12 traditional spices, and weekend buffet featuring 15 Nepalese dishes"]
+Operational Details: [EXACT hours, price range, reservations - e.g., "Open Tue-Sun 5:00 PM - 9:30 PM, closed Mondays, entrees $12-22, reservations recommended for groups of 4+"]
+Walking Directions: [DETAILED turn-by-turn directions from previous stop - e.g., "From The Corrib Pub, head north on Centre Street. Walk 3 blocks (approximately 0.3 miles, 6-minute walk). Pass the West Roxbury Branch Library on your left. The restaurant is on your right in a white building with blue trim, next to Roche Bros grocery store."]
+
+[Continue for all 5 stops]
+
+🔥 CRITICAL REQUIREMENTS:
+- Each stop MUST start with "Stop X:" followed by a real, specific business name
+- Each stop MUST include a COMPLETE street address with city, state, ZIP code
+- First stop MUST include GPS coordinates in "latitude, longitude" format
+- Each stop MUST include DETAILED turn-by-turn walking directions with specific landmarks
+- Each stop MUST include 2-3 CONCRETE, SPECIFIC examples (not generic statements)
+- Include EXACT operating hours and price ranges
+- Use actual street names, landmarks, and specific directions
+- NO generic statements like "commitment to quality" - give SPECIFIC examples
+
+EXAMPLE OF SPECIFIC VS GENERIC:
+❌ GENERIC: "Known for their commitment to quality and excellent service"
+✅ SPECIFIC: "Famous for their 24-hour dry-aged steaks, sommelier-selected wine pairings, and tableside Caesar salad preparation"
+
+❌ GENERIC: "Popular local restaurant with great atmosphere"
+✅ SPECIFIC: "Features live jazz every Thursday with the Boston Quartet, exposed brick walls from 1892, and their signature lobster mac and cheese with Maine lobster"

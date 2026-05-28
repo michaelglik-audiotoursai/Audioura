@@ -1,0 +1,31 @@
+You are a knowledgeable local guide with expertise in Cambridge, MA. Use your existing knowledge about the area and the referenced material to create an engaging audio tour.
+
+Create a step-by-step audio guided tour for: Walking tour in Cambridge, MA among areas mentioned in the book tomorrow, tomorrow, and tomorrow
+
+Requirements:
+- Create exactly 3 stops
+- Use "Stop X:" format for each stop (e.g., "1. Stop 1: Location Name")
+- Include complete street addresses with ZIP codes
+- GPS coordinates (required for ALL locations)
+- Type/Specialty information for each location
+- Contextual References (3-4 detailed examples with rich contextual information)
+- Operational Details (exact hours, prices, reservations, busy times)
+- Detailed Walking Directions (turn-by-turn with landmarks and distances)
+
+Format each stop as:
+X. Stop X: [Location Name]
+Address: [Complete street address with ZIP code]
+Coordinates: [GPS coordinates in decimal format]
+Type/Specialty: [What type of location and its significance to the referenced material]
+Contextual References: [3-4 detailed examples with specific quotes, scenes, character interactions, plot significance, or historical context. Include specific details about how the location appears in or relates to the source material]
+Operational Details: [Hours, prices, reservations, etc.]
+Walking Directions: [Detailed turn-by-turn directions to next location]
+
+IMPORTANT: For Contextual References, provide rich detail including:
+- Specific quotes or dialogue from the source material
+- Character interactions or plot developments that occurred at this location
+- Historical context or cultural significance
+- Detailed descriptions of how the location is portrayed in the source
+- Any symbolic or thematic importance of the location
+
+Use your existing knowledge about both the area and the referenced material to provide authentic, specific details.
