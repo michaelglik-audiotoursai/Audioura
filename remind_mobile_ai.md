@@ -12,14 +12,14 @@
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 When chat history is compacted, user will ask you to read @remind_ai.md and @remind_mobile_ai.md.
 **Your Response**:
-"📱 MOBILE APP AMAZON-Q - I've read both reminder files. Current version is v1.2.9+65, committed and pushed to Newsletters branch on GitHub. A#75 is complete (news_player_screen.dart InAppWebView v6 migration). iOS smoke test passed on iPhone. Android build v1.2.9+65 is needed on Ubuntu VM. Ready to continue."
+"📱 MOBILE APP AMAZON-Q - I've read both reminder files. Current version is v1.2.9+65, committed and pushed to services-migration branch on GitHub. A#75 is complete (news_player_screen.dart InAppWebView v6 migration). iOS smoke test passed on iPhone. Android build v1.2.9+65 is needed on Ubuntu VM. Ready to continue."
 
 ## CURRENT PROJECT STATUS
 **Project**: Audioura Mobile App — iOS iPhone + Android
-**Version**: v1.2.9+65 ✅ COMMITTED, PUSHED to GitHub (Newsletters branch)
+**Version**: v1.2.9+65 ✅ COMMITTED, PUSHED to GitHub (services-migration branch)
 **iOS**: ✅ A#75 complete — smoke tested on iPhone
 **Android**: 🔄 Build pending on Ubuntu VM (v1.2.9+65 not yet built for Android)
-**Branch**: Newsletters
+**Branch**: services-migration
 **Bundle ID**: `com.glikfamily.audioura`
 **App Name**: Audioura
 
@@ -73,7 +73,7 @@ bash build_flutter_clean.sh
 **Workflow**: Analyze → Propose Plan → Get Approval → Implement → User Tests
 
 ## 🗺️ A#55 MAP BUTTONS — PENDING (ANDROID, NOT YET IMPLEMENTED)
-**Branch**: `Tours_Step_Maps` merged into `Newsletters` — work continues on Newsletters
+**Branch**: `Tours_Step_Maps` merged into `Newsletters` — work continues on services-migration
 **Status**: C1/C2/C3 confirmed ✅, `_countStops()` bug fix proposed, NOT YET IMPLEMENTED
 
 ### 🐛 _countStops() BUG — FIX PROPOSED, NOT YET APPLIED
@@ -95,7 +95,7 @@ bash build_flutter_clean.sh
 ## CRITICAL REMINDERS
 - ❌ **NEVER attempt APK build in Windows** — Always requires Ubuntu VM
 - ❌ **NEVER attempt iOS build in Windows** — Always requires Mac Mini
-- 🌿 **All commits go to Newsletters branch** — NOT main branch
+- 🌿 **All commits go to services-migration branch** — NOT main branch
 - 🔄 **Version Management**: Only increment version for functional changes, not build fixes
 - ⚠️ **BUILD ERROR RULE**: NEVER increment version numbers when fixing build errors
 
@@ -124,7 +124,7 @@ bash build_flutter_clean.sh
 - **Dev tree**: `C:\Users\micha\eclipse-workspace\AudioTours\development\audio_tour_app\`
 - **Build**: Ubuntu VM — `bash build_flutter_clean.sh` (shared folder, no git pull needed)
 - **APK output**: `audioura-dev.apk`
-- **Branch**: Newsletters
+- **Branch**: services-migration
 
 ## ENCRYPTION IMPLEMENTATION - VERIFIED SECURE (HISTORICAL)
 **Method**: RFC 3526 Diffie-Hellman (2048-bit) → SHA-256 full entropy → AES-128-CBC

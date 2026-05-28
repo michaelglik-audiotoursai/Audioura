@@ -30,7 +30,7 @@ This is required so the user can identify which Amazon-Q tab they are talking to
 #### Three locations — two are git repos
 ```
 GitHub (remote)
-  repo: michaelglik-audiotoursai/Audioura  branch: Newsletters
+  repo: michaelglik-audiotoursai/Audioura  branch: services-migration
        ↑ push                    ↓ pull
        |                         |
 Mac Mini clone            Windows dev tree
@@ -50,9 +50,9 @@ D:\Audioura\assets\
 - Mac Mini Q does `git pull` → reads directives → edits files directly in `~/Development/Audioura-build/development/` → commits + pushes
 - `copy_ios_fixes.sh` is legacy (used in A#71 and earlier)
 
-- **Mac Mini build clone**: `~/Development/Audioura-build/`, branch `Newsletters` ✅
+- **Mac Mini build clone**: `~/Development/Audioura-build/`, branch `services-migration` ✅
 - **Flutter project path**: `~/Development/Audioura-build/development/audio_tour_app/`
-- **Windows dev tree**: `C:\Users\micha\eclipse-workspace\AudioTours\development\` — IS a git clone, branch `Newsletters`
+- **Windows dev tree**: `C:\Users\micha\eclipse-workspace\AudioTours\development\` — IS a git clone, branch `services-migration`
 - **USB assets** (`D:\Audioura\assets\`): NOT a git repo — legacy staging area only
 - **OLD repo**: `~/Development/AudioTours/` — BROKEN, do NOT use
 - **Remote**: `https://github.com/michaelglik-audiotoursai/Audioura.git`
@@ -62,9 +62,9 @@ D:\Audioura\assets\
 #### Git operation ownership
 | Operation | Who | Where | When |
 |---|---|---|---|
-| `git pull origin Newsletters` | Mac Mini (Q) | `~/Development/Audioura-build/` | Start of every assignment |
+| `git pull origin services-migration` | Mac Mini (Q) | `~/Development/Audioura-build/` | Start of every assignment |
 | `git add / commit / push` | Mac Mini (Q) | `~/Development/Audioura-build/` | After successful build + test |
-| `git pull origin Newsletters` | Sir Michael (Windows) | `C:\Users\micha\eclipse-workspace\AudioTours\development\` | After Mac Mini pushes |
+| `git pull origin services-migration` | Sir Michael (Windows) | `C:\Users\micha\eclipse-workspace\AudioTours\development\` | After Mac Mini pushes |
 | Any git operation | USB `D:\Audioura\assets\` | — | **NEVER** — not a git repo |
 
 ---
@@ -94,7 +94,7 @@ D:\Audioura\assets\
 2. **Legacy workflow (A#71 and earlier)**: `copy_ios_fixes.sh` copied 23 files from USB assets to Mac Mini. Still works but no longer the primary workflow.
 3. `build_install_launch.sh` — proven stable. Points at `~/Development/Audioura-build/development/audio_tour_app`.
 4. Every new assignment = directives doc committed to Windows dev tree + pushed before Mac Mini starts.
-5. After successful build → `git add` changed files → `git commit` → `git push origin Newsletters`.
+5. After successful build → `git add` changed files → `git commit` → `git push origin services-migration`.
 6. **LF FILES**: `home_screen.dart`, `tour_generator_screen.dart`, `my_tours_screen.dart` — `fsReplace` FAILS on Windows. Use Python script via `fsWrite` + `executeBash`.
 7. **PYTHON OUTPUT**: Not visible in stdout. Write result to file, read with `fsRead`.
 8. **Windows dev tree IS a git repo** — `git pull` works at `C:\Users\micha\eclipse-workspace\AudioTours\development\`. Q never commits from there — Mac Mini only.
@@ -103,13 +103,13 @@ D:\Audioura\assets\
 ---
 
 ### 🏗️ **BUILD PROCESS**
-- Build from: `~/Development/Audioura-build/`, branch `Newsletters`
+- Build from: `~/Development/Audioura-build/`, branch `services-migration`
 - Flutter project: `~/Development/Audioura-build/development/audio_tour_app/`
 - Old `~/Development/AudioTours/` repo is BROKEN — never use it
 - Standard build cycle:
   ```bash
   cd ~/Development/Audioura-build
-  git pull origin Newsletters
+  git pull origin services-migration
   cd development/audio_tour_app
   flutter clean
   flutter pub get
@@ -205,7 +205,7 @@ GET http://192.168.0.218:5005/download-tour/<translated_id>  → ZIP file
 - **A#59**: ✅ v1.2.9+59/+60 — NF8 jitter + IndexedStack Listen reload
 - **A#60**: ✅ v1.2.9+60 — single-POI `_fitBounds` guard
 - **A#61–A#62**: [CANCELLED] — old repo was broken. Superseded by A#63+.
-- **A#63**: ✅ Fresh clone `~/Development/Audioura-build/`, branch `Newsletters`
+- **A#63**: ✅ Fresh clone `~/Development/Audioura-build/`, branch `services-migration`
 - **A#64**: ✅ iOS signing fixed (bundle ID `com.glikfamily.audioura`, team `4HGRU6TKGQ`)
 - **A#65**: ✅ `dart:async` import fix in `my_tours_screen.dart`
 - **A#66**: ✅ flutter analyze errors confirmed non-blocking (dead files only)

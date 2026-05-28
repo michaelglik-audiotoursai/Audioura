@@ -13,12 +13,13 @@ c:\Users\micha\eclipse-workspace\AudioTours\development\
 └── GitHub Repo: Audioura (Tag: 1.2.7.5)
 ```
 
-### 🌿 **CURRENT BRANCH: Newsletters**
-- **Active Branch**: `Newsletters` (for newsletter development)
-- **Base**: Created from main at v1.2.7+5
-- **Purpose**: Newsletter feature development
-- **GitHub**: https://github.com/michaelglik-audiotoursai/Audioura/tree/Newsletters
-- **⚠️ CRITICAL**: All commits must go to Newsletters branch, NOT main
+### 🌿 **CURRENT BRANCH: services-migration**
+- **Active Branch**: `services-migration` (for all ongoing development)
+- **Base**: Created from main at v1.2.9+65 (fast-forwarded from Newsletters 2026-05-28)
+- **Purpose**: All services and mobile development going forward
+- **GitHub**: https://github.com/michaelglik-audiotoursai/Audioura/tree/services-migration
+- **⚠️ CRITICAL**: All commits must go to services-migration branch, NOT main
+- **Newsletters branch**: Kept as archive, no longer active
 
 ### 🐳 **Docker Services Architecture**
 ```bash
@@ -116,29 +117,29 @@ newsletters_article_link(newsletter_id, article_requests_id)
 4. **CRITICAL**: Voice control should now work (ISSUE-009 FIXED)
 5. **Check**: Audio elements have proper id="audio1" attributes
 
-### 🔥 **MANDATORY GIT WORKFLOW - NEWSLETTERS BRANCH**
+### 🔥 **MANDATORY GIT WORKFLOW - services-migration BRANCH**
 **ALWAYS commit changes to Git after each successful modification. This prevents losing functionality if files get corrupted.**
 
-**⚠️ CRITICAL: Currently on Newsletters branch - DO NOT commit to main!**
+**⚠️ CRITICAL: Currently on services-migration branch - DO NOT commit to main!**
 
-**Newsletter Development Workflow:**
+**Development Workflow:**
 ```bash
-git checkout Newsletters  # Ensure on correct branch
+git checkout services-migration  # Ensure on correct branch
 git add audio_tour_app/lib/screens/home_screen.dart
 git add audio_tour_app/pubspec.yaml  
 git add audio_tour_app/lib/main.dart
 git add *.py  # Add any modified services
-git commit -m "Newsletter: [Description of changes]"
-git push origin Newsletters  # Push to Newsletters branch
+git commit -m "[Description of changes]"
+git push origin services-migration  # Push to services-migration branch
 ```
 
-**When Newsletter Development Complete:**
+**When services-migration Development Complete:**
 ```bash
 git checkout main
-git merge Newsletters
+git merge --ff-only services-migration
 git push origin main
-git tag "1.2.8.XXX"  # New version after merge
-git push origin "1.2.8.XXX"
+git tag "v2.0.0"  # New version after merge
+git push origin "v2.0.0"
 ```
 
 **Use safe_commit.bat to avoid long filename issues:**

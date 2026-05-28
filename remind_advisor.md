@@ -27,7 +27,7 @@ What needs my input?"
 ## 📊 **CURRENT PROJECT STATUS**
 **Date**: 2026-06-02 (Session 5)
 **Version**: v1.2.9+65 (A#75 complete — InAppWebView v6 migration in news_player_screen.dart)
-**Branch**: Newsletters
+**Branch**: services-migration
 **Overall Status**: ✅ **BOTH PLATFORMS ON v1.2.9+65** — iOS and Android synchronized
 
 ### **COMPLETED SESSION 4**:
@@ -40,12 +40,12 @@ What needs my input?"
 ### **COMPLETED SESSION 5**:
 1. ✅ **A#75 complete**: v1.2.9+65 shipped — InAppWebView v6 in news_player_screen.dart (`5adcee7`)
 2. ✅ **Claude transition docs committed**: claude_io_handoff.md, git_branch_strategy.md, transition_for_*.md x5, audioura-dev.apk (`bd473f7`)
-3. ✅ **Branch fully clean**: up to date with origin/Newsletters
+3. ✅ **Branch fully clean**: up to date with origin/services-migration
 
 ### **GIT STATE**:
-- **Branch**: Newsletters
+- **Branch**: services-migration
 - **Last commit**: `bd473f7` — Claude transition/handoff docs + audioura-dev.apk
-- **Remote**: up to date with origin/Newsletters ✅
+- **Remote**: up to date with origin/services-migration ✅
 - **Working tree**: clean (log_iphone_05282026_0038.txt intentionally untracked)
 
 ### **BUILD HISTORY (RECENT)**:
@@ -88,7 +88,7 @@ What needs my input?"
 - **Assignments (Mac/USB)**: `/Volumes/USB DISK/Audioura/assignments/mac_mini_assignments.md`
 - **Dev Directory**: `c:\Users\micha\eclipse-workspace\AudioTours\development\`
 - **Backup Directory**: `c:\Users\micha\eclipse-workspace\AudioTours\backup\`
-- **Git Repo (Mac Mini)**: `~/Development/Audioura-build/` (branch: Newsletters)
+- **Git Repo (Mac Mini)**: `~/Development/Audioura-build/` (branch: services-migration)
 - **A#75 Directives**: `development/a75_directives_for_q.md` (committed `76baaf2`) — A#75 complete
 - **Transition Docs**: `development/transition_for_*.md` — one per Amazon-Q role (committed `bd473f7`)
 - **Cloud Migration Spec**: `C:\Business\AudioTours.io\Claude\Audioura development\AUDIOURA_CLOUD_MIGRATION_AND_LIFECYCLE.md`

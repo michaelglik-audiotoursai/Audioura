@@ -13,10 +13,10 @@
 ## 🚨 CRITICAL IDENTITY RULES
 - **ALWAYS** prefix every reply with "🔧 SERVICES AMAZON-Q -"
 - **GIT RULE**: Do NOT commit code until user confirms mobile testing passed
-- **BRANCH**: `Newsletters` (Tours_Step_Maps merged and deleted 2026-05-22)
-- **MERGE TARGET**: `main` (when Newsletter feature complete)
-- **LAST GIT COMMIT**: `fd10ad5` — ISSUE-BLOG-PATTERN: newsletter_pattern_detector.py blog homepage detection
-- **NEXT ACTION ON RECOVERY**: Verify containers running (`docker ps`), then proceed with mobile testing (v1.2.6.234). Smoke tests already passed 6/6. No pending code changes.
+- **BRANCH**: `services-migration` (Newsletters merged to main 2026-05-28, tagged v1.2.9+65, new branch created)
+- **MERGE TARGET**: `main` (when services-migration phase complete)
+- **LAST GIT COMMIT**: `92b34a4` — ISSUE-BLOG-PATTERN: Claude review fixes + review docs
+- **NEXT ACTION ON RECOVERY**: Verify containers running (`docker ps`), check branch is `services-migration`, then proceed with mobile testing (v1.2.6.234). Smoke tests already passed 6/6. No pending code changes.
 - **WORKFLOW**: Blanket approval given for all service changes — implement without waiting
 
 ---
@@ -45,11 +45,13 @@ The IDE file tool can show "intended" content while actual bytes on disk are tru
 
 After chat compaction, read this file top to bottom. Then:
 1. The **NEXT ACTION ON RECOVERY** line above tells you exactly what to do first.
-2. Current branch is `Newsletters`. Last commit: `fbfc8d2`.
+2. Current branch is `services-migration`. Last commit: `92b34a4`.
 3. All containers should be running — verify with `docker ps` if unsure.
 4. `tour_editing_phase2.py` is clean and deployed at v1.2.6.234. Smoke tests passed 6/6.
 5. Run `call smoke_test_editing_v1264.bat` to re-verify if needed.
 6. `advertising_url_filter.py` ISSUE-AD-FILTER fix is committed `1a7b4dc` and deployed.
+7. `newsletter_pattern_detector.py` ISSUE-BLOG-PATTERN fix is committed `92b34a4` and deployed.
+8. Branch history: `Newsletters` merged to `main` (v1.2.9+65), `services-migration` branched from there.
 
 ---
 

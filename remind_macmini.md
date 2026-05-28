@@ -18,9 +18,9 @@
 ## 📊 CURRENT STATUS
 **Date**: 2026-05-28
 **Last Completed**: A#75 — v1.2.9+65 (InAppWebView v6 migration in news_player_screen.dart)
-**Branch**: Newsletters
+**Branch**: services-migration
 **Build Status**: ✅ iOS builds working on iPhone 16
-**Last Commit**: `5adcee7` — pushed to origin/Newsletters
+**Last Commit**: `5adcee7` — pushed to origin/services-migration
 
 ### RECENT HISTORY:
 - **A#72** (v1.2.9+63): Applied A#56 path-healing pattern to news articles. Articles load, no white screen.
@@ -32,7 +32,7 @@
 - **Results**: `/Volumes/USB DISK/Audioura/results/`
 - **Scripts**: `/Volumes/USB DISK/Audioura/scripts/`
 - **Build script**: `/Volumes/USB DISK/Audioura/scripts/build_install_launch.sh`
-- **Git repo**: `~/Development/Audioura-build/` (branch: Newsletters)
+- **Git repo**: `~/Development/Audioura-build/` (branch: services-migration)
 - **USB mount**: `/Volumes/USB DISK/` (note the space in the name)
 
 ## 🔑 IOS SIGNING (WORKING - DO NOT CHANGE)
@@ -41,7 +41,7 @@
 - **Status**: ✅ Signing works — do not modify signing config
 
 ## 📱 BUILD WORKFLOW
-1. `cd ~/Development/Audioura-build && git pull origin Newsletters`
+1. `cd ~/Development/Audioura-build && git pull origin services-migration`
 2. Read directives doc if referenced in assignment
 3. Apply code edits per directives
 4. Run spot-checks (grep verification)
@@ -57,13 +57,13 @@
 - **Prefer unmount over eject** so USB can be remounted without physical intervention
 
 ## 🔄 AFTER EACH BUILD
-1. Push to GitHub: `git push origin Newsletters`
+1. Push to GitHub: `git push origin services-migration`
 2. Write results to `~/Desktop/aNNN_results.txt` and copy to USB results folder
 3. User syncs Windows tree separately
 
 ## 🚨 CRITICAL RULES
 - **ALWAYS** use `~/Development/Audioura-build/` as the build directory
-- **ALWAYS** stay on branch `Newsletters`
+- **ALWAYS** stay on branch `services-migration`
 - **USB path has a space**: `/Volumes/USB DISK/` not `/Volumes/USBDISK/`
 - **Pre-existing analyze errors** in `audio_handler.dart`, `map_page.dart`, `subscription_management_screen.dart`, `test/widget_test.dart` are dead/orphan files — non-blocking, ignore them
 - **Build script verdict "AMBIGUOUS"** is normal — the process-list grep doesn't reliably detect the running app. Build/Install/Launch all exit 0 + zero crashes = success.
