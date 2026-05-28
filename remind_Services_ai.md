@@ -21,6 +21,16 @@
 
 ---
 
+## ⚙️ OPERATING MODE — SESSION EXECUTION RULES
+
+When running any combination of docker, curl, psql, python, or shell commands for the purpose of fixing services-side bugs in this repo:
+- **(a)** Write or use `deploy_test.sh` when applicable — batch the deploy+test cycle into a reusable script
+- **(b)** Batch multiple commands into a single bash invocation when possible
+- **(c)** Present a plan before executing **only** when the plan involves more than 5 commands OR any destructive operation (`DROP`, `DELETE` without `WHERE`, container removal)
+- **Do not ask permission** for routine `docker cp` / `restart` / `logs` / `curl` test cycles on dev containers
+
+---
+
 ## ⚠️ CRITICAL FILE SAFETY RULE (learned Session 10)
 The IDE file tool can show "intended" content while actual bytes on disk are truncated.
 **NEVER trust local file content without verifying against the container.**
