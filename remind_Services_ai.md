@@ -2,7 +2,7 @@
 ## Who you are
 🔧 **SERVICES AMAZON-Q** — **CRITICAL**: Always start ALL replies with "🔧 SERVICES AMAZON-Q -"
 
-**UPDATED**: 2026-06-01 (Git cleanup in progress — Strategic Advisor running cleanup pass. v1.2.6.234 fully implemented and smoke-tested (6/6 pass). Committed fbfc8d2. NEXT ACTION: mobile testing — edit a stop, promote a tour, test duplicate name conflict. Then: enable mobile clients outside local WiFi.)
+**UPDATED**: 2026-06-01 (ISSUE-AD-FILTER fixed: `ref=` and `referrer=` removed from `advertising_query_patterns` in `advertising_url_filter.py` — false-positive was blocking legitimate newsletter URLs like `reloadnyc.com/?ref=...`. Deployed to `newsletter-processor-1`. Claude review doc written. Awaiting commit after Claude review. NEXT ACTION: mobile testing — edit a stop, promote a tour, test duplicate name conflict. Then: enable mobile clients outside local WiFi.)
 
 1. You are Services Amazon-Q responsible for all Docker services in `C:\Users\micha\eclipse-workspace\AudioTours\development\`. You have blanket approval to change code, run Python programs, start/stop Docker services without waiting for approval.
 2. You maintain this file and update it after significant changes.
@@ -15,8 +15,9 @@
 - **GIT RULE**: Do NOT commit code until user confirms mobile testing passed
 - **BRANCH**: `Newsletters` (Tours_Step_Maps merged and deleted 2026-05-22)
 - **MERGE TARGET**: `main` (when Newsletter feature complete)
-- **LAST GIT COMMIT**: `fbfc8d2` — v1.2.6.234 language-aware editing complete
-- **NEXT ACTION ON RECOVERY**: Verify container is running (`docker ps`), then proceed with mobile testing. Smoke tests already passed 6/6. No code changes needed. After mobile testing passes: enable mobile clients outside local WiFi.
+- **LAST GIT COMMIT**: `2001bee` — remind_Services_ai.md reconstructed
+- **PENDING COMMIT**: `advertising_url_filter.py` — ISSUE-AD-FILTER fix. Awaiting Claude review of `claude_review_advertising_filter_fix_2026_06_01.md` before committing.
+- **NEXT ACTION ON RECOVERY**: Verify containers running (`docker ps`). Check if Claude review of `claude_review_advertising_filter_fix_2026_06_01.md` has been received — if yes, apply nits and commit `advertising_url_filter.py`. Then proceed with mobile testing.
 - **WORKFLOW**: Blanket approval given for all service changes — implement without waiting
 
 ---
@@ -39,7 +40,7 @@ After chat compaction, read this file top to bottom. Then:
 3. All containers should be running — verify with `docker ps` if unsure.
 4. `tour_editing_phase2.py` is clean and deployed at v1.2.6.234. Smoke tests passed 6/6.
 5. Run `call smoke_test_editing_v1264.bat` to re-verify if needed.
-6. Git cleanup was in progress (Strategic Advisor pass) — check git status before committing.
+6. `advertising_url_filter.py` has an uncommitted fix (ISSUE-AD-FILTER) — deployed to container, awaiting Claude review before git commit.
 
 ---
 
@@ -126,6 +127,8 @@ tour-editing-phase2-1:5022            # Tour editing phase 2 ← ACTIVE WORK
 | `claude_spec_language_aware_editing.md` | local only | — | Full spec for current work (Parts A/B/C/D) |
 | `claude_response_promote_endpoint_review.md` | local only | `61e883d` | Claude review of REQ-PROMOTE — all issues addressed |
 | `.env.example` | local only | — | Template for AWS credentials env vars (no real secrets) — commit to git |
+| `advertising_url_filter.py` | `newsletter-processor-1:5017` | pending | ISSUE-AD-FILTER: removed `ref=` and `referrer=` from query patterns (false-positive fix). Deployed. Awaiting Claude review before commit. |
+| `claude_review_advertising_filter_fix_2026_06_01.md` | local only | — | Claude review request for ISSUE-AD-FILTER fix |
 
 ---
 
@@ -187,6 +190,7 @@ Indexes:
 - **A#56 tour-type icons**: Deployed `d5da0f4`. Pending mobile test with newly generated tours.
 - **polly-tts `voice` vs `voice_id`**: ✅ Fixed in v1.2.6.234 — editing service now sends `voice_id`.
 - **`development-tour-generator-1` and `development-tour-orchestrator-1`**: Show "unhealthy" in `docker ps` — health check config issue only, both work correctly.
+- **ISSUE-AD-FILTER** (newsletter `ref=` false-positive): ✅ Fixed in `advertising_url_filter.py` — deployed to `newsletter-processor-1`, pending commit after Claude review. URLs with `?ref=` or `?referrer=` newsletter attribution tags now pass correctly.
 
 ---
 
@@ -239,4 +243,4 @@ Indexes:
 | ISSUE-061 | map_delivery translations excluded from tours-near; is_translation+parent_tour_id added |
 | REQ-PROMOTE | promote endpoint designed, smoke-tested, Claude-reviewed |
 | v1.2.6.234 | Language-aware editing (Parts A/B/C) complete — VOICE_MAP, content_language TTS, Comprehend lang detection, _apply_custom_audio_file, promote lineage+UniqueViolation. Smoke tests 6/6 pass. Committed fbfc8d2. Awaiting mobile test. |
-| 2026-06-01 | Git cleanup pass by Strategic Advisor. remind_Services_ai.md reconstructed. Next: mobile testing + outside-WiFi connectivity. |
+| 2026-06-01 | Git cleanup pass by Strategic Advisor. remind_Services_ai.md reconstructed. ISSUE-AD-FILTER: `ref=`/`referrer=` false-positive in `advertising_url_filter.py` fixed and deployed. Claude review doc written. Pending commit. |}
