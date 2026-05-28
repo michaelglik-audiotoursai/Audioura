@@ -4,7 +4,7 @@ Advertising URL Filter - Enhanced filtering to prevent processing advertising si
 """
 
 import logging
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 class AdvertisingURLFilter:
     def __init__(self):
@@ -97,8 +97,6 @@ class AdvertisingURLFilter:
             'deal',
             'discount',
             'coupon',
-            'ref=',
-            'referrer=',
             'click_id',
             'campaign_id'
         ]
@@ -125,10 +123,12 @@ class AdvertisingURLFilter:
                     return True, f"Advertising path pattern detected: {pattern}"
             
             # Check query parameters for advertising indicators
+            # Match against parameter *names* only (not values or raw query string)
+            # to avoid false positives on URLs like ?topic=offering or ?q=promotion+news
             if parsed.query:
-                query_lower = parsed.query.lower()
+                query_keys = {k.lower() for k in parse_qs(parsed.query, keep_blank_values=True).keys()}
                 for pattern in self.advertising_query_patterns:
-                    if pattern in query_lower:
+                    if pattern in query_keys:
                         return True, f"Advertising query parameter detected: {pattern}"
             
             return False, "Clean URL"
@@ -206,34 +206,46 @@ class AdvertisingURLFilter:
         return True, "Appears to be legitimate content"
 
 def test_advertising_filter():
-    """Test the advertising URL filter"""
-    filter = AdvertisingURLFilter()
-    
-    test_urls = [
-        # Legitimate URLs
+    """Regression test — raises AssertionError on any misclassification."""
+    f = AdvertisingURLFilter()
+
+    CLEAN = [
+        # Legitimate news sites
         "https://www.bostonglobe.com/2024/11/27/business/article-title",
         "https://www.nytimes.com/2024/11/27/politics/article-title",
-        
-        # Advertising URLs that should be filtered
+        # Newsletter attribution tags — must NOT be filtered
+        "https://www.reloadnyc.com/?ref=artificial-commonsense-newsletter",
+        "https://somesite.com/article?referrer=newsletter-weekly",
+        # Legitimate query params whose values contain ad-pattern words
+        "https://example.com/article?topic=offering",
+        "https://example.com/search?q=promotion+impact",
+        "https://example.com/recipe?topic=dealing-with-leftovers",
+        "https://example.com/news?topic=partnerships",
+    ]
+
+    AD = [
+        # Advertising domains
         "https://www.booking.com/hotel/us/bend-campfire-hotel.html",
         "https://liadm.com/redirect?url=example",
         "https://amazon.com/product/example",
         "https://googleadservices.com/ads/example",
-        
-        # Tracking URLs with advertising parameters
-        "https://example.com/article?utm_source=email&utm_campaign=promo",
-        "https://example.com/shop/deals/special-offer"
+        # Real UTM / affiliate query params
+        "https://example.com/article?utm_source=email&utm_campaign=spring",
+        "https://example.com/?affiliate=acmecorp",
+        "https://example.com/?click_id=abc123",
+        # Advertising path patterns
+        "https://example.com/shop/deals/special-offer",
     ]
-    
-    clean_urls, filtered_urls = filter.filter_urls(test_urls)
-    
-    print("CLEAN URLs:")
-    for url in clean_urls:
-        print(f"  ✅ {url}")
-    
-    print("\nFILTERED URLs:")
-    for item in filtered_urls:
-        print(f"  ❌ {item['url']} - {item['reason']}")
+
+    for url in CLEAN:
+        is_ad, reason = f.is_advertising_url(url)
+        assert not is_ad, f"FALSE POSITIVE: {url} -> {reason}"
+
+    for url in AD:
+        is_ad, reason = f.is_advertising_url(url)
+        assert is_ad, f"FALSE NEGATIVE: {url} was not flagged"
+
+    print(f"OK — {len(CLEAN)} clean + {len(AD)} ad URLs all classified correctly")
 
 if __name__ == "__main__":
     test_advertising_filter()
