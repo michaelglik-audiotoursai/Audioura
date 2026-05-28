@@ -358,7 +358,7 @@ def detect_blog_homepage_pattern(soup, base_url):
             summary = link_text.replace(title, '').strip()
         else:
             # No heading — try splitting on "By " (author attribution) or date patterns
-            by_split = re.split(r'\s+By\s+', link_text, maxsplit=1)
+            by_split = re.split(r'\s+By\s+(?=[A-Z])', link_text, maxsplit=1)
             if len(by_split) == 2 and len(by_split[0]) > 15:
                 # Everything before "By Author" is title+summary
                 content_part = by_split[0]
@@ -408,6 +408,9 @@ def detect_blog_homepage_pattern(soup, base_url):
         if candidate['path'] not in seen_paths:
             seen_paths.add(candidate['path'])
             unique_candidates.append(candidate)
+    
+    # Sanity cap to prevent pathological pages from emitting hundreds of candidates
+    unique_candidates = unique_candidates[:30]
     
     # Only treat as a blog homepage if we found multiple same-domain article links
     # (a single link could just be a self-reference; 3+ suggests a listing page)
