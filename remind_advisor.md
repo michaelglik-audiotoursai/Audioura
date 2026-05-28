@@ -2,16 +2,15 @@
 ## Who you are
 🎯 **STRATEGIC ADVISOR AMAZON-Q** - **CRITICAL**: Always start all replies with "🎯 STRATEGIC ADVISOR AMAZON-Q -" to help identify which Amazon-Q tab is being used across multiple Eclipse tabs.
 
-**UPDATED**: 2026-06-01 SESSION 4 - Git fully clean, branch synced, A#75 directives committed, ready for Mac Mini
+**UPDATED**: 2026-06-02 SESSION 5 - A#75 complete, v1.2.9+65 shipped on both iOS and Android, Claude transition docs committed, services migration next
 
 ## 🚨 **POST-COMPACTION RECOVERY PROTOCOL**
 **When chat history is compacted, user will ask you to read @remind_advisor.md**
 
-**Your Response**: "🎯 STRATEGIC ADVISOR AMAZON-Q - Context restored. Current status: git fully clean and synced with origin/Newsletters. mac_mini_setup_guide.md committed and pushed. A#75 directives committed and pushed. IMMEDIATE NEXT ACTIONS:
-1. Eject USB drive, carry to Mac Mini, switch KVM
-2. On Mac Mini: git pull origin Newsletters
-3. Execute A#75 per a75_directives_for_q.md (verify v6 migration, bump to v1.2.9+65, build, commit, push)
-4. After Mac Mini pushes: git pull origin Newsletters on Windows to sync
+**Your Response**: "🎯 STRATEGIC ADVISOR AMAZON-Q - Context restored. Current status: v1.2.9+65 shipped on both iOS and Android (A#75 complete). Git clean and synced. Claude transition docs committed. IMMEDIATE NEXT ACTIONS:
+1. Read transition_for_Advisor_AQ.md for full strategic context
+2. Coordinate Services Q to begin GCP migration (M01) per AUDIOURA_CLOUD_MIGRATION_AND_LIFECYCLE.md
+3. Block App Store / Play Store submission until Services M04+M05 complete (public HTTPS gate)
 What needs my input?"
 
 ---
@@ -26,55 +25,53 @@ What needs my input?"
 ---
 
 ## 📊 **CURRENT PROJECT STATUS**
-**Date**: 2026-06-01 (Session 4)
-**Version**: v1.2.9+64 (A#73 complete — brick red icon background #A93105)
-**Next Version**: v1.2.9+65 (A#75 — InAppWebView v6 migration in news_player_screen.dart)
+**Date**: 2026-06-02 (Session 5)
+**Version**: v1.2.9+65 (A#75 complete — InAppWebView v6 migration in news_player_screen.dart)
 **Branch**: Newsletters
-**Overall Status**: ✅ **iOS BUILDS ACTIVE** — A#63 through A#73 executed successfully on Mac Mini
+**Overall Status**: ✅ **BOTH PLATFORMS ON v1.2.9+65** — iOS and Android synchronized
 
-### **COMPLETED THIS SESSION (Session 4)**:
-1. ✅ **mac_mini_setup_guide.md sanitized**: `Eight6Eight7!` → `<YOUR_GITHUB_PASSWORD>`, PAT already replaced in prior session
-2. ✅ **mac_mini_setup_guide.md committed and pushed**: commit `6c52ef3`
-3. ✅ **Git history rewritten**: Removed commits containing GitHub PAT secret (771ac20, 926af38, 68f98c7) — redone cleanly
-4. ✅ **~100 log/output txt files moved to backup**: terminal_output_*, Xcode_*, *_results.txt, fix_*, verify_*, etc.
-5. ✅ **27 meaningful files committed**: requirements*.txt, prompt templates, tour content, architecture docs — commit `3764d93`
-6. ✅ **enhanced_tour_content.txt committed, mobile_app_logs removed**: commit `e31f87e`
-7. ✅ **a75_directives_for_q.md created and pushed**: commit `76baaf2`
-8. ✅ **Branch fully clean**: zero untracked files, zero modified files, up to date with origin/Newsletters
+### **COMPLETED SESSION 4**:
+1. ✅ mac_mini_setup_guide.md sanitized and committed (`6c52ef3`)
+2. ✅ Git history rewritten — removed commits with GitHub PAT secret
+3. ✅ ~100 log/output txt files moved to backup
+4. ✅ 27 meaningful files committed (`3764d93`)
+5. ✅ a75_directives_for_q.md created and pushed (`76baaf2`)
+
+### **COMPLETED SESSION 5**:
+1. ✅ **A#75 complete**: v1.2.9+65 shipped — InAppWebView v6 in news_player_screen.dart (`5adcee7`)
+2. ✅ **Claude transition docs committed**: claude_io_handoff.md, git_branch_strategy.md, transition_for_*.md x5, audioura-dev.apk (`bd473f7`)
+3. ✅ **Branch fully clean**: up to date with origin/Newsletters
 
 ### **GIT STATE**:
 - **Branch**: Newsletters
-- **Last commit**: `76baaf2` — A#75 directives for v6 InAppWebView migration
+- **Last commit**: `bd473f7` — Claude transition/handoff docs + audioura-dev.apk
 - **Remote**: up to date with origin/Newsletters ✅
-- **Working tree**: clean — zero `??` untracked, zero modified
+- **Working tree**: clean (log_iphone_05282026_0038.txt intentionally untracked)
 
-### **iOS BUILD HISTORY (RECENT)**:
+### **BUILD HISTORY (RECENT)**:
 - **A#71**: ✅ COMPLETE - v1.2.9+62 - App name fix + InAppWebViewSettings v6 (tour_player_screen only)
 - **A#72**: ✅ COMPLETE - v1.2.9+63 - Heal stale iOS container paths for news articles
 - **A#73**: ✅ COMPLETE - v1.2.9+64 - Brick red app icon background (#A93105)
-- **A#74**: ✅ COMPLETE - Windows-side cleanup (this session)
-- **A#75**: 🔄 NEXT — InAppWebView v6 migration in news_player_screen.dart → v1.2.9+65
+- **A#74**: ✅ COMPLETE - Windows-side cleanup (Session 4)
+- **A#75**: ✅ COMPLETE - v1.2.9+65 - InAppWebView v6 migration in news_player_screen.dart (`5adcee7`)
+- **NEXT**: Services GCP migration M01 (Services Q owns execution)
 
 ---
 
 ## 🚨 **IMMEDIATE NEXT ACTIONS**
 
-### **A#75 Execution on Mac Mini**
-1. Eject USB drive from Windows
-2. Carry USB to Mac Mini, switch KVM
-3. On Mac Mini: `git pull origin Newsletters`
-4. Mac Mini Q reads `a75_directives_for_q.md` and executes:
-   - Verify `news_player_screen.dart` already has v6 API (`initialSettings: InAppWebViewSettings(...)`)
-   - If confirmed correct → skip code change
-   - Bump `pubspec.yaml`: `1.2.9+64` → `1.2.9+65`
-   - `flutter analyze` → must show no issues in our code
-   - `flutter build ios --release --no-codesign`
-   - `git commit -m "v1.2.9+65 - A#75: InAppWebView v6 migration in news_player_screen.dart"`
-   - `git push origin Newsletters`
-5. After Mac Mini pushes: `git pull origin Newsletters` on Windows
+### **Services GCP Migration (Services Q owns)**
+1. Services Q reads `AUDIOURA_CLOUD_MIGRATION_AND_LIFECYCLE.md` and begins M01
+2. Advisor Q tracks phase progress — surface to Sir Michael if any phase slips >30%
+3. Watch GCP billing — floor is ~$10/month (Cloud SQL). Newsletter-processor is cost outlier (headless Chrome)
+4. **GATE**: App Store + Play Store submission blocked until M04+M05 complete (public HTTPS required)
 
-### **Key insight about A#75**:
-The Windows copy of `news_player_screen.dart` already uses v6 API (`initialSettings: InAppWebViewSettings(...)` with flat settings). Mac Mini Q should verify this is in the pulled code and skip the migration step if confirmed. The only guaranteed work is version bump + build + commit.
+### **App Store / Play Store (blocked on Services M04+M05)**
+- Spec: `STORE_SUBMISSION_ROADMAP.md`
+- No IAP in v1.0 — RevenueCat deferred to v1.3
+- Demo account required for Apple App Review before submission
+- Pre-write background audio justification for App Review Information
+- Mobile Q must back up Android keystore to 3 places — Sir Michael to confirm
 
 ---
 
@@ -92,7 +89,10 @@ The Windows copy of `news_player_screen.dart` already uses v6 API (`initialSetti
 - **Dev Directory**: `c:\Users\micha\eclipse-workspace\AudioTours\development\`
 - **Backup Directory**: `c:\Users\micha\eclipse-workspace\AudioTours\backup\`
 - **Git Repo (Mac Mini)**: `~/Development/Audioura-build/` (branch: Newsletters)
-- **A#75 Directives**: `development/a75_directives_for_q.md` (committed `76baaf2`)
+- **A#75 Directives**: `development/a75_directives_for_q.md` (committed `76baaf2`) — A#75 complete
+- **Transition Docs**: `development/transition_for_*.md` — one per Amazon-Q role (committed `bd473f7`)
+- **Cloud Migration Spec**: `C:\Business\AudioTours.io\Claude\Audioura development\AUDIOURA_CLOUD_MIGRATION_AND_LIFECYCLE.md`
+- **Store Submission Spec**: `C:\Business\AudioTours.io\Claude\Audioura development\STORE_SUBMISSION_ROADMAP.md`
 
 ### **GitHub Secret Scanning — Lessons Learned**
 - NEVER commit files containing `ghp_` tokens or plain-text passwords
@@ -120,13 +120,13 @@ The Windows copy of `news_player_screen.dart` already uses v6 API (`initialSetti
 
 ## 📊 **STRATEGIC PHASES**
 
-### **PHASE 0: PLATFORM FOUNDATION (LARGELY COMPLETE)**
-- ✅ iOS builds working (A#63-A#73 on Mac Mini)
-- ✅ Android stable
+### **PHASE 0: PLATFORM FOUNDATION (COMPLETE)**
+- ✅ iOS builds working (A#63-A#75 on Mac Mini)
+- ✅ Android stable, both platforms on v1.2.9+65
 - ✅ Git repository clean and fully synced
 - ✅ Development directory cleaned (300+ one-shot files moved to backup)
 - ✅ mac_mini_setup_guide.md sanitized and committed
-- 🔄 A#75 next on Mac Mini
+- ✅ A#75 complete — v1.2.9+65 shipped
 
 ### **PHASE 1: PRODUCTION LAUNCH (2-4 weeks)**
 - App Store submissions (iOS + Google Play)
@@ -148,15 +148,14 @@ The Windows copy of `news_player_screen.dart` already uses v6 API (`initialSetti
 
 ---
 
-## 📋 **NEXT ACTION ON MAC MINI**
-Read `@/Volumes/USB DISK/Audioura/assignments/mac_mini_assignments.md` and execute A#75.
-Companion doc: `development/a75_directives_for_q.md` (already in git, pulled with `git pull`).
-After Mac Mini pushes A#75: run `git pull origin Newsletters` on Windows to sync.
+## 📋 **NEXT ACTION**
+Coordinate Services Q to begin GCP migration M01 per `AUDIOURA_CLOUD_MIGRATION_AND_LIFECYCLE.md`.
+Read `transition_for_Advisor_AQ.md` for full decision table and cost monitoring responsibilities.
 
 ---
 
-**Last Updated**: 2026-06-01 Session 4
-**Status**: ✅ Git fully clean + synced | ✅ mac_mini_setup_guide committed | ✅ A#75 directives committed
-**Current Build**: v1.2.9+64 (A#73)
-**Next Build**: v1.2.9+65 (A#75) on Mac Mini
-**No Blockers**: iOS signing works, builds succeed, git clean, directives ready
+**Last Updated**: 2026-06-02 Session 5
+**Status**: ✅ Git fully clean + synced | ✅ v1.2.9+65 on both platforms | ✅ Claude transition docs committed
+**Current Build**: v1.2.9+65 (A#75) — iOS + Android
+**Next Milestone**: Services GCP migration M01 → gates App Store submission
+**No Blockers**: Both platforms stable, git clean, transition docs ready
