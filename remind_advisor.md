@@ -60,11 +60,12 @@ What needs my input?"
 
 ## 🚨 **IMMEDIATE NEXT ACTIONS**
 
-### **Services GCP Migration (Services Q owns)**
-1. Services Q reads `AUDIOURA_CLOUD_MIGRATION_AND_LIFECYCLE.md` and begins M01
-2. Advisor Q tracks phase progress — surface to Sir Michael if any phase slips >30%
-3. Watch GCP billing — floor is ~$10/month (Cloud SQL). Newsletter-processor is cost outlier (headless Chrome)
-4. **GATE**: App Store + Play Store submission blocked until M04+M05 complete (public HTTPS required)
+### **Services GCP Migration — Phase A (M01) is next**
+1. Services Q drafts M01 audit assignment per `AUDIOURA_CLOUD_MIGRATION_AND_LIFECYCLE.md` §4 Phase A
+2. Claude reviews M01 before execution (V2 discipline — review-before-execute)
+3. Sir Michael executes audit on laptop
+4. Output: `development/migration/m01_audit_results.md`
+5. **$0 GCP cost** during M01 and M02 — billing only starts at M03 (Cloud SQL provisioning)
 
 ### **App Store / Play Store (blocked on Services M04+M05)**
 - Spec: `STORE_SUBMISSION_ROADMAP.md`
@@ -91,8 +92,9 @@ What needs my input?"
 - **Git Repo (Mac Mini)**: `~/Development/Audioura-build/` (branch: services-migration)
 - **A#75 Directives**: `development/a75_directives_for_q.md` (committed `76baaf2`) — A#75 complete
 - **Transition Docs**: `development/transition_for_*.md` — one per Amazon-Q role (committed `bd473f7`)
-- **Cloud Migration Spec**: `C:\Business\AudioTours.io\Claude\Audioura development\AUDIOURA_CLOUD_MIGRATION_AND_LIFECYCLE.md`
-- **Store Submission Spec**: `C:\Business\AudioTours.io\Claude\Audioura development\STORE_SUBMISSION_ROADMAP.md`
+- **Cloud Migration Spec**: `C:\Users\micha\eclipse-workspace\AudioTours\development\AUDIOURA_CLOUD_MIGRATION_AND_LIFECYCLE.md` (also in git)
+- **Store Submission Spec**: `C:\Business\audiotours.com\Claude\Audioura development\STORE_SUBMISSION_ROADMAP.md`
+- **Migration Output Dir**: `C:\Users\micha\eclipse-workspace\AudioTours\development\migration\` (create during M01)
 
 ### **GitHub Secret Scanning — Lessons Learned**
 - NEVER commit files containing `ghp_` tokens or plain-text passwords
@@ -125,15 +127,24 @@ What needs my input?"
 - ✅ Android stable, both platforms on v1.2.9+65
 - ✅ Git repository clean and fully synced
 - ✅ Development directory cleaned (300+ one-shot files moved to backup)
-- ✅ mac_mini_setup_guide.md sanitized and committed
 - ✅ A#75 complete — v1.2.9+65 shipped
 
-### **PHASE 1: PRODUCTION LAUNCH (2-4 weeks)**
-- App Store submissions (iOS + Google Play)
-- AWS-hosted public services
-- Version consolidation: v1.2.9 → v1.3.0
+### **PHASE 1: GCP MIGRATION (IN PROGRESS — 20-30 hrs total)**
+- 🔄 **M01** — Pre-migration audit (~2 hrs) — $0 GCP cost
+- ⬜ **M02** — Local cloud-ready rehearsal (~3 hrs) — $0 GCP cost
+- ⬜ **M03** — GCP project setup (~3 hrs) — **billing starts here ~$35/month**
+- ⬜ **M04** — Service-by-service deploy to PreProd (~10-15 hrs)
+- ⬜ **M05** — Production cutover (~2-4 hrs) — gates App Store submission
+- **Target architecture**: Cloud Run (13 services) + Cloud SQL Postgres + Cloudflare R2
+- **Floor cost at launch**: ~$36/month (no load balancer — subdomain-per-service strategy)
+- **Key cost outlier**: newsletter-processor (headless Chrome, 4 GB RAM, concurrency=1)
 
-### **PHASE 2: MARKET OPTIMIZATION (1-2 months)**
+### **PHASE 2: APP STORE SUBMISSION (blocked on M04+M05)**
+- iOS App Store + Google Play Store
+- Version consolidation: v1.2.9 → v1.3.0
+- No IAP in v1.0 — RevenueCat in v1.3 post-launch
+
+### **PHASE 3: MARKET OPTIMIZATION (post-launch)**
 - User feedback integration
 - Feature adoption tracking
 - App store rating optimization
@@ -148,8 +159,45 @@ What needs my input?"
 
 ---
 
+## 🏗️ **GCP MIGRATION — KEY FACTS FOR ADVISOR**
+
+### **Architecture decisions (locked)**
+- Cloud Run per service (13 total) — matches current Docker Compose exactly
+- Cloud SQL Postgres db-g1-small prod (~$25/mo), db-f1-micro preprod (~$10/mo)
+- Cloudflare R2 for audio files — zero egress fees (critical for audio app at scale)
+- AWS Polly stays — no migration off Polly for v1
+- Two GCP projects: `audioura-preprod` + `audioura-prod` (hard isolation)
+- Subdomain-per-service (option b) — saves $18/month vs Cloud Load Balancer
+- No prod Cloud SQL until M05 — saves $25/month during M04
+
+### **Cost monitoring responsibilities (Advisor Q owns)**
+- Floor: ~$36/month at zero users (Cloud SQL dominates)
+- Newsletter-processor is #1 cost outlier — headless Chrome, 4 GB RAM
+- AWS Polly + OpenAI are dominant variable costs at scale (~$0.10/tour, ~$0.75/news article)
+- Surface to Sir Michael if any phase slips >30% or billing surprises >2x expected
+
+### **Phase gate rules (Advisor Q enforces)**
+- **M03 gate**: Don't provision prod Cloud SQL until M05 — saves $25/month
+- **App Store gate**: BLOCK Phase 1 submission until M04+M05 complete (public HTTPS required)
+- **No IAP gate**: If anyone proposes subscriptions/IAP for v1 — answer is NO (Apple 3.1.1)
+- **Cloudflare Tunnel stopgap**: NO — Apple review window catches laptop offline overnight
+
+### **Special service handling**
+- newsletter-processor: 4 GB RAM, 2 vCPU, concurrency=1, timeout=900s (Cloud Run max)
+- tour-processor + polly-tts: 2 vCPU, 1-2 GB RAM, concurrency=5-10, timeout=300s
+- All services need `GET /health` → 200 in <1s (Cloud Run liveness)
+- All services need `DATABASE_URL` env var (replace hardcoded localhost:5432)
+
+### **Working agreement**
+- Amazon-Q drafts each phase's scripts
+- Claude reviews before execution (V2 discipline)
+- Sir Michael executes; authorizes destructive operations
+- All migration files in `development/migration/` named `m##_<description>_<timestamp>.txt`
+
+---
+
 ## 📋 **NEXT ACTION**
-Coordinate Services Q to begin GCP migration M01 per `AUDIOURA_CLOUD_MIGRATION_AND_LIFECYCLE.md`.
+Begin M01: Services Q drafts audit assignment. Output goes to `development/migration/m01_audit_results.md`.
 Read `transition_for_Advisor_AQ.md` for full decision table and cost monitoring responsibilities.
 
 ---
