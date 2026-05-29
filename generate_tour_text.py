@@ -306,7 +306,7 @@ def _classify_tour_category(location, tour_type):
     
     # Museum indicators
     museum_keywords = ['museum', 'gallery', 'mfa', 'moma', 'exhibition', 'collection', 'art center', 'cultural center']
-    if any(keyword in location_lower for keyword in museum_keywords):
+    if any(keyword in location_lower or keyword in tour_type_lower for keyword in museum_keywords):
         return 'museum'
     
     # Specialized tour indicators
