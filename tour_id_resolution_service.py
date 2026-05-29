@@ -18,10 +18,11 @@ TOURS_DIR = "/app/tours"
 
 def get_db_connection():
     return psycopg2.connect(
-        host="postgres-2",
-        database="audiotours", 
-        user="admin",
-        password="password123"
+        host=os.getenv('DB_HOST', 'postgres-2'),
+        database=os.getenv('DB_NAME', 'audiotours'),
+        user=os.getenv('DB_USER', 'admin'),
+        password=os.getenv('DB_PASSWORD', 'password123'),
+        port=os.getenv('DB_PORT', '5432')
     )
 
 def find_edit_tour_id(download_id):

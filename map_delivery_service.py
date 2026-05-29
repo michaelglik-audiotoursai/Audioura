@@ -41,10 +41,11 @@ def log_request():
 def get_db_connection():
     """Get database connection"""
     return psycopg2.connect(
-        host="postgres-2",
-        database="audiotours", 
-        user="admin",
-        password="password123"
+        host=os.getenv('DB_HOST', 'postgres-2'),
+        database=os.getenv('DB_NAME', 'audiotours'),
+        user=os.getenv('DB_USER', 'admin'),
+        password=os.getenv('DB_PASSWORD', 'password123'),
+        port=os.getenv('DB_PORT', '5432')
     )
 
 def calculate_distance(lat1, lng1, lat2, lng2):

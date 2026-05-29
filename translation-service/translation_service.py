@@ -28,10 +28,11 @@ class TranslationService:
         
     def get_db_connection(self):
         return psycopg2.connect(
-            host="development-postgres-2-1",
-            database="audiotours",
-            user="admin",
-            password="password123"
+            host=os.getenv('DB_HOST', 'development-postgres-2-1'),
+            database=os.getenv('DB_NAME', 'audiotours'),
+            user=os.getenv('DB_USER', 'admin'),
+            password=os.getenv('DB_PASSWORD', 'password123'),
+            port=os.getenv('DB_PORT', '5432')
         )
     
     # Only these two labels must stay in English — mobile app parses them by exact string match.

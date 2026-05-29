@@ -114,10 +114,11 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         # Connect to the database
         print(f"Connecting to database...")
         conn = psycopg2.connect(
-            host="postgres-2",
-            database="audiotours",
-            user="admin",
-            password="password123"
+            host=os.getenv('DB_HOST', 'postgres-2'),
+            database=os.getenv('DB_NAME', 'audiotours'),
+            user=os.getenv('DB_USER', 'admin'),
+            password=os.getenv('DB_PASSWORD', 'password123'),
+            port=os.getenv('DB_PORT', '5432')
         )
         cur = conn.cursor()
         print(f"Connected to database")
@@ -595,10 +596,11 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             try:
                 import psycopg2
                 conn = psycopg2.connect(
-                    host="postgres-2",
-                    database="audiotours",
-                    user="admin",
-                    password="password123"
+                    host=os.getenv('DB_HOST', 'postgres-2'),
+                    database=os.getenv('DB_NAME', 'audiotours'),
+                    user=os.getenv('DB_USER', 'admin'),
+                    password=os.getenv('DB_PASSWORD', 'password123'),
+                    port=os.getenv('DB_PORT', '5432')
                 )
                 cur = conn.cursor()
                 cur.execute(
@@ -1014,10 +1016,11 @@ def download_tour(job_id):
         
         # Connect to database
         conn = psycopg2.connect(
-            host="postgres-2",
-            database="audiotours",
-            user="admin",
-            password="password123"
+            host=os.getenv('DB_HOST', 'postgres-2'),
+            database=os.getenv('DB_NAME', 'audiotours'),
+            user=os.getenv('DB_USER', 'admin'),
+            password=os.getenv('DB_PASSWORD', 'password123'),
+            port=os.getenv('DB_PORT', '5432')
         )
         cur = conn.cursor()
         

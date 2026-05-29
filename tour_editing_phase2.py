@@ -116,10 +116,11 @@ def sanitize_user_input(text):
 
 def get_db_connection():
     return psycopg2.connect(
-        host="postgres-2",
-        database="audiotours", 
-        user="admin",
-        password="password123"
+        host=os.getenv('DB_HOST', 'postgres-2'),
+        database=os.getenv('DB_NAME', 'audiotours'),
+        user=os.getenv('DB_USER', 'admin'),
+        password=os.getenv('DB_PASSWORD', 'password123'),
+        port=os.getenv('DB_PORT', '5432')
     )
 
 def resolve_numeric_to_uuid_directory(tour_id):

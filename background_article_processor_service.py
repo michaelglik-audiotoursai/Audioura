@@ -37,10 +37,10 @@ class BackgroundArticleProcessor:
     def store_article_request(self, user_id, article_id, article_url, newsletter_source):
         """Store article request in database"""
         conn = psycopg2.connect(
-            host="development-postgres-2-1",
-            database="audiotours",
-            user="admin",
-            password="password123"
+            host=os.getenv('DB_HOST', 'development-postgres-2-1'),
+            database=os.getenv('DB_NAME', 'audiotours'),
+            user=os.getenv('DB_USER', 'admin'),
+            password=os.getenv('DB_PASSWORD', 'password123')
         )
         
         cursor = conn.cursor()
@@ -138,10 +138,10 @@ class BackgroundArticleProcessor:
     def store_article_content(self, article_id, article_content):
         """Store article content in database"""
         conn = psycopg2.connect(
-            host="development-postgres-2-1",
-            database="audiotours",
-            user="admin",
-            password="password123"
+            host=os.getenv('DB_HOST', 'development-postgres-2-1'),
+            database=os.getenv('DB_NAME', 'audiotours'),
+            user=os.getenv('DB_USER', 'admin'),
+            password=os.getenv('DB_PASSWORD', 'password123')
         )
         
         cursor = conn.cursor()
@@ -174,10 +174,10 @@ class BackgroundArticleProcessor:
     def store_news_audio(self, article_id, article_title):
         """Store news audio record"""
         conn = psycopg2.connect(
-            host="development-postgres-2-1",
-            database="audiotours",
-            user="admin",
-            password="password123"
+            host=os.getenv('DB_HOST', 'development-postgres-2-1'),
+            database=os.getenv('DB_NAME', 'audiotours'),
+            user=os.getenv('DB_USER', 'admin'),
+            password=os.getenv('DB_PASSWORD', 'password123')
         )
         
         cursor = conn.cursor()
@@ -193,10 +193,10 @@ class BackgroundArticleProcessor:
     def update_article_status(self, article_id, status):
         """Update article processing status"""
         conn = psycopg2.connect(
-            host="development-postgres-2-1",
-            database="audiotours",
-            user="admin",
-            password="password123"
+            host=os.getenv('DB_HOST', 'development-postgres-2-1'),
+            database=os.getenv('DB_NAME', 'audiotours'),
+            user=os.getenv('DB_USER', 'admin'),
+            password=os.getenv('DB_PASSWORD', 'password123')
         )
         
         cursor = conn.cursor()
@@ -221,10 +221,10 @@ class BackgroundArticleProcessor:
     def get_user_articles(self, user_id):
         """Get processed articles for user (for Home page display)"""
         conn = psycopg2.connect(
-            host="development-postgres-2-1",
-            database="audiotours",
-            user="admin",
-            password="password123"
+            host=os.getenv('DB_HOST', 'development-postgres-2-1'),
+            database=os.getenv('DB_NAME', 'audiotours'),
+            user=os.getenv('DB_USER', 'admin'),
+            password=os.getenv('DB_PASSWORD', 'password123')
         )
         
         cursor = conn.cursor()
