@@ -12,18 +12,19 @@
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 When chat history is compacted, user will ask you to read @remind_ai.md and @remind_mobile_ai.md.
 **Your Response**:
-"📱 MOBILE APP AMAZON-Q - I've read both reminder files. Current version is v1.2.9+65, committed and pushed to services-migration branch on GitHub. A#75 is complete (news_player_screen.dart InAppWebView v6 migration). iOS smoke test passed on iPhone. Android build v1.2.9+65 is needed on Ubuntu VM. Ready to continue."
+"📱 MOBILE APP AMAZON-Q - I've read both reminder files. Current version is v1.2.9+66, committed and pushed to services-migration branch on GitHub. Map icon restored on Listen page. Android build v1.2.9+66 needed on Ubuntu VM. Ready to continue."
 
 ## CURRENT PROJECT STATUS
 **Project**: Audioura Mobile App — iOS iPhone + Android
-**Version**: v1.2.9+65 ✅ COMMITTED, PUSHED to GitHub (services-migration branch)
-**iOS**: ✅ A#75 complete — smoke tested on iPhone
-**Android**: 🔄 Build pending on Ubuntu VM (v1.2.9+65 not yet built for Android)
+**Version**: v1.2.9+66 ✅ COMMITTED, PUSHED to GitHub (services-migration branch)
+**iOS**: 🔄 Build pending on Mac Mini (v1.2.9+66 not yet built for iPhone)
+**Android**: 🔄 Build pending on Ubuntu VM (v1.2.9+66 not yet built for Android)
 **Branch**: services-migration
 **Bundle ID**: `com.glikfamily.audioura`
 **App Name**: Audioura
 
 ## RECENT VERSION HISTORY (latest first)
+- **v1.2.9+66** — Restore map icon on Listen page (lost in Tours_Step_Maps merge)
 - **v1.2.9+65** — A#75: migrate `news_player_screen.dart` to InAppWebView v6 (`initialSettings`)
 - **v1.2.9+64** — A#73: app icon background color `#A93105` (brick red)
 - **v1.2.9+63** — A#72: heal stale iOS container paths for news articles
@@ -50,17 +51,9 @@ When chat history is compacted, user will ask you to read @remind_ai.md and @rem
 **Fix**: 4-line guard in `_fitBounds()` — uses `_mapController.move(points.first, 15)` for single-point case
 **File**: `tour_map_screen.dart`
 
-## 🔄 NEXT ACTION: Android Build v1.2.9+65
-**What**: Build Android APK on Ubuntu VM
-**Why**: v1.2.9+65 not yet built for Android
-**How**: Ubuntu VM uses shared folder — no git pull needed, files are already there
-```bash
-cd ~/Development/AudioTours/development
-bash build_flutter_clean.sh
-```
-**APK output**: `audioura-dev.apk`
-
-**Note from Advisor Amazon-Q**: After Mac Mini pushes 1.2.9+65, pull and confirm GitHub Actions produced the Android APK — no separate code change needed.
+## 🔄 NEXT ACTION: Build v1.2.9+66
+**Android**: Ubuntu VM — `bash build_flutter_clean.sh` (shared folder, no git pull needed)
+**iOS**: Mac Mini — new assignment needed (A#76)
 
 ## ⚠️ CRITICAL PROCESS NOTES
 - **NEVER apply changes only to `D:\Audioura\assets\` staging copy** without also committing to git dev tree
