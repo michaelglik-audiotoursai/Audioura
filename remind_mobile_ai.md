@@ -34,6 +34,12 @@ When chat history is compacted, user will ask you to read @remind_ai.md and @rem
 
 ## ✅ KEY FIXES IN RECENT VERSIONS
 
+### v1.2.9+66 — Map Icon Restored on Listen Page
+**Bug**: Green map icon missing from tour list — lost when `Tours_Step_Maps` branch was merged
+**Fix**: Restored `_tourHasMap`, `_detectMapTours()`, `_healTourPaths()`, and `Icons.map` button in `_buildToursView()`
+**File**: `my_tours_screen.dart`
+**Behaviour**: Map icon (green) appears per-tour only when `audio_1.txt` contains `Coordinates:` line
+
 ### v1.2.9+65 — InAppWebView v6 Migration (news_player_screen.dart)
 **Fix**: Migrated `news_player_screen.dart` from deprecated InAppWebView API to v6 `initialSettings`
 **File**: `news_player_screen.dart`
