@@ -291,9 +291,31 @@ When `BLOB_STORAGE=r2`: store ZIP in R2, store R2 key in DB column
 
 ---
 
-## 9. Success Criteria for Phase B
+## 10. Claude Review Response (2026-05-28) — Decisions Captured
 
-After Phase B is complete:
+Claude's full review is in `migration/claude_response_m02_phase_b_design.md`.
+
+### Key findings Claude raised:
+
+1. **`ACTIVE_JOBS = {}` breaks under multi-instance Cloud Run** — polling `/status/{job_id}` will 404 when load balancer routes to a different instance. Needs shared store.
+2. **`translation_service.py` Dockerfile divergence** — container builds from 8 KB stale file in `./translation-service/`, but live code is the 76 KB root file (docker cp'd in). Cloud Build will silently regress.
+3. **Hardcoded DB credentials** (`password123` in source) — must externalize before any cloud image is built.
+4. **Edit-session state** — `bulk-save` creates a directory that `promote` reads later, but in Cloud Run these may hit different instances.
+
+### Decisions made:
+
+| Item | Decision |
+|---|---|
+| Edit-session state (Q3) | **Option 2: `draft=true` row in DB.** `bulk-save` stores the draft ZIP in `audio_tours` with a draft flag. `promote` flips the flag and sets the name. Preserves two-call UX. |
+| `ACTIVE_JOBS` shared store | **DB table (`job_status`).** Simpler than Redis, no new infrastructure. Sufficient for current scale (<10 concurrent jobs). Migrate to Redis later if needed. |
+| Translation-service Dockerfile | **Fix immediately.** Copy root `translation_service.py` (76 KB) into build context. Delete stale 8 KB copy. |
+| Credentials externalization | **Phase B scope confirmed.** All hardcoded passwords/keys → `os.getenv()` with no fallback to hardcoded values. |
+| Env var naming | **`TOUR_STORAGE_MODE`** (not generic `STORAGE_MODE`) per Claude's suggestion. |
+
+### Revised effort estimate: 23-28 hours (Claude's assessment)
+
+Steps 1-6 (safe, low-risk): ~6 hours  
+Steps 7-13 (architectural): ~17-22 hours
 
 1. All 21 services can run locally with `STORAGE_MODE=cloud` set
 2. Tour generation pipeline works end-to-end without the shared volume
@@ -302,3 +324,20 @@ After Phase B is complete:
 5. All inter-service URLs are env-var-driven (with Docker hostname defaults)
 6. R2 storage abstraction exists behind feature flag (tested with MinIO locally)
 7. Existing Docker Compose workflow is UNCHANGED when env vars are not set
+
+
+---
+
+## 9. Success Criteria for Phase B
+
+After Phase B is complete:
+
+1. All 21 services can run locally with `TOUR_STORAGE_MODE=cloud` set
+2. Tour generation pipeline works end-to-end without the shared volume
+3. Tour editing works by extracting from DB instead of reading volume directories
+4. All services have `/health` endpoints returning 200 (with real dependency checks)
+5. All inter-service URLs are env-var-driven (with Docker hostname defaults)
+6. R2 storage abstraction exists behind feature flag (tested with MinIO locally)
+7. Existing Docker Compose workflow is UNCHANGED when env vars are not set
+8. Multi-instance smoke test passes (orchestrator + modernized with 2 replicas)
+9. No hardcoded credentials in any service source (grep returns zero hits)
