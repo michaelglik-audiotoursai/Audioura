@@ -12,6 +12,7 @@ import '../screens/debug_log_viewer_screen.dart';
 import 'tour_player_screen.dart';
 import 'news_player_screen.dart';
 import 'edit_tour_screen.dart';
+import 'tour_map_screen.dart';
 
 class MyToursScreen extends StatefulWidget {
   const MyToursScreen({super.key});
@@ -45,6 +46,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
   bool _isListening = false;
   int _currentVisibleIndex = 0;
   double _previousScrollPosition = 0.0;
+  Map<int, bool> _tourHasMap = {};
 
   final ScrollController _scrollController = ScrollController();
   
@@ -615,15 +617,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
 
     await DebugLogHelper.addDebugLog('LISTEN: Loading ${tours.length} tours from storage');
 
-    // A#56: heal stale container paths. iOS reassigns the app container UUID on
-    // reinstall, so a tour's stored absolute path can point at an old container
-    // that is now outside the sandbox (white screen on playback). Re-anchor each
-    // path to the current Documents directory on load.
-    final docsDir = await getApplicationDocumentsDirectory();
-    const docsMarker = '/Documents/';
-
     final parsed = <Map<String, dynamic>>[];
-    int healed = 0;
     for (final tourJson in tours) {
       try {
         final tour = jsonDecode(tourJson) as Map<String, dynamic>;
@@ -631,23 +625,10 @@ class _MyToursScreenState extends State<MyToursScreen> {
           await DebugLogHelper.addDebugLog('LISTEN: Skipping tour with invalid field types: ${tour.keys.toList()}');
           continue;
         }
-        final storedPath = tour['path'] as String;
-        final mi = storedPath.indexOf(docsMarker);
-        if (mi != -1) {
-          final healedPath =
-              '${docsDir.path}/${storedPath.substring(mi + docsMarker.length)}';
-          if (healedPath != storedPath) {
-            tour['path'] = healedPath;
-            healed++;
-          }
-        }
         parsed.add(tour);
       } catch (e) {
         await DebugLogHelper.addDebugLog('LISTEN: Skipping corrupt tour entry: $e');
       }
-    }
-    if (healed > 0) {
-      await DebugLogHelper.addDebugLog('LISTEN: Healed $healed stale container path(s)');
     }
 
     await DebugLogHelper.addDebugLog('LISTEN: Loaded ${parsed.length} valid tours (${tours.length - parsed.length} skipped)');
@@ -657,12 +638,63 @@ class _MyToursScreenState extends State<MyToursScreen> {
       await DebugLogHelper.addDebugLog('LISTEN: Pruned ${tours.length - parsed.length} corrupt entries from saved_tours');
     }
 
-    setState(() {
-      _tours = parsed.reversed.toList();
-    });
+    await _healTourPaths();
+
+    final healedList = prefs.getStringList('saved_tours') ?? [];
+    final healedParsed = <Map<String, dynamic>>[];
+    for (final t in healedList) {
+      try { healedParsed.add(Map<String, dynamic>.from(json.decode(t) as Map)); } catch (_) {}
+    }
+    setState(() { _tours = healedParsed.reversed.toList(); });
 
     final tourInfoList = _tours.map((tour) => '${tour['title']}|${tour['path']}').toList();
     await prefs.setStringList('available_tours', tourInfoList);
+    unawaited(_detectMapTours());
+  }
+
+  Future<void> _healTourPaths() async {
+    final docsDir = (await getApplicationDocumentsDirectory()).path;
+    final prefs = await SharedPreferences.getInstance();
+    final savedRaw = prefs.getStringList('saved_tours') ?? [];
+    bool anyHealed = false;
+    final healedRaw = <String>[];
+    for (final raw in savedRaw) {
+      try {
+        final tour = Map<String, dynamic>.from(json.decode(raw) as Map);
+        final oldPath = tour['path'] as String? ?? '';
+        final idx = oldPath.indexOf('/tours/');
+        if (idx != -1 && !oldPath.startsWith(docsDir)) {
+          tour['path'] = docsDir + oldPath.substring(idx);
+          healedRaw.add(json.encode(tour));
+          anyHealed = true;
+        } else {
+          healedRaw.add(raw);
+        }
+      } catch (_) {
+        healedRaw.add(raw);
+      }
+    }
+    if (anyHealed) {
+      await prefs.setStringList('saved_tours', healedRaw);
+      await DebugLogHelper.addDebugLog('LISTEN: Healed stale container paths in saved_tours');
+    }
+  }
+
+  Future<void> _detectMapTours() async {
+    final results = <int, bool>{};
+    for (int i = 0; i < _tours.length; i++) {
+      final path = _tours[i]['path'] as String? ?? '';
+      final file = File('$path/audio_1.txt');
+      bool hasCoords = false;
+      try {
+        if (await file.exists()) {
+          final content = await file.readAsString();
+          hasCoords = RegExp(r'Coordinates:\s*[-\d.]+\s*,\s*[-\d.]+').hasMatch(content);
+        }
+      } catch (_) {}
+      results[i] = hasCoords;
+    }
+    if (mounted) setState(() => _tourHasMap = results);
   }
   
   Future<void> _deleteNews(int index) async {
@@ -1166,6 +1198,20 @@ class _MyToursScreenState extends State<MyToursScreen> {
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        if (_tourHasMap[index] == true)
+                          IconButton(
+                            icon: const Icon(Icons.map, color: Color(0xFF27ae60)),
+                            tooltip: 'View Map',
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => TourMapScreen(
+                                  tourPath: tour['path'],
+                                  tourTitle: tour['title'],
+                                ),
+                              ),
+                            ),
+                          ),
                         IconButton(
                           icon: const Icon(Icons.edit, color: Colors.orange),
                           onPressed: () => _editTour(tour),
