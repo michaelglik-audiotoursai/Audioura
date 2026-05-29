@@ -262,10 +262,16 @@ Most services already use `os.getenv('DB_HOST', 'localhost')` pattern. This mean
 
 ## 11. Decision Points for Sir Michael
 
-Before Phase B can start, please confirm:
+### Decisions captured (2026-05-28):
 
-1. **Can we retire `tour-editing-1` (port 5020)?** Phase 2 (port 5022) appears to be the active version.
-2. **Is `development-voice-control-1` (port 5008) needed in production?** Or is it dev-only?
-3. **Are `simple-news-search-1` and `background-article-processor-1` actively used by the mobile app?**
-4. **Do you want to use `db-f1-micro` ($10/month) for prod** if we move blobs to R2? Or keep `db-g1-small` ($25/month) for headroom?
-5. **Should we replace gTTS with Polly** for news audio generation? (Small cost increase, much more reliable.)
+1. **`tour-editing-1` (port 5020):** KEEP — news_processor_service.py uses voice-control container for short title generation via this pipeline path.
+2. **`voice-control` (port 5008):** KEEP for now — `news_processor_service.py` calls `5008/generate_short_title` to shorten article titles for the news/newsletter audio pipeline. The other two endpoints (`/parse_voice_search`, `/process-voice-command`) are unused server-side. `news_generator_service.py` has a duplicate inline `generate_short_title()` that doesn't use the service. Unclear which path is active; not worth the risk of dropping.
+3. **`simple-news-search-1` (5016) + `background-article-processor-1` (5015):** LIKELY DEAD — prototype containers superseded by `newsletter-processor-1:5017`. **Action:** Turn off locally, have Services Amazon-Q run full newsletter pipeline tests to verify nothing breaks. If confirmed dead, exclude from cloud deployment (saves 2 services).
+4. **Database tier:** `db-f1-micro` ($10/month) for prod — confirmed. Blobs move to R2.
+5. **gTTS → Polly:** Already done. All 4 main voices are Polly Neural. No migration needed.
+
+### Revised Cloud Run service count: 19 (if dead services confirmed)
+
+- 21 total containers minus postgres (Cloud SQL) = 20 Cloud Run candidates
+- Minus 2 dead services (simple-news-search, background-article-processor) = **18-19 Cloud Run services**
+- Minus newsletter-browser (not currently running, only needed if browser automation required) = **18 active services**
