@@ -29,7 +29,7 @@ app = Flask(__name__)
 CORS(app)
 
 TOURS_DIR = "/app/tours"
-POLLY_TTS_URL = "http://polly-tts-1:5018"
+POLLY_TTS_URL = os.getenv('POLLY_TTS_URL', 'http://polly-tts-1:5018')
 MAX_AUDIO_SIZE_MB = int(os.getenv('CUSTOM_AUDIO_MAX_SIZE_MB', 5))
 MAX_AUDIO_SIZE = MAX_AUDIO_SIZE_MB * 1024 * 1024  # Convert to bytes
 

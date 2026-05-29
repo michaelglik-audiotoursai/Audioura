@@ -19,6 +19,14 @@ from flask import Flask, request, jsonify, send_file, make_response
 # - This prevents storage bloat and maintains clean architecture
 # - Tour resolution service handles ZIP files, not directories
 
+# Inter-service URLs (env-var-driven for Cloud Run, defaults for local Docker)
+TOUR_GENERATOR_URL = os.getenv('TOUR_GENERATOR_URL', 'http://development-tour-generator-1:5000')
+MODERNIZED_URL = os.getenv('MODERNIZED_URL', 'http://tour-generation-modernized-1:5021')
+TRANSLATION_URL = os.getenv('TRANSLATION_URL', 'http://translation-service-1:5030')
+TOUR_UPDATE_URL = os.getenv('TOUR_UPDATE_URL', 'http://development-tour-update-1:5001')
+USER_API_URL = os.getenv('USER_API_URL', 'http://user-api-2:5000')
+COORDINATES_URL = os.getenv('COORDINATES_URL', 'http://coordinates-fromai:5004')
+
 # Configure unbuffered logging
 import sys
 sys.stdout.reconfigure(line_buffering=True)
@@ -343,7 +351,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         print(f"Calling tour text generator API: {datetime.now().isoformat()}")
         print(f"Request data: {generate_data}")
         response = requests.post(
-            "http://development-tour-generator-1:5000/generate",
+            f"{TOUR_GENERATOR_URL}/generate",
             headers={"Content-Type": "application/json"},
             json=generate_data,
             timeout=60
@@ -367,7 +375,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         while True:
             poll_count += 1
             print(f"Checking tour text generator status: {datetime.now().isoformat()} (Poll #{poll_count})")
-            status_response = requests.get(f"http://development-tour-generator-1:5000/status/{job_id_1}", timeout=10)
+            status_response = requests.get(f"{TOUR_GENERATOR_URL}/status/{job_id_1}", timeout=10)
             print(f"Status response: {status_response.status_code}")
             
             if status_response.status_code == 200:
@@ -404,7 +412,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         print(f"Calling MODERNIZED service: {datetime.now().isoformat()}")
         print(f"Request data: {modernized_data}")
         modernized_response = requests.post(
-            "http://tour-generation-modernized-1:5021/process",
+            f"{MODERNIZED_URL}/process",
             headers={"Content-Type": "application/json"},
             json=modernized_data,
             timeout=60
@@ -420,7 +428,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         # Wait for modernized processing to complete
         ACTIVE_JOBS[job_id]["progress"] = "Waiting for modernized processing..."
         while True:
-            modernized_status_response = requests.get(f"http://tour-generation-modernized-1:5021/status/{modernized_job_id}", timeout=10)
+            modernized_status_response = requests.get(f"{MODERNIZED_URL}/status/{modernized_job_id}", timeout=10)
             
             if modernized_status_response.status_code == 200:
                 modernized_status_data = modernized_status_response.json()
@@ -467,7 +475,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         safe_location = location.replace(' ', '_').replace(',', '').replace(':', '').replace('/', '_').replace('\\', '_').lower()
         
         print(f"Downloading complete tour from MODERNIZED service: {datetime.now().isoformat()}")
-        download_response = requests.get(f"http://tour-generation-modernized-1:5021/download/{modernized_job_id}", timeout=60)
+        download_response = requests.get(f"{MODERNIZED_URL}/download/{modernized_job_id}", timeout=60)
         print(f"Download response: {download_response.status_code}")
         
         if download_response.status_code == 200:
@@ -630,7 +638,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                     
                     print(f"Calling translation service with data: {translation_data}")
                     translation_response = requests.post(
-                        "http://translation-service-1:5030/translate-with-audio",
+                        f"{TRANSLATION_URL}/translate-with-audio",
                         headers={"Content-Type": "application/json"},
                         json=translation_data,
                         timeout=120
@@ -668,7 +676,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                         'finished_at': datetime.now().isoformat()
                     }
                     update_response = requests.post(
-                        "http://development-tour-update-1:5001/update",
+                        f"{TOUR_UPDATE_URL}/update",
                         headers={"Content-Type": "application/json"},
                         json=update_data,
                         timeout=10
@@ -741,7 +749,7 @@ def track_user_tour(user_id, tour_id, request_string):
         print(f"Payload: {payload}")
         
         response = requests.put(
-            f"http://user-api-2:5000/user/{user_id}",
+            f"{USER_API_URL}/user/{user_id}",
             json=payload,
             timeout=10
         )
@@ -772,7 +780,7 @@ def get_coordinates_direct(location):
         encoded_location = urllib.parse.quote(location)
         
         # Make the request to the coordinates-fromai service (internal port 5004)
-        url = f"http://coordinates-fromai:5004/coordinates/{encoded_location}"
+        url = f"{COORDINATES_URL}/coordinates/{encoded_location}"
         print(f"Requesting URL: {url}")
         
         response = requests.get(url, timeout=60)
@@ -816,7 +824,7 @@ def call_coordinates_service(location):
         encoded_location = urllib.parse.quote(location)
         
         # Make the request to the coordinates-fromai service
-        url = f"http://coordinates-fromai:5004/coordinates/{encoded_location}"
+        url = f"{COORDINATES_URL}/coordinates/{encoded_location}"
         print(f"Requesting URL: {url}")
         
         response = requests.get(url, timeout=60)

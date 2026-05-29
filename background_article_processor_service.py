@@ -3,9 +3,13 @@ import requests
 import uuid
 import threading
 import time
+import os
 from datetime import datetime
 
 SERVICE_VERSION = "1.2.2.82"
+
+# Inter-service URLs
+NEWS_ORCHESTRATOR_URL = os.getenv('NEWS_ORCHESTRATOR_URL', 'http://news-orchestrator-1:5009')
 
 class BackgroundArticleProcessor:
     def __init__(self):
@@ -158,7 +162,7 @@ class BackgroundArticleProcessor:
     def request_audio_generation(self, article_id, article_content):
         """Request audio generation from news-orchestrator-1"""
         try:
-            response = requests.post('http://news-orchestrator-1:5009/generate-article', 
+            response = requests.post(f'{NEWS_ORCHESTRATOR_URL}/generate-article', 
                                    json={
                                        'article_text': article_content['content'],
                                        'request_string': article_content['title'],

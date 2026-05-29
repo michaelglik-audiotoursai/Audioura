@@ -26,6 +26,10 @@ import sys
 sys.stdout = sys.__stdout__
 sys.stderr = sys.__stderr__
 
+# Inter-service URLs
+POLLY_TTS_URL = os.getenv('POLLY_TTS_URL', 'http://polly-tts-1:5018')
+VOICE_CONTROL_URL = os.getenv('VOICE_CONTROL_URL', 'http://development-voice-control-1:5008')
+
 # Database connection
 def get_db_connection():
     return psycopg2.connect(
@@ -47,7 +51,7 @@ def generate_short_title(original_title, article_type):
         
         # Call voice control service to generate short title
         response = requests.post(
-            'http://development-voice-control-1:5008/generate_short_title',
+            f'{VOICE_CONTROL_URL}/generate_short_title',
             json={
                 'original_title': original_title,
                 'article_type': article_type,
@@ -165,7 +169,7 @@ def generate_audio_with_polly(text, output_path):
         logging.info(f"Sending {len(clean_text)} clean characters to Polly (original: {len(text)})")
         
         response = requests.post(
-            'http://polly-tts-1:5018/synthesize',
+            f'{POLLY_TTS_URL}/synthesize',
             json={
                 'text': clean_text,
                 'voice_id': 'Joanna',

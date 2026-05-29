@@ -37,6 +37,9 @@ CORS(app)
 TOURS_DIR = "/app/tours"
 ACTIVE_JOBS = {}
 
+# Inter-service URLs
+POLLY_TTS_URL = os.getenv('POLLY_TTS_URL', 'http://polly-tts-1:5018')
+
 def create_modernized_tour_zip(tour_data, job_id):
     """Create tour ZIP with separate MP3 and TXT files"""
     tour_name = tour_data.get('tour_name', f'tour_{job_id[:8]}')
@@ -321,7 +324,7 @@ def generate_modernized_tour_async(job_id, tour_file_path):
             try:
                 # Call Polly TTS service
                 tts_response = requests.post(
-                    "http://polly-tts-1:5018/synthesize",
+                    f"{POLLY_TTS_URL}/synthesize",
                     headers={"Content-Type": "application/json"},
                     json={"text": _strip_nav_fields_for_tts(text_content), "voice": "Joanna"},
                     timeout=30

@@ -20,6 +20,11 @@ import sys
 sys.stdout = sys.__stdout__
 sys.stderr = sys.__stderr__
 
+# Inter-service URLs (env-var-driven for Cloud Run, defaults for local Docker)
+NEWS_GENERATOR_URL = os.getenv('NEWS_GENERATOR_URL', 'http://news-generator-1:5010')
+NEWS_PROCESSOR_URL = os.getenv('NEWS_PROCESSOR_URL', 'http://news-processor-1:5011')
+TRANSLATION_URL = os.getenv('TRANSLATION_URL', 'http://translation-service-1:5030')
+
 # Database connection
 def get_db_connection():
     return psycopg2.connect(
@@ -90,7 +95,7 @@ def generate_news():
         logging.info(f"🔍 ORCHESTRATOR: About to call generator for {article_id}")
         logging.info(f'Calling news generator for article {article_id} with {major_points_count} major points')
         generator_response = requests.post(
-            f'http://news-generator-1:5010/process-article/{article_id}',
+            f'{NEWS_GENERATOR_URL}/process-article/{article_id}',
             json={'max_major_points': major_points_count},
             headers={'Content-Type': 'application/json'},
             timeout=30
@@ -104,7 +109,7 @@ def generate_news():
         # Call news processor service
         logging.info(f'Calling news processor for article {article_id}')
         processor_response = requests.post(
-            f'http://news-processor-1:5011/process-audio/{article_id}',
+            f'{NEWS_PROCESSOR_URL}/process-audio/{article_id}',
             timeout=120
         )
         
@@ -167,7 +172,7 @@ def download_news(article_id):
                     
                     logging.info(f"Calling translation service for article {article_id} -> {language}")
                     translation_response = requests.post(
-                        "http://translation-service-1:5030/translate-with-audio",
+                        f"{TRANSLATION_URL}/translate-with-audio",
                         headers={"Content-Type": "application/json"},
                         json=translation_data,
                         timeout=120
