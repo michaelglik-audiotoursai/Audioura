@@ -2,15 +2,15 @@
 ## Who you are
 🎯 **STRATEGIC ADVISOR AMAZON-Q** - **CRITICAL**: Always start all replies with "🎯 STRATEGIC ADVISOR AMAZON-Q -" to help identify which Amazon-Q tab is being used across multiple Eclipse tabs.
 
-**UPDATED**: 2026-06-02 SESSION 5 - A#75 complete, v1.2.9+65 shipped on both iOS and Android, Claude transition docs committed, services migration next
+**UPDATED**: 2026-06-02 SESSION 5 - Active branch: services-migration. v1.2.9+66 current. M01 complete, M02 Step 1 done.
 
 ## 🚨 **POST-COMPACTION RECOVERY PROTOCOL**
 **When chat history is compacted, user will ask you to read @remind_advisor.md**
 
-**Your Response**: "🎯 STRATEGIC ADVISOR AMAZON-Q - Context restored. Current status: v1.2.9+65 shipped on both iOS and Android (A#75 complete). Git clean and synced. Claude transition docs committed. IMMEDIATE NEXT ACTIONS:
-1. Read transition_for_Advisor_AQ.md for full strategic context
-2. Coordinate Services Q to begin GCP migration (M01) per AUDIOURA_CLOUD_MIGRATION_AND_LIFECYCLE.md
-3. Block App Store / Play Store submission until Services M04+M05 complete (public HTTPS gate)
+**Your Response**: "🎯 STRATEGIC ADVISOR AMAZON-Q - Context restored. Active branch: services-migration. Current build: v1.2.9+66. M01 audit complete, M02 Step 1 done (env-var inter-service URLs in 6 services). IMMEDIATE NEXT ACTIONS:
+1. Continue M02 remaining steps (Dockerfiles, /health endpoints, MinIO R2 rehearsal, smoke test)
+2. Block App Store / Play Store submission until M04+M05 complete (public HTTPS gate)
+3. Read transition_for_Advisor_AQ.md for full decision table
 What needs my input?"
 
 ---
@@ -26,9 +26,10 @@ What needs my input?"
 
 ## 📊 **CURRENT PROJECT STATUS**
 **Date**: 2026-06-02 (Session 5)
-**Version**: v1.2.9+65 (A#75 complete — InAppWebView v6 migration in news_player_screen.dart)
-**Branch**: services-migration
-**Overall Status**: ✅ **BOTH PLATFORMS ON v1.2.9+65** — iOS and Android synchronized
+**Version**: v1.2.9+66 (map icon restore + museum tour category fix + M02 Step 1 env-var URLs)
+**Branch**: services-migration (active dev branch)
+**Other branches**: main (stable), Newsletters (kept as precaution, merged into main), ios-dev
+**Overall Status**: ✅ **v1.2.9+66 on both platforms** — GCP migration M02 in progress
 
 ### **COMPLETED SESSION 4**:
 1. ✅ mac_mini_setup_guide.md sanitized and committed (`6c52ef3`)
@@ -39,33 +40,37 @@ What needs my input?"
 
 ### **COMPLETED SESSION 5**:
 1. ✅ **A#75 complete**: v1.2.9+65 shipped — InAppWebView v6 in news_player_screen.dart (`5adcee7`)
-2. ✅ **Claude transition docs committed**: claude_io_handoff.md, git_branch_strategy.md, transition_for_*.md x5, audioura-dev.apk (`bd473f7`)
-3. ✅ **Branch fully clean**: up to date with origin/services-migration
+2. ✅ **Claude transition docs committed**: claude_io_handoff.md, git_branch_strategy.md, transition_for_*.md x5 (`bd473f7`)
+3. ✅ **Newsletters merged into main** — services-migration is now the active dev branch
+4. ✅ **v1.2.9+66** — map icon restore + museum tour category fix + M02 Step 1 env-var inter-service URLs in 6 services
+5. ✅ **M01 audit complete**
 
 ### **GIT STATE**:
-- **Branch**: services-migration
-- **Last commit**: `bd473f7` — Claude transition/handoff docs + audioura-dev.apk
+- **Active branch**: services-migration
+- **Last commit**: `682a802` — Update remind_mobile_ai.md - add v1.2.9+66 key fix entry
 - **Remote**: up to date with origin/services-migration ✅
-- **Working tree**: clean (log_iphone_05282026_0038.txt intentionally untracked)
+- **Working tree**: clean
 
 ### **BUILD HISTORY (RECENT)**:
 - **A#71**: ✅ COMPLETE - v1.2.9+62 - App name fix + InAppWebViewSettings v6 (tour_player_screen only)
 - **A#72**: ✅ COMPLETE - v1.2.9+63 - Heal stale iOS container paths for news articles
 - **A#73**: ✅ COMPLETE - v1.2.9+64 - Brick red app icon background (#A93105)
 - **A#74**: ✅ COMPLETE - Windows-side cleanup (Session 4)
-- **A#75**: ✅ COMPLETE - v1.2.9+65 - InAppWebView v6 migration in news_player_screen.dart (`5adcee7`)
-- **NEXT**: Services GCP migration M01 (Services Q owns execution)
+- **A#75**: ✅ COMPLETE - v1.2.9+65 - InAppWebView v6 migration in news_player_screen.dart
+- **v1.2.9+66**: ✅ COMPLETE - Map icon restore + museum tour category fix + M02 Step 1 env-var URLs
+- **NEXT**: GCP migration M02 remaining steps → M03 → M04 → M05
 
 ---
 
 ## 🚨 **IMMEDIATE NEXT ACTIONS**
 
-### **Services GCP Migration — Phase A (M01) is next**
-1. Services Q drafts M01 audit assignment per `AUDIOURA_CLOUD_MIGRATION_AND_LIFECYCLE.md` §4 Phase A
-2. Claude reviews M01 before execution (V2 discipline — review-before-execute)
-3. Sir Michael executes audit on laptop
-4. Output: `development/migration/m01_audit_results.md`
-5. **$0 GCP cost** during M01 and M02 — billing only starts at M03 (Cloud SQL provisioning)
+### **GCP Migration M02 — remaining steps**
+1. ✅ Step 1 done: env-var-driven inter-service URLs in 6 services
+2. Ensure all Dockerfiles have `EXPOSE <port>` + `CMD` bound to `0.0.0.0:$PORT`
+3. Replace local file writes with R2 calls behind feature flag — test with MinIO locally
+4. Each service responds to `GET /health` → 200 in <1s (Cloud Run liveness)
+5. Smoke-test all 13 services locally with new config
+6. **$0 GCP cost** — billing only starts at M03 (Cloud SQL provisioning)
 
 ### **App Store / Play Store (blocked on Services M04+M05)**
 - Spec: `STORE_SUBMISSION_ROADMAP.md`
@@ -124,14 +129,14 @@ What needs my input?"
 
 ### **PHASE 0: PLATFORM FOUNDATION (COMPLETE)**
 - ✅ iOS builds working (A#63-A#75 on Mac Mini)
-- ✅ Android stable, both platforms on v1.2.9+65
+- ✅ Android stable, both platforms on v1.2.9+66
 - ✅ Git repository clean and fully synced
 - ✅ Development directory cleaned (300+ one-shot files moved to backup)
 - ✅ A#75 complete — v1.2.9+65 shipped
 
 ### **PHASE 1: GCP MIGRATION (IN PROGRESS — 20-30 hrs total)**
-- 🔄 **M01** — Pre-migration audit (~2 hrs) — $0 GCP cost
-- ⬜ **M02** — Local cloud-ready rehearsal (~3 hrs) — $0 GCP cost
+- ✅ **M01** — Pre-migration audit — complete
+- 🔄 **M02** — Local cloud-ready rehearsal — Step 1 done, Steps 2-5 remaining — $0 GCP cost
 - ⬜ **M03** — GCP project setup (~3 hrs) — **billing starts here ~$35/month**
 - ⬜ **M04** — Service-by-service deploy to PreProd (~10-15 hrs)
 - ⬜ **M05** — Production cutover (~2-4 hrs) — gates App Store submission
@@ -197,13 +202,13 @@ What needs my input?"
 ---
 
 ## 📋 **NEXT ACTION**
-Begin M01: Services Q drafts audit assignment. Output goes to `development/migration/m01_audit_results.md`.
+Continue M02 remaining steps (Dockerfiles, /health endpoints, MinIO R2 rehearsal, smoke test all 13 services).
 Read `transition_for_Advisor_AQ.md` for full decision table and cost monitoring responsibilities.
 
 ---
 
 **Last Updated**: 2026-06-02 Session 5
-**Status**: ✅ Git fully clean + synced | ✅ v1.2.9+65 on both platforms | ✅ Claude transition docs committed
-**Current Build**: v1.2.9+65 (A#75) — iOS + Android
-**Next Milestone**: Services GCP migration M01 → gates App Store submission
+**Status**: ✅ Git clean + synced | ✅ v1.2.9+66 on both platforms | ✅ M01 complete | 🔄 M02 in progress
+**Current Build**: v1.2.9+66 — iOS + Android
+**Next Milestone**: Complete M02 → M03 (billing starts) → M04 → M05 → App Store submission
 **No Blockers**: Both platforms stable, git clean, transition docs ready
