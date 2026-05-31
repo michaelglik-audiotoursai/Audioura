@@ -8,20 +8,40 @@ This is required so the user can identify which Amazon-Q tab they are talking to
 
 ---
 
-### ✅ **CURRENT STATE — v1.2.9+65 ON iPHONE, A#75 COMPLETE**
+### ✅ **CURRENT STATE — v1.2.9+65 ON iPHONE, A#76 STAGED**
 
 - iPhone running **v1.2.9+65** (A#75 complete — InAppWebView v6 migration) ✅
-- A#75 done: `news_player_screen.dart` v6 API confirmed, built, smoke tested, committed + pushed
-- Next assignment: A#76 (pending ISSUE-061 server fix for translated tours in `/tours-near/`)
+- A#76 staged and ready — map icon restored on Listen page. One file: `my_tours_screen.dart`. Branch: `services-migration`.
+- Mac Mini needs: `git pull origin services-migration` + `copy_ios_fixes.sh` + build
 
 ---
 
 ### 🎯 **IMMEDIATE NEXT STEPS**
 
-#### A#76 — Translated tours in download list (BLOCKED on server)
-- Blocked until Services team adds `is_translation: true` + `parent_tour_id` to `/tours-near/` listing response
-- See `ISSUE-061_TRANSLATED_TOURS_IN_DOWNLOAD_LIST.md` for server fix request
-- No iOS work until server fix is confirmed
+#### A#76 — Build v1.2.9+66 ⚠️ READY TO BUILD
+**What changes:** Green `Icons.map` button restored on Listen page — appears per-tour when tour has coordinate data. One file: `my_tours_screen.dart`.
+
+**Mac Mini runs** (per `mac_mini_assignments.md` A#76 block):
+```bash
+cd ~/Development/Audioura-build
+git pull origin services-migration
+cd "/Volumes/USB DISK/Audioura/scripts"
+./copy_ios_fixes.sh
+# Spot-check: pubspec at +66, Icons.map present in my_tours_screen.dart
+# Verify Xcode signing: com.glikfamily.audioura + team 4HGRU6TKGQ
+cd ~/Development/Audioura-build/development/audio_tour_app
+flutter clean && flutter pub get
+cd "/Volumes/USB DISK/Audioura/scripts"
+./build_install_launch.sh
+# STOP for Sir Michael smoke test
+# After smoke test passes:
+git add development/audio_tour_app/lib/screens/my_tours_screen.dart \
+        development/audio_tour_app/pubspec.yaml
+git commit -m "v1.2.9+66 - A#76: restore map icon on Listen page per-tour"
+git push origin services-migration
+```
+
+**Smoke test:** Listen tab → Tours mode → tap tour with map data → green map icon appears in trailing row → tap it → map opens.
 
 ---
 
@@ -86,6 +106,7 @@ D:\Audioura\assets\
 - **Current version on iPhone**: v1.2.9+65 ✅ (A#75 — InAppWebView v6 migration)
 - **pubspec.yaml in dev tree**: `1.2.9+65` ✅
 - **All features in +65**: Tour clustering, location search, tour search, newsletter system, subscription, language selector, about screen, settings persistence, location permissions, keyboard dismissal, download spinner fix, microphone voice control, translation (ru/fr/zh), walking tour map, per-stop map focus, coordinate jitter, museum single-POI map guard, mode-switch fix, stale tour path healing, stale news article path healing, brick-red app icon, app name "Audioura", InAppWebView v6 in all WebView screens
+- **New in +66 (staged):** Map icon restored on Listen page per-tour (`my_tours_screen.dart`)
 
 ---
 
@@ -179,8 +200,8 @@ GET http://192.168.0.218:5005/download-tour/<translated_id>  → ZIP file
 ---
 
 ### 📋 **OPEN ITEMS**
-1. **A#76** ⚠️ BLOCKED — Translated tours in `/tours-near/` → 404 on direct download. Waiting on server fix (ISSUE-061). iOS work follows after server adds `is_translation: true` + `parent_tour_id` to listing response.
-2. **ISSUE-061** — Translated tours in `/tours-near/` → 404 on direct download. Filed for Services. iOS A#76 follows after server adds `is_translation: true` + `parent_tour_id` to listing response.
+1. **A#76** ⚠️ STAGED — Map icon restored on Listen page. `my_tours_screen.dart` + pubspec bump to +66. Branch: `services-migration`. Uses `copy_ios_fixes.sh` (legacy workflow).
+2. **ISSUE-061** — Translated tours in `/tours-near/` → 404 on direct download. Filed for Services. Future iOS assignment follows after server fix.
 3. **NF4 (LOW)** — `openMap` handler bare-int widening. Two-line fix.
 4. **NF5 (LOW)** — `Colors.blue.withOpacity(0.6)` → `.withValues(alpha: 0.6)`.
 5. **Coordinates keyword** — Must stay English in all translated `audio_N.txt`.
@@ -218,7 +239,7 @@ GET http://192.168.0.218:5005/download-tour/<translated_id>  → ZIP file
 - **A#73**: ✅ v1.2.9+64 — brick-red (#A93105) app icon. 15 PNGs regenerated via Python script. 2026-05-26.
 - **A#74**: ✅ Windows-side git cleanup (Sir Michael only — not a Mac Mini assignment).
 - **A#75**: ✅ v1.2.9+65 — InAppWebView v6 migration in `news_player_screen.dart`. No functional change. Built, smoke tested, committed + pushed. 2026-06-01.
-- **A#76**: ⏳ BLOCKED — Translated tours download list fix. Waiting on ISSUE-061 server fix.
+- **A#76**: ⚠️ STAGED — v1.2.9+66. Map icon restored on Listen page per-tour (`my_tours_screen.dart`). Branch: `services-migration`. Uses `copy_ios_fixes.sh`.
 
 ---
 
@@ -264,7 +285,7 @@ cd ~/Development/Audioura-build/development/audio_tour_app && flutter clean && f
 | `lib/screens/tour_generator_screen.dart` | Translation + player navigation. LF. |
 | `lib/screens/debug_log_viewer_screen.dart` | Contains `DebugLogHelper` class |
 | `lib/config.dart` | `Config.defaultServerIp = '192.168.0.218'` |
-| `D:\Audioura\assignments\mac_mini_assignments.md` | A#75 block at top |
+| `D:\Audioura\assignments\mac_mini_assignments.md` | A#76 block at top |
 | `D:\Audioura\scripts\build_install_launch.sh` | Proven stable build script |
 | `C:\Users\micha\eclipse-workspace\AudioTours\development\build_process_for_ios_q.md` | Build process rules |
 | `C:\Users\micha\eclipse-workspace\AudioTours\development\git_source_control_for_q.md` | Git structure — READ BEFORE ANY GIT WORK |
@@ -273,5 +294,5 @@ cd ~/Development/Audioura-build/development/audio_tour_app && flutter clean && f
 
 ---
 
-**Last Updated**: 2026-06-01 — v94.0. iPhone on v1.2.9+65. A#75 complete (InAppWebView v6 migration in news_player_screen.dart, no functional change). A#76 blocked on ISSUE-061 server fix. Repo has `development/` subdirectory — Flutter project path updated throughout.
-**iOS Amazon-Q Version**: 94.0
+**Last Updated**: 2026-06-01 — v95.0. iPhone on v1.2.9+65. A#75 complete. A#76 staged (map icon restored on Listen page, `my_tours_screen.dart`, branch `services-migration`, uses `copy_ios_fixes.sh`). ISSUE-061 (translated tours 404) deferred to future assignment.
+**iOS Amazon-Q Version**: 95.0
