@@ -1,0 +1,12 @@
+# USB results folder — hundreds of build logs and binary files, not tracked in git
+results/
+
+# Empty staging folder
+verify/
+
+# macOS metadata files
+._*
+.DS_Store
+
+# Temp files
+tmp_lines.txt
