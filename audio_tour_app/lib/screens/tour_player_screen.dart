@@ -5,6 +5,7 @@ import 'dart:io';
 import 'dart:async';
 import 'voice_methods.dart';
 import 'debug_log_viewer_screen.dart';
+import 'tour_map_screen.dart';
 
 class TourPlayerScreen extends StatefulWidget {
   final String tourPath;
@@ -103,6 +104,25 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                 _controller = controller;
                 webController = controller;
                 await DebugLogHelper.addDebugLog('VOICE: InAppWebView created, controller set');
+                controller.addJavaScriptHandler(
+                  handlerName: 'openMap',
+                  callback: (args) async {
+                    final stopArg = args.isNotEmpty && args[0] is Map ? args[0]['stop'] : null;
+                    final stopIndex = stopArg is int ? stopArg : int.tryParse('$stopArg');
+                    await DebugLogHelper.addDebugLog('MAP: openMap handler fired for stop $stopIndex');
+                    if (!mounted) return;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => TourMapScreen(
+                          tourPath: widget.tourPath,
+                          tourTitle: widget.tourTitle,
+                          focusStopIndex: stopIndex,
+                        ),
+                      ),
+                    );
+                  },
+                );
               },
               onLoadStop: (InAppWebViewController controller, WebUri? url) async {
                 await DebugLogHelper.addDebugLog('VOICE: WebView loaded: $url');
