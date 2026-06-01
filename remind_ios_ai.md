@@ -44,6 +44,28 @@ cd "/Volumes/USB DISK/Audioura/scripts"
 
 ---
 
+### 🗂️ **USB MIRROR IN GIT (NEW)**
+
+The USB drive contents (`D:\Audioura\`) are now mirrored into git at:
+`C:\Users\micha\eclipse-workspace\AudioTours\development\usb\Audioura\`
+
+What's tracked:
+- `usb/Audioura/assignments/` — `mac_mini_assignments.md` + individual assignment docs
+- `usb/Audioura/assets/` — all Dart screens, services, widgets, pubspec, Podfile, Info.plist
+- `usb/Audioura/scripts/` — all build and diagnostic shell scripts
+- `usb/Audioura/archive/` — old assignment walkthroughs
+- `usb/Audioura/claude_analysis/` — analysis docs
+- `usb/Audioura/.gitignore` — excludes `results/`, `verify/`, macOS dot-files
+
+`results/` is NOT tracked (hundreds of build logs — too large).
+
+**Workflow:** Edit files in `usb/Audioura/` → `git commit` + `git push` → copy to USB when needed:
+```cmd
+copy C:\Users\micha\eclipse-workspace\AudioTours\development\usb\Audioura\assignments\mac_mini_assignments.md D:\Audioura\assignments\
+```
+
+---
+
 ### 🔑 **GIT / BUILD STATE**
 
 #### Three locations — two are git repos
@@ -285,7 +307,8 @@ cd ~/Development/Audioura-build/development/audio_tour_app && flutter clean && f
 | `lib/screens/tour_generator_screen.dart` | Translation + player navigation. LF. |
 | `lib/screens/debug_log_viewer_screen.dart` | Contains `DebugLogHelper` class |
 | `lib/config.dart` | `Config.defaultServerIp = '192.168.0.218'` |
-| `D:\Audioura\assignments\mac_mini_assignments.md` | A#76 block at top |
+| `D:\Audioura\assignments\mac_mini_assignments.md` | A#76 block at top. Git mirror: `usb/Audioura/assignments/mac_mini_assignments.md` |
+| `C:\Users\micha\eclipse-workspace\AudioTours\development\usb\Audioura\` | Git mirror of full USB contents (assignments, assets, scripts, archive) |
 | `D:\Audioura\scripts\build_install_launch.sh` | Proven stable build script |
 | `C:\Users\micha\eclipse-workspace\AudioTours\development\build_process_for_ios_q.md` | Build process rules |
 | `C:\Users\micha\eclipse-workspace\AudioTours\development\git_source_control_for_q.md` | Git structure — READ BEFORE ANY GIT WORK |
@@ -294,5 +317,5 @@ cd ~/Development/Audioura-build/development/audio_tour_app && flutter clean && f
 
 ---
 
-**Last Updated**: 2026-06-01 — v96.0. iPhone on v1.2.9+65. A#75 complete. A#76 staged targeting v1.2.9+68: +66 map icon restore, +67 HitTestBehavior hardening, +68 openMap JS handler fix (POI tap was silently dropped). All commits in git on services-migration. Mac Mini: git pull + build only.
-**iOS Amazon-Q Version**: 96.0
+**Last Updated**: 2026-06-01 — v97.0. iPhone on v1.2.9+65. A#75 complete. A#76 staged targeting v1.2.9+68: +66 map icon restore, +67 HitTestBehavior hardening, +68 openMap JS handler fix (POI tap was silently dropped). All commits in git on services-migration. Mac Mini: git pull + build only. USB contents now mirrored in git at usb/Audioura/ (commit a1da162).
+**iOS Amazon-Q Version**: 97.0
