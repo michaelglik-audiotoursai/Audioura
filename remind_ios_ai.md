@@ -8,40 +8,39 @@ This is required so the user can identify which Amazon-Q tab they are talking to
 
 ---
 
-### ✅ **CURRENT STATE — v1.2.9+65 ON iPHONE, A#76 STAGED**
+### ✅ **CURRENT STATE — v1.2.9+65 ON iPHONE, A#76 STAGED (v1.2.9+68)**
 
 - iPhone running **v1.2.9+65** (A#75 complete — InAppWebView v6 migration) ✅
-- A#76 staged and ready — map icon restored on Listen page. One file: `my_tours_screen.dart`. Branch: `services-migration`.
-- Mac Mini needs: `git pull origin services-migration` + `copy_ios_fixes.sh` + build
+- A#76 staged — targets v1.2.9+68. Covers three versions (+66, +67, +68). Critical fix: `openMap` JS handler was never registered in `TourPlayerScreen` — POI map buttons silently did nothing.
+- All three commits already in git on `services-migration`. Mac Mini needs: `git pull` + build only.
 
 ---
 
 ### 🎯 **IMMEDIATE NEXT STEPS**
 
-#### A#76 — Build v1.2.9+66 ⚠️ READY TO BUILD
-**What changes:** Green `Icons.map` button restored on Listen page — appears per-tour when tour has coordinate data. One file: `my_tours_screen.dart`.
+#### A#76 — Build v1.2.9+68 ⚠️ READY TO BUILD
+**What changed (+66 → +67 → +68):**
+- +66: `my_tours_screen.dart` — map icon (`Icons.map`) restored on Listen page per-tour
+- +67: `tour_map_screen.dart` — `HitTestBehavior.opaque` on marker GestureDetector (wrong diagnosis, kept as hardening)
+- +68: `tour_player_screen.dart` — `addJavaScriptHandler('openMap')` registered in `onWebViewCreated` — **the real fix**
 
-**Mac Mini runs** (per `mac_mini_assignments.md` A#76 block):
+**Root cause:** `flutter_inappwebview` silently drops `callHandler('openMap')` if no handler is registered. `TourPlayerScreen` never registered it. Server HTML was always correct.
+
+**Key test:** After build, tap a POI map icon in tour player → debug log must show `MAP: openMap handler fired for stop N`.
+
+**Mac Mini runs:**
 ```bash
 cd ~/Development/Audioura-build
 git pull origin services-migration
-cd "/Volumes/USB DISK/Audioura/scripts"
-./copy_ios_fixes.sh
-# Spot-check: pubspec at +66, Icons.map present in my_tours_screen.dart
-# Verify Xcode signing: com.glikfamily.audioura + team 4HGRU6TKGQ
-cd ~/Development/Audioura-build/development/audio_tour_app
+# Spot-checks: pubspec at +68, openMap in tour_player_screen.dart, Icons.map in my_tours_screen.dart
+# Verify Xcode signing
+cd development/audio_tour_app
 flutter clean && flutter pub get
 cd "/Volumes/USB DISK/Audioura/scripts"
 ./build_install_launch.sh
 # STOP for Sir Michael smoke test
-# After smoke test passes:
-git add development/audio_tour_app/lib/screens/my_tours_screen.dart \
-        development/audio_tour_app/pubspec.yaml
-git commit -m "v1.2.9+66 - A#76: restore map icon on Listen page per-tour"
-git push origin services-migration
+# After smoke test passes: git push origin services-migration (commits already in git)
 ```
-
-**Smoke test:** Listen tab → Tours mode → tap tour with map data → green map icon appears in trailing row → tap it → map opens.
 
 ---
 
@@ -106,7 +105,7 @@ D:\Audioura\assets\
 - **Current version on iPhone**: v1.2.9+65 ✅ (A#75 — InAppWebView v6 migration)
 - **pubspec.yaml in dev tree**: `1.2.9+65` ✅
 - **All features in +65**: Tour clustering, location search, tour search, newsletter system, subscription, language selector, about screen, settings persistence, location permissions, keyboard dismissal, download spinner fix, microphone voice control, translation (ru/fr/zh), walking tour map, per-stop map focus, coordinate jitter, museum single-POI map guard, mode-switch fix, stale tour path healing, stale news article path healing, brick-red app icon, app name "Audioura", InAppWebView v6 in all WebView screens
-- **New in +66 (staged):** Map icon restored on Listen page per-tour (`my_tours_screen.dart`)
+- **New in +66/+67/+68 (staged):** Map icon restored on Listen page (+66). `HitTestBehavior.opaque` on map markers (+67, hardening). `openMap` JS handler registered in `TourPlayerScreen` (+68, real POI tap fix).
 
 ---
 
@@ -158,8 +157,9 @@ D:\Audioura\assets\
 
 #### tour_player_screen.dart (CRLF)
 - All injection code removed. Kept: `addJavaScriptHandler('openMap')` + `_openMapForStop()`
-- `openMap` handler: `(args[0]['stop'] as num?)?.toInt()` — `if (stop != null && mounted)` guard
+- `openMap` handler: registered in `onWebViewCreated` — `args[0]['stop']` parsed as int, fallback `int.tryParse`. Logs `MAP: openMap handler fired for stop N`. Pushes `TourMapScreen(focusStopIndex: stopIndex)`.
 - Uses `initialSettings: InAppWebViewSettings(...)` — v6 API ✅
+- **A#76 +68**: `import 'tour_map_screen.dart'` added. `addJavaScriptHandler('openMap')` registered — was missing before, causing silent drop of all POI tap events.
 
 #### news_player_screen.dart (CRLF — A#72 + A#75)
 - **A#72**: `_getIndexUrl()` heals stale container paths. `FutureBuilder<String>` wraps WebView body. `late final Future<String> _indexUrlFuture` cached in `initState`.
@@ -200,7 +200,7 @@ GET http://192.168.0.218:5005/download-tour/<translated_id>  → ZIP file
 ---
 
 ### 📋 **OPEN ITEMS**
-1. **A#76** ⚠️ STAGED — Map icon restored on Listen page. `my_tours_screen.dart` + pubspec bump to +66. Branch: `services-migration`. Uses `copy_ios_fixes.sh` (legacy workflow).
+1. **A#76** ⚠️ STAGED — Build v1.2.9+68. Three versions bundled: +66 (map icon on Listen page), +67 (`HitTestBehavior.opaque` hardening), +68 (`openMap` JS handler registered in `TourPlayerScreen` — real POI tap fix). All commits in git. Mac Mini: `git pull` + build only. Key test: `MAP: openMap handler fired for stop N` in debug log.
 2. **ISSUE-061** — Translated tours in `/tours-near/` → 404 on direct download. Filed for Services. Future iOS assignment follows after server fix.
 3. **NF4 (LOW)** — `openMap` handler bare-int widening. Two-line fix.
 4. **NF5 (LOW)** — `Colors.blue.withOpacity(0.6)` → `.withValues(alpha: 0.6)`.
@@ -239,7 +239,7 @@ GET http://192.168.0.218:5005/download-tour/<translated_id>  → ZIP file
 - **A#73**: ✅ v1.2.9+64 — brick-red (#A93105) app icon. 15 PNGs regenerated via Python script. 2026-05-26.
 - **A#74**: ✅ Windows-side git cleanup (Sir Michael only — not a Mac Mini assignment).
 - **A#75**: ✅ v1.2.9+65 — InAppWebView v6 migration in `news_player_screen.dart`. No functional change. Built, smoke tested, committed + pushed. 2026-06-01.
-- **A#76**: ⚠️ STAGED — v1.2.9+66. Map icon restored on Listen page per-tour (`my_tours_screen.dart`). Branch: `services-migration`. Uses `copy_ios_fixes.sh`.
+- **A#76**: ⚠️ STAGED — v1.2.9+68. Three versions: +66 map icon restore, +67 `HitTestBehavior.opaque` hardening, +68 `openMap` JS handler registered in `TourPlayerScreen` (real POI tap fix). Commits `0d4d46a` (+67) and `7d012d5` (+68) in git on `services-migration`. Build pending.
 
 ---
 
@@ -294,5 +294,5 @@ cd ~/Development/Audioura-build/development/audio_tour_app && flutter clean && f
 
 ---
 
-**Last Updated**: 2026-06-01 — v95.0. iPhone on v1.2.9+65. A#75 complete. A#76 staged (map icon restored on Listen page, `my_tours_screen.dart`, branch `services-migration`, uses `copy_ios_fixes.sh`). ISSUE-061 (translated tours 404) deferred to future assignment.
-**iOS Amazon-Q Version**: 95.0
+**Last Updated**: 2026-06-01 — v96.0. iPhone on v1.2.9+65. A#75 complete. A#76 staged targeting v1.2.9+68: +66 map icon restore, +67 HitTestBehavior hardening, +68 openMap JS handler fix (POI tap was silently dropped). All commits in git on services-migration. Mac Mini: git pull + build only.
+**iOS Amazon-Q Version**: 96.0
