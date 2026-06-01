@@ -334,6 +334,7 @@ class _TourMapScreenState extends State<TourMapScreen> {
               width: 36,
               height: 36,
               child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: () => _showPoiDetails(poi),
                 child: Container(
                   decoration: BoxDecoration(
