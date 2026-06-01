@@ -1537,8 +1537,8 @@ DO NOT include directions to the next stop - these will be added separately.
             # Debug: Print the directions
             print(f"DEBUG - Directions for Stop {stop_num} to {stop_num+1}: '{directions}'")
             
-            # Always include the standard phrase
-            poi_content += "Please resume the tour at the next stop once you reach it by following these directions: "
+            # Always include the standard phrase with the next stop name
+            poi_content += f"Please resume the tour at {next_poi['name']} by following these directions: "
             
             # CRITICAL FIX: Use the CURRENT POI's directions to get TO the next POI
             # The directions should be stored in the NEXT POI but describe how to get there FROM current POI
@@ -1548,7 +1548,7 @@ DO NOT include directions to the next stop - these will be added separately.
                 print(f"  ✅ Using detailed walking directions: {directions[:50]}...")
             else:
                 # Fallback to generic direction only if no detailed directions available
-                poi_content += f"Continue to the next location, '{next_poi['name']}'."
+                poi_content += f"Continue to '{next_poi['name']}'."
                 print(f"  ⚠️ Using generic directions - no detailed directions found")
         else:
             # For the last POI, add the conclusion
