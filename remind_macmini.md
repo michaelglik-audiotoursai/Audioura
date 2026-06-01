@@ -6,7 +6,7 @@
 
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 **When chat history is compacted, user will ask you to read @remind_macmini.md**
-**Your Response**: "I've read my reminder file. Current status: A#75 complete (v1.2.9+65). Ready for next assignment. What should I execute?"
+**Your Response**: "I've read my reminder file. Current status: A#76 complete (v1.2.9+68). Ready for next assignment. What should I execute?"
 **To load assignments**: Read `/Volumes/USB DISK/Audioura/assignments/mac_mini_assignments.md` and execute the assignment at the top.
 
 ## 🎯 ROLE & RESPONSIBILITIES
@@ -16,16 +16,16 @@
 - **STOP conditions**: Only stop if a step says STOP or a command fails unexpectedly
 
 ## 📊 CURRENT STATUS
-**Date**: 2026-05-28
-**Last Completed**: A#75 — v1.2.9+65 (InAppWebView v6 migration in news_player_screen.dart)
+**Date**: 2026-06-01
+**Last Completed**: A#76 — v1.2.9+68 (POI map button fix + map icon restore)
 **Branch**: services-migration
 **Build Status**: ✅ iOS builds working on iPhone 16
-**Last Commit**: `5adcee7` — pushed to origin/services-migration
+**Last Commit**: `3220ff5` — on origin/services-migration
 
 ### RECENT HISTORY:
-- **A#72** (v1.2.9+63): Applied A#56 path-healing pattern to news articles. Articles load, no white screen.
-- **A#73** (v1.2.9+64): App icon background changed from white to brick-red (#A93105). Required app deletion + reinstall for iOS icon cache.
-- **A#75** (v1.2.9+65): Completed InAppWebView v5→v6 migration in news_player_screen.dart. No functional change — eliminates deprecation footgun.
+- **A#73** (v1.2.9+64): App icon background changed from white to brick-red (#A93105).
+- **A#75** (v1.2.9+65): Completed InAppWebView v5→v6 migration in news_player_screen.dart.
+- **A#76** (v1.2.9+68): Fixed POI map button (openMap JS handler registered in tour_player_screen), restored map icon on Listen page. Branch: services-migration.
 
 ## 🗂️ KEY FILE LOCATIONS (MAC MINI)
 - **Assignments**: `/Volumes/USB DISK/Audioura/assignments/mac_mini_assignments.md`
