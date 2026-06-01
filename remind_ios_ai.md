@@ -8,34 +8,11 @@ This is required so the user can identify which Amazon-Q tab they are talking to
 
 ---
 
-### ✅ **CURRENT STATE — v1.2.9+68 ON iPHONE PENDING, A#76 NEEDS UPDATE**
+### ✅ **CURRENT STATE — v1.2.9+65 ON iPHONE, A#76 STAGED**
 
-- iPhone last built on **v1.2.9+65** (A#75 complete)
-- A#76 was staged for v1.2.9+66 but was **never built for iPhone**
-- Since then, two more versions shipped: **v1.2.9+67** and **v1.2.9+68**
-- You should update `mac_mini_assignments.md` — either update A#76 to target v1.2.9+68 directly, or supersede it with A#77. Your decision.
-- Latest commit on `services-migration`: `43d68de` — version `1.2.9+68`
-
----
-
-### 📦 **WHAT CHANGED SINCE v1.2.9+65 (last iPhone build)**
-
-#### v1.2.9+66 — commit `05e4557`
-- **File**: `my_tours_screen.dart`
-- **Change**: Restored green map icon on Listen page — `_tourHasMap`, `_detectMapTours()`, `_healTourPaths()`, `Icons.map` button in `_buildToursView()`
-- **Behaviour**: Map icon appears per-tour only when `audio_1.txt` contains `Coordinates:` line
-
-#### v1.2.9+67 — commit `0d4d46a`
-- **File**: `tour_map_screen.dart`
-- **Change**: Added `behavior: HitTestBehavior.opaque` to `GestureDetector` on POI circle markers
-- **Note**: This was an incorrect initial diagnosis of the POI tap bug. Kept as minor hardening per Claude code review. No functional impact expected.
-
-#### v1.2.9+68 — commit `7d012d5` ← THE REAL FIX
-- **Files**: `tour_player_screen.dart`, `pubspec.yaml`
-- **Bug fixed**: Tapping POI map icons during tour playback did nothing — silent no-op
-- **Root cause**: Server HTML emits `<button onclick="openMap(N)">` calling `flutter_inappwebview.callHandler('openMap', {stop:N})`. Flutter side never registered the `'openMap'` handler.
-- **Fix**: Added `controller.addJavaScriptHandler(handlerName: 'openMap')` in `onWebViewCreated`. Handler pushes `TourMapScreen` with `focusStopIndex: stopIndex`.
-- **Key test**: Play a tour → tap a POI map icon → `TourMapScreen` opens focused on that stop. Log shows: `MAP: openMap handler fired for stop N`
+- iPhone running **v1.2.9+65** (A#75 complete — InAppWebView v6 migration) ✅
+- A#76 staged and ready — map icon restored on Listen page. One file: `my_tours_screen.dart`. Branch: `services-migration`.
+- Mac Mini needs: `git pull origin services-migration` + `copy_ios_fixes.sh` + build
 
 ---
 
