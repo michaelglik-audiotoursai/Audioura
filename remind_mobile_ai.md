@@ -71,6 +71,24 @@ When chat history is compacted, user will ask you to read @remind_ai.md and @rem
 **Android**: Ubuntu VM — `bash build_flutter_clean.sh` (shared folder, no git pull needed)
 **iOS**: Mac Mini — A#77 staged at `D:\Audioura\assignments\mac_mini_assignments.md`
 
+## 📡 COMMUNICATION INFRASTRUCTURE
+
+**Between Amazon-Qs**: Two channels:
+1. **Direct** — via the user in conversation
+2. **Communication Layer** — file-based, committed to git:
+   - **Directory**: `c:\Users\micha\eclipse-workspace\amazon-q-communications\audiotours\`
+   - **Structure**:
+     ```
+     amazon-q-communications\audiotours\
+     ├── requirements\    ← bug reports, feature requests, cross-Q issues
+     ├── specifications\  ← technical specs
+     ├── decisions\       ← architectural decisions
+     └── issues\          ← active issues being tracked
+     ```
+   - **Usage**: Write a markdown file in `requirements\` to communicate with Services Amazon-Q or iOS Amazon-Q. They read it on their next session.
+   - **iOS Amazon-Q reminder file**: `c:\Users\micha\eclipse-workspace\AudioTours\development\remind_ios_ai.md` — update this to hand off work to iOS Amazon-Q
+   - **⚠️ DO NOT write to** `D:\Audioura\assignments\mac_mini_assignments.md` — that is iOS Amazon-Q's document, owned and maintained by iOS Amazon-Q only
+
 ## ⚠️ CRITICAL PROCESS NOTES
 - **NEVER apply changes only to `D:\Audioura\assets\` staging copy** without also committing to git dev tree
 - **Always commit `audio_tour_app/lib/` changes to git after each accepted cycle**
