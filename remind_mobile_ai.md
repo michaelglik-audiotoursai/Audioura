@@ -12,18 +12,20 @@
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 When chat history is compacted, user will ask you to read @remind_ai.md and @remind_mobile_ai.md.
 **Your Response**:
-"📱 MOBILE APP AMAZON-Q - I've read both reminder files. Current version is v1.2.9+66, committed and pushed to services-migration branch on GitHub. Map icon restored on Listen page. Android build v1.2.9+66 needed on Ubuntu VM. Ready to continue."
+"📱 MOBILE APP AMAZON-Q - I've read both reminder files. Current version is v1.2.9+68, committed and pushed to services-migration branch on GitHub. POI map button fix in tour player. Android and iOS builds pending. Ready to continue."
 
 ## CURRENT PROJECT STATUS
 **Project**: Audioura Mobile App — iOS iPhone + Android
-**Version**: v1.2.9+66 ✅ COMMITTED, PUSHED to GitHub (services-migration branch)
-**iOS**: 🔄 Build pending on Mac Mini (v1.2.9+66 not yet built for iPhone)
-**Android**: 🔄 Build pending on Ubuntu VM (v1.2.9+66 not yet built for Android)
+**Version**: v1.2.9+68 ✅ COMMITTED, PUSHED to GitHub (services-migration branch)
+**iOS**: 🔄 Build pending on Mac Mini — A#77 (v1.2.9+68)
+**Android**: 🔄 Build pending on Ubuntu VM (v1.2.9+68)
 **Branch**: services-migration
 **Bundle ID**: `com.glikfamily.audioura`
 **App Name**: Audioura
 
 ## RECENT VERSION HISTORY (latest first)
+- **v1.2.9+68** — Fix POI map buttons in tour player (wire `openMap` JS→Dart handler)
+- **v1.2.9+67** — Map marker tap hardening (`HitTestBehavior.opaque` in `tour_map_screen.dart`)
 - **v1.2.9+66** — Restore map icon on Listen page (lost in Tours_Step_Maps merge)
 - **v1.2.9+65** — A#75: migrate `news_player_screen.dart` to InAppWebView v6 (`initialSettings`)
 - **v1.2.9+64** — A#73: app icon background color `#A93105` (brick red)
@@ -33,6 +35,14 @@ When chat history is compacted, user will ask you to read @remind_ai.md and @rem
 - **v1.2.9+60** — Fix white screen on single-POI museum tours (`_fitBounds()` guard)
 
 ## ✅ KEY FIXES IN RECENT VERSIONS
+
+### v1.2.9+68 — POI Map Buttons Fixed in Tour Player
+**Bug**: Tapping POI map icons during tour playback did nothing — no map opened, no error in logs
+**Root Cause**: Server HTML emits `<button onclick="openMap(N)">` calling `flutter_inappwebview.callHandler('openMap', {stop:N})`. Flutter side never registered the `'openMap'` handler — silent no-op.
+**Fix**: Added `controller.addJavaScriptHandler(handlerName: 'openMap')` in `onWebViewCreated` in `TourPlayerScreen`. Handler parses stop number, pushes `TourMapScreen` with `focusStopIndex`.
+**Files**: `tour_player_screen.dart` (import + handler), `pubspec.yaml`
+**Log confirmation**: `MAP: openMap handler fired for stop N` appears when POI icon tapped
+**Note**: v1.2.9+67 (`HitTestBehavior.opaque` in `tour_map_screen.dart`) was an incorrect initial diagnosis — kept as minor hardening per Claude code review
 
 ### v1.2.9+66 — Map Icon Restored on Listen Page
 **Bug**: Green map icon missing from tour list — lost when `Tours_Step_Maps` branch was merged
@@ -57,9 +67,9 @@ When chat history is compacted, user will ask you to read @remind_ai.md and @rem
 **Fix**: 4-line guard in `_fitBounds()` — uses `_mapController.move(points.first, 15)` for single-point case
 **File**: `tour_map_screen.dart`
 
-## 🔄 NEXT ACTION: Build v1.2.9+66
+## 🔄 NEXT ACTION: Build v1.2.9+68
 **Android**: Ubuntu VM — `bash build_flutter_clean.sh` (shared folder, no git pull needed)
-**iOS**: Mac Mini — new assignment needed (A#76)
+**iOS**: Mac Mini — A#77 staged at `D:\Audioura\assignments\mac_mini_assignments.md`
 
 ## ⚠️ CRITICAL PROCESS NOTES
 - **NEVER apply changes only to `D:\Audioura\assets\` staging copy** without also committing to git dev tree
