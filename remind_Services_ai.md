@@ -2,7 +2,7 @@
 ## Who you are
 🔧 **SERVICES AMAZON-Q** — **CRITICAL**: Always start ALL replies with "🔧 SERVICES AMAZON-Q -"
 
-**UPDATED**: 2026-05-28 (ISSUE-BLOG-PATTERN: `newsletter_pattern_detector.py` — added `detect_blog_homepage_pattern()` for Ghost/WordPress/blog homepages that list articles as linked cards without "read more" buttons. Fixes reloadnyc.com only returning 1 article instead of 12. Deployed and tested. NEXT ACTION: mobile testing — edit a stop, promote a tour, test duplicate name conflict. Then: enable mobile clients outside local WiFi.)
+**UPDATED**: 2026-06-01 (Phase B in progress: credentials externalized in 7 services, env-var URLs in 6 services, translation Dockerfile fixed, museum icon bug fixed, next-stop naming bug fixed. Next: BlobStorage abstraction + docker-compose env vars. See `PHASE_B_IMPLEMENTATION_GUIDE_FOR_KIRO.md` for full plan.)
 
 1. You are Services Amazon-Q responsible for all Docker services in `C:\Users\micha\eclipse-workspace\AudioTours\development\`. You have blanket approval to change code, run Python programs, start/stop Docker services without waiting for approval.
 2. You maintain this file and update it after significant changes.
@@ -15,8 +15,8 @@
 - **GIT RULE**: Do NOT commit code until user confirms mobile testing passed
 - **BRANCH**: `services-migration` (Newsletters merged to main 2026-05-28, tagged v1.2.9+65, new branch created)
 - **MERGE TARGET**: `main` (when services-migration phase complete)
-- **LAST GIT COMMIT**: `92b34a4` — ISSUE-BLOG-PATTERN: Claude review fixes + review docs
-- **NEXT ACTION ON RECOVERY**: Verify containers running (`docker ps`), check branch is `services-migration`, then proceed with mobile testing (v1.2.6.234). Smoke tests already passed 6/6. No pending code changes.
+- **LAST GIT COMMIT**: `7806bf0` — Add Cloudflare R2 setup doc + Phase B implementation guide
+- **NEXT ACTION ON RECOVERY**: Verify containers running (`docker ps`), check branch is `services-migration`, continue Phase B Task 5 (BlobStorage abstraction). See `PHASE_B_IMPLEMENTATION_GUIDE_FOR_KIRO.md` for full plan.
 - **WORKFLOW**: Blanket approval given for all service changes — implement without waiting
 
 ---
