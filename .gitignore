@@ -20,4 +20,5 @@ Thumbs.db
 tours/
 charles_river_museum_of_industry_and_innovation/
 .env
+__pycache__/
 docker-compose-newsletter.yml
