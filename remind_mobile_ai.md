@@ -9,9 +9,9 @@
 7. **⚠️ IDENTIFICATION REQUIREMENT**: Always start replies with "📱 MOBILE APP AMAZON-Q -"
 
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
-When chat history is compacted, user will ask you to read `android_q_onboarding.md` and `remind_mobile_ai.md`.
+When chat history is compacted, user will ask you to read `remind_ai.md` and `remind_mobile_ai.md`.
 **Your Response**:
-"📱 MOBILE APP AMAZON-Q - I've read both files. Current version is v1.2.9+68, Android build pending on Ubuntu VM. Ready to build."
+"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v1.2.9+68. iOS Q is building v1.2.9+69 (newsletter Refresh fix) on Mac Mini — waiting for that commit to be pushed before building Android. Ready to continue."
 
 ## 🚫 OWNERSHIP BOUNDARIES — CRITICAL
 - ✅ **MY files**: `remind_mobile_ai.md`, `code_review_v*.md`, files in `amazon-q-communications/`
@@ -21,14 +21,16 @@ When chat history is compacted, user will ask you to read `android_q_onboarding.
 
 ## CURRENT PROJECT STATUS
 **Project**: Audioura Android APK
-**Version**: v1.2.9+68 ✅ COMMITTED on `services-migration` branch
-**Android**: 🔄 Build pending on Ubuntu VM
-**iOS**: Handled by iOS Amazon-Q — currently building v1.2.9+69 on Mac Mini
+**Version on branch**: v1.2.9+68 ✅ committed on `services-migration`
+**iPhone**: Already running v1.2.9+68 ✅ (iOS Q built and installed it)
+**Android**: ⏳ WAITING — for iOS Q to push v1.2.9+69 before building
+**iOS Q current task**: Building v1.2.9+69 (newsletter Refresh fix) on Mac Mini — A#77
 **Branch**: `services-migration`
 **Android Application ID**: `com.audioura.app`
 **Server**: `192.168.0.218` (Docker services on Windows laptop)
 
 ## RECENT VERSION HISTORY (latest first)
+- **v1.2.9+69** — Newsletter Refresh fix (iOS Q building now — not yet on branch)
 - **v1.2.9+68** — Fix POI map buttons in tour player (wire `openMap` JS→Dart handler)
 - **v1.2.9+67** — Map marker tap hardening (`HitTestBehavior.opaque` in `tour_map_screen.dart`)
 - **v1.2.9+66** — Restore map icon on Listen page (lost in Tours_Step_Maps merge)
@@ -72,18 +74,21 @@ When chat history is compacted, user will ask you to read `android_q_onboarding.
 **Fix**: 4-line guard in `_fitBounds()` — uses `_mapController.move(points.first, 15)` for single-point case
 **File**: `tour_map_screen.dart`
 
-## 🔄 NEXT ACTION: Build v1.2.9+68 on Ubuntu VM
-**Step 1**: Switch to Ubuntu VM
-**Step 2**: `bash build_flutter_clean.sh` (shared folder already has latest — no git pull needed)
-**Step 3**: Install APK, run smoke test checklist from `android_q_onboarding.md`
-**Step 4**: Report results — especially POI map button test and stale path healing test
-**APK output**: `audioura-dev.apk` in `development/` folder (shared folder = Windows `C:\Users\micha\eclipse-workspace\AudioTours\development\audioura-dev.apk`)
+## 🔄 NEXT ACTION: Wait for v1.2.9+69, then build on Ubuntu VM
+**Waiting for**: iOS Q to push v1.2.9+69 (newsletter Refresh fix) to `services-migration`
+**When user confirms +69 is pushed**:
+1. `git pull origin services-migration` on Windows dev tree
+2. Confirm version and changes
+3. Tell user to run `bash build_flutter_clean.sh` on Ubuntu VM
+4. Shared folder picks up latest automatically — no git pull needed on Ubuntu
+5. After build: install APK, run smoke test checklist from `android_q_onboarding.md`
+**APK output**: `audioura-dev.apk` → `C:\Users\micha\eclipse-workspace\AudioTours\development\audioura-dev.apk`
 
 ## ⚠️ VERSION SYNC RULE
-- iOS Q makes code changes → commits → bumps `pubspec.yaml` version
-- Android Q: `git pull` on Windows dev tree → Ubuntu VM picks up via shared folder → build → smoke test
+- iOS Q makes code changes → commits → bumps `pubspec.yaml` version → pushes to `services-migration`
+- Android Q: user confirms push → `git pull` on Windows dev tree → Ubuntu shared folder picks it up → build → smoke test → report
 - **Android Q does NOT independently bump version numbers**
-- Next version after +68 is **v1.2.9+69** (newsletter Refresh fix — iOS Q committing now)
+- **Android Q does NOT push code changes** unless Android-specific files changed (e.g. `AndroidManifest.xml`, `build.gradle.kts`)
 
 ## 📡 COMMUNICATION INFRASTRUCTURE
 
