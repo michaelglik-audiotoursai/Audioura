@@ -408,9 +408,16 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         if not tour_file:
             raise Exception("No tour file received from text generator")
         
-        modernized_data = {"tour_file": tour_file}
+        # Prefer tour_content (HTTP-based, Cloud Run compatible) over tour_file (volume-based)
+        tour_content = status_data.get("tour_content")
+        if tour_content:
+            modernized_data = {"tour_content": tour_content}
+            print(f"Using tour_content for modernized service ({len(tour_content)} chars)")
+        else:
+            modernized_data = {"tour_file": tour_file}
+            print(f"Using tour_file for modernized service: {tour_file}")
+        
         print(f"Calling MODERNIZED service: {datetime.now().isoformat()}")
-        print(f"Request data: {modernized_data}")
         modernized_response = requests.post(
             f"{MODERNIZED_URL}/process",
             headers={"Content-Type": "application/json"},

@@ -84,6 +84,15 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10):
         ACTIVE_JOBS[job_id]["output_file"] = output_filename
         ACTIVE_JOBS[job_id]["coordinates"] = coordinates
         
+        # Store tour content for HTTP-based delivery (Cloud Run mode)
+        # This allows the orchestrator to pass content directly to modernized service
+        # without reading from the shared volume
+        try:
+            with open(output_path, 'r', encoding='utf-8') as f:
+                ACTIVE_JOBS[job_id]["tour_content"] = f.read()
+        except Exception as content_err:
+            print(f"Warning: Could not store tour_content in job: {content_err}")
+        
     except Exception as e:
         ACTIVE_JOBS[job_id]["status"] = "error"
         ACTIVE_JOBS[job_id]["error"] = str(e)
@@ -167,6 +176,8 @@ def get_job_status(job_id):
         response["output_file"] = job["output_file"]
         if "coordinates" in job:
             response["coordinates"] = job["coordinates"]
+        if "tour_content" in job:
+            response["tour_content"] = job["tour_content"]
     elif job["status"] == "error":
         response["error"] = job["error"]
     

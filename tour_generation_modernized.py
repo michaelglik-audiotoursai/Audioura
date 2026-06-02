@@ -445,19 +445,37 @@ def create_modernized_tour():
 
 @app.route('/process', methods=['POST'])
 def process_tour():
-    """Process existing tour file into modernized format"""
+    """Process existing tour file into modernized format.
+    
+    Accepts EITHER:
+      - tour_file: filename to read from /app/tours/ (local Docker mode)
+      - tour_content: inline text content (Cloud Run mode, no shared volume)
+    """
     data = request.json
     if not data:
         return jsonify({"error": "No JSON data provided"}), 400
     
     tour_file = data.get('tour_file')
-    if not tour_file:
-        return jsonify({"error": "tour_file parameter is required"}), 400
+    tour_content = data.get('tour_content')
     
-    # Check if tour file exists
-    tour_file_path = os.path.join(TOURS_DIR, tour_file)
-    if not os.path.exists(tour_file_path):
-        return jsonify({"error": f"Tour file '{tour_file}' not found"}), 404
+    if not tour_file and not tour_content:
+        return jsonify({"error": "Either 'tour_file' or 'tour_content' parameter is required"}), 400
+    
+    # Determine the source of tour text
+    tour_file_path = None
+    if tour_content:
+        # Cloud mode: write content to /tmp/ for processing
+        import tempfile
+        tmp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, dir='/tmp')
+        tmp_file.write(tour_content)
+        tmp_file.close()
+        tour_file_path = tmp_file.name
+        print(f"Cloud mode: wrote tour_content ({len(tour_content)} chars) to {tour_file_path}")
+    elif tour_file:
+        # Volume mode: read from shared volume
+        tour_file_path = os.path.join(TOURS_DIR, tour_file)
+        if not os.path.exists(tour_file_path):
+            return jsonify({"error": f"Tour file '{tour_file}' not found"}), 404
     
     job_id = str(uuid.uuid4())
     
@@ -465,7 +483,7 @@ def process_tour():
         "status": "queued",
         "progress": "Job queued for modernized tour processing",
         "created_at": datetime.now().isoformat(),
-        "tour_file": tour_file,
+        "tour_file": tour_file or "inline_content",
         "modernized": True
     }
     
