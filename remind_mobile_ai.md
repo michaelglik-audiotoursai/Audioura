@@ -1,27 +1,32 @@
 # Mobile App Amazon-Q Context Reminder - POST COMPACTION
 ## Who you are
-1. **Mobile App Amazon-Q**: Responsible for Audioura mobile app (Android + iOS iPhone)
+1. **Android Amazon-Q**: Responsible for Audioura Android APK build and smoke testing
 2. **ANDROID BUILD**: ❌ Cannot build in Windows — Ubuntu VM shared folder, run `bash build_flutter_clean.sh`
-3. **iOS BUILD**: ❌ Cannot build in Windows — Mac Mini with `build_install_launch.sh`
-4. **Workflow**: Propose → Get approval → Implement → User builds
+3. **iOS BUILD**: ❌ Not your responsibility — handled by iOS Amazon-Q on Mac Mini
+4. **Workflow**: Pull latest → build on Ubuntu VM → smoke test → report results
 5. **Dev Location**: `C:\Users\micha\eclipse-workspace\AudioTours\development\audio_tour_app\`
-6. **iOS Scripts**: `D:\Audioura\scripts\` — copied to USB for Mac Mini execution
-7. **iOS Assignments**: `D:\Audioura\assignments\mac_mini_assignments.md`
-8. **⚠️ IDENTIFICATION REQUIREMENT**: Always start replies with "📱 MOBILE APP AMAZON-Q -"
+6. **Onboarding doc**: `C:\Users\micha\eclipse-workspace\AudioTours\development\android_q_onboarding.md`
+7. **⚠️ IDENTIFICATION REQUIREMENT**: Always start replies with "📱 MOBILE APP AMAZON-Q -"
 
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
-When chat history is compacted, user will ask you to read @remind_ai.md and @remind_mobile_ai.md.
+When chat history is compacted, user will ask you to read `android_q_onboarding.md` and `remind_mobile_ai.md`.
 **Your Response**:
-"📱 MOBILE APP AMAZON-Q - I've read both reminder files. Current version is v1.2.9+68, committed and pushed to services-migration branch on GitHub. POI map button fix in tour player. Android and iOS builds pending. Ready to continue."
+"📱 MOBILE APP AMAZON-Q - I've read both files. Current version is v1.2.9+68, Android build pending on Ubuntu VM. Ready to build."
+
+## 🚫 OWNERSHIP BOUNDARIES — CRITICAL
+- ✅ **MY files**: `remind_mobile_ai.md`, `code_review_v*.md`, files in `amazon-q-communications/`
+- ❌ **NOT MY files**: `remind_ios_ai.md` (iOS Amazon-Q only), `mac_mini_assignments.md` (iOS Amazon-Q only)
+- ❌ **NEVER write to** `remind_ios_ai.md` or `D:\Audioura\assignments\mac_mini_assignments.md`
+- ✅ **To communicate with iOS Amazon-Q**: write a file in `amazon-q-communications\audiotours\requirements\`
 
 ## CURRENT PROJECT STATUS
-**Project**: Audioura Mobile App — iOS iPhone + Android
-**Version**: v1.2.9+68 ✅ COMMITTED, PUSHED to GitHub (services-migration branch)
-**iOS**: 🔄 Build pending on Mac Mini — A#77 (v1.2.9+68)
-**Android**: 🔄 Build pending on Ubuntu VM (v1.2.9+68)
-**Branch**: services-migration
-**Bundle ID**: `com.glikfamily.audioura`
-**App Name**: Audioura
+**Project**: Audioura Android APK
+**Version**: v1.2.9+68 ✅ COMMITTED on `services-migration` branch
+**Android**: 🔄 Build pending on Ubuntu VM
+**iOS**: Handled by iOS Amazon-Q — currently building v1.2.9+69 on Mac Mini
+**Branch**: `services-migration`
+**Android Application ID**: `com.audioura.app`
+**Server**: `192.168.0.218` (Docker services on Windows laptop)
 
 ## RECENT VERSION HISTORY (latest first)
 - **v1.2.9+68** — Fix POI map buttons in tour player (wire `openMap` JS→Dart handler)
@@ -67,9 +72,18 @@ When chat history is compacted, user will ask you to read @remind_ai.md and @rem
 **Fix**: 4-line guard in `_fitBounds()` — uses `_mapController.move(points.first, 15)` for single-point case
 **File**: `tour_map_screen.dart`
 
-## 🔄 NEXT ACTION: Build v1.2.9+68
-**Android**: Ubuntu VM — `bash build_flutter_clean.sh` (shared folder, no git pull needed)
-**iOS**: Mac Mini — A#77 staged at `D:\Audioura\assignments\mac_mini_assignments.md`
+## 🔄 NEXT ACTION: Build v1.2.9+68 on Ubuntu VM
+**Step 1**: Switch to Ubuntu VM
+**Step 2**: `bash build_flutter_clean.sh` (shared folder already has latest — no git pull needed)
+**Step 3**: Install APK, run smoke test checklist from `android_q_onboarding.md`
+**Step 4**: Report results — especially POI map button test and stale path healing test
+**APK output**: `audioura-dev.apk` in `development/` folder (shared folder = Windows `C:\Users\micha\eclipse-workspace\AudioTours\development\audioura-dev.apk`)
+
+## ⚠️ VERSION SYNC RULE
+- iOS Q makes code changes → commits → bumps `pubspec.yaml` version
+- Android Q: `git pull` on Windows dev tree → Ubuntu VM picks up via shared folder → build → smoke test
+- **Android Q does NOT independently bump version numbers**
+- Next version after +68 is **v1.2.9+69** (newsletter Refresh fix — iOS Q committing now)
 
 ## 📡 COMMUNICATION INFRASTRUCTURE
 
@@ -90,10 +104,11 @@ When chat history is compacted, user will ask you to read @remind_ai.md and @rem
    - **⚠️ DO NOT write to** `D:\Audioura\assignments\mac_mini_assignments.md` — that is iOS Amazon-Q's document, owned and maintained by iOS Amazon-Q only
 
 ## ⚠️ CRITICAL PROCESS NOTES
-- **NEVER apply changes only to `D:\Audioura\assets\` staging copy** without also committing to git dev tree
-- **Always commit `audio_tour_app/lib/` changes to git after each accepted cycle**
-- **Mac Mini broken repo**: Leave `~/Development/AudioTours/` untouched. All future iOS builds use `~/Development/Audioura-build/`
-- **Ubuntu build**: Uses VirtualBox shared folder — same files as Windows dev tree, no git pull needed
+- **NEVER write to `remind_ios_ai.md`** — iOS Amazon-Q's file only
+- **NEVER write to `mac_mini_assignments.md`** — iOS Amazon-Q's file only
+- **Always commit `audio_tour_app/lib/` changes to git** after each accepted code change cycle
+- **Ubuntu build**: Uses VirtualBox shared folder — same files as Windows dev tree, no git pull needed on Ubuntu
+- **Android-specific concern**: Stale path healing uses `/Documents/` marker — may not apply to Android. Test reinstall scenario.
 
 ## 🚨 CRITICAL WORKFLOW RULE
 **⚠️ NEVER CHANGE CODE WITHOUT APPROVAL**: Always propose plan first, get user approval, then implement
@@ -150,8 +165,11 @@ When chat history is compacted, user will ask you to read @remind_ai.md and @rem
 ## ANDROID BUILD INFRASTRUCTURE
 - **Dev tree**: `C:\Users\micha\eclipse-workspace\AudioTours\development\audio_tour_app\`
 - **Build**: Ubuntu VM — `bash build_flutter_clean.sh` (shared folder, no git pull needed)
-- **APK output**: `audioura-dev.apk`
-- **Branch**: services-migration
+- **APK output**: `audioura-dev.apk` in `development/` folder
+- **Application ID**: `com.audioura.app`
+- **Branch**: `services-migration`
+- **Signing**: `debug.keystore` committed at `android/app/debug.keystore` — no Play Store keystore needed yet
+- **compileSdk**: 35, **minSdk**: 24, **ndkVersion**: `27.0.12077973`
 
 ## ENCRYPTION IMPLEMENTATION - VERIFIED SECURE (HISTORICAL)
 **Method**: RFC 3526 Diffie-Hellman (2048-bit) → SHA-256 full entropy → AES-128-CBC
