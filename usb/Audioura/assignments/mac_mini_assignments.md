@@ -133,6 +133,12 @@ If build FAILS: copy `~/Desktop/full_a28_session.txt` and `~/Desktop/a28_flutter
 6. Black screen or freeze = fix did not land. STOP.
 7. Open **About → Debug Log**. Confirm line `LISTEN: Manual refresh triggered` appears, followed by `LISTEN: Loading N articles from storage` / `LISTEN: Successfully loaded N articles`. Absence of these log lines = handler still broken.
 
+**Test 1b — Refresh while in selection mode (Claude Q3 hardening check):**
+1. On the Listen tab (Audio mode), tap the checklist icon to enter **Select Articles** mode.
+2. Select one or more articles.
+3. Tap **Refresh**.
+4. **Expected:** Selection mode exits cleanly, list reloads, no crash, no RangeError. If app crashes or freezes — report it (pre-existing risk, not a blocker for v1.2.9+70 but must be logged).
+
 **Test 2 — Newsletter screen Refresh still works:**
 1. Tap the **Home/Newsletter tab** (Audio mode).
 2. Tap **Refresh** in the newsletter screen (top AppBar).
@@ -164,6 +170,7 @@ echo "Date: $(date)" >> ~/Desktop/a77b_results.txt
 echo "Build: [SUCCESS/FAILED]" >> ~/Desktop/a77b_results.txt
 echo "Listen page Refresh no black screen: [YES/NO]" >> ~/Desktop/a77b_results.txt
 echo "LISTEN: Manual refresh triggered log present: [YES/NO]" >> ~/Desktop/a77b_results.txt
+echo "Refresh while in selection mode no crash: [YES/NO/NOT_TESTED]" >> ~/Desktop/a77b_results.txt
 echo "Newsletter Refresh no black screen: [YES/NO]" >> ~/Desktop/a77b_results.txt
 echo "Tour audio plays (no regression): [YES/NO]" >> ~/Desktop/a77b_results.txt
 echo "News article loads (no regression): [YES/NO]" >> ~/Desktop/a77b_results.txt
