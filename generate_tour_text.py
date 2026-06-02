@@ -299,12 +299,20 @@ def _classify_tour_category(location, tour_type):
     location_lower = location.lower()
     tour_type_lower = tour_type.lower()
     
-    # Restaurant/Food tour detection (highest priority)
+    # EXPLICIT WALKING TOUR detection (highest priority — overrides everything)
+    # If the user explicitly says "walking tour" in the location, honor that
+    # even if a museum name appears as one of the stops
+    explicit_walking_phrases = ['walking tour', 'walk tour', 'walking in', 'walk in']
+    if any(phrase in location_lower for phrase in explicit_walking_phrases):
+        return 'walking'
+    
+    # Restaurant/Food tour detection
     food_keywords = ['restaurant', 'food', 'dining', 'culinary', 'eat', 'cafe', 'bistro', 'eatery']
     if any(keyword in location_lower or keyword in tour_type_lower for keyword in food_keywords):
         return 'restaurant'
     
-    # Museum indicators
+    # Museum indicators — check location first, then tour_type as fallback
+    # Only check tour_type if location doesn't suggest a different category
     museum_keywords = ['museum', 'gallery', 'mfa', 'moma', 'exhibition', 'collection', 'art center', 'cultural center']
     if any(keyword in location_lower or keyword in tour_type_lower for keyword in museum_keywords):
         return 'museum'
