@@ -109,14 +109,6 @@ class _MyToursScreenState extends State<MyToursScreen> {
       return;
     }
     
-    final permission = await Permission.microphone.request();
-    if (!permission.isGranted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Microphone permission required')),
-      );
-      return;
-    }
-    
     setState(() {
       _isListening = true;
     });
