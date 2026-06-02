@@ -8,11 +8,12 @@ This is required so the user can identify which Amazon-Q tab they are talking to
 
 ---
 
-### ✅ **CURRENT STATE — v1.2.9+65 ON iPHONE, A#76 STAGED (v1.2.9+68)**
+### ✅ **CURRENT STATE — v1.2.9+65 ON iPHONE, A#76 STAGED (v1.2.9+68), A#77 FIX READY**
 
 - iPhone running **v1.2.9+65** (A#75 complete — InAppWebView v6 migration) ✅
 - A#76 staged — targets v1.2.9+68. Covers three versions (+66, +67, +68). Critical fix: `openMap` JS handler was never registered in `TourPlayerScreen` — POI map buttons silently did nothing.
 - All three commits already in git on `services-migration`. Mac Mini needs: `git pull` + build only.
+- **A#77 fix coded (Windows, not yet committed)** — newsletter Refresh black screen fixed in `home_screen.dart`. Targets v1.2.9+69. Waiting for A#76 build to complete first.
 
 ---
 
@@ -223,13 +224,15 @@ GET http://192.168.0.218:5005/download-tour/<translated_id>  → ZIP file
 
 ### 📋 **OPEN ITEMS**
 1. **A#76** ⚠️ STAGED — Build v1.2.9+68. Three versions bundled: +66 (map icon on Listen page), +67 (`HitTestBehavior.opaque` hardening), +68 (`openMap` JS handler registered in `TourPlayerScreen` — real POI tap fix). All commits in git. Mac Mini: `git pull` + build only. Key test: `MAP: openMap handler fired for stop N` in debug log.
-2. **ISSUE-061** — Translated tours in `/tours-near/` → 404 on direct download. Filed for Services. Future iOS assignment follows after server fix.
-3. **NF4 (LOW)** — `openMap` handler bare-int widening. Two-line fix.
-4. **NF5 (LOW)** — `Colors.blue.withOpacity(0.6)` → `.withValues(alpha: 0.6)`.
-5. **Coordinates keyword** — Must stay English in all translated `audio_N.txt`.
-6. **OSM tiles** — swap to Stadia Maps or Mapbox before App Store.
-7. **ISSUE-060** — Museum tours directions reference streets. Deferred.
-8. **Dead files backlog** — delete `audio_handler.dart`, `map_page.dart`, `subscription_management_screen.dart` so `flutter analyze` becomes a clean signal.
+2. **A#77** ⚠️ FIX CODED — Newsletter Refresh black screen fix in `home_screen.dart` (Windows dev tree only, not yet committed to git). Targets v1.2.9+69. Requires Mac Mini directives doc before build.
+3. **ISSUE-SERVICES-NEWSLETTER** — `get_articles_by_newsletter_id` returns only 2 of 5 articles for newsletter 280. Filed in `ISSUE_SERVICES_NEWSLETTER_ARTICLES_INCOMPLETE.md`. Awaiting Kiro fix. NOT an iOS bug — log confirms phone never received more than 2 IDs.
+4. **ISSUE-061** — Translated tours in `/tours-near/` → 404 on direct download. Filed for Services. Future iOS assignment follows after server fix.
+5. **NF4 (LOW)** — `openMap` handler bare-int widening. Two-line fix.
+6. **NF5 (LOW)** — `Colors.blue.withOpacity(0.6)` → `.withValues(alpha: 0.6)`.
+7. **Coordinates keyword** — Must stay English in all translated `audio_N.txt`.
+8. **OSM tiles** — swap to Stadia Maps or Mapbox before App Store.
+9. **ISSUE-060** — Museum tours directions reference streets. Deferred.
+10. **Dead files backlog** — delete `audio_handler.dart`, `map_page.dart`, `subscription_management_screen.dart` so `flutter analyze` becomes a clean signal.
 
 ---
 
@@ -262,6 +265,7 @@ GET http://192.168.0.218:5005/download-tour/<translated_id>  → ZIP file
 - **A#74**: ✅ Windows-side git cleanup (Sir Michael only — not a Mac Mini assignment).
 - **A#75**: ✅ v1.2.9+65 — InAppWebView v6 migration in `news_player_screen.dart`. No functional change. Built, smoke tested, committed + pushed. 2026-06-01.
 - **A#76**: ⚠️ STAGED — v1.2.9+68. Three versions: +66 map icon restore, +67 `HitTestBehavior.opaque` hardening, +68 `openMap` JS handler registered in `TourPlayerScreen` (real POI tap fix). Commits `0d4d46a` (+67) and `7d012d5` (+68) in git on `services-migration`. Build pending.
+- **A#77**: ⚠️ FIX CODED — v1.2.9+69. Newsletter Refresh black screen. Root cause: `setState(_isLoading=true)` in refresh handler triggered wrong "Tours" spinner scaffold in Audio mode. Fix: removed that setState call from `_buildNewsletterView` refresh button. `home_screen.dart` patched on Windows dev tree via `patch_newsletter_refresh_fix.py`. NOT yet committed — needs Mac Mini directives doc + build.
 
 ---
 
@@ -314,8 +318,10 @@ cd ~/Development/Audioura-build/development/audio_tour_app && flutter clean && f
 | `C:\Users\micha\eclipse-workspace\AudioTours\development\git_source_control_for_q.md` | Git structure — READ BEFORE ANY GIT WORK |
 | `C:\Users\micha\eclipse-workspace\AudioTours\development\a75_directives_for_q.md` | A#75 directives for Mac Mini Q |
 | `C:\Users\micha\eclipse-workspace\AudioTours\development\ISSUE-061_TRANSLATED_TOURS_IN_DOWNLOAD_LIST.md` | Server fix request for translated tour 404 |
+| `C:\Users\micha\eclipse-workspace\AudioTours\development\ISSUE_SERVICES_NEWSLETTER_ARTICLES_INCOMPLETE.md` | Services bug: `get_articles_by_newsletter_id` returns only 2 of 5 articles — filed for Kiro |
+| `C:\Users\micha\eclipse-workspace\AudioTours\development\patch_newsletter_refresh_fix.py` | A#77 patch — removes `_isLoading=true` from newsletter refresh handler |
 
 ---
 
-**Last Updated**: 2026-06-01 — v97.0. iPhone on v1.2.9+65. A#75 complete. A#76 staged targeting v1.2.9+68: +66 map icon restore, +67 HitTestBehavior hardening, +68 openMap JS handler fix (POI tap was silently dropped). All commits in git on services-migration. Mac Mini: git pull + build only. USB contents now mirrored in git at usb/Audioura/ (commit a1da162).
-**iOS Amazon-Q Version**: 97.0
+**Last Updated**: 2026-06-02 — v98.0. iPhone on v1.2.9+65. A#76 staged (v1.2.9+68, all commits in git). A#77 fix coded in Windows dev tree (home_screen.dart newsletter refresh black screen — removed setState(_isLoading=true) from refresh handler, targets v1.2.9+69). Newsletter issue investigation: 2/5 articles is a SERVICES bug (get_articles_by_newsletter_id returned only 2 IDs — phone never attempted more); filed ISSUE_SERVICES_NEWSLETTER_ARTICLES_INCOMPLETE.md for Kiro. Black screen on Refresh is iOS bug — fixed. Issue C (wrong article content) undecided — services extractor fingerprint matches, Kiro must check server egress log.
+**iOS Amazon-Q Version**: 98.0

@@ -3090,9 +3090,6 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.refresh),
             onPressed: () async {
               await DebugLogHelper.addDebugLog('HOME: Manual newsletter refresh triggered');
-              setState(() {
-                _isLoading = true;
-              });
               await _loadNewsletters();
             },
           ),

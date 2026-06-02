@@ -2196,16 +2196,22 @@ def process_newsletter():
         if failed_articles:
             logging.info(f"Failed articles summary: {[f['error'] for f in failed_articles[:5]]}")
         
-        # Build response with subscription information (Stage 1)
+        # Build response — report ONLY deliverable count to the user
+        # articles_created = successfully stored articles that will become deliverable
+        # articles_found is internal/diagnostic only — NOT for user-facing display
         response_data = {
             "status": "success",
             "newsletter_id": newsletter_id,
-            "articles_found": len(article_urls),
             "articles_created": articles_created,
             "articles_requiring_subscription": articles_requiring_subscription,
-            "articles_failed": len(failed_articles),
-            "failed_articles": failed_articles[:3],
             "message": f"Newsletter processed: {articles_created} articles created, {articles_requiring_subscription} require subscription"
+        }
+        
+        # Internal diagnostic fields (not for user-facing display)
+        response_data["_diagnostic"] = {
+            "articles_detected": len(article_urls),
+            "articles_failed": len(failed_articles),
+            "failed_articles": failed_articles[:3]
         }
         
         # Include server public key for DH key exchange if available
