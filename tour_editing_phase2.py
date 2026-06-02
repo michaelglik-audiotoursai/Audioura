@@ -16,6 +16,7 @@ import html
 import base64
 import subprocess
 import tempfile
+import io
 from datetime import datetime
 from pathlib import Path
 from flask import Flask, request, jsonify, send_file
@@ -123,6 +124,49 @@ def get_db_connection():
         port=os.getenv('DB_PORT', '5432')
     )
 
+
+def _resolve_tour_from_db(tour_identifier):
+    """Cloud mode: Extract tour ZIP from database to /tmp/ directory.
+    Returns a Path to the extracted directory, or None if not found.
+    """
+    import tempfile
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Try numeric ID first
+        if tour_identifier.isdigit():
+            cur.execute("SELECT id, tour_name, audio_tour FROM audio_tours WHERE id = %s AND audio_tour IS NOT NULL", (int(tour_identifier),))
+        else:
+            # Try by name match
+            cur.execute("SELECT id, tour_name, audio_tour FROM audio_tours WHERE tour_name ILIKE %s AND audio_tour IS NOT NULL ORDER BY id DESC LIMIT 1", (f'%{tour_identifier}%',))
+        
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
+        
+        if not result:
+            print(f"Cloud mode: Tour '{tour_identifier}' not found in database")
+            return None
+        
+        tour_id_db, tour_name, zip_data = result
+        
+        # Extract ZIP to /tmp/
+        tmp_dir = tempfile.mkdtemp(prefix=f"tour_{tour_id_db}_")
+        tmp_path = Path(tmp_dir)
+        
+        zip_buffer = zipfile.ZipFile(io.BytesIO(bytes(zip_data)), 'r')
+        zip_buffer.extractall(tmp_path)
+        zip_buffer.close()
+        
+        print(f"Cloud mode: Extracted tour {tour_id_db} to {tmp_path} ({len(list(tmp_path.iterdir()))} files)")
+        return tmp_path
+        
+    except Exception as e:
+        print(f"Cloud mode: Error extracting tour '{tour_identifier}' from DB: {e}")
+        return None
+
+
 def resolve_numeric_to_uuid_directory(tour_id):
     try:
         conn = get_db_connection()
@@ -154,6 +198,18 @@ def resolve_numeric_to_uuid_directory(tour_id):
         return None
 
 def resolve_tour_to_directory(tour_identifier):
+    """Resolve a tour ID to a directory path containing its files.
+    
+    In volume mode (default): searches /app/tours/ for the directory.
+    In cloud mode: extracts the tour ZIP from the database to /tmp/.
+    """
+    storage_mode = os.getenv('TOUR_STORAGE_MODE', 'volume')
+    
+    # Cloud mode: extract from database to /tmp/
+    if storage_mode == 'cloud':
+        return _resolve_tour_from_db(tour_identifier)
+    
+    # Volume mode: search the shared filesystem (existing behavior)
     tours_dir = Path(TOURS_DIR)
     
     exact_path = tours_dir / tour_identifier
