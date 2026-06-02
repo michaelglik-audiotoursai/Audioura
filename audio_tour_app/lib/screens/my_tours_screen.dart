@@ -50,15 +50,10 @@ class _MyToursScreenState extends State<MyToursScreen> {
 
   final ScrollController _scrollController = ScrollController();
   
-  void _manualRefresh() {
-    Navigator.of(context).pop();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => MyToursScreen()),
-        );
-      }
-    });
+  Future<void> _manualRefresh() async {
+    await DebugLogHelper.addDebugLog('LISTEN: Manual refresh triggered');
+    if (!mounted) return;
+    await _loadAppMode();
   }
   
   @override
