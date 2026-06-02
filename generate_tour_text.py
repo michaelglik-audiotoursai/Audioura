@@ -411,9 +411,18 @@ def _validate_museum_stop_descriptions(poi_list, venue_name, headers):
     first_stop = poi_list[0]
     candidates = poi_list[1:]  # only check stops 1..N
 
-    # Split candidates into suspect (needs OpenAI check) and clean (pass through)
-    suspect = [p for p in candidates if _is_suspect(p.get('name', ''))]
-    clean = [p for p in candidates if not _is_suspect(p.get('name', ''))]
+    # Single-venue museum tours: verify EVERY stop's description is inside the venue.
+    # The name-only pre-filter (_is_suspect) missed exhibits that belong to a DIFFERENT
+    # museum but whose names contain no institutional marker (e.g. "Thoreau's Bedroom"
+    # is housed at the Concord Museum, not The Old Manse).
+    # Cost is tiny: typical 3-7 stops × 1 gpt-3.5-turbo call each.
+    if len(candidates) <= 12:
+        suspect = list(candidates)
+        clean = []
+    else:
+        # Fallback to name-based pre-filter only for unusually large tours (cost guard)
+        suspect = [p for p in candidates if _is_suspect(p.get('name', ''))]
+        clean = [p for p in candidates if not _is_suspect(p.get('name', ''))]
     print(f"   Pre-filter: {len(clean)} clean, {len(suspect)} suspect (will call OpenAI for suspect only)")
 
     # Run OpenAI checks only on suspect stops (parallel)
@@ -1372,7 +1381,14 @@ Then provide a detailed description of the exhibit that is EXACTLY 300 words lon
 - Information about the artist and their creative process
 - How this piece fits into the broader context of {tour_type}
 - Interesting details that would engage visitors
+"""
+        # Add venue containment constraint for single-venue museum tours
+        if tour_category == 'museum' and _museum_venue_name:
+            description_prompt += f"""
+CRITICAL CONSTRAINT: Every stop MUST be a room, gallery, exhibit, or area physically located INSIDE '{_museum_venue_name}'. Do NOT include artifacts, collections, or rooms that are housed at any other institution, even if thematically related to the same person or topic. If '{poi_name}' is not actually inside '{_museum_venue_name}', describe what IS at that location within the venue instead.
+"""
 
+        description_prompt += f"""
 Format your response as follows:
 Orientation: [Brief orientation text explaining the best viewing position]
 
