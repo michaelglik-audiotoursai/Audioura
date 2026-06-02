@@ -8,39 +8,33 @@ This is required so the user can identify which Amazon-Q tab they are talking to
 
 ---
 
-### ✅ **CURRENT STATE — v1.2.9+65 ON iPHONE, A#76 STAGED (v1.2.9+68), A#77 FIX READY**
+### ✅ **CURRENT STATE — v1.2.9+68 ON iPHONE, A#77 READY TO BUILD**
 
-- iPhone running **v1.2.9+65** (A#75 complete — InAppWebView v6 migration) ✅
-- A#76 staged — targets v1.2.9+68. Covers three versions (+66, +67, +68). Critical fix: `openMap` JS handler was never registered in `TourPlayerScreen` — POI map buttons silently did nothing.
-- All three commits already in git on `services-migration`. Mac Mini needs: `git pull` + build only.
-- **A#77 fix coded (Windows, not yet committed)** — newsletter Refresh black screen fixed in `home_screen.dart`. Targets v1.2.9+69. Waiting for A#76 build to complete first.
+- iPhone running **v1.2.9+68** (A#76 complete — POI map button fix + map icon restore) ✅
+- **A#77 fix already in git on `services-migration`** — newsletter Refresh black screen fixed in `home_screen.dart` (commit `4dba042`). Targets v1.2.9+69. Needs Mac Mini directives doc + build.
 
 ---
 
 ### 🎯 **IMMEDIATE NEXT STEPS**
 
-#### A#76 — Build v1.2.9+68 ⚠️ READY TO BUILD
-**What changed (+66 → +67 → +68):**
-- +66: `my_tours_screen.dart` — map icon (`Icons.map`) restored on Listen page per-tour
-- +67: `tour_map_screen.dart` — `HitTestBehavior.opaque` on marker GestureDetector (wrong diagnosis, kept as hardening)
-- +68: `tour_player_screen.dart` — `addJavaScriptHandler('openMap')` registered in `onWebViewCreated` — **the real fix**
+#### A#77 — Build v1.2.9+69 ⚠️ READY TO BUILD
+**What changed:**
+- `home_screen.dart` — removed `setState(() { _isLoading = true; })` from newsletter Refresh button handler in `_buildNewsletterView`. Fix already committed to `services-migration` at `4dba042`.
 
-**Root cause:** `flutter_inappwebview` silently drops `callHandler('openMap')` if no handler is registered. `TourPlayerScreen` never registered it. Server HTML was always correct.
+**Root cause of black screen:** Setting `_isLoading = true` triggered the Tours-mode spinner scaffold to render while in Audio mode. No recovery path — only kill + restart.
 
-**Key test:** After build, tap a POI map icon in tour player → debug log must show `MAP: openMap handler fired for stop N`.
+**Key smoke test:** In Audio mode, press Refresh → newsletter list should reload cleanly, no black screen.
 
 **Mac Mini runs:**
 ```bash
 cd ~/Development/Audioura-build
 git pull origin services-migration
-# Spot-checks: pubspec at +68, openMap in tour_player_screen.dart, Icons.map in my_tours_screen.dart
-# Verify Xcode signing
-cd development/audio_tour_app
-flutter clean && flutter pub get
+# Bump pubspec version to 1.2.9+69
+# flutter clean && flutter pub get
 cd "/Volumes/USB DISK/Audioura/scripts"
 ./build_install_launch.sh
 # STOP for Sir Michael smoke test
-# After smoke test passes: git push origin services-migration (commits already in git)
+# After smoke test passes: git commit pubspec + push origin services-migration
 ```
 
 ---
@@ -223,8 +217,7 @@ GET http://192.168.0.218:5005/download-tour/<translated_id>  → ZIP file
 ---
 
 ### 📋 **OPEN ITEMS**
-1. **A#76** ⚠️ STAGED — Build v1.2.9+68. Three versions bundled: +66 (map icon on Listen page), +67 (`HitTestBehavior.opaque` hardening), +68 (`openMap` JS handler registered in `TourPlayerScreen` — real POI tap fix). All commits in git. Mac Mini: `git pull` + build only. Key test: `MAP: openMap handler fired for stop N` in debug log.
-2. **A#77** ⚠️ FIX CODED — Newsletter Refresh black screen fix in `home_screen.dart` (Windows dev tree only, not yet committed to git). Targets v1.2.9+69. Requires Mac Mini directives doc before build.
+1. **A#77** ⚠️ READY TO BUILD — v1.2.9+69. Newsletter Refresh black screen fix in `home_screen.dart` already committed at `4dba042`. Mac Mini: `git pull` + bump pubspec to +69 + build. Smoke test: Refresh in Audio mode must not black screen.
 3. **ISSUE-SERVICES-NEWSLETTER** — `get_articles_by_newsletter_id` returns only 2 of 5 articles for newsletter 280. Filed in `ISSUE_SERVICES_NEWSLETTER_ARTICLES_INCOMPLETE.md`. Awaiting Kiro fix. NOT an iOS bug — log confirms phone never received more than 2 IDs.
 4. **ISSUE-061** — Translated tours in `/tours-near/` → 404 on direct download. Filed for Services. Future iOS assignment follows after server fix.
 5. **NF4 (LOW)** — `openMap` handler bare-int widening. Two-line fix.
@@ -264,8 +257,8 @@ GET http://192.168.0.218:5005/download-tour/<translated_id>  → ZIP file
 - **A#73**: ✅ v1.2.9+64 — brick-red (#A93105) app icon. 15 PNGs regenerated via Python script. 2026-05-26.
 - **A#74**: ✅ Windows-side git cleanup (Sir Michael only — not a Mac Mini assignment).
 - **A#75**: ✅ v1.2.9+65 — InAppWebView v6 migration in `news_player_screen.dart`. No functional change. Built, smoke tested, committed + pushed. 2026-06-01.
-- **A#76**: ⚠️ STAGED — v1.2.9+68. Three versions: +66 map icon restore, +67 `HitTestBehavior.opaque` hardening, +68 `openMap` JS handler registered in `TourPlayerScreen` (real POI tap fix). Commits `0d4d46a` (+67) and `7d012d5` (+68) in git on `services-migration`. Build pending.
-- **A#77**: ⚠️ FIX CODED — v1.2.9+69. Newsletter Refresh black screen. Root cause: `setState(_isLoading=true)` in refresh handler triggered wrong "Tours" spinner scaffold in Audio mode. Fix: removed that setState call from `_buildNewsletterView` refresh button. `home_screen.dart` patched on Windows dev tree via `patch_newsletter_refresh_fix.py`. NOT yet committed — needs Mac Mini directives doc + build.
+- **A#76**: ✅ v1.2.9+68 CONFIRMED ON iPHONE — POI map button fix (openMap JS handler registered in TourPlayerScreen) + map icon restore on Listen page. Built by Mac Mini Q, commit `f2bb356`. 2026-06-01.
+- **A#77**: ⚠️ READY TO BUILD — v1.2.9+69. Newsletter Refresh black screen. Root cause: `setState(_isLoading=true)` in refresh handler triggered wrong Tours-mode spinner scaffold in Audio mode. Fix in `home_screen.dart` committed at `4dba042`. Mac Mini: `git pull` + bump pubspec +69 + build.
 
 ---
 
@@ -323,5 +316,5 @@ cd ~/Development/Audioura-build/development/audio_tour_app && flutter clean && f
 
 ---
 
-**Last Updated**: 2026-06-02 — v98.0. iPhone on v1.2.9+65. A#76 staged (v1.2.9+68, all commits in git). A#77 fix coded in Windows dev tree (home_screen.dart newsletter refresh black screen — removed setState(_isLoading=true) from refresh handler, targets v1.2.9+69). Newsletter issue investigation: 2/5 articles is a SERVICES bug (get_articles_by_newsletter_id returned only 2 IDs — phone never attempted more); filed ISSUE_SERVICES_NEWSLETTER_ARTICLES_INCOMPLETE.md for Kiro. Black screen on Refresh is iOS bug — fixed. Issue C (wrong article content) undecided — services extractor fingerprint matches, Kiro must check server egress log.
-**iOS Amazon-Q Version**: 98.0
+**Last Updated**: 2026-06-02 — v99.0. iPhone on v1.2.9+68 (A#76 complete, confirmed). A#77 ready to build (v1.2.9+69) — newsletter Refresh black screen fix already committed at 4dba042. Newsletter investigation: 2/5 articles is SERVICES bug filed for Kiro (ISSUE_SERVICES_NEWSLETTER_ARTICLES_INCOMPLETE.md). Issue C (wrong article) undecided — Kiro must check server egress log. remind_ios_ai.md was stale on A#76 status — corrected to v99.0.
+**iOS Amazon-Q Version**: 99.0
