@@ -639,12 +639,16 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
             _INSTITUTION_TAIL = ('museum', 'house', 'gallery', 'library',
                                  'homestead', 'mansion', 'estate', 'manse')
             _interior = re.search(r'\b(in|inside|within|of)\b', _req_lower)
-            if (_interior and _scope
-                    and _scope.strip().lower().rstrip('.').split()[-1] in _INSTITUTION_TAIL
-                    and intent.get('scope_precision', '').upper() in ('BUILDING', 'DISTRICT')):
-                intent['venue_name'] = _scope
-                print(f"  [venue promotion] scope '{_scope}' promoted to venue_name "
-                      f"(interior preposition + institutional noun)")
+            if _interior and _scope and intent.get('scope_precision', '').upper() in ('BUILDING', 'DISTRICT'):
+                # Strip trailing city/state (e.g., "Robbins House, Concord" → check "House")
+                _scope_core = _scope.split(',')[0].strip().lower().rstrip('.')
+                _scope_words = _scope_core.split()
+                # Check if any of the last 3 words is an institutional noun
+                _tail_words = _scope_words[-3:] if len(_scope_words) >= 3 else _scope_words
+                if any(w in _INSTITUTION_TAIL for w in _tail_words):
+                    intent['venue_name'] = _scope.split(',')[0].strip()  # Use name without city
+                    print(f"  [venue promotion] scope '{_scope}' promoted to venue_name "
+                          f"(interior preposition + institutional noun)")
         
         # If PHASE 1 identified a specific venue AND the location string does not
         # explicitly request a non-museum tour type, force museum category.
@@ -1570,7 +1574,7 @@ DO NOT include directions to the next stop - these will be added separately.
     if not (tour_category == 'museum' and _museum_venue_name):
         # Use geographic_scope if precision is tight enough (BUILDING or DISTRICT)
         _scope_for_check = ''
-        if intent and intent.get('geographic_scope') and intent.get('scope_precision', '').upper() in ('BUILDING', 'DISTRICT'):
+        if intent and intent.get('geographic_scope') and intent.get('scope_precision', '').upper() in ('BUILDING', 'DISTRICT', 'CORRIDOR'):
             _scope_for_check = intent['geographic_scope']
         if _scope_for_check:
             _before = len(poi_list)

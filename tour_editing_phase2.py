@@ -167,6 +167,18 @@ def _resolve_tour_from_db(tour_identifier):
         return None
 
 
+def cleanup_tmp_tour_path(tour_path):
+    """Remove temporary tour directories created in cloud mode.
+    Safe to call on volume-mode paths (does nothing if not in /tmp/).
+    """
+    if tour_path and str(tour_path).startswith('/tmp/tour_'):
+        try:
+            shutil.rmtree(str(tour_path), ignore_errors=True)
+            print(f"Cloud mode: Cleaned up tmp dir {tour_path}")
+        except Exception as e:
+            print(f"Cloud mode: Cleanup warning for {tour_path}: {e}")
+
+
 def resolve_numeric_to_uuid_directory(tour_id):
     try:
         conn = get_db_connection()

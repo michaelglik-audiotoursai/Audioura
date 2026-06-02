@@ -31,11 +31,13 @@ def _strip_nav_fields_for_tts(text):
     lines = text.split('\n')
     return '\n'.join(l for l in lines if not _NAV_LABEL_RE.match(l))
 
+from job_store import get_job_store
+
 app = Flask(__name__)
 CORS(app)
 
 TOURS_DIR = "/app/tours"
-ACTIVE_JOBS = {}
+ACTIVE_JOBS = get_job_store('tour-generation-modernized')
 
 # Inter-service URLs
 POLLY_TTS_URL = os.getenv('POLLY_TTS_URL', 'http://polly-tts-1:5018')

@@ -16,13 +16,14 @@ import re
 # Import the tour text generator
 from generate_tour_text import generate_tour_text
 import api_call_logger
+from job_store import get_job_store
 
 app = Flask(__name__)
 CORS(app)
 
 # Global variables
 TOURS_DIR = "/app/tours"
-ACTIVE_JOBS = {}
+ACTIVE_JOBS = get_job_store('tour-generator')
 
 def ensure_tours_directory():
     """Ensure the tours directory exists."""
