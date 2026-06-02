@@ -313,8 +313,22 @@ cd ~/Development/Audioura-build/development/audio_tour_app && flutter clean && f
 | `C:\Users\micha\eclipse-workspace\AudioTours\development\ISSUE-061_TRANSLATED_TOURS_IN_DOWNLOAD_LIST.md` | Server fix request for translated tour 404 |
 | `C:\Users\micha\eclipse-workspace\AudioTours\development\ISSUE_SERVICES_NEWSLETTER_ARTICLES_INCOMPLETE.md` | Services bug: `get_articles_by_newsletter_id` returns only 2 of 5 articles — filed for Kiro |
 | `C:\Users\micha\eclipse-workspace\AudioTours\development\patch_newsletter_refresh_fix.py` | A#77 patch — removes `_isLoading=true` from newsletter refresh handler |
+| `C:\Users\micha\eclipse-workspace\AudioTours\development\android_q_onboarding.md` | Android Q onboarding doc — give this to Android Amazon-Q to build Android parity builds |
 
 ---
 
-**Last Updated**: 2026-06-02 — v99.0. iPhone on v1.2.9+68 (A#76 complete, confirmed). A#77 ready to build (v1.2.9+69) — newsletter Refresh black screen fix already committed at 4dba042. Newsletter investigation: 2/5 articles is SERVICES bug filed for Kiro (ISSUE_SERVICES_NEWSLETTER_ARTICLES_INCOMPLETE.md). Issue C (wrong article) undecided — Kiro must check server egress log. remind_ios_ai.md was stale on A#76 status — corrected to v99.0.
-**iOS Amazon-Q Version**: 99.0
+---
+
+### 🤖 **ANDROID PARITY**
+
+- Android bundle ID: `com.audioura.app` (different from iOS `com.glikfamily.audioura`)
+- Android build config: `android/app/build.gradle.kts` — minSdk 24, compileSdk 35, debug keystore committed
+- Android Q onboarding doc: `android_q_onboarding.md` in Windows dev tree — give this to Android Amazon-Q
+- **Key Android risk**: stale path healing uses `/Documents/` marker (iOS-specific). Android paths may not need healing, or may need a different marker. Android Q must verify with reinstall test.
+- **Version sync rule**: iOS Q bumps `pubspec.yaml` version → Android Q pulls + builds. Android Q never bumps version independently.
+- **LF file warning applies on Windows**: `home_screen.dart`, `my_tours_screen.dart`, `tour_generator_screen.dart` — Python-only edits on Windows.
+
+---
+
+**Last Updated**: 2026-06-02 — v100.0. iPhone on v1.2.9+68 (A#76 complete). A#77 ready to build (v1.2.9+69, newsletter Refresh fix committed at 4dba042). Android Q onboarding doc created (android_q_onboarding.md) — Android bundle ID com.audioura.app, debug keystore committed, key risk is stale path healing marker difference vs iOS.
+**iOS Amazon-Q Version**: 100.0
