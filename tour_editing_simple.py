@@ -21,6 +21,8 @@ class TourEditingHandler(BaseHTTPRequestHandler):
             self.handle_get_tour_edit_info(tour_id)
         elif len(path_parts) >= 2 and path_parts[0] == 'tours-near':
             self.handle_get_tours_near()
+        elif path_parts[0] == 'health':
+            self.send_json_response({"status": "healthy", "service": "tour_editing_simple", "version": SERVICE_VERSION})
         else:
             self.send_error(404)
     

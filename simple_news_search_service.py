@@ -182,4 +182,8 @@ if __name__ == "__main__":
         sources = search_service.get_newsletter_sources(user_id)
         return jsonify(sources)
     
+    @app.route('/health', methods=['GET'])
+    def health_check():
+        return jsonify({"status": "healthy", "service": "simple_news_search", "version": "1.0.0"})
+    
     app.run(host='0.0.0.0', port=5016)

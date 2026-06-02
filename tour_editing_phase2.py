@@ -1704,6 +1704,20 @@ def promote_custom_tour(tour_id):
             conn.close()
 
 
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint for Cloud Run liveness probe."""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT 1")
+        cur.close()
+        conn.close()
+        return jsonify({"status": "healthy", "service": "tour_editing_phase2", "version": SERVICE_VERSION})
+    except Exception as e:
+        return jsonify({"status": "unhealthy", "error": str(e)}), 503
+
+
 if __name__ == '__main__':
     os.makedirs(TOURS_DIR, exist_ok=True)
     print(f"Starting Phase 2 Tour Editing Service v{SERVICE_VERSION}")

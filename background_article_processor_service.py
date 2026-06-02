@@ -277,4 +277,8 @@ if __name__ == "__main__":
         articles = processor.get_user_articles(user_id)
         return jsonify(articles)
     
+    @app.route('/health', methods=['GET'])
+    def health_check():
+        return jsonify({"status": "healthy", "service": "background_article_processor", "version": "1.2.2.82"})
+    
     app.run(host='0.0.0.0', port=5015)
