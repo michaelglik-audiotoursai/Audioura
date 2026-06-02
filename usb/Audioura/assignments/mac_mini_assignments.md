@@ -1,6 +1,143 @@
 # Mac Mini Assignment Instructions
 ## iOS Development Task Execution
 
+# T: 06/2026 - A#78 — Build v1.2.9+71 (Listen Page Microphone Voice Search Fix)
+
+**Goal:** Build v1.2.9+71 on iPhone. Fix already committed at `df6b61b`. One block removed from `my_tours_screen.dart`.
+
+**What changed:**
+
+| Version | File | Change |
+|---------|------|--------|
+| +71 | `my_tours_screen.dart` | Removed redundant `Permission.microphone.request()` block from `_startVoiceSearch()` |
+| +71 | `pubspec.yaml` | `1.2.9+70` → `1.2.9+71` |
+
+**Root cause:** `_setupVoiceCommands()` calls `_speechToText.initialize()` which internally acquires microphone permission via iOS's speech recognition framework. Then `_startVoiceSearch()` called `Permission.microphone.request()` again via the `permission_handler` plugin — a different permission pathway. iOS considers the permission already handled; `permission_handler` sees it as denied from its own perspective and returns not-granted. Fix: remove the redundant block. `_speechEnabled == true` (set by `initialize()`) is sufficient proof the mic is available.
+
+**Roles:**
+- **[SIR MICHAEL]** — orchestrator. Switches KVM, runs smoke test, syncs Windows afterward.
+- **[MAC MINI Q]** — pulls latest, bumps pubspec, builds, commits.
+
+**Version target:** v1.2.9+71  **Branch:** `services-migration`
+
+---
+
+## Step 0 — [SIR MICHAEL] Eject USB, carry to Mac Mini, switch KVM
+
+## Step 1 — [SIR MICHAEL on Mac Mini] Launch Q
+
+Paste:
+> Read `@/Volumes/USB DISK/Audioura/assignments/mac_mini_assignments.md` and execute the A#78 assignment at the top. Follow STOP conditions; skip steps labelled `[SIR MICHAEL]`.
+
+## Step 2 — [MAC MINI Q] Pull latest
+
+```bash
+cd ~/Development/Audioura-build
+git pull origin services-migration
+```
+
+**Expected:** fast-forward that includes commit `df6b61b` (A#78 fix).
+
+## Step 3 — [MAC MINI Q] Spot-check BEFORE building ⚠️ REQUIRED
+
+```bash
+cd ~/Development/Audioura-build/development/audio_tour_app
+
+# 3a — pubspec at +70
+grep "^version:" pubspec.yaml
+# Expected: version: 1.2.9+70
+
+# 3b — confirm Permission.microphone.request() block is GONE
+grep -n "microphone.request\|Microphone permission required" lib/screens/my_tours_screen.dart
+# Expected: zero matches
+
+# 3c — confirm _speechEnabled guard still present
+grep -n "_speechEnabled" lib/screens/my_tours_screen.dart
+# Expected: at least 2 matches (declaration + guard in _startVoiceSearch)
+```
+
+If 3b shows any match, STOP and report.
+
+## Step 4 — [MAC MINI Q] Bump pubspec to +71
+
+```bash
+sed -i '' 's/^version: 1.2.9+70/version: 1.2.9+71/' pubspec.yaml
+grep "^version:" pubspec.yaml
+# Must print: version: 1.2.9+71
+```
+
+## Step 5 — [MAC MINI Q] Verify Xcode signing
+
+```bash
+grep -E 'PRODUCT_BUNDLE_IDENTIFIER|DEVELOPMENT_TEAM' \
+  ios/Runner.xcodeproj/project.pbxproj | sort -u
+```
+**Expected:** `com.glikfamily.audioura` and `4HGRU6TKGQ`
+
+## Step 6 — [MAC MINI Q] Clean rebuild, install, launch
+
+```bash
+cd ~/Development/Audioura-build/development/audio_tour_app
+flutter clean && flutter pub get
+cd "/Volumes/USB DISK/Audioura/scripts"
+./build_install_launch.sh
+```
+
+**Expected:** `FINAL VERDICT: SUCCESS`. STOP and tell Sir Michael.
+
+## Step 7 — [SIR MICHAEL] Smoke test on iPhone (STOP HERE FOR Q)
+
+**Test 1 — Microphone voice search (primary fix):**
+1. Audio mode → Listen tab.
+2. Tap the **microphone icon** in the AppBar.
+3. **Expected:** Listening dialog appears immediately. No "Microphone permission required" snackbar.
+4. Say something (e.g. "Boston"). Expected: dialog closes, article list filters.
+5. Check debug log: `LISTEN: Voice search ...` line should appear.
+
+**Test 2 — Regression:**
+1. Listen page Refresh → list reloads, no black screen (A#77b regression).
+2. Open a tour → audio plays. Open a news article → loads. POI map icon → TourMapScreen opens.
+
+Tell Q "Smoke test passes, proceed to Step 8" if both pass.
+
+## Step 8 — [MAC MINI Q] Commit and push
+
+```bash
+cd ~/Development/Audioura-build
+git add development/audio_tour_app/pubspec.yaml
+git commit -m "v1.2.9+71 — A#78 bump pubspec (mic fix in df6b61b)"
+git push origin services-migration
+```
+
+## Step 9 — [MAC MINI Q] Copy results and eject
+
+```bash
+echo "A#78 Results:" > ~/Desktop/a78_results.txt
+echo "Date: $(date)" >> ~/Desktop/a78_results.txt
+echo "Build: [SUCCESS/FAILED]" >> ~/Desktop/a78_results.txt
+echo "Mic dialog opens without permission error: [YES/NO]" >> ~/Desktop/a78_results.txt
+echo "Voice search filters articles: [YES/NO]" >> ~/Desktop/a78_results.txt
+echo "Listen Refresh no black screen (A#77b regression): [YES/NO]" >> ~/Desktop/a78_results.txt
+echo "git push: [SUCCESS/FAILED]" >> ~/Desktop/a78_results.txt
+echo "Overall: [SUCCESS/PARTIAL/FAILED]" >> ~/Desktop/a78_results.txt
+cp ~/Desktop/a78_results.txt "/Volumes/USB DISK/Audioura/results/"
+diskutil eject "/Volumes/USB DISK"
+```
+
+## Step 10 — [MAC MINI Q] Report Results
+
+> "Assignment 78 complete. Build: [SUCCESS/FAILED]. Mic opens without error: [YES/NO]. Voice search works: [YES/NO]. A#77b regression: [YES/NO]. git push: [SUCCESS/FAILED]. Overall: [SUCCESS/PARTIAL/FAILED]."
+
+## Step 11 — [SIR MICHAEL, back on Windows] Sync
+
+```cmd
+cd C:\Users\micha\eclipse-workspace\AudioTours\development
+git pull origin services-migration
+```
+Verify `pubspec.yaml` shows `version: 1.2.9+71`.
+
+---
+
 # T: 06/2026 - A#77b — Build v1.2.9+70 (Listen Page Refresh Black Screen — Real Fix)
 
 **Goal:** Build v1.2.9+70 on iPhone. Two commits are already in `services-migration` — `4dba042` (A#77 original, +69) and `4948178` (A#77b real fix, +70). Mac Mini needs to pull, bump pubspec to +70, build, and smoke test.

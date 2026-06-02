@@ -8,47 +8,38 @@ This is required so the user can identify which Amazon-Q tab they are talking to
 
 ---
 
-### ✅ **CURRENT STATE — v1.2.9+68 ON iPHONE, A#77b READY TO BUILD**
+### ✅ **CURRENT STATE — v1.2.9+70 ON iPHONE, A#78 READY TO BUILD**
 
-- iPhone running **v1.2.9+68** (A#76 complete — POI map button fix + map icon restore) ✅
-- **A#77b fix already in git on `services-migration`** — Listen page Refresh black screen fix in `my_tours_screen.dart` (commit `4948178`). Targets v1.2.9+70. Needs Mac Mini build.
-- **v1.2.9+69 was built but smoke test failed** — A#77 fixed the wrong Refresh button (`home_screen.dart`). Real cause was in `my_tours_screen.dart`. See A#77b below.
+- iPhone running **v1.2.9+70** (A#77b complete — Listen page Refresh black screen fixed) ✅
+- **A#78 fix already in git on `services-migration`** — Listen page microphone voice search fix in `my_tours_screen.dart` (commit `df6b61b`). Targets v1.2.9+71. Needs Mac Mini build.
 
 ---
 
 ### 🎯 **IMMEDIATE NEXT STEPS**
 
-#### A#77b — Build v1.2.9+70 ⚠️ READY TO BUILD
-**Root cause of black screen:** `_manualRefresh()` in `my_tours_screen.dart` called `Navigator.of(context).pop()` which disposed the State. The `addPostFrameCallback` `if (mounted)` then evaluated false → `pushReplacement` never ran → screen gone, nothing replaced it → black screen.
+#### A#78 — Build v1.2.9+71 ⚠️ READY TO BUILD
+**Bug:** On the Listen page (Audio mode), tapping the microphone icon showed "Microphone permission required" snackbar and did nothing. Voice search inside individual news articles worked fine.
 
-**Fix (commit `4948178`):** `_manualRefresh()` replaced with in-place reload:
-```dart
-Future<void> _manualRefresh() async {
-  await DebugLogHelper.addDebugLog('LISTEN: Manual refresh triggered');
-  if (!mounted) return;
-  await _loadAppMode();
-}
-```
-Call site: `onPressed: () => _manualRefresh()`, tooltip: `'Refresh'`
+**Root cause:** `_setupVoiceCommands()` calls `_speechToText.initialize()` which acquires mic permission internally via iOS speech framework. Then `_startVoiceSearch()` called `Permission.microphone.request()` again via the `permission_handler` plugin — a separate permission pathway. iOS considers the permission already handled; `permission_handler` sees it as denied → snackbar → return.
 
-**Claude review:** ✅ Approved. `onPressed` type is valid Dart. Double-tap re-entrancy harmless. Selection-mode crash risk is pre-existing, not a blocker.
+**Fix (commit `df6b61b`):** Removed the redundant `Permission.microphone.request()` block from `_startVoiceSearch()` in `my_tours_screen.dart`. `_speechEnabled == true` (set by `initialize()`) is sufficient proof mic is available.
 
 **Mac Mini runs:**
 ```bash
 cd ~/Development/Audioura-build
 git pull origin services-migration
-sed -i '' 's/^version: 1.2.9+69/version: 1.2.9+70/' development/audio_tour_app/pubspec.yaml
+sed -i '' 's/^version: 1.2.9+70/version: 1.2.9+71/' development/audio_tour_app/pubspec.yaml
 cd development/audio_tour_app && flutter clean && flutter pub get
 cd "/Volumes/USB DISK/Audioura/scripts" && ./build_install_launch.sh
 # STOP for Sir Michael smoke test
-# After smoke test passes: git add pubspec.yaml && git commit -m "v1.2.9+70" && git push origin services-migration
+# After smoke test passes: git add pubspec.yaml && git commit -m "v1.2.9+71" && git push origin services-migration
 ```
 
 **Smoke tests:**
-1. Audio mode → Listen tab → tap Refresh → list reloads in place, no black screen. Log must show `LISTEN: Manual refresh triggered` then `LISTEN: Loading N articles` then `LISTEN: Successfully loaded N articles`.
-2. Enter Select Articles mode → select some → tap Refresh → no crash, list reloads cleanly.
-3. Newsletter tab → tap Refresh → no black screen (regression check for +69 fix).
-4. Open a tour → audio plays normally. Open a news article → no white screen. Tap POI map icon → TourMapScreen opens.
+1. Audio mode → Listen tab → tap microphone icon → Listening dialog appears immediately, no "Microphone permission required" snackbar.
+2. Say a word → dialog closes → article list filters. Debug log shows `LISTEN: Voice search ...`.
+3. Listen page Refresh → list reloads, no black screen (A#77b regression check).
+4. Tour audio plays, news article loads, POI map icon opens TourMapScreen.
 
 ---
 
@@ -70,16 +61,14 @@ Audioura-build/           AudioTours\development\
 - **Windows dev tree**: `C:\Users\micha\eclipse-workspace\AudioTours\development\` — IS a git clone, branch `services-migration`. Q edits files here, commits planning/directives docs. Never commits code — Mac Mini does that.
 - **USB mirror in git**: `usb/Audioura/` in Windows dev tree mirrors `D:\Audioura\`. After editing, copy to USB: `copy usb\Audioura\assignments\mac_mini_assignments.md D:\Audioura\assignments\`
 - **OLD repo**: `~/Development/AudioTours/` — BROKEN, never use
-- **NEVER** push from `~/Development/AudioTours/`
+- **pubspec.yaml**: `1.2.9+70` on Mac Mini and dev tree (synced after A#77b). Next build bumps to +71.
 
 #### Git operation ownership
 | Operation | Who | Where |
 |---|---|---|
 | `git pull` + build + `git push` | Mac Mini Q | `~/Development/Audioura-build/` |
-| Edit + commit directives/planning docs | Windows Q | `C:\Users\micha\eclipse-workspace\AudioTours\development\` |
+| Edit + commit directives/planning docs + code fixes | Windows Q | `C:\Users\micha\eclipse-workspace\AudioTours\development\` |
 | `git pull` to sync after Mac Mini pushes | Sir Michael (Windows) | Windows dev tree |
-
-**Current pubspec.yaml**: `1.2.9+69` (bumped by A#77, not yet +70 — Mac Mini bumps to +70 during A#77b build)
 
 ---
 
@@ -96,8 +85,8 @@ Audioura-build/           AudioTours\development\
 ---
 
 ### 📱 **APP STATUS**
-- **iPhone**: v1.2.9+68 ✅
-- **All shipped features**: Tour clustering, location search, tour search, newsletter system, subscription, language selector, about screen, settings persistence, location permissions, keyboard dismissal, download spinner fix, microphone voice control, translation (ru/fr/zh), walking tour map, per-stop map focus, coordinate jitter, museum single-POI map guard, mode-switch fix, stale tour/news path healing, brick-red app icon, app name "Audioura", InAppWebView v6, map icon on Listen page, POI tap → TourMapScreen via `openMap` JS handler.
+- **iPhone**: v1.2.9+70 ✅
+- **All shipped features**: Tour clustering, location search, tour search, newsletter system, subscription, language selector, about screen, settings persistence, location permissions, keyboard dismissal, download spinner fix, microphone voice control, translation (ru/fr/zh), walking tour map, per-stop map focus, coordinate jitter, museum single-POI map guard, mode-switch fix, stale tour/news path healing, brick-red app icon, app name "Audioura", InAppWebView v6, map icon on Listen page, POI tap → TourMapScreen via `openMap` JS handler, Listen page Refresh in-place reload.
 
 ---
 
@@ -106,7 +95,7 @@ Audioura-build/           AudioTours\development\
 2. Code fixes on Windows: edit in `development/audio_tour_app/lib/` → commit → push → Mac Mini pulls + builds.
 3. After successful build: Mac Mini commits pubspec bump + pushes. Windows does `git pull` to sync.
 4. **LF FILES**: `home_screen.dart`, `tour_generator_screen.dart`, `my_tours_screen.dart` — `fsReplace` FAILS on Windows. Use Python patch script via `fsWrite` + `executeBash`.
-5. **PYTHON OUTPUT**: stdout is unreliable — always write results to `D:\Audioura\results\<file>.txt` and read back with `executeBash` `type` command.
+5. **PYTHON OUTPUT**: stdout is unreliable in `executeBash`. Always write results to `D:\Audioura\results\<file>.txt` and read back with `executeBash` `type D:\Audioura\results\<name>.txt`. Writing to dev tree path does NOT reliably work.
 6. Read `git_source_control_for_q.md` before any git operation.
 
 ---
@@ -122,6 +111,7 @@ cd "/Volumes/USB DISK/Audioura/scripts"
 ```
 - `flutter analyze` issues in dead files only (`audio_handler.dart`, `map_page.dart`, `subscription_management_screen.dart`, `test/widget_test.dart`) — non-blocking.
 - If `git push` blocked by GitHub secret scanning — STOP, report, never click "Allow secret".
+- If push rejected (fetch first) — Mac Mini pushed while Windows was working. Do `git pull origin services-migration` then push again.
 
 ---
 
@@ -133,10 +123,12 @@ cd "/Volumes/USB DISK/Audioura/scripts"
 - `_healTourPaths()` — heals stale container paths in saved_tours
 - `_detectMapTours()` — checks `audio_1.txt` for `Coordinates:` to show map icon
 - `_manualRefresh()` — **A#77b**: `Future<void>`, logs, `if (!mounted) return`, calls `_loadAppMode()`. No navigation teardown.
-- ⚠️ Known pre-existing: Refresh while in Select Articles mode may cause RangeError if list size changes. Not a blocker.
+- `_setupVoiceCommands()` — calls `_speechToText.initialize()` in `initState`. This is the only mic permission acquisition needed.
+- `_startVoiceSearch()` — **A#78**: `Permission.microphone.request()` block removed. Guards only on `!_speechEnabled`.
+- ⚠️ Known pre-existing: Refresh while in Select Articles mode may RangeError if list size changes. Not a blocker.
 
 #### tour_player_screen.dart (CRLF)
-- `addJavaScriptHandler('openMap')` registered in `onWebViewCreated` — **A#76**: was missing, causing silent drop of all POI taps
+- `addJavaScriptHandler('openMap')` registered in `onWebViewCreated` — **A#76**
 - `openMap` handler: `args[0]['stop']` → `int` → pushes `TourMapScreen(focusStopIndex: stopIndex)`
 - Uses `initialSettings: InAppWebViewSettings(...)` — v6 API ✅
 
@@ -157,13 +149,12 @@ cd "/Volumes/USB DISK/Audioura/scripts"
 
 #### home_screen.dart (LF — Python edits only)
 - Download + translation logic
-- `_downloadTranslatedVersions()`, `_resolveParentEditTourId()`, `_saveTourToMyToursTranslated()`
-- Newsletter Refresh handler in `_buildNewsletterView` — **A#77 (+69)**: `setState(_isLoading=true)` removed (correct cleanup)
+- Newsletter Refresh handler in `_buildNewsletterView` — **A#77**: `setState(_isLoading=true)` removed
 
 ---
 
 ### 📋 **OPEN ITEMS**
-1. **A#77b** ⚠️ READY TO BUILD — v1.2.9+70. See IMMEDIATE NEXT STEPS above.
+1. **A#78** ⚠️ READY TO BUILD — v1.2.9+71. Listen page mic voice search fix in `my_tours_screen.dart` committed at `df6b61b`. Mac Mini: `git pull` + bump pubspec to +71 + build.
 2. **ISSUE-SERVICES-NEWSLETTER** — `get_articles_by_newsletter_id` returns only 2 of 5 articles for newsletter 280. Filed in `ISSUE_SERVICES_NEWSLETTER_ARTICLES_INCOMPLETE.md`. Awaiting Kiro. NOT an iOS bug.
 3. **ISSUE-061** — Translated tours in `/tours-near/` → 404. Filed for Services. iOS work follows after server fix.
 4. **NF4 (LOW)** — `openMap` handler bare-int widening. Two-line fix.
@@ -174,10 +165,10 @@ cd "/Volumes/USB DISK/Audioura/scripts"
 ---
 
 ### 🔄 **RECENT ASSIGNMENT HISTORY**
-- **A#75**: ✅ v1.2.9+65 — InAppWebView v6 migration in `news_player_screen.dart`. 2026-06-01.
-- **A#76**: ✅ v1.2.9+68 — POI map button fix (`openMap` JS handler registered in `TourPlayerScreen`) + map icon restore on Listen page. Commit `f2bb356`. 2026-06-01.
-- **A#77**: ⚠️ v1.2.9+69 BUILT BUT FAILED — removed `setState(_isLoading=true)` from newsletter Refresh in `home_screen.dart`. Correct cleanup but wrong screen — black screen persisted.
-- **A#77b**: ⚠️ READY TO BUILD — v1.2.9+70. `_manualRefresh()` in `my_tours_screen.dart` replaced with in-place `_loadAppMode()` reload. Commit `4948178`. Claude approved.
+- **A#76**: ✅ v1.2.9+68 — POI map button fix + map icon restore. Commit `f2bb356`. 2026-06-01.
+- **A#77**: ⚠️ v1.2.9+69 BUILT BUT FAILED — fixed wrong Refresh button (`home_screen.dart`). Black screen persisted.
+- **A#77b**: ✅ v1.2.9+70 CONFIRMED ON iPHONE — `_manualRefresh()` replaced with in-place `_loadAppMode()` reload. Commit `4948178`. 2026-06-02.
+- **A#78**: ⚠️ READY TO BUILD — v1.2.9+71. Removed redundant `Permission.microphone.request()` from `_startVoiceSearch()`. Commit `df6b61b`. 2026-06-02.
 
 ---
 
@@ -211,7 +202,7 @@ xcrun devicectl device uninstall app --device F9D6F807-D301-59EE-B574-5747D617D8
 | File | Purpose |
 |------|---------|
 | `lib/screens/home_screen.dart` | Download + translation logic. LF. |
-| `lib/screens/my_tours_screen.dart` | Tours/news list. LF. A#77b: `_manualRefresh()` fixed. |
+| `lib/screens/my_tours_screen.dart` | Tours/news list. LF. A#77b: `_manualRefresh()` fixed. A#78: mic permission fixed. |
 | `lib/screens/my_news_screen.dart` | News list. Heals stale paths in `_loadNews()`. |
 | `lib/screens/main_screen.dart` | Tab navigation. CRLF. `_buildBody()` switch. |
 | `lib/screens/tour_player_screen.dart` | `openMap` JS handler. CRLF. |
@@ -220,7 +211,7 @@ xcrun devicectl device uninstall app --device F9D6F807-D301-59EE-B574-5747D617D8
 | `lib/screens/tour_generator_screen.dart` | Translation + player navigation. LF. |
 | `lib/screens/debug_log_viewer_screen.dart` | `DebugLogHelper` class lives here. |
 | `lib/config.dart` | `Config.defaultServerIp = '192.168.0.218'` |
-| `usb/Audioura/assignments/mac_mini_assignments.md` | Mac Mini task queue. A#77b block at top. Copy to `D:\Audioura\assignments\` before Mac Mini run. |
+| `usb/Audioura/assignments/mac_mini_assignments.md` | Mac Mini task queue. A#78 block at top. Copy to `D:\Audioura\assignments\` before Mac Mini run. |
 | `git_source_control_for_q.md` | Git rules — READ before any git operation. |
 | `ISSUE_SERVICES_NEWSLETTER_ARTICLES_INCOMPLETE.md` | Services bug filed for Kiro. |
 | `ISSUE-061_TRANSLATED_TOURS_IN_DOWNLOAD_LIST.md` | Services bug: translated tour 404. |
@@ -237,5 +228,5 @@ xcrun devicectl device uninstall app --device F9D6F807-D301-59EE-B574-5747D617D8
 
 ---
 
-**Last Updated**: 2026-06-02 — v103.0. iPhone on v1.2.9+68. A#77b ready to build as v1.2.9+70 — `_manualRefresh()` in `my_tours_screen.dart` replaced with `_loadAppMode()` in-place reload (commit `4948178`, Claude approved). pubspec in dev tree at `1.2.9+69` (Mac Mini bumps to +70 during build).
-**iOS Amazon-Q Version**: 103.0
+**Last Updated**: 2026-06-02 — v104.0. iPhone on v1.2.9+70 (A#77b complete). A#78 ready to build as v1.2.9+71 — removed redundant `Permission.microphone.request()` from `_startVoiceSearch()` in `my_tours_screen.dart` (commit `df6b61b`). pubspec at `1.2.9+70`.
+**iOS Amazon-Q Version**: 104.0
