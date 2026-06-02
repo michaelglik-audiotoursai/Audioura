@@ -11,61 +11,49 @@ This is required so the user can identify which Amazon-Q tab they are talking to
 ### ✅ **CURRENT STATE — v1.2.9+68 ON iPHONE, A#77b READY TO BUILD**
 
 - iPhone running **v1.2.9+68** (A#76 complete — POI map button fix + map icon restore) ✅
-- **A#77b fix already in git on `services-migration`** — Listen page Refresh black screen real fix in `my_tours_screen.dart` (commit `4948178`). Targets v1.2.9+70. Needs Mac Mini build.
-- **v1.2.9+69 was built but test failed** — A#77 (+69) fixed the wrong Refresh button (`home_screen.dart`). The black screen came from `my_tours_screen.dart` `_manualRefresh()`. See A#77b.
+- **A#77b fix already in git on `services-migration`** — Listen page Refresh black screen fix in `my_tours_screen.dart` (commit `4948178`). Targets v1.2.9+70. Needs Mac Mini build.
+- **v1.2.9+69 was built but smoke test failed** — A#77 fixed the wrong Refresh button (`home_screen.dart`). Real cause was in `my_tours_screen.dart`. See A#77b below.
 
 ---
 
 ### 🎯 **IMMEDIATE NEXT STEPS**
 
 #### A#77b — Build v1.2.9+70 ⚠️ READY TO BUILD
-**What changed:**
-- `home_screen.dart` (+69) — removed `setState(() { _isLoading = true; })` from newsletter Refresh handler. Correct cleanup but not the black screen cause.
-- `my_tours_screen.dart` (+70) — `_manualRefresh()` replaced. Old code called `Navigator.of(context).pop()` which disposed the State, then `addPostFrameCallback` `if (mounted)` evaluated false and `pushReplacement` never ran → black screen. New code: `await _loadAppMode()` in-place reload. No navigation teardown.
+**Root cause of black screen:** `_manualRefresh()` in `my_tours_screen.dart` called `Navigator.of(context).pop()` which disposed the State. The `addPostFrameCallback` `if (mounted)` then evaluated false → `pushReplacement` never ran → screen gone, nothing replaced it → black screen.
 
-**Key smoke test:** Audio mode → Listen tab → tap Refresh → list reloads in place, no black screen. Log must show `LISTEN: Manual refresh triggered` followed by `LISTEN: Loading N articles from storage` / `LISTEN: Successfully loaded N articles`.
-**Extra test (Claude Q3):** Enter Select Articles mode on Listen tab → select some → tap Refresh → must not crash, selection exits cleanly, list reloads.
-**Claude review:** ✅ Approved `4948178`. No blocking issues. `onPressed: () => _manualRefresh()` is valid Dart. Double-tap re-entrancy is harmless. Selection-mode risk is pre-existing, not a blocker.
+**Fix (commit `4948178`):** `_manualRefresh()` replaced with in-place reload:
+```dart
+Future<void> _manualRefresh() async {
+  await DebugLogHelper.addDebugLog('LISTEN: Manual refresh triggered');
+  if (!mounted) return;
+  await _loadAppMode();
+}
+```
+Call site: `onPressed: () => _manualRefresh()`, tooltip: `'Refresh'`
+
+**Claude review:** ✅ Approved. `onPressed` type is valid Dart. Double-tap re-entrancy harmless. Selection-mode crash risk is pre-existing, not a blocker.
 
 **Mac Mini runs:**
 ```bash
 cd ~/Development/Audioura-build
 git pull origin services-migration
-# Bump pubspec version to 1.2.9+70 (sed -i '' 's/1.2.9+69/1.2.9+70/' pubspec.yaml)
-# flutter clean && flutter pub get
-cd "/Volumes/USB DISK/Audioura/scripts"
-./build_install_launch.sh
+sed -i '' 's/^version: 1.2.9+69/version: 1.2.9+70/' development/audio_tour_app/pubspec.yaml
+cd development/audio_tour_app && flutter clean && flutter pub get
+cd "/Volumes/USB DISK/Audioura/scripts" && ./build_install_launch.sh
 # STOP for Sir Michael smoke test
-# After smoke test passes: git commit pubspec + push origin services-migration
+# After smoke test passes: git add pubspec.yaml && git commit -m "v1.2.9+70" && git push origin services-migration
 ```
 
----
-
-### 🗂️ **USB MIRROR IN GIT (NEW)**
-
-The USB drive contents (`D:\Audioura\`) are now mirrored into git at:
-`C:\Users\micha\eclipse-workspace\AudioTours\development\usb\Audioura\`
-
-What's tracked:
-- `usb/Audioura/assignments/` — `mac_mini_assignments.md` + individual assignment docs
-- `usb/Audioura/assets/` — all Dart screens, services, widgets, pubspec, Podfile, Info.plist
-- `usb/Audioura/scripts/` — all build and diagnostic shell scripts
-- `usb/Audioura/archive/` — old assignment walkthroughs
-- `usb/Audioura/claude_analysis/` — analysis docs
-- `usb/Audioura/.gitignore` — excludes `results/`, `verify/`, macOS dot-files
-
-`results/` is NOT tracked (hundreds of build logs — too large).
-
-**Workflow:** Edit files in `usb/Audioura/` → `git commit` + `git push` → copy to USB when needed:
-```cmd
-copy C:\Users\micha\eclipse-workspace\AudioTours\development\usb\Audioura\assignments\mac_mini_assignments.md D:\Audioura\assignments\
-```
+**Smoke tests:**
+1. Audio mode → Listen tab → tap Refresh → list reloads in place, no black screen. Log must show `LISTEN: Manual refresh triggered` then `LISTEN: Loading N articles` then `LISTEN: Successfully loaded N articles`.
+2. Enter Select Articles mode → select some → tap Refresh → no crash, list reloads cleanly.
+3. Newsletter tab → tap Refresh → no black screen (regression check for +69 fix).
+4. Open a tour → audio plays normally. Open a news article → no white screen. Tap POI map icon → TourMapScreen opens.
 
 ---
 
 ### 🔑 **GIT / BUILD STATE**
 
-#### Three locations — two are git repos
 ```
 GitHub (remote)
   repo: michaelglik-audiotoursai/Audioura  branch: services-migration
@@ -74,207 +62,134 @@ GitHub (remote)
 Mac Mini clone            Windows dev tree
 ~/Development/            C:\Users\micha\eclipse-workspace\
 Audioura-build/           AudioTours\development\
-(builds + commits)        (reference/review — git pull after Mac Mini push)
-       ↑
-  copy_ios_fixes.sh copies files here (legacy workflow — see note below)
-       |
-USB Staging Area  ← Q writes fixes here
-D:\Audioura\assets\
-(NOT a git repo)
+(builds + commits)        (reference/review only)
 ```
 
-**⚠️ WORKFLOW CHANGE (A#72+)**: New assignments no longer use `copy_ios_fixes.sh`. Instead:
-- Sir Michael commits directives doc to Windows dev tree → pushes to GitHub
-- Mac Mini Q does `git pull` → reads directives → edits files directly in `~/Development/Audioura-build/development/` → commits + pushes
-- `copy_ios_fixes.sh` is legacy (used in A#71 and earlier)
-
-- **Mac Mini build clone**: `~/Development/Audioura-build/`, branch `services-migration` ✅
-- **Flutter project path**: `~/Development/Audioura-build/development/audio_tour_app/`
-- **Windows dev tree**: `C:\Users\micha\eclipse-workspace\AudioTours\development\` — IS a git clone, branch `services-migration`
-- **USB assets** (`D:\Audioura\assets\`): NOT a git repo — legacy staging area only
-- **OLD repo**: `~/Development/AudioTours/` — BROKEN, do NOT use
-- **Remote**: `https://github.com/michaelglik-audiotoursai/Audioura.git`
-- **Last confirmed commit**: A#73 brick-red icon (v1.2.9+64)
+- **Mac Mini build clone**: `~/Development/Audioura-build/`, branch `services-migration`
+- **Flutter project on Mac Mini**: `~/Development/Audioura-build/development/audio_tour_app/`
+- **Windows dev tree**: `C:\Users\micha\eclipse-workspace\AudioTours\development\` — IS a git clone, branch `services-migration`. Q edits files here, commits planning/directives docs. Never commits code — Mac Mini does that.
+- **USB mirror in git**: `usb/Audioura/` in Windows dev tree mirrors `D:\Audioura\`. After editing, copy to USB: `copy usb\Audioura\assignments\mac_mini_assignments.md D:\Audioura\assignments\`
+- **OLD repo**: `~/Development/AudioTours/` — BROKEN, never use
 - **NEVER** push from `~/Development/AudioTours/`
 
 #### Git operation ownership
-| Operation | Who | Where | When |
-|---|---|---|---|
-| `git pull origin services-migration` | Mac Mini (Q) | `~/Development/Audioura-build/` | Start of every assignment |
-| `git add / commit / push` | Mac Mini (Q) | `~/Development/Audioura-build/` | After successful build + test |
-| `git pull origin services-migration` | Sir Michael (Windows) | `C:\Users\micha\eclipse-workspace\AudioTours\development\` | After Mac Mini pushes |
-| Any git operation | USB `D:\Audioura\assets\` | — | **NEVER** — not a git repo |
+| Operation | Who | Where |
+|---|---|---|
+| `git pull` + build + `git push` | Mac Mini Q | `~/Development/Audioura-build/` |
+| Edit + commit directives/planning docs | Windows Q | `C:\Users\micha\eclipse-workspace\AudioTours\development\` |
+| `git pull` to sync after Mac Mini pushes | Sir Michael (Windows) | Windows dev tree |
+
+**Current pubspec.yaml**: `1.2.9+69` (bumped by A#77, not yet +70 — Mac Mini bumps to +70 during A#77b build)
 
 ---
 
 ### 🚀 **QUICK CONTEXT RECOVERY**
 - **Mission**: iOS Amazon-Q for Audioura LLC mobile app
-- **App name**: Audioura (com.glikfamily.audioura)
+- **App name**: Audioura (`com.glikfamily.audioura`)
 - **Device**: iPhone 16, UDID `F9D6F807-D301-59EE-B574-5747D617D82C`, iOS 18.3.1
-- **Apple Dev**: Team ID `4HGRU6TKGQ`, paid license (Order W1583339145, glikfamily@gmail.com), valid until April 7 2027
-- **Certificate**: Apple Development: Mikhail Glik (594584F3D3BC571D94A822A2158871CA13898701)
+- **Apple Dev**: Team ID `4HGRU6TKGQ`, paid license (glikfamily@gmail.com), valid until April 7 2027
+- **Certificate**: Apple Development: Mikhail Glik (`594584F3D3BC571D94A822A2158871CA13898701`)
 - **Flutter UDID** (provisioning): `00008140-000558A902BA801C`
-- **Repo**: `https://github.com/michaelglik-audiotoursai/Audioura`
 - **Network**: iPhone → Windows laptop Docker services at `192.168.0.218:5002/5004/5005/5030`
-- **Build environment**: Mac Mini M4 + Xcode 16, project at `~/Development/Audioura-build/development/audio_tour_app`
+- **Build environment**: Mac Mini M4 + Xcode 16
 
 ---
 
 ### 📱 **APP STATUS**
-- **Current version on iPhone**: v1.2.9+65 ✅ (A#75 — InAppWebView v6 migration)
-- **pubspec.yaml in dev tree**: `1.2.9+65` ✅
-- **All features in +65**: Tour clustering, location search, tour search, newsletter system, subscription, language selector, about screen, settings persistence, location permissions, keyboard dismissal, download spinner fix, microphone voice control, translation (ru/fr/zh), walking tour map, per-stop map focus, coordinate jitter, museum single-POI map guard, mode-switch fix, stale tour path healing, stale news article path healing, brick-red app icon, app name "Audioura", InAppWebView v6 in all WebView screens
-- **New in +66/+67/+68 (staged):** Map icon restored on Listen page (+66). `HitTestBehavior.opaque` on map markers (+67, hardening). `openMap` JS handler registered in `TourPlayerScreen` (+68, real POI tap fix).
+- **iPhone**: v1.2.9+68 ✅
+- **All shipped features**: Tour clustering, location search, tour search, newsletter system, subscription, language selector, about screen, settings persistence, location permissions, keyboard dismissal, download spinner fix, microphone voice control, translation (ru/fr/zh), walking tour map, per-stop map focus, coordinate jitter, museum single-POI map guard, mode-switch fix, stale tour/news path healing, brick-red app icon, app name "Audioura", InAppWebView v6, map icon on Listen page, POI tap → TourMapScreen via `openMap` JS handler.
 
 ---
 
-### 🔄 **WORKFLOW RULES (current)**
-1. **New workflow (A#72+)**: Sir Michael commits directives to Windows dev tree → pushes → Mac Mini Q pulls → edits directly in clone → commits + pushes. No USB copy script.
-2. **Legacy workflow (A#71 and earlier)**: `copy_ios_fixes.sh` copied 23 files from USB assets to Mac Mini. Still works but no longer the primary workflow.
-3. `build_install_launch.sh` — proven stable. Points at `~/Development/Audioura-build/development/audio_tour_app`.
-4. Every new assignment = directives doc committed to Windows dev tree + pushed before Mac Mini starts.
-5. After successful build → `git add` changed files → `git commit` → `git push origin services-migration`.
-6. **LF FILES**: `home_screen.dart`, `tour_generator_screen.dart`, `my_tours_screen.dart` — `fsReplace` FAILS on Windows. Use Python script via `fsWrite` + `executeBash`.
-7. **PYTHON OUTPUT**: Not visible in stdout. Write result to file, read with `fsRead`.
-8. **Windows dev tree IS a git repo** — `git pull` works at `C:\Users\micha\eclipse-workspace\AudioTours\development\`. Q never commits from there — Mac Mini only.
-9. **Read `git_source_control_for_q.md` before any git work** — `C:\Users\micha\eclipse-workspace\AudioTours\development\git_source_control_for_q.md`
+### 🔄 **WORKFLOW RULES**
+1. Assignments: Windows Q writes directives to `usb/Audioura/assignments/mac_mini_assignments.md` → copies to USB → commits + pushes → Mac Mini Q pulls + executes.
+2. Code fixes on Windows: edit in `development/audio_tour_app/lib/` → commit → push → Mac Mini pulls + builds.
+3. After successful build: Mac Mini commits pubspec bump + pushes. Windows does `git pull` to sync.
+4. **LF FILES**: `home_screen.dart`, `tour_generator_screen.dart`, `my_tours_screen.dart` — `fsReplace` FAILS on Windows. Use Python patch script via `fsWrite` + `executeBash`.
+5. **PYTHON OUTPUT**: stdout is unreliable — always write results to `D:\Audioura\results\<file>.txt` and read back with `executeBash` `type` command.
+6. Read `git_source_control_for_q.md` before any git operation.
 
 ---
 
 ### 🏗️ **BUILD PROCESS**
-- Build from: `~/Development/Audioura-build/`, branch `services-migration`
-- Flutter project: `~/Development/Audioura-build/development/audio_tour_app/`
-- Old `~/Development/AudioTours/` repo is BROKEN — never use it
-- Standard build cycle:
-  ```bash
-  cd ~/Development/Audioura-build
-  git pull origin services-migration
-  cd development/audio_tour_app
-  flutter clean
-  flutter pub get
-  cd "/Volumes/USB DISK/Audioura/scripts"
-  ./build_install_launch.sh
-  ```
-- `flutter analyze` reports issues in dead files only (`audio_handler.dart`, `map_page.dart`, `subscription_management_screen.dart`, `test/widget_test.dart`). Real errors are only those OUTSIDE these four files.
-- If `git push` blocked by GitHub secret scanning — STOP and report. Never click "Allow secret".
+```bash
+cd ~/Development/Audioura-build
+git pull origin services-migration
+cd development/audio_tour_app
+flutter clean && flutter pub get
+cd "/Volumes/USB DISK/Audioura/scripts"
+./build_install_launch.sh
+```
+- `flutter analyze` issues in dead files only (`audio_handler.dart`, `map_page.dart`, `subscription_management_screen.dart`, `test/widget_test.dart`) — non-blocking.
+- If `git push` blocked by GitHub secret scanning — STOP, report, never click "Allow secret".
 
 ---
 
-### 🗺️ **MAP FEATURE ARCHITECTURE**
-
-#### tour_map_screen.dart (CRLF — fsReplace works)
-- Full-screen `flutter_map` with OSM tiles
-- `TourPoi` class: `index`, `name`, `type`, `address`, `coords`
-- `focusStopIndex` (int?) — 1-based, matches audio_N.txt numbering
-- `_focusPoi()` — exact index match; fallback nearest by GPS
-- `_fitBounds({bool forceFitAll = false})` — NF6: `if (forceFitAll) _fittedWithLocation = true`
-- **A#60**: `if (points.length == 1) { _mapController.move(points.first, 15); return; }` — single-POI guard
-- Marker color: `poi.index == next?.index` (NF7)
-- **NF3**: AppBar title shows `"Tour — Stop N"` only when `_pois.any((p) => p.index == widget.focusStopIndex)`
-- **A#59 NF8**: `_applyCoordJitter(pois)` — offsets duplicate-coord POIs ~0.00008°
-- Coordinates regex: `RegExp(r'Coordinates:\s*([-\d.]+)\s*,\s*([-\d.]+)')` (space-tolerant)
-
-#### tour_player_screen.dart (CRLF)
-- All injection code removed. Kept: `addJavaScriptHandler('openMap')` + `_openMapForStop()`
-- `openMap` handler: registered in `onWebViewCreated` — `args[0]['stop']` parsed as int, fallback `int.tryParse`. Logs `MAP: openMap handler fired for stop N`. Pushes `TourMapScreen(focusStopIndex: stopIndex)`.
-- Uses `initialSettings: InAppWebViewSettings(...)` — v6 API ✅
-- **A#76 +68**: `import 'tour_map_screen.dart'` added. `addJavaScriptHandler('openMap')` registered — was missing before, causing silent drop of all POI tap events.
-
-#### news_player_screen.dart (CRLF — A#72 + A#75)
-- **A#72**: `_getIndexUrl()` heals stale container paths. `FutureBuilder<String>` wraps WebView body. `late final Future<String> _indexUrlFuture` cached in `initState`.
-- **A#75**: `initialSettings: InAppWebViewSettings(...)` — v6 API ✅ (complete, v1.2.9+65)
-- `onReceivedError` — v6 callback ✅
+### 🗺️ **KEY SCREEN ARCHITECTURE**
 
 #### my_tours_screen.dart (LF — Python edits only)
-- **A#56**: `_healTourPaths()` present, `_tourHasMap` declared, `_detectMapTours()` called
+- Shows tours (Tours mode) or news articles (Audio mode) depending on `_appMode`
+- `_loadAppMode()` → routes to `_loadTours()` or `_loadNews()` — called by `initState` and `_manualRefresh`
+- `_healTourPaths()` — heals stale container paths in saved_tours
+- `_detectMapTours()` — checks `audio_1.txt` for `Coordinates:` to show map icon
+- `_manualRefresh()` — **A#77b**: `Future<void>`, logs, `if (!mounted) return`, calls `_loadAppMode()`. No navigation teardown.
+- ⚠️ Known pre-existing: Refresh while in Select Articles mode may cause RangeError if list size changes. Not a blocker.
 
-#### my_news_screen.dart (A#72)
-- `_loadNews()` heals stale container paths for news articles
-- Mirrors A#56 pattern: extracts `/news/<folder>` suffix, prepends current `getApplicationDocumentsDirectory()`
+#### tour_player_screen.dart (CRLF)
+- `addJavaScriptHandler('openMap')` registered in `onWebViewCreated` — **A#76**: was missing, causing silent drop of all POI taps
+- `openMap` handler: `args[0]['stop']` → `int` → pushes `TourMapScreen(focusStopIndex: stopIndex)`
+- Uses `initialSettings: InAppWebViewSettings(...)` — v6 API ✅
 
-#### main_screen.dart (CRLF — in copy script)
-- **A#62**: `_buildBody()` switch replaces `IndexedStack` — fixes Tours↔Audio mode switching
-- `_listenTabVersion` + `MyToursScreen(key: ValueKey(_listenTabVersion))` — Listen reload preserved
-- **DO NOT wrap `_buildBody()` in IndexedStack** — that was the regression
+#### news_player_screen.dart (CRLF)
+- `_getIndexUrl()` heals stale container paths at WebView launch
+- `FutureBuilder<String>` wraps WebView body, `_indexUrlFuture` cached in `initState`
+- `initialSettings: InAppWebViewSettings(...)` — v6 API ✅
 
----
+#### tour_map_screen.dart (CRLF)
+- `focusStopIndex` (int?, 1-based) — focuses map on specific stop
+- `_applyCoordJitter()` — offsets duplicate-coord POIs ~0.00008°
+- Single-POI guard: `if (points.length == 1) { _mapController.move(points.first, 15); return; }`
+- Coordinates regex: `RegExp(r'Coordinates:\s*([-\d.]+)\s*,\s*([-\d.]+)')` (space-tolerant)
 
-### 🌍 **TRANSLATION FEATURE ARCHITECTURE**
+#### main_screen.dart (CRLF)
+- `_buildBody()` switch — **never** wrap in IndexedStack (regression risk)
+- `_listenTabVersion` + `MyToursScreen(key: ValueKey(_listenTabVersion))` — preserves Listen reload
 
-#### API Contract
-```
-POST http://192.168.0.218:5030/translate-with-audio
-Body: { "content_id": <int>, "content_type": "tour", "languages": ["ru", "fr"] }
-Response: { "status": "completed", "translations": { "ru": { "id": 170 }, "fr": { "id": 171 } } }
-GET http://192.168.0.218:5005/download-tour/<translated_id>  → ZIP file
-```
-
-#### Key Functions in home_screen.dart
-- `_downloadTranslatedVersions(tourId, languages, serverIp, parentEditTourId)` — M8 shared method
-- `_resolveParentEditTourId(downloadTourId, prefs)` — port 5025, only for original English tours
-- `_saveTourToMyToursTranslated(...)` — saves translated tour directly, no resolution call
-- `_extractTranslatedIds(result)` — handles both server response shapes
-- `_countTourStops(zipBytes)` — defaults to 10 with log
+#### home_screen.dart (LF — Python edits only)
+- Download + translation logic
+- `_downloadTranslatedVersions()`, `_resolveParentEditTourId()`, `_saveTourToMyToursTranslated()`
+- Newsletter Refresh handler in `_buildNewsletterView` — **A#77 (+69)**: `setState(_isLoading=true)` removed (correct cleanup)
 
 ---
 
 ### 📋 **OPEN ITEMS**
-1. **A#77b** ⚠️ READY TO BUILD — v1.2.9+70. Listen page Refresh black screen real fix in `my_tours_screen.dart` committed at `4948178`. Mac Mini: `git pull` + bump pubspec to +70 + build. Smoke test: Audio mode → Listen tab → Refresh must not black screen. Log must show `LISTEN: Manual refresh triggered`.
-3. **ISSUE-SERVICES-NEWSLETTER** — `get_articles_by_newsletter_id` returns only 2 of 5 articles for newsletter 280. Filed in `ISSUE_SERVICES_NEWSLETTER_ARTICLES_INCOMPLETE.md`. Awaiting Kiro fix. NOT an iOS bug — log confirms phone never received more than 2 IDs.
-4. **ISSUE-061** — Translated tours in `/tours-near/` → 404 on direct download. Filed for Services. Future iOS assignment follows after server fix.
-5. **NF4 (LOW)** — `openMap` handler bare-int widening. Two-line fix.
-6. **NF5 (LOW)** — `Colors.blue.withOpacity(0.6)` → `.withValues(alpha: 0.6)`.
-7. **Coordinates keyword** — Must stay English in all translated `audio_N.txt`.
-8. **OSM tiles** — swap to Stadia Maps or Mapbox before App Store.
-9. **ISSUE-060** — Museum tours directions reference streets. Deferred.
-10. **Dead files backlog** — delete `audio_handler.dart`, `map_page.dart`, `subscription_management_screen.dart` so `flutter analyze` becomes a clean signal.
+1. **A#77b** ⚠️ READY TO BUILD — v1.2.9+70. See IMMEDIATE NEXT STEPS above.
+2. **ISSUE-SERVICES-NEWSLETTER** — `get_articles_by_newsletter_id` returns only 2 of 5 articles for newsletter 280. Filed in `ISSUE_SERVICES_NEWSLETTER_ARTICLES_INCOMPLETE.md`. Awaiting Kiro. NOT an iOS bug.
+3. **ISSUE-061** — Translated tours in `/tours-near/` → 404. Filed for Services. iOS work follows after server fix.
+4. **NF4 (LOW)** — `openMap` handler bare-int widening. Two-line fix.
+5. **NF5 (LOW)** — `Colors.blue.withOpacity(0.6)` → `.withValues(alpha: 0.6)`.
+6. **OSM tiles** — swap to Stadia Maps or Mapbox before App Store.
+7. **Dead files** — delete `audio_handler.dart`, `map_page.dart`, `subscription_management_screen.dart` so `flutter analyze` is a clean signal.
 
 ---
 
-### 🔄 **ASSIGNMENT HISTORY**
-- **A#27–A#35**: ✅ iOS build barrier + mic permission (v1.2.9+22→+30)
-- **A#36–A#44**: ✅ Translation feature built end-to-end (v1.2.9+31→+39)
-- **A#45–A#46**: ✅ Build fixes, edit_tour_screen inlined (v1.2.9+40→+41)
-- **A#47**: ✅ v1.2.9+43 — real translation in tour generator
-- **A#48**: ✅ v1.2.9+45 — save-then-remove pattern
-- **A#49**: ✅ v1.2.9+47 — suppress English auto-play, navigate to translated player
-- **A#49c**: ✅ v1.2.9+49 — spinner + flicker gate
-- **A#50**: ✅ v1.2.9+50 — walking tour map on Listen page
-- **A#52**: ✅ v1.2.9+52 — per-stop map focus (focusStopIndex)
-- **A#55**: ✅ v1.2.9+55 — per-stop map icons via JS handler
-- **A#58**: ✅ v1.2.9+58 — A#56 + A#57 + NF3
-- **A#59**: ✅ v1.2.9+59/+60 — NF8 jitter + IndexedStack Listen reload
-- **A#60**: ✅ v1.2.9+60 — single-POI `_fitBounds` guard
-- **A#61–A#62**: [CANCELLED] — old repo was broken. Superseded by A#63+.
-- **A#63**: ✅ Fresh clone `~/Development/Audioura-build/`, branch `services-migration`
-- **A#64**: ✅ iOS signing fixed (bundle ID `com.glikfamily.audioura`, team `4HGRU6TKGQ`)
-- **A#65**: ✅ `dart:async` import fix in `my_tours_screen.dart`
-- **A#66**: ✅ flutter analyze errors confirmed non-blocking (dead files only)
-- **A#67**: ✅ `assets/icons/` removed from pubspec, `.env` committed
-- **A#68**: ✅ `NativeAudioRecorderPlugin.swift` wired into Xcode target
-- **A#69**: ✅ Reset to complete build config (commit `74a8c04`), first successful build
-- **A#70**: ✅ v1.2.9+61 CONFIRMED ON iPHONE — stale path healing + real Audioura icon. 2026-05-24.
-- **A#71**: ✅ v1.2.9+62 — app name "Audioura" fixed (Info.plist). White screen NOT fixed (wrong diagnosis — real cause was stale paths, not v5 API). Commit `11113c5`.
-- **A#72**: ✅ v1.2.9+63 — news article white screen FIXED. `my_news_screen._loadNews()` heals stale paths. `news_player_screen._getIndexUrl()` heals defensively at WebView launch. FutureBuilder wraps WebView. 2026-05-26.
-- **A#73**: ✅ v1.2.9+64 — brick-red (#A93105) app icon. 15 PNGs regenerated via Python script. 2026-05-26.
-- **A#74**: ✅ Windows-side git cleanup (Sir Michael only — not a Mac Mini assignment).
-- **A#75**: ✅ v1.2.9+65 — InAppWebView v6 migration in `news_player_screen.dart`. No functional change. Built, smoke tested, committed + pushed. 2026-06-01.
-- **A#76**: ✅ v1.2.9+68 CONFIRMED ON iPHONE — POI map button fix (openMap JS handler registered in TourPlayerScreen) + map icon restore on Listen page. Built by Mac Mini Q, commit `f2bb356`. 2026-06-01.
-- **A#77** (v1.2.9+69): ⚠️ BUILT BUT FAILED SMOKE TEST — fixed wrong Refresh button (`home_screen.dart` newsletter handler). Black screen persisted.
-- **A#77b**: ⚠️ READY TO BUILD — v1.2.9+70. Real root cause: `_manualRefresh()` in `my_tours_screen.dart` called `Navigator.of(context).pop()` → State disposed → `addPostFrameCallback` `if (mounted)` false → `pushReplacement` never ran → black screen. Fix: replace with `await _loadAppMode()` in-place reload. Committed at `4948178`. Mac Mini: `git pull` + bump pubspec to +70 + build.
+### 🔄 **RECENT ASSIGNMENT HISTORY**
+- **A#75**: ✅ v1.2.9+65 — InAppWebView v6 migration in `news_player_screen.dart`. 2026-06-01.
+- **A#76**: ✅ v1.2.9+68 — POI map button fix (`openMap` JS handler registered in `TourPlayerScreen`) + map icon restore on Listen page. Commit `f2bb356`. 2026-06-01.
+- **A#77**: ⚠️ v1.2.9+69 BUILT BUT FAILED — removed `setState(_isLoading=true)` from newsletter Refresh in `home_screen.dart`. Correct cleanup but wrong screen — black screen persisted.
+- **A#77b**: ⚠️ READY TO BUILD — v1.2.9+70. `_manualRefresh()` in `my_tours_screen.dart` replaced with in-place `_loadAppMode()` reload. Commit `4948178`. Claude approved.
 
 ---
 
 ### ⚠️ **CRITICAL TECHNICAL NOTES**
-- **LF files**: `home_screen.dart`, `tour_generator_screen.dart`, `my_tours_screen.dart` — `fsReplace` FAILS. Use Python script via `fsWrite` + `executeBash`.
-- **CRLF files**: `tour_map_screen.dart`, `tour_player_screen.dart`, `main_screen.dart`, `news_player_screen.dart` — `fsReplace` works
-- **DebugLogHelper**: defined in `lib/screens/debug_log_viewer_screen.dart`
-- **unawaited()**: requires `import 'dart:async'`
-- **Config class**: `lib/config.dart` — `Config.defaultServerIp = '192.168.0.218'`
-- **InAppWebView API**: v6 uses `initialSettings: InAppWebViewSettings(...)`. v5 `initialOptions`/`InAppWebViewGroupOptions` is BANNED.
-- **Stale container paths**: iOS reassigns app container UUID on reinstall. Tours healed in `my_tours_screen._healTourPaths()`. News articles healed in `my_news_screen._loadNews()` + `news_player_screen._getIndexUrl()`.
-- **pubspec.yaml version**: `1.2.9+68` in dev tree. iPhone on +68. Next build targets +70.
-- **Flutter project path on Mac Mini**: `~/Development/Audioura-build/development/audio_tour_app/` (has `development/` subdirectory — different from earlier assignments).
+- **LF files**: `home_screen.dart`, `tour_generator_screen.dart`, `my_tours_screen.dart` — `fsReplace` FAILS. Python only.
+- **CRLF files**: `tour_map_screen.dart`, `tour_player_screen.dart`, `main_screen.dart`, `news_player_screen.dart` — `fsReplace` works.
+- **Python stdout**: always empty in `executeBash`. Write to `D:\Audioura\results\<name>.txt`, read back with `executeBash` `type D:\Audioura\results\<name>.txt`.
+- **InAppWebView**: v6 API only — `initialSettings: InAppWebViewSettings(...)`. v5 `initialOptions` is BANNED.
+- **Stale container paths**: iOS reassigns UUID on reinstall. Tours healed in `_healTourPaths()`. News healed in `my_news_screen._loadNews()` + `news_player_screen._getIndexUrl()`.
+- **DebugLogHelper**: defined in `lib/screens/debug_log_viewer_screen.dart`.
+- **unawaited()**: requires `import 'dart:async'`.
+- **Config class**: `lib/config.dart` — `Config.defaultServerIp = '192.168.0.218'`.
 
 ---
 
@@ -282,14 +197,12 @@ GET http://192.168.0.218:5005/download-tour/<translated_id>  → ZIP file
 ```bash
 # iPhone not detected:
 sudo launchctl kickstart -k system/com.apple.usbd
-# Flutter checks
+# Flutter checks:
 flutter doctor -v && flutter devices
-# Verify pubspec version on Mac Mini:
+# Verify pubspec on Mac Mini:
 grep "^version:" ~/Development/Audioura-build/development/audio_tour_app/pubspec.yaml
-# Uninstall app completely:
+# Uninstall app:
 xcrun devicectl device uninstall app --device F9D6F807-D301-59EE-B574-5747D617D82C com.glikfamily.audioura
-# Clean build:
-cd ~/Development/Audioura-build/development/audio_tour_app && flutter clean && flutter pub get && flutter build ios --release
 ```
 
 ---
@@ -298,42 +211,31 @@ cd ~/Development/Audioura-build/development/audio_tour_app && flutter clean && f
 | File | Purpose |
 |------|---------|
 | `lib/screens/home_screen.dart` | Download + translation logic. LF. |
-| `lib/screens/my_tours_screen.dart` | Tour list. LF. A#56: `_healTourPaths()`. |
-| `lib/screens/my_news_screen.dart` | News list. A#72: heals stale article paths in `_loadNews()`. |
-| `lib/screens/main_screen.dart` | Tab navigation. CRLF. A#62: `_buildBody()`. |
-| `lib/screens/tour_player_screen.dart` | A#57: injection removed, `openMap` handler kept. CRLF. |
-| `lib/screens/news_player_screen.dart` | A#72: `_getIndexUrl()` + FutureBuilder. A#75: v6 API. CRLF. |
-| `lib/screens/tour_map_screen.dart` | Map screen. A#59: NF8 jitter. A#60: single-POI guard. CRLF. |
+| `lib/screens/my_tours_screen.dart` | Tours/news list. LF. A#77b: `_manualRefresh()` fixed. |
+| `lib/screens/my_news_screen.dart` | News list. Heals stale paths in `_loadNews()`. |
+| `lib/screens/main_screen.dart` | Tab navigation. CRLF. `_buildBody()` switch. |
+| `lib/screens/tour_player_screen.dart` | `openMap` JS handler. CRLF. |
+| `lib/screens/news_player_screen.dart` | `_getIndexUrl()` path healing + FutureBuilder. CRLF. |
+| `lib/screens/tour_map_screen.dart` | Map screen. Jitter + single-POI guard. CRLF. |
 | `lib/screens/tour_generator_screen.dart` | Translation + player navigation. LF. |
-| `lib/screens/debug_log_viewer_screen.dart` | Contains `DebugLogHelper` class |
+| `lib/screens/debug_log_viewer_screen.dart` | `DebugLogHelper` class lives here. |
 | `lib/config.dart` | `Config.defaultServerIp = '192.168.0.218'` |
-| `D:\Audioura\assignments\mac_mini_assignments.md` | A#77b block at top. Git mirror: `usb/Audioura/assignments/mac_mini_assignments.md` |
-| `C:\Users\micha\eclipse-workspace\AudioTours\development\a77b_review_request_for_claude.md` | A#77b Claude review request |
-| `C:\Users\micha\eclipse-workspace\AudioTours\development\claude_review_a77b_2026_06_02.md` | Claude review response — approved, no blockers |
-| `C:\Users\micha\eclipse-workspace\AudioTours\development\usb\Audioura\` | Git mirror of full USB contents (assignments, assets, scripts, archive) |
-| `D:\Audioura\scripts\build_install_launch.sh` | Proven stable build script |
-| `C:\Users\micha\eclipse-workspace\AudioTours\development\build_process_for_ios_q.md` | Build process rules |
-| `C:\Users\micha\eclipse-workspace\AudioTours\development\git_source_control_for_q.md` | Git structure — READ BEFORE ANY GIT WORK |
-| `C:\Users\micha\eclipse-workspace\AudioTours\development\a75_directives_for_q.md` | A#75 directives for Mac Mini Q |
-| `C:\Users\micha\eclipse-workspace\AudioTours\development\ISSUE-061_TRANSLATED_TOURS_IN_DOWNLOAD_LIST.md` | Server fix request for translated tour 404 |
-| `C:\Users\micha\eclipse-workspace\AudioTours\development\ISSUE_SERVICES_NEWSLETTER_ARTICLES_INCOMPLETE.md` | Services bug: `get_articles_by_newsletter_id` returns only 2 of 5 articles — filed for Kiro |
-| `C:\Users\micha\eclipse-workspace\AudioTours\development\patch_newsletter_refresh_fix.py` | A#77 patch — removes `_isLoading=true` from newsletter refresh handler |
-| `C:\Users\micha\eclipse-workspace\AudioTours\development\android_q_onboarding.md` | Android Q onboarding doc — give this to Android Amazon-Q to build Android parity builds |
-
----
+| `usb/Audioura/assignments/mac_mini_assignments.md` | Mac Mini task queue. A#77b block at top. Copy to `D:\Audioura\assignments\` before Mac Mini run. |
+| `git_source_control_for_q.md` | Git rules — READ before any git operation. |
+| `ISSUE_SERVICES_NEWSLETTER_ARTICLES_INCOMPLETE.md` | Services bug filed for Kiro. |
+| `ISSUE-061_TRANSLATED_TOURS_IN_DOWNLOAD_LIST.md` | Services bug: translated tour 404. |
+| `android_q_onboarding.md` | Give to Android Q for parity builds. |
 
 ---
 
 ### 🤖 **ANDROID PARITY**
-
-- Android bundle ID: `com.audioura.app` (different from iOS `com.glikfamily.audioura`)
-- Android build config: `android/app/build.gradle.kts` — minSdk 24, compileSdk 35, debug keystore committed
-- Android Q onboarding doc: `android_q_onboarding.md` in Windows dev tree — give this to Android Amazon-Q
-- **Key Android risk**: stale path healing uses `/Documents/` marker (iOS-specific). Android paths may not need healing, or may need a different marker. Android Q must verify with reinstall test.
-- **Version sync rule**: iOS Q bumps `pubspec.yaml` version → Android Q pulls + builds. Android Q never bumps version independently.
-- **LF file warning applies on Windows**: `home_screen.dart`, `my_tours_screen.dart`, `tour_generator_screen.dart` — Python-only edits on Windows.
+- Android bundle ID: `com.audioura.app` (iOS is `com.glikfamily.audioura`)
+- `android/app/build.gradle.kts` — minSdk 24, compileSdk 35, debug keystore committed
+- Onboarding doc: `android_q_onboarding.md` — give to Android Q
+- **Key risk**: stale path healing uses `/Documents/` marker (iOS-specific). Android Q must verify with reinstall test.
+- **Version sync**: iOS Q bumps `pubspec.yaml` → Android Q pulls + builds. Android Q never bumps independently.
 
 ---
 
-**Last Updated**: 2026-06-02 — v102.0. iPhone on v1.2.9+68 (A#76 complete). A#77 (+69) built but failed — wrong Refresh button. A#77b real fix at `4948178` — `_manualRefresh()` replaced with in-place `_loadAppMode()`. Claude approved (`claude_review_a77b_2026_06_02.md`). Extra smoke test: Refresh while in selection mode. Ready to build as v1.2.9+70.
-**iOS Amazon-Q Version**: 102.0
+**Last Updated**: 2026-06-02 — v103.0. iPhone on v1.2.9+68. A#77b ready to build as v1.2.9+70 — `_manualRefresh()` in `my_tours_screen.dart` replaced with `_loadAppMode()` in-place reload (commit `4948178`, Claude approved). pubspec in dev tree at `1.2.9+69` (Mac Mini bumps to +70 during build).
+**iOS Amazon-Q Version**: 103.0
