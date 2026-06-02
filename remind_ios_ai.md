@@ -23,7 +23,9 @@ This is required so the user can identify which Amazon-Q tab they are talking to
 - `home_screen.dart` (+69) — removed `setState(() { _isLoading = true; })` from newsletter Refresh handler. Correct cleanup but not the black screen cause.
 - `my_tours_screen.dart` (+70) — `_manualRefresh()` replaced. Old code called `Navigator.of(context).pop()` which disposed the State, then `addPostFrameCallback` `if (mounted)` evaluated false and `pushReplacement` never ran → black screen. New code: `await _loadAppMode()` in-place reload. No navigation teardown.
 
-**Key smoke test:** Audio mode → Listen tab → tap Refresh → list reloads in place, no black screen. Log must show `LISTEN: Manual refresh triggered`.
+**Key smoke test:** Audio mode → Listen tab → tap Refresh → list reloads in place, no black screen. Log must show `LISTEN: Manual refresh triggered` followed by `LISTEN: Loading N articles from storage` / `LISTEN: Successfully loaded N articles`.
+**Extra test (Claude Q3):** Enter Select Articles mode on Listen tab → select some → tap Refresh → must not crash, selection exits cleanly, list reloads.
+**Claude review:** ✅ Approved `4948178`. No blocking issues. `onPressed: () => _manualRefresh()` is valid Dart. Double-tap re-entrancy is harmless. Selection-mode risk is pre-existing, not a blocker.
 
 **Mac Mini runs:**
 ```bash
@@ -271,7 +273,7 @@ GET http://192.168.0.218:5005/download-tour/<translated_id>  → ZIP file
 - **Config class**: `lib/config.dart` — `Config.defaultServerIp = '192.168.0.218'`
 - **InAppWebView API**: v6 uses `initialSettings: InAppWebViewSettings(...)`. v5 `initialOptions`/`InAppWebViewGroupOptions` is BANNED.
 - **Stale container paths**: iOS reassigns app container UUID on reinstall. Tours healed in `my_tours_screen._healTourPaths()`. News articles healed in `my_news_screen._loadNews()` + `news_player_screen._getIndexUrl()`.
-- **pubspec.yaml version**: `1.2.9+65` in dev tree and on iPhone.
+- **pubspec.yaml version**: `1.2.9+68` in dev tree. iPhone on +68. Next build targets +70.
 - **Flutter project path on Mac Mini**: `~/Development/Audioura-build/development/audio_tour_app/` (has `development/` subdirectory — different from earlier assignments).
 
 ---
@@ -305,7 +307,9 @@ cd ~/Development/Audioura-build/development/audio_tour_app && flutter clean && f
 | `lib/screens/tour_generator_screen.dart` | Translation + player navigation. LF. |
 | `lib/screens/debug_log_viewer_screen.dart` | Contains `DebugLogHelper` class |
 | `lib/config.dart` | `Config.defaultServerIp = '192.168.0.218'` |
-| `D:\Audioura\assignments\mac_mini_assignments.md` | A#76 block at top. Git mirror: `usb/Audioura/assignments/mac_mini_assignments.md` |
+| `D:\Audioura\assignments\mac_mini_assignments.md` | A#77b block at top. Git mirror: `usb/Audioura/assignments/mac_mini_assignments.md` |
+| `C:\Users\micha\eclipse-workspace\AudioTours\development\a77b_review_request_for_claude.md` | A#77b Claude review request |
+| `C:\Users\micha\eclipse-workspace\AudioTours\development\claude_review_a77b_2026_06_02.md` | Claude review response — approved, no blockers |
 | `C:\Users\micha\eclipse-workspace\AudioTours\development\usb\Audioura\` | Git mirror of full USB contents (assignments, assets, scripts, archive) |
 | `D:\Audioura\scripts\build_install_launch.sh` | Proven stable build script |
 | `C:\Users\micha\eclipse-workspace\AudioTours\development\build_process_for_ios_q.md` | Build process rules |
@@ -331,5 +335,5 @@ cd ~/Development/Audioura-build/development/audio_tour_app && flutter clean && f
 
 ---
 
-**Last Updated**: 2026-06-02 — v101.0. iPhone on v1.2.9+68 (A#76 complete). A#77 (+69) built but failed smoke test — fixed wrong Refresh button. A#77b real fix committed at 4948178 — `_manualRefresh()` in `my_tours_screen.dart` replaced with in-place `_loadAppMode()` reload. Ready to build as v1.2.9+70.
-**iOS Amazon-Q Version**: 101.0
+**Last Updated**: 2026-06-02 — v102.0. iPhone on v1.2.9+68 (A#76 complete). A#77 (+69) built but failed — wrong Refresh button. A#77b real fix at `4948178` — `_manualRefresh()` replaced with in-place `_loadAppMode()`. Claude approved (`claude_review_a77b_2026_06_02.md`). Extra smoke test: Refresh while in selection mode. Ready to build as v1.2.9+70.
+**iOS Amazon-Q Version**: 102.0
