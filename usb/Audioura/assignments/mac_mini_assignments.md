@@ -1,24 +1,31 @@
 # Mac Mini Assignment Instructions
 ## iOS Development Task Execution
 
-# T: 06/2026 - A#77 — Build v1.2.9+69 (Newsletter Refresh Black Screen Fix)
+# T: 06/2026 - A#77b — Build v1.2.9+70 (Listen Page Refresh Black Screen — Real Fix)
 
-**Goal:** Build v1.2.9+69 on iPhone. The fix is already committed to `services-migration` at `4dba042`. This is a one-line removal — Mac Mini only needs to pull, bump pubspec, build, and smoke test.
+**Goal:** Build v1.2.9+70 on iPhone. Two commits are already in `services-migration` — `4dba042` (A#77 original, +69) and `4948178` (A#77b real fix, +70). Mac Mini needs to pull, bump pubspec to +70, build, and smoke test.
+
+**Background — why two commits:**
+- A#77 (+69) removed `setState(_isLoading=true)` from the Newsletter screen's Refresh handler in `home_screen.dart`. That was a correct cleanup but NOT the cause of the black screen.
+- The actual black screen came from the **Listen page** (`my_tours_screen.dart`) — its `_manualRefresh()` called `Navigator.of(context).pop()` to remove the screen, then tried `pushReplacement` in a `addPostFrameCallback`. But once popped, `mounted == false`, so the re-push never ran. Screen gone, nothing replaced it → black screen.
+- A#77b (`4948178`) replaces that broken pop/push dance with a simple `await _loadAppMode()` in-place reload.
 
 **What changed:**
 
 | Version | File | Change |
 |---------|------|--------|
-| +69 | `home_screen.dart` | Removed `setState(() { _isLoading = true; })` from newsletter Refresh button handler in `_buildNewsletterView` |
+| +69 | `home_screen.dart` | Removed `setState(() { _isLoading = true; })` from newsletter Refresh in `_buildNewsletterView` (correct cleanup, not the black screen cause) |
 | +69 | `pubspec.yaml` | `1.2.9+68` → `1.2.9+69` |
+| +70 | `my_tours_screen.dart` | `_manualRefresh()` replaced — no more pop/pushReplacement. Now: log + `if (!mounted) return` + `await _loadAppMode()` |
+| +70 | `pubspec.yaml` | `1.2.9+69` → `1.2.9+70` |
 
-**Root cause of black screen:** Setting `_isLoading = true` triggered the Tours-mode spinner scaffold to render while the app was in Audio/Newsletter mode. No recovery path — only kill + restart. Fix: remove that setState call entirely; the `_newsController.refresh()` call below it handles the reload.
+**Root cause of black screen:** `_manualRefresh()` called `Navigator.of(context).pop()` first, which disposed the State. The `addPostFrameCallback` condition `if (mounted)` then evaluated false — the re-push never ran. The Listen page was gone with nothing in its place.
 
 **Roles:**
 - **[SIR MICHAEL]** — orchestrator. Switches KVM, runs smoke test, syncs Windows afterward.
 - **[MAC MINI Q]** — pulls latest, bumps pubspec, builds, commits.
 
-**Version target:** v1.2.9+69  **Branch:** `services-migration`  **Time:** ~20 minutes
+**Version target:** v1.2.9+70  **Branch:** `services-migration`  **Time:** ~20 minutes
 
 ---
 
@@ -52,32 +59,39 @@ If pull fails with "local changes would be overwritten," STOP and report. Do not
 ```bash
 cd ~/Development/Audioura-build/development/audio_tour_app
 
-# 3a — pubspec still at +68 (not yet bumped)
+# 3a — pubspec still at +69 (not yet bumped to +70)
 grep "^version:" pubspec.yaml
-# Expected: version: 1.2.9+68
+# Expected: version: 1.2.9+69
 
-# 3b — confirm the offending setState is GONE from home_screen.dart
-grep -n "_isLoading = true" lib/screens/home_screen.dart
-# Expected: zero or only lines NOT in _buildNewsletterView refresh handler
-# (There should be no line that sets _isLoading=true inside the newsletter Refresh onPressed)
+# 3b — confirm NEW _manualRefresh is in place (in-place reload, no pop)
+grep -n "_manualRefresh\|_loadAppMode\|addPostFrameCallback" lib/screens/my_tours_screen.dart
+# Expected:
+#   line ~53: Future<void> _manualRefresh() async {
+#   line ~56: await _loadAppMode();
+#   line ~62: _loadAppMode();   (from initState)
+#   NO addPostFrameCallback line
 
-# 3c — confirm _newsController.refresh() is still present
-grep -n "_newsController.refresh" lib/screens/home_screen.dart
-# Expected: at least 1 match
+# 3c — confirm Navigator.of(context).pop() is GONE from _manualRefresh
+grep -n "Navigator.of(context).pop" lib/screens/my_tours_screen.dart
+# Expected: zero matches (or only in dialog handlers, not in _manualRefresh)
+
+# 3d — confirm LISTEN log line is present
+grep -n "LISTEN: Manual refresh triggered" lib/screens/my_tours_screen.dart
+# Expected: 1 match
 ```
 
-If check 3b shows `_isLoading = true` inside the newsletter refresh handler, STOP and report.
+If 3b shows `addPostFrameCallback` or 3c shows a pop in `_manualRefresh`, STOP and report.
 
-## Step 4 — [MAC MINI Q] Bump pubspec to +69
+## Step 4 — [MAC MINI Q] Bump pubspec to +70
 
 ```bash
 cd ~/Development/Audioura-build/development/audio_tour_app
-sed -i '' 's/^version: 1.2.9+68/version: 1.2.9+69/' pubspec.yaml
+sed -i '' 's/^version: 1.2.9+69/version: 1.2.9+70/' pubspec.yaml
 grep "^version:" pubspec.yaml
-# Must print: version: 1.2.9+69
+# Must print: version: 1.2.9+70
 ```
 
-If grep does not show `+69`, STOP and report.
+If grep does not show `+70`, STOP and report.
 
 ## Step 5 — [MAC MINI Q] Verify Xcode signing ⚠️ REQUIRED BEFORE BUILD
 
@@ -110,17 +124,19 @@ If build FAILS: copy `~/Desktop/full_a28_session.txt` and `~/Desktop/a28_flutter
 
 ## Step 7 — [SIR MICHAEL] Smoke test on iPhone (STOP HERE FOR Q)
 
-**Test 1 — Newsletter Refresh (primary fix):**
-1. Tap the **Audio/Newsletter tab** (not Tours mode).
-2. Tap **Refresh** in the newsletter view.
-3. **Expected:** Newsletter list reloads cleanly. No black screen. No spinner takeover.
-4. Tap Refresh a second time to confirm it's repeatable.
-5. Black screen or no response = fix did not land. STOP.
+**Test 1 — Listen page Refresh (primary fix):**
+1. Switch to **Audio mode** (so Listen tab shows news articles).
+2. Go to **Listen tab**.
+3. Tap **Refresh** (the refresh icon in the top AppBar of the Listen page).
+4. **Expected:** Article list reloads in place. No black screen. Screen stays intact.
+5. Tap Refresh a second time — must stay stable.
+6. Black screen or freeze = fix did not land. STOP.
+7. Open **About → Debug Log**. Confirm line `LISTEN: Manual refresh triggered` appears, followed by `LISTEN: Loading N articles from storage` / `LISTEN: Successfully loaded N articles`. Absence of these log lines = handler still broken.
 
-**Test 2 — Tours mode not broken:**
-1. Switch to **Tours mode** (Listen tab).
-2. Navigate normally — tour list loads.
-3. No regression in spinner or loading behavior.
+**Test 2 — Newsletter screen Refresh still works:**
+1. Tap the **Home/Newsletter tab** (Audio mode).
+2. Tap **Refresh** in the newsletter screen (top AppBar).
+3. **Expected:** Newsletter list reloads. No black screen.
 
 **Test 3 — Regression:**
 1. Open a tour → confirm it still plays audio normally.
@@ -134,7 +150,7 @@ Tell Q "Smoke test passes, proceed to Step 8" if all three pass.
 ```bash
 cd ~/Development/Audioura-build
 git add development/audio_tour_app/pubspec.yaml
-git commit -m "v1.2.9+69 — A#77 bump pubspec (fix already in 4dba042)"
+git commit -m "v1.2.9+70 — A#77b bump pubspec (_manualRefresh in-place reload fix)"
 git push origin services-migration
 ```
 
@@ -143,23 +159,24 @@ git push origin services-migration
 ## Step 9 — [MAC MINI Q] Copy results and eject
 
 ```bash
-echo "A#77 Results:" > ~/Desktop/a77_results.txt
-echo "Date: $(date)" >> ~/Desktop/a77_results.txt
-echo "Build: [SUCCESS/FAILED]" >> ~/Desktop/a77_results.txt
-echo "Newsletter Refresh no black screen: [YES/NO]" >> ~/Desktop/a77_results.txt
-echo "Tours mode loads (no regression): [YES/NO]" >> ~/Desktop/a77_results.txt
-echo "Tour audio plays (no regression): [YES/NO]" >> ~/Desktop/a77_results.txt
-echo "News article loads (no regression): [YES/NO]" >> ~/Desktop/a77_results.txt
-echo "POI map opens (no regression): [YES/NO]" >> ~/Desktop/a77_results.txt
-echo "git push: [SUCCESS/FAILED]" >> ~/Desktop/a77_results.txt
-echo "Overall: [SUCCESS/PARTIAL/FAILED]" >> ~/Desktop/a77_results.txt
-cp ~/Desktop/a77_results.txt "/Volumes/USB DISK/Audioura/results/"
+echo "A#77b Results:" > ~/Desktop/a77b_results.txt
+echo "Date: $(date)" >> ~/Desktop/a77b_results.txt
+echo "Build: [SUCCESS/FAILED]" >> ~/Desktop/a77b_results.txt
+echo "Listen page Refresh no black screen: [YES/NO]" >> ~/Desktop/a77b_results.txt
+echo "LISTEN: Manual refresh triggered log present: [YES/NO]" >> ~/Desktop/a77b_results.txt
+echo "Newsletter Refresh no black screen: [YES/NO]" >> ~/Desktop/a77b_results.txt
+echo "Tour audio plays (no regression): [YES/NO]" >> ~/Desktop/a77b_results.txt
+echo "News article loads (no regression): [YES/NO]" >> ~/Desktop/a77b_results.txt
+echo "POI map opens (no regression): [YES/NO]" >> ~/Desktop/a77b_results.txt
+echo "git push: [SUCCESS/FAILED]" >> ~/Desktop/a77b_results.txt
+echo "Overall: [SUCCESS/PARTIAL/FAILED]" >> ~/Desktop/a77b_results.txt
+cp ~/Desktop/a77b_results.txt "/Volumes/USB DISK/Audioura/results/"
 diskutil eject "/Volumes/USB DISK"
 ```
 
 ## Step 10 — [MAC MINI Q] Report Results
 
-> "Assignment 77 complete. Build: [SUCCESS/FAILED]. Newsletter Refresh no black screen: [YES/NO]. Tours regression: [YES/NO]. git push: [SUCCESS/FAILED]. Overall: [SUCCESS/PARTIAL/FAILED]."
+> "Assignment 77b complete. Build: [SUCCESS/FAILED]. Listen page Refresh no black screen: [YES/NO]. LISTEN log present: [YES/NO]. Newsletter Refresh clean: [YES/NO]. git push: [SUCCESS/FAILED]. Overall: [SUCCESS/PARTIAL/FAILED]."
 
 ## Step 11 — [SIR MICHAEL, back on Windows] Sync
 
@@ -168,7 +185,7 @@ cd C:\Users\micha\eclipse-workspace\AudioTours\development
 git pull origin services-migration
 ```
 
-Verify `audio_tour_app\pubspec.yaml` shows `version: 1.2.9+69`.
+Verify `audio_tour_app\pubspec.yaml` shows `version: 1.2.9+70`.
 
 ---
 

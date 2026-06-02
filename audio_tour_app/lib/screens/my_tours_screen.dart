@@ -1029,8 +1029,8 @@ class _MyToursScreenState extends State<MyToursScreen> {
           ),
           IconButton(
             icon: Icon(Icons.refresh),
-            onPressed: _manualRefresh,
-            tooltip: 'Manual Refresh (Test Navigation Reset)',
+            onPressed: () => _manualRefresh(),
+            tooltip: 'Refresh',
           ),
           if (_filteredNews.isNotEmpty)
             IconButton(
