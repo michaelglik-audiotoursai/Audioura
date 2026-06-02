@@ -40,8 +40,7 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10):
             "total_stops": total_stops,
         })
         
-        ACTIVE_JOBS[job_id]["status"] = "processing"
-        ACTIVE_JOBS[job_id]["progress"] = "Starting tour text generation..."
+        ACTIVE_JOBS.update(job_id, status="processing", progress="Starting tour text generation...")
         
         # Create a temporary file for the output
         with tempfile.NamedTemporaryFile(delete=False, suffix='.txt') as temp_file:
@@ -59,8 +58,8 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10):
         tour_text, _, coordinates = generate_tour_text(location, tour_type, temp_path, total_stops)
         
         if tour_text is None:
-            ACTIVE_JOBS[job_id]["status"] = "error"
-            ACTIVE_JOBS[job_id]["error"] = f"Tour generation failed for '{location}' — no stops could be generated (all filtered or knowledge insufficient)."
+            ACTIVE_JOBS.update(job_id, status="error",
+                              error=f"Tour generation failed for '{location}' — no stops could be generated (all filtered or knowledge insufficient).")
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
             return
@@ -79,24 +78,22 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10):
         # Clean up the temporary file
         os.unlink(temp_path)
         
-        # Update job status
-        ACTIVE_JOBS[job_id]["status"] = "completed"
-        ACTIVE_JOBS[job_id]["progress"] = "Tour text generation completed successfully!"
-        ACTIVE_JOBS[job_id]["output_file"] = output_filename
-        ACTIVE_JOBS[job_id]["coordinates"] = coordinates
-        
-        # Store tour content for HTTP-based delivery (Cloud Run mode)
-        # This allows the orchestrator to pass content directly to modernized service
-        # without reading from the shared volume
+        # Update job status — use .update() for database-mode compatibility
+        tour_content_str = None
         try:
             with open(output_path, 'r', encoding='utf-8') as f:
-                ACTIVE_JOBS[job_id]["tour_content"] = f.read()
+                tour_content_str = f.read()
         except Exception as content_err:
-            print(f"Warning: Could not store tour_content in job: {content_err}")
+            print(f"Warning: Could not read tour_content: {content_err}")
+        
+        ACTIVE_JOBS.update(job_id, status="completed",
+                          progress="Tour text generation completed successfully!",
+                          output_file=output_filename,
+                          coordinates=coordinates,
+                          **({"tour_content": tour_content_str} if tour_content_str else {}))
         
     except Exception as e:
-        ACTIVE_JOBS[job_id]["status"] = "error"
-        ACTIVE_JOBS[job_id]["error"] = str(e)
+        ACTIVE_JOBS.update(job_id, status="error", error=str(e))
 
 @app.route('/health', methods=['GET'])
 def health_check():

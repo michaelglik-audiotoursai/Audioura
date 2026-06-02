@@ -1498,36 +1498,39 @@ def get_edit_info(tour_id):
             "suggested_action": "Please verify the tour ID and try again, or contact support"
         }), 404
     
-    stops = []
-    text_files = sorted(tour_path.glob("audio_*.txt"), key=lambda x: int(x.stem.split('_')[1]))
-    
-    for text_file in text_files:
-        stop_number = int(text_file.stem.split('_')[1])
-        try:
-            with open(text_file, 'r', encoding='utf-8') as f:
-                text_content = f.read().strip()
-            
-            # Check audio source
-            audio_source = "tts_generated"
-            if has_custom_audio(tour_id, stop_number):
-                audio_source = "user_recorded"
-            
-            stops.append({
-                "stop_number": stop_number,
-                "text_content": text_content,
-                "audio_file": f"audio_{stop_number}.mp3",
-                "generate_audio_from_text": True,  # Default for existing tours
-                "audio_source": audio_source,
-                "editable": True
-            })
-        except Exception as e:
-            print(f"Error reading {text_file}: {e}")
-    
-    return jsonify({
-        "tour_id": tour_id,
-        "tour_name": tour_id.replace('_', ' ').title(),
-        "stops": stops
-    })
+    try:
+        stops = []
+        text_files = sorted(tour_path.glob("audio_*.txt"), key=lambda x: int(x.stem.split('_')[1]))
+        
+        for text_file in text_files:
+            stop_number = int(text_file.stem.split('_')[1])
+            try:
+                with open(text_file, 'r', encoding='utf-8') as f:
+                    text_content = f.read().strip()
+                
+                # Check audio source
+                audio_source = "tts_generated"
+                if has_custom_audio(tour_id, stop_number):
+                    audio_source = "user_recorded"
+                
+                stops.append({
+                    "stop_number": stop_number,
+                    "text_content": text_content,
+                    "audio_file": f"audio_{stop_number}.mp3",
+                    "generate_audio_from_text": True,  # Default for existing tours
+                    "audio_source": audio_source,
+                    "editable": True
+                })
+            except Exception as e:
+                print(f"Error reading {text_file}: {e}")
+        
+        return jsonify({
+            "tour_id": tour_id,
+            "tour_name": tour_id.replace('_', ' ').title(),
+            "stops": stops
+        })
+    finally:
+        cleanup_tmp_tour_path(tour_path)
 
 @app.route('/tour/<tour_id>/download', methods=['GET'])
 def download_tour_with_flags(tour_id):

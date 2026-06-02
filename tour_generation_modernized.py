@@ -308,19 +308,18 @@ self.addEventListener('install', function(event) {
 def generate_modernized_tour_async(job_id, tour_file_path):
     """Generate modernized tour from existing tour text file"""
     try:
-        ACTIVE_JOBS[job_id]["status"] = "processing"
-        ACTIVE_JOBS[job_id]["progress"] = "Processing tour text file..."
+        ACTIVE_JOBS.update(job_id, status="processing", progress="Processing tour text file...")
         
         # Read the tour text file
         with open(tour_file_path, 'r', encoding='utf-8') as f:
             tour_content = f.read()
         
         # Parse the tour content using the same logic as the working system
-        ACTIVE_JOBS[job_id]["progress"] = "Parsing tour content..."
+        ACTIVE_JOBS.update(job_id, progress="Parsing tour content...")
         modernized_data = parse_tour_content_to_modernized(tour_content)
         
         # Generate audio using TTS service
-        ACTIVE_JOBS[job_id]["progress"] = "Generating audio files..."
+        ACTIVE_JOBS.update(job_id, progress="Generating audio files...")
         audio_files = []
         for i, text_content in enumerate(modernized_data["text_content"], 1):
             try:
@@ -345,17 +344,15 @@ def generate_modernized_tour_async(job_id, tour_file_path):
         modernized_data["audio_files"] = audio_files
         
         # Step 3: Create modernized ZIP
-        ACTIVE_JOBS[job_id]["progress"] = "Creating modernized tour ZIP..."
+        ACTIVE_JOBS.update(job_id, progress="Creating modernized tour ZIP...")
         zip_filename = create_modernized_tour_zip(modernized_data, job_id)
         
-        ACTIVE_JOBS[job_id]["status"] = "completed"
-        ACTIVE_JOBS[job_id]["progress"] = "Modernized tour created successfully!"
-        ACTIVE_JOBS[job_id]["output_zip"] = zip_filename
-        ACTIVE_JOBS[job_id]["modernized"] = True
+        ACTIVE_JOBS.update(job_id, status="completed",
+                          progress="Modernized tour created successfully!",
+                          output_zip=zip_filename, modernized=True)
         
     except Exception as e:
-        ACTIVE_JOBS[job_id]["status"] = "error"
-        ACTIVE_JOBS[job_id]["error"] = str(e)
+        ACTIVE_JOBS.update(job_id, status="error", error=str(e))
 
 def parse_tour_content_to_modernized(tour_content):
     """Parse tour text content into modernized structure"""
@@ -402,19 +399,16 @@ def parse_tour_content_to_modernized(tour_content):
 def process_modernized_tour_async(job_id, tour_data):
     """Process tour with modernized structure"""
     try:
-        ACTIVE_JOBS[job_id]["status"] = "processing"
-        ACTIVE_JOBS[job_id]["progress"] = "Creating modernized tour structure..."
+        ACTIVE_JOBS.update(job_id, status="processing", progress="Creating modernized tour structure...")
         
         zip_filename = create_modernized_tour_zip(tour_data, job_id)
         
-        ACTIVE_JOBS[job_id]["status"] = "completed"
-        ACTIVE_JOBS[job_id]["progress"] = "Modernized tour created successfully!"
-        ACTIVE_JOBS[job_id]["output_zip"] = zip_filename
-        ACTIVE_JOBS[job_id]["modernized"] = True
+        ACTIVE_JOBS.update(job_id, status="completed",
+                          progress="Modernized tour created successfully!",
+                          output_zip=zip_filename, modernized=True)
         
     except Exception as e:
-        ACTIVE_JOBS[job_id]["status"] = "error"
-        ACTIVE_JOBS[job_id]["error"] = str(e)
+        ACTIVE_JOBS.update(job_id, status="error", error=str(e))
 
 @app.route('/health', methods=['GET'])
 def health_check():
