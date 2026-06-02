@@ -290,6 +290,80 @@ Example: For "Paul Revere House" and poi_type "restaurant":
         print(f"POI verification error: {e}")
         return {"matches": True, "reason": "verification failed", "confidence": "low"}
 
+
+def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12):
+    """
+    PHASE 5.6 — Geographic-scope containment guard.
+
+    Runs when the request is bounded to a tight named place (BUILDING/DISTRICT scope)
+    but no museum venue_name was detected, so PHASE 5.5b did not fire.
+    Verifies every generated stop is actually inside scope_name and removes
+    famous-but-out-of-scope landmarks (e.g. "Walden Pond" for a "Robbins House" request).
+
+    Checks EVERY stop (no institution-marker pre-filter), because out-of-scope
+    landmarks usually have no institutional marker in their names.
+    Stop 0 is kept unconditionally (graceful degradation). Original order preserved.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    if not poi_list or not scope_name:
+        return poi_list
+
+    def _check_one(poi):
+        name = poi.get('name', '')
+        desc = (poi.get('description', '') or '')[:400]
+        prompt = (
+            f"You are a geography fact-checker for location tours.\n"
+            f"The tour must stay strictly within: '{scope_name}'.\n"
+            f"Stop name: '{name}'\n"
+            f"Description snippet:\n{desc}\n\n"
+            f"Question: Is this stop physically located INSIDE or within the bounds of "
+            f"'{scope_name}'? A stop that is in the same town but OUTSIDE '{scope_name}' "
+            f"is NOT inside.\n"
+            "Respond ONLY with valid JSON:\n"
+            '{"inside_scope": true/false, "confidence": "high/medium/low", "reason": "<brief>"}'
+        )
+        data = {
+            "model": "gpt-3.5-turbo",
+            "messages": [
+                {"role": "system", "content": "You are a geography fact-checker. Respond only with valid JSON."},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.1,
+            "max_tokens": 60,
+        }
+        try:
+            resp = requests.post("https://api.openai.com/v1/chat/completions",
+                                headers=headers, data=json.dumps(data))
+            if resp.status_code != 200:
+                return poi, True, "low", f"API error {resp.status_code} - keeping"
+            parsed = json.loads(resp.json()["choices"][0]["message"]["content"])
+            return (poi, parsed.get("inside_scope", True),
+                    parsed.get("confidence", "low"), parsed.get("reason", ""))
+        except Exception as e:
+            return poi, True, "low", f"check error: {e}"
+
+    first_stop = poi_list[0]
+    candidates = poi_list[1:1 + max_check]
+    tail = poi_list[1 + max_check:]
+
+    survivors = []
+    if candidates:
+        with ThreadPoolExecutor(max_workers=min(len(candidates), 5)) as ex:
+            futures = {ex.submit(_check_one, p): p for p in candidates}
+            results = [f.result() for f in as_completed(futures)]
+        results.sort(key=lambda x: candidates.index(x[0]))
+        for poi, inside, conf, reason in results:
+            if inside or conf == "low":
+                survivors.append(poi)
+                print(f"   OK '{poi['name']}' — inside '{scope_name}': {reason}")
+            else:
+                print(f"   X SCOPE-CHECK REMOVED '{poi['name']}' — outside '{scope_name}': {reason}")
+
+    kept = [first_stop] + survivors + tail
+    return kept
+
+
 def _classify_tour_category(location, tour_type):
     """
     Detect the appropriate tour template based on location and tour_type.
@@ -554,6 +628,23 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
             intent['venue_name'] = None
         elif raw_venue:
             print(f"  [venue_name sanity] '{raw_venue}' OK")
+        
+        # Venue promotion: when venue_name is null but request uses interior preposition
+        # and scope ends in an institutional building noun, promote scope to venue_name.
+        # This catches "tour IN Robbins House and Monument Square museum" patterns.
+        # Does NOT promote district nouns (square, campus, area) — those stay as scope.
+        if not intent.get('venue_name'):
+            _req_lower = (location or '').lower()
+            _scope = (intent.get('geographic_scope') or '').strip()
+            _INSTITUTION_TAIL = ('museum', 'house', 'gallery', 'library',
+                                 'homestead', 'mansion', 'estate', 'manse')
+            _interior = re.search(r'\b(in|inside|within|of)\b', _req_lower)
+            if (_interior and _scope
+                    and _scope.strip().lower().rstrip('.').split()[-1] in _INSTITUTION_TAIL
+                    and intent.get('scope_precision', '').upper() in ('BUILDING', 'DISTRICT')):
+                intent['venue_name'] = _scope
+                print(f"  [venue promotion] scope '{_scope}' promoted to venue_name "
+                      f"(interior preposition + institutional noun)")
         
         # If PHASE 1 identified a specific venue AND the location string does not
         # explicitly request a non-museum tour type, force museum category.
@@ -1474,6 +1565,21 @@ DO NOT include directions to the next stop - these will be added separately.
         poi_list = _validate_museum_stop_descriptions(poi_list, _museum_venue_name, headers)
         # Stop 0 is always kept by _validate_museum_stop_descriptions, so len >= 1
         print(f"OK PHASE 5.5b: {len(poi_list)} stop(s) passed venue description validation")
+
+    # PHASE 5.6: Geographic-scope containment — only when the museum guard did NOT run
+    if not (tour_category == 'museum' and _museum_venue_name):
+        # Use geographic_scope if precision is tight enough (BUILDING or DISTRICT)
+        _scope_for_check = ''
+        if intent and intent.get('geographic_scope') and intent.get('scope_precision', '').upper() in ('BUILDING', 'DISTRICT'):
+            _scope_for_check = intent['geographic_scope']
+        if _scope_for_check:
+            _before = len(poi_list)
+            print(f"\nPHASE 5.6: Validating stops are within '{_scope_for_check}'...")
+            poi_list = _validate_stops_within_scope(poi_list, _scope_for_check, headers)
+            print(f"OK PHASE 5.6: {len(poi_list)}/{_before} stop(s) within scope")
+            if len(poi_list) <= max(1, _before // 2):
+                print(f"  [PHASE 5.6] >50% of stops were outside '{_scope_for_check}' — "
+                      f"scope is likely a small single venue; delivering {len(poi_list)} verified stop(s).")
 
     # PHASE 6: Assemble the complete tour
     print(f"\nPHASE 6: Assembling the complete tour...")
