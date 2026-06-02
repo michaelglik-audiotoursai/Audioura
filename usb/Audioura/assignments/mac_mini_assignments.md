@@ -3,14 +3,15 @@
 
 # T: 06/2026 - A#78 — Build v1.2.9+71 (Listen Page Microphone Voice Search Fix)
 
-**Goal:** Build v1.2.9+71 on iPhone. Fix already committed at `df6b61b`. One block removed from `my_tours_screen.dart`.
+**Goal:** Build v1.2.9+71 on iPhone. Two commits already in `services-migration` — `df6b61b` (A#78 fix) and `92d0175` (A#78b import cleanup per Claude review Q2).
 
 **What changed:**
 
-| Version | File | Change |
-|---------|------|--------|
-| +71 | `my_tours_screen.dart` | Removed redundant `Permission.microphone.request()` block from `_startVoiceSearch()` |
-| +71 | `pubspec.yaml` | `1.2.9+70` → `1.2.9+71` |
+| Version | File | Change | Commit |
+|---------|------|--------|--------|
+| +71 | `my_tours_screen.dart` | Removed redundant `Permission.microphone.request()` block from `_startVoiceSearch()` | `df6b61b` |
+| +71 | `my_tours_screen.dart` | Removed now-dead `permission_handler` import (line 8) — Claude review Q2 | `92d0175` |
+| +71 | `pubspec.yaml` | `1.2.9+70` → `1.2.9+71` | Mac Mini bumps |
 
 **Root cause:** `_setupVoiceCommands()` calls `_speechToText.initialize()` which internally acquires microphone permission via iOS's speech recognition framework. Then `_startVoiceSearch()` called `Permission.microphone.request()` again via the `permission_handler` plugin — a different permission pathway. iOS considers the permission already handled; `permission_handler` sees it as denied from its own perspective and returns not-granted. Fix: remove the redundant block. `_speechEnabled == true` (set by `initialize()`) is sufficient proof the mic is available.
 
@@ -54,9 +55,13 @@ grep -n "microphone.request\|Microphone permission required" lib/screens/my_tour
 # 3c — confirm _speechEnabled guard still present
 grep -n "_speechEnabled" lib/screens/my_tours_screen.dart
 # Expected: at least 2 matches (declaration + guard in _startVoiceSearch)
+
+# 3d — confirm permission_handler import is GONE (Claude review Q2 — commit 92d0175)
+grep -n "permission_handler" lib/screens/my_tours_screen.dart
+# Expected: zero matches
 ```
 
-If 3b shows any match, STOP and report.
+If 3b or 3d shows any match, STOP and report.
 
 ## Step 4 — [MAC MINI Q] Bump pubspec to +71
 
@@ -94,11 +99,17 @@ cd "/Volumes/USB DISK/Audioura/scripts"
 4. Say something (e.g. "Boston"). Expected: dialog closes, article list filters.
 5. Check debug log: `LISTEN: Voice search ...` line should appear.
 
+**Test 1b — Dialog timeout / no-speech (Claude review Q3 fast follow — observe only, not a blocker):**
+1. Tap microphone icon → Listening dialog appears.
+2. Say nothing for ~10 seconds.
+3. **Observe:** Does the dialog auto-close, or does it stay open with a permanent spinner? Log the result.
+4. Not a blocker for v1.2.9+71 — report outcome for A#79 planning.
+
 **Test 2 — Regression:**
 1. Listen page Refresh → list reloads, no black screen (A#77b regression).
 2. Open a tour → audio plays. Open a news article → loads. POI map icon → TourMapScreen opens.
 
-Tell Q "Smoke test passes, proceed to Step 8" if both pass.
+Tell Q "Smoke test passes, proceed to Step 8" if Tests 1 and 2 pass (Test 1b is observe-only).
 
 ## Step 8 — [MAC MINI Q] Commit and push
 
@@ -117,6 +128,7 @@ echo "Date: $(date)" >> ~/Desktop/a78_results.txt
 echo "Build: [SUCCESS/FAILED]" >> ~/Desktop/a78_results.txt
 echo "Mic dialog opens without permission error: [YES/NO]" >> ~/Desktop/a78_results.txt
 echo "Voice search filters articles: [YES/NO]" >> ~/Desktop/a78_results.txt
+echo "Dialog auto-closes on 10s timeout (observe only): [YES/NO/NOT_TESTED]" >> ~/Desktop/a78_results.txt
 echo "Listen Refresh no black screen (A#77b regression): [YES/NO]" >> ~/Desktop/a78_results.txt
 echo "git push: [SUCCESS/FAILED]" >> ~/Desktop/a78_results.txt
 echo "Overall: [SUCCESS/PARTIAL/FAILED]" >> ~/Desktop/a78_results.txt
@@ -126,7 +138,7 @@ diskutil eject "/Volumes/USB DISK"
 
 ## Step 10 — [MAC MINI Q] Report Results
 
-> "Assignment 78 complete. Build: [SUCCESS/FAILED]. Mic opens without error: [YES/NO]. Voice search works: [YES/NO]. A#77b regression: [YES/NO]. git push: [SUCCESS/FAILED]. Overall: [SUCCESS/PARTIAL/FAILED]."
+> "Assignment 78 complete. Build: [SUCCESS/FAILED]. Mic opens without error: [YES/NO]. Voice search works: [YES/NO]. Dialog timeout auto-close: [YES/NO/NOT_TESTED]. A#77b regression: [YES/NO]. git push: [SUCCESS/FAILED]. Overall: [SUCCESS/PARTIAL/FAILED]."
 
 ## Step 11 — [SIR MICHAEL, back on Windows] Sync
 
