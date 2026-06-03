@@ -154,10 +154,70 @@ def migrate_news_audios(r2, clear_bytea=False):
     print(f"\nnews_audios migration: {migrated} migrated, {failed} failed, {total - migrated - failed} skipped")
     return migrated
 
+
+def verify_migration(r2):
+    """Verify R2 objects match DB BYTEA sizes. Use before --clear."""
+    conn = get_db()
+    cur = conn.cursor()
+    
+    print("\n=== VERIFICATION: Comparing R2 object sizes to DB BYTEA sizes ===")
+    
+    mismatches = 0
+    verified = 0
+    
+    # Verify tours
+    cur.execute("SELECT id, tour_blob_uri, octet_length(audio_tour) FROM audio_tours WHERE tour_blob_uri IS NOT NULL AND audio_tour IS NOT NULL")
+    tour_rows = cur.fetchall()
+    print(f"\nVerifying {len(tour_rows)} tour objects...")
+    
+    for tour_id, blob_uri, db_size in tour_rows:
+        try:
+            head = r2.client.head_object(Bucket=r2.bucket, Key=blob_uri)
+            r2_size = head['ContentLength']
+            if r2_size != db_size:
+                print(f"  MISMATCH Tour {tour_id}: DB={db_size}, R2={r2_size}")
+                mismatches += 1
+            else:
+                verified += 1
+        except Exception as e:
+            print(f"  ERROR Tour {tour_id}: {e}")
+            mismatches += 1
+    
+    # Verify news
+    cur.execute("SELECT id, article_id, news_blob_uri, octet_length(news_article) FROM news_audios WHERE news_blob_uri IS NOT NULL AND news_article IS NOT NULL")
+    news_rows = cur.fetchall()
+    print(f"\nVerifying {len(news_rows)} news objects...")
+    
+    for row_id, article_id, blob_uri, db_size in news_rows:
+        try:
+            head = r2.client.head_object(Bucket=r2.bucket, Key=blob_uri)
+            r2_size = head['ContentLength']
+            if r2_size != db_size:
+                print(f"  MISMATCH News {str(article_id)[:12]}: DB={db_size}, R2={r2_size}")
+                mismatches += 1
+            else:
+                verified += 1
+        except Exception as e:
+            print(f"  ERROR News {str(article_id)[:12]}: {e}")
+            mismatches += 1
+    
+    cur.close()
+    conn.close()
+    
+    print(f"\n{'=' * 50}")
+    print(f"VERIFIED: {verified} objects match")
+    if mismatches:
+        print(f"MISMATCHES: {mismatches} — DO NOT run --clear until resolved!")
+    else:
+        print("✅ ALL objects verified — safe to --clear when ready")
+    return mismatches == 0
+
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='Migrate blobs from PostgreSQL to Cloudflare R2')
     parser.add_argument('--clear', action='store_true', help='NULL out BYTEA after successful upload (reclaims DB space)')
+    parser.add_argument('--verify', action='store_true', help='Verify R2 object sizes match DB BYTEA sizes (run before --clear)')
     parser.add_argument('--tours-only', action='store_true', help='Only migrate audio_tours')
     parser.add_argument('--news-only', action='store_true', help='Only migrate news_audios')
     args = parser.parse_args()
@@ -174,6 +234,10 @@ if __name__ == '__main__':
         sys.exit(1)
     
     print("R2 connectivity: OK")
+    
+    if args.verify:
+        verify_migration(r2)
+        sys.exit(0)
     
     total_migrated = 0
     

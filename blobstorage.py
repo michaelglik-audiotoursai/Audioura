@@ -50,6 +50,7 @@ class R2BlobStorage(BlobStorage):
 
     def __init__(self, endpoint=None, access_key=None, secret_key=None, bucket=None):
         import boto3
+        from botocore.config import Config
         from urllib.parse import urlparse
         self.bucket = bucket or os.getenv('R2_BUCKET', 'v1-audiotours-r2-bucket')
         access = access_key or os.getenv('R2_ACCESS_KEY_ID', '')
@@ -65,16 +66,21 @@ class R2BlobStorage(BlobStorage):
             endpoint_url=self.endpoint,
             aws_access_key_id=access,
             aws_secret_access_key=secret,
-            region_name='auto'
+            region_name='auto',
+            config=Config(
+                retries={'max_attempts': 3, 'mode': 'standard'},
+                connect_timeout=10,
+                read_timeout=30
+            )
         )
         logger.info(f"R2BlobStorage initialized: bucket={self.bucket}, endpoint={self.endpoint}")
 
     def upload(self, key: str, data: bytes) -> str:
-        """Upload to R2. Key format: 'tours/{tour_id}.zip' or 'news/{article_id}.zip'"""
+        """Upload to R2. Key format: 'tours/{tour_id}.zip' or 'news/{article_id}.zip'
+        Returns the bare key (same value stored in tour_blob_uri/news_blob_uri)."""
         self.client.put_object(Bucket=self.bucket, Key=key, Body=data)
-        uri = f"r2://{self.bucket}/{key}"
         logger.info(f"R2 upload: {key} ({len(data)} bytes)")
-        return uri
+        return key
 
     def download(self, key: str) -> bytes:
         """Download from R2."""
