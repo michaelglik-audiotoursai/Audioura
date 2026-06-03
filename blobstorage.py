@@ -50,10 +50,15 @@ class R2BlobStorage(BlobStorage):
 
     def __init__(self, endpoint=None, access_key=None, secret_key=None, bucket=None):
         import boto3
-        self.endpoint = endpoint or os.getenv('R2_ENDPOINT', '')
+        from urllib.parse import urlparse
         self.bucket = bucket or os.getenv('R2_BUCKET', 'v1-audiotours-r2-bucket')
         access = access_key or os.getenv('R2_ACCESS_KEY_ID', '')
         secret = secret_key or os.getenv('R2_SECRET_ACCESS_KEY', '')
+        
+        # R2 endpoint must be base URL only (no bucket path)
+        raw_endpoint = endpoint or os.getenv('R2_ENDPOINT', '')
+        parsed = urlparse(raw_endpoint)
+        self.endpoint = f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else raw_endpoint
 
         self.client = boto3.client(
             's3',
