@@ -190,6 +190,36 @@ def get_tours_near_location(lat, lng):
 
 
 
+@app.route('/tour/<download_id>/resolve', methods=['GET'])
+def resolve_tour_id(download_id):
+    """Resolve download ID to tour info (cloud-compatible version)"""
+    try:
+        if not download_id.isdigit():
+            return jsonify({"status": "error", "error_code": "INVALID_DOWNLOAD_ID", "message": f"Download ID must be numeric"}), 400
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT id, tour_name, tour_blob_uri FROM audio_tours WHERE id = %s AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL)", (int(download_id),))
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
+        
+        if not result:
+            return jsonify({"status": "error", "error_code": "TOUR_NOT_FOUND", "message": f"Tour {download_id} not found"}), 404
+        
+        tour_id, tour_name, blob_uri = result
+        return jsonify({
+            "status": "success",
+            "download_id": int(download_id),
+            "tour_id": str(tour_id),
+            "tour_name": tour_name,
+            "editable": False,
+            "has_audio": True
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @app.route('/download-tour/<tour_id>', methods=['GET'])
 def download_tour(tour_id):
     """Download a tour zip file by ID with version checking"""
