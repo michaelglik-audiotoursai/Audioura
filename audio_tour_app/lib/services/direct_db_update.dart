@@ -1,3 +1,6 @@
+// ⚠️ DEV ONLY — NEVER expose on Cloud Run. These endpoints issue raw SQL directly
+// to the database. Must never have public ingress. Guard: uses server_ip directly
+// (unreachable off-WiFi in cloud mode) — do NOT migrate to Endpoints resolver.
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';

@@ -1179,7 +1179,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<List<String>> _downloadTranslatedVersions(
     int tourId,
     List<String> languages,
-    String serverIp,
     String parentEditTourId,
   ) async {
     final failures = <String>[];
@@ -1249,7 +1248,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (nonEnglish.isEmpty) return [];
 
     final parentEditTourId = await _resolveParentEditTourId(tourId, prefs);
-    return await _downloadTranslatedVersions(tourId, nonEnglish, serverIp, parentEditTourId);
+    return await _downloadTranslatedVersions(tourId, nonEnglish, parentEditTourId);
   }
 
   Future<void> _downloadSingleTour(int tourId, [List<String>? languages]) async {
@@ -1302,7 +1301,7 @@ class _HomeScreenState extends State<HomeScreen> {
           );
 
           final parentEditTourId = await _resolveParentEditTourId(tourId, prefs);
-          final failures = await _downloadTranslatedVersions(tourId, nonEnglishLanguages, serverIp, parentEditTourId);
+          final failures = await _downloadTranslatedVersions(tourId, nonEnglishLanguages, parentEditTourId);
           translationFailures.addAll(failures);
 
           if (!mounted) return;
@@ -1963,8 +1962,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
       
-      final processUri2 = await Endpoints.url(Service.newsletter, '/process_newsletter');
-      final requestUrl = processUri2.toString();
+      final processUri = await Endpoints.url(Service.newsletter, '/process_newsletter');
+      final requestUrl = processUri.toString();
       final requestBody = {
         'newsletter_url': newsletterUrl,
         'user_id': deviceId,

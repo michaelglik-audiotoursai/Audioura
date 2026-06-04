@@ -28,6 +28,7 @@ class _AboutScreenState extends State<AboutScreen> {
   final TextEditingController _cloudBaseUrlController = TextEditingController();
   String _currentServerIp = '192.168.0.218';
   String _serverMode = 'local'; // 'local' or 'cloud'
+  bool _usePathPrefixes = false; // true = gateway mode (prefix routing)
   String _selectedMode = 'Tours';
 
   @override
@@ -80,6 +81,7 @@ class _AboutScreenState extends State<AboutScreen> {
       final savedIp = prefs.getString('server_ip') ?? '192.168.0.218';
       final savedServerMode = prefs.getString('server_mode') ?? 'local';
       final savedCloudBaseUrl = prefs.getString('cloud_base_url') ?? '';
+      final savedUsePathPrefixes = prefs.getBool('cloud_use_path_prefixes') ?? false;
       
       await DebugLogHelper.addDebugLog('ABOUT: Checking user: $userId');
       
@@ -115,6 +117,7 @@ class _AboutScreenState extends State<AboutScreen> {
         _serverIpController.text = savedIp;
         _serverMode = savedServerMode;
         _cloudBaseUrlController.text = savedCloudBaseUrl;
+        _usePathPrefixes = savedUsePathPrefixes;
       });
     } catch (e) {
       await DebugLogHelper.addDebugLog('ABOUT: Error loading app info: $e');
@@ -273,6 +276,21 @@ class _AboutScreenState extends State<AboutScreen> {
                       const Text(
                         '⚠️ Cloud mode: only map-delivery is deployed. Tour generation, news, and newsletters remain local.',
                         style: TextStyle(fontSize: 11, color: Colors.orange),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: _usePathPrefixes,
+                            onChanged: (val) => _setUsePathPrefixes(val ?? false),
+                          ),
+                          const Expanded(
+                            child: Text(
+                              'Use gateway path routing (enable only when audioura.com gateway is deployed)',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -492,6 +510,13 @@ class _AboutScreenState extends State<AboutScreen> {
   }
   
 
+
+  Future<void> _setUsePathPrefixes(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('cloud_use_path_prefixes', value);
+    setState(() { _usePathPrefixes = value; });
+    await DebugLogHelper.addDebugLog('ABOUT: Gateway path routing set to: $value');
+  }
 
   Future<void> _setServerMode(String mode) async {
     final prefs = await SharedPreferences.getInstance();

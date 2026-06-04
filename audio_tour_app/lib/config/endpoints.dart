@@ -39,14 +39,18 @@ class Endpoints {
 
   /// Returns the base URL for [s] based on current server_mode.
   /// Local:  http://<server_ip>:<port>
-  /// Cloud:  <cloud_base_url><path_prefix>
+  /// Cloud (interim, bare per-service host):  <cloud_base_url>   (no prefix)
+  /// Cloud (gateway, cloud_use_path_prefixes=true):  <cloud_base_url><path_prefix>
   static Future<String> base(Service s) async {
     final prefs = await SharedPreferences.getInstance();
     final mode = prefs.getString('server_mode') ?? 'local';
     if (mode == 'cloud') {
       final cloudBase = (prefs.getString('cloud_base_url') ?? '').trim();
       if (cloudBase.isEmpty) throw StateError('Cloud base URL not set — open About and enter it.');
-      return '$cloudBase${_cloudPaths[s]}';
+      // Interim (bare per-service host): prefixes OFF by default.
+      // Enable when a gateway that routes+strips path prefixes is deployed.
+      final usePrefix = prefs.getBool('cloud_use_path_prefixes') ?? false;
+      return usePrefix ? '$cloudBase${_cloudPaths[s]}' : cloudBase;
     }
     final ip = prefs.getString('server_ip') ?? Config.defaultServerIp;
     return 'http://$ip:${_localPorts[s]}';

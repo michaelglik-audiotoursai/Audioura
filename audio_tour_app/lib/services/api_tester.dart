@@ -1,3 +1,5 @@
+// ⚠️ DEV ONLY — NEVER expose on Cloud Run. Tests raw SQL/postgres endpoints
+// that must never have public ingress. Do NOT migrate to Endpoints resolver.
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
