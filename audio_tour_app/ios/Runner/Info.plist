@@ -32,6 +32,8 @@
 	<string>This app needs speech recognition for voice commands</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app needs microphone access for voice commands</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Audioura connects to your local Audioura server on the same WiFi network.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Audioura needs location access to find nearby tours and provide location-based audio experiences.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
