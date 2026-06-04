@@ -21,16 +21,19 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## CURRENT PROJECT STATUS
 **Project**: Audioura Android APK
-**Version on branch**: v1.2.9+68 ✅ committed on `services-migration`
-**iPhone**: Already running v1.2.9+68 ✅ (iOS Q built and installed it)
-**Android**: ⏳ WAITING — for iOS Q to push v1.2.9+69 before building
-**iOS Q current task**: Building v1.2.9+69 (newsletter Refresh fix) on Mac Mini — A#77
+**Version on branch**: v1.2.9+72 ✅ committed on `services-migration`
+**iPhone**: On v1.2.9+71 (iOS Q built — A#78 mic fix)
+**Android**: ✅ v1.2.9+72 built and committed — awaiting Ubuntu build + smoke test
+**iOS Q current task**: No active task assigned
 **Branch**: `services-migration`
 **Android Application ID**: `com.audioura.app`
 **Server**: `192.168.0.218` (Docker services on Windows laptop)
 
 ## RECENT VERSION HISTORY (latest first)
-- **v1.2.9+69** — Newsletter Refresh fix (iOS Q building now — not yet on branch)
+- **v1.2.9+72** — Dual environment networking: `Endpoints` resolver, Local/Cloud toggle in About, all services migrated
+- **v1.2.9+71** — A#78: mic permission fix (remove redundant `Permission.microphone.request()` from `my_tours_screen.dart`)
+- **v1.2.9+70** — (iOS Q — newsletter Refresh fix A#77)
+- **v1.2.9+69** — Newsletter Refresh fix (iOS Q)
 - **v1.2.9+68** — Fix POI map buttons in tour player (wire `openMap` JS→Dart handler)
 - **v1.2.9+67** — Map marker tap hardening (`HitTestBehavior.opaque` in `tour_map_screen.dart`)
 - **v1.2.9+66** — Restore map icon on Listen page (lost in Tours_Step_Maps merge)
@@ -43,7 +46,16 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## ✅ KEY FIXES IN RECENT VERSIONS
 
-### v1.2.9+68 — POI Map Buttons Fixed in Tour Player
+### v1.2.9+72 — Dual Environment Networking
+**Feature**: App can now switch between local WiFi and cloud (cellular) server endpoints at runtime — no rebuild needed.
+**New file**: `lib/config/endpoints.dart` — `Endpoints` class with `Service` enum, `base()` and `url()` methods
+**Logic**: Reads `server_mode` from SharedPreferences (`'local'` or `'cloud'`). Local = `http://$ip:$port`. Cloud = `$cloudBaseUrl$pathPrefix`.
+**About screen**: Added Local/Cloud `ChoiceChip` toggle + editable `cloud_base_url` field. Local mode keeps existing IP field.
+**Migrated**: All 13 service call sites in `home_screen.dart`, `about_screen.dart`, `custom_audio_service.dart`
+**Review doc**: `code_review_v1.2.9.72.md` — 5 questions for Claude
+**Note**: `direct_db_update.dart` and `api_tester.dart` NOT migrated — dev-only, must never be exposed on Cloud Run
+
+### v1.2.9+71 — A#78 Mic Permission Fix
 **Bug**: Tapping POI map icons during tour playback did nothing — no map opened, no error in logs
 **Root Cause**: Server HTML emits `<button onclick="openMap(N)">` calling `flutter_inappwebview.callHandler('openMap', {stop:N})`. Flutter side never registered the `'openMap'` handler — silent no-op.
 **Fix**: Added `controller.addJavaScriptHandler(handlerName: 'openMap')` in `onWebViewCreated` in `TourPlayerScreen`. Handler parses stop number, pushes `TourMapScreen` with `focusStopIndex`.
@@ -74,15 +86,14 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 **Fix**: 4-line guard in `_fitBounds()` — uses `_mapController.move(points.first, 15)` for single-point case
 **File**: `tour_map_screen.dart`
 
-## 🔄 NEXT ACTION: Wait for v1.2.9+69, then build on Ubuntu VM
-**Waiting for**: iOS Q to push v1.2.9+69 (newsletter Refresh fix) to `services-migration`
-**When user confirms +69 is pushed**:
-1. `git pull origin services-migration` on Windows dev tree
-2. Confirm version and changes
-3. Tell user to run `bash build_flutter_clean.sh` on Ubuntu VM
-4. Shared folder picks up latest automatically — no git pull needed on Ubuntu
-5. After build: install APK, run smoke test checklist from `android_q_onboarding.md`
-**APK output**: `audioura-dev.apk` → `C:\Users\micha\eclipse-workspace\AudioTours\development\audioura-dev.apk`
+## 🔄 NEXT ACTION: Ubuntu build for v1.2.9+72
+**Status**: ✅ Code committed and pushed
+**Steps**:
+1. Tell user to run `bash build_flutter_clean.sh` on Ubuntu VM
+2. Shared folder already has latest — no git pull needed on Ubuntu
+3. After install: smoke test per A#78 checklist + new dual-network test
+4. Key new test: About → toggle to Cloud → enter `https://map-delivery-ixkp5nkrlq-uc.a.run.app` → off WiFi → Home loads tours from cellular
+5. Report results
 
 ## ⚠️ VERSION SYNC RULE
 - iOS Q makes code changes → commits → bumps `pubspec.yaml` version → pushes to `services-migration`
