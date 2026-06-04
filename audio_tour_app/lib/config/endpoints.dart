@@ -50,7 +50,8 @@ class Endpoints {
       // Interim (bare per-service host): prefixes OFF by default.
       // Enable when a gateway that routes+strips path prefixes is deployed.
       final usePrefix = prefs.getBool('cloud_use_path_prefixes') ?? false;
-      return usePrefix ? '$cloudBase${_cloudPaths[s]}' : cloudBase;
+      // Use ?? '' to degrade gracefully if a new Service is added without a _cloudPaths entry.
+      return usePrefix ? '$cloudBase${_cloudPaths[s] ?? ''}' : cloudBase;
     }
     final ip = prefs.getString('server_ip') ?? Config.defaultServerIp;
     return 'http://$ip:${_localPorts[s]}';

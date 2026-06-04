@@ -1,6 +1,9 @@
-// ⚠️ DEV ONLY — NEVER expose on Cloud Run. These endpoints issue raw SQL directly
-// to the database. Must never have public ingress. Guard: uses server_ip directly
-// (unreachable off-WiFi in cloud mode) — do NOT migrate to Endpoints resolver.
+// ⚠️ LIVE TOUR FLOW — issues raw SQL to :5003/:5004 for tour status updates.
+// Called by TourStatusService, background_service, background_tour_monitor, tour_generator_screen.
+// TODO: replace with a proper REST status endpoint on the orchestrator before cloud tour
+// generation can work. Until then, :5003 SQL endpoints must never have public ingress.
+// Do NOT add a server_mode guard here — that would silently break tour-status updates in cloud mode.
+// Do NOT migrate to Endpoints resolver.
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';

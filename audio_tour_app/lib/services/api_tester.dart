@@ -1,5 +1,5 @@
-// ⚠️ DEV ONLY — NEVER expose on Cloud Run. Tests raw SQL/postgres endpoints
-// that must never have public ingress. Do NOT migrate to Endpoints resolver.
+// ⚠️ DEV ONLY — genuine test harness, not part of live flow.
+// NEVER expose on Cloud Run. Do NOT migrate to Endpoints resolver.
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -10,6 +10,11 @@ class ApiTester {
   /// Test all possible API endpoints
   static Future<void> testAllEndpoints() async {
     final prefs = await SharedPreferences.getInstance();
+    // Guard: no-op outside local mode — raw SQL endpoints must never hit a public host.
+    if ((prefs.getString('server_mode') ?? 'local') != 'local') {
+      await DebugLogHelper.addDebugLog('API TESTER: skipped — not in local mode');
+      return;
+    }
     final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
     
     await DebugLogHelper.addDebugLog('API TESTER: Testing all endpoints on $serverIp');
