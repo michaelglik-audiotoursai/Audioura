@@ -788,4 +788,4 @@ def create_news_html_with_points(summary_text, full_text, title, major_points, a
     return html_template.format(title=title, audio_sections=audio_sections)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5011, debug=True)
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', '5011')), debug=False)

@@ -92,4 +92,4 @@ def get_coordinates(location):
 
 if __name__ == '__main__':
     logging.info("Starting Coordinates from AI Service...")
-    app.run(host='0.0.0.0', port=5004, debug=True)
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', '5004')), debug=False)

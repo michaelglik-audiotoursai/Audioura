@@ -1159,4 +1159,4 @@ if __name__ == '__main__':
     print(f"Pipeline: Complete tour generation orchestration with database storage")
     
     # Run Flask app
-    app.run(host='0.0.0.0', port=5002, debug=True)
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', '5002')), debug=False)

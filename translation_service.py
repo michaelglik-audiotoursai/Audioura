@@ -1566,4 +1566,4 @@ def get_supported_languages():
         conn.close()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5030, debug=True)
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', '5030')), debug=False)

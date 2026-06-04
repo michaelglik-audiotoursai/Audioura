@@ -2598,4 +2598,4 @@ def _validate_boston_globe_tracking_url(tracking_url):
         }
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5017, debug=True)
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', '5017')), debug=False)

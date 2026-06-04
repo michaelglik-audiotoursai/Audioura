@@ -146,4 +146,4 @@ if __name__ == '__main__':
     print("  GET /treats-near/<lat>/<lng> - Get 5 treats near location")
     sys.stdout.flush()
     
-    app.run(host='0.0.0.0', port=5006, debug=True)
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', '5006')), debug=False)
