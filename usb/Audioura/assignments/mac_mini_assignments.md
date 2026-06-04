@@ -1,6 +1,181 @@
 # Mac Mini Assignment Instructions
 ## iOS Development Task Execution
 
+# T: 06/2026 - A#79 — Build v2.1.1+1 iOS (Dual-Environment Parity with Android)
+
+**Goal:** Build v2.1.1+1 on iPhone. This is a **parity build** — all Dart changes are already in the shared codebase from Android Q's work. iOS task is to build the same commit and verify iOS-specific behaviour.
+
+**What this build delivers:**
+- Dual-environment networking: Local WiFi (default, `192.168.0.218`) and Cloud (user-supplied HTTPS URL)
+- About screen: Local/Cloud toggle + cloud base URL field + gateway path routing checkbox
+- `Endpoints` resolver — all service calls route through a single resolver based on the active mode
+- A#77b Listen page Refresh fix (already shipped in prior iOS build, regression check only)
+- A#78 mic permission fix (already shipped in prior iOS build, regression check only)
+- `NSLocalNetworkUsageDescription` added to `Info.plist` for iOS 14+ local network hygiene (commit `52d8282`)
+
+**Key fact:** No Dart re-implementation needed. All `lib/` changes are shared Flutter code already committed by Android Q. iOS builds the same source and gets everything automatically.
+
+**Roles:**
+- **[SIR MICHAEL]** — orchestrator. Switches KVM, runs smoke test, syncs Windows afterward.
+- **[MAC MINI Q]** — pulls latest, verifies signing, runs `pod install`, builds, installs, commits nothing (pubspec already at `2.1.1+1`).
+
+**Version target:** v2.1.1+1  **Branch:** `services-migration`
+
+---
+
+## Step 0 — [SIR MICHAEL] Eject USB, carry to Mac Mini, switch KVM
+
+## Step 1 — [SIR MICHAEL on Mac Mini] Launch Q
+
+Paste:
+> Read `@/Volumes/USB DISK/Audioura/assignments/mac_mini_assignments.md` and execute the A#79 assignment at the top. Follow STOP conditions; skip steps labelled `[SIR MICHAEL]`.
+
+## Step 2 — [MAC MINI Q] Pull latest
+
+```bash
+cd ~/Development/Audioura-build
+git pull origin services-migration
+```
+
+**Expected:** fast-forward to at least commit `52d8282` (NSLocalNetworkUsageDescription) which is on top of `4c8c040` (v2.1.1+1 Android fixes).
+
+## Step 3 — [MAC MINI Q] Spot-check BEFORE building ⚠️ REQUIRED
+
+```bash
+cd ~/Development/Audioura-build/development/audio_tour_app
+
+# 3a — pubspec at 2.1.1+1
+grep "^version:" pubspec.yaml
+# Expected: version: 2.1.1+1
+
+# 3b — NSLocalNetworkUsageDescription present in Info.plist
+grep -n "NSLocalNetworkUsageDescription" ios/Runner/Info.plist
+# Expected: 1 match
+
+# 3c — Endpoints class exists (dual-environment resolver)
+grep -rn "class Endpoints" lib/
+# Expected: 1 match in lib/services/ or lib/config/
+
+# 3d — About screen has Local/Cloud toggle
+grep -rn "Local\|Cloud\|cloudUrl\|cloud_url" lib/screens/about_screen.dart | head -5
+# Expected: several matches confirming toggle UI is present
+
+# 3e — signing intact
+grep -E 'PRODUCT_BUNDLE_IDENTIFIER|DEVELOPMENT_TEAM' \
+  ios/Runner.xcodeproj/project.pbxproj | sort -u
+# Expected: com.glikfamily.audioura and 4HGRU6TKGQ
+```
+
+If 3a or 3b fails, STOP and report to iOS Q. If 3c or 3d shows nothing, STOP — the shared Dart may not have pulled correctly.
+
+## Step 4 — [MAC MINI Q] pod install
+
+```bash
+cd ~/Development/Audioura-build/development/audio_tour_app/ios
+pod install
+```
+
+No new pods expected, but required after any pull that touches the Flutter plugin graph.
+
+## Step 5 — [MAC MINI Q] Clean rebuild, install, launch
+
+```bash
+cd ~/Development/Audioura-build/development/audio_tour_app
+flutter clean && flutter pub get
+cd "/Volumes/USB DISK/Audioura/scripts"
+./build_install_launch.sh
+```
+
+**Expected:** `FINAL VERDICT: SUCCESS`. STOP and tell Sir Michael.
+
+If build FAILS with signing error — open Xcode:
+```bash
+open ~/Development/Audioura-build/development/audio_tour_app/ios/Runner.xcworkspace
+```
+Runner → Signing & Capabilities → Automatically manage signing ✅ → Team: Mikhail Glik (4HGRU6TKGQ) → Bundle ID: `com.glikfamily.audioura` → Quit Xcode → re-run Step 5.
+
+## Step 6 — [SIR MICHAEL] Smoke test on iPhone ⚠️ STOP HERE FOR Q
+
+**Test 1 — Local mode (default, on WiFi):**
+1. Launch app → Home tab.
+2. **Expected:** Tours load from local server (`192.168.0.218`). No errors.
+3. About tab → confirm mode shows **Local** by default.
+
+**Test 2 — About screen Local/Cloud toggle:**
+1. About tab → find the Local/Cloud environment toggle.
+2. **Expected:** Toggle is present, default is Local.
+3. Switch to **Cloud** → a cloud base URL input field appears.
+4. Leave the "gateway path routing" checkbox **unchecked**.
+5. Switch back to **Local** → field disappears.
+
+**Test 3 — Cloud mode, existing tour download (off WiFi if possible):**
+1. Switch to **Cloud** in About tab, paste the cloud base URL: `https://[your-cloud-run-url]`.
+2. Download an **existing** tour (do not attempt to generate a new one — cloud generation not ready).
+3. **Expected:** Tour downloads from R2 storage and appears in Listen tab.
+4. Tap tour → audio plays.
+5. ⚠️ If no cloud URL is available yet, mark this test NOT_TESTED — not a blocker.
+
+**Test 4 — A#78 regression (mic):**
+1. Audio mode → Listen tab → tap microphone icon.
+2. **Expected:** Listening dialog opens. No "Microphone permission required" snackbar.
+
+**Test 5 — A#77b regression (Refresh):**
+1. Listen tab → tap Refresh.
+2. **Expected:** List reloads in place. No black screen.
+
+**Test 6 — General regression:**
+1. Open a tour → audio plays.
+2. Open a news article → loads.
+3. POI map icon → TourMapScreen opens.
+
+Tell Q "Smoke test passes, proceed to Step 7" when done. Report which tests passed/failed/not_tested.
+
+## Step 7 — [MAC MINI Q] No pubspec commit needed — version already at 2.1.1+1
+
+The pubspec was already bumped by Android Q. Do NOT bump it again.
+
+Verify remote is up to date:
+```bash
+cd ~/Development/Audioura-build
+git status
+# Expected: nothing to commit, working tree clean (or only untracked files)
+git log --oneline -3
+# Confirm 52d8282 (NSLocalNetworkUsageDescription) is present
+```
+
+If `git status` shows modified tracked files — STOP and report to iOS Q before committing anything.
+
+## Step 8 — [MAC MINI Q] Copy results and eject
+
+```bash
+echo "A#79 Results:" > ~/Desktop/a79_results.txt
+echo "Date: $(date)" >> ~/Desktop/a79_results.txt
+echo "Build: [SUCCESS/FAILED]" >> ~/Desktop/a79_results.txt
+echo "Local mode tours load (Test 1): [YES/NO]" >> ~/Desktop/a79_results.txt
+echo "About Local/Cloud toggle present (Test 2): [YES/NO]" >> ~/Desktop/a79_results.txt
+echo "Cloud mode tour download+play (Test 3): [YES/NO/NOT_TESTED]" >> ~/Desktop/a79_results.txt
+echo "Mic no permission snackbar (Test 4): [YES/NO]" >> ~/Desktop/a79_results.txt
+echo "Listen Refresh no black screen (Test 5): [YES/NO]" >> ~/Desktop/a79_results.txt
+echo "General regression clean (Test 6): [YES/NO]" >> ~/Desktop/a79_results.txt
+echo "Overall: [SUCCESS/PARTIAL/FAILED]" >> ~/Desktop/a79_results.txt
+cp ~/Desktop/a79_results.txt "/Volumes/USB DISK/Audioura/results/"
+diskutil eject "/Volumes/USB DISK"
+```
+
+## Step 9 — [MAC MINI Q] Report Results
+
+> "Assignment 79 complete. Build: [SUCCESS/FAILED]. Local mode works: [YES/NO]. Local/Cloud toggle present: [YES/NO]. Cloud download: [YES/NO/NOT_TESTED]. Mic regression: [YES/NO]. Refresh regression: [YES/NO]. General regression: [YES/NO]. Overall: [SUCCESS/PARTIAL/FAILED]."
+
+## Step 10 — [SIR MICHAEL, back on Windows] Sync
+
+```cmd
+cd C:\Users\micha\eclipse-workspace\AudioTours\development
+git pull origin services-migration
+```
+Verify `audio_tour_app\pubspec.yaml` shows `version: 2.1.1+1`.
+
+---
+
 # T: 06/2026 - A#78 — Build v1.2.9+71 (Listen Page Microphone Voice Search Fix)
 
 **Goal:** Build v1.2.9+71 on iPhone. Two commits already in `services-migration` — `df6b61b` (A#78 fix) and `92d0175` (A#78b import cleanup per Claude review Q2).
