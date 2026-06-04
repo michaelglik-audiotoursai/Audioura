@@ -394,7 +394,7 @@ def get_tour_version(tour_id):
         
         cur.execute("""
             SELECT id, tour_name FROM audio_tours 
-            WHERE id = %s AND audio_tour IS NOT NULL
+            WHERE id = %s AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL)
         """, (int(tour_id),))
         
         result = cur.fetchone()
@@ -444,7 +444,7 @@ def check_multiple_versions():
                 
             cur.execute("""
                 SELECT id FROM audio_tours 
-                WHERE id = %s AND audio_tour IS NOT NULL
+                WHERE id = %s AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL)
             """, (int(tour_id),))
             
             if cur.fetchone():
@@ -564,8 +564,8 @@ def extract_tour_stops(tour_id):
         """, (tour_id,))
     else:
         cur.execute("""
-            SELECT audio_tour, tour_name FROM audio_tours 
-            WHERE id = %s AND audio_tour IS NOT NULL
+            SELECT audio_tour, tour_name, tour_blob_uri FROM audio_tours 
+            WHERE id = %s AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL)
         """, (tour_id,))
     
     result = cur.fetchone()
@@ -574,7 +574,20 @@ def extract_tour_stops(tour_id):
         conn.close()
         return []
     
-    audio_tour_data, tour_name = result
+    audio_tour_data, tour_name, tour_blob_uri = result
+    
+    # R2 read if available
+    if not audio_tour_data and tour_blob_uri and _get_blob_storage():
+        try:
+            audio_tour_data = _get_blob_storage().download(tour_blob_uri)
+        except Exception as r2_err:
+            print(f"R2 read failed for tour stops extraction: {r2_err}")
+    
+    if not audio_tour_data:
+        cur.close()
+        conn.close()
+        return []
+    
     cur.close()
     conn.close()
     
@@ -656,7 +669,7 @@ def get_tour_edit_info(tour_id):
         else:
             cur.execute("""
                 SELECT id, tour_name FROM audio_tours 
-                WHERE id = %s AND audio_tour IS NOT NULL
+                WHERE id = %s AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL)
             """, (int(tour_id),))
         
         result = cur.fetchone()
@@ -775,14 +788,20 @@ def create_custom_tour(tour_id):
                 return jsonify({'error': 'Original tour not found'}), 404
         else:
             cur.execute("""
-                SELECT tour_name, request_string, audio_tour, lat, lng
+                SELECT tour_name, request_string, audio_tour, lat, lng, tour_blob_uri
                 FROM audio_tours 
-                WHERE id = %s AND audio_tour IS NOT NULL
+                WHERE id = %s AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL)
             """, (int(tour_id),))
             result = cur.fetchone()
             if result:
-                tour_name, request_string, audio_tour, lat, lng = result
+                tour_name, request_string, audio_tour, lat, lng, tour_blob_uri = result
                 original_id = int(tour_id)
+                # R2 read if BYTEA is null
+                if not audio_tour and tour_blob_uri and _get_blob_storage():
+                    try:
+                        audio_tour = _get_blob_storage().download(tour_blob_uri)
+                    except Exception as r2_err:
+                        print(f"R2 read failed for create-custom: {r2_err}")
             else:
                 cur.close()
                 conn.close()

@@ -21,7 +21,7 @@
 
 **Permanent fix (TODO for production):** Private IP + Serverless VPC Access connector. This removes the DB from the public internet entirely. For the current testing phase, the DB is accessible but protected by the Secret Manager password (not the `password123` default).
 
-**Verification:** DB password in Secret Manager (version 3) is `audioura2026cloud` — no trailing newline, matches the Cloud SQL user password.
+**Verification:** DB password in Secret Manager (version 3) has been set correctly — no trailing newline. (Password value not disclosed in this document for security.)
 
 ### Issue 2: Pin tour-generator + tour-modernized to max=1
 
