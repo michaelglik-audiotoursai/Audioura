@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'dart:io' show Platform;
 
 import 'debug_log_viewer_screen.dart';
+import '../config/endpoints.dart';
 
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
@@ -24,8 +25,10 @@ class _AboutScreenState extends State<AboutScreen> {
   String _deviceModel = 'Loading...';
   String _androidVersion = 'Loading...';
   final TextEditingController _serverIpController = TextEditingController();
-  String _currentServerIp = '192.168.0.217';
-  String _selectedMode = 'Tours'; // Default to Tours
+  final TextEditingController _cloudBaseUrlController = TextEditingController();
+  String _currentServerIp = '192.168.0.218';
+  String _serverMode = 'local'; // 'local' or 'cloud'
+  String _selectedMode = 'Tours';
 
   @override
   void initState() {
@@ -73,8 +76,10 @@ class _AboutScreenState extends State<AboutScreen> {
         await prefs.setString('user_id', userId);
       }
       
-      // Load saved server IP
-      final savedIp = prefs.getString('server_ip') ?? '192.168.0.217';
+      // Load saved server IP and cloud settings
+      final savedIp = prefs.getString('server_ip') ?? '192.168.0.218';
+      final savedServerMode = prefs.getString('server_mode') ?? 'local';
+      final savedCloudBaseUrl = prefs.getString('cloud_base_url') ?? '';
       
       await DebugLogHelper.addDebugLog('ABOUT: Checking user: $userId');
       
@@ -108,6 +113,8 @@ class _AboutScreenState extends State<AboutScreen> {
         _androidVersion = osVersion;
         _currentServerIp = savedIp;
         _serverIpController.text = savedIp;
+        _serverMode = savedServerMode;
+        _cloudBaseUrlController.text = savedCloudBaseUrl;
       });
     } catch (e) {
       await DebugLogHelper.addDebugLog('ABOUT: Error loading app info: $e');
@@ -176,21 +183,39 @@ class _AboutScreenState extends State<AboutScreen> {
                   _buildInfoRow('Build', _buildNumber),
                   _buildInfoRow('User ID', _userId),
                   const SizedBox(height: 10),
+                  // Server mode toggle
                   Row(
+                    children: [
+                      const Text('Mode:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      const SizedBox(width: 10),
+                      ChoiceChip(
+                        label: const Text('Local WiFi'),
+                        selected: _serverMode == 'local',
+                        onSelected: (_) => _setServerMode('local'),
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('Cloud'),
+                        selected: _serverMode == 'cloud',
+                        selectedColor: Colors.green.shade100,
+                        onSelected: (_) => _setServerMode('cloud'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  // Local IP field — shown in local mode
+                  if (_serverMode == 'local') Row(
                     children: [
                       const Text(
                         'Server IP:',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: TextField(
                           controller: _serverIpController,
                           decoration: const InputDecoration(
-                            hintText: '192.168.0.217',
+                            hintText: '192.168.0.218',
                             border: OutlineInputBorder(),
                             contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           ),
@@ -206,6 +231,48 @@ class _AboutScreenState extends State<AboutScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
                         child: const Text('Save', style: TextStyle(fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                  // Cloud base URL field — shown in cloud mode
+                  if (_serverMode == 'cloud') Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Cloud Base URL:',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _cloudBaseUrlController,
+                              decoration: const InputDecoration(
+                                hintText: 'https://api.audioura.com',
+                                border: OutlineInputBorder(),
+                                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                helperText: 'e.g. https://map-delivery-xxx-uc.a.run.app',
+                              ),
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          ElevatedButton(
+                            onPressed: _saveCloudBaseUrl,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                            child: const Text('Save', style: TextStyle(fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        '⚠️ Cloud mode: only map-delivery is deployed. Tour generation, news, and newsletters remain local.',
+                        style: TextStyle(fontSize: 11, color: Colors.orange),
                       ),
                     ],
                   ),
@@ -369,9 +436,9 @@ class _AboutScreenState extends State<AboutScreen> {
         'build_number': _buildNumber,
       };
       
-      final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
+      final userUri = await Endpoints.url(Service.userDb, '/user');
       final response = await http.post(
-        Uri.parse('http://$serverIp:5003/user'),
+        userUri,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'secret_id': userId,
@@ -425,6 +492,35 @@ class _AboutScreenState extends State<AboutScreen> {
   }
   
 
+
+  Future<void> _setServerMode(String mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('server_mode', mode);
+    setState(() { _serverMode = mode; });
+    await DebugLogHelper.addDebugLog('ABOUT: Server mode set to: $mode');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Switched to ${mode == 'cloud' ? 'Cloud' : 'Local WiFi'} mode'),
+        backgroundColor: mode == 'cloud' ? Colors.green : Colors.blue,
+      ),
+    );
+  }
+
+  Future<void> _saveCloudBaseUrl() async {
+    final url = _cloudBaseUrlController.text.trim();
+    if (url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a cloud base URL'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('cloud_base_url', url);
+    await DebugLogHelper.addDebugLog('ABOUT: Cloud base URL saved: $url');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Cloud base URL saved: $url'), backgroundColor: Colors.green),
+    );
+  }
 
   Future<void> _saveServerIp() async {
     final newIp = _serverIpController.text.trim();
@@ -492,15 +588,9 @@ class _AboutScreenState extends State<AboutScreen> {
   
   Future<void> _testServerConnectivity() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
-      
-      await DebugLogHelper.addDebugLog('Testing connectivity to: $serverIp');
-      
-      final response = await http.get(
-        Uri.parse('http://$serverIp:5003/health'),
-      ).timeout(Duration(seconds: 5));
-      
+      final uri = await Endpoints.url(Service.userDb, '/health');
+      await DebugLogHelper.addDebugLog('Testing connectivity to: $uri');
+      final response = await http.get(uri).timeout(Duration(seconds: 5));
       if (response.statusCode == 200) {
         await DebugLogHelper.addDebugLog('✅ Server connectivity: OK');
       } else {
@@ -514,6 +604,7 @@ class _AboutScreenState extends State<AboutScreen> {
   @override
   void dispose() {
     _serverIpController.dispose();
+    _cloudBaseUrlController.dispose();
     super.dispose();
   }
 }

@@ -19,6 +19,7 @@ import '../services/subscription_encryption_service.dart';
 import '../services/device_service.dart';
 import '../services/translation_service.dart';
 import '../config.dart';
+import '../config/endpoints.dart';
 // import '../services/credential_storage_service.dart';  // TEMPORARILY DISABLED - CAUSING BUILD ERRORS
 // import '../services/subscription_article_storage.dart';  // TEMPORARILY DISABLED - CAUSING BUILD ERRORS
 import '../widgets/subscription_credential_dialog.dart';
@@ -310,13 +311,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
-      final url = 'http://$serverIp:5005/tours-near/${searchLocation.latitude}/${searchLocation.longitude}?radius=50';
+      final uri = await Endpoints.url(Service.mapDelivery, '/tours-near/${searchLocation.latitude}/${searchLocation.longitude}?radius=50');
+      final url = uri.toString();
       
       await DebugLogHelper.addDebugLog('HOME: Requesting tours from: $url');
       
       final response = await http.get(
-        Uri.parse(url),
+        uri,
         headers: {'Content-Type': 'application/json'},
       ).timeout(Duration(seconds: 10));
 
@@ -1051,13 +1052,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     try {
-      final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
-      final url = 'http://$serverIp:5005/download-tour/$tourId';
+      final downloadUri = await Endpoints.url(Service.mapDelivery, '/download-tour/$tourId');
+      final url = downloadUri.toString();
       
       await DebugLogHelper.addDebugLog('HOME: Downloading from: $url');
       
       final response = await http.get(
-        Uri.parse(url),
+        downloadUri,
         headers: {'Content-Type': 'application/json'},
       ).timeout(Duration(seconds: 120));
 
@@ -1161,9 +1162,9 @@ class _HomeScreenState extends State<HomeScreen> {
   // Resolves the editTourId for a given download ID by calling the resolution endpoint.
   // Used to populate parent_tour_id on translated tours.
   Future<String> _resolveParentEditTourId(int downloadTourId, SharedPreferences prefs) async {
-    final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
     try {
-      final resp = await http.get(Uri.parse('http://$serverIp:5025/tour/$downloadTourId/resolve'));
+      final uri = await Endpoints.url(Service.tourIdResolution, '/tour/$downloadTourId/resolve');
+      final resp = await http.get(uri);
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
         return (data['edit_tour_id'] ?? '').toString();
@@ -1200,8 +1201,8 @@ class _HomeScreenState extends State<HomeScreen> {
               continue;
             }
             try {
-              final translatedUrl = 'http://$serverIp:5005/download-tour/$translatedId';
-              final translatedResponse = await http.get(Uri.parse(translatedUrl)).timeout(Duration(seconds: 120));
+              final translatedUri = await Endpoints.url(Service.mapDelivery, '/download-tour/$translatedId');
+              final translatedResponse = await http.get(translatedUri).timeout(Duration(seconds: 120));
               if (translatedResponse.statusCode == 200) {
                 final prefs = await SharedPreferences.getInstance();
                 final appDir = await getApplicationDocumentsDirectory();
@@ -1234,10 +1235,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<List<String>> _downloadSingleTourSilent(int tourId, [List<String>? languages]) async {
     final prefs = await SharedPreferences.getInstance();
-    final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
 
-    final url = 'http://$serverIp:5005/download-tour/$tourId';
-    final response = await http.get(Uri.parse(url)).timeout(Duration(seconds: 120));
+    final uri = await Endpoints.url(Service.mapDelivery, '/download-tour/$tourId');
+    final response = await http.get(uri).timeout(Duration(seconds: 120));
     if (response.statusCode == 200) {
       await _saveTourToMyTours(tourId, response.bodyBytes);
     } else {
@@ -1254,7 +1254,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _downloadSingleTour(int tourId, [List<String>? languages]) async {
     final prefs = await SharedPreferences.getInstance();
-    final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
     
     showDialog(
       context: context,
@@ -1272,8 +1271,8 @@ class _HomeScreenState extends State<HomeScreen> {
     
     try {
       // Always download English version first
-      final url = 'http://$serverIp:5005/download-tour/$tourId';
-      final response = await http.get(Uri.parse(url)).timeout(Duration(seconds: 120));
+      final dlUri = await Endpoints.url(Service.mapDelivery, '/download-tour/$tourId');
+      final response = await http.get(dlUri).timeout(Duration(seconds: 120));
       if (response.statusCode == 200) {
         await _saveTourToMyTours(tourId, response.bodyBytes);
       } else {
@@ -1503,9 +1502,6 @@ class _HomeScreenState extends State<HomeScreen> {
   
   Future<List<Map<String, dynamic>>> _searchTours(String query) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
-      
       // Convert wildcard pattern to regex
       final regexPattern = query.replaceAll('*', '.*');
       
@@ -1515,11 +1511,12 @@ class _HomeScreenState extends State<HomeScreen> {
         return [];
       }
       
-      final searchUrl = 'http://$serverIp:5005/search-tours?pattern=${Uri.encodeComponent(regexPattern)}&lat=${searchLocation.latitude}&lng=${searchLocation.longitude}';
+      final searchUri = await Endpoints.url(Service.mapDelivery, '/search-tours?pattern=${Uri.encodeComponent(regexPattern)}&lat=${searchLocation.latitude}&lng=${searchLocation.longitude}');
+      final searchUrl = searchUri.toString();
       await DebugLogHelper.addDebugLog('HOME: Searching tours with URL: $searchUrl');
       
       final response = await http.get(
-        Uri.parse(searchUrl),
+        searchUri,
         headers: {'Content-Type': 'application/json'},
       ).timeout(Duration(seconds: 10));
       
@@ -1615,16 +1612,13 @@ class _HomeScreenState extends State<HomeScreen> {
         await DebugLogHelper.addDebugLog('HOME: SAVE - Got app directory: $appDirPath');
       }
       
-      // Get tour resolution info first
-      final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
       await DebugLogHelper.addDebugLog('HOME: Resolving tour ID for download ID: $tourId');
       
       assert(!isTranslation,
           '_saveTourToMyTours should not be called with isTranslation: true after M8; '
           'use _saveTourToMyToursTranslated directly via _downloadTranslatedVersions');
-      final resolutionResponse = await http.get(
-        Uri.parse('http://$serverIp:5025/tour/$tourId/resolve'),
-      );
+      final resolveUri = await Endpoints.url(Service.tourIdResolution, '/tour/$tourId/resolve');
+      final resolutionResponse = await http.get(resolveUri);
       
       await DebugLogHelper.addDebugLog('HOME: Tour resolution response: ${resolutionResponse.statusCode}');
       
@@ -1802,12 +1796,11 @@ class _HomeScreenState extends State<HomeScreen> {
       // Load cached newsletters first
       await _loadCachedNewsletters();
       
-      final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
-      
-      await DebugLogHelper.addDebugLog('HOME: Loading newsletters from http://$serverIp:5017/newsletters_v2');
+      final newsUri = await Endpoints.url(Service.newsletter, '/newsletters_v2');
+      await DebugLogHelper.addDebugLog('HOME: Loading newsletters from $newsUri');
       
       final response = await http.get(
-        Uri.parse('http://$serverIp:5017/newsletters_v2'),
+        newsUri,
         headers: {'Content-Type': 'application/json'},
       ).timeout(Duration(seconds: 10));
       
@@ -1892,8 +1885,6 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!hasKey) {
         await DebugLogHelper.addDebugLog('NEWSLETTER: No encryption key found, processing newsletter URL to get key');
         
-        final prefs = await SharedPreferences.getInstance();
-        final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
         final deviceId = await DeviceService.getUserId();
         
         showDialog(
@@ -1910,7 +1901,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         );
         
-        final requestUrl = 'http://$serverIp:5017/process_newsletter';
+        final processUri = await Endpoints.url(Service.newsletter, '/process_newsletter');
+        final requestUrl = processUri.toString();
         final requestBody = {
           'newsletter_url': newsletterUrl,
           'user_id': deviceId,
@@ -1955,8 +1947,6 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       await DebugLogHelper.addDebugLog('NEWSLETTER: Starting newsletter URL processing: $newsletterUrl');
       
-      final prefs = await SharedPreferences.getInstance();
-      final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
       final deviceId = await DeviceService.getUserId();
       
       showDialog(
@@ -1973,7 +1963,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
       
-      final requestUrl = 'http://$serverIp:5017/process_newsletter';
+      final processUri2 = await Endpoints.url(Service.newsletter, '/process_newsletter');
+      final requestUrl = processUri2.toString();
       final requestBody = {
         'newsletter_url': newsletterUrl,
         'user_id': deviceId,
@@ -2059,11 +2050,6 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       await DebugLogHelper.addDebugLog('NEWSLETTER: Starting _processNewsletter with ID: $newsletterId, Name: $name');
       
-      final prefs = await SharedPreferences.getInstance();
-      final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
-      
-      await DebugLogHelper.addDebugLog('NEWSLETTER: Using server IP: $serverIp');
-      
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -2078,7 +2064,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
       
-      final requestUrl = 'http://$serverIp:5017/get_articles_by_newsletter_id';
+      final articlesUri = await Endpoints.url(Service.newsletter, '/get_articles_by_newsletter_id');
+      final requestUrl = articlesUri.toString();
       final requestBody = {'newsletter_id': newsletterId};
       
       await DebugLogHelper.addDebugLog('NEWSLETTER: Making POST request to: $requestUrl');
@@ -2173,8 +2160,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _processSelectedArticles(List<Map<String, dynamic>> selectedArticles, int newsletterId, [List<String>? languages]) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
-      
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -2315,7 +2300,6 @@ class _HomeScreenState extends State<HomeScreen> {
   
   Future<void> _downloadAndSaveArticle(String articleId, String title, Map<String, dynamic> article, [List<String>? languages]) async {
     final prefs = await SharedPreferences.getInstance();
-    final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
     final deviceId = await DeviceService.getUserId();
     final subscriptionDomain = article['subscription_domain'];
     
@@ -2326,7 +2310,9 @@ class _HomeScreenState extends State<HomeScreen> {
     for (final language in languagesToDownload) {
       await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: Downloading article $articleId in language: $language');
       
-      String downloadUrl = 'http://$serverIp:5012/download/$articleId?user_id=$deviceId';
+      String downloadUrl;
+      final dlBase = await Endpoints.base(Service.news);
+      downloadUrl = '$dlBase/download/$articleId?user_id=$deviceId';
       if (language != 'en') {
         downloadUrl += '&language=$language';
         await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: Adding language parameter: $language');

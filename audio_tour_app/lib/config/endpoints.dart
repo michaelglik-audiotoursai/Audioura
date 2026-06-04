@@ -1,0 +1,58 @@
+import 'package:shared_preferences/shared_preferences.dart';
+import '../config.dart';
+
+enum Service {
+  orchestrator,    // :5002
+  userDb,          // :5003
+  mapDelivery,     // :5005
+  news,            // :5012
+  newsletter,      // :5017
+  customAudio,     // :5023
+  tourIdResolution,// :5025
+  translation,     // :5030
+}
+
+class Endpoints {
+  static const _localPorts = {
+    Service.orchestrator: 5002,
+    Service.userDb: 5003,
+    Service.mapDelivery: 5005,
+    Service.news: 5012,
+    Service.newsletter: 5017,
+    Service.customAudio: 5023,
+    Service.tourIdResolution: 5025,
+    Service.translation: 5030,
+  };
+
+  // Path prefix appended to cloud_base_url for each service.
+  // Used when a single gateway/domain routes all services.
+  static const _cloudPaths = {
+    Service.orchestrator: '/orchestrator',
+    Service.userDb: '/user',
+    Service.mapDelivery: '/map-delivery',
+    Service.news: '/news',
+    Service.newsletter: '/newsletter',
+    Service.customAudio: '/custom-audio',
+    Service.tourIdResolution: '/tour-id',
+    Service.translation: '/translation',
+  };
+
+  /// Returns the base URL for [s] based on current server_mode.
+  /// Local:  http://<server_ip>:<port>
+  /// Cloud:  <cloud_base_url><path_prefix>
+  static Future<String> base(Service s) async {
+    final prefs = await SharedPreferences.getInstance();
+    final mode = prefs.getString('server_mode') ?? 'local';
+    if (mode == 'cloud') {
+      final cloudBase = (prefs.getString('cloud_base_url') ?? '').trim();
+      if (cloudBase.isEmpty) throw StateError('Cloud base URL not set — open About and enter it.');
+      return '$cloudBase${_cloudPaths[s]}';
+    }
+    final ip = prefs.getString('server_ip') ?? Config.defaultServerIp;
+    return 'http://$ip:${_localPorts[s]}';
+  }
+
+  /// Convenience: returns a fully-formed [Uri] for [s] + [path].
+  static Future<Uri> url(Service s, String path) async =>
+      Uri.parse('${await base(s)}$path');
+}

@@ -3,17 +3,15 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../screens/debug_log_viewer_screen.dart';
+import '../config/endpoints.dart';
 
 class CustomAudioService {
   static final CustomAudioService _instance = CustomAudioService._internal();
   factory CustomAudioService() => _instance;
   CustomAudioService._internal();
 
-  Future<String> _getServerUrl() async {
-    final prefs = await SharedPreferences.getInstance();
-    final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
-    return 'http://$serverIp:5023';
-  }
+  Future<String> _getServerUrl() async =>
+      await Endpoints.base(Service.customAudio);
 
   Future<String> _getUserId() async {
     final prefs = await SharedPreferences.getInstance();
