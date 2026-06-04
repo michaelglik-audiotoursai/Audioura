@@ -18,6 +18,19 @@ from datetime import datetime
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 
+# R2 blob storage for tour delivery (Phase D)
+_blob_storage = None
+def _get_blob_storage():
+    global _blob_storage
+    if _blob_storage is None:
+        blob_type = os.getenv('BLOB_STORAGE_TYPE', 'database')
+        if blob_type == 'r2':
+            from blobstorage import R2BlobStorage
+            _blob_storage = R2BlobStorage()
+        else:
+            _blob_storage = None
+    return _blob_storage
+
 # Configure unbuffered logging
 sys.stdout.reconfigure(line_buffering=True)
 print(f"\n==== MAP DELIVERY SERVICE STARTING: {datetime.now().isoformat()} ====")
@@ -211,17 +224,35 @@ def download_tour(tour_id):
                 conn.close()
                 return jsonify({'error': 'Custom tour not found'}), 404
         else:
-            # Regular tour
+            # Regular tour — dual-read: R2 if tour_blob_uri set, else BYTEA
             cur.execute("""
-                SELECT tour_name, audio_tour, request_string
+                SELECT tour_name, audio_tour, request_string, tour_blob_uri
                 FROM audio_tours 
-                WHERE id = %s AND audio_tour IS NOT NULL
+                WHERE id = %s AND (audio_tour IS NOT NULL OR tour_blob_uri IS NOT NULL)
             """, (int(tour_id),))
             
             result = cur.fetchone()
             
             if result:
-                tour_name, audio_tour_data, request_string = result
+                tour_name, audio_tour_data, request_string, tour_blob_uri = result
+                
+                # If R2 key is available and R2 is configured, read from R2
+                if tour_blob_uri and _get_blob_storage():
+                    try:
+                        audio_tour_data = _get_blob_storage().download(tour_blob_uri)
+                        print(f"Serving tour {tour_id} from R2: {tour_blob_uri}")
+                    except Exception as r2_err:
+                        print(f"R2 read failed for {tour_id}, falling back to BYTEA: {r2_err}")
+                        if not audio_tour_data:
+                            cur.close()
+                            conn.close()
+                            return jsonify({'error': 'Tour data unavailable'}), 500
+                
+                if not audio_tour_data:
+                    cur.close()
+                    conn.close()
+                    return jsonify({'error': 'Tour data not found'}), 404
+                
                 cur.execute("""
                     UPDATE audio_tours 
                     SET number_requested = number_requested + 1 

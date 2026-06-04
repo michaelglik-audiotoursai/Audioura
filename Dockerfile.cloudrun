@@ -1,0 +1,36 @@
+# Audioura Cloud Run Service Image
+# Contains all Python service files. CMD selects which service to run.
+# Build once, deploy many (different CMD per Cloud Run service).
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# System dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc curl ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python dependencies (superset covering all services)
+RUN pip install --no-cache-dir \
+    flask==2.3.3 \
+    flask-cors==4.0.0 \
+    requests==2.31.0 \
+    psycopg2-binary==2.9.9 \
+    boto3>=1.34.0 \
+    openai>=1.3.0 \
+    beautifulsoup4==4.12.2 \
+    pydub==0.25.1 \
+    python-dotenv \
+    lxml==4.9.3
+
+# Copy all service files
+COPY *.py /app/
+
+# Create tours directory (for volume mode compatibility)
+RUN mkdir -p /app/tours
+
+EXPOSE 8080
+
+# Default health check
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8080}/health || exit 1
