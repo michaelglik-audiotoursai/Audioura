@@ -518,4 +518,4 @@ def get_job_status(job_id):
 if __name__ == '__main__':
     os.makedirs(TOURS_DIR, exist_ok=True)
     print(f"Starting Modernized Tour Generation Service v{SERVICE_VERSION}")
-    app.run(host='0.0.0.0', port=5021, debug=False)
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', '5021')), debug=False)

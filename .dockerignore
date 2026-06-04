@@ -1,0 +1,66 @@
+# Docker ignore for Cloud Run builds
+# Keep: all active service .py files + their dependencies
+# Exclude: test scripts, one-off utilities, backup files, non-Python assets
+
+# Test files
+test_*.py
+smoke_test_*.py
+check_*.py
+
+# One-off/utility scripts (not runtime dependencies)
+fix_*.py
+add_*.py
+build_*.py
+deploy_*.py
+setup_*.py
+update_*.py
+restore_*.py
+cleanup_*.py
+modify_*.py
+
+# Backup/duplicate files (keep *_fixed.py since enhanced_tour_templates_fixed is needed)
+*_backup.py
+*_restored.py
+*_working.py
+*_container.py
+*_from_container.py
+
+# Directories not needed at runtime
+migration/
+mock-server/
+scripts/
+audio_tour_app/
+tours/
+container_backup/
+coordinates_fromAI/
+map_delivery/
+translation-service/
+all_tours_netlify/
+temp_tour_analysis/
+Temp/
+
+# Non-Python files
+*.md
+*.txt
+*.sql
+*.bat
+*.sh
+*.zip
+*.apk
+*.json
+*.html
+*.dart
+*.yaml
+*.yml
+*.docx
+*.aab
+*.mp3
+*.wav
+
+# Git/IDE
+.git/
+.github/
+.vscode/
+__pycache__/
+*.pyc
+.env

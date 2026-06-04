@@ -869,4 +869,4 @@ if __name__ == '__main__':
     print("  - Enhanced tours-near with custom tour support")
     sys.stdout.flush()
     
-    app.run(host='0.0.0.0', port=5005, debug=True)
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', '5005')), debug=False)
