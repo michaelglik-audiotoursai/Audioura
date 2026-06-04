@@ -11,7 +11,7 @@
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 When chat history is compacted, user will ask you to read `remind_ai.md` and `remind_mobile_ai.md`.
 **Your Response**:
-"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v1.2.9+72 (dual environment networking). Code is committed and pushed. Awaiting Ubuntu build + smoke test. Claude.AI code review doc `code_review_v1.2.9.72.md` has 5 open questions — ready to review and respond. Ready to continue."
+"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.1+1 (major version restart — Claude review fixes applied). Code is committed and pushed. Awaiting Ubuntu build + smoke test. Claude.AI code review doc `code_review_v2.1.1.1.md` has 5 open questions — ready to review and respond. Ready to continue."
 
 ## 🚫 OWNERSHIP BOUNDARIES — CRITICAL
 - ✅ **MY files**: `remind_mobile_ai.md`, `code_review_v*.md`, files in `amazon-q-communications/`
@@ -21,15 +21,16 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## CURRENT PROJECT STATUS
 **Project**: Audioura Android APK
-**Version on branch**: v1.2.9+72 ✅ committed on `services-migration`
+**Version on branch**: v2.1.1+1 ✅ committed on `services-migration` (commit `c3c7c81`)
 **iPhone**: On v1.2.9+71 (iOS Q built — A#78 mic fix)
-**Android**: ✅ v1.2.9+72 built and committed — awaiting Ubuntu build + smoke test
+**Android**: ✅ v2.1.1+1 code committed — awaiting Ubuntu build + smoke test
 **iOS Q current task**: No active task assigned
 **Branch**: `services-migration`
 **Android Application ID**: `com.audioura.app`
 **Server**: `192.168.0.218` (Docker services on Windows laptop)
 
 ## RECENT VERSION HISTORY (latest first)
+- **v2.1.1+1** — Major version restart: Claude review fixes — Q1 cloud prefix flag, Q2 dead param removal, Q3 rename, Q5 DEV ONLY guards
 - **v1.2.9+72** — Dual environment networking: `Endpoints` resolver, Local/Cloud toggle in About, all services migrated
 - **v1.2.9+71** — A#78: mic permission fix (remove redundant `Permission.microphone.request()` from `my_tours_screen.dart`)
 - **v1.2.9+70** — (iOS Q — newsletter Refresh fix A#77)
@@ -45,6 +46,29 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 - **v1.2.9+60** — Fix white screen on single-POI museum tours (`_fitBounds()` guard)
 
 ## ✅ KEY FIXES IN RECENT VERSIONS
+
+### v2.1.1+1 — Claude Review Fixes (Major Version Restart)
+**Q1 — Cloud path prefix fix** (`endpoints.dart` + `about_screen.dart`):
+- `Endpoints.base()` now reads `cloud_use_path_prefixes` bool (default `false`).
+- `false` (interim/default): returns bare `cloudBase` — no prefix. Works against bare Cloud Run per-service hosts.
+- `true` (future gateway): appends `_cloudPaths[s]`. Enable only when `audioura.com` gateway is deployed.
+- About screen: added "Use gateway path routing" checkbox in cloud section, wired to `cloud_use_path_prefixes`.
+
+**Q2 — Removed dead `serverIp` param** (`home_screen.dart`):
+- Removed `serverIp` parameter from `_downloadTranslatedVersions()` signature.
+- Updated both callers: `_downloadSingleTour` and `_downloadSingleTourSilent`.
+- No behavior change — method body already used only `Endpoints.url()` internally.
+
+**Q3 — Renamed `processUri2`** (`home_screen.dart`):
+- Renamed `processUri2` → `processUri` in `_processNewsletterUrl`. Cosmetic only — separate method scope from `_processNewsletterWithUrl`.
+
+**Q5 — DEV ONLY warning comments** (`direct_db_update.dart`, `api_tester.dart`):
+- Added `// ⚠️ DEV ONLY — NEVER expose on Cloud Run` header comments to both files.
+- Files intentionally NOT migrated to `Endpoints` — they use `server_ip` directly, making them unreachable off-WiFi.
+
+**Q4** — No action. `SharedPreferences.getInstance()` is a cached singleton — confirmed non-issue.
+
+**Review doc**: `code_review_v2.1.1.1.md` — 5 new questions for Claude (see NEXT ACTION below).
 
 ### v1.2.9+72 — Dual Environment Networking
 **Feature**: App can now switch between local WiFi and cloud (cellular) server endpoints at runtime — no rebuild needed.
@@ -87,34 +111,24 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## 🔄 NEXT ACTION: Two parallel items
 
-### 1. Ubuntu build for v1.2.9+72
-**Status**: ✅ Code committed and pushed (`5d79a1f`)
+### 1. Ubuntu build for v2.1.1+1
+**Status**: ✅ Code committed and pushed (`c3c7c81`)
 **Steps**:
 1. Tell user to run `bash build_flutter_clean.sh` on Ubuntu VM
 2. Shared folder already has latest — no git pull needed on Ubuntu
-3. After install: smoke test checklist from `android_q_onboarding.md` + new dual-network test
-4. Key new test: About → toggle to Cloud → enter `https://map-delivery-ixkp5nkrlq-uc.a.run.app` → off WiFi → Home loads tours from cellular
-5. Report results
+3. After install: smoke test checklist from `android_q_onboarding.md` + dual-network test
+4. Key test: About → toggle to Cloud → enter `https://map-delivery-xxx-uc.a.run.app` → keep "Use gateway path routing" UNCHECKED → off WiFi → Home loads tours from cellular ✅
+5. Gateway prefix test (future): check "Use gateway path routing" → verify URLs include path prefix
+6. Report results
 
-### 2. Respond to Claude.AI code review questions (`code_review_v1.2.9.72.md`)
-Five open questions. Answers to provide:
+### 2. Respond to Claude.AI code review questions (`code_review_v2.1.1.1.md`)
+Five open questions awaiting Claude response:
 
-**Q1 — Cloud path prefix double-segment** (`/map-delivery/map-delivery/...`):
-The Cloud Run host `map-delivery-xxx.run.app` does NOT route on path prefix — it serves all paths directly. So `_cloudPaths[Service.mapDelivery]` should be `''` (empty string) for the interim single-host-per-service setup. When a gateway is deployed, it becomes `/map-delivery`. **Fix needed**: Make `_cloudPaths` empty string for mapDelivery until gateway exists, OR document that user must set `cloud_base_url` to `https://map-delivery-xxx.run.app` and the `/map-delivery` prefix will need removing. The cleanest interim fix: change `_cloudPaths[Service.mapDelivery]` to `''` and note in About that it will become `/map-delivery` when gateway is live.
-
-**Q2 — `_downloadTranslatedVersions` unused `serverIp` parameter**:
-Remove the `serverIp` parameter from the signature and update both callers (`_downloadSingleTour`, `_downloadSingleTourSilent`). Clean fix — no behavior change.
-
-**Q3 — `processUri2` variable name**:
-Not a real conflict — `processUri` in `_processNewsletterWithUrl` and `processUri2` in `_processNewsletterUrl` are in different method scopes. Rename `processUri2` → `processUri` in `_processNewsletterUrl`. No conflict at all.
-
-**Q4 — Multiple `SharedPreferences.getInstance()` calls**:
-No concern. `SharedPreferences.getInstance()` returns a cached singleton after first load — subsequent calls are synchronous memory reads. No performance issue.
-
-**Q5 — `direct_db_update.dart` / `api_tester.dart` not migrated**:
-These are dev-only debug tools. Add a `// ⚠️ DEV ONLY — NEVER expose on Cloud Run` comment at the top of each file. Services team must ensure these endpoints have no public ingress on Cloud Run. No code migration needed — they should NEVER route through cloud mode.
-
-**Action after compaction**: Read `code_review_v1.2.9.72.md`, implement Q2 (remove param) and Q3 (rename var) as code fixes in v1.2.9+73, document Q1 answer in About screen helper text, add Q5 warning comments. Q4 is informational only.
+**Q1** — Nullable `_cloudPaths[s]` in prefix expression — should we add `!` or `?? ''`?
+**Q2** — Is `cloud_use_path_prefixes` flag safe when user returns to local mode? (flag only read inside `mode == 'cloud'` block — likely already safe)
+**Q3** — Confirm no hidden side effect from removing `serverIp` param in `_downloadTranslatedVersions`
+**Q4** — Confirm `processUri` rename is conflict-free across two separate method scopes
+**Q5** — Should `direct_db_update.dart` / `api_tester.dart` get a runtime `server_mode != 'local'` guard?
 
 ## ⚠️ VERSION SYNC RULE
 - iOS Q makes code changes → commits → bumps `pubspec.yaml` version → pushes to `services-migration`
