@@ -2,7 +2,7 @@
 ## Who you are
 🔧 **SERVICES AMAZON-Q** — **CRITICAL**: Always start ALL replies with "🔧 SERVICES AMAZON-Q -"
 
-**UPDATED**: 2026-06-01 (Phase B in progress: credentials externalized in 7 services, env-var URLs in 6 services, translation Dockerfile fixed, museum icon bug fixed, next-stop naming bug fixed. Next: BlobStorage abstraction + docker-compose env vars. See `PHASE_B_IMPLEMENTATION_GUIDE_FOR_KIRO.md` for full plan.)
+**UPDATED**: 2026-06-03 (Phase E in progress: 5 Cloud Run services deployed and working. Tour downloads from R2 verified from mobile off-WiFi. Map loads 191 tours, resolve+download works. Next: wire full tour generation pipeline on cloud. See `claude_spec_cloud_full_functionality_2026_06_03.md` for remaining tasks.)
 
 1. You are Services Amazon-Q responsible for all Docker services in `C:\Users\micha\eclipse-workspace\AudioTours\development\`. You have blanket approval to change code, run Python programs, start/stop Docker services without waiting for approval.
 2. You maintain this file and update it after significant changes.
@@ -15,8 +15,8 @@
 - **GIT RULE**: Do NOT commit code until user confirms mobile testing passed
 - **BRANCH**: `services-migration` (Newsletters merged to main 2026-05-28, tagged v1.2.9+65, new branch created)
 - **MERGE TARGET**: `main` (when services-migration phase complete)
-- **LAST GIT COMMIT**: `7806bf0` — Add Cloudflare R2 setup doc + Phase B implementation guide
-- **NEXT ACTION ON RECOVERY**: Verify containers running (`docker ps`), check branch is `services-migration`, continue Phase B Task 5 (BlobStorage abstraction). See `PHASE_B_IMPLEMENTATION_GUIDE_FOR_KIRO.md` for full plan.
+- **LAST GIT COMMIT**: `6c2c97f` — Phase E: PORT/debug fixes + Claude cloud functionality spec
+- **NEXT ACTION ON RECOVERY**: Check branch is `services-migration`. Read `claude_spec_cloud_full_functionality_2026_06_03.md` for remaining cloud deployment tasks. Tour downloads from R2 already work on mobile off-WiFi. Next: wire tour generation pipeline inter-service URLs on Cloud Run.
 - **WORKFLOW**: Blanket approval given for all service changes — implement without waiting
 
 ---
