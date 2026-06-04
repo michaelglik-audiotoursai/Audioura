@@ -11,7 +11,7 @@
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 When chat history is compacted, user will ask you to read `remind_ai.md` and `remind_mobile_ai.md`.
 **Your Response**:
-"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v1.2.9+68. iOS Q is building v1.2.9+69 (newsletter Refresh fix) on Mac Mini — waiting for that commit to be pushed before building Android. Ready to continue."
+"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v1.2.9+72 (dual environment networking). Code is committed and pushed. Awaiting Ubuntu build + smoke test. Claude.AI code review doc `code_review_v1.2.9.72.md` has 5 open questions — ready to review and respond. Ready to continue."
 
 ## 🚫 OWNERSHIP BOUNDARIES — CRITICAL
 - ✅ **MY files**: `remind_mobile_ai.md`, `code_review_v*.md`, files in `amazon-q-communications/`
@@ -56,12 +56,11 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 **Note**: `direct_db_update.dart` and `api_tester.dart` NOT migrated — dev-only, must never be exposed on Cloud Run
 
 ### v1.2.9+71 — A#78 Mic Permission Fix
-**Bug**: Tapping POI map icons during tour playback did nothing — no map opened, no error in logs
-**Root Cause**: Server HTML emits `<button onclick="openMap(N)">` calling `flutter_inappwebview.callHandler('openMap', {stop:N})`. Flutter side never registered the `'openMap'` handler — silent no-op.
-**Fix**: Added `controller.addJavaScriptHandler(handlerName: 'openMap')` in `onWebViewCreated` in `TourPlayerScreen`. Handler parses stop number, pushes `TourMapScreen` with `focusStopIndex`.
-**Files**: `tour_player_screen.dart` (import + handler), `pubspec.yaml`
-**Log confirmation**: `MAP: openMap handler fired for stop N` appears when POI icon tapped
-**Note**: v1.2.9+67 (`HitTestBehavior.opaque` in `tour_map_screen.dart`) was an incorrect initial diagnosis — kept as minor hardening per Claude code review
+**Bug**: Tapping mic icon on Listen page showed "Microphone permission required" snackbar even after permission already granted
+**Root Cause**: Redundant `Permission.microphone.request()` block in `_startVoiceSearch()` conflicted with `speech_to_text` plugin's own permission pathway
+**Fix**: Removed redundant `Permission.microphone.request()` block and now-dead `permission_handler` import from `my_tours_screen.dart`
+**Files**: `my_tours_screen.dart`, `pubspec.yaml`
+**Android note**: `RECORD_AUDIO` still declared in `AndroidManifest.xml` — system dialog appears on first tap (correct), no snackbar on subsequent taps
 
 ### v1.2.9+66 — Map Icon Restored on Listen Page
 **Bug**: Green map icon missing from tour list — lost when `Tours_Step_Maps` branch was merged
@@ -86,14 +85,36 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 **Fix**: 4-line guard in `_fitBounds()` — uses `_mapController.move(points.first, 15)` for single-point case
 **File**: `tour_map_screen.dart`
 
-## 🔄 NEXT ACTION: Ubuntu build for v1.2.9+72
-**Status**: ✅ Code committed and pushed
+## 🔄 NEXT ACTION: Two parallel items
+
+### 1. Ubuntu build for v1.2.9+72
+**Status**: ✅ Code committed and pushed (`5d79a1f`)
 **Steps**:
 1. Tell user to run `bash build_flutter_clean.sh` on Ubuntu VM
 2. Shared folder already has latest — no git pull needed on Ubuntu
-3. After install: smoke test per A#78 checklist + new dual-network test
+3. After install: smoke test checklist from `android_q_onboarding.md` + new dual-network test
 4. Key new test: About → toggle to Cloud → enter `https://map-delivery-ixkp5nkrlq-uc.a.run.app` → off WiFi → Home loads tours from cellular
 5. Report results
+
+### 2. Respond to Claude.AI code review questions (`code_review_v1.2.9.72.md`)
+Five open questions. Answers to provide:
+
+**Q1 — Cloud path prefix double-segment** (`/map-delivery/map-delivery/...`):
+The Cloud Run host `map-delivery-xxx.run.app` does NOT route on path prefix — it serves all paths directly. So `_cloudPaths[Service.mapDelivery]` should be `''` (empty string) for the interim single-host-per-service setup. When a gateway is deployed, it becomes `/map-delivery`. **Fix needed**: Make `_cloudPaths` empty string for mapDelivery until gateway exists, OR document that user must set `cloud_base_url` to `https://map-delivery-xxx.run.app` and the `/map-delivery` prefix will need removing. The cleanest interim fix: change `_cloudPaths[Service.mapDelivery]` to `''` and note in About that it will become `/map-delivery` when gateway is live.
+
+**Q2 — `_downloadTranslatedVersions` unused `serverIp` parameter**:
+Remove the `serverIp` parameter from the signature and update both callers (`_downloadSingleTour`, `_downloadSingleTourSilent`). Clean fix — no behavior change.
+
+**Q3 — `processUri2` variable name**:
+Not a real conflict — `processUri` in `_processNewsletterWithUrl` and `processUri2` in `_processNewsletterUrl` are in different method scopes. Rename `processUri2` → `processUri` in `_processNewsletterUrl`. No conflict at all.
+
+**Q4 — Multiple `SharedPreferences.getInstance()` calls**:
+No concern. `SharedPreferences.getInstance()` returns a cached singleton after first load — subsequent calls are synchronous memory reads. No performance issue.
+
+**Q5 — `direct_db_update.dart` / `api_tester.dart` not migrated**:
+These are dev-only debug tools. Add a `// ⚠️ DEV ONLY — NEVER expose on Cloud Run` comment at the top of each file. Services team must ensure these endpoints have no public ingress on Cloud Run. No code migration needed — they should NEVER route through cloud mode.
+
+**Action after compaction**: Read `code_review_v1.2.9.72.md`, implement Q2 (remove param) and Q3 (rename var) as code fixes in v1.2.9+73, document Q1 answer in About screen helper text, add Q5 warning comments. Q4 is informational only.
 
 ## ⚠️ VERSION SYNC RULE
 - iOS Q makes code changes → commits → bumps `pubspec.yaml` version → pushes to `services-migration`
