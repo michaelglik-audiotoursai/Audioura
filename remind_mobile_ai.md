@@ -31,7 +31,7 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## RECENT VERSION HISTORY (latest first)
 - **v2.1.2+1** — M1 complete: all 11 orchestrator/mapDelivery URLs migrated, runtime crash fixed (`apiBaseUrl as String` cast), all `print()` replaced with `DebugLogHelper`, dead locals removed
-- **v2.1.1+2** — M1 partial: route core tour generation through `Endpoints(Service.orchestrator)`. Version corrected from 2.1.2+1 → build number only
+- **v2.1.1+2** — Version correction (2.1.2+1 → 2.1.1+2): build number increment only. M1 partial: `_downloadBackgroundTour` + `_processAdditionalLanguages` migrated, dead `apiBaseUrl`/`serverIp` removed from `background_service.dart`
 - **v2.1.1+1** — Major version restart: Claude review fixes — Q1 cloud prefix flag, Q2 dead param removal, Q3 rename, Q5 DEV ONLY guards
 - **v1.2.9+72** — Dual environment networking: `Endpoints` resolver, Local/Cloud toggle in About, all services migrated
 - **v1.2.9+71** — A#78: mic permission fix (remove redundant `Permission.microphone.request()` from `my_tours_screen.dart`)
@@ -59,6 +59,15 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 **Deferred**: news (`:5012`) and newsletter (`:5017`) — services not yet on Cloud Run
 **Review doc**: `code_review_v2.1.2.1_final.md` — 2 questions for Claude (Q1 style, Q2 confirm deferrals)
 **M2 status**: blocked on Kiro's K1 REST endpoint contract (`POST /tour-status` on orchestrator)
+
+### v2.1.1+2 — Version Correction + M1 Partial
+**Version**: Corrected backwards bump (`2.1.2+1` → `2.1.1+2`) — build number only, no new functionality.
+**M1 partial applied**:
+- `_downloadBackgroundTour` status + download → `Endpoints.url(Service.orchestrator, ...)`
+- `_processAdditionalLanguages` → `Endpoints.url(Service.mapDelivery, '/download-tour/$translatedId')`
+- Dead `apiBaseUrl` read + dead `serverIp` local removed from `background_service.dart`
+- Compile blocker fixed: `prefs` re-added to `_processAdditionalLanguages`
+**Files**: `tour_generator_screen.dart`, `background_service.dart`, `pubspec.yaml`
 
 ### v2.1.1+1 — Claude Review Fixes (Major Version Restart)
 **Q1 — Cloud path prefix fix** (`endpoints.dart` + `about_screen.dart`):
