@@ -408,6 +408,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         return null;
       }
 
+      final prefs = await SharedPreferences.getInstance();
       final appDir = await getApplicationDocumentsDirectory();
 
       for (final lang in nonEnglish) {
