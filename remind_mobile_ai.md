@@ -11,7 +11,7 @@
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 When chat history is compacted, user will ask you to read `remind_ai.md` and `remind_mobile_ai.md`.
 **Your Response**:
-"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.1+2 (M1: tour generation routed through Endpoints — unblocks cloud generation). Code is committed and pushed. Awaiting Ubuntu build + smoke test. Claude.AI code review doc `code_review_v2.1.2.1.md` has 5 open questions — ready to review and respond. Ready to continue."
+"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.2+1 (M1 complete: all tour/orchestrator/map-delivery URLs through Endpoints, runtime crash fixed, all print() removed). Code is committed and pushed. Claude.AI final review doc is `code_review_v2.1.2.1_final.md`. Ready for Ubuntu build + smoke test. Ready to continue."
 
 ## 🚫 OWNERSHIP BOUNDARIES — CRITICAL
 - ✅ **MY files**: `remind_mobile_ai.md`, `code_review_v*.md`, files in `amazon-q-communications/`
@@ -21,16 +21,17 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## CURRENT PROJECT STATUS
 **Project**: Audioura Android APK
-**Version on branch**: v2.1.1+2 ✅ committed on `services-migration` (commit `6617bfc`)
+**Version on branch**: v2.1.2+1 ✅ committed on `services-migration` (commit `9265ac6`)
 **iPhone**: On v1.2.9+71 (iOS Q built — A#78 mic fix)
-**Android**: ✅ v2.1.1+2 code committed — awaiting Ubuntu build + smoke test
+**Android**: ✅ v2.1.2+1 code committed — awaiting Claude review + Ubuntu build + smoke test
 **iOS Q current task**: No active task assigned
 **Branch**: `services-migration`
 **Android Application ID**: `com.audioura.app`
 **Server**: `192.168.0.218` (Docker services on Windows laptop)
 
 ## RECENT VERSION HISTORY (latest first)
-- **v2.1.1+2** — M1: route all tour generation through `Endpoints(Service.orchestrator)` — unblocks cloud generation. Version corrected: build number only, no new functionality
+- **v2.1.2+1** — M1 complete: all 11 orchestrator/mapDelivery URLs migrated, runtime crash fixed (`apiBaseUrl as String` cast), all `print()` replaced with `DebugLogHelper`, dead locals removed
+- **v2.1.1+2** — M1 partial: route core tour generation through `Endpoints(Service.orchestrator)`. Version corrected from 2.1.2+1 → build number only
 - **v2.1.1+1** — Major version restart: Claude review fixes — Q1 cloud prefix flag, Q2 dead param removal, Q3 rename, Q5 DEV ONLY guards
 - **v1.2.9+72** — Dual environment networking: `Endpoints` resolver, Local/Cloud toggle in About, all services migrated
 - **v1.2.9+71** — A#78: mic permission fix (remove redundant `Permission.microphone.request()` from `my_tours_screen.dart`)
@@ -48,13 +49,15 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## ✅ KEY FIXES IN RECENT VERSIONS
 
-### v2.1.1+2 — M1: Tour Generation through Endpoints
-**Feature**: All tour generation/status/download calls now route through `Endpoints(Service.orchestrator)` — no more hardcoded `http://$serverIp:5002`.
+### v2.1.2+1 — M1 Complete + Full Cleanup
+**Feature**: M1 fully complete. All 11 tour/orchestrator/map-delivery call sites across 3 files route through `Endpoints`. Runtime crash fixed. All `print()` eliminated.
 **Files**: `tour_generator_screen.dart`, `background_service.dart`, `background_tour_monitor.dart`
-**6 migrated sites**: foreground generation POST, status poll, status+download in `_autoDownloadAndPlay`, coordinates fetch in `_saveTourInfo`, background generation POST
-**Removed**: `_apiBaseUrl` field, `_loadServerIp()` method, `apiBaseUrl` keys from pending tour JSON
-**Not yet migrated (deferred)**: news/newsletter calls (`:5012`, `:5017`) — separate services, not M1 scope. `_processAdditionalLanguages` `:5005` — M3 cleanup.
-**Review doc**: `code_review_v2.1.2.1.md` — 5 questions for Claude
+**11 migrated sites**: foreground POST, status poll, status+download in `_autoDownloadAndPlay`, coordinates in `_saveTourInfo`, background POST, `_processAdditionalLanguages` (mapDelivery), `_downloadBackgroundTour` (status+download), `background_service` status+download, `background_tour_monitor` status+download
+**Runtime crash fixed**: `apiBaseUrl as String` cast in `background_tour_monitor.checkBackgroundTourStatus` — key absent from JSON since v2.1.1+1, was throwing TypeError on every backgrounded tour
+**Dead code removed**: `apiBaseUrl` reads and `serverIp` locals in `background_service.dart` and `background_tour_monitor.dart`
+**print() eliminated**: 14 in `tour_generator_screen.dart`, 7 in `background_service.dart` — all → `DebugLogHelper.addDebugLog()`
+**Deferred**: news (`:5012`) and newsletter (`:5017`) — services not yet on Cloud Run
+**Review doc**: `code_review_v2.1.2.1_final.md` — 2 questions for Claude (Q1 style, Q2 confirm deferrals)
 **M2 status**: blocked on Kiro's K1 REST endpoint contract (`POST /tour-status` on orchestrator)
 
 ### v2.1.1+1 — Claude Review Fixes (Major Version Restart)
@@ -121,25 +124,26 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## 🔄 NEXT ACTION
 
-### 1. Ubuntu build for v2.1.1+2
-**Status**: ✅ Code committed and pushed (`6617bfc`)
-**Steps**:
-1. Tell user to run `bash build_flutter_clean.sh` on Ubuntu VM
-2. Shared folder already has latest — no git pull needed on Ubuntu
-3. After install: smoke test local generation first (regression), then cloud generation
-4. Key test: About → Cloud → enter gateway URL → leave "Use gateway path routing" UNCHECKED → off WiFi → Generate tab → request a tour → verify it completes and downloads
-5. Report results
+### 1. Claude.AI final review (`code_review_v2.1.2.1_final.md`)
+**Status**: ✅ Doc ready — paste into Claude.AI, get response, apply any fixes
+**2 open questions**:
+- Q1 — `prefs` passed as parameter to `_saveTourToMyToursTranslated` vs. obtained inside — style question
+- Q2 — Confirm defer news (`:5012`) and newsletter (`:5017`) until those services deploy to Cloud Run
 
-### 2. Claude.AI code review (`code_review_v2.1.1.2.md`) — 5 open questions
-**Q1** — `apiBaseUrl` key gone from pending tour JSON — is Endpoints approach correct for background status polling?
-**Q2** — Dead `apiBaseUrl` read from tour JSON in `background_service.dart` — remove?
-**Q3** — Dead `serverIp` local in `background_service.dart` — remove?
-**Q4** — Is `Endpoints.url()` (async SharedPreferences) safe inside `Timer.periodic` callback?
-**Q5** — Should `_processAdditionalLanguages` `:5005` URL be migrated to `Service.mapDelivery` now?
+### 2. Ubuntu build for v2.1.2+1
+**Status**: ✅ Code committed and pushed (`9265ac6`) — awaiting Claude review first
+**Steps**:
+1. After Claude review + any fixes: run `bash build_flutter_clean.sh` on Ubuntu VM
+2. Shared folder already has latest — no git pull needed on Ubuntu
+3. Smoke tests (priority order):
+   - Foreground single-language local (regression)
+   - Multi-language cloud (exercises `Service.mapDelivery` fix)
+   - Backgrounded tour cloud (exercises `_downloadBackgroundTour` + `background_tour_monitor` fixes)
 
 ### 3. M2 — blocked on Kiro's K1
 Waiting for Kiro to publish `POST /tour-status` REST contract on orchestrator.
 When ready: migrate `tour_status_service.dart` → `Endpoints.url(Service.orchestrator, '/tour-status')`, delete 6 raw-SQL files.
+**Note**: endpoint keys on `tour_id` (the `tour_xxx` request id), not `request_string` — send correct id or update affects 0 rows.
 
 ## ⚠️ VERSION SYNC RULE
 - iOS Q makes code changes → commits → bumps `pubspec.yaml` version → pushes to `services-migration`
