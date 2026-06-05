@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:archive/archive.dart';
 import 'tour_status_service.dart';
 import 'notification_service.dart';
+import '../config/endpoints.dart';
 import '../screens/debug_log_viewer_screen.dart';
 
 /// Service to monitor background tours and update their status
@@ -78,7 +79,7 @@ class BackgroundTourMonitor {
         try {
           // Check the status of this tour
           final response = await http.get(
-            Uri.parse('$apiBaseUrl/status/$jobId'),
+            await Endpoints.url(Service.orchestrator, '/status/$jobId'),
           );
           
           if (response.statusCode == 200) {
@@ -143,7 +144,7 @@ class BackgroundTourMonitor {
       
       try {
         // Download the tour
-        final response = await http.get(Uri.parse('http://$serverIp:5002/download/$jobId'));
+        final response = await http.get(await Endpoints.url(Service.orchestrator, '/download/$jobId'));
         
         if (response.statusCode == 200) {
           // Save and extract the tour

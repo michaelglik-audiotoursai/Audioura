@@ -14,6 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/tour_status_service.dart';
 import '../services/background_tour_monitor.dart';
 import '../config.dart';
+import '../config/endpoints.dart';
 import '../services/translation_service.dart';
 
 import '../screens/debug_log_viewer_screen.dart';
@@ -34,7 +35,6 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   final TextEditingController _stopCountController = TextEditingController(text: '10');
   bool _isGenerating = false;
   String _progress = '';
-  String _apiBaseUrl = 'http://192.168.0.217:5002';
   List<Map<String, dynamic>> _pendingTours = [];
   List<Map<String, dynamic>> _backgroundTours = [];
   String _appMode = 'Tours'; // Default to Tours mode
@@ -46,7 +46,6 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   @override
   void initState() {
     super.initState();
-    _loadServerIp();
     _loadBackgroundStatus();
     _loadAppMode();
     
@@ -97,16 +96,6 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         backgroundColor: Colors.green,
       ),
     );
-  }
-  
-  Future<void> _loadServerIp() async {
-    final prefs = await SharedPreferences.getInstance();
-    final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
-    print('Server IP from preferences: $serverIp');
-    setState(() {
-      _apiBaseUrl = 'http://$serverIp:5002';
-    });
-    print('API Base URL: $_apiBaseUrl');
   }
   
   Future<void> _loadAppMode() async {
@@ -199,7 +188,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       
       // Step 1: Start tour generation
       final response = await http.post(
-        Uri.parse('$_apiBaseUrl/generate-complete-tour'),
+        await Endpoints.url(Service.orchestrator, '/generate-complete-tour'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(tourData),
       );
@@ -256,7 +245,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     jobTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
       try {
         final response = await http.get(
-          Uri.parse('$_apiBaseUrl/status/$jobId'),
+          await Endpoints.url(Service.orchestrator, '/status/$jobId'),
         );
         
         if (response.statusCode == 200) {
@@ -531,7 +520,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       });
       
       final statusResponse = await http.get(
-        Uri.parse('$_apiBaseUrl/status/$jobId'),
+        await Endpoints.url(Service.orchestrator, '/status/$jobId'),
       );
       
       if (statusResponse.statusCode != 200) {
@@ -554,7 +543,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       });
       
       final response = await http.get(
-        Uri.parse('$_apiBaseUrl/download/$finalTourId'),
+        await Endpoints.url(Service.orchestrator, '/download/$finalTourId'),
       );
       
       if (response.statusCode != 200) {
@@ -710,7 +699,9 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       double? lat;
       double? lng;
       try {
-        final statusResponse = await http.get(Uri.parse('$_apiBaseUrl/status/$jobId'));
+        final statusResponse = await http.get(
+          await Endpoints.url(Service.orchestrator, '/status/$jobId'),
+        );
         if (statusResponse.statusCode == 200) {
           final statusData = jsonDecode(statusResponse.body);
           if (statusData['coordinates'] != null && 
@@ -718,11 +709,11 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
               statusData['coordinates'].length >= 2) {
             lat = statusData['coordinates'][0]?.toDouble();
             lng = statusData['coordinates'][1]?.toDouble();
-            print('SAVE_TOUR: Found coordinates: $lat, $lng');
+            await DebugLogHelper.addDebugLog('SAVE_TOUR: Found coordinates: $lat, $lng');
           }
         }
       } catch (e) {
-        print('SAVE_TOUR: Error getting coordinates: $e');
+        await DebugLogHelper.addDebugLog('SAVE_TOUR: Error getting coordinates: $e');
       }
       
       // Get existing tours to generate unique title
@@ -1276,17 +1267,16 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       tourData['total_stops'] = stopCount; // Add custom stop count
       
       // Print debug info
-      print('Generating background tour: ${tourData['location']}');
-      print('API URL: $_apiBaseUrl/generate-complete-tour');
+      await DebugLogHelper.addDebugLog('BACKGROUND: Generating tour: ${tourData["location"]}');
       
       final response = await http.post(
-        Uri.parse('$_apiBaseUrl/generate-complete-tour'),
+        await Endpoints.url(Service.orchestrator, '/generate-complete-tour'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(tourData),
       );
 
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
+      await DebugLogHelper.addDebugLog('BACKGROUND: Response status: ${response.statusCode}');
+      await DebugLogHelper.addDebugLog('BACKGROUND: Response body: ${response.body}');
       
       if (response.statusCode != 200) {
         throw Exception('Failed to start tour generation: ${response.body}');
@@ -1295,7 +1285,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       Map<String, dynamic> result = jsonDecode(response.body);
       String jobId = result['job_id'];
       
-      print('Job ID: $jobId');
+      await DebugLogHelper.addDebugLog('BACKGROUND: Job ID: $jobId');
       
       // Add user tracking with the job ID and stop count
       await TourStatusService.trackTourRequest(sanitizedInput, jobId, stopCount: stopCount);
@@ -1305,7 +1295,6 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         _pendingTours.add({
           'jobId': jobId,
           'location': tourData['location'],
-          'apiBaseUrl': _apiBaseUrl,
           'startTime': DateTime.now().toIso8601String(),
         });
       });
@@ -1375,7 +1364,6 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     final pendingTour = jsonEncode({
       'jobId': jobId,
       'location': location,
-      'apiBaseUrl': _apiBaseUrl,
       'startTime': DateTime.now().toIso8601String(),
       'stopCount': _stopCountController.text,
       'notificationsEnabled': requestPermission && status.isGranted,

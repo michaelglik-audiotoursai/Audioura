@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:archive/archive.dart';
 
 import '../screens/debug_log_viewer_screen.dart';
+import '../config/endpoints.dart';
 import 'notification_service.dart';
 import 'tour_status_service.dart';
 
@@ -38,8 +39,9 @@ class BackgroundService {
           final apiBaseUrl = tour['apiBaseUrl'];
           
           try {
-            await DebugLogHelper.addDebugLog('Checking tour status: $apiBaseUrl/status/$jobId');
-            final response = await http.get(Uri.parse('$apiBaseUrl/status/$jobId'));
+            final statusUri = await Endpoints.url(Service.orchestrator, '/status/$jobId');
+            await DebugLogHelper.addDebugLog('Checking tour status: $statusUri');
+            final response = await http.get(statusUri);
             
             await DebugLogHelper.addDebugLog('Status response: ${response.statusCode}');
             if (response.statusCode == 200) {
@@ -102,13 +104,13 @@ class BackgroundService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
-      await DebugLogHelper.addDebugLog('Downloading tour from: http://$serverIp:5002/download/$jobId');
+      await DebugLogHelper.addDebugLog('Downloading tour via Endpoints: orchestrator/download/$jobId');
       
       // Show notification first to ensure user is notified even if download fails
       await NotificationService.showTourReadyNotification(location);
       
       try {
-        final response = await http.get(Uri.parse('http://$serverIp:5002/download/$jobId'));
+        final response = await http.get(await Endpoints.url(Service.orchestrator, '/download/$jobId'));
       
         if (response.statusCode == 200) {
           final directory = await getApplicationDocumentsDirectory();
