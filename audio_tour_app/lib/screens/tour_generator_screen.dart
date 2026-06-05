@@ -13,7 +13,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/tour_status_service.dart';
 import '../services/background_tour_monitor.dart';
-import '../config.dart';
 import '../config/endpoints.dart';
 import '../services/translation_service.dart';
 
@@ -409,8 +408,6 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         return null;
       }
 
-      final prefs = await SharedPreferences.getInstance();
-      final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
       final appDir = await getApplicationDocumentsDirectory();
 
       for (final lang in nonEnglish) {
@@ -421,8 +418,9 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
           continue;
         }
         try {
-          final url = 'http://$serverIp:5005/download-tour/$translatedId';
-          final resp = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 120));
+          final resp = await http.get(
+            await Endpoints.url(Service.mapDelivery, '/download-tour/$translatedId'),
+          ).timeout(const Duration(seconds: 120));
           if (resp.statusCode == 200) {
             await _saveTourToMyToursTranslated(translatedId, resp.bodyBytes, appDir.path, prefs, lang);
             await DebugLogHelper.addDebugLog('TOUR: Saved translated tour ($lang) ID: $translatedId');
@@ -1427,29 +1425,32 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   Future<void> _downloadBackgroundTour(Map<String, dynamic> tour) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
-      
+
       // First get status to check for coordinates
       double? lat;
       double? lng;
       try {
-        final statusResponse = await http.get(Uri.parse('http://$serverIp:5002/status/${tour['id']}'));
+        final statusResponse = await http.get(
+          await Endpoints.url(Service.orchestrator, '/status/${tour[\'id\']}'),
+        );
         if (statusResponse.statusCode == 200) {
           final statusData = jsonDecode(statusResponse.body);
-          if (statusData['coordinates'] != null && 
-              statusData['coordinates'] is List && 
+          if (statusData['coordinates'] != null &&
+              statusData['coordinates'] is List &&
               statusData['coordinates'].length >= 2) {
             lat = statusData['coordinates'][0]?.toDouble();
             lng = statusData['coordinates'][1]?.toDouble();
-            print('Found coordinates: $lat, $lng');
+            await DebugLogHelper.addDebugLog('Found coordinates: $lat, $lng');
           }
         }
       } catch (e) {
-        print('Error getting coordinates: $e');
+        await DebugLogHelper.addDebugLog('Error getting coordinates: $e');
       }
-      
+
       // Now download the tour
-      final response = await http.get(Uri.parse('http://$serverIp:5002/download/${tour['id']}'));
+      final response = await http.get(
+        await Endpoints.url(Service.orchestrator, '/download/${tour[\'id\']}'),
+      );
       
       if (response.statusCode == 200) {
         final directory = await getApplicationDocumentsDirectory();

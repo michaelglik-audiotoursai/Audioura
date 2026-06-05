@@ -36,7 +36,6 @@ class BackgroundService {
           final tour = jsonDecode(tourJson);
           final jobId = tour['jobId'];
           final location = tour['location'];
-          final apiBaseUrl = tour['apiBaseUrl'];
           
           try {
             final statusUri = await Endpoints.url(Service.orchestrator, '/status/$jobId');
@@ -103,7 +102,6 @@ class BackgroundService {
   static Future<void> _autoDownloadBackgroundTour(String jobId, String location, [Map<String, dynamic>? statusData]) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
       await DebugLogHelper.addDebugLog('Downloading tour via Endpoints: orchestrator/download/$jobId');
       
       // Show notification first to ensure user is notified even if download fails
