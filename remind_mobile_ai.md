@@ -11,7 +11,7 @@
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 When chat history is compacted, user will ask you to read `remind_ai.md` and `remind_mobile_ai.md`.
 **Your Response**:
-"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.1+1 (major version restart — Claude review fixes applied). Code is committed and pushed. Awaiting Ubuntu build + smoke test. Claude.AI code review doc `code_review_v2.1.1.1.md` has 5 open questions — ready to review and respond. Ready to continue."
+"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.2+1 (M1: tour generation routed through Endpoints — unblocks cloud generation). Code is committed and pushed. Awaiting Ubuntu build + smoke test. Claude.AI code review doc `code_review_v2.1.2.1.md` has 5 open questions — ready to review and respond. Ready to continue."
 
 ## 🚫 OWNERSHIP BOUNDARIES — CRITICAL
 - ✅ **MY files**: `remind_mobile_ai.md`, `code_review_v*.md`, files in `amazon-q-communications/`
@@ -21,15 +21,16 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## CURRENT PROJECT STATUS
 **Project**: Audioura Android APK
-**Version on branch**: v2.1.1+1 ✅ committed on `services-migration` (commit `c3c7c81`)
+**Version on branch**: v2.1.2+1 ✅ committed on `services-migration` (commit `40a9152`)
 **iPhone**: On v1.2.9+71 (iOS Q built — A#78 mic fix)
-**Android**: ✅ v2.1.1+1 code committed — awaiting Ubuntu build + smoke test
+**Android**: ✅ v2.1.2+1 code committed — awaiting Ubuntu build + smoke test
 **iOS Q current task**: No active task assigned
 **Branch**: `services-migration`
 **Android Application ID**: `com.audioura.app`
 **Server**: `192.168.0.218` (Docker services on Windows laptop)
 
 ## RECENT VERSION HISTORY (latest first)
+- **v2.1.2+1** — M1: route all tour generation through `Endpoints(Service.orchestrator)` — unblocks cloud generation
 - **v2.1.1+1** — Major version restart: Claude review fixes — Q1 cloud prefix flag, Q2 dead param removal, Q3 rename, Q5 DEV ONLY guards
 - **v1.2.9+72** — Dual environment networking: `Endpoints` resolver, Local/Cloud toggle in About, all services migrated
 - **v1.2.9+71** — A#78: mic permission fix (remove redundant `Permission.microphone.request()` from `my_tours_screen.dart`)
@@ -46,6 +47,15 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 - **v1.2.9+60** — Fix white screen on single-POI museum tours (`_fitBounds()` guard)
 
 ## ✅ KEY FIXES IN RECENT VERSIONS
+
+### v2.1.2+1 — M1: Tour Generation through Endpoints
+**Feature**: All tour generation/status/download calls now route through `Endpoints(Service.orchestrator)` — no more hardcoded `http://$serverIp:5002`.
+**Files**: `tour_generator_screen.dart`, `background_service.dart`, `background_tour_monitor.dart`
+**6 migrated sites**: foreground generation POST, status poll, status+download in `_autoDownloadAndPlay`, coordinates fetch in `_saveTourInfo`, background generation POST
+**Removed**: `_apiBaseUrl` field, `_loadServerIp()` method, `apiBaseUrl` keys from pending tour JSON
+**Not yet migrated (deferred)**: news/newsletter calls (`:5012`, `:5017`) — separate services, not M1 scope. `_processAdditionalLanguages` `:5005` — M3 cleanup.
+**Review doc**: `code_review_v2.1.2.1.md` — 5 questions for Claude
+**M2 status**: blocked on Kiro's K1 REST endpoint contract (`POST /tour-status` on orchestrator)
 
 ### v2.1.1+1 — Claude Review Fixes (Major Version Restart)
 **Q1 — Cloud path prefix fix** (`endpoints.dart` + `about_screen.dart`):
@@ -109,26 +119,27 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 **Fix**: 4-line guard in `_fitBounds()` — uses `_mapController.move(points.first, 15)` for single-point case
 **File**: `tour_map_screen.dart`
 
-## 🔄 NEXT ACTION: Two parallel items
+## 🔄 NEXT ACTION
 
-### 1. Ubuntu build for v2.1.1+1
-**Status**: ✅ Code committed and pushed (`c3c7c81`)
+### 1. Ubuntu build for v2.1.2+1
+**Status**: ✅ Code committed and pushed (`40a9152`)
 **Steps**:
 1. Tell user to run `bash build_flutter_clean.sh` on Ubuntu VM
 2. Shared folder already has latest — no git pull needed on Ubuntu
-3. After install: smoke test checklist from `android_q_onboarding.md` + dual-network test
-4. Key test: About → toggle to Cloud → enter `https://map-delivery-xxx-uc.a.run.app` → keep "Use gateway path routing" UNCHECKED → off WiFi → Home loads tours from cellular ✅
-5. Gateway prefix test (future): check "Use gateway path routing" → verify URLs include path prefix
-6. Report results
+3. After install: smoke test local generation first (regression), then cloud generation
+4. Key test: About → Cloud → enter gateway URL → leave "Use gateway path routing" UNCHECKED → off WiFi → Generate tab → request a tour → verify it completes and downloads
+5. Report results
 
-### 2. Respond to Claude.AI code review questions (`code_review_v2.1.1.1.md`)
-Five open questions awaiting Claude response:
+### 2. Claude.AI code review (`code_review_v2.1.2.1.md`) — 5 open questions
+**Q1** — `apiBaseUrl` key gone from pending tour JSON — is Endpoints approach correct for background status polling?
+**Q2** — Dead `apiBaseUrl` read from tour JSON in `background_service.dart` — remove?
+**Q3** — Dead `serverIp` local in `background_service.dart` — remove?
+**Q4** — Is `Endpoints.url()` (async SharedPreferences) safe inside `Timer.periodic` callback?
+**Q5** — Should `_processAdditionalLanguages` `:5005` URL be migrated to `Service.mapDelivery` now?
 
-**Q1** — Nullable `_cloudPaths[s]` in prefix expression — should we add `!` or `?? ''`?
-**Q2** — Is `cloud_use_path_prefixes` flag safe when user returns to local mode? (flag only read inside `mode == 'cloud'` block — likely already safe)
-**Q3** — Confirm no hidden side effect from removing `serverIp` param in `_downloadTranslatedVersions`
-**Q4** — Confirm `processUri` rename is conflict-free across two separate method scopes
-**Q5** — Should `direct_db_update.dart` / `api_tester.dart` get a runtime `server_mode != 'local'` guard?
+### 3. M2 — blocked on Kiro's K1
+Waiting for Kiro to publish `POST /tour-status` REST contract on orchestrator.
+When ready: migrate `tour_status_service.dart` → `Endpoints.url(Service.orchestrator, '/tour-status')`, delete 6 raw-SQL files.
 
 ## ⚠️ VERSION SYNC RULE
 - iOS Q makes code changes → commits → bumps `pubspec.yaml` version → pushes to `services-migration`
