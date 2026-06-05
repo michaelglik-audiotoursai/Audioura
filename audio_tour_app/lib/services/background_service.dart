@@ -64,23 +64,21 @@ class BackgroundService {
                 // Auto-download background tour to My Tours (notification is shown inside this method)
                 await _autoDownloadBackgroundTour(jobId, location, status);
                 
-                print('Background tour ready: $location (Job: $jobId)');
+                await DebugLogHelper.addDebugLog('Background tour ready: $location (Job: $jobId)');
                 await DebugLogHelper.addDebugLog('Tour completed: $location');
                 await DebugLogHelper.addDebugLog('Job ID: $jobId');
               }
             }
           } catch (e) {
             await DebugLogHelper.addDebugLog('Error connecting to server: $e');
-            print('Error connecting to server: $e');
           }
         } catch (e) {
           final tourData = jsonDecode(tourJson);
-          print('Error processing background tour ${tourData['jobId']} (${tourData['location']}): $e');
-          // Continue with other tours even if one fails
+          await DebugLogHelper.addDebugLog('Error processing background tour ${tourData["jobId"]} (${tourData["location"]}): $e');
         }
       }
     } catch (e) {
-      print('Background check error: $e');
+      await DebugLogHelper.addDebugLog('Background check error: $e');
     }
   }
   
@@ -94,7 +92,6 @@ class BackgroundService {
       await TourStatusService.updateTourStatus(jobId, status);
       
     } catch (e) {
-      print('Error updating background tour status: $e');
       await DebugLogHelper.addDebugLog('Error updating background tour status: $e');
     }
   }
@@ -183,8 +180,7 @@ class BackgroundService {
           });
           await prefs.setStringList('background_tours', backgroundTours);
           
-          print('Background tour auto-downloaded to My Tours: $location');
-          await DebugLogHelper.addDebugLog('Auto-downloaded: $location');
+          await DebugLogHelper.addDebugLog('Background tour auto-downloaded to My Tours: $location');
           await DebugLogHelper.addDebugLog('Moved to My Tours tab');
           await DebugLogHelper.addDebugLog('Removed from Background tab');
         } else {
@@ -196,8 +192,7 @@ class BackgroundService {
         throw Exception('Failed to download tour: $e');
       }
     } catch (e) {
-      print('Error auto-downloading background tour: $e');
-      await DebugLogHelper.addDebugLog('Error auto-downloading tour: $e');
+      await DebugLogHelper.addDebugLog('Error auto-downloading background tour: $e');
     }
   }
   

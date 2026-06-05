@@ -226,7 +226,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       await _pollAndAutoDownload(jobId, tourData['location'], _selectedLanguages);
       
     } catch (error) {
-      print('DETAILED ERROR: $error');
+      await DebugLogHelper.addDebugLog('DETAILED ERROR: $error');
       _showError('Failed to generate tour: $error');
       setState(() {
         _isGenerating = false;
@@ -732,7 +732,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         'lng': lng,
       };
       
-      print('SAVE_TOUR: Saving tour info: $tourInfo');
+      await DebugLogHelper.addDebugLog('SAVE_TOUR: Saving tour info: $tourInfo');
       
       // Add to saved tours list
       tours.add(jsonEncode(tourInfo));
@@ -744,16 +744,16 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         return '${tour['title']}|${tour['path']}';
       }).toList();
       await prefs.setStringList('available_tours', tourInfoList);
-      print('VOICE: Updated available_tours list with ${tourInfoList.length} tours');
+      await DebugLogHelper.addDebugLog('VOICE: Updated available_tours list with ${tourInfoList.length} tours');
       
-      print('SAVE_TOUR: Tour saved successfully. Total tours: ${tours.length}');
+      await DebugLogHelper.addDebugLog('SAVE_TOUR: Tour saved successfully. Total tours: ${tours.length}');
       
       // Verify save
       final savedTours = prefs.getStringList('saved_tours') ?? [];
-      print('SAVE_TOUR: Verification - saved tours count: ${savedTours.length}');
+      await DebugLogHelper.addDebugLog('SAVE_TOUR: Verification - saved tours count: ${savedTours.length}');
       
     } catch (e) {
-      print('SAVE_TOUR: Error saving tour info: $e');
+      await DebugLogHelper.addDebugLog('SAVE_TOUR: Error saving tour info: $e');
       throw e;
     }
   }
@@ -832,7 +832,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   }
 
   void _showError(String message) {
-    print('ERROR: $message');
+    await DebugLogHelper.addDebugLog('ERROR: $message');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -864,7 +864,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   }
 
   void _showSuccess(String message) {
-    print('SUCCESS: $message');
+    await DebugLogHelper.addDebugLog('SUCCESS: $message');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -1305,13 +1305,13 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       _tourRequestController.clear();
       
     } catch (error) {
-      print('ERROR: $error');
+      await DebugLogHelper.addDebugLog('ERROR: $error');
       _showError('Failed to start background generation: $error');
     }
   }
 
   void _showNotificationPermissionDialog(String jobId, String location) {
-    print('Showing notification permission dialog for job $jobId');
+    await DebugLogHelper.addDebugLog('Showing notification permission dialog for job $jobId');
     
     // Show a dialog asking for notification permission
     showDialog(
@@ -1343,13 +1343,13 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   }
 
   Future<void> _requestNotificationPermissionAndStartBackground(String jobId, String location, bool requestPermission) async {
-    print('Requesting notification permission for job $jobId, requestPermission: $requestPermission');
+    await DebugLogHelper.addDebugLog('Requesting notification permission for job $jobId, requestPermission: $requestPermission');
     
     // Only request permission if user agreed
     PermissionStatus status = PermissionStatus.denied;
     if (requestPermission) {
       status = await Permission.notification.request();
-      print('Permission status: $status');
+      await DebugLogHelper.addDebugLog('Permission status: $status');
     }
     
     // Always proceed with background tour, even if permission denied
@@ -1368,7 +1368,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       'notificationsEnabled': requestPermission && status.isGranted,
     });
     
-    print('Adding pending tour: $pendingTour');
+    await DebugLogHelper.addDebugLog('Adding pending tour: $pendingTour');
     pendingTours.add(pendingTour);
     await prefs.setStringList('pending_background_tours', pendingTours);
     
@@ -1949,7 +1949,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       await DebugLogHelper.addDebugLog('NEWS: Last saved article: ${savedNews.isNotEmpty ? savedNews.last : "none"}');
       
     } catch (e) {
-      print('Error saving news info: $e');
+      await DebugLogHelper.addDebugLog('Error saving news info: $e');
       throw e;
     }
   }

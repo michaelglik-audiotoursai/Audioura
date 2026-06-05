@@ -73,7 +73,6 @@ class BackgroundTourMonitor {
         final tour = jsonDecode(tourJson);
         final jobId = tour['jobId'] as String;
         final location = tour['location'] as String;
-        final apiBaseUrl = tour['apiBaseUrl'] as String;
         final notificationsEnabled = tour['notificationsEnabled'] as bool? ?? false;
         
         try {
@@ -132,8 +131,6 @@ class BackgroundTourMonitor {
   static Future<void> _autoDownloadCompletedTour(String jobId, String location, Map<String, dynamic> status, bool notificationsEnabled) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
-      
       await DebugLogHelper.addDebugLog('Auto-downloading completed tour: $jobId');
       
       // Show notification if enabled
