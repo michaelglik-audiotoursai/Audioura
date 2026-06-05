@@ -1000,6 +1000,71 @@ def get_job_status(job_id):
     print(f"Returning status: {response}")
     return jsonify(response)
 
+
+@app.route('/tour-status', methods=['POST'])
+def update_tour_status():
+    """K1: REST endpoint for mobile app to update tour request status.
+    Replaces the client-side raw SQL direct DB update.
+    
+    Request body:
+        {
+            "tour_id": "tour_19e73f4059d",    (required)
+            "status": "completed|failed|started",  (required)
+            "job_id": "uuid"                  (optional, for correlation)
+        }
+    Response:
+        {"status": "success", "tour_id": "...", "rows_affected": 1}
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"status": "error", "message": "JSON body required"}), 400
+        
+        tour_id = data.get('tour_id')
+        new_status = data.get('status')
+        
+        if not tour_id or not new_status:
+            return jsonify({"status": "error", "message": "tour_id and status are required"}), 400
+        
+        # Validate status value
+        allowed_statuses = ('started', 'completed', 'failed', 'processing')
+        if new_status not in allowed_statuses:
+            return jsonify({"status": "error", "message": f"status must be one of: {allowed_statuses}"}), 400
+        
+        import psycopg2
+        conn = psycopg2.connect(
+            host=os.getenv('DB_HOST', 'postgres-2'),
+            database=os.getenv('DB_NAME', 'audiotours'),
+            user=os.getenv('DB_USER', 'admin'),
+            password=os.getenv('DB_PASSWORD', 'password123'),
+            port=os.getenv('DB_PORT', '5432')
+        )
+        cur = conn.cursor()
+        
+        if new_status == 'completed':
+            cur.execute(
+                "UPDATE tour_requests SET status = %s, finished_at = NOW() WHERE tour_id = %s",
+                (new_status, tour_id)
+            )
+        else:
+            cur.execute(
+                "UPDATE tour_requests SET status = %s WHERE tour_id = %s",
+                (new_status, tour_id)
+            )
+        
+        rows_affected = cur.rowcount
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        print(f"[TOUR-STATUS] Updated tour_id={tour_id} to status={new_status}, rows={rows_affected}")
+        return jsonify({"status": "success", "tour_id": tour_id, "rows_affected": rows_affected})
+    
+    except Exception as e:
+        print(f"[TOUR-STATUS] Error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @app.route('/download/<job_id>', methods=['GET'])
 def download_tour(job_id):
     """Download the complete tour package."""
