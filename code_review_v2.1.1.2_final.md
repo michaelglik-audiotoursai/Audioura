@@ -1,8 +1,8 @@
-# Code Review Request — v2.1.2+1 (M1 complete + full cleanup)
+# Code Review Request — v2.1.1+2 (M1 complete + full cleanup)
 **Date:** 2026-06-03
 **Prepared by:** Android Amazon-Q
 **Commit:** `9265ac6` on branch `services-migration`
-**Scope:** All changes from v2.1.1+1 → v2.1.2+1. Ready for final review before Ubuntu build.
+**Scope:** All changes from v2.1.1+1 → v2.1.1+2. Ready for final review before Ubuntu build.
 
 ---
 
@@ -170,7 +170,7 @@ await Endpoints.url(Service.orchestrator, '/download/$jobId')
 |------|--------|
 | Compile blocker (`prefs` missing in `_processAdditionalLanguages`) | ✅ Fixed |
 | Runtime crash (`apiBaseUrl as String` cast in `background_tour_monitor`) | ✅ Fixed |
-| Version monotonic (`2.1.1+1` → `2.1.2+1`) | ✅ Fixed |
+| Version monotonic (`2.1.1+1` → `2.1.1+2`) | ✅ Fixed |
 | All orchestrator URLs migrated (11 sites across 3 files) | ✅ |
 | `_processAdditionalLanguages` → `Service.mapDelivery` | ✅ |
 | Dead `apiBaseUrl` reads removed (both files) | ✅ |
