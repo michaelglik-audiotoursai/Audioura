@@ -11,7 +11,7 @@
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 When chat history is compacted, user will ask you to read `remind_ai.md` and `remind_mobile_ai.md`.
 **Your Response**:
-"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.2+1 (M1: tour generation routed through Endpoints — unblocks cloud generation). Code is committed and pushed. Awaiting Ubuntu build + smoke test. Claude.AI code review doc `code_review_v2.1.2.1.md` has 5 open questions — ready to review and respond. Ready to continue."
+"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.1+2 (M1: tour generation routed through Endpoints — unblocks cloud generation). Code is committed and pushed. Awaiting Ubuntu build + smoke test. Claude.AI code review doc `code_review_v2.1.2.1.md` has 5 open questions — ready to review and respond. Ready to continue."
 
 ## 🚫 OWNERSHIP BOUNDARIES — CRITICAL
 - ✅ **MY files**: `remind_mobile_ai.md`, `code_review_v*.md`, files in `amazon-q-communications/`
@@ -21,16 +21,16 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## CURRENT PROJECT STATUS
 **Project**: Audioura Android APK
-**Version on branch**: v2.1.2+1 ✅ committed on `services-migration` (commit `40a9152`)
+**Version on branch**: v2.1.1+2 ✅ committed on `services-migration` (commit `6617bfc`)
 **iPhone**: On v1.2.9+71 (iOS Q built — A#78 mic fix)
-**Android**: ✅ v2.1.2+1 code committed — awaiting Ubuntu build + smoke test
+**Android**: ✅ v2.1.1+2 code committed — awaiting Ubuntu build + smoke test
 **iOS Q current task**: No active task assigned
 **Branch**: `services-migration`
 **Android Application ID**: `com.audioura.app`
 **Server**: `192.168.0.218` (Docker services on Windows laptop)
 
 ## RECENT VERSION HISTORY (latest first)
-- **v2.1.2+1** — M1: route all tour generation through `Endpoints(Service.orchestrator)` — unblocks cloud generation
+- **v2.1.1+2** — M1: route all tour generation through `Endpoints(Service.orchestrator)` — unblocks cloud generation. Version corrected: build number only, no new functionality
 - **v2.1.1+1** — Major version restart: Claude review fixes — Q1 cloud prefix flag, Q2 dead param removal, Q3 rename, Q5 DEV ONLY guards
 - **v1.2.9+72** — Dual environment networking: `Endpoints` resolver, Local/Cloud toggle in About, all services migrated
 - **v1.2.9+71** — A#78: mic permission fix (remove redundant `Permission.microphone.request()` from `my_tours_screen.dart`)
@@ -48,7 +48,7 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## ✅ KEY FIXES IN RECENT VERSIONS
 
-### v2.1.2+1 — M1: Tour Generation through Endpoints
+### v2.1.1+2 — M1: Tour Generation through Endpoints
 **Feature**: All tour generation/status/download calls now route through `Endpoints(Service.orchestrator)` — no more hardcoded `http://$serverIp:5002`.
 **Files**: `tour_generator_screen.dart`, `background_service.dart`, `background_tour_monitor.dart`
 **6 migrated sites**: foreground generation POST, status poll, status+download in `_autoDownloadAndPlay`, coordinates fetch in `_saveTourInfo`, background generation POST
@@ -121,8 +121,8 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## 🔄 NEXT ACTION
 
-### 1. Ubuntu build for v2.1.2+1
-**Status**: ✅ Code committed and pushed (`40a9152`)
+### 1. Ubuntu build for v2.1.1+2
+**Status**: ✅ Code committed and pushed (`6617bfc`)
 **Steps**:
 1. Tell user to run `bash build_flutter_clean.sh` on Ubuntu VM
 2. Shared folder already has latest — no git pull needed on Ubuntu
@@ -130,7 +130,7 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 4. Key test: About → Cloud → enter gateway URL → leave "Use gateway path routing" UNCHECKED → off WiFi → Generate tab → request a tour → verify it completes and downloads
 5. Report results
 
-### 2. Claude.AI code review (`code_review_v2.1.2.1.md`) — 5 open questions
+### 2. Claude.AI code review (`code_review_v2.1.1.2.md`) — 5 open questions
 **Q1** — `apiBaseUrl` key gone from pending tour JSON — is Endpoints approach correct for background status polling?
 **Q2** — Dead `apiBaseUrl` read from tour JSON in `background_service.dart` — remove?
 **Q3** — Dead `serverIp` local in `background_service.dart` — remove?
