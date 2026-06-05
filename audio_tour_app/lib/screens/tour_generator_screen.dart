@@ -831,7 +831,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     );
   }
 
-  void _showError(String message) {
+  Future<void> _showError(String message) async {
     await DebugLogHelper.addDebugLog('ERROR: $message');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -863,7 +863,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     );
   }
 
-  void _showSuccess(String message) {
+  Future<void> _showSuccess(String message) async {
     await DebugLogHelper.addDebugLog('SUCCESS: $message');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -1310,7 +1310,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     }
   }
 
-  void _showNotificationPermissionDialog(String jobId, String location) {
+  Future<void> _showNotificationPermissionDialog(String jobId, String location) async {
     await DebugLogHelper.addDebugLog('Showing notification permission dialog for job $jobId');
     
     // Show a dialog asking for notification permission
@@ -1432,7 +1432,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       double? lng;
       try {
         final statusResponse = await http.get(
-          await Endpoints.url(Service.orchestrator, '/status/${tour[\'id\']}'),
+          await Endpoints.url(Service.orchestrator, '/status/${tour["id"]}'),
         );
         if (statusResponse.statusCode == 200) {
           final statusData = jsonDecode(statusResponse.body);
@@ -1450,7 +1450,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
 
       // Now download the tour
       final response = await http.get(
-        await Endpoints.url(Service.orchestrator, '/download/${tour[\'id\']}'),
+        await Endpoints.url(Service.orchestrator, '/download/${tour["id"]}'),
       );
       
       if (response.statusCode == 200) {
