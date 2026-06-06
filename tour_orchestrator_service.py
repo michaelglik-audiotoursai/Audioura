@@ -910,6 +910,20 @@ def generate_complete_tour():
     except ValueError:
         return jsonify({"error": "total_stops must be a valid integer"}), 400
     
+    # Entitlements check: verify user hasn't exceeded their plan limits
+    if user_id:
+        try:
+            from entitlements import check_tour_quota
+            quota = check_tour_quota(user_id, total_stops)
+            if not quota['allowed']:
+                print(f"[QUOTA] Denied tour for {user_id}: {quota}")
+                return jsonify(quota), 429
+            # Clamp stops to plan maximum
+            total_stops = quota['clamped_stops']
+            print(f"[QUOTA] Allowed for {user_id}: used={quota['used']}, remaining={quota['remaining']}, stops_clamped={total_stops}")
+        except Exception as quota_err:
+            print(f"[QUOTA] Error checking quota (allowing): {quota_err}")
+    
     # Generate job ID
     job_id = str(uuid.uuid4())
     print(f"Generated job ID: {job_id}")
