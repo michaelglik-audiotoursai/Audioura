@@ -21,6 +21,19 @@ BACKENDS = {
     'newsletter': os.getenv('NEWSLETTER_URL', 'https://newsletter-processor-60899077572.us-central1.run.app'),
 }
 
+# API key for cost-bearing endpoints (generation, translation, newsletter processing)
+# Mobile app must send this in X-API-Key header to access these endpoints
+API_KEY = os.getenv('GATEWAY_API_KEY', '')
+
+def require_api_key():
+    """Check X-API-Key header on cost-bearing endpoints. Returns error response or None."""
+    if not API_KEY:
+        return None  # No key configured = open (dev mode)
+    client_key = request.headers.get('X-API-Key', '')
+    if client_key != API_KEY:
+        return jsonify({"error": "unauthorized", "message": "Valid X-API-Key header required"}), 401
+    return None
+
 # Token cache (tokens last ~1 hour)
 _token_cache = {}
 
@@ -97,9 +110,12 @@ def search_tours():
     return proxy_request(BACKENDS['map-delivery'], '/search-tours')
 
 
-# === TOUR ORCHESTRATOR ===
+# === TOUR ORCHESTRATOR (COST-BEARING: require API key) ===
 @app.route('/generate-complete-tour', methods=['POST'])
 def generate_tour():
+    auth_err = require_api_key()
+    if auth_err:
+        return auth_err
     return proxy_request(BACKENDS['orchestrator'], '/generate-complete-tour', timeout=600)
 
 @app.route('/status/<job_id>', methods=['GET'])
@@ -112,6 +128,9 @@ def download_job(job_id):
 
 @app.route('/tour-status', methods=['POST'])
 def tour_status():
+    auth_err = require_api_key()
+    if auth_err:
+        return auth_err
     return proxy_request(BACKENDS['orchestrator'], '/tour-status')
 
 @app.route('/jobs', methods=['GET'])
@@ -119,15 +138,21 @@ def list_jobs():
     return proxy_request(BACKENDS['orchestrator'], '/jobs')
 
 
-# === TRANSLATION ===
+# === TRANSLATION (COST-BEARING: require API key) ===
 @app.route('/translate-with-audio', methods=['POST'])
 def translate():
+    auth_err = require_api_key()
+    if auth_err:
+        return auth_err
     return proxy_request(BACKENDS['translation'], '/translate-with-audio', timeout=300)
 
 
-# === NEWS/NEWSLETTER ===
+# === NEWS/NEWSLETTER (COST-BEARING: require API key) ===
 @app.route('/process_newsletter', methods=['POST'])
 def process_newsletter():
+    auth_err = require_api_key()
+    if auth_err:
+        return auth_err
     return proxy_request(BACKENDS['newsletter'], '/process_newsletter', timeout=120)
 
 @app.route('/newsletters_v2', methods=['GET'])
@@ -138,7 +163,7 @@ def newsletters_v2():
 def get_articles():
     return proxy_request(BACKENDS['newsletter'], '/get_articles_by_newsletter_id')
 
-@app.route('/download/<article_id>', methods=['GET'])
+@app.route('/news-download/<article_id>', methods=['GET'])
 def download_article(article_id):
     return proxy_request(BACKENDS['news-orchestrator'], f'/download/{article_id}', timeout=30)
 
