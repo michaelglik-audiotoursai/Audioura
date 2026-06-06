@@ -188,7 +188,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       // Step 1: Start tour generation
       final response = await http.post(
         await Endpoints.url(Service.orchestrator, '/generate-complete-tour'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await Endpoints.apiHeaders(Service.orchestrator),
         body: jsonEncode(tourData),
       );
 
@@ -1270,7 +1270,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       
       final response = await http.post(
         await Endpoints.url(Service.orchestrator, '/generate-complete-tour'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await Endpoints.apiHeaders(Service.orchestrator),
         body: jsonEncode(tourData),
       );
 

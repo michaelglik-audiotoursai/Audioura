@@ -60,4 +60,18 @@ class Endpoints {
   /// Convenience: returns a fully-formed [Uri] for [s] + [path].
   static Future<Uri> url(Service s, String path) async =>
       Uri.parse('${await base(s)}$path');
+
+  /// Returns HTTP headers for [s]. In cloud mode, adds X-API-Key for
+  /// cost-bearing/write endpoints (orchestrator, translation).
+  /// Local mode: Content-Type only (LAN services don't require a key).
+  static Future<Map<String, String>> apiHeaders(Service s) async {
+    final prefs = await SharedPreferences.getInstance();
+    final headers = {'Content-Type': 'application/json'};
+    final mode = prefs.getString('server_mode') ?? 'local';
+    if (mode == 'cloud') {
+      final key = (prefs.getString('gateway_api_key') ?? '').trim();
+      if (key.isNotEmpty) headers['X-API-Key'] = key;
+    }
+    return headers;
+  }
 }

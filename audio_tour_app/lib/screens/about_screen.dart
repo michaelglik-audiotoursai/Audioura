@@ -26,9 +26,10 @@ class _AboutScreenState extends State<AboutScreen> {
   String _androidVersion = 'Loading...';
   final TextEditingController _serverIpController = TextEditingController();
   final TextEditingController _cloudBaseUrlController = TextEditingController();
+  final TextEditingController _apiKeyController = TextEditingController();
   String _currentServerIp = '192.168.0.218';
-  String _serverMode = 'local'; // 'local' or 'cloud'
-  bool _usePathPrefixes = false; // true = gateway mode (prefix routing)
+  String _serverMode = 'local';
+  bool _usePathPrefixes = false;
   String _selectedMode = 'Tours';
 
   @override
@@ -82,6 +83,7 @@ class _AboutScreenState extends State<AboutScreen> {
       final savedServerMode = prefs.getString('server_mode') ?? 'local';
       final savedCloudBaseUrl = prefs.getString('cloud_base_url') ?? '';
       final savedUsePathPrefixes = prefs.getBool('cloud_use_path_prefixes') ?? false;
+      final savedApiKey = prefs.getString('gateway_api_key') ?? '';
       
       await DebugLogHelper.addDebugLog('ABOUT: Checking user: $userId');
       
@@ -118,6 +120,7 @@ class _AboutScreenState extends State<AboutScreen> {
         _serverMode = savedServerMode;
         _cloudBaseUrlController.text = savedCloudBaseUrl;
         _usePathPrefixes = savedUsePathPrefixes;
+        _apiKeyController.text = savedApiKey;
       });
     } catch (e) {
       await DebugLogHelper.addDebugLog('ABOUT: Error loading app info: $e');
@@ -276,6 +279,43 @@ class _AboutScreenState extends State<AboutScreen> {
                       const Text(
                         '✅ Cloud mode: tour generation and map delivery live at api.audioura.com. News/newsletters remain local until deployed.',
                         style: TextStyle(fontSize: 11, color: Colors.green),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'API Key:',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _apiKeyController,
+                              obscureText: true,
+                              decoration: const InputDecoration(
+                                hintText: 'Gateway API key',
+                                border: OutlineInputBorder(),
+                                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              ),
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          ElevatedButton(
+                            onPressed: _saveApiKey,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                            child: const Text('Save', style: TextStyle(fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Required for cloud generation. Never share or commit this key.',
+                        style: TextStyle(fontSize: 11, color: Colors.orange),
                       ),
                       const SizedBox(height: 8),
                       Row(
@@ -511,6 +551,19 @@ class _AboutScreenState extends State<AboutScreen> {
   
 
 
+  Future<void> _saveApiKey() async {
+    final key = _apiKeyController.text.trim();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('gateway_api_key', key);
+    await DebugLogHelper.addDebugLog('ABOUT: API key saved (${key.isEmpty ? "cleared" : "set"})');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(key.isEmpty ? 'API key cleared' : 'API key saved'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
   Future<void> _setUsePathPrefixes(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('cloud_use_path_prefixes', value);
@@ -630,6 +683,7 @@ class _AboutScreenState extends State<AboutScreen> {
   void dispose() {
     _serverIpController.dispose();
     _cloudBaseUrlController.dispose();
+    _apiKeyController.dispose();
     super.dispose();
   }
 }

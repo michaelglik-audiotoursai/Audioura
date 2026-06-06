@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../screens/debug_log_viewer_screen.dart';
-import '../config.dart';
+import '../config/endpoints.dart';
 
 class TranslationService {
   static Future<Map<String, dynamic>> translateTour({
@@ -10,15 +10,14 @@ class TranslationService {
     required List<String> languages,
   }) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
-      final baseUrl = 'http://$serverIp:5030';
+      final uri = await Endpoints.url(Service.translation, '/translate-with-audio');
+      final headers = await Endpoints.apiHeaders(Service.translation);
 
-      await DebugLogHelper.addDebugLog('Translation: POST $baseUrl/translate-with-audio tourId=$tourId languages=${languages.join(", ")}');
+      await DebugLogHelper.addDebugLog('Translation: POST $uri tourId=$tourId languages=${languages.join(", ")}');
 
       final response = await http.post(
-        Uri.parse('$baseUrl/translate-with-audio'),
-        headers: {'Content-Type': 'application/json'},
+        uri,
+        headers: headers,
         body: jsonEncode({
           'content_id': tourId,
           'content_type': 'tour',
