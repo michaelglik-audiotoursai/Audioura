@@ -11,7 +11,7 @@
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 When chat history is compacted, user will ask you to read `remind_ai.md` and `remind_mobile_ai.md`.
 **Your Response**:
-"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.1+3 (M2 complete: POST /tour-status via Endpoints, 9 raw-SQL/dead files deleted; M3: about_screen gateway text updated; Finding 1 fixed: test_update_api.dart deleted). Code is committed and pushed. Claude.AI final review doc is `code_review_v2.1.1.3_final.md`. Ready for Claude review + Ubuntu build + smoke test. Ready to continue."
+"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.1+3 (M2+M3 complete, Blocker A: X-API-Key via Endpoints.apiHeaders() on all cost-bearing POSTs + API key field in About, Blocker B: TranslationService migrated to Endpoints, 9 dead files deleted). Code committed and pushed. Claude.AI final review doc is `code_review_v2.1.1.3_final.md`. Ready to continue."
 
 ## 🚫 OWNERSHIP BOUNDARIES — CRITICAL
 - ✅ **MY files**: `remind_mobile_ai.md`, `code_review_v*.md`, files in `amazon-q-communications/`
@@ -21,16 +21,22 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## CURRENT PROJECT STATUS
 **Project**: Audioura Android APK
-**Version on branch**: v2.1.1+3 ✅ committed on `services-migration` (commit `7c5cc46`)
+**Version on branch**: v2.1.1+3 ✅ committed on `services-migration` (commit `787a7f6`)
 **iPhone**: On v1.2.9+71 (iOS Q built — A#78 mic fix)
-**Android**: ✅ v2.1.1+3 code committed — awaiting Claude review + Ubuntu build + smoke test
+**Android**: ✅ v2.1.1+3 code committed — awaiting Claude final review + Ubuntu build
 **iOS Q current task**: No active task assigned
 **Branch**: `services-migration`
 **Android Application ID**: `com.audioura.app`
 **Server**: `192.168.0.218` (Docker services on Windows laptop)
 
 ## RECENT VERSION HISTORY (latest first)
-- **v2.1.1+3** — M2 complete: `tour_status_service.dart` → `POST /tour-status` via `Endpoints.url(Service.orchestrator)`, keyed on `tour_xxx` tour_id, logs `rows_affected`; 9 raw-SQL/dead files deleted (949 lines); M3: `about_screen.dart` gateway URL hint + status text updated, checkbox label clarified (prefixes stay OFF). Finding 1 fixed: `test_update_api.dart` deleted (broken imports). Finding 2 noted: `rows_affected: 0` in cloud expected until `/user` gateway route + user-api deployed (services dependency, not mobile bug)
+- **v2.1.1+3** — M2+M3 complete + Blocker A + Blocker B:
+  - `Endpoints.apiHeaders()` — injects `X-API-Key` in cloud mode only, reads `gateway_api_key` from SharedPreferences
+  - Both `/generate-complete-tour` POSTs + `/tour-status` POST use `apiHeaders()`
+  - `translation_service.dart` migrated from hardcoded `:5030` LAN IP → `Endpoints.url(Service.translation)` + `apiHeaders()`
+  - API key field added to About screen (obscured, cloud section, never committed)
+  - 9 raw-SQL/dead files deleted (949 lines)
+  - Finding 2 noted: `rows_affected: 0` in cloud until `/user` gateway route deployed (services dep)
 - **v2.1.1+2** — M1 complete: all 11 orchestrator/mapDelivery URLs migrated, runtime crash fixed (`apiBaseUrl as String` cast), all `print()` replaced with `DebugLogHelper`, dead locals removed
 - **v2.1.1+1** — Major version restart: Claude review fixes — Q1 cloud prefix flag, Q2 dead param removal, Q3 rename, Q5 DEV ONLY guards
 - **v1.2.9+72** — Dual environment networking: `Endpoints` resolver, Local/Cloud toggle in About, all services migrated
@@ -49,16 +55,14 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## ✅ KEY FIXES IN RECENT VERSIONS
 
-### v2.1.1+3 — M2 Complete + M3 About Screen
-**Feature**: Raw-SQL client path fully removed. Tour status now writes via REST through the gateway.
-**Files changed**: `tour_status_service.dart` (rewrite), `about_screen.dart` (text only)
-**Files deleted**: `direct_db_update.dart`, `direct_jdbc_update.dart`, `direct_postgres_connection.dart`, `direct_update_api.dart`, `postgres_direct.dart`, `server_api.dart`, `test_update_api.dart` (+ 2 stale root-level copies) — 949 lines removed
-**Finding 2 (services dep)**: `rows_affected: 0` in cloud is expected until `/user` gateway route + user-api deployed — generation/download unaffected
-**`POST /tour-status`**: `Endpoints.url(Service.orchestrator, '/tour-status')`, body `{tour_id, status}`, logs `rows_affected` with ⚠️ on 0
-**`trackTourRequest`**: now uses `Endpoints.url(Service.userDb, ...)` — no more hardcoded `:5003`
-**About screen**: gateway hint/text updated to reflect `api.audioura.com` live; checkbox label clarified (prefixes stay OFF)
-**Gateway rule**: `cloud_use_path_prefixes` stays `false` — gateway routes by root path, not `/service-name/` prefixes
-**Review doc**: `code_review_v2.1.1.3_final.md` (overwritten with final version after Finding 1 fix) — 1 question for Claude (Q1: SharedPreferences key cleanup after terminal status)
+### v2.1.1+3 — M2+M3 + Blocker A + Blocker B
+**M2**: `tour_status_service.dart` → `POST /tour-status` via `Endpoints.url(Service.orchestrator)`, keyed on `tour_xxx` tour_id, logs `rows_affected` with ⚠️ on 0
+**M3**: `about_screen.dart` gateway URL hint + status text updated, checkbox label clarified (prefixes stay OFF)
+**Blocker A**: `Endpoints.apiHeaders(Service s)` — `{'Content-Type': 'application/json'}` in local; adds `X-API-Key` from `gateway_api_key` SharedPreferences in cloud. Applied to: both `/generate-complete-tour` POSTs, `/tour-status` POST, `/translate-with-audio` POST. API key field added to About screen (obscured, cloud section only).
+**Blocker B**: `translation_service.dart` — `config.dart` import removed, hardcoded `http://$serverIp:5030` → `Endpoints.url(Service.translation, '/translate-with-audio')` + `apiHeaders()`
+**Files deleted**: 9 total — 6 raw-SQL services + `test_update_api.dart` + 2 stale root-level copies (949 lines)
+**Finding 2 (services dep)**: `rows_affected: 0` in cloud until `/user` gateway route + user-api deployed — generation/download unaffected
+**Review doc**: `code_review_v2.1.1.3_final.md` — 2 questions (Q1: empty key warning, Q2: SharedPreferences cleanup)
 
 ### v2.1.1+2 — M1 Complete + Full Cleanup
 **Feature**: M1 fully complete. All 11 tour/orchestrator/map-delivery call sites across 3 files route through `Endpoints`. Runtime crash fixed. All `print()` eliminated.
@@ -146,19 +150,21 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ### 1. Claude.AI final review (`code_review_v2.1.1.3_final.md`)
 **Status**: ✅ Doc ready — paste into Claude.AI, get response, apply any fixes
-**1 open question**:
-- Q1 — If app restarts between `trackTourRequest` and `updateTourStatus`, SharedPreferences mapping survives — is this sufficient, or should `updateTourStatus` accept `tour_id` directly as optional param?
+**2 open questions**:
+- Q1 — `apiHeaders()` silently omits `X-API-Key` if key is empty in cloud mode (will 401) — should it log a warning?
+- Q2 — `tour_id_$jobId` / `request_$jobId` keys accumulate in SharedPreferences, never cleaned up after terminal status
 
 ### 2. Ubuntu build for v2.1.1+3
-**Status**: ✅ Code committed and pushed (`4cfc29a`) — awaiting Claude review first
+**Status**: ✅ Code committed and pushed (`787a7f6`) — awaiting Claude review first
 **Steps**:
-1. After Claude review + any fixes: run `bash build_flutter_clean.sh` on Ubuntu VM
-2. Shared folder already has latest — no git pull needed on Ubuntu
-3. Smoke tests (cloud mode — `https://api.audioura.com`, prefixes OFF):
-   - Foreground local (regression)
-   - Foreground cloud generation — verify `rows_affected: 1` in debug logs
-   - Multi-language cloud (exercises `Service.mapDelivery` fix)
-   - Backgrounded tour cloud
+1. Sir Michael must enter the `gateway-api-key` value in About → API Key field before cloud tests
+2. After Claude review + any fixes: run `bash build_flutter_clean.sh` on Ubuntu VM
+3. Shared folder already has latest — no git pull needed on Ubuntu
+4. Smoke tests:
+   - Local WiFi foreground (regression — `rows_affected: 1`)
+   - Cloud foreground generation off-WiFi (`rows_affected: 0` expected until /user deployed)
+   - Cloud multi-language (exercises TranslationService Endpoints fix)
+   - Cloud backgrounded tour
 
 ## ⚠️ VERSION SYNC RULE
 - iOS Q makes code changes → commits → bumps `pubspec.yaml` version → pushes to `services-migration`

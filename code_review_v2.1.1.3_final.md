@@ -1,92 +1,101 @@
-# Code Review Request — v2.1.1+3 final (M2 + M3, Finding 1 fixed)
+# Code Review Request — v2.1.1+3 final (all blockers fixed)
 **Date:** 2026-06-03
 **Prepared by:** Android Amazon-Q
-**Commits:** `4cfc29a` (M2+M3) + `7c5cc46` (delete test_update_api.dart) on branch `services-migration`
-**Scope:** All changes from v2.1.1+2 → v2.1.1+3. Ready for final review before Ubuntu build.
+**Commits:** `4cfc29a` + `7c5cc46` + `787a7f6` on branch `services-migration`
+**Scope:** Changes from v2.1.1+2 → v2.1.1+3. Ready for final review before Ubuntu build.
 
 ---
 
 ## Context
 
-Gateway `https://api.audioura.com` is live and smoke-tested (6/6 passing).
-All M1 tour/orchestrator/map-delivery URL migrations are committed in v2.1.1+2.
-This version completes M2 (raw-SQL removal) and M3 (about_screen gateway text).
-A prior Claude review of `4cfc29a` found two issues — Finding 1 is fixed in `7c5cc46`;
-Finding 2 is a services dependency (documented below, no Dart fix possible).
+Gateway `https://api.audioura.com` is live (6/6 smoke tests passing). This version completes:
+- **M2**: raw-SQL removal, `tour_status_service.dart` → REST
+- **M3**: `about_screen.dart` gateway text
+- **Blocker A**: `X-API-Key` header on cost-bearing cloud POSTs
+- **Blocker B**: `translation_service.dart` migrated from hardcoded LAN IP to `Endpoints`
+- **Finding 1**: `test_update_api.dart` deleted (dangling imports)
 
 ---
 
-## What Changed
+## What Changed — Full Summary
 
-### `services/tour_status_service.dart` — full rewrite (M2)
+### `config/endpoints.dart` — new `apiHeaders()` helper (Blocker A)
 
-**Before:** Three-layer raw-SQL fallback chain via `direct_db_update`, `direct_update_api`,
-`server_api` — all matched on `request_string`. Hardcoded `http://$serverIp:5003`.
-
-**After:**
 ```dart
-// trackTourRequest — user registration via Endpoints
-await http.put(
-  await Endpoints.url(Service.userDb, '/user/$userId'),
-  ...
-);
-// stores tour_id_$jobId mapping in SharedPreferences
-
-// updateTourStatus — REST via orchestrator
-await http.post(
-  await Endpoints.url(Service.orchestrator, '/tour-status'),
-  headers: {'Content-Type': 'application/json'},
-  body: jsonEncode({'tour_id': tourId, 'status': status}),
-);
-// logs rows_affected, warns if 0
+static Future<Map<String, String>> apiHeaders(Service s) async {
+  final prefs = await SharedPreferences.getInstance();
+  final headers = {'Content-Type': 'application/json'};
+  final mode = prefs.getString('server_mode') ?? 'local';
+  if (mode == 'cloud') {
+    final key = (prefs.getString('gateway_api_key') ?? '').trim();
+    if (key.isNotEmpty) headers['X-API-Key'] = key;
+  }
+  return headers;
+}
 ```
-- Keyed on `tour_xxx` tour_id (not `request_string`)
-- `tour_id_$jobId` mapping persisted in SharedPreferences — survives app restart
-- All `print()` → `DebugLogHelper.addDebugLog()`
-- ~75 lines (was ~120)
+- Local mode: returns `{'Content-Type': 'application/json'}` only — LAN services don't require a key
+- Cloud mode: adds `X-API-Key` from `gateway_api_key` SharedPreferences value
+- If key is empty in cloud mode, header is omitted (will 401 — user must set it in About)
 
-### `screens/about_screen.dart` — text only (M3)
+### `services/translation_service.dart` — migrated to `Endpoints` (Blocker B)
 
-| Location | Before | After |
-|----------|--------|-------|
-| Cloud URL `helperText` | `'e.g. https://map-delivery-xxx-uc.a.run.app'` | `'Gateway: https://api.audioura.com'` |
-| Cloud status text | `'⚠️ Cloud mode: only map-delivery is deployed…'` (orange) | `'✅ Cloud mode: tour generation and map delivery live at api.audioura.com…'` (green) |
-| Prefix checkbox label | `'…enable only when audioura.com gateway is deployed'` | `'…leave unchecked — api.audioura.com routes by root path'` |
+```dart
+// BEFORE:
+final serverIp = prefs.getString('server_ip') ?? Config.defaultServerIp;
+final baseUrl = 'http://$serverIp:5030';
+final response = await http.post(Uri.parse('$baseUrl/translate-with-audio'),
+  headers: {'Content-Type': 'application/json'}, ...);
 
-`cloud_use_path_prefixes` default remains `false` — gateway routes by root path, not prefixes.
+// AFTER:
+final uri = await Endpoints.url(Service.translation, '/translate-with-audio');
+final headers = await Endpoints.apiHeaders(Service.translation);
+final response = await http.post(uri, headers: headers, ...);
+```
+- `config.dart` import removed
+- Resolves to `http://192.168.0.218:5030` in local, `https://api.audioura.com/translate-with-audio` in cloud
+- `X-API-Key` included in cloud mode via `apiHeaders()`
 
-### Files deleted (9 total — 949 lines removed)
+### `services/tour_status_service.dart` — `apiHeaders()` added (Blocker A)
 
-| File | Reason |
-|------|--------|
-| `services/direct_db_update.dart` | Raw SQL via `:5003/execute_sql` |
-| `services/direct_jdbc_update.dart` | Duplicate raw-SQL updater |
-| `services/direct_postgres_connection.dart` | Duplicate raw-SQL updater |
-| `services/direct_update_api.dart` | Duplicate raw-SQL updater |
-| `services/postgres_direct.dart` | Duplicate raw-SQL updater |
-| `services/server_api.dart` | Duplicate raw-SQL updater |
-| `services/test_update_api.dart` | Dead test harness; imported 3 of the above (broken imports) |
-| `lib/direct_db_update.dart` | Stale root-level copy |
-| `lib/tour_status_service.dart` | Stale root-level copy |
+```dart
+// BEFORE:
+headers: {'Content-Type': 'application/json'},
 
-No remaining imports of any deleted file in the lib tree — verified by directory scan.
+// AFTER:
+headers: await Endpoints.apiHeaders(Service.orchestrator),
+```
+
+### `screens/tour_generator_screen.dart` — `apiHeaders()` on both generate POSTs (Blocker A)
+
+Both `/generate-complete-tour` POSTs (foreground `_generateTour` and background `_generateTourBackground`) updated:
+```dart
+// BEFORE:
+headers: {'Content-Type': 'application/json'},
+
+// AFTER:
+headers: await Endpoints.apiHeaders(Service.orchestrator),
+```
+
+### `screens/about_screen.dart` — API key field added (Blocker A)
+
+New `_apiKeyController` + `gateway_api_key` SharedPreferences key:
+- Obscured text field in cloud mode section
+- `_saveApiKey()` method persists to SharedPreferences
+- Loaded in `_loadAppInfo()`, disposed in `dispose()`
+- Helper text: "Required for cloud generation. Never share or commit this key."
+
+### Files deleted (9 total — Finding 1 + M2)
+`direct_db_update`, `direct_jdbc_update`, `direct_postgres_connection`, `direct_update_api`,
+`postgres_direct`, `server_api`, `test_update_api` (services/), plus 2 stale root-level copies.
 
 ---
 
-## Known Services Dependency (not a mobile bug)
+## Known Services Dependency (not a mobile fix)
 
-**`trackTourRequest` PUT → `Service.userDb /user/$userId`** — in cloud mode this resolves to
-`https://api.audioura.com/user/USER-xxx`. The live gateway has no `/user` route and `user-api`
-(`:5003`) is not yet deployed. So in cloud:
-- The `tour_requests` row is never created (PUT hits 404)
-- `updateTourStatus` finds no matching row → `rows_affected: 0`
-
-The `rows_affected: 0` ⚠️ warning in the debug log is the signal. Tour **generation and
-download** are unaffected — only status bookkeeping is a no-op until the services dependency
-is resolved. Cannot be fixed in Dart; requires `/user` gateway route + user-api deployment.
-
-**Smoke test expectation:** `rows_affected: 0` in cloud is expected and correct until
-services dependency resolved. `rows_affected: 1` in local WiFi mode is the regression check.
+`trackTourRequest` PUT → `Service.userDb /user/$userId` — in cloud mode the `/user` gateway
+route is not yet deployed, so `tour_requests` row is never created → `rows_affected: 0` on
+status updates. Generation and download are unaffected. Expect `rows_affected: 0` in cloud
+smoke tests until Kiro deploys the `/user` route.
 
 ---
 
@@ -94,16 +103,17 @@ services dependency resolved. `rows_affected: 1` in local WiFi mode is the regre
 
 | Item | Status |
 |------|--------|
-| `POST /tour-status` via `Endpoints.url(Service.orchestrator)` | ✅ |
-| Keyed on `tour_xxx` tour_id (not `request_string`) | ✅ |
-| `rows_affected` logged, ⚠️ on 0 | ✅ |
-| All `print()` → `DebugLogHelper.addDebugLog()` | ✅ |
-| All 9 raw-SQL/dead files deleted | ✅ |
-| No remaining imports of deleted files | ✅ |
-| `about_screen.dart` gateway URL/text correct | ✅ |
+| `Endpoints.apiHeaders()` injects `X-API-Key` in cloud only | ✅ |
+| `gateway_api_key` stored in SharedPreferences, never committed | ✅ |
+| Both `/generate-complete-tour` POSTs use `apiHeaders()` | ✅ |
+| `/tour-status` POST uses `apiHeaders()` | ✅ |
+| `TranslationService` → `Endpoints.url(Service.translation)` + `apiHeaders()` | ✅ |
+| `config.dart` import removed from `translation_service.dart` | ✅ |
+| API key field in About screen (obscured, cloud section only) | ✅ |
+| 9 raw-SQL/dead files deleted, no remaining imports | ✅ |
 | `cloud_use_path_prefixes` default `false` | ✅ |
 | Version monotonic (`2.1.1+2` → `2.1.1+3`) | ✅ |
-| Services dependency documented (Finding 2) | ✅ noted — not a mobile fix |
+| Services dependency (`/user` route) documented | ✅ noted |
 
 ---
 
@@ -111,7 +121,8 @@ services dependency resolved. `rows_affected: 1` in local WiFi mode is the regre
 
 | # | Topic | Priority |
 |---|-------|----------|
-| Q1 | `tour_id_$jobId` / `request_$jobId` keys accumulate in SharedPreferences and are never cleaned up after terminal status. Worth adding cleanup, or acceptable as-is for now? | Low |
+| Q1 | `apiHeaders()` silently omits `X-API-Key` if key is empty in cloud mode (will get 401). Should it throw or log a warning instead so the user knows why generation failed? | Medium |
+| Q2 | `tour_id_$jobId` / `request_$jobId` keys accumulate in SharedPreferences and are never cleaned up after terminal status. Worth adding cleanup? | Low |
 
 ---
 
@@ -124,9 +135,9 @@ bash build_flutter_clean.sh
 
 ### Priority smoke tests
 1. **Local WiFi — foreground** (regression): generate → completes → opens in player →
-   debug logs show `rows_affected: 1` ✅
-2. **Cloud — foreground generation** (About → Cloud → `https://api.audioura.com`, prefixes OFF,
-   off-WiFi): generate → completes → opens → debug logs show `rows_affected: 0` ⚠️ expected
-   (services dependency) — generation + download must still succeed ✅
-3. **Cloud — multi-language**: generate with RU+EN → English opens, Russian appears in My Tours
+   debug logs show `TOUR_STATUS: tour_xxx → completed — rows_affected: 1` ✅
+2. **Cloud — foreground generation** (About → Cloud → URL + API key set, prefixes OFF, off-WiFi):
+   generate → completes → opens → `rows_affected: 0` expected (services dep) — generation must succeed ✅
+3. **Cloud — multi-language**: generate RU+EN → English opens, Russian in My Tours
+   (exercises `Endpoints.url(Service.translation)` fix)
 4. **Cloud — backgrounded tour**: Generate in Background → leave app → return → tour in My Tours
