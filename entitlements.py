@@ -40,20 +40,20 @@ def get_user_plan(user_id):
     try:
         conn = _get_conn()
         cur = conn.cursor()
-        # Try to get user's specific plan
+        # Get user's plan (user-first query)
         cur.execute("""
             SELECT p.plan_id, p.tours_per_day, p.tour_max_poi, p.tour_max_minutes,
                    p.news_per_period, p.news_period, p.news_max_minutes, p.downloads_unlimited
-            FROM plans p
-            LEFT JOIN users u ON u.plan = p.plan_id
-            WHERE u.secret_id = %s OR u.device_id = %s
+            FROM users u
+            JOIN plans p ON u.plan = p.plan_id
+            WHERE u.secret_id = %s
             LIMIT 1
-        """, (user_id, user_id))
+        """, (user_id,))
         row = cur.fetchone()
         
         if not row:
-            # Default to free plan
-            cur.execute("SELECT * FROM plans WHERE plan_id = 'free'")
+            # User not in users table or no plan — default to free
+            cur.execute("SELECT plan_id, tours_per_day, tour_max_poi, tour_max_minutes, news_per_period, news_period, news_max_minutes, downloads_unlimited FROM plans WHERE plan_id = 'free'")
             row = cur.fetchone()
         
         cur.close()
@@ -80,14 +80,14 @@ def get_user_plan(user_id):
         'tour_max_poi': 30,
         'tour_max_minutes': 120,
         'news_per_period': 10,
-        'news_period': 'day',
+        'news_period': 'week',
         'news_max_minutes': 10,
         'downloads_unlimited': True
     }
 
 
 def get_tours_used_today(user_id):
-    """Count tours generated today by this user."""
+    """Count tours generated today by this user. Fails CLOSED (returns max) on error."""
     try:
         conn = _get_conn()
         cur = conn.cursor()
@@ -100,34 +100,40 @@ def get_tours_used_today(user_id):
         conn.close()
         return count
     except Exception as e:
-        print(f"[ENTITLEMENTS] Error counting tours for {user_id}: {e}")
-        return 0
+        print(f"[ENTITLEMENTS] ERROR counting tours for {user_id}: {e} — DENYING (fail-closed)")
+        return 9999  # Fail closed: deny on error
 
 
-def get_news_used_period(user_id, period='day'):
-    """Count news articles processed this period by this user."""
+def get_news_used_period(user_id, period='week'):
+    """Count news articles processed this period by this user. Fails CLOSED on error."""
     try:
         conn = _get_conn()
         cur = conn.cursor()
         if period == 'day':
             cur.execute("""
                 SELECT COUNT(*) FROM article_requests 
-                WHERE (url IS NOT NULL OR article_text IS NOT NULL)
+                WHERE secret_id = %s
                 AND created_at::date = CURRENT_DATE
-            """)
+            """, (user_id,))
+        elif period == 'week':
+            cur.execute("""
+                SELECT COUNT(*) FROM article_requests 
+                WHERE secret_id = %s
+                AND created_at >= date_trunc('week', CURRENT_DATE)
+            """, (user_id,))
         else:  # month
             cur.execute("""
                 SELECT COUNT(*) FROM article_requests 
-                WHERE (url IS NOT NULL OR article_text IS NOT NULL)
+                WHERE secret_id = %s
                 AND created_at >= date_trunc('month', CURRENT_DATE)
-            """)
+            """, (user_id,))
         count = cur.fetchone()[0]
         cur.close()
         conn.close()
         return count
     except Exception as e:
-        print(f"[ENTITLEMENTS] Error counting news for {user_id}: {e}")
-        return 0
+        print(f"[ENTITLEMENTS] ERROR counting news for {user_id}: {e} — DENYING (fail-closed)")
+        return 9999  # Fail closed: deny on error
 
 
 def check_tour_quota(user_id, requested_stops=10):
@@ -142,7 +148,8 @@ def check_tour_quota(user_id, requested_stops=10):
     used_today = get_tours_used_today(user_id)
     
     if used_today >= plan['tours_per_day']:
-        tomorrow = date.today().strftime('%Y-%m-%d') + 'T00:00:00Z'
+        from datetime import timedelta
+        tomorrow = (date.today() + timedelta(days=1)).strftime('%Y-%m-%dT00:00:00Z')
         return {
             'allowed': False,
             'error': 'quota_exceeded',

@@ -15,8 +15,8 @@ CREATE TABLE IF NOT EXISTS plans (
 
 -- Seed the free plan
 INSERT INTO plans (plan_id, tours_per_day, tour_max_poi, tour_max_minutes, news_per_period, news_period, news_max_minutes, downloads_unlimited)
-VALUES ('free', 1, 30, 120, 10, 'day', 10, TRUE)
-ON CONFLICT (plan_id) DO NOTHING;
+VALUES ('free', 1, 30, 120, 10, 'week', 10, TRUE)
+ON CONFLICT (plan_id) DO UPDATE SET news_period = 'week';
 
 -- Add plan column to users (if users table exists)
 DO $$
