@@ -1,7 +1,7 @@
-# Code Review Request — v2.1.1+3 (M2 complete + M3 about_screen updates)
+# Code Review Request — v2.1.1+3 final (M2 + M3, Finding 1 fixed)
 **Date:** 2026-06-03
 **Prepared by:** Android Amazon-Q
-**Commit:** `4cfc29a` on branch `services-migration`
+**Commits:** `4cfc29a` (M2+M3) + `7c5cc46` (delete test_update_api.dart) on branch `services-migration`
 **Scope:** All changes from v2.1.1+2 → v2.1.1+3. Ready for final review before Ubuntu build.
 
 ---
@@ -9,93 +9,84 @@
 ## Context
 
 Gateway `https://api.audioura.com` is live and smoke-tested (6/6 passing).
-All M1 tour/orchestrator/map-delivery URL migrations are already committed in v2.1.1+2.
-This version completes M2 (raw-SQL removal) and M3 (about_screen gateway text updates).
+All M1 tour/orchestrator/map-delivery URL migrations are committed in v2.1.1+2.
+This version completes M2 (raw-SQL removal) and M3 (about_screen gateway text).
+A prior Claude review of `4cfc29a` found two issues — Finding 1 is fixed in `7c5cc46`;
+Finding 2 is a services dependency (documented below, no Dart fix possible).
 
 ---
 
-## What Changed — Full Summary
+## What Changed
 
-Two files changed, eight files deleted.
+### `services/tour_status_service.dart` — full rewrite (M2)
 
----
+**Before:** Three-layer raw-SQL fallback chain via `direct_db_update`, `direct_update_api`,
+`server_api` — all matched on `request_string`. Hardcoded `http://$serverIp:5003`.
 
-## File 1: `services/tour_status_service.dart` — full rewrite (M2)
-
-### Before
-- Imported `server_api.dart`, `direct_db_update.dart`, `direct_update_api.dart`
-- `trackTourRequest` used hardcoded `http://$serverIp:5003/user/$userId`
-- `updateTourStatus` had a three-layer fallback chain:
-  1. `DirectUpdateApi.updateTourStatus` → raw HTTP to `:5003`
-  2. `ServerApi.updateTourStatus` → raw SQL via `:5003/execute_sql`
-  3. `DirectDbUpdate.updateTourStatus` → matched on `request_string` (wrong key)
-- Multiple `print()` calls present
-- ~120 lines
-
-### After
+**After:**
 ```dart
 // trackTourRequest — user registration via Endpoints
-final response = await http.put(
+await http.put(
   await Endpoints.url(Service.userDb, '/user/$userId'),
   ...
 );
+// stores tour_id_$jobId mapping in SharedPreferences
 
 // updateTourStatus — REST via orchestrator
-final response = await http.post(
+await http.post(
   await Endpoints.url(Service.orchestrator, '/tour-status'),
   headers: {'Content-Type': 'application/json'},
   body: jsonEncode({'tour_id': tourId, 'status': status}),
 );
-// Logs rows_affected — warns if 0
+// logs rows_affected, warns if 0
 ```
-- All `print()` replaced with `DebugLogHelper.addDebugLog()`
-- Keyed on `tour_xxx` tour_id (stored mapping `tour_id_$jobId` in SharedPreferences)
-- Logs `rows_affected` with ⚠️ warning if 0
-- ~75 lines (net −45 lines, −3 imports)
+- Keyed on `tour_xxx` tour_id (not `request_string`)
+- `tour_id_$jobId` mapping persisted in SharedPreferences — survives app restart
+- All `print()` → `DebugLogHelper.addDebugLog()`
+- ~75 lines (was ~120)
 
-### Key behavioral difference
-Old path matched on `request_string` as fallback. New path matches exclusively on `tour_id`
-(`tour_XXXXXXXXXXX` format). The `tour_id_$jobId` mapping is set in `trackTourRequest` and
-read in `updateTourStatus` — both must be called in the same session for the mapping to exist.
-
-**Q1:** If the app is killed between `trackTourRequest` and `updateTourStatus` (e.g. backgrounded
-tour that completes after a restart), `tour_id_$jobId` is still in SharedPreferences (persisted).
-Is this the correct recovery path, or should `updateTourStatus` also accept the tour_id directly
-as a parameter for cases where the caller already has it?
-
----
-
-## File 2: `screens/about_screen.dart` — text updates (M3)
-
-Three string changes only — no logic changes:
+### `screens/about_screen.dart` — text only (M3)
 
 | Location | Before | After |
 |----------|--------|-------|
-| Cloud URL field `helperText` | `'e.g. https://map-delivery-xxx-uc.a.run.app'` | `'Gateway: https://api.audioura.com'` |
-| Cloud warning text | `'⚠️ Cloud mode: only map-delivery is deployed…'` (orange) | `'✅ Cloud mode: tour generation and map delivery live at api.audioura.com…'` (green) |
-| Path prefix checkbox label | `'Use gateway path routing (enable only when audioura.com gateway is deployed)'` | `'Use gateway path routing (leave unchecked — api.audioura.com routes by root path)'` |
+| Cloud URL `helperText` | `'e.g. https://map-delivery-xxx-uc.a.run.app'` | `'Gateway: https://api.audioura.com'` |
+| Cloud status text | `'⚠️ Cloud mode: only map-delivery is deployed…'` (orange) | `'✅ Cloud mode: tour generation and map delivery live at api.audioura.com…'` (green) |
+| Prefix checkbox label | `'…enable only when audioura.com gateway is deployed'` | `'…leave unchecked — api.audioura.com routes by root path'` |
 
-The `cloud_use_path_prefixes` default remains `false` — the live gateway routes by root path,
-not by `/service-name/` prefixes, so the checkbox must stay unchecked.
+`cloud_use_path_prefixes` default remains `false` — gateway routes by root path, not prefixes.
 
----
-
-## Files Deleted (M2)
-
-Eight files removed — 891 lines of raw-SQL client code eliminated:
+### Files deleted (9 total — 949 lines removed)
 
 | File | Reason |
 |------|--------|
-| `services/direct_db_update.dart` | Raw SQL via `:5003/execute_sql` — replaced by REST |
+| `services/direct_db_update.dart` | Raw SQL via `:5003/execute_sql` |
 | `services/direct_jdbc_update.dart` | Duplicate raw-SQL updater |
 | `services/direct_postgres_connection.dart` | Duplicate raw-SQL updater |
 | `services/direct_update_api.dart` | Duplicate raw-SQL updater |
 | `services/postgres_direct.dart` | Duplicate raw-SQL updater |
 | `services/server_api.dart` | Duplicate raw-SQL updater |
+| `services/test_update_api.dart` | Dead test harness; imported 3 of the above (broken imports) |
 | `lib/direct_db_update.dart` | Stale root-level copy |
 | `lib/tour_status_service.dart` | Stale root-level copy |
 
-Verified: no remaining imports of any deleted file in the lib tree (compile check passed).
+No remaining imports of any deleted file in the lib tree — verified by directory scan.
+
+---
+
+## Known Services Dependency (not a mobile bug)
+
+**`trackTourRequest` PUT → `Service.userDb /user/$userId`** — in cloud mode this resolves to
+`https://api.audioura.com/user/USER-xxx`. The live gateway has no `/user` route and `user-api`
+(`:5003`) is not yet deployed. So in cloud:
+- The `tour_requests` row is never created (PUT hits 404)
+- `updateTourStatus` finds no matching row → `rows_affected: 0`
+
+The `rows_affected: 0` ⚠️ warning in the debug log is the signal. Tour **generation and
+download** are unaffected — only status bookkeeping is a no-op until the services dependency
+is resolved. Cannot be fixed in Dart; requires `/user` gateway route + user-api deployment.
+
+**Smoke test expectation:** `rows_affected: 0` in cloud is expected and correct until
+services dependency resolved. `rows_affected: 1` in local WiFi mode is the regression check.
 
 ---
 
@@ -103,23 +94,24 @@ Verified: no remaining imports of any deleted file in the lib tree (compile chec
 
 | Item | Status |
 |------|--------|
-| `tour_status_service.dart` uses `Endpoints` throughout | ✅ |
-| `POST /tour-status` keyed on `tour_id` (not `request_string`) | ✅ |
-| `rows_affected` logged with ⚠️ warning on 0 | ✅ |
-| All `print()` replaced with `DebugLogHelper.addDebugLog()` | ✅ |
-| All 6 raw-SQL service files deleted | ✅ |
+| `POST /tour-status` via `Endpoints.url(Service.orchestrator)` | ✅ |
+| Keyed on `tour_xxx` tour_id (not `request_string`) | ✅ |
+| `rows_affected` logged, ⚠️ on 0 | ✅ |
+| All `print()` → `DebugLogHelper.addDebugLog()` | ✅ |
+| All 9 raw-SQL/dead files deleted | ✅ |
 | No remaining imports of deleted files | ✅ |
-| `about_screen.dart` gateway URL/text updated | ✅ |
-| `cloud_use_path_prefixes` default stays `false` | ✅ |
+| `about_screen.dart` gateway URL/text correct | ✅ |
+| `cloud_use_path_prefixes` default `false` | ✅ |
 | Version monotonic (`2.1.1+2` → `2.1.1+3`) | ✅ |
+| Services dependency documented (Finding 2) | ✅ noted — not a mobile fix |
 
 ---
 
-## Summary of Questions
+## Questions for Claude
 
 | # | Topic | Priority |
 |---|-------|----------|
-| Q1 | If app restarts between `trackTourRequest` and `updateTourStatus`, SharedPreferences mapping survives — is this sufficient, or should `updateTourStatus` accept `tour_id` directly as optional param? | Low |
+| Q1 | `tour_id_$jobId` / `request_$jobId` keys accumulate in SharedPreferences and are never cleaned up after terminal status. Worth adding cleanup, or acceptable as-is for now? | Low |
 
 ---
 
@@ -129,17 +121,12 @@ Verified: no remaining imports of any deleted file in the lib tree (compile chec
 ```bash
 bash build_flutter_clean.sh
 ```
-**APK:** `audioura-dev.apk` in `development/` folder
 
-### Priority smoke tests (cloud mode — `https://api.audioura.com`, prefixes OFF)
-1. **Foreground single-language local** (regression): generate → completes → opens in player
-2. **Foreground cloud generation**: About → Cloud → `cloud_base_url = https://api.audioura.com` → off-WiFi → generate → check debug logs for `TOUR_STATUS: tour_xxx → completed — rows_affected: 1`
-3. **Multi-language cloud**: generate with RU+EN → English opens, Russian in My Tours
-4. **Backgrounded tour cloud**: Generate in Background → leave app → return → tour in My Tours
-
-### Key log lines to verify in smoke test 2
-```
-TOUR_TRACK: Created tour_id tour_xxx for job <uuid> — HTTP 200
-TOUR_STATUS: tour_xxx → completed — rows_affected: 1
-```
-`rows_affected: 0` means the tour_id didn't match a DB row — flag for Kiro.
+### Priority smoke tests
+1. **Local WiFi — foreground** (regression): generate → completes → opens in player →
+   debug logs show `rows_affected: 1` ✅
+2. **Cloud — foreground generation** (About → Cloud → `https://api.audioura.com`, prefixes OFF,
+   off-WiFi): generate → completes → opens → debug logs show `rows_affected: 0` ⚠️ expected
+   (services dependency) — generation + download must still succeed ✅
+3. **Cloud — multi-language**: generate with RU+EN → English opens, Russian appears in My Tours
+4. **Cloud — backgrounded tour**: Generate in Background → leave app → return → tour in My Tours

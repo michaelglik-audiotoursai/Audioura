@@ -11,7 +11,7 @@
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 When chat history is compacted, user will ask you to read `remind_ai.md` and `remind_mobile_ai.md`.
 **Your Response**:
-"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.1+3 (M2 complete: POST /tour-status via Endpoints, 8 raw-SQL files deleted; M3: about_screen gateway text updated). Code is committed and pushed. Claude.AI final review doc is `code_review_v2.1.1.3_final.md`. Ready for Claude review + Ubuntu build + smoke test. Ready to continue."
+"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.1+3 (M2 complete: POST /tour-status via Endpoints, 9 raw-SQL/dead files deleted; M3: about_screen gateway text updated; Finding 1 fixed: test_update_api.dart deleted). Code is committed and pushed. Claude.AI final review doc is `code_review_v2.1.1.3_final.md`. Ready for Claude review + Ubuntu build + smoke test. Ready to continue."
 
 ## 🚫 OWNERSHIP BOUNDARIES — CRITICAL
 - ✅ **MY files**: `remind_mobile_ai.md`, `code_review_v*.md`, files in `amazon-q-communications/`
@@ -21,7 +21,7 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## CURRENT PROJECT STATUS
 **Project**: Audioura Android APK
-**Version on branch**: v2.1.1+3 ✅ committed on `services-migration` (commit `4cfc29a`)
+**Version on branch**: v2.1.1+3 ✅ committed on `services-migration` (commit `7c5cc46`)
 **iPhone**: On v1.2.9+71 (iOS Q built — A#78 mic fix)
 **Android**: ✅ v2.1.1+3 code committed — awaiting Claude review + Ubuntu build + smoke test
 **iOS Q current task**: No active task assigned
@@ -30,7 +30,7 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 **Server**: `192.168.0.218` (Docker services on Windows laptop)
 
 ## RECENT VERSION HISTORY (latest first)
-- **v2.1.1+3** — M2 complete: `tour_status_service.dart` → `POST /tour-status` via `Endpoints.url(Service.orchestrator)`, keyed on `tour_xxx` tour_id, logs `rows_affected`; 8 raw-SQL files deleted (891 lines); M3: `about_screen.dart` gateway URL hint + status text updated, checkbox label clarified (prefixes stay OFF)
+- **v2.1.1+3** — M2 complete: `tour_status_service.dart` → `POST /tour-status` via `Endpoints.url(Service.orchestrator)`, keyed on `tour_xxx` tour_id, logs `rows_affected`; 9 raw-SQL/dead files deleted (949 lines); M3: `about_screen.dart` gateway URL hint + status text updated, checkbox label clarified (prefixes stay OFF). Finding 1 fixed: `test_update_api.dart` deleted (broken imports). Finding 2 noted: `rows_affected: 0` in cloud expected until `/user` gateway route + user-api deployed (services dependency, not mobile bug)
 - **v2.1.1+2** — M1 complete: all 11 orchestrator/mapDelivery URLs migrated, runtime crash fixed (`apiBaseUrl as String` cast), all `print()` replaced with `DebugLogHelper`, dead locals removed
 - **v2.1.1+1** — Major version restart: Claude review fixes — Q1 cloud prefix flag, Q2 dead param removal, Q3 rename, Q5 DEV ONLY guards
 - **v1.2.9+72** — Dual environment networking: `Endpoints` resolver, Local/Cloud toggle in About, all services migrated
@@ -52,12 +52,13 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 ### v2.1.1+3 — M2 Complete + M3 About Screen
 **Feature**: Raw-SQL client path fully removed. Tour status now writes via REST through the gateway.
 **Files changed**: `tour_status_service.dart` (rewrite), `about_screen.dart` (text only)
-**Files deleted**: `direct_db_update.dart`, `direct_jdbc_update.dart`, `direct_postgres_connection.dart`, `direct_update_api.dart`, `postgres_direct.dart`, `server_api.dart` (+ 2 stale root-level copies) — 891 lines removed
+**Files deleted**: `direct_db_update.dart`, `direct_jdbc_update.dart`, `direct_postgres_connection.dart`, `direct_update_api.dart`, `postgres_direct.dart`, `server_api.dart`, `test_update_api.dart` (+ 2 stale root-level copies) — 949 lines removed
+**Finding 2 (services dep)**: `rows_affected: 0` in cloud is expected until `/user` gateway route + user-api deployed — generation/download unaffected
 **`POST /tour-status`**: `Endpoints.url(Service.orchestrator, '/tour-status')`, body `{tour_id, status}`, logs `rows_affected` with ⚠️ on 0
 **`trackTourRequest`**: now uses `Endpoints.url(Service.userDb, ...)` — no more hardcoded `:5003`
 **About screen**: gateway hint/text updated to reflect `api.audioura.com` live; checkbox label clarified (prefixes stay OFF)
 **Gateway rule**: `cloud_use_path_prefixes` stays `false` — gateway routes by root path, not `/service-name/` prefixes
-**Review doc**: `code_review_v2.1.1.3_final.md` — 1 question for Claude (Q1: SharedPreferences mapping survival across restarts)
+**Review doc**: `code_review_v2.1.1.3_final.md` (overwritten with final version after Finding 1 fix) — 1 question for Claude (Q1: SharedPreferences key cleanup after terminal status)
 
 ### v2.1.1+2 — M1 Complete + Full Cleanup
 **Feature**: M1 fully complete. All 11 tour/orchestrator/map-delivery call sites across 3 files route through `Endpoints`. Runtime crash fixed. All `print()` eliminated.
