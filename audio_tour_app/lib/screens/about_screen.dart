@@ -255,7 +255,7 @@ class _AboutScreenState extends State<AboutScreen> {
                                 hintText: 'https://api.audioura.com',
                                 border: OutlineInputBorder(),
                                 contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                helperText: 'e.g. https://map-delivery-xxx-uc.a.run.app',
+                                helperText: 'Gateway: https://api.audioura.com',
                               ),
                               style: const TextStyle(fontSize: 12),
                             ),
@@ -274,8 +274,8 @@ class _AboutScreenState extends State<AboutScreen> {
                       ),
                       const SizedBox(height: 4),
                       const Text(
-                        '⚠️ Cloud mode: only map-delivery is deployed. Tour generation, news, and newsletters remain local.',
-                        style: TextStyle(fontSize: 11, color: Colors.orange),
+                        '✅ Cloud mode: tour generation and map delivery live at api.audioura.com. News/newsletters remain local until deployed.',
+                        style: TextStyle(fontSize: 11, color: Colors.green),
                       ),
                       const SizedBox(height: 8),
                       Row(
@@ -286,7 +286,7 @@ class _AboutScreenState extends State<AboutScreen> {
                           ),
                           const Expanded(
                             child: Text(
-                              'Use gateway path routing (enable only when audioura.com gateway is deployed)',
+                              'Use gateway path routing (leave unchecked — api.audioura.com routes by root path)',
                               style: TextStyle(fontSize: 12),
                             ),
                           ),
