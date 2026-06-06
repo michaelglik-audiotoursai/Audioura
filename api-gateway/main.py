@@ -25,12 +25,17 @@ BACKENDS = {
 # Mobile app must send this in X-API-Key header to access these endpoints
 API_KEY = os.getenv('GATEWAY_API_KEY', '')
 
+if not API_KEY:
+    print("[WARNING] GATEWAY_API_KEY is not set — cost-bearing endpoints will REJECT all requests (fail-closed)")
+
 def require_api_key():
-    """Check X-API-Key header on cost-bearing endpoints. Returns error response or None."""
+    """Check X-API-Key header on cost-bearing endpoints. Fails CLOSED if key not configured."""
+    import hmac
     if not API_KEY:
-        return None  # No key configured = open (dev mode)
+        # Fail closed: if key isn't configured, refuse all cost-bearing requests
+        return jsonify({"error": "service_misconfigured", "message": "API key not configured on gateway"}), 503
     client_key = request.headers.get('X-API-Key', '')
-    if client_key != API_KEY:
+    if not client_key or not hmac.compare_digest(client_key, API_KEY):
         return jsonify({"error": "unauthorized", "message": "Valid X-API-Key header required"}), 401
     return None
 
