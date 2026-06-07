@@ -21,7 +21,7 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## CURRENT PROJECT STATUS
 **Project**: Audioura Android APK
-**Version on branch**: v2.1.1+3 ✅ committed on `services-migration` (commit `787a7f6`)
+**Version on branch**: v2.1.1+4 ✅ committed on `services-migration` (commit `ea663ee`)
 **iPhone**: On v1.2.9+71 (iOS Q built — A#78 mic fix)
 **Android**: ✅ v2.1.1+3 code committed — awaiting Claude final review + Ubuntu build
 **iOS Q current task**: No active task assigned
@@ -30,6 +30,12 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 **Server**: `192.168.0.218` (Docker services on Windows laptop)
 
 ## RECENT VERSION HISTORY (latest first)
+- **v2.1.1+4** — Poll resilience fix:
+  - `_pollAndAutoDownload` in `tour_generator_screen.dart`: `SocketException` / `http.ClientException` caught separately — keep polling, log warning, do NOT mark failed
+  - Tolerates up to 3 consecutive transient errors before soft give-up
+  - Soft give-up: shows orange snackbar "Tour may still be generating — check My Tours shortly", clears spinner, does NOT write `failed` status, leaves `tour_id_$jobId` mapping intact
+  - Successful poll resets transient error counter
+  - Background poll (`background_tour_monitor.dart`, `background_service.dart`) already resilient — no changes needed
 - **v2.1.1+3** — M2+M3 complete + Blocker A + Blocker B:
   - `Endpoints.apiHeaders()` — injects `X-API-Key` in cloud mode only, reads `gateway_api_key` from SharedPreferences
   - Both `/generate-complete-tour` POSTs + `/tour-status` POST use `apiHeaders()`
@@ -148,13 +154,22 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## 🔄 NEXT ACTION
 
-### 1. Claude.AI final review (`code_review_v2.1.1.3_final.md`)
-**Status**: ✅ Doc ready — paste into Claude.AI, get response, apply any fixes
-**2 open questions**:
-- Q1 — `apiHeaders()` silently omits `X-API-Key` if key is empty in cloud mode (will 401) — should it log a warning?
-- Q2 — `tour_id_$jobId` / `request_$jobId` keys accumulate in SharedPreferences, never cleaned up after terminal status
+### 1. Ubuntu build for v2.1.1+3 — READY TO BUILD
+**Status**: ✅ Claude review complete (`REVIEW_FOR_MOBILE_AQ_v2.1.1.3_apikey_2026_06_03.md`) — verdict: both blockers fixed, worth testing
+**Prerequisite**: Enter `gateway-api-key` (from Secret Manager) in About → cloud → API Key field, set `cloud_base_url = https://api.audioura.com`, path-routing OFF
 
-### 2. Ubuntu build for v2.1.1+3
+### ⚠️ QUEUED FIXES FOR NEXT BUILD (v2.1.1+5)
+**Q1 — Empty API key warning** (Claude recommendation, medium priority):
+- In `apiHeaders()`: when `mode == 'cloud'` and key is empty → `DebugLogHelper.addDebugLog('Cloud mode but gateway_api_key not set — request will 401; set it in About')`
+- When any cost-endpoint returns 401 → surface user-facing message: "Set your API key in About settings"
+**Q2 — SharedPreferences cleanup** (low priority, defer):
+- Clean up `tour_id_$jobId` / `request_$jobId` keys after terminal status reached
+- Prevents unbounded growth over time
+**Voice commands** (future, not current sprint):
+- Voice commands are 100% on-device (speech-to-text → command parsing → execution), no services involved
+- Multi-language voice command support NOT yet implemented — future enhancement only
+
+### 2. Ubuntu build for v2.1.1+4
 **Status**: ✅ Code committed and pushed (`787a7f6`) — awaiting Claude review first
 **Steps**:
 1. Sir Michael must enter the `gateway-api-key` value in About → API Key field before cloud tests
