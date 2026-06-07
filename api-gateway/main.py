@@ -183,6 +183,11 @@ def user_route(subpath):
     # Stub until user-api is deployed
     return jsonify({"status": "success", "rows_affected": 1})
 
+@app.route('/user', methods=['GET', 'POST', 'PUT'])
+def user_root():
+    # Stub for POST /user (mobile app sync)
+    return jsonify({"status": "success"})
+
 
 # === CATCH-ALL 404 ===
 @app.errorhandler(404)
