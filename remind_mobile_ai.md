@@ -11,7 +11,7 @@
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 When chat history is compacted, user will ask you to read `remind_ai.md` and `remind_mobile_ai.md`.
 **Your Response**:
-"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.1+4 (poll resilience fix: SocketException/ClientException keep polling up to 3 consecutive errors, soft give-up with orange snackbar, no failed status written). Code committed `ea663ee`. Claude review doc ready: `code_review_v2.1.1.4_poll_resilience.md`. Ready to continue."
+"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.1+5 (poll hardening: _pollTimer State field + dispose cancel, non-200 handling 429/5xx/4xx, maxTransientErrors 3→6, handleTransient closure). Code committed `5853b62`. Claude review doc ready: `code_review_v2.1.1.5_poll_hardening.md`. Ready to continue."
 
 ## 🚫 OWNERSHIP BOUNDARIES — CRITICAL
 - ✅ **MY files**: `remind_mobile_ai.md`, `code_review_v*.md`, files in `amazon-q-communications/`
@@ -21,15 +21,21 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## CURRENT PROJECT STATUS
 **Project**: Audioura Android APK
-**Version on branch**: v2.1.1+4 ✅ committed on `services-migration` (commit `ea663ee`)
+**Version on branch**: v2.1.1+5 ✅ committed on `services-migration` (commit `5853b62`)
 **iPhone**: On v1.2.9+71 (iOS Q built — A#78 mic fix)
-**Android**: ✅ v2.1.1+4 code committed — awaiting Claude review + Ubuntu build
+**Android**: ✅ v2.1.1+5 code committed — awaiting Claude review + Ubuntu build
 **iOS Q current task**: No active task assigned
 **Branch**: `services-migration`
 **Android Application ID**: `com.audioura.app`
 **Server**: `192.168.0.218` (Docker services on Windows laptop)
 
 ## RECENT VERSION HISTORY (latest first)
+- **v2.1.1+5** — Poll hardening (Claude review fixes for v2.1.1+4):
+  - `_pollTimer` promoted to State field — `_pollTimer?.cancel()` added to `dispose()` (Q1 leak fix)
+  - Non-200 HTTP responses now handled (Q2 critical fix): 429 → stop + quota snackbar; 5xx → `handleTransient()` (counts toward limit); other 4xx → log + stop spinner silently
+  - `maxTransientErrors` raised `3 → 6` (~60s tolerance matching observed DNS outage) (Q3)
+  - Duplicate SocketException/ClientException handler bodies replaced with `handleTransient` local closure (Q4 DRY)
+  - `maxAttempts = 90` overall cap confirmed ✅ (Claude asked to verify)
 - **v2.1.1+4** — Poll resilience fix:
   - `_pollAndAutoDownload` in `tour_generator_screen.dart`: `SocketException` / `http.ClientException` caught separately — keep polling, log warning, do NOT mark failed
   - Tolerates up to 3 consecutive transient errors before soft give-up
@@ -154,19 +160,19 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## 🔄 NEXT ACTION
 
-### 1. Claude.AI review of v2.1.1+4 poll resilience fix
-**Status**: ⏳ Doc ready — paste `code_review_v2.1.1.4_poll_resilience.md` into Claude.AI, get response, apply any fixes
+### 1. Claude.AI review of v2.1.1+5 poll hardening
+**Status**: ⏳ Doc ready — paste `code_review_v2.1.1.5_poll_hardening.md` into Claude.AI, get response, apply any fixes
 **4 open questions**:
-- Q1 — `jobTimer` declared but never used directly — leak risk?
-- Q2 — Non-200 HTTP responses fall through silently — should they be counted as transient errors?
-- Q3 — `maxTransientErrors = 3` (30s) — sufficient given the 60s DNS blip in the log?
-- Q4 — Duplicate `SocketException`/`ClientException` handler code — cleaner approach?
+- Q1 — `handleTransient` closure captures `timer` by reference — stale/null risk after async await?
+- Q2 — 429: should `TourStatusService.updateTourStatus(jobId, 'quota_exceeded')` be written so background monitor doesn't re-try?
+- Q3 — Other 4xx stops spinner silently — should a snackbar be shown?
+- Q4 — `dispose()` + in-flight async callback interaction — is `mounted` check in `handleTransient` sufficient?
 
-### 2. Ubuntu build for v2.1.1+4 — READY TO BUILD
-**Status**: ✅ Code committed (`ea663ee`) — awaiting Claude review first
+### 2. Ubuntu build for v2.1.1+5 — READY TO BUILD
+**Status**: ✅ Code committed (`5853b62`) — awaiting Claude review first
 **Prerequisite**: Enter `gateway-api-key` (from Secret Manager) in About → cloud → API Key field, set `cloud_base_url = https://api.audioura.com`, path-routing OFF
 
-### ⚠️ QUEUED FIXES FOR NEXT BUILD (v2.1.1+5)
+### ⚠️ QUEUED FIXES FOR NEXT BUILD (v2.1.1+6)
 **Q1 — Empty API key warning** (Claude recommendation, medium priority):
 - In `apiHeaders()`: when `mode == 'cloud'` and key is empty → `DebugLogHelper.addDebugLog('Cloud mode but gateway_api_key not set — request will 401; set it in About')`
 - When any cost-endpoint returns 401 → surface user-facing message: "Set your API key in About settings"
