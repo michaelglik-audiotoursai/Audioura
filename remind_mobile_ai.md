@@ -11,7 +11,7 @@
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 When chat history is compacted, user will ask you to read `remind_ai.md` and `remind_mobile_ai.md`.
 **Your Response**:
-"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.1+3 (M2+M3 complete, Blocker A: X-API-Key via Endpoints.apiHeaders() on all cost-bearing POSTs + API key field in About, Blocker B: TranslationService migrated to Endpoints, 9 dead files deleted). Code committed and pushed. Claude.AI final review doc is `code_review_v2.1.1.3_final.md`. Ready to continue."
+"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.1+4 (poll resilience fix: SocketException/ClientException keep polling up to 3 consecutive errors, soft give-up with orange snackbar, no failed status written). Code committed `ea663ee`. Claude review doc ready: `code_review_v2.1.1.4_poll_resilience.md`. Ready to continue."
 
 ## 🚫 OWNERSHIP BOUNDARIES — CRITICAL
 - ✅ **MY files**: `remind_mobile_ai.md`, `code_review_v*.md`, files in `amazon-q-communications/`
@@ -23,7 +23,7 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 **Project**: Audioura Android APK
 **Version on branch**: v2.1.1+4 ✅ committed on `services-migration` (commit `ea663ee`)
 **iPhone**: On v1.2.9+71 (iOS Q built — A#78 mic fix)
-**Android**: ✅ v2.1.1+3 code committed — awaiting Claude final review + Ubuntu build
+**Android**: ✅ v2.1.1+4 code committed — awaiting Claude review + Ubuntu build
 **iOS Q current task**: No active task assigned
 **Branch**: `services-migration`
 **Android Application ID**: `com.audioura.app`
@@ -154,8 +154,16 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## 🔄 NEXT ACTION
 
-### 1. Ubuntu build for v2.1.1+3 — READY TO BUILD
-**Status**: ✅ Claude review complete (`REVIEW_FOR_MOBILE_AQ_v2.1.1.3_apikey_2026_06_03.md`) — verdict: both blockers fixed, worth testing
+### 1. Claude.AI review of v2.1.1+4 poll resilience fix
+**Status**: ⏳ Doc ready — paste `code_review_v2.1.1.4_poll_resilience.md` into Claude.AI, get response, apply any fixes
+**4 open questions**:
+- Q1 — `jobTimer` declared but never used directly — leak risk?
+- Q2 — Non-200 HTTP responses fall through silently — should they be counted as transient errors?
+- Q3 — `maxTransientErrors = 3` (30s) — sufficient given the 60s DNS blip in the log?
+- Q4 — Duplicate `SocketException`/`ClientException` handler code — cleaner approach?
+
+### 2. Ubuntu build for v2.1.1+4 — READY TO BUILD
+**Status**: ✅ Code committed (`ea663ee`) — awaiting Claude review first
 **Prerequisite**: Enter `gateway-api-key` (from Secret Manager) in About → cloud → API Key field, set `cloud_base_url = https://api.audioura.com`, path-routing OFF
 
 ### ⚠️ QUEUED FIXES FOR NEXT BUILD (v2.1.1+5)
@@ -169,17 +177,11 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 - Voice commands are 100% on-device (speech-to-text → command parsing → execution), no services involved
 - Multi-language voice command support NOT yet implemented — future enhancement only
 
-### 2. Ubuntu build for v2.1.1+4
-**Status**: ✅ Code committed and pushed (`787a7f6`) — awaiting Claude review first
-**Steps**:
-1. Sir Michael must enter the `gateway-api-key` value in About → API Key field before cloud tests
-2. After Claude review + any fixes: run `bash build_flutter_clean.sh` on Ubuntu VM
-3. Shared folder already has latest — no git pull needed on Ubuntu
-4. Smoke tests:
-   - Local WiFi foreground (regression — `rows_affected: 1`)
-   - Cloud foreground generation off-WiFi (`rows_affected: 0` expected until /user deployed)
-   - Cloud multi-language (exercises TranslationService Endpoints fix)
-   - Cloud backgrounded tour
+### 3. Smoke tests for v2.1.1+4 (after Claude review + Ubuntu build)
+1. Local WiFi foreground generation (regression — `rows_affected: 1`)
+2. Cloud foreground generation — simulate network blip during poll → expect orange snackbar, NOT failed status
+3. Cloud multi-language generation
+4. Cloud backgrounded tour
 
 ## ⚠️ VERSION SYNC RULE
 - iOS Q makes code changes → commits → bumps `pubspec.yaml` version → pushes to `services-migration`
