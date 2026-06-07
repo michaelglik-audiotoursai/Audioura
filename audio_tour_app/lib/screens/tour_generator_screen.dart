@@ -269,6 +269,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         final response = await http.get(
           await Endpoints.url(Service.orchestrator, '/status/$jobId'),
         );
+        if (!mounted) { timer.cancel(); return; }  // screen left while awaiting — stop safely
 
         if (response.statusCode == 200) {
           // Successful poll — reset transient error counter
@@ -410,11 +411,18 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
           await DebugLogHelper.addDebugLog('TOUR_POLL: ${response.statusCode} server error for job $jobId — counting as transient');
           await handleTransient('HTTP ${response.statusCode}');
         } else {
-          // Other 4xx — likely a permanent client error; log and stop
+          // Other 4xx — likely a permanent client error; log, stop, tell the user
           timer.cancel();
           await DebugLogHelper.addDebugLog('TOUR_POLL: unexpected ${response.statusCode} for job $jobId: ${response.body}');
           if (mounted) {
             setState(() { _isGenerating = false; _progress = ''; });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Tour generation unavailable right now — please try again.'),
+                backgroundColor: Colors.red,
+                duration: Duration(seconds: 8),
+              ),
+            );
           }
         }
 
