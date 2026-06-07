@@ -8,47 +8,52 @@ This is required so the user can identify which Amazon-Q tab they are talking to
 
 ---
 
-### ✅ **CURRENT STATE — v2.1.1+1 PARITY BUILD READY FOR MAC MINI**
+### ✅ **CURRENT STATE — v2.1.1+3 PARITY BUILD READY FOR MAC MINI**
 
 - iPhone last confirmed on **v1.2.9+71** (A#78 mic fix — smoke test passed)
-- **A#79 is ready to build** — v2.1.1+1 iOS parity with Android. All Dart code already in repo from Android Q. iOS-only change: `NSLocalNetworkUsageDescription` added to `Info.plist` (commit `52d8282`). Mac Mini: `git pull` + `pod install` + build. No pubspec bump needed (already at `2.1.1+1`).
-- **Version jump**: v1.2.9+71 → v2.1.1+1. This is intentional — Android Q restarted the major version for the dual-environment (Local WiFi / Cloud) release.
+- **A#80 is ready to build** — v2.1.1+3 iOS parity with Android. All Dart code already in repo from Android Q. No iOS-only file changes. Mac Mini: `git pull` + `pod install` + build. No pubspec bump needed (already at `2.1.1+3`).
+- **Version jump**: v1.2.9+71 → v2.1.1+3. This is intentional — Android Q restarted the major version for the dual-environment (Local WiFi / Cloud) release.
+- **Full assignment doc**: `amazon-q-communications/audiotours/requirements/IOS_A80_PARITY_BUILD_v2.1.1.3_2026_06_06.md`
 
 ---
 
 ### 🎯 **IMMEDIATE NEXT STEPS**
 
-#### A#79 — Build v2.1.1+1 on iPhone ⚠️ READY TO BUILD
+#### A#80 — Build v2.1.1+3 on iPhone ⚠️ READY TO BUILD
 
-**What this delivers:**
-- Dual-environment networking: Local WiFi (default `192.168.0.218`) and Cloud (HTTPS URL)
-- About screen: Local/Cloud toggle + cloud base URL field + gateway path routing checkbox (leave unchecked)
-- `Endpoints` resolver — all service calls route through a single resolver per active mode
-- `NSLocalNetworkUsageDescription` in `Info.plist` — iOS 14+ local network hygiene
-- All prior fixes (A#77b Refresh, A#78 mic) carried forward — regression check only
+**What this delivers (since last iPhone build v1.2.9+71):**
+- Dual-environment networking: Local WiFi / Cloud toggle in About
+- `Endpoints.apiHeaders()` — injects `X-API-Key` from SharedPreferences in cloud mode only
+- All cost-bearing POSTs (`/generate-complete-tour`, `/tour-status`, `/translate-with-audio`) send `X-API-Key` in cloud
+- `TranslationService` migrated from hardcoded LAN IP → `Endpoints.url(Service.translation)` + `apiHeaders()`
+- API key field in About screen (obscured, cloud section, `gateway_api_key` SharedPreferences key)
+- 9 dead/raw-SQL files deleted
+- All prior fixes (A#77b Refresh, A#78 mic) carried forward
 
-**Key fact:** No Dart coding was needed. All `lib/` changes are shared Flutter code from Android Q. iOS just builds the same commit.
+**Before cloud tests**: Enter `gateway-api-key` value (from AWS Secrets Manager) in About → cloud → API Key field. Set `cloud_base_url = https://api.audioura.com`. Leave "Use gateway path routing" unchecked.
+
+**Key fact:** No Dart coding needed. All `lib/` changes are shared Flutter code from Android Q. iOS builds same commit. No iOS-only file changes since `52d8282`.
 
 **Mac Mini runs:**
 ```bash
 cd ~/Development/Audioura-build
 git pull origin services-migration
-# Verify: grep "^version:" development/audio_tour_app/pubspec.yaml → 2.1.1+1
-# Verify: grep -n "NSLocalNetworkUsageDescription" development/audio_tour_app/ios/Runner/Info.plist → 1 match
+# Verify: grep "^version:" development/audio_tour_app/pubspec.yaml → 2.1.1+3
 cd development/audio_tour_app/ios && pod install
 cd .. && flutter clean && flutter pub get
 cd "/Volumes/USB DISK/Audioura/scripts" && ./build_install_launch.sh
 # STOP for Sir Michael smoke test
-# NO pubspec commit — version already at 2.1.1+1
+# NO pubspec commit — version already at 2.1.1+3
 ```
 
-**Smoke tests (6):**
-1. Local mode (WiFi) → tours load from `192.168.0.218`. About tab shows Local by default.
-2. About tab → Local/Cloud toggle present. Switching to Cloud shows URL field. Back to Local hides it.
-3. Cloud mode → download existing tour → plays. (Mark NOT_TESTED if no cloud URL available — not a blocker.)
-4. Mic regression (A#78) → no "permission required" snackbar.
-5. Refresh regression (A#77b) → no black screen.
-6. General regression → tour audio, news article, POI map all work.
+**Smoke tests (7):**
+1. Local WiFi → tours load from `192.168.0.218`. About tab shows Local by default.
+2. Local WiFi → generate tour → succeeds, `rows_affected: 1` in logs.
+3. Local WiFi → generate + translate (1 language) → succeeds.
+4. Cloud → download existing tour → plays.
+5. Cloud → user sync → 404 expected (Kiro gateway task — not a failure).
+6. Mic regression (A#78) → no "permission required" snackbar.
+7. Refresh regression (A#77b) → no black screen.
 
 ---
 
@@ -80,7 +85,8 @@ Audioura-build/           AudioTours\development\
 | 1.2.9+69 | A#77 wrong Refresh fix | ⚠️ BUILT BUT FAILED |
 | 1.2.9+70 | A#77b Listen Refresh black screen fix | ✅ |
 | 1.2.9+71 | A#78 mic permission fix + dead import | ✅ |
-| **2.1.1+1** | **A#79 dual-environment parity** | **⏳ READY TO BUILD** |
+| 2.1.1+1 | A#79 dual-environment parity | ⏳ SKIPPED — superseded by A#80 |
+| **2.1.1+3** | **A#80 cloud-ready parity (Blocker A+B)** | **⏳ READY TO BUILD** |
 
 #### Git operation ownership
 | Operation | Who | Where |
@@ -168,7 +174,7 @@ cd "/Volumes/USB DISK/Audioura/scripts"
 ---
 
 ### 📋 **OPEN ITEMS**
-1. **A#79** ⚠️ READY TO BUILD — v2.1.1+1 iOS parity. `git pull` + `pod install` + build. No pubspec bump. See Immediate Next Steps.
+1. **A#80** ⚠️ READY TO BUILD — v2.1.1+3 iOS parity. `git pull` + `pod install` + build. No pubspec bump. No iOS-only file changes. Full assignment: `IOS_A80_PARITY_BUILD_v2.1.1.3_2026_06_06.md` in communications/requirements.
 2. **Dialog auto-dismiss** — `_startVoiceSearch()` dialog does not auto-close on 10s timeout. `onStatus` never wired. Confirmed never implemented (not a regression). Deferred to future assignment.
 3. **Android A#79 parity** — Android is already on v2.1.1+1. After iOS A#79 builds, both platforms are in sync.
 4. **Cloud tour generation** — not ready on either platform (`:5003` not deployed to cloud). Test existing-tour download only.
@@ -243,5 +249,5 @@ cd ios && pod deintegrate && pod install
 
 ---
 
-**Last Updated**: 2026-06-03 — v106.0. pubspec at `2.1.1+1` (Android Q). iOS A#79 parity build ready: `git pull` + `pod install` + build. NSLocalNetworkUsageDescription added to Info.plist (`52d8282`). No Dart changes needed for iOS — shared codebase carries all dual-environment features.
-**iOS Amazon-Q Version**: 106.0
+**Last Updated**: 2026-06-06 — v107.0. pubspec at `2.1.1+3` (Android Q). iOS A#80 parity build ready: `git pull` + `pod install` + build. No iOS-only file changes since `52d8282`. No Dart changes needed — shared codebase. Full assignment in `IOS_A80_PARITY_BUILD_v2.1.1.3_2026_06_06.md`.
+**iOS Amazon-Q Version**: 107.0
