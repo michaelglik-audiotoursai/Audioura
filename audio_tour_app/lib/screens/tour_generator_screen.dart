@@ -39,9 +39,8 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   String _appMode = 'Tours'; // Default to Tours mode
   String _contentType = 'Article'; // Article or Newsletter
   List<String> _selectedLanguages = ['en']; // Language selection
+  Timer? _pollTimer;
 
-
-  
   @override
   void initState() {
     super.initState();
@@ -237,38 +236,60 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
 
   Future<void> _pollAndAutoDownload(String jobId, String location, [List<String>? languages]) async {
     const int maxAttempts = 90; // 15 minutes timeout
-    const int maxTransientErrors = 3; // tolerate up to 3 consecutive network blips
+    const int maxTransientErrors = 6; // tolerate up to 6 consecutive blips (~60s)
     int attempts = 0;
     int transientErrors = 0;
-    
-    // Create unique timer for this job to avoid conflicts
-    Timer? jobTimer;
-    jobTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
+
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
+
+      // Closure: handle transient network/DNS blips without marking failed
+      Future<void> handleTransient(Object e) async {
+        transientErrors++;
+        await DebugLogHelper.addDebugLog('TOUR_POLL: transient error ($transientErrors/$maxTransientErrors): $e');
+        if (transientErrors >= maxTransientErrors) {
+          timer.cancel();
+          await DebugLogHelper.addDebugLog('TOUR_POLL: too many consecutive errors — soft give-up for job $jobId (tour may still complete on server)');
+          if (mounted) {
+            setState(() { _isGenerating = false; _progress = ''; });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Network connection lost. Tour may still be generating — check My Tours shortly.'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 10),
+              ),
+            );
+          }
+        } else {
+          if (mounted) setState(() { _progress = 'Network hiccup — still waiting for tour...'; });
+        }
+      }
+
       try {
         final response = await http.get(
           await Endpoints.url(Service.orchestrator, '/status/$jobId'),
         );
-        
+
         if (response.statusCode == 200) {
           // Successful poll — reset transient error counter
           transientErrors = 0;
           Map<String, dynamic> status = jsonDecode(response.body);
-          
+
           setState(() {
             _progress = status['progress'] ?? 'Processing...';
           });
-          
+
           if (status['status'] == 'completed') {
             timer.cancel();
             setState(() {
               _progress = 'Downloading and extracting tour...';
             });
-            
+
             // Auto-download, extract, and play
             final nonEnglish = (languages ?? []).where((l) => l != 'en').toList();
             final wantsEnglish = languages == null || languages.isEmpty || languages.contains('en');
             final finalTourId = await _autoDownloadAndPlay(jobId, location, languages, wantsEnglish);
-            
+
             // Process additional languages if requested
             if (finalTourId != null && nonEnglish.isNotEmpty) {
               final translatedPath = await _processAdditionalLanguages(finalTourId, languages!);
@@ -294,24 +315,24 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
                 if (mounted) setState(() { _isGenerating = false; _progress = ''; });
               }
             }
-            
+
             // Update tour request status to completed AFTER download
             // This ensures we don't mark it complete until we've actually downloaded it
             await TourStatusService.updateTourStatus(jobId, 'completed');
-            
+
           } else if (status['status'] == 'error' || status['status'] == 'failed') {
             timer.cancel();
             await TourStatusService.updateTourStatus(jobId, 'failed');
-            
+
             // Extract detailed error information from Services
             String errorMessage = 'Tour generation failed';
             String userFriendlyMessage = 'Unable to generate tour. Please try again.';
             List<String> suggestions = [];
-            
+
             if (status['error'] != null) {
               errorMessage = status['error'].toString();
             }
-            
+
             // Check for user_error field with detailed information
             if (status['user_error'] != null) {
               final userError = status['user_error'];
@@ -343,20 +364,20 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
                   userFriendlyMessage = status['error_type'].toString().replaceAll('_', ' ');
               }
             }
-            
+
             // Log detailed error for debugging
             await DebugLogHelper.addDebugLog('TOUR_ERROR: Services returned error - Type: ${status['error_type']}, Message: $errorMessage');
             await DebugLogHelper.addDebugLog('TOUR_ERROR: Full status response: ${jsonEncode(status)}');
-            
+
             // Show user-friendly error dialog instead of just throwing exception
             setState(() {
               _isGenerating = false;
               _progress = '';
             });
-            
+
             _showServicesErrorDialog(userFriendlyMessage, suggestions);
             return;
-            
+
           } else if (attempts >= maxAttempts) {
             timer.cancel();
             await TourStatusService.updateTourStatus(jobId, 'timeout');
@@ -367,50 +388,39 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
             });
             return;
           }
-          
+
           attempts++;
-        }
-      } on SocketException catch (e) {
-        // Transient network/DNS error — keep polling, don't mark failed
-        transientErrors++;
-        await DebugLogHelper.addDebugLog('TOUR_POLL: Transient network error ($transientErrors/$maxTransientErrors): $e — continuing to poll');
-        if (transientErrors >= maxTransientErrors) {
+
+        } else if (response.statusCode == 429) {
+          // Quota exceeded — stop polling, tell the user
           timer.cancel();
-          await DebugLogHelper.addDebugLog('TOUR_POLL: Too many consecutive network errors — giving up poll for job $jobId (tour may still complete on server)');
+          await DebugLogHelper.addDebugLog('TOUR_POLL: 429 quota exceeded for job $jobId: ${response.body}');
           if (mounted) {
             setState(() { _isGenerating = false; _progress = ''; });
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Network connection lost. Tour may still be generating — check My Tours shortly.'),
-                backgroundColor: Colors.orange,
-                duration: Duration(seconds: 10),
+                content: Text('Daily tour limit reached. Please try again tomorrow or check your plan.'),
+                backgroundColor: Colors.deepOrange,
+                duration: Duration(seconds: 12),
               ),
             );
           }
+        } else if (response.statusCode >= 500) {
+          // Server-side transient error (5xx) — treat like a network blip
+          await DebugLogHelper.addDebugLog('TOUR_POLL: ${response.statusCode} server error for job $jobId — counting as transient');
+          await handleTransient('HTTP ${response.statusCode}');
         } else {
-          if (mounted) setState(() { _progress = 'Network hiccup — still waiting for tour...'; });
-        }
-      } on http.ClientException catch (e) {
-        // Transient HTTP client error — same treatment as SocketException
-        transientErrors++;
-        await DebugLogHelper.addDebugLog('TOUR_POLL: Transient client error ($transientErrors/$maxTransientErrors): $e — continuing to poll');
-        if (transientErrors >= maxTransientErrors) {
+          // Other 4xx — likely a permanent client error; log and stop
           timer.cancel();
-          await DebugLogHelper.addDebugLog('TOUR_POLL: Too many consecutive client errors — giving up poll for job $jobId (tour may still complete on server)');
+          await DebugLogHelper.addDebugLog('TOUR_POLL: unexpected ${response.statusCode} for job $jobId: ${response.body}');
           if (mounted) {
             setState(() { _isGenerating = false; _progress = ''; });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Network connection lost. Tour may still be generating — check My Tours shortly.'),
-                backgroundColor: Colors.orange,
-                duration: Duration(seconds: 10),
-              ),
-            );
           }
-        } else {
-          if (mounted) setState(() { _progress = 'Network hiccup — still waiting for tour...'; });
         }
-      } catch (error) {
+
+      } on SocketException catch (e) { await handleTransient(e); }
+        on http.ClientException catch (e) { await handleTransient(e); }
+        catch (error) {
         // Unexpected error (not a network blip) — abort and mark failed
         timer.cancel();
         await TourStatusService.updateTourStatus(jobId, 'failed');
@@ -2140,6 +2150,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _tourRequestController.dispose();
     _stopCountController.dispose();
     super.dispose();
