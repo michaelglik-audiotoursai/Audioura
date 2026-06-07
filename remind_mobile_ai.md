@@ -11,7 +11,7 @@
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 When chat history is compacted, user will ask you to read `remind_ai.md` and `remind_mobile_ai.md`.
 **Your Response**:
-"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.1+5 (poll hardening: _pollTimer State field + dispose cancel, non-200 handling 429/5xx/4xx, maxTransientErrors 3→6, handleTransient closure). Code committed `5853b62`. Claude review doc ready: `code_review_v2.1.1.5_poll_hardening.md`. Ready to continue."
+"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.1+5 (poll hardening complete: mounted guard after http.get, 4xx snackbar, _pollTimer dispose, non-200 handling, maxTransientErrors=6, handleTransient closure). Latest commit `14f11eb`. Ready for Ubuntu build."
 
 ## 🚫 OWNERSHIP BOUNDARIES — CRITICAL
 - ✅ **MY files**: `remind_mobile_ai.md`, `code_review_v*.md`, files in `amazon-q-communications/`
@@ -21,21 +21,23 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## CURRENT PROJECT STATUS
 **Project**: Audioura Android APK
-**Version on branch**: v2.1.1+5 ✅ committed on `services-migration` (commit `5853b62`)
+**Version on branch**: v2.1.1+5 ✅ committed on `services-migration` (latest commit `14f11eb`)
 **iPhone**: On v1.2.9+71 (iOS Q built — A#78 mic fix)
-**Android**: ✅ v2.1.1+5 code committed — awaiting Claude review + Ubuntu build
+**Android**: ✅ v2.1.1+5 fully complete — ready for Ubuntu build
 **iOS Q current task**: No active task assigned
 **Branch**: `services-migration`
 **Android Application ID**: `com.audioura.app`
 **Server**: `192.168.0.218` (Docker services on Windows laptop)
 
 ## RECENT VERSION HISTORY (latest first)
-- **v2.1.1+5** — Poll hardening (Claude review fixes for v2.1.1+4):
+- **v2.1.1+5** — Poll hardening (all Claude review fixes applied, 2 commits):
+  - `mounted` guard after `http.get` in poll callback — prevents setState after dispose if user leaves mid-await (Q4 real gap)
+  - Other 4xx: red snackbar "Tour generation unavailable right now" instead of silent spinner clear (Q3)
   - `_pollTimer` promoted to State field — `_pollTimer?.cancel()` added to `dispose()` (Q1 leak fix)
-  - Non-200 HTTP responses now handled (Q2 critical fix): 429 → stop + quota snackbar; 5xx → `handleTransient()` (counts toward limit); other 4xx → log + stop spinner silently
-  - `maxTransientErrors` raised `3 → 6` (~60s tolerance matching observed DNS outage) (Q3)
-  - Duplicate SocketException/ClientException handler bodies replaced with `handleTransient` local closure (Q4 DRY)
-  - `maxAttempts = 90` overall cap confirmed ✅ (Claude asked to verify)
+  - Non-200 HTTP responses handled (Q2 critical): 429 → stop + quota snackbar; 5xx → `handleTransient()`; other 4xx → log + stop + snackbar
+  - `maxTransientErrors` raised `3 → 6` (~60s tolerance matching observed DNS outage)
+  - Duplicate SocketException/ClientException handlers → `handleTransient` local closure (DRY)
+  - `maxAttempts = 90` overall cap confirmed ✅
 - **v2.1.1+4** — Poll resilience fix:
   - `_pollAndAutoDownload` in `tour_generator_screen.dart`: `SocketException` / `http.ClientException` caught separately — keep polling, log warning, do NOT mark failed
   - Tolerates up to 3 consecutive transient errors before soft give-up
@@ -160,16 +162,8 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## 🔄 NEXT ACTION
 
-### 1. Claude.AI review of v2.1.1+5 poll hardening
-**Status**: ⏳ Doc ready — paste `code_review_v2.1.1.5_poll_hardening.md` into Claude.AI, get response, apply any fixes
-**4 open questions**:
-- Q1 — `handleTransient` closure captures `timer` by reference — stale/null risk after async await?
-- Q2 — 429: should `TourStatusService.updateTourStatus(jobId, 'quota_exceeded')` be written so background monitor doesn't re-try?
-- Q3 — Other 4xx stops spinner silently — should a snackbar be shown?
-- Q4 — `dispose()` + in-flight async callback interaction — is `mounted` check in `handleTransient` sufficient?
-
-### 2. Ubuntu build for v2.1.1+5 — READY TO BUILD
-**Status**: ✅ Code committed (`5853b62`) — awaiting Claude review first
+### 1. Ubuntu build for v2.1.1+5 — READY TO BUILD ✅
+**Status**: ✅ All Claude fixes applied and committed (`14f11eb`) — no more review needed
 **Prerequisite**: Enter `gateway-api-key` (from Secret Manager) in About → cloud → API Key field, set `cloud_base_url = https://api.audioura.com`, path-routing OFF
 
 ### ⚠️ QUEUED FIXES FOR NEXT BUILD (v2.1.1+6)
@@ -183,7 +177,7 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 - Voice commands are 100% on-device (speech-to-text → command parsing → execution), no services involved
 - Multi-language voice command support NOT yet implemented — future enhancement only
 
-### 3. Smoke tests for v2.1.1+4 (after Claude review + Ubuntu build)
+### 2. Smoke tests for v2.1.1+5 (after Ubuntu build)
 1. Local WiFi foreground generation (regression — `rows_affected: 1`)
 2. Cloud foreground generation — simulate network blip during poll → expect orange snackbar, NOT failed status
 3. Cloud multi-language generation
