@@ -33,6 +33,23 @@ def _strip_nav_fields_for_tts(text):
 
 from job_store import get_job_store
 
+def _get_auth_token(target_url):
+    """Get identity token for Cloud Run service-to-service auth."""
+    if not target_url.startswith('https://'):
+        return {}
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(target_url)
+        audience = f"{parsed.scheme}://{parsed.netloc}"
+        resp = requests.get(
+            f"http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience={audience}",
+            headers={"Metadata-Flavor": "Google"}, timeout=5)
+        if resp.status_code == 200:
+            return {"Authorization": f"Bearer {resp.text}"}
+    except:
+        pass
+    return {}
+
 app = Flask(__name__)
 CORS(app)
 
@@ -323,10 +340,12 @@ def generate_modernized_tour_async(job_id, tour_file_path):
         audio_files = []
         for i, text_content in enumerate(modernized_data["text_content"], 1):
             try:
-                # Call Polly TTS service
+                # Call Polly TTS service (with auth for Cloud Run)
+                tts_headers = {"Content-Type": "application/json"}
+                tts_headers.update(_get_auth_token(POLLY_TTS_URL))
                 tts_response = requests.post(
                     f"{POLLY_TTS_URL}/synthesize",
-                    headers={"Content-Type": "application/json"},
+                    headers=tts_headers,
                     json={"text": _strip_nav_fields_for_tts(text_content), "voice": "Joanna"},
                     timeout=30
                 )

@@ -173,10 +173,15 @@ def download_article(article_id):
     return proxy_request(BACKENDS['news-orchestrator'], f'/download/{article_id}', timeout=30)
 
 
-# === USER SYNC (stub) ===
+# === USER SYNC (stub — returns success until user-api deployed) ===
 @app.route('/sync', methods=['POST', 'GET'])
 def sync():
     return jsonify({"status": "success"})
+
+@app.route('/user/<path:subpath>', methods=['GET', 'POST', 'PUT'])
+def user_route(subpath):
+    # Stub until user-api is deployed
+    return jsonify({"status": "success", "rows_affected": 1})
 
 
 # === CATCH-ALL 404 ===

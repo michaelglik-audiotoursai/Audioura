@@ -27,6 +27,38 @@ TOUR_UPDATE_URL = os.getenv('TOUR_UPDATE_URL', 'http://development-tour-update-1
 USER_API_URL = os.getenv('USER_API_URL', 'http://user-api-2:5000')
 COORDINATES_URL = os.getenv('COORDINATES_URL', 'http://coordinates-fromai:5004')
 
+
+def _get_auth_headers(target_url):
+    """Get authorization headers for service-to-service calls on Cloud Run.
+    On local Docker, returns empty dict (no auth needed).
+    On Cloud Run, fetches an identity token from the metadata server."""
+    if not target_url.startswith('https://'):
+        return {}  # Local Docker — no auth needed
+    try:
+        metadata_url = f"http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience={target_url}"
+        resp = requests.get(metadata_url, headers={"Metadata-Flavor": "Google"}, timeout=5)
+        if resp.status_code == 200:
+            return {"Authorization": f"Bearer {resp.text}"}
+    except Exception as e:
+        print(f"[AUTH] Failed to get identity token for {target_url}: {e}")
+    return {}
+
+
+def _authenticated_request(method, url, **kwargs):
+    """Wrapper for requests that adds identity token for Cloud Run service-to-service calls."""
+    # Extract base URL for audience (scheme + netloc)
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    audience = f"{parsed.scheme}://{parsed.netloc}"
+    auth_headers = _get_auth_headers(audience)
+    
+    headers = kwargs.get('headers', {}) or {}
+    headers.update(auth_headers)
+    kwargs['headers'] = headers
+    
+    return requests.request(method, url, **kwargs)
+
+
 # Configure unbuffered logging
 import sys
 sys.stdout.reconfigure(line_buffering=True)
@@ -350,8 +382,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         
         print(f"Calling tour text generator API: {datetime.now().isoformat()}")
         print(f"Request data: {generate_data}")
-        response = requests.post(
-            f"{TOUR_GENERATOR_URL}/generate",
+        response = _authenticated_request("POST", f"{TOUR_GENERATOR_URL}/generate",
             headers={"Content-Type": "application/json"},
             json=generate_data,
             timeout=60
@@ -375,7 +406,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         while True:
             poll_count += 1
             print(f"Checking tour text generator status: {datetime.now().isoformat()} (Poll #{poll_count})")
-            status_response = requests.get(f"{TOUR_GENERATOR_URL}/status/{job_id_1}", timeout=10)
+            status_response = _authenticated_request("GET", f"{TOUR_GENERATOR_URL}/status/{job_id_1}", timeout=10)
             print(f"Status response: {status_response.status_code}")
             
             if status_response.status_code == 200:
@@ -418,8 +449,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             print(f"Using tour_file for modernized service: {tour_file}")
         
         print(f"Calling MODERNIZED service: {datetime.now().isoformat()}")
-        modernized_response = requests.post(
-            f"{MODERNIZED_URL}/process",
+        modernized_response = _authenticated_request("POST", f"{MODERNIZED_URL}/process",
             headers={"Content-Type": "application/json"},
             json=modernized_data,
             timeout=60
@@ -435,7 +465,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         # Wait for modernized processing to complete
         ACTIVE_JOBS[job_id]["progress"] = "Waiting for modernized processing..."
         while True:
-            modernized_status_response = requests.get(f"{MODERNIZED_URL}/status/{modernized_job_id}", timeout=10)
+            modernized_status_response = _authenticated_request("GET", f"{MODERNIZED_URL}/status/{modernized_job_id}", timeout=10)
             
             if modernized_status_response.status_code == 200:
                 modernized_status_data = modernized_status_response.json()
@@ -482,7 +512,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         safe_location = location.replace(' ', '_').replace(',', '').replace(':', '').replace('/', '_').replace('\\', '_').lower()
         
         print(f"Downloading complete tour from MODERNIZED service: {datetime.now().isoformat()}")
-        download_response = requests.get(f"{MODERNIZED_URL}/download/{modernized_job_id}", timeout=60)
+        download_response = _authenticated_request("GET", f"{MODERNIZED_URL}/download/{modernized_job_id}", timeout=60)
         print(f"Download response: {download_response.status_code}")
         
         if download_response.status_code == 200:
@@ -644,8 +674,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                     }
                     
                     print(f"Calling translation service with data: {translation_data}")
-                    translation_response = requests.post(
-                        f"{TRANSLATION_URL}/translate-with-audio",
+                    translation_response = _authenticated_request("POST", f"{TRANSLATION_URL}/translate-with-audio",
                         headers={"Content-Type": "application/json"},
                         json=translation_data,
                         timeout=120
@@ -682,8 +711,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                         'status': 'completed',
                         'finished_at': datetime.now().isoformat()
                     }
-                    update_response = requests.post(
-                        f"{TOUR_UPDATE_URL}/update",
+                    update_response = _authenticated_request("POST", f"{TOUR_UPDATE_URL}/update",
                         headers={"Content-Type": "application/json"},
                         json=update_data,
                         timeout=10
@@ -755,8 +783,7 @@ def track_user_tour(user_id, tour_id, request_string):
         print(f"Calling user tracking API for user {user_id}")
         print(f"Payload: {payload}")
         
-        response = requests.put(
-            f"{USER_API_URL}/user/{user_id}",
+        response = _authenticated_request("PUT", f"{USER_API_URL}/user/{user_id}",
             json=payload,
             timeout=10
         )
@@ -790,7 +817,7 @@ def get_coordinates_direct(location):
         url = f"{COORDINATES_URL}/coordinates/{encoded_location}"
         print(f"Requesting URL: {url}")
         
-        response = requests.get(url, timeout=60)
+        _auth = _get_auth_headers(COORDINATES_URL); response = requests.get(url, headers=_auth, timeout=60)
         
         print(f"Response status code: {response.status_code}")
         print(f"Response time: {datetime.now().isoformat()}")
@@ -834,7 +861,7 @@ def call_coordinates_service(location):
         url = f"{COORDINATES_URL}/coordinates/{encoded_location}"
         print(f"Requesting URL: {url}")
         
-        response = requests.get(url, timeout=60)
+        _auth = _get_auth_headers(COORDINATES_URL); response = requests.get(url, headers=_auth, timeout=60)
         
         print(f"Response status code: {response.status_code}")
         print(f"Response time: {datetime.now().isoformat()}")
