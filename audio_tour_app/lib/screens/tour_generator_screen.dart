@@ -237,7 +237,9 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
 
   Future<void> _pollAndAutoDownload(String jobId, String location, [List<String>? languages]) async {
     const int maxAttempts = 90; // 15 minutes timeout
+    const int maxTransientErrors = 3; // tolerate up to 3 consecutive network blips
     int attempts = 0;
+    int transientErrors = 0;
     
     // Create unique timer for this job to avoid conflicts
     Timer? jobTimer;
@@ -248,6 +250,8 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         );
         
         if (response.statusCode == 200) {
+          // Successful poll — reset transient error counter
+          transientErrors = 0;
           Map<String, dynamic> status = jsonDecode(response.body);
           
           setState(() {
@@ -366,7 +370,48 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
           
           attempts++;
         }
+      } on SocketException catch (e) {
+        // Transient network/DNS error — keep polling, don't mark failed
+        transientErrors++;
+        await DebugLogHelper.addDebugLog('TOUR_POLL: Transient network error ($transientErrors/$maxTransientErrors): $e — continuing to poll');
+        if (transientErrors >= maxTransientErrors) {
+          timer.cancel();
+          await DebugLogHelper.addDebugLog('TOUR_POLL: Too many consecutive network errors — giving up poll for job $jobId (tour may still complete on server)');
+          if (mounted) {
+            setState(() { _isGenerating = false; _progress = ''; });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Network connection lost. Tour may still be generating — check My Tours shortly.'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 10),
+              ),
+            );
+          }
+        } else {
+          if (mounted) setState(() { _progress = 'Network hiccup — still waiting for tour...'; });
+        }
+      } on http.ClientException catch (e) {
+        // Transient HTTP client error — same treatment as SocketException
+        transientErrors++;
+        await DebugLogHelper.addDebugLog('TOUR_POLL: Transient client error ($transientErrors/$maxTransientErrors): $e — continuing to poll');
+        if (transientErrors >= maxTransientErrors) {
+          timer.cancel();
+          await DebugLogHelper.addDebugLog('TOUR_POLL: Too many consecutive client errors — giving up poll for job $jobId (tour may still complete on server)');
+          if (mounted) {
+            setState(() { _isGenerating = false; _progress = ''; });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Network connection lost. Tour may still be generating — check My Tours shortly.'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 10),
+              ),
+            );
+          }
+        } else {
+          if (mounted) setState(() { _progress = 'Network hiccup — still waiting for tour...'; });
+        }
       } catch (error) {
+        // Unexpected error (not a network blip) — abort and mark failed
         timer.cancel();
         await TourStatusService.updateTourStatus(jobId, 'failed');
         _showError('Error: $error');
