@@ -11,7 +11,7 @@
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 When chat history is compacted, user will ask you to read `remind_ai.md` and `remind_mobile_ai.md`.
 **Your Response**:
-"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.1+5 (poll hardening complete: mounted guard after http.get, 4xx snackbar, _pollTimer dispose, non-200 handling, maxTransientErrors=6, handleTransient closure). Latest commit `14f11eb`. Ready for Ubuntu build."
+"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.1+5 (poll hardening complete, Claude approved). Latest commit `e7634b9`. Ready for Ubuntu build."
 
 ## 🚫 OWNERSHIP BOUNDARIES — CRITICAL
 - ✅ **MY files**: `remind_mobile_ai.md`, `code_review_v*.md`, files in `amazon-q-communications/`
@@ -167,7 +167,14 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 **Prerequisite**: Enter `gateway-api-key` (from Secret Manager) in About → cloud → API Key field, set `cloud_base_url = https://api.audioura.com`, path-routing OFF
 
 ### ⚠️ QUEUED FIXES FOR NEXT BUILD (v2.1.1+6)
-**Q1 — Empty API key warning** (Claude recommendation, medium priority):
+**`Timer.periodic` → `Future.delayed` loop** (Claude Q3, optional but meaningful):
+- `Timer.periodic` + async callback can overlap on slow networks — if poll takes >10s, next tick fires before previous finishes → concurrent `/status` calls, rare double-download
+- Fix: replace `Timer.periodic` with a self-scheduling `while (!done) { await poll(); await Future.delayed(10s); }` loop — next poll only starts after current finishes
+**`translation_failed` UX message** (Kiro new field, small UX):
+- Kiro added `translation_failed: true` to `/status` response when multi-language tour falls back to English
+- Read `status['translation_failed']` in completed branch → show "Translation unavailable — showing English version" snackbar
+- Prevents non-English users being confused why they got English
+**Q1 — Empty API key warning** (Claude recommendation from v2.1.1+3, medium priority):
 - In `apiHeaders()`: when `mode == 'cloud'` and key is empty → `DebugLogHelper.addDebugLog('Cloud mode but gateway_api_key not set — request will 401; set it in About')`
 - When any cost-endpoint returns 401 → surface user-facing message: "Set your API key in About settings"
 **Q2 — SharedPreferences cleanup** (low priority, defer):
