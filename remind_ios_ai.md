@@ -8,47 +8,49 @@ This is required so the user can identify which Amazon-Q tab they are talking to
 
 ---
 
-### ✅ **CURRENT STATE — v2.1.1+1 PARITY BUILD READY FOR MAC MINI**
+### ✅ **CURRENT STATE — v2.1.1+3 READY TO BUILD ON iPHONE**
 
 - iPhone last confirmed on **v1.2.9+71** (A#78 mic fix — smoke test passed)
-- **A#79 is ready to build** — v2.1.1+1 iOS parity with Android. All Dart code already in repo from Android Q. iOS-only change: `NSLocalNetworkUsageDescription` added to `Info.plist` (commit `52d8282`). Mac Mini: `git pull` + `pod install` + build. No pubspec bump needed (already at `2.1.1+1`).
-- **Version jump**: v1.2.9+71 → v2.1.1+1. This is intentional — Android Q restarted the major version for the dual-environment (Local WiFi / Cloud) release.
+- **A#80 is ready to build** — v2.1.1+3 iOS parity with Android. Android has fully tested both Local WiFi AND Cloud. No iOS-only code changes needed beyond `Info.plist` already updated at `52d8282`.
+- **API Key field** is in the About screen as a **temporary development tool** — Sir Michael enters the gateway API key manually during testing. Will be removed in a future version (customers cannot be expected to know the key).
 
 ---
 
 ### 🎯 **IMMEDIATE NEXT STEPS**
 
-#### A#79 — Build v2.1.1+1 on iPhone ⚠️ READY TO BUILD
+#### A#80 — Build v2.1.1+3 on iPhone ⚠️ READY TO BUILD
 
-**What this delivers:**
-- Dual-environment networking: Local WiFi (default `192.168.0.218`) and Cloud (HTTPS URL)
-- About screen: Local/Cloud toggle + cloud base URL field + gateway path routing checkbox (leave unchecked)
+**What this delivers over v1.2.9+71:**
+- Dual-environment networking: Local WiFi (default) and Cloud (HTTPS)
 - `Endpoints` resolver — all service calls route through a single resolver per active mode
-- `NSLocalNetworkUsageDescription` in `Info.plist` — iOS 14+ local network hygiene
-- All prior fixes (A#77b Refresh, A#78 mic) carried forward — regression check only
-
-**Key fact:** No Dart coding was needed. All `lib/` changes are shared Flutter code from Android Q. iOS just builds the same commit.
+- `Endpoints.apiHeaders()` sends `X-API-Key` in cloud mode (reads `gateway_api_key` from SharedPreferences)
+- `tour_status_service.dart` — REST via `Endpoints(Service.orchestrator)` + `apiHeaders()`, keyed on `tour_xxx` tour_id
+- `TranslationService` — migrated to `Endpoints.url(Service.translation)` + `apiHeaders()` — cloud multi-language works
+- About screen: Local/Cloud toggle + cloud URL field + API Key field (temporary) + gateway path routing checkbox (leave unchecked)
+- Inter-service auth tokens on all edges, OpenAI + AWS secret key fixes
+- Dead files removed: `test_update_api.dart` + raw-SQL files
+- `NSLocalNetworkUsageDescription` in `Info.plist` (commit `52d8282`)
 
 **Mac Mini runs:**
 ```bash
 cd ~/Development/Audioura-build
 git pull origin services-migration
-# Verify: grep "^version:" development/audio_tour_app/pubspec.yaml → 2.1.1+1
-# Verify: grep -n "NSLocalNetworkUsageDescription" development/audio_tour_app/ios/Runner/Info.plist → 1 match
+# Verify: grep "^version:" development/audio_tour_app/pubspec.yaml → 2.1.1+3
 cd development/audio_tour_app/ios && pod install
 cd .. && flutter clean && flutter pub get
 cd "/Volumes/USB DISK/Audioura/scripts" && ./build_install_launch.sh
-# STOP for Sir Michael smoke test
-# NO pubspec commit — version already at 2.1.1+1
+# STOP for Sir Michael smoke test — Local WiFi + Cloud both
+# NO pubspec commit — version already at 2.1.1+3
 ```
 
-**Smoke tests (6):**
-1. Local mode (WiFi) → tours load from `192.168.0.218`. About tab shows Local by default.
-2. About tab → Local/Cloud toggle present. Switching to Cloud shows URL field. Back to Local hides it.
-3. Cloud mode → download existing tour → plays. (Mark NOT_TESTED if no cloud URL available — not a blocker.)
-4. Mic regression (A#78) → no "permission required" snackbar.
-5. Refresh regression (A#77b) → no black screen.
-6. General regression → tour audio, news article, POI map all work.
+**Smoke tests (7):**
+1. Local mode (WiFi) → tours load from `192.168.0.218`. About shows Local by default.
+2. Local WiFi tour generation → generates, appears in Listen tab.
+3. About tab → Local/Cloud toggle present. Switch to Cloud → URL + API Key fields appear.
+4. Cloud mode → enter URL + API Key → download/generate tour → plays.
+5. Cloud multi-language translation → completes (NOT_TESTED acceptable — not a blocker).
+6. Mic regression (A#78) → no "permission required" snackbar.
+7. Refresh regression (A#77b) → no black screen. General regression: tour audio, news article, POI map.
 
 ---
 
@@ -67,11 +69,11 @@ Audioura-build/           AudioTours\development\
 
 - **Mac Mini build clone**: `~/Development/Audioura-build/`, branch `services-migration`
 - **Flutter project on Mac Mini**: `~/Development/Audioura-build/development/audio_tour_app/`
-- **Windows dev tree**: `C:\Users\micha\eclipse-workspace\AudioTours\development\` — IS a git clone. Q edits files here, commits planning/directives/iOS-only changes. Never commits Dart code — Mac Mini does that.
-- **USB mirror in git**: `usb/Audioura/` mirrors `D:\Audioura\`. After editing: `copy usb\Audioura\assignments\mac_mini_assignments.md D:\Audioura\assignments\`
+- **Windows dev tree**: `C:\Users\micha\eclipse-workspace\AudioTours\development\` — IS a git clone. Q edits iOS-only files + planning docs here. Never commits Dart code.
+- **USB mirror**: `usb/Audioura/` mirrors `D:\Audioura\`. After editing: `copy usb\Audioura\assignments\mac_mini_assignments.md D:\Audioura\assignments\`
 - **OLD repo**: `~/Development/AudioTours/` — BROKEN, never use
-- **pubspec.yaml**: `2.1.1+1` (shared, bumped by Android Q — iOS Q never bumps independently)
-- **Head commit**: `52d8282` — NSLocalNetworkUsageDescription added to Info.plist
+- **pubspec**: `2.1.1+3` (Android Q bumped — iOS Q never bumps independently)
+- **Head commit**: `049bb35` — Cloud generation verified with real audio
 
 #### Version history
 | Version | Assignment | Status |
@@ -80,15 +82,18 @@ Audioura-build/           AudioTours\development\
 | 1.2.9+69 | A#77 wrong Refresh fix | ⚠️ BUILT BUT FAILED |
 | 1.2.9+70 | A#77b Listen Refresh black screen fix | ✅ |
 | 1.2.9+71 | A#78 mic permission fix + dead import | ✅ |
-| **2.1.1+1** | **A#79 dual-environment parity** | **⏳ READY TO BUILD** |
+| 2.1.1+1 | A#79 dual-environment — superseded by A#80 | ⏭️ SKIPPED |
+| **2.1.1+3** | **A#80 cloud fully working + API key + auth** | **⏳ READY TO BUILD** |
 
 #### Git operation ownership
 | Operation | Who | Where |
 |---|---|---|
 | `git pull` + build + `git push` (pubspec bump) | Mac Mini Q | `~/Development/Audioura-build/` |
-| Edit + commit directives/iOS-only files | Windows Q | `C:\Users\micha\eclipse-workspace\AudioTours\development\` |
-| Dart code changes + version bumps | Android Q or Mac Mini Q | per assignment |
+| Edit + commit iOS-only files + planning docs | Windows Q | `C:\Users\micha\eclipse-workspace\AudioTours\development\` |
+| Dart code changes + version bumps | Android Q | per assignment |
 | `git pull` to sync after pushes | Sir Michael (Windows) | Windows dev tree |
+
+⚠️ Android Q must NOT edit `remind_ios_ai.md` — unauthorized edit reverted at `e5c103d`.
 
 ---
 
@@ -105,19 +110,19 @@ Audioura-build/           AudioTours\development\
 ---
 
 ### 📱 **APP STATUS**
-- **iPhone**: v1.2.9+71 (A#79 parity build pending)
+- **iPhone**: v1.2.9+71 (A#80 parity build pending)
 - **All shipped features**: Tour clustering, location search, tour search, newsletter system, subscription, language selector, about screen, settings persistence, location permissions, keyboard dismissal, download spinner fix, microphone voice control, translation (ru/fr/zh), walking tour map, per-stop map focus, coordinate jitter, museum single-POI map guard, mode-switch fix, stale tour/news path healing, brick-red app icon, app name "Audioura", InAppWebView v6, map icon on Listen page, POI tap → TourMapScreen via `openMap` JS handler, Listen page Refresh in-place reload, Listen page mic permission fix.
-- **New in v2.1.1+1** (pending A#79 build): Dual-environment Local/Cloud networking, `Endpoints` resolver, About screen toggle.
+- **New in v2.1.1+3** (pending A#80 build): Dual-environment Local/Cloud networking, `Endpoints` resolver, `X-API-Key` header, `TranslationService` cloud migration, About screen toggle + API Key field.
 
 ---
 
 ### 🔄 **WORKFLOW RULES**
-1. Assignments: Windows Q writes directives to `usb/Audioura/assignments/mac_mini_assignments.md` → copies to USB → commits + pushes → Mac Mini Q pulls + executes.
-2. iOS-only file changes (e.g. `Info.plist`): Windows Q edits + commits + pushes → Mac Mini pulls.
-3. Dart code changes: Android Q or Mac Mini Q commits. Windows Q never touches `lib/`.
-4. After successful build: Mac Mini commits pubspec bump + pushes IF version was bumped. For parity builds where pubspec is already correct, no commit needed.
+1. Assignments: Windows Q writes to `usb/Audioura/assignments/mac_mini_assignments.md` → copies to USB → commits + pushes → Mac Mini Q pulls + executes.
+2. iOS-only file changes (`Info.plist`, `Podfile`): Windows Q edits + commits + pushes → Mac Mini pulls.
+3. Dart code changes: Android Q commits. Windows Q never touches `lib/`.
+4. After parity build: no pubspec commit needed (Android Q already bumped it).
 5. **LF FILES**: `home_screen.dart`, `tour_generator_screen.dart`, `my_tours_screen.dart` — `fsReplace` FAILS on Windows. Python patch scripts only.
-6. **PYTHON OUTPUT**: stdout is unreliable in `executeBash`. Always write results to `D:\Audioura\results\<file>.txt` and read back with `type D:\Audioura\results\<name>.txt`.
+6. **PYTHON OUTPUT**: stdout is unreliable in `executeBash`. Write to `D:\Audioura\results\<file>.txt`, read with `type`.
 7. Read `git_source_control_for_q.md` before any git operation.
 
 ---
@@ -140,18 +145,19 @@ cd "/Volumes/USB DISK/Audioura/scripts"
 ### 🗺️ **KEY SCREEN ARCHITECTURE**
 
 #### my_tours_screen.dart (LF — Python edits only)
-- Shows tours (Tours mode) or news articles (Audio mode) depending on `_appMode`
 - `_manualRefresh()` — **A#77b**: in-place `_loadAppMode()`, no navigation teardown
 - `_setupVoiceCommands()` — sole mic permission acquisition via `_speechToText.initialize()`
-- `_startVoiceSearch()` — **A#78**: no `Permission.microphone.request()`, no `permission_handler` import. Guards on `!_speechEnabled`. `listen()` has `onResult` + `listenFor: 10s` — `onStatus` not wired (auto-dismiss not implemented, deferred to future assignment)
+- `_startVoiceSearch()` — **A#78**: no `Permission.microphone.request()`, no `permission_handler` import. `listen()` has `onResult` + `listenFor: 10s` — `onStatus` not wired (auto-dismiss not implemented, deferred)
+
+#### about_screen.dart
+- **v2.1.1+x**: Local/Cloud toggle, cloud base URL field, **API Key field** (temporary — reads/writes `gateway_api_key` in SharedPreferences), gateway path routing checkbox (leave unchecked).
 
 #### tour_player_screen.dart (CRLF)
 - `addJavaScriptHandler('openMap')` in `onWebViewCreated` — **A#76**
 - `initialSettings: InAppWebViewSettings(...)` — v6 API ✅
 
 #### news_player_screen.dart (CRLF)
-- `_getIndexUrl()` heals stale container paths. `FutureBuilder<String>` wraps WebView body.
-- `initialSettings: InAppWebViewSettings(...)` — v6 API ✅
+- `_getIndexUrl()` heals stale container paths. `FutureBuilder<String>` wraps WebView body. v6 API ✅
 
 #### tour_map_screen.dart (CRLF)
 - `focusStopIndex` (int?, 1-based). `_applyCoordJitter()`. Single-POI guard.
@@ -160,24 +166,25 @@ cd "/Volumes/USB DISK/Audioura/scripts"
 - `_buildBody()` switch — never wrap in IndexedStack. `_listenTabVersion` key for Listen reload.
 
 #### home_screen.dart (LF — Python edits only)
-- Download + translation logic. Newsletter Refresh handler cleaned up in A#77.
+- Download + translation logic.
 
-#### about_screen.dart
-- **NEW in v2.1.1+1**: Local/Cloud toggle, cloud base URL field, gateway path routing checkbox.
+#### lib/config/endpoints.dart
+- `Endpoints.base(Service)` — returns local `http://ip:port` or cloud URL per `server_mode`
+- `Endpoints.url(Service, path)` — full URI
+- `Endpoints.apiHeaders(Service)` — `Content-Type` always; adds `X-API-Key` in cloud mode from `gateway_api_key` pref
 
 ---
 
 ### 📋 **OPEN ITEMS**
-1. **A#79** ⚠️ READY TO BUILD — v2.1.1+1 iOS parity. `git pull` + `pod install` + build. No pubspec bump. See Immediate Next Steps.
-2. **Dialog auto-dismiss** — `_startVoiceSearch()` dialog does not auto-close on 10s timeout. `onStatus` never wired. Confirmed never implemented (not a regression). Deferred to future assignment.
-3. **Android A#79 parity** — Android is already on v2.1.1+1. After iOS A#79 builds, both platforms are in sync.
-4. **Cloud tour generation** — not ready on either platform (`:5003` not deployed to cloud). Test existing-tour download only.
-5. **ISSUE-SERVICES-NEWSLETTER** — `get_articles_by_newsletter_id` returns only 2 of 5 articles. Awaiting Kiro. Not iOS.
-6. **ISSUE-061** — Translated tours → 404. Awaiting Services fix.
-7. **NF4 (LOW)** — `openMap` handler bare-int widening. Two-line fix.
-8. **NF5 (LOW)** — `Colors.blue.withOpacity(0.6)` → `.withValues(alpha: 0.6)`.
-9. **OSM tiles** — swap to Stadia Maps or Mapbox before App Store.
-10. **Dead files** — delete `audio_handler.dart`, `map_page.dart`, `subscription_management_screen.dart`.
+1. **A#80** ⚠️ READY TO BUILD — v2.1.1+3. Local WiFi + Cloud. See Immediate Next Steps.
+2. **API Key field removal** — About screen manual API Key input is temporary. Future assignment: remove field, embed/auto-supply key. Customers must never see it.
+3. **Dialog auto-dismiss** — `_startVoiceSearch()` dialog doesn't auto-close on 10s timeout. `onStatus` not wired. Never implemented, not a regression. Deferred.
+4. **ISSUE-SERVICES-NEWSLETTER** — `get_articles_by_newsletter_id` returns only 2 of 5 articles. Awaiting Kiro. Not iOS.
+5. **ISSUE-061** — Translated tours → 404. Awaiting Services fix.
+6. **NF4 (LOW)** — `openMap` handler bare-int widening.
+7. **NF5 (LOW)** — `Colors.blue.withOpacity(0.6)` → `.withValues(alpha: 0.6)`.
+8. **OSM tiles** — swap to Stadia Maps or Mapbox before App Store.
+9. **Dead files** — delete `audio_handler.dart`, `map_page.dart`, `subscription_management_screen.dart`.
 
 ---
 
@@ -185,11 +192,12 @@ cd "/Volumes/USB DISK/Audioura/scripts"
 - **Version numbering**: iOS and Android share `pubspec.yaml`. Android Q owns version bumps. iOS Q never bumps independently.
 - **Parity rule**: Both platforms always build the same commit on `services-migration`. No iOS-specific Dart forks.
 - **iOS-only files**: `ios/Runner/Info.plist`, `ios/Runner.xcodeproj/`, `ios/Podfile` — Windows Q may edit these. Everything in `lib/` is shared.
+- **API Key (temporary)**: `Endpoints.apiHeaders()` reads `gateway_api_key` from SharedPreferences and sends as `X-API-Key` in cloud mode only. About screen has a manual entry field. Field will be removed once key is embedded.
 - **LF files**: `home_screen.dart`, `tour_generator_screen.dart`, `my_tours_screen.dart` — `fsReplace` FAILS. Python only.
 - **CRLF files**: `tour_map_screen.dart`, `tour_player_screen.dart`, `main_screen.dart`, `news_player_screen.dart` — `fsReplace` works.
 - **Python stdout**: always empty in `executeBash`. Write to `D:\Audioura\results\<name>.txt`, read with `type`.
 - **InAppWebView**: v6 API only — `initialSettings: InAppWebViewSettings(...)`. v5 `initialOptions` BANNED.
-- **ATS**: Flutter's `package:http` bypasses iOS App Transport Security. Local HTTP (`192.168.0.218`) works without any `NSAppTransportSecurity` plist entry. Cloud mode is HTTPS anyway.
+- **ATS**: Flutter `package:http` bypasses iOS ATS. Local HTTP works without plist entry. Cloud is HTTPS.
 - **pod install**: always run after `git pull` on Mac Mini before building.
 - **DebugLogHelper**: in `lib/screens/debug_log_viewer_screen.dart`.
 - **unawaited()**: requires `import 'dart:async'`.
@@ -217,31 +225,32 @@ cd ios && pod deintegrate && pod install
 |------|---------|
 | `lib/screens/home_screen.dart` | Download + translation. LF. |
 | `lib/screens/my_tours_screen.dart` | Tours/news list. LF. A#77b + A#78 fixed. |
-| `lib/screens/about_screen.dart` | Local/Cloud toggle (new in v2.1.1+1). |
+| `lib/screens/about_screen.dart` | Local/Cloud toggle + API Key field (temporary). |
 | `lib/screens/main_screen.dart` | Tab navigation. CRLF. |
 | `lib/screens/tour_player_screen.dart` | `openMap` JS handler. CRLF. |
 | `lib/screens/news_player_screen.dart` | Path healing + FutureBuilder. CRLF. |
 | `lib/screens/tour_map_screen.dart` | Map screen. Jitter + single-POI guard. CRLF. |
 | `lib/screens/tour_generator_screen.dart` | Translation + player navigation. LF. |
 | `lib/screens/debug_log_viewer_screen.dart` | `DebugLogHelper` class. |
+| `lib/config/endpoints.dart` | `Endpoints` resolver — base URL + apiHeaders with X-API-Key. |
+| `lib/services/tour_status_service.dart` | Tour status REST via Endpoints. |
+| `lib/services/translation_service.dart` | Translation via Endpoints (cloud-ready). |
 | `lib/config.dart` | `Config.defaultServerIp = '192.168.0.218'` |
-| `ios/Runner/Info.plist` | iOS permissions + `NSLocalNetworkUsageDescription` added `52d8282`. |
-| `usb/Audioura/assignments/mac_mini_assignments.md` | Mac Mini task queue. A#79 at top. |
+| `ios/Runner/Info.plist` | iOS permissions + `NSLocalNetworkUsageDescription`. |
+| `usb/Audioura/assignments/mac_mini_assignments.md` | Mac Mini task queue. A#80 at top. |
 | `git_source_control_for_q.md` | Git rules — READ before any git operation. |
 | `android_q_onboarding.md` | Android Q full onboarding doc. |
-| `android_assignment_a78_2026_06_02.md` | Android Q A#78 parity assignment. |
-| `claude_ios_aq_v2.1.1.1_correlated_build_2026_06_03.md` | Claude's parity build instructions. |
 
 ---
 
 ### 🤖 **ANDROID PARITY**
 - Android bundle ID: `com.audioura.app` (iOS: `com.glikfamily.audioura`)
-- Android already on v2.1.1+1 — iOS A#79 build brings iPhone to same version
+- Android is on v2.1.1+3 — A#80 brings iPhone to same version
 - Version sync: Android Q bumps `pubspec.yaml` → iOS Q pulls + builds same commit
 - iOS Q never bumps version independently
-- Stale path healing uses `/Documents/` marker (iOS-specific) — Android Q must verify separately
+- ⚠️ Android Q must NOT edit `remind_ios_ai.md` — this file is iOS Q's domain only
 
 ---
 
-**Last Updated**: 2026-06-03 — v106.0. pubspec at `2.1.1+1` (Android Q). iOS A#79 parity build ready: `git pull` + `pod install` + build. NSLocalNetworkUsageDescription added to Info.plist (`52d8282`). No Dart changes needed for iOS — shared codebase carries all dual-environment features.
-**iOS Amazon-Q Version**: 106.0
+**Last Updated**: 2026-06-06 — v107.0. pubspec at `2.1.1+3`. Android fully tested Local WiFi + Cloud (Sir Michael entered API key in About screen). A#80 ready to build on iPhone. API Key field in About is temporary — future assignment will remove it. Both prior cloud blockers confirmed fixed in current code (`Endpoints.apiHeaders` + `TranslationService` migration).
+**iOS Amazon-Q Version**: 107.0

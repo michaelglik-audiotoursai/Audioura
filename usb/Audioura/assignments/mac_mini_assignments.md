@@ -1,6 +1,352 @@
 # Mac Mini Assignment Instructions
 ## iOS Development Task Execution
 
+# T: 06/2026 - A#80 — Build v2.1.1+3 iOS (Local WiFi Parity with Android)
+
+**Goal:** Build v2.1.1+3 on iPhone. Parity build — all Dart changes are shared Flutter code from Android Q. iOS task is build-and-verify LOCAL WiFi mode only. **Cloud testing is explicitly excluded** — two mobile-side blockers (no `X-API-Key` header, `TranslationService` bypasses `Endpoints`) must be fixed by Android Q in a future version before cloud smoke tests run.
+
+**What this build delivers over v2.1.1+1:**
+- `tour_status_service.dart` rewritten — clean REST via `Endpoints(Service.orchestrator)`, keyed on `tour_xxx` tour_id
+- `test_update_api.dart` and all 9 dead raw-SQL files deleted — dangling import resolved
+- About-screen text: `cloud_use_path_prefixes` stays `false` (confirmed correct)
+- SharedPreferences key cleanup (minor)
+
+**Cloud blockers (NOT iOS's job — Android Q owns these for v2.1.1+4):**
+- Blocker A: No `X-API-Key` header on cost-bearing POSTs → gateway 401s in cloud mode
+- Blocker B: `TranslationService` still hardcodes `192.168.0.218:5030` → cloud multi-language fails
+
+**Roles:**
+- **[SIR MICHAEL]** — orchestrator. Switches KVM, runs smoke test (LOCAL WiFi only), syncs Windows afterward.
+- **[MAC MINI Q]** — pulls latest, verifies signing, runs `pod install`, builds, installs. No pubspec bump (already at `2.1.1+3`).
+
+**Version target:** v2.1.1+3  **Branch:** `services-migration`
+
+---
+
+## Step 0 — [SIR MICHAEL] Eject USB, carry to Mac Mini, switch KVM
+
+## Step 1 — [SIR MICHAEL on Mac Mini] Launch Q
+
+Paste:
+> Read `@/Volumes/USB DISK/Audioura/assignments/mac_mini_assignments.md` and execute the A#80 assignment at the top. Follow STOP conditions; skip steps labelled `[SIR MICHAEL]`.
+
+## Step 2 — [MAC MINI Q] Pull latest
+
+```bash
+cd ~/Development/Audioura-build
+git pull origin services-migration
+```
+
+**Expected:** fast-forward to at least commit `049bb35`.
+
+## Step 3 — [MAC MINI Q] Spot-check BEFORE building ⚠️ REQUIRED
+
+```bash
+cd ~/Development/Audioura-build/development/audio_tour_app
+
+# 3a — pubspec at 2.1.1+3
+grep "^version:" pubspec.yaml
+# Expected: version: 2.1.1+3
+
+# 3b — NSLocalNetworkUsageDescription present
+grep -n "NSLocalNetworkUsageDescription" ios/Runner/Info.plist
+# Expected: 1 match
+
+# 3c — test_update_api.dart is GONE
+find lib/ -name "test_update_api.dart"
+# Expected: no output
+
+# 3d — tour_status_service uses Endpoints (not raw serverIp)
+grep -n "Endpoints\|Service.orchestrator" lib/services/tour_status_service.dart
+# Expected: at least 1 match
+
+# 3e — signing intact
+grep -E 'PRODUCT_BUNDLE_IDENTIFIER|DEVELOPMENT_TEAM' \
+  ios/Runner.xcodeproj/project.pbxproj | sort -u
+# Expected: com.glikfamily.audioura and 4HGRU6TKGQ
+```
+
+If 3a fails or 3c shows the file still exists, STOP and report to iOS Q.
+
+## Step 4 — [MAC MINI Q] pod install
+
+```bash
+cd ~/Development/Audioura-build/development/audio_tour_app/ios
+pod install
+```
+
+## Step 5 — [MAC MINI Q] Clean rebuild, install, launch
+
+```bash
+cd ~/Development/Audioura-build/development/audio_tour_app
+flutter clean && flutter pub get
+cd "/Volumes/USB DISK/Audioura/scripts"
+./build_install_launch.sh
+```
+
+**Expected:** `FINAL VERDICT: SUCCESS`. STOP and tell Sir Michael.
+
+If build FAILS with signing error — open Xcode:
+```bash
+open ~/Development/Audioura-build/development/audio_tour_app/ios/Runner.xcworkspace
+```
+Runner → Signing & Capabilities → Automatically manage signing ✅ → Team: Mikhail Glik (4HGRU6TKGQ) → Bundle ID: `com.glikfamily.audioura` → Quit Xcode → re-run Step 5.
+
+## Step 6 — [SIR MICHAEL] Smoke test on iPhone ⚠️ STOP HERE FOR Q
+
+⚠️ **LOCAL WiFi ONLY — do NOT test Cloud mode. Cloud blockers not yet fixed.**
+
+**Test 1 — Local mode default (on WiFi):**
+1. Launch app → Home tab.
+2. **Expected:** Tours load from `192.168.0.218`. No errors.
+3. About tab → mode shows **Local** by default.
+
+**Test 2 — About screen toggle present:**
+1. About tab → Local/Cloud toggle visible.
+2. Switch to Cloud → URL field appears. Leave gateway path routing checkbox **unchecked**.
+3. Switch back to Local → URL field disappears.
+4. ⚠️ Do NOT test tour generation or download in Cloud mode — stop here.
+
+**Test 3 — Local WiFi tour generation:**
+1. On WiFi → generate a new tour.
+2. **Expected:** Tour generates, status updates, tour appears in Listen tab.
+
+**Test 4 — A#78 regression (mic):**
+1. Audio mode → Listen tab → tap microphone icon.
+2. **Expected:** Listening dialog opens. No "Microphone permission required" snackbar.
+
+**Test 5 — A#77b regression (Refresh):**
+1. Listen tab → tap Refresh.
+2. **Expected:** List reloads, no black screen.
+
+**Test 6 — General regression:**
+1. Open a tour → audio plays.
+2. Open a news article → loads.
+3. POI map icon → TourMapScreen opens.
+
+Tell Q "Smoke test passes, proceed to Step 7" when done. Report each test result.
+
+## Step 7 — [MAC MINI Q] No pubspec commit needed — version already at 2.1.1+3
+
+```bash
+cd ~/Development/Audioura-build
+git status
+# Expected: nothing to commit (or only untracked files)
+git log --oneline -3
+# Confirm 049bb35 or later is present
+```
+
+If `git status` shows modified tracked files — STOP and report before committing anything.
+
+## Step 8 — [MAC MINI Q] Copy results and eject
+
+```bash
+echo "A#80 Results:" > ~/Desktop/a80_results.txt
+echo "Date: $(date)" >> ~/Desktop/a80_results.txt
+echo "Build: [SUCCESS/FAILED]" >> ~/Desktop/a80_results.txt
+echo "Local mode tours load (Test 1): [YES/NO]" >> ~/Desktop/a80_results.txt
+echo "About Local/Cloud toggle present (Test 2): [YES/NO]" >> ~/Desktop/a80_results.txt
+echo "Local WiFi tour generation works (Test 3): [YES/NO/NOT_TESTED]" >> ~/Desktop/a80_results.txt
+echo "Mic no permission snackbar (Test 4): [YES/NO]" >> ~/Desktop/a80_results.txt
+echo "Listen Refresh no black screen (Test 5): [YES/NO]" >> ~/Desktop/a80_results.txt
+echo "General regression clean (Test 6): [YES/NO]" >> ~/Desktop/a80_results.txt
+echo "Overall: [SUCCESS/PARTIAL/FAILED]" >> ~/Desktop/a80_results.txt
+cp ~/Desktop/a80_results.txt "/Volumes/USB DISK/Audioura/results/"
+diskutil eject "/Volumes/USB DISK"
+```
+
+## Step 9 — [MAC MINI Q] Report Results
+
+> "Assignment 80 complete. Build: [SUCCESS/FAILED]. Local mode works: [YES/NO]. Toggle present: [YES/NO]. Local generation: [YES/NO/NOT_TESTED]. Mic regression: [YES/NO]. Refresh regression: [YES/NO]. General regression: [YES/NO]. Overall: [SUCCESS/PARTIAL/FAILED]."
+
+## Step 10 — [SIR MICHAEL, back on Windows] Sync
+
+```cmd
+cd C:\Users\micha\eclipse-workspace\AudioTours\development
+git pull origin services-migration
+```
+Verify `audio_tour_app\pubspec.yaml` shows `version: 2.1.1+3`.
+
+---
+
+# T: 06/2026 - A#80 — Build v2.1.1+3 iOS (Full Parity with Android — Local WiFi + Cloud)
+
+**Goal:** Build v2.1.1+3 on iPhone. Full parity build — Local WiFi and Cloud both tested and working on Android. iOS just needs to build the same commit.
+
+**What this build delivers over v2.1.1+1:**
+- `tour_status_service.dart` rewritten — REST via `Endpoints(Service.orchestrator)` + `Endpoints.apiHeaders()`, keyed on `tour_xxx` tour_id
+- `TranslationService` migrated to `Endpoints.url(Service.translation)` + `Endpoints.apiHeaders()` — cloud multi-language works
+- `Endpoints.apiHeaders()` sends `X-API-Key` header in cloud mode (reads from `SharedPreferences('gateway_api_key')`)
+- About screen: API Key field present — user enters the key manually (temporary — field will be removed once key is baked in)
+- Dead files removed: `test_update_api.dart` + raw-SQL files
+- Inter-service auth tokens on all service edges
+- OpenAI + AWS secret key fixes
+
+**About the API Key field:** Customers cannot be expected to know the gateway API key, so the About screen's API Key input is a **temporary development tool**. It will be removed in a future version once the key is embedded or handled automatically. For now: Sir Michael enters the key during smoke testing.
+
+**Roles:**
+- **[SIR MICHAEL]** — orchestrator. Switches KVM, runs smoke test (both Local WiFi and Cloud), syncs Windows afterward.
+- **[MAC MINI Q]** — pulls latest, verifies signing, runs `pod install`, builds, installs. No pubspec bump (already at `2.1.1+3`).
+
+**Version target:** v2.1.1+3  **Branch:** `services-migration`
+
+---
+
+## Step 0 — [SIR MICHAEL] Eject USB, carry to Mac Mini, switch KVM
+
+## Step 1 — [SIR MICHAEL on Mac Mini] Launch Q
+
+Paste:
+> Read `@/Volumes/USB DISK/Audioura/assignments/mac_mini_assignments.md` and execute the A#80 assignment at the top. Follow STOP conditions; skip steps labelled `[SIR MICHAEL]`.
+
+## Step 2 — [MAC MINI Q] Pull latest
+
+```bash
+cd ~/Development/Audioura-build
+git pull origin services-migration
+```
+
+**Expected:** fast-forward to at least commit `049bb35`.
+
+## Step 3 — [MAC MINI Q] Spot-check BEFORE building ⚠️ REQUIRED
+
+```bash
+cd ~/Development/Audioura-build/development/audio_tour_app
+
+# 3a — pubspec at 2.1.1+3
+grep "^version:" pubspec.yaml
+# Expected: version: 2.1.1+3
+
+# 3b — NSLocalNetworkUsageDescription present
+grep -n "NSLocalNetworkUsageDescription" ios/Runner/Info.plist
+# Expected: 1 match
+
+# 3c — Endpoints.apiHeaders sends X-API-Key in cloud mode
+grep -n "X-API-Key\|apiHeaders\|gateway_api_key" lib/config/endpoints.dart
+# Expected: matches for all three
+
+# 3d — TranslationService uses Endpoints (not hardcoded IP)
+grep -n "Endpoints\|Service.translation" lib/services/translation_service.dart
+# Expected: at least 2 matches
+
+# 3e — test_update_api.dart is GONE
+ls lib/services/test_update_api.dart 2>/dev/null && echo FOUND || echo GONE
+# Expected: GONE
+
+# 3f — signing intact
+grep -E 'PRODUCT_BUNDLE_IDENTIFIER|DEVELOPMENT_TEAM' \
+  ios/Runner.xcodeproj/project.pbxproj | sort -u
+# Expected: com.glikfamily.audioura and 4HGRU6TKGQ
+```
+
+If 3a fails or 3e shows FOUND, STOP and report to iOS Q.
+
+## Step 4 — [MAC MINI Q] pod install
+
+```bash
+cd ~/Development/Audioura-build/development/audio_tour_app/ios
+pod install
+```
+
+## Step 5 — [MAC MINI Q] Clean rebuild, install, launch
+
+```bash
+cd ~/Development/Audioura-build/development/audio_tour_app
+flutter clean && flutter pub get
+cd "/Volumes/USB DISK/Audioura/scripts"
+./build_install_launch.sh
+```
+
+**Expected:** `FINAL VERDICT: SUCCESS`. STOP and tell Sir Michael.
+
+If build FAILS with signing error — open Xcode:
+```bash
+open ~/Development/Audioura-build/development/audio_tour_app/ios/Runner.xcworkspace
+```
+Runner → Signing & Capabilities → Automatically manage signing ✅ → Team: Mikhail Glik (4HGRU6TKGQ) → Bundle ID: `com.glikfamily.audioura` → Quit Xcode → re-run Step 5.
+
+## Step 6 — [SIR MICHAEL] Smoke test on iPhone ⚠️ STOP HERE FOR Q
+
+**Test 1 — Local mode (on WiFi):**
+1. Launch app → Home tab.
+2. **Expected:** Tours load from `192.168.0.218`. No errors.
+3. About tab → mode shows **Local** by default.
+
+**Test 2 — Local WiFi tour generation:**
+1. On WiFi, generate a new tour.
+2. **Expected:** Tour generates, status updates, tour appears in Listen tab.
+
+**Test 3 — Cloud mode:**
+1. About tab → switch to **Cloud**, enter cloud base URL.
+2. Enter the **API Key** in the API Key field.
+3. Leave gateway path routing checkbox **unchecked**.
+4. Generate or download an existing tour.
+5. **Expected:** Tour downloads/generates and plays.
+
+**Test 4 — Cloud multi-language (if available):**
+1. In Cloud mode, generate a tour and request a translation.
+2. **Expected:** Translation completes (uses cloud translation service, not LAN IP).
+3. Mark NOT_TESTED if translation not exercised — not a blocker.
+
+**Test 5 — A#78 regression (mic):**
+1. Audio mode → Listen tab → tap microphone icon.
+2. **Expected:** Listening dialog opens. No "Microphone permission required" snackbar.
+
+**Test 6 — A#77b regression (Refresh):**
+1. Listen tab → tap Refresh.
+2. **Expected:** List reloads, no black screen.
+
+**Test 7 — General regression:**
+1. Open a tour → audio plays.
+2. Open a news article → loads.
+3. POI map icon → TourMapScreen opens.
+
+Tell Q "Smoke test passes, proceed to Step 7" when done.
+
+## Step 7 — [MAC MINI Q] No pubspec commit needed — version already at 2.1.1+3
+
+```bash
+cd ~/Development/Audioura-build
+git status
+# Expected: nothing to commit (or only untracked files)
+git log --oneline -3
+# Confirm 049bb35 or later is present
+```
+
+If `git status` shows modified tracked files — STOP and report before committing anything.
+
+## Step 8 — [MAC MINI Q] Copy results and eject
+
+```bash
+echo "A#80 Results:" > ~/Desktop/a80_results.txt
+echo "Date: $(date)" >> ~/Desktop/a80_results.txt
+echo "Build: [SUCCESS/FAILED]" >> ~/Desktop/a80_results.txt
+echo "Local mode tours load (Test 1): [YES/NO]" >> ~/Desktop/a80_results.txt
+echo "Local WiFi tour generation (Test 2): [YES/NO]" >> ~/Desktop/a80_results.txt
+echo "Cloud mode tour download/generate (Test 3): [YES/NO]" >> ~/Desktop/a80_results.txt
+echo "Cloud multi-language (Test 4): [YES/NO/NOT_TESTED]" >> ~/Desktop/a80_results.txt
+echo "Mic no permission snackbar (Test 5): [YES/NO]" >> ~/Desktop/a80_results.txt
+echo "Listen Refresh no black screen (Test 6): [YES/NO]" >> ~/Desktop/a80_results.txt
+echo "General regression clean (Test 7): [YES/NO]" >> ~/Desktop/a80_results.txt
+echo "Overall: [SUCCESS/PARTIAL/FAILED]" >> ~/Desktop/a80_results.txt
+cp ~/Desktop/a80_results.txt "/Volumes/USB DISK/Audioura/results/"
+diskutil eject "/Volumes/USB DISK"
+```
+
+## Step 9 — [MAC MINI Q] Report Results
+
+> "Assignment 80 complete. Build: [SUCCESS/FAILED]. Local mode: [YES/NO]. Local generation: [YES/NO]. Cloud mode: [YES/NO]. Cloud translation: [YES/NO/NOT_TESTED]. Mic regression: [YES/NO]. Refresh regression: [YES/NO]. General regression: [YES/NO]. Overall: [SUCCESS/PARTIAL/FAILED]."
+
+## Step 10 — [SIR MICHAEL, back on Windows] Sync
+
+```cmd
+cd C:\Users\micha\eclipse-workspace\AudioTours\development
+git pull origin services-migration
+```
+Verify `audio_tour_app\pubspec.yaml` shows `version: 2.1.1+3`.
+
+---
+
 # T: 06/2026 - A#79 — Build v2.1.1+1 iOS (Dual-Environment Parity with Android)
 
 **Goal:** Build v2.1.1+1 on iPhone. This is a **parity build** — all Dart changes are already in the shared codebase from Android Q's work. iOS task is to build the same commit and verify iOS-specific behaviour.
