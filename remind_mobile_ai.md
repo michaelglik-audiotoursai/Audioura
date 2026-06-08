@@ -11,7 +11,7 @@
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 When chat history is compacted, user will ask you to read `remind_ai.md` and `remind_mobile_ai.md`.
 **Your Response**:
-"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.1+5 (poll hardening complete, Claude approved). Latest commit `e7634b9`. Ready for Ubuntu build."
+"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.1+6 (Timer.periodic → Future.delayed poll loop, translation_failed snackbar). Commit `1472279`. Claude review doc ready: `code_review_v2.1.1.6_poll_loop.md`. iOS assignment written. Ready to continue."
 
 ## 🚫 OWNERSHIP BOUNDARIES — CRITICAL
 - ✅ **MY files**: `remind_mobile_ai.md`, `code_review_v*.md`, files in `amazon-q-communications/`
@@ -21,15 +21,22 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## CURRENT PROJECT STATUS
 **Project**: Audioura Android APK
-**Version on branch**: v2.1.1+5 ✅ committed on `services-migration` (latest commit `14f11eb`)
-**iPhone**: On v1.2.9+71 (iOS Q built — A#78 mic fix)
-**Android**: ✅ v2.1.1+5 fully complete — ready for Ubuntu build
+**Version on branch**: v2.1.1+6 ✅ committed on `services-migration` (commit `1472279`)
+**iPhone**: On v2.1.1+5 (iOS Q to build v2.1.1+6 — assignment in communications dir)
+**Android**: ✅ v2.1.1+6 code committed — v2.1.1+5 under test, Claude review doc ready for v2.1.1+6
 **iOS Q current task**: No active task assigned
 **Branch**: `services-migration`
 **Android Application ID**: `com.audioura.app`
 **Server**: `192.168.0.218` (Docker services on Windows laptop)
 
 ## RECENT VERSION HISTORY (latest first)
+- **v2.1.1+6** — Poll loop rewrite + translation_failed UX:
+  - `Timer.periodic` → `Future.delayed` self-scheduling loop in `_pollAndAutoDownload` — prevents concurrent `/status` calls and rare double-download on slow networks
+  - `while (!done && mounted)` loop: poll → process → `await Future.delayed(10s)` only if not done
+  - `done = true` replaces all `timer.cancel()` calls; `mounted` check at loop top + after `http.get`
+  - `_pollTimer` State field removed; `_pollTimer?.cancel()` removed from `dispose()` (no longer needed)
+  - `translation_failed` snackbar: reads `status['translation_failed']` in completed branch — shows "Translation unavailable — showing English version" orange snackbar when server falls back to English
+  - `pollLoop()` called fire-and-forget from `_pollAndAutoDownload`
 - **v2.1.1+5** — Poll hardening (all Claude review fixes applied, 2 commits):
   - `mounted` guard after `http.get` in poll callback — prevents setState after dispose if user leaves mid-await (Q4 real gap)
   - Other 4xx: red snackbar "Tour generation unavailable right now" instead of silent spinner clear (Q3)
@@ -162,18 +169,22 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## 🔄 NEXT ACTION
 
-### 1. Ubuntu build for v2.1.1+5 — READY TO BUILD ✅
-**Status**: ✅ All Claude fixes applied and committed (`14f11eb`) — no more review needed
-**Prerequisite**: Enter `gateway-api-key` (from Secret Manager) in About → cloud → API Key field, set `cloud_base_url = https://api.audioura.com`, path-routing OFF
+### 1. Claude.AI review of v2.1.1+6 poll loop rewrite
+**Status**: ⏳ Doc ready — paste `code_review_v2.1.1.6_poll_loop.md` into Claude.AI, get response, apply any fixes
+**3 open questions**:
+- Q1 — `pollLoop()` fire-and-forget safety — leak risk from unawaited Future accessing State members?
+- Q2 — `done = true` set inside `handleTransient` nested closure — any unintended continuation past terminal point?
+- Q3 — unhandled exception from unawaited `pollLoop()` — silently swallowed or surfaces as unhandled Future error?
 
-### ⚠️ QUEUED FIXES FOR NEXT BUILD (v2.1.1+6)
-**`Timer.periodic` → `Future.delayed` loop** (Claude Q3, optional but meaningful):
-- `Timer.periodic` + async callback can overlap on slow networks — if poll takes >10s, next tick fires before previous finishes → concurrent `/status` calls, rare double-download
-- Fix: replace `Timer.periodic` with a self-scheduling `while (!done) { await poll(); await Future.delayed(10s); }` loop — next poll only starts after current finishes
-**`translation_failed` UX message** (Kiro new field, small UX):
-- Kiro added `translation_failed: true` to `/status` response when multi-language tour falls back to English
-- Read `status['translation_failed']` in completed branch → show "Translation unavailable — showing English version" snackbar
-- Prevents non-English users being confused why they got English
+### 2. Ubuntu build for v2.1.1+6 — awaiting Claude review first
+**Status**: ⏳ Code committed (`1472279`) — Claude review first
+**Prerequisite**: Enter `gateway-api-key` in About → cloud → API Key field, set `cloud_base_url = https://api.audioura.com`, path-routing OFF
+
+### 3. iOS build for v2.1.1+6
+**Status**: ⏳ Assignment written → `amazon-q-communications/audiotours/requirements/IOS_BUILD_v2.1.1.6_2026_06_08.md`
+**Action**: Deliver to iOS Amazon-Q when ready
+
+### ⚠️ QUEUED FIXES FOR NEXT BUILD (v2.1.1+7)
 **Q1 — Empty API key warning** (Claude recommendation from v2.1.1+3, medium priority):
 - In `apiHeaders()`: when `mode == 'cloud'` and key is empty → `DebugLogHelper.addDebugLog('Cloud mode but gateway_api_key not set — request will 401; set it in About')`
 - When any cost-endpoint returns 401 → surface user-facing message: "Set your API key in About settings"
@@ -184,7 +195,11 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 - Voice commands are 100% on-device (speech-to-text → command parsing → execution), no services involved
 - Multi-language voice command support NOT yet implemented — future enhancement only
 
-### 2. Smoke tests for v2.1.1+5 (after Ubuntu build)
+### 2. Smoke tests for v2.1.1+6 (after Claude review + Ubuntu build)
+1. English foreground generation — regression check, tour opens automatically
+2. Leave screen mid-poll — switch tabs while generating, confirm no crash
+3. Multi-language tour — if `translation_failed: true` returned → orange snackbar; if translation succeeds → no snackbar
+4. Background generation — pending entry appears, no hang
 1. Local WiFi foreground generation (regression — `rows_affected: 1`)
 2. Cloud foreground generation — simulate network blip during poll → expect orange snackbar, NOT failed status
 3. Cloud multi-language generation
