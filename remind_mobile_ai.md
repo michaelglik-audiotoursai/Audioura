@@ -11,7 +11,7 @@
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 When chat history is compacted, user will ask you to read `remind_ai.md` and `remind_mobile_ai.md`.
 **Your Response**:
-"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.1+6 (Timer.periodic → Future.delayed poll loop, translation_failed snackbar). Commit `1472279`. Claude review doc ready: `code_review_v2.1.1.6_poll_loop.md`. iOS assignment written. Ready to continue."
+"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.1+7 (pollLoop crash guard, remove vestigial _pollTimer refs, re-entry guard). Commit `e711874`. Claude review doc ready: `code_review_v2.1.1.7_poll_hardening.md`. Ready to continue."
 
 ## 🚫 OWNERSHIP BOUNDARIES — CRITICAL
 - ✅ **MY files**: `remind_mobile_ai.md`, `code_review_v*.md`, files in `amazon-q-communications/`
@@ -21,15 +21,19 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## CURRENT PROJECT STATUS
 **Project**: Audioura Android APK
-**Version on branch**: v2.1.1+6 ✅ committed on `services-migration` (commit `1472279`)
-**iPhone**: On v2.1.1+5 (iOS Q to build v2.1.1+6 — assignment in communications dir)
-**Android**: ✅ v2.1.1+6 code committed — v2.1.1+5 under test, Claude review doc ready for v2.1.1+6
+**Version on branch**: v2.1.1+7 ✅ committed on `services-migration` (commit `e711874`)
+**iPhone**: On v2.1.1+5 (iOS Q to build v2.1.1+7 — assignment pending)
+**Android**: ✅ v2.1.1+7 code committed — v2.1.1+5 under test, Claude review doc ready for v2.1.1+7
 **iOS Q current task**: No active task assigned
 **Branch**: `services-migration`
 **Android Application ID**: `com.audioura.app`
 **Server**: `192.168.0.218` (Docker services on Windows laptop)
 
 ## RECENT VERSION HISTORY (latest first)
+- **v2.1.1+7** — Poll hardening fixes (3 fixes from Claude v2.1.1+6 review):
+  - Re-entry guard added to `_generateTour`: `if (_isGenerating) return;` — prevents double-poll if button tapped programmatically or in race condition
+  - Removed vestigial `_pollTimer?.cancel(); _pollTimer = null;` lines from `_pollAndAutoDownload` — field was removed in v2.1.1+6, these lines were a compile error
+  - `pollLoop()` wrapped with `unawaited(...).catchError(...)` — resets `_isGenerating = false` and logs if loop crashes unexpectedly; spinner can no longer get stuck forever
 - **v2.1.1+6** — Poll loop rewrite + translation_failed UX:
   - `Timer.periodic` → `Future.delayed` self-scheduling loop in `_pollAndAutoDownload` — prevents concurrent `/status` calls and rare double-download on slow networks
   - `while (!done && mounted)` loop: poll → process → `await Future.delayed(10s)` only if not done
@@ -169,20 +173,20 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## 🔄 NEXT ACTION
 
-### 1. Claude.AI review of v2.1.1+6 poll loop rewrite
-**Status**: ⏳ Doc ready — paste `code_review_v2.1.1.6_poll_loop.md` into Claude.AI, get response, apply any fixes
+### 1. Claude.AI review of v2.1.1+7 poll hardening
+**Status**: ⏳ Doc ready — paste `code_review_v2.1.1.7_poll_hardening.md` into Claude.AI, get response, apply any fixes
 **3 open questions**:
-- Q1 — `pollLoop()` fire-and-forget safety — leak risk from unawaited Future accessing State members?
-- Q2 — `done = true` set inside `handleTransient` nested closure — any unintended continuation past terminal point?
-- Q3 — unhandled exception from unawaited `pollLoop()` — silently swallowed or surfaces as unhandled Future error?
+- Q1 — `catchError` async callback — is `async` OK on a `Future<void>` catchError handler, or should it be sync?
+- Q2 — Re-entry guard in `_generateTour` vs `_pollAndAutoDownload` — confirm `_pollAndAutoDownload` has no other call sites
+- Q3 — `_generateTourBackground` re-entry — should it also get an `if (_isGenerating) return;` guard?
 
-### 2. Ubuntu build for v2.1.1+6 — awaiting Claude review first
-**Status**: ⏳ Code committed (`1472279`) — Claude review first
+### 2. Ubuntu build for v2.1.1+7 — awaiting Claude review first
+**Status**: ⏳ Code committed (`e711874`) — Claude review first
 **Prerequisite**: Enter `gateway-api-key` in About → cloud → API Key field, set `cloud_base_url = https://api.audioura.com`, path-routing OFF
 
-### 3. iOS build for v2.1.1+6
-**Status**: ⏳ Assignment written → `amazon-q-communications/audiotours/requirements/IOS_BUILD_v2.1.1.6_2026_06_08.md`
-**Action**: Deliver to iOS Amazon-Q when ready
+### 3. iOS build for v2.1.1+7
+**Status**: ⏳ Needs assignment update — old assignment was for v2.1.1+6
+**Action**: Update iOS assignment or create new one for v2.1.1+7 when Claude review passes
 
 ### ⚠️ QUEUED FIXES FOR NEXT BUILD (v2.1.1+7)
 **Q1 — Empty API key warning** (Claude recommendation from v2.1.1+3, medium priority):
@@ -191,6 +195,9 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 **Q2 — SharedPreferences cleanup** (low priority, defer):
 - Clean up `tour_id_$jobId` / `request_$jobId` keys after terminal status reached
 - Prevents unbounded growth over time
+**Q3 — `_generateTourBackground` re-entry guard** (pending Claude Q3 answer from v2.1.1+7 review):
+- Depends on whether background gen can run concurrently with foreground gen
+- Hold until Claude verdict
 **Voice commands** (future, not current sprint):
 - Voice commands are 100% on-device (speech-to-text → command parsing → execution), no services involved
 - Multi-language voice command support NOT yet implemented — future enhancement only
