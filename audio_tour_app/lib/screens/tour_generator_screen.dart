@@ -143,6 +143,8 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   }
 
   Future<void> _generateTour() async {
+    if (_isGenerating) return; // re-entry guard
+
     final rawInput = _tourRequestController.text.trim();
     if (rawInput.isEmpty) {
       _showError('Please enter a tour request');
@@ -239,9 +241,6 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     int attempts = 0;
     int transientErrors = 0;
     bool done = false;
-
-    _pollTimer?.cancel();
-    _pollTimer = null;
 
     // Self-scheduling loop: next poll only starts after current one finishes — prevents overlap
     Future<void> pollLoop() async {
@@ -448,7 +447,10 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       }
     }
 
-    pollLoop();
+    unawaited(pollLoop().catchError((e, st) async {
+      await DebugLogHelper.addDebugLog('TOUR_POLL: pollLoop crashed: $e\n$st');
+      if (mounted) setState(() { _isGenerating = false; _progress = ''; });
+    }));
   }
 
   Future<String?> _processAdditionalLanguages(int finalTourId, List<String> languages) async {
