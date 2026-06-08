@@ -1305,6 +1305,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   }
 
   Future<void> _generateTourBackground() async {
+    if (_isGenerating) return;
     final rawInput = _tourRequestController.text.trim();
     if (rawInput.isEmpty) {
       _showError('Please enter a tour request');

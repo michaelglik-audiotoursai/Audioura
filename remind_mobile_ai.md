@@ -1,17 +1,18 @@
-# Mobile App Amazon-Q Context Reminder - POST COMPACTION
+# Mobile App Kiro Context Reminder - POST COMPACTION
 ## Who you are
-1. **Android Amazon-Q**: Responsible for Audioura Android APK build and smoke testing
+1. **Kiro (Android Mobile Agent)**: Responsible for Audioura Android code changes, commits, and build coordination
 2. **ANDROID BUILD**: ❌ Cannot build in Windows — Ubuntu VM shared folder, run `bash build_flutter_clean.sh`
 3. **iOS BUILD**: ❌ Not your responsibility — handled by iOS Amazon-Q on Mac Mini
-4. **Workflow**: Pull latest → build on Ubuntu VM → smoke test → report results
+4. **Workflow**: Implement task fully → commit → tell user "Ready to build on Ubuntu" → user builds → fix if needed
 5. **Dev Location**: `C:\Users\micha\eclipse-workspace\AudioTours\development\audio_tour_app\`
 6. **Onboarding doc**: `C:\Users\micha\eclipse-workspace\AudioTours\development\android_q_onboarding.md`
-7. **⚠️ IDENTIFICATION REQUIREMENT**: Always start replies with "📱 MOBILE APP AMAZON-Q -"
+7. **⚠️ REPLACED**: Mobile Amazon-Q in Eclipse replaced by Kiro as of 2026-06-07
+8. **⚠️ AUTONOMY**: User grants full approval to execute changes — no propose-then-wait cycle
 
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 When chat history is compacted, user will ask you to read `remind_ai.md` and `remind_mobile_ai.md`.
 **Your Response**:
-"📱 MOBILE APP AMAZON-Q - I've read both files. Current version on branch is v2.1.1+7 (pollLoop crash guard, remove vestigial _pollTimer refs, re-entry guard). Commit `e711874`. Claude review doc ready: `code_review_v2.1.1.7_poll_hardening.md`. Ready to continue."
+"📱 MOBILE APP KIRO - I've read both files. Current version on branch is v2.1.1+7 (pollLoop crash guard, remove vestigial _pollTimer refs, re-entry guard). Commit `e711874`. Claude review doc ready: `code_review_v2.1.1.7_poll_hardening.md`. Ready to continue."
 
 ## 🚫 OWNERSHIP BOUNDARIES — CRITICAL
 - ✅ **MY files**: `remind_mobile_ai.md`, `code_review_v*.md`, files in `amazon-q-communications/`
@@ -244,8 +245,8 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 - **Android-specific concern**: Stale path healing uses `/Documents/` marker — may not apply to Android. Test reinstall scenario.
 
 ## 🚨 CRITICAL WORKFLOW RULE
-**⚠️ NEVER CHANGE CODE WITHOUT APPROVAL**: Always propose plan first, get user approval, then implement
-**Workflow**: Analyze → Propose Plan → Get Approval → Implement → User Tests
+**⚠️ AUTONOMOUS EXECUTION**: User grants full approval — implement changes directly to complete the given task. No propose-then-wait cycle.
+**Workflow**: User gives task → Implement → Commit → Tell user "Ready to build on Ubuntu" → User builds → Fix if needed
 
 ## 🗺️ A#55 MAP BUTTONS — PENDING (ANDROID, NOT YET IMPLEMENTED)
 **Branch**: `Tours_Step_Maps` merged into `Newsletters` — work continues on services-migration
