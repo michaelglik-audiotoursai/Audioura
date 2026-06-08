@@ -39,7 +39,6 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   String _appMode = 'Tours'; // Default to Tours mode
   String _contentType = 'Article'; // Article or Newsletter
   List<String> _selectedLanguages = ['en']; // Language selection
-  Timer? _pollTimer;
 
   @override
   void initState() {
@@ -239,206 +238,217 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     const int maxTransientErrors = 6; // tolerate up to 6 consecutive blips (~60s)
     int attempts = 0;
     int transientErrors = 0;
+    bool done = false;
 
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
+    _pollTimer = null;
 
-      // Closure: handle transient network/DNS blips without marking failed
-      Future<void> handleTransient(Object e) async {
-        transientErrors++;
-        await DebugLogHelper.addDebugLog('TOUR_POLL: transient error ($transientErrors/$maxTransientErrors): $e');
-        if (transientErrors >= maxTransientErrors) {
-          timer.cancel();
-          await DebugLogHelper.addDebugLog('TOUR_POLL: too many consecutive errors — soft give-up for job $jobId (tour may still complete on server)');
-          if (mounted) {
-            setState(() { _isGenerating = false; _progress = ''; });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Network connection lost. Tour may still be generating — check My Tours shortly.'),
-                backgroundColor: Colors.orange,
-                duration: Duration(seconds: 10),
-              ),
-            );
+    // Self-scheduling loop: next poll only starts after current one finishes — prevents overlap
+    Future<void> pollLoop() async {
+      while (!done && mounted) {
+
+        // Handle transient network/DNS blips without marking failed
+        Future<void> handleTransient(Object e) async {
+          transientErrors++;
+          await DebugLogHelper.addDebugLog('TOUR_POLL: transient error ($transientErrors/$maxTransientErrors): $e');
+          if (transientErrors >= maxTransientErrors) {
+            done = true;
+            await DebugLogHelper.addDebugLog('TOUR_POLL: too many consecutive errors — soft give-up for job $jobId (tour may still complete on server)');
+            if (mounted) {
+              setState(() { _isGenerating = false; _progress = ''; });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Network connection lost. Tour may still be generating — check My Tours shortly.'),
+                  backgroundColor: Colors.orange,
+                  duration: Duration(seconds: 10),
+                ),
+              );
+            }
+          } else {
+            if (mounted) setState(() { _progress = 'Network hiccup — still waiting for tour...'; });
           }
-        } else {
-          if (mounted) setState(() { _progress = 'Network hiccup — still waiting for tour...'; });
         }
-      }
 
-      try {
-        final response = await http.get(
-          await Endpoints.url(Service.orchestrator, '/status/$jobId'),
-        );
-        if (!mounted) { timer.cancel(); return; }  // screen left while awaiting — stop safely
+        try {
+          final response = await http.get(
+            await Endpoints.url(Service.orchestrator, '/status/$jobId'),
+          );
+          if (!mounted) { done = true; return; }  // screen left while awaiting — stop safely
 
-        if (response.statusCode == 200) {
-          // Successful poll — reset transient error counter
-          transientErrors = 0;
-          Map<String, dynamic> status = jsonDecode(response.body);
+          if (response.statusCode == 200) {
+            // Successful poll — reset transient error counter
+            transientErrors = 0;
+            Map<String, dynamic> status = jsonDecode(response.body);
 
-          setState(() {
-            _progress = status['progress'] ?? 'Processing...';
-          });
-
-          if (status['status'] == 'completed') {
-            timer.cancel();
             setState(() {
-              _progress = 'Downloading and extracting tour...';
+              _progress = status['progress'] ?? 'Processing...';
             });
 
-            // Auto-download, extract, and play
-            final nonEnglish = (languages ?? []).where((l) => l != 'en').toList();
-            final wantsEnglish = languages == null || languages.isEmpty || languages.contains('en');
-            final finalTourId = await _autoDownloadAndPlay(jobId, location, languages, wantsEnglish);
+            if (status['status'] == 'completed') {
+              done = true;
+              setState(() {
+                _progress = 'Downloading and extracting tour...';
+              });
 
-            // Process additional languages if requested
-            if (finalTourId != null && nonEnglish.isNotEmpty) {
-              final translatedPath = await _processAdditionalLanguages(finalTourId, languages!);
-              // Remove English fallback if user didn't want it and translation succeeded
-              if (!wantsEnglish && translatedPath != null) {
-                await _removeTourFromSavedTours(finalTourId);
-                // Navigate to translated tour now that it's ready
-                if (mounted) {
-                  setState(() { _isGenerating = false; _progress = ''; });
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => TourPlayerScreen(
-                        tourPath: translatedPath,
-                        tourTitle: location,
+              // Notify user if server-side translation fell back to English
+              if (status['translation_failed'] == true && mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Translation unavailable — showing English version.'),
+                    backgroundColor: Colors.orange,
+                    duration: Duration(seconds: 6),
+                  ),
+                );
+              }
+
+              // Auto-download, extract, and play
+              final nonEnglish = (languages ?? []).where((l) => l != 'en').toList();
+              final wantsEnglish = languages == null || languages.isEmpty || languages.contains('en');
+              final finalTourId = await _autoDownloadAndPlay(jobId, location, languages, wantsEnglish);
+
+              // Process additional languages if requested
+              if (finalTourId != null && nonEnglish.isNotEmpty) {
+                final translatedPath = await _processAdditionalLanguages(finalTourId, languages!);
+                // Remove English fallback if user didn't want it and translation succeeded
+                if (!wantsEnglish && translatedPath != null) {
+                  await _removeTourFromSavedTours(finalTourId);
+                  // Navigate to translated tour now that it's ready
+                  if (mounted) {
+                    setState(() { _isGenerating = false; _progress = ''; });
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TourPlayerScreen(
+                          tourPath: translatedPath,
+                          tourTitle: location,
+                        ),
                       ),
-                    ),
-                  );
+                    );
+                  }
+                }
+                // C2: clear progress label if translation failed and user didn't want English
+                else if (!wantsEnglish && translatedPath == null) {
+                  if (mounted) setState(() { _isGenerating = false; _progress = ''; });
                 }
               }
-              // C2: clear progress label if translation failed and user didn't want English
-              else if (!wantsEnglish && translatedPath == null) {
-                if (mounted) setState(() { _isGenerating = false; _progress = ''; });
+
+              // Update tour request status to completed AFTER download
+              await TourStatusService.updateTourStatus(jobId, 'completed');
+              return;
+
+            } else if (status['status'] == 'error' || status['status'] == 'failed') {
+              done = true;
+              await TourStatusService.updateTourStatus(jobId, 'failed');
+
+              String errorMessage = 'Tour generation failed';
+              String userFriendlyMessage = 'Unable to generate tour. Please try again.';
+              List<String> suggestions = [];
+
+              if (status['error'] != null) {
+                errorMessage = status['error'].toString();
               }
+
+              if (status['user_error'] != null) {
+                final userError = status['user_error'];
+                if (userError['message'] != null) {
+                  userFriendlyMessage = userError['message'].toString();
+                }
+                if (userError['suggestions'] != null && userError['suggestions'] is List) {
+                  suggestions = List<String>.from(userError['suggestions']);
+                }
+              } else if (status['user_message'] != null) {
+                userFriendlyMessage = status['user_message'].toString();
+              } else if (status['error_type'] != null) {
+                switch (status['error_type']) {
+                  case 'knowledge_validation_failed':
+                  case 'ai_knowledge_insufficient':
+                    userFriendlyMessage = 'Unable to find sufficient information about this location. Please try a more specific or well-known location.';
+                    break;
+                  case 'location_not_found':
+                    userFriendlyMessage = 'Location not found. Please check the spelling and try a more specific address.';
+                    break;
+                  case 'insufficient_content':
+                    userFriendlyMessage = 'Not enough information available to create a tour for this location. Please try a different location.';
+                    break;
+                  case 'service_unavailable':
+                    userFriendlyMessage = 'Tour generation service is temporarily unavailable. Please try again in a few minutes.';
+                    break;
+                  default:
+                    userFriendlyMessage = status['error_type'].toString().replaceAll('_', ' ');
+                }
+              }
+
+              await DebugLogHelper.addDebugLog('TOUR_ERROR: Services returned error - Type: ${status['error_type']}, Message: $errorMessage');
+              await DebugLogHelper.addDebugLog('TOUR_ERROR: Full status response: ${jsonEncode(status)}');
+
+              if (mounted) {
+                setState(() { _isGenerating = false; _progress = ''; });
+                _showServicesErrorDialog(userFriendlyMessage, suggestions);
+              }
+              return;
+
+            } else if (attempts >= maxAttempts) {
+              done = true;
+              await TourStatusService.updateTourStatus(jobId, 'timeout');
+              if (mounted) {
+                _showTimeoutError();
+                setState(() { _isGenerating = false; _progress = ''; });
+              }
+              return;
             }
 
-            // Update tour request status to completed AFTER download
-            // This ensures we don't mark it complete until we've actually downloaded it
-            await TourStatusService.updateTourStatus(jobId, 'completed');
+            attempts++;
 
-          } else if (status['status'] == 'error' || status['status'] == 'failed') {
-            timer.cancel();
-            await TourStatusService.updateTourStatus(jobId, 'failed');
-
-            // Extract detailed error information from Services
-            String errorMessage = 'Tour generation failed';
-            String userFriendlyMessage = 'Unable to generate tour. Please try again.';
-            List<String> suggestions = [];
-
-            if (status['error'] != null) {
-              errorMessage = status['error'].toString();
+          } else if (response.statusCode == 429) {
+            done = true;
+            await DebugLogHelper.addDebugLog('TOUR_POLL: 429 quota exceeded for job $jobId: ${response.body}');
+            if (mounted) {
+              setState(() { _isGenerating = false; _progress = ''; });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Daily tour limit reached. Please try again tomorrow or check your plan.'),
+                  backgroundColor: Colors.deepOrange,
+                  duration: Duration(seconds: 12),
+                ),
+              );
             }
-
-            // Check for user_error field with detailed information
-            if (status['user_error'] != null) {
-              final userError = status['user_error'];
-              if (userError['message'] != null) {
-                userFriendlyMessage = userError['message'].toString();
-              }
-              if (userError['suggestions'] != null && userError['suggestions'] is List) {
-                suggestions = List<String>.from(userError['suggestions']);
-              }
-            } else if (status['user_message'] != null) {
-              userFriendlyMessage = status['user_message'].toString();
-            } else if (status['error_type'] != null) {
-              // Handle specific error types from Services
-              switch (status['error_type']) {
-                case 'knowledge_validation_failed':
-                case 'ai_knowledge_insufficient':
-                  userFriendlyMessage = 'Unable to find sufficient information about this location. Please try a more specific or well-known location.';
-                  break;
-                case 'location_not_found':
-                  userFriendlyMessage = 'Location not found. Please check the spelling and try a more specific address.';
-                  break;
-                case 'insufficient_content':
-                  userFriendlyMessage = 'Not enough information available to create a tour for this location. Please try a different location.';
-                  break;
-                case 'service_unavailable':
-                  userFriendlyMessage = 'Tour generation service is temporarily unavailable. Please try again in a few minutes.';
-                  break;
-                default:
-                  userFriendlyMessage = status['error_type'].toString().replaceAll('_', ' ');
-              }
-            }
-
-            // Log detailed error for debugging
-            await DebugLogHelper.addDebugLog('TOUR_ERROR: Services returned error - Type: ${status['error_type']}, Message: $errorMessage');
-            await DebugLogHelper.addDebugLog('TOUR_ERROR: Full status response: ${jsonEncode(status)}');
-
-            // Show user-friendly error dialog instead of just throwing exception
-            setState(() {
-              _isGenerating = false;
-              _progress = '';
-            });
-
-            _showServicesErrorDialog(userFriendlyMessage, suggestions);
             return;
-
-          } else if (attempts >= maxAttempts) {
-            timer.cancel();
-            await TourStatusService.updateTourStatus(jobId, 'timeout');
-            _showTimeoutError();
-            setState(() {
-              _isGenerating = false;
-              _progress = '';
-            });
+          } else if (response.statusCode >= 500) {
+            await DebugLogHelper.addDebugLog('TOUR_POLL: ${response.statusCode} server error for job $jobId — counting as transient');
+            await handleTransient('HTTP ${response.statusCode}');
+          } else {
+            done = true;
+            await DebugLogHelper.addDebugLog('TOUR_POLL: unexpected ${response.statusCode} for job $jobId: ${response.body}');
+            if (mounted) {
+              setState(() { _isGenerating = false; _progress = ''; });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Tour generation unavailable right now — please try again.'),
+                  backgroundColor: Colors.red,
+                  duration: Duration(seconds: 8),
+                ),
+              );
+            }
             return;
           }
 
-          attempts++;
-
-        } else if (response.statusCode == 429) {
-          // Quota exceeded — stop polling, tell the user
-          timer.cancel();
-          await DebugLogHelper.addDebugLog('TOUR_POLL: 429 quota exceeded for job $jobId: ${response.body}');
+        } on SocketException catch (e) { await handleTransient(e); }
+          on http.ClientException catch (e) { await handleTransient(e); }
+          catch (error) {
+          done = true;
+          await TourStatusService.updateTourStatus(jobId, 'failed');
           if (mounted) {
+            _showError('Error: $error');
             setState(() { _isGenerating = false; _progress = ''; });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Daily tour limit reached. Please try again tomorrow or check your plan.'),
-                backgroundColor: Colors.deepOrange,
-                duration: Duration(seconds: 12),
-              ),
-            );
           }
-        } else if (response.statusCode >= 500) {
-          // Server-side transient error (5xx) — treat like a network blip
-          await DebugLogHelper.addDebugLog('TOUR_POLL: ${response.statusCode} server error for job $jobId — counting as transient');
-          await handleTransient('HTTP ${response.statusCode}');
-        } else {
-          // Other 4xx — likely a permanent client error; log, stop, tell the user
-          timer.cancel();
-          await DebugLogHelper.addDebugLog('TOUR_POLL: unexpected ${response.statusCode} for job $jobId: ${response.body}');
-          if (mounted) {
-            setState(() { _isGenerating = false; _progress = ''; });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Tour generation unavailable right now — please try again.'),
-                backgroundColor: Colors.red,
-                duration: Duration(seconds: 8),
-              ),
-            );
-          }
+          return;
         }
 
-      } on SocketException catch (e) { await handleTransient(e); }
-        on http.ClientException catch (e) { await handleTransient(e); }
-        catch (error) {
-        // Unexpected error (not a network blip) — abort and mark failed
-        timer.cancel();
-        await TourStatusService.updateTourStatus(jobId, 'failed');
-        _showError('Error: $error');
-        setState(() {
-          _isGenerating = false;
-          _progress = '';
-        });
+        if (!done) await Future.delayed(const Duration(seconds: 10));
       }
-    });
+    }
+
+    pollLoop();
   }
 
   Future<String?> _processAdditionalLanguages(int finalTourId, List<String> languages) async {
@@ -2158,7 +2168,6 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
 
   @override
   void dispose() {
-    _pollTimer?.cancel();
     _tourRequestController.dispose();
     _stopCountController.dispose();
     super.dispose();
