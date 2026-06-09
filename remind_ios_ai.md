@@ -8,17 +8,18 @@ This is required so the user can identify which Amazon-Q tab they are talking to
 
 ---
 
-### ✅ **CURRENT STATE — v2.1.1+3 READY TO BUILD ON iPHONE**
+### ✅ **CURRENT STATE — v2.1.1+7 READY TO BUILD ON iPHONE**
 
 - iPhone last confirmed on **v1.2.9+71** (A#78 mic fix — smoke test passed)
-- **A#80 is ready to build** — v2.1.1+3 iOS parity with Android. Android has fully tested both Local WiFi AND Cloud. No iOS-only code changes needed beyond `Info.plist` already updated at `52d8282`.
+- **A#81 is ready to build** — v2.1.1+7 consolidated parity build. Supersedes all prior unbuilt assignments (A#79, A#80). Single assignment takes iPhone from v1.2.9+71 directly to v2.1.1+7.
 - **API Key field** is in the About screen as a **temporary development tool** — Sir Michael enters the gateway API key manually during testing. Will be removed in a future version (customers cannot be expected to know the key).
+- **Mobile Kiro** (Kiro IDE) has replaced Android Amazon-Q (Eclipse) as the Android mobile agent as of 2026-06-08. Same codebase, same branch, same communication channel.
 
 ---
 
 ### 🎯 **IMMEDIATE NEXT STEPS**
 
-#### A#80 — Build v2.1.1+3 on iPhone ⚠️ READY TO BUILD
+#### A#81 — Build v2.1.1+7 on iPhone ⚠️ READY TO BUILD
 
 **What this delivers over v1.2.9+71:**
 - Dual-environment networking: Local WiFi (default) and Cloud (HTTPS)
@@ -27,30 +28,35 @@ This is required so the user can identify which Amazon-Q tab they are talking to
 - `tour_status_service.dart` — REST via `Endpoints(Service.orchestrator)` + `apiHeaders()`, keyed on `tour_xxx` tour_id
 - `TranslationService` — migrated to `Endpoints.url(Service.translation)` + `apiHeaders()` — cloud multi-language works
 - About screen: Local/Cloud toggle + cloud URL field + API Key field (temporary) + gateway path routing checkbox (leave unchecked)
-- Inter-service auth tokens on all edges, OpenAI + AWS secret key fixes
-- Dead files removed: `test_update_api.dart` + raw-SQL files
+- Inter-service auth tokens, OpenAI + AWS secret key fixes, dead files removed
 - `NSLocalNetworkUsageDescription` in `Info.plist` (commit `52d8282`)
+- `Timer.periodic` → `Future.delayed` self-scheduling poll loop — no stuck timers
+- `_pollTimer` field removed entirely — any stale reference = compile error
+- `translation_failed` orange snackbar
+- `if (_isGenerating) return;` re-entry guard — double-tap Generate starts only one generation
+- `pollLoop()` wrapped with `unawaited(...).catchError(...)` — spinner can't stick on crash
+
+**Target commit:** `e7c3ade`  **pubspec:** `2.1.1+7`  **No pubspec bump needed.**
 
 **Mac Mini runs:**
 ```bash
 cd ~/Development/Audioura-build
 git pull origin services-migration
-# Verify: grep "^version:" development/audio_tour_app/pubspec.yaml → 2.1.1+3
+# Verify: grep "^version:" development/audio_tour_app/pubspec.yaml → 2.1.1+7
 cd development/audio_tour_app/ios && pod install
 cd .. && flutter clean && flutter pub get
 cd "/Volumes/USB DISK/Audioura/scripts" && ./build_install_launch.sh
-# STOP for Sir Michael smoke test — Local WiFi + Cloud both
-# NO pubspec commit — version already at 2.1.1+3
 ```
 
-**Smoke tests (7):**
+**Smoke tests (8):**
 1. Local mode (WiFi) → tours load from `192.168.0.218`. About shows Local by default.
-2. Local WiFi tour generation → generates, appears in Listen tab.
+2. Local WiFi tour generation → spinner runs, tour opens automatically. Switch tabs mid-poll → no crash. Double-tap Generate → only one generation starts.
 3. About tab → Local/Cloud toggle present. Switch to Cloud → URL + API Key fields appear.
 4. Cloud mode → enter URL + API Key → download/generate tour → plays.
 5. Cloud multi-language translation → completes (NOT_TESTED acceptable — not a blocker).
 6. Mic regression (A#78) → no "permission required" snackbar.
-7. Refresh regression (A#77b) → no black screen. General regression: tour audio, news article, POI map.
+7. Refresh regression (A#77b) → no black screen.
+8. General regression: tour audio, news article, POI map.
 
 ---
 
@@ -72,8 +78,8 @@ Audioura-build/           AudioTours\development\
 - **Windows dev tree**: `C:\Users\micha\eclipse-workspace\AudioTours\development\` — IS a git clone. Q edits iOS-only files + planning docs here. Never commits Dart code.
 - **USB mirror**: `usb/Audioura/` mirrors `D:\Audioura\`. After editing: `copy usb\Audioura\assignments\mac_mini_assignments.md D:\Audioura\assignments\`
 - **OLD repo**: `~/Development/AudioTours/` — BROKEN, never use
-- **pubspec**: `2.1.1+3` (Android Q bumped — iOS Q never bumps independently)
-- **Head commit**: `049bb35` — Cloud generation verified with real audio
+- **pubspec**: `2.1.1+7` (Mobile Kiro bumped)
+- **Head commit**: `e7c3ade` — v2.1.1+7 poll hardening + re-entry guard
 
 #### Version history
 | Version | Assignment | Status |
@@ -82,18 +88,20 @@ Audioura-build/           AudioTours\development\
 | 1.2.9+69 | A#77 wrong Refresh fix | ⚠️ BUILT BUT FAILED |
 | 1.2.9+70 | A#77b Listen Refresh black screen fix | ✅ |
 | 1.2.9+71 | A#78 mic permission fix + dead import | ✅ |
-| 2.1.1+1 | A#79 dual-environment — superseded by A#80 | ⏭️ SKIPPED |
-| **2.1.1+3** | **A#80 cloud fully working + API key + auth** | **⏳ READY TO BUILD** |
+| 2.1.1+1 | A#79 dual-environment — superseded | ⏭️ SKIPPED |
+| 2.1.1+3 | A#80 cloud fully working + API key + auth — superseded | ⏭️ SKIPPED |
+| 2.1.1+6 | poll loop rewrite + translation_failed snackbar — included in A#81 | ⏭️ SKIPPED |
+| **2.1.1+7** | **A#81 poll hardening + re-entry guard (consolidated)** | **⏳ READY TO BUILD** |
 
 #### Git operation ownership
 | Operation | Who | Where |
 |---|---|---|
 | `git pull` + build + `git push` (pubspec bump) | Mac Mini Q | `~/Development/Audioura-build/` |
 | Edit + commit iOS-only files + planning docs | Windows Q | `C:\Users\micha\eclipse-workspace\AudioTours\development\` |
-| Dart code changes + version bumps | Android Q | per assignment |
+| Dart code changes + version bumps | Mobile Kiro | per assignment |
 | `git pull` to sync after pushes | Sir Michael (Windows) | Windows dev tree |
 
-⚠️ Android Q must NOT edit `remind_ios_ai.md` — unauthorized edit reverted at `e5c103d`.
+⚠️ Mobile Kiro must NOT edit `remind_ios_ai.md` — this file is iOS Q's domain only.
 
 ---
 
@@ -106,21 +114,22 @@ Audioura-build/           AudioTours\development\
 - **Flutter UDID** (provisioning): `00008140-000558A902BA801C`
 - **Network**: iPhone → Windows laptop Docker services at `192.168.0.218:5002/5004/5005/5030`
 - **Build environment**: Mac Mini M4 + Xcode 16
+- **Android agent**: Mobile Kiro (Kiro IDE) — replaced Android Amazon-Q as of 2026-06-08
 
 ---
 
 ### 📱 **APP STATUS**
-- **iPhone**: v1.2.9+71 (A#80 parity build pending)
+- **iPhone**: v1.2.9+71 (A#81 build pending → v2.1.1+7)
 - **All shipped features**: Tour clustering, location search, tour search, newsletter system, subscription, language selector, about screen, settings persistence, location permissions, keyboard dismissal, download spinner fix, microphone voice control, translation (ru/fr/zh), walking tour map, per-stop map focus, coordinate jitter, museum single-POI map guard, mode-switch fix, stale tour/news path healing, brick-red app icon, app name "Audioura", InAppWebView v6, map icon on Listen page, POI tap → TourMapScreen via `openMap` JS handler, Listen page Refresh in-place reload, Listen page mic permission fix.
-- **New in v2.1.1+3** (pending A#80 build): Dual-environment Local/Cloud networking, `Endpoints` resolver, `X-API-Key` header, `TranslationService` cloud migration, About screen toggle + API Key field.
+- **New in v2.1.1+7** (pending A#81 build): Dual-environment Local/Cloud networking, `Endpoints` resolver, `X-API-Key` header, `TranslationService` cloud migration, About screen toggle + API Key field, poll loop rewrite (no stuck timer), re-entry guard on Generate, `translation_failed` snackbar, `unawaited` crash recovery on poll loop.
 
 ---
 
 ### 🔄 **WORKFLOW RULES**
 1. Assignments: Windows Q writes to `usb/Audioura/assignments/mac_mini_assignments.md` → copies to USB → commits + pushes → Mac Mini Q pulls + executes.
 2. iOS-only file changes (`Info.plist`, `Podfile`): Windows Q edits + commits + pushes → Mac Mini pulls.
-3. Dart code changes: Android Q commits. Windows Q never touches `lib/`.
-4. After parity build: no pubspec commit needed (Android Q already bumped it).
+3. Dart code changes: Mobile Kiro commits. Windows Q never touches `lib/`.
+4. After parity build: no pubspec commit needed (Mobile Kiro already bumped it).
 5. **LF FILES**: `home_screen.dart`, `tour_generator_screen.dart`, `my_tours_screen.dart` — `fsReplace` FAILS on Windows. Python patch scripts only.
 6. **PYTHON OUTPUT**: stdout is unreliable in `executeBash`. Write to `D:\Audioura\results\<file>.txt`, read with `type`.
 7. Read `git_source_control_for_q.md` before any git operation.
@@ -149,6 +158,12 @@ cd "/Volumes/USB DISK/Audioura/scripts"
 - `_setupVoiceCommands()` — sole mic permission acquisition via `_speechToText.initialize()`
 - `_startVoiceSearch()` — **A#78**: no `Permission.microphone.request()`, no `permission_handler` import. `listen()` has `onResult` + `listenFor: 10s` — `onStatus` not wired (auto-dismiss not implemented, deferred)
 
+#### tour_generator_screen.dart (LF — Python edits only)
+- **v2.1.1+6/+7**: `_pollAndAutoDownload` uses `Future.delayed` self-scheduling loop. `_pollTimer` field GONE.
+- `if (_isGenerating) return;` guard in `_generateTour` + `_generateTourBackground`
+- `pollLoop()` fire-and-forget with `unawaited(...).catchError(...)` — resets `_isGenerating` on crash
+- `translation_failed` orange snackbar reads server response field
+
 #### about_screen.dart
 - **v2.1.1+x**: Local/Cloud toggle, cloud base URL field, **API Key field** (temporary — reads/writes `gateway_api_key` in SharedPreferences), gateway path routing checkbox (leave unchecked).
 
@@ -176,7 +191,7 @@ cd "/Volumes/USB DISK/Audioura/scripts"
 ---
 
 ### 📋 **OPEN ITEMS**
-1. **A#80** ⚠️ READY TO BUILD — v2.1.1+3. Local WiFi + Cloud. See Immediate Next Steps.
+1. **A#81** ⚠️ READY TO BUILD — v2.1.1+7. Consolidated. See Immediate Next Steps.
 2. **API Key field removal** — About screen manual API Key input is temporary. Future assignment: remove field, embed/auto-supply key. Customers must never see it.
 3. **Dialog auto-dismiss** — `_startVoiceSearch()` dialog doesn't auto-close on 10s timeout. `onStatus` not wired. Never implemented, not a regression. Deferred.
 4. **ISSUE-SERVICES-NEWSLETTER** — `get_articles_by_newsletter_id` returns only 2 of 5 articles. Awaiting Kiro. Not iOS.
@@ -189,7 +204,7 @@ cd "/Volumes/USB DISK/Audioura/scripts"
 ---
 
 ### ⚠️ **CRITICAL TECHNICAL NOTES**
-- **Version numbering**: iOS and Android share `pubspec.yaml`. Android Q owns version bumps. iOS Q never bumps independently.
+- **Version numbering**: iOS and Android share `pubspec.yaml`. Mobile Kiro owns version bumps. iOS Q never bumps independently.
 - **Parity rule**: Both platforms always build the same commit on `services-migration`. No iOS-specific Dart forks.
 - **iOS-only files**: `ios/Runner/Info.plist`, `ios/Runner.xcodeproj/`, `ios/Podfile` — Windows Q may edit these. Everything in `lib/` is shared.
 - **API Key (temporary)**: `Endpoints.apiHeaders()` reads `gateway_api_key` from SharedPreferences and sends as `X-API-Key` in cloud mode only. About screen has a manual entry field. Field will be removed once key is embedded.
@@ -201,6 +216,7 @@ cd "/Volumes/USB DISK/Audioura/scripts"
 - **pod install**: always run after `git pull` on Mac Mini before building.
 - **DebugLogHelper**: in `lib/screens/debug_log_viewer_screen.dart`.
 - **unawaited()**: requires `import 'dart:async'`.
+- **`_pollTimer` is GONE**: removed in v2.1.1+6. Any reference to it is a compile error. Do not reintroduce.
 
 ---
 
@@ -225,32 +241,31 @@ cd ios && pod deintegrate && pod install
 |------|---------|
 | `lib/screens/home_screen.dart` | Download + translation. LF. |
 | `lib/screens/my_tours_screen.dart` | Tours/news list. LF. A#77b + A#78 fixed. |
+| `lib/screens/tour_generator_screen.dart` | Tour generation + poll loop. LF. v2.1.1+6/+7 poll rewrite. |
 | `lib/screens/about_screen.dart` | Local/Cloud toggle + API Key field (temporary). |
 | `lib/screens/main_screen.dart` | Tab navigation. CRLF. |
 | `lib/screens/tour_player_screen.dart` | `openMap` JS handler. CRLF. |
 | `lib/screens/news_player_screen.dart` | Path healing + FutureBuilder. CRLF. |
 | `lib/screens/tour_map_screen.dart` | Map screen. Jitter + single-POI guard. CRLF. |
-| `lib/screens/tour_generator_screen.dart` | Translation + player navigation. LF. |
 | `lib/screens/debug_log_viewer_screen.dart` | `DebugLogHelper` class. |
 | `lib/config/endpoints.dart` | `Endpoints` resolver — base URL + apiHeaders with X-API-Key. |
 | `lib/services/tour_status_service.dart` | Tour status REST via Endpoints. |
 | `lib/services/translation_service.dart` | Translation via Endpoints (cloud-ready). |
 | `lib/config.dart` | `Config.defaultServerIp = '192.168.0.218'` |
 | `ios/Runner/Info.plist` | iOS permissions + `NSLocalNetworkUsageDescription`. |
-| `usb/Audioura/assignments/mac_mini_assignments.md` | Mac Mini task queue. A#80 at top. |
+| `usb/Audioura/assignments/mac_mini_assignments.md` | Mac Mini task queue. A#81 at top. |
 | `git_source_control_for_q.md` | Git rules — READ before any git operation. |
-| `android_q_onboarding.md` | Android Q full onboarding doc. |
 
 ---
 
-### 🤖 **ANDROID PARITY**
+### 🤖 **ANDROID PARITY (Mobile Kiro)**
 - Android bundle ID: `com.audioura.app` (iOS: `com.glikfamily.audioura`)
-- Android is on v2.1.1+3 — A#80 brings iPhone to same version
-- Version sync: Android Q bumps `pubspec.yaml` → iOS Q pulls + builds same commit
+- Mobile Kiro replaced Android Amazon-Q as of 2026-06-08 — same codebase, same branch
+- Version sync: Mobile Kiro bumps `pubspec.yaml` → iOS Q pulls + builds same commit
 - iOS Q never bumps version independently
-- ⚠️ Android Q must NOT edit `remind_ios_ai.md` — this file is iOS Q's domain only
+- ⚠️ Mobile Kiro must NOT edit `remind_ios_ai.md` — this file is iOS Q's domain only
 
 ---
 
-**Last Updated**: 2026-06-06 — v107.0. pubspec at `2.1.1+3`. Android fully tested Local WiFi + Cloud (Sir Michael entered API key in About screen). A#80 ready to build on iPhone. API Key field in About is temporary — future assignment will remove it. Both prior cloud blockers confirmed fixed in current code (`Endpoints.apiHeaders` + `TranslationService` migration).
-**iOS Amazon-Q Version**: 107.0
+**Last Updated**: 2026-06-08 — v108.0. pubspec at `2.1.1+7` (commit `e7c3ade`). iPhone on v1.2.9+71. A#81 consolidated assignment written — takes iPhone directly from v1.2.9+71 to v2.1.1+7 in one build. Mobile Kiro replaces Android Q. No iOS-specific Dart changes needed.
+**iOS Amazon-Q Version**: 108.0
