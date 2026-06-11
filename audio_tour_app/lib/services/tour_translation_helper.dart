@@ -11,6 +11,26 @@ import 'translation_service.dart';
 /// Shared translation-download logic used by both HomeScreen (at download time)
 /// and MyToursScreen (translate existing tours on Listen page).
 class TourTranslationHelper {
+  /// Canonical list of supported translation languages.
+  static const availableLanguages = <String, String>{
+    'ru': 'Russian',
+    'zh': 'Chinese',
+    'fr': 'French',
+    'es': 'Spanish',
+    'de': 'German',
+    'ja': 'Japanese',
+    'ko': 'Korean',
+    'pt': 'Portuguese',
+    'it': 'Italian',
+    'ar': 'Arabic',
+  };
+
+  /// Returns true if the tour metadata indicates this is a translated tour.
+  static bool isTranslation(Map<String, dynamic> tour) {
+    final val = tour['is_translation'];
+    return val == true || val == 'true';
+  }
+
   /// Translates a tour and downloads each translated version as a new entry.
   /// Returns a list of language codes that failed.
   /// The English tour must already be saved before calling this.
@@ -106,7 +126,8 @@ class TourTranslationHelper {
       await outFile.parent.create(recursive: true);
       await outFile.writeAsBytes(file.content as List<int>);
     }
-    final actualStops = _countStopsFromZip(zipBytes);
+    // Q5 fix: reuse already-decoded archive instead of decoding zipBytes a second time
+    final actualStops = _countStopsFromArchive(archive);
     final savedTours = prefs.getStringList('saved_tours') ?? [];
     final tourData = {
       'title': tourName,
@@ -123,10 +144,9 @@ class TourTranslationHelper {
     await prefs.setStringList('saved_tours', savedTours);
   }
 
-  /// Count stops from ZIP content by checking tour.json or counting MP3s.
-  static int _countStopsFromZip(List<int> zipBytes) {
+  /// Count stops from an already-decoded archive by checking tour.json or counting MP3s.
+  static int _countStopsFromArchive(Archive archive) {
     try {
-      final archive = ZipDecoder().decodeBytes(zipBytes);
       for (final file in archive) {
         if (file.name == 'tour.json' && file.isFile) {
           final jsonContent = String.fromCharCodes(file.content as List<int>);
@@ -136,7 +156,6 @@ class TourTranslationHelper {
           }
         }
       }
-      // Fallback: count MP3 files
       int count = 0;
       for (final file in archive) {
         if (file.name.endsWith('.mp3') && file.isFile) count++;

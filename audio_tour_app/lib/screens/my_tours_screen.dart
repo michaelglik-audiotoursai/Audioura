@@ -829,18 +829,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
       return;
     }
 
-    final availableLanguages = <String, String>{
-      'ru': 'Russian',
-      'zh': 'Chinese',
-      'fr': 'French',
-      'es': 'Spanish',
-      'de': 'German',
-      'ja': 'Japanese',
-      'ko': 'Korean',
-      'pt': 'Portuguese',
-      'it': 'Italian',
-      'ar': 'Arabic',
-    };
+    final availableLanguages = TourTranslationHelper.availableLanguages;
 
     final selected = <String>{};
 
@@ -1315,7 +1304,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
                               ),
                             ),
                           ),
-                        if (tour['is_translation'] != true && tour['is_translation'] != 'true')
+                        if (!TourTranslationHelper.isTranslation(tour))
                           IconButton(
                             icon: const Icon(Icons.translate, color: Color(0xFF8e44ad)),
                             tooltip: 'Translate',
