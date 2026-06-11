@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
+import '../services/app_attestation_service.dart';
 
 enum Service {
   orchestrator,    // :5002
@@ -64,14 +65,27 @@ class Endpoints {
   /// Returns HTTP headers for [s]. In cloud mode, adds X-API-Key for
   /// cost-bearing/write endpoints (orchestrator, translation).
   /// Local mode: Content-Type only (LAN services don't require a key).
-  static Future<Map<String, String>> apiHeaders(Service s) async {
+  /// If [requestBody] is provided and [s] is a protected service,
+  /// attaches X-App-Attestation token (Phase 1-2 attestation).
+  static Future<Map<String, String>> apiHeaders(Service s, {Map<String, dynamic>? requestBody}) async {
     final prefs = await SharedPreferences.getInstance();
     final headers = {'Content-Type': 'application/json'};
     final mode = prefs.getString('server_mode') ?? 'local';
     if (mode == 'cloud') {
       final key = (prefs.getString('gateway_api_key') ?? '').trim();
       if (key.isNotEmpty) headers['X-API-Key'] = key;
+
+      // Attestation for cost-bearing endpoints only
+      if (_isProtectedService(s) && requestBody != null) {
+        final token = await AppAttestationService.getToken(requestBody);
+        if (token != null) headers['X-App-Attestation'] = token;
+      }
     }
     return headers;
+  }
+
+  /// Services that incur cost and require attestation in production.
+  static bool _isProtectedService(Service s) {
+    return s == Service.orchestrator || s == Service.translation;
   }
 }
