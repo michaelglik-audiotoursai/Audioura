@@ -5,8 +5,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
 import 'dart:convert';
-import 'dart:io' show Platform;
+import 'dart:io' show Platform, Directory;
 
 import 'debug_log_viewer_screen.dart';
 import '../config/endpoints.dart';
@@ -447,6 +448,55 @@ class _AboutScreenState extends State<AboutScreen> {
               ],
             ),
             const SizedBox(height: 30),
+            // Account Deletion — App Store / Play Store requirement
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.warning_amber, size: 30, color: Colors.red),
+                      SizedBox(width: 10),
+                      Text(
+                        'Danger Zone',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Permanently delete your account and all associated data from our servers. Downloaded tours and articles on this device will also be removed.',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _confirmDeleteAccount,
+                      icon: const Icon(Icons.delete_forever),
+                      label: const Text('Delete My Account'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 30),
             Center(
               child: Text(
                 '© 2024 Audio Tour Generator\nPowered by AI',
@@ -677,6 +727,112 @@ class _AboutScreenState extends State<AboutScreen> {
     } catch (e) {
       await DebugLogHelper.addDebugLog('❌ Server connectivity: FAILED - $e');
     }
+  }
+
+  Future<void> _confirmDeleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Account?'),
+        content: const Text(
+          'This will permanently delete your account and all data from our servers. '
+          'All downloaded tours and articles on this device will also be removed.\n\n'
+          'This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete Permanently'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _deleteAccount();
+    }
+  }
+
+  Future<void> _deleteAccount() async {
+    try {
+      await DebugLogHelper.addDebugLog('ACCOUNT: Starting account deletion for $_userId');
+
+      // Call server deletion endpoint
+      final uri = await Endpoints.url(Service.orchestrator, '/delete-account/$_userId');
+      final headers = await Endpoints.apiHeaders(Service.orchestrator);
+      final response = await http.delete(uri, headers: headers).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        await DebugLogHelper.addDebugLog('ACCOUNT: Server deletion successful: ${response.body}');
+      } else if (response.statusCode == 400) {
+        await DebugLogHelper.addDebugLog('ACCOUNT: Server returned 400: ${response.body}');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Invalid request. Please try again.'), backgroundColor: Colors.red),
+          );
+        }
+        return;
+      } else {
+        await DebugLogHelper.addDebugLog('ACCOUNT: Server deletion failed: ${response.statusCode} ${response.body}');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Server error (${response.statusCode}). Data preserved.'), backgroundColor: Colors.red),
+          );
+        }
+        return;
+      }
+
+      // Server succeeded — now wipe local data
+      await _wipeLocalData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Account deleted successfully.'), backgroundColor: Colors.green),
+        );
+        // Pop back to main screen — app will behave as fresh install on next navigation
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    } on Exception catch (e) {
+      await DebugLogHelper.addDebugLog('ACCOUNT: Deletion error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not connect to server. Data preserved.\n$e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _wipeLocalData() async {
+    // Clear all SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+
+    // Delete local tours directory
+    try {
+      final docsDir = await getApplicationDocumentsDirectory();
+      final toursDir = Directory('${docsDir.path}/tours');
+      if (await toursDir.exists()) {
+        await toursDir.delete(recursive: true);
+        await DebugLogHelper.addDebugLog('ACCOUNT: Deleted local tours directory');
+      }
+      final newsDir = Directory('${docsDir.path}/news');
+      if (await newsDir.exists()) {
+        await newsDir.delete(recursive: true);
+        await DebugLogHelper.addDebugLog('ACCOUNT: Deleted local news directory');
+      }
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('ACCOUNT: Error deleting local files: $e');
+    }
+
+    await DebugLogHelper.addDebugLog('ACCOUNT: Local data wiped. App will behave as fresh install.');
   }
 
   @override
