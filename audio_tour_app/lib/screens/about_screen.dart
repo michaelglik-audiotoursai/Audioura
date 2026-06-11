@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
@@ -763,10 +764,49 @@ class _AboutScreenState extends State<AboutScreen> {
 
   Future<void> _deleteAccount() async {
     try {
-      await DebugLogHelper.addDebugLog('ACCOUNT: Starting account deletion for $_userId');
+      // Q3 fix: re-read user_id from prefs right before the call — don't use stale _userId
+      final prefs = await SharedPreferences.getInstance();
+      final currentUserId = prefs.getString('user_id') ?? '';
+      if (currentUserId.isEmpty || currentUserId.startsWith('Error')) {
+        await DebugLogHelper.addDebugLog('ACCOUNT: Aborting — user_id is empty or invalid: "$currentUserId"');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Cannot delete: no valid user ID found.'), backgroundColor: Colors.red),
+          );
+        }
+        return;
+      }
+
+      // Warn if in local mode — deletion hits dev server, not production
+      final serverMode = prefs.getString('server_mode') ?? 'local';
+      if (serverMode == 'local') {
+        final proceedLocal = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Local Mode Warning'),
+            content: const Text(
+              'You are in Local WiFi mode. This will delete your account from the LOCAL development server, not the production cloud.\n\n'
+              'Switch to Cloud mode first if you want to delete your production account.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Delete from local anyway'),
+              ),
+            ],
+          ),
+        );
+        if (proceedLocal != true) return;
+      }
+
+      await DebugLogHelper.addDebugLog('ACCOUNT: Starting account deletion for $currentUserId');
 
       // Call server deletion endpoint
-      final uri = await Endpoints.url(Service.orchestrator, '/delete-account/$_userId');
+      final uri = await Endpoints.url(Service.orchestrator, '/delete-account/$currentUserId');
       final headers = await Endpoints.apiHeaders(Service.orchestrator);
       final response = await http.delete(uri, headers: headers).timeout(const Duration(seconds: 15));
 
@@ -793,12 +833,17 @@ class _AboutScreenState extends State<AboutScreen> {
       // Server succeeded — now wipe local data
       await _wipeLocalData();
 
+      // Q2 fix: close the app entirely. On next launch, initState re-runs from scratch,
+      // SharedPreferences is empty, and a new user_id is generated.
+      // Note: _generateUserId is deterministic from device hardware, so the same device
+      // will get the same user_id — that's fine, the server record is gone.
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Account deleted successfully.'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('Account deleted. App will close.'), backgroundColor: Colors.green),
         );
-        // Pop back to main screen — app will behave as fresh install on next navigation
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        // Give the snackbar time to show, then exit
+        await Future.delayed(const Duration(seconds: 2));
+        SystemNavigator.pop();
       }
     } on Exception catch (e) {
       await DebugLogHelper.addDebugLog('ACCOUNT: Deletion error: $e');
@@ -811,8 +856,9 @@ class _AboutScreenState extends State<AboutScreen> {
   }
 
   Future<void> _wipeLocalData() async {
-    // Clear all SharedPreferences
     final prefs = await SharedPreferences.getInstance();
+    // Q1 fix: log before clear
+    await DebugLogHelper.addDebugLog('ACCOUNT: Wiping local data (tours + news + prefs)...');
     await prefs.clear();
 
     // Delete local tours directory
@@ -821,18 +867,15 @@ class _AboutScreenState extends State<AboutScreen> {
       final toursDir = Directory('${docsDir.path}/tours');
       if (await toursDir.exists()) {
         await toursDir.delete(recursive: true);
-        await DebugLogHelper.addDebugLog('ACCOUNT: Deleted local tours directory');
       }
       final newsDir = Directory('${docsDir.path}/news');
       if (await newsDir.exists()) {
         await newsDir.delete(recursive: true);
-        await DebugLogHelper.addDebugLog('ACCOUNT: Deleted local news directory');
       }
     } catch (e) {
+      // Best-effort — files may be locked; they'll be orphaned but not harmful
       await DebugLogHelper.addDebugLog('ACCOUNT: Error deleting local files: $e');
     }
-
-    await DebugLogHelper.addDebugLog('ACCOUNT: Local data wiped. App will behave as fresh install.');
   }
 
   @override
