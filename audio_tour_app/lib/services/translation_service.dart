@@ -11,18 +11,19 @@ class TranslationService {
   }) async {
     try {
       final uri = await Endpoints.url(Service.translation, '/translate-with-audio');
-      final headers = await Endpoints.apiHeaders(Service.translation);
+      final requestBody = {
+        'content_id': tourId,
+        'content_type': 'tour',
+        'languages': languages,
+      };
+      final headers = await Endpoints.apiHeaders(Service.translation, requestBody: requestBody);
 
       await DebugLogHelper.addDebugLog('Translation: POST $uri tourId=$tourId languages=${languages.join(", ")}');
 
       final response = await http.post(
         uri,
         headers: headers,
-        body: jsonEncode({
-          'content_id': tourId,
-          'content_type': 'tour',
-          'languages': languages,
-        }),
+        body: jsonEncode(requestBody),
       ).timeout(Duration(minutes: 5));
 
       await DebugLogHelper.addDebugLog('Translation: HTTP ${response.statusCode} received');
