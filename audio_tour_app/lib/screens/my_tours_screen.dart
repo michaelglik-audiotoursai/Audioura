@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:path_provider/path_provider.dart';
 import '../screens/debug_log_viewer_screen.dart';
+import '../services/tour_translation_helper.dart';
 
 import 'tour_player_screen.dart';
 import 'news_player_screen.dart';
@@ -809,6 +810,122 @@ class _MyToursScreenState extends State<MyToursScreen> {
       );
     }
   }
+
+  Future<void> _showTranslateDialog(Map<String, dynamic> tour) async {
+    final tourId = tour['tour_id'];
+    if (tourId == null || tourId.toString().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This tour cannot be translated (no tour ID).'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
+    // Parse tour_id to int (translation service requires numeric ID)
+    final numericId = int.tryParse(tourId.toString());
+    if (numericId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This tour uses a non-numeric ID and cannot be translated yet.'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
+    final availableLanguages = <String, String>{
+      'ru': 'Russian',
+      'zh': 'Chinese',
+      'fr': 'French',
+      'es': 'Spanish',
+      'de': 'German',
+      'ja': 'Japanese',
+      'ko': 'Korean',
+      'pt': 'Portuguese',
+      'it': 'Italian',
+      'ar': 'Arabic',
+    };
+
+    final selected = <String>{};
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Translate Tour'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Select languages for: ${tour['title']}', style: const TextStyle(fontSize: 13)),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: availableLanguages.entries.map((entry) => FilterChip(
+                    label: Text(entry.value),
+                    selected: selected.contains(entry.key),
+                    onSelected: (val) => setDialogState(() {
+                      if (val) { selected.add(entry.key); } else { selected.remove(entry.key); }
+                    }),
+                  )).toList(),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: selected.isEmpty ? null : () => Navigator.of(context).pop(true),
+              child: const Text('Translate'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || selected.isEmpty) return;
+
+    // Show progress
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 20),
+              Expanded(child: Text('Translating tour...')),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final parentEditTourId = tour['edit_tour_id']?.toString() ?? tourId.toString();
+    final failures = await TourTranslationHelper.downloadTranslatedVersions(
+      tourId: numericId,
+      languages: selected.toList(),
+      parentEditTourId: parentEditTourId,
+    );
+
+    if (mounted) Navigator.of(context).pop(); // dismiss progress
+
+    if (mounted) {
+      if (failures.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Translated to ${selected.length} language(s) successfully!'), backgroundColor: Colors.green),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Some translations failed: ${failures.join(", ")}'), backgroundColor: Colors.orange),
+        );
+      }
+      _loadTours(); // refresh list to show new translated entries
+    }
+  }
   
   void _editTour(Map<String, dynamic> tour) {
     Navigator.push(
@@ -1197,6 +1314,12 @@ class _MyToursScreenState extends State<MyToursScreen> {
                                 ),
                               ),
                             ),
+                          ),
+                        if (tour['is_translation'] != true && tour['is_translation'] != 'true')
+                          IconButton(
+                            icon: const Icon(Icons.translate, color: Color(0xFF8e44ad)),
+                            tooltip: 'Translate',
+                            onPressed: () => _showTranslateDialog(tour),
                           ),
                         IconButton(
                           icon: const Icon(Icons.edit, color: Colors.orange),
