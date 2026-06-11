@@ -1176,6 +1176,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // M8: Shared translation download logic used by both _downloadSingleTour
   // and _downloadSingleTourSilent. Returns list of language codes that failed.
   // English must already be saved before calling this.
+  // ⚠️ Keep in sync with TourTranslationHelper.downloadTranslatedVersions() until consolidated.
   Future<List<String>> _downloadTranslatedVersions(
     int tourId,
     List<String> languages,

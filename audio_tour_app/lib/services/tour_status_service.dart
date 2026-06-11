@@ -58,7 +58,7 @@ class TourStatusService {
       final statusBody = {'tour_id': tourId, 'status': status};
       final response = await http.post(
         await Endpoints.url(Service.orchestrator, '/tour-status'),
-        headers: await Endpoints.apiHeaders(Service.orchestrator, requestBody: statusBody),
+        headers: await Endpoints.apiHeaders(Service.orchestrator),
         body: jsonEncode(statusBody),
       );
 

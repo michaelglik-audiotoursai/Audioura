@@ -833,17 +833,20 @@ class _AboutScreenState extends State<AboutScreen> {
       // Server succeeded — now wipe local data
       await _wipeLocalData();
 
-      // Q2 fix: close the app entirely. On next launch, initState re-runs from scratch,
-      // SharedPreferences is empty, and a new user_id is generated.
-      // Note: _generateUserId is deterministic from device hardware, so the same device
-      // will get the same user_id — that's fine, the server record is gone.
+      // Close/reset the app so all in-memory state is gone.
+      // Android: SystemNavigator.pop() cleanly exits; fresh state on next launch.
+      // iOS: Apple disallows self-termination; pop to root so the user sees a clean state.
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Account deleted. App will close.'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('Account deleted successfully.'), backgroundColor: Colors.green),
         );
-        // Give the snackbar time to show, then exit
         await Future.delayed(const Duration(seconds: 2));
-        SystemNavigator.pop();
+        if (Platform.isAndroid) {
+          SystemNavigator.pop();
+        } else {
+          // iOS: navigate to root — initState re-runs, prefs are empty, fresh user_id generated
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
       }
     } on Exception catch (e) {
       await DebugLogHelper.addDebugLog('ACCOUNT: Deletion error: $e');
