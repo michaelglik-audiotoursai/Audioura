@@ -837,14 +837,18 @@ class _AboutScreenState extends State<AboutScreen> {
       // Android: SystemNavigator.pop() cleanly exits; fresh state on next launch.
       // iOS: Apple disallows self-termination; pop to root so the user sees a clean state.
       if (mounted) {
+        final message = Platform.isAndroid
+            ? 'Account deleted successfully.'
+            : 'Account deleted. Please reopen the app to finish resetting.';
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Account deleted successfully.'), backgroundColor: Colors.green),
+          SnackBar(content: Text(message), backgroundColor: Colors.green),
         );
         await Future.delayed(const Duration(seconds: 2));
         if (Platform.isAndroid) {
           SystemNavigator.pop();
         } else {
-          // iOS: navigate to root — initState re-runs, prefs are empty, fresh user_id generated
+          // iOS: pop to root. MainScreen stays mounted (initState does NOT re-run),
+          // but child screens rebuild from empty prefs. User is prompted to reopen.
           Navigator.of(context).popUntil((route) => route.isFirst);
         }
       }
