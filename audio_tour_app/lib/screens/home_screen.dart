@@ -2310,18 +2310,20 @@ class _HomeScreenState extends State<HomeScreen> {
     for (final language in languagesToDownload) {
       await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: Downloading article $articleId in language: $language');
       
-      String downloadUrl;
-      final dlBase = await Endpoints.base(Service.news);
-      downloadUrl = '$dlBase/download/$articleId?user_id=$deviceId';
+      // Use Endpoints.newsDownloadUrl which handles cloud (/news-download) vs local (/download)
+      var downloadUri = await Endpoints.newsDownloadUrl(articleId, deviceId);
       if (language != 'en') {
-        downloadUrl += '&language=$language';
+        // Add language query parameter
+        final params = Map<String, String>.from(downloadUri.queryParameters);
+        params['language'] = language;
+        downloadUri = downloadUri.replace(queryParameters: params);
         await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: Adding language parameter: $language');
       }
       
-      await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: Download URL: $downloadUrl');
+      await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: Download URL: $downloadUri');
       
       final downloadResponse = await http.get(
-        Uri.parse(downloadUrl),
+        downloadUri,
         headers: await Endpoints.apiHeaders(Service.news),
       ).timeout(Duration(seconds: 30));
       

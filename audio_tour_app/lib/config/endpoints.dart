@@ -62,6 +62,16 @@ class Endpoints {
   static Future<Uri> url(Service s, String path) async =>
       Uri.parse('${await base(s)}$path');
 
+  /// Returns the correct news article download URI, handling the cloud path
+  /// difference: local uses /download/<id>, cloud gateway uses /news-download/<id>.
+  static Future<Uri> newsDownloadUrl(String articleId, String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final mode = prefs.getString('server_mode') ?? 'local';
+    final baseUrl = await base(Service.news);
+    final path = mode == 'cloud' ? '/news-download/$articleId' : '/download/$articleId';
+    return Uri.parse('$baseUrl$path').replace(queryParameters: {'user_id': userId});
+  }
+
   /// Returns HTTP headers for [s]. In cloud mode, adds X-API-Key for
   /// cost-bearing/write endpoints (orchestrator, translation).
   /// Local mode: Content-Type only (LAN services don't require a key).
