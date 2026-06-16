@@ -12,7 +12,7 @@
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 When chat history is compacted, user will ask you to read `remind_ai.md` and `remind_mobile_ai.md`.
 **Your Response**:
-"📱 MOBILE APP KIRO - I've read both files. Current version on branch is v2.1.1+7 (pollLoop crash guard, remove vestigial _pollTimer refs, re-entry guard). Commit `e711874`. Claude review doc ready: `code_review_v2.1.1.7_poll_hardening.md`. Ready to continue."
+"📱🔧 MOBILE KIRO - I've read both files. Current version on branch is v2.1.1+8 (launch gating: account deletion, translate-existing, attestation stubs, news cloud paths). Head commit `580a3af`. Awaiting Claude review of news download path fix, then Ubuntu build. Ready to continue."
 
 ## 🚫 OWNERSHIP BOUNDARIES — CRITICAL
 - ✅ **MY files**: `remind_mobile_ai.md`, `code_review_v*.md`, files in `amazon-q-communications/`
@@ -22,15 +22,63 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## CURRENT PROJECT STATUS
 **Project**: Audioura Android APK
-**Version on branch**: v2.1.1+7 ✅ committed on `services-migration` (commit `e711874`)
-**iPhone**: On v2.1.1+5 (iOS Q to build v2.1.1+7 — assignment pending)
-**Android**: ✅ v2.1.1+7 code committed — v2.1.1+5 under test, Claude review doc ready for v2.1.1+7
-**iOS Q current task**: No active task assigned
+**Version on branch**: v2.1.1+8 ✅ committed on `services-migration` (head commit `580a3af`)
+**iPhone**: On v1.2.9+71 (iOS Q to build v2.1.1+8 — assignment in `amazon-q-communications/`)
+**Android**: ✅ v2.1.1+8 code committed — awaiting Claude review of news download path fix, then Ubuntu build
+**iOS Q current task**: Build v2.1.1+7 (now superseded by +8) — communication doc at `IOS_BUILD_v2.1.1.7_2026_06_08.md`
 **Branch**: `services-migration`
 **Android Application ID**: `com.audioura.app`
 **Server**: `192.168.0.218` (Docker services on Windows laptop)
+**Cloud**: `https://api.audioura.com` (gateway, API-key gated)
+
+## v2.1.1+8 LAUNCH GATING — CURRENT WORK (10 commits)
+**Head commit**: `580a3af`
+**Features shipped in v2.1.1+8:**
+1. **Account Deletion UI** — red "Delete My Account" button in About, server-first deletion (`DELETE /delete-account/<secret_id>` on orchestrator), local data wipe, platform-guarded close (Android exits, iOS pops to root with restart message)
+2. **Existing-Tour Translation** — purple translate icon on non-translated tours in Listen page, language selection dialog, shared `TourTranslationHelper` service with `availableLanguages` constant and `isTranslation()` helper
+3. **App Attestation (Phases 1-2-5)** — `AppAttestationService` with stub token generation, `apiHeaders()` extended with optional `requestBody` param, `X-App-Attestation` header for protected services in cloud mode, nonce = SHA-256 of request body. Phase 3 (Play Integrity) and Phase 4 (App Attest) are stubs returning null.
+4. **News Cloud Paths** — all 5 news/newsletter HTTP calls use `Endpoints.apiHeaders()` for `X-API-Key` in cloud mode. News article download uses `Endpoints.newsDownloadUrl()` which routes to `/news-download/<id>` in cloud (gateway) vs `/download/<id>` in local. Proper `Uri` construction with query params.
+5. **Poll hardening (from v2.1.1+7)** — re-entry guard in `_generateTourBackground`
+
+**Review docs for v2.1.1+8:**
+- `code_review_v2.1.1.8_launch_gating_2026_06_11.md` (initial, pre-fixes)
+- `code_review_v2.1.1.8_final_2026_06_11.md` (post all P0/P1/P2 fixes)
+- `code_review_v2.1.1.8_post_final_fixes_2026_06_11.md` (un-attest tour-status + iOS close)
+- `code_review_v2.1.1.8_news_cloud_paths_2026_06_12.md` (headers wiring)
+- `code_review_v2.1.1.8_news_download_path_fix_2026_06_12.md` (cloud path /news-download fix)
+
+**Key files changed:**
+- `lib/screens/about_screen.dart` — account deletion + cloud mode text
+- `lib/screens/my_tours_screen.dart` — translate icon + dialog
+- `lib/screens/home_screen.dart` — news apiHeaders + newsDownloadUrl
+- `lib/screens/tour_generator_screen.dart` — requestBody wiring
+- `lib/services/tour_translation_helper.dart` — NEW shared translation logic
+- `lib/services/app_attestation_service.dart` — NEW attestation stubs
+- `lib/services/translation_service.dart` — requestBody wiring
+- `lib/services/tour_status_service.dart` — removed attestation (not cost endpoint)
+- `lib/config/endpoints.dart` — apiHeaders optional requestBody, newsDownloadUrl(), _isProtectedService()
+- `pubspec.yaml` — version bump to 2.1.1+8
+
+**Open items (not blocking build):**
+- Q8 nonce encoding: settle with Kiro — gateway hashes raw body bytes (recommended)
+- Phase 3 (Play Integrity): next after build, requires plugin evaluation
+- Phase 4 (App Attest): iOS-AQ native Swift — hand channel contract after Phase 3 works
+- `TOUR_STATUS rows_affected=0`: investigate string-vs-int tour_id mismatch
+- `home_screen.dart` translation duplication: consolidate with helper in future version
+- E2E deletion: blocked on Kiro fixing server `/delete-account` (credential tables)
 
 ## RECENT VERSION HISTORY (latest first)
+- **v2.1.1+8** — Launch gating (10 commits, head `580a3af`):
+  - Account Deletion UI: red button, confirmation, server DELETE, local wipe, platform-guarded close
+  - Existing-Tour Translation: translate icon on Listen page, shared `TourTranslationHelper` service
+  - App Attestation Phases 1-2-5: `AppAttestationService` stub, `X-App-Attestation` header in `apiHeaders()`, requestBody wired to all protected POST callers
+  - News Cloud Paths: all news/newsletter calls use `apiHeaders()`, `Endpoints.newsDownloadUrl()` routes to `/news-download/<id>` in cloud mode
+  - P0 fixes: re-read userId before DELETE, `SystemNavigator.pop()` on Android / `popUntil` on iOS, log before clear, local-mode warning
+  - P1: requestBody wired to generate/translate/tour-status callers
+  - P2: shared `availableLanguages` constant, `isTranslation()` helper, single ZIP decode
+  - Un-attested `/tour-status` (not cost endpoint)
+  - iOS-specific restart message
+  - Cloud news download path fix (`/news-download/<id>` vs `/download/<id>`)
 - **v2.1.1+7** — Poll hardening fixes (3 fixes from Claude v2.1.1+6 review):
   - Re-entry guard added to `_generateTour`: `if (_isGenerating) return;` — prevents double-poll if button tapped programmatically or in race condition
   - Removed vestigial `_pollTimer?.cancel(); _pollTimer = null;` lines from `_pollAndAutoDownload` — field was removed in v2.1.1+6, these lines were a compile error
