@@ -1801,7 +1801,7 @@ class _HomeScreenState extends State<HomeScreen> {
       
       final response = await http.get(
         newsUri,
-        headers: {'Content-Type': 'application/json'},
+        headers: await Endpoints.apiHeaders(Service.newsletter),
       ).timeout(Duration(seconds: 10));
       
       await DebugLogHelper.addDebugLog('HOME: Newsletter response status: ${response.statusCode}');
@@ -1913,7 +1913,7 @@ class _HomeScreenState extends State<HomeScreen> {
         
         final response = await http.post(
           Uri.parse(requestUrl),
-          headers: {'Content-Type': 'application/json'},
+          headers: await Endpoints.apiHeaders(Service.newsletter),
           body: json.encode(requestBody),
         ).timeout(Duration(seconds: 60));
         
@@ -1976,7 +1976,7 @@ class _HomeScreenState extends State<HomeScreen> {
       
       final response = await http.post(
         Uri.parse(requestUrl),
-        headers: {'Content-Type': 'application/json'},
+        headers: await Endpoints.apiHeaders(Service.newsletter),
         body: json.encode(requestBody),
       ).timeout(Duration(seconds: 60));
       
@@ -2073,7 +2073,7 @@ class _HomeScreenState extends State<HomeScreen> {
       
       final response = await http.post(
         Uri.parse(requestUrl),
-        headers: {'Content-Type': 'application/json'},
+        headers: await Endpoints.apiHeaders(Service.newsletter),
         body: json.encode(requestBody),
       ).timeout(Duration(seconds: 30));
       
@@ -2322,7 +2322,7 @@ class _HomeScreenState extends State<HomeScreen> {
       
       final downloadResponse = await http.get(
         Uri.parse(downloadUrl),
-        headers: {'Content-Type': 'application/json'},
+        headers: await Endpoints.apiHeaders(Service.news),
       ).timeout(Duration(seconds: 30));
       
       await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: Response status for $language: ${downloadResponse.statusCode}');

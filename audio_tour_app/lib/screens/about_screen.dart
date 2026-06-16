@@ -279,7 +279,7 @@ class _AboutScreenState extends State<AboutScreen> {
                       ),
                       const SizedBox(height: 4),
                       const Text(
-                        '✅ Cloud mode: tour generation and map delivery live at api.audioura.com. News/newsletters remain local until deployed.',
+                        '✅ Cloud mode: all services (tours, news, newsletters) route through api.audioura.com.',
                         style: TextStyle(fontSize: 11, color: Colors.green),
                       ),
                       const SizedBox(height: 8),
