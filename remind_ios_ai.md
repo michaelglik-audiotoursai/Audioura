@@ -8,55 +8,56 @@ This is required so the user can identify which Amazon-Q tab they are talking to
 
 ---
 
-### ✅ **CURRENT STATE — v2.1.1+7 READY TO BUILD ON iPHONE**
+### ✅ **CURRENT STATE — v2.1.1+8 READY TO BUILD ON iPHONE**
 
 - iPhone last confirmed on **v1.2.9+71** (A#78 mic fix — smoke test passed)
-- **A#81 is ready to build** — v2.1.1+7 consolidated parity build. Supersedes all prior unbuilt assignments (A#79, A#80). Single assignment takes iPhone from v1.2.9+71 directly to v2.1.1+7.
-- **API Key field** is in the About screen as a **temporary development tool** — Sir Michael enters the gateway API key manually during testing. Will be removed in a future version (customers cannot be expected to know the key).
-- **Mobile Kiro** (Kiro IDE) has replaced Android Amazon-Q (Eclipse) as the Android mobile agent as of 2026-06-08. Same codebase, same branch, same communication channel.
+- **A#82 is ready to build** — v2.1.1+8 consolidated parity build. Supersedes A#81 (v2.1.1+7, never built). Single assignment takes iPhone from v1.2.9+71 directly to v2.1.1+8.
+- **API Key field** is in the About screen as a **temporary development tool** — Sir Michael enters the gateway API key manually during testing. Will be removed in a future version.
+- **Mobile Kiro** (Kiro IDE) replaced Android Amazon-Q (Eclipse) as of 2026-06-08. Same codebase, same branch, same communication channel.
+- **App Attestation Phase 4** (native Swift MethodChannel) is NOT in v2.1.1+8 — stubs return null. Separate future assignment after Phase 3 (Android Play Integrity) is validated.
 
 ---
 
 ### 🎯 **IMMEDIATE NEXT STEPS**
 
-#### A#81 — Build v2.1.1+7 on iPhone ⚠️ READY TO BUILD
+#### A#82 — Build v2.1.1+8 on iPhone ⚠️ READY TO BUILD
 
 **What this delivers over v1.2.9+71:**
-- Dual-environment networking: Local WiFi (default) and Cloud (HTTPS)
-- `Endpoints` resolver — all service calls route through a single resolver per active mode
-- `Endpoints.apiHeaders()` sends `X-API-Key` in cloud mode (reads `gateway_api_key` from SharedPreferences)
-- `tour_status_service.dart` — REST via `Endpoints(Service.orchestrator)` + `apiHeaders()`, keyed on `tour_xxx` tour_id
-- `TranslationService` — migrated to `Endpoints.url(Service.translation)` + `apiHeaders()` — cloud multi-language works
-- About screen: Local/Cloud toggle + cloud URL field + API Key field (temporary) + gateway path routing checkbox (leave unchecked)
-- Inter-service auth tokens, OpenAI + AWS secret key fixes, dead files removed
-- `NSLocalNetworkUsageDescription` in `Info.plist` (commit `52d8282`)
-- `Timer.periodic` → `Future.delayed` self-scheduling poll loop — no stuck timers
-- `_pollTimer` field removed entirely — any stale reference = compile error
-- `translation_failed` orange snackbar
-- `if (_isGenerating) return;` re-entry guard — double-tap Generate starts only one generation
-- `pollLoop()` wrapped with `unawaited(...).catchError(...)` — spinner can't stick on crash
+- Dual-environment networking: Local WiFi (default) + Cloud (HTTPS) via `Endpoints` resolver
+- `Endpoints.apiHeaders()` sends `X-API-Key` in cloud mode
+- `TranslationService` cloud migration; dead files removed
+- About screen: Local/Cloud toggle + cloud URL field + API Key field (temporary)
+- Poll loop rewrite (no stuck timer), re-entry guard, `translation_failed` snackbar, crash recovery
+- **Account Deletion UI** — Danger Zone in About, two-step confirm, server-first DELETE, local wipe on success
+- **Existing-Tour Translation** — purple translate icon on Listen page, 10-language dialog, `TourTranslationHelper`
+- **App Attestation stubs** — `AppAttestationService` (null), `X-App-Attestation` header stub in `apiHeaders()`
+- **News Cloud Paths** — all news/newsletter calls use `apiHeaders()`, `newsDownloadUrl()` routes correctly
 
-**Target commit:** `e7c3ade`  **pubspec:** `2.1.1+7`  **No pubspec bump needed.**
+**Target commit:** `37dcc49`  **pubspec:** `2.1.1+8`  **No pubspec bump needed.**
 
 **Mac Mini runs:**
 ```bash
 cd ~/Development/Audioura-build
 git pull origin services-migration
-# Verify: grep "^version:" development/audio_tour_app/pubspec.yaml → 2.1.1+7
+# Verify: grep "^version:" development/audio_tour_app/pubspec.yaml → 2.1.1+8
 cd development/audio_tour_app/ios && pod install
 cd .. && flutter clean && flutter pub get
 cd "/Volumes/USB DISK/Audioura/scripts" && ./build_install_launch.sh
 ```
 
-**Smoke tests (8):**
-1. Local mode (WiFi) → tours load from `192.168.0.218`. About shows Local by default.
-2. Local WiFi tour generation → spinner runs, tour opens automatically. Switch tabs mid-poll → no crash. Double-tap Generate → only one generation starts.
-3. About tab → Local/Cloud toggle present. Switch to Cloud → URL + API Key fields appear.
-4. Cloud mode → enter URL + API Key → download/generate tour → plays.
-5. Cloud multi-language translation → completes (NOT_TESTED acceptable — not a blocker).
-6. Mic regression (A#78) → no "permission required" snackbar.
-7. Refresh regression (A#77b) → no black screen.
-8. General regression: tour audio, news article, POI map.
+**Smoke tests (12):**
+1. App launches — no crash
+2. Local WiFi tour generation — spinner polls, tour opens, re-entry guard works
+3. Tour playback — audio plays
+4. POI map button — TourMapScreen opens
+5. News/Audio mode — newsletter loads, article downloads, plays
+6. Account Deletion UI — Danger Zone visible, confirmation dialog, Cancel works (do NOT confirm)
+7. Existing-tour Translation — purple icon on Listen page, language dialog appears
+8. Cloud mode — enter URL + API Key → tour generates via cloud
+9. Cloud news download — article downloads via cloud path (NOT_TESTED acceptable)
+10. Mic regression (A#78) — no permission snackbar
+11. Refresh regression (A#77b) — no black screen
+12. Double-tap generation guard — only one generation starts
 
 ---
 
@@ -78,8 +79,8 @@ Audioura-build/           AudioTours\development\
 - **Windows dev tree**: `C:\Users\micha\eclipse-workspace\AudioTours\development\` — IS a git clone. Q edits iOS-only files + planning docs here. Never commits Dart code.
 - **USB mirror**: `usb/Audioura/` mirrors `D:\Audioura\`. After editing: `copy usb\Audioura\assignments\mac_mini_assignments.md D:\Audioura\assignments\`
 - **OLD repo**: `~/Development/AudioTours/` — BROKEN, never use
-- **pubspec**: `2.1.1+7` (Mobile Kiro bumped)
-- **Head commit**: `e7c3ade` — v2.1.1+7 poll hardening + re-entry guard
+- **pubspec**: `2.1.1+8` (Mobile Kiro bumped)
+- **Head commit**: `37dcc49` — docs update on top of `580a3af` (news cloud paths fix)
 
 #### Version history
 | Version | Assignment | Status |
@@ -88,10 +89,9 @@ Audioura-build/           AudioTours\development\
 | 1.2.9+69 | A#77 wrong Refresh fix | ⚠️ BUILT BUT FAILED |
 | 1.2.9+70 | A#77b Listen Refresh black screen fix | ✅ |
 | 1.2.9+71 | A#78 mic permission fix + dead import | ✅ |
-| 2.1.1+1 | A#79 dual-environment — superseded | ⏭️ SKIPPED |
-| 2.1.1+3 | A#80 cloud fully working + API key + auth — superseded | ⏭️ SKIPPED |
-| 2.1.1+6 | poll loop rewrite + translation_failed snackbar — included in A#81 | ⏭️ SKIPPED |
-| **2.1.1+7** | **A#81 poll hardening + re-entry guard (consolidated)** | **⏳ READY TO BUILD** |
+| 2.1.1+1–+3 | A#79/A#80 dual-environment — superseded | ⏭️ SKIPPED |
+| 2.1.1+6–+7 | A#81 poll hardening — superseded | ⏭️ SKIPPED |
+| **2.1.1+8** | **A#82 4 new features + poll hardening + dual-env (consolidated)** | **⏳ READY TO BUILD** |
 
 #### Git operation ownership
 | Operation | Who | Where |
@@ -115,13 +115,14 @@ Audioura-build/           AudioTours\development\
 - **Network**: iPhone → Windows laptop Docker services at `192.168.0.218:5002/5004/5005/5030`
 - **Build environment**: Mac Mini M4 + Xcode 16
 - **Android agent**: Mobile Kiro (Kiro IDE) — replaced Android Amazon-Q as of 2026-06-08
+- **Cloud URL**: `https://api.audioura.com` (hint in About screen)
 
 ---
 
 ### 📱 **APP STATUS**
-- **iPhone**: v1.2.9+71 (A#81 build pending → v2.1.1+7)
+- **iPhone**: v1.2.9+71 (A#82 build pending → v2.1.1+8)
 - **All shipped features**: Tour clustering, location search, tour search, newsletter system, subscription, language selector, about screen, settings persistence, location permissions, keyboard dismissal, download spinner fix, microphone voice control, translation (ru/fr/zh), walking tour map, per-stop map focus, coordinate jitter, museum single-POI map guard, mode-switch fix, stale tour/news path healing, brick-red app icon, app name "Audioura", InAppWebView v6, map icon on Listen page, POI tap → TourMapScreen via `openMap` JS handler, Listen page Refresh in-place reload, Listen page mic permission fix.
-- **New in v2.1.1+7** (pending A#81 build): Dual-environment Local/Cloud networking, `Endpoints` resolver, `X-API-Key` header, `TranslationService` cloud migration, About screen toggle + API Key field, poll loop rewrite (no stuck timer), re-entry guard on Generate, `translation_failed` snackbar, `unawaited` crash recovery on poll loop.
+- **New in v2.1.1+8** (pending A#82 build): Dual-environment networking, poll loop rewrite, re-entry guard, Account Deletion UI, Existing-Tour Translation, App Attestation stubs, News Cloud Paths.
 
 ---
 
@@ -156,23 +157,38 @@ cd "/Volumes/USB DISK/Audioura/scripts"
 #### my_tours_screen.dart (LF — Python edits only)
 - `_manualRefresh()` — **A#77b**: in-place `_loadAppMode()`, no navigation teardown
 - `_setupVoiceCommands()` — sole mic permission acquisition via `_speechToText.initialize()`
-- `_startVoiceSearch()` — **A#78**: no `Permission.microphone.request()`, no `permission_handler` import. `listen()` has `onResult` + `listenFor: 10s` — `onStatus` not wired (auto-dismiss not implemented, deferred)
+- `_startVoiceSearch()` — **A#78**: no `Permission.microphone.request()`. `onStatus` not wired (auto-dismiss deferred)
+- **v2.1.1+8**: Purple translate icon on non-translated tours → `TourTranslationHelper.translateTour()`
 
 #### tour_generator_screen.dart (LF — Python edits only)
-- **v2.1.1+6/+7**: `_pollAndAutoDownload` uses `Future.delayed` self-scheduling loop. `_pollTimer` field GONE.
+- **v2.1.1+6/+7**: `Future.delayed` self-scheduling poll loop. `_pollTimer` GONE.
 - `if (_isGenerating) return;` guard in `_generateTour` + `_generateTourBackground`
-- `pollLoop()` fire-and-forget with `unawaited(...).catchError(...)` — resets `_isGenerating` on crash
-- `translation_failed` orange snackbar reads server response field
+- `unawaited(pollLoop().catchError(...))` — resets `_isGenerating` on crash
+- `translation_failed` orange snackbar
 
-#### about_screen.dart
-- **v2.1.1+x**: Local/Cloud toggle, cloud base URL field, **API Key field** (temporary — reads/writes `gateway_api_key` in SharedPreferences), gateway path routing checkbox (leave unchecked).
+#### about_screen.dart (CRLF)
+- Local/Cloud toggle, cloud URL field, **API Key field** (temporary), gateway path routing checkbox
+- **v2.1.1+8**: Danger Zone section — red "Delete My Account" button, two-step confirm, server-first DELETE
+
+#### lib/config/endpoints.dart
+- `Endpoints.base(Service)` — local `http://ip:port` or cloud URL per `server_mode`
+- `Endpoints.url(Service, path)` — full URI
+- `Endpoints.apiHeaders(Service, {requestBody})` — `Content-Type` always; `X-API-Key` + `X-App-Attestation` stub in cloud mode
+- `Endpoints.newsDownloadUrl(id)` — `/news-download/<id>` cloud, `/download/<id>` local
+
+#### lib/services/tour_translation_helper.dart (NEW in v2.1.1+8)
+- Shared logic for existing-tour translation from Listen page
+
+#### lib/services/app_attestation_service.dart (NEW in v2.1.1+8)
+- Platform stubs, returns null. iOS Phase 4 (native Swift MethodChannel) is future work.
+- Channel: `com.audioura.app/attestation`, Method: `getAssertion`, Args: `{'nonce': String}`
 
 #### tour_player_screen.dart (CRLF)
 - `addJavaScriptHandler('openMap')` in `onWebViewCreated` — **A#76**
 - `initialSettings: InAppWebViewSettings(...)` — v6 API ✅
 
 #### news_player_screen.dart (CRLF)
-- `_getIndexUrl()` heals stale container paths. `FutureBuilder<String>` wraps WebView body. v6 API ✅
+- `_getIndexUrl()` heals stale container paths. `FutureBuilder<String>`. v6 API ✅
 
 #### tour_map_screen.dart (CRLF)
 - `focusStopIndex` (int?, 1-based). `_applyCoordJitter()`. Single-POI guard.
@@ -180,26 +196,19 @@ cd "/Volumes/USB DISK/Audioura/scripts"
 #### main_screen.dart (CRLF)
 - `_buildBody()` switch — never wrap in IndexedStack. `_listenTabVersion` key for Listen reload.
 
-#### home_screen.dart (LF — Python edits only)
-- Download + translation logic.
-
-#### lib/config/endpoints.dart
-- `Endpoints.base(Service)` — returns local `http://ip:port` or cloud URL per `server_mode`
-- `Endpoints.url(Service, path)` — full URI
-- `Endpoints.apiHeaders(Service)` — `Content-Type` always; adds `X-API-Key` in cloud mode from `gateway_api_key` pref
-
 ---
 
 ### 📋 **OPEN ITEMS**
-1. **A#81** ⚠️ READY TO BUILD — v2.1.1+7. Consolidated. See Immediate Next Steps.
-2. **API Key field removal** — About screen manual API Key input is temporary. Future assignment: remove field, embed/auto-supply key. Customers must never see it.
-3. **Dialog auto-dismiss** — `_startVoiceSearch()` dialog doesn't auto-close on 10s timeout. `onStatus` not wired. Never implemented, not a regression. Deferred.
-4. **ISSUE-SERVICES-NEWSLETTER** — `get_articles_by_newsletter_id` returns only 2 of 5 articles. Awaiting Kiro. Not iOS.
-5. **ISSUE-061** — Translated tours → 404. Awaiting Services fix.
-6. **NF4 (LOW)** — `openMap` handler bare-int widening.
-7. **NF5 (LOW)** — `Colors.blue.withOpacity(0.6)` → `.withValues(alpha: 0.6)`.
-8. **OSM tiles** — swap to Stadia Maps or Mapbox before App Store.
-9. **Dead files** — delete `audio_handler.dart`, `map_page.dart`, `subscription_management_screen.dart`.
+1. **A#82** ⚠️ READY TO BUILD — v2.1.1+8. See Immediate Next Steps.
+2. **App Attestation Phase 4** — iOS native Swift MethodChannel (`com.audioura.app/attestation`). Blocked on Android Phase 3 (Play Integrity) validation first. Future assignment — Windows Q will need to edit `ios/` Swift files.
+3. **API Key field removal** — About screen manual API Key input is temporary. Future: embed/auto-supply key.
+4. **Dialog auto-dismiss** — `_startVoiceSearch()` dialog doesn't auto-close on 10s timeout. `onStatus` not wired. Deferred.
+5. **ISSUE-SERVICES-NEWSLETTER** — `get_articles_by_newsletter_id` returns only 2 of 5 articles. Awaiting Kiro.
+6. **ISSUE-061** — Translated tours → 404. Awaiting Services fix.
+7. **NF4 (LOW)** — `openMap` handler bare-int widening.
+8. **NF5 (LOW)** — `Colors.blue.withOpacity(0.6)` → `.withValues(alpha: 0.6)`.
+9. **OSM tiles** — swap to Stadia Maps or Mapbox before App Store.
+10. **Dead files** — delete `audio_handler.dart`, `map_page.dart`, `subscription_management_screen.dart`.
 
 ---
 
@@ -207,16 +216,17 @@ cd "/Volumes/USB DISK/Audioura/scripts"
 - **Version numbering**: iOS and Android share `pubspec.yaml`. Mobile Kiro owns version bumps. iOS Q never bumps independently.
 - **Parity rule**: Both platforms always build the same commit on `services-migration`. No iOS-specific Dart forks.
 - **iOS-only files**: `ios/Runner/Info.plist`, `ios/Runner.xcodeproj/`, `ios/Podfile` — Windows Q may edit these. Everything in `lib/` is shared.
-- **API Key (temporary)**: `Endpoints.apiHeaders()` reads `gateway_api_key` from SharedPreferences and sends as `X-API-Key` in cloud mode only. About screen has a manual entry field. Field will be removed once key is embedded.
+- **API Key (temporary)**: `Endpoints.apiHeaders()` reads `gateway_api_key` from SharedPreferences and sends as `X-API-Key` in cloud mode only. Field will be removed once key is embedded.
 - **LF files**: `home_screen.dart`, `tour_generator_screen.dart`, `my_tours_screen.dart` — `fsReplace` FAILS. Python only.
-- **CRLF files**: `tour_map_screen.dart`, `tour_player_screen.dart`, `main_screen.dart`, `news_player_screen.dart` — `fsReplace` works.
+- **CRLF files**: `tour_map_screen.dart`, `tour_player_screen.dart`, `main_screen.dart`, `news_player_screen.dart`, `about_screen.dart` — `fsReplace` works.
 - **Python stdout**: always empty in `executeBash`. Write to `D:\Audioura\results\<name>.txt`, read with `type`.
 - **InAppWebView**: v6 API only — `initialSettings: InAppWebViewSettings(...)`. v5 `initialOptions` BANNED.
 - **ATS**: Flutter `package:http` bypasses iOS ATS. Local HTTP works without plist entry. Cloud is HTTPS.
 - **pod install**: always run after `git pull` on Mac Mini before building.
 - **DebugLogHelper**: in `lib/screens/debug_log_viewer_screen.dart`.
 - **unawaited()**: requires `import 'dart:async'`.
-- **`_pollTimer` is GONE**: removed in v2.1.1+6. Any reference to it is a compile error. Do not reintroduce.
+- **`_pollTimer` is GONE**: removed in v2.1.1+6. Any reference = compile error. Do not reintroduce.
+- **App Attestation stubs**: `AppAttestationService` returns null — Phase 4 iOS native work is pending. Do not attempt to implement Swift side until Android Phase 3 is validated.
 
 ---
 
@@ -240,20 +250,22 @@ cd ios && pod deintegrate && pod install
 | File | Purpose |
 |------|---------|
 | `lib/screens/home_screen.dart` | Download + translation. LF. |
-| `lib/screens/my_tours_screen.dart` | Tours/news list. LF. A#77b + A#78 fixed. |
+| `lib/screens/my_tours_screen.dart` | Tours/news list. LF. A#77b + A#78. v2.1.1+8: translate icon. |
 | `lib/screens/tour_generator_screen.dart` | Tour generation + poll loop. LF. v2.1.1+6/+7 poll rewrite. |
-| `lib/screens/about_screen.dart` | Local/Cloud toggle + API Key field (temporary). |
+| `lib/screens/about_screen.dart` | Local/Cloud toggle + API Key + Danger Zone delete. CRLF. |
 | `lib/screens/main_screen.dart` | Tab navigation. CRLF. |
 | `lib/screens/tour_player_screen.dart` | `openMap` JS handler. CRLF. |
 | `lib/screens/news_player_screen.dart` | Path healing + FutureBuilder. CRLF. |
 | `lib/screens/tour_map_screen.dart` | Map screen. Jitter + single-POI guard. CRLF. |
 | `lib/screens/debug_log_viewer_screen.dart` | `DebugLogHelper` class. |
-| `lib/config/endpoints.dart` | `Endpoints` resolver — base URL + apiHeaders with X-API-Key. |
+| `lib/config/endpoints.dart` | `Endpoints` resolver — base URL + apiHeaders + newsDownloadUrl. |
 | `lib/services/tour_status_service.dart` | Tour status REST via Endpoints. |
 | `lib/services/translation_service.dart` | Translation via Endpoints (cloud-ready). |
+| `lib/services/tour_translation_helper.dart` | NEW v2.1.1+8 — Listen-page translation logic. |
+| `lib/services/app_attestation_service.dart` | NEW v2.1.1+8 — Attestation stubs (null). |
 | `lib/config.dart` | `Config.defaultServerIp = '192.168.0.218'` |
 | `ios/Runner/Info.plist` | iOS permissions + `NSLocalNetworkUsageDescription`. |
-| `usb/Audioura/assignments/mac_mini_assignments.md` | Mac Mini task queue. A#81 at top. |
+| `usb/Audioura/assignments/mac_mini_assignments.md` | Mac Mini task queue. A#82 at top. |
 | `git_source_control_for_q.md` | Git rules — READ before any git operation. |
 
 ---
@@ -267,5 +279,5 @@ cd ios && pod deintegrate && pod install
 
 ---
 
-**Last Updated**: 2026-06-08 — v108.0. pubspec at `2.1.1+7` (commit `e7c3ade`). iPhone on v1.2.9+71. A#81 consolidated assignment written — takes iPhone directly from v1.2.9+71 to v2.1.1+7 in one build. Mobile Kiro replaces Android Q. No iOS-specific Dart changes needed.
-**iOS Amazon-Q Version**: 108.0
+**Last Updated**: 2026-06-12 — v109.0. pubspec at `2.1.1+8` (HEAD `37dcc49`). iPhone on v1.2.9+71. A#82 consolidated assignment written — takes iPhone directly from v1.2.9+71 to v2.1.1+8 in one build. 4 new features: Account Deletion, Existing-Tour Translation, App Attestation stubs, News Cloud Paths.
+**iOS Amazon-Q Version**: 109.0
