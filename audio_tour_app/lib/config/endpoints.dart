@@ -6,8 +6,11 @@ enum Service {
   orchestrator,    // :5002
   userDb,          // :5003
   mapDelivery,     // :5005
+  treats,          // :5007
+  voice,           // :5008
   news,            // :5012
   newsletter,      // :5017
+  tourEditing,     // :5022
   customAudio,     // :5023
   tourIdResolution,// :5025
   translation,     // :5030
@@ -18,8 +21,11 @@ class Endpoints {
     Service.orchestrator: 5002,
     Service.userDb: 5003,
     Service.mapDelivery: 5005,
+    Service.treats: 5007,
+    Service.voice: 5008,
     Service.news: 5012,
     Service.newsletter: 5017,
+    Service.tourEditing: 5022,
     Service.customAudio: 5023,
     Service.tourIdResolution: 5025,
     Service.translation: 5030,
@@ -31,8 +37,11 @@ class Endpoints {
     Service.orchestrator: '/orchestrator',
     Service.userDb: '/user',
     Service.mapDelivery: '/map-delivery',
+    Service.treats: '/treats',
+    Service.voice: '/voice',
     Service.news: '/news',
     Service.newsletter: '/newsletter',
+    Service.tourEditing: '/tour-editing',
     Service.customAudio: '/custom-audio',
     Service.tourIdResolution: '/tour-id',
     Service.translation: '/translation',

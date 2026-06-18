@@ -438,8 +438,8 @@ class _MyToursScreenState extends State<MyToursScreen> {
     try {
       final stopwatch = Stopwatch()..start();
       final response = await http.post(
-        Uri.parse('http://192.168.0.217:5008/parse_voice_search'),
-        headers: {'Content-Type': 'application/json'},
+        await Endpoints.url(Service.voice, '/parse_voice_search'),
+        headers: await Endpoints.apiHeaders(Service.voice),
         body: json.encode({'voice_command': voiceCommand}),
       ).timeout(Duration(seconds: 3));
       

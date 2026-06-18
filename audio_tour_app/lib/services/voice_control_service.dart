@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../config/endpoints.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import '../screens/debug_log_viewer_screen.dart';
 
@@ -194,15 +195,14 @@ class VoiceControlService {
   Future<void> processVoiceCommand(String voiceText) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
       
       // Get current tour state (you'll need to pass this from the audio player)
       final currentStop = prefs.getInt('current_stop') ?? 0;
       final totalStops = prefs.getInt('total_stops') ?? 10;
 
       final response = await http.post(
-        Uri.parse('http://$serverIp:5008/process-voice-command'),
-        headers: {'Content-Type': 'application/json'},
+        await Endpoints.url(Service.voice, '/process-voice-command'),
+        headers: await Endpoints.apiHeaders(Service.voice),
         body: json.encode({
           'text': voiceText,
           'current_stop': currentStop,

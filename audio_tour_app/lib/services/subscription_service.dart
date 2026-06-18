@@ -5,6 +5,7 @@ import 'subscription_encryption_service.dart';
 // import 'credential_storage_service.dart';  // TEMPORARILY DISABLED - CAUSING ENCRYPTION CONFLICT
 // import 'subscription_article_storage.dart';  // TEMPORARILY DISABLED - CAUSING ENCRYPTION CONFLICT
 import '../screens/debug_log_viewer_screen.dart';
+import '../config/endpoints.dart';
 
 class CredentialResponse {
   final String status;
@@ -96,8 +97,7 @@ class SubscriptionService {
       }
       
       final prefs = await SharedPreferences.getInstance();
-      final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
-      final url = 'http://$serverIp:5017/submit_credentials';
+      final url = (await Endpoints.url(Service.newsletter, '/submit_credentials')).toString();
       
       final requestBody = <String, dynamic>{
         'article_id': articleId,
@@ -173,9 +173,7 @@ class SubscriptionService {
   /// Submit client public key to server for key exchange
   static Future<String?> submitPublicKey(String clientPublicKey, String deviceId) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
-      final url = 'http://$serverIp:5017/key_exchange';
+      final url = (await Endpoints.url(Service.newsletter, '/key_exchange')).toString();
       
       final requestBody = {
         'device_id': deviceId,
@@ -186,7 +184,7 @@ class SubscriptionService {
       
       final response = await http.post(
         Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
+        headers: await Endpoints.apiHeaders(Service.newsletter),
         body: json.encode(requestBody),
       ).timeout(Duration(seconds: 30));
       

@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
+import '../config/endpoints.dart';
 
 class TreatsScreen extends StatefulWidget {
   const TreatsScreen({super.key});
@@ -50,11 +51,9 @@ class _TreatsScreenState extends State<TreatsScreen> {
         searchLng = _userPosition!.longitude;
       }
       
-      final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
-      
       final response = await http.get(
-        Uri.parse('http://$serverIp:5007/treats-near/$searchLat/$searchLng'),
-        headers: {'Content-Type': 'application/json'},
+        await Endpoints.url(Service.treats, '/treats-near/$searchLat/$searchLng'),
+        headers: await Endpoints.apiHeaders(Service.treats),
       );
 
       if (response.statusCode == 200) {

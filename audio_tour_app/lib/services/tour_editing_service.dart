@@ -5,12 +5,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:archive/archive.dart';
 import '../screens/debug_log_viewer_screen.dart';
 import '../screens/edit_tour_screen.dart';
+import '../config/endpoints.dart';
 
 class TourEditingService {
   static Future<String> _getBaseUrl() async {
-    final prefs = await SharedPreferences.getInstance();
-    final serverIp = prefs.getString('server_ip') ?? '192.168.0.217';
-    return 'http://$serverIp:5022';
+    return await Endpoints.base(Service.tourEditing);
   }
   
   static Future<Map<String, dynamic>> updateStop({
