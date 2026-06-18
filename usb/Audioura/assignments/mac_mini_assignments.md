@@ -1,38 +1,25 @@
 # Mac Mini Assignment Instructions
 ## iOS Development Task Execution
 
-# T: 06/2026 - A#82 — Build v2.1.1+8 on iPhone (Major Feature Release — First build since v1.2.9+71)
+# T: 06/2026 - A#83 — Build v2.1.1+9 on iPhone (Cloud Hotfix — auth_required + news URLs)
 
-**Goal:** Build v2.1.1+8 on iPhone. This is a **consolidated parity build** — iPhone has never been built past v1.2.9+71. This single assignment brings the iPhone all the way to v2.1.1+8, which includes all changes from v2.1.1+3 through +8.
+**Goal:** Build v2.1.1+9 on iPhone. This is a **hotfix** on top of v2.1.1+8. A#82 smoke testing found two cloud-mode failures (Tests 8 and 9). All 10 other tests passed — local mode, UI features, and regressions are fine. This build fixes both cloud failures and re-runs only the failed tests plus local regressions.
 
-**What this build delivers over v1.2.9+71:**
+**What changed since v2.1.1+8 (3 commits):**
 
-*Dual-Environment Networking (v2.1.1+3):*
-- `Endpoints` resolver — all service calls route through a single resolver per active mode
-- `Endpoints.apiHeaders()` sends `X-API-Key` in cloud mode
-- `TranslationService` cloud migration, dead files removed
-- About screen: Local/Cloud toggle + cloud URL field + API Key field
+| Commit | Fix |
+|--------|-----|
+| `2836d7b` | `user_id` added to tour generation body (both foreground + background) — fixes 401 `auth_required` in cloud. `Endpoints.url()` replaces 4 hardcoded news/newsletter local URLs. `newsStatusUrl()` added to `endpoints.dart`. |
+| `ea9fd95` | pubspec bumped to `2.1.1+9` |
+| `f72ee23` | Compile fix — `userId` not in scope in `_downloadAndSaveNews`, reads from prefs |
 
-*Poll Hardening (v2.1.1+6/+7):*
-- `Timer.periodic` → `Future.delayed` self-scheduling poll loop — no stuck timers
-- `_pollTimer` field removed entirely
-- `if (_isGenerating) return;` re-entry guard — double-tap Generate starts only one generation
-- `unawaited(pollLoop().catchError(...))` — spinner can't stick on crash
-- `translation_failed` orange snackbar
-
-*New in v2.1.1+8 — 4 Features:*
-- **Account Deletion UI** — Red "Delete My Account" in About → Danger Zone section. Two-step confirmation. Server-first DELETE call. On success: wipes local tours + news + SharedPreferences. iOS behavior: pops to root.
-- **Existing-Tour Translation** — Purple translate icon on non-translated tours in Listen page. Language selection dialog (10 languages). Calls `TranslationService.translateTour()`.
-- **App Attestation (stubs)** — `AppAttestationService` returns null (Phase 3/4 not yet implemented). `apiHeaders()` extended with optional `requestBody` param → `X-App-Attestation` header stub. iOS native Swift work (Phase 4) is a separate future assignment.
-- **News Cloud Paths** — All 5 news/newsletter HTTP calls use `Endpoints.apiHeaders()`. `Endpoints.newsDownloadUrl()` routes `/news-download/<id>` in cloud, `/download/<id>` in local.
-
-**Target commit:** `37dcc49`  **Version:** `2.1.1+8`  **Branch:** `services-migration`
-**No pubspec bump needed** — Mobile Kiro already at `2.1.1+8`.
-**No iOS-specific changes needed** — `Info.plist` already has `NSLocalNetworkUsageDescription`.
+**Target commit:** `f72ee23`  **Version:** `2.1.1+9`  **Branch:** `services-migration`
+**No pubspec bump needed** — Mobile Kiro already at `2.1.1+9`.
+**No iOS-specific changes** — no `Info.plist`, no pods added.
 
 **Roles:**
 - **[SIR MICHAEL]** — orchestrator. Switches KVM, runs smoke test, syncs Windows afterward.
-- **[MAC MINI Q]** — pulls latest, verifies signing, runs `pod install`, builds, installs. No pubspec bump.
+- **[MAC MINI Q]** — pulls latest, runs `pod install`, builds, installs. No pubspec bump.
 
 ---
 
@@ -41,7 +28,7 @@
 ## Step 1 — [SIR MICHAEL on Mac Mini] Launch Q
 
 Paste:
-> Read `@/Volumes/USB DISK/Audioura/assignments/mac_mini_assignments.md` and execute the A#82 assignment at the top. Follow STOP conditions; skip steps labelled `[SIR MICHAEL]`.
+> Read `@/Volumes/USB DISK/Audioura/assignments/mac_mini_assignments.md` and execute the A#83 assignment at the top. Follow STOP conditions; skip steps labelled `[SIR MICHAEL]`.
 
 ## Step 2 — [MAC MINI Q] Pull latest
 
@@ -50,7 +37,7 @@ cd ~/Development/Audioura-build
 git pull origin services-migration
 ```
 
-**Expected:** fast-forward to commit `37dcc49` or later.
+**Expected:** fast-forward to commit `f72ee23` or later.
 
 If pull fails with "local changes would be overwritten" — STOP and report. Do not `git reset --hard`.
 
@@ -59,43 +46,30 @@ If pull fails with "local changes would be overwritten" — STOP and report. Do 
 ```bash
 cd ~/Development/Audioura-build/development/audio_tour_app
 
-# 3a — pubspec at 2.1.1+8
+# 3a — pubspec at 2.1.1+9
 grep "^version:" pubspec.yaml
-# Expected: version: 2.1.1+8
+# Expected: version: 2.1.1+9
 
-# 3b — NSLocalNetworkUsageDescription present
-grep -n "NSLocalNetworkUsageDescription" ios/Runner/Info.plist
-# Expected: 1 match
+# 3b — user_id included in tour generation (cloud auth fix)
+grep -n "user_id" lib/screens/tour_generator_screen.dart | head -10
+# Expected: at least 2 matches in tourData map (foreground + background generation)
 
-# 3c — Account deletion button present in about_screen
-grep -n "Delete My Account\|delete-account\|deleteAccount\|Danger Zone" lib/screens/about_screen.dart | head -5
-# Expected: matches for deletion UI
-
-# 3d — TourTranslationHelper exists (Existing-Tour Translation feature)
-ls lib/services/tour_translation_helper.dart 2>/dev/null && echo FOUND || echo MISSING
-# Expected: FOUND
-
-# 3e — AppAttestationService exists
-ls lib/services/app_attestation_service.dart 2>/dev/null && echo FOUND || echo MISSING
-# Expected: FOUND
-
-# 3f — _pollTimer is GONE (removed in v2.1.1+6 — any match = compile error)
-grep -n "_pollTimer" lib/screens/tour_generator_screen.dart
-# Expected: zero matches
-
-# 3g — newsDownloadUrl present in endpoints.dart
-grep -n "newsDownloadUrl\|news-download" lib/config/endpoints.dart
+# 3c — newsStatusUrl helper exists in endpoints.dart
+grep -n "newsStatusUrl\|news-status" lib/config/endpoints.dart
 # Expected: at least 1 match
 
-# 3h — signing intact
+# 3d — hardcoded 5012/5017 URLs are GONE from tour_generator_screen
+grep -n "5012\|5017" lib/screens/tour_generator_screen.dart
+# Expected: zero matches (all replaced with Endpoints.url())
+
+# 3e — signing intact
 grep -E 'PRODUCT_BUNDLE_IDENTIFIER|DEVELOPMENT_TEAM' \
   ios/Runner.xcodeproj/project.pbxproj | sort -u
 # Expected: com.glikfamily.audioura and 4HGRU6TKGQ
 ```
 
-If 3a fails — STOP, wrong commit pulled.
-If 3f shows any `_pollTimer` match — STOP, will fail to compile.
-If 3d or 3e shows MISSING — STOP, new service files not pulled.
+If 3a fails — STOP, wrong commit.
+If 3d shows any 5012 or 5017 matches — STOP, hardcoded URLs still present, cloud news will fail.
 
 ## Step 4 — [MAC MINI Q] pod install
 
@@ -123,73 +97,43 @@ open ~/Development/Audioura-build/development/audio_tour_app/ios/Runner.xcworksp
 ```
 Runner → Signing & Capabilities → Automatically manage signing ✅ → Team: Mikhail Glik (4HGRU6TKGQ) → Bundle ID: `com.glikfamily.audioura` → Quit Xcode → re-run Step 5.
 
-If build FAILS with compile error mentioning `_pollTimer` — STOP immediately, report to iOS Q.
-If `flutter analyze` shows errors in `audio_handler.dart`, `map_page.dart`, `subscription_management_screen.dart`, or `widget_test.dart` — these are known dead files, non-blocking, proceed.
-
 ## Step 6 — [SIR MICHAEL] Smoke test on iPhone ⚠️ STOP HERE FOR Q
 
-### Core functionality (5 tests)
+⚠️ **Have the cloud URL (`https://api.audioura.com`) and API Key ready before starting Tests 1 and 2.**
 
-**Test 1 — App launches:**
-- Launch app. No crash. Home tab loads.
+### Previously-failed cloud tests (primary focus)
 
-**Test 2 — Local WiFi tour generation:**
-1. On WiFi → generate a new English tour.
-2. **Expected:** Spinner polls, status updates. Tour opens automatically when ready. No stuck spinner.
-3. Tap Generate a second time immediately — **Expected:** only one generation starts (re-entry guard).
-
-**Test 3 — Tour playback:**
-1. Open a generated tour → audio plays in WebView.
-
-**Test 4 — POI map button:**
-1. In tour player → tap POI map icon.
-2. **Expected:** TourMapScreen opens.
-
-**Test 5 — News/Audio mode:**
-1. Switch to Audio mode (About tab).
-2. Newsletter list loads. Download an article. Playback works.
-
-### New features (4 tests)
-
-**Test 6 — Account Deletion UI:**
-1. About tab → scroll down → find **Danger Zone** section → "Delete My Account" red button.
-2. Tap it → confirmation dialog appears.
-3. Tap **Cancel** — dialog dismisses, nothing deleted.
-4. ⚠️ Do NOT confirm deletion unless using a throwaway account.
-
-**Test 7 — Existing-tour Translation:**
-1. Listen page → find a non-translated tour.
-2. **Expected:** Purple translate icon visible on that tour row.
-3. Tap it → language selection dialog appears with 10 language options.
-4. Select a language → translated tour starts processing → eventually appears in Listen.
-5. Mark NOT_TESTED if no suitable tour available — not a blocker.
-
-**Test 8 — Cloud mode tour generation:**
+**Test 1 — Cloud tour generation (was Test 8 in A#82 — previously FAILED):**
 1. About tab → switch to **Cloud** → enter URL `https://api.audioura.com` + API Key → Save both.
 2. Leave gateway path routing checkbox **unchecked**.
-3. Generate a tour in Cloud mode.
-4. **Expected:** Tour generates via cloud, opens automatically.
+3. Generate a new English tour.
+4. **Expected:** Generation succeeds. No 401 `auth_required` error. Spinner polls, tour opens automatically.
+5. Check debug log — should NOT contain `auth_required`. Should show `200` on generation POST.
 
-**Test 9 — Cloud news download:**
-1. In Cloud mode → Audio mode → process newsletter → download an article.
-2. **Expected:** Article downloads via cloud path, playback works.
-3. Mark NOT_TESTED if cloud news service not deployed — not a blocker.
+**Test 2 — Cloud news (was Test 9 in A#82 — previously FAILED):**
+1. Still in Cloud mode → switch to **Audio mode**.
+2. Process newsletter OR generate a news article.
+3. **Expected:** News/newsletter request hits `api.audioura.com` (not `192.168.0.218`). Article generates/downloads. Playback works.
+4. Check debug log — should show cloud URLs (`api.audioura.com`), not local IP.
 
-### Regressions (3 tests)
+### Local mode regressions
 
-**Test 10 — Mic regression (A#78):**
-1. Audio mode → Listen tab → tap microphone icon.
-2. **Expected:** Listening dialog opens. No "Microphone permission required" snackbar.
+**Test 3 — Local WiFi tour generation:**
+1. About tab → switch back to **Local WiFi**.
+2. Generate a new tour on WiFi.
+3. **Expected:** Tour generates normally. No regression from URL changes.
 
-**Test 11 — Refresh regression (A#77b):**
-1. Listen tab → tap Refresh.
-2. **Expected:** List reloads in place. No black screen.
+**Test 4 — Local news/newsletter:**
+1. In Local WiFi mode → Audio mode → process newsletter or generate news.
+2. **Expected:** News hits `192.168.0.218:5012/5017` as before. No regression.
 
-**Test 12 — Double-tap generation:**
-1. Tap Generate twice rapidly.
-2. **Expected:** Only one generation starts.
+### Spot regression checks
 
-Tell Q "Smoke test passes, proceed to Step 7" when done. Report each test result including NOT_TESTED where applicable.
+**Test 5 — Mic (A#78):** Tap mic icon → listening dialog, no permission snackbar.
+**Test 6 — Refresh (A#77b):** Listen page Refresh → no black screen.
+**Test 7 — Account Deletion UI:** About → Danger Zone → Delete button visible → Cancel works.
+
+Tell Q "Smoke test passes, proceed to Step 7" when done. Report each test result.
 
 ## Step 7 — [MAC MINI Q] Verify git state — no commit needed
 
@@ -198,7 +142,7 @@ cd ~/Development/Audioura-build
 git status
 # Expected: nothing to commit (or only untracked files)
 git log --oneline -3
-# Confirm 37dcc49 or later is HEAD
+# Confirm f72ee23 or later is HEAD
 ```
 
 If `git status` shows modified tracked files — STOP and report before committing anything.
@@ -206,29 +150,24 @@ If `git status` shows modified tracked files — STOP and report before committi
 ## Step 8 — [MAC MINI Q] Copy results and eject
 
 ```bash
-echo "A#82 Results:" > ~/Desktop/a82_results.txt
-echo "Date: $(date)" >> ~/Desktop/a82_results.txt
-echo "Build: [SUCCESS/FAILED]" >> ~/Desktop/a82_results.txt
-echo "Test 1  App launches: [YES/NO]" >> ~/Desktop/a82_results.txt
-echo "Test 2  Local WiFi generation + re-entry guard: [YES/NO]" >> ~/Desktop/a82_results.txt
-echo "Test 3  Tour playback: [YES/NO]" >> ~/Desktop/a82_results.txt
-echo "Test 4  POI map button: [YES/NO]" >> ~/Desktop/a82_results.txt
-echo "Test 5  News/Audio mode: [YES/NO]" >> ~/Desktop/a82_results.txt
-echo "Test 6  Account Deletion UI: [YES/NO]" >> ~/Desktop/a82_results.txt
-echo "Test 7  Existing-tour Translation: [YES/NO/NOT_TESTED]" >> ~/Desktop/a82_results.txt
-echo "Test 8  Cloud mode generation: [YES/NO/NOT_TESTED]" >> ~/Desktop/a82_results.txt
-echo "Test 9  Cloud news download: [YES/NO/NOT_TESTED]" >> ~/Desktop/a82_results.txt
-echo "Test 10 Mic regression: [YES/NO]" >> ~/Desktop/a82_results.txt
-echo "Test 11 Refresh regression: [YES/NO]" >> ~/Desktop/a82_results.txt
-echo "Test 12 Double-tap guard: [YES/NO]" >> ~/Desktop/a82_results.txt
-echo "Overall: [SUCCESS/PARTIAL/FAILED]" >> ~/Desktop/a82_results.txt
-cp ~/Desktop/a82_results.txt "/Volumes/USB DISK/Audioura/results/"
+echo "A#83 Results:" > ~/Desktop/a83_results.txt
+echo "Date: $(date)" >> ~/Desktop/a83_results.txt
+echo "Build: [SUCCESS/FAILED]" >> ~/Desktop/a83_results.txt
+echo "Test 1  Cloud tour generation (no 401): [YES/NO]" >> ~/Desktop/a83_results.txt
+echo "Test 2  Cloud news/newsletter: [YES/NO/NOT_TESTED]" >> ~/Desktop/a83_results.txt
+echo "Test 3  Local WiFi tour generation: [YES/NO]" >> ~/Desktop/a83_results.txt
+echo "Test 4  Local news/newsletter: [YES/NO]" >> ~/Desktop/a83_results.txt
+echo "Test 5  Mic regression: [YES/NO]" >> ~/Desktop/a83_results.txt
+echo "Test 6  Refresh regression: [YES/NO]" >> ~/Desktop/a83_results.txt
+echo "Test 7  Account Deletion UI present: [YES/NO]" >> ~/Desktop/a83_results.txt
+echo "Overall: [SUCCESS/PARTIAL/FAILED]" >> ~/Desktop/a83_results.txt
+cp ~/Desktop/a83_results.txt "/Volumes/USB DISK/Audioura/results/"
 diskutil eject "/Volumes/USB DISK"
 ```
 
 ## Step 9 — [MAC MINI Q] Report Results
 
-> "Assignment 82 complete. Build: [SUCCESS/FAILED]. Core (Tests 1-5): [ALL_PASS/ISSUES]. Account Deletion UI (T6): [YES/NO]. Translation icon (T7): [YES/NO/NOT_TESTED]. Cloud generation (T8): [YES/NO/NOT_TESTED]. Cloud news (T9): [YES/NO/NOT_TESTED]. Mic regression (T10): [YES/NO]. Refresh regression (T11): [YES/NO]. Double-tap guard (T12): [YES/NO]. Overall: [SUCCESS/PARTIAL/FAILED]."
+> "Assignment 83 complete. Build: [SUCCESS/FAILED]. Cloud generation no 401 (T1): [YES/NO]. Cloud news (T2): [YES/NO/NOT_TESTED]. Local generation (T3): [YES/NO]. Local news (T4): [YES/NO]. Mic regression (T5): [YES/NO]. Refresh regression (T6): [YES/NO]. Delete UI (T7): [YES/NO]. Overall: [SUCCESS/PARTIAL/FAILED]."
 
 ## Step 10 — [SIR MICHAEL, back on Windows] Sync
 
@@ -236,12 +175,17 @@ diskutil eject "/Volumes/USB DISK"
 cd C:\Users\micha\eclipse-workspace\AudioTours\development
 git pull origin services-migration
 ```
-Verify `audio_tour_app\pubspec.yaml` shows `version: 2.1.1+8`.
+Verify `audio_tour_app\pubspec.yaml` shows `version: 2.1.1+9`.
 
 ---
 
-# T: 06/2026 - A#81 — Build v2.1.1+7 — SUPERSEDED by A#82
-**Status**: ⏭️ SUPERSEDED — never built. A#82 includes all v2.1.1+7 changes.
+# T: 06/2026 - A#82 — Build v2.1.1+8 — SUPERSEDED by A#83
+**Status**: ⏭️ SUPERSEDED — never built on iPhone. A#83 includes all v2.1.1+8 features plus cloud hotfix.
+
+---
+
+# T: 06/2026 - A#81 — Build v2.1.1+7 — SUPERSEDED by A#83
+**Status**: ⏭️ SUPERSEDED — never built. All changes included in A#83.
 
 ---
 
