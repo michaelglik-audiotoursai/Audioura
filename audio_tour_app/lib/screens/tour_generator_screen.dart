@@ -184,6 +184,10 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     try {
       Map<String, dynamic> tourData = _parseTourRequest(sanitizedInput);
       tourData['total_stops'] = stopCount; // Add custom stop count
+      // Include user_id — required by cloud gateway for auth
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id') ?? '';
+      if (userId.isNotEmpty) tourData['user_id'] = userId;
       
       // Step 1: Start tour generation
       final response = await http.post(
@@ -1340,6 +1344,10 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     try {
       Map<String, dynamic> tourData = _parseTourRequest(sanitizedInput);
       tourData['total_stops'] = stopCount; // Add custom stop count
+      // Include user_id — required by cloud gateway for auth
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id') ?? '';
+      if (userId.isNotEmpty) tourData['user_id'] = userId;
       
       // Print debug info
       await DebugLogHelper.addDebugLog('BACKGROUND: Generating tour: ${tourData["location"]}');
@@ -1661,8 +1669,8 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         }
         
         final response = await http.post(
-          Uri.parse('http://$serverIp:5012/generate-news'),
-          headers: {'Content-Type': 'application/json'},
+          await Endpoints.url(Service.news, '/generate-news'),
+          headers: await Endpoints.apiHeaders(Service.news),
           body: jsonEncode(requestBody),
         );
 
@@ -1698,7 +1706,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       try {
         // Check if news is ready
         final statusResponse = await http.get(
-          Uri.parse('http://$serverIp:5012/status/$articleId'),
+          await Endpoints.newsStatusUrl(articleId),
         );
         
         if (statusResponse.statusCode == 200) {
@@ -1750,7 +1758,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         _progress = 'Downloading article...';
       });
       
-      await DebugLogHelper.addDebugLog('NEWS: Starting download for article $articleId from $serverIp:5012');
+      await DebugLogHelper.addDebugLog('NEWS: Starting download for article $articleId');
       
       // Download for each selected language
       final languagesToDownload = languages ?? ['en'];
@@ -1762,15 +1770,18 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       for (final language in languagesToDownload) {
         await DebugLogHelper.addDebugLog('NEWS: Downloading article $articleId in language: $language');
         
-        String downloadUrl = 'http://$serverIp:5012/download/$articleId';
+        // Use Endpoints.newsDownloadUrl which handles cloud (/news-download) vs local (/download)
+        var downloadUri = await Endpoints.newsDownloadUrl(articleId, userId);
         if (language != 'en') {
-          downloadUrl += '?language=$language';
+          final params = Map<String, String>.from(downloadUri.queryParameters);
+          params['language'] = language;
+          downloadUri = downloadUri.replace(queryParameters: params);
           await DebugLogHelper.addDebugLog('NEWS: Adding language parameter: $language');
         }
         
-        await DebugLogHelper.addDebugLog('NEWS: Download URL: $downloadUrl');
+        await DebugLogHelper.addDebugLog('NEWS: Download URL: $downloadUri');
         
-        final response = await http.get(Uri.parse(downloadUrl));
+        final response = await http.get(downloadUri, headers: await Endpoints.apiHeaders(Service.news));
         
         await DebugLogHelper.addDebugLog('NEWS: Download response status for $language: ${response.statusCode}');
         await DebugLogHelper.addDebugLog('NEWS: Download response size for $language: ${response.bodyBytes.length} bytes');
@@ -2067,8 +2078,8 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         
         try {
           final response = await http.post(
-            Uri.parse('http://$serverIp:5017/process_newsletter'),
-            headers: {'Content-Type': 'application/json'},
+            await Endpoints.url(Service.newsletter, '/process_newsletter'),
+            headers: await Endpoints.apiHeaders(Service.newsletter),
             body: jsonEncode({
               'newsletter_url': url,
               'user_id': userId,

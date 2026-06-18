@@ -72,6 +72,16 @@ class Endpoints {
     return Uri.parse('$baseUrl$path').replace(queryParameters: {'user_id': userId});
   }
 
+  /// Returns the correct news status polling URI.
+  /// Local: /status/<id>, Cloud: /news-status/<id>
+  static Future<Uri> newsStatusUrl(String articleId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final mode = prefs.getString('server_mode') ?? 'local';
+    final baseUrl = await base(Service.news);
+    final path = mode == 'cloud' ? '/news-status/$articleId' : '/status/$articleId';
+    return Uri.parse('$baseUrl$path');
+  }
+
   /// Returns HTTP headers for [s]. In cloud mode, adds X-API-Key for
   /// cost-bearing/write endpoints (orchestrator, translation).
   /// Local mode: Content-Type only (LAN services don't require a key).
