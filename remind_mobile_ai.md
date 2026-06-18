@@ -12,7 +12,7 @@
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 When chat history is compacted, user will ask you to read `remind_ai.md` and `remind_mobile_ai.md`.
 **Your Response**:
-"📱🔧 MOBILE KIRO - I've read both files. Current version on branch is v2.1.1+8 (launch gating: account deletion, translate-existing, attestation stubs, news cloud paths). Head commit `580a3af`. Awaiting Claude review of news download path fix, then Ubuntu build. Ready to continue."
+"📱🔧 MOBILE KIRO - I've read both files. Current version on branch is v2.1.1+9 (cloud auth fix + news URL migration). Head commit `f72ee23`. Ubuntu build succeeded. iOS build assignment at `IOS_BUILD_v2.1.1.9_2026_06_17.md`. Ready to continue."
 
 ## 🚫 OWNERSHIP BOUNDARIES — CRITICAL
 - ✅ **MY files**: `remind_mobile_ai.md`, `code_review_v*.md`, files in `amazon-q-communications/`
@@ -22,32 +22,63 @@ When chat history is compacted, user will ask you to read `remind_ai.md` and `re
 
 ## CURRENT PROJECT STATUS
 **Project**: Audioura Android APK
-**Version on branch**: v2.1.1+8 ✅ committed on `services-migration` (head commit `580a3af`)
-**iPhone**: On v1.2.9+71 (iOS Q to build v2.1.1+8 — assignment in `amazon-q-communications/`)
-**Android**: ✅ v2.1.1+8 code committed — awaiting Claude review of news download path fix, then Ubuntu build
-**iOS Q current task**: Build v2.1.1+7 (now superseded by +8) — communication doc at `IOS_BUILD_v2.1.1.7_2026_06_08.md`
+**Version on branch**: v2.1.1+9 ✅ committed on `services-migration` (head commit `f72ee23`)
+**iPhone**: A#82 tested v2.1.1+8 — 10/12 pass, Tests 8+9 fixed in +9. iOS build assignment ready: `IOS_BUILD_v2.1.1.9_2026_06_17.md`
+**Android**: ✅ v2.1.1+9 built successfully on Ubuntu (compile error fixed in `f72ee23`)
+**iOS Q current task**: Build v2.1.1+9 — communication doc at `IOS_BUILD_v2.1.1.9_2026_06_17.md`
 **Branch**: `services-migration`
 **Android Application ID**: `com.audioura.app`
 **Server**: `192.168.0.218` (Docker services on Windows laptop)
 **Cloud**: `https://api.audioura.com` (gateway, API-key gated)
 
-## v2.1.1+8 LAUNCH GATING — CURRENT WORK (10 commits)
-**Head commit**: `580a3af`
-**Features shipped in v2.1.1+8:**
+## v2.1.1+9 — CURRENT VERSION (hotfix on top of v2.1.1+8)
+**Head commit**: `f72ee23`
+**What v2.1.1+9 fixes over v2.1.1+8:**
+1. **Cloud tour gen `auth_required`** — added `user_id` to tour generation request body (foreground + background). Gateway requires it for quota/entitlements check.
+2. **News/newsletter hardcoded URLs** — migrated ALL 4 remaining hardcoded `http://$serverIp:5012/...` and `:5017/...` calls in `tour_generator_screen.dart` to use `Endpoints.url()` + `Endpoints.apiHeaders()`. Added `Endpoints.newsStatusUrl()` helper (cloud: `/news-status/<id>`, local: `/status/<id>`).
+3. **Compile fix** — `userId` variable wasn't in scope in `_downloadAndSaveNews`, read from SharedPreferences.
+
+**Review doc**: `code_review_v2.1.1.9_cloud_fixes_2026_06_17.md`
+
+## v2.1.1+8 LAUNCH GATING (still in this version)
+**Features shipped in v2.1.1+8 (all still present in +9):**
 1. **Account Deletion UI** — red "Delete My Account" button in About, server-first deletion (`DELETE /delete-account/<secret_id>` on orchestrator), local data wipe, platform-guarded close (Android exits, iOS pops to root with restart message)
 2. **Existing-Tour Translation** — purple translate icon on non-translated tours in Listen page, language selection dialog, shared `TourTranslationHelper` service with `availableLanguages` constant and `isTranslation()` helper
 3. **App Attestation (Phases 1-2-5)** — `AppAttestationService` with stub token generation, `apiHeaders()` extended with optional `requestBody` param, `X-App-Attestation` header for protected services in cloud mode, nonce = SHA-256 of request body. Phase 3 (Play Integrity) and Phase 4 (App Attest) are stubs returning null.
-4. **News Cloud Paths** — all 5 news/newsletter HTTP calls use `Endpoints.apiHeaders()` for `X-API-Key` in cloud mode. News article download uses `Endpoints.newsDownloadUrl()` which routes to `/news-download/<id>` in cloud (gateway) vs `/download/<id>` in local. Proper `Uri` construction with query params.
+4. **News Cloud Paths** — all news/newsletter HTTP calls use `Endpoints.apiHeaders()` for `X-API-Key` in cloud mode. News article download uses `Endpoints.newsDownloadUrl()` which routes to `/news-download/<id>` in cloud (gateway) vs `/download/<id>` in local.
 5. **Poll hardening (from v2.1.1+7)** — re-entry guard in `_generateTourBackground`
 
-**Review docs for v2.1.1+8:**
+**Review docs for v2.1.1+8 and v2.1.1+9:**
 - `code_review_v2.1.1.8_launch_gating_2026_06_11.md` (initial, pre-fixes)
 - `code_review_v2.1.1.8_final_2026_06_11.md` (post all P0/P1/P2 fixes)
 - `code_review_v2.1.1.8_post_final_fixes_2026_06_11.md` (un-attest tour-status + iOS close)
 - `code_review_v2.1.1.8_news_cloud_paths_2026_06_12.md` (headers wiring)
 - `code_review_v2.1.1.8_news_download_path_fix_2026_06_12.md` (cloud path /news-download fix)
+- `code_review_v2.1.1.9_cloud_fixes_2026_06_17.md` (auth_required fix + news URL migration)
 
-**Key files changed:**
+**A#82 iPhone test results** (v2.1.1+8): `E:\Audioura\results\a82_results.txt`
+- Tests 1-7, 10-12: PASS
+- Test 8 (cloud tour gen): FAILED → fixed in v2.1.1+9 (user_id added)
+- Test 9 (cloud news): FAILED → fixed in v2.1.1+9 (URLs migrated to Endpoints)
+
+**Key files changed in v2.1.1+9:**
+- `lib/screens/tour_generator_screen.dart` — user_id in tourData, 4 hardcoded URLs migrated
+- `lib/config/endpoints.dart` — added `newsStatusUrl()` helper
+- `pubspec.yaml` — version bump to 2.1.1+9
+
+**Open items (not blocking current build):**
+- Q8 nonce encoding: settle with Kiro — gateway hashes raw body bytes (recommended)
+- Phase 3 (Play Integrity): next after v2.1.1+9 validated on device
+- Phase 4 (App Attest): iOS-AQ native Swift — hand channel contract after Phase 3
+- `TOUR_STATUS rows_affected=0`: investigate string-vs-int tour_id mismatch
+- `home_screen.dart` translation duplication: consolidate with helper in future version
+- E2E deletion: blocked on Kiro fixing server `/delete-account` (credential tables)
+- ClickUp integration: user wants to connect ClickUp task queue — needs MCP server config or manual task paste
+
+**iOS Amazon-Q communication docs (in `amazon-q-communications/audiotours/requirements/`):**
+- `IOS_BUILD_v2.1.1.7_2026_06_08.md` — superseded
+- `IOS_BUILD_v2.1.1.8_2026_06_12.md` — superseded
+- `IOS_BUILD_v2.1.1.9_2026_06_17.md` — CURRENT (fixes Tests 8+9)
 - `lib/screens/about_screen.dart` — account deletion + cloud mode text
 - `lib/screens/my_tours_screen.dart` — translate icon + dialog
 - `lib/screens/home_screen.dart` — news apiHeaders + newsDownloadUrl
