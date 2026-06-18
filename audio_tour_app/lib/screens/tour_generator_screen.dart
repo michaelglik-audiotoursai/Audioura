@@ -1766,12 +1766,14 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       Map<String, int> languageFileSizes = {};
       List<String> translationFailures = [];
       int successCount = 0;
+      final prefs = await SharedPreferences.getInstance();
+      final newsUserId = prefs.getString('user_id') ?? 'anonymous';
       
       for (final language in languagesToDownload) {
         await DebugLogHelper.addDebugLog('NEWS: Downloading article $articleId in language: $language');
         
         // Use Endpoints.newsDownloadUrl which handles cloud (/news-download) vs local (/download)
-        var downloadUri = await Endpoints.newsDownloadUrl(articleId, userId);
+        var downloadUri = await Endpoints.newsDownloadUrl(articleId, newsUserId);
         if (language != 'en') {
           final params = Map<String, String>.from(downloadUri.queryParameters);
           params['language'] = language;
