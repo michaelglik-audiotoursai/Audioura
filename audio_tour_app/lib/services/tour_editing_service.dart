@@ -9,6 +9,11 @@ import '../config/endpoints.dart';
 
 class TourEditingService {
   static Future<String> _getBaseUrl() async {
+    // Gate off in cloud mode — tour editing service not deployed to cloud yet
+    final prefs = await SharedPreferences.getInstance();
+    if ((prefs.getString('server_mode') ?? 'local') == 'cloud') {
+      throw Exception('Tour editing is only available on local WiFi mode.');
+    }
     return await Endpoints.base(Service.tourEditing);
   }
   

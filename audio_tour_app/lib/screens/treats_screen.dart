@@ -50,6 +50,16 @@ class _TreatsScreenState extends State<TreatsScreen> {
         searchLat = _userPosition!.latitude;
         searchLng = _userPosition!.longitude;
       }
+
+      // Gate off in cloud mode — treats service not deployed to cloud yet
+      final prefs = await SharedPreferences.getInstance();
+      if ((prefs.getString('server_mode') ?? 'local') == 'cloud') {
+        setState(() { _isLoading = false; });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Local Treats is only available on WiFi mode.'), backgroundColor: Colors.orange),
+        );
+        return;
+      }
       
       final response = await http.get(
         await Endpoints.url(Service.treats, '/treats-near/$searchLat/$searchLng'),

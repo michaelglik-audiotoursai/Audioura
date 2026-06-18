@@ -436,6 +436,13 @@ class _MyToursScreenState extends State<MyToursScreen> {
     await DebugLogHelper.addDebugLog('VOICE: Attempting AI conversion for "$voiceCommand"');
     
     try {
+      // Gate off in cloud mode — voice AI service not deployed to cloud yet
+      final prefs = await SharedPreferences.getInstance();
+      if ((prefs.getString('server_mode') ?? 'local') == 'cloud') {
+        await DebugLogHelper.addDebugLog('VOICE: AI voice search not available in cloud mode — using pattern fallback');
+        return voiceCommand; // Fall through to local pattern matching
+      }
+
       final stopwatch = Stopwatch()..start();
       final response = await http.post(
         await Endpoints.url(Service.voice, '/parse_voice_search'),

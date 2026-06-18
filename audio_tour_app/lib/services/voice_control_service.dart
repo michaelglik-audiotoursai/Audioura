@@ -195,6 +195,14 @@ class VoiceControlService {
   Future<void> processVoiceCommand(String voiceText) async {
     try {
       final prefs = await SharedPreferences.getInstance();
+
+      // Gate off server-side voice processing in cloud mode — not deployed yet.
+      // Voice commands are 100% on-device (speech-to-text → command parsing → execution).
+      // This server call is only for AI-enhanced parsing; fall through to local handling on cloud.
+      if ((prefs.getString('server_mode') ?? 'local') == 'cloud') {
+        await DebugLogHelper.addDebugLog('VOICE: Server-side voice processing not available in cloud mode — using local commands only');
+        return;
+      }
       
       // Get current tour state (you'll need to pass this from the audio player)
       final currentStop = prefs.getInt('current_stop') ?? 0;

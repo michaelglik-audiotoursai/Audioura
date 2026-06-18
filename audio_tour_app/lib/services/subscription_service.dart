@@ -96,7 +96,6 @@ class SubscriptionService {
         return null;
       }
       
-      final prefs = await SharedPreferences.getInstance();
       final url = (await Endpoints.url(Service.newsletter, '/submit_credentials')).toString();
       
       final requestBody = <String, dynamic>{
@@ -119,7 +118,7 @@ class SubscriptionService {
       
       final response = await http.post(
         Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
+        headers: await Endpoints.apiHeaders(Service.newsletter),
         body: json.encode(requestBody),
       ).timeout(Duration(seconds: 30));
       
