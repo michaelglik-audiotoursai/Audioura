@@ -18,6 +18,7 @@ import '../services/subscription_service.dart';
 import '../services/subscription_encryption_service.dart';
 import '../services/device_service.dart';
 import '../services/translation_service.dart';
+import '../services/tour_translation_helper.dart';
 import '../config.dart';
 import '../config/endpoints.dart';
 // import '../services/credential_storage_service.dart';  // TEMPORARILY DISABLED - CAUSING BUILD ERRORS
@@ -1143,22 +1144,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
   
-  // Silent version used by _downloadMultipleTours - caller manages the dialog.
-  // Handles both response shapes:
-  // Shape A (ISSUE-058 spec): {"translated_tour_ids": {"ru": 168}}
-  // Shape B (actual server):  {"translations": {"ru": {"id": 168, "status": "translated"}}}
-  Map<String, dynamic>? _extractTranslatedIds(Map<String, dynamic> result) {
-    if (result.containsKey('translated_tour_ids')) {
-      return result['translated_tour_ids'] as Map<String, dynamic>?;
-    }
-    final translations = result['translations'] as Map<String, dynamic>?;
-    if (translations == null) return null;
-    return translations.map((lang, val) {
-      final id = val is Map ? val['id'] : val;
-      return MapEntry(lang, id);
-    });
-  }
-
   // Resolves the editTourId for a given download ID by calling the resolution endpoint.
   // Used to populate parent_tour_id on translated tours.
   Future<String> _resolveParentEditTourId(int downloadTourId, SharedPreferences prefs) async {
@@ -1173,65 +1158,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return '';
   }
 
-  // M8: Shared translation download logic used by both _downloadSingleTour
-  // and _downloadSingleTourSilent. Returns list of language codes that failed.
-  // English must already be saved before calling this.
-  // ⚠️ Keep in sync with TourTranslationHelper.downloadTranslatedVersions() until consolidated.
-  Future<List<String>> _downloadTranslatedVersions(
-    int tourId,
-    List<String> languages,
-    String parentEditTourId,
-  ) async {
-    final failures = <String>[];
-    final nonEnglish = languages.where((l) => l != 'en').toList();
-    if (nonEnglish.isEmpty) return failures;
-
-    try {
-      await DebugLogHelper.addDebugLog('HOME: Requesting tour translation for languages: ${nonEnglish.join(", ")}');
-      final result = await TranslationService.translateTour(tourId: tourId, languages: nonEnglish);
-
-      if (result['status'] == 'completed') {
-        final translatedIds = _extractTranslatedIds(result);
-        if (translatedIds != null) {
-          for (final lang in nonEnglish) {
-            final translatedId = translatedIds[lang];
-            if (translatedId == null) {
-              failures.add(lang);
-              await DebugLogHelper.addDebugLog('HOME: Translation service did not return ID for $lang');
-              continue;
-            }
-            try {
-              final translatedUri = await Endpoints.url(Service.mapDelivery, '/download-tour/$translatedId');
-              final translatedResponse = await http.get(translatedUri).timeout(Duration(seconds: 120));
-              if (translatedResponse.statusCode == 200) {
-                final prefs = await SharedPreferences.getInstance();
-                final appDir = await getApplicationDocumentsDirectory();
-                await _saveTourToMyToursTranslated(translatedId, translatedResponse.bodyBytes, appDir.path, prefs, parentEditTourId, lang);
-                await DebugLogHelper.addDebugLog('HOME: Saved translated tour ($lang) ID: $translatedId');
-              } else {
-                failures.add(lang);
-                await DebugLogHelper.addDebugLog('HOME: Failed to download translated tour ($lang): ${translatedResponse.statusCode}');
-              }
-            } catch (e) {
-              failures.add(lang);
-              await DebugLogHelper.addDebugLog('HOME: Error saving translated tour ($lang): $e');
-            }
-          }
-        } else {
-          for (final lang in nonEnglish) failures.add(lang);
-          await DebugLogHelper.addDebugLog('HOME: Translation service returned unrecognized response shape');
-        }
-      } else {
-        for (final lang in nonEnglish) failures.add(lang);
-        await DebugLogHelper.addDebugLog('HOME: Translation failed: ${result["message"]}');
-      }
-    } catch (e) {
-      for (final lang in nonEnglish) failures.add(lang);
-      await DebugLogHelper.addDebugLog('HOME: Translation block error: $e');
-      // English is already saved — do not rethrow
-    }
-    return failures;
-  }
 
   Future<List<String>> _downloadSingleTourSilent(int tourId, [List<String>? languages]) async {
     final prefs = await SharedPreferences.getInstance();
@@ -1249,7 +1175,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (nonEnglish.isEmpty) return [];
 
     final parentEditTourId = await _resolveParentEditTourId(tourId, prefs);
-    return await _downloadTranslatedVersions(tourId, nonEnglish, parentEditTourId);
+    return await TourTranslationHelper.downloadTranslatedVersions(tourId: tourId, languages: nonEnglish, parentEditTourId: parentEditTourId);
   }
 
   Future<void> _downloadSingleTour(int tourId, [List<String>? languages]) async {
@@ -1302,7 +1228,7 @@ class _HomeScreenState extends State<HomeScreen> {
           );
 
           final parentEditTourId = await _resolveParentEditTourId(tourId, prefs);
-          final failures = await _downloadTranslatedVersions(tourId, nonEnglishLanguages, parentEditTourId);
+          final failures = await TourTranslationHelper.downloadTranslatedVersions(tourId: tourId, languages: nonEnglishLanguages, parentEditTourId: parentEditTourId);
           translationFailures.addAll(failures);
 
           if (!mounted) return;
