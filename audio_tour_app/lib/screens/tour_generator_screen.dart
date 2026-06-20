@@ -2105,6 +2105,14 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
               await DebugLogHelper.addDebugLog('NEWSLETTER SUCCESS: $successMsg');
               successCount++;
             }
+          } else if (response.statusCode == 402) {
+            // Subscription required — expected outcome, not a retry-able error
+            String subMsg = 'Subscription required';
+            try { subMsg = jsonDecode(response.body)['message'] ?? subMsg; } catch (_) {}
+            final subError = '🔒 ${url}: $subMsg';
+            results.add(subError);
+            await DebugLogHelper.addDebugLog('NEWSLETTER 402: $subError');
+            failCount++;
           } else {
             final httpError = '❌ ${url}: HTTP ${response.statusCode}';
             results.add(httpError);

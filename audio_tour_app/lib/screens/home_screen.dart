@@ -1927,6 +1927,8 @@ class _HomeScreenState extends State<HomeScreen> {
             await SubscriptionService.handleKeyExchange(deviceEncryptionKey);
             await DebugLogHelper.addDebugLog('NEWSLETTER: Encryption key obtained and stored');
           }
+        } else if (response.statusCode == 402) {
+          await DebugLogHelper.addDebugLog('NEWSLETTER: 402 — source requires subscription (key exchange skipped)');
         }
       } else {
         await DebugLogHelper.addDebugLog('NEWSLETTER: Encryption key already available');
@@ -2018,6 +2020,17 @@ class _HomeScreenState extends State<HomeScreen> {
         } else {
           throw Exception(data['message'] ?? 'Newsletter processing failed');
         }
+      } else if (response.statusCode == 402) {
+        // Subscription required — expected outcome, not an error
+        String subMessage = 'This source requires a subscription.';
+        try {
+          final errorData = json.decode(response.body);
+          subMessage = errorData['message'] ?? subMessage;
+        } catch (_) {}
+        await DebugLogHelper.addDebugLog('NEWSLETTER: 402 subscription required: $subMessage');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(subMessage), backgroundColor: Colors.orange, duration: const Duration(seconds: 5)),
+        );
       } else {
         // Parse server error message for user-friendly display
         String userMessage = 'Server error: ${response.statusCode}';
@@ -2329,6 +2342,13 @@ class _HomeScreenState extends State<HomeScreen> {
       
       await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: Response status for $language: ${downloadResponse.statusCode}');
       
+      if (downloadResponse.statusCode == 402) {
+        // Subscription required — log and skip cleanly (not an error to retry)
+        String subMsg = 'Subscription required';
+        try { subMsg = json.decode(downloadResponse.body)['message'] ?? subMsg; } catch (_) {}
+        await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: 402 — $subMsg');
+        continue;
+      }
       if (downloadResponse.statusCode != 200) {
         await DebugLogHelper.addDebugLog('ARTICLE_DOWNLOAD: Download failed for $language: ${downloadResponse.statusCode}');
         continue; // Skip this language, try next
