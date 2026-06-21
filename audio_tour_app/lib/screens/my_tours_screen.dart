@@ -8,6 +8,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 import 'package:path_provider/path_provider.dart';
 import '../screens/debug_log_viewer_screen.dart';
 import '../services/tour_translation_helper.dart';
+import '../config/endpoints.dart';
 
 import 'tour_player_screen.dart';
 import 'news_player_screen.dart';

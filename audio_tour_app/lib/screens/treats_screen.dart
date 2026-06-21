@@ -52,7 +52,6 @@ class _TreatsScreenState extends State<TreatsScreen> {
       }
 
       // Gate off in cloud mode — treats service not deployed to cloud yet
-      final prefs = await SharedPreferences.getInstance();
       if ((prefs.getString('server_mode') ?? 'local') == 'cloud') {
         setState(() { _isLoading = false; });
         ScaffoldMessenger.of(context).showSnackBar(
