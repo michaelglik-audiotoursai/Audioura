@@ -11,7 +11,7 @@ This is required so the user can identify which Amazon-Q tab they are talking to
 ### ✅ **CURRENT STATE — v2.1.1+9 READY TO BUILD ON iPHONE**
 
 - iPhone last confirmed on **v1.2.9+71** (A#78 mic fix — smoke test passed)
-- **A#83 is ready to build** — v2.1.1+9 hotfix build. Supersedes A#82 (v2.1.1+8, never built on iPhone). Single assignment takes iPhone from v1.2.9+71 directly to v2.1.1+9.
+- **A#83 is ready to build** — v2.1.1+9 final build. Supersedes A#82 (v2.1.1+8, never built on iPhone). Single assignment takes iPhone from v1.2.9+71 directly to v2.1.1+9.
 - **API Key field** is in the About screen as a **temporary development tool** — Sir Michael enters the gateway API key manually during testing. Will be removed in a future version.
 - **Mobile Kiro** (Kiro IDE) replaced Android Amazon-Q (Eclipse) as of 2026-06-08. Same codebase, same branch, same communication channel.
 - **App Attestation Phase 4** (native Swift MethodChannel) is NOT in v2.1.1+9 — stubs return null. Separate future assignment after Phase 3 (Android Play Integrity) is validated.
@@ -32,9 +32,13 @@ This is required so the user can identify which Amazon-Q tab they are talking to
 - **Existing-Tour Translation** — purple translate icon on Listen page, 10-language dialog, `TourTranslationHelper`
 - **App Attestation stubs** — `AppAttestationService` (null), `X-App-Attestation` header stub in `apiHeaders()`
 - **News Cloud Paths** — all news/newsletter calls use `apiHeaders()`, `newsDownloadUrl()` routes correctly
-- **Cloud hotfix** — `user_id` added to tour generation body (fixes 401 `auth_required`); 4 hardcoded `5012`/`5017` URLs replaced with `Endpoints.url()`; `newsStatusUrl()` added to `endpoints.dart`
+- **Cloud auth fix** — `user_id` in tour generation body (fixes 401 `auth_required`)
+- **Full hardcoded URL audit** — all `5012`/`5017` URLs replaced; 3 new Service entries (`treats`, `voice`, `tourEditing`); cloud-gate messages for undeployed services
+- **402 handling** — newsletter/news/download 402 → orange snackbar or 🔒 icon, no crash
+- **Translation consolidation** — `home_screen.dart` calls `TourTranslationHelper` (77 duplicate lines removed)
+- **Dead files deleted** — `home_page_flutter_map.dart`, `api_config.dart`; compile fixes
 
-**Target commit:** `f72ee23`  **pubspec:** `2.1.1+9`  **No pubspec bump needed.**
+**Target commit:** `4aa8382` (docs at `cb7540e` on top)  **pubspec:** `2.1.1+9`  **No pubspec bump needed.**
 
 **Mac Mini runs:**
 ```bash
@@ -46,14 +50,19 @@ cd .. && flutter clean && flutter pub get
 cd "/Volumes/USB DISK/Audioura/scripts" && ./build_install_launch.sh
 ```
 
-**Smoke tests (7 — focused on cloud fixes + key regressions):**
-1. Cloud tour generation — no 401 `auth_required`, tour generates via `api.audioura.com`
-2. Cloud news/newsletter — hits cloud URL not `192.168.0.218` (NOT_TESTED acceptable if not deployed)
-3. Local WiFi tour generation — no regression from URL changes
-4. Local news/newsletter — still hits `192.168.0.218:5012/5017`
-5. Mic regression (A#78) — no permission snackbar
-6. Refresh regression (A#77b) — no black screen
-7. Account Deletion UI — Danger Zone visible, Cancel works
+**Smoke tests (12):**
+1. Cloud tour generation — no 401, tour generates via `api.audioura.com`
+2. Cloud newsletter — succeeds or clean 402 snackbar
+3. Cloud news article download — downloads via cloud path
+4. News article playback — WebView loads, audio plays
+5. Cloud translation — translated versions appear (NOT_TESTED acceptable)
+6. Account Deletion UI — Danger Zone visible, Cancel works
+7. Existing-tour Translation — purple icon + language dialog
+8. Local WiFi regression — generation + news + newsletter all work
+9. Mic regression (A#78) — no permission snackbar
+10. Refresh regression (A#77b) — no black screen
+11. POI map button — TourMapScreen opens
+12. Cloud-gated features — treats/voice/editing show clean message
 
 ---
 
@@ -76,7 +85,7 @@ Audioura-build/           AudioTours\development\
 - **USB mirror**: `usb/Audioura/` mirrors `D:\Audioura\`. After editing: `copy usb\Audioura\assignments\mac_mini_assignments.md D:\Audioura\assignments\`
 - **OLD repo**: `~/Development/AudioTours/` — BROKEN, never use
 - **pubspec**: `2.1.1+9` (Mobile Kiro bumped)
-- **Head commit**: `f72ee23` — compile fix for `_downloadAndSaveNews` userId scope
+- **Head commit**: `cb7540e` (docs) on top of `4aa8382` (compile fixes — final v2.1.1+9)
 
 #### Version history
 | Version | Assignment | Status |
@@ -88,7 +97,7 @@ Audioura-build/           AudioTours\development\
 | 2.1.1+1–+3 | A#79/A#80 dual-environment — superseded | ⏭️ SKIPPED |
 | 2.1.1+6–+7 | A#81 poll hardening — superseded | ⏭️ SKIPPED |
 | 2.1.1+8 | A#82 4 new features + poll hardening + dual-env — superseded | ⏭️ SKIPPED |
-| **2.1.1+9** | **A#83 cloud hotfix — auth_required + hardcoded news URLs (consolidated)** | **⏳ READY TO BUILD** |
+| **2.1.1+9** | **A#83 final — cloud E2E + URL audit + 402 handling + translation consolidation** | **⏳ READY TO BUILD** |
 
 #### Git operation ownership
 | Operation | Who | Where |
@@ -119,7 +128,7 @@ Audioura-build/           AudioTours\development\
 ### 📱 **APP STATUS**
 - **iPhone**: v1.2.9+71 (A#83 build pending → v2.1.1+9)
 - **All shipped features**: Tour clustering, location search, tour search, newsletter system, subscription, language selector, about screen, settings persistence, location permissions, keyboard dismissal, download spinner fix, microphone voice control, translation (ru/fr/zh), walking tour map, per-stop map focus, coordinate jitter, museum single-POI map guard, mode-switch fix, stale tour/news path healing, brick-red app icon, app name "Audioura", InAppWebView v6, map icon on Listen page, POI tap → TourMapScreen via `openMap` JS handler, Listen page Refresh in-place reload, Listen page mic permission fix.
-- **New in v2.1.1+9** (pending A#83 build): Dual-environment networking, poll loop rewrite, re-entry guard, Account Deletion UI, Existing-Tour Translation, App Attestation stubs, News Cloud Paths, cloud `user_id` auth fix, hardcoded news URL fix.
+- **New in v2.1.1+9** (pending A#83 build): Dual-environment networking, poll loop rewrite, re-entry guard, Account Deletion UI, Existing-Tour Translation, App Attestation stubs, News Cloud Paths, cloud auth fix, full hardcoded URL audit, 402 handling, translation consolidation.
 
 ---
 
@@ -172,6 +181,8 @@ cd "/Volumes/USB DISK/Audioura/scripts"
 - `Endpoints.url(Service, path)` — full URI
 - `Endpoints.apiHeaders(Service, {requestBody})` — `Content-Type` always; `X-API-Key` + `X-App-Attestation` stub in cloud mode
 - `Endpoints.newsDownloadUrl(id)` — `/news-download/<id>` cloud, `/download/<id>` local
+- `Endpoints.newsStatusUrl(id)` — `/news-status/<id>` cloud, `/status/<id>` local
+- New Service entries: `treats` (:5007), `voice` (:5008), `tourEditing` (:5022) — cloud-gated
 
 #### lib/services/tour_translation_helper.dart (NEW in v2.1.1+8)
 - Shared logic for existing-tour translation from Listen page
@@ -276,5 +287,5 @@ cd ios && pod deintegrate && pod install
 
 ---
 
-**Last Updated**: 2026-06-17 — v110.0. pubspec at `2.1.1+9` (HEAD `f72ee23`). iPhone on v1.2.9+71. A#83 assignment written — takes iPhone from v1.2.9+71 to v2.1.1+9 in one build. Includes all v2.1.1+8 features plus cloud hotfix: `user_id` auth fix + hardcoded news URL migration to `Endpoints`.
-**iOS Amazon-Q Version**: 110.0
+**Last Updated**: 2026-06-21 — v111.0. pubspec at `2.1.1+9` (HEAD `cb7540e`/`4aa8382`). iPhone on v1.2.9+71. A#83 final assignment written — takes iPhone from v1.2.9+71 to v2.1.1+9 in one build. Includes all v2.1.1+8 features + cloud auth fix + full hardcoded URL audit + 402 handling + translation consolidation.
+**iOS Amazon-Q Version**: 111.0
