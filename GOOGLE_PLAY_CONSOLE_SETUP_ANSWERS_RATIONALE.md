@@ -1,325 +1,85 @@
-# Google Play Console Setup: Answers & Rationale
+# Google Play Console Setup: Answers & Rationale (CORRECTED 2026-06-21)
 
-**Date:** June 21, 2026  
-**Project:** Audioura (iOS + Android launch)  
-**Purpose:** Document all Google Play Console "Target audience and content" section responses with reasoning  
-**Status:** ✅ Completed and saved for review
+**Project:** Audioura (com.audioura.audiotours) · **Entity:** Audioura LLC
+**Status:** Corrected by Claude review. Earlier draft mis-declared target audience and data collection — fixed below.
+**Governing rule:** every answer must match the app's real behavior and the privacy policy at `https://audioura.com/privacy`.
 
----
-
-## Executive Summary
-
-Audioura has been configured in Google Play Console as an **all-ages travel/exploration app** with full compliance to children's privacy regulations (COPPA/GDPR). All declarative questions have been answered, and the app is ready to proceed to store listing setup.
-
-**IARC Content Rating:** 4+ (All Ages)  
-**Target Audience:** All ages (5 and under through 18 and over)  
-**Ads:** None  
-**Monetization:** Free at launch
+> ⚠️ Audioura is **NOT** a children's app. It collects **precise location** + a **device identifier** + (optional) **subscription credentials** — so it must be declared as a **13+** app with accurate data disclosure. Declaring "all ages / collects nothing" fails review.
 
 ---
 
-## Task 1: Target Audience ✅
+## Task 1: Target Audience  ✅ CORRECTED
 
-### Question
-**What are the target age groups of your app?**
+**Question:** What are the target age groups of your app?
 
-### Answer
-✅ Selected **all age groups:**
-- 5 and under
-- 6-8
-- 9-12
-- 13-15
-- 16-17
-- 18 and over
+**Correct answer — select ONLY:**
+- ☑️ 13–15
+- ☑️ 16–17
+- ☑️ 18 and over
+- ☐ 5 and under — **UNCHECK**
+- ☐ 6–8 — **UNCHECK**
+- ☐ 9–12 — **UNCHECK**
 
-### Rationale
-
-**Why all ages?**
-1. **IARC Rating Confirmation:** Audioura received a 4+ (All Ages) content rating from Google's IARC system, indicating suitability for all audiences
-2. **Educational Travel Content:** Tours provide location-based information and cultural context appropriate for family use
-3. **Safety Filters:** Claude AI generates tour content with built-in safety guidelines that prevent inappropriate material
-4. **Parental Involvement:** Families can explore locations together; parent-child friendly use case
-5. **No Age Restrictions:** No content, features, or mechanics are restricted by age within the app
-
-**Implications:**
-- Audioura must comply with **Families Policy** (Google's policy for apps targeting children)
-- All content displayed must be appropriate for the youngest audience (5 and under)
-- No inappropriate ads or tracking; privacy-first approach required
-- Data collection limited to functional needs (location, analytics only)
-
-**Policy Compliance Certification:**
-✅ Confirmed: "I certify that this app (including all APIs, SDKs, and ads) complies with all applicable laws and regulations relating to children"
-
-This includes compliance with:
-- **COPPA** (US Children's Online Privacy Protection Act)
-- **GDPR** (EU General Data Protection Regulation)
-- Google Play Families Policy requirements
-
----
-
-## Task 2: Data Safety ⏳ (To Be Completed)
-
-### Question
-**What data does your app collect and how is it protected?**
-
-### Answer (Planned)
-
-**Data Collection:**
-- ✅ **Location data** — Required to generate tours for the user's location
-- ✅ **Analytics data** — Which tours users view, app usage patterns (non-identifying)
-- ❌ **No device identifiers** (AAID/GAID not required; location only)
-- ❌ **No personal information** (name, email, phone not collected)
-- ❌ **No biometric data**
-- ❌ **No payments/billing** (app is free)
-- ❌ **No health/fitness data**
-
-**Data Protection:**
-- ✅ **Encryption in transit** — All API calls to Claude and analytics services use HTTPS/TLS
-- ✅ **No third-party sharing** — Location and analytics data NOT shared with ad networks or external services
-- ✅ **No data sales** — Data is not sold or monetized
-- ✅ **Data retention** — Analytics data retained for 90 days; location data not stored persistently
-- ✅ **User deletion rights** — Users can request data deletion (via privacy policy)
+**"Does your app appeal to children?"** → **No.**
+**Do NOT** opt into the Families/Designed-for-Families program. **Do NOT** certify the app as child-directed.
 
 **Rationale:**
-1. **Functional necessity:** Location is essential for tour generation; analytics help improve service
-2. **Privacy-first design:** Minimal data collection reduces privacy risks
-3. **Compliance:** COPPA/GDPR compliant data practices
-4. **Trust:** Transparent about what data is collected and why
-5. **Future scalability:** Minimal data collection allows easy GDPR/CCPA compliance post-launch
+1. The privacy policy (§5) states Audioura is **not directed to children under 13**. The audience selection must match.
+2. The app collects **precise GPS** and a **persistent device identifier** — both are **restricted for children** under Google's Families Policy. A child-targeted app collecting these **fails** review.
+3. Certifying COPPA/Families compliance while collecting precise location + device id from kids would be a **false certification.** Targeting 13+ avoids this entirely.
 
 ---
 
-## Task 3: Government Apps ⏳ (To Be Completed)
+## Task 2: Data Safety  ✅ CORRECTED — answer from the mapping doc
 
-### Question
-**Is this app published by a government entity?**
+Answer the Data Safety form directly from **`AUDIOURA_DATA_SAFETY_MAPPING.md`** (it's reconciled with the privacy policy). Summary:
 
-### Answer
-❌ **No**
+**Collected (= Yes), none Shared, all encrypted in transit:**
+- **Location → Precise location** — GPS sent to server for tours/Treats; stored. Optional.
+- **Device or other IDs** — the `USER-<hash>` device identifier; saves tours + enforces quotas. Required.
+- **App info & performance → Crash logs + Diagnostics** — per privacy policy §1.
+- **App activity → In-app search history + App interactions** — voice/text search, tour requests, listening.
+- **Personal info → Other info** — optional third-party **subscription credentials** (username/password) when a user connects a paid news source.
 
-### Rationale
-1. **Company Status:** Audioura is developed by **Audioura LLC**, a private company
-2. **No Government Affiliation:** Not a US government, state government, or municipal app
-3. **Not Required:** This question is for official government services (e.g., IRS, DMV apps)
-4. **Accurate Classification:** Audioura is a commercial travel/entertainment app
+**Not collected:** Name/Email (no accounts), Financial, Health, Messages, Photos/Videos, **Audio** (on-device transcription — raw audio never leaves the device), Files, Calendar, Contacts.
 
-**Impact:** No special government app requirements apply.
+**Other Data-Safety answers:** Encrypted in transit → **Yes**. Provide a way to request data deletion → **Yes** (in-app About → Delete My Account + contact on the privacy page). Independent security review → **No**.
 
----
-
-## Task 4: Financial Features ⏳ (To Be Completed)
-
-### Question
-**Does your app include payments, banking, financial services, or investment features?**
-
-### Answer
-❌ **No**
-
-### Rationale
-
-**Current State (MVP Launch):**
-- ✅ App is **free**
-- ✅ No in-app purchases (IAP)
-- ✅ No premium tiers or paywalls
-- ✅ No payment processing
-- ✅ No banking or investment features
-- ✅ No financial data collection
-
-**Future "Treats" Tab:**
-- Post-launch, Audioura will add a "Treats" tab with coupons/offers from partner businesses
-- These are **not in-app purchases**; they are links to external partner discounts
-- No payment processing through Audioura
-- Does NOT require updating this declaration to "Yes"
-
-**Why This Answer:**
-1. **Accurate for MVP:** Launch is free with no monetization
-2. **Future-proof:** Post-launch features (coupons) don't change this answer
-3. **Legal clarity:** Coupons/partnerships ≠ financial features
-4. **Simple compliance:** No financial regulation required
-
-**Impact:** Audioura avoids financial services compliance burden (PCI DSS, banking regulations, etc.).
+*(The earlier draft's "no device identifiers / location not stored / no personal info" was wrong and contradicted the privacy policy.)*
 
 ---
 
-## Task 5: Health ⏳ (To Be Completed)
+## Task 3: Government Apps  ✅ (unchanged — correct)
+**Answer: No.** Audioura LLC is a private company; not a government service.
 
-### Question
-**Does your app provide health, medical, or fitness advice or services?**
+## Task 4: Financial Features  ✅ (correct for MVP)
+**Answer: No.** Free at launch; no IAP, no payments, no banking/investment.
+*Note: revisit when v2.3 subscriptions launch — in-app subscriptions are a monetization/financial feature and may change this.*
 
-### Answer
-❌ **No**
+## Task 5: Health  ✅ (unchanged — correct)
+**Answer: No.** Travel/audio-tour app; no fitness, medical, or health data.
 
-### Rationale
-
-**App Purpose:**
-- Audioura generates **travel and location-based audio tours**
-- Primary use: Exploring cities, landmarks, historical sites, cultural locations
-- Secondary features: Community curation of tours, "Treats" tab with local offers
-
-**Not Health-Related:**
-- ✅ No fitness tracking (no step counts, calories, workouts)
-- ✅ No health monitoring (no heart rate, sleep, vitals)
-- ✅ No medical advice (no diagnosis, treatment recommendations)
-- ✅ No mental health services (no therapy, coaching)
-- ✅ No nutrition tracking (no meal logging, diet plans)
-- ✅ No medication management
-- ✅ No health data collection
-
-**Why This Answer:**
-1. **Accurate classification:** Travel app, not health app
-2. **Avoids regulatory burden:** Health apps require additional compliance (HIPAA, medical device regulations)
-3. **Correct categorization:** Play Store category is Travel, not Health & Fitness
-
-**Impact:** Audioura avoids health app compliance requirements.
-
----
-
-## Task 6: App Category & Contact Details ⏳ (To Be Completed)
-
-### Question
-**What is your app's category, and what are your support contact details?**
-
-### Answer (Planned)
-
-| Field | Value | Rationale |
+## Task 6: App Category & Contact Details
+| Field | Value | Note |
 |---|---|---|
-| **Category** | Travel (primary) or Maps & Navigation (secondary) | Audioura generates travel tours; users explore locations via audio |
-| **App Name** | Audioura | Official product name |
-| **Support Email** | info@audioura.com | Professional email for customer support |
-| **Support Website** | https://audioura.com | Primary website for app info, blog, FAQs, privacy policy |
-| **Support Phone** | (TBD if available) | Optional; provide if available for compliance |
-| **Company Name** | Audioura LLC | Legal company name for B2B credibility |
+| Category | **Travel & Local** (primary) | Core function = location-based audio tours |
+| App name | Audioura | |
+| Support email | **info@audioura.com** | ⚠️ Verify this mailbox is real + monitored (the policy contact was a gmail; `www` DNS is currently broken) |
+| Support website | **https://audioura.com** | Use the no-`www` URL (the `www` host doesn't resolve yet) |
+| Privacy policy | **https://audioura.com/privacy** | Live ✅ |
 
-**Rationale:**
-1. **Travel Category:** Best matches app's core function (generating audio tours of locations)
-2. **Professional Presence:** info@ email and audioura.com establish credibility
-3. **Support Infrastructure:** Ready to handle user inquiries and support requests
-4. **Legal Compliance:** Using correct legal entity name (Audioura LLC)
+## Task 7: Store Listing
+App name **Audioura**; short description e.g. *"AI audio tours + audio news for any place"* (include the **Audio/news mode** — it's half the app, omitted in the earlier draft). Full description, screenshots (Mobile/Mac-Mini), icon 512×512, feature graphic 1024×500. Copy/assets in the **Beta Launch Kit** doc.
 
 ---
 
-## Task 7: Store Listing ⏳ (To Be Completed)
+## Compliance status (corrected)
+| Item | Status |
+|---|---|
+| Target audience | **13+** (NOT all-ages / NOT Families) |
+| Data Safety | Location, Device ID, Crash logs, Diagnostics, App activity, Subscription creds = collected; none shared |
+| COPPA / Families Policy | **N/A** — app is not child-directed (this is the correct posture) |
+| Ads | No for Beta (Treats off); becomes Yes when paid placement ships |
+| Financial / Health / Government | No |
 
-### Question
-**What are your app's name, description, screenshots, and other store listing assets?**
-
-### Answer (Planned - In Progress)
-
-**App Name:**
-```
-Audioura
-```
-
-**Short Description (80 characters max):**
-```
-AI-powered audio tours for any location
-```
-
-**Full Description (4,000 characters):**
-```
-[TBD - To be drafted after mobile team provides screenshots and copy]
-
-Key points to cover:
-- What Audioura does (generate AI-powered audio tours)
-- How to use it (select a location, get an audio tour)
-- Key features (AI generation, community curation, Treats tab)
-- Target audience (travelers, families, explorers)
-- Value prop (personalized tours, discover locations)
-```
-
-**Store Listing Assets Required:**
-
-| Asset | Spec | Status | Owner |
-|---|---|---|---|
-| **Screenshots** | 5-8 images, 480×854px (phone) | ⏳ Pending | Mobile-AQ team |
-| **Feature Graphic** | 1024×500px banner | ⏳ Pending | Design/Marketing |
-| **App Icon** | 512×512px (should already exist) | ⏳ Verify | Design team |
-| **Privacy Policy** | URL link | ✅ Ready | https://audioura.com/privacy |
-| **Support Email** | From Task 6 | ✅ Ready | info@audioura.com |
-| **Support Website** | From Task 6 | ✅ Ready | https://audioura.com |
-
-**Rationale for Store Listing:**
-1. **Clear Positioning:** Short description immediately communicates what Audioura does
-2. **Searchability:** Keywords (AI, audio, tours, location) help discovery
-3. **Conversion:** Full description sells features and use cases
-4. **Visual Appeal:** Screenshots/graphics crucial for install rate
-5. **Trust:** Privacy policy and support links establish legitimacy
-
-**Timeline:** Store listing should be completed once Mobile-AQ team provides screenshots and copy.
-
----
-
-## Compliance Checklist
-
-| Requirement | Status | Notes |
-|---|---|---|
-| **COPPA Compliance** | ✅ | Minimal data collection; location-based only; no targeted ads |
-| **GDPR Compliance** | ✅ | Data retention limits; user deletion rights; privacy policy available |
-| **Families Policy** | ✅ | All content appropriate for all ages; no inappropriate ads; privacy-first |
-| **Content Rating (IARC)** | ✅ | 4+ (All Ages) confirmed |
-| **Data Privacy** | ✅ | No third-party data sharing; encryption in transit; no personal data collection |
-| **Children's Safety** | ✅ | Claude's safety filters prevent inappropriate content; no targeting to children |
-| **Financial Compliance** | ✅ | Free app; no payment processing; no financial services |
-| **Health Compliance** | ✅ | Not a health app; no medical/fitness features |
-
----
-
-## Google Play Console Setup Status
-
-| Task | Status | Completed Date |
-|---|---|---|
-| 1. Target Audience | ✅ Complete | June 21, 2026 |
-| 2. Data Safety | ⏳ In Progress | — |
-| 3. Government Apps | ⏳ In Progress | — |
-| 4. Financial Features | ⏳ In Progress | — |
-| 5. Health | ⏳ In Progress | — |
-| 6. App Category & Contact Details | ⏳ In Progress | — |
-| 7. Store Listing | ⏳ In Progress | — |
-| **Total Progress** | **1/7 (14%)** | — |
-
----
-
-## Next Steps
-
-1. **Complete Tasks 2-5 (Declarative):** ~10 minutes total
-   - Answer Data Safety form
-   - Answer Government Apps (No)
-   - Answer Financial Features (No)
-   - Answer Health (No)
-
-2. **Complete Task 6 (Category & Contact):** ~5 minutes
-   - Select Travel category
-   - Enter support email/website
-
-3. **Complete Task 7 (Store Listing):** 30-45 minutes
-   - Wait for Mobile-AQ team to provide screenshots
-   - Draft full description
-   - Upload assets to Play Console
-
-4. **Submit for Review:** Once all 7 tasks complete
-   - Click "Save" on each section
-   - Submit app for Google Play review
-   - Expected review time: 24-48 hours
-
----
-
-## Files & Links
-
-- `GOOGLE_PLAY_ADS_DECLARATION_GUIDE.md` — Ads declaration (already submitted)
-- `GOOGLE_PLAY_CONTENT_RATING_ANSWERS_GUIDE.md` — Content rating questionnaire (already submitted)
-- ClickUp Task: "Google Play Store: Complete setup and submit for review"
-- GitHub: services-migration branch
-
----
-
-## Document History
-
-| Date | Author | Changes |
-|---|---|---|
-| June 21, 2026 | Sir Michael | Initial document; Task 1 completed and documented |
-
----
-
-**Last Updated:** June 21, 2026  
-**For:** Audioura LLC  
-**Status:** In Progress — Remaining 6 tasks to be completed and documented
+**Fix order in Console:** Target Audience (#1) → Data Safety (#2) → confirm the rest. Keep every answer consistent with the privacy policy.

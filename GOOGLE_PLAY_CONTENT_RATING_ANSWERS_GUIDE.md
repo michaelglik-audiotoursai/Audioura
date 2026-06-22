@@ -1,246 +1,39 @@
-# Google Play Console: Content Rating Questionnaire Answers
+# Google Play Content Rating Questionnaire — Answers (CORRECTED 2026-06-21)
 
-**Date:** June 21, 2026  
-**Project:** Audioura (iOS + Android launch)  
-**App:** Audioura (com.audioura.audiotours)  
-**Purpose:** Document content rating answers for Google Play submission  
-**Status:** ✅ Completed and submitted
+**App:** Audioura (com.audioura.audiotours) · **Entity:** Audioura LLC
+**Status:** ⚠️ **DRAFT — verify before submitting.** (The earlier version was marked "submitted and accepted"; if it was submitted with the old Target Audience/UGC answers, **resubmit** after these corrections.)
+**Expected IARC rating:** Everyone / 4+ (content is benign).
 
 ---
 
-## Overview
+## Content questions — all **No** (correct, unchanged)
+- **Downloaded mature content?** No — nothing explicit is bundled; tours are AI-generated on demand.
+- **Violence?** No · **Sexuality/nudity?** No · **Offensive language?** No · **Controlled substances?** No.
+- **Age-restricted products (alcohol/tobacco/firearms/gambling)?** No — Treats offers are not age-restricted items.
+- **Shares user location with other users?** No.
+- **Purchase digital goods / cash rewards / gift cards / crypto / NFTs?** No (free app, no IAP at MVP).
+- **Web browser or search engine?** No.
 
-Audioura's content rating was submitted to Google Play Console on June 21, 2026. This document explains each answer and the reasoning behind it.
+These keep the base rating at Everyone/4+.
 
-**Final IARC Rating Expected:** 4+ (All Ages)
+## Online content — **Yes** (correct)
+Tours and news audio are **generated/fetched online**, not bundled. (Google lists AI-generated content as an example.)
 
----
+## ⚠️ User-generated content / sharing — needs a report path
+**"Does the app allow users to interact or exchange content with other users?"** → **Yes** — this is accurate: per the no-private-tours design, a user's curated tours go to a **shared library visible to other users**.
 
-## Content Rating Answers & Rationale
+**BUT:** the earlier draft answered "No reporting / No blocking." For an app where user-curated content is visible to others, Google/IARC generally **expects a content-report mechanism.** Two valid paths:
+- **Recommended:** add a minimal **"report this tour"** action (even a mailto/report link) — small Mobile task — and answer that a reporting method exists.
+- Or, if you conclude tours aren't meaningfully "exchanged with other users" (they go to a shared pool, no direct user-to-user interaction/messaging), answer **No** to the interaction question — but that must be a deliberate, accurate call, not a default.
 
-### **Downloaded App**
-**Question:** Does the app contain any ratings-relevant content (e.g., sex, violence, language) downloaded as part of the app package?
+Do **not** ship public UGC with no report path **and** a child audience (the audience is now correctly 13+, which lowers the risk, but the report path is still the cleaner answer).
 
-**Answer:** ❌ **No**
-
-**Rationale:**
-- Audioura doesn't bundle explicit, violent, or offensive content
-- All tour content is generated dynamically by Claude AI
-- No pre-packaged mature content in the app
-- Tours are generated on-demand, not included in the APK/AAB
-
----
-
-### **User Content Sharing**
-
-#### Q1: Does the app allow users to interact or exchange content with other users?
-**Answer:** ✅ **Yes**
-
-**Rationale:**
-- Users generate/curate tours by requesting and modifying Claude's output
-- Modified tours become publicly available to all users
-- Users effectively share their curated tours with the community
-- This is content exchange (user-to-user sharing of tours)
+## "Primarily a news or educational product?" — No (borderline)
+Defensible as "primarily a tours app," **but be aware** the Audio mode (news/newsletter processing) is roughly half the app. If Google questions it, "tours primary, news secondary" is the honest framing.
 
 ---
 
-#### Q2: Is user-generated content the primary source of content in the app?
-**Answer:** ❌ **No**
-
-**Rationale:**
-- Tours are **AI-generated** (by Claude), not user-generated
-- Users REQUEST and CURATE, but don't generate from scratch
-- Users modify existing AI content (audio, text) but the initial content is AI-created
-- Primary content source is Claude AI, not users
-
----
-
-#### Q3-Q8: Public Sharing (Nudity, Violence), Blocking, Reporting, Chat Moderation, Friends-Only Interactions
-**Answer:** ❌ **No** for all
-
-**Rationale:**
-- **No public nudity:** Audioura generates tour content; no nudity expected
-- **No graphic violence:** No violent content in tour generation
-- **No blocking ability:** MVP doesn't include user-blocking features
-- **No reporting ability:** MVP doesn't include content reporting features
-- **No chat moderation:** No chat/messaging in app; no moderation needed yet
-- **No friends-only option:** All tours are public; no privacy controls at MVP
-
-**Important Note:** These features (blocking, reporting) can be added post-launch without resubmitting the questionnaire if they're only for community safety, not changes to content type.
-
----
-
-### **Online Content**
-**Question:** Does the app feature content not in the initial download but accessible from the app?
-
-**Answer:** ✅ **Yes**
-
-**Rationale:**
-- Tours are **AI-generated content** (explicitly listed as an example by Google)
-- Tours are NOT bundled with the app
-- Tours are **generated dynamically** on-demand via Claude API
-- Tours require **online connection** to the generation service
-- This is the definition of "online content"
-
----
-
-### **Violence**
-**Question:** Can the app contain violent material?
-
-**Answer:** ❌ **No**
-
-**Rationale:**
-- Audioura generates tour narratives about locations
-- No inherent violent content in tour generation
-- Claude's safety guidelines prevent violent content
-- Tours are informational/educational about locations
-
----
-
-### **Sexuality**
-**Question:** Can the app contain sexual material or nudity (except natural/scientific)?
-
-**Answer:** ❌ **No**
-
-**Rationale:**
-- Tours are location-based narratives
-- No sexual or nude content expected
-- Claude's safety guidelines prevent explicit content
-- Tours focus on historical, cultural, and informational content about locations
-
----
-
-### **Language**
-**Question:** Can the app contain potentially offensive language?
-
-**Answer:** ❌ **No**
-
-**Rationale:**
-- Tours are generated by Claude with content filters
-- No requirement for offensive language in tour generation
-- Tours are designed to be educational and family-friendly
-- Claude's safety guidelines handle language filtering
-
----
-
-### **Controlled Substance**
-**Question:** Can the app contain references to illegal or recreational drugs?
-
-**Answer:** ❌ **No**
-
-**Rationale:**
-- Tours are location narratives, not drug-related content
-- Claude's safety guidelines prevent drug promotion/depiction
-- No reason for controlled substance content in tour generation
-
----
-
-### **Promotion or Sale of Age-Restricted Products**
-**Question:** Does the app promote or sell age-restricted items (cigarettes, alcohol, firearms, gambling)?
-
-**Answer:** ❌ **No**
-
-**Rationale:**
-- Audioura is a tour app, not a retail app
-- No sales of alcohol, tobacco, firearms, or gambling
-- "Treats" tab includes coupons for partner services, not age-restricted items
-- Future partnerships won't include age-restricted products at launch
-
----
-
-### **Miscellaneous**
-
-#### Q1: Does the app share user location with other users?
-**Answer:** ❌ **No**
-
-**Rationale:**
-- Audioura uses location to generate tours but doesn't share user location with others
-- User privacy is protected
-- Tours are location-based but not user-tracking
-
----
-
-#### Q2: Does the app allow users to purchase digital goods?
-**Answer:** ❌ **No**
-
-**Rationale:**
-- Audioura is free at launch
-- No in-app purchases planned for MVP
-- No digital goods for sale
-- "Treats" coupons don't count as app-sold digital goods
-
----
-
-#### Q3: Does the app include cash rewards, gift cards, crypto, NFTs, or digital assets?
-**Answer:** ❌ **No**
-
-**Rationale:**
-- No gamification with cash rewards
-- No gift card system
-- No cryptocurrency or blockchain features
-- No NFTs or digital assets for purchase/trade
-
----
-
-#### Q4: Is the app a web browser or search engine?
-**Answer:** ❌ **No**
-
-**Rationale:**
-- Audioura is a native mobile app (tour generation)
-- Not a browser; not a search engine
-- Has internet connectivity but is not a browser app
-
----
-
-#### Q5: Is the app primarily a news or educational product?
-**Answer:** ❌ **No**
-
-**Rationale:**
-- Audioura is a **tour generation and exploration app**
-- While tours include educational content, it's not the primary focus
-- Primary purpose: generate audio tours and explore locations
-- Not a news app or dedicated educational platform
-
----
-
-## Expected Rating
-
-**IARC Content Rating: 4+**
-
-All Ages. Suitable for all audiences.
-
----
-
-## Post-Launch Considerations
-
-**Community Safety (Can be added without resubmitting):**
-- User reporting of inappropriate tour content
-- User blocking features
-- Content moderation system
-
-These additions won't change the content rating because the app itself doesn't create the restricted content; users/AI do.
-
-**Age Gate or Parental Controls (If needed):**
-- If future content requires age restrictions, resubmit questionnaire
-- Unlikely with current design
-
----
-
-## Files & Links
-
-- `GOOGLE_PLAY_ADS_DECLARATION_GUIDE.md` — Ads declaration explanation
-- ClickUp Task: "Apple App Store: Set up App Store Connect and TestFlight"
-
----
-
-## Submission Details
-
-**Date Submitted:** June 21, 2026  
-**Account:** Audioura LLC (Organization account)  
-**Status:** ✅ Questionnaire completed and accepted by Google Play
-
----
-
-**Last Updated:** June 21, 2026  
-**For:** Audioura LLC  
-**Status:** Ready for App Store submission
+## Notes
+- **Status discipline:** don't mark a compliance questionnaire "✅ submitted/accepted" until the answers have been verified — the old draft nearly locked in the wrong Target Audience.
+- Cross-check: these answers must stay consistent with **Target Audience = 13+** (see `GOOGLE_PLAY_CONSOLE_SETUP_ANSWERS_RATIONALE.md`) and the **Data Safety** mapping.
+- Open item: decide on the **"report content" mechanism** (recommended small Mobile task) before relying on the "Yes" UGC answer.
