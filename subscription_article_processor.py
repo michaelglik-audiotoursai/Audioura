@@ -4,10 +4,37 @@ Subscription Article Processor - Phase 2
 Handles credential-aware article processing with browser automation
 """
 import logging
+import os
+import time
 import requests
 from urllib.parse import urlparse
 from browser_automation import extract_content_with_login
 from subscription_detector import SubscriptionDetector
+
+# Inter-service URL (env-var-driven for Cloud Run, default for local Docker)
+NEWS_ORCHESTRATOR_URL = os.getenv('NEWS_ORCHESTRATOR_URL', 'http://news-orchestrator-1:5012')
+
+# OIDC token cache for authenticated inter-service calls on Cloud Run
+_oidc_token_cache = {}
+
+def _get_auth_headers(target_url):
+    """Get OIDC identity token for inter-service calls on Cloud Run."""
+    if target_url.startswith('http://'):
+        return {}
+    audience = target_url.rstrip('/')
+    cached = _oidc_token_cache.get(audience)
+    if cached and cached['expires'] > time.time():
+        return {'Authorization': f"Bearer {cached['token']}"}
+    metadata_url = f"http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience={audience}"
+    try:
+        resp = requests.get(metadata_url, headers={"Metadata-Flavor": "Google"}, timeout=5)
+        if resp.status_code == 200:
+            token = resp.text
+            _oidc_token_cache[audience] = {'token': token, 'expires': time.time() + 3500}
+            return {'Authorization': f"Bearer {token}"}
+    except Exception as e:
+        logging.error(f"[AUTH] Failed to get identity token for {audience}: {e}")
+    return {}
 
 class SubscriptionArticleProcessor:
     def __init__(self):
@@ -296,10 +323,10 @@ class SubscriptionArticleProcessor:
                         }
                         
                         orchestrator_response = requests.post(
-                            'http://news-orchestrator-1:5012/generate-news',
+                            f'{NEWS_ORCHESTRATOR_URL}/generate-news',
                             json=payload,
                             timeout=180,
-                            headers={'Content-Type': 'application/json; charset=utf-8'}
+                            headers={**{'Content-Type': 'application/json; charset=utf-8'}, **_get_auth_headers(NEWS_ORCHESTRATOR_URL)}
                         )
                         
                         if orchestrator_response.status_code == 200:

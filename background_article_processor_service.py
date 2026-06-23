@@ -9,7 +9,30 @@ from datetime import datetime
 SERVICE_VERSION = "1.2.2.82"
 
 # Inter-service URLs
-NEWS_ORCHESTRATOR_URL = os.getenv('NEWS_ORCHESTRATOR_URL', 'http://news-orchestrator-1:5009')
+NEWS_ORCHESTRATOR_URL = os.getenv('NEWS_ORCHESTRATOR_URL', 'http://news-orchestrator-1:5012')
+
+# OIDC token cache for authenticated inter-service calls on Cloud Run
+_oidc_token_cache = {}
+
+def _get_auth_headers(target_url):
+    """Get OIDC identity token for inter-service calls on Cloud Run."""
+    if target_url.startswith('http://'):
+        return {}
+    audience = target_url.rstrip('/')
+    cached = _oidc_token_cache.get(audience)
+    if cached and cached['expires'] > time.time():
+        return {'Authorization': f"Bearer {cached['token']}"}
+    metadata_url = f"http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience={audience}"
+    try:
+        resp = requests.get(metadata_url, headers={"Metadata-Flavor": "Google"}, timeout=5)
+        if resp.status_code == 200:
+            token = resp.text
+            _oidc_token_cache[audience] = {'token': token, 'expires': time.time() + 3500}
+            return {'Authorization': f"Bearer {token}"}
+    except Exception as e:
+        import logging
+        logging.error(f"[AUTH] Failed to get identity token for {audience}: {e}")
+    return {}
 
 class BackgroundArticleProcessor:
     def __init__(self):
@@ -160,14 +183,16 @@ class BackgroundArticleProcessor:
         conn.close()
     
     def request_audio_generation(self, article_id, article_content):
-        """Request audio generation from news-orchestrator-1"""
+        """Request audio generation from news-orchestrator"""
         try:
             response = requests.post(f'{NEWS_ORCHESTRATOR_URL}/generate-article', 
                                    json={
                                        'article_text': article_content['content'],
                                        'request_string': article_content['title'],
                                        'secret_id': 'newsletter_user'
-                                   }, timeout=60)
+                                   },
+                                   headers=_get_auth_headers(NEWS_ORCHESTRATOR_URL),
+                                   timeout=60)
             
             return response.json() if response.status_code == 200 else None
             

@@ -28,6 +28,32 @@ from user_consolidation_service import user_consolidation_service
 from credential_verification_service import credential_verification_service
 from advertising_url_filter import AdvertisingURLFilter
 
+# Inter-service URL (env-var-driven for Cloud Run, default for local Docker)
+NEWS_ORCHESTRATOR_URL = os.getenv('NEWS_ORCHESTRATOR_URL', 'http://news-orchestrator-1:5012')
+
+# OIDC token cache for authenticated inter-service calls on Cloud Run
+_oidc_token_cache = {}
+
+def _get_auth_headers(target_url):
+    """Get OIDC identity token for inter-service calls on Cloud Run."""
+    if target_url.startswith('http://'):
+        return {}
+    audience = target_url.rstrip('/')
+    cached = _oidc_token_cache.get(audience)
+    if cached and cached['expires'] > time.time():
+        return {'Authorization': f"Bearer {cached['token']}"}
+    metadata_url = f"http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience={audience}"
+    try:
+        resp = requests.get(metadata_url, headers={"Metadata-Flavor": "Google"}, timeout=5)
+        if resp.status_code == 200:
+            token = resp.text
+            _oidc_token_cache[audience] = {'token': token, 'expires': time.time() + 3500}
+            return {'Authorization': f"Bearer {token}"}
+    except Exception as e:
+        logging.error(f"[AUTH] Failed to get identity token for {audience}: {e}")
+    return {}
+
+
 # Boston Globe Session-Aware Authentication
 def authenticate_boston_globe_with_credentials(credentials, article_url):
     """Authenticate with Boston Globe using session-aware approach"""
@@ -935,6 +961,35 @@ def process_newsletter():
         newsletter_id = cursor.fetchone()[0]
         conn.commit()
         
+        # ── Batch-level news quota check ──────────────────────────────────────
+        # A single newsletter submission counts as ONE quota unit regardless of
+        # how many articles it contains.  Individual /generate-news calls use
+        # source='newsletter' to skip the per-article check.
+        if user_id and not test_mode:
+            try:
+                from entitlements import check_news_quota
+                quota = check_news_quota(user_id)
+                if not quota['allowed']:
+                    logging.info(f"[QUOTA] Newsletter denied for {user_id}: {quota}")
+                    cursor.close()
+                    conn.close()
+                    return jsonify({
+                        "status": "error",
+                        "error": "quota_exceeded",
+                        "message": f"News quota exceeded ({quota['used']}/{quota['max']} this {quota['period']}). Try again later or upgrade your plan.",
+                        "quota": quota
+                    }), 429
+                logging.info(f"[QUOTA] Newsletter allowed for {user_id}: used={quota['used']}, remaining={quota['remaining']}")
+            except Exception as quota_err:
+                logging.error(f"[QUOTA] Newsletter quota check failed — denying (fail-closed): {quota_err}")
+                cursor.close()
+                conn.close()
+                return jsonify({
+                    "status": "error",
+                    "error": "quota_check_failed",
+                    "message": "Could not verify your news quota. Please try again."
+                }), 503
+        
         # Enhanced headers for better compatibility - DISABLE BROTLI for Guy Raz
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -948,6 +1003,40 @@ def process_newsletter():
             'Sec-Fetch-Site': 'none'
         }
         
+        # GUARDRAIL: Check if the URL is from a known paywalled/subscription site BEFORE fetching
+        # If so, return a clean message instead of scraping garbage teasers or getting a 403
+        _parsed_url = urlparse(processing_url)
+        _domain = _parsed_url.netloc.replace('www.', '')
+        if _domain in subscription_detector.SUBSCRIPTION_DOMAINS:
+            logging.info(f"[GUARDRAIL] Known subscription site detected: {_domain}")
+            has_credentials = False
+            if user_id:
+                try:
+                    cred_conn = get_db_connection()
+                    cred_cursor = cred_conn.cursor()
+                    cred_cursor.execute(
+                        "SELECT 1 FROM user_subscription_credentials WHERE device_id = %s AND domain = %s AND verified_at IS NOT NULL LIMIT 1",
+                        (user_id, _domain)
+                    )
+                    has_credentials = cred_cursor.fetchone() is not None
+                    cred_cursor.close()
+                    cred_conn.close()
+                except Exception as cred_err:
+                    logging.error(f"[GUARDRAIL] Credential check failed: {cred_err}")
+            
+            if not has_credentials:
+                cursor.close()
+                conn.close()
+                return jsonify({
+                    "status": "error",
+                    "message": f"This source ({_domain}) requires a subscription. Please add your subscription credentials in the app to access this content.",
+                    "error_type": "subscription_required",
+                    "subscription_domain": _domain,
+                    "newsletter_id": newsletter_id,
+                    "articles_found": 0,
+                    "articles_created": 0
+                }), 402
+
         # Check if this is a protected site that needs browser automation
         # REMOVED Guy Raz from browser automation - binary detection is now fixed
         use_browser = any(domain in processing_url for domain in ['quora.com', 'medium.com'])
@@ -1497,7 +1586,8 @@ def process_newsletter():
             if any(skip in url.lower() for skip in [
                 '/subscribe', '/login', '/account', '/newsletter', '/events/community/add',
                 'javascript:', 'mailto:', '#', '/search', '/contact', '/about', '/privacy',
-                '/terms', '/cookie', '/rss', '/feed', 'facebook.com', 'twitter.com', 'linkedin.com'
+                '/terms', '/cookie', '/rss', '/feed', 'facebook.com', 'twitter.com', 'linkedin.com',
+                '/topics/', '/category/', '/tag/', '/section/', '/authors/', '/columnist/'
             ]):
                 continue
             
@@ -1568,6 +1658,25 @@ def process_newsletter():
                     break
         
         # Limit articles but ensure main article is first
+        # GUARDRAIL: Reject articles with garbage titles (>100 chars or chrome keywords)
+        _chrome_keywords = ['share', 'reuse this content', 'more from', 'advertisement', 'sponsored']
+        _clean_articles = []
+        for a in article_urls:
+            title = a.get('title', '')
+            if len(title) > 100:
+                logging.warning(f"[GUARDRAIL] Rejected article with garbage title (>{len(title)} chars): {title[:60]}...")
+                continue
+            if any(kw in title.lower() for kw in _chrome_keywords):
+                logging.warning(f"[GUARDRAIL] Rejected article with chrome keyword in title: {title[:60]}")
+                continue
+            # Also reject topic/category URLs that slipped through
+            url = a.get('url', '')
+            if any(seg in url.lower() for seg in ['/topics/', '/category/', '/tag/', '/section/']):
+                logging.warning(f"[GUARDRAIL] Rejected topic/category URL: {url}")
+                continue
+            _clean_articles.append(a)
+        article_urls = _clean_articles
+        
         main_articles = [a for a in article_urls if a.get('is_main_article')]
         other_articles = [a for a in article_urls if not a.get('is_main_article')]
         article_urls = main_articles + other_articles[:max_articles-len(main_articles)]
@@ -2037,7 +2146,8 @@ def process_newsletter():
                         'article_text': article_content,
                         'request_string': article['title'],
                         'secret_id': user_id,
-                        'major_points_count': 4
+                        'major_points_count': 4,
+                        'source': 'newsletter'  # Skip per-article quota; batch already authorized
                     }
                     
                     # Enhanced binary content check for payload
@@ -2060,10 +2170,10 @@ def process_newsletter():
                         continue
                     
                     orchestrator_response = requests.post(
-                        'http://news-orchestrator-1:5012/generate-news',
+                        f'{NEWS_ORCHESTRATOR_URL}/generate-news',
                         json=payload,
                         timeout=180,
-                        headers={'Content-Type': 'application/json; charset=utf-8'}
+                        headers={**{'Content-Type': 'application/json; charset=utf-8'}, **_get_auth_headers(NEWS_ORCHESTRATOR_URL)}
                     )
                     
                     if orchestrator_response.status_code == 200:
@@ -2115,6 +2225,12 @@ def process_newsletter():
                             error_detail = error_response.get('error', 'Unknown orchestrator error')
                         except Exception as json_error:
                             error_detail = f"HTTP {orchestrator_response.status_code}"
+                        
+                        # If quota exceeded (shouldn't happen with source='newsletter', but defense-in-depth)
+                        if orchestrator_response.status_code == 429:
+                            logging.warning(f"[QUOTA] Orchestrator returned 429 — stopping remaining articles")
+                            failed_articles.append({"url": article['url'], "error": f"Quota exceeded: {error_detail}"})
+                            break  # Stop processing more articles
                         
                         logging.error(f"Orchestrator FAILED: {error_detail}")
                         failed_articles.append({"url": article['url'], "error": f"Orchestrator: {error_detail}"})
@@ -2228,6 +2344,61 @@ def process_newsletter():
             "message": f"Processing failed: {str(e)}",
             "error_type": "general_error"
         }), 500
+
+@app.route('/key_exchange', methods=['POST'])
+def key_exchange():
+    """DH key exchange Stage 2: receive client public key, compute shared secret, store AES key."""
+    try:
+        data = request.get_json()
+        device_id = data.get('device_id')
+        client_public_key = data.get('client_public_key')
+        newsletter_id = data.get('newsletter_id')
+        
+        if not device_id or not client_public_key:
+            return jsonify({"error": "device_id and client_public_key are required"}), 400
+        
+        logging.info(f"[KEY_EXCHANGE] device_id={device_id}, newsletter_id={newsletter_id}")
+        
+        # Get the server private key for this newsletter (stored during process_newsletter)
+        server_private_key = get_server_private_key_by_newsletter(newsletter_id) if newsletter_id else None
+        
+        if not server_private_key:
+            # Fallback: try to get from dh_server_keys by device_id
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT private_key FROM dh_server_keys WHERE device_id = %s ORDER BY created_at DESC LIMIT 1", (device_id,))
+                row = cursor.fetchone()
+                cursor.close()
+                conn.close()
+                if row:
+                    server_private_key = int(row[0])
+            except Exception as e:
+                logging.error(f"[KEY_EXCHANGE] Error getting server key: {e}")
+        
+        if not server_private_key:
+            return jsonify({"error": "No server key found. Please process a newsletter first."}), 404
+        
+        # Calculate shared secret
+        shared_secret = calculate_shared_secret(client_public_key, server_private_key)
+        
+        # Derive AES key
+        aes_key = derive_aes_key(shared_secret)
+        
+        # Store AES key for this device
+        store_device_aes_key(device_id, aes_key)
+        
+        logging.info(f"[KEY_EXCHANGE] Success for device {device_id}")
+        
+        return jsonify({
+            "status": "success",
+            "shared_secret_confirmed": True,
+            "device_id": device_id
+        })
+        
+    except Exception as e:
+        logging.error(f"[KEY_EXCHANGE] Error: {e}")
+        return jsonify({"error": f"Key exchange failed: {str(e)}"}), 500
 
 @app.route('/submit_credentials', methods=['POST'])
 def submit_credentials():

@@ -25,6 +25,31 @@ NEWS_GENERATOR_URL = os.getenv('NEWS_GENERATOR_URL', 'http://news-generator-1:50
 NEWS_PROCESSOR_URL = os.getenv('NEWS_PROCESSOR_URL', 'http://news-processor-1:5011')
 TRANSLATION_URL = os.getenv('TRANSLATION_URL', 'http://translation-service-1:5030')
 
+# OIDC token cache for authenticated inter-service calls on Cloud Run
+import time as _time
+_token_cache = {}
+
+def _get_auth_headers(target_url):
+    """Get OIDC identity token for inter-service calls on Cloud Run.
+    Returns empty dict locally (services are unauthenticated in Docker)."""
+    if target_url.startswith('http://'):
+        return {}  # Local Docker — no auth needed
+    # Cloud Run: fetch identity token from metadata server
+    audience = target_url.rstrip('/')
+    cached = _token_cache.get(audience)
+    if cached and cached['expires'] > _time.time():
+        return {'Authorization': f"Bearer {cached['token']}"}
+    metadata_url = f"http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience={audience}"
+    try:
+        resp = requests.get(metadata_url, headers={"Metadata-Flavor": "Google"}, timeout=5)
+        if resp.status_code == 200:
+            token = resp.text
+            _token_cache[audience] = {'token': token, 'expires': _time.time() + 3500}
+            return {'Authorization': f"Bearer {token}"}
+    except Exception as e:
+        logging.error(f"[AUTH] Failed to get identity token for {audience}: {e}")
+    return {}
+
 # Database connection
 def get_db_connection():
     return psycopg2.connect(
@@ -47,9 +72,49 @@ def generate_news():
         request_string = data.get('request_string', 'News Article')
         secret_id = data.get('secret_id', 'anonymous')
         major_points_count = data.get('major_points_count', 0)
+        source = data.get('source', 'direct')  # 'direct' | 'newsletter' — newsletter articles are pre-authorized
         
         if not article_text:
             return jsonify({"error": "Article text is required"}), 400
+        
+        # Entitlements check: verify user hasn't exceeded their news quota. FAIL-CLOSED.
+        # Newsletter-sourced articles SKIP per-article quota — the newsletter processor
+        # checks quota once for the whole batch (one newsletter = one quota unit).
+        if source == 'newsletter':
+            logging.info(f"[QUOTA] Skipping per-article quota for newsletter-sourced article (user={secret_id})")
+            # Still need word budget for narration capping
+            from entitlements import get_user_plan, words_budget_for_minutes
+            try:
+                plan = get_user_plan(secret_id)
+                max_narration_words = words_budget_for_minutes(plan.get('news_max_minutes'))
+            except Exception:
+                max_narration_words = words_budget_for_minutes(10)  # fallback: 10 min cap
+        else:
+            if not secret_id or secret_id == 'anonymous':
+                logging.warning("[QUOTA] Missing/anonymous secret_id — denying news (fail-closed)")
+                return jsonify({
+                    "allowed": False, "error": "auth_required",
+                    "message": "A valid user id is required to generate news."
+                }), 401
+
+            try:
+                from entitlements import check_news_quota
+                quota = check_news_quota(secret_id)
+            except Exception as quota_err:
+                logging.error(f"[QUOTA] News quota check failed — denying (fail-closed): {quota_err}")
+                return jsonify({
+                    "allowed": False, "error": "quota_check_failed",
+                    "message": "Could not verify your news quota. Please try again."
+                }), 503
+
+            if not quota['allowed']:
+                logging.info(f"[QUOTA] Denied news for {secret_id}: {quota}")
+                return jsonify(quota), 429
+            logging.info(f"[QUOTA] Allowed news for {secret_id}: used={quota['used']}, remaining={quota['remaining']}")
+
+            # Derive word budget from news_max_minutes for narration length capping
+            from entitlements import words_budget_for_minutes
+            max_narration_words = words_budget_for_minutes(quota.get('news_max_minutes'))
         
         # Generate unique article ID
         article_id = str(uuid.uuid4())
@@ -96,8 +161,8 @@ def generate_news():
         logging.info(f'Calling news generator for article {article_id} with {major_points_count} major points')
         generator_response = requests.post(
             f'{NEWS_GENERATOR_URL}/process-article/{article_id}',
-            json={'max_major_points': major_points_count},
-            headers={'Content-Type': 'application/json'},
+            json={'max_major_points': major_points_count, 'max_narration_words': max_narration_words},
+            headers={**{'Content-Type': 'application/json'}, **_get_auth_headers(NEWS_GENERATOR_URL)},
             timeout=30
         )
         
@@ -110,6 +175,7 @@ def generate_news():
         logging.info(f'Calling news processor for article {article_id}')
         processor_response = requests.post(
             f'{NEWS_PROCESSOR_URL}/process-audio/{article_id}',
+            headers=_get_auth_headers(NEWS_PROCESSOR_URL),
             timeout=120
         )
         
@@ -137,7 +203,7 @@ def download_news(article_id):
         language = request.args.get('language', 'en')
         
         # Validate language parameter
-        supported_languages = ['en', 'ru', 'es', 'fr', 'de', 'zh']
+        supported_languages = ['en', 'ru', 'es', 'fr', 'de', 'zh', 'ko']
         if language not in supported_languages:
             return jsonify({"error": f"Unsupported language: {language}. Supported: {supported_languages}"}), 400
         
