@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import '../screens/debug_log_viewer_screen.dart';
 import '../services/tour_translation_helper.dart';
 import '../config/endpoints.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'tour_player_screen.dart';
 import 'news_player_screen.dart';
@@ -924,6 +925,66 @@ class _MyToursScreenState extends State<MyToursScreen> {
     }
   }
   
+  Future<void> _reportTour(Map<String, dynamic> tour) async {
+    final tourTitle = tour['title'] ?? 'Unknown Tour';
+    final tourId = tour['tour_id'] ?? 'unknown';
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Report This Tour'),
+        content: Text(
+          'Report "$tourTitle" as objectionable content?\n\n'
+          'This will open an email to our support team with the tour details.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Report'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final subject = Uri.encodeComponent('Content Report: $tourTitle');
+    final body = Uri.encodeComponent(
+      'I would like to report the following tour content:\n\n'
+      'Tour: $tourTitle\n'
+      'Tour ID: $tourId\n\n'
+      'Reason for report:\n[Please describe the issue]\n\n'
+      '---\nSent from Audioura App',
+    );
+    final mailtoUri = Uri.parse('mailto:support@audioura.com?subject=$subject&body=$body');
+
+    try {
+      if (await canLaunchUrl(mailtoUri)) {
+        await launchUrl(mailtoUri);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open email client. Please email support@audioura.com directly.'), backgroundColor: Colors.orange),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   void _editTour(Map<String, dynamic> tour) {
     Navigator.push(
       context,
@@ -1326,6 +1387,11 @@ class _MyToursScreenState extends State<MyToursScreen> {
                         IconButton(
                           icon: const Icon(Icons.delete, color: Colors.red),
                           onPressed: () => _deleteTour(index),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.flag_outlined, color: Colors.grey),
+                          tooltip: 'Report this tour',
+                          onPressed: () => _reportTour(tour),
                         ),
                         const Icon(Icons.play_arrow, color: Color(0xFF3498db)),
                       ],
