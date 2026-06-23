@@ -31,6 +31,10 @@ from advertising_url_filter import AdvertisingURLFilter
 # Inter-service URL (env-var-driven for Cloud Run, default for local Docker)
 NEWS_ORCHESTRATOR_URL = os.getenv('NEWS_ORCHESTRATOR_URL', 'http://news-orchestrator-1:5012')
 
+# Internal service secret — used to prove identity to the orchestrator
+# (gateway strips X-Internal-Service from client requests, so this can't be spoofed)
+INTERNAL_SERVICE_SECRET = os.getenv('INTERNAL_SERVICE_SECRET', '')
+
 # OIDC token cache for authenticated inter-service calls on Cloud Run
 _oidc_token_cache = {}
 
@@ -961,10 +965,10 @@ def process_newsletter():
         newsletter_id = cursor.fetchone()[0]
         conn.commit()
         
-        # ── Batch-level news quota check ──────────────────────────────────────
+        # ── Batch-level news quota check + debit ─────────────────────────────
         # A single newsletter submission counts as ONE quota unit regardless of
-        # how many articles it contains.  Individual /generate-news calls use
-        # source='newsletter' to skip the per-article check.
+        # how many articles it contains. Individual /generate-news calls are
+        # authenticated via X-Internal-Service header (not a body field).
         if user_id and not test_mode:
             try:
                 from entitlements import check_news_quota
@@ -980,6 +984,21 @@ def process_newsletter():
                         "quota": quota
                     }), 429
                 logging.info(f"[QUOTA] Newsletter allowed for {user_id}: used={quota['used']}, remaining={quota['remaining']}")
+                
+                # DEBIT: Insert a single tracking row so this newsletter counts as
+                # one quota unit.  get_news_used_period counts article_requests rows,
+                # so one row = one unit consumed.  The article_id is a placeholder
+                # (the real articles get their own rows from the orchestrator).
+                _debit_id = f"newsletter-debit-{newsletter_id}"
+                cursor.execute("""
+                    INSERT INTO article_requests 
+                    (article_id, secret_id, request_string, status, created_at)
+                    VALUES (%s, %s, %s, 'newsletter_debit', %s)
+                    ON CONFLICT (article_id) DO NOTHING
+                """, (_debit_id, user_id, f"Newsletter quota debit (ID {newsletter_id})", datetime.now()))
+                conn.commit()
+                logging.info(f"[QUOTA] Debited 1 unit for newsletter {newsletter_id} (user={user_id})")
+                
             except Exception as quota_err:
                 logging.error(f"[QUOTA] Newsletter quota check failed — denying (fail-closed): {quota_err}")
                 cursor.close()
@@ -2146,8 +2165,7 @@ def process_newsletter():
                         'article_text': article_content,
                         'request_string': article['title'],
                         'secret_id': user_id,
-                        'major_points_count': 4,
-                        'source': 'newsletter'  # Skip per-article quota; batch already authorized
+                        'major_points_count': 4
                     }
                     
                     # Enhanced binary content check for payload
@@ -2173,7 +2191,11 @@ def process_newsletter():
                         f'{NEWS_ORCHESTRATOR_URL}/generate-news',
                         json=payload,
                         timeout=180,
-                        headers={**{'Content-Type': 'application/json; charset=utf-8'}, **_get_auth_headers(NEWS_ORCHESTRATOR_URL)}
+                        headers={
+                            'Content-Type': 'application/json; charset=utf-8',
+                            **(({'X-Internal-Service': INTERNAL_SERVICE_SECRET} if INTERNAL_SERVICE_SECRET else {})),
+                            **_get_auth_headers(NEWS_ORCHESTRATOR_URL)
+                        }
                     )
                     
                     if orchestrator_response.status_code == 200:

@@ -7,6 +7,7 @@ import sys
 import psycopg2
 from flask import Flask, request, jsonify, send_file
 import uuid
+import hmac
 import logging
 import requests
 from datetime import datetime
@@ -72,17 +73,26 @@ def generate_news():
         request_string = data.get('request_string', 'News Article')
         secret_id = data.get('secret_id', 'anonymous')
         major_points_count = data.get('major_points_count', 0)
-        source = data.get('source', 'direct')  # 'direct' | 'newsletter' — newsletter articles are pre-authorized
         
         if not article_text:
             return jsonify({"error": "Article text is required"}), 400
         
-        # Entitlements check: verify user hasn't exceeded their news quota. FAIL-CLOSED.
-        # Newsletter-sourced articles SKIP per-article quota — the newsletter processor
-        # checks quota once for the whole batch (one newsletter = one quota unit).
-        if source == 'newsletter':
-            logging.info(f"[QUOTA] Skipping per-article quota for newsletter-sourced article (user={secret_id})")
-            # Still need word budget for narration capping
+        # ── Caller identity verification ────────────────────────────────────
+        # Determine if this is a trusted internal service (newsletter-processor).
+        # Trust is established via X-Internal-Service header with a shared secret
+        # that the gateway STRIPS from inbound client requests (cannot be spoofed).
+        _INTERNAL_SERVICE_SECRET = os.getenv('INTERNAL_SERVICE_SECRET', '')
+        caller_token = request.headers.get('X-Internal-Service', '')
+        is_trusted_internal = (
+            _INTERNAL_SERVICE_SECRET
+            and caller_token
+            and hmac.compare_digest(caller_token, _INTERNAL_SERVICE_SECRET)
+        )
+        
+        if is_trusted_internal:
+            # Trusted internal caller (newsletter-processor) — skip per-article quota.
+            # The newsletter-processor does one batch-level quota check + debit upfront.
+            logging.info(f"[QUOTA] Internal service call verified — skipping per-article quota (user={secret_id})")
             from entitlements import get_user_plan, words_budget_for_minutes
             try:
                 plan = get_user_plan(secret_id)
@@ -90,6 +100,7 @@ def generate_news():
             except Exception:
                 max_narration_words = words_budget_for_minutes(10)  # fallback: 10 min cap
         else:
+            # External caller (via gateway or direct) — full auth + quota enforcement.
             if not secret_id or secret_id == 'anonymous':
                 logging.warning("[QUOTA] Missing/anonymous secret_id — denying news (fail-closed)")
                 return jsonify({

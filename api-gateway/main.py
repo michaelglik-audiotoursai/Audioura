@@ -156,7 +156,7 @@ def _proxy_request(backend_url, path, timeout=60):
     target_url = f"{backend_url}{path}"
     token = _get_identity_token(backend_url)
 
-    headers = {k: v for k, v in request.headers if k.lower() not in ('host', 'content-length', 'transfer-encoding')}
+    headers = {k: v for k, v in request.headers if k.lower() not in ('host', 'content-length', 'transfer-encoding', 'x-internal-service')}
     if token:
         headers['Authorization'] = f"Bearer {token}"
 
