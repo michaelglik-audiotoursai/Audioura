@@ -195,7 +195,7 @@ def download_tour(job_id):
     if not os.path.exists(output_path):
         return jsonify({"error": "File not found"}), 404
     
-    return send_file(output_path, as_attachment=True, attachment_filename=job["output_file"])
+    return send_file(output_path, as_attachment=True, download_name=job["output_file"])
 
 @app.route('/jobs', methods=['GET'])
 def list_jobs():

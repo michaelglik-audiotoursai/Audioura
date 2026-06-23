@@ -36,13 +36,37 @@ def _get_conn():
 
 
 def get_user_plan(user_id):
-    """Get the user's plan limits. Returns plan dict or free-tier defaults."""
+    """Get the user's plan limits. Returns plan dict or free-tier defaults.
+    Supports per-user tours_per_day_override (COALESCE: override > plan > default).
+    Raises on DB connection errors (caller returns 503).
+    """
+    if not user_id or user_id.strip() == '':
+        # Anonymous/empty user — return free defaults immediately (no DB hit)
+        print(f"[ENTITLEMENTS] Empty user_id — returning free defaults")
+        return {
+            'plan_id': 'free',
+            'tours_per_day': 1,
+            'tour_max_poi': 30,
+            'tour_max_minutes': 120,
+            'news_per_period': 10,
+            'news_period': 'week',
+            'news_max_minutes': 10,
+            'downloads_unlimited': True
+        }
     try:
         conn = _get_conn()
+    except Exception as e:
+        # DB connection failure — raise so orchestrator returns 503
+        print(f"[ENTITLEMENTS] DB CONNECTION ERROR getting plan for {user_id}: {e}")
+        raise
+
+    try:
         cur = conn.cursor()
-        # Get user's plan (user-first query)
+        # Get user's plan with per-user override support
         cur.execute("""
-            SELECT p.plan_id, p.tours_per_day, p.tour_max_poi, p.tour_max_minutes,
+            SELECT p.plan_id,
+                   COALESCE(u.tours_per_day_override, p.tours_per_day) AS tours_per_day,
+                   p.tour_max_poi, p.tour_max_minutes,
                    p.news_per_period, p.news_period, p.news_max_minutes, p.downloads_unlimited
             FROM users u
             JOIN plans p ON u.plan = p.plan_id
@@ -71,9 +95,13 @@ def get_user_plan(user_id):
                 'downloads_unlimited': row[7]
             }
     except Exception as e:
-        print(f"[ENTITLEMENTS] Error getting plan for {user_id}: {e}")
+        print(f"[ENTITLEMENTS] Error querying plan for {user_id}: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
     
-    # Fallback defaults if DB unavailable
+    # Fallback defaults if query fails (connected but query error) — last-resort backstop
     return {
         'plan_id': 'free',
         'tours_per_day': 1,
@@ -87,13 +115,23 @@ def get_user_plan(user_id):
 
 
 def get_tours_used_today(user_id):
-    """Count tours generated today by this user. Fails CLOSED (returns max) on error."""
+    """Count tours generated today by this user. 
+    Raises on DB connection errors (caller returns 503).
+    Returns 9999 only on unexpected query errors (last-resort backstop).
+    Only counts orchestrator-written rows (source='orchestrator') — the single authoritative writer."""
     try:
         conn = _get_conn()
+    except Exception as e:
+        # DB connection failure — raise so orchestrator returns 503
+        print(f"[ENTITLEMENTS] DB CONNECTION ERROR counting tours for {user_id}: {e}")
+        raise
+
+    try:
         cur = conn.cursor()
         cur.execute("""
             SELECT COUNT(*) FROM tour_requests 
             WHERE secret_id = %s AND started_at::date = CURRENT_DATE
+            AND source = 'orchestrator'
         """, (user_id,))
         count = cur.fetchone()[0]
         cur.close()
@@ -101,13 +139,25 @@ def get_tours_used_today(user_id):
         return count
     except Exception as e:
         print(f"[ENTITLEMENTS] ERROR counting tours for {user_id}: {e} — DENYING (fail-closed)")
-        return 9999  # Fail closed: deny on error
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return 9999  # Last-resort backstop: deny on query error
 
 
 def get_news_used_period(user_id, period='week'):
-    """Count news articles processed this period by this user. Fails CLOSED on error."""
+    """Count news articles processed this period by this user.
+    Raises on DB connection errors (caller returns 503).
+    Returns 9999 only on unexpected non-connection errors (last-resort backstop)."""
     try:
         conn = _get_conn()
+    except Exception as e:
+        # DB connection failure — raise so orchestrator returns 503
+        print(f"[ENTITLEMENTS] DB CONNECTION ERROR counting news for {user_id}: {e}")
+        raise
+
+    try:
         cur = conn.cursor()
         if period == 'day':
             cur.execute("""
@@ -133,7 +183,11 @@ def get_news_used_period(user_id, period='week'):
         return count
     except Exception as e:
         print(f"[ENTITLEMENTS] ERROR counting news for {user_id}: {e} — DENYING (fail-closed)")
-        return 9999  # Fail closed: deny on error
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return 9999  # Last-resort backstop: deny on query error
 
 
 def check_tour_quota(user_id, requested_stops=10):
@@ -162,6 +216,10 @@ def check_tour_quota(user_id, requested_stops=10):
         }
     
     # Clamp stops to plan maximum
+    # NOTE: tour_max_minutes is not enforced directly — the POI clamp serves as its proxy.
+    # Tour duration is roughly proportional to stop count (2-5 min/stop), so clamping POI
+    # to tour_max_poi effectively caps duration. Direct time enforcement would require
+    # post-generation measurement + rejection, which wastes the compute cost.
     clamped_stops = min(requested_stops, plan['tour_max_poi'])
     
     return {
@@ -190,6 +248,7 @@ def check_news_quota(user_id):
             'used': used,
             'max': plan['news_per_period'],
             'period': plan['news_period'],
+            'news_max_minutes': plan['news_max_minutes'],
             'upgrade': True
         }
     
@@ -198,5 +257,36 @@ def check_news_quota(user_id):
         'plan': plan['plan_id'],
         'used': used,
         'max': plan['news_per_period'],
-        'remaining': plan['news_per_period'] - used - 1
+        'remaining': plan['news_per_period'] - used - 1,
+        'news_max_minutes': plan['news_max_minutes']
     }
+
+
+# ---------------------------------------------------------------------------
+# News narration length enforcement
+# ---------------------------------------------------------------------------
+NEWS_WORDS_PER_MINUTE = int(os.getenv('NEWS_WPM', '150'))  # Polly ~150 wpm; tune via env, no redeploy
+
+
+def words_budget_for_minutes(max_minutes):
+    """Convert max_minutes entitlement to a word budget for narration text.
+    Returns None if no cap (max_minutes is 0 or None)."""
+    if not max_minutes or max_minutes <= 0:
+        return None
+    return int(max_minutes * NEWS_WORDS_PER_MINUTE)
+
+
+def truncate_to_word_budget(text, word_budget):
+    """Truncate text to word_budget words, cutting at the last sentence boundary.
+    Returns (text, was_truncated). If under budget, returns unchanged."""
+    if not word_budget or not text:
+        return text, False
+    words = text.split()
+    if len(words) <= word_budget:
+        return text, False
+    clipped = ' '.join(words[:word_budget])
+    # Cut at last sentence-ending punctuation for cleaner output
+    cut = max(clipped.rfind('.'), clipped.rfind('!'), clipped.rfind('?'))
+    if cut > 0:
+        clipped = clipped[:cut + 1]
+    return clipped, True

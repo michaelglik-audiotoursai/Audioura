@@ -9,6 +9,9 @@
 7. **⚠️ REPLACED**: Mobile Amazon-Q in Eclipse replaced by Kiro as of 2026-06-07
 8. **⚠️ AUTONOMY**: User grants full approval to execute changes — no propose-then-wait cycle
 
+## 🚫 FILE HYGIENE RULE (STANDING)
+Don't create backup copies of source files — no `_fixed`, `_backup`, `_working`, or `.bak` versions. Git is the history; edit the canonical file and commit. Put any throwaway, debug, or test-output files in `scratch/` (gitignored) and delete them when the task is done. Never leave temp files in the repo root.
+
 ## 🚨 POST-COMPACTION RECOVERY PROTOCOL
 When chat history is compacted, user will ask you to read `remind_ai.md` and `remind_mobile_ai.md`.
 **Your Response**:

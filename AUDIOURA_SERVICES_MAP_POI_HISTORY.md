@@ -1,154 +1,132 @@
-# Audioura Services — Map POI Workstream
-**Started:** May 15, 2026 (Session 11)
-**Branch:** Newsletters
-**Predecessor archive:** `AUDIOURA_SERVICES_SESSION_HISTORY_2026_05.md` (closed workstream; **do not load by default** into new sessions — only load if a specific debugging task crosses into tour-generation or translation internals)
+# Audioura Services — Carry-Forward Context (Cloud Migration)
 
-This document is the portable carry-forward context for the map POI workstream. Paste it into a fresh session if more changes are needed — it should give a new Claude enough context to be useful without re-reading the closed-workstream history.
+**Updated:** 2026-05-28 (Session 18+)
+**Active workstream:** **M02 — Phase B: Cloud-ready refactoring** (21 services → Google Cloud Run)
+**Branch:** `services-migration` (was `Newsletters`)
+**Purpose:** Paste this into a fresh session to continue the migration work without re-reading the full `claude_*` document trail. This is **migration-focused** — other workstreams (custom tours editing, generation pipeline, newsletter processing) are stable and summarised in §5 only as context.
 
 ---
 
-## Carry-forward facts from the closed workstream (Sessions 1–10)
+## 1. Where the migration stands
 
-Six structural facts from May 9–17 work are still load-bearing here. Everything else from that period — PHASE 3A/3B architecture, museum venue constraints, `_is_suspect` threshold tuning, file truncation recovery, translation hallucination fixes — is archived and not relevant to map work.
+**Goal:** Make all 21 Docker services run on Google Cloud Run with no behaviour change for end users.
 
-### 1. Service topology (Docker)
+**Phases (per migration plan):**
+- Phase A: assessment + planning. Done.
+- **Phase B: cloud-ready refactoring (current).** Design doc reviewed; awaiting implementation.
+- Phase C: GCP project setup.
+- Phase D: data migration (DB blobs → Cloudflare R2; existing tour ZIPs).
+- Phase E: production cutover.
+
+**Phase B design:** `migration/m02_phase_b_design_for_claude_review.md` (Kiro).
+**Claude review:** `migration/claude_response_m02_phase_b_design.md` — **approved with 4 decisions to make before coding** (see §3).
+
+---
+
+## 2. The three things Phase B must solve
+
+1. **Shared volume `/app/tours/`.** 7 services share it as a message bus during tour generation. Cloud Run is stateless — no shared FS. Solution: pass tour content (text, then ZIP) between services via HTTP instead of via disk; orchestrator still stores final ZIP in DB.
+2. **Hardcoded inter-service URLs.** Services call each other by Docker container names (`http://development-tour-generator-1:5000`). Cloud Run URLs are dynamic. Solution: env-var-driven URLs with current Docker names as defaults (so local dev keeps working).
+3. **2.7 GB of ZIP files in PostgreSQL BYTEA.** Expensive backups, slow restores. Solution: abstraction layer in Phase B (with `BlobStorage` interface, MinIO-backed local test); flip to R2 in Phase D.
+
+**Feature flag:** `TOUR_STORAGE_MODE=volume|cloud` (Kiro proposed `STORAGE_MODE`; Claude review recommended scoping the name). When unset → local Docker Compose behaviour unchanged. When `=cloud` → HTTP content passing + `/tmp` + DB blobs.
+
+---
+
+## 3. Four pre-implementation decisions (from the Claude review)
+
+These are **architectural calls Phase B's code depends on.** Resolve before writing the editing-service refactor.
+
+### 3.1 Edit-session state across multi-instance Cloud Run
+Today: `bulk-save` writes `/app/tours/<uuid>/` on disk; `promote` reads it later. In Cloud Run those two calls hit different instances → directory is gone. Three options:
+- **Collapse `bulk-save` + `promote` into one call.** Cheapest; loses naming-conflict UX.
+- **`draft=true` row in `audio_tours`.** [**Claude's recommendation**] Persist the draft ZIP in the DB between calls; `promote` flips the flag and sets the user's name. Preserves current UX.
+- **Cloud Run session affinity.** Fragile across deploys/recycles.
+
+### 3.2 `ACTIVE_JOBS` shared store
+Every async service (`generator`, `modernized`, `editing`) holds job status in a module-level `ACTIVE_JOBS = {}` dict. Per-instance — breaks the moment Cloud Run scales past 1 replica (POST creates job on A; GET `/status/<id>` hits B → 404). Options: Redis Memorystore (recommended), DB table, or pin services to `min=max=1` as a temporary measure.
+
+### 3.3 `translation_service.py` Dockerfile/runtime divergence
+Container builds from `./translation-service/translation_service.py` (8 KB, old) but the **live** logic (`translate_tour_with_audio`, `/translate-with-audio`) is the **root** `translation_service.py` (76 KB), `docker cp`'d in. A plain `docker compose build` would silently revert it. **Cloud Build will.** Fix the Dockerfile before any Cloud Run deploy of this service.
+
+### 3.4 Credentials externalization
+`tour_editing_phase2.py:97` has `password="password123"` hardcoded. Cloud Run images cannot ship credentials. Move all DB/AWS creds to env vars; local Compose injects via `.env`; Cloud Run injects via Secret Manager.
+
+---
+
+## 4. Critical caveats (don't relearn the hard way)
+
+- **9 stale sibling files in `development/`** (e.g. `tour_editing_phase2_*.py` × 9; multiple `tour_orchestrator_service*.py`; multiple `tour_editing*.py`). Docker Compose runs the file in its `command:` line, today; Cloud Build will copy whatever the Dockerfile says. Audit each service's Dockerfile vs. its `docker-compose.yml command:` *before* the migration touches it.
+- **Pre-fix tours stay broken.** Mobile reuses tours from the DB by `request_string` match. Fixes only show on newly generated tours. Cleanup of cached rows is required to verify any fix end-to-end.
+- **Translation needs `tour_content`** (DB text column). The legacy fallback `translate_zip_audio()` only understands embedded-base64 ZIPs — silently no-ops on modern separate-file ZIPs. Normal generated tours are fine because the orchestrator populates `tour_content`. The risk is for the in-flight Custom Tours `promote` work: that endpoint **must** populate `tour_content` or translation breaks silently.
+- **Deploy pattern is changing.** Today: `docker cp <file> <container>:/app/<file> && docker restart`. This works because of host-mounted source. **In Cloud Run, every change rebuilds the image.** Resolve every `docker cp` drift before cutover.
+
+---
+
+## 5. Other workstreams (context only — not active)
+
+- **Custom tours / editing / translation / `promote`.** Spec: `claude_spec_language_aware_editing.md` (Parts A/B/C services + Part D mobile). Work plan: `claude_workplan_tour_editing.md` (8 small tasks). `promote` endpoint still has open items from `claude_response_promote_endpoint_review.md`: DB unique index, `derived_from_tour_id` column, populating `tour_content`. **Should converge with migration:** the editing service's `ACTIVE_JOBS` and stale-sibling-files issues overlap with §3.2 / §4 here.
+- **Tour generation pipeline (PHASEs 1–6 + 3C + GEO-CHECK).** Stable. Session 17 (geographic_scope + walking-compactness haversine GEO-CHECK) shipped and approved with minor follow-ups (`claude_response_session17_approval.md`).
+- **Newsletter processing.** Two recent fixes shipped: `advertising_url_filter.py` (parse_qs + assertion tests, `claude_response_advertising_filter_fix.md`) and `newsletter_pattern_detector.py` (blog-homepage pattern for Ghost/WordPress/Substack, `claude_response_blog_homepage_pattern.md`).
+- **Needham in-tour map white screen.** Flutter-side bug diagnosed (`tour_map_screen.dart` `_fitBounds()` with single-POI degenerate bounds; fix: `if points.length == 1: move(point, 15)`). Status: confirm whether applied.
+
+---
+
+## 6. Service topology (current Docker, the migration's source of truth)
 
 | Service | Container | Port | Role |
 |---|---|---|---|
-| `tour-orchestrator` | `development-tour-orchestrator-1` | 5002 | Mobile-facing; coordinates the pipeline; stores result in DB |
-| `tour-generation-modernized` | `tour-generation-modernized-1` | 5021 | Splits assembled tour text into per-stop chunks; **generates `index.html`**; calls TTS; builds final ZIP |
-| `translation-service` | `translation-service-1` | 5030 | Translates tour text and re-renders HTML/audio for non-EN languages |
+| `tour-orchestrator` | `development-tour-orchestrator-1` | 5002 | Mobile-facing; coordinates pipeline; stores ZIP + row in `audio_tours` |
+| `tour-generator` | `development-tour-generator-1` | 5000 | `generate_tour_text.py` — POI generation (PHASEs 1–6) |
+| `tour-generation-modernized` | `tour-generation-modernized-1` | 5021 | Splits text into stops, builds `index.html`, calls TTS, builds ZIP |
+| `tour-editing-phase2` | `tour-editing-phase2-1` | 5022 | Tour editing — runs `tour_editing_phase2.py` (per docker-compose) |
+| `tour-editing-1` | (port 5020) | | Short title generation only; consolidation deferred |
+| `tour-id-resolution` | | 5025 | Resolves tour IDs by reading the volume → must switch to DB |
+| `translation-service` | `translation-service-1` | 5030 | Translates tours; **divergent Dockerfile, see §3.3** |
 | `polly-tts` | `polly-tts-1` | 5018 | AWS Polly wrapper |
-| `tour-generator` | `development-tour-generator-1` | 5000 | Runs `generate_tour_text.py`; OpenAI calls (not touched by map work) |
+| `map-delivery` | | 5005 | Serves tour ZIPs from DB BYTEA — **already volume-free** |
+| `newsletter-processor` | `newsletter-processor-1` | 5017 | Runs `newsletter_processor_service.py` |
+| (+ 11 others — see docker-compose.yml) | | | |
 
-### 2. Tour ZIP layout
+**DB:** PostgreSQL `audiotours` on host `postgres-2`. Tables: `audio_tours` (tours + translations, `audio_tour` BYTEA), `news_audios`. Migration needs `derived_from_tour_id` column on `audio_tours` (separate change, from the editing workstream).
 
-Every delivered ZIP contains:
-- `index.html` — the player UI loaded by Flutter's `flutter_inappwebview` WebView. **This is where map buttons live.**
-- `audio_1.mp3 … audio_N.mp3` — TTS output, one per stop.
-- `audio_1.txt … audio_N.txt` — per-stop metadata including the `Coordinates:` line used for map availability.
-- `tour_content.txt` — assembled tour text.
-- `manifest.json`, `service-worker.js` — PWA scaffolding.
-
-### 3. Modernized vs legacy HTML paths in `translation_service.py`
-
-There are two HTML rendering paths in translation, and **they behave differently for map buttons**:
-- **`_create_mobile_compatible_zip()`** (~line 1140) — modernized path. Reuses the original English `index.html` and only edits `<h1>`–`<h6>` and `<p>` text via `h.clear(); h.append(NavigableString(...))`. Buttons that are siblings of the headings survive untouched.
-- **`_generate_translated_html()`** (~line 1280) — legacy embedded-audio path. Regenerates HTML from scratch. **Would lose any baked-in buttons** unless the generator code is updated to emit them.
-
-### 4. The `Coordinates:` keyword must stay in English in all `audio_N.txt` files
-
-This was the Session 6 rule. `_NAV_LABEL_RE` matches all 5 nav-field labels; `_restore_metadata_labels` extracts the English `Coordinates:` / `Address:` lines from the original text and prepends them on top of the translated stop body. Tours 229 (ru) and 231 (zh) were affected before this fix. The map feature depends on this rule continuing to hold.
-
-### 5. Deploy pattern
-
+**Deploy pattern today (will change in Phase E):**
 ```bash
-docker cp <file>.py <container>:/app/<file>.py
-docker restart <container>
+docker cp <file>.py <container>:/app/<file>.py && docker restart <container>
 ```
 
-No container rebuild needed. After mobile confirms a bundle works, commit on the `Newsletters` branch.
+---
 
-### 6. Git state
+## 7. How to verify (migration smoke tests)
 
-Branch is `Newsletters`. Last pre-workstream commit `dc89045`. User has explicitly asked NOT to commit before mobile testing confirms each fix works end-to-end.
+Before declaring Phase B done, locally with `TOUR_STORAGE_MODE=cloud` set:
+
+1. **End-to-end tour generation works without the shared volume.** Mobile → orchestrator → generator → modernized → ZIP back to orchestrator → DB. No reads/writes to `/app/tours/` anywhere except `/tmp/`.
+2. **Multi-instance smoke test.** `docker-compose up --scale tour-generator=2 --scale tour-generation-modernized=2 --scale tour-editing-phase2=2`. Generation + editing + promote still work — surfaces the §3.2 `ACTIVE_JOBS` problem cheaply.
+3. **Health endpoints.** Every service's `/health` returns 200 *and actually checks dependency it needs* (DB connection, AWS client). Slow checks behind `/health/deep`.
+4. **No hardcoded credentials.** `grep -rn 'password=' --include='*.py' .` returns zero non-test hits.
+5. **Service URL audit.** `grep -rn 'http://[a-z0-9.-]*:' --include='*.py' .` returns only env-var reads, no raw container names.
+6. **Translation regression.** Generate a tour, translate to Russian, confirm audio is Russian (catches `translation_service.py` Dockerfile divergence — §3.3).
 
 ---
 
-## Session 11 — A#55: Per-stop map buttons in `index.html` (May 15–17)
+## 8. Document trail for migration
 
-### Request (from iOS Amazon-Q, May 15)
+Active:
+- `migration/m02_phase_b_design_for_claude_review.md` — Kiro's Phase B design.
+- `migration/claude_response_m02_phase_b_design.md` — Claude review + 4 pre-implementation decisions.
+- `AUDIOURA_CLOUD_MIGRATION_AND_LIFECYCLE.md` — overall migration plan.
+- `sir_michael_services_migration_overview.md`, `aws_migration_notes.md` — background context.
 
-Document: `services_request_a55_map_handler.md`.
+Adjacent (read on demand):
+- `claude_spec_language_aware_editing.md` + `claude_workplan_tour_editing.md` — custom-tours work; intersects migration at §3.1 / §3.2.
+- `claude_response_promote_endpoint_review.md` — promote endpoint open items.
+- `claude_advice_amazon_q_autonomy.md` — Eclipse plugin's limited per-tool permission UI; helper-script pattern in `dev_tools/deploy_test.sh` is the biggest win.
 
-The Audioura iOS app plays tours by loading `index.html` from the tour ZIP inside a `flutter_inappwebview` WebView. The app already has a full-screen map (`TourMapScreen`) that can open focused on any specific stop — it just needs to know which stop number to focus on. The request: add a map icon button next to each stop's audio player in the HTML; tapping it calls back to Flutter via `window.flutter_inappwebview.callHandler('openMap', {stop: N})`, and Flutter opens the map focused on stop N.
-
-The contract is fire-and-forget: JS calls Flutter, Flutter does the work, no return value. Stop numbers are 1-based and match `audio_N.txt` numbering. Buttons are only added for stops that have coordinates. The `Coordinates:` keyword must stay in English in all `audio_N.txt` files (Session 6 rule, already enforced).
-
-### Answers to iOS Amazon-Q's three questions
-
-**Q1 (HTML structure around each stop's audio player):** in `tour_generation_modernized.generate_html_with_external_audio()` each stop is wrapped as `<div class="audio-item"><h3>Title: Audio N</h3><audio>…</audio></div>`. Room to add the button next to `<audio>` or after `<h3>`.
-
-**Q2 (when is `index.html` generated):** once at tour creation time as a static string. Stop number can be hardcoded into the `onclick` — no JS loop needed at page load.
-
-**Q3 (translated tours):** the modernized translation path (`_create_mobile_compatible_zip()`) reuses the original HTML and only edits heading and paragraph text — buttons survive untouched. The separate legacy `_generate_translated_html()` (~line 1280) regenerates HTML from scratch and would lose any baked-in buttons. Both paths need the button code if the bake-in design is kept.
-
-### Three implementation suggestions (all accepted by Services Amazon-Q)
-
-1. **Don't put the button inside the `<h3>` tag.** The translation path does `h.clear()` then `h.append(NavigableString(translated_text))` on every `h1`–`h6` — that wipes out any child elements, including a button. Put the button as a sibling of the `<h3>` (after it, inside the `audio-item` div), not inside it. Otherwise translated tours lose their map buttons.
-
-2. **Use a single JS helper instead of inline `onclick`.** Inline `onclick="window.flutter_inappwebview.callHandler(...)"` works but is fragile (the browser or Android case will throw if `flutter_inappwebview` is undefined). One helper at the top of the page is cleaner and safer:
-
-    ```html
-    <script>
-    function openMap(stopNum) {
-      if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler) {
-        window.flutter_inappwebview.callHandler('openMap', {stop: stopNum});
-      }
-      // Silently noop in browsers / Android without handler — matches iOS doc's Rule 5
-    }
-    </script>
-    ```
-
-    Each button becomes `<button onclick="openMap(3)" …>🗺</button>`. Less duplicated code per stop, harmless on non-iOS platforms.
-
-3. **Use the structured data, not a regex over text.** The request doc suggests checking `audio_N.txt` for `Coordinates:` to decide whether to render the button. In services we have the actual `poi['coordinates']` field — checking `if poi.get('coordinates')` is more reliable and matches the museum-tour rule (only stop 1 has coords, per `coords_eligible` logic). No regex over text needed.
-
-### Minor concern: coordinate-detection regex on iOS
-
-The request doc cites the iOS detection regex as `Coordinates:\s*[-\d.]+\s*,[-\d.]+` (no whitespace permitted after the comma). Services emits `Coordinates: 42.3294, -71.1922` (space after the comma). Likely the live regex is `,\s*` and the doc is a transcription drift, but worth verifying in iOS source — if the doc reflects what's in code, walking-tour stops 2+ will fail to be detected as map-eligible. Flagged in the Android compat doc.
-
-### Open questions
-
-**OQ-1 — RESOLVED (2026-05-18): Option B chosen.** Buttons are baked into `index.html`
-at tour generation time by services. User explicitly instructed Services Amazon-Q to
-build the map buttons, which constitutes the decision to take Option B over Option C.
-Legacy tours (pre-600e0cd) will have no buttons — graceful degradation, not a crash.
-See `services_response_a55_review_findings.md` for full rationale.
-
-For reference, the three options that were under discussion:
-
-- **A.** Polling-timer fallback for tours without buttons — leaves dead code paths on mobile, bifurcates UX between old and new tours.
-- **B.** ✅ CHOSEN — Bake buttons into `index.html` at generation time. Services emits buttons; Flutter registers handler. Legacy tours have no buttons (graceful degradation).
-- **C.** Flutter injects buttons at load time via `evaluateJavascript` — single mechanism for legacy and new tours, removes button-baking from services scope entirely.
-
-**OQ-2 — Android compatibility.** The request doc's Rule 5 ("Works on iOS only") is misleading. `flutter_inappwebview.callHandler` is cross-platform; `addJavaScriptHandler` is plain Dart in `tour_player_screen.dart`. Whatever Android builds from that Dart, the handler runs on Android too. For Android to work without additional services-side or HTML changes, Android Amazon-Q must confirm: (1) Android uses the same `tour_player_screen.dart`; (2) Android has an equivalent map screen accepting `focusStopIndex`; (3) Android's WebView is `flutter_inappwebview` (not `webview_flutter`). All three appear present in the current Flutter codebase but need explicit confirmation before merge.
-
-See `services_response_a55_android_compat.md` for the full cross-platform notes sent back to iOS Amazon-Q.
-
-### State of fixes after Session 11
-
-A#55 implemented on `Tours_Step_Maps` (commits 600e0cd, 792487c, and follow-up).
-Buttons baked into `index.html` per Option B (OQ-1 RESOLVED). SVG replaced with
-`🗺` emoji to fix BeautifulSoup `viewBox` lowercasing bug in translated tours.
-Pending: iOS regex confirmation (Issue 4), Android scope confirmation (Issue 2).
-Not yet merged to `Newsletters`.
-
----
-
-## How to verify a map-related fix
-
-1. Generate a new walking tour (English) via `POST /generate-complete-tour` on `localhost:5002`.
-2. Poll `/status/<job_id>` until `completed` or `error`.
-3. Extract the ZIP and confirm `index.html` contains either baked-in `openMap(N)` buttons next to each stop with coordinates (if Option A or B from OQ-1), OR no buttons at all (if Option C, where Flutter injects them).
-4. Confirm `audio_N.txt` files contain `Coordinates: <lat>, <lon>` in English for stops that should be map-eligible.
-5. Open the tour on iOS — tap a map icon for stop N — `TourMapScreen` should open centered on stop N with N's marker highlighted.
-6. Repeat on Android — same behavior expected.
-7. Generate a translated version (e.g. `"language": "ru"`) and verify buttons still appear and `Coordinates:` is still in English in `audio_N.txt`.
-8. Open a museum tour — only stop 1 should have a button (other stops have no coordinates by `coords_eligible` logic).
-
----
-
-## Files worth reading first in a new session
-
-If a new Claude needs to understand this workstream, read in this order:
-
-1. `services_request_a55_map_handler.md` — iOS Amazon-Q's original request and contract.
-2. `services_response_a55_android_compat.md` — Services-side cross-platform / legacy-tour follow-up sent back to iOS.
-3. `session11_a55_map_handler_draft.md` — Session 11 draft (mostly subsumed by this doc; kept for reference).
-4. `tour_generation_modernized.py` — `generate_html_with_external_audio()` is where button baking would live for new tours.
-5. `translation_service.py` — `_create_mobile_compatible_zip()` (modernized path, ~line 1140) and `_generate_translated_html()` (legacy path, ~line 1280).
-6. `audio_tour_app/lib/screens/tour_player_screen.dart` — where the `openMap` handler registration would land.
-7. `audio_tour_app/lib/screens/tour_map_screen.dart` — Flutter map target for `focusStopIndex`.
-
-Do **not** load `AUDIOURA_SERVICES_SESSION_HISTORY_2026_05.md` by default — it covers a closed workstream and the only facts that survived are already in this doc's "Carry-forward facts" section. Reach for it only if a specific bug crosses back into tour-generation or translation internals.
+Key source files (the migration touches these directly):
+- `tour_orchestrator_service.py` — pipeline coordination, DB insert.
+- `generate_tour_text_service.py` / `generate_tour_text.py` — generator service wrapper + the PHASE 1–6 logic.
+- `tour_generation_modernized.py` — modernized ZIP builder, port 5021.
+- `tour_editing_phase2.py` — editing service, the most complex migration target.
+- `translation_service.py` (root 76 KB — the **live** one, not the 8 KB Dockerfile-copied one).
+- `docker-compose.yml` — source of truth for which file runs in which container.

@@ -147,7 +147,8 @@ class TranslationService:
             'fr': 'Celine', 
             'de': 'Marlene',
             'ru': 'Tatyana',
-            'zh': 'Zhiyu'
+            'zh': 'Zhiyu',
+            'ko': 'Seoyeon'
         }
         
         try:
@@ -280,7 +281,7 @@ class TranslationService:
             conn.close()
     
     def translate_zip_audio(self, zip_data, target_language):
-        """Translate audio content in ZIP file - extracts and replaces embedded base64 audio data"""
+        """Translate audio content in ZIP file - handles both embedded base64 and modernized (separate mp3) formats"""
         import tempfile
         import os
         import base64
@@ -316,6 +317,128 @@ class TranslationService:
                 
                 logging.info(f"Found {len(audio_matches)} embedded audio data URLs")
                 
+                # Detect modernized ZIP format: separate audio_N.mp3 files
+                existing_mp3s = sorted([f for f in os.listdir(extract_dir) if re.match(r'audio_\d+\.mp3', f)])
+                is_modernized_format = len(existing_mp3s) > 0
+                
+                if is_modernized_format and not audio_matches:
+                    # === MODERNIZED FORMAT: separate mp3 files ===
+                    logging.info(f"Modernized ZIP format detected ({len(existing_mp3s)} mp3 files). Translating and replacing audio.")
+                    
+                    # For each audio_N.mp3, source the text from its sibling audio_N.txt
+                    # (the exact narration script that produced the original mp3).
+                    # Fall back to HTML paragraph extraction only if .txt is missing.
+                    html_fallback_texts = None  # lazy-loaded if needed
+                    
+                    for i, mp3_filename in enumerate(existing_mp3s, start=1):
+                        mp3_path = os.path.join(extract_dir, mp3_filename)
+                        txt_path = os.path.join(extract_dir, f'audio_{i}.txt')
+                        
+                        # Determine source text for this stop
+                        if os.path.exists(txt_path):
+                            with open(txt_path, 'r', encoding='utf-8') as f:
+                                source_text = f.read().strip()
+                            logging.info(f"Stop {i}: sourced from audio_{i}.txt ({len(source_text)} chars)")
+                        else:
+                            # Fallback: extract from HTML paragraphs (imprecise, last resort)
+                            if html_fallback_texts is None:
+                                html_fallback_texts = []
+                                for p in soup.find_all('p'):
+                                    text = p.get_text().strip()
+                                    if text and len(text) > 10:
+                                        html_fallback_texts.append(text)
+                                logging.warning(f"audio_{i}.txt missing — falling back to HTML paragraphs ({len(html_fallback_texts)} elements)")
+                            
+                            idx = i - 1
+                            if idx < len(html_fallback_texts):
+                                source_text = html_fallback_texts[idx]
+                            else:
+                                logging.warning(f"No text source for stop {i}, keeping original {mp3_filename}")
+                                continue
+                        
+                        if not source_text:
+                            logging.warning(f"Empty text for stop {i}, keeping original {mp3_filename}")
+                            continue
+                        
+                        try:
+                            translated_text = self.translate_text(source_text, target_language)
+                            # Restore English Coordinates/Address lines so mobile app can parse map pins
+                            translated_text_with_meta = self._restore_metadata_labels(source_text, translated_text, target_language)
+                            # For TTS audio: strip nav/metadata fields (don't read coordinates aloud)
+                            tts_source = self._strip_nav_fields_for_tts(source_text)
+                            tts_translated = self.translate_text(tts_source, target_language)
+                            audio_bytes = self.generate_audio(tts_translated, target_language)
+                            if audio_bytes:
+                                with open(mp3_path, 'wb') as f:
+                                    f.write(audio_bytes)
+                                logging.info(f"Replaced {mp3_filename} with translated audio ({len(audio_bytes)} bytes)")
+                                # Also write translated script (with metadata) back to audio_N.txt
+                                with open(txt_path, 'w', encoding='utf-8') as f:
+                                    f.write(translated_text_with_meta)
+                            else:
+                                logging.warning(f"Polly returned no audio for stop {i}, keeping original {mp3_filename}")
+                        except Exception as e:
+                            logging.error(f"Error translating audio for stop {i}: {e}")
+                    
+                    # Translate visible HTML text content
+                    for tag in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                        for h in soup.find_all(tag):
+                            text = h.get_text().strip()
+                            if text:
+                                translated_text = self.translate_text(text, target_language)
+                                h.clear()
+                                h.append(NavigableString(translated_text))
+                    
+                    for p in soup.find_all('p'):
+                        text = p.get_text().strip()
+                        if text and len(text) > 5:
+                            translated_text = self.translate_text(text, target_language)
+                            p.clear()
+                            p.append(NavigableString(translated_text))
+                    
+                    # Update title
+                    title_tag = soup.find('title')
+                    if title_tag and title_tag.get_text().strip():
+                        translated_title = self.translate_text(title_tag.get_text(), target_language)
+                        title_tag.string = translated_title
+                    
+                    # Save updated HTML
+                    with open(html_file, 'w', encoding='utf-8') as f:
+                        f.write(str(soup))
+                    
+                    # Update manifest.json with translated name
+                    manifest_path = os.path.join(extract_dir, 'manifest.json')
+                    if os.path.exists(manifest_path):
+                        try:
+                            with open(manifest_path, 'r', encoding='utf-8') as f:
+                                manifest = json.load(f)
+                            original_name = manifest.get('name', '')
+                            if original_name:
+                                translated_manifest_name = self.translate_text(original_name, target_language)
+                                manifest['name'] = translated_manifest_name
+                                manifest['short_name'] = translated_manifest_name[:12]
+                            with open(manifest_path, 'w', encoding='utf-8') as f:
+                                json.dump(manifest, f, indent=2, ensure_ascii=False)
+                            logging.info(f"Updated manifest.json with translated name")
+                        except Exception as e:
+                            logging.warning(f"Could not update manifest.json: {e}")
+                    
+                    # Create new ZIP with translated content
+                    new_zip_path = os.path.join(temp_dir, "translated.zip")
+                    with zipfile.ZipFile(new_zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_ref:
+                        for root, dirs, files in os.walk(extract_dir):
+                            for file in files:
+                                file_path = os.path.join(root, file)
+                                arc_name = os.path.relpath(file_path, extract_dir)
+                                zip_ref.write(file_path, arc_name)
+                    
+                    with open(new_zip_path, 'rb') as f:
+                        translated_zip = f.read()
+                    
+                    logging.info(f"Successfully translated modernized ZIP with {len(existing_mp3s)} mp3 files replaced")
+                    return translated_zip
+                
+                # === LEGACY FORMAT: embedded base64 audio ===
                 # Extract text content for translation
                 text_elements = []
                 
@@ -1502,7 +1625,26 @@ def translate_content_with_audio():
             translated_id = None
         
         if translated_id:
-            results[lang] = {'status': 'translated', 'id': translated_id}
+            # Include translated tour_name so the mobile app can display the correct title
+            translated_name = None
+            try:
+                conn = translation_service.get_db_connection()
+                cur = conn.cursor()
+                table = 'audio_tours' if content_type == 'tour' else 'article_requests'
+                name_col = 'tour_name' if content_type == 'tour' else 'request_string'
+                cur.execute(f"SELECT {name_col} FROM {table} WHERE id = %s", (translated_id,))
+                row = cur.fetchone()
+                if row:
+                    translated_name = row[0]
+                cur.close()
+                conn.close()
+            except Exception as e:
+                logging.warning(f"Could not fetch translated name for {translated_id}: {e}")
+            
+            result_entry = {'status': 'translated', 'id': translated_id}
+            if translated_name:
+                result_entry['name'] = translated_name
+            results[lang] = result_entry
         else:
             results[lang] = {'status': 'failed', 'id': None}
     
@@ -1566,4 +1708,5 @@ def get_supported_languages():
         conn.close()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5030, debug=True)
+    port = int(os.getenv('PORT', '5030'))
+    app.run(host='0.0.0.0', port=port, debug=False)

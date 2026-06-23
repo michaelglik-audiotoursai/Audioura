@@ -27,6 +27,10 @@ class SubscriptionDetector:
         'washingtonpost.com': {
             'indicators': ['subscribe', 'subscription', 'premium'],
             'paywall_text': ['Subscribe to The Washington Post', 'This article is for subscribers']
+        },
+        'economist.com': {
+            'indicators': ['subscribe', 'subscription', 'premium', 'subscriber only', 'log in'],
+            'paywall_text': ['Subscribe to The Economist', 'This article is for subscribers', 'Subscriber only']
         }
     }
     

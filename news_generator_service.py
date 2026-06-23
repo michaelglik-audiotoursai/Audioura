@@ -568,6 +568,7 @@ def process_article(article_id):
         # Get number of major points requested (mobile app always sends this)
         data = request.get_json() if request.is_json else {}
         max_points = data.get('max_major_points', 0)
+        max_narration_words = data.get('max_narration_words')  # word budget from entitlements
         
         # Generate major points from cleaned text (can be 0)
         major_points = extract_major_points(cleaned_text, max_points) if max_points > 0 else []
@@ -575,6 +576,15 @@ def process_article(article_id):
         # Create final content with summary and full article
         processed_text = f"Summary: {summary}\n\nFull Article: {cleaned_text}"
         logging.info(f"Final processed_text length: {len(processed_text)} chars (should be ~8500 for Guy Raz)")
+        
+        # Enforce news_max_minutes via word budget truncation
+        if max_narration_words:
+            from entitlements import truncate_to_word_budget
+            processed_text, was_truncated = truncate_to_word_budget(processed_text, max_narration_words)
+            if was_truncated:
+                logging.info(f"[QUOTA] Narration truncated to ~{max_narration_words} words (news_max_minutes cap)")
+            else:
+                logging.info(f"[QUOTA] Narration within word budget ({len(processed_text.split())} words <= {max_narration_words})")
         
         # For RSS content, don't add author since it's already clean
         if ('EPISODE_TITLE:' in article_text or 

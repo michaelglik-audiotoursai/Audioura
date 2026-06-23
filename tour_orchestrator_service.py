@@ -5,6 +5,7 @@ import uuid
 import zipfile
 import shutil
 import time
+import signal
 import threading
 import requests
 import traceback
@@ -26,6 +27,20 @@ TRANSLATION_URL = os.getenv('TRANSLATION_URL', 'http://translation-service-1:503
 TOUR_UPDATE_URL = os.getenv('TOUR_UPDATE_URL', 'http://development-tour-update-1:5001')
 USER_API_URL = os.getenv('USER_API_URL', 'http://user-api-2:5000')
 COORDINATES_URL = os.getenv('COORDINATES_URL', 'http://coordinates-fromai:5004')
+
+# Cloud Tasks configuration (Part B architecture)
+# When GENERATION_MODE=cloud_tasks, the orchestrator enqueues to Cloud Tasks instead of threading.
+# When GENERATION_MODE=thread (default), uses the original daemon-thread approach (local Docker).
+GENERATION_MODE = os.getenv('GENERATION_MODE', 'thread')  # 'thread' or 'cloud_tasks'
+CLOUD_TASKS_QUEUE = os.getenv('CLOUD_TASKS_QUEUE', 'tour-generation')
+CLOUD_TASKS_LOCATION = os.getenv('CLOUD_TASKS_LOCATION', 'us-central1')
+GCP_PROJECT_ID = os.getenv('GCP_PROJECT_ID', 'audiotours-migration')
+TOUR_WORKER_URL = os.getenv('TOUR_WORKER_URL', 'https://tour-worker-60899077572.us-central1.run.app')
+# Service account for Cloud Tasks OIDC auth to the worker
+WORKER_SERVICE_ACCOUNT = os.getenv('WORKER_SERVICE_ACCOUNT', '')
+
+# Job store mode: 'memory' for local Docker, 'database' for Cloud Run (multi-instance safe)
+JOB_STORE_MODE = os.getenv('JOB_STORE_MODE', 'memory')
 
 
 def _get_auth_headers(target_url):
@@ -122,6 +137,152 @@ def log_request_info():
 # Global variables
 TOURS_DIR = "/app/tours"  # Docker volume mount point
 ACTIVE_JOBS = {}  # Track running jobs
+_ACTIVE_GENERATION_THREADS = []  # Track in-flight generation threads for graceful shutdown
+_SHUTTING_DOWN = False  # Signal that shutdown is in progress
+
+
+def _graceful_shutdown(signum, frame):
+    """Handle SIGTERM (Cloud Run shutdown signal) by waiting for in-flight generations."""
+    global _SHUTTING_DOWN
+    _SHUTTING_DOWN = True
+    active = [t for t in _ACTIVE_GENERATION_THREADS if t.is_alive()]
+    if active:
+        print(f"[SHUTDOWN] SIGTERM received. Waiting for {len(active)} in-flight generation(s) to complete (max 240s)...")
+        for t in active:
+            t.join(timeout=240)  # Below Cloud Run's 300s grace period to allow clean exit
+        still_active = [t for t in active if t.is_alive()]
+        if still_active:
+            print(f"[SHUTDOWN] WARNING: {len(still_active)} generation(s) did not finish in time.")
+        else:
+            print(f"[SHUTDOWN] All in-flight generations completed cleanly.")
+    else:
+        print(f"[SHUTDOWN] SIGTERM received. No in-flight generations. Exiting cleanly.")
+    sys.exit(0)
+
+
+signal.signal(signal.SIGTERM, _graceful_shutdown)
+
+
+def _enqueue_cloud_task(job_id, location, tour_type, total_stops, user_id, request_string, language):
+    """Enqueue a tour generation task to Cloud Tasks.
+    The task will HTTP-push to tour-worker's /run-job endpoint."""
+    try:
+        from google.cloud import tasks_v2
+        from google.protobuf import timestamp_pb2
+        import datetime as dt
+
+        client = tasks_v2.CloudTasksClient()
+        parent = client.queue_path(GCP_PROJECT_ID, CLOUD_TASKS_LOCATION, CLOUD_TASKS_QUEUE)
+
+        payload = json.dumps({
+            "job_id": job_id,
+            "location": location,
+            "tour_type": tour_type,
+            "total_stops": total_stops,
+            "user_id": user_id,
+            "request_string": request_string,
+            "language": language
+        })
+
+        task = {
+            "http_request": {
+                "http_method": tasks_v2.HttpMethod.POST,
+                "url": f"{TOUR_WORKER_URL}/run-job",
+                "headers": {"Content-Type": "application/json"},
+                "body": payload.encode(),
+            }
+        }
+
+        # Add OIDC token for authenticated worker access
+        if WORKER_SERVICE_ACCOUNT:
+            task["http_request"]["oidc_token"] = {
+                "service_account_email": WORKER_SERVICE_ACCOUNT,
+                "audience": TOUR_WORKER_URL,
+            }
+
+        # Set dispatch deadline (max time for the task to complete)
+        task["dispatch_deadline"] = {"seconds": 900}  # 15 min
+
+        response = client.create_task(request={"parent": parent, "task": task})
+        print(f"[CLOUD_TASKS] Enqueued task for job {job_id}: {response.name}")
+        return True
+    except Exception as e:
+        print(f"[CLOUD_TASKS] ERROR enqueuing task for job {job_id}: {e}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return False
+
+
+def _create_job_in_db(job_id, location, tour_type, total_stops, user_id, request_string, language):
+    """Create a job row in job_status table (for database-backed job tracking)."""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host=os.getenv('DB_HOST', 'postgres-2'),
+            database=os.getenv('DB_NAME', 'audiotours'),
+            user=os.getenv('DB_USER', 'admin'),
+            password=os.getenv('DB_PASSWORD', 'password123'),
+            port=os.getenv('DB_PORT', '5432')
+        )
+        cur = conn.cursor()
+        output_data = json.dumps({
+            "user_id": user_id,
+            "request_string": request_string,
+            "language": language,
+        })
+        cur.execute("""
+            INSERT INTO job_status (job_id, service_name, status, progress, location, tour_type, total_stops, output_data)
+            VALUES (%s, 'tour-orchestrator', 'queued', 'Job queued for processing', %s, %s, %s, %s)
+            ON CONFLICT (job_id) DO NOTHING
+        """, (job_id, location, tour_type, total_stops, output_data))
+        conn.commit()
+        cur.close()
+        conn.close()
+        print(f"[JOB_DB] Created job row for {job_id}")
+        return True
+    except Exception as e:
+        print(f"[JOB_DB] ERROR creating job row for {job_id}: {e}")
+        return False
+
+
+def _read_job_from_db(job_id):
+    """Read a job from job_status table (for /status endpoint in database mode)."""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host=os.getenv('DB_HOST', 'postgres-2'),
+            database=os.getenv('DB_NAME', 'audiotours'),
+            user=os.getenv('DB_USER', 'admin'),
+            password=os.getenv('DB_PASSWORD', 'password123'),
+            port=os.getenv('DB_PORT', '5432')
+        )
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT job_id, status, progress, location, tour_type, total_stops, output_data, error, created_at
+            FROM job_status WHERE job_id = %s
+        """, (job_id,))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        if not row:
+            return None
+        result = {
+            "job_id": row[0],
+            "status": row[1],
+            "progress": row[2],
+            "location": row[3],
+            "tour_type": row[4],
+            "total_stops": row[5],
+            "error": row[7],
+            "created_at": row[8].isoformat() if row[8] else None,
+        }
+        # Merge output_data fields
+        if row[6]:
+            extra = row[6] if isinstance(row[6], dict) else json.loads(row[6])
+            result.update(extra)
+        return result
+    except Exception as e:
+        print(f"[JOB_DB] ERROR reading job {job_id}: {e}")
+        return None
 
 def ensure_tours_directory():
     """Ensure the tours directory exists."""
@@ -762,6 +923,25 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         print(f"Traceback: {traceback.format_exc()}")
         ACTIVE_JOBS[job_id]["status"] = "error"
         ACTIVE_JOBS[job_id]["error"] = str(e)
+        
+        # Rollback usage row so a failed generation doesn't permanently consume quota
+        try:
+            import psycopg2 as _pg2
+            _rc = _pg2.connect(
+                host=os.getenv('DB_HOST', 'postgres-2'),
+                database=os.getenv('DB_NAME', 'audiotours'),
+                user=os.getenv('DB_USER', 'admin'),
+                password=os.getenv('DB_PASSWORD', 'password123'),
+                port=os.getenv('DB_PORT', '5432')
+            )
+            _rcur = _rc.cursor()
+            _rcur.execute("DELETE FROM tour_requests WHERE tour_id = %s AND source = 'orchestrator'", (job_id,))
+            _rc.commit()
+            _rcur.close()
+            _rc.close()
+            print(f"[QUOTA] Rolled back usage row for failed job {job_id}")
+        except Exception as rb_err:
+            print(f"[QUOTA] WARNING: Failed to rollback usage row: {rb_err}")
 
 def track_user_tour(user_id, tour_id, request_string):
     """Track a user's tour request in the user tracking service."""
@@ -923,12 +1103,18 @@ def generate_complete_tour():
     print(f"  language: {language}")
     
     # Validate language parameter
-    supported_languages = ['en', 'ru', 'es', 'fr', 'de', 'zh']
+    supported_languages = ['en', 'ru', 'es', 'fr', 'de', 'zh', 'ko']
     if language not in supported_languages:
         return jsonify({"error": f"Unsupported language: {language}. Supported: {supported_languages}"}), 400
     
     if not location or not tour_type:
         return jsonify({"error": "location and tour_type are required"}), 400
+    
+    # Reject new requests during graceful shutdown
+    if _SHUTTING_DOWN:
+        response = jsonify({"error": "Service is shutting down. Please retry in a few seconds."})
+        response.headers['Retry-After'] = '5'
+        return response, 503
     
     try:
         total_stops = int(total_stops)
@@ -937,24 +1123,63 @@ def generate_complete_tour():
     except ValueError:
         return jsonify({"error": "total_stops must be a valid integer"}), 400
     
-    # Entitlements check: verify user hasn't exceeded their plan limits
-    if user_id:
-        try:
-            from entitlements import check_tour_quota
-            quota = check_tour_quota(user_id, total_stops)
-            if not quota['allowed']:
-                print(f"[QUOTA] Denied tour for {user_id}: {quota}")
-                return jsonify(quota), 429
-            # Clamp stops to plan maximum
-            total_stops = quota['clamped_stops']
-            print(f"[QUOTA] Allowed for {user_id}: used={quota['used']}, remaining={quota['remaining']}, stops_clamped={total_stops}")
-        except Exception as quota_err:
-            print(f"[QUOTA] Error checking quota (allowing): {quota_err}")
-    
-    # Generate job ID
+    # Entitlements check: verify user hasn't exceeded their plan limits. FAIL-CLOSED.
+    # Reject missing/anonymous user_id (matches news path — consistent policy).
+    if not user_id or user_id.strip() == '':
+        print(f"[QUOTA] Missing/anonymous user_id — denying tour (fail-closed)")
+        return jsonify({
+            "allowed": False, "error": "auth_required",
+            "message": "A valid user id is required to generate tours."
+        }), 401
+
+    try:
+        from entitlements import check_tour_quota
+        quota = check_tour_quota(user_id, total_stops)
+    except Exception as quota_err:
+        print(f"[QUOTA] Tour quota check failed — denying (fail-closed): {quota_err}")
+        return jsonify({
+            "allowed": False, "error": "quota_check_failed",
+            "message": "Could not verify your tour quota. Please try again."
+        }), 503
+
+    if not quota['allowed']:
+        print(f"[QUOTA] Denied tour for {user_id}: {quota}")
+        return jsonify(quota), 429
+    # Clamp stops to plan maximum
+    total_stops = quota['clamped_stops']
+    print(f"[QUOTA] Allowed for {user_id}: used={quota['used']}, remaining={quota['remaining']}, stops_clamped={total_stops}")
+
+    # Generate job ID FIRST (needed for usage recording)
     job_id = str(uuid.uuid4())
     print(f"Generated job ID: {job_id}")
     sys.stdout.flush()
+
+    # Record usage immediately, keyed on job_id so we can rollback on failure.
+    # source='orchestrator' distinguishes from tracking-service rows (avoids double-counting).
+    _usage_row_id = None
+    try:
+        import psycopg2 as _pg
+        _conn = _pg.connect(
+            host=os.getenv('DB_HOST', 'postgres-2'),
+            database=os.getenv('DB_NAME', 'audiotours'),
+            user=os.getenv('DB_USER', 'admin'),
+            password=os.getenv('DB_PASSWORD', 'password123'),
+            port=os.getenv('DB_PORT', '5432')
+        )
+        _cur = _conn.cursor()
+        _cur.execute("""
+            INSERT INTO tour_requests (secret_id, tour_id, status, started_at, source)
+            VALUES (%s, %s, 'started', NOW(), 'orchestrator')
+            RETURNING id
+        """, (user_id, job_id))
+        _usage_row_id = _cur.fetchone()[0]
+        _conn.commit()
+        _cur.close()
+        _conn.close()
+        print(f"[QUOTA] Usage recorded for {user_id} (row_id={_usage_row_id}, job_id={job_id})")
+    except Exception as usage_err:
+        # Non-fatal: usage recording failure shouldn't block generation
+        print(f"[QUOTA] WARNING: Failed to record usage (non-fatal): {usage_err}")
     
     # Initialize job tracking
     ACTIVE_JOBS[job_id] = {
@@ -984,62 +1209,119 @@ def generate_complete_tour():
     else:
         print(f"User tracking skipped - user_id empty: {not user_id}, request_string empty: {not request_string}")
     
-    # Start orchestration in background thread
-    print(f"Starting orchestration in background thread")
-    sys.stdout.flush()
-    thread = threading.Thread(
-        target=orchestrate_tour_async,
-        args=(job_id, location, tour_type, total_stops, user_id, request_string, language)
-    )
-    thread.daemon = True
-    thread.start()
+    # === GENERATION MODE DISPATCH ===
+    if GENERATION_MODE == 'cloud_tasks':
+        # Part B: Enqueue to Cloud Tasks — worker does generation synchronously
+        # Job state lives in Cloud SQL (job_status table), readable by any instance
+        _create_job_in_db(job_id, location, tour_type, total_stops, user_id, request_string, language)
+        enqueued = _enqueue_cloud_task(job_id, location, tour_type, total_stops, user_id, request_string, language)
+        if not enqueued:
+            # Fallback: if Cloud Tasks enqueue fails, fall back to thread
+            print(f"[CLOUD_TASKS] Enqueue failed, falling back to thread mode for job {job_id}")
+            thread = threading.Thread(
+                target=orchestrate_tour_async,
+                args=(job_id, location, tour_type, total_stops, user_id, request_string, language)
+            )
+            thread.daemon = True
+            thread.start()
+            _ACTIVE_GENERATION_THREADS.append(thread)
+            _ACTIVE_GENERATION_THREADS[:] = [t for t in _ACTIVE_GENERATION_THREADS if t.is_alive()]
+    else:
+        # Legacy mode: background daemon thread (local Docker / single-instance)
+        print(f"Starting orchestration in background thread")
+        sys.stdout.flush()
+        thread = threading.Thread(
+            target=orchestrate_tour_async,
+            args=(job_id, location, tour_type, total_stops, user_id, request_string, language)
+        )
+        thread.daemon = True
+        thread.start()
+        _ACTIVE_GENERATION_THREADS.append(thread)
+        # Clean up completed threads from tracking list
+        _ACTIVE_GENERATION_THREADS[:] = [t for t in _ACTIVE_GENERATION_THREADS if t.is_alive()]
     
-    print(f"Returning response: job_id={job_id}, status=queued, language={language}")
+    print(f"Returning response: job_id={job_id}, status=queued, language={language}, mode={GENERATION_MODE}")
     sys.stdout.flush()
     return jsonify({"job_id": job_id, "status": "queued", "language": language})
 
 @app.route('/status/<job_id>', methods=['GET'])
 def get_job_status(job_id):
-    """Get job status."""
+    """Get job status. Reads from in-memory dict (thread mode) or database (cloud_tasks mode)."""
     print(f"\n==== STATUS REQUEST: {datetime.now().isoformat()} ====")
     print(f"Job ID: {job_id}")
     
-    if job_id not in ACTIVE_JOBS:
-        print(f"Job not found: {job_id}")
-        return jsonify({"error": "Job not found"}), 404
+    # Try in-memory first (covers thread mode and recently-created cloud_tasks jobs)
+    if job_id in ACTIVE_JOBS:
+        job = ACTIVE_JOBS[job_id]
+        response = {
+            "job_id": job_id,
+            "status": job["status"],
+            "progress": job.get("progress", ""),
+            "location": job.get("location", ""),
+            "tour_type": job.get("tour_type", ""),
+            "total_stops": job.get("total_stops", 0),
+            "created_at": job.get("created_at", "")
+        }
+        
+        if job["status"] == "completed":
+            if "output_zip" in job:
+                response["output_zip"] = job["output_zip"]
+            if "extract_dir" in job:
+                response["extract_dir"] = job["extract_dir"]
+            response["netlify_ready"] = job.get("netlify_ready", True)
+            if "coordinates" in job:
+                response["coordinates"] = job["coordinates"]
+            if "final_tour_id" in job:
+                response["final_tour_id"] = job["final_tour_id"]
+            if "translated_tour_id" in job:
+                response["translated_tour_id"] = job["translated_tour_id"]
+            if "expected_stops" in job:
+                response["expected_stops"] = job["expected_stops"]
+            if "actual_stops" in job:
+                response["actual_stops"] = job["actual_stops"]
+            if "stop_count_warning" in job:
+                response["stop_count_warning"] = job["stop_count_warning"]
+        elif job["status"] == "error":
+            response["error"] = job.get("error", "Unknown error")
+        
+        print(f"Returning status (memory): {response}")
+        return jsonify(response)
     
-    job = ACTIVE_JOBS[job_id]
-    response = {
-        "job_id": job_id,
-        "status": job["status"],
-        "progress": job["progress"],
-        "location": job["location"],
-        "tour_type": job["tour_type"],
-        "total_stops": job["total_stops"],
-        "created_at": job["created_at"]
-    }
+    # If not in memory, check database (cloud_tasks mode — worker writes status to DB)
+    if GENERATION_MODE == 'cloud_tasks' or JOB_STORE_MODE == 'database':
+        db_job = _read_job_from_db(job_id)
+        if db_job:
+            response = {
+                "job_id": db_job["job_id"],
+                "status": db_job["status"],
+                "progress": db_job.get("progress", ""),
+                "location": db_job.get("location", ""),
+                "tour_type": db_job.get("tour_type", ""),
+                "total_stops": db_job.get("total_stops", 0),
+                "created_at": db_job.get("created_at", "")
+            }
+            if db_job["status"] == "completed":
+                response["netlify_ready"] = True
+                if "final_tour_id" in db_job:
+                    response["final_tour_id"] = db_job["final_tour_id"]
+                if "english_tour_id" in db_job:
+                    response["english_tour_id"] = db_job["english_tour_id"]
+                if "coordinates" in db_job:
+                    response["coordinates"] = db_job["coordinates"]
+                if "output_zip" in db_job:
+                    response["output_zip"] = db_job["output_zip"]
+                if "actual_stops" in db_job:
+                    response["actual_stops"] = db_job["actual_stops"]
+                if "expected_stops" in db_job:
+                    response["expected_stops"] = db_job["expected_stops"]
+            elif db_job["status"] == "error":
+                response["error"] = db_job.get("error", "Unknown error")
+            
+            print(f"Returning status (database): {response}")
+            return jsonify(response)
     
-    if job["status"] == "completed":
-        response["output_zip"] = job["output_zip"]
-        response["extract_dir"] = job["extract_dir"]
-        response["netlify_ready"] = job["netlify_ready"]
-        if "coordinates" in job:
-            response["coordinates"] = job["coordinates"]
-        if "final_tour_id" in job:
-            response["final_tour_id"] = job["final_tour_id"]
-        if "translated_tour_id" in job:
-            response["translated_tour_id"] = job["translated_tour_id"]
-        if "expected_stops" in job:
-            response["expected_stops"] = job["expected_stops"]
-        if "actual_stops" in job:
-            response["actual_stops"] = job["actual_stops"]
-        if "stop_count_warning" in job:
-            response["stop_count_warning"] = job["stop_count_warning"]
-    elif job["status"] == "error":
-        response["error"] = job["error"]
-    
-    print(f"Returning status: {response}")
-    return jsonify(response)
+    print(f"Job not found: {job_id}")
+    return jsonify({"error": "Job not found"}), 404
 
 
 @app.route('/tour-status', methods=['POST'])
@@ -1125,7 +1407,7 @@ def download_tour(job_id):
             safe_filename = job["output_zip"].replace('\n', '_').replace('\r', '_').replace('/', '_').replace('\\', '_').replace(':', '_').replace('*', '_').replace('?', '_').replace('"', '_').replace('<', '_').replace('>', '_').replace('|', '_')
             
             print(f"Sending file from active jobs: {zip_path}")
-            return send_file(zip_path, as_attachment=True, attachment_filename=safe_filename)
+            return send_file(zip_path, as_attachment=True, download_name=safe_filename)
     
     # Try to find in database (for translated tours or older tours)
     try:
@@ -1173,7 +1455,7 @@ def download_tour(job_id):
             return send_file(
                 zip_buffer,
                 as_attachment=True,
-                attachment_filename=safe_filename,
+                download_name=safe_filename,
                 mimetype='application/zip'
             )
         else:
@@ -1255,6 +1537,101 @@ def list_jobs():
     
     print(f"Returning {len(jobs)} jobs")
     return jsonify({"jobs": jobs})
+
+
+# === ACCOUNT DELETION (Apple/Google Store requirement) ===
+@app.route('/delete-account/<secret_id>', methods=['DELETE'])
+def delete_account(secret_id):
+    """Full erasure of all personal data for a user. Idempotent.
+    Required by Apple App Store and Google Play Store policies.
+    Deletes from ALL tables keyed on secret_id/device_id, children before parents."""
+    print(f"\n==== DELETE ACCOUNT REQUEST: {datetime.now().isoformat()} ====")
+    print(f"secret_id: {secret_id}")
+    
+    if not secret_id or secret_id.strip() == '':
+        return jsonify({"error": "secret_id required"}), 400
+    
+    conn = None
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host=os.getenv('DB_HOST', 'postgres-2'),
+            database=os.getenv('DB_NAME', 'audiotours'),
+            user=os.getenv('DB_USER', 'admin'),
+            password=os.getenv('DB_PASSWORD', 'password123'),
+            port=os.getenv('DB_PORT', '5432')
+        )
+        cur = conn.cursor()
+        
+        # Everything in one transaction — fail-closed (all or nothing)
+        tables_deleted = []
+        
+        # --- Children of article_requests (must go first due to FK) ---
+        cur.execute("DELETE FROM news_audios WHERE article_id IN (SELECT article_id FROM article_requests WHERE secret_id = %s)", (secret_id,))
+        tables_deleted.append(('news_audios', cur.rowcount))
+        
+        # --- Credential/encryption tables (keyed on device_id or consolidated_user_id) ---
+        # The app may use secret_id as device_id, or they may be linked via consolidation.
+        # Delete by both: device_id = secret_id OR consolidated_user_id = secret_id
+        cur.execute("DELETE FROM user_subscription_credentials WHERE device_id = %s OR consolidated_user_id = %s", (secret_id, secret_id))
+        tables_deleted.append(('user_subscription_credentials', cur.rowcount))
+        
+        cur.execute("DELETE FROM dh_aes_keys WHERE device_id = %s", (secret_id,))
+        tables_deleted.append(('dh_aes_keys', cur.rowcount))
+        
+        cur.execute("DELETE FROM dh_server_keys WHERE device_id = %s", (secret_id,))
+        tables_deleted.append(('dh_server_keys', cur.rowcount))
+        
+        cur.execute("DELETE FROM device_encryption_keys WHERE device_id = %s", (secret_id,))
+        tables_deleted.append(('device_encryption_keys', cur.rowcount))
+        
+        # --- Consolidation tables ---
+        cur.execute("DELETE FROM device_consolidation_history WHERE consolidated_user_id = %s", (secret_id,))
+        tables_deleted.append(('device_consolidation_history', cur.rowcount))
+        
+        cur.execute("DELETE FROM user_consolidation_map WHERE consolidated_user_id = %s", (secret_id,))
+        tables_deleted.append(('user_consolidation_map', cur.rowcount))
+        
+        # --- Tables with FK to users (children, must go before users) ---
+        cur.execute("DELETE FROM coordinates WHERE secret_id = %s", (secret_id,))
+        tables_deleted.append(('coordinates', cur.rowcount))
+        
+        cur.execute("DELETE FROM map_requests WHERE secret_id = %s", (secret_id,))
+        tables_deleted.append(('map_requests', cur.rowcount))
+        
+        cur.execute("DELETE FROM tour_requests WHERE secret_id = %s", (secret_id,))
+        tables_deleted.append(('tour_requests', cur.rowcount))
+        
+        cur.execute("DELETE FROM article_requests WHERE secret_id = %s", (secret_id,))
+        tables_deleted.append(('article_requests', cur.rowcount))
+        
+        # --- Parent: users table (last — all FK children already removed) ---
+        cur.execute("DELETE FROM users WHERE secret_id = %s", (secret_id,))
+        tables_deleted.append(('users', cur.rowcount))
+        
+        conn.commit()
+        cur.close()
+        
+        total_rows = sum(count for _, count in tables_deleted)
+        print(f"[DELETE-ACCOUNT] Deleted {total_rows} total rows for {secret_id}")
+        for table, count in tables_deleted:
+            if count > 0:
+                print(f"  {table}: {count} rows")
+        
+        return jsonify({"deleted": True, "rows_removed": total_rows})
+    
+    except Exception as e:
+        print(f"[DELETE-ACCOUNT] ERROR: {e}")
+        if conn:
+            conn.rollback()
+        return jsonify({"error": "deletion_failed", "message": "Could not delete account. Please try again."}), 500
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
 
 if __name__ == '__main__':
     # Ensure tours directory exists

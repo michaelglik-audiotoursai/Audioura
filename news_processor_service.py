@@ -30,6 +30,30 @@ sys.stderr = sys.__stderr__
 POLLY_TTS_URL = os.getenv('POLLY_TTS_URL', 'http://polly-tts-1:5018')
 VOICE_CONTROL_URL = os.getenv('VOICE_CONTROL_URL', 'http://development-voice-control-1:5008')
 
+# OIDC token cache for authenticated inter-service calls on Cloud Run
+import time as _time
+_token_cache = {}
+
+def _get_auth_headers(target_url):
+    """Get OIDC identity token for inter-service calls on Cloud Run.
+    Returns empty dict locally (services are unauthenticated in Docker)."""
+    if target_url.startswith('http://'):
+        return {}  # Local Docker — no auth needed
+    audience = target_url.rstrip('/')
+    cached = _token_cache.get(audience)
+    if cached and cached['expires'] > _time.time():
+        return {'Authorization': f"Bearer {cached['token']}"}
+    metadata_url = f"http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience={audience}"
+    try:
+        resp = requests.get(metadata_url, headers={"Metadata-Flavor": "Google"}, timeout=5)
+        if resp.status_code == 200:
+            token = resp.text
+            _token_cache[audience] = {'token': token, 'expires': _time.time() + 3500}
+            return {'Authorization': f"Bearer {token}"}
+    except Exception as e:
+        logging.error(f"[AUTH] Failed to get identity token for {audience}: {e}")
+    return {}
+
 # Database connection
 def get_db_connection():
     return psycopg2.connect(
@@ -57,6 +81,7 @@ def generate_short_title(original_title, article_type):
                 'article_type': article_type,
                 'max_words': 12
             },
+            headers=_get_auth_headers(VOICE_CONTROL_URL),
             timeout=10
         )
         
@@ -175,6 +200,7 @@ def generate_audio_with_polly(text, output_path):
                 'voice_id': 'Joanna',
                 'output_format': 'mp3'
             },
+            headers=_get_auth_headers(POLLY_TTS_URL),
             timeout=300  # 5 minutes for very long articles
         )
         

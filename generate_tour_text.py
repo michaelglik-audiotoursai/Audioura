@@ -49,6 +49,15 @@ _EXPLICIT_NON_MUSEUM_TOUR_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Multi-building institution keywords — these should NOT be classified as single-venue museum
+# even if GPT returns a venue_name. They imply multiple distinct locations.
+# PLURAL-ONLY: "libraries" (multi) blocks museum; "library" (single) does not.
+_MULTI_BUILDING_INSTITUTION_RE = re.compile(
+    r'\b(libraries|churches|schools|synagogues|mosques|temples'
+    r'|buildings|branches|historic\s+houses|fire\s+stations)\b',
+    re.IGNORECASE,
+)
+
 def _haversine_km(a, b):
     """Straight-line distance in km between two (lat, lng) tuples."""
     lat1, lon1 = a; lat2, lon2 = b
@@ -655,12 +664,15 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
         # Safety net (_EXPLICIT_NON_MUSEUM_TOUR_RE) prevents GPT-hallucinated venue_names
         # on "walking tour starting at X" / "restaurant tour near X" requests from
         # silently flipping the category. See S15 Claude review §3.
-        if intent.get('venue_name') and not _EXPLICIT_NON_MUSEUM_TOUR_RE.search(location):
+        if intent.get('venue_name') and not _EXPLICIT_NON_MUSEUM_TOUR_RE.search(location) and not _MULTI_BUILDING_INSTITUTION_RE.search(location):
             tour_category = 'museum'
             print(f"  [S15] Forced tour_category=museum from venue_name='{intent['venue_name']}'")
         else:
             if intent.get('venue_name'):
-                print(f"  [S15] venue_name='{intent['venue_name']}' overridden — location contains explicit non-museum phrase")
+                if _MULTI_BUILDING_INSTITUTION_RE.search(location):
+                    print(f"  [S15] venue_name='{intent['venue_name']}' overridden — location contains multi-building institution keyword")
+                else:
+                    print(f"  [S15] venue_name='{intent['venue_name']}' overridden — location contains explicit non-museum phrase")
             tour_category = _classify_tour_category(location, tour_type)
     else:
         print("⚠️ Intent analysis failed, using fallback detection")
@@ -982,11 +994,42 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
         for p in poi_list:
             forbidden_norms.add(_normalize_name(p["name"]))
 
+        # -------- Detect user-explicit stops --------
+        # When the user request contains "with stops at X, Y, Z" or "stops: X, Y, Z",
+        # those POI names are sacrosanct — PHASE 3C must NOT remove them based on address.
+        # The user knows better than the address validator which stops they want.
+        _explicit_stop_names = set()
+        _explicit_match = re.search(r'(?:with\s+)?stops\s+(?:at|:)\s*(.+?)(?:,\s*(?:[A-Z]{2})\s*$|$)', location, re.IGNORECASE)
+        if _explicit_match:
+            _explicit_raw = _explicit_match.group(1)
+            # Split on commas, strip whitespace and leading dots/periods
+            _explicit_candidates = [s.strip().strip('.').strip() for s in _explicit_raw.split(',')]
+            # Filter out state/city suffixes (short tokens like "MA", "Milton")
+            for cand in _explicit_candidates:
+                if len(cand) > 3 and not re.match(r'^[A-Z]{2}$', cand.strip()):
+                    _explicit_stop_names.add(_normalize_name(cand))
+            if _explicit_stop_names:
+                print(f"   [PHASE 3C bypass] User-explicit stops detected: {_explicit_stop_names}")
+
         # -------- PHASE 3C: address-based location guard --------
         # Runs BEFORE Part C so rejected stops can be replaced by the replacement loop.
         # Museum tours with a single venue are skipped -- all stops are inside one building.
-        if tour_category != 'museum' or not _museum_venue_name:
-            location_rejects = [p for p in poi_list if not _address_matches_location(p.get('address', ''), location)]
+        # Walking tours are skipped -- the GEO-CHECK (coordinate-based distance validation)
+        # after Phase 3B is a better proximity check than town-name matching. Stops on town
+        # borders (e.g. Milton/Dorchester/Hyde Park) share geography but differ in postal city,
+        # so address matching produces false rejections for walking tours.
+        if tour_category == 'walking':
+            print(f"   PHASE 3C: skipped for walking tours (GEO-CHECK handles proximity)")
+        elif tour_category != 'museum' or not _museum_venue_name:
+            location_rejects = []
+            for p in poi_list:
+                p_norm = _normalize_name(p['name'])
+                # Skip address check for user-explicit stops
+                if p_norm in _explicit_stop_names:
+                    print(f"   PHASE 3C: KEPT '{p['name']}' (user-explicit stop, address check bypassed)")
+                    continue
+                if not _address_matches_location(p.get('address', ''), location):
+                    location_rejects.append(p)
             if location_rejects:
                 for p in location_rejects:
                     print(f"   PHASE 3C: REMOVED '{p['name']}' -- address '{p['address']}' not in '{location}'")
@@ -1073,8 +1116,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
 
                 # Verify the new stops too (same PHASE 4 logic)
                 survived, _ = _verify_against_intent(new_stops)
-                # Also apply PHASE 3C address check to replacements
-                if tour_category != 'museum' or not _museum_venue_name:
+                # Also apply PHASE 3C address check to replacements (skip for walking tours)
+                if tour_category == 'walking':
+                    pass  # GEO-CHECK handles proximity for walking tours
+                elif tour_category != 'museum' or not _museum_venue_name:
                     survived = [p for p in survived if _address_matches_location(p.get('address', ''), location)]
                 survived = survived[:needed]
                 poi_list.extend(survived)
@@ -1306,6 +1351,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
                 # Dedupe (a stop can be flagged by two adjacent legs)
                 seen_ids = set()
                 outliers = [o for o in outliers if id(o) not in seen_ids and not seen_ids.add(id(o))]
+                # Protect user-explicit stops from GEO-CHECK removal — the user knows
+                # their named stops may be far apart (regional/driving tour); honor the request.
+                if _explicit_stop_names:
+                    protected = [o for o in outliers if _normalize_name(o['name']) in _explicit_stop_names]
+                    if protected:
+                        for p in protected:
+                            print(f"   GEO-CHECK: KEPT '{p['name']}' (user-explicit stop, distance check bypassed)")
+                        outliers = [o for o in outliers if o not in protected]
                 if outliers and (len(poi_list) - len(outliers)) >= 2:
                     for p in outliers:
                         print(f"   GEO-CHECK: REMOVED '{p['name']}' — exceeds walking-tour distance limit")
@@ -1626,9 +1679,17 @@ DO NOT include directions to the next stop - these will be added separately.
             poi_content += f"Address: {poi['address']}\n\n"
         
         # Add coordinates if available
-        # Museum tours: first stop only (all exhibits in same building)
+        # Museum tours with a single venue: first stop only (all exhibits in same building)
+        # Museum tours with DIFFERENT coordinates per stop: every stop (multiple buildings)
         # All other tours: every stop (different geo locations need map pins)
-        coords_eligible = (tour_category == 'museum' and i == 0) or (tour_category != 'museum')
+        if tour_category == 'museum':
+            # Check if stops have different coordinates (multi-building "museum" like libraries)
+            all_coords = [p.get("coordinates") for p in poi_list if p.get("coordinates")]
+            unique_coords = set(all_coords)
+            is_single_building = len(unique_coords) <= 1
+            coords_eligible = (i == 0) if is_single_building else True
+        else:
+            coords_eligible = True
         if coords_eligible and poi.get("coordinates"):
             poi_content += f"Coordinates: {poi['coordinates']}\n\n"
         
