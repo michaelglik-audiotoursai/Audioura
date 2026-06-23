@@ -47,21 +47,26 @@ class Endpoints {
     Service.translation: '/translation',
   };
 
+  /// Default cloud base URL — baked into the build, no user input needed.
+  static const _defaultCloudBaseUrl = 'https://api.audioura.com';
+
+  /// Gateway API key — injected at build time via --dart-define=GATEWAY_API_KEY=...
+  /// NEVER hardcode the actual key in source.
+  static const _builtInApiKey = String.fromEnvironment('GATEWAY_API_KEY');
+
   /// Returns the base URL for [s] based on current server_mode.
   /// Local:  http://<server_ip>:<port>
   /// Cloud (interim, bare per-service host):  <cloud_base_url>   (no prefix)
   /// Cloud (gateway, cloud_use_path_prefixes=true):  <cloud_base_url><path_prefix>
   static Future<String> base(Service s) async {
     final prefs = await SharedPreferences.getInstance();
-    final mode = prefs.getString('server_mode') ?? 'local';
+    final mode = prefs.getString('server_mode') ?? 'cloud';
     if (mode == 'cloud') {
+      // Use stored URL if set, otherwise fall back to compiled-in default
       final cloudBase = (prefs.getString('cloud_base_url') ?? '').trim();
-      if (cloudBase.isEmpty) throw StateError('Cloud base URL not set — open About and enter it.');
-      // Interim (bare per-service host): prefixes OFF by default.
-      // Enable when a gateway that routes+strips path prefixes is deployed.
-      final usePrefix = prefs.getBool('cloud_use_path_prefixes') ?? false;
-      // Use ?? '' to degrade gracefully if a new Service is added without a _cloudPaths entry.
-      return usePrefix ? '$cloudBase${_cloudPaths[s] ?? ''}' : cloudBase;
+      final effectiveBase = cloudBase.isNotEmpty ? cloudBase : _defaultCloudBaseUrl;
+      // Path prefixes are hardcoded OFF (api.audioura.com routes by root path)
+      return effectiveBase;
     }
     final ip = prefs.getString('server_ip') ?? Config.defaultServerIp;
     return 'http://$ip:${_localPorts[s]}';
@@ -75,7 +80,7 @@ class Endpoints {
   /// difference: local uses /download/<id>, cloud gateway uses /news-download/<id>.
   static Future<Uri> newsDownloadUrl(String articleId, String userId) async {
     final prefs = await SharedPreferences.getInstance();
-    final mode = prefs.getString('server_mode') ?? 'local';
+    final mode = prefs.getString('server_mode') ?? 'cloud';
     final baseUrl = await base(Service.news);
     final path = mode == 'cloud' ? '/news-download/$articleId' : '/download/$articleId';
     return Uri.parse('$baseUrl$path').replace(queryParameters: {'user_id': userId});
@@ -85,7 +90,7 @@ class Endpoints {
   /// Local: /status/<id>, Cloud: /news-status/<id>
   static Future<Uri> newsStatusUrl(String articleId) async {
     final prefs = await SharedPreferences.getInstance();
-    final mode = prefs.getString('server_mode') ?? 'local';
+    final mode = prefs.getString('server_mode') ?? 'cloud';
     final baseUrl = await base(Service.news);
     final path = mode == 'cloud' ? '/news-status/$articleId' : '/status/$articleId';
     return Uri.parse('$baseUrl$path');
@@ -99,9 +104,11 @@ class Endpoints {
   static Future<Map<String, String>> apiHeaders(Service s, {Map<String, dynamic>? requestBody}) async {
     final prefs = await SharedPreferences.getInstance();
     final headers = {'Content-Type': 'application/json'};
-    final mode = prefs.getString('server_mode') ?? 'local';
+    final mode = prefs.getString('server_mode') ?? 'cloud';
     if (mode == 'cloud') {
-      final key = (prefs.getString('gateway_api_key') ?? '').trim();
+      // Use stored key if set, otherwise fall back to compiled-in key from --dart-define
+      final storedKey = (prefs.getString('gateway_api_key') ?? '').trim();
+      final key = storedKey.isNotEmpty ? storedKey : _builtInApiKey;
       if (key.isNotEmpty) headers['X-API-Key'] = key;
 
       // Attestation for cost-bearing endpoints only

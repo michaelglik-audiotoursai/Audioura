@@ -30,7 +30,7 @@ class _AboutScreenState extends State<AboutScreen> {
   final TextEditingController _cloudBaseUrlController = TextEditingController();
   final TextEditingController _apiKeyController = TextEditingController();
   String _currentServerIp = '192.168.0.218';
-  String _serverMode = 'local';
+  String _serverMode = 'cloud';
   bool _usePathPrefixes = false;
   String _selectedMode = 'Tours';
 
@@ -82,7 +82,7 @@ class _AboutScreenState extends State<AboutScreen> {
       
       // Load saved server IP and cloud settings
       final savedIp = prefs.getString('server_ip') ?? '192.168.0.218';
-      final savedServerMode = prefs.getString('server_mode') ?? 'local';
+      final savedServerMode = prefs.getString('server_mode') ?? 'cloud';
       final savedCloudBaseUrl = prefs.getString('cloud_base_url') ?? '';
       final savedUsePathPrefixes = prefs.getBool('cloud_use_path_prefixes') ?? false;
       final savedApiKey = prefs.getString('gateway_api_key') ?? '';
@@ -242,99 +242,13 @@ class _AboutScreenState extends State<AboutScreen> {
                       ),
                     ],
                   ),
-                  // Cloud base URL field — shown in cloud mode
-                  if (_serverMode == 'cloud') Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Cloud Base URL:',
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _cloudBaseUrlController,
-                              decoration: const InputDecoration(
-                                hintText: 'https://api.audioura.com',
-                                border: OutlineInputBorder(),
-                                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                helperText: 'Gateway: https://api.audioura.com',
-                              ),
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          ElevatedButton(
-                            onPressed: _saveCloudBaseUrl,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            ),
-                            child: const Text('Save', style: TextStyle(fontSize: 12)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        '✅ Cloud mode: all services (tours, news, newsletters) route through api.audioura.com.',
-                        style: TextStyle(fontSize: 11, color: Colors.green),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'API Key:',
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _apiKeyController,
-                              obscureText: true,
-                              decoration: const InputDecoration(
-                                hintText: 'Gateway API key',
-                                border: OutlineInputBorder(),
-                                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              ),
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          ElevatedButton(
-                            onPressed: _saveApiKey,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            ),
-                            child: const Text('Save', style: TextStyle(fontSize: 12)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Required for cloud generation. Never share or commit this key.',
-                        style: TextStyle(fontSize: 11, color: Colors.orange),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Checkbox(
-                            value: _usePathPrefixes,
-                            onChanged: (val) => _setUsePathPrefixes(val ?? false),
-                          ),
-                          const Expanded(
-                            child: Text(
-                              'Use gateway path routing (leave unchecked — api.audioura.com routes by root path)',
-                              style: TextStyle(fontSize: 12),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                  // Cloud mode — no fields needed (values baked in via --dart-define)
+                  if (_serverMode == 'cloud') const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text(
+                      '✅ Cloud mode active — connected to api.audioura.com',
+                      style: TextStyle(fontSize: 12, color: Colors.green),
+                    ),
                   ),
                 ],
               ),
