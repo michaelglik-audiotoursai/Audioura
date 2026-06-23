@@ -147,7 +147,14 @@ def get_tours_used_today(user_id):
 
 
 def get_news_used_period(user_id, period='week'):
-    """Count news articles processed this period by this user.
+    """Count news quota units consumed this period by this user.
+    
+    Counting rules:
+      - Direct articles (not linked to a newsletter) count as 1 each.
+      - Newsletter debit rows (status='newsletter_debit') count as 1 each.
+      - Newsletter-sourced articles (linked via newsletters_article_link) are EXCLUDED
+        because the newsletter debit row already accounts for the whole batch.
+    
     Raises on DB connection errors (caller returns 503).
     Returns 9999 only on unexpected non-connection errors (last-resort backstop)."""
     try:
@@ -160,23 +167,23 @@ def get_news_used_period(user_id, period='week'):
     try:
         cur = conn.cursor()
         if period == 'day':
-            cur.execute("""
-                SELECT COUNT(*) FROM article_requests 
-                WHERE secret_id = %s
-                AND created_at::date = CURRENT_DATE
-            """, (user_id,))
+            date_filter = "AND ar.created_at::date = CURRENT_DATE"
         elif period == 'week':
-            cur.execute("""
-                SELECT COUNT(*) FROM article_requests 
-                WHERE secret_id = %s
-                AND created_at >= date_trunc('week', CURRENT_DATE)
-            """, (user_id,))
+            date_filter = "AND ar.created_at >= date_trunc('week', CURRENT_DATE)"
         else:  # month
-            cur.execute("""
-                SELECT COUNT(*) FROM article_requests 
-                WHERE secret_id = %s
-                AND created_at >= date_trunc('month', CURRENT_DATE)
-            """, (user_id,))
+            date_filter = "AND ar.created_at >= date_trunc('month', CURRENT_DATE)"
+        
+        # Count only: direct articles (no newsletter link) + newsletter debit rows.
+        # Exclude newsletter-sourced articles (they're covered by the debit row).
+        cur.execute(f"""
+            SELECT COUNT(*) FROM article_requests ar
+            WHERE ar.secret_id = %s
+            {date_filter}
+            AND NOT EXISTS (
+                SELECT 1 FROM newsletters_article_link nal
+                WHERE nal.article_requests_id = ar.article_id
+            )
+        """, (user_id,))
         count = cur.fetchone()[0]
         cur.close()
         conn.close()
