@@ -35,3 +35,4 @@ debug_*
 *_backup.py
 *_restored.py
 *_working.py
+# ^ Section D patterns added by commit 0afe7ca, re-confirmed in this commit.
