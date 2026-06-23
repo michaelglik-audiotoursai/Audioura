@@ -250,7 +250,7 @@ def download_news(article_id):
                     logging.info(f"Calling translation service for article {article_id} -> {language}")
                     translation_response = requests.post(
                         f"{TRANSLATION_URL}/translate-with-audio",
-                        headers={"Content-Type": "application/json"},
+                        headers={**{"Content-Type": "application/json"}, **_get_auth_headers(TRANSLATION_URL)},
                         json=translation_data,
                         timeout=120
                     )
