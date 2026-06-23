@@ -500,7 +500,7 @@ class _AboutScreenState extends State<AboutScreen> {
             const SizedBox(height: 30),
             Center(
               child: Text(
-                '© 2024 Audio Tour Generator\nPowered by AI',
+                '© 2026 Audioura LLC\nPowered by AI',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 12,
