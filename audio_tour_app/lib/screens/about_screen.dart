@@ -462,7 +462,7 @@ class _AboutScreenState extends State<AboutScreen> {
       final userUri = await Endpoints.url(Service.userDb, '/user');
       final response = await http.post(
         userUri,
-        headers: {'Content-Type': 'application/json'},
+        headers: await Endpoints.apiHeaders(Service.userDb),
         body: jsonEncode({
           'secret_id': userId,
           'app_version': '$_appVersion+$_buildNumber',

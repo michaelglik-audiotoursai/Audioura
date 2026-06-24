@@ -1149,7 +1149,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<String> _resolveParentEditTourId(int downloadTourId, SharedPreferences prefs) async {
     try {
       final uri = await Endpoints.url(Service.tourIdResolution, '/tour/$downloadTourId/resolve');
-      final resp = await http.get(uri);
+      final resp = await http.get(uri, headers: await Endpoints.apiHeaders(Service.tourIdResolution));
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
         return (data['edit_tour_id'] ?? '').toString();
@@ -1163,7 +1163,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final prefs = await SharedPreferences.getInstance();
 
     final uri = await Endpoints.url(Service.mapDelivery, '/download-tour/$tourId');
-    final response = await http.get(uri).timeout(Duration(seconds: 120));
+    final response = await http.get(uri, headers: await Endpoints.apiHeaders(Service.mapDelivery)).timeout(Duration(seconds: 120));
     if (response.statusCode == 200) {
       await _saveTourToMyTours(tourId, response.bodyBytes);
     } else {
@@ -1198,7 +1198,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       // Always download English version first
       final dlUri = await Endpoints.url(Service.mapDelivery, '/download-tour/$tourId');
-      final response = await http.get(dlUri).timeout(Duration(seconds: 120));
+      final response = await http.get(dlUri, headers: await Endpoints.apiHeaders(Service.mapDelivery)).timeout(Duration(seconds: 120));
       if (response.statusCode == 200) {
         await _saveTourToMyTours(tourId, response.bodyBytes);
       } else {
@@ -1544,7 +1544,7 @@ class _HomeScreenState extends State<HomeScreen> {
           '_saveTourToMyTours should not be called with isTranslation: true after M8; '
           'use _saveTourToMyToursTranslated directly via _downloadTranslatedVersions');
       final resolveUri = await Endpoints.url(Service.tourIdResolution, '/tour/$tourId/resolve');
-      final resolutionResponse = await http.get(resolveUri);
+      final resolutionResponse = await http.get(resolveUri, headers: await Endpoints.apiHeaders(Service.tourIdResolution));
       
       await DebugLogHelper.addDebugLog('HOME: Tour resolution response: ${resolutionResponse.statusCode}');
       

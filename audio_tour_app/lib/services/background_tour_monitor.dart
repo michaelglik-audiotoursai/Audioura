@@ -79,6 +79,7 @@ class BackgroundTourMonitor {
           // Check the status of this tour
           final response = await http.get(
             await Endpoints.url(Service.orchestrator, '/status/$jobId'),
+            headers: await Endpoints.apiHeaders(Service.orchestrator),
           );
           
           if (response.statusCode == 200) {

@@ -59,7 +59,7 @@ class TourTranslationHelper {
             }
             try {
               final translatedUri = await Endpoints.url(Service.mapDelivery, '/download-tour/$translatedId');
-              final translatedResponse = await http.get(translatedUri).timeout(const Duration(seconds: 120));
+              final translatedResponse = await http.get(translatedUri, headers: await Endpoints.apiHeaders(Service.mapDelivery)).timeout(const Duration(seconds: 120));
               if (translatedResponse.statusCode == 200) {
                 final prefs = await SharedPreferences.getInstance();
                 final appDir = await getApplicationDocumentsDirectory();

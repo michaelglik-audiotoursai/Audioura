@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
 import '../services/app_attestation_service.dart';
@@ -73,6 +75,22 @@ class Endpoints {
   /// Convenience: returns a fully-formed [Uri] for [s] + [path].
   static Future<Uri> url(Service s, String path) async =>
       Uri.parse('${await base(s)}$path');
+
+  /// Convenience GET with apiHeaders included automatically.
+  static Future<http.Response> get(Service s, String path, {Duration? timeout}) async {
+    final uri = await url(s, path);
+    final headers = await apiHeaders(s);
+    final request = http.get(uri, headers: headers);
+    return timeout != null ? request.timeout(timeout) : request;
+  }
+
+  /// Convenience POST with apiHeaders included automatically.
+  static Future<http.Response> post(Service s, String path, {required Map<String, dynamic> body, Duration? timeout}) async {
+    final uri = await url(s, path);
+    final headers = await apiHeaders(s, requestBody: body);
+    final request = http.post(uri, headers: headers, body: jsonEncode(body));
+    return timeout != null ? request.timeout(timeout) : request;
+  }
 
   /// Returns the correct news article download URI, handling the cloud path
   /// difference: local uses /download/<id>, cloud gateway uses /news-download/<id>.

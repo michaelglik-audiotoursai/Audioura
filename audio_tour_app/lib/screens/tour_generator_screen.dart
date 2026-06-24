@@ -275,6 +275,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         try {
           final response = await http.get(
             await Endpoints.url(Service.orchestrator, '/status/$jobId'),
+            headers: await Endpoints.apiHeaders(Service.orchestrator),
           );
           if (!mounted) { done = true; return; }  // screen left while awaiting — stop safely
 
@@ -500,6 +501,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         try {
           final resp = await http.get(
             await Endpoints.url(Service.mapDelivery, '/download-tour/$translatedId'),
+            headers: await Endpoints.apiHeaders(Service.mapDelivery),
           ).timeout(const Duration(seconds: 120));
           if (resp.statusCode == 200) {
             await _saveTourToMyToursTranslated(translatedId, resp.bodyBytes, appDir.path, prefs, lang);
@@ -599,6 +601,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       
       final statusResponse = await http.get(
         await Endpoints.url(Service.orchestrator, '/status/$jobId'),
+        headers: await Endpoints.apiHeaders(Service.orchestrator),
       );
       
       if (statusResponse.statusCode != 200) {
@@ -622,6 +625,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       
       final response = await http.get(
         await Endpoints.url(Service.orchestrator, '/download/$finalTourId'),
+        headers: await Endpoints.apiHeaders(Service.orchestrator),
       );
       
       if (response.statusCode != 200) {
@@ -779,6 +783,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       try {
         final statusResponse = await http.get(
           await Endpoints.url(Service.orchestrator, '/status/$jobId'),
+          headers: await Endpoints.apiHeaders(Service.orchestrator),
         );
         if (statusResponse.statusCode == 200) {
           final statusData = jsonDecode(statusResponse.body);
@@ -1517,6 +1522,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       try {
         final statusResponse = await http.get(
           await Endpoints.url(Service.orchestrator, '/status/${tour["id"]}'),
+          headers: await Endpoints.apiHeaders(Service.orchestrator),
         );
         if (statusResponse.statusCode == 200) {
           final statusData = jsonDecode(statusResponse.body);
@@ -1535,6 +1541,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       // Now download the tour
       final response = await http.get(
         await Endpoints.url(Service.orchestrator, '/download/${tour["id"]}'),
+        headers: await Endpoints.apiHeaders(Service.orchestrator),
       );
       
       if (response.statusCode == 200) {
@@ -1707,6 +1714,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         // Check if news is ready
         final statusResponse = await http.get(
           await Endpoints.newsStatusUrl(articleId),
+          headers: await Endpoints.apiHeaders(Service.news),
         );
         
         if (statusResponse.statusCode == 200) {
