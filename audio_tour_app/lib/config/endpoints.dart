@@ -62,11 +62,9 @@ class Endpoints {
     final prefs = await SharedPreferences.getInstance();
     final mode = prefs.getString('server_mode') ?? 'cloud';
     if (mode == 'cloud') {
-      // Use stored URL if set, otherwise fall back to compiled-in default
-      final cloudBase = (prefs.getString('cloud_base_url') ?? '').trim();
-      final effectiveBase = cloudBase.isNotEmpty ? cloudBase : _defaultCloudBaseUrl;
-      // Path prefixes are hardcoded OFF (api.audioura.com routes by root path)
-      return effectiveBase;
+      // ALWAYS use baked-in default — never read stored overrides in cloud mode.
+      // This ensures a dev device behaves identically to a real new user.
+      return _defaultCloudBaseUrl;
     }
     final ip = prefs.getString('server_ip') ?? Config.defaultServerIp;
     return 'http://$ip:${_localPorts[s]}';
@@ -106,9 +104,8 @@ class Endpoints {
     final headers = {'Content-Type': 'application/json'};
     final mode = prefs.getString('server_mode') ?? 'cloud';
     if (mode == 'cloud') {
-      // Use stored key if set, otherwise fall back to compiled-in key from --dart-define
-      final storedKey = (prefs.getString('gateway_api_key') ?? '').trim();
-      final key = storedKey.isNotEmpty ? storedKey : _builtInApiKey;
+      // ALWAYS use baked-in key — never read stored overrides in cloud mode.
+      final key = _builtInApiKey;
       if (key.isNotEmpty) headers['X-API-Key'] = key;
 
       // Attestation for cost-bearing endpoints only
