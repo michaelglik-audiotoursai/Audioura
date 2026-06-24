@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -29,12 +28,6 @@ void main() async {
   
   // Initialize InAppWebView (debugging enabled by default in debug mode)
   
-  try {
-    await dotenv.load(fileName: '.env');
-  } catch (e) {
-    // .env file not found, continue with defaults
-    print('Warning: .env file not found, using defaults');
-  }
   runApp(const AudioTourApp());
 }
 
