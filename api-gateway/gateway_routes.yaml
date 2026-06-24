@@ -1,0 +1,171 @@
+##############################################################################
+# Audioura API Gateway Route Manifest
+# ====================================
+# Single source of truth for all cloud-exposed endpoints.
+# The gateway loads this at startup and registers routes automatically.
+#
+# Adding an endpoint: add a block to 'routes'. No Python changes needed.
+# Hiding an endpoint: move it to 'internal_only' with a reason.
+#
+# Fields:
+#   public_path  - the path exposed on api.audioura.com
+#   backend      - key from 'backends' map
+#   upstream     - the path sent to the backend service
+#   methods      - list of HTTP methods
+#   auth         - 'api_key' (requires X-API-Key) or 'none' (public)
+#   timeout      - request timeout in seconds (default 60)
+##############################################################################
+
+backends:
+  map-delivery: ${MAP_DELIVERY_URL:-https://map-delivery-60899077572.us-central1.run.app}
+  orchestrator: ${ORCHESTRATOR_URL:-https://tour-orchestrator-60899077572.us-central1.run.app}
+  translation: ${TRANSLATION_URL:-https://translation-service-60899077572.us-central1.run.app}
+  news-orchestrator: ${NEWS_ORCHESTRATOR_URL:-https://news-orchestrator-60899077572.us-central1.run.app}
+  newsletter: ${NEWSLETTER_URL:-https://newsletter-processor-60899077572.us-central1.run.app}
+
+routes:
+  # === MAP DELIVERY ===
+  - public_path: /tours-near/<path:subpath>
+    backend: map-delivery
+    upstream: /tours-near/{subpath}
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /download-tour/<tour_id>
+    backend: map-delivery
+    upstream: /download-tour/{tour_id}
+    methods: [GET]
+    auth: api_key
+    timeout: 30
+
+  - public_path: /tour/<tour_id>/resolve
+    backend: map-delivery
+    upstream: /tour/{tour_id}/resolve
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /search-tours
+    backend: map-delivery
+    upstream: /search-tours
+    methods: [GET, POST]
+    auth: api_key
+
+  # === TOUR ORCHESTRATOR ===
+  - public_path: /generate-complete-tour
+    backend: orchestrator
+    upstream: /generate-complete-tour
+    methods: [POST]
+    auth: api_key
+    timeout: 600
+
+  - public_path: /status/<job_id>
+    backend: orchestrator
+    upstream: /status/{job_id}
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /download/<job_id>
+    backend: orchestrator
+    upstream: /download/{job_id}
+    methods: [GET]
+    auth: api_key
+    timeout: 120
+
+  - public_path: /tour-status
+    backend: orchestrator
+    upstream: /tour-status
+    methods: [POST]
+    auth: api_key
+
+  - public_path: /jobs
+    backend: orchestrator
+    upstream: /jobs
+    methods: [GET]
+    auth: api_key
+
+  # === TRANSLATION ===
+  - public_path: /translate-with-audio
+    backend: translation
+    upstream: /translate-with-audio
+    methods: [POST]
+    auth: api_key
+    timeout: 300
+
+  # === NEWS ORCHESTRATOR ===
+  - public_path: /generate-news
+    backend: news-orchestrator
+    upstream: /generate-news
+    methods: [POST]
+    auth: api_key
+    timeout: 600
+
+  - public_path: /news-status/<article_id>
+    backend: news-orchestrator
+    upstream: /status/{article_id}
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /news-articles
+    backend: news-orchestrator
+    upstream: /articles
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /news-download/<article_id>
+    backend: news-orchestrator
+    upstream: /download/{article_id}
+    methods: [GET]
+    auth: api_key
+    timeout: 120
+
+  # === NEWSLETTER PROCESSOR ===
+  - public_path: /process_newsletter
+    backend: newsletter
+    upstream: /process_newsletter
+    methods: [POST]
+    auth: api_key
+    timeout: 120
+
+  - public_path: /newsletters_v2
+    backend: newsletter
+    upstream: /newsletters_v2
+    methods: [GET]
+    auth: api_key
+
+  - public_path: /get_articles_by_newsletter_id
+    backend: newsletter
+    upstream: /get_articles_by_newsletter_id
+    methods: [POST]
+    auth: api_key
+
+  - public_path: /submit_credentials
+    backend: newsletter
+    upstream: /submit_credentials
+    methods: [POST]
+    auth: api_key
+    timeout: 30
+
+  - public_path: /key_exchange
+    backend: newsletter
+    upstream: /key_exchange
+    methods: [POST]
+    auth: api_key
+    timeout: 30
+
+  - public_path: /get_user_consolidation_status/<device_id>
+    backend: newsletter
+    upstream: /get_user_consolidation_status/{device_id}
+    methods: [GET]
+    auth: api_key
+
+  # === ACCOUNT MANAGEMENT ===
+  - public_path: /delete-account/<secret_id>
+    backend: orchestrator
+    upstream: /delete-account/{secret_id}
+    methods: [DELETE]
+    auth: api_key
+
+internal_only:
+  - backend: newsletter
+    path: /decrypt_credentials
+    reason: "Handles raw credentials; service-to-service only (OIDC-authenticated inter-service calls)"

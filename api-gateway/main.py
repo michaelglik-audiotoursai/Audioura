@@ -192,7 +192,7 @@ def _make_handler(route_cfg):
     """Create a Flask view function for a route config entry."""
     backend_key = route_cfg['backend']
     upstream_template = route_cfg['upstream']
-    auth = route_cfg.get('auth', 'none')
+    auth = route_cfg.get('auth', 'api_key')  # FAIL-CLOSED: default requires API key
     timeout = route_cfg.get('timeout', 60)
 
     def handler(**kwargs):
