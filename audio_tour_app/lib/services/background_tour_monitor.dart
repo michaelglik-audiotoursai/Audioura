@@ -142,7 +142,7 @@ class BackgroundTourMonitor {
       
       try {
         // Download the tour
-        final response = await http.get(await Endpoints.url(Service.orchestrator, '/download/$jobId'));
+        final response = await http.get(await Endpoints.url(Service.orchestrator, '/download/$jobId'), headers: await Endpoints.apiHeaders(Service.orchestrator));
         
         if (response.statusCode == 200) {
           // Save and extract the tour

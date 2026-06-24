@@ -40,7 +40,7 @@ class BackgroundService {
           try {
             final statusUri = await Endpoints.url(Service.orchestrator, '/status/$jobId');
             await DebugLogHelper.addDebugLog('Checking tour status: $statusUri');
-            final response = await http.get(statusUri);
+            final response = await http.get(statusUri, headers: await Endpoints.apiHeaders(Service.orchestrator));
             
             await DebugLogHelper.addDebugLog('Status response: ${response.statusCode}');
             if (response.statusCode == 200) {
@@ -105,7 +105,7 @@ class BackgroundService {
       await NotificationService.showTourReadyNotification(location);
       
       try {
-        final response = await http.get(await Endpoints.url(Service.orchestrator, '/download/$jobId'));
+        final response = await http.get(await Endpoints.url(Service.orchestrator, '/download/$jobId'), headers: await Endpoints.apiHeaders(Service.orchestrator));
       
         if (response.statusCode == 200) {
           final directory = await getApplicationDocumentsDirectory();
