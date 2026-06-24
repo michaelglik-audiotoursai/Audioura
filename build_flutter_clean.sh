@@ -12,6 +12,21 @@ echo "Starting clean build process..."
 WORK_DIR="/tmp/audiotours_clean_build"
 SOURCE_DIR="/media/sf_audiotours"
 
+# Source secrets file for build-time keys (gitignored — never committed)
+if [ -f "$SOURCE_DIR/build_secrets.env" ]; then
+    source "$SOURCE_DIR/build_secrets.env"
+    echo "✅ Loaded build secrets from build_secrets.env"
+else
+    echo "⚠️  No build_secrets.env found at $SOURCE_DIR/build_secrets.env"
+fi
+
+# Fail-fast if GATEWAY_API_KEY is not set — prevents building an APK that 401s on cloud
+if [ -z "$GATEWAY_API_KEY" ]; then
+    echo "ERROR: GATEWAY_API_KEY not set."
+    echo "Create $SOURCE_DIR/build_secrets.env with: GATEWAY_API_KEY=your-key-here"
+    exit 1
+fi
+
 echo "Cleaning up previous build directory..."
 rm -rf "$WORK_DIR"
 mkdir -p "$WORK_DIR"
@@ -93,7 +108,7 @@ echo "Step 2: Getting dependencies..."
 flutter pub get
 
 echo "Step 3: Building APK with clean cache..."
-flutter build apk --release
+flutter build apk --release --dart-define=GATEWAY_API_KEY="$GATEWAY_API_KEY"
 
 echo "=== BUILD COMPLETED ==="
 APK_PATH="$WORK_DIR/audio_tour_app/build/app/outputs/flutter-apk/app-release.apk"

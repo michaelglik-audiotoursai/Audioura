@@ -36,3 +36,7 @@ debug_*
 *_restored.py
 *_working.py
 # ^ Section D patterns added by commit 0afe7ca, re-confirmed in this commit.
+
+# Build secrets — NEVER commit API keys
+build_secrets.env
+scratch/
