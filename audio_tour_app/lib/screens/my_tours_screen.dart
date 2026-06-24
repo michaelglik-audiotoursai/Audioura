@@ -1361,8 +1361,9 @@ class _MyToursScreenState extends State<MyToursScreen> {
                       children: [
                         if (_tourHasMap[index] == true)
                           IconButton(
-                            icon: const Icon(Icons.map, color: Color(0xFF27ae60)),
+                            icon: const Icon(Icons.map, color: Color(0xFF27ae60), size: 20),
                             tooltip: 'View Map',
+                            constraints: const BoxConstraints(minWidth: 36),
                             onPressed: () => Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -1373,25 +1374,24 @@ class _MyToursScreenState extends State<MyToursScreen> {
                               ),
                             ),
                           ),
-                        if (!TourTranslationHelper.isTranslation(tour))
-                          IconButton(
-                            icon: const Icon(Icons.translate, color: Color(0xFF8e44ad)),
-                            tooltip: 'Translate',
-                            onPressed: () => _showTranslateDialog(tour),
-                          ),
-                        IconButton(
-                          icon: const Icon(Icons.edit, color: Colors.orange),
-                          onPressed: () => _editTour(tour),
-                          tooltip: 'Edit Tour',
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => _deleteTour(index),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.flag_outlined, color: Colors.grey),
-                          tooltip: 'Report this tour',
-                          onPressed: () => _reportTour(tour),
+                        PopupMenuButton<String>(
+                          icon: const Icon(Icons.more_vert, size: 20),
+                          constraints: const BoxConstraints(minWidth: 36),
+                          onSelected: (value) {
+                            switch (value) {
+                              case 'translate': _showTranslateDialog(tour); break;
+                              case 'edit': _editTour(tour); break;
+                              case 'delete': _deleteTour(index); break;
+                              case 'report': _reportTour(tour); break;
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            if (!TourTranslationHelper.isTranslation(tour))
+                              const PopupMenuItem(value: 'translate', child: ListTile(leading: Icon(Icons.translate, color: Color(0xFF8e44ad)), title: Text('Translate'), dense: true)),
+                            const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit, color: Colors.orange), title: Text('Edit'), dense: true)),
+                            const PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete, color: Colors.red), title: Text('Delete'), dense: true)),
+                            const PopupMenuItem(value: 'report', child: ListTile(leading: Icon(Icons.flag_outlined, color: Colors.grey), title: Text('Report'), dense: true)),
+                          ],
                         ),
                         const Icon(Icons.play_arrow, color: Color(0xFF3498db)),
                       ],
