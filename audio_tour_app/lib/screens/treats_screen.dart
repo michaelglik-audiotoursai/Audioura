@@ -18,6 +18,7 @@ class TreatsScreen extends StatefulWidget {
 class _TreatsScreenState extends State<TreatsScreen> {
   List<Map<String, dynamic>> _treats = [];
   bool _isLoading = true;
+  bool _isPreviewMode = false;
   Position? _userPosition;
 
   @override
@@ -52,11 +53,28 @@ class _TreatsScreenState extends State<TreatsScreen> {
       }
 
       // Gate off in cloud mode — treats service not deployed to cloud yet
-      if ((prefs.getString('server_mode') ?? 'local') == 'cloud') {
-        setState(() { _isLoading = false; });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Local Treats is only available on WiFi mode.'), backgroundColor: Colors.orange),
-        );
+      // Show sample preview offers instead of calling undeployed backend
+      if ((prefs.getString('server_mode') ?? 'cloud') == 'cloud') {
+        setState(() {
+          _treats = [
+            {
+              'name': 'Sample Bakery',
+              'description': '\$1 off any pastry — Example only',
+              'lat': searchLat,
+              'lng': searchLng,
+              'image_base64': null,
+            },
+            {
+              'name': 'Demo Coffee Co.',
+              'description': 'Free size upgrade — Example only',
+              'lat': searchLat + 0.001,
+              'lng': searchLng + 0.001,
+              'image_base64': null,
+            },
+          ];
+          _isLoading = false;
+          _isPreviewMode = true;
+        });
         return;
       }
       
@@ -120,7 +138,21 @@ class _TreatsScreenState extends State<TreatsScreen> {
                     style: TextStyle(fontSize: 18, color: Colors.grey),
                   ),
                 )
-              : ListView.builder(
+              : Column(
+                  children: [
+                    if (_isPreviewMode)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        color: Colors.amber.shade100,
+                        child: const Text(
+                          '📋 Preview — local offers coming in a future version. Examples only, not real offers.',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    Expanded(
+                      child: ListView.builder(
                   itemCount: _treats.length,
                   itemBuilder: (context, index) {
                     final treat = _treats[index];
@@ -225,6 +257,9 @@ class _TreatsScreenState extends State<TreatsScreen> {
                       ),
                     );
                   },
+                ),
+                    ),
+                  ],
                 ),
     );
   }
