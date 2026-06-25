@@ -18,7 +18,6 @@ class TreatsScreen extends StatefulWidget {
 class _TreatsScreenState extends State<TreatsScreen> {
   List<Map<String, dynamic>> _treats = [];
   bool _isLoading = true;
-  bool _isPreviewMode = false;
   Position? _userPosition;
 
   @override
@@ -116,13 +115,12 @@ class _TreatsScreenState extends State<TreatsScreen> {
                 )
               : Column(
                   children: [
-                    if (_isPreviewMode)
-                      Container(
+                    Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
                         color: Colors.amber.shade100,
                         child: const Text(
-                          '📋 Preview — local offers coming in a future version. Examples only, not real offers.',
+                          'Samples for the future',
                           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                           textAlign: TextAlign.center,
                         ),
