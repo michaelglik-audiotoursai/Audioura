@@ -1259,7 +1259,7 @@ class _HomeScreenState extends State<HomeScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('English downloaded; ${translationFailures.join(", ")} translation failed.'),
+            content: Text('${translationFailures.map((l) => TourTranslationHelper.availableLanguages[l] ?? l).join(", ")} not available for this tour — English version saved.'),
             backgroundColor: Colors.orange,
           ),
         );

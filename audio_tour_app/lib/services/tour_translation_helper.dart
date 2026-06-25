@@ -54,7 +54,7 @@ class TourTranslationHelper {
             final translatedId = translatedIds[lang];
             if (translatedId == null) {
               failures.add(lang);
-              await DebugLogHelper.addDebugLog('TRANSLATE: No ID returned for $lang');
+              await DebugLogHelper.addDebugLog('TRANSLATE: Translation failed for $lang (id=null or status=failed)');
               continue;
             }
             try {
@@ -90,6 +90,7 @@ class TourTranslationHelper {
   }
 
   /// Handles both response shapes from the translation service.
+  /// Returns null for languages with status='failed' or id=null.
   static Map<String, dynamic>? _extractTranslatedIds(Map<String, dynamic> result) {
     if (result.containsKey('translated_tour_ids')) {
       return result['translated_tour_ids'] as Map<String, dynamic>?;
@@ -97,6 +98,10 @@ class TourTranslationHelper {
     final translations = result['translations'] as Map<String, dynamic>?;
     if (translations == null) return null;
     return translations.map((lang, val) {
+      // Detect failed translations: {id: null, status: "failed"}
+      if (val is Map && (val['status'] == 'failed' || val['id'] == null)) {
+        return MapEntry(lang, null);
+      }
       final id = val is Map ? val['id'] : val;
       return MapEntry(lang, id);
     });

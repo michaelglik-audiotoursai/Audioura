@@ -917,8 +917,13 @@ class _MyToursScreenState extends State<MyToursScreen> {
           SnackBar(content: Text('Translated to ${selected.length} language(s) successfully!'), backgroundColor: Colors.green),
         );
       } else {
+        final failedNames = failures.map((code) => TourTranslationHelper.availableLanguages[code] ?? code).join(', ');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Some translations failed: ${failures.join(", ")}'), backgroundColor: Colors.orange),
+          SnackBar(
+            content: Text('$failedNames not available for this tour — playing the original (English).'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 6),
+          ),
         );
       }
       _loadTours(); // refresh list to show new translated entries
