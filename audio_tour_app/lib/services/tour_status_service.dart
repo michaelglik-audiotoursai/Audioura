@@ -26,7 +26,7 @@ class TourStatusService {
 
         final response = await http.put(
           await Endpoints.url(Service.userDb, '/user/$userId'),
-          headers: {'Content-Type': 'application/json'},
+          headers: await Endpoints.apiHeaders(Service.userDb),
           body: jsonEncode(trackingData),
         );
 
