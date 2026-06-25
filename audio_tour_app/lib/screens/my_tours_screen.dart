@@ -964,7 +964,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
       'Reason for report:\n[Please describe the issue]\n\n'
       '---\nSent from Audioura App',
     );
-    final mailtoUri = Uri.parse('mailto:support@audioura.com?subject=$subject&body=$body');
+    final mailtoUri = Uri.parse('mailto:info@audioura.com?subject=$subject&body=$body');
 
     try {
       if (await canLaunchUrl(mailtoUri)) {
@@ -972,7 +972,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not open email client. Please email support@audioura.com directly.'), backgroundColor: Colors.orange),
+            const SnackBar(content: Text('Could not open email client. Please email info@audioura.com directly.'), backgroundColor: Colors.orange),
           );
         }
       }

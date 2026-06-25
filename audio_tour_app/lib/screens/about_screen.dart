@@ -12,6 +12,7 @@ import 'dart:io' show Platform, Directory;
 
 import 'debug_log_viewer_screen.dart';
 import '../config/endpoints.dart';
+import '../services/error_handler_service.dart';
 
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
@@ -738,7 +739,7 @@ class _AboutScreenState extends State<AboutScreen> {
         await DebugLogHelper.addDebugLog('ACCOUNT: Server deletion failed: ${response.statusCode} ${response.body}');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Server error (${response.statusCode}). Data preserved.'), backgroundColor: Colors.red),
+            SnackBar(content: Text(ErrorHandlerService.friendlyMessage(response.statusCode)), backgroundColor: Colors.red),
           );
         }
         return;

@@ -6,6 +6,7 @@ import 'subscription_encryption_service.dart';
 // import 'subscription_article_storage.dart';  // TEMPORARILY DISABLED - CAUSING ENCRYPTION CONFLICT
 import '../screens/debug_log_viewer_screen.dart';
 import '../config/endpoints.dart';
+import 'error_handler_service.dart';
 
 class CredentialResponse {
   final String status;
@@ -145,7 +146,7 @@ class SubscriptionService {
         await DebugLogHelper.addDebugLog('SUBSCRIPTION: Server error: ${response.statusCode}');
         return CredentialResponse(
           status: 'error',
-          message: 'Server error: ${response.statusCode}',
+          message: ErrorHandlerService.friendlyMessage(response.statusCode),
         );
       }
     } catch (e) {

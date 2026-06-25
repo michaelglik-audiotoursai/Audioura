@@ -111,7 +111,7 @@ class ErrorHandlerService {
         'Description of what happened:\n[Please describe what you were doing]\n',
       );
 
-      final mailtoUri = Uri.parse('mailto:support@audioura.com?subject=$subject&body=$body');
+      final mailtoUri = Uri.parse('mailto:info@audioura.com?subject=$subject&body=$body');
 
       if (await canLaunchUrl(mailtoUri)) {
         await launchUrl(mailtoUri);
@@ -119,7 +119,7 @@ class ErrorHandlerService {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Could not open email. Please contact support@audioura.com directly.'),
+              content: Text('Could not open email. Please contact info@audioura.com directly.'),
               backgroundColor: Colors.orange,
             ),
           );

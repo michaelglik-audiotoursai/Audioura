@@ -1759,7 +1759,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (_newsletters.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Server error: ${response.statusCode}. Showing cached newsletters.'),
+              content: Text(ErrorHandlerService.friendlyMessage(response.statusCode)),
               backgroundColor: Colors.orange,
             ),
           );
@@ -1966,7 +1966,7 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       } else {
         // Parse server error message for user-friendly display
-        String userMessage = 'Server error: ${response.statusCode}';
+        String userMessage = ErrorHandlerService.friendlyMessage(response.statusCode);
         try {
           final errorData = json.decode(response.body);
           if (errorData['message'] != null) {
@@ -2078,7 +2078,7 @@ class _HomeScreenState extends State<HomeScreen> {
           errorMessage = errorData['error'] ?? 'Failed to load articles';
           await DebugLogHelper.addDebugLog('NEWSLETTER: Parsed error message: $errorMessage');
         } catch (parseError) {
-          errorMessage = 'Server error: ${response.statusCode}';
+          errorMessage = ErrorHandlerService.friendlyMessage(response.statusCode);
           await DebugLogHelper.addDebugLog('NEWSLETTER: Could not parse error response: $parseError');
         }
         
