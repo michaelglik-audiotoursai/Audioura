@@ -52,31 +52,7 @@ class _TreatsScreenState extends State<TreatsScreen> {
         searchLng = _userPosition!.longitude;
       }
 
-      // Gate off in cloud mode — treats service not deployed to cloud yet
-      // Show sample preview offers instead of calling undeployed backend
-      if ((prefs.getString('server_mode') ?? 'cloud') == 'cloud') {
-        setState(() {
-          _treats = [
-            {
-              'name': 'Sample Bakery',
-              'description': '\$1 off any pastry — Example only',
-              'lat': searchLat,
-              'lng': searchLng,
-              'image_base64': null,
-            },
-            {
-              'name': 'Demo Coffee Co.',
-              'description': 'Free size upgrade — Example only',
-              'lat': searchLat + 0.001,
-              'lng': searchLng + 0.001,
-              'image_base64': null,
-            },
-          ];
-          _isLoading = false;
-          _isPreviewMode = true;
-        });
-        return;
-      }
+      // Treats: always call the backend — works on local WiFi, may fail on cloud (handled gracefully below)
       
       final response = await http.get(
         await Endpoints.url(Service.treats, '/treats-near/$searchLat/$searchLng'),
