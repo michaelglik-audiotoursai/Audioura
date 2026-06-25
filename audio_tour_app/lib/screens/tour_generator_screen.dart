@@ -362,6 +362,9 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
                 }
               } else if (status['user_message'] != null) {
                 userFriendlyMessage = status['user_message'].toString();
+              } else if (errorMessage.contains('no stops could be generated') || errorMessage.contains('knowledge insufficient')) {
+                userFriendlyMessage = 'No stops could be found for that location. Try a broader area, a different tour type, or a more well-known destination.';
+                suggestions = ['Try a larger city or neighborhood', 'Use "walking tour" instead of specific types', 'Check the spelling of the location'];
               } else if (status['error_type'] != null) {
                 switch (status['error_type']) {
                   case 'knowledge_validation_failed':

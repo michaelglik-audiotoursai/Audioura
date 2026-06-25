@@ -60,23 +60,27 @@ echo "Looking for Audioura image at: $OWL_IMAGE"
 if [ -f "$OWL_IMAGE" ]; then
     echo "Audioura image found, processing..."
     # Resize and copy OwlAudio image to proper Android icon sizes
-    # Crop to square first, then resize to fill circular icons properly
+    # First composite onto solid #A93105 background to ensure no transparency
     if command -v convert >/dev/null 2>&1; then
         echo "Using ImageMagick to resize icons..."
-        # Create optimized, small-sized icons
-        convert "$OWL_IMAGE" -resize 48x48! -strip -quality 85 "$ICON_DIR/mipmap-mdpi/ic_launcher.png"
-        convert "$OWL_IMAGE" -resize 72x72! -strip -quality 85 "$ICON_DIR/mipmap-hdpi/ic_launcher.png"
-        convert "$OWL_IMAGE" -resize 96x96! -strip -quality 85 "$ICON_DIR/mipmap-xhdpi/ic_launcher.png"
-        convert "$OWL_IMAGE" -resize 144x144! -strip -quality 85 "$ICON_DIR/mipmap-xxhdpi/ic_launcher.png"
-        convert "$OWL_IMAGE" -resize 192x192! -strip -quality 85 "$ICON_DIR/mipmap-xxxhdpi/ic_launcher.png"
+        # Create a temp icon with solid #A93105 background (matches iOS icon)
+        TEMP_ICON="/tmp/audioura_icon_solid.png"
+        convert "$OWL_IMAGE" -background '#A93105' -flatten "$TEMP_ICON"
+        # Create optimized, small-sized icons from the solid-background version
+        convert "$TEMP_ICON" -resize 48x48! -strip -quality 85 "$ICON_DIR/mipmap-mdpi/ic_launcher.png"
+        convert "$TEMP_ICON" -resize 72x72! -strip -quality 85 "$ICON_DIR/mipmap-hdpi/ic_launcher.png"
+        convert "$TEMP_ICON" -resize 96x96! -strip -quality 85 "$ICON_DIR/mipmap-xhdpi/ic_launcher.png"
+        convert "$TEMP_ICON" -resize 144x144! -strip -quality 85 "$ICON_DIR/mipmap-xxhdpi/ic_launcher.png"
+        convert "$TEMP_ICON" -resize 192x192! -strip -quality 85 "$ICON_DIR/mipmap-xxxhdpi/ic_launcher.png"
         
-        # Create optimized foreground versions for adaptive icons
-        convert "$OWL_IMAGE" -resize 48x48! -strip -quality 85 "$ICON_DIR/mipmap-mdpi/ic_launcher_foreground.png"
-        convert "$OWL_IMAGE" -resize 72x72! -strip -quality 85 "$ICON_DIR/mipmap-hdpi/ic_launcher_foreground.png"
-        convert "$OWL_IMAGE" -resize 96x96! -strip -quality 85 "$ICON_DIR/mipmap-xhdpi/ic_launcher_foreground.png"
-        convert "$OWL_IMAGE" -resize 144x144! -strip -quality 85 "$ICON_DIR/mipmap-xxhdpi/ic_launcher_foreground.png"
-        convert "$OWL_IMAGE" -resize 192x192! -strip -quality 85 "$ICON_DIR/mipmap-xxxhdpi/ic_launcher_foreground.png"
-        echo "✅ Audioura app icon optimized and resized to all resolutions (small file sizes)"
+        # Create optimized foreground versions for adaptive icons (same solid background)
+        convert "$TEMP_ICON" -resize 48x48! -strip -quality 85 "$ICON_DIR/mipmap-mdpi/ic_launcher_foreground.png"
+        convert "$TEMP_ICON" -resize 72x72! -strip -quality 85 "$ICON_DIR/mipmap-hdpi/ic_launcher_foreground.png"
+        convert "$TEMP_ICON" -resize 96x96! -strip -quality 85 "$ICON_DIR/mipmap-xhdpi/ic_launcher_foreground.png"
+        convert "$TEMP_ICON" -resize 144x144! -strip -quality 85 "$ICON_DIR/mipmap-xxhdpi/ic_launcher_foreground.png"
+        convert "$TEMP_ICON" -resize 192x192! -strip -quality 85 "$ICON_DIR/mipmap-xxxhdpi/ic_launcher_foreground.png"
+        rm -f "$TEMP_ICON"
+        echo "✅ Audioura app icon optimized with solid #A93105 background (matches iOS)"
     else
         echo "ImageMagick not available, copying directly..."
         # Fallback: direct copy without resizing
