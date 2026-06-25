@@ -170,7 +170,7 @@ class TranslationService:
             
             # Get original tour with tour_content
             cursor.execute(
-                "SELECT id, tour_name, request_string, audio_tour, number_requested, lat, lng, tour_content, content_language FROM audio_tours WHERE id = %s", 
+                "SELECT id, tour_name, request_string, audio_tour, number_requested, lat, lng, tour_content, content_language, tour_blob_uri FROM audio_tours WHERE id = %s", 
                 (original_tour_id,)
             )
             original_tour = cursor.fetchone()
@@ -180,6 +180,31 @@ class TranslationService:
             
             tour_content = original_tour[7]  # tour_content column
             original_zip_data = original_tour[3]  # audio_tour column
+            tour_blob_uri = original_tour[9] if len(original_tour) > 9 else None  # R2 blob key
+            
+            # If audio_tour is NULL but tour_blob_uri exists, download from R2
+            if not original_zip_data and tour_blob_uri:
+                logging.info(f"Tour {original_tour_id}: audio_tour is NULL, fetching from R2 blob: {tour_blob_uri}")
+                try:
+                    import boto3
+                    r2_endpoint = os.getenv('R2_ENDPOINT', '')
+                    r2_access_key = os.getenv('R2_ACCESS_KEY_ID', '')
+                    r2_secret_key = os.getenv('R2_SECRET_ACCESS_KEY', '')
+                    r2_bucket = os.getenv('R2_BUCKET', 'v1-audiotours-r2-bucket')
+                    
+                    if r2_endpoint and r2_access_key:
+                        s3 = boto3.client('s3',
+                            endpoint_url=r2_endpoint,
+                            aws_access_key_id=r2_access_key,
+                            aws_secret_access_key=r2_secret_key
+                        )
+                        response = s3.get_object(Bucket=r2_bucket, Key=tour_blob_uri)
+                        original_zip_data = response['Body'].read()
+                        logging.info(f"Downloaded {len(original_zip_data)} bytes from R2 for tour {original_tour_id}")
+                    else:
+                        logging.error(f"R2 credentials not configured — cannot fetch tour {original_tour_id} blob")
+                except Exception as r2_err:
+                    logging.error(f"Failed to download tour {original_tour_id} from R2: {r2_err}")
             
             if not tour_content:
                 logging.warning(f"No tour content found for tour {original_tour_id}, falling back to ZIP extraction")
@@ -197,7 +222,7 @@ class TranslationService:
                         return None
                 except Exception:
                     pass
-                return self._translate_tour_from_zip(original_tour, target_language)
+                return self._translate_tour_from_zip(original_tour, target_language, zip_data_override=original_zip_data)
             
             logging.info(f"Using stored tour content: {len(tour_content)} characters")
             
@@ -1548,7 +1573,7 @@ Say 'What are my options' to hear this help again"""
 </html>'''
         return html
     
-    def _translate_tour_from_zip(self, original_tour, target_language):
+    def _translate_tour_from_zip(self, original_tour, target_language, zip_data_override=None):
         """Fallback method for tours without stored content - uses old ZIP extraction method"""
         logging.info("Using fallback ZIP extraction method for tour translation")
         
@@ -1556,8 +1581,8 @@ Say 'What are my options' to hear this help again"""
         translated_name = self.translate_text(original_tour[1], target_language)
         translated_request = self.translate_text(original_tour[2], target_language)
         
-        # Process ZIP file for audio translation
-        original_zip_data = original_tour[3]  # audio_tour column
+        # Process ZIP file for audio translation — use override if provided (e.g., from R2)
+        original_zip_data = zip_data_override if zip_data_override else original_tour[3]
         if not original_zip_data:
             logging.error(f"Tour {original_tour[0]} has no ZIP data (audio_tour is NULL) — cannot translate")
             return None
