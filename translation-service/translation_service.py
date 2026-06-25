@@ -184,9 +184,13 @@ class TranslationService:
             if not tour_content:
                 logging.warning(f"No tour content found for tour {original_tour_id}, falling back to ZIP extraction")
                 # Verify ZIP has actual audio before attempting fallback
+                if not original_zip_data:
+                    logging.error(f"Tour {original_tour_id} has no tour_content AND no ZIP data — cannot translate")
+                    return None
                 try:
                     import io as _io
-                    with zipfile.ZipFile(_io.BytesIO(bytes(original_zip_data))) as _z:
+                    zip_bytes = original_zip_data.tobytes() if hasattr(original_zip_data, 'tobytes') else bytes(original_zip_data)
+                    with zipfile.ZipFile(_io.BytesIO(zip_bytes)) as _z:
                         audio_files_in_zip = [n for n in _z.namelist() if n.startswith('audio_') and n.endswith('.mp3')]
                     if not audio_files_in_zip:
                         logging.error(f"Tour {original_tour_id} ZIP has no audio files and no tour_content — cannot translate")
@@ -1554,6 +1558,16 @@ Say 'What are my options' to hear this help again"""
         
         # Process ZIP file for audio translation
         original_zip_data = original_tour[3]  # audio_tour column
+        if not original_zip_data:
+            logging.error(f"Tour {original_tour[0]} has no ZIP data (audio_tour is NULL) — cannot translate")
+            return None
+        
+        # Convert memoryview/buffer to bytes if needed
+        if hasattr(original_zip_data, 'tobytes'):
+            original_zip_data = original_zip_data.tobytes()
+        elif not isinstance(original_zip_data, bytes):
+            original_zip_data = bytes(original_zip_data)
+        
         translated_zip_data = self.translate_zip_audio(original_zip_data, target_language)
         
         # Create new tour record
