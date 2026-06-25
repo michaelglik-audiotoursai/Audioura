@@ -22,6 +22,7 @@ backends:
   translation: ${TRANSLATION_URL:-https://translation-service-60899077572.us-central1.run.app}
   news-orchestrator: ${NEWS_ORCHESTRATOR_URL:-https://news-orchestrator-60899077572.us-central1.run.app}
   newsletter: ${NEWSLETTER_URL:-https://newsletter-processor-60899077572.us-central1.run.app}
+  treats: ${TREATS_URL:-https://treats-service-60899077572.us-central1.run.app}
 
 routes:
   # === MAP DELIVERY ===
@@ -163,6 +164,13 @@ routes:
     backend: orchestrator
     upstream: /delete-account/{secret_id}
     methods: [DELETE]
+    auth: api_key
+
+  # === TREATS ===
+  - public_path: /treats-near/<path:subpath>
+    backend: treats
+    upstream: /treats-near/{subpath}
+    methods: [GET]
     auth: api_key
 
 internal_only:
