@@ -321,7 +321,7 @@ class _HomeScreenState extends State<HomeScreen> {
       
       final response = await http.get(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: await Endpoints.apiHeaders(Service.mapDelivery),
       ).timeout(Duration(seconds: 10));
 
       await DebugLogHelper.addDebugLog('HOME: Response status: ${response.statusCode}');
@@ -1067,7 +1067,7 @@ class _HomeScreenState extends State<HomeScreen> {
       
       final response = await http.get(
         downloadUri,
-        headers: {'Content-Type': 'application/json'},
+        headers: await Endpoints.apiHeaders(Service.mapDelivery),
       ).timeout(Duration(seconds: 120));
 
       await DebugLogHelper.addDebugLog('HOME: Download response: ${response.statusCode}');
@@ -1450,7 +1450,7 @@ class _HomeScreenState extends State<HomeScreen> {
       
       final response = await http.get(
         searchUri,
-        headers: {'Content-Type': 'application/json'},
+        headers: await Endpoints.apiHeaders(Service.mapDelivery),
       ).timeout(Duration(seconds: 10));
       
       await DebugLogHelper.addDebugLog('HOME: Tour search response: ${response.statusCode}');
