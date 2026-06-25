@@ -46,7 +46,9 @@ else
 fi
 
 echo "Copying Audioura app icon with proper sizing..."
-OWL_IMAGE="$SOURCE_DIR/APK_BUILDS/Audioura_3.png"
+# Use the iOS app icon as the source — it already has the #A93105 brick-orange background baked in.
+# (APK_BUILDS/Audioura_3.png has an OPAQUE WHITE background, so -flatten could not recolor it.)
+OWL_IMAGE="$SOURCE_DIR/audio_tour_app/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png"
 ICON_DIR="$WORK_DIR/audio_tour_app/android/app/src/main/res"
 
 # Install ImageMagick if not available
