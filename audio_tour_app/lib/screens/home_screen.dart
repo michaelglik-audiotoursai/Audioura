@@ -19,6 +19,7 @@ import '../services/subscription_encryption_service.dart';
 import '../services/device_service.dart';
 import '../services/translation_service.dart';
 import '../services/tour_translation_helper.dart';
+import '../services/error_handler_service.dart';
 import '../config.dart';
 import '../config/endpoints.dart';
 // import '../services/credential_storage_service.dart';  // TEMPORARILY DISABLED - CAUSING BUILD ERRORS
@@ -39,6 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
   LatLng? _displayLocation; // Location being displayed (may differ from user location)
   List<Marker> _tourMarkers = [];
   bool _isLoading = true;
+  bool _connectionError = false;
   String _appMode = 'Tours';
   bool _isUsingCustomLocation = false;
   String _customLocationName = '';
@@ -404,9 +406,14 @@ class _HomeScreenState extends State<HomeScreen> {
         await DebugLogHelper.addDebugLog('HOME: Loaded ${tours.length} tours for ${_isUsingCustomLocation ? _customLocationName : "current location"}');
       } else {
         await DebugLogHelper.addDebugLog('HOME: Server error: ${response.statusCode}');
+        if (mounted && response.statusCode == 401) {
+          ErrorHandlerService.showError(context, statusCode: 401, endpoint: '/tours-near');
+        }
+        setState(() { _connectionError = true; });
       }
     } catch (e) {
       await DebugLogHelper.addDebugLog('HOME: Error loading tours: $e');
+      if (mounted) setState(() { _connectionError = true; });
     }
   }
   

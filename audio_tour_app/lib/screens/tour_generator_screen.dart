@@ -15,6 +15,7 @@ import '../services/tour_status_service.dart';
 import '../services/background_tour_monitor.dart';
 import '../config/endpoints.dart';
 import '../services/translation_service.dart';
+import '../services/error_handler_service.dart';
 
 import '../screens/debug_log_viewer_screen.dart';
 import '../screens/tour_player_screen.dart';
@@ -202,18 +203,21 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       if (response.statusCode != 200) {
         String errorMessage = 'Failed to start tour generation';
         
-        try {
-          final errorData = jsonDecode(response.body);
-          if (errorData['user_message'] != null) {
-            errorMessage = errorData['user_message'];
-          } else if (errorData['error'] != null) {
-            errorMessage = errorData['error'];
-          } else if (errorData['message'] != null) {
-            errorMessage = errorData['message'];
+        if (response.statusCode == 401) {
+          errorMessage = ErrorHandlerService.friendlyMessage(401);
+        } else {
+          try {
+            final errorData = jsonDecode(response.body);
+            if (errorData['user_message'] != null) {
+              errorMessage = errorData['user_message'];
+            } else if (errorData['error'] != null) {
+              errorMessage = errorData['error'];
+            } else if (errorData['message'] != null) {
+              errorMessage = errorData['message'];
+            }
+          } catch (e) {
+            errorMessage = ErrorHandlerService.friendlyMessage(response.statusCode);
           }
-        } catch (e) {
-          // Use default message if JSON parsing fails
-          errorMessage = 'Server error: ${response.statusCode}';
         }
         
         await DebugLogHelper.addDebugLog('TOUR_REQUEST_ERROR: $errorMessage');
