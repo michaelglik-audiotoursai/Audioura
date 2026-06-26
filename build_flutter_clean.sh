@@ -140,6 +140,17 @@ else
     exit 1
 fi
 
+# Copy AAB back to Windows directory for Play Store upload
+AAB_PATH="$WORK_DIR/audio_tour_app/build/app/outputs/bundle/release/app-release.aab"
+if [ -f "$AAB_PATH" ]; then
+    cp "$AAB_PATH" "$SOURCE_DIR/audioura-release.aab"
+    echo "✅ AAB copied to: $SOURCE_DIR/audioura-release.aab"
+    echo "AAB size: $(du -h "$AAB_PATH" | cut -f1)"
+else
+    echo "❌ AAB not found at $AAB_PATH — appbundle build may have failed"
+    exit 1
+fi
+
 echo "=== CLEAN BUILD PROCESS COMPLETED ==="
 echo "Install the APK and check for startup message in debug logs:"
 
