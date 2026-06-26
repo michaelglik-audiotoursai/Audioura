@@ -8,37 +8,37 @@ This is required so the user can identify which Amazon-Q tab they are talking to
 
 ---
 
-### ✅ **CURRENT STATE — v2.1.1+9 READY TO BUILD ON iPHONE**
+### ✅ **CURRENT STATE — v2.1.1+18 APP STORE SUBMISSION BUILD READY**
 
 - iPhone last confirmed on **v1.2.9+71** (A#78 mic fix — smoke test passed)
-- **A#83 is ready to build** — v2.1.1+9 final build. Supersedes A#82 (v2.1.1+8, never built on iPhone). Single assignment takes iPhone from v1.2.9+71 directly to v2.1.1+9.
-- **API Key field** is in the About screen as a **temporary development tool** — Sir Michael enters the gateway API key manually during testing. Will be removed in a future version.
-- **Mobile Kiro** (Kiro IDE) replaced Android Amazon-Q (Eclipse) as of 2026-06-08. Same codebase, same branch, same communication channel.
-- **App Attestation Phase 4** (native Swift MethodChannel) is NOT in v2.1.1+9 — stubs return null. Separate future assignment after Phase 3 (Android Play Integrity) is validated.
+- **A#84 is ready to build** — v2.1.1+18 App Store / TestFlight release archive. Supersedes all prior unbuilt assignments (A#83, A#82). This is the first App Store submission build.
+- **API key now baked in** via `--dart-define=GATEWAY_API_KEY="aura-gw-360721-880288"` — no manual About screen entry needed. App defaults to Cloud mode on fresh install.
+- **Mobile Kiro** (Kiro IDE) replaced Android Amazon-Q (Eclipse) as of 2026-06-08.
+- **App Attestation Phase 4** (native Swift MethodChannel) is NOT in this build — stubs return null. Future assignment after Phase 3 (Android Play Integrity) validated.
+- ⚠️ **Sir Michael must create the App Store Connect record BEFORE Mac Mini Q uploads** (bundle ID `com.glikfamily.audioura`, SKU `audioura-1`). Also generate an App-Specific Password at appleid.apple.com.
 
 ---
 
 ### 🎯 **IMMEDIATE NEXT STEPS**
 
-#### A#83 — Build v2.1.1+9 on iPhone ⚠️ READY TO BUILD
+#### A#84 — Build v2.1.1+18 App Store Release ⚠️ READY TO BUILD
 
-**What this delivers over v1.2.9+71:**
-- Dual-environment networking: Local WiFi (default) + Cloud (HTTPS) via `Endpoints` resolver
-- `Endpoints.apiHeaders()` sends `X-API-Key` in cloud mode
-- `TranslationService` cloud migration; dead files removed
-- About screen: Local/Cloud toggle + cloud URL field + API Key field (temporary)
-- Poll loop rewrite (no stuck timer), re-entry guard, `translation_failed` snackbar, crash recovery
-- **Account Deletion UI** — Danger Zone in About, two-step confirm, server-first DELETE, local wipe on success
-- **Existing-Tour Translation** — purple translate icon on Listen page, 10-language dialog, `TourTranslationHelper`
-- **App Attestation stubs** — `AppAttestationService` (null), `X-App-Attestation` header stub in `apiHeaders()`
-- **News Cloud Paths** — all news/newsletter calls use `apiHeaders()`, `newsDownloadUrl()` routes correctly
-- **Cloud auth fix** — `user_id` in tour generation body (fixes 401 `auth_required`)
-- **Full hardcoded URL audit** — all `5012`/`5017` URLs replaced; 3 new Service entries (`treats`, `voice`, `tourEditing`); cloud-gate messages for undeployed services
-- **402 handling** — newsletter/news/download 402 → orange snackbar or 🔒 icon, no crash
-- **Translation consolidation** — `home_screen.dart` calls `TourTranslationHelper` (77 duplicate lines removed)
-- **Dead files deleted** — `home_page_flutter_map.dart`, `api_config.dart`; compile fixes
+⚠️ **DIFFERENT BUILD PROCESS — release archive, not dev install.**
 
-**Target commit:** `4aa8382` (docs at `cb7540e` on top)  **pubspec:** `2.1.1+9`  **No pubspec bump needed.**
+**What this delivers over v1.2.9+71 (all changes since last iPhone build):**
+- Fresh install defaults to Cloud mode — no manual URL/key entry needed
+- API key baked in via `--dart-define=GATEWAY_API_KEY="aura-gw-360721-880288"`
+- All cloud HTTP requests send `X-API-Key` on every call
+- Friendly error messages — no raw 401 shown to users
+- Translation failure modal dialog
+- Listen page overflow menu (⋮) — translate/edit/delete/report
+- Report this tour — prefilled mailto from overflow menu
+- Account deletion — iOS pops to root with restart message
+- Treats tab — real backend + "Samples for the future" banner
+- 402 handling, poll hardening, URL audit, translation consolidation (all v2.1.1+9 fixes)
+- `.env` removed — no bundled secrets
+
+**Target commit:** `700d579`  **pubspec:** `2.1.1+18`  **No pubspec bump needed.**
 
 **Mac Mini runs:**
 ```bash
@@ -50,19 +50,20 @@ cd .. && flutter clean && flutter pub get
 cd "/Volumes/USB DISK/Audioura/scripts" && ./build_install_launch.sh
 ```
 
-**Smoke tests (12):**
-1. Cloud tour generation — no 401, tour generates via `api.audioura.com`
-2. Cloud newsletter — succeeds or clean 402 snackbar
-3. Cloud news article download — downloads via cloud path
-4. News article playback — WebView loads, audio plays
-5. Cloud translation — translated versions appear (NOT_TESTED acceptable)
-6. Account Deletion UI — Danger Zone visible, Cancel works
-7. Existing-tour Translation — purple icon + language dialog
-8. Local WiFi regression — generation + news + newsletter all work
-9. Mic regression (A#78) — no permission snackbar
-10. Refresh regression (A#77b) — no black screen
-11. POI map button — TourMapScreen opens
-12. Cloud-gated features — treats/voice/editing show clean message
+**Build command:**
+```bash
+flutter build ipa --release --dart-define=GATEWAY_API_KEY="aura-gw-360721-880288"
+```
+
+**Smoke tests (8):**
+1. Cloud tour generation — no 401, generates automatically
+2. Cloud news/newsletter — processes, downloads, plays
+3. Translation — works; failure shows modal dialog
+4. Account deletion — iOS pops to root with restart message
+5. Report tour — overflow menu → Report → email compose opens
+6. Treats tab — banner + real content
+7. Map/POI — walking person icons + TourMapScreen opens
+8. Mic/Voice — no permission snackbar
 
 ---
 
@@ -84,8 +85,8 @@ Audioura-build/           AudioTours\development\
 - **Windows dev tree**: `C:\Users\micha\eclipse-workspace\AudioTours\development\` — IS a git clone. Q edits iOS-only files + planning docs here. Never commits Dart code.
 - **USB mirror**: `usb/Audioura/` mirrors `D:\Audioura\`. After editing: `copy usb\Audioura\assignments\mac_mini_assignments.md D:\Audioura\assignments\`
 - **OLD repo**: `~/Development/AudioTours/` — BROKEN, never use
-- **pubspec**: `2.1.1+9` (Mobile Kiro bumped)
-- **Head commit**: `cb7540e` (docs) on top of `4aa8382` (compile fixes — final v2.1.1+9)
+- **pubspec**: `2.1.1+18` (Mobile Kiro bumped)
+- **Head commit**: `700d579` — compile fix (imports for Properties/FileInputStream)
 
 #### Version history
 | Version | Assignment | Status |
@@ -96,8 +97,9 @@ Audioura-build/           AudioTours\development\
 | 1.2.9+71 | A#78 mic permission fix + dead import | ✅ |
 | 2.1.1+1–+3 | A#79/A#80 dual-environment — superseded | ⏭️ SKIPPED |
 | 2.1.1+6–+7 | A#81 poll hardening — superseded | ⏭️ SKIPPED |
-| 2.1.1+8 | A#82 4 new features + poll hardening + dual-env — superseded | ⏭️ SKIPPED |
-| **2.1.1+9** | **A#83 final — cloud E2E + URL audit + 402 handling + translation consolidation** | **⏳ READY TO BUILD** |
+| 2.1.1+8 | A#82 4 new features — superseded | ⏭️ SKIPPED |
+| 2.1.1+9–+17 | A#83 cloud fixes + audit + 402 — superseded | ⏭️ SKIPPED |
+| **2.1.1+18** | **A#84 App Store release archive — first submission build** | **⏳ READY TO BUILD** |
 
 #### Git operation ownership
 | Operation | Who | Where |
@@ -126,9 +128,9 @@ Audioura-build/           AudioTours\development\
 ---
 
 ### 📱 **APP STATUS**
-- **iPhone**: v1.2.9+71 (A#83 build pending → v2.1.1+9)
+- **iPhone**: v1.2.9+71 (A#84 App Store build pending → v2.1.1+18)
 - **All shipped features**: Tour clustering, location search, tour search, newsletter system, subscription, language selector, about screen, settings persistence, location permissions, keyboard dismissal, download spinner fix, microphone voice control, translation (ru/fr/zh), walking tour map, per-stop map focus, coordinate jitter, museum single-POI map guard, mode-switch fix, stale tour/news path healing, brick-red app icon, app name "Audioura", InAppWebView v6, map icon on Listen page, POI tap → TourMapScreen via `openMap` JS handler, Listen page Refresh in-place reload, Listen page mic permission fix.
-- **New in v2.1.1+9** (pending A#83 build): Dual-environment networking, poll loop rewrite, re-entry guard, Account Deletion UI, Existing-Tour Translation, App Attestation stubs, News Cloud Paths, cloud auth fix, full hardcoded URL audit, 402 handling, translation consolidation.
+- **New in v2.1.1+18** (pending A#84 build): Cloud-first defaults, baked-in API key, all cloud URLs sending X-API-Key, translation modal, overflow menu, Report tour, Treats tab, Account deletion iOS flow, 402 handling, full URL audit.
 
 ---
 
@@ -207,7 +209,8 @@ cd "/Volumes/USB DISK/Audioura/scripts"
 ---
 
 ### 📋 **OPEN ITEMS**
-1. **A#83** ⚠️ READY TO BUILD — v2.1.1+9. See Immediate Next Steps.
+1. **A#84** ⚠️ READY TO BUILD — v2.1.1+18 App Store release archive. See Immediate Next Steps.
+   - Sir Michael: create App Store Connect record + App-Specific Password BEFORE Mac Mini build.
 2. **App Attestation Phase 4** — iOS native Swift MethodChannel (`com.audioura.app/attestation`). Blocked on Android Phase 3 (Play Integrity) validation first. Future assignment — Windows Q will need to edit `ios/` Swift files.
 3. **API Key field removal** — About screen manual API Key input is temporary. Future: embed/auto-supply key.
 4. **Dialog auto-dismiss** — `_startVoiceSearch()` dialog doesn't auto-close on 10s timeout. `onStatus` not wired. Deferred.
@@ -273,7 +276,7 @@ cd ios && pod deintegrate && pod install
 | `lib/services/app_attestation_service.dart` | NEW v2.1.1+8 — Attestation stubs (null). |
 | `lib/config.dart` | `Config.defaultServerIp = '192.168.0.218'` |
 | `ios/Runner/Info.plist` | iOS permissions + `NSLocalNetworkUsageDescription`. |
-| `usb/Audioura/assignments/mac_mini_assignments.md` | Mac Mini task queue. A#83 at top. |
+| `usb/Audioura/assignments/mac_mini_assignments.md` | Mac Mini task queue. A#84 at top. |
 | `git_source_control_for_q.md` | Git rules — READ before any git operation. |
 
 ---
@@ -287,5 +290,5 @@ cd ios && pod deintegrate && pod install
 
 ---
 
-**Last Updated**: 2026-06-21 — v111.0. pubspec at `2.1.1+9` (HEAD `cb7540e`/`4aa8382`). iPhone on v1.2.9+71. A#83 final assignment written — takes iPhone from v1.2.9+71 to v2.1.1+9 in one build. Includes all v2.1.1+8 features + cloud auth fix + full hardcoded URL audit + 402 handling + translation consolidation.
-**iOS Amazon-Q Version**: 111.0
+**Last Updated**: 2026-06-26 — v112.0. pubspec at `2.1.1+18` (HEAD `700d579`). iPhone on v1.2.9+71. A#84 App Store submission assignment written — first release archive build, takes iPhone from v1.2.9+71 to v2.1.1+18. API key baked in via dart-define. App defaults to Cloud mode. Sir Michael must create App Store Connect record + App-Specific Password before upload step.
+**iOS Amazon-Q Version**: 112.0
