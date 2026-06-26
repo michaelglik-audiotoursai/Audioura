@@ -1257,10 +1257,15 @@ class _HomeScreenState extends State<HomeScreen> {
           SnackBar(content: Text(msg), backgroundColor: Colors.green),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${translationFailures.map((l) => TourTranslationHelper.availableLanguages[l] ?? l).join(", ")} not available for this tour — English version saved.'),
-            backgroundColor: Colors.orange,
+        final failedNames = translationFailures.map((l) => TourTranslationHelper.availableLanguages[l] ?? l).join(', ');
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Translation Not Available'),
+            content: Text('$failedNames wasn\'t available for this older tour, so the English version was saved.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')),
+            ],
           ),
         );
       }

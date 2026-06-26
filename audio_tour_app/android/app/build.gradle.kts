@@ -17,6 +17,23 @@ android {
             storeFile = file("debug.keystore")
             storePassword = "android"
         }
+        create("release") {
+            val keystorePropertiesFile = rootProject.file("key.properties")
+            if (keystorePropertiesFile.exists()) {
+                val keystoreProperties = java.util.Properties()
+                keystoreProperties.load(java.io.FileInputStream(keystorePropertiesFile))
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+            } else {
+                // Fall back to debug signing if key.properties not found (dev builds)
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+                storeFile = file("debug.keystore")
+                storePassword = "android"
+            }
+        }
     }
 
     compileOptions {
@@ -31,7 +48,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.audioura.app"
+        applicationId = "com.audioura.audiotours"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 24
@@ -42,8 +59,7 @@ android {
 
     buildTypes {
         release {
-            // Signing with debug keys for testing
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
         debug {
             signingConfig = signingConfigs.getByName("debug")

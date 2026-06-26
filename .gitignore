@@ -40,3 +40,8 @@ debug_*
 # Build secrets — NEVER commit API keys
 build_secrets.env
 scratch/
+setup_build_secrets.sh
+key.properties
+*.keystore
+*.jks
+!audio_tour_app/android/app/debug.keystore

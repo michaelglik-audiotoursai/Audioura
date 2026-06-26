@@ -113,8 +113,13 @@ flutter clean
 echo "Step 2: Getting dependencies..."
 flutter pub get
 
-echo "Step 3: Building APK with clean cache..."
+echo "Step 3: Building APK and AAB with clean cache..."
 flutter build apk --release --dart-define=GATEWAY_API_KEY="$GATEWAY_API_KEY"
+echo "✅ APK built successfully"
+
+echo "Step 4: Building App Bundle (.aab) for Play Store..."
+flutter build appbundle --release --dart-define=GATEWAY_API_KEY="$GATEWAY_API_KEY"
+echo "✅ AAB built successfully"
 
 echo "=== BUILD COMPLETED ==="
 APK_PATH="$WORK_DIR/audio_tour_app/build/app/outputs/flutter-apk/app-release.apk"

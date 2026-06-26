@@ -918,11 +918,14 @@ class _MyToursScreenState extends State<MyToursScreen> {
         );
       } else {
         final failedNames = failures.map((code) => TourTranslationHelper.availableLanguages[code] ?? code).join(', ');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$failedNames not available for this tour — playing the original (English).'),
-            backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 6),
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Translation Not Available'),
+            content: Text('$failedNames wasn\'t available for this older tour, so the English version was saved.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')),
+            ],
           ),
         );
       }
