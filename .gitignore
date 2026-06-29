@@ -45,3 +45,5 @@ key.properties
 *.keystore
 *.jks
 !audio_tour_app/android/app/debug.keystore
+
+*.apk
