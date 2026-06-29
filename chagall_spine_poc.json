@@ -1,0 +1,109 @@
+{
+  "tour_hook": "What secret did Chagall embed in his art that reveals a profound message about faith and humanity?",
+  "connecting_thread": "A journey through Chagall's exploration of biblical tales and human experiences expressed in vibrant color and form.",
+  "arc": [
+    {
+      "stop": 1,
+      "name": "Biblical Message Room",
+      "chapter_role": "opening",
+      "emotional_beat": "awe and curiosity",
+      "unique_angle": "Chagall's unique blend of Jewish and Christian iconography sets the stage for universal themes.",
+      "plant": "The use of stained glass as a storytelling tool, to be seen in Stop 2.",
+      "callback": null,
+      "cliffhanger": "Why did Chagall choose to tell these stories in such monumental scale?"
+    },
+    {
+      "stop": 2,
+      "name": "The Tribe of Judah Room",
+      "chapter_role": "rising",
+      "emotional_beat": "reverence and reflection",
+      "unique_angle": "The stained glass filters light in a way that symbolically represents the divine presence.",
+      "plant": "The exploration of tribes continues, leading to a deeper understanding in Stop 3.",
+      "callback": "Biblical Message Room",
+      "cliffhanger": "What other tribes might Chagall have immortalized in glass?"
+    },
+    {
+      "stop": 3,
+      "name": "The Tribe of Naphtali Room",
+      "chapter_role": "rising",
+      "emotional_beat": "wonder and enlightenment",
+      "unique_angle": "The Naphtali windows uniquely incorporate Chagall's signature floating figures.",
+      "plant": "A deeper dive into biblical narrative in Stop 4.",
+      "callback": "The Tribe of Judah Room",
+      "cliffhanger": "How do these floating figures connect to Chagall's vision of life and death?"
+    },
+    {
+      "stop": 4,
+      "name": "Life and Death Room",
+      "chapter_role": "rising",
+      "emotional_beat": "introspection and solemnity",
+      "unique_angle": "Chagall's depiction of mortality incorporates elements of hope and resurrection.",
+      "plant": "The theme of love as a counterpoint to death, explored in Stop 5.",
+      "callback": "The Tribe of Naphtali Room",
+      "cliffhanger": "What does love look like in Chagall's biblical universe?"
+    },
+    {
+      "stop": 5,
+      "name": "Song of Songs Room",
+      "chapter_role": "rising",
+      "emotional_beat": "romanticism and joy",
+      "unique_angle": "Chagall's paintings illustrate the Song of Songs as both an earthly and divine love story.",
+      "plant": "The narrative of sacrifice and faith, which awaits in Stop 6.",
+      "callback": "Life and Death Room",
+      "cliffhanger": "How does sacrifice intertwine with love in Chagall's world?"
+    },
+    {
+      "stop": 6,
+      "name": "The Sacrifice of Isaac Room",
+      "chapter_role": "rising",
+      "emotional_beat": "tension and empathy",
+      "unique_angle": "Chagall uses color to express conflicting emotions in the story of Abraham and Isaac.",
+      "plant": "The role of prophets and prophecy to be revealed in Stop 7.",
+      "callback": "Song of Songs Room",
+      "cliffhanger": "How do the voices of the prophets echo through Chagall's art?"
+    },
+    {
+      "stop": 7,
+      "name": "The Prophet Room",
+      "chapter_role": "climax",
+      "emotional_beat": "inspiration and empowerment",
+      "unique_angle": "The prophets' windows, rare in Chagall's work, depict direct communication with God.",
+      "plant": "The creation narrative, a fundamental theme, to be explored in Stop 8.",
+      "callback": "The Sacrifice of Isaac Room",
+      "cliffhanger": "What fundamental truths does Chagall reveal about creation?"
+    },
+    {
+      "stop": 8,
+      "name": "The Seven Days of Creation Room",
+      "chapter_role": "rising",
+      "emotional_beat": "awe and contemplation",
+      "unique_angle": "Chagall’s seven windows explore the Genesis creation story through a prism of color and light.",
+      "plant": "The role of the Levites as spiritual leaders, discussed in Stop 9.",
+      "callback": "The Prophet Room",
+      "cliffhanger": "What special role do the Levites play in Chagall's narrative universe?"
+    },
+    {
+      "stop": 9,
+      "name": "The Tribe of Levi Room",
+      "chapter_role": "resolution",
+      "emotional_beat": "serenity and understanding",
+      "unique_angle": "Chagall's depiction focuses on the Levites' spiritual leadership and connection to divine service.",
+      "plant": "The final insight tied to the Tribe of Benjamin's legacy, revealed in Stop 10.",
+      "callback": "The Seven Days of Creation Room",
+      "cliffhanger": "How does Chagall conclude this journey through ancient tribes?"
+    },
+    {
+      "stop": 10,
+      "name": "The Tribe of Benjamin Room",
+      "chapter_role": "resolution",
+      "emotional_beat": "closure and revelation",
+      "unique_angle": "The painting reflects Benjamin's tumultuous yet pivotal role in biblical history.",
+      "plant": null,
+      "callback": "The Tribe of Levi Room",
+      "cliffhanger": "What hidden truth about humanity does Chagall leave us with?"
+    }
+  ],
+  "climax_stop": 7,
+  "resolution_stop": 10,
+  "closing_revelation": "Chagall's art reveals an eternal dialogue between faith and humanity, a testament to the enduring power of hope and love."
+}

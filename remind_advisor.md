@@ -2,15 +2,18 @@
 ## Who you are
 🎯 **STRATEGIC ADVISOR AMAZON-Q** - **CRITICAL**: Always start all replies with "🎯 STRATEGIC ADVISOR AMAZON-Q -" to help identify which Amazon-Q tab is being used across multiple Eclipse tabs.
 
-**UPDATED**: 2026-06-02 SESSION 5 - Active branch: services-migration. v1.2.9+66 current. M01 complete, M02 Step 1 done.
+**UPDATED**: 2026-06-29 SESSION 6 - Tour Quality Enhancement architecture designed. Spine POC proven. enhancement_tasks.md next.
 
 ## 🚨 **POST-COMPACTION RECOVERY PROTOCOL**
 **When chat history is compacted, user will ask you to read @remind_advisor.md**
 
-**Your Response**: "🎯 STRATEGIC ADVISOR AMAZON-Q - Context restored. Active branch: services-migration. Current build: v1.2.9+66. M01 audit complete, M02 Step 1 done (env-var inter-service URLs in 6 services). IMMEDIATE NEXT ACTIONS:
-1. Continue M02 remaining steps (Dockerfiles, /health endpoints, MinIO R2 rehearsal, smoke test)
-2. Block App Store / Play Store submission until M04+M05 complete (public HTTPS gate)
-3. Read transition_for_Advisor_AQ.md for full decision table
+**Your Response**: "🎯 STRATEGIC ADVISOR AMAZON-Q - Context restored. Active branch: services-migration. Current build: v1.2.9+66. TWO parallel tracks active:
+TRACK A — GCP Migration: M01 complete, M02 Step 1 done, M02 Steps 2-5 remaining.
+TRACK B — Tour Quality Enhancement: Architecture designed, spine POC proven ($0.014/tour, 11.6s). Next: draft enhancement_tasks.md for parallel Amazon-Q execution.
+IMMEDIATE NEXT ACTIONS:
+1. Draft enhancement_tasks.md (~100 independent tasks for all Amazon-Q teams)
+2. Continue M02 remaining steps
+3. Block App Store submission until M04+M05 complete
 What needs my input?"
 
 ---
@@ -45,11 +48,20 @@ What needs my input?"
 4. ✅ **v1.2.9+66** — map icon restore + museum tour category fix + M02 Step 1 env-var inter-service URLs in 6 services
 5. ✅ **M01 audit complete**
 
+### **COMPLETED SESSION 6 (2026-06-29)**:
+1. ✅ **Kiro PATH fixed**: `C:\Users\micha\AppData\Local\Programs\Kiro` added to Windows user PATH via PowerShell
+2. ✅ **Claude transition docs pushed**: `bd473f7` — all 7 Claude.AI handoff/transition docs + audioura-dev.apk
+3. ✅ **transition_for_Advisor_AQ.md reviewed** — accurate, two projects: GCP migration + App Store submission
+4. ✅ **AUDIOURA_CLOUD_MIGRATION_AND_LIFECYCLE.md fully read** — Advisor Q now has complete migration knowledge
+5. ✅ **Tour Quality Enhancement architecture designed** — see section below
+6. ✅ **Narrative spine POC run** — gpt-4o, 11.6s, $0.01421, saved as `chagall_spine_poc.json`
+7. ✅ **Chagall current tour saved** as `chagall_current_tour.txt` for comparison
+
 ### **GIT STATE**:
 - **Active branch**: services-migration
-- **Last commit**: `682a802` — Update remind_mobile_ai.md - add v1.2.9+66 key fix entry
+- **Last commit**: `32f596c` — Update remind_advisor.md (Session 5 update)
+- **Untracked**: `chagall_current_tour.txt`, `chagall_spine_poc.json`, `spine_poc.py` — commit or backup before next session
 - **Remote**: up to date with origin/services-migration ✅
-- **Working tree**: clean
 
 ### **BUILD HISTORY (RECENT)**:
 - **A#71**: ✅ COMPLETE - v1.2.9+62 - App name fix + InAppWebViewSettings v6 (tour_player_screen only)
@@ -64,13 +76,18 @@ What needs my input?"
 
 ## 🚨 **IMMEDIATE NEXT ACTIONS**
 
-### **GCP Migration M02 — remaining steps**
+### **TRACK A — GCP Migration M02 remaining steps**
 1. ✅ Step 1 done: env-var-driven inter-service URLs in 6 services
 2. Ensure all Dockerfiles have `EXPOSE <port>` + `CMD` bound to `0.0.0.0:$PORT`
 3. Replace local file writes with R2 calls behind feature flag — test with MinIO locally
 4. Each service responds to `GET /health` → 200 in <1s (Cloud Run liveness)
 5. Smoke-test all 13 services locally with new config
 6. **$0 GCP cost** — billing only starts at M03 (Cloud SQL provisioning)
+
+### **TRACK B — Tour Quality Enhancement (next action)**
+- Draft `development/enhancement_tasks.md` — ~100 independent tasks for parallel Amazon-Q execution
+- POC files to commit: `chagall_current_tour.txt`, `chagall_spine_poc.json`, `spine_poc.py`
+- See Tour Quality Enhancement section below for full architecture
 
 ### **App Store / Play Store (blocked on Services M04+M05)**
 - Spec: `STORE_SUBMISSION_ROADMAP.md`
@@ -156,6 +173,79 @@ What needs my input?"
 
 ---
 
+## 🎨 **TOUR QUALITY ENHANCEMENT — ARCHITECTURE (Session 6)**
+
+### **Strategic Vision**
+Tours must be strikingly different from generic AI output — factually accurate, narratively connected, personalized, engaging enough that users pay money and share with friends.
+
+### **Three Architectural Layers**
+
+**Layer 1 — Content Foundation (accuracy)**
+- Fact sheet per POI generated BEFORE narrative writing
+- gpt-3.5-turbo at low temperature for structured JSON facts (NOT gpt-4o — cost unjustified)
+- RAG: Wikipedia API (free) + museum website content retrieved per stop, fed as grounding
+- Hallucination flag: low-confidence facts flagged, not published
+
+**Layer 2 — Narrative Spine (differentiator)**
+- ONE gpt-4o call per tour generation (not per stop) — $0.014/tour, 11.6s ✅ PROVEN
+- Produces: tour_hook, connecting_thread, per-stop emotional_beat + unique_angle + plant + callback + cliffhanger, climax_stop, closing_revelation
+- Spine varies by tour type — saved as reusable templates per type
+- Spine template files: `templates/spine_museum.txt`, `spine_walking.txt`, `spine_restaurant.txt`, `spine_book.txt`
+- Spine injected into existing Phase 5 description prompts as context (no extra API call)
+
+**Layer 3 — Perspective System (personalization)**
+- 3 perspective layers per stop: 🎨 Artist/Creator, 📚 Historian, 👁️ Curator
+- Generated via RAG: Wikipedia → Artist layer, historical period article → Historian layer, museum site → Curator layer
+- Model: gpt-3.5-turbo for narrative rewrite of RAG content (~$0.001-0.003/perspective)
+- User preference inferred PASSIVELY: replay behavior + single emoji onboarding question
+- Onboarding: "What brings you here today?" → 🎨 Art lover / 📖 History buff / 👨‍👩‍👧 Family / ✈️ First-time visitor
+
+### **Tour Caching + Trend Intelligence (3 levels)**
+- **Level 1 — Exact cache**: hash(location + tour_type + total_stops) → Postgres lookup before OpenAI call
+- **Level 2 — Partial reuse**: fuzzy-match POIs by name+coordinates, reuse fact sheets and descriptions (~70-80% cost saving on similar requests)
+- **Level 3 — Trend intelligence**: request frequency counter → proactive pre-generation during off-peak → "Popular this week" surface in app
+- All 3 levels buildable on existing Postgres + Docker stack, migrate to Cloud Run in M04
+
+### **Tour Type Spine Variations**
+| Tour Type | Spine Structure | Connecting Thread |
+|---|---|---|
+| Museum | Linear chapters — each room builds on last | Artist's life arc, thematic evolution |
+| Walking | Geographic journey — arrival → discovery → departure | Neighborhood character, hidden history |
+| Restaurant | Culinary journey — appetizer → main → dessert metaphor | Cuisine culture, chef stories |
+| Book/Movie | Plot-parallel — stops mirror story chapters | Character motivations, scene context |
+
+### **Revised Cost Table**
+| Component | Effort | Quality Impact | Cost per tour |
+|---|---|---|---|
+| Fact extraction + hallucination guard | Medium | High | +$0.002 (gpt-3.5-turbo) |
+| RAG retrieval (Wikipedia API) | Medium | Very High | $0 (free API) |
+| Narrative spine (gpt-4o, 1 call/tour) | Medium | Very High | +$0.014 ✅ proven |
+| Callback injection into Phase 5 | Medium | High | $0 (context only) |
+| Perspective layers x3 per stop | High | Very High | +$0.03 (gpt-3.5-turbo) |
+| Passive preference inference | High | Medium | $0 (client-side) |
+| Single onboarding question | Low | High | $0 (UI only) |
+| Tour caching Level 1 | Low | Cost saving | -$0.10+ per cache hit |
+| Tour caching Level 2 | Medium | Cost saving | -70-80% on similar requests |
+| Trend pre-generation | Medium | Revenue | Near-zero marginal per user |
+| **Total upgrade cost** | | | **+~$0.05/tour net** |
+
+### **Implementation Sprints**
+- **Sprint 1** (2-3 weeks): Fact extraction + RAG + Narrative spine + callback injection → immediately market-differentiated
+- **Sprint 2** (3-4 weeks): Perspective layers (Artist/Historian/Curator) + onboarding question
+- **Sprint 3** (post-launch): Passive preference inference from replay behavior + trend intelligence
+
+### **POC Evidence**
+- Spine generated for Chagall museum tour: `development/chagall_spine_poc.json`
+- Current tour baseline: `development/chagall_current_tour.txt`
+- POC script: `development/spine_poc.py` (runs inside `development-tour-generator-1` container)
+- Measured: 11.6s, 546 tokens in / 1284 out, $0.01421 total
+- Quality verdict: hook genuine, emotional beats differentiated, climax at Stop 7 correct, closing_revelation needs strengthening with RAG facts
+
+### **Next Step**
+Draft `development/enhancement_tasks.md` — ~100 independent tasks broken down for parallel Amazon-Q execution across Services Q, Mobile Q, iOS Q, and Demo Q.
+
+---
+
 ## 🛠️ **WINDOWS TOOLING LESSONS (Session 4)**
 - **Batch files**: Use `cmd /c "full\path\to\file.bat"` to run batch files from executeBash
 - **Multi-command**: Use `&&` operator for short chains instead of batch files
@@ -207,8 +297,9 @@ Read `transition_for_Advisor_AQ.md` for full decision table and cost monitoring 
 
 ---
 
-**Last Updated**: 2026-06-02 Session 5
-**Status**: ✅ Git clean + synced | ✅ v1.2.9+66 on both platforms | ✅ M01 complete | 🔄 M02 in progress
+**Last Updated**: 2026-06-29 Session 6
+**Status**: ✅ v1.2.9+66 both platforms | ✅ M01 complete | 🔄 M02 in progress | 🔄 Tour Enhancement architecture designed
 **Current Build**: v1.2.9+66 — iOS + Android
-**Next Milestone**: Complete M02 → M03 (billing starts) → M04 → M05 → App Store submission
-**No Blockers**: Both platforms stable, git clean, transition docs ready
+**Two Active Tracks**: A) GCP Migration M02→M05 | B) Tour Quality Enhancement Sprint 1
+**Next Milestone**: draft enhancement_tasks.md + complete M02
+**POC Files to commit**: chagall_current_tour.txt, chagall_spine_poc.json, spine_poc.py
