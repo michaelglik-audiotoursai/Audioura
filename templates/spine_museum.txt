@@ -24,7 +24,7 @@ Return ONLY valid JSON (no markdown fences, no commentary) with this exact schem
   ],
   "climax_stop": <integer — which stop number is the emotional peak>,
   "resolution_stop": <integer — which stop number resolves the tour_hook>,
-  "closing_revelation": "The final insight that answers the tour_hook and gives the listener a takeaway they'll remember."
+  "closing_revelation": "A specific, verifiable fact about this venue or artist that answers the tour_hook — something the visitor can look up and confirm. MUST include a concrete image or action the visitor can carry away (e.g., 'Next time you see X, notice Y'). NEVER use generic words: 'eternal', 'dialogue', 'testament', 'legacy', 'timeless'. Ground it in a real date, number, or documented event."
 }
 
 RULES:
