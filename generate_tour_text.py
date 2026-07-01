@@ -1883,6 +1883,22 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
             # Debug: Print the directions
             print(f"DEBUG - Directions for Stop {stop_num} to {stop_num+1}: '{directions}'")
             
+            # [S32] Storied: generate improved directions when STORIED_MODE=true
+            if _storied_mode:
+                try:
+                    if tour_category == 'museum':
+                        from directions_generator import generate_real_directions
+                        _storied_directions = generate_real_directions(poi_name, next_poi['name'], api_key)
+                    else:
+                        from directions_generator import generate_walking_directions
+                        _storied_directions = generate_walking_directions(poi_name, next_poi['name'], location, api_key)
+                    if _storied_directions:
+                        directions = _storied_directions
+                except ImportError:
+                    pass  # Fall back to Phase 3B directions
+                except Exception as _dir_err:
+                    print(f"  [S32] Directions generation error: {_dir_err}")
+
             # Always include the standard phrase with the next stop name
             poi_content += f"Please resume the tour at {next_poi['name']} by following these directions: "
             
