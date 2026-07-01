@@ -85,10 +85,10 @@ def main():
                 if actual_cols == 0:
                     print(f"MIGRATION FAILED: {table_name} — table does not exist")
                     all_ok = False
-                elif actual_cols >= expected_cols:
-                    print(f"MIGRATION OK: {table_name} ({actual_cols} columns, expected ≥{expected_cols})")
+                elif actual_cols == expected_cols:
+                    print(f"MIGRATION OK: {table_name} ({actual_cols} columns, expected {expected_cols})")
                 else:
-                    print(f"MIGRATION FAILED: {table_name} — {actual_cols} columns, expected ≥{expected_cols}")
+                    print(f"MIGRATION FAILED: {table_name} — {actual_cols} columns, expected exactly {expected_cols}")
                     all_ok = False
     except Exception as e:
         print(f"MIGRATION FAILED: validation error — {e}")
