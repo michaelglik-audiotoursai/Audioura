@@ -189,6 +189,9 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('user_id') ?? '';
       if (userId.isNotEmpty) tourData['user_id'] = userId;
+      // Include narrative tone from onboarding (Storied personalization)
+      final tone = prefs.getString('narrative_tone') ?? 'general';
+      tourData['narrative_tone'] = tone;
       
       // Step 1: Start tour generation
       final response = await http.post(
@@ -1360,6 +1363,9 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('user_id') ?? '';
       if (userId.isNotEmpty) tourData['user_id'] = userId;
+      // Include narrative tone from onboarding (Storied personalization)
+      final tone = prefs.getString('narrative_tone') ?? 'general';
+      tourData['narrative_tone'] = tone;
       
       // Print debug info
       await DebugLogHelper.addDebugLog('BACKGROUND: Generating tour: ${tourData["location"]}');

@@ -3,6 +3,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/main_screen.dart';
+import 'screens/onboarding_screen.dart';
 
 class MainScreenWithTreatsTab extends StatelessWidget {
   const MainScreenWithTreatsTab({super.key});
@@ -31,18 +32,41 @@ void main() async {
   runApp(const AudioTourApp());
 }
 
-class AudioTourApp extends StatelessWidget {
+class AudioTourApp extends StatefulWidget {
   const AudioTourApp({super.key});
+
+  @override
+  State<AudioTourApp> createState() => _AudioTourAppState();
+}
+
+class _AudioTourAppState extends State<AudioTourApp> {
+  bool _onboardingComplete = true; // assume complete until loaded
+
+  @override
+  void initState() {
+    super.initState();
+    _checkOnboarding();
+  }
+
+  Future<void> _checkOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    final complete = prefs.getBool('onboarding_complete') ?? false;
+    if (mounted) setState(() { _onboardingComplete = complete; });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Audio Tour Generator',
+      title: 'Audioura',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         useMaterial3: true,
       ),
-      home: const MainScreen(),
+      home: _onboardingComplete
+          ? const MainScreen()
+          : OnboardingScreen(onComplete: () {
+              setState(() { _onboardingComplete = true; });
+            }),
       routes: {
         '/treats': (context) => const MainScreenWithTreatsTab(),
       },
