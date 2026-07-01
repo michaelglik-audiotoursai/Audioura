@@ -16,7 +16,7 @@ import sys
 
 # Expected tables and their column counts
 EXPECTED_TABLES = {
-    "tour_cache": 4,
+    "tour_cache": 8,
     "user_preferences": 3,
     "shared_tours": 7,
     "referral_codes": 4,

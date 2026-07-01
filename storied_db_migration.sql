@@ -5,9 +5,13 @@
 -- 1. Tour Cache (from tour_cache_layer1.py, task #19)
 CREATE TABLE IF NOT EXISTS tour_cache (
     cache_key VARCHAR(64) PRIMARY KEY,
-    tour_text TEXT NOT NULL,
+    location TEXT NOT NULL,
+    tour_type TEXT NOT NULL,
+    total_stops INTEGER NOT NULL,
+    tour_content TEXT NOT NULL,
     spine_json TEXT,
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT NOW(),
+    hit_count INTEGER DEFAULT 0
 );
 
 -- 2. User Preferences (from persona_preference_store.py, task #44)
