@@ -36,6 +36,23 @@ def _load_template(tour_category: str) -> str:
         return f.read()
 
 
+def select_spine_template(tour_category: str) -> str:
+    """Select the correct spine template file path for a tour category.
+
+    Args:
+        tour_category: 'museum', 'walking', 'restaurant', or 'specialized'/'book'.
+
+    Returns:
+        Full file path to the template. Falls back to spine_walking.txt for unknown types.
+    """
+    category = tour_category.lower().strip()
+    # Map specialized/book/movie to the book template
+    if category in ('specialized', 'book', 'movie', 'film'):
+        category = 'book'
+    filename = _TEMPLATE_MAP.get(category, "spine_walking.txt")
+    return os.path.join(_TEMPLATE_DIR, filename)
+
+
 def generate_spine(
     venue_name: str,
     poi_list: List[str],
