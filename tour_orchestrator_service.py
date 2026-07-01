@@ -910,6 +910,29 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             print("Failed to store tour in database")
             print(f"Keeping extraction directory due to database storage failure: {extract_path}")
         
+        # [S82] Auto-call POST /tour/share after successful generation (Storied mode only)
+        storied_mode = os.getenv('STORIED_MODE', 'false').lower() == 'true'
+        if storied_mode and tour_content:
+            try:
+                share_payload = {
+                    "location": location,
+                    "tour_type": tour_type,
+                    "total_stops": total_stops,
+                    "tour_content": tour_content,
+                }
+                if user_id:
+                    share_payload["user_id"] = user_id
+                share_url = f"{TOUR_GENERATOR_URL}/tour/share"
+                print(f"[S82][SHARE] Auto-sharing tour to {share_url}")
+                share_resp = _authenticated_request("POST", share_url,
+                    headers={"Content-Type": "application/json"},
+                    json=share_payload,
+                    timeout=15
+                )
+                print(f"[S82][SHARE] Response: {share_resp.status_code} — {share_resp.text[:200]}")
+            except Exception as share_err:
+                print(f"[S82][SHARE] Best-effort share failed (non-fatal): {share_err}")
+
         # Complete
         final_message = f"Tour generation completed in {language.upper()}!"
         if language != 'en' and 'translated_tour_id' in ACTIVE_JOBS[job_id]:
