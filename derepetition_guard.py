@@ -62,3 +62,107 @@ def scan_for_repetition(text: str) -> List[str]:
                 matches.append(m.group(0))
 
     return matches
+
+
+def _jaccard_similarity(words_a: set, words_b: set) -> float:
+    """Word-level Jaccard similarity between two sets."""
+    if not words_a or not words_b:
+        return 0.0
+    intersection = words_a & words_b
+    union = words_a | words_b
+    return len(intersection) / len(union)
+
+
+def _split_into_sentences(text: str) -> List[str]:
+    """Split text into sentences (simple regex, no external libs)."""
+    import re
+    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+    return [s.strip() for s in sentences if len(s.strip()) > 20]
+
+
+def _tokenize(sentence: str) -> set:
+    """Tokenize a sentence into lowercase word set (stopwords removed)."""
+    import re
+    _STOP_WORDS = {
+        'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+        'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+        'should', 'may', 'might', 'shall', 'can', 'to', 'of', 'in', 'for',
+        'on', 'with', 'at', 'by', 'from', 'as', 'into', 'through', 'during',
+        'before', 'after', 'above', 'below', 'and', 'but', 'or', 'nor', 'not',
+        'so', 'yet', 'both', 'either', 'neither', 'each', 'every', 'all',
+        'any', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'only',
+        'own', 'same', 'than', 'too', 'very', 'just', 'because', 'this',
+        'that', 'these', 'those', 'it', 'its', 'you', 'your', 'we', 'our',
+        'they', 'their', 'his', 'her', 'him', 'she', 'he', 'i', 'me', 'my',
+    }
+    words = set(re.findall(r'[a-z]+', sentence.lower()))
+    return words - _STOP_WORDS
+
+
+def check_cross_stop_repetition(tour_text: str, threshold: float = 0.70) -> List[dict]:
+    """Find near-duplicate sentences across different stops in a tour.
+
+    Splits the tour text into per-stop blocks (separated by common stop markers),
+    extracts sentences, and finds pairs with word-overlap Jaccard > threshold.
+
+    Args:
+        tour_text: Full tour narration text.
+        threshold: Jaccard similarity threshold (default 0.85).
+
+    Returns:
+        List of dicts: {stop_a, stop_b, sentence_a, sentence_b, similarity}
+        Empty list if no cross-stop repetition found.
+    """
+    import re
+
+    if not tour_text or len(tour_text) < 100:
+        return []
+
+    # Split into stops — look for "Stop N:" pattern (most common in our tours)
+    stop_blocks = re.split(r'\nStop\s+\d+[:.]\s*', tour_text)
+    # Filter out tiny blocks (likely separators or headers)
+    stop_blocks = [b.strip() for b in stop_blocks if len(b.strip()) > 50]
+
+    if len(stop_blocks) < 2:
+        # Try splitting by numbered lines "1." or double newlines
+        stop_blocks = re.split(r'\n(?:\d+)\.\s+', tour_text)
+        stop_blocks = [b.strip() for b in stop_blocks if len(b.strip()) > 50]
+
+    if len(stop_blocks) < 2:
+        # Last resort: paragraph breaks
+        stop_blocks = [b.strip() for b in tour_text.split('\n\n') if len(b.strip()) > 50]
+
+    if len(stop_blocks) < 2:
+        return []
+
+    # Extract sentences per stop with their tokenized forms
+    stop_sentences = []
+    for i, block in enumerate(stop_blocks):
+        sentences = _split_into_sentences(block)
+        for sent in sentences:
+            tokens = _tokenize(sent)
+            if len(tokens) >= 4:  # Skip very short sentences
+                stop_sentences.append((i, sent, tokens))
+
+    # Compare all pairs across different stops
+    duplicates = []
+    for i in range(len(stop_sentences)):
+        for j in range(i + 1, len(stop_sentences)):
+            stop_a, sent_a, tokens_a = stop_sentences[i]
+            stop_b, sent_b, tokens_b = stop_sentences[j]
+
+            # Only compare across different stops
+            if stop_a == stop_b:
+                continue
+
+            sim = _jaccard_similarity(tokens_a, tokens_b)
+            if sim >= threshold:
+                duplicates.append({
+                    "stop_a": stop_a + 1,
+                    "stop_b": stop_b + 1,
+                    "sentence_a": sent_a[:100],
+                    "sentence_b": sent_b[:100],
+                    "similarity": round(sim, 3),
+                })
+
+    return duplicates
