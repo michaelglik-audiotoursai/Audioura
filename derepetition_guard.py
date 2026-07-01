@@ -166,3 +166,93 @@ def check_cross_stop_repetition(tour_text: str, threshold: float = 0.70) -> List
                 })
 
     return duplicates
+
+
+def rewrite_repeated_sentence(
+    sentence: str,
+    stop_name: str,
+    story_type: str,
+    api_key: str,
+) -> str:
+    """Rewrite a repeated/cliché sentence in the voice of its story_type.
+
+    Uses GPT-3.5-turbo to produce a fresh version that:
+    - Preserves the factual content
+    - Uses the tone appropriate to story_type
+    - Avoids all forbidden phrases
+    - Is 1–2 sentences
+
+    Args:
+        sentence: The flagged sentence to rewrite.
+        stop_name: The POI/stop this sentence belongs to.
+        story_type: One of the 6 taxonomy types (history, anecdote, etc.).
+        api_key: OpenAI API key.
+
+    Returns:
+        Rewritten sentence (1–2 sentences). Original on failure.
+    """
+    import json as _json
+    import requests as _requests
+    import logging as _logging
+
+    _log = _logging.getLogger(__name__)
+
+    # Load forbidden phrases for this story_type from taxonomy
+    try:
+        taxonomy = _json.load(open("story_type_taxonomy.json"))
+        type_entry = next((t for t in taxonomy["types"] if t["type"] == story_type), None)
+        type_forbidden = type_entry["forbidden_phrases"] if type_entry else []
+    except Exception:
+        type_forbidden = []
+
+    # Compile full ban list
+    ban_list = type_forbidden + [
+        "vibrant colors", "dreamlike imagery", "intricate details",
+        "timeless themes", "deep connection", "truly remarkable",
+        "rich tapestry", "hidden gem", "steeped in history",
+    ]
+
+    prompt = (
+        f"Rewrite this sentence about '{stop_name}' in the voice of a {story_type} narrator.\n\n"
+        f"Original: \"{sentence}\"\n\n"
+        f"Rules:\n"
+        f"- Keep the same factual content.\n"
+        f"- Write 1–2 sentences maximum.\n"
+        f"- DO NOT USE these phrases: {', '.join(ban_list)}\n"
+        f"- Make it fresh, specific, and engaging.\n\n"
+        f"Return ONLY the rewritten sentence(s), no quotes or explanation."
+    )
+
+    try:
+        response = _requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "gpt-3.5-turbo",
+                "messages": [
+                    {"role": "system", "content": "You are a creative writing editor. Return only the rewritten text."},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.8,
+                "max_tokens": 150,
+            },
+            timeout=10,
+        )
+
+        if response.status_code != 200:
+            _log.error(f"Rewrite API error: {response.status_code}")
+            return sentence
+
+        result = response.json()
+        rewritten = result["choices"][0]["message"]["content"].strip().strip('"')
+        tokens = result.get("usage", {}).get("total_tokens", 0)
+        cost = tokens / 1000 * 0.002
+        _log.info(f"Rewrite: {stop_name}/{story_type} | {tokens} tokens | ${cost:.4f}")
+        return rewritten
+
+    except Exception as e:
+        _log.error(f"Rewrite error: {e}")
+        return sentence
