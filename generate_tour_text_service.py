@@ -30,7 +30,7 @@ def ensure_tours_directory():
     if not os.path.exists(TOURS_DIR):
         os.makedirs(TOURS_DIR)
 
-def generate_tour_async(job_id, location, tour_type, total_stops=10):
+def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=None):
     """Generate tour text asynchronously."""
     try:
         api_call_logger.log("GENERATOR_SERVICE_ASYNC_START", {
@@ -38,9 +38,27 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10):
             "location": location,
             "tour_type": tour_type,
             "total_stops": total_stops,
+            "user_id": user_id,
         })
         
         ACTIVE_JOBS.update(job_id, status="processing", progress="Starting tour text generation...")
+
+        # [S46] Persona lookup — graceful degradation if unavailable
+        _persona_value = None
+        if user_id:
+            try:
+                from persona_preference_store import get_persona
+                from onboarding_preference import UserPersona
+                _db_url = os.getenv('DATABASE_URL', 'postgresql://admin:admin@localhost:5432/audiotours')
+                _persona_result = get_persona(user_id, _db_url)
+                if _persona_result is not None:
+                    _persona_value = _persona_result.value
+                    print(f"  [S46] Persona for user '{user_id}': {_persona_value}")
+                else:
+                    print(f"  [S46] No persona stored for user '{user_id}' — using default")
+            except Exception as e:
+                print(f"  [S46] Persona lookup failed (graceful degradation): {e}")
+                _persona_value = None
         
         # Create a temporary file for the output
         with tempfile.NamedTemporaryFile(delete=False, suffix='.txt') as temp_file:
@@ -51,11 +69,12 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10):
             "location": location,
             "tour_type": tour_type,
             "total_stops": total_stops,
+            "persona": _persona_value,
             "log_file": api_call_logger.get_log_path(),
         })
         
-        # Generate the tour text - PASS total_stops parameter
-        tour_text, _, coordinates = generate_tour_text(location, tour_type, temp_path, total_stops)
+        # Generate the tour text - PASS total_stops and persona parameters
+        tour_text, _, coordinates = generate_tour_text(location, tour_type, temp_path, total_stops, persona=_persona_value)
         
         if tour_text is None:
             ACTIVE_JOBS.update(job_id, status="error",
@@ -111,6 +130,7 @@ def generate_tour():
     location = data.get('location')
     tour_type = data.get('tour_type')
     total_stops = data.get('total_stops', 10)
+    user_id = data.get('user_id')  # [S46] Extract user_id for persona lookup
     
     api_call_logger.log("GENERATOR_SERVICE_RECEIVED_REQUEST", {
         "raw_request_body": data,
@@ -146,7 +166,7 @@ def generate_tour():
     # Start generation in background thread
     thread = threading.Thread(
         target=generate_tour_async,
-        args=(job_id, location, tour_type, total_stops)
+        args=(job_id, location, tour_type, total_stops, user_id)
     )
     thread.daemon = True
     thread.start()
