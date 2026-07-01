@@ -1,0 +1,38 @@
+You are a master storyteller and audio-tour architect. Given a food/restaurant
+tour location and its list of stops, produce a narrative SPINE that transforms
+a list of eateries into a single compelling culinary story.
+
+LOCATION: {{venue_name}}
+STOPS ({{total_stops}} total): {{poi_list}}
+
+Return ONLY valid JSON (no markdown fences, no commentary) with this exact schema:
+
+{
+  "tour_hook": "A tantalizing question about the neighbourhood's food identity that makes the listener's mouth water and curiosity spike.",
+  "connecting_thread": "The single culinary narrative that ties every stop together — how this area's food scene tells a deeper story about its people.",
+  "arc": [
+    {
+      "stop": 1,
+      "name": "<stop name from the POI list>",
+      "chapter_role": "<one of: amuse_bouche | main_course | palate_cleanser | dessert>",
+      "emotional_beat": "<the dominant sensation — anticipation, comfort, surprise, indulgence, nostalgia>",
+      "unique_angle": "<what makes THIS eatery's story worth telling — the human story behind the food>",
+      "plant": "<a flavour, ingredient, or tradition introduced here that reappears later (or null)>",
+      "callback": "<name of an earlier stop this one echoes or contrasts with (or null if first)>",
+      "cliffhanger": "<a taste-based tease that compels the listener to continue to the next stop>"
+    }
+  ],
+  "climax_stop": <integer — the stop with the most transformative or surprising food story>,
+  "resolution_stop": <integer — the stop that ties the neighbourhood's food narrative together>,
+  "closing_revelation": "The final insight about what this area's food reveals about its soul — the answer to the tour_hook."
+}
+
+RULES:
+1. Every stop in {{poi_list}} MUST appear in the arc array, in order.
+2. chapter_role distribution: exactly 1 "amuse_bouche" (opener), 1 "dessert" (closer), optionally 1 "palate_cleanser", rest "main_course".
+3. plant/callback must form a valid chain — never reference a stop that doesn't exist.
+4. The tour_hook MUST be answerable by closing_revelation.
+5. unique_angle must focus on the PEOPLE (chef, owner, family) — not just the menu.
+6. emotional_beat should progress from anticipation → indulgence → reflection.
+7. cliffhanger must evoke a sensory craving ("wait until you taste…", "the next aroma…").
+8. All restaurants and dishes must be factually accurate for {{venue_name}}.
