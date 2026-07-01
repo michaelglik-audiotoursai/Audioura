@@ -17,6 +17,9 @@ import re
 from generate_tour_text import generate_tour_text
 import api_call_logger
 from job_store import get_job_store
+from storied_version_constants import STORIED_SERVICE_VERSION
+
+SERVICE_VERSION = STORIED_SERVICE_VERSION
 
 app = Flask(__name__)
 CORS(app)
@@ -117,7 +120,12 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint."""
-    return jsonify({"status": "healthy", "service": "tour_text_generator"})
+    return jsonify({
+        "status": "healthy",
+        "service": "tour_text_generator",
+        "version": SERVICE_VERSION,
+        "mode": os.getenv("STORIED_MODE", "false"),
+    })
 
 @app.route('/generate', methods=['POST'])
 def generate_tour():
