@@ -1918,6 +1918,32 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                 for pair in _rep_pairs:
                     print(f"REPETITION WARN: Stop {pair.get('stop_a','')} and Stop {pair.get('stop_b','')} share near-identical sentence (sim={pair.get('similarity',0):.2f})")
                 print(f"  [S27] {len(_rep_pairs)} repetition pair(s) found (log only, no rewrite)")
+                # [S29] Auto-rewrite flagged repetitions (cap at 10)
+                _rewrite_count = 0
+                _MAX_REWRITES = 10
+                if _rep_pairs and _rewrite_count < _MAX_REWRITES:
+                    try:
+                        from derepetition_guard import rewrite_repeated_sentence
+                        for pair in _rep_pairs[:_MAX_REWRITES]:
+                            _sentence_b = pair.get('sentence_b', '')
+                            _stop_b = pair.get('stop_b', '')
+                            _story_type_b = ''  # Get from poi_list if available
+                            for p in poi_list:
+                                if str(p.get('stop_number', '')) == str(_stop_b):
+                                    _story_type_b = p.get('story_type', '')
+                                    break
+                            if _sentence_b:
+                                _rewritten = rewrite_repeated_sentence(_sentence_b, f"Stop {_stop_b}", _story_type_b, api_key)
+                                if _rewritten and _rewritten != _sentence_b:
+                                    complete_tour = complete_tour.replace(_sentence_b, _rewritten, 1)
+                                    _rewrite_count += 1
+                                    print(f"REPETITION FIXED: Stop {_stop_b} sentence rewritten")
+                        if _rewrite_count > 0:
+                            print(f"  [S29] {_rewrite_count} sentence(s) rewritten")
+                    except ImportError:
+                        print(f"  [S29] rewrite_repeated_sentence not available — skipping rewrites")
+                    except Exception as _rw_err:
+                        print(f"  [S29] Rewrite error: {_rw_err}")
             else:
                 print(f"  [S27] No cross-stop repetition detected")
         except ImportError:
