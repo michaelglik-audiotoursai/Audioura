@@ -610,6 +610,30 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     total_tokens = 0
     total_cost = 0
     
+    # -------- [S20] Storied: check tour cache before generation --------
+    _cache_hit = None
+    if _storied_mode:
+        _db_url = os.environ.get("DATABASE_URL")
+        if _db_url:
+            try:
+                from tour_cache_layer1 import get_cached_tour
+                _cache_hit = get_cached_tour(location, tour_type, total_stops, _db_url)
+                if _cache_hit:
+                    print(f"CACHE HIT: {location} / {tour_type} / {total_stops}")
+                    # Return cached tour immediately
+                    if output_file:
+                        with open(output_file, "w", encoding="utf-8") as _cf:
+                            _cf.write(_cache_hit)
+                    return _cache_hit, output_file, (None, None)
+                else:
+                    print(f"CACHE MISS: {location} / {tour_type} / {total_stops}")
+            except ImportError:
+                print(f"  [S20] tour_cache_layer1 not available — cache skipped")
+            except Exception as e:
+                print(f"  [S20] Cache check error: {e}")
+        else:
+            print(f"  [S20] DATABASE_URL not set — cache skipped")
+
     # PHASE 1: Analyze user intent with AI
     print(f"\nPHASE 1: Analyzing tour intent with AI...")
     # BUG 2 FIX: Mobile app hardcodes tour_type="museum" for ALL requests.
@@ -1991,6 +2015,23 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
     # Print total cost
     print(f"\nTotal API cost: ${total_cost:.4f} ({total_tokens} tokens)")
     
+    # -------- [S20] Storied: store in cache after successful generation --------
+    if _storied_mode and complete_tour:
+        _db_url = os.environ.get("DATABASE_URL")
+        if _db_url:
+            try:
+                from tour_cache_layer1 import store_tour
+                _spine_json_str = None
+                if _storied_spine:
+                    import json as _cache_json
+                    _spine_json_str = _cache_json.dumps(_storied_spine)
+                store_tour(location, tour_type, total_stops, complete_tour, _db_url, spine_json=_spine_json_str)
+                print(f"CACHE STORE: {location} / {tour_type} / {total_stops}")
+            except ImportError:
+                pass
+            except Exception as e:
+                print(f"  [S20] Cache store error: {e}")
+
     # Save to file if output_file is provided
     if not output_file:
         # Create default filename based on location and tour type
