@@ -55,3 +55,87 @@ def build_share_url(tour_id: str, base_url: str = "https://audioura.io") -> str:
         Full share URL: '{base_url}/tour/{tour_id}'
     """
     return f"{base_url.rstrip('/')}/tour/{tour_id}"
+
+
+import logging
+import psycopg2
+from datetime import datetime
+from typing import Optional
+
+_logger = logging.getLogger(__name__)
+
+
+def _ensure_shared_tours_table(conn) -> None:
+    """Create shared_tours table if not exists (idempotent)."""
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS shared_tours (
+                tour_id VARCHAR(8) PRIMARY KEY,
+                tour_text TEXT NOT NULL,
+                location TEXT NOT NULL,
+                tour_type TEXT NOT NULL,
+                total_stops INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW(),
+                share_count INTEGER DEFAULT 0
+            )
+        """)
+    conn.commit()
+
+
+def store_shared_tour(
+    tour_id: str,
+    tour_text: str,
+    location: str,
+    tour_type: str,
+    total_stops: int,
+    db_url: str,
+) -> bool:
+    """Store (upsert) a shared tour. Returns True on success."""
+    try:
+        conn = psycopg2.connect(db_url)
+        _ensure_shared_tours_table(conn)
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO shared_tours (tour_id, tour_text, location, tour_type, total_stops)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (tour_id) DO UPDATE
+                SET tour_text = EXCLUDED.tour_text,
+                    location = EXCLUDED.location,
+                    tour_type = EXCLUDED.tour_type,
+                    total_stops = EXCLUDED.total_stops
+            """, (tour_id, tour_text, location, tour_type, total_stops))
+        conn.commit()
+        conn.close()
+        _logger.info(f"Stored shared tour: {tour_id}")
+        return True
+    except Exception as e:
+        _logger.error(f"Error storing shared tour {tour_id}: {e}")
+        return False
+
+
+def get_shared_tour(tour_id: str, db_url: str) -> Optional[dict]:
+    """Retrieve a shared tour by ID. Returns row dict or None."""
+    try:
+        conn = psycopg2.connect(db_url)
+        _ensure_shared_tours_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT tour_id, tour_text, location, tour_type, total_stops, created_at, share_count FROM shared_tours WHERE tour_id = %s",
+                (tour_id,),
+            )
+            row = cur.fetchone()
+        conn.close()
+        if not row:
+            return None
+        return {
+            "tour_id": row[0],
+            "tour_text": row[1],
+            "location": row[2],
+            "tour_type": row[3],
+            "total_stops": row[4],
+            "created_at": row[5].isoformat() if row[5] else None,
+            "share_count": row[6],
+        }
+    except Exception as e:
+        _logger.error(f"Error getting shared tour {tour_id}: {e}")
+        return None
