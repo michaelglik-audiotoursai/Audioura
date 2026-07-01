@@ -286,3 +286,30 @@ Indexes:
 | 2026-06-01 | Git cleanup pass by Strategic Advisor. remind_Services_ai.md reconstructed. ISSUE-AD-FILTER: `advertising_url_filter.py` — `ref=`/`referrer=` removed; `parse_qs` key-based matching (Claude Q2); assertion tests (Claude Q4). Committed `1a7b4dc`. |
 | 2026-05-28 | ISSUE-BLOG-PATTERN: `newsletter_pattern_detector.py` — added `detect_blog_homepage_pattern()` for blog/newsletter homepages (Ghost, WordPress). Fixes reloadnyc.com returning 1 article instead of 12. Deployed to container. |
 | 2026-06-07 | CPU THROTTLING FIX: `--no-cpu-throttling --min-instances=1` on tour-orchestrator, `--no-cpu-throttling` on tour-modernized. Graceful shutdown handler added to orchestrator (`_graceful_shutdown`, SIGTERM handling, thread tracking). Secret fixes: OpenAI key (wrong value), AWS keys (\r\n suffix), /user route added to gateway. |
+
+
+---
+
+## 🆕 STORIED BRANCH — New Service Files
+
+The following modules were added on the `storied` branch to implement the Storied v2.2.0 pipeline:
+
+| File | Purpose |
+|------|---------|
+| `spine_generator.py` | Narrative spine generation (gpt-4o) |
+| `fact_extractor.py` | RAG-grounded fact sheets (gpt-3.5-turbo) |
+| `story_type_assigner.py` | 6-type taxonomy assignment |
+| `derepetition_guard.py` | Cross-stop repetition detection + rewrite |
+| `directions_generator.py` | Improved non-fabricated directions |
+| `tour_hook_generator.py` | Tour introduction from spine hook |
+| `onboarding_preference.py` | 4 personas + weights |
+| `persona_preference_store.py` | Postgres persona persistence |
+| `persona_endpoints.py` | POST/GET /user/persona |
+| `tour_sharing.py` + `sharing_endpoints.py` | Share links + POST/GET |
+| `referral_engine.py` + `referral_endpoints.py` | Referral codes |
+| `attestation_verifier.py` | Play Integrity + App Attest (log-only) |
+| `cost_ceiling_monitor.py` | $0.15 ceiling guard |
+| `storied_version_constants.py` | v2.2.0 versioning |
+
+**Feature flag**: All Storied code is guarded by `STORIED_MODE` env var (default: false). When false, pipeline runs identically to Beta.
+
