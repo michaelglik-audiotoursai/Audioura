@@ -45,8 +45,12 @@ if not API_KEY:
 
 # Attestation configuration (log-only by default)
 ATTESTATION_ENFORCED = os.getenv('ATTESTATION_ENFORCED', 'false').lower() == 'true'
+ATTESTATION_MODE = os.getenv('ATTESTATION_MODE', 'off')  # 'log_only', 'off', or 'enforce'
 ATTESTATION_SECRET = os.getenv('ATTESTATION_NONCE_SECRET', 'default-nonce-hmac-key-change-in-prod')
-print(f"[ATTESTATION] Mode: {'ENFORCING' if ATTESTATION_ENFORCED else 'LOG-ONLY'}")
+PLAY_INTEGRITY_API_KEY = os.getenv('PLAY_INTEGRITY_API_KEY', '')
+APP_PACKAGE_NAME = os.getenv('APP_PACKAGE_NAME', 'com.audioura.audiotours')
+APP_BUNDLE_ID = os.getenv('APP_BUNDLE_ID', 'com.audioura.app')
+print(f"[ATTESTATION] Mode: {ATTESTATION_MODE} (ENFORCED={ATTESTATION_ENFORCED})")
 
 # Nonce is STATELESS (HMAC-signed with embedded timestamp) — works across multiple Cloud Run instances.
 # No shared state needed. Any instance can verify any nonce it or another instance issued.
@@ -66,34 +70,46 @@ def _require_api_key():
 
 def _verify_attestation():
     """Verify platform attestation token on cost-bearing endpoints.
-    In log-only mode (ATTESTATION_ENFORCED=false): logs pass/fail but always allows.
-    In enforcing mode: rejects invalid/missing tokens with 403.
     
-    The app sends a single header: X-App-Attestation (for both Android and iOS).
-    Optional: X-App-Platform: android|ios (for server-side platform branching).
+    Behavior depends on ATTESTATION_MODE env var:
+    - 'off' (default): skip entirely, no logging.
+    - 'log_only': call attestation_verifier functions, log results, ALWAYS allow.
+    - 'enforce': not implemented for Aug 1 release (see [S58]).
+    
+    The app sends: X-App-Attestation (token) and X-App-Platform (android|ios).
     """
-    token = request.headers.get('X-App-Attestation', '')
-    platform = request.headers.get('X-App-Platform', 'unknown')
-    
-    if not token:
-        msg = "[ATTESTATION] No X-App-Attestation token present"
-        if ATTESTATION_ENFORCED:
-            print(f"{msg} — BLOCKING")
-            return jsonify({"error": "attestation_failed", "message": "Platform attestation required"}), 403
-        else:
-            print(f"{msg} — allowing (log-only mode)")
-            return None
-    
-    # TODO: Implement actual verification:
-    # Android (platform='android'): call Play Integrity API to verify token, check verdict + nonce
-    # iOS (platform='ios'): verify App Attest assertion signature against registered key + counter
-    # For now: log presence and allow (scaffold only)
-    
-    token_preview = token[:20] + '...' if len(token) > 20 else token
-    print(f"[ATTESTATION] {platform} token present: {token_preview}")
-    
-    # Placeholder verification (always passes in scaffold)
-    print(f"[ATTESTATION] {platform} token — PASS (scaffold, no server-side verification yet)")
+    # If attestation is off, skip entirely
+    if ATTESTATION_MODE not in ('log_only', 'enforce'):
+        return None
+
+    token = request.headers.get('X-App-Attestation', '') or request.headers.get('X-Attestation-Token', '')
+    platform = request.headers.get('X-App-Platform', '') or request.headers.get('X-Attestation-Platform', 'unknown')
+
+    # Import attestation verifier (placed in sys.path at gateway startup)
+    try:
+        import sys
+        _dev_path = os.path.join(os.path.dirname(os.path.dirname(__file__)))
+        if _dev_path not in sys.path:
+            sys.path.insert(0, _dev_path)
+        from attestation_verifier import verify_attestation_token, verify_play_integrity, verify_app_attest
+    except ImportError as e:
+        print(f"[ATTESTATION] Warning: could not import attestation_verifier: {e}")
+        return None
+
+    # Generate a request_id for correlation
+    import uuid
+    request_id = request.headers.get('X-Request-ID', str(uuid.uuid4())[:8])
+
+    # Step 1: Structural log (always runs in log_only mode)
+    verify_attestation_token(token if token else None, platform, request_id)
+
+    # Step 2: Platform-specific verification (log-only, never blocks)
+    if platform.lower() == 'android' and token:
+        verify_play_integrity(token, APP_PACKAGE_NAME, PLAY_INTEGRITY_API_KEY)
+    elif platform.lower() == 'ios' and token:
+        verify_app_attest(token, key_id=request.headers.get('X-App-Key-ID', ''), app_id=APP_BUNDLE_ID)
+
+    # NEVER block in log_only mode — always return None (allow request)
     return None
 
 
