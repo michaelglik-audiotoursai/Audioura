@@ -518,7 +518,7 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         print(f"Traceback: {traceback.format_exc()}")
         return False
 
-def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=None, request_string=None, language='en'):
+def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=None, request_string=None, language='en', persona=None):
     """Orchestrate the complete tour generation pipeline asynchronously."""
     print(f"\n==== ORCHESTRATE_TOUR_ASYNC STARTED: {datetime.now().isoformat()} ====")
     print(f"Parameters:")
@@ -529,6 +529,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
     print(f"  user_id: {user_id}")
     print(f"  request_string: {request_string}")
     print(f"  language: {language}")
+    print(f"  persona: {persona}")
     try:
         ACTIVE_JOBS[job_id]["status"] = "processing"
         ACTIVE_JOBS[job_id]["progress"] = "Starting complete tour generation pipeline..."
@@ -540,6 +541,12 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             "tour_type": tour_type,
             "total_stops": total_stops
         }
+        # [S81] Forward user_id so downstream tour-generator can perform persona lookup
+        if user_id:
+            generate_data["user_id"] = user_id
+        # [S81] Forward persona for direct-pass cases (skips DB lookup in tour-generator)
+        if persona:
+            generate_data["persona"] = persona
         
         print(f"Calling tour text generator API: {datetime.now().isoformat()}")
         print(f"Request data: {generate_data}")
@@ -1093,6 +1100,7 @@ def generate_complete_tour():
     user_id = sanitize_input(data.get('user_id'))
     request_string = sanitize_input(data.get('request_string'))
     language = data.get('language', 'en')  # Default to English
+    persona = sanitize_input(data.get('persona'))  # [S81] Direct-pass persona (optional)
     
     print(f"Extracted parameters:")
     print(f"  location: {location}")
@@ -1101,6 +1109,7 @@ def generate_complete_tour():
     print(f"  user_id: {user_id}")
     print(f"  request_string: {request_string}")
     print(f"  language: {language}")
+    print(f"  persona: {persona}")
     
     # Validate language parameter
     supported_languages = ['en', 'ru', 'es', 'fr', 'de', 'zh', 'ko']
@@ -1191,6 +1200,7 @@ def generate_complete_tour():
         "user_id": user_id,
         "request_string": request_string,
         "language": language,
+        "persona": persona,  # [S81] Pass persona for downstream generation
         "created_at": datetime.now().isoformat()
     }
     
@@ -1220,7 +1230,7 @@ def generate_complete_tour():
             print(f"[CLOUD_TASKS] Enqueue failed, falling back to thread mode for job {job_id}")
             thread = threading.Thread(
                 target=orchestrate_tour_async,
-                args=(job_id, location, tour_type, total_stops, user_id, request_string, language)
+                args=(job_id, location, tour_type, total_stops, user_id, request_string, language, persona)
             )
             thread.daemon = True
             thread.start()
@@ -1232,7 +1242,7 @@ def generate_complete_tour():
         sys.stdout.flush()
         thread = threading.Thread(
             target=orchestrate_tour_async,
-            args=(job_id, location, tour_type, total_stops, user_id, request_string, language)
+            args=(job_id, location, tour_type, total_stops, user_id, request_string, language, persona)
         )
         thread.daemon = True
         thread.start()
