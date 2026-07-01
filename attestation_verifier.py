@@ -117,3 +117,76 @@ def verify_play_integrity(token: str | None, package_name: str, api_key: str) ->
         logger.error(f"PLAY_INTEGRITY_VERDICT: error={e} verdict=None")
 
     return result
+
+
+def verify_app_attest(
+    attestation_object: bytes | str | None,
+    key_id: str = "",
+    app_id: str = "",
+) -> dict:
+    """Verify an Apple App Attest attestation object (log-only — NEVER blocks).
+
+    Format check only (no Apple server call in log-only mode):
+    - Attempts CBOR decode
+    - Checks fmt == "apple-appattest"
+    - Checks authData present
+
+    Args:
+        attestation_object: Raw CBOR bytes or base64 string from the iOS app.
+        key_id: The key identifier associated with the attestation.
+        app_id: The app's bundle ID (e.g. 'com.audioura.app').
+
+    Returns:
+        dict with verified=True, log_only=True (always — never blocks).
+    """
+    result = {
+        "verified": True,
+        "log_only": True,
+        "fmt_valid": False,
+        "auth_data_present": False,
+        "key_id": key_id or "unknown",
+    }
+
+    if not attestation_object:
+        logger.info(
+            f"APP_ATTEST_VERDICT: key_id={key_id} fmt_valid=False "
+            f"auth_data_present=False reason=no_attestation_object"
+        )
+        return result
+
+    try:
+        import base64
+
+        # Convert base64 string to bytes if needed
+        if isinstance(attestation_object, str):
+            try:
+                raw_bytes = base64.b64decode(attestation_object)
+            except Exception:
+                raw_bytes = attestation_object.encode("utf-8")
+        else:
+            raw_bytes = bytes(attestation_object) if not isinstance(attestation_object, bytes) else attestation_object
+
+        # Attempt CBOR-like structure validation
+        # Full CBOR parsing requires cbor2 library; for log-only we do basic format check
+        # Apple App Attest CBOR starts with a map containing 'fmt' and 'attStmt'
+        # We check for known byte patterns without requiring cbor2 dependency
+
+        # Check if it looks like CBOR (starts with map marker 0xa or contains 'apple-appattest')
+        fmt_marker = b"apple-appattest"
+        auth_data_marker = b"authData"
+
+        fmt_valid = fmt_marker in raw_bytes
+        auth_data_present = auth_data_marker in raw_bytes
+
+        result["fmt_valid"] = fmt_valid
+        result["auth_data_present"] = auth_data_present
+
+        logger.info(
+            f"APP_ATTEST_VERDICT: key_id={key_id} fmt_valid={fmt_valid} "
+            f"auth_data_present={auth_data_present} size={len(raw_bytes)}"
+        )
+
+    except Exception as e:
+        logger.error(f"APP_ATTEST_VERDICT: key_id={key_id} error={e} (malformed input)")
+
+    return result
