@@ -1,13 +1,17 @@
 import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:crypto/crypto.dart';
+import 'package:flutter/services.dart';
 import '../screens/debug_log_viewer_screen.dart';
 
 /// Platform attestation service.
-/// Android: Play Integrity API token.
+/// Android: Play Integrity API token via MethodChannel.
 /// iOS: App Attest assertion via MethodChannel.
 /// Returns null if attestation is unavailable (dev/emulator/unsupported).
+/// Log-only mode: token is attached but gateway doesn't enforce (observes only).
 class AppAttestationService {
+  static const _channel = MethodChannel('com.audioura.app/attestation');
+
   /// Returns a platform-appropriate attestation token tied to [requestBody].
   /// Nonce = SHA-256 of the request body, preventing replay attacks.
   /// Never throws — logs failures and returns null so the request can proceed.
@@ -32,30 +36,46 @@ class AppAttestationService {
     return sha256.convert(bytes).toString();
   }
 
-  /// Android: Play Integrity API token.
-  /// Phase 3 implementation — currently returns null (stub).
+  /// Android: Play Integrity API token via MethodChannel.
+  /// The native Android side (MainActivity.kt) calls the Play Integrity API
+  /// and returns the integrity token string.
   static Future<String?> _getPlayIntegrityToken(String nonce) async {
-    // TODO: Phase 3 — integrate play_integrity plugin
-    // 1. Call IntegrityManager.requestIntegrityToken(nonce: nonce, cloudProjectNumber: PROJECT_NUMBER)
-    // 2. Return the token string
-    await DebugLogHelper.addDebugLog('ATTEST: Play Integrity not yet implemented (Phase 3)');
+    try {
+      final token = await _channel.invokeMethod<String>('getPlayIntegrityToken', {'nonce': nonce});
+      if (token != null && token.isNotEmpty) {
+        await DebugLogHelper.addDebugLog('ATTEST: Play Integrity token generated (${token.length} bytes)');
+        return token;
+      }
+      await DebugLogHelper.addDebugLog('ATTEST: Play Integrity returned empty/null (device may not support it)');
+    } on MissingPluginException {
+      await DebugLogHelper.addDebugLog('ATTEST: Play Integrity MethodChannel not registered (native side not implemented yet)');
+    } on PlatformException catch (e) {
+      await DebugLogHelper.addDebugLog('ATTEST: Play Integrity platform error: ${e.message}');
+    }
     return null;
   }
 
   /// iOS: App Attest assertion via MethodChannel.
-  /// Phase 4 implementation — currently returns null (stub).
-  /// iOS-AQ will implement the native Swift side (AppAttestHandler.swift).
+  /// The native Swift side (AppAttestHandler.swift) calls DCAppAttestService
+  /// and returns a base64-encoded assertion.
   /// MethodChannel contract:
   ///   Channel: 'com.audioura.app/attestation'
   ///   Method: 'getAssertion'
   ///   Args: {'nonce': String}
   ///   Returns: String (base64-encoded assertion) or null
   static Future<String?> _getAppAttestToken(String nonce) async {
-    // TODO: Phase 4 — MethodChannel to native DCAppAttestService
-    // final channel = MethodChannel('com.audioura.app/attestation');
-    // final result = await channel.invokeMethod<String>('getAssertion', {'nonce': nonce});
-    // return result;
-    await DebugLogHelper.addDebugLog('ATTEST: App Attest not yet implemented (Phase 4)');
+    try {
+      final token = await _channel.invokeMethod<String>('getAssertion', {'nonce': nonce});
+      if (token != null && token.isNotEmpty) {
+        await DebugLogHelper.addDebugLog('ATTEST: App Attest assertion generated (${token.length} bytes)');
+        return token;
+      }
+      await DebugLogHelper.addDebugLog('ATTEST: App Attest returned empty/null');
+    } on MissingPluginException {
+      await DebugLogHelper.addDebugLog('ATTEST: App Attest MethodChannel not registered (native side not implemented yet)');
+    } on PlatformException catch (e) {
+      await DebugLogHelper.addDebugLog('ATTEST: App Attest platform error: ${e.message}');
+    }
     return null;
   }
 }

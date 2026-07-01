@@ -9,6 +9,8 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.util.*
+import com.google.android.play.core.integrity.IntegrityManagerFactory
+import com.google.android.play.core.integrity.IntegrityTokenRequest
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "voice_recognition"
@@ -36,6 +38,18 @@ class MainActivity : FlutterActivity() {
                 "startListening" -> {
                     pendingResult = result
                     startSpeechRecognition()
+                }
+                else -> result.notImplemented()
+            }
+        }
+
+        // Attestation channel for Play Integrity (log-only → enforce)
+        val attestChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.audioura.app/attestation")
+        attestChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getPlayIntegrityToken" -> {
+                    val nonce = call.argument<String>("nonce") ?: ""
+                    getPlayIntegrityToken(nonce, result)
                 }
                 else -> result.notImplemented()
             }
@@ -85,6 +99,28 @@ class MainActivity : FlutterActivity() {
             }
             override fun onPartialResults(partialResults: Bundle?) {}
             override fun onEvent(eventType: Int, params: Bundle?) {}
+        }
+    }
+
+    /// Calls the Play Integrity API and returns the token to Flutter.
+    /// In log-only mode, this token is sent to the gateway which observes but doesn't enforce.
+    private fun getPlayIntegrityToken(nonce: String, result: MethodChannel.Result) {
+        try {
+            val integrityManager = IntegrityManagerFactory.create(applicationContext)
+            val request = IntegrityTokenRequest.builder()
+                .setNonce(nonce)
+                .build()
+            integrityManager.requestIntegrityToken(request)
+                .addOnSuccessListener { response ->
+                    result.success(response.token())
+                }
+                .addOnFailureListener { exception ->
+                    android.util.Log.e("Attestation", "Play Integrity failed: ${exception.message}")
+                    result.success(null) // Return null, don't error — log-only mode
+                }
+        } catch (e: Exception) {
+            android.util.Log.e("Attestation", "Play Integrity exception: ${e.message}")
+            result.success(null) // Graceful — never block the request
         }
     }
 }
