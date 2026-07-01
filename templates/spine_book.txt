@@ -10,13 +10,13 @@ Return ONLY valid JSON (no markdown fences, no commentary) with this exact schem
 
 {
   "tour_hook": "A compelling question that bridges the fictional world and the real place — why does THIS location matter to the story?",
-  "connecting_thread": "The single thread connecting fiction to reality — how the real place shaped the author's imagination or vice versa.",
+  "connecting_thread": "The single thread connecting fiction to reality — weave character motivations (desires, fears, transformations) with scene context (what actually happened here, why the author chose this place) into one narrative arc.",
   "arc": [
     {
       "stop": 1,
       "name": "<stop name from the POI list>",
-      "chapter_role": "<one of: prologue | chapter | plot_twist | epilogue>",
-      "emotional_beat": "<the emotion the listener should feel — wonder, recognition, melancholy, triumph>",
+      "chapter_role": "<one of: inciting_incident | rising_action | midpoint_turn | dark_moment | climax | resolution | epilogue>",
+      "emotional_beat": "<the emotion the listener should feel — wonder, recognition, melancholy, tension, triumph, catharsis>",
       "unique_angle": "<the specific connection between THIS real place and the fictional world — a detail readers miss>",
       "plant": "<a literary detail or real-world fact planted here that pays off later (or null)>",
       "callback": "<name of an earlier stop this one references (or null if first)>",
@@ -25,15 +25,24 @@ Return ONLY valid JSON (no markdown fences, no commentary) with this exact schem
   ],
   "climax_stop": <integer — the stop where fiction and reality collide most powerfully>,
   "resolution_stop": <integer — the stop that reveals what the author ultimately meant>,
-  "closing_revelation": "The final insight about the relationship between story and place — what the listener now understands that readers alone cannot."
+  "closing_revelation": "The final insight about the relationship between story and place — what the listener now understands that readers alone cannot. MUST reference the book/film title and one specific scene from the work as the anchor for this revelation."
 }
 
 RULES:
 1. Every stop in {{poi_list}} MUST appear in the arc array, in order.
-2. chapter_role distribution: exactly 1 "prologue", 1 "plot_twist", 1 "epilogue", rest "chapter".
+2. chapter_role vocabulary — use ONLY these values:
+   - "inciting_incident" (exactly 1) — the opener that disrupts the ordinary world and launches the journey
+   - "rising_action" (1 or more) — stops that deepen conflict, raise stakes, or reveal character
+   - "midpoint_turn" (exactly 1) — the pivot where the story's direction fundamentally shifts
+   - "dark_moment" (at most 1) — the low point or moment of greatest uncertainty
+   - "climax" (exactly 1) — the emotional and narrative peak; fiction and reality collide
+   - "resolution" (exactly 1) — the aftermath; meaning crystallises from the collision
+   - "epilogue" (exactly 1) — the farewell that sends the listener back into the world changed
 3. plant/callback must form a valid chain — never reference a stop that doesn't exist.
 4. The tour_hook MUST be answerable by closing_revelation.
-5. unique_angle must cite a SPECIFIC passage, character, or scene from the source work.
+5. unique_angle must cite a SPECIFIC passage, character, or scene from {{theme_name}}.
 6. emotional_beat should mirror the source material's emotional arc where possible.
 7. cliffhanger must blend literary curiosity with physical exploration ("around this corner, the scene where…").
-8. All locations must be real and factually connected to {{theme_name}}.
+8. connecting_thread must braid character motivations (why characters act as they do) with scene context (how this real place shaped or mirrors the fiction). Neither strand alone is sufficient.
+9. closing_revelation MUST reference the title of {{theme_name}} and name one specific scene from the work — generic statements about "the power of stories" without a concrete anchor are not acceptable.
+10. All locations must be real and factually connected to {{theme_name}}.
