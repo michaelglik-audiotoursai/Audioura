@@ -1535,11 +1535,54 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 "description": "",
             })
     
+    # -------- [S11] Storied: generate spine + fact sheets when STORIED_MODE=true --------
+    _storied_spine = None
+    _storied_fact_sheets = None
+    if _storied_mode:
+        print(f"\n[Storied] STORIED_MODE=true — generating spine + fact sheets...")
+        try:
+            from spine_generator import generate_spine
+            from fact_extractor import generate_fact_sheets_parallel
+
+            _poi_names = [p["name"] for p in poi_list]
+            _venue_name = (_museum_venue_name or location) if tour_category == 'museum' else location
+
+            _storied_spine = generate_spine(
+                venue_name=_venue_name,
+                poi_list=_poi_names,
+                tour_category=tour_category,
+                api_key=api_key,
+                theme_name="",
+            )
+            if _storied_spine:
+                print(f"  [Storied] Spine generated: {len(_storied_spine.get('arc', []))} arc entries")
+            else:
+                print(f"  [Storied] Spine generation failed — descriptions will proceed without spine")
+
+            _storied_fact_sheets = generate_fact_sheets_parallel(
+                poi_list=_poi_names,
+                venue_name=_venue_name,
+                tour_category=tour_category,
+                api_key=api_key,
+            )
+            if _storied_fact_sheets:
+                _valid_sheets = sum(1 for fs in _storied_fact_sheets if fs is not None)
+                print(f"  [Storied] Fact sheets: {_valid_sheets}/{len(_poi_names)} generated")
+            else:
+                print(f"  [Storied] Fact sheet generation failed — descriptions will proceed without facts")
+                _storied_fact_sheets = []
+        except ImportError as e:
+            print(f"  [Storied] Import error (spine/fact modules not available): {e}")
+        except Exception as e:
+            print(f"  [Storied] Error generating spine/facts: {e}")
+    else:
+        print(f"\n[Storied] STORIED_MODE=false — skipping spine + fact sheets")
+
     # PHASE 5: Generate detailed descriptions for each POI (parallelized)
     print(f"\nPHASE 5: Generating detailed descriptions for each POI (parallel)...")
 
     def _generate_description(args):
-        idx, poi = args
+        idx, poi, spine_stop, fact_sheet = args
         stop_num = idx + 1
         poi_name = poi["name"]
         artist = poi["artist"]
@@ -1556,6 +1599,37 @@ Then provide a detailed description of the exhibit that is EXACTLY 300 words lon
 - Information about the artist and their creative process
 - How this piece fits into the broader context of {tour_type}
 - Interesting details that would engage visitors
+"""
+        # [S9] Storied: inject spine context if provided
+        if spine_stop:
+            _emotional_beat = spine_stop.get('emotional_beat', '')
+            _unique_angle = spine_stop.get('unique_angle', '')
+            _cliffhanger = spine_stop.get('cliffhanger', '')
+            _callback = spine_stop.get('callback', '')
+            spine_block = f"""
+NARRATIVE SPINE CONTEXT (use to shape your description):
+- Emotional beat for this stop: {_emotional_beat}
+- Unique angle to emphasize: {_unique_angle}"""
+            if _callback:
+                spine_block += f"\n- Callback to weave in: {_callback}"
+            if _cliffhanger:
+                spine_block += f"\n- End with a forward-looking hook: {_cliffhanger}"
+            description_prompt += spine_block + "\n"
+
+        # [S10] Storied: inject fact sheet if provided
+        if fact_sheet:
+            _confirmed = fact_sheet.get('confirmed_facts', [])
+            _surprising = fact_sheet.get('surprising_detail', '')
+            if _confirmed:
+                facts_str = "; ".join(_confirmed[:5])
+                description_prompt += f"""
+VERIFIED FACTS (incorporate these for accuracy):
+{facts_str}
+"""
+            if _surprising:
+                description_prompt += f"""
+MANDATORY INCLUSION — work this surprising detail into the description naturally:
+{_surprising}
 """
         # Add venue containment constraint for single-venue museum tours
         if tour_category == 'museum' and _museum_venue_name:
@@ -1631,7 +1705,14 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
 
     max_workers = min(len(poi_list), 5)
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(_generate_description, (i, poi)): i for i, poi in enumerate(poi_list)}
+        # [S9/S10/S11] Pass spine_stop and fact_sheet per stop (None when not in Storied mode)
+        _spine_arc = _storied_spine.get("arc", []) if _storied_mode and _storied_spine else []
+        _fact_sheets_list = _storied_fact_sheets if _storied_mode and _storied_fact_sheets else []
+        futures = {}
+        for i, poi in enumerate(poi_list):
+            spine_stop = _spine_arc[i] if i < len(_spine_arc) else None
+            fact_sheet = _fact_sheets_list[i] if i < len(_fact_sheets_list) else None
+            futures[executor.submit(_generate_description, (i, poi, spine_stop, fact_sheet))] = i
         for future in as_completed(futures):
             idx, orientation, description, word_count, tokens_used, call_cost = future.result()
             poi_list[idx]["orientation"] = orientation
