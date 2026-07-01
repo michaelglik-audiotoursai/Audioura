@@ -1578,6 +1578,18 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     else:
         print(f"\n[Storied] STORIED_MODE=false — skipping spine + fact sheets")
 
+    # -------- [S25] Storied: assign story types when STORIED_MODE=true --------
+    if _storied_mode:
+        try:
+            from story_type_assigner import assign_story_types
+            assign_story_types(poi_list, tour_category, persona=_persona_enum)
+            _assigned_types = [p.get('story_type', '?') for p in poi_list]
+            print(f"  [S25] Story types assigned: {_assigned_types}")
+        except ImportError as e:
+            print(f"  [S25] story_type_assigner not available: {e}")
+        except Exception as e:
+            print(f"  [S25] Error assigning story types: {e}")
+
     # PHASE 5: Generate detailed descriptions for each POI (parallelized)
     print(f"\nPHASE 5: Generating detailed descriptions for each POI (parallel)...")
 
