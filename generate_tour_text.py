@@ -1801,7 +1801,22 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
         tour_title = f"Step-by-Step Audio Guided Tour: {location} - {tour_type.title()} Tour"
     
     complete_tour = tour_title + "\n" + f"Tour-Category: {tour_category}" + "\n\n"
-    
+
+    # -------- [S38] Storied: prepend tour hook introduction --------
+    if _storied_mode and _storied_spine and _storied_spine.get("tour_hook"):
+        try:
+            from tour_hook_generator import generate_tour_hook_audio
+            _hook_text = generate_tour_hook_audio(_storied_spine["tour_hook"], api_key)
+            if _hook_text:
+                complete_tour += f"Introduction:\n\n{_hook_text}\n\n"
+                print(f"  [S38] Tour hook introduction added ({len(_hook_text.split())} words)")
+            else:
+                print(f"  [S38] Tour hook generation returned empty — skipping introduction")
+        except ImportError:
+            print(f"  [S38] tour_hook_generator not available — skipping introduction")
+        except Exception as e:
+            print(f"  [S38] Tour hook error: {e}")
+
     # Add each POI with its description and directions
     for i, poi in enumerate(poi_list):
         stop_num = i + 1   # always sequential; ignore whatever AI emitted
