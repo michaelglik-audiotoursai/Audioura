@@ -12,6 +12,10 @@ services:
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - STORIED_MODE=false
+      - ATTESTATION_MODE=log_only
+      - BASE_URL=http://localhost:5000
+      - REFERRAL_BASE_URL=http://localhost:5000
+      - DATABASE_URL=postgresql://admin:admin@localhost:5432/audiotours
     volumes:
       - ./tours:/app/tours
     restart: unless-stopped
