@@ -1909,6 +1909,22 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
         # Add to complete tour
         complete_tour += poi_content + "\n\n"
     
+    # -------- [S27] Storied: post-assembly de-repetition check --------
+    if _storied_mode:
+        try:
+            from derepetition_guard import check_cross_stop_repetition
+            _rep_pairs = check_cross_stop_repetition(complete_tour)
+            if _rep_pairs:
+                for pair in _rep_pairs:
+                    print(f"REPETITION WARN: Stop {pair.get('stop_a','')} and Stop {pair.get('stop_b','')} share near-identical sentence (sim={pair.get('similarity',0):.2f})")
+                print(f"  [S27] {len(_rep_pairs)} repetition pair(s) found (log only, no rewrite)")
+            else:
+                print(f"  [S27] No cross-stop repetition detected")
+        except ImportError:
+            print(f"  [S27] derepetition_guard not available — repetition check skipped")
+        except Exception as e:
+            print(f"  [S27] Repetition check error: {e}")
+
     # Print word count statistics
     print("\n=== Word Count Statistics ===")
     for poi in poi_list:
