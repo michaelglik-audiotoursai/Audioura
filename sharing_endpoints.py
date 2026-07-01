@@ -1,9 +1,10 @@
 """
-Sharing Endpoints — POST /tour/share
-======================================
+Sharing Endpoints — POST /tour/share and GET /tour/<tour_id>
+==============================================================
 Flask blueprint for tour sharing functionality.
 
 Task [S49]: POST /tour/share — generate share ID, store tour, return URL.
+Task [S50]: GET /tour/<tour_id> — retrieve shared tour by ID (public).
 """
 import os
 import logging
@@ -98,3 +99,45 @@ def share_tour():
     share_url = build_share_url(share_id, BASE_URL)
     logger.info(f"Tour shared: {share_id} → {share_url}")
     return jsonify({"share_id": share_id, "share_url": share_url}), 200
+
+
+@sharing_bp.route('/tour/<tour_id>', methods=['GET'])
+def get_tour(tour_id):
+    """Retrieve a shared tour by ID.
+
+    Public endpoint — no API key required.
+    Increments share_count on each retrieval.
+    Returns: 200 {tour_text, location, tour_type, total_stops, share_count}
+             or 404 {"error": "tour not found"}.
+    """
+    tour = get_shared_tour(tour_id, DATABASE_URL)
+    if not tour:
+        return jsonify({"error": "tour not found"}), 404
+
+    # Increment share_count
+    _increment_share_count(tour_id)
+
+    # Return tour data with updated count
+    return jsonify({
+        "tour_text": tour["tour_text"],
+        "location": tour["location"],
+        "tour_type": tour["tour_type"],
+        "total_stops": tour["total_stops"],
+        "share_count": tour["share_count"] + 1,  # reflect the increment
+    }), 200
+
+
+def _increment_share_count(tour_id: str) -> None:
+    """Increment the share_count for a tour. Best-effort, no error propagation."""
+    import psycopg2
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE shared_tours SET share_count = share_count + 1 WHERE tour_id = %s",
+                (tour_id,),
+            )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.warning(f"Failed to increment share_count for {tour_id}: {e}")
