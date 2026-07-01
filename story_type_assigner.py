@@ -21,20 +21,50 @@ _CATEGORY_POOLS: Dict[str, List[str]] = {
 _DEFAULT_POOL = ["history", "anecdote", "architecture", "culture", "nature", "art"]
 
 
-def assign_story_types(poi_list: List[dict], tour_category: str = "museum") -> List[dict]:
+def assign_story_types(poi_list: List[dict], tour_category: str = "museum", persona=None) -> List[dict]:
     """Assign a story_type to each POI, ensuring no adjacent duplicates.
 
     Args:
         poi_list: List of POI dicts (each must have at least 'name').
         tour_category: 'museum', 'walking', 'restaurant', or 'book'.
+        persona: Optional UserPersona enum. If given, biases selection toward
+                 persona's preferred story types (weighted random, no consecutive repeats).
 
     Returns:
         The same list with 'story_type' key added to each POI dict.
-        Assignment is deterministic (same input → same output).
+        Without persona: deterministic round-robin (same input → same output).
+        With persona: weighted selection (biased but varied).
     """
     if not poi_list:
         return poi_list
 
+    if persona is not None:
+        # Weighted selection mode — use persona weights
+        import random
+        from onboarding_preference import persona_to_story_type_weights
+        weights = persona_to_story_type_weights(persona)
+        types = list(weights.keys())
+        type_weights = [weights[t] for t in types]
+
+        # Use a seeded RNG for reproducibility per tour (seeded on category + persona)
+        rng = random.Random(f"{tour_category}_{persona.value}_{len(poi_list)}")
+        last_type = None
+
+        for poi in poi_list:
+            # Weighted selection, excluding last_type to prevent repeats
+            available_types = [t for t in types if t != last_type]
+            available_weights = [weights[t] for t in available_types]
+            # Normalize
+            total = sum(available_weights)
+            norm_weights = [w / total for w in available_weights]
+
+            chosen = rng.choices(available_types, weights=norm_weights, k=1)[0]
+            poi["story_type"] = chosen
+            last_type = chosen
+
+        return poi_list
+
+    # Original deterministic round-robin mode (unchanged behavior)
     pool = _CATEGORY_POOLS.get(tour_category.lower(), _DEFAULT_POOL)
     pool_len = len(pool)
 
@@ -42,7 +72,6 @@ def assign_story_types(poi_list: List[dict], tour_category: str = "museum") -> L
     pool_idx = 0
 
     for poi in poi_list:
-        # Pick next type from pool, skipping if it would duplicate the previous
         candidate = pool[pool_idx % pool_len]
         attempts = 0
         while candidate == last_type and attempts < pool_len:
