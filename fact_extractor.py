@@ -116,3 +116,56 @@ def generate_fact_sheet(
     except Exception as e:
         logger.error(f"Fact sheet error for {poi_name}: {e}")
         return None
+
+
+def generate_fact_sheets_parallel(
+    poi_list: list,
+    venue_name: str,
+    tour_category: str,
+    api_key: str,
+    max_workers: int = 5,
+) -> list:
+    """Generate fact sheets for all POIs in parallel.
+
+    Uses ThreadPoolExecutor to fetch RAG context and generate a fact sheet
+    per POI concurrently. Returns results in original order.
+    Gracefully handles individual POI failures (None per failed stop).
+
+    Args:
+        poi_list: List of POI dicts (each with 'name') or strings.
+        venue_name: The venue/location name.
+        tour_category: 'museum', 'walking', 'restaurant', or 'book'.
+        api_key: OpenAI API key.
+        max_workers: Max concurrent threads (default 5).
+
+    Returns:
+        List of fact_sheet dicts (or None for failed POIs), in original order.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from rag_retriever import fetch_poi_rag_context
+
+    def _process_one(idx_poi):
+        idx, poi = idx_poi
+        poi_name = poi.get("name", str(poi)) if isinstance(poi, dict) else str(poi)
+        try:
+            rag_ctx = fetch_poi_rag_context(poi_name, venue_name, tour_category)
+            fact_sheet = generate_fact_sheet(poi_name, rag_ctx, api_key)
+            return idx, fact_sheet
+        except Exception as e:
+            logger.error(f"Fact sheet failed for POI #{idx} ({poi_name}): {e}")
+            return idx, None
+
+    # Submit all in parallel
+    results = [None] * len(poi_list)
+    with ThreadPoolExecutor(max_workers=min(max_workers, len(poi_list))) as executor:
+        futures = {
+            executor.submit(_process_one, (i, poi)): i
+            for i, poi in enumerate(poi_list)
+        }
+        for future in as_completed(futures):
+            idx, fact_sheet = future.result()
+            results[idx] = fact_sheet
+
+    success_count = sum(1 for r in results if r is not None)
+    logger.info(f"Fact sheets: {success_count}/{len(poi_list)} successful for {venue_name}")
+    return results
