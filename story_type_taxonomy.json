@@ -1,0 +1,88 @@
+{
+  "types": [
+    {
+      "type": "history",
+      "tone_instruction": "Narrate with gravitas and a sense of time passing — make the listener feel the weight of centuries.",
+      "example_signal_phrases": [
+        "dating back to",
+        "in the year",
+        "historically significant"
+      ],
+      "forbidden_phrases": [
+        "fun fact",
+        "interestingly enough",
+        "believe it or not"
+      ]
+    },
+    {
+      "type": "anecdote",
+      "tone_instruction": "Tell the story as if sharing a secret over coffee — intimate, surprising, and slightly conspiratorial.",
+      "example_signal_phrases": [
+        "the story goes that",
+        "few people know",
+        "legend has it"
+      ],
+      "forbidden_phrases": [
+        "historically speaking",
+        "according to records",
+        "scholarly consensus"
+      ]
+    },
+    {
+      "type": "architecture",
+      "tone_instruction": "Speak with the precision of a craftsman — draw the listener's eye to details they would otherwise walk past.",
+      "example_signal_phrases": [
+        "look up at the",
+        "notice how the",
+        "the architect designed"
+      ],
+      "forbidden_phrases": [
+        "it is said that",
+        "rumor has it",
+        "some believe"
+      ]
+    },
+    {
+      "type": "culture",
+      "tone_instruction": "Evoke the living pulse of a community — traditions, rituals, and the everyday rhythms that define a place.",
+      "example_signal_phrases": [
+        "the local tradition of",
+        "generations have",
+        "this neighborhood is known for"
+      ],
+      "forbidden_phrases": [
+        "built in the year",
+        "the facade features",
+        "architecturally speaking"
+      ]
+    },
+    {
+      "type": "nature",
+      "tone_instruction": "Invite the listener to slow down and observe — let the natural world speak through sensory detail.",
+      "example_signal_phrases": [
+        "if you listen closely",
+        "the landscape here",
+        "seasonal changes bring"
+      ],
+      "forbidden_phrases": [
+        "constructed in",
+        "the building's",
+        "municipal records show"
+      ]
+    },
+    {
+      "type": "art",
+      "tone_instruction": "Channel the passion of a curator who fell in love with this piece — make the listener see what the artist felt.",
+      "example_signal_phrases": [
+        "the artist chose to",
+        "notice the interplay of",
+        "this work captures"
+      ],
+      "forbidden_phrases": [
+        "the building was erected",
+        "historically important",
+        "the population of"
+      ]
+    }
+  ]
+}
