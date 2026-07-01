@@ -1582,7 +1582,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     print(f"\nPHASE 5: Generating detailed descriptions for each POI (parallel)...")
 
     def _generate_description(args):
-        idx, poi, spine_stop, fact_sheet = args
+        idx, poi, spine_stop, fact_sheet, story_type = args
         stop_num = idx + 1
         poi_name = poi["name"]
         artist = poi["artist"]
@@ -1600,6 +1600,30 @@ Then provide a detailed description of the exhibit that is EXACTLY 300 words lon
 - How this piece fits into the broader context of {tour_type}
 - Interesting details that would engage visitors
 """
+
+        # [S24] Storied: inject story-type tone + forbidden-phrase ban
+        if story_type:
+            try:
+                import json as _st_json
+                with open("story_type_taxonomy.json", "r", encoding="utf-8") as _st_f:
+                    _taxonomy = _st_json.load(_st_f)
+                _type_entry = next((t for t in _taxonomy["types"] if t["type"] == story_type), None)
+                if _type_entry:
+                    _tone_instruction = _type_entry.get("tone_instruction", "")
+                    if _tone_instruction:
+                        description_prompt = f"STYLE: {_tone_instruction}\n\n" + description_prompt
+                    # Combine type-specific forbidden phrases with global FORBIDDEN_PHRASES
+                    _type_forbidden = _type_entry.get("forbidden_phrases", [])
+                    try:
+                        from derepetition_guard import FORBIDDEN_PHRASES as _GLOBAL_FORBIDDEN
+                        _global_phrases = [p.pattern for p in _GLOBAL_FORBIDDEN]
+                    except ImportError:
+                        _global_phrases = []
+                    _all_forbidden = _type_forbidden + _global_phrases
+                    if _all_forbidden:
+                        description_prompt += f"\nDO NOT USE these phrases: {', '.join(_all_forbidden)}\n"
+            except Exception as _st_err:
+                print(f"  [S24] Story-type injection error (stop {stop_num}): {_st_err}")
         # [S9] Storied: inject spine context if provided
         if spine_stop:
             _emotional_beat = spine_stop.get('emotional_beat', '')
@@ -1712,7 +1736,8 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
         for i, poi in enumerate(poi_list):
             spine_stop = _spine_arc[i] if i < len(_spine_arc) else None
             fact_sheet = _fact_sheets_list[i] if i < len(_fact_sheets_list) else None
-            futures[executor.submit(_generate_description, (i, poi, spine_stop, fact_sheet))] = i
+            story_type = poi.get('story_type')
+            futures[executor.submit(_generate_description, (i, poi, spine_stop, fact_sheet, story_type))] = i
         for future in as_completed(futures):
             idx, orientation, description, word_count, tokens_used, call_cost = future.result()
             poi_list[idx]["orientation"] = orientation
