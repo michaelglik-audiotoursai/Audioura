@@ -293,3 +293,53 @@ What needs my input?"
 **Active Branches**: `services-migration` (GCP migration) | `storied` (Storied release, HEAD `48a9d5a`)
 **Two Active Tracks**: A) GCP Migration M02→M05 | B) Storied Release Aug 1
 **Next Milestone**: ClickUp import of Storied tasks + M02 remaining steps
+
+
+---
+
+## 📦 STORIED BRANCH STATUS (Updated by S87)
+
+**Branch**: `storied` (latest on origin)
+**Base**: off `main` = `beta-2.1.1+18`
+
+### Task Progress
+- **Tasks completed**: 70+ of 95
+- **Tasks in review**: ~20
+- **Tasks remaining**: ~5 (blocked on live execution or Michael-owned)
+
+### Key Files Added (Python modules)
+| File | Purpose |
+|------|---------|
+| `spine_generator.py` | Narrative spine generation (gpt-4o, $0.014/tour) |
+| `fact_extractor.py` | RAG-grounded fact sheets per stop (gpt-3.5-turbo) |
+| `story_type_assigner.py` | 6-type taxonomy assignment + persona weighting |
+| `derepetition_guard.py` | Cross-stop repetition detection + auto-rewrite |
+| `directions_generator.py` | Improved non-fabricated directions (museum + walking) |
+| `tour_hook_generator.py` | Tour introduction generated from spine hook |
+| `onboarding_preference.py` | 4 personas (art_lover, history_buff, foodie, explorer) + weights |
+| `persona_preference_store.py` | Postgres-backed persona persistence |
+| `persona_endpoints.py` | POST/GET /user/persona |
+| `tour_sharing.py` + `sharing_endpoints.py` | Share links + POST/GET /tour/share |
+| `referral_engine.py` + `referral_endpoints.py` | Referral codes + attribution tracking |
+| `attestation_verifier.py` | Play Integrity + App Attest (log-only mode) |
+| `cost_ceiling_monitor.py` | $0.15/tour ceiling guard (logged, never aborts) |
+| `storied_version_constants.py` | v2.2.0 versioning constants |
+
+### Pipeline Changes (STORIED_MODE=true enables)
+- Narrative spine generation before per-stop content
+- Fact extraction with RAG grounding (Wikipedia API)
+- Story-type taxonomy applied per stop
+- De-repetition guard scans + rewrites across all stops
+- Directions generated from structured data (no fabrication)
+- Tour hook/intro generated from spine
+- Persona weighting applied to story selection
+- Share link auto-created after successful generation (S82)
+- Cost ceiling monitored per tour ($0.15 cap, log-only)
+- Attestation tokens validated (log-only, never blocks)
+
+### Next Steps
+- **S79**: Flip `STORIED_MODE=true` in docker-compose for all services
+- **S40**: Full QA pass — regression + new feature validation
+- **S94**: Storied launch checklist sign-off
+- **S95**: Final gate — all automated items PASS + Michael items confirmed
+
