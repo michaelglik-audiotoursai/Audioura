@@ -9,13 +9,13 @@ Return ONLY valid JSON (no markdown fences, no commentary) with this exact schem
 
 {
   "tour_hook": "A tantalizing question about the neighbourhood's food identity that makes the listener's mouth water and curiosity spike.",
-  "connecting_thread": "The single culinary narrative that ties every stop together — how this area's food scene tells a deeper story about its people.",
+  "connecting_thread": "The single culinary narrative tying every stop together — weave cuisine culture (techniques, ingredients, regional traditions) with the chef/owner story arc (immigration, family legacy, reinvention) into one flavour journey.",
   "arc": [
     {
       "stop": 1,
       "name": "<stop name from the POI list>",
-      "chapter_role": "<one of: amuse_bouche | main_course | palate_cleanser | dessert>",
-      "emotional_beat": "<the dominant sensation — anticipation, comfort, surprise, indulgence, nostalgia>",
+      "chapter_role": "<one of: aperitivo | first_course | main | palette_cleanser | dessert | digestif>",
+      "emotional_beat": "<the dominant sensation — anticipation, comfort, surprise, indulgence, nostalgia, satisfaction>",
       "unique_angle": "<what makes THIS eatery's story worth telling — the human story behind the food>",
       "plant": "<a flavour, ingredient, or tradition introduced here that reappears later (or null)>",
       "callback": "<name of an earlier stop this one echoes or contrasts with (or null if first)>",
@@ -24,15 +24,23 @@ Return ONLY valid JSON (no markdown fences, no commentary) with this exact schem
   ],
   "climax_stop": <integer — the stop with the most transformative or surprising food story>,
   "resolution_stop": <integer — the stop that ties the neighbourhood's food narrative together>,
-  "closing_revelation": "The final insight about what this area's food reveals about its soul — the answer to the tour_hook."
+  "closing_revelation": "The final insight about what this area's food reveals about its soul — the answer to the tour_hook. MUST name one specific dish or culinary tradition unique to this location as the anchor for the revelation."
 }
 
 RULES:
 1. Every stop in {{poi_list}} MUST appear in the arc array, in order.
-2. chapter_role distribution: exactly 1 "amuse_bouche" (opener), 1 "dessert" (closer), optionally 1 "palate_cleanser", rest "main_course".
+2. chapter_role vocabulary — use ONLY these values:
+   - "aperitivo" (exactly 1) — the opener that whets the appetite and sets the tone
+   - "first_course" (exactly 1) — establishes the culinary landscape and introduces the area's signature flavours
+   - "main" (1 or more) — the substantial stops that carry the narrative weight
+   - "palette_cleanser" (at most 1) — a lighter moment that provides contrast before the finale
+   - "dessert" (exactly 1) — the emotional peak; the sweetest or most surprising food story
+   - "digestif" (exactly 1) — the closer that lets the listener reflect on what they have tasted and learned
 3. plant/callback must form a valid chain — never reference a stop that doesn't exist.
 4. The tour_hook MUST be answerable by closing_revelation.
 5. unique_angle must focus on the PEOPLE (chef, owner, family) — not just the menu.
 6. emotional_beat should progress from anticipation → indulgence → reflection.
 7. cliffhanger must evoke a sensory craving ("wait until you taste…", "the next aroma…").
-8. All restaurants and dishes must be factually accurate for {{venue_name}}.
+8. connecting_thread must braid cuisine culture (techniques, ingredients, traditions) with the human story arc (chefs, owners, families, immigrants). Neither strand alone is sufficient.
+9. closing_revelation MUST name one specific dish or culinary tradition that is unique to or emblematic of this location — generic statements about "food bringing people together" without a concrete anchor are not acceptable.
+10. All restaurants and dishes must be factually accurate for {{venue_name}}.
