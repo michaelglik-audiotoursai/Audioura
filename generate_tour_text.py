@@ -529,7 +529,7 @@ def _validate_museum_stop_descriptions(poi_list, venue_name, headers):
     return [first_stop] + all_survivors
 
 
-def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
+def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None):
     """
     Generate audio tour text using OpenAI API with geo coordinates.
     
@@ -538,11 +538,38 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
         tour_type: Type of tour (e.g., "sculpture", "architecture")
         output_file: File to save the tour text (optional)
         total_stops: Number of stops requested
+        persona: Optional persona string (e.g. "art_lover", "history_buff").
+                 When STORIED_MODE=true and persona is provided, biases story-type
+                 assignment and injects persona tone into descriptions.
+                 When STORIED_MODE=false or persona=None: no effect.
     
     Returns:
         tuple: (tour_text, output_file, coordinates)
     """
     import api_call_logger
+
+    # --- Storied: persona handling ---
+    _storied_mode = os.environ.get("STORIED_MODE", "false").lower() == "true"
+    _persona_enum = None
+    _persona_tone = ""
+    if _storied_mode and persona:
+        try:
+            from onboarding_preference import UserPersona, PERSONA_TONE_OVERRIDE
+            _persona_enum = UserPersona(persona.strip().lower())
+            _persona_tone = PERSONA_TONE_OVERRIDE.get(_persona_enum, "")
+            print(f"  [Storied] Persona='{_persona_enum.value}' tone='{_persona_tone}'")
+        except (ValueError, ImportError):
+            # Unknown persona value or module not available — default gracefully
+            try:
+                from onboarding_preference import UserPersona, PERSONA_TONE_OVERRIDE
+                from onboarding_preference import UserPersona as _UP
+                _persona_enum = _UP.FIRST_TIME_VISITOR
+                _persona_tone = PERSONA_TONE_OVERRIDE.get(_persona_enum, "")
+                print(f"  [Storied] Unknown persona '{persona}' → defaulting to FIRST_TIME_VISITOR")
+            except ImportError:
+                print(f"  [Storied] onboarding_preference not available — persona skipped")
+                _persona_enum = None
+                _persona_tone = ""
     api_call_logger.log("GENERATE_TOUR_TEXT_FUNCTION_ENTRY", {
         "location": location,
         "tour_type": tour_type,
@@ -1544,6 +1571,12 @@ Orientation: [Brief orientation text explaining the best viewing position]
 
 DO NOT include any section headers other than "Orientation:" - the description should flow naturally after the orientation section.
 DO NOT include directions to the next stop - these will be added separately.
+"""
+
+        # [S43] Storied: inject persona tone override into description prompt
+        if _storied_mode and _persona_tone:
+            description_prompt += f"""
+NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize aspects that would appeal to someone with this sensibility.
 """
 
         description_data = {
