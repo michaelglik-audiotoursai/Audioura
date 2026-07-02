@@ -1125,6 +1125,10 @@ def generate_complete_tour():
     language = data.get('language', 'en')  # Default to English
     persona = sanitize_input(data.get('persona'))  # [S81] Direct-pass persona (optional)
     
+    # [S81] Resolve persona: stored-preference-wins (downstream tour-generator handles DB lookup)
+    # Log the resolved persona on every /generate request
+    print(f"PERSONA_RESOLVED: {persona or 'none'}")
+    
     print(f"Extracted parameters:")
     print(f"  location: {location}")
     print(f"  tour_type: {tour_type}")
