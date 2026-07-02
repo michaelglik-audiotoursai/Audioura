@@ -924,14 +924,17 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                     share_payload["user_id"] = user_id
                 share_url = f"{TOUR_GENERATOR_URL}/tour/share"
                 print(f"[S82][SHARE] Auto-sharing tour to {share_url}")
-                share_resp = _authenticated_request("POST", share_url,
+                _share_resp = _authenticated_request("POST", share_url,
                     headers={"Content-Type": "application/json"},
                     json=share_payload,
                     timeout=15
                 )
-                print(f"[S82][SHARE] Response: {share_resp.status_code} — {share_resp.text[:200]}")
+                print(f"[S82][SHARE] Response: {_share_resp.status_code} — {_share_resp.text[:200]}")
+                _share_data = _share_resp.json()
+                ACTIVE_JOBS[job_id]["share_id"] = _share_data.get('share_id', '')
+                ACTIVE_JOBS[job_id]["share_url"] = _share_data.get('share_url', '')
             except Exception as share_err:
-                print(f"[S82][SHARE] Best-effort share failed (non-fatal): {share_err}")
+                print(f"SHARE_STORE_WARN: {share_err}")
 
         # Complete
         final_message = f"Tour generation completed in {language.upper()}!"
@@ -1318,6 +1321,9 @@ def get_job_status(job_id):
                 response["actual_stops"] = job["actual_stops"]
             if "stop_count_warning" in job:
                 response["stop_count_warning"] = job["stop_count_warning"]
+            if "share_id" in job:
+                response["share_id"] = job["share_id"]
+                response["share_url"] = job.get("share_url", "")
         elif job["status"] == "error":
             response["error"] = job.get("error", "Unknown error")
         
