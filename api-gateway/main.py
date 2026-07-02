@@ -7,12 +7,20 @@ Adding/removing an endpoint = editing the YAML, not this Python file.
 Backends set to --no-allow-unauthenticated; only this gateway is public.
 """
 import os
+import sys
 import re
 import time
 import hmac
 import yaml
 import requests as http_requests
 from flask import Flask, request, jsonify, Response
+
+sys.path.insert(0, '/app')  # Ensure storied modules are importable
+try:
+    from storied_version_constants import STORIED_SERVICE_VERSION
+    SERVICE_VERSION = STORIED_SERVICE_VERSION
+except ImportError:
+    SERVICE_VERSION = "2.2.0.1"
 
 app = Flask(__name__)
 
@@ -252,7 +260,8 @@ print(f"[GATEWAY] Loaded {len(ROUTES)} routes from {MANIFEST_PATH}")
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({"status": "healthy", "service": "api-gateway", "auth": "enabled",
-                    "routes": len(ROUTES), "attestation": "enforcing" if ATTESTATION_ENFORCED else "log-only"})
+                    "routes": len(ROUTES), "attestation": "enforcing" if ATTESTATION_ENFORCED else "log-only",
+                    "version": SERVICE_VERSION, "mode": os.getenv("STORIED_MODE", "false")})
 
 @app.route('/attest-nonce', methods=['GET'])
 def attest_nonce():

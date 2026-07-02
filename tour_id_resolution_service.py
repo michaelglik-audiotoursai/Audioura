@@ -2,7 +2,13 @@
 Tour ID Resolution Service - REQ-004 Implementation
 Maps download IDs (numeric) to edit IDs (UUID) for cross-service compatibility
 """
-SERVICE_VERSION = "1.0.0"
+import sys
+sys.path.insert(0, '/app')  # Ensure storied modules are importable
+try:
+    from storied_version_constants import STORIED_SERVICE_VERSION
+    SERVICE_VERSION = STORIED_SERVICE_VERSION
+except ImportError:
+    SERVICE_VERSION = "2.2.0.1"
 
 import os
 import json
@@ -119,7 +125,8 @@ def health_check():
     return jsonify({
         "status": "healthy", 
         "service": "tour_id_resolution", 
-        "version": SERVICE_VERSION
+        "version": SERVICE_VERSION,
+        "mode": os.getenv("STORIED_MODE", "false")
     })
 
 @app.route('/tour/<download_id>/resolve', methods=['GET'])
