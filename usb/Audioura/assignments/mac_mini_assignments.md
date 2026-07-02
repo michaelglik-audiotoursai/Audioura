@@ -1,124 +1,118 @@
 # Mac Mini Assignment Instructions
 ## iOS Development Task Execution
 
-# T: 06/2026 - A#84 — Build v2.1.1+18 for App Store / TestFlight (First App Store Release)
+# T: 06/2026 - A#85 — Build v2.2.0+1 on iPhone + TestFlight Upload (Storied Release)
 
-**Goal:** Build v2.1.1+18 as a **release archive** for App Store Connect / TestFlight upload. This is NOT a dev install build — it produces a signed IPA for submission. iPhone has never been built past v1.2.9+71, so this single assignment also serves as the first full production build.
+**Goal:** Build v2.2.0+1 from the **`storied` branch**, install on iPhone for smoke test, then upload to TestFlight. This supersedes A#84 (v2.1.1+18, `services-migration`, never built). The `storied` branch includes everything from v2.1.1+18 PLUS the new Storied features.
 
-⚠️ **This build is DIFFERENT from all previous assignments:**
-- Uses `flutter build ipa --release` (NOT `build_install_launch.sh`)
-- Requires `--dart-define=GATEWAY_API_KEY="aura-gw-360721-880288"` — without it every cloud call returns 401
-- Must be signed with distribution profile (not development)
-- Final step is upload to App Store Connect via Xcode Organizer or `xcrun altool`
+⚠️ **CRITICAL DIFFERENCES from all previous assignments:**
+- Branch is **`storied`** — NOT `services-migration`
+- Flutter app root is **`~/Development/Audioura-build/audio_tour_app/`** — NOT `development/audio_tour_app/`
+- Build command is `flutter build ipa --release` (App Store archive) — NOT `build_install_launch.sh`
+- `--dart-define=GATEWAY_API_KEY="aura-gw-360721-880288"` is REQUIRED — without it every cloud call returns 401
 
-**What this build delivers over v1.2.9+71 (all versions since last iPhone build):**
-- Fresh install defaults to Cloud mode — no manual URL/key entry needed
-- API key baked in via `--dart-define` (not stored in prefs)
-- All cloud HTTP requests send `X-API-Key` (tours-near, downloads, status, newsletters, everything)
-- Friendly error messages — no raw 401 shown to users
-- Translation failure modal dialog
-- Listen page overflow menu (⋮) — translate/edit/delete/report options
-- Report this tour — prefilled mailto from overflow menu
-- Account deletion — iOS pops to root with "Please reopen" message
-- Treats tab — "Samples for the future" banner, real backend calls
-- 402 subscription_required handled gracefully
-- News cloud paths all correct
-- Poll hardening, re-entry guard, translation consolidation (all v2.1.1+9 fixes)
-- `.env` removed — no bundled secrets
+**What this delivers over v1.2.9+71 (everything since last iPhone build):**
+- All v2.1.1+18 Beta features: cloud-first defaults, baked-in API key, all cloud URLs sending `X-API-Key`, translation modal, overflow menu (⋮), Report tour, Treats tab, Account deletion iOS flow, 402 handling, full URL audit
+- **NEW — Onboarding Personalization:** First launch shows "What brings you here?" with 4 choices (🎨 Art & Culture, 📖 History, 👨‍👩‍👧 Family Fun, ✈️ First-time Visitor + Skip). Saves `narrative_tone` → sent in tour generation. Never shows again after first choice.
+- **NEW — App Attestation Dart side:** `AppAttestationService` uses MethodChannel `com.audioura.app/attestation`. iOS native Swift side NOT YET implemented — `MissingPluginException` handled gracefully (logs, returns null, never blocks the build or any feature).
 
-**Target commit:** `700d579`  **Version:** `2.1.1+18`  **Branch:** `services-migration`
-**iOS bundle ID:** `com.glikfamily.audioura` (Android uses `com.audioura.audiotours` — different)
+**Target commit:** `2962fe5` (or later — `0045823` is on top)
+**Version:** `2.2.0+1`  **Branch:** `storied`
+**iOS bundle ID:** `com.glikfamily.audioura` (unchanged)
 **No pubspec bump needed.**
 
 **Roles:**
-- **[SIR MICHAEL]** — App Store Connect setup (must be done BEFORE Mac Mini Q uploads), smoke test on device, final upload approval.
-- **[MAC MINI Q]** — pulls latest, builds release archive, installs on device for smoke test, then uploads to TestFlight.
+- **[SIR MICHAEL]** — App Store Connect setup (Step 0, must be done BEFORE upload), smoke test, TestFlight activation.
+- **[MAC MINI Q]** — checkout `storied` branch, build release archive, install on device, upload to TestFlight.
 
 ---
 
-## Step 0 — [SIR MICHAEL] App Store Connect setup ⚠️ DO THIS BEFORE MAC MINI BUILD
+## Step 0 — [SIR MICHAEL] App Store Connect setup ⚠️ DO THIS BEFORE MAC MINI UPLOAD STEP
 
-Before Mac Mini Q can upload anything, the app record must exist in App Store Connect:
+**If not already done from A#84 prep:**
 
 1. Go to **appstoreconnect.apple.com** → sign in with `glikfamily@gmail.com`
-2. Click **+** → New App
-3. Fill in:
+2. Click **+** → New App:
    - Platform: **iOS**
    - Name: **Audioura**
    - Primary Language: **English (U.S.)**
-   - Bundle ID: **com.glikfamily.audioura** (select from dropdown — must match Xcode)
+   - Bundle ID: **com.glikfamily.audioura**
    - SKU: **audioura-1**
-4. Complete **App Privacy** details (required before submission)
-5. Tell Mac Mini Q "App Store Connect record created, proceed" when done
+3. Complete **App Privacy** details (required before any upload)
+4. Generate an **App-Specific Password** at **appleid.apple.com** → Sign-In and Security → App-Specific Passwords → Generate → label "Mac Mini Audioura Upload" → save it
 
-Also generate an **App-Specific Password** for the Apple ID (needed for `xcrun altool` upload):
-- Go to **appleid.apple.com** → Sign-In and Security → App-Specific Passwords → Generate
-- Label it "Mac Mini Audioura Upload"
-- Save the password — Mac Mini Q will need it
+Tell Mac Mini Q the App-Specific Password when it reaches Step 10.
 
 ## Step 1 — [SIR MICHAEL] Eject USB, carry to Mac Mini, switch KVM
 
 ## Step 2 — [SIR MICHAEL on Mac Mini] Launch Q
 
 Paste:
-> Read `@/Volumes/USB DISK/Audioura/assignments/mac_mini_assignments.md` and execute the A#84 assignment at the top. Follow STOP conditions; skip steps labelled `[SIR MICHAEL]`.
+> Read `@/Volumes/USB DISK/Audioura/assignments/mac_mini_assignments.md` and execute the A#85 assignment at the top. Follow STOP conditions; skip steps labelled `[SIR MICHAEL]`.
 
-## Step 3 — [MAC MINI Q] Pull latest
+## Step 3 — [MAC MINI Q] Checkout `storied` branch
 
 ```bash
 cd ~/Development/Audioura-build
-git pull origin services-migration
+git fetch origin
+git checkout storied
+git pull origin storied
 ```
 
-**Expected:** fast-forward to commit `700d579` or later.
+**Expected:** HEAD at `2962fe5` or later (`0045823`).
+
+If `git checkout storied` fails with "local changes" — STOP and report. Do not force.
 
 ## Step 4 — [MAC MINI Q] Spot-check BEFORE building ⚠️ REQUIRED
 
 ```bash
-cd ~/Development/Audioura-build/development/audio_tour_app
+# NOTE: storied branch root is audio_tour_app/ (NOT development/audio_tour_app/)
+cd ~/Development/Audioura-build/audio_tour_app
 
-# 4a — pubspec at 2.1.1+18
+# 4a — pubspec at 2.2.0+1
 grep "^version:" pubspec.yaml
-# Expected: version: 2.1.1+18
+# Expected: version: 2.2.0+1
 
-# 4b — no hardcoded 5012/5017 in tour_generator_screen
-grep -n "5012\|5017" lib/screens/tour_generator_screen.dart
-# Expected: zero matches
+# 4b — onboarding screen exists
+ls lib/screens/onboarding_screen.dart 2>/dev/null && echo FOUND || echo MISSING
+# Expected: FOUND
 
-# 4c — _pollTimer is GONE
-grep -n "_pollTimer" lib/screens/tour_generator_screen.dart
-# Expected: zero matches
-
-# 4d — GATEWAY_API_KEY dart-define wired up (reads from env)
+# 4c — GATEWAY_API_KEY dart-define wired up
 grep -rn "GATEWAY_API_KEY\|fromEnvironment" lib/config/ | head -5
-# Expected: at least 1 match showing dart-define is read
+# Expected: at least 1 match
+
+# 4d — no hardcoded 5012/5017 URLs
+grep -rn "5012\|5017" lib/screens/tour_generator_screen.dart
+# Expected: zero matches
 
 # 4e — signing intact
 grep -E 'PRODUCT_BUNDLE_IDENTIFIER|DEVELOPMENT_TEAM' \
   ios/Runner.xcodeproj/project.pbxproj | sort -u
 # Expected: com.glikfamily.audioura and 4HGRU6TKGQ
 
-# 4f — no .env file bundled
-ls .env 2>/dev/null && echo "FOUND - STOP" || echo "NOT PRESENT - OK"
-# Expected: NOT PRESENT - OK
+# 4f — NSLocalNetworkUsageDescription present
+grep -n "NSLocalNetworkUsageDescription" ios/Runner/Info.plist
+# Expected: 1 match
 ```
 
-If 4a fails — STOP, wrong commit.
-If 4b or 4c shows matches — STOP, stale code.
-If 4f shows FOUND — STOP, do not build with bundled secrets.
+If 4a fails — STOP, wrong branch or commit.
+If 4b shows MISSING — STOP, onboarding feature not present.
+If 4d shows any matches — STOP, hardcoded URLs still present.
 
 ## Step 5 — [MAC MINI Q] pod install
 
 ```bash
-cd ~/Development/Audioura-build/development/audio_tour_app/ios
+cd ~/Development/Audioura-build/audio_tour_app/ios
 pod install
 cd ..
 ```
 
-## Step 6 — [MAC MINI Q] Verify Xcode signing for DISTRIBUTION
+⚠️ `pod install` is especially important here — switching branches may have changed the pod state.
+
+## Step 6 — [MAC MINI Q] Verify Xcode signing for distribution
 
 ```bash
-open ~/Development/Audioura-build/development/audio_tour_app/ios/Runner.xcworkspace
+open ~/Development/Audioura-build/audio_tour_app/ios/Runner.xcworkspace
 ```
 
 In Xcode:
@@ -126,23 +120,22 @@ In Xcode:
 2. Confirm **Automatically manage signing** ✅
 3. Confirm **Team: Mikhail Glik (4HGRU6TKGQ)**
 4. Confirm **Bundle Identifier: com.glikfamily.audioura**
-5. Switch scheme from **Debug** to **Release** (top bar → scheme selector)
-6. Quit Xcode
+5. Quit Xcode
 
 ## Step 7 — [MAC MINI Q] Build release archive (IPA)
 
 ```bash
-cd ~/Development/Audioura-build/development/audio_tour_app
+cd ~/Development/Audioura-build/audio_tour_app
 flutter clean && flutter pub get
 flutter build ipa --release --dart-define=GATEWAY_API_KEY="aura-gw-360721-880288"
 ```
 
-**Expected:** Build completes with output similar to:
+**Expected:** Build completes with:
 ```
 Built build/ios/ipa/audioura.ipa
 ```
 
-`flutter analyze` warnings in dead files — **non-blocking**, proceed.
+`flutter analyze` warnings in dead files (`audio_handler.dart`, `map_page.dart`, `subscription_management_screen.dart`, `widget_test.dart`) — **non-blocking**, proceed.
 
 If build FAILS with signing error:
 ```bash
@@ -150,77 +143,62 @@ open ios/Runner.xcworkspace
 ```
 Runner → Signing & Capabilities → Automatically manage signing ✅ → Team: 4HGRU6TKGQ → quit Xcode → re-run Step 7.
 
-If build FAILS with `--dart-define` error — try without quotes:
-```bash
-flutter build ipa --release --dart-define=GATEWAY_API_KEY=aura-gw-360721-880288
-```
+If `MissingPluginException` appears in build output for `com.audioura.app/attestation` — this is **expected and non-blocking**. The iOS native side is not yet implemented. Proceed.
 
 ## Step 8 — [MAC MINI Q] Install on iPhone for smoke test
 
-Install the release build on the iPhone for a quick pre-submission smoke test:
-
 ```bash
-# Install the IPA directly to the connected iPhone
 xcrun devicectl device install app \
   --device F9D6F807-D301-59EE-B574-5747D617D82C \
   build/ios/ipa/audioura.ipa
 ```
 
-If `devicectl` fails, use `ios-deploy` or open Xcode → Window → Devices and Simulators → drag IPA onto device.
+If `devicectl` fails, use Xcode → Window → Devices and Simulators → drag IPA onto device.
 
-STOP and tell Sir Michael the build is installed. Wait for smoke test result.
+STOP and tell Sir Michael the build is installed. Wait for smoke test.
 
 ## Step 9 — [SIR MICHAEL] Smoke test on iPhone ⚠️ STOP HERE FOR Q
 
-⚠️ **App should default to Cloud mode with no manual URL/key entry needed.**
+⚠️ **Uninstall the old app first if present** — onboarding only shows on fresh install.
 
-**Test 1 — Cloud tour generation:**
-Launch app → generate a tour → no 401, tour generates and opens automatically.
+**Test 1 — Onboarding (NEW — primary test):**
+1. Launch app for the first time (fresh install).
+2. **Expected:** "Welcome to Audioura / What brings you here?" screen appears with 4 choices.
+3. Select one (e.g. 📖 History).
+4. **Expected:** Onboarding dismisses, app proceeds normally.
+5. Kill app and relaunch — **Expected:** onboarding does NOT show again.
 
-**Test 2 — Cloud news/newsletter:**
+**Test 2 — Cloud tour generation:**
+1. App should default to Cloud mode — no manual URL/key entry needed.
+2. Generate a tour → no 401, tour generates and opens automatically.
+
+**Test 3 — Cloud news/newsletter:**
 Audio mode → process newsletter → download article → playback works.
 
-**Test 3 — Translation:**
-Generate a tour with translation → works. If translation unavailable → modal dialog shown (not silent English fallback).
+**Test 4 — Translation:**
+Generate a tour with translation → works. If unavailable → modal dialog shown (not silent fallback).
 
-**Test 4 — Account deletion:**
-About → Delete My Account → confirmation → tap Delete → iOS pops to root with "Please reopen the app to finish resetting." message. ⚠️ Only test with a throwaway account.
+**Test 5 — Account deletion:**
+About → Delete My Account → confirmation → tap Delete → iOS pops to root with "Please reopen the app to finish resetting." ⚠️ Only test with throwaway account.
 
-**Test 5 — Report tour:**
-Listen page → open overflow menu (⋮) on a tour → Report → email compose opens prefilled.
+**Test 6 — Report tour:**
+Listen page → overflow menu (⋮) on a tour → Report → email compose opens prefilled.
 
-**Test 6 — Treats tab:**
-Navigate to Treats → shows "Samples for the future" banner + real backend content.
+**Test 7 — Treats tab:**
+Navigate to Treats → "Samples for the future" banner + real content visible.
 
-**Test 7 — Map/POI:**
+**Test 8 — Map/POI:**
 Open a walking tour → tap POI map icon → TourMapScreen opens.
 
-**Test 8 — Mic/Voice:**
+**Test 9 — Mic/Voice:**
 Listen tab → tap mic → listening dialog opens, no permission snackbar.
 
 Tell Q "Smoke test passes, proceed to Step 10" when done. Report any failures.
 
-## Step 10 — [MAC MINI Q] Upload to TestFlight via Xcode Organizer
+## Step 10 — [MAC MINI Q] Upload to TestFlight ⚠️ WAIT FOR SIR MICHAEL'S APP-SPECIFIC PASSWORD
 
 ```bash
-open ios/Runner.xcworkspace
-```
-
-In Xcode:
-1. Menu → **Product → Archive**
-   - If archive already exists from Step 7, skip to step 2
-   - Wait for archive to complete
-2. **Window → Organizer** opens automatically
-3. Select the `2.1.1 (18)` archive → click **Distribute App**
-4. Choose **App Store Connect** → **Next**
-5. Choose **Upload** → **Next**
-6. Leave all options default → **Next** → **Next**
-7. Click **Upload**
-8. Wait for upload to complete — Xcode will show "Upload Successful"
-
-**Alternative — command line upload (if Organizer upload fails):**
-```bash
-# Sir Michael provides the app-specific password
+# Sir Michael provides <app-specific-password> from Step 0
 xcrun altool --upload-app \
   -f build/ios/ipa/audioura.ipa \
   -t ios \
@@ -228,59 +206,70 @@ xcrun altool --upload-app \
   -p <app-specific-password>
 ```
 
-STOP and tell Sir Michael the upload status.
+**Alternative — Xcode Organizer (if altool fails):**
+```bash
+open ios/Runner.xcworkspace
+```
+Xcode → Product → Archive → Window → Organizer → select `2.2.0 (1)` archive → Distribute App → App Store Connect → Upload → Next → Next → Upload.
 
-## Step 11 — [SIR MICHAEL] TestFlight activation in App Store Connect
+STOP and report upload status to Sir Michael.
+
+## Step 11 — [SIR MICHAEL] TestFlight activation
 
 After upload succeeds:
-1. Go to **appstoreconnect.apple.com** → Audioura app → **TestFlight** tab
-2. Wait for build to finish processing (~5–15 minutes)
+1. **appstoreconnect.apple.com** → Audioura → **TestFlight** tab
+2. Wait for build processing (~5–15 minutes)
 3. Once processed → click build → **Add to Group** → add yourself as internal tester
 4. Install via TestFlight app on iPhone
-5. Verify app version shows `2.1.1 (18)` in TestFlight
+5. Verify version shows `2.2.0 (1)` in TestFlight
 
 ## Step 12 — [MAC MINI Q] Copy results and eject
 
 ```bash
-echo "A#84 Results:" > ~/Desktop/a84_results.txt
-echo "Date: $(date)" >> ~/Desktop/a84_results.txt
-echo "Release archive built: [YES/NO]" >> ~/Desktop/a84_results.txt
-echo "IPA path: build/ios/ipa/audioura.ipa" >> ~/Desktop/a84_results.txt
-echo "Test 1  Cloud tour generation: [YES/NO]" >> ~/Desktop/a84_results.txt
-echo "Test 2  Cloud news/newsletter: [YES/NO]" >> ~/Desktop/a84_results.txt
-echo "Test 3  Translation + modal dialog: [YES/NO]" >> ~/Desktop/a84_results.txt
-echo "Test 4  Account deletion iOS pop: [YES/NO/NOT_TESTED]" >> ~/Desktop/a84_results.txt
-echo "Test 5  Report tour email: [YES/NO]" >> ~/Desktop/a84_results.txt
-echo "Test 6  Treats tab: [YES/NO]" >> ~/Desktop/a84_results.txt
-echo "Test 7  Map/POI: [YES/NO]" >> ~/Desktop/a84_results.txt
-echo "Test 8  Mic/Voice: [YES/NO]" >> ~/Desktop/a84_results.txt
-echo "TestFlight upload: [SUCCESS/FAILED/PENDING]" >> ~/Desktop/a84_results.txt
-echo "Overall: [SUCCESS/PARTIAL/FAILED]" >> ~/Desktop/a84_results.txt
-cp ~/Desktop/a84_results.txt "/Volumes/USB DISK/Audioura/results/"
+echo "A#85 Results:" > ~/Desktop/a85_results.txt
+echo "Date: $(date)" >> ~/Desktop/a85_results.txt
+echo "Branch: storied" >> ~/Desktop/a85_results.txt
+echo "Release archive built: [YES/NO]" >> ~/Desktop/a85_results.txt
+echo "Test 1  Onboarding shows on fresh install: [YES/NO]" >> ~/Desktop/a85_results.txt
+echo "Test 1b Onboarding does NOT show on relaunch: [YES/NO]" >> ~/Desktop/a85_results.txt
+echo "Test 2  Cloud tour generation (no 401): [YES/NO]" >> ~/Desktop/a85_results.txt
+echo "Test 3  Cloud news/newsletter: [YES/NO]" >> ~/Desktop/a85_results.txt
+echo "Test 4  Translation + modal dialog: [YES/NO]" >> ~/Desktop/a85_results.txt
+echo "Test 5  Account deletion iOS pop: [YES/NO/NOT_TESTED]" >> ~/Desktop/a85_results.txt
+echo "Test 6  Report tour email: [YES/NO]" >> ~/Desktop/a85_results.txt
+echo "Test 7  Treats tab: [YES/NO]" >> ~/Desktop/a85_results.txt
+echo "Test 8  Map/POI: [YES/NO]" >> ~/Desktop/a85_results.txt
+echo "Test 9  Mic/Voice: [YES/NO]" >> ~/Desktop/a85_results.txt
+echo "TestFlight upload: [SUCCESS/FAILED/PENDING]" >> ~/Desktop/a85_results.txt
+echo "Overall: [SUCCESS/PARTIAL/FAILED]" >> ~/Desktop/a85_results.txt
+cp ~/Desktop/a85_results.txt "/Volumes/USB DISK/Audioura/results/"
 diskutil eject "/Volumes/USB DISK"
 ```
 
 ## Step 13 — [MAC MINI Q] Report Results
 
-> "Assignment 84 complete. Archive built: [YES/NO]. Cloud generation (T1): [YES/NO]. Cloud news (T2): [YES/NO]. Translation (T3): [YES/NO]. Account deletion (T4): [YES/NO/NOT_TESTED]. Report tour (T5): [YES/NO]. Treats (T6): [YES/NO]. Map/POI (T7): [YES/NO]. Mic (T8): [YES/NO]. TestFlight upload: [SUCCESS/FAILED/PENDING]. Overall: [SUCCESS/PARTIAL/FAILED]."
+> "Assignment 85 complete. Branch: storied. Archive built: [YES/NO]. Onboarding shows (T1): [YES/NO]. Onboarding no repeat (T1b): [YES/NO]. Cloud generation (T2): [YES/NO]. Cloud news (T3): [YES/NO]. Translation modal (T4): [YES/NO]. Account deletion (T5): [YES/NO/NOT_TESTED]. Report tour (T6): [YES/NO]. Treats (T7): [YES/NO]. Map/POI (T8): [YES/NO]. Mic (T9): [YES/NO]. TestFlight upload: [SUCCESS/FAILED/PENDING]. Overall: [SUCCESS/PARTIAL/FAILED]."
 
 ## Step 14 — [SIR MICHAEL, back on Windows] Sync
 
 ```cmd
 cd C:\Users\micha\eclipse-workspace\AudioTours\development
-git pull origin services-migration
+git fetch origin
+git checkout storied
+git pull origin storied
 ```
-Verify `audio_tour_app\pubspec.yaml` shows `version: 2.1.1+18`.
+
+Verify `audio_tour_app\pubspec.yaml` shows `version: 2.2.0+1`.
 
 ---
 
-# T: 06/2026 - A#83 — Build v2.1.1+9 — SUPERSEDED by A#84
-**Status**: ⏭️ SUPERSEDED — never built on iPhone. All v2.1.1+9 features included in A#84.
+# T: 06/2026 - A#84 — Build v2.1.1+18 App Store (services-migration) — SUPERSEDED by A#85
+**Status**: ⏭️ SUPERSEDED — never built. All v2.1.1+18 features included in A#85 (storied branch).
 
 ---
 
-# T: 06/2026 - A#82 — Build v2.1.1+8 — SUPERSEDED by A#84
-**Status**: ⏭️ SUPERSEDED — never built on iPhone. All changes included in A#84.
+# T: 06/2026 - A#83 — Build v2.1.1+9 — SUPERSEDED by A#85
+**Status**: ⏭️ SUPERSEDED — never built. All changes included in A#85.
 
 ---
 
@@ -306,8 +295,3 @@ Verify `audio_tour_app\pubspec.yaml` shows `version: 2.1.1+18`.
 
 # T: 05/26/2026 - A#73 — Build v1.2.9+64 (App Icon Background — #A93105 brick red)
 **Status**: ✅ COMPLETE — brick-red icon confirmed on iPhone. 2026-05-26.
-
----
-
-# T: 05/25/2026 - A#72 — Build v1.2.9+63 (News Article White Screen — Stale Container Paths)
-**Status**: ✅ COMPLETE — articles load without white screen. 2026-05-26.

@@ -8,37 +8,30 @@ This is required so the user can identify which Amazon-Q tab they are talking to
 
 ---
 
-### ✅ **CURRENT STATE — v2.1.1+18 APP STORE SUBMISSION BUILD READY**
+### ✅ **CURRENT STATE — v2.2.0+1 STORIED RELEASE READY TO BUILD**
 
 - iPhone last confirmed on **v1.2.9+71** (A#78 mic fix — smoke test passed)
-- **A#84 is ready to build** — v2.1.1+18 App Store / TestFlight release archive. Supersedes all prior unbuilt assignments (A#83, A#82). This is the first App Store submission build.
-- **API key now baked in** via `--dart-define=GATEWAY_API_KEY="aura-gw-360721-880288"` — no manual About screen entry needed. App defaults to Cloud mode on fresh install.
+- **A#85 is ready to build** — v2.2.0+1 from `storied` branch. Supersedes A#84 (v2.1.1+18, never built). First App Store / TestFlight submission build.
+- **Branch is `storied`** — NOT `services-migration`. Flutter app root is `audio_tour_app/` (not `development/audio_tour_app/`).
+- **API key baked in** via `--dart-define=GATEWAY_API_KEY="aura-gw-360721-880288"` — no manual entry needed. App defaults to Cloud mode on fresh install.
 - **Mobile Kiro** (Kiro IDE) replaced Android Amazon-Q (Eclipse) as of 2026-06-08.
-- **App Attestation Phase 4** (native Swift MethodChannel) is NOT in this build — stubs return null. Future assignment after Phase 3 (Android Play Integrity) validated.
-- ⚠️ **Sir Michael must create the App Store Connect record BEFORE Mac Mini Q uploads** (bundle ID `com.glikfamily.audioura`, SKU `audioura-1`). Also generate an App-Specific Password at appleid.apple.com.
+- **App Attestation iOS native (Phase 4)** NOT yet implemented — `MissingPluginException` handled gracefully, never blocks. Future assignment.
+- ⚠️ **Sir Michael must create App Store Connect record + App-Specific Password BEFORE upload step** (bundle ID `com.glikfamily.audioura`, SKU `audioura-1`).
 
 ---
 
 ### 🎯 **IMMEDIATE NEXT STEPS**
 
-#### A#84 — Build v2.1.1+18 App Store Release ⚠️ READY TO BUILD
+#### A#85 — Build v2.2.0+1 Storied Release ⚠️ READY TO BUILD
 
-⚠️ **DIFFERENT BUILD PROCESS — release archive, not dev install.**
+⚠️ **DIFFERENT BUILD PROCESS — `storied` branch, release archive, TestFlight upload.**
 
-**What this delivers over v1.2.9+71 (all changes since last iPhone build):**
-- Fresh install defaults to Cloud mode — no manual URL/key entry needed
-- API key baked in via `--dart-define=GATEWAY_API_KEY="aura-gw-360721-880288"`
-- All cloud HTTP requests send `X-API-Key` on every call
-- Friendly error messages — no raw 401 shown to users
-- Translation failure modal dialog
-- Listen page overflow menu (⋮) — translate/edit/delete/report
-- Report this tour — prefilled mailto from overflow menu
-- Account deletion — iOS pops to root with restart message
-- Treats tab — real backend + "Samples for the future" banner
-- 402 handling, poll hardening, URL audit, translation consolidation (all v2.1.1+9 fixes)
-- `.env` removed — no bundled secrets
+**What this delivers over v1.2.9+71:**
+- All v2.1.1+18 Beta features: cloud-first defaults, baked-in API key, all cloud URLs sending `X-API-Key`, translation modal, overflow menu (⋮), Report tour, Treats tab, Account deletion iOS flow, 402 handling, full URL audit
+- **NEW — Onboarding Personalization:** "What brings you here?" on first launch, 4 choices, saves `narrative_tone`, never shows again
+- **NEW — App Attestation Dart stubs:** MethodChannel `com.audioura.app/attestation` wired, iOS native side pending (graceful fallback)
 
-**Target commit:** `700d579`  **pubspec:** `2.1.1+18`  **No pubspec bump needed.**
+**Target commit:** `2962fe5` (or later `0045823`)  **pubspec:** `2.2.0+1`  **Branch:** `storied`
 
 **Mac Mini runs:**
 ```bash
@@ -52,18 +45,20 @@ cd "/Volumes/USB DISK/Audioura/scripts" && ./build_install_launch.sh
 
 **Build command:**
 ```bash
+# From ~/Development/Audioura-build/audio_tour_app/ on storied branch
 flutter build ipa --release --dart-define=GATEWAY_API_KEY="aura-gw-360721-880288"
 ```
 
-**Smoke tests (8):**
-1. Cloud tour generation — no 401, generates automatically
-2. Cloud news/newsletter — processes, downloads, plays
-3. Translation — works; failure shows modal dialog
-4. Account deletion — iOS pops to root with restart message
-5. Report tour — overflow menu → Report → email compose opens
-6. Treats tab — banner + real content
-7. Map/POI — walking person icons + TourMapScreen opens
-8. Mic/Voice — no permission snackbar
+**Smoke tests (9):**
+1. Onboarding — "What brings you here?" on fresh install, 4 choices, never repeats
+2. Cloud tour generation — no 401, generates automatically
+3. Cloud news/newsletter — processes, downloads, plays
+4. Translation — works; failure shows modal dialog
+5. Account deletion — iOS pops to root with restart message
+6. Report tour — overflow menu → Report → email compose opens
+7. Treats tab — banner + real content
+8. Map/POI — TourMapScreen opens
+9. Mic/Voice — no permission snackbar
 
 ---
 
@@ -85,8 +80,8 @@ Audioura-build/           AudioTours\development\
 - **Windows dev tree**: `C:\Users\micha\eclipse-workspace\AudioTours\development\` — IS a git clone. Q edits iOS-only files + planning docs here. Never commits Dart code.
 - **USB mirror**: `usb/Audioura/` mirrors `D:\Audioura\`. After editing: `copy usb\Audioura\assignments\mac_mini_assignments.md D:\Audioura\assignments\`
 - **OLD repo**: `~/Development/AudioTours/` — BROKEN, never use
-- **pubspec**: `2.1.1+18` (Mobile Kiro bumped)
-- **Head commit**: `700d579` — compile fix (imports for Properties/FileInputStream)
+- **pubspec**: `2.2.0+1` (Mobile Kiro bumped — `storied` branch)
+- **Head commit**: `0045823` (storied branch) — storied_mode ALTER + audio_tours INSERT fix
 
 #### Version history
 | Version | Assignment | Status |
@@ -98,8 +93,8 @@ Audioura-build/           AudioTours\development\
 | 2.1.1+1–+3 | A#79/A#80 dual-environment — superseded | ⏭️ SKIPPED |
 | 2.1.1+6–+7 | A#81 poll hardening — superseded | ⏭️ SKIPPED |
 | 2.1.1+8 | A#82 4 new features — superseded | ⏭️ SKIPPED |
-| 2.1.1+9–+17 | A#83 cloud fixes + audit + 402 — superseded | ⏭️ SKIPPED |
-| **2.1.1+18** | **A#84 App Store release archive — first submission build** | **⏳ READY TO BUILD** |
+| 2.1.1+9–+18 | A#83/A#84 cloud fixes + App Store prep — superseded | ⏭️ SKIPPED |
+| **2.2.0+1** | **A#85 Storied release — onboarding + attestation stubs + TestFlight** | **⏳ READY TO BUILD** |
 
 #### Git operation ownership
 | Operation | Who | Where |
@@ -128,9 +123,9 @@ Audioura-build/           AudioTours\development\
 ---
 
 ### 📱 **APP STATUS**
-- **iPhone**: v1.2.9+71 (A#84 App Store build pending → v2.1.1+18)
+- **iPhone**: v1.2.9+71 (A#85 Storied build pending → v2.2.0+1)
 - **All shipped features**: Tour clustering, location search, tour search, newsletter system, subscription, language selector, about screen, settings persistence, location permissions, keyboard dismissal, download spinner fix, microphone voice control, translation (ru/fr/zh), walking tour map, per-stop map focus, coordinate jitter, museum single-POI map guard, mode-switch fix, stale tour/news path healing, brick-red app icon, app name "Audioura", InAppWebView v6, map icon on Listen page, POI tap → TourMapScreen via `openMap` JS handler, Listen page Refresh in-place reload, Listen page mic permission fix.
-- **New in v2.1.1+18** (pending A#84 build): Cloud-first defaults, baked-in API key, all cloud URLs sending X-API-Key, translation modal, overflow menu, Report tour, Treats tab, Account deletion iOS flow, 402 handling, full URL audit.
+- **New in v2.2.0+1** (pending A#85 build): Cloud-first defaults, baked-in API key, all cloud URLs sending X-API-Key, translation modal, overflow menu, Report tour, Treats tab, Account deletion iOS flow, 402 handling, full URL audit, onboarding personalization, App Attestation Dart stubs.
 
 ---
 
@@ -209,8 +204,8 @@ cd "/Volumes/USB DISK/Audioura/scripts"
 ---
 
 ### 📋 **OPEN ITEMS**
-1. **A#84** ⚠️ READY TO BUILD — v2.1.1+18 App Store release archive. See Immediate Next Steps.
-   - Sir Michael: create App Store Connect record + App-Specific Password BEFORE Mac Mini build.
+1. **A#85** ⚠️ READY TO BUILD — v2.2.0+1 Storied release. `storied` branch. See Immediate Next Steps.
+   - Sir Michael: create App Store Connect record + App-Specific Password BEFORE upload step (Step 10).
 2. **App Attestation Phase 4** — iOS native Swift MethodChannel (`com.audioura.app/attestation`). Blocked on Android Phase 3 (Play Integrity) validation first. Future assignment — Windows Q will need to edit `ios/` Swift files.
 3. **API Key field removal** — About screen manual API Key input is temporary. Future: embed/auto-supply key.
 4. **Dialog auto-dismiss** — `_startVoiceSearch()` dialog doesn't auto-close on 10s timeout. `onStatus` not wired. Deferred.
@@ -276,7 +271,7 @@ cd ios && pod deintegrate && pod install
 | `lib/services/app_attestation_service.dart` | NEW v2.1.1+8 — Attestation stubs (null). |
 | `lib/config.dart` | `Config.defaultServerIp = '192.168.0.218'` |
 | `ios/Runner/Info.plist` | iOS permissions + `NSLocalNetworkUsageDescription`. |
-| `usb/Audioura/assignments/mac_mini_assignments.md` | Mac Mini task queue. A#84 at top. |
+| `usb/Audioura/assignments/mac_mini_assignments.md` | Mac Mini task queue. A#85 at top. |
 | `git_source_control_for_q.md` | Git rules — READ before any git operation. |
 
 ---
@@ -290,5 +285,5 @@ cd ios && pod deintegrate && pod install
 
 ---
 
-**Last Updated**: 2026-06-26 — v112.0. pubspec at `2.1.1+18` (HEAD `700d579`). iPhone on v1.2.9+71. A#84 App Store submission assignment written — first release archive build, takes iPhone from v1.2.9+71 to v2.1.1+18. API key baked in via dart-define. App defaults to Cloud mode. Sir Michael must create App Store Connect record + App-Specific Password before upload step.
-**iOS Amazon-Q Version**: 112.0
+**Last Updated**: 2026-06-30 — v113.0. pubspec at `2.2.0+1` on `storied` branch (HEAD `0045823`). iPhone on v1.2.9+71. A#85 Storied release assignment written — takes iPhone from v1.2.9+71 to v2.2.0+1 in one build + TestFlight upload. Supersedes A#84 (never built). New features: onboarding personalization + App Attestation Dart stubs. Flutter app root on storied branch is `audio_tour_app/` not `development/audio_tour_app/`.
+**iOS Amazon-Q Version**: 113.0
