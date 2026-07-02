@@ -57,7 +57,7 @@ ATTESTATION_MODE = os.getenv('ATTESTATION_MODE', 'off')  # 'log_only', 'off', or
 ATTESTATION_SECRET = os.getenv('ATTESTATION_NONCE_SECRET', 'default-nonce-hmac-key-change-in-prod')
 PLAY_INTEGRITY_API_KEY = os.getenv('PLAY_INTEGRITY_API_KEY', '')
 APP_PACKAGE_NAME = os.getenv('APP_PACKAGE_NAME', 'com.audioura.audiotours')
-APP_BUNDLE_ID = os.getenv('APP_BUNDLE_ID', 'com.audioura.app')
+APP_BUNDLE_ID = os.getenv('APP_BUNDLE_ID', 'com.glikfamily.audioura')
 print(f"[ATTESTATION] Mode: {ATTESTATION_MODE} (ENFORCED={ATTESTATION_ENFORCED})")
 
 # Nonce is STATELESS (HMAC-signed with embedded timestamp) — works across multiple Cloud Run instances.

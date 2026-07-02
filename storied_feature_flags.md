@@ -18,7 +18,7 @@ All environment variables controlling Storied behavior. This document is the sin
 | `GATEWAY_API_KEY` | (required) | api-gateway, tour-generator | Shared secret for API key authentication on cost-bearing endpoints. |
 | `PLAY_INTEGRITY_API_KEY` | (empty) | api-gateway | Google Cloud API key for Play Integrity verification. Only needed when `ATTESTATION_MODE=log_only` or `enforce`. |
 | `APP_PACKAGE_NAME` | `com.audioura.audiotours` | api-gateway | Android package name for Play Integrity API calls. |
-| `APP_BUNDLE_ID` | `com.audioura.app` | api-gateway | iOS bundle ID for App Attest verification. |
+| `APP_BUNDLE_ID` | `com.glikfamily.audioura` | api-gateway | iOS bundle ID for App Attest verification. |
 
 ---
 
