@@ -49,4 +49,15 @@ CREATE TABLE IF NOT EXISTS referral_redemptions (
 );
 
 -- Verification
+-- [S85] Add storied_mode column to audio_tours table (idempotent)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'audio_tours' AND column_name = 'storied_mode'
+    ) THEN
+        ALTER TABLE audio_tours ADD COLUMN storied_mode BOOLEAN DEFAULT FALSE;
+    END IF;
+END $$;
+
 SELECT 'storied_migration_complete' AS status;

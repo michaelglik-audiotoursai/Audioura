@@ -475,10 +475,11 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
             if has_audio_tour and has_lat and has_number_requested and has_tour_content:
                 cur.execute(
                     """
-                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng, tour_content, content_language)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng, tour_content, content_language, storied_mode)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
-                    (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, tour_content, 'en')
+                    (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, tour_content, 'en',
+                     os.getenv('STORIED_MODE', 'false').lower() == 'true')
                 )
             elif has_audio_tour and has_lat and has_number_requested:
                 cur.execute(
