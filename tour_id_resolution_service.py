@@ -20,6 +20,9 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
+from deeplink_resolution_endpoint import deeplink_bp
+app.register_blueprint(deeplink_bp)
+
 TOURS_DIR = "/app/tours"
 
 def get_db_connection():
