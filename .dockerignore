@@ -57,6 +57,14 @@ Temp/
 *.mp3
 *.wav
 
+# Exceptions — required for build/runtime despite matching exclusion patterns above
+!requirements_generator.txt
+!requirements_orchestrator.txt
+!requirements.txt
+!story_type_taxonomy.json
+!templates/
+!templates/**
+
 # Git/IDE
 .git/
 .github/

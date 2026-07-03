@@ -3,7 +3,8 @@ WORKDIR /app
 COPY requirements_generator.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 COPY *.py /app/
+COPY *.json /app/
 COPY templates/ /app/templates/
-ENV STORIED_MODE=false
+ENV STORIED_MODE=true
 EXPOSE 5000
 CMD ["python", "generate_tour_text_service.py"]
