@@ -529,6 +529,117 @@ def _validate_museum_stop_descriptions(poi_list, venue_name, headers):
     return [first_stop] + all_survivors
 
 
+def _verify_works_in_collection(poi_list, venue_name):
+    """[D1] In-collection verification gate for museum tours.
+    
+    Verifies that candidate works actually belong in the specified venue
+    by cross-referencing Wikipedia articles.
+    
+    Returns filtered poi_list with only verified works, or None if fewer
+    than 4 works verify or all fetches fail.
+    """
+    from rag_retriever import fetch_wikipedia_summary
+    import re as _d1_re
+
+    # Extract artist name from venue for reverse lookup
+    _venue_artist = ""
+    cleaned = _d1_re.sub(
+        r"(?i)(mus[ée]+e?|museum|gallery|national|the|of|art|centre|center)\s*",
+        " ", venue_name
+    ).strip()
+    _venue_artist = " ".join(w for w in cleaned.split() if w and len(w) > 1).strip()
+
+    # Fetch venue Wikipedia article
+    venue_article = fetch_wikipedia_summary(venue_name)
+    _all_fetches_failed = True
+    if venue_article:
+        _all_fetches_failed = False
+
+    # Extract city from venue name or article for secondary matching
+    _venue_city = ""
+    # Try to find a city reference in the venue article
+    if venue_article:
+        # Common pattern: "located in <City>" or "in <City>, <Country>"
+        _city_match = _d1_re.search(r'\bin\s+([A-Z][a-zé]+(?:\s+[A-Z][a-zé]+)?)', venue_article)
+        if _city_match:
+            _venue_city = _city_match.group(1)
+
+    verified_pois = []
+    for poi in poi_list:
+        work_name = poi.get('name', '')
+        # Normalize: lowercase, no leading "The", no parenthetical years
+        _norm_name = work_name.lower().strip()
+        _norm_name = _d1_re.sub(r'^the\s+', '', _norm_name)
+        _norm_name = _d1_re.sub(r'\s*\([^)]*\d{4}[^)]*\)\s*', '', _norm_name).strip()
+
+        # Check 1: work name appears in venue article
+        if venue_article and _norm_name and _norm_name in venue_article.lower():
+            print(f"  [D1] VERIFIED '{work_name}' via venue article")
+            verified_pois.append(poi)
+            continue
+
+        # Check 2: reverse lookup — fetch work's own Wikipedia article
+        _lookup_query = f"{work_name} {_venue_artist}" if _venue_artist else work_name
+        work_article = fetch_wikipedia_summary(_lookup_query)
+        if work_article:
+            _all_fetches_failed = False
+
+            _work_lower = work_article.lower()
+            _venue_lower = venue_name.lower()
+
+            # REJECTED: article places work at a DIFFERENT venue
+            _other_venue_indicators = ['hadassah', 'jerusalem', 'moma', 'metropolitan',
+                                       'louvre', 'hermitage', 'uffizi', 'tate', 'prado']
+            _rejected = False
+            for _other in _other_venue_indicators:
+                if _other in _work_lower and _other not in _venue_lower:
+                    # Confirm it's not just a passing mention — check proximity to "located" or "housed"
+                    if _d1_re.search(rf'(located|housed|displayed|held|collection)\s+.{{0,30}}{_other}', _work_lower):
+                        print(f"  [D1] REJECTED '{work_name}' — located elsewhere ({_other})")
+                        _rejected = True
+                        break
+            if _rejected:
+                continue
+
+            # VERIFIED: work article mentions the venue or city
+            if _venue_lower in _work_lower:
+                print(f"  [D1] VERIFIED '{work_name}' via work article (venue mention)")
+                verified_pois.append(poi)
+                continue
+            if _venue_city and _venue_city.lower() in _work_lower:
+                print(f"  [D1] VERIFIED '{work_name}' via work article (city mention)")
+                verified_pois.append(poi)
+                continue
+
+            # No evidence either way
+            print(f"  [D1] DROPPED '{work_name}' — no evidence")
+            continue
+        else:
+            # Fetch returned nothing — check if venue article alone has evidence
+            if venue_article and _norm_name and len(_norm_name) > 3:
+                # Try partial match (first significant word)
+                _words = [w for w in _norm_name.split() if len(w) > 3]
+                if _words and any(w in venue_article.lower() for w in _words):
+                    print(f"  [D1] VERIFIED '{work_name}' via venue article (partial)")
+                    verified_pois.append(poi)
+                    continue
+            print(f"  [D1] DROPPED '{work_name}' — no evidence")
+            continue
+
+    # All fetches failed → network error
+    if _all_fetches_failed and len(poi_list) > 0:
+        print(f"  [D1] All Wikipedia fetches failed — network error")
+        return None
+
+    # Fewer than 4 verified → fail
+    if len(verified_pois) < 4:
+        print(f"  [D1] Only {len(verified_pois)} work(s) verified — need at least 4")
+        return None
+
+    print(f"  [D1] {len(verified_pois)}/{len(poi_list)} works verified for '{venue_name}'")
+    return verified_pois
+
+
 def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None):
     """
     Generate audio tour text using OpenAI API with geo coordinates.
@@ -1034,6 +1145,15 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         print(f"OK PHASE 3A parsed {len(poi_list)} candidate POI(s):")
         for p in poi_list:
             print(f"   - {p['name']}" + (f" @ {p['address']}" if p['address'] else ""))
+
+        # -------- [D1] In-collection verification for museum tours --------
+        if tour_category == 'museum' and _museum_venue_name:
+            _d1_result = _verify_works_in_collection(poi_list, _museum_venue_name)
+            if _d1_result is None:
+                print(f"  [D1] In-collection verification FAILED — not enough verified works")
+                return None, None, (None, None)
+            else:
+                poi_list = _d1_result
 
         # -------- [BLOCKER 1] Single-venue validation --------
         # For a named single museum, check if POIs look like other museums/venues
@@ -1586,6 +1706,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             except Exception as e:
                 print(f"Error parsing first POI coordinates: {e}")
 
+        # [D4] Museum tours: use single venue coordinate for all interior stops
+        if tour_category == 'museum' and _museum_venue_name:
+            _venue_coord = first_poi_coordinates
+            if _venue_coord and _venue_coord != (None, None):
+                for p in poi_list:
+                    p['coordinates'] = f"{_venue_coord[0]}, {_venue_coord[1]}"
+                print(f"  [D4] Museum single-coordinate: all stops set to {_venue_coord}")
+
         # Print extracted POI information
         print("\n=== Extracted POI Information ===")
         for p in poi_list:
@@ -1771,6 +1899,10 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
         if tour_category == 'museum' and _museum_venue_name:
             description_prompt += f"""
 CRITICAL CONSTRAINT: This artwork/exhibit MUST be something that is physically on display at '{_museum_venue_name}'. Describe the ARTWORK itself — its visual qualities, technique, symbolism, and story. If you know which room or hall it's in, mention that briefly. If you don't know the exact room, do NOT fabricate one — just describe the work and tell the visitor to ask museum staff for its current location.
+"""
+            # [D5] No artist bio repetition in descriptions
+            description_prompt += """
+Do NOT repeat the artist's biographical background (birth year, nationality, school associations like 'École de Paris', artistic formats like 'stained glass and stage sets'). That information belongs in the tour introduction only. Here, focus EXCLUSIVELY on THIS SPECIFIC ARTWORK — what it depicts, its technique, its story, what to look for with your eyes.
 """
 
         description_prompt += f"""
@@ -1973,6 +2105,11 @@ Requirements:
         orientation = re.sub(r'^Stop\s+\d+:\s*', '', orientation, count=1, flags=re.IGNORECASE).strip()
         if not orientation:
             orientation = "Position yourself to best view this location."
+        # [D6] Museum tours: strip street navigation from Orientation
+        if tour_category == 'museum' and _museum_venue_name:
+            orientation = re.sub(r'(?i)\b(head|walk|turn|continue|proceed)\s+(north|south|east|west|northeast|northwest|southeast|southwest)\b[^.]*\.?\s*', '', orientation)
+            orientation = re.sub(r'(?i)\b(on|along|down)\s+\w+\s+(street|avenue|road|boulevard|ave|st|rd|blvd)\b[^.]*\.?\s*', '', orientation)
+            orientation = orientation.strip() or "Position yourself to best view this artwork."
         description = poi.get("description", f"[Description for {poi_name} could not be generated.]")
         
         # Format the POI header
@@ -2012,9 +2149,13 @@ Requirements:
         if poi.get("specific_examples"):
             poi_content += f"Specific Examples: {poi['specific_examples']}\n\n"
         
-        # Add operational details if available
-        if poi.get("operational_details"):
-            poi_content += f"Operational Details: {poi['operational_details']}\n\n"
+        # [D7] Museum: operational details only on first stop
+        if tour_category == 'museum' and _museum_venue_name:
+            if i == 0 and poi.get("operational_details"):
+                poi_content += f"Museum Information: {poi['operational_details']}\n\n"
+        else:
+            if poi.get("operational_details"):
+                poi_content += f"Operational Details: {poi['operational_details']}\n\n"
         
         print(f"  DEBUG - POI {stop_num} content includes:")
         print(f"    Specific Examples: {bool(poi.get('specific_examples'))}")
@@ -2109,6 +2250,21 @@ Requirements:
         # Add to complete tour
         complete_tour += poi_content + "\n\n"
     
+    # [D2] Strip GPT self-references to "Stop N" in description bodies
+    if _storied_mode:
+        import re as _d2_re
+        # Split into stop blocks, clean description text only (not headers)
+        _d2_lines = complete_tour.split('\n')
+        _d2_cleaned = []
+        for _line in _d2_lines:
+            # Don't touch headers (lines starting with "Stop N:")
+            if _d2_re.match(r'^Stop\s+\d+:', _line):
+                _d2_cleaned.append(_line)
+            else:
+                # Replace self-referential "Stop N" with context-appropriate text
+                _d2_cleaned.append(_d2_re.sub(r'\bStop\s+\d+\b', 'this work', _line))
+        complete_tour = '\n'.join(_d2_cleaned)
+
     # -------- [S27] Storied: post-assembly de-repetition check --------
     if _storied_mode:
         try:
@@ -2135,7 +2291,24 @@ Requirements:
                             if _sentence_b:
                                 _rewritten = rewrite_repeated_sentence(_sentence_b, f"Stop {_stop_b}", _story_type_b, api_key)
                                 if _rewritten and _rewritten != _sentence_b:
-                                    complete_tour = complete_tour.replace(_sentence_b, _rewritten, 1)
+                                    # [D2] Scoped replacement: only within the target stop's block
+                                    import re as _d2_re_inner
+                                    _stop_blocks = _d2_re_inner.split(r'(Stop \d+:)', complete_tour)
+                                    _replaced = False
+                                    _rebuilt = []
+                                    for _bi, _block in enumerate(_stop_blocks):
+                                        if not _replaced and _sentence_b in _block:
+                                            # Check this is the right stop block
+                                            _prev_header = _stop_blocks[_bi - 1] if _bi > 0 else ''
+                                            if f"Stop {_stop_b}:" in _prev_header or f"Stop {_stop_b}:" in _block:
+                                                _block = _block.replace(_sentence_b, _rewritten, 1)
+                                                _replaced = True
+                                        _rebuilt.append(_block)
+                                    if _replaced:
+                                        complete_tour = ''.join(_rebuilt)
+                                    else:
+                                        # Fallback: if block matching failed, do scoped replace
+                                        complete_tour = complete_tour.replace(_sentence_b, _rewritten, 1)
                                     _rewrite_count += 1
                                     print(f"REPETITION FIXED: Stop {_stop_b} sentence rewritten")
                         if _rewrite_count > 0:
