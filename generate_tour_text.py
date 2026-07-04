@@ -626,10 +626,10 @@ def _verify_works_in_collection(poi_list, venue_name):
             print(f"  [D1] DROPPED '{work_name}' — no evidence")
             continue
 
-    # All fetches failed → network error
+    # All fetches failed → network error — skip verification (don't block the tour)
     if _all_fetches_failed and len(poi_list) > 0:
-        print(f"  [D1] All Wikipedia fetches failed — network error")
-        return None
+        print(f"  [D1] All Wikipedia fetches failed — network error, skipping verification (works unverified)")
+        return poi_list  # Return original list unfiltered — verification is best-effort
 
     # Fewer than 4 verified → fail
     if len(verified_pois) < 4:
