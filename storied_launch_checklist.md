@@ -8,10 +8,10 @@ Every item must be PASS before submitting to Google Play (closed test) + Apple T
 
 - [ ] `python integration_test_storied_full.py` exits 0 — **Owner: Claude** — Blocking: yes
 - [ ] `python regression_all_tour_types.py` exits 0 — **Owner: Claude** — Blocking: yes
-- [ ] `python content_qa_runner.py storied_chagall.txt` scores ≥ 7/8 — **Owner: Claude** — Blocking: yes
-- [ ] `python content_qa_runner.py` on walking tour scores ≥ 7/8 — **Owner: Claude** — Blocking: yes
-- [ ] `python content_qa_runner.py` on restaurant tour scores ≥ 7/8 — **Owner: Claude** — Blocking: yes
-- [ ] `python content_qa_runner.py` on book/movie tour scores ≥ 7/8 — **Owner: Claude** — Blocking: yes
+- [ ] `python content_qa_runner.py storied_chagall.txt` scores ≥ 8/11 + factual checks PASS — **Owner: Claude** — Blocking: yes
+- [ ] `python content_qa_runner.py` on walking tour scores ≥ 8/11 + factual checks PASS — **Owner: Claude** — Blocking: yes
+- [ ] `python content_qa_runner.py` on restaurant tour scores ≥ 8/11 + factual checks PASS — **Owner: Claude** — Blocking: yes
+- [ ] `python content_qa_runner.py` on book/movie tour scores ≥ 8/11 + factual checks PASS — **Owner: Claude** — Blocking: yes
 - [ ] `python regression_beta_parity.py` exits 0 — **Owner: Claude** — Blocking: yes
 - [ ] `python storied_smoke_test.py` exits 0 — **Owner: Claude** — Blocking: yes
 - [ ] `python run_storied_db_migration.py` exits 0 (all 5 tables validated) — **Owner: Claude** — Blocking: yes

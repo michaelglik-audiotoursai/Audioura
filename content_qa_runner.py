@@ -20,6 +20,7 @@ def load_tour(path):
 
 PASS_COUNT = 0
 FAIL_COUNT = 0
+FACTUAL_FAIL_COUNT = 0
 
 
 def check(name, condition, detail=""):
@@ -103,58 +104,69 @@ def run_qa(tour_text, tour_file=""):
           f"total={total_words} words")
 
     # -------- [BLOCKER 3] Factual integrity checks --------
+    # These are RELEASE-GATING: any factual failure → exit 1 regardless of style score.
+    global FACTUAL_FAIL_COUNT
+    FACTUAL_FAIL_COUNT = 0
 
-    # 9. Single-venue consistency: for museum tours, stops should not reference other venues
+    # 9. Single-venue consistency: for museum tours, stops should not reference other NAMED venues
     is_museum = "Tour-Category: museum" in tour_text
+    _other_venue_flags = []
     if is_museum:
-        # Extract venue name from the title line (e.g. "Audio Guided Tour: Musée X - Museum Tour")
+        # Extract venue name from the title line
         _title_match = re.search(r"Audio Guided Tour:\s*(.+?)(?:\s*-\s*Museum Tour)?$", tour_text, re.MULTILINE)
         _tour_venue = _title_match.group(1).strip() if _title_match else ""
-        # Check each stop for references to OTHER museums/venues
-        _VENUE_WORDS = ('musée', 'museum', 'gallery', 'galerie', 'palais', 'villa')
-        _other_venue_flags = []
+        # Only flag PROPER-NAMED venues (capitalized multi-word names like "Musée Matisse")
+        # Ignore bare/generic references like "the museum", "a gallery", "this museum"
+        _NAMED_VENUE_PATTERN = re.compile(
+            r'\b(Mus[ée]+e?\s+[A-Z]\w+(?:\s+[A-Za-z]+)*|'
+            r'Galerie\s+[A-Z]\w+(?:\s+[A-Za-z]+)*|'
+            r'Palais\s+[A-Z]\w+(?:\s+[A-Za-z]+)*|'
+            r'Villa\s+[A-Z]\w+(?:\s+[A-Za-z]+)*|'
+            r'[A-Z]\w+\s+Museum(?:\s+[A-Za-z]+)*|'
+            r'[A-Z]\w+\s+Gallery(?:\s+[A-Za-z]+)*)',
+            re.UNICODE
+        )
         for i, stop in enumerate(stops):
-            for vw in _VENUE_WORDS:
-                # Find venue references in this stop
-                _refs = re.findall(rf'\b\w*{vw}\w*\b[^.]*', stop, re.IGNORECASE)
-                for ref in _refs:
-                    # If the reference is NOT to the target venue, flag it
-                    if _tour_venue and _tour_venue.lower()[:20] not in ref.lower():
-                        _other_venue_flags.append(f"Stop {i+1}: '{ref.strip()[:60]}'")
-        check("Single-venue consistency (no other venues referenced)",
-              len(_other_venue_flags) <= 2,
-              f"{len(_other_venue_flags)} references to other venues: {_other_venue_flags[:3]}")
+            _named_refs = _NAMED_VENUE_PATTERN.findall(stop)
+            for ref in _named_refs:
+                # If the named venue is NOT the target venue, flag it
+                if _tour_venue and _tour_venue.lower()[:20] not in ref.lower() and ref.lower()[:20] not in _tour_venue.lower():
+                    _other_venue_flags.append(f"Stop {i+1}: '{ref.strip()[:60]}'")
+        _passed_9 = len(_other_venue_flags) <= 2
+        check("Single-venue consistency (no other NAMED venues)",
+              _passed_9,
+              f"{len(_other_venue_flags)} refs to other named venues: {_other_venue_flags[:3]}")
+        if not _passed_9:
+            FACTUAL_FAIL_COUNT += 1
     else:
-        check("Single-venue consistency (no other venues referenced)", True, "(not a museum tour)")
+        check("Single-venue consistency (no other NAMED venues)", True, "(not a museum tour)")
 
-    # 10. Attribution grounding: if stops reference other venues (check #9 failed),
-    #     then artist attributions are suspect. A single-artist museum where all stops
-    #     are INSIDE the venue (check #9 passed) is fine — Chagall everywhere in
-    #     the Chagall museum is correct. Only flag attribution when combined with
-    #     venue-inconsistency (the real signal that something is wrong).
+    # 10. Attribution grounding: only flag when venue-inconsistency exists
     if is_museum and stops:
-        # Attribution is only a problem when combined with other-venue references
         _has_venue_problem = len(_other_venue_flags) > 2
         if _has_venue_problem:
-            # Stops reference other venues AND attributions exist → likely wrong
             _artist_patterns = re.findall(r"(?:by|created by|painted by|work of)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)", tour_text)
+            _passed_10 = len(_artist_patterns) < 5
             check("Attribution grounding (no unverified claims when venues are mixed)",
-                  len(_artist_patterns) < 5,
-                  f"{len(_artist_patterns)} artist attributions while stops reference {len(_other_venue_flags)} other venues — likely fabricated")
+                  _passed_10,
+                  f"{len(_artist_patterns)} artist attributions while {len(_other_venue_flags)} other venues flagged")
+            if not _passed_10:
+                FACTUAL_FAIL_COUNT += 1
         else:
-            # Venue is consistent (all interior) — attribution to the venue's artist is correct
             check("Attribution grounding (consistent with venue)", True,
-                  "(single-venue tour — attribution to venue artist is appropriate)")
+                  "(single-venue tour — attribution is appropriate)")
     else:
         check("Attribution grounding (consistent with venue)", True, "(not a museum tour)")
 
     # 11. Venue coherence: stop descriptions should reference the correct venue
     if is_museum and _tour_venue:
         _venue_mentions = sum(1 for stop in stops if _tour_venue.lower()[:15] in stop.lower())
-        # At least some stops should mention the venue (confirms they know where they are)
+        _passed_11 = _venue_mentions >= len(stops) // 3
         check("Venue coherence (stops reference correct venue)",
-              _venue_mentions >= len(stops) // 3,
+              _passed_11,
               f"{_venue_mentions}/{len(stops)} stops mention '{_tour_venue[:30]}'")
+        if not _passed_11:
+            FACTUAL_FAIL_COUNT += 1
     else:
         check("Venue coherence (stops reference correct venue)", True, "(not a museum tour)")
 
@@ -181,12 +193,15 @@ def main():
     run_qa(tour_text, tour_file)
 
     print(f"\n{'=' * 60}")
-    print(f"Score: {PASS_COUNT}/11")
-    if PASS_COUNT >= 8:
-        print("QA PASSED (>=8/11)")
+    print(f"Score: {PASS_COUNT}/11 (style+factual)")
+    if FACTUAL_FAIL_COUNT > 0:
+        print(f"FACTUAL INTEGRITY FAILED ({FACTUAL_FAIL_COUNT} factual check(s) failed) — RELEASE BLOCKED")
+        sys.exit(1)
+    elif PASS_COUNT >= 8:
+        print("QA PASSED (>=8/11 style + all factual checks pass)")
         sys.exit(0)
     else:
-        print("QA FAILED (<8/11)")
+        print("QA FAILED (<8/11 style checks)")
         sys.exit(1)
 
 

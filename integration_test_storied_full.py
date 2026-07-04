@@ -57,9 +57,9 @@ def main():
         content_qa_runner.FAIL_COUNT = 0
         run_qa(tour_text)
         qa_score = content_qa_runner.PASS_COUNT
-        check("Content QA score >= 5/8", qa_score >= 5, f"score={qa_score}/8")
+        check("Content QA score >= 8/11", qa_score >= 8, f"score={qa_score}/11")
     except ImportError:
-        check("Content QA score >= 5/8", True, "(content_qa_runner unavailable — skipped)")
+        check("Content QA score >= 8/11", True, "(content_qa_runner unavailable — skipped)")
 
     # Step 3: Share the tour
     print("\n[3] Share tour via POST /tour/share")
