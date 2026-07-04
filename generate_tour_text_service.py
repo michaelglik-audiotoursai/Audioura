@@ -86,6 +86,37 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                 os.unlink(temp_path)
             return
         
+        # [BLOCKER4c] Factual QA gate — reject factually-broken tours in serving path
+        if os.getenv('STORIED_MODE', 'false').lower() == 'true' and tour_text:
+            try:
+                import content_qa_runner
+                content_qa_runner.PASS_COUNT = 0
+                content_qa_runner.FAIL_COUNT = 0
+                content_qa_runner.FACTUAL_FAIL_COUNT = 0
+                content_qa_runner.run_qa(tour_text)
+                if content_qa_runner.FACTUAL_FAIL_COUNT > 0:
+                    print(f"[BLOCKER4c] FACTUAL QA FAILED ({content_qa_runner.FACTUAL_FAIL_COUNT} failures) — rejecting tour")
+                    ACTIVE_JOBS.update(job_id, status="error",
+                                      error=f"Tour failed factual integrity check ({content_qa_runner.FACTUAL_FAIL_COUNT} factual failures). Please try again.")
+                    if os.path.exists(temp_path):
+                        os.unlink(temp_path)
+                    return
+                else:
+                    print(f"[BLOCKER4c] Factual QA passed ({content_qa_runner.PASS_COUNT}/11)")
+            except ImportError:
+                print(f"[BLOCKER4c] content_qa_runner not available — QA gate skipped")
+            except SystemExit:
+                # content_qa_runner calls sys.exit() — catch it in serving path
+                if content_qa_runner.FACTUAL_FAIL_COUNT > 0:
+                    print(f"[BLOCKER4c] FACTUAL QA FAILED (caught SystemExit) — rejecting tour")
+                    ACTIVE_JOBS.update(job_id, status="error",
+                                      error=f"Tour failed factual integrity check. Please try again.")
+                    if os.path.exists(temp_path):
+                        os.unlink(temp_path)
+                    return
+            except Exception as e:
+                print(f"[BLOCKER4c] QA gate error (non-fatal): {e}")
+
         # Create a safe filename for the output
         safe_location = ''.join(c if c.isalnum() else '_' for c in location)
         safe_tour_type = ''.join(c if c.isalnum() else '_' for c in tour_type)

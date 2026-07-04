@@ -55,11 +55,16 @@ def main():
         import content_qa_runner
         content_qa_runner.PASS_COUNT = 0
         content_qa_runner.FAIL_COUNT = 0
+        content_qa_runner.FACTUAL_FAIL_COUNT = 0
         run_qa(tour_text)
         qa_score = content_qa_runner.PASS_COUNT
         check("Content QA score >= 8/11", qa_score >= 8, f"score={qa_score}/11")
+        check("Factual integrity (0 factual failures)",
+              content_qa_runner.FACTUAL_FAIL_COUNT == 0,
+              f"factual_fails={content_qa_runner.FACTUAL_FAIL_COUNT}")
     except ImportError:
         check("Content QA score >= 8/11", True, "(content_qa_runner unavailable — skipped)")
+        check("Factual integrity (0 factual failures)", True, "(content_qa_runner unavailable — skipped)")
 
     # Step 3: Share the tour
     print("\n[3] Share tour via POST /tour/share")

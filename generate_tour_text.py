@@ -886,6 +886,18 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             # Skip the constraint entirely — do not apply a fabricated venue name.
             _museum_venue_name = ""
             print(f"  [Museum constraint] No venue_name from intent — single-venue constraint skipped")
+        # [BLOCKER4a] Deterministic venue fallback: extract venue from location string
+        # when intent failed to identify it. Case-insensitive.
+        if not _museum_venue_name and tour_category == 'museum':
+            _VENUE_WORDS_RE = re.compile(
+                r'(?i)\b(mus[ée]+e?|museum|gallery|galerie|palais|villa|château|chateau|library|institute)\b'
+            )
+            # Take the first comma-segment of the normalized location
+            _first_segment = _location_normalized.split(',')[0].strip()
+            if _VENUE_WORDS_RE.search(_first_segment) and len(_first_segment.split()) >= 3:
+                # Looks like a proper venue name — use it (title-cased)
+                _museum_venue_name = _first_segment.title()
+                print(f"  [BLOCKER4a] venue_name from location fallback: '{_museum_venue_name}'")
         if _museum_venue_name:
             _museum_venue_constraint = (
                 f"\nCRITICAL CONSTRAINT — THIS IS A SINGLE-VENUE MUSEUM TOUR:\n"
@@ -1024,27 +1036,41 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # -------- [BLOCKER 1] Single-venue validation --------
         # For a named single museum, check if POIs look like other museums/venues
         # instead of interior rooms/exhibits. Reject and note for retry.
-        if tour_category == 'museum' and _museum_venue_name:
+        if tour_category == 'museum':
             _VENUE_INDICATORS = ('musée', 'museum', 'galerie', 'gallery', 'palais',
                                  'villa', 'château', 'castle', 'cathedral', 'church',
                                  'basilica', 'temple', 'theatre', 'theater', 'opera',
                                  'bibliothèque', 'library', 'institut', 'centre')
-            _venue_norm = _museum_venue_name.lower()
-            _suspect_venues = []
+            if _museum_venue_name:
+                _venue_norm = _museum_venue_name.lower()
+                _suspect_venues = []
+                for p in poi_list:
+                    _pname = p['name'].lower()
+                    # Check if POI name contains a venue-type word AND is not the target venue
+                    for indicator in _VENUE_INDICATORS:
+                        if indicator in _pname and _venue_norm not in _pname and _pname not in _venue_norm:
+                            _suspect_venues.append(p['name'])
+                            break
+                if len(_suspect_venues) >= len(poi_list) // 2:
+                    print(f"  [BLOCKER1] ⚠️ Phase 3A returned {len(_suspect_venues)} stops that look like "
+                          f"OTHER venues (not interior rooms of '{_museum_venue_name}'):")
+                    for sv in _suspect_venues:
+                        print(f"    ✗ {sv}")
+                    print(f"  [BLOCKER1] This indicates the model misread the request as 'a tour OF the city' "
+                          f"rather than 'a tour INSIDE the venue'. Rejecting — will retry or fail cleanly.")
+                    return None, None, (None, None)
+            # [BLOCKER4b] Address-scatter check: a contained museum tour should have
+            # at most 2-3 distinct addresses (all inside one building).
+            _unique_addresses = set()
             for p in poi_list:
-                _pname = p['name'].lower()
-                # Check if POI name contains a venue-type word AND is not the target venue
-                for indicator in _VENUE_INDICATORS:
-                    if indicator in _pname and _venue_norm not in _pname and _pname not in _venue_norm:
-                        _suspect_venues.append(p['name'])
-                        break
-            if len(_suspect_venues) >= len(poi_list) // 2:
-                print(f"  [BLOCKER1] ⚠️ Phase 3A returned {len(_suspect_venues)} stops that look like "
-                      f"OTHER venues (not interior rooms of '{_museum_venue_name}'):")
-                for sv in _suspect_venues:
-                    print(f"    ✗ {sv}")
-                print(f"  [BLOCKER1] This indicates the model misread the request as 'a tour OF the city' "
-                      f"rather than 'a tour INSIDE the venue'. Rejecting — will retry or fail cleanly.")
+                addr = (p.get('address') or '').strip().lower()
+                if addr and len(addr) > 10:
+                    # Normalize: take first 30 chars to group similar addresses
+                    _unique_addresses.add(addr[:30])
+            if len(_unique_addresses) >= len(poi_list) // 2 and len(poi_list) >= 5:
+                print(f"  [BLOCKER4b] ⚠️ Address scatter: {len(_unique_addresses)} distinct addresses "
+                      f"for {len(poi_list)} stops — a contained museum tour should have 1-2 addresses.")
+                print(f"  [BLOCKER4b] Rejecting — this looks like a city-wide museum tour, not interior rooms.")
                 return None, None, (None, None)
 
         # -------- PHASE 4.5: knowledge validation (names + descriptions) --------
