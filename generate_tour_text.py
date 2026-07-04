@@ -900,18 +900,20 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 print(f"  [BLOCKER4a] venue_name from location fallback: '{_museum_venue_name}'")
         if _museum_venue_name:
             _museum_venue_constraint = (
-                f"\nCRITICAL CONSTRAINT — THIS IS A SINGLE-VENUE MUSEUM TOUR:\n"
-                f"- ALL {total_stops} stops MUST be rooms, galleries, exhibits, or areas physically "
-                f"located INSIDE '{_museum_venue_name}'.\n"
+                f"\nCRITICAL CONSTRAINT — THIS IS A SINGLE-VENUE MUSEUM TOUR (WORKS-FIRST):\n"
+                f"- List the {total_stops} most famous, notable, or significant ARTWORKS, PAINTINGS, "
+                f"SCULPTURES, or PERMANENT EXHIBITS at '{_museum_venue_name}'.\n"
+                f"- Each stop MUST be named after the ARTWORK or EXHIBIT itself — NOT a room name.\n"
+                f"  Good examples: 'Song of Songs' (painting series), 'The Creation of the World' (mosaic), "
+                f"'Jerusalem Windows' (stained glass studies)\n"
+                f"  Bad examples: 'East Wing Gallery', 'Room 3', 'The Main Hall'\n"
+                f"- For each work, if you know which room/gallery/hall it is displayed in, include that "
+                f"as a note in the address field (e.g. 'Concert Hall, Avenue Docteur Ménard...'). "
+                f"If you do NOT know the room, just use the museum's street address.\n"
                 f"- Do NOT suggest any other museums, institutions, or locations outside this building.\n"
-                f"- Do NOT list other museums in the city (e.g. if venue is 'Musée Chagall', do NOT "
-                f"include 'Musée Matisse', 'Musée du Sport', 'Palais Lascaris', or any other venue).\n"
-                f"- Each stop name should be a specific gallery, room, exhibit, or collection within "
-                f"'{_museum_venue_name}' (e.g. 'East Wing Gallery', 'Biblical Message Room', 'Concert Hall').\n"
-                f"- If you are unsure whether a specific exhibit currently exists at '{_museum_venue_name}', "
-                f"use well-known permanent collections or named galleries that are verifiably part of this venue.\n"
-                f"- NEVER fabricate exhibit names or claim exhibits exist that you cannot verify.\n"
-                f"- NEVER list nearby museums or cultural institutions as stops — they are OUTSIDE this venue."
+                f"- Do NOT fabricate artwork names — only include works you are confident exist at this museum.\n"
+                f"- NEVER list nearby museums or cultural institutions as stops — they are OUTSIDE this venue.\n"
+                f"- Prefer the museum's most iconic/signature pieces that visitors specifically come to see."
             )
 
     # -------- Scope + compactness constraints for PHASE 3A --------
@@ -1768,7 +1770,7 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
         # Add venue containment constraint for single-venue museum tours
         if tour_category == 'museum' and _museum_venue_name:
             description_prompt += f"""
-CRITICAL CONSTRAINT: Every stop MUST be a room, gallery, exhibit, or area physically located INSIDE '{_museum_venue_name}'. Do NOT include artifacts, collections, or rooms that are housed at any other institution, even if thematically related to the same person or topic. If '{poi_name}' is not actually inside '{_museum_venue_name}', describe what IS at that location within the venue instead.
+CRITICAL CONSTRAINT: This artwork/exhibit MUST be something that is physically on display at '{_museum_venue_name}'. Describe the ARTWORK itself — its visual qualities, technique, symbolism, and story. If you know which room or hall it's in, mention that briefly. If you don't know the exact room, do NOT fabricate one — just describe the work and tell the visitor to ask museum staff for its current location.
 """
 
         description_prompt += f"""
@@ -2045,13 +2047,23 @@ Requirements:
             if _storied_mode:
                 try:
                     if tour_category == 'museum':
-                        from directions_generator import generate_real_directions
-                        _storied_directions = generate_real_directions(poi_name, next_poi['name'], api_key)
+                        # Works-first: for museum tours, don't fabricate room-to-room directions.
+                        # If next POI has a known location_hint (room/hall), use it.
+                        # Otherwise, tell visitor to ask staff.
+                        _next_address = next_poi.get('address', '')
+                        _next_type = next_poi.get('type_specialty', '')
+                        if _next_type and any(w in _next_type.lower() for w in ('hall', 'room', 'gallery', 'floor', 'wing')):
+                            directions = f"Proceed to {next_poi['name']}, located in the {_next_type}."
+                        elif _next_address and _museum_venue_name and _museum_venue_name.lower()[:10] not in _next_address.lower():
+                            # Address contains a room/location hint different from just the venue address
+                            directions = f"Proceed to {next_poi['name']}."
+                        else:
+                            directions = f"Ask museum staff for the current location of {next_poi['name']}."
                     else:
                         from directions_generator import generate_walking_directions
                         _storied_directions = generate_walking_directions(poi_name, next_poi['name'], location, api_key)
-                    if _storied_directions:
-                        directions = _storied_directions
+                        if _storied_directions:
+                            directions = _storied_directions
                 except ImportError:
                     pass  # Fall back to Phase 3B directions
                 except Exception as _dir_err:
