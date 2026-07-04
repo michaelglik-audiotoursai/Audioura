@@ -150,6 +150,9 @@ def generate_fact_sheets_parallel(
         try:
             rag_ctx = fetch_poi_rag_context(poi_name, venue_name, tour_category)
             fact_sheet = generate_fact_sheet(poi_name, rag_ctx, api_key)
+            # [BLOCKER 2] Pass attribution_confident from RAG to the fact sheet
+            if fact_sheet and isinstance(fact_sheet, dict):
+                fact_sheet['attribution_confident'] = rag_ctx.get('attribution_confident', False)
             return idx, fact_sheet
         except Exception as e:
             logger.error(f"Fact sheet failed for POI #{idx} ({poi_name}): {e}")

@@ -642,13 +642,22 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # return museum cafes instead of standalone restaurants.
     # Passing "" as tour_type ensures the category comes only from the location string,
     # not from the (potentially wrong) mobile-supplied tour_type.
-    _pre_category = _classify_tour_category(location, "")
+    
+    # [BLOCKER 1] Normalize: strip trailing "tour"/"tours" from location before analysis.
+    # "Musée National Marc Chagall tour, Nice" → "Musée National Marc Chagall, Nice"
+    # This prevents the model from reading "tour" as "a tour OF Nice" instead of
+    # "a tour INSIDE the Chagall museum."
+    _location_normalized = re.sub(r'\b[Tt]ours?\b', '', location).strip().strip(',').strip()
+    if _location_normalized != location:
+        print(f"  [BLOCKER1] Stripped 'tour' from location: '{location}' → '{_location_normalized}'")
+    
+    _pre_category = _classify_tour_category(_location_normalized, "")
     if _pre_category in ('restaurant', 'walking', 'specialized'):
         # Location string already encodes the real intent — don't prepend tour_type
-        user_request = location
+        user_request = _location_normalized
         print(f"  [Bug2Fix] tour_type='{tour_type}' suppressed for intent analysis (pre_category='{_pre_category}'); using location only")
     else:
-        user_request = f"{tour_type} {location}"
+        user_request = f"{tour_type} {_location_normalized}"
     intent = analyze_tour_intent(user_request, api_key)
     
     if intent:
@@ -883,11 +892,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 f"- ALL {total_stops} stops MUST be rooms, galleries, exhibits, or areas physically "
                 f"located INSIDE '{_museum_venue_name}'.\n"
                 f"- Do NOT suggest any other museums, institutions, or locations outside this building.\n"
+                f"- Do NOT list other museums in the city (e.g. if venue is 'Musée Chagall', do NOT "
+                f"include 'Musée Matisse', 'Musée du Sport', 'Palais Lascaris', or any other venue).\n"
                 f"- Each stop name should be a specific gallery, room, exhibit, or collection within "
-                f"'{_museum_venue_name}' (e.g. 'East Wing Gallery', 'Underground Railroad Exhibit').\n"
+                f"'{_museum_venue_name}' (e.g. 'East Wing Gallery', 'Biblical Message Room', 'Concert Hall').\n"
                 f"- If you are unsure whether a specific exhibit currently exists at '{_museum_venue_name}', "
                 f"use well-known permanent collections or named galleries that are verifiably part of this venue.\n"
-                f"- NEVER fabricate exhibit names or claim exhibits exist that you cannot verify."
+                f"- NEVER fabricate exhibit names or claim exhibits exist that you cannot verify.\n"
+                f"- NEVER list nearby museums or cultural institutions as stops — they are OUTSIDE this venue."
             )
 
     # -------- Scope + compactness constraints for PHASE 3A --------
@@ -1008,6 +1020,32 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         print(f"OK PHASE 3A parsed {len(poi_list)} candidate POI(s):")
         for p in poi_list:
             print(f"   - {p['name']}" + (f" @ {p['address']}" if p['address'] else ""))
+
+        # -------- [BLOCKER 1] Single-venue validation --------
+        # For a named single museum, check if POIs look like other museums/venues
+        # instead of interior rooms/exhibits. Reject and note for retry.
+        if tour_category == 'museum' and _museum_venue_name:
+            _VENUE_INDICATORS = ('musée', 'museum', 'galerie', 'gallery', 'palais',
+                                 'villa', 'château', 'castle', 'cathedral', 'church',
+                                 'basilica', 'temple', 'theatre', 'theater', 'opera',
+                                 'bibliothèque', 'library', 'institut', 'centre')
+            _venue_norm = _museum_venue_name.lower()
+            _suspect_venues = []
+            for p in poi_list:
+                _pname = p['name'].lower()
+                # Check if POI name contains a venue-type word AND is not the target venue
+                for indicator in _VENUE_INDICATORS:
+                    if indicator in _pname and _venue_norm not in _pname and _pname not in _venue_norm:
+                        _suspect_venues.append(p['name'])
+                        break
+            if len(_suspect_venues) >= len(poi_list) // 2:
+                print(f"  [BLOCKER1] ⚠️ Phase 3A returned {len(_suspect_venues)} stops that look like "
+                      f"OTHER venues (not interior rooms of '{_museum_venue_name}'):")
+                for sv in _suspect_venues:
+                    print(f"    ✗ {sv}")
+                print(f"  [BLOCKER1] This indicates the model misread the request as 'a tour OF the city' "
+                      f"rather than 'a tour INSIDE the venue'. Rejecting — will retry or fail cleanly.")
+                return None, None, (None, None)
 
         # -------- PHASE 4.5: knowledge validation (names + descriptions) --------
         print(f"\nPHASE 4.5: Validating AI knowledge for {location}...")
@@ -1677,16 +1715,26 @@ NARRATIVE SPINE CONTEXT (use to shape your description):
             description_prompt += spine_block + "\n"
 
         # [S10] Storied: inject fact sheet if provided
+        # [BLOCKER 2] Only inject facts marked as verified/confident.
+        # Never assert artist attribution that isn't grounded for this specific POI.
         if fact_sheet:
             _confirmed = fact_sheet.get('confirmed_facts', [])
             _surprising = fact_sheet.get('surprising_detail', '')
-            if _confirmed:
+            _attribution_ok = fact_sheet.get('attribution_confident', False)
+            if _confirmed and _attribution_ok:
                 facts_str = "; ".join(_confirmed[:5])
                 description_prompt += f"""
-VERIFIED FACTS (incorporate these for accuracy):
+VERIFIED FACTS (incorporate these for accuracy — these are confirmed for this specific POI):
 {facts_str}
 """
-            if _surprising:
+            elif _confirmed:
+                # Facts exist but attribution isn't confident — use as context, not as assertions
+                facts_str = "; ".join(_confirmed[:3])
+                description_prompt += f"""
+CONTEXTUAL INFORMATION (use as background only — do NOT assert these as facts about this specific exhibit):
+{facts_str}
+"""
+            if _surprising and _attribution_ok:
                 description_prompt += f"""
 MANDATORY INCLUSION — work this surprising detail into the description naturally:
 {_surprising}

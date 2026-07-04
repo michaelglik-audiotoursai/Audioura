@@ -73,11 +73,10 @@ def fetch_poi_rag_context(
 ) -> dict:
     """Fetch RAG context for a POI by looking up related Wikipedia topics.
 
-    Builds 2 lookup topics:
-      - artist_context: the creator/artist associated with the venue or POI
-      - period_context: the historical period, movement, or cultural context
-
-    For museum tours, uses venue_name to derive the artist lookup.
+    [BLOCKER 2 FIX] Context is now POI-specific, not venue-derived.
+    The artist/creator attribution is ONLY applied when the POI name suggests
+    a specific artist's work (e.g. "Biblical Message" at a Chagall museum).
+    For generic room names or non-art POIs, no artist is asserted.
 
     Args:
         poi_name: Name of the point of interest (e.g. "Biblical Message Room").
@@ -86,49 +85,77 @@ def fetch_poi_rag_context(
 
     Returns:
         dict with keys:
-            artist_context: str — Wikipedia summary about the artist/creator
-            period_context: str — Wikipedia summary about the period/context
+            artist_context: str — Wikipedia summary about the POI's creator (if identifiable)
+            period_context: str — Wikipedia summary about the POI or venue context
+            attribution_confident: bool — True only if we can confidently attribute the POI
     """
+    import re
     artist_context = ""
     period_context = ""
+    attribution_confident = False
 
     if tour_category == "museum" and venue_name:
-        # Extract artist name from venue name (e.g. "Marc Chagall" from "Musée National Marc Chagall")
-        # Common patterns: "Museum of X", "X Museum", "Musée X", "The X Gallery"
-        import re
-        # Try to extract a proper noun (the artist/subject name)
-        # Remove common museum prefixes/suffixes
-        cleaned = re.sub(
-            r"(?i)(mus[ée]+e?|museum|gallery|national|the|of|art|centre|center)\s*",
-            " ", venue_name
-        ).strip()
-        # Use the longest remaining word group as the artist topic
-        artist_topic = " ".join(w for w in cleaned.split() if w and len(w) > 1).strip()
-        if artist_topic:
-            artist_context = fetch_wikipedia_summary(artist_topic)
-
-        # Period context: look up the venue itself, then fall back to related topics
-        period_context = fetch_wikipedia_summary(venue_name)
-        if not period_context:
-            # Try the venue name with common Wikipedia article patterns
-            period_context = fetch_wikipedia_summary(venue_name.replace("Musee", "Musée"))
-        if not period_context and artist_topic:
-            # Fall back to the artist's primary article (different angle from artist_context)
-            # This gets the artist's movement/period information
-            period_context = fetch_wikipedia_summary(f"{artist_topic} (artist)")
-        if not period_context and artist_topic:
-            # Last resort: the broader cultural movement
-            period_context = fetch_wikipedia_summary("Modern art")
-    else:
-        # Walking/restaurant/book: use the POI name directly for context
-        artist_context = fetch_wikipedia_summary(poi_name)
-        # And the broader area/venue for period context
-        if venue_name:
-            period_context = fetch_wikipedia_summary(venue_name)
+        # [BLOCKER 2] First try to look up the POI itself — this is the most specific context
+        poi_context = fetch_wikipedia_summary(poi_name)
+        if poi_context and len(poi_context) > 100:
+            # The POI has its own Wikipedia article — use that as primary context
+            period_context = poi_context
+            # Check if the venue artist is mentioned in the POI's context
+            _venue_artist = _extract_artist_from_venue(venue_name)
+            if _venue_artist and _venue_artist.lower() in poi_context.lower():
+                artist_context = fetch_wikipedia_summary(_venue_artist)
+                attribution_confident = True
         else:
-            period_context = ""
+            # POI doesn't have a standalone article — use venue context
+            # but DO NOT assert the venue artist as the POI's creator
+            period_context = fetch_wikipedia_summary(venue_name)
+            if not period_context:
+                period_context = fetch_wikipedia_summary(venue_name.replace("Musee", "Musée"))
+
+            # Only fetch artist context if we can verify the connection
+            _venue_artist = _extract_artist_from_venue(venue_name)
+            if _venue_artist:
+                # Check: does the POI name suggest it's by this artist?
+                # (e.g. "Song of Songs" at Chagall museum → likely Chagall)
+                # But "Gift Shop" or "Garden" at Chagall museum → NOT Chagall's work
+                _NON_ART_INDICATORS = ('shop', 'gift', 'cafe', 'garden', 'entrance',
+                                       'lobby', 'restroom', 'parking', 'courtyard',
+                                       'auditorium', 'concert hall', 'library')
+                _poi_lower = poi_name.lower()
+                is_non_art = any(ind in _poi_lower for ind in _NON_ART_INDICATORS)
+                if not is_non_art:
+                    artist_context = fetch_wikipedia_summary(_venue_artist)
+                    # Mark attribution as confident only for a single-artist museum
+                    # where the POI is likely an artwork (not a facility room)
+                    attribution_confident = True
+
+    elif tour_category == "walking":
+        # Walking tours: look up the POI name directly
+        period_context = fetch_wikipedia_summary(poi_name)
+    elif tour_category == "restaurant":
+        # Restaurant tours: look up the restaurant/establishment
+        period_context = fetch_wikipedia_summary(poi_name)
+    else:
+        # Default: try the POI name
+        period_context = fetch_wikipedia_summary(poi_name)
 
     return {
         "artist_context": artist_context,
         "period_context": period_context,
+        "attribution_confident": attribution_confident,
     }
+
+
+def _extract_artist_from_venue(venue_name: str) -> str:
+    """Extract a likely artist/subject name from a museum venue name.
+    
+    E.g. "Musée National Marc Chagall" → "Marc Chagall"
+    Returns empty string if no artist can be extracted.
+    """
+    import re
+    cleaned = re.sub(
+        r"(?i)(mus[ée]+e?|museum|gallery|national|the|of|art|centre|center)\s*",
+        " ", venue_name
+    ).strip()
+    artist_topic = " ".join(w for w in cleaned.split() if w and len(w) > 1).strip()
+    return artist_topic
