@@ -1874,20 +1874,65 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
     
     complete_tour = tour_title + "\n" + f"Tour-Category: {tour_category}" + "\n\n"
 
-    # -------- [S38] Storied: prepend tour hook introduction --------
-    if _storied_mode and _storied_spine and _storied_spine.get("tour_hook"):
+    # -------- [PROLOG] Storied: prepend journey prolog --------
+    if _storied_mode and _storied_spine:
         try:
-            from tour_hook_generator import generate_tour_hook_audio
-            _hook_text = generate_tour_hook_audio(_storied_spine["tour_hook"], api_key)
-            if _hook_text:
-                complete_tour += f"Introduction:\n\n{_hook_text}\n\n"
-                print(f"  [S38] Tour hook introduction added ({len(_hook_text.split())} words)")
+            _connecting_thread = _storied_spine.get("connecting_thread", "")
+            _tour_hook = _storied_spine.get("tour_hook", "")
+            _arc = _storied_spine.get("arc", [])
+            _chapter_previews = []
+            for entry in _arc[:5]:  # Preview first 5 chapters max
+                role = entry.get("chapter_role", "")
+                angle = entry.get("unique_angle", "")
+                if role and angle:
+                    _chapter_previews.append(f"{role}: {angle}")
+            
+            _prolog_prompt = f"""Write a compelling 80-150 word tour introduction that frames this experience as a journey — a book of connected chapters.
+
+Theme/connecting thread: {_connecting_thread}
+Tour hook: {_tour_hook}
+Chapter previews: {'; '.join(_chapter_previews)}
+
+Requirements:
+- Write in second-person present tense ("You are about to embark...")
+- Name the journey's central theme/goal
+- Preview how the stops connect into one arc (each reveals a different facet)
+- Make it read like a book's opening page — compelling, with a sense of discovery
+- 80-150 words exactly
+- Do NOT end with a question
+- Return ONLY the paragraph, no quotes or labels"""
+
+            import requests as _prolog_requests
+            _prolog_resp = _prolog_requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json={
+                    "model": "gpt-3.5-turbo",
+                    "messages": [
+                        {"role": "system", "content": "You write immersive, literary audio tour introductions."},
+                        {"role": "user", "content": _prolog_prompt},
+                    ],
+                    "temperature": 0.8,
+                    "max_tokens": 300,
+                },
+                timeout=15,
+            )
+            if _prolog_resp.status_code == 200:
+                _prolog_text = _prolog_resp.json()["choices"][0]["message"]["content"].strip()
+                if _prolog_text.startswith('"') and _prolog_text.endswith('"'):
+                    _prolog_text = _prolog_text[1:-1].strip()
+                complete_tour += f"Introduction:\n\n{_prolog_text}\n\n"
+                print(f"  [PROLOG] Journey introduction added ({len(_prolog_text.split())} words)")
             else:
-                print(f"  [S38] Tour hook generation returned empty — skipping introduction")
-        except ImportError:
-            print(f"  [S38] tour_hook_generator not available — skipping introduction")
+                # Fallback to simple hook if prolog generation fails
+                if _tour_hook:
+                    complete_tour += f"Introduction:\n\n{_tour_hook}\n\n"
+                    print(f"  [PROLOG] Fallback to simple hook (API error: {_prolog_resp.status_code})")
         except Exception as e:
-            print(f"  [S38] Tour hook error: {e}")
+            print(f"  [PROLOG] Error: {e}")
+            # Fallback
+            if _storied_spine.get("tour_hook"):
+                complete_tour += f"Introduction:\n\n{_storied_spine['tour_hook']}\n\n"
 
     # Add each POI with its description and directions
     for i, poi in enumerate(poi_list):
