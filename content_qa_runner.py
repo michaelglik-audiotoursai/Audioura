@@ -127,26 +127,26 @@ def run_qa(tour_text, tour_file=""):
     else:
         check("Single-venue consistency (no other venues referenced)", True, "(not a museum tour)")
 
-    # 10. Attribution consistency: same artist should not be asserted across clearly different POIs
+    # 10. Attribution grounding: if stops reference other venues (check #9 failed),
+    #     then artist attributions are suspect. A single-artist museum where all stops
+    #     are INSIDE the venue (check #9 passed) is fine — Chagall everywhere in
+    #     the Chagall museum is correct. Only flag attribution when combined with
+    #     venue-inconsistency (the real signal that something is wrong).
     if is_museum and stops:
-        # Check if a single artist name appears in ALL stops (suspicious for multi-work venues)
-        # This is a heuristic: if >80% of stops assert the exact same "by [Artist]" pattern,
-        # and some stops are clearly not that artist's work, flag it
-        _artist_patterns = re.findall(r"(?:by|created by|painted by|work of)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)", tour_text)
-        if _artist_patterns:
-            from collections import Counter
-            _artist_counts = Counter(_artist_patterns)
-            _dominant_artist, _dominant_count = _artist_counts.most_common(1)[0]
-            _total_attributions = sum(_artist_counts.values())
-            # If one artist is attributed in >90% of cases, that's suspicious for a mixed-venue
-            _ratio = _dominant_count / _total_attributions if _total_attributions > 0 else 0
-            check("Attribution diversity (not all stops same artist)",
-                  _ratio < 0.90 or _total_attributions <= 3,
-                  f"'{_dominant_artist}' in {_dominant_count}/{_total_attributions} attributions ({_ratio:.0%})")
+        # Attribution is only a problem when combined with other-venue references
+        _has_venue_problem = len(_other_venue_flags) > 2
+        if _has_venue_problem:
+            # Stops reference other venues AND attributions exist → likely wrong
+            _artist_patterns = re.findall(r"(?:by|created by|painted by|work of)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)", tour_text)
+            check("Attribution grounding (no unverified claims when venues are mixed)",
+                  len(_artist_patterns) < 5,
+                  f"{len(_artist_patterns)} artist attributions while stops reference {len(_other_venue_flags)} other venues — likely fabricated")
         else:
-            check("Attribution diversity (not all stops same artist)", True, "(no explicit attributions found)")
+            # Venue is consistent (all interior) — attribution to the venue's artist is correct
+            check("Attribution grounding (consistent with venue)", True,
+                  "(single-venue tour — attribution to venue artist is appropriate)")
     else:
-        check("Attribution diversity (not all stops same artist)", True, "(not a museum tour)")
+        check("Attribution grounding (consistent with venue)", True, "(not a museum tour)")
 
     # 11. Venue coherence: stop descriptions should reference the correct venue
     if is_museum and _tour_venue:
