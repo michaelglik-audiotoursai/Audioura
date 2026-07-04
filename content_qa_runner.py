@@ -102,6 +102,62 @@ def run_qa(tour_text, tour_file=""):
           1000 <= total_words <= 8000,
           f"total={total_words} words")
 
+    # -------- [BLOCKER 3] Factual integrity checks --------
+
+    # 9. Single-venue consistency: for museum tours, stops should not reference other venues
+    is_museum = "Tour-Category: museum" in tour_text
+    if is_museum:
+        # Extract venue name from the title line (e.g. "Audio Guided Tour: Musée X - Museum Tour")
+        _title_match = re.search(r"Audio Guided Tour:\s*(.+?)(?:\s*-\s*Museum Tour)?$", tour_text, re.MULTILINE)
+        _tour_venue = _title_match.group(1).strip() if _title_match else ""
+        # Check each stop for references to OTHER museums/venues
+        _VENUE_WORDS = ('musée', 'museum', 'gallery', 'galerie', 'palais', 'villa')
+        _other_venue_flags = []
+        for i, stop in enumerate(stops):
+            for vw in _VENUE_WORDS:
+                # Find venue references in this stop
+                _refs = re.findall(rf'\b\w*{vw}\w*\b[^.]*', stop, re.IGNORECASE)
+                for ref in _refs:
+                    # If the reference is NOT to the target venue, flag it
+                    if _tour_venue and _tour_venue.lower()[:20] not in ref.lower():
+                        _other_venue_flags.append(f"Stop {i+1}: '{ref.strip()[:60]}'")
+        check("Single-venue consistency (no other venues referenced)",
+              len(_other_venue_flags) <= 2,
+              f"{len(_other_venue_flags)} references to other venues: {_other_venue_flags[:3]}")
+    else:
+        check("Single-venue consistency (no other venues referenced)", True, "(not a museum tour)")
+
+    # 10. Attribution consistency: same artist should not be asserted across clearly different POIs
+    if is_museum and stops:
+        # Check if a single artist name appears in ALL stops (suspicious for multi-work venues)
+        # This is a heuristic: if >80% of stops assert the exact same "by [Artist]" pattern,
+        # and some stops are clearly not that artist's work, flag it
+        _artist_patterns = re.findall(r"(?:by|created by|painted by|work of)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)", tour_text)
+        if _artist_patterns:
+            from collections import Counter
+            _artist_counts = Counter(_artist_patterns)
+            _dominant_artist, _dominant_count = _artist_counts.most_common(1)[0]
+            _total_attributions = sum(_artist_counts.values())
+            # If one artist is attributed in >90% of cases, that's suspicious for a mixed-venue
+            _ratio = _dominant_count / _total_attributions if _total_attributions > 0 else 0
+            check("Attribution diversity (not all stops same artist)",
+                  _ratio < 0.90 or _total_attributions <= 3,
+                  f"'{_dominant_artist}' in {_dominant_count}/{_total_attributions} attributions ({_ratio:.0%})")
+        else:
+            check("Attribution diversity (not all stops same artist)", True, "(no explicit attributions found)")
+    else:
+        check("Attribution diversity (not all stops same artist)", True, "(not a museum tour)")
+
+    # 11. Venue coherence: stop descriptions should reference the correct venue
+    if is_museum and _tour_venue:
+        _venue_mentions = sum(1 for stop in stops if _tour_venue.lower()[:15] in stop.lower())
+        # At least some stops should mention the venue (confirms they know where they are)
+        check("Venue coherence (stops reference correct venue)",
+              _venue_mentions >= len(stops) // 3,
+              f"{_venue_mentions}/{len(stops)} stops mention '{_tour_venue[:30]}'")
+    else:
+        check("Venue coherence (stops reference correct venue)", True, "(not a museum tour)")
+
 
 def main():
     print("=" * 60)
@@ -125,12 +181,12 @@ def main():
     run_qa(tour_text, tour_file)
 
     print(f"\n{'=' * 60}")
-    print(f"Score: {PASS_COUNT}/8")
-    if PASS_COUNT >= 6:
-        print("QA PASSED (>=6/8)")
+    print(f"Score: {PASS_COUNT}/11")
+    if PASS_COUNT >= 8:
+        print("QA PASSED (>=8/11)")
         sys.exit(0)
     else:
-        print("QA FAILED (<6/8)")
+        print("QA FAILED (<8/11)")
         sys.exit(1)
 
 
