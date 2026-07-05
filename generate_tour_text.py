@@ -555,15 +555,40 @@ def _verify_works_in_collection(poi_list, venue_name):
         venue_name.replace("National ", ""),  # "Musee Marc Chagall" 
         f"{_venue_artist} Museum" if _venue_artist else "",
         f"Musee {_venue_artist}" if _venue_artist else "",
+        # French Wikipedia variations
+        f"Musée national {_venue_artist}",
+        f"Musée national Marc-Chagall" if "chagall" in venue_name.lower() else "",
     ]
     venue_article = ""
     for _var in _venue_variations:
         if not _var:
             continue
         venue_article = fetch_wikipedia_summary(_var)
-        if venue_article:
+        if venue_article and len(venue_article) > 300:
             print(f"  [D1] Venue article found via: '{_var}' ({len(venue_article)} chars)")
             break
+    
+    # Also try the museum's official collection page (source #3)
+    _museum_site_content = ""
+    try:
+        import requests as _d1_req
+        # Try common museum collection page patterns
+        _site_urls = []
+        if "chagall" in venue_name.lower():
+            _site_urls.append("https://musees-nationaux-alpesmaritimes.fr/chagall/en/collection")
+        # Generic pattern: try the venue name as a URL slug
+        # (Only for known museums — extend as needed)
+        for _url in _site_urls:
+            try:
+                _site_resp = _d1_req.get(_url, headers={'User-Agent': 'Audioura/2.2'}, timeout=8)
+                if _site_resp.status_code == 200 and len(_site_resp.text) > 500:
+                    _museum_site_content = _site_resp.text[:10000]  # First 10K chars
+                    print(f"  [D1] Museum site fetched: {_url} ({len(_museum_site_content)} chars)")
+                    break
+            except Exception:
+                continue
+    except Exception:
+        pass
 
     # Also fetch the ARTIST's article — rich corpus for work verification
     artist_article = ""
@@ -572,10 +597,10 @@ def _verify_works_in_collection(poi_list, venue_name):
         if artist_article:
             print(f"  [D1] Artist article found: '{_venue_artist}' ({len(artist_article)} chars)")
 
-    _all_fetches_failed = not venue_article and not artist_article
+    _all_fetches_failed = not venue_article and not artist_article and not _museum_site_content
     
-    # Combined corpus for name matching
-    _corpus = (venue_article + " " + artist_article).lower()
+    # Combined corpus for name matching (venue + artist + museum site)
+    _corpus = (venue_article + " " + artist_article + " " + _museum_site_content).lower()
 
     # Extract city from venue article
     _venue_city = ""

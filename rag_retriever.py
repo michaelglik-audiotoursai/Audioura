@@ -169,44 +169,58 @@ def _extract_artist_from_venue(venue_name: str) -> str:
 
 
 def _fetch_via_action_api(topic: str) -> str:
-    """Fallback: use Wikipedia's Action API for broader article extracts.
+    """Fallback: use Wikipedia's Action API for full article text (no char limit).
     
-    This returns more text than the REST summary endpoint and is rarely blocked.
+    Returns the complete article extract — much richer than the REST summary endpoint.
+    Also tries French Wikipedia for French museums.
     """
     import requests as _req
     if not topic or not topic.strip():
         return ""
     
-    try:
-        response = _req.get(
-            "https://en.wikipedia.org/w/api.php",
-            params={
-                "action": "query",
-                "prop": "extracts",
-                "exintro": False,  # Get full article, not just intro
-                "explaintext": True,
-                "titles": topic.strip(),
-                "format": "json",
-                "exchars": 3000,  # Up to 3000 chars of content
-            },
-            headers={
-                "User-Agent": "Audioura/2.2 (tour-generation; contact: support@audioura.com)",
-            },
-            timeout=8,
-        )
-        
-        if response.status_code != 200:
-            return ""
-        
-        data = response.json()
-        pages = data.get("query", {}).get("pages", {})
-        for page_id, page_data in pages.items():
-            if page_id == "-1":
-                return ""  # Page not found
-            extract = page_data.get("extract", "")
-            if extract:
-                return extract
-        return ""
-    except Exception as e:
-        logger.warning(f"Wikipedia action API error for '{topic}': {e}")
-        return ""
+    # Try English Wikipedia first (full text, no char limit)
+    for wiki_host in ['en.wikipedia.org', 'fr.wikipedia.org']:
+        try:
+            response = _req.get(
+                f"https://{wiki_host}/w/api.php",
+                params={
+                    "action": "query",
+                    "prop": "extracts",
+                    "explaintext": "1",
+                    "formatversion": "2",
+                    "titles": topic.strip(),
+                    "format": "json",
+                    # NO exchars/exintro — get FULL article text
+                },
+                headers={
+                    "User-Agent": "Audioura/2.2 (tour-generation; contact: support@audioura.com)",
+                },
+                timeout=10,
+            )
+            
+            if response.status_code != 200:
+                continue
+            
+            data = response.json()
+            pages = data.get("query", {}).get("pages", [])
+            if isinstance(pages, list):
+                for page_data in pages:
+                    if page_data.get("missing"):
+                        continue
+                    extract = page_data.get("extract", "")
+                    if extract and len(extract) > 200:
+                        logger.info(f"Wikipedia ({wiki_host}): full article for '{topic}' = {len(extract)} chars")
+                        return extract
+            elif isinstance(pages, dict):
+                for page_id, page_data in pages.items():
+                    if page_id == "-1" or page_data.get("missing"):
+                        continue
+                    extract = page_data.get("extract", "")
+                    if extract and len(extract) > 200:
+                        logger.info(f"Wikipedia ({wiki_host}): full article for '{topic}' = {len(extract)} chars")
+                        return extract
+        except Exception as e:
+            logger.warning(f"Wikipedia action API error ({wiki_host}) for '{topic}': {e}")
+            continue
+    
+    return ""
