@@ -11,8 +11,8 @@ from typing import List
 # Each pattern matches the phrase (or close variants) wherever it appears.
 FORBIDDEN_PHRASES: List[re.Pattern] = [
     # Chagall-specific repetition (from current tour analysis)
-    re.compile(r"vibrant\s+colou?rs?\s*(and|of)", re.IGNORECASE),
-    re.compile(r"dreamlike\s+(imagery|quality|world|scene)", re.IGNORECASE),
+    re.compile(r"vibrant\s+colou?rs?\s*(and|of|that)", re.IGNORECASE),
+    re.compile(r"dreamlike\s+(imagery|quality|world|scene|composition)", re.IGNORECASE),
     re.compile(r"deep\s+connection\s+to", re.IGNORECASE),
     re.compile(r"(his|her|their)\s+Jewish\s+heritage", re.IGNORECASE),
     re.compile(r"intricate\s+details?", re.IGNORECASE),
@@ -21,6 +21,14 @@ FORBIDDEN_PHRASES: List[re.Pattern] = [
     re.compile(r"the\s+artist['']?s?\s+(unique|remarkable|extraordinary)", re.IGNORECASE),
     re.compile(r"masterpiece\s+that", re.IGNORECASE),
     re.compile(r"a\s+testament\s+to", re.IGNORECASE),
+    re.compile(r"creative\s+genius", re.IGNORECASE),
+    re.compile(r"stir(s|ring)?\s+the\s+soul", re.IGNORECASE),
+    re.compile(r"touch(es|ing)?\s+(the|our|your)\s+(heart|soul)", re.IGNORECASE),
+    re.compile(r"pulsate\w*\s+with\s+life", re.IGNORECASE),
+    re.compile(r"symphony\s+of\s+(emotions?|colou?rs?)", re.IGNORECASE),
+    re.compile(r"tapestry\s+of\s+(dreams?|emotions?)", re.IGNORECASE),
+    re.compile(r"weaves?\s+a\s+narrative", re.IGNORECASE),
+    re.compile(r"(captivating|mesmerizing)\s+(artistry|world|vision)", re.IGNORECASE),
     # Generic GPT-ism clichés
     re.compile(r"truly\s+remarkable", re.IGNORECASE),
     re.compile(r"can['']t\s+help\s+but", re.IGNORECASE),
@@ -37,6 +45,10 @@ FORBIDDEN_PHRASES: List[re.Pattern] = [
     re.compile(r"transcends?\s+(time|boundaries)", re.IGNORECASE),
     re.compile(r"a\s+window\s+into", re.IGNORECASE),
     re.compile(r"breathtaking\s+(view|beauty|display)", re.IGNORECASE),
+    re.compile(r"let\s+(your|the)\s+(curiosity|imagination)\s+guide", re.IGNORECASE),
+    re.compile(r"beacon\s+of\s+(creativity|hope|light)", re.IGNORECASE),
+    re.compile(r"gaze\s+upon\s+this", re.IGNORECASE),
+    re.compile(r"power\s+of\s+art\s+to", re.IGNORECASE),
 ]
 
 

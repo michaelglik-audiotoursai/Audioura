@@ -1554,6 +1554,30 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     pass  # GEO-CHECK handles proximity for walking tours
                 elif tour_category != 'museum' or not _museum_venue_name:
                     survived = [p for p in survived if _address_matches_location(p.get('address', ''), location)]
+                
+                # [Cycle 4] D1 re-verification for museum tour Part C candidates
+                # Filter out candidates that are OTHER museums/venues (not artworks)
+                if tour_category == 'museum' and _museum_venue_name and survived:
+                    _VENUE_INDICATORS_PARTC = ('musée', 'museum', 'musee', 'galerie', 'gallery',
+                                               'palais', 'villa', 'château', 'castle', 'cathedral',
+                                               'church', 'basilica', 'temple', 'theatre', 'theater',
+                                               'opera', 'bibliothèque', 'library', 'institut', 'centre')
+                    _venue_lower = _museum_venue_name.lower()
+                    _partc_filtered = []
+                    for _pc in survived:
+                        _pc_name_lower = _pc['name'].lower()
+                        # Reject if it's clearly another venue/institution
+                        _is_other_venue = False
+                        for _vi in _VENUE_INDICATORS_PARTC:
+                            if _vi in _pc_name_lower and _venue_lower not in _pc_name_lower and _pc_name_lower not in _venue_lower:
+                                _is_other_venue = True
+                                break
+                        if _is_other_venue:
+                            print(f"   Part C D1: REJECTED '{_pc['name']}' — looks like another venue")
+                        else:
+                            _partc_filtered.append(_pc)
+                    survived = _partc_filtered
+                
                 survived = survived[:needed]
                 poi_list.extend(survived)
                 # forbid every attempted name so subsequent attempts diverge
@@ -2099,6 +2123,19 @@ CRITICAL CONSTRAINT: This artwork/exhibit MUST be something that is physically o
             # [D5] No artist bio repetition in descriptions
             description_prompt += """
 Do NOT repeat the artist's biographical background (birth year, nationality, school associations like 'École de Paris', artistic formats like 'stained glass and stage sets'). That information belongs in the tour introduction only. Here, focus EXCLUSIVELY on THIS SPECIFIC ARTWORK — what it depicts, its technique, its story, what to look for with your eyes.
+"""
+            # [Cycle 4] Ban forbidden cliché phrases that GPT overuses
+            description_prompt += """
+BANNED PHRASES — do NOT use any of these in your description:
+- "vibrant colors" / "dreamlike imagery" / "dreamlike quality"
+- "creative genius" / "artistic prowess" / "masterpiece that"
+- "stir the soul" / "touch the heart" / "pulsate with life"
+- "symphony of emotions" / "tapestry of dreams" / "weaves a narrative"
+- "truly remarkable" / "a testament to" / "stands as a testament"
+- "captivating artistry" / "mesmerizing world" / "intricate details"
+- "invites you to explore/discover/reflect" / "immerse yourself in"
+- "can't help but" / "feast for the eyes" / "step into a world"
+Instead, use SPECIFIC, CONCRETE language: name colors precisely (cerulean, ochre, vermilion), describe actual compositional choices, mention documented historical context.
 """
 
         description_prompt += f"""
