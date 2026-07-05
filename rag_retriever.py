@@ -45,7 +45,7 @@ def fetch_wikipedia_summary(topic: str, sentences: int = 5) -> str:
             return ""
 
         if response.status_code != 200:
-            logger.warning(f"Wikipedia API returned {response.status_code} for '{topic}'")
+            logger.warning(f"Wikipedia API returned {response.status_code} for '{topic}' | URL: {url} | body[:200]: {response.text[:200]}")
             return ""
 
         data = response.json()
