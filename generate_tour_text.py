@@ -833,7 +833,7 @@ def _verify_works_in_collection(poi_list, venue_name):
         return None
 
     print(f"  [D1] {len(verified_pois)}/{len(poi_list)} works verified for '{venue_name}'")
-    return verified_pois
+    return verified_pois, _evidence_log, _venue_corpus
 
 
 def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None):
@@ -1343,13 +1343,15 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             print(f"   - {p['name']}" + (f" @ {p['address']}" if p['address'] else ""))
 
         # -------- [D1] In-collection verification for museum tours --------
+        _d1_evidence_log = {}
+        _d1_venue_corpus = ""
         if tour_category == 'museum' and _museum_venue_name:
             _d1_result = _verify_works_in_collection(poi_list, _museum_venue_name)
             if _d1_result is None:
                 print(f"  [D1] In-collection verification FAILED — not enough verified works")
                 return None, None, (None, None)
             else:
-                poi_list = _d1_result
+                poi_list, _d1_evidence_log, _d1_venue_corpus = _d1_result
 
         # -------- [BLOCKER 1] Single-venue validation --------
         # For a named single museum, check if POIs look like other museums/venues
@@ -2115,6 +2117,18 @@ CONTEXTUAL INFORMATION (use as background only — do NOT assert these as facts 
 MANDATORY INCLUSION — work this surprising detail into the description naturally:
 {_surprising}
 """
+        # [C5-1] Inject D1 venue corpus evidence as additional grounding
+        if tour_category == 'museum' and _d1_venue_corpus and poi_name:
+            import re as _c51_re
+            _work_lower = poi_name.lower()
+            # Extract sentences from venue corpus that mention this work's key words
+            _key_words = [w for w in _work_lower.split() if len(w) >= 4 and w not in ('the','and','for')]
+            if _key_words:
+                _corpus_sentences = [s.strip() for s in _d1_venue_corpus.split('.') if any(kw in s.lower() for kw in _key_words)]
+                if _corpus_sentences:
+                    _grounded_facts = '. '.join(_corpus_sentences[:3])
+                    description_prompt += f"\nGROUNDED FACTS FROM MUSEUM SOURCES (use these dates/details as MANDATORY content):\n{_grounded_facts}\n"
+
         # Add venue containment constraint for single-venue museum tours
         if tour_category == 'museum' and _museum_venue_name:
             description_prompt += f"""
@@ -2136,6 +2150,14 @@ BANNED PHRASES — do NOT use any of these in your description:
 - "invites you to explore/discover/reflect" / "immerse yourself in"
 - "can't help but" / "feast for the eyes" / "step into a world"
 Instead, use SPECIFIC, CONCRETE language: name colors precisely (cerulean, ochre, vermilion), describe actual compositional choices, mention documented historical context.
+"""
+            description_prompt += """
+FACTUAL INTEGRITY RULE: Do NOT invent visual specifics or biographical claims not in the fact sheet above. You may describe the general biblical SUBJECT (e.g. "depicts the parting of the Red Sea") but do NOT assert specific visual details as facts (colors, composition) unless grounded in the facts above. Never call a work "the artist's final masterpiece" or similar unverifiable superlatives.
+"""
+            # [C5-5] Truthful framing for multi-work cycles
+            if 'biblical message' in poi_name.lower() or 'message biblique' in poi_name.lower():
+                description_prompt += """
+NOTE: "The Biblical Message" (Message Biblique) is the name of the COMPLETE CYCLE of 17 large-scale paintings by Chagall, illustrating Genesis, Exodus, and the Song of Songs. Describe it as a cycle/series of paintings, NOT as a single painting. The museum was PURPOSE-BUILT to house this cycle (inaugurated 1973).
 """
 
         description_prompt += f"""
@@ -2338,10 +2360,15 @@ Requirements:
         orientation = re.sub(r'^Stop\s+\d+:\s*', '', orientation, count=1, flags=re.IGNORECASE).strip()
         if not orientation:
             orientation = "Position yourself to best view this location."
-        # [D6] Museum tours: strip street navigation from Orientation
+        # [D6] Museum tours: strip ALL fabricated navigation from Orientation
         if tour_category == 'museum' and _museum_venue_name:
             orientation = re.sub(r'(?i)\b(head|walk|turn|continue|proceed)\s+(north|south|east|west|northeast|northwest|southeast|southwest)\b[^.]*\.?\s*', '', orientation)
             orientation = re.sub(r'(?i)\b(on|along|down)\s+\w+\s+(street|avenue|road|boulevard|ave|st|rd|blvd)\b[^.]*\.?\s*', '', orientation)
+            # [C5-3] Kill distance-based fabricated directions
+            orientation = re.sub(r'(?i)(walk|head|go)\s+(straight\s+)?(ahead\s+)?for\s+\d+\s*m(eters?|\.?)\b[^.]*\.?\s*', '', orientation)
+            orientation = re.sub(r'(?i)then\s+turn\s+(left|right)\b[^.]*\.?\s*', '', orientation)
+            orientation = re.sub(r'(?i)(the\s+)?destination\s+will\s+be\b[^.]*\.?\s*', '', orientation)
+            orientation = re.sub(r'(?i)start\s+at\s+the\s+main\s+entrance\b[^.]*\.?\s*', '', orientation)
             orientation = orientation.strip() or "Position yourself to best view this artwork."
         description = poi.get("description", f"[Description for {poi_name} could not be generated.]")
         
@@ -2422,9 +2449,11 @@ Requirements:
         poi_content += "Orientation: "
         if i == 0:
             # For the first POI, include directions from the entrance
-            entrance_directions = poi.get("directions", "")
-            if entrance_directions:
-                poi_content += entrance_directions + " "
+            # [C5-3] Museum tours: skip fabricated entrance directions entirely
+            if tour_category != 'museum' or not _museum_venue_name:
+                entrance_directions = poi.get("directions", "")
+                if entrance_directions:
+                    poi_content += entrance_directions + " "
         
         # Add the orientation text
         poi_content += orientation + "\n\n"
@@ -2620,6 +2649,17 @@ Requirements:
     print(f"\nTour text generated successfully!")
     print(f"Saved to: {output_file}")
     
+    # [C5-5] Persist D1 evidence JSON
+    if _d1_evidence_log and output_file:
+        import json as _ej
+        _evidence_path = output_file.replace('.txt', '_evidence.json')
+        try:
+            with open(_evidence_path, 'w', encoding='utf-8') as _ef:
+                _ej.dump(_d1_evidence_log, _ef, indent=2, ensure_ascii=False)
+            print(f"  [C5-5] Evidence persisted: {_evidence_path}")
+        except Exception as _ee:
+            print(f"  [C5-5] Evidence persist error: {_ee}")
+
     # Show a preview
     preview_length = min(500, len(complete_tour))
     print(f"\nPreview of the generated tour:\n")

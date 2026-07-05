@@ -156,7 +156,7 @@ def run_qa(tour_text, tour_file=""):
     if stops and len(stops) >= 3:
         from collections import Counter
         _shingle_counts = Counter()
-        _STRUCTURAL_LINE_RE = re.compile(r'^(Address|Coordinates|Type|Specific|Operational|Orientation|Museum Information|Introduction|Stop \d+):')
+        _STRUCTURAL_LINE_RE = re.compile(r'^(Address|Coordinates|Type/?Specialty|Specific Examples?|Operational|Orientation|Museum Information|Introduction|Stop \d+|Please resume):')
         for stop in stops:
             # Get content lines only (exclude structural lines)
             _content_lines = [l for l in stop.split('\n') 
