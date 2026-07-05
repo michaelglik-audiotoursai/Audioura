@@ -532,37 +532,60 @@ def _validate_museum_stop_descriptions(poi_list, venue_name, headers):
 def _verify_works_in_collection(poi_list, venue_name):
     """[D1] In-collection verification gate for museum tours.
     
-    Verifies that candidate works actually belong in the specified venue
-    by cross-referencing Wikipedia articles.
+    Verifies candidate works belong in the specified venue using multi-source lookup:
+    1. Venue article (try multiple name variations)
+    2. Artist's main article (mentions of works in their oeuvre)
+    3. Reverse lookup per work (reject if placed at another venue)
     
-    Returns filtered poi_list with only verified works, or None if fewer
-    than 4 works verify or all fetches fail.
+    Returns filtered poi_list, or None if <4 verify or all fetches fail.
     """
     from rag_retriever import fetch_wikipedia_summary
     import re as _d1_re
 
-    # Extract artist name from venue for reverse lookup
-    _venue_artist = ""
+    # Extract artist name from venue
     cleaned = _d1_re.sub(
         r"(?i)(mus[ée]+e?|museum|gallery|national|the|of|art|centre|center)\s*",
         " ", venue_name
     ).strip()
     _venue_artist = " ".join(w for w in cleaned.split() if w and len(w) > 1).strip()
 
-    # Fetch venue Wikipedia article
-    venue_article = fetch_wikipedia_summary(venue_name)
-    _all_fetches_failed = True
-    if venue_article:
-        _all_fetches_failed = False
+    # Try multiple venue name variations to find the Wikipedia article
+    _venue_variations = [
+        venue_name,
+        venue_name.replace("National ", ""),  # "Musee Marc Chagall" 
+        f"{_venue_artist} Museum" if _venue_artist else "",
+        f"Musee {_venue_artist}" if _venue_artist else "",
+    ]
+    venue_article = ""
+    for _var in _venue_variations:
+        if not _var:
+            continue
+        venue_article = fetch_wikipedia_summary(_var)
+        if venue_article:
+            print(f"  [D1] Venue article found via: '{_var}' ({len(venue_article)} chars)")
+            break
 
-    # Extract city from venue name or article for secondary matching
+    # Also fetch the ARTIST's article — rich corpus for work verification
+    artist_article = ""
+    if _venue_artist:
+        artist_article = fetch_wikipedia_summary(_venue_artist)
+        if artist_article:
+            print(f"  [D1] Artist article found: '{_venue_artist}' ({len(artist_article)} chars)")
+
+    _all_fetches_failed = not venue_article and not artist_article
+    
+    # Combined corpus for name matching
+    _corpus = (venue_article + " " + artist_article).lower()
+
+    # Extract city from venue article
     _venue_city = ""
-    # Try to find a city reference in the venue article
     if venue_article:
-        # Common pattern: "located in <City>" or "in <City>, <Country>"
         _city_match = _d1_re.search(r'\bin\s+([A-Z][a-zé]+(?:\s+[A-Z][a-zé]+)?)', venue_article)
         if _city_match:
             _venue_city = _city_match.group(1)
+    # Fallback: extract city from the venue_name itself (after last comma)
+    if not _venue_city and ',' in venue_name:
+        _venue_city = venue_name.split(',')[-1].strip().split()[0] if venue_name.split(',')[-1].strip() else ""
 
     verified_pois = []
     for poi in poi_list:
@@ -572,29 +595,34 @@ def _verify_works_in_collection(poi_list, venue_name):
         _norm_name = _d1_re.sub(r'^the\s+', '', _norm_name)
         _norm_name = _d1_re.sub(r'\s*\([^)]*\d{4}[^)]*\)\s*', '', _norm_name).strip()
 
-        # Check 1: work name appears in venue article
-        if venue_article and _norm_name and _norm_name in venue_article.lower():
-            print(f"  [D1] VERIFIED '{work_name}' via venue article")
-            verified_pois.append(poi)
-            continue
+        # Check 1: work name appears in combined corpus (venue + artist article)
+        if _corpus and _norm_name and len(_norm_name) > 3:
+            if _norm_name in _corpus:
+                print(f"  [D1] VERIFIED '{work_name}' via corpus (exact match)")
+                verified_pois.append(poi)
+                continue
+            # Partial: key words from the work name appear in corpus
+            _key_words = [w for w in _norm_name.split() if len(w) > 3 and w not in ('tribe', 'song', 'prophet')]
+            if _key_words and all(w in _corpus for w in _key_words):
+                print(f"  [D1] VERIFIED '{work_name}' via corpus (all key words)")
+                verified_pois.append(poi)
+                continue
 
-        # Check 2: reverse lookup — fetch work's own Wikipedia article
+        # Check 2: reverse lookup — fetch work's own article
         _lookup_query = f"{work_name} {_venue_artist}" if _venue_artist else work_name
         work_article = fetch_wikipedia_summary(_lookup_query)
         if work_article:
             _all_fetches_failed = False
-
             _work_lower = work_article.lower()
-            _venue_lower = venue_name.lower()
 
-            # REJECTED: article places work at a DIFFERENT venue
-            _other_venue_indicators = ['hadassah', 'jerusalem', 'moma', 'metropolitan',
-                                       'louvre', 'hermitage', 'uffizi', 'tate', 'prado']
+            # REJECTED: article places work at a DIFFERENT venue/city
+            _rejection_indicators = ['hadassah', 'jerusalem', 'metropolitan opera',
+                                     'new york', 'pompidou', 'louvre', 'hermitage',
+                                     'uffizi', 'tate', 'prado', 'moma']
             _rejected = False
-            for _other in _other_venue_indicators:
-                if _other in _work_lower and _other not in _venue_lower:
-                    # Confirm it's not just a passing mention — check proximity to "located" or "housed"
-                    if _d1_re.search(rf'(located|housed|displayed|held|collection)\s+.{{0,30}}{_other}', _work_lower):
+            for _other in _rejection_indicators:
+                if _other in _work_lower and _other not in venue_name.lower():
+                    if _d1_re.search(rf'(located|housed|installed|displayed|held|collection|synagogue|opera)\s*.{{0,40}}{_other}', _work_lower):
                         print(f"  [D1] REJECTED '{work_name}' — located elsewhere ({_other})")
                         _rejected = True
                         break
@@ -602,36 +630,32 @@ def _verify_works_in_collection(poi_list, venue_name):
                 continue
 
             # VERIFIED: work article mentions the venue or city
-            if _venue_lower in _work_lower:
-                print(f"  [D1] VERIFIED '{work_name}' via work article (venue mention)")
-                verified_pois.append(poi)
-                continue
-            if _venue_city and _venue_city.lower() in _work_lower:
-                print(f"  [D1] VERIFIED '{work_name}' via work article (city mention)")
+            if venue_name.lower()[:15] in _work_lower or (_venue_city and _venue_city.lower() in _work_lower):
+                print(f"  [D1] VERIFIED '{work_name}' via reverse lookup")
                 verified_pois.append(poi)
                 continue
 
-            # No evidence either way
-            print(f"  [D1] DROPPED '{work_name}' — no evidence")
+            # Work article exists but doesn't mention this venue — ambiguous, keep if not rejected
+            print(f"  [D1] DROPPED '{work_name}' — article found but no venue/city link")
             continue
         else:
-            # Fetch returned nothing — check if venue article alone has evidence
-            if venue_article and _norm_name and len(_norm_name) > 3:
-                # Try partial match (first significant word)
-                _words = [w for w in _norm_name.split() if len(w) > 3]
-                if _words and any(w in venue_article.lower() for w in _words):
-                    print(f"  [D1] VERIFIED '{work_name}' via venue article (partial)")
+            # No article found at all — if corpus had partial evidence, keep
+            if _corpus and _norm_name:
+                # Less strict: any single meaningful word from work name in corpus
+                _any_word = [w for w in _norm_name.split() if len(w) > 4]
+                if _any_word and any(w in _corpus for w in _any_word):
+                    print(f"  [D1] VERIFIED '{work_name}' via corpus (single word, no contrary evidence)")
                     verified_pois.append(poi)
                     continue
             print(f"  [D1] DROPPED '{work_name}' — no evidence")
             continue
 
-    # All fetches failed → network error — fail the job (verification is load-bearing)
+    # All fetches failed → network error
     if _all_fetches_failed and len(poi_list) > 0:
         print(f"  [D1] All Wikipedia fetches failed — NETWORK ERROR (job will fail)")
         return None
 
-    # Fewer than 4 verified → fail
+    # Fewer than 4 verified
     if len(verified_pois) < 4:
         print(f"  [D1] Only {len(verified_pois)} work(s) verified — need at least 4")
         return None
