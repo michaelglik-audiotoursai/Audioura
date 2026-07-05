@@ -533,14 +533,60 @@ def _verify_works_in_collection(poi_list, venue_name):
     """[D1] In-collection verification gate for museum tours.
     
     Verifies candidate works belong in the specified venue using multi-source lookup:
-    1. Venue article (try multiple name variations)
-    2. Artist's main article (mentions of works in their oeuvre)
-    3. Reverse lookup per work (reject if placed at another venue)
+    1. Venue article (try multiple name variations) — VERIFICATION source
+    2. Museum official site — VERIFICATION source
+    3. Artist's main article — REJECTION only (names works at OTHER venues)
+    4. Reverse lookup per work — VERIFICATION if mentions venue/city, REJECTION if elsewhere
     
+    Matching: normalized token-overlap >=60% of content words.
     Returns filtered poi_list, or None if <4 verify or all fetches fail.
     """
     from rag_retriever import fetch_wikipedia_summary
     import re as _d1_re
+    import unicodedata
+
+    def _normalize_for_match(text):
+        """Normalize text for token matching: lowercase, strip accents, remove articles/years."""
+        if not text:
+            return ""
+        # Decompose unicode and strip accent marks
+        nfkd = unicodedata.normalize('NFKD', text.lower())
+        stripped = ''.join(c for c in nfkd if not unicodedata.combining(c))
+        # Remove leading "the", parenthetical years, punctuation
+        stripped = _d1_re.sub(r'^the\s+', '', stripped)
+        stripped = _d1_re.sub(r'\s*\([^)]*\d{4}[^)]*\)', '', stripped)
+        stripped = _d1_re.sub(r'[^\w\s]', ' ', stripped)
+        return ' '.join(stripped.split())
+
+    def _content_tokens(text):
+        """Extract content words (>=3 chars, not stopwords) for overlap matching."""
+        _STOP = {'the', 'and', 'for', 'with', 'from', 'that', 'this', 'are', 'was',
+                 'his', 'her', 'has', 'had', 'its', 'who', 'which', 'their', 'about',
+                 'one', 'two', 'three', 'not', 'but', 'all', 'can', 'will', 'been'}
+        words = _normalize_for_match(text).split()
+        return [w for w in words if len(w) >= 3 and w not in _STOP]
+
+    def _token_overlap(work_name, corpus_text):
+        """Check if >=60% of work name's content tokens appear in corpus text.
+        Also handles French/inflected variants by checking 4+ char prefix matches."""
+        work_tokens = _content_tokens(work_name)
+        if not work_tokens:
+            return False, 0.0
+        corpus_norm = _normalize_for_match(corpus_text)
+        corpus_words = set(corpus_norm.split())
+        
+        matched = 0
+        for token in work_tokens:
+            if token in corpus_norm:
+                matched += 1
+            elif len(token) >= 5:
+                # Try prefix matching for inflected forms (startswith, not substring)
+                _prefix = token[:5]
+                if any(word.startswith(_prefix) for word in corpus_words if len(word) >= 5):
+                    matched += 1
+        
+        overlap = matched / len(work_tokens) if work_tokens else 0.0
+        return overlap >= 0.60, overlap
 
     # Extract artist name from venue
     cleaned = _d1_re.sub(
@@ -549,140 +595,241 @@ def _verify_works_in_collection(poi_list, venue_name):
     ).strip()
     _venue_artist = " ".join(w for w in cleaned.split() if w and len(w) > 1).strip()
 
-    # Try multiple venue name variations to find the Wikipedia article
+    # --- SOURCE 1: Venue Wikipedia article (multiple name variations) ---
     _venue_variations = [
         venue_name,
-        venue_name.replace("National ", ""),  # "Musee Marc Chagall" 
+        venue_name.replace("National ", ""),
+        # Accented variants (Wikipedia action API is accent-sensitive)
+        venue_name.replace("Musee", "Musée"),
+        venue_name.replace("Musee National", "Musée").replace("National ", ""),
+        f"Musée Marc Chagall" if "chagall" in venue_name.lower() else "",
         f"{_venue_artist} Museum" if _venue_artist else "",
         f"Musee {_venue_artist}" if _venue_artist else "",
-        # French Wikipedia variations
         f"Musée national {_venue_artist}",
         f"Musée national Marc-Chagall" if "chagall" in venue_name.lower() else "",
     ]
     venue_article = ""
+    _best_venue_article = ""
     for _var in _venue_variations:
         if not _var:
             continue
-        venue_article = fetch_wikipedia_summary(_var)
-        if venue_article and len(venue_article) > 300:
-            print(f"  [D1] Venue article found via: '{_var}' ({len(venue_article)} chars)")
-            break
+        _candidate = fetch_wikipedia_summary(_var)
+        if _candidate and len(_candidate) > 100:
+            # Validate: the article should be about THIS venue (check for Nice/France/the actual venue name)
+            _cand_lower = _candidate[:2000].lower()
+            _is_right_venue = (
+                'nice' in _cand_lower or 
+                'france' in _cand_lower or
+                venue_name.lower()[:15] in _cand_lower or
+                'alpes-maritimes' in _cand_lower
+            )
+            if _is_right_venue:
+                if len(_candidate) > len(_best_venue_article):
+                    _best_venue_article = _candidate
+                    print(f"  [D1] Venue article candidate via: '{_var}' ({len(_candidate)} chars)")
+                # If we found a substantial article (>500 chars), stop searching
+                if len(_best_venue_article) > 500:
+                    break
+            else:
+                print(f"  [D1] Skipped '{_var}' ({len(_candidate)} chars) — wrong venue (not Nice/France)")
+    venue_article = _best_venue_article
+    if venue_article:
+        print(f"  [D1] Venue article selected: {len(venue_article)} chars")
     
-    # Also try the museum's official collection page (source #3)
+    # If no validated venue article, note it
+    if not venue_article:
+        print(f"  [D1] No venue article found for Nice/France — using museum site only")
+    
+    # --- SOURCE 2: Museum's official collection page ---
     _museum_site_content = ""
     try:
         import requests as _d1_req
-        # Try common museum collection page patterns
+        from html.parser import HTMLParser
+        
+        class _TextExtractor(HTMLParser):
+            """Extract visible text from HTML, ignoring scripts/styles."""
+            def __init__(self):
+                super().__init__()
+                self._text = []
+                self._skip = False
+            def handle_starttag(self, tag, attrs):
+                if tag in ('script', 'style', 'noscript'):
+                    self._skip = True
+            def handle_endtag(self, tag):
+                if tag in ('script', 'style', 'noscript'):
+                    self._skip = False
+            def handle_data(self, data):
+                if not self._skip:
+                    self._text.append(data)
+            def get_text(self):
+                return ' '.join(self._text)
+        
         _site_urls = []
         if "chagall" in venue_name.lower():
             _site_urls.append("https://musees-nationaux-alpesmaritimes.fr/chagall/en/collection")
-        # Generic pattern: try the venue name as a URL slug
-        # (Only for known museums — extend as needed)
         for _url in _site_urls:
             try:
                 _site_resp = _d1_req.get(_url, headers={'User-Agent': 'Audioura/2.2'}, timeout=8)
                 if _site_resp.status_code == 200 and len(_site_resp.text) > 500:
-                    _museum_site_content = _site_resp.text[:10000]  # First 10K chars
-                    print(f"  [D1] Museum site fetched: {_url} ({len(_museum_site_content)} chars)")
+                    # Extract plain text from HTML for better matching
+                    _extractor = _TextExtractor()
+                    _extractor.feed(_site_resp.text)
+                    _museum_site_content = _extractor.get_text()[:30000]
+                    print(f"  [D1] Museum site fetched: {_url} ({len(_museum_site_content)} chars text)")
                     break
             except Exception:
                 continue
     except Exception:
         pass
 
-    # Also fetch the ARTIST's article — rich corpus for work verification
+    # --- SOURCE 3: Artist article (REJECTION ONLY — names works at other venues) ---
     artist_article = ""
     if _venue_artist:
         artist_article = fetch_wikipedia_summary(_venue_artist)
         if artist_article:
-            print(f"  [D1] Artist article found: '{_venue_artist}' ({len(artist_article)} chars)")
+            print(f"  [D1] Artist article fetched: '{_venue_artist}' ({len(artist_article)} chars)")
 
     _all_fetches_failed = not venue_article and not artist_article and not _museum_site_content
     
-    # Combined corpus for name matching (venue + artist + museum site)
-    _corpus = (venue_article + " " + artist_article + " " + _museum_site_content).lower()
+    # Build VENUE-LINKED corpus: venue article + museum site (NOT artist article)
+    # Artist article is used for REJECTION only, never for verification
+    # Keep original case — _token_overlap normalizes internally
+    _venue_corpus = venue_article + " " + _museum_site_content
 
-    # Extract city from venue article
+    # Extract city from venue article for reverse-lookup verification
     _venue_city = ""
     if venue_article:
         _city_match = _d1_re.search(r'\bin\s+([A-Z][a-zé]+(?:\s+[A-Z][a-zé]+)?)', venue_article)
         if _city_match:
             _venue_city = _city_match.group(1)
-    # Fallback: extract city from the venue_name itself (after last comma)
     if not _venue_city and ',' in venue_name:
         _venue_city = venue_name.split(',')[-1].strip().split()[0] if venue_name.split(',')[-1].strip() else ""
+    if _venue_city:
+        print(f"  [D1] Venue city: '{_venue_city}'")
 
+    # Evidence log for D3 grounding assertion
+    _evidence_log = {}
+    
+    # Rejection indicators: venues that indicate a work is NOT at our target museum
+    _rejection_indicators = ['hadassah', 'jerusalem', 'metropolitan opera',
+                             'new york', 'pompidou', 'louvre', 'hermitage',
+                             'uffizi', 'tate', 'prado', 'moma', 'guggenheim']
+    
     verified_pois = []
     for poi in poi_list:
         work_name = poi.get('name', '')
-        # Normalize: lowercase, no leading "The", no parenthetical years
-        _norm_name = work_name.lower().strip()
-        _norm_name = _d1_re.sub(r'^the\s+', '', _norm_name)
-        _norm_name = _d1_re.sub(r'\s*\([^)]*\d{4}[^)]*\)\s*', '', _norm_name).strip()
+        _norm_name = _normalize_for_match(work_name)
 
-        # Check 1: work name appears in combined corpus (venue + artist article)
-        if _corpus and _norm_name and len(_norm_name) > 3:
-            if _norm_name in _corpus:
-                print(f"  [D1] VERIFIED '{work_name}' via corpus (exact match)")
+        # --- CHECK 1: Token-overlap in VENUE-LINKED corpus (venue article + museum site) ---
+        if _venue_corpus and _norm_name and len(_norm_name) > 3:
+            overlaps, pct = _token_overlap(work_name, _venue_corpus)
+            if overlaps:
+                print(f"  [D1] VERIFIED '{work_name}' via venue corpus (token overlap {pct:.0%})")
+                _evidence_log[work_name] = f"venue corpus overlap {pct:.0%}"
                 verified_pois.append(poi)
                 continue
-            # Partial: key words from the work name appear in corpus
-            _key_words = [w for w in _norm_name.split() if len(w) > 3 and w not in ('tribe', 'song', 'prophet')]
-            if _key_words and all(w in _corpus for w in _key_words):
-                print(f"  [D1] VERIFIED '{work_name}' via corpus (all key words)")
+            # Also check exact normalized name substring match
+            if _norm_name in _normalize_for_match(_venue_corpus):
+                print(f"  [D1] VERIFIED '{work_name}' via venue corpus (exact substring)")
+                _evidence_log[work_name] = "venue corpus exact substring"
                 verified_pois.append(poi)
                 continue
 
-        # Check 2: reverse lookup — fetch work's own article
+        # --- CHECK 2: Reverse lookup — fetch work's own article ---
         _lookup_query = f"{work_name} {_venue_artist}" if _venue_artist else work_name
         work_article = fetch_wikipedia_summary(_lookup_query)
         if work_article:
             _all_fetches_failed = False
             _work_lower = work_article.lower()
 
-            # REJECTED: article places work at a DIFFERENT venue/city
-            _rejection_indicators = ['hadassah', 'jerusalem', 'metropolitan opera',
-                                     'new york', 'pompidou', 'louvre', 'hermitage',
-                                     'uffizi', 'tate', 'prado', 'moma']
+            # REJECTION: article places work at a DIFFERENT venue/city
             _rejected = False
             for _other in _rejection_indicators:
                 if _other in _work_lower and _other not in venue_name.lower():
-                    if _d1_re.search(rf'(located|housed|installed|displayed|held|collection|synagogue|opera)\s*.{{0,40}}{_other}', _work_lower):
+                    if _d1_re.search(rf'(located|housed|installed|displayed|held|collection|synagogue|opera|commission)\s*.{{0,40}}{_other}', _work_lower):
                         print(f"  [D1] REJECTED '{work_name}' — located elsewhere ({_other})")
+                        _evidence_log[work_name] = f"REJECTED: located at {_other}"
                         _rejected = True
                         break
             if _rejected:
                 continue
 
-            # VERIFIED: work article mentions the venue or city
-            if venue_name.lower()[:15] in _work_lower or (_venue_city and _venue_city.lower() in _work_lower):
-                print(f"  [D1] VERIFIED '{work_name}' via reverse lookup")
+            # VERIFICATION: work article mentions the venue or city
+            _venue_lower = venue_name.lower()[:15]
+            if _venue_lower in _work_lower or (_venue_city and _venue_city.lower() in _work_lower):
+                print(f"  [D1] VERIFIED '{work_name}' via reverse lookup (mentions venue/city)")
+                _evidence_log[work_name] = "reverse lookup: mentions venue/city"
                 verified_pois.append(poi)
                 continue
 
-            # Work article exists but doesn't mention this venue — ambiguous, keep if not rejected
+            # Work article exists but doesn't mention this venue — DROPPED
             print(f"  [D1] DROPPED '{work_name}' — article found but no venue/city link")
+            _evidence_log[work_name] = "DROPPED: no venue link in article"
             continue
         else:
-            # No article found at all — if corpus had partial evidence, keep
-            if _corpus and _norm_name:
-                # Less strict: any single meaningful word from work name in corpus
-                _any_word = [w for w in _norm_name.split() if len(w) > 4]
-                if _any_word and any(w in _corpus for w in _any_word):
-                    print(f"  [D1] VERIFIED '{work_name}' via corpus (single word, no contrary evidence)")
-                    verified_pois.append(poi)
-                    continue
-            print(f"  [D1] DROPPED '{work_name}' — no evidence")
+            # No article found — check if venue corpus has partial evidence
+            # Require at least 2 long (5+ char) words from the name in corpus for confidence
+            _corpus_lower = _venue_corpus.lower() if _venue_corpus else ""
+            if _corpus_lower and _norm_name:
+                _long_words = [w for w in _content_tokens(work_name) if len(w) >= 5]
+                if len(_long_words) >= 2:
+                    _matches = [w for w in _long_words if w in _corpus_lower]
+                    if len(_matches) >= 2:
+                        print(f"  [D1] VERIFIED '{work_name}' via venue corpus (multi-word match: {_matches})")
+                        _evidence_log[work_name] = f"venue corpus multi-word match: {_matches}"
+                        verified_pois.append(poi)
+                        continue
+                elif len(_long_words) == 1 and _long_words[0] in _corpus_lower:
+                    # Single long word — only verify if the word is very specific (>7 chars)
+                    if len(_long_words[0]) >= 7:
+                        print(f"  [D1] VERIFIED '{work_name}' via venue corpus (specific word: {_long_words[0]})")
+                        _evidence_log[work_name] = f"venue corpus specific word: {_long_words[0]}"
+                        verified_pois.append(poi)
+                        continue
+            
+            # --- CHECK 3: Artist article as REJECTION-ONLY source ---
+            # If the artist article explicitly places this work elsewhere, reject it
+            _rejected = False
+            if artist_article:
+                _artist_lower = artist_article.lower()
+                _norm_tokens = _content_tokens(work_name)
+                # Only check if the work name appears in artist article at all
+                _name_in_artist = _norm_name in _artist_lower or (
+                    _norm_tokens and all(t in _artist_lower for t in _norm_tokens if len(t) >= 4)
+                )
+                if _name_in_artist:
+                    # Found in artist article — check if it's placed elsewhere
+                    for _other in _rejection_indicators:
+                        if _other in _artist_lower:
+                            # Find if the work name and the other-venue are in proximity
+                            _work_pos = _artist_lower.find(_norm_name[:10]) if _norm_name else -1
+                            if _work_pos >= 0:
+                                _context = _artist_lower[max(0, _work_pos-200):_work_pos+200]
+                                if _other in _context and _other not in venue_name.lower():
+                                    print(f"  [D1] REJECTED '{work_name}' — artist article places near '{_other}'")
+                                    _evidence_log[work_name] = f"REJECTED: artist article context -> {_other}"
+                                    _rejected = True
+                                    break
+            if _rejected:
+                continue
+            
+            print(f"  [D1] DROPPED '{work_name}' — no evidence from any source")
+            _evidence_log[work_name] = "DROPPED: no evidence"
             continue
 
     # All fetches failed → network error
     if _all_fetches_failed and len(poi_list) > 0:
-        print(f"  [D1] All Wikipedia fetches failed — NETWORK ERROR (job will fail)")
+        print(f"  [D1] All fetches failed — NETWORK ERROR (job will fail)")
         return None
+
+    # Log evidence summary
+    print(f"  [D1] Evidence log:")
+    for work, evidence in _evidence_log.items():
+        print(f"    {work}: {evidence}")
 
     # Fewer than 4 verified
     if len(verified_pois) < 4:
-        print(f"  [D1] Only {len(verified_pois)} work(s) verified — need at least 4")
+        print(f"  [D1] Only {len(verified_pois)} work(s) verified — need at least 4 (fail-closed)")
         return None
 
     print(f"  [D1] {len(verified_pois)}/{len(poi_list)} works verified for '{venue_name}'")
@@ -2167,6 +2314,29 @@ Requirements:
             poi_header += f" by {artist}"
         if year:
             poi_header += f", {year}"
+        
+        # [F3] Header assertion: ensure GPT hasn't injected flowery text into the name field
+        _expected_header_start = f"Stop {stop_num}: {poi['name']}"
+        if not poi_header.startswith(_expected_header_start):
+            print(f"  [F3] ⚠️ HEADER MISMATCH at stop {stop_num}:")
+            print(f"    Expected start: '{_expected_header_start}'")
+            print(f"    Got: '{poi_header}'")
+            # Force-correct the header to the clean version
+            poi_header = _expected_header_start
+            if artist and artist.lower() != "unknown artist":
+                poi_header += f" by {artist}"
+            if year:
+                poi_header += f", {year}"
+        # Also assert the name itself is a short noun phrase (no sentences/descriptions)
+        if len(poi_name.split()) > 12 or any(c in poi_name for c in '.!?;'):
+            print(f"  [F3] ⚠️ NAME TOO LONG/CORRUPT at stop {stop_num}: '{poi_name[:80]}'")
+            # Truncate to first 8 words if corrupted
+            _clean_name = ' '.join(poi_name.split()[:8]).rstrip('.,;:!?')
+            poi_header = f"Stop {stop_num}: {_clean_name}"
+            if artist and artist.lower() != "unknown artist":
+                poi_header += f" by {artist}"
+            if year:
+                poi_header += f", {year}"
         
         # Start the POI content with all extracted information
         poi_content = poi_header + "\n\n"

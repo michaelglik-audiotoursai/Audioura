@@ -187,10 +187,10 @@ def _fetch_via_action_api(topic: str) -> str:
                     "action": "query",
                     "prop": "extracts",
                     "explaintext": "1",
-                    "formatversion": "2",
                     "titles": topic.strip(),
                     "format": "json",
-                    # NO exchars/exintro — get FULL article text
+                    # NO exchars/exintro/formatversion — get FULL article text
+                    # formatversion=2 removed: causes 0-char extracts on some pages
                 },
                 headers={
                     "User-Agent": "Audioura/2.2 (tour-generation; contact: support@audioura.com)",
@@ -202,8 +202,9 @@ def _fetch_via_action_api(topic: str) -> str:
                 continue
             
             data = response.json()
-            pages = data.get("query", {}).get("pages", [])
+            pages = data.get("query", {}).get("pages", {})
             if isinstance(pages, list):
+                # Shouldn't happen without formatversion=2, but handle gracefully
                 for page_data in pages:
                     if page_data.get("missing"):
                         continue

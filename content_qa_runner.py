@@ -108,15 +108,111 @@ def run_qa(tour_text, tour_file=""):
     global FACTUAL_FAIL_COUNT
     FACTUAL_FAIL_COUNT = 0
 
+    # -------- [D3] New deterministic checks --------
+    
+    # D3(a) Stop-title sanity: short noun phrase, no "Welcome to", no self-referential "Stop N", no mid-word punctuation
+    _title_issues = []
+    _stop_headers = re.findall(r'^(Stop\s+\d+:.+)$', tour_text, re.MULTILINE)
+    for _header in _stop_headers:
+        # Extract just the name part (after "Stop N: ")
+        _name_part = re.sub(r'^Stop\s+\d+:\s*', '', _header).strip()
+        # Remove " by Artist" and ", Year" suffixes
+        _name_part = re.sub(r'\s+by\s+[A-Z][^,]*$', '', _name_part)
+        _name_part = re.sub(r',\s*\d{4}$', '', _name_part).strip()
+        
+        _word_count = len(_name_part.split())
+        if _word_count > 12:
+            _title_issues.append(f"'{_header[:60]}...' ({_word_count} words — too long)")
+        if re.search(r'\b(welcome to|behold|discover|featuring|located at|awaits)\b', _name_part, re.I):
+            _title_issues.append(f"'{_header[:60]}...' (contains flowery text)")
+        if re.search(r'Stop\s+\d+', _name_part, re.I):
+            _title_issues.append(f"'{_header[:60]}...' (self-referential Stop N)")
+        if re.search(r'\w\.\w', _name_part):  # mid-word punctuation
+            _title_issues.append(f"'{_header[:60]}...' (mid-word punctuation)")
+    check("D3(a) Stop-title sanity", len(_title_issues) == 0,
+          f"{len(_title_issues)} issue(s): {_title_issues[:3]}")
+
+    # D3(b) Coordinate scatter for museum tours: all interior stops within ~100m
+    if is_museum:
+        _coords_found = re.findall(r'Coordinates:\s*([\d.-]+)\s*,\s*([\d.-]+)', tour_text)
+        if len(_coords_found) >= 2:
+            _lats = [float(c[0]) for c in _coords_found]
+            _lngs = [float(c[1]) for c in _coords_found]
+            _lat_spread = max(_lats) - min(_lats)
+            _lng_spread = max(_lngs) - min(_lngs)
+            # ~0.001 degree ≈ 111m latitude, ~80m longitude at 45°N
+            _scatter_ok = _lat_spread < 0.002 and _lng_spread < 0.002
+            check("D3(b) Coordinate scatter (museum <200m)",
+                  _scatter_ok,
+                  f"lat spread={_lat_spread:.4f}° lng spread={_lng_spread:.4f}°")
+        else:
+            check("D3(b) Coordinate scatter (museum <200m)", True,
+                  f"(only {len(_coords_found)} coordinate(s) — single-coord mode)")
+    else:
+        check("D3(b) Coordinate scatter (museum <200m)", True, "(not a museum tour)")
+
+    # D3(c) Cross-stop boilerplate shingles: flag 4-word shingles in >=3 stops (STYLE check)
+    _shingle_issues = []
+    if stops and len(stops) >= 3:
+        from collections import Counter
+        _shingle_counts = Counter()
+        _STRUCTURAL_LINE_RE = re.compile(r'^(Address|Coordinates|Type|Specific|Operational|Orientation|Museum Information|Introduction|Stop \d+):')
+        for stop in stops:
+            # Get content lines only (exclude structural lines)
+            _content_lines = [l for l in stop.split('\n') 
+                            if l.strip() and not _STRUCTURAL_LINE_RE.match(l.strip())]
+            _content_text = ' '.join(_content_lines).lower()
+            _words = re.findall(r'\b\w{4,}\b', _content_text)
+            # Generate 4-word shingles for this stop (deduplicated within stop)
+            _stop_shingles = set()
+            for j in range(len(_words) - 3):
+                _shingle = ' '.join(_words[j:j+4])
+                _stop_shingles.add(_shingle)
+            for s in _stop_shingles:
+                _shingle_counts[s] += 1
+        # Flag shingles appearing in 3+ stops
+        _repeated_shingles = [(s, c) for s, c in _shingle_counts.items() if c >= 3]
+        _shingle_issues = _repeated_shingles[:5]  # Show top 5
+    check("D3(c) No boilerplate shingles (4-word in 3+ stops)",
+          len(_shingle_issues) == 0,
+          f"{len(_shingle_issues)} repeated shingle(s): {[s[0] for s in _shingle_issues[:3]]}")
+
+    # D3(d) Grounding assertion: if D1 evidence was persisted, check stop titles appear in it
+    # (This check is informational until evidence files are consistently written)
+    # For now: check that stop titles are short, real-looking noun phrases (proxy for grounding)
+    _ungrounded = []
+    for _header in _stop_headers:
+        _name_part = re.sub(r'^Stop\s+\d+:\s*', '', _header).strip()
+        _name_part = re.sub(r'\s+by\s+[A-Z][^,]*$', '', _name_part)
+        _name_part = re.sub(r',\s*\d{4}$', '', _name_part).strip()
+        # A real artwork name should be 1-8 words, start with uppercase
+        if _name_part and (len(_name_part.split()) > 10 or not _name_part[0].isupper()):
+            _ungrounded.append(_name_part[:50])
+    check("D3(d) Grounding assertion (titles look like real entities)",
+          len(_ungrounded) == 0,
+          f"{len(_ungrounded)} suspicious title(s): {_ungrounded[:3]}")
+    if _ungrounded:
+        FACTUAL_FAIL_COUNT += 1
+
     # 9. Single-venue consistency: for museum tours, stops should not reference other NAMED venues
+    # [GAP 3] Exemption: when address-contained (<=2 unique addresses), exempt named-venue refs
+    # that are substrings of the tour's own stop titles.
     is_museum = "Tour-Category: museum" in tour_text
     _other_venue_flags = []
     if is_museum:
         # Extract venue name from the title line
         _title_match = re.search(r"Audio Guided Tour:\s*(.+?)(?:\s*-\s*Museum Tour)?$", tour_text, re.MULTILINE)
         _tour_venue = _title_match.group(1).strip() if _title_match else ""
-        # Only flag PROPER-NAMED venues (capitalized multi-word names like "Musée Matisse")
-        # Ignore bare/generic references like "the museum", "a gallery", "this museum"
+        
+        # [GAP 3] Collect stop titles for exemption check
+        _stop_titles = [re.sub(r'^Stop\s+\d+:\s*', '', h).strip().lower() for h in _stop_headers]
+        
+        # Check address containment (<=2 unique addresses)
+        _all_addresses = re.findall(r'^Address:\s*(.+)$', tour_text, re.MULTILINE)
+        _unique_addrs = set(a.strip().lower()[:30] for a in _all_addresses if a.strip())
+        _is_contained = len(_unique_addrs) <= 2
+        
+        # Only flag PROPER-NAMED venues
         _NAMED_VENUE_PATTERN = re.compile(
             r'\b(Mus[ée]+e?\s+[A-Z]\w+(?:\s+[A-Za-z]+)*|'
             r'Galerie\s+[A-Z]\w+(?:\s+[A-Za-z]+)*|'
@@ -129,8 +225,14 @@ def run_qa(tour_text, tour_file=""):
         for i, stop in enumerate(stops):
             _named_refs = _NAMED_VENUE_PATTERN.findall(stop)
             for ref in _named_refs:
-                # If the named venue is NOT the target venue, flag it
+                # If the named venue is NOT the target venue, potentially flag it
                 if _tour_venue and _tour_venue.lower()[:20] not in ref.lower() and ref.lower()[:20] not in _tour_venue.lower():
+                    # [GAP 3] Exemption: if tour is address-contained AND ref matches a stop title
+                    if _is_contained:
+                        _ref_lower = ref.strip().lower()
+                        _is_stop_title = any(_ref_lower in t or t in _ref_lower for t in _stop_titles)
+                        if _is_stop_title:
+                            continue  # Exempt — it's the tour's own stop name
                     _other_venue_flags.append(f"Stop {i+1}: '{ref.strip()[:60]}'")
         _passed_9 = len(_other_venue_flags) <= 2
         check("Single-venue consistency (no other NAMED venues)",
@@ -193,15 +295,15 @@ def main():
     run_qa(tour_text, tour_file)
 
     print(f"\n{'=' * 60}")
-    print(f"Score: {PASS_COUNT}/11 (style+factual)")
+    print(f"Score: {PASS_COUNT}/{PASS_COUNT + FAIL_COUNT} (style+factual)")
     if FACTUAL_FAIL_COUNT > 0:
         print(f"FACTUAL INTEGRITY FAILED ({FACTUAL_FAIL_COUNT} factual check(s) failed) — RELEASE BLOCKED")
         sys.exit(1)
-    elif PASS_COUNT >= 8:
-        print("QA PASSED (>=8/11 style + all factual checks pass)")
+    elif FAIL_COUNT <= 3:
+        print("QA PASSED (<=3 style failures + all factual checks pass)")
         sys.exit(0)
     else:
-        print("QA FAILED (<8/11 style checks)")
+        print(f"QA FAILED ({FAIL_COUNT} failures)")
         sys.exit(1)
 
 
