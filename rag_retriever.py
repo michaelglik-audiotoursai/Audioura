@@ -42,18 +42,19 @@ def fetch_wikipedia_summary(topic: str, sentences: int = 5) -> str:
 
         if response.status_code == 404:
             logger.info(f"Wikipedia: no article found for '{topic}'")
-            return ""
+            # Try the action API as fallback (broader search)
+            return _fetch_via_action_api(topic)
 
         if response.status_code != 200:
             logger.warning(f"Wikipedia API returned {response.status_code} for '{topic}' | URL: {url} | body[:200]: {response.text[:200]}")
-            return ""
+            return _fetch_via_action_api(topic)
 
         data = response.json()
         extract = data.get("extract", "")
 
         if not extract:
             logger.info(f"Wikipedia: empty extract for '{topic}'")
-            return ""
+            return _fetch_via_action_api(topic)
 
         return extract
 
@@ -159,3 +160,47 @@ def _extract_artist_from_venue(venue_name: str) -> str:
     ).strip()
     artist_topic = " ".join(w for w in cleaned.split() if w and len(w) > 1).strip()
     return artist_topic
+
+
+def _fetch_via_action_api(topic: str) -> str:
+    """Fallback: use Wikipedia's Action API for broader article extracts.
+    
+    This returns more text than the REST summary endpoint and is rarely blocked.
+    """
+    import requests as _req
+    if not topic or not topic.strip():
+        return ""
+    
+    try:
+        response = _req.get(
+            "https://en.wikipedia.org/w/api.php",
+            params={
+                "action": "query",
+                "prop": "extracts",
+                "exintro": False,  # Get full article, not just intro
+                "explaintext": True,
+                "titles": topic.strip(),
+                "format": "json",
+                "exchars": 3000,  # Up to 3000 chars of content
+            },
+            headers={
+                "User-Agent": "Audioura/2.2 (tour-generation; contact: support@audioura.com)",
+            },
+            timeout=8,
+        )
+        
+        if response.status_code != 200:
+            return ""
+        
+        data = response.json()
+        pages = data.get("query", {}).get("pages", {})
+        for page_id, page_data in pages.items():
+            if page_id == "-1":
+                return ""  # Page not found
+            extract = page_data.get("extract", "")
+            if extract:
+                return extract
+        return ""
+    except Exception as e:
+        logger.warning(f"Wikipedia action API error for '{topic}': {e}")
+        return ""
