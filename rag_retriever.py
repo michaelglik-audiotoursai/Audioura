@@ -56,6 +56,12 @@ def fetch_wikipedia_summary(topic: str, sentences: int = 5) -> str:
             logger.info(f"Wikipedia: empty extract for '{topic}'")
             return _fetch_via_action_api(topic)
 
+        # If summary is too short, try action API for richer content
+        if len(extract) < 500:
+            richer = _fetch_via_action_api(topic)
+            if richer and len(richer) > len(extract):
+                return richer
+
         return extract
 
     except requests.Timeout:
