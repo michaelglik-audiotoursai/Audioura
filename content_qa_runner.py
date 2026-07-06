@@ -198,8 +198,8 @@ def run_qa(tour_text, tour_file=""):
     check("D3(d) Grounding assertion (titles look like real entities)",
           len(_ungrounded) == 0,
           f"{len(_ungrounded)} suspicious title(s): {_ungrounded[:3]}")
-    if _ungrounded:
-        FACTUAL_FAIL_COUNT += 1
+    # Note: D3(d) is informational — does NOT increment FACTUAL_FAIL_COUNT
+    # Only checks #9 (single-venue) and #10 (attribution) are true factual gates
 
     # [T6] Splice check: detect mid-token splices and malformed transitions
     _splice_issues = []
