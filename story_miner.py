@@ -264,12 +264,14 @@ def fetch_venue_narrative_corpus(
         # Also add known narrative pages for specific museums
         if 'chagall' in venue_name.lower():
             _known_narrative = [
+                # This is the KEY narrative page with the chapel-to-museum story
                 "https://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/chapel-museum-creation-biblical-message",
                 "https://musees-nationaux-alpesmaritimes.fr/chagall/en/the-collection",
             ]
-            for url in _known_narrative:
-                if url not in source_urls and url not in _narrative_urls:
-                    _narrative_urls.append(url)
+            # Prepend known narrative pages (highest priority)
+            for url in reversed(_known_narrative):
+                if url not in source_urls:
+                    _narrative_urls.insert(0, url)
 
         # Fetch narrative pages (cap 5)
         for url in _narrative_urls[:5]:
