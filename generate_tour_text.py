@@ -2170,13 +2170,35 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             except Exception as e:
                 print(f"Error parsing first POI coordinates: {e}")
 
+        # [T5] Venue coordinate from geocoding/known sources (not model output)
+        # Known museum coordinates (authoritative, from Wikipedia/Google Maps)
+        _KNOWN_VENUE_COORDS = {
+            'chagall': (43.7102, 7.2703),  # Musée National Marc Chagall, Nice
+        }
+        _geocoded_coord = None
+        for _key, _coord in _KNOWN_VENUE_COORDS.items():
+            if _key in (_museum_venue_name or '').lower():
+                _geocoded_coord = _coord
+                print(f"  [T5] Venue coordinate from known database: {_geocoded_coord}")
+                break
+        
+        # Fallback: try to extract from Wikipedia article (Wikidata coordinates)
+        if not _geocoded_coord and _story_corpus_result:
+            _wiki_text = _story_corpus_result.get('combined_text', '')
+            # Look for coordinate patterns in Wikipedia articles
+            _coord_match = re.search(r'(\d{2}\.\d{3,6})\s*[°]?\s*N.*?(\d+\.\d{3,6})\s*[°]?\s*E', _wiki_text)
+            if _coord_match:
+                _geocoded_coord = (float(_coord_match.group(1)), float(_coord_match.group(2)))
+                print(f"  [T5] Venue coordinate from Wikipedia: {_geocoded_coord}")
+        
         # [D4] Museum tours: use single venue coordinate for all interior stops
         if tour_category == 'museum' and _museum_venue_name:
-            _venue_coord = first_poi_coordinates
+            _venue_coord = _geocoded_coord if _geocoded_coord else first_poi_coordinates
             if _venue_coord and _venue_coord != (None, None):
                 for p in poi_list:
                     p['coordinates'] = f"{_venue_coord[0]}, {_venue_coord[1]}"
-                print(f"  [D4] Museum single-coordinate: all stops set to {_venue_coord}")
+                _source = "geocoded" if _geocoded_coord else "model (fallback)"
+                print(f"  [D4] Museum single-coordinate: all stops set to {_venue_coord} (source: {_source})")
 
         # Print extracted POI information
         print("\n=== Extracted POI Information ===")
@@ -2230,15 +2252,36 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             _poi_names = [p["name"] for p in poi_list]
             _venue_name = (_museum_venue_name or location) if tour_category == 'museum' else location
 
+            # [§3] Extract story elements before spine generation (if corpus available)
+            _story_elements = []
+            if _story_corpus_result and _story_corpus_result.get('pages'):
+                try:
+                    from story_element_extractor import extract_story_elements_from_pages, persist_story_elements
+                    _story_elements = extract_story_elements_from_pages(
+                        pages=_story_corpus_result['pages'],
+                        venue_name=_venue_name,
+                        api_key=api_key,
+                        max_pages=5,
+                    )
+                    # Persist story elements
+                    if _story_elements and output_file:
+                        _elem_path = output_file.replace('.txt', '_story_elements.json')
+                        persist_story_elements(_story_elements, _elem_path)
+                except ImportError:
+                    print(f"  [§3] story_element_extractor not available")
+                except Exception as _se_err:
+                    print(f"  [§3] Story element extraction error: {_se_err}")
+
             _storied_spine = generate_spine(
                 venue_name=_venue_name,
                 poi_list=_poi_names,
                 tour_category=tour_category,
                 api_key=api_key,
                 theme_name="",
+                story_elements=_story_elements if _story_elements else None,
             )
             if _storied_spine:
-                print(f"  [Storied] Spine generated: {len(_storied_spine.get('arc', []))} arc entries")
+                print(f"  [Storied] Spine generated: {len(_storied_spine.get('arc', []))} arc entries (mode={_storied_spine.get('story_mode', '?')})")
             else:
                 print(f"  [Storied] Spine generation failed — descriptions will proceed without spine")
 

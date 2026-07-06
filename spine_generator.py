@@ -59,6 +59,7 @@ def generate_spine(
     tour_category: str,
     api_key: str,
     theme_name: str = "",
+    story_elements: Optional[List[dict]] = None,
 ) -> Optional[dict]:
     """Generate a narrative spine for a tour.
 
@@ -68,9 +69,11 @@ def generate_spine(
         tour_category: 'museum', 'walking', 'restaurant', or 'book'.
         api_key: OpenAI API key.
         theme_name: For book tours, the source work/theme name.
+        story_elements: Optional list of documented story elements from story_element_extractor.
+                       When provided, the spine must build from these (story_mode: found).
 
     Returns:
-        Parsed spine dict with all 11 fields, or None on failure.
+        Parsed spine dict with all 11 fields + optional grounded_on per arc entry.
         Logs cost and latency to stdout/logger.
     """
     template = _load_template(tour_category)
@@ -82,6 +85,32 @@ def generate_spine(
     prompt = prompt.replace("{{total_stops}}", str(len(poi_list)))
     if "{{theme_name}}" in prompt:
         prompt = prompt.replace("{{theme_name}}", theme_name or venue_name)
+
+    # [§3] Story-grounded spine: inject story elements into the prompt
+    _story_mode = "invented"
+    if story_elements and len(story_elements) >= 3:
+        _story_mode = "found"
+        _elements_text = "\n".join(
+            f"  [{e.get('id','?')}] ({e.get('type','?')}) {e.get('text','')}"
+            for e in story_elements[:15]  # Cap to avoid token overflow
+        )
+        _story_injection = f"""
+
+DOCUMENTED STORY ELEMENTS (build the spine arc FROM these — each chapter should declare which element(s) it uses):
+{_elements_text}
+
+REQUIREMENTS for story-grounded spine:
+- The tour_hook and connecting_thread MUST reference the documented origin story (how/why the collection exists)
+- The prolog (tour_hook) MUST tell the origin story using elements marked 'origin', 'intention', 'turning_point'
+- Each arc chapter should declare "grounded_on": ["se_001", "se_003"] listing element IDs it uses
+- Chapters with no grounding element are allowed only as connective tissue (no factual claims)
+- The closing_revelation MUST close the documented arc (return to the origin story's conclusion)
+- NEVER invent dates, intentions, quotes, or provenance not in the elements above
+"""
+        prompt += _story_injection
+        print(f"  [§3] Story elements injected into spine prompt ({len(story_elements)} elements, mode=found)")
+    else:
+        print(f"  [§3] No story elements available — spine will use invented arc (mode=invented)")
 
     start = time.time()
 
@@ -164,6 +193,9 @@ def generate_spine(
                 if af not in stop:
                     logger.warning(f"Arc stop missing field: {af}")
 
+        # [§3] Add story_mode to spine
+        spine["story_mode"] = _story_mode
+        
         return spine
 
     except json.JSONDecodeError as e:

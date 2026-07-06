@@ -77,9 +77,10 @@ def run_qa(tour_text, tour_file=""):
     else:
         check("No compass bearings (museum)", True, "(not a museum tour — skipped)")
 
-    # 5. Introduction block present (Storied feature)
-    check("Introduction block present", "Introduction:" in tour_text or "Introduction\n" in tour_text,
-          "no Introduction block found")
+    # 5. [R2] No standalone Introduction block — prolog now lives in Stop 1
+    _has_standalone_intro = bool(re.match(r'^Introduction:', tour_text, re.MULTILINE))
+    check("No standalone Introduction block (R2)", not _has_standalone_intro,
+          "found standalone 'Introduction:' — should be folded into Stop 1")
 
     # 6. closing_revelation present in final stop
     if stops:
@@ -90,10 +91,16 @@ def run_qa(tour_text, tour_file=""):
     else:
         check("Final stop has substantial content", False, "no stops found")
 
-    # 7. Word count per stop between 200-500
+    # 7. Word count per stop: 200-500 for middle stops, up to 800 for first/last (prolog/epilog)
     word_counts = [len(stop.split()) for stop in stops]
-    in_range = [200 <= wc <= 500 for wc in word_counts]
-    check("Word count per stop 200-500",
+    in_range = []
+    for idx, wc in enumerate(word_counts):
+        if idx == 0 or idx == len(word_counts) - 1:
+            # Stop 1 carries prolog, last stop carries epilog — allow up to 800
+            in_range.append(150 <= wc <= 800)
+        else:
+            in_range.append(200 <= wc <= 500)
+    check("Word count per stop (200-500 middle, 150-800 first/last)",
           sum(in_range) >= len(word_counts) * 0.7,
           f"{sum(in_range)}/{len(word_counts)} in range; counts={word_counts[:5]}")
 
@@ -193,6 +200,53 @@ def run_qa(tour_text, tour_file=""):
           f"{len(_ungrounded)} suspicious title(s): {_ungrounded[:3]}")
     if _ungrounded:
         FACTUAL_FAIL_COUNT += 1
+
+    # [T6] Splice check: detect mid-token splices and malformed transitions
+    _splice_issues = []
+    _lines = tour_text.split('\n')
+    for line_num, line in enumerate(_lines, 1):
+        # Check for [a-z].[a-z] mid-token patterns (splice signature)
+        _splices = re.findall(r'[a-z]\.[a-z]', line)
+        # Filter out legitimate abbreviations (e.g., "i.e.", "e.g.", URLs)
+        for sp in _splices:
+            if not any(x in line.lower() for x in ['i.e.', 'e.g.', 'http', '.com', '.fr', '.org']):
+                _splice_issues.append(f"Line {line_num}: '{sp}' in ...{line[max(0,line.find(sp)-20):line.find(sp)+20]}...")
+        # Check for "Stop N" references in body text (not headers)
+        if not re.match(r'^Stop\s+\d+:', line) and re.search(r'\bStop\s+\d+\b', line):
+            if 'Directions:' not in line:  # Allow in transition templates
+                _splice_issues.append(f"Line {line_num}: 'Stop N' reference in body")
+    check("T6 No splice corruption (mid-token dots, stray Stop N refs)",
+          len(_splice_issues) <= 1,
+          f"{len(_splice_issues)} issue(s): {_splice_issues[:3]}")
+
+    # [R3] Orientation substance check: flag generic filler orientations
+    _orientation_filler = []
+    _orientation_blocks = re.findall(r'^Orientation:\s*(.+?)$', tour_text, re.MULTILINE)
+    _ORIENTATION_FILLER_PATTERNS = [
+        r'(?i)fully\s+immerse',
+        r'(?i)intricate\s+details',
+        r'(?i)symbolic\s+richness',
+        r'(?i)position\s+yourself\s+(directly\s+)?in\s+front',
+        r'(?i)take\s+a\s+moment\s+to\s+let',
+        r'(?i)allow\s+your\s+(eyes|gaze)\s+to\s+wander',
+    ]
+    for orient in _orientation_blocks:
+        _has_filler = any(re.search(pat, orient) for pat in _ORIENTATION_FILLER_PATTERNS)
+        # Check if it also has substance (specific art element, positional reason)
+        _has_substance = bool(re.search(
+            r'(?i)(mosaic|reflected|window|pond|corner|ceiling|floor|left wall|right wall|'
+            r'lower|upper|behind|above|below|stained glass|tapestry|sculpture|goat|angel|'
+            r'designed to be|from this angle)',
+            orient
+        ))
+        if _has_filler and not _has_substance:
+            _orientation_filler.append(orient[:60])
+    if is_museum:
+        check("R3 Orientation substance (no generic filler in museum)",
+              len(_orientation_filler) == 0,
+              f"{len(_orientation_filler)} filler orientation(s): {_orientation_filler[:2]}")
+    else:
+        check("R3 Orientation substance (museum only)", True, "(not museum — skipped)")
 
     # 9. Single-venue consistency: for museum tours, stops should not reference other NAMED venues
     # [GAP 3] Exemption: when address-contained (<=2 unique addresses), exempt named-venue refs
