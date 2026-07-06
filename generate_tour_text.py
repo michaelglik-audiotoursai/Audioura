@@ -1488,6 +1488,113 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 else:
                     poi_list, _d1_evidence_log, _d1_venue_corpus = _d1_result
 
+            # -------- [R4] Bounded replenishment loop --------
+            # If verified < requested, re-prompt for MORE candidates and verify
+            _r4_all_tried_names = set(_normalize_name(p['name']) for p in poi_list)
+            _r4_all_tried_names.update(_normalize_name(k) for k in _d1_evidence_log.keys())
+            _r4_round = 0
+            _R4_MAX_ROUNDS = 3
+            _R4_MAX_CANDIDATES = 30
+            
+            while len(poi_list) < total_stops and _r4_round < _R4_MAX_ROUNDS and len(_r4_all_tried_names) < _R4_MAX_CANDIDATES:
+                _r4_round += 1
+                _r4_needed = total_stops - len(poi_list)
+                _r4_ask = min(_r4_needed + 5, 15)  # Ask for extras to improve hit rate
+                print(f"\n  [R4] Replenishment round {_r4_round}/{_R4_MAX_ROUNDS}: need {_r4_needed} more, asking for {_r4_ask}")
+                
+                # Build exclusion list
+                _r4_forbidden = sorted(_r4_all_tried_names)[:50]
+                _r4_forbidden_str = "; ".join(_r4_forbidden) if _r4_forbidden else "(none)"
+                
+                _r4_prompt = (
+                    f"You are a knowledgeable art historian. "
+                    f"List exactly {_r4_ask} INDIVIDUAL ARTWORKS at '{_museum_venue_name}'.\n"
+                    f"DO NOT include: {_r4_forbidden_str}\n"
+                    f"DO NOT include the name of the exhibition/collection itself.\n"
+                    f"Each must be a real, named, individual artwork (painting, mosaic, sculpture, stained glass).\n"
+                    f"Return ONLY a JSON array: [{{\"name\": \"...\", \"address\": \"...\"}}]"
+                )
+                _r4_data = {
+                    "model": "gpt-3.5-turbo",
+                    "messages": [
+                        {"role": "system", "content": "Return ONLY valid JSON arrays."},
+                        {"role": "user", "content": _r4_prompt}
+                    ],
+                    "temperature": 0.7,
+                    "max_tokens": 600,
+                }
+                try:
+                    _r4_resp = requests.post(
+                        "https://api.openai.com/v1/chat/completions",
+                        headers=headers, data=json.dumps(_r4_data)
+                    )
+                    if _r4_resp.status_code != 200:
+                        print(f"    [R4] API error {_r4_resp.status_code}")
+                        break
+                    _r4_result = _r4_resp.json()
+                    _r4_text = _r4_result["choices"][0]["message"]["content"]
+                    tokens_used = _r4_result["usage"]["total_tokens"]
+                    total_tokens += tokens_used
+                    total_cost += tokens_used / 1000 * 0.002
+                    
+                    _r4_candidates = _parse_json_array_loose(_r4_text)
+                    if not _r4_candidates:
+                        print(f"    [R4] Unparseable response")
+                        break
+                    
+                    # Build POI objects and verify
+                    _r4_new_pois = []
+                    for c in _r4_candidates:
+                        if not isinstance(c, dict):
+                            continue
+                        name = (c.get("name") or "").strip()
+                        if not name or _normalize_name(name) in _r4_all_tried_names:
+                            continue
+                        _r4_all_tried_names.add(_normalize_name(name))
+                        _r4_new_pois.append(_new_poi(name, c.get("address") or ""))
+                    
+                    if not _r4_new_pois:
+                        print(f"    [R4] No new candidates after dedup")
+                        break
+                    
+                    # Verify new candidates
+                    if _story_corpus_result:
+                        from story_miner import match_candidate_to_canonical
+                        _r4_verified = []
+                        for p in _r4_new_pois:
+                            match = match_candidate_to_canonical(
+                                p['name'],
+                                _story_corpus_result['canonical_titles'],
+                                _story_corpus_result['combined_text']
+                            )
+                            if match:
+                                _r4_verified.append(p)
+                                _d1_evidence_log[p['name']] = {
+                                    "status": "VERIFIED",
+                                    "canonical_title": match[0],
+                                    "snippet": match[1],
+                                    "method": "R4_replenishment",
+                                }
+                                print(f"    [R4] VERIFIED '{p['name']}' → '{match[0]}'")
+                            else:
+                                print(f"    [R4] dropped '{p['name']}'")
+                        
+                        _r4_added = _r4_verified[:_r4_needed]
+                        poi_list.extend(_r4_added)
+                        print(f"    [R4] Round {_r4_round}: +{len(_r4_added)} verified, total now {len(poi_list)}")
+                    else:
+                        print(f"    [R4] No corpus for verification — skipping")
+                        break
+                        
+                except Exception as e:
+                    print(f"    [R4] Error: {e}")
+                    break
+            
+            if len(poi_list) < total_stops:
+                print(f"  [R4] Replenishment exhausted: {len(poi_list)}/{total_stops} stops (stop_count_warning)")
+            else:
+                print(f"  [R4] Target reached: {len(poi_list)}/{total_stops} stops")
+
         # -------- [BLOCKER 1] Single-venue validation --------
         # For a named single museum, check if POIs look like other museums/venues
         # instead of interior rooms/exhibits. Reject and note for retry.
@@ -2264,6 +2371,24 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 if _corpus_sentences:
                     _grounded_facts = '. '.join(_corpus_sentences[:3])
                     description_prompt += f"\nGROUNDED FACTS FROM MUSEUM SOURCES (use these dates/details as MANDATORY content):\n{_grounded_facts}\n"
+        
+        # [§4] Story element injection — per-work facts from story_elements
+        if tour_category == 'museum' and _story_corpus_result and poi_name:
+            _per_work_ctx = _story_corpus_result.get('per_work_contexts', {})
+            # Find matching work contexts
+            _work_facts = []
+            for _title, _sents in _per_work_ctx.items():
+                from story_miner import _normalize
+                if _normalize(poi_name)[:8] in _normalize(_title) or _normalize(_title)[:8] in _normalize(poi_name):
+                    _work_facts.extend(_sents[:3])
+            # Also use evidence snippet from D1
+            if poi_name in _d1_evidence_log:
+                _ev = _d1_evidence_log[poi_name]
+                if isinstance(_ev, dict) and _ev.get('snippet'):
+                    _work_facts.append(_ev['snippet'])
+            if _work_facts:
+                _facts_text = '. '.join(f[:200] for f in _work_facts[:4])
+                description_prompt += f"\nDOCUMENTED FACTS FOR THIS WORK (incorporate at least one):\n{_facts_text}\n"
 
         # Add venue containment constraint for single-venue museum tours
         if tour_category == 'museum' and _museum_venue_name:
