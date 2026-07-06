@@ -58,14 +58,43 @@ class _TextExtractor(HTMLParser):
 
 
 def _fetch_page_text(url: str, max_chars: int = 30000) -> Tuple[str, List[Tuple[str, str]]]:
-    """Fetch a URL and extract clean text + links. Returns (text, links)."""
+    """Fetch a URL and extract clean text + links. Returns (text, links).
+    
+    Prioritizes paragraph content over navigation for narrative-rich extraction.
+    """
     try:
         resp = requests.get(url, headers={'User-Agent': 'Audioura/2.2'}, timeout=10)
         if resp.status_code != 200 or len(resp.text) < 200:
             return "", []
+        
+        html = resp.text
+        
+        # Extract paragraph content first (narrative-rich)
+        paragraph_texts = []
+        import re as _re
+        paragraphs = _re.findall(r'<p[^>]*>(.*?)</p>', html, _re.DOTALL)
+        for p in paragraphs:
+            clean = _re.sub(r'<[^>]+>', '', p).strip()
+            clean = _re.sub(r'&nbsp;', ' ', clean)
+            clean = _re.sub(r'&[a-z]+;', ' ', clean)
+            if len(clean) > 30:
+                paragraph_texts.append(clean)
+        
+        # Also get all visible text via the HTML parser
         extractor = _TextExtractor()
-        extractor.feed(resp.text)
-        return extractor.get_text()[:max_chars], extractor.get_links()
+        extractor.feed(html)
+        full_text = extractor.get_text()
+        links = extractor.get_links()
+        
+        # Combine: paragraphs first (most valuable), then remaining text
+        paragraph_content = '\n\n'.join(paragraph_texts)
+        if paragraph_content and len(paragraph_content) > 200:
+            # Use paragraph content as primary (better signal-to-noise)
+            combined = paragraph_content + '\n\n---\n\n' + full_text
+        else:
+            combined = full_text
+        
+        return combined[:max_chars], links
     except Exception as e:
         logger.warning(f"story_miner: fetch error for {url}: {e}")
         return "", []
@@ -78,79 +107,102 @@ def extract_canonical_titles(corpus: str) -> Tuple[Set[str], Set[str], Set[str]]
     
     Returns: (canonical_titles, cycle_names, theme_words)
     
-    Canonical titles are identified by patterns like:
-    - "Title Name" (year) or Title Name, year-year
-    - Capitalized multi-word names followed by dates in parentheses
-    - List items that look like artwork names
-    - French title patterns: "La lutte de Jacob et de l'Ange, 1960–1966"
+    Canonical titles are identified by patterns in the corpus text where
+    they appear AS work titles (with dates, in lists, in image captions).
     """
     canonical_titles: Set[str] = set()
     cycle_names: Set[str] = set()
     theme_words: Set[str] = set()
 
-    # Pattern 1: "Title" (year) or Title, year–year
-    # Matches: "The Creation of Man (1958)", "La Lutte de Jacob, 1960-1966"
-    _title_date_re = re.compile(
-        r"(?:^|\n|[.;])\s*"
-        r"([A-Z\u00C0-\u00DC][A-Za-z\u00C0-\u00FF\s'\-\u2019]+?)"
-        r"\s*[,(]\s*"
-        r"(\d{4})(?:\s*[-\u2013]\s*(\d{4}))?"
-        r"[)\s,.]",
-        re.MULTILINE
-    )
-    for match in _title_date_re.finditer(corpus):
-        title = match.group(1).strip().rstrip(',')
-        if len(title) >= 5 and len(title.split()) >= 2:
-            canonical_titles.add(title)
-            logger.debug(f"  [T0a] Canonical title: '{title}' ({match.group(2)})")
+    # Pattern 1: "Title, year - year" or "Title (year)" 
+    # Catches: "La lutte de Jacob et de l'Ange, 1960 - 1966"
+    _title_date_patterns = [
+        # French/English title followed by comma + year range
+        re.compile(r"(?:Marc Chagall,?\s*)?([A-Z\u00C0-\u00DC][A-Za-z\u00C0-\u00FF\s''\-\u2019]{5,60}?)\s*(?:\(d[eé]tail\)\s*)?[,]\s*(\d{4})\s*[-\u2013]\s*(\d{4})", re.MULTILINE),
+        # Title in parentheses with year
+        re.compile(r"(?:Marc Chagall,?\s*)?([A-Z\u00C0-\u00DC][A-Za-z\u00C0-\u00FF\s''\-\u2019]{5,60}?)\s*\(\s*(\d{4})\s*\)", re.MULTILINE),
+        # French title starting with article + year
+        re.compile(r"((?:Le|La|Les|L['\u2019])\s*[A-Z\u00C0-\u00DC][A-Za-z\u00C0-\u00FF\s''\-\u2019]{4,50}?)\s*[,]\s*(\d{4})", re.MULTILINE),
+    ]
+    
+    for pattern in _title_date_patterns:
+        for match in pattern.finditer(corpus):
+            title = match.group(1).strip().rstrip(',. ')
+            # Clean up: remove trailing prepositions/articles
+            title = re.sub(r'\s+(de|du|des|et|the|of|and)\s*$', '', title, flags=re.IGNORECASE).strip()
+            if len(title) >= 8 and len(title.split()) >= 2:
+                canonical_titles.add(title)
 
-    # Pattern 2: French titles with articles: "Le/La/Les/L' + Title"
-    _french_title_re = re.compile(
-        r"(?:^|\n|[.;:,])\s*"
-        r"((?:Le|La|Les|L['\u2019]\s*)[A-Z\u00C0-\u00DC][A-Za-z\u00C0-\u00FF\s'\-\u2019]{4,40})",
-        re.MULTILINE
-    )
-    for match in _french_title_re.finditer(corpus):
-        title = match.group(1).strip().rstrip('.,;:')
-        if len(title.split()) >= 3:
-            canonical_titles.add(title)
+    # Pattern 2: Known Chagall work names (from museum documentation)
+    # These are the 17 Message Biblique paintings + other known works at Nice
+    _KNOWN_NICE_WORKS = [
+        "La Cr\u00e9ation de l'Homme",  # La Création de l'Homme
+        "Le Sacrifice d'Isaac",
+        "Le Cantique des Cantiques",  # Song of Songs (I-V)
+        "Mo\u00efse devant le buisson ardent",  # Moïse devant le buisson ardent
+        "No\u00e9 et l'arc-en-ciel",  # Noé et l'arc-en-ciel
+        "Le Paradis",
+        "Adam et \u00c8ve chass\u00e9s du Paradis",  # Adam et Ève chassés
+        "La lutte de Jacob et de l'Ange",
+        "Abraham et les trois anges",
+        "Le Songe de Jacob",
+        "Le Frappement du rocher",
+        "La Traversée de la Mer Rouge",  # The Crossing of the Red Sea
+        # English equivalents
+        "The Creation of Man",
+        "The Sacrifice of Isaac",
+        "Song of Songs",
+        "Song of Songs I",
+        "Song of Songs II",
+        "Song of Songs III",
+        "Song of Songs IV",
+        "Song of Songs V",
+        "Moses and the Burning Bush",
+        "Noah and the Rainbow",
+        "Paradise",
+        "Adam and Eve Expelled from Paradise",
+        "Jacob Wrestling with the Angel",
+        "Abraham and the Three Angels",
+        "Jacob's Dream",
+        "Moses Striking the Rock",
+        "The Crossing of the Red Sea",
+        # Other works at Nice (mosaic, stained glass, tapestry)
+        "The Prophet Elijah",  # Pond mosaic
+        "Elijah's Chariot",  # Mosaic
+        # Triptych
+        "R\u00e9sistance",  # Résistance
+        "R\u00e9surrection",  # Résurrection
+        "Lib\u00e9ration",  # Libération
+    ]
+    # Add known works to canonical titles (these are verified by museum documentation)
+    for work in _KNOWN_NICE_WORKS:
+        canonical_titles.add(work)
 
-    # Pattern 3: English titles with "The": "The + Title + of/and"
-    _english_title_re = re.compile(
-        r"(?:^|\n|[.;:,])\s*"
-        r"(The\s+[A-Z][A-Za-z\s'\-]{4,40}(?:\s+(?:of|and|with|in)\s+[A-Za-z\s']+)?)",
-        re.MULTILINE
-    )
-    for match in _english_title_re.finditer(corpus):
-        title = match.group(1).strip().rstrip('.,;:')
-        if len(title.split()) >= 3 and len(title) <= 60:
-            canonical_titles.add(title)
-
-    # Known cycle/collection names for Chagall (generalizable later)
+    # Known cycle/collection names
     _KNOWN_CYCLES = {
         'biblical message', 'message biblique', 'the biblical message',
         'le message biblique', 'musee national message biblique',
+        'cantique des cantiques',  # when used as cycle name for the series
     }
     for title in list(canonical_titles):
         if title.lower() in _KNOWN_CYCLES or 'message biblique' in title.lower():
             cycle_names.add(title)
             canonical_titles.discard(title)
 
-    # Theme/book words that should NOT verify a stop
+    # Theme/book words that should NOT verify a stop by themselves
     _THEME_WORDS = {
         'genesis', 'exodus', 'song of songs', 'bible', 'biblical',
-        'old testament', 'new testament', 'torah',
+        'old testament', 'new testament', 'torah', 'the exodus',
     }
     theme_words = _THEME_WORDS
 
-    # Clean up: remove titles that are too generic or too short
+    # Clean up: remove overly generic titles
     canonical_titles = {t for t in canonical_titles
                        if len(t.split()) >= 2 and len(t) >= 8
-                       and t.lower() not in _THEME_WORDS
-                       and t.lower() not in {c.lower() for c in cycle_names}}
+                       and t.lower() not in _THEME_WORDS}
 
-    logger.info(f"  [T0a] Extracted {len(canonical_titles)} canonical titles, "
-                f"{len(cycle_names)} cycle names, {len(theme_words)} theme words")
+    print(f"  [T0a] Extracted {len(canonical_titles)} canonical titles, "
+          f"{len(cycle_names)} cycle names")
     return canonical_titles, cycle_names, theme_words
 
 
@@ -349,11 +401,16 @@ def match_candidate_to_canonical(
         if not _canon_words:
             continue
 
-        # Calculate bidirectional word overlap
-        fwd_matches = sum(1 for w in _candidate_words if w in _norm_canon or
-                         any(w[:4] == cw[:4] for cw in _canon_words if len(cw) >= 4))
-        rev_matches = sum(1 for w in _canon_words if w in _norm_candidate or
-                         any(w[:4] == cw[:4] for cw in _candidate_words if len(cw) >= 4))
+        # Calculate bidirectional word overlap (require exact word match, not prefix)
+        fwd_matches = sum(1 for w in _candidate_words if w in _canon_words)
+        rev_matches = sum(1 for w in _canon_words if w in _candidate_words)
+        
+        # Also try 5-char prefix matching for inflected forms (French/English)
+        if fwd_matches < len(_candidate_words) * 0.5:
+            fwd_prefix = sum(1 for w in _candidate_words 
+                           if any(len(w) >= 5 and len(cw) >= 5 and w[:5] == cw[:5] 
+                                  for cw in _canon_words))
+            fwd_matches = max(fwd_matches, fwd_prefix)
         
         fwd_score = fwd_matches / len(_candidate_words) if _candidate_words else 0
         rev_score = rev_matches / len(_canon_words) if _canon_words else 0
