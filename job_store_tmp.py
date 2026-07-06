@@ -1,4 +1,4 @@
-"""
+﻿"""
 Job Store ΓÇö Database-backed replacement for ACTIVE_JOBS in-memory dict.
 ===========================================================================
 

@@ -5,5 +5,5 @@
 WALKING_LEG_TARGET_KM    = 1.0    # what the prompt asks GPT for
 WALKING_LEG_HARD_KM      = 1.75   # verifier rejects a sequential leg above this
 WALKING_TOTAL_HARD_KM    = 12.0   # backstop on total straight-line route length
-SPECIALIZED_LEG_HARD_KM  = 4.0    # biking / driving / themed tours â€” looser (future)
+SPECIALIZED_LEG_HARD_KM  = 4.0    # biking / driving / themed tours “Çö looser (future)
 MAX_REPLACEMENT_ATTEMPTS = 2      # Part C replacement loop cap
