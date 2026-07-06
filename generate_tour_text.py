@@ -2113,6 +2113,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # -------- [S11] Storied: generate spine + fact sheets when STORIED_MODE=true --------
     _storied_spine = None
     _storied_fact_sheets = None
+    _saved_prolog = ""  # [R2] Prolog text to be folded into Stop 1 (no standalone Introduction block)
     if _storied_mode:
         print(f"\n[Storied] STORIED_MODE=true — generating spine + fact sheets...")
         try:
@@ -2471,18 +2472,18 @@ Requirements:
                 _prolog_text = _prolog_resp.json()["choices"][0]["message"]["content"].strip()
                 if _prolog_text.startswith('"') and _prolog_text.endswith('"'):
                     _prolog_text = _prolog_text[1:-1].strip()
-                complete_tour += f"Introduction:\n\n{_prolog_text}\n\n"
-                print(f"  [PROLOG] Journey introduction added ({len(_prolog_text.split())} words)")
+                # [R2] Do NOT emit standalone Introduction block — save for Stop 1
+                _saved_prolog = _prolog_text
+                print(f"  [R2] Prolog saved for Stop 1 ({len(_prolog_text.split())} words)")
             else:
-                # Fallback to simple hook if prolog generation fails
+                # Fallback to simple hook
                 if _tour_hook:
-                    complete_tour += f"Introduction:\n\n{_tour_hook}\n\n"
-                    print(f"  [PROLOG] Fallback to simple hook (API error: {_prolog_resp.status_code})")
+                    _saved_prolog = _tour_hook
+                    print(f"  [R2] Prolog fallback (hook) saved for Stop 1")
         except Exception as e:
             print(f"  [PROLOG] Error: {e}")
-            # Fallback
             if _storied_spine.get("tour_hook"):
-                complete_tour += f"Introduction:\n\n{_storied_spine['tour_hook']}\n\n"
+                _saved_prolog = _storied_spine['tour_hook']
 
     # Add each POI with its description and directions
     for i, poi in enumerate(poi_list):
@@ -2590,8 +2591,23 @@ Requirements:
                 if entrance_directions:
                     poi_content += entrance_directions + " "
         
-        # Add the orientation text
-        poi_content += orientation + "\n\n"
+        # Add the orientation text — [R3] only if substantive (museum tours)
+        if tour_category == 'museum' and _museum_venue_name:
+            # R3: Orientation only if it contains a grounded viewing note
+            _has_substance = bool(re.search(
+                r'(?i)(mosaic|reflected|window|pond|corner|ceiling|floor|left wall|right wall|'
+                r'lower|upper|behind|above|below|stained glass|tapestry|sculpture)',
+                orientation
+            ))
+            if _has_substance and orientation != "Position yourself to best view this artwork.":
+                poi_content += f"Orientation: {orientation}\n\n"
+            # else: skip orientation entirely — go straight to description
+        else:
+            poi_content += f"Orientation: {orientation}\n\n"
+        
+        # [R2] For Stop 1: inject prolog before description
+        if i == 0 and _saved_prolog:
+            poi_content += f"{_saved_prolog}\n\n"
         
         # Add description
         poi_content += description + "\n\n"
@@ -2599,50 +2615,30 @@ Requirements:
         # Add directions to next stop or conclusion
         if i < len(poi_list) - 1:
             next_poi = poi_list[i + 1]
-            directions = next_poi.get("directions", "")
             
-            # Debug: Print the directions
-            print(f"DEBUG - Directions for Stop {stop_num} to {stop_num+1}: '{directions}'")
-            
-            # [S32] Storied: generate improved directions when STORIED_MODE=true
-            if _storied_mode:
-                try:
-                    if tour_category == 'museum':
-                        # Works-first: for museum tours, don't fabricate room-to-room directions.
-                        # If next POI has a known location_hint (room/hall), use it.
-                        # Otherwise, tell visitor to ask staff.
-                        _next_address = next_poi.get('address', '')
-                        _next_type = next_poi.get('type_specialty', '')
-                        if _next_type and any(w in _next_type.lower() for w in ('hall', 'room', 'gallery', 'floor', 'wing')):
-                            directions = f"Proceed to {next_poi['name']}, located in the {_next_type}."
-                        elif _next_address and _museum_venue_name and _museum_venue_name.lower()[:10] not in _next_address.lower():
-                            # Address contains a room/location hint different from just the venue address
-                            directions = f"Proceed to {next_poi['name']}."
-                        else:
-                            directions = f"Ask museum staff for the current location of {next_poi['name']}."
-                    else:
+            # [T4] DETERMINISTIC TRANSITION TEMPLATES — no LLM content in transitions
+            # This eliminates the splice-corruption bug class entirely
+            if tour_category == 'museum' and _museum_venue_name:
+                # Museum tours: simple deterministic transition
+                _transition = f"Proceed to the next work: {next_poi['name']}. Ask museum staff if you need directions."
+            else:
+                # Walking tours: use generated directions if available
+                directions = next_poi.get("directions", "")
+                if _storied_mode:
+                    try:
                         from directions_generator import generate_walking_directions
                         _storied_directions = generate_walking_directions(poi_name, next_poi['name'], location, api_key)
                         if _storied_directions:
                             directions = _storied_directions
-                except ImportError:
-                    pass  # Fall back to Phase 3B directions
-                except Exception as _dir_err:
-                    print(f"  [S32] Directions generation error: {_dir_err}")
-
-            # Always include the standard phrase with the next stop name
-            poi_content += f"Please resume the tour at {next_poi['name']} by following these directions: "
+                    except (ImportError, Exception):
+                        pass
+                if directions and directions.strip():
+                    _transition = directions.strip()
+                else:
+                    _transition = f"Continue to {next_poi['name']}."
             
-            # CRITICAL FIX: Use the CURRENT POI's directions to get TO the next POI
-            # The directions should be stored in the NEXT POI but describe how to get there FROM current POI
-            if directions and directions.strip() and "Continue to" not in directions:
-                # Use the detailed walking directions provided by AI
-                poi_content += directions.strip()
-                print(f"  ✅ Using detailed walking directions: {directions[:50]}...")
-            else:
-                # Fallback to generic direction only if no detailed directions available
-                poi_content += f"Continue to '{next_poi['name']}'."
-                print(f"  ⚠️ Using generic directions - no detailed directions found")
+            poi_content += f"\nDirections: {_transition}\n\n"
+            print(f"  [T4] Transition to Stop {stop_num+1}: {_transition[:60]}...")
         else:
             # For the last POI — EPILOG when Storied, generic conclusion when Beta
             if _storied_mode and _storied_spine:
@@ -2658,6 +2654,20 @@ Requirements:
                 epilog += f"\n\nIf you'd like to explore more, consider generating another tour — perhaps a different perspective on this same place, or a new destination entirely. The next journey awaits."
                 
                 poi_content += epilog
+                
+                # [R1] Sources line — credit found stories
+                if _story_corpus_result and _story_corpus_result.get('source_urls'):
+                    _src_urls = _story_corpus_result['source_urls']
+                    _src_domains = set()
+                    for u in _src_urls:
+                        from urllib.parse import urlparse as _up
+                        _domain = _up(u).netloc
+                        if _domain:
+                            _src_domains.add(_domain)
+                    if _src_domains:
+                        _sources_text = ", ".join(sorted(_src_domains))
+                        poi_content += f"\n\nSources: This tour draws on information from {_sources_text} and the Wikipedia article on the museum."
+                
                 print(f"  [EPILOG] Journey epilog added to last stop")
             else:
                 # Beta: standard conclusion
