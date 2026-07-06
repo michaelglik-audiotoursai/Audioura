@@ -529,6 +529,134 @@ def _validate_museum_stop_descriptions(poi_list, venue_name, headers):
     return [first_stop] + all_survivors
 
 
+def _verify_works_v2(poi_list, venue_name):
+    """[D1 v2] In-collection verification using story_miner canonical title matching.
+    
+    Uses the new story_miner module for:
+    - Expanded corpus fetch (museum narrative pages + fr.wikipedia)
+    - Canonical title extraction and matching (T0a)
+    - Stop disjointness (T0b)
+    - Per-work evidence snippets
+    
+    Returns (verified_pois, evidence_log, venue_corpus, story_corpus_result) or None.
+    """
+    try:
+        from story_miner import (
+            fetch_venue_narrative_corpus,
+            match_candidate_to_canonical,
+            check_stop_disjointness,
+        )
+    except ImportError:
+        print("  [D1v2] story_miner not available — falling back to legacy D1")
+        return None  # Caller will fall back to legacy
+
+    # Determine museum site URL
+    _base_site_url = ""
+    if "chagall" in venue_name.lower():
+        _base_site_url = "https://musees-nationaux-alpesmaritimes.fr/chagall/en/collection"
+    
+    # Determine Wikipedia title
+    _wiki_title = venue_name.replace("Musee", "Musée").replace("National ", "")
+
+    # Fetch the expanded narrative corpus
+    corpus_result = fetch_venue_narrative_corpus(
+        venue_name=venue_name,
+        base_site_url=_base_site_url,
+        wikipedia_title=_wiki_title,
+    )
+
+    canonical_titles = corpus_result['canonical_titles']
+    cycle_names = corpus_result['cycle_names']
+    combined_text = corpus_result['combined_text']
+
+    if not canonical_titles:
+        print(f"  [D1v2] No canonical titles extracted — cannot verify")
+        return None
+
+    # Verify each candidate against canonical titles
+    evidence_log = {}
+    verified_pois = []
+    
+    # Also check for rejection using artist article (same logic as before)
+    from rag_retriever import fetch_wikipedia_summary
+    import re as _d1v2_re
+    
+    # Extract artist name for rejection checks
+    _cleaned = _d1v2_re.sub(
+        r"(?i)(mus[ée]+e?|museum|gallery|national|the|of|art|centre|center)\s*",
+        " ", venue_name
+    ).strip()
+    _venue_artist = " ".join(w for w in _cleaned.split() if w and len(w) > 1).strip()
+    artist_article = ""
+    if _venue_artist:
+        artist_article = fetch_wikipedia_summary(_venue_artist)
+
+    _rejection_indicators = ['hadassah', 'jerusalem', 'metropolitan opera',
+                             'new york', 'pompidou', 'louvre', 'hermitage',
+                             'uffizi', 'tate', 'prado', 'moma', 'guggenheim']
+
+    for poi in poi_list:
+        work_name = poi.get('name', '')
+        
+        # Step 1: Try canonical title match
+        match = match_candidate_to_canonical(work_name, canonical_titles, combined_text)
+        if match:
+            canonical_title, snippet = match
+            print(f"  [D1v2] VERIFIED '{work_name}' → canonical: '{canonical_title}'")
+            evidence_log[work_name] = {
+                "status": "VERIFIED",
+                "canonical_title": canonical_title,
+                "snippet": snippet,
+                "method": "canonical_title_match",
+            }
+            verified_pois.append(poi)
+            continue
+        
+        # Step 2: Check if it's a theme word / cycle name (should not be a stop)
+        _work_lower = work_name.lower()
+        if any(tw in _work_lower for tw in corpus_result['theme_words']):
+            print(f"  [D1v2] DROPPED '{work_name}' — theme/book word, not a work title")
+            evidence_log[work_name] = {"status": "DROPPED", "reason": "theme word"}
+            continue
+        if any(cn.lower() in _work_lower or _work_lower in cn.lower() 
+               for cn in cycle_names):
+            print(f"  [D1v2] DROPPED '{work_name}' — cycle/collection name (prolog material)")
+            evidence_log[work_name] = {"status": "DROPPED", "reason": "cycle name"}
+            continue
+        
+        # Step 3: Rejection check using artist article
+        if artist_article:
+            _artist_lower = artist_article.lower()
+            _rejected = False
+            for _other in _rejection_indicators:
+                if _other in _artist_lower and _other not in venue_name.lower():
+                    # Check if this work name + other venue are in proximity
+                    from story_miner import _normalize
+                    _norm_work = _normalize(work_name)
+                    _work_pos = _artist_lower.find(_norm_work[:8]) if _norm_work else -1
+                    if _work_pos >= 0:
+                        _context = _artist_lower[max(0, _work_pos-200):_work_pos+200]
+                        if _other in _context:
+                            print(f"  [D1v2] REJECTED '{work_name}' — artist article places near '{_other}'")
+                            evidence_log[work_name] = {"status": "REJECTED", "reason": f"located at {_other}"}
+                            _rejected = True
+                            break
+            if _rejected:
+                continue
+        
+        # Step 4: No match — DROPPED
+        print(f"  [D1v2] DROPPED '{work_name}' — no canonical title match")
+        evidence_log[work_name] = {"status": "DROPPED", "reason": "no canonical match"}
+
+    # Fail-closed: need ≥4 verified
+    if len(verified_pois) < 4:
+        print(f"  [D1v2] Only {len(verified_pois)} verified — need ≥4 (fail-closed)")
+        return None
+
+    print(f"  [D1v2] {len(verified_pois)}/{len(poi_list)} works verified")
+    return verified_pois, evidence_log, combined_text, corpus_result
+
+
 def _verify_works_in_collection(poi_list, venue_name):
     """[D1] In-collection verification gate for museum tours.
     
@@ -1345,13 +1473,20 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # -------- [D1] In-collection verification for museum tours --------
         _d1_evidence_log = {}
         _d1_venue_corpus = ""
+        _story_corpus_result = None
         if tour_category == 'museum' and _museum_venue_name:
-            _d1_result = _verify_works_in_collection(poi_list, _museum_venue_name)
-            if _d1_result is None:
-                print(f"  [D1] In-collection verification FAILED — not enough verified works")
-                return None, None, (None, None)
+            # Try new story_miner-based verification (T0a/T1)
+            _d1v2_result = _verify_works_v2(poi_list, _museum_venue_name)
+            if _d1v2_result is not None and _d1v2_result is not None:
+                poi_list, _d1_evidence_log, _d1_venue_corpus, _story_corpus_result = _d1v2_result
             else:
-                poi_list, _d1_evidence_log, _d1_venue_corpus = _d1_result
+                # Fallback to legacy D1
+                _d1_result = _verify_works_in_collection(poi_list, _museum_venue_name)
+                if _d1_result is None:
+                    print(f"  [D1] In-collection verification FAILED — not enough verified works")
+                    return None, None, (None, None)
+                else:
+                    poi_list, _d1_evidence_log, _d1_venue_corpus = _d1_result
 
         # -------- [BLOCKER 1] Single-venue validation --------
         # For a named single museum, check if POIs look like other museums/venues
