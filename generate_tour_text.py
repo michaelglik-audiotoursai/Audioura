@@ -554,9 +554,13 @@ def _verify_works_v2(poi_list, venue_name):
     _base_site_url = ""
     if "chagall" in venue_name.lower():
         _base_site_url = "https://musees-nationaux-alpesmaritimes.fr/chagall/en/collection"
+    elif "matisse" in venue_name.lower():
+        _base_site_url = "https://www.musee-matisse-nice.org/en/the-collection/"
     
     # Determine Wikipedia title
     _wiki_title = venue_name.replace("Musee", "Musée").replace("National ", "")
+    # Try common variants
+    _wiki_variants = [_wiki_title, f"{_wiki_title} (Nice)", f"Musée Matisse (Nice)" if "matisse" in venue_name.lower() else _wiki_title]
 
     # Fetch the expanded narrative corpus
     corpus_result = fetch_venue_narrative_corpus(
@@ -564,13 +568,25 @@ def _verify_works_v2(poi_list, venue_name):
         base_site_url=_base_site_url,
         wikipedia_title=_wiki_title,
     )
+    
+    # If no pages fetched and we have variants, try them
+    if not corpus_result.get('pages') or len(corpus_result.get('combined_text', '')) < 500:
+        for variant in _wiki_variants[1:]:
+            _alt = fetch_venue_narrative_corpus(
+                venue_name=venue_name,
+                base_site_url=_base_site_url,
+                wikipedia_title=variant,
+            )
+            if _alt.get('combined_text', '') and len(_alt['combined_text']) > len(corpus_result.get('combined_text', '')):
+                corpus_result = _alt
+                break
 
     canonical_titles = corpus_result['canonical_titles']
     cycle_names = corpus_result['cycle_names']
     combined_text = corpus_result['combined_text']
 
     if not canonical_titles:
-        print(f"  [D1v2] No canonical titles extracted — cannot verify")
+        print(f"  [D1v2] No canonical titles extracted — falling back to legacy D1")
         return None
 
     # Verify each candidate against canonical titles
@@ -2174,6 +2190,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # Known museum coordinates (authoritative, from Wikipedia/Google Maps)
         _KNOWN_VENUE_COORDS = {
             'chagall': (43.7102, 7.2703),  # Musée National Marc Chagall, Nice
+            'matisse': (43.7196, 7.2755),  # Musée Matisse, Nice (Villa des Arènes, Cimiez)
         }
         _geocoded_coord = None
         for _key, _coord in _KNOWN_VENUE_COORDS.items():

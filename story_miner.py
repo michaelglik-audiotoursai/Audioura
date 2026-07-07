@@ -102,7 +102,7 @@ def _fetch_page_text(url: str, max_chars: int = 30000) -> Tuple[str, List[Tuple[
 
 # --- Canonical title extraction (T0a) ---
 
-def extract_canonical_titles(corpus: str) -> Tuple[Set[str], Set[str], Set[str]]:
+def extract_canonical_titles(corpus: str, venue_name: str = "") -> Tuple[Set[str], Set[str], Set[str]]:
     """Extract canonical work titles, cycle names, and theme words from venue corpus.
     
     Returns: (canonical_titles, cycle_names, theme_words)
@@ -133,50 +133,81 @@ def extract_canonical_titles(corpus: str) -> Tuple[Set[str], Set[str], Set[str]]
             if len(title) >= 8 and len(title.split()) >= 2:
                 canonical_titles.add(title)
 
-    # Pattern 2: Known Chagall work names (from museum documentation)
-    # These are the 17 Message Biblique paintings + other known works at Nice
-    _KNOWN_NICE_WORKS = [
-        "La Cr\u00e9ation de l'Homme",  # La Création de l'Homme
-        "Le Sacrifice d'Isaac",
-        "Le Cantique des Cantiques",  # Song of Songs (I-V)
-        "Mo\u00efse devant le buisson ardent",  # Moïse devant le buisson ardent
-        "No\u00e9 et l'arc-en-ciel",  # Noé et l'arc-en-ciel
-        "Le Paradis",
-        "Adam et \u00c8ve chass\u00e9s du Paradis",  # Adam et Ève chassés
-        "La lutte de Jacob et de l'Ange",
-        "Abraham et les trois anges",
-        "Le Songe de Jacob",
-        "Le Frappement du rocher",
-        "La Traversée de la Mer Rouge",  # The Crossing of the Red Sea
-        # English equivalents
-        "The Creation of Man",
-        "The Sacrifice of Isaac",
-        "Song of Songs",
-        "Song of Songs I",
-        "Song of Songs II",
-        "Song of Songs III",
-        "Song of Songs IV",
-        "Song of Songs V",
-        "Moses and the Burning Bush",
-        "Noah and the Rainbow",
-        "Paradise",
-        "Adam and Eve Expelled from Paradise",
-        "Jacob Wrestling with the Angel",
-        "Abraham and the Three Angels",
-        "Jacob's Dream",
-        "Moses Striking the Rock",
-        "The Crossing of the Red Sea",
-        # Other works at Nice (mosaic, stained glass, tapestry)
-        "The Prophet Elijah",  # Pond mosaic
-        "Elijah's Chariot",  # Mosaic
-        # Triptych
-        "R\u00e9sistance",  # Résistance
-        "R\u00e9surrection",  # Résurrection
-        "Lib\u00e9ration",  # Libération
-    ]
-    # Add known works to canonical titles (these are verified by museum documentation)
-    for work in _KNOWN_NICE_WORKS:
-        canonical_titles.add(work)
+    # Pattern 2: Known work names per venue (from museum documentation)
+    # Keyed by substring that appears in venue_name
+    _KNOWN_WORKS_BY_VENUE = {
+        "chagall": [
+            # 17 Message Biblique paintings (French)
+            "La Cr\u00e9ation de l'Homme", "Le Sacrifice d'Isaac",
+            "Le Cantique des Cantiques",
+            "Mo\u00efse devant le buisson ardent", "No\u00e9 et l'arc-en-ciel",
+            "Le Paradis", "Adam et \u00c8ve chass\u00e9s du Paradis",
+            "La lutte de Jacob et de l'Ange", "Abraham et les trois anges",
+            "Le Songe de Jacob", "Le Frappement du rocher",
+            "La Travers\u00e9e de la Mer Rouge",
+            # English equivalents
+            "The Creation of Man", "The Sacrifice of Isaac",
+            "Song of Songs", "Song of Songs I", "Song of Songs II",
+            "Song of Songs III", "Song of Songs IV", "Song of Songs V",
+            "Moses and the Burning Bush", "Noah and the Rainbow",
+            "Paradise", "Adam and Eve Expelled from Paradise",
+            "Jacob Wrestling with the Angel", "Abraham and the Three Angels",
+            "Jacob's Dream", "Moses Striking the Rock", "The Crossing of the Red Sea",
+            # Other works at Nice (mosaic, stained glass, tapestry)
+            "The Prophet Elijah", "Elijah's Chariot",
+            # Triptych
+            "R\u00e9sistance", "R\u00e9surrection", "Lib\u00e9ration",
+        ],
+        "matisse": [
+            # Key works at Musée Matisse, Nice (Villa des Arènes, Cimiez)
+            # From the museum's permanent collection
+            "Nature morte aux grenades",  # Still Life with Pomegranates (1947)
+            "Nu bleu IV",  # Blue Nude IV (1952)
+            "Fleurs et fruits",  # Flowers and Fruits (1952-53)
+            "La Danse inachev\u00e9e",  # The Unfinished Dance
+            "Temp\u00eate \u00e0 Nice",  # Storm in Nice (1919-20)
+            "Portrait de Madame Matisse",
+            "Rocaille sur fond noir",  # Rocaille on Black Background
+            "Fauteuil rocaille",  # Rocaille Armchair (1946)
+            "La Vague",  # The Wave
+            "Fen\u00eatre \u00e0 Tahiti",  # Window at Tahiti
+            "Lectrice \u00e0 la table jaune",  # Reader at the Yellow Table
+            # English equivalents
+            "Still Life with Pomegranates",
+            "Blue Nude IV", "Blue Nude",
+            "Flowers and Fruits",
+            "Storm in Nice",
+            "The Dance", "The Unfinished Dance",
+            "Portrait of Madame Matisse",
+            "Rocaille Armchair",
+            "The Wave",
+            "Window at Tahiti", "Window in Tahiti",
+            "Reader at the Yellow Table",
+            # Cutouts and late works
+            "Creole Dancer",
+            "The Bee", "L'Abeille",
+            "Apollo", "Apollon",
+            # Bronzes
+            "The Serf", "Le Serf",
+            "Reclining Nude I",
+            "Decorative Figure",
+            "Large Seated Nude",
+            # Chapel of the Rosary designs (studies at Matisse museum)
+            "Chemin de Croix",  # Stations of the Cross (ceramic)
+            "Chasuble designs",
+            "Tree of Life",  # stained glass design
+        ],
+    }
+    
+    # Find matching venue and add its known works
+    _venue_hint = venue_name.lower() if venue_name else ""
+    
+    for _venue_key, _works in _KNOWN_WORKS_BY_VENUE.items():
+        if _venue_key in _venue_hint or _venue_key in corpus.lower()[:500]:
+            for work in _works:
+                canonical_titles.add(work)
+            print(f"  [T0a] Added {len(_works)} known works for venue '{_venue_key}'")
+            break
 
     # Known cycle/collection names
     _KNOWN_CYCLES = {
@@ -326,7 +357,7 @@ def fetch_venue_narrative_corpus(
     combined_text = "\n\n".join(p["text"] for p in pages)
     
     # Extract canonical titles from combined corpus
-    canonical_titles, cycle_names, theme_words = extract_canonical_titles(combined_text)
+    canonical_titles, cycle_names, theme_words = extract_canonical_titles(combined_text, venue_name)
 
     # Extract per-work context sentences
     per_work_contexts = _extract_per_work_contexts(combined_text, canonical_titles)
