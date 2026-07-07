@@ -1345,7 +1345,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             )
             # Take the first comma-segment of the normalized location
             _first_segment = _location_normalized.split(',')[0].strip()
-            if _VENUE_WORDS_RE.search(_first_segment) and len(_first_segment.split()) >= 3:
+            if _VENUE_WORDS_RE.search(_first_segment) and len(_first_segment.split()) >= 2:
                 # Looks like a proper venue name — use it (title-cased)
                 _museum_venue_name = _first_segment.title()
                 print(f"  [BLOCKER4a] venue_name from location fallback: '{_museum_venue_name}'")
