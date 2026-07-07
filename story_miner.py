@@ -421,7 +421,22 @@ def match_candidate_to_canonical(
     Returns (matched_canonical_title, evidence_snippet) or None if no match.
     """
     _norm_candidate = _normalize(candidate_name)
-    _candidate_words = [w for w in _norm_candidate.split() if len(w) >= 3]
+    # [M3 fix] Multilingual stop words — these should not count as content words
+    _STOP_WORDS = {
+        # English
+        'the', 'and', 'for', 'with', 'from', 'that', 'this', 'are', 'was', 'his',
+        'her', 'its', 'who', 'which', 'their', 'not', 'but', 'all', 'can', 'will',
+        # French
+        'les', 'des', 'une', 'dans', 'sur', 'par', 'pour', 'avec', 'son', 'ses',
+        'est', 'sont', 'qui', 'que', 'aux',
+        # German
+        'der', 'die', 'das', 'und', 'ein', 'eine', 'mit', 'von', 'den', 'dem',
+        # Italian
+        'del', 'della', 'dei', 'con', 'gli', 'per', 'una',
+        # Spanish
+        'los', 'las', 'del', 'con', 'por', 'una',
+    }
+    _candidate_words = [w for w in _norm_candidate.split() if len(w) >= 3 and w not in _STOP_WORDS]
     if not _candidate_words:
         return None
 
@@ -430,7 +445,7 @@ def match_candidate_to_canonical(
 
     for canonical in canonical_titles:
         _norm_canon = _normalize(canonical)
-        _canon_words = [w for w in _norm_canon.split() if len(w) >= 3]
+        _canon_words = [w for w in _norm_canon.split() if len(w) >= 3 and w not in _STOP_WORDS]
         if not _canon_words:
             continue
 
@@ -450,6 +465,10 @@ def match_candidate_to_canonical(
         score = (fwd_score + rev_score) / 2
 
         if score > best_score and score >= 0.5:
+            # [M3 fix] Short titles (≤2 content words) require ALL content words to match
+            if len(_candidate_words) <= 2:
+                if fwd_matches < len(_candidate_words):
+                    continue  # Not all candidate words matched — skip
             best_score = score
             best_match = canonical
 

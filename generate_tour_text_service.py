@@ -86,96 +86,57 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                 os.unlink(temp_path)
             return
         
-        # [BLOCKER4c] QA gate with CORRECTIVE ACTIONS — never relax, always fix
+        # [BLOCKER4c] QA gate — corrections on structured data, never deliver on exit 1
         if os.getenv('STORIED_MODE', 'false').lower() == 'true' and tour_text:
-            _QA_MAX_CORRECTIONS = 2
-            _qa_round = 0
+            import content_qa_runner
+            import re as _qa_re
+            
+            _QA_MAX_ROUNDS = 3
             _qa_passed = False
             
-            while _qa_round <= _QA_MAX_CORRECTIONS and not _qa_passed:
-                _qa_round += 1
+            for _qa_round in range(1, _QA_MAX_ROUNDS + 1):
+                # Run QA
+                content_qa_runner.PASS_COUNT = 0
+                content_qa_runner.FAIL_COUNT = 0
+                content_qa_runner.FACTUAL_FAIL_COUNT = 0
                 try:
-                    import content_qa_runner
-                    import re as _qa_re
-                    content_qa_runner.PASS_COUNT = 0
-                    content_qa_runner.FAIL_COUNT = 0
-                    content_qa_runner.FACTUAL_FAIL_COUNT = 0
                     content_qa_runner.run_qa(tour_text)
-                    
-                    if content_qa_runner.FACTUAL_FAIL_COUNT == 0 and content_qa_runner.FAIL_COUNT == 0:
-                        _qa_passed = True
-                        print(f"[QA] PASSED (round {_qa_round}): {content_qa_runner.PASS_COUNT} checks pass")
-                    elif content_qa_runner.FACTUAL_FAIL_COUNT == 0:
-                        # Style failures only — apply algorithmic corrections
-                        _qa_passed = True  # Allow delivery with style issues after corrections
-                        print(f"[QA] Style issues ({content_qa_runner.FAIL_COUNT}) — applying corrections (round {_qa_round})")
-                        
-                        # Strip forbidden phrases algorithmically
-                        try:
-                            from derepetition_guard import FORBIDDEN_PHRASES
-                            for pattern in FORBIDDEN_PHRASES:
-                                tour_text = pattern.sub('', tour_text)
-                            # Clean up double spaces/newlines from removals
-                            tour_text = _qa_re.sub(r'  +', ' ', tour_text)
-                            tour_text = _qa_re.sub(r'\n\n\n+', '\n\n', tour_text)
-                        except ImportError:
-                            pass
-                    else:
-                        # Factual failures — corrective action: remove problematic stops
-                        if _qa_round <= _QA_MAX_CORRECTIONS:
-                            print(f"[QA] FACTUAL FAIL (round {_qa_round}/{_QA_MAX_CORRECTIONS}) — attempting corrective action")
-                            
-                            # Find stops with issues: titles that are too long or have bad formatting
-                            _stop_blocks = _qa_re.split(r'(^Stop \d+:.*$)', tour_text, flags=_qa_re.MULTILINE)
-                            _cleaned_blocks = []
-                            _removed = 0
-                            for _block in _stop_blocks:
-                                if _block.startswith('Stop ') and ':' in _block:
-                                    _name = _qa_re.sub(r'^Stop\s+\d+:\s*', '', _block).strip()
-                                    # Remove stops with suspicious titles (>10 words, has sentences)
-                                    if len(_name.split()) > 10 or any(c in _name for c in '.!?;'):
-                                        _removed += 1
-                                        print(f"[QA] Removed problematic stop: '{_name[:50]}'")
-                                        continue
-                                _cleaned_blocks.append(_block)
-                            
-                            if _removed > 0:
-                                tour_text = ''.join(_cleaned_blocks)
-                                # Renumber remaining stops
-                                _stop_num = 0
-                                def _renumber(m):
-                                    nonlocal _stop_num
-                                    _stop_num += 1
-                                    return f"Stop {_stop_num}:"
-                                tour_text = _qa_re.sub(r'Stop \d+:', _renumber, tour_text)
-                                print(f"[QA] Removed {_removed} stop(s), {_stop_num} remaining")
-                            else:
-                                # Can't fix — allow through after max rounds
-                                print(f"[QA] No fixable stops found — allowing through")
-                                _qa_passed = True
-                        else:
-                            print(f"[QA] Max correction rounds reached — rejecting")
-                            ACTIVE_JOBS.update(job_id, status="error",
-                                              error=f"Tour failed factual integrity check after {_QA_MAX_CORRECTIONS} correction attempts.")
-                            if os.path.exists(temp_path):
-                                os.unlink(temp_path)
-                            return
-                            
-                except ImportError:
-                    print(f"[QA] content_qa_runner not available — QA gate skipped")
-                    _qa_passed = True
                 except SystemExit:
-                    # content_qa_runner calls sys.exit() — catch it
-                    if content_qa_runner.FACTUAL_FAIL_COUNT > 0 and _qa_round > _QA_MAX_CORRECTIONS:
-                        ACTIVE_JOBS.update(job_id, status="error",
-                                          error=f"Tour failed factual integrity check.")
-                        if os.path.exists(temp_path):
-                            os.unlink(temp_path)
-                        return
-                    _qa_passed = True  # Allow after corrections attempted
-                except Exception as e:
-                    print(f"[QA] Gate error (non-fatal): {e}")
+                    pass  # run_qa calls sys.exit() — catch it
+                except Exception as _qa_err:
+                    print(f"[BLOCKER4c] QA error: {_qa_err}")
+                    break
+                
+                # Check result
+                if content_qa_runner.FACTUAL_FAIL_COUNT == 0 and content_qa_runner.FAIL_COUNT == 0:
                     _qa_passed = True
+                    print(f"[BLOCKER4c] QA PASSED (round {_qa_round}): all checks clean")
+                    break
+                elif content_qa_runner.FACTUAL_FAIL_COUNT > 0:
+                    # Factual failure — reject entirely (upstream pipeline bug, not fixable here)
+                    print(f"[BLOCKER4c] FACTUAL QA FAILED (round {_qa_round}): {content_qa_runner.FACTUAL_FAIL_COUNT} factual failure(s)")
+                    ACTIVE_JOBS.update(job_id, status="error",
+                                      error=f"Tour failed factual integrity check ({content_qa_runner.FACTUAL_FAIL_COUNT} factual failures). Please try again.")
+                    if os.path.exists(temp_path):
+                        os.unlink(temp_path)
+                    return
+                else:
+                    # Style failures only — apply algorithmic corrections, then re-check
+                    print(f"[BLOCKER4c] Style issues (round {_qa_round}): {content_qa_runner.FAIL_COUNT} style failure(s) — correcting")
+                    try:
+                        from derepetition_guard import FORBIDDEN_PHRASES
+                        for pattern in FORBIDDEN_PHRASES:
+                            tour_text = pattern.sub('', tour_text)
+                        tour_text = _qa_re.sub(r'  +', ' ', tour_text)
+                        tour_text = _qa_re.sub(r'\n\n\n+', '\n\n', tour_text)
+                    except ImportError:
+                        pass
+                    # Loop continues — will re-run QA on corrected text
+            
+            if not _qa_passed:
+                # After max rounds, style issues remain — deliver with warning (style is non-blocking)
+                print(f"[BLOCKER4c] Style issues persist after {_QA_MAX_ROUNDS} rounds — delivering with warning")
+                # This is acceptable: style failures are cosmetic, factual failures already rejected above
 
         # Create a safe filename for the output
         safe_location = ''.join(c if c.isalnum() else '_' for c in location)

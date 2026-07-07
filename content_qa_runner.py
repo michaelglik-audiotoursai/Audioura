@@ -277,7 +277,13 @@ def run_qa(tour_text, tour_file=""):
             re.UNICODE
         )
         for i, stop in enumerate(stops):
-            _named_refs = _NAMED_VENUE_PATTERN.findall(stop)
+            # [M4] Exclude structural lines before scanning for venue references
+            _STRUCT_LINE_RE = re.compile(r'^(Address|Coordinates|Type/?Specialty|Specific Examples?|Operational|Orientation|Museum Information|Directions|Sources|Stop \d+|Please resume):')
+            _content_only = '\n'.join(
+                line for line in stop.split('\n')
+                if line.strip() and not _STRUCT_LINE_RE.match(line.strip())
+            )
+            _named_refs = _NAMED_VENUE_PATTERN.findall(_content_only)
             for ref in _named_refs:
                 # If the named venue is NOT the target venue, potentially flag it
                 if _tour_venue and _tour_venue.lower()[:20] not in ref.lower() and ref.lower()[:20] not in _tour_venue.lower():
