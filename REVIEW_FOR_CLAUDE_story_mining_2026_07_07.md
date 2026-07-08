@@ -162,3 +162,70 @@ e0aec2a S3+T5+QA implementation (spine elements, geocoded coord, splice checks)
 6463f27 Add Matisse museum support (known works + site URL + coords)
 f07846b Fix BLOCKER4a: accept 2-word venue names (Musee Matisse)
 ```
+
+
+---
+
+## ADDENDUM: Fix Round (2026-07-08) — Addressing LEAD Review B1/B2/M3/M4
+
+### Commits (fix round)
+
+```
+c728220 Fix B1+B2+M3+M4 from LEAD review
+91efa49 D3(d) as style check (not factual gate) - F3 validates upstream
+11865a3 R4 retry on unparseable + add missing Chagall works to canonical list
+47247fa Expand Chagall canonical works (Noah's Ark, Dream of Jacob, Blue Concert, etc)
+5cfee3d Museum Phase 3A asks 2x candidates for better D1v2 hit rate
+```
+
+### B1+B2 Fix: QA Corrective Loop Rewritten
+
+**Problem:** The original corrective loop did `re.split(r'(^Stop \d+:.*$)')` regex surgery on assembled text — orphaning stop bodies (creating 0-word stops) and splicing prose. Tours shipped with QA exit 1.
+
+**Fix:** Complete rewrite of `generate_tour_text_service.py` BLOCKER4c gate:
+- Factual failures → immediate rejection (upstream pipeline bug, not fixable at serving layer)
+- Style failures → strip forbidden phrases algorithmically using `derepetition_guard.FORBIDDEN_PHRASES` patterns, then RE-RUN QA
+- Up to 3 correction rounds for style
+- After max rounds, style-only issues are delivered (cosmetic, factual gates already passed)
+- No string surgery on stop structure — ever
+
+### M3 Fix: Multilingual Stop Words
+
+**Problem:** `len(w) >= 3` kept "the/les/der/una" as content words, causing "The Wave" to match "The Sorrows of the King" (sharing "the").
+
+**Fix:** Added `_STOP_WORDS` set with EN/FR/DE/IT/ES common articles/prepositions:
+```python
+_STOP_WORDS = {'the', 'and', 'for', 'les', 'des', 'une', 'der', 'die', 'das', 'del', 'della', ...}
+_candidate_words = [w for w in _norm_candidate.split() if len(w) >= 3 and w not in _STOP_WORDS]
+```
+Also: titles with ≤2 content words now require ALL content words to match.
+
+### M4 Fix: Check #9 Structural-Line Exclusion
+
+**Problem:** Named-venue regex scanned ALL lines including Type/Specialty ("Art Museum") and self-references ("Musee Matisse and the city of Nice").
+
+**Fix:** Before scanning, exclude structural lines:
+```python
+_STRUCT_LINE_RE = re.compile(r'^(Address|Coordinates|Type/?Specialty|Specific Examples?|Operational|Orientation|Museum Information|Directions|Sources|Stop \d+|Please resume):')
+_content_only = '\n'.join(line for line in stop.split('\n') if not _STRUCT_LINE_RE.match(line.strip()))
+_named_refs = _NAMED_VENUE_PATTERN.findall(_content_only)
+```
+
+### D3(d) Reclassification
+
+**Problem:** D3(d) "titles look like real entities" incremented `FACTUAL_FAIL_COUNT`, causing the serving gate to reject tours where F3 had already validated the header upstream.
+
+**Fix:** D3(d) is now a style check (increments `FAIL_COUNT` not `FACTUAL_FAIL_COUNT`). Rationale from LEAD: "a suspicious title post-F3 means an upstream bug — fix the source, don't amputate downstream."
+
+### Additional Reliability Fixes
+
+- **R4 retry on unparseable:** Changed `break` to `continue` so the replenishment loop retries when GPT returns bad JSON
+- **Phase 3A 2x candidates:** Museum tours now ask for `min(total_stops * 2, 20)` candidates to improve D1v2 verification hit rate
+- **Expanded canonical lists:** Added missing Chagall works (Creation of the World, The Resurrection, Noah's Ark, Dream of Jacob, Blue Concert, Moses Receiving Tablets, Parting of Red Sea)
+
+### Current Status
+
+- Chagall: generates 4-5 stops reliably via direct test; intermittent via service path (GPT variance in candidate proposals)
+- Matisse: generates 10 stops reliably via both paths
+- QA gate: factual failures correctly block; style failures corrected algorithmically
+- The intermittent Chagall service-path failure is a coverage/variance issue that the Generic Grounding task (Wikidata-based dynamic discovery) will eliminate
