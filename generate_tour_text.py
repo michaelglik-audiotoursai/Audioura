@@ -1555,8 +1555,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     
                     _r4_candidates = _parse_json_array_loose(_r4_text)
                     if not _r4_candidates:
-                        print(f"    [R4] Unparseable response")
-                        break
+                        print(f"    [R4] Unparseable response — retrying")
+                        continue
                     
                     # Build POI objects and verify
                     _r4_new_pois = []

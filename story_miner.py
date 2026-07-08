@@ -146,7 +146,8 @@ def extract_canonical_titles(corpus: str, venue_name: str = "") -> Tuple[Set[str
             "Le Songe de Jacob", "Le Frappement du rocher",
             "La Travers\u00e9e de la Mer Rouge",
             # English equivalents
-            "The Creation of Man", "The Sacrifice of Isaac",
+            "The Creation of Man", "The Creation of the World",  # painting + mosaic
+            "The Sacrifice of Isaac",
             "Song of Songs", "Song of Songs I", "Song of Songs II",
             "Song of Songs III", "Song of Songs IV", "Song of Songs V",
             "Moses and the Burning Bush", "Noah and the Rainbow",
@@ -157,6 +158,8 @@ def extract_canonical_titles(corpus: str, venue_name: str = "") -> Tuple[Set[str
             "The Prophet Elijah", "Elijah's Chariot",
             # Triptych
             "R\u00e9sistance", "R\u00e9surrection", "Lib\u00e9ration",
+            "The Resurrection",  # English name for Résurrection (part of triptych)
+            "Resistance, Resurrection, Liberation",  # Full triptych name
         ],
         "matisse": [
             # Key works at Musée Matisse, Nice (Villa des Arènes, Cimiez)
