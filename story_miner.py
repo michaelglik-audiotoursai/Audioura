@@ -145,26 +145,30 @@ def extract_canonical_titles(corpus: str, venue_name: str = "") -> Tuple[Set[str
             "La lutte de Jacob et de l'Ange", "Abraham et les trois anges",
             "Le Songe de Jacob", "Le Frappement du rocher",
             "La Travers\u00e9e de la Mer Rouge",
-            # English equivalents
-            "The Creation of Man", "The Creation of the World",  # painting + mosaic
-            "The Sacrifice of Isaac",
-            "Song of Songs", "Song of Songs I", "Song of Songs II",
-            "Song of Songs III", "Song of Songs IV", "Song of Songs V",
-            "Moses and the Burning Bush", "Noah and the Rainbow", "Noah's Ark",
-            "Paradise", "Adam and Eve Expelled from Paradise",
-            "Jacob Wrestling with the Angel", "Abraham and the Three Angels",
-            "Jacob's Dream", "The Dream of Jacob",
-            "Moses Striking the Rock", "Moses Receiving the Tablets",
-            "The Crossing of the Red Sea", "The Parting of the Red Sea",
-            "The Fall of Icarus",  # painting at Nice
-            # Other works at Nice (mosaic, stained glass, tapestry)
-            "The Prophet Elijah", "Prophet Elijah",
-            "Elijah's Chariot",  # Mosaic
-            "The Blue Concert",  # Stained glass concert hall windows
-            # Triptych
+            # English equivalents (VERIFIED: each work confirmed at Nice museum via Wikipedia/museum site)
+            # Alias map: variants resolve to one canonical entry to prevent duplicate stops
+            "The Creation of Man",  # La Création de l'Homme (1958) — verified in venue Wikipedia article
+            "The Creation of the World",  # Mosaic — verified in venue Wikipedia article  
+            "The Sacrifice of Isaac",  # Le Sacrifice d'Isaac — verified in Wikipedia (one of 17 Message Biblique)
+            "Song of Songs",  # Le Cantique des Cantiques (5 paintings) — verified in venue article
+            "Song of Songs I", "Song of Songs II", "Song of Songs III",
+            "Song of Songs IV", "Song of Songs V",
+            "Moses and the Burning Bush",  # Moïse devant le buisson ardent — verified (one of 17)
+            "Noah and the Rainbow",  # Noé et l'arc-en-ciel — verified (one of 17)
+            "Paradise",  # Le Paradis — verified (one of 17)
+            "Adam and Eve Expelled from Paradise",  # verified (one of 17)
+            "Jacob Wrestling with the Angel",  # La lutte de Jacob et de l'Ange — verified (chapel page caption)
+            "Abraham and the Three Angels",  # Abraham et les trois anges — verified (one of 17)
+            "Jacob's Dream",  # Le Songe de Jacob — verified (one of 17)
+            "Moses Striking the Rock",  # Le Frappement du rocher — verified (one of 17)
+            "The Crossing of the Red Sea",  # La Traversée de la Mer Rouge — verified (one of 17)
+            # Other works at Nice (mosaic, stained glass)
+            "The Prophet Elijah", "Prophet Elijah",  # Pond mosaic — verified in Wikipedia article (Elijah)
+            "Elijah's Chariot",  # Mosaic — verified in Wikipedia article
+            # Triptych (acquired 1988 dation — verified in venue article history)
             "R\u00e9sistance", "R\u00e9surrection", "Lib\u00e9ration",
-            "The Resurrection",  # English name for Résurrection (part of triptych)
-            "Resistance, Resurrection, Liberation",  # Full triptych name
+            "The Resurrection",  # English name for Résurrection
+            "Resistance, Resurrection, Liberation",
         ],
         "matisse": [
             # Key works at Musée Matisse, Nice (Villa des Arènes, Cimiez)

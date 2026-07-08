@@ -105,7 +105,12 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                     pass  # run_qa calls sys.exit() — catch it
                 except Exception as _qa_err:
                     print(f"[BLOCKER4c] QA error: {_qa_err}")
-                    break
+                    # [F1] QA infrastructure error → reject (fail closed). Never deliver unverified.
+                    ACTIVE_JOBS.update(job_id, status="error",
+                                      error=f"Tour quality check failed (infrastructure error). Please try again.")
+                    if os.path.exists(temp_path):
+                        os.unlink(temp_path)
+                    return
                 
                 # Check result
                 if content_qa_runner.FACTUAL_FAIL_COUNT == 0 and content_qa_runner.FAIL_COUNT == 0:
@@ -134,9 +139,17 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                     # Loop continues — will re-run QA on corrected text
             
             if not _qa_passed:
-                # After max rounds, style issues remain — deliver with warning (style is non-blocking)
-                print(f"[BLOCKER4c] Style issues persist after {_QA_MAX_ROUNDS} rounds — delivering with warning")
-                # This is acceptable: style failures are cosmetic, factual failures already rejected above
+                # After max rounds, style issues remain — but QA DID complete successfully
+                # (factual gates passed, only style checks failed). Deliver with warning.
+                if content_qa_runner.FACTUAL_FAIL_COUNT == 0:
+                    print(f"[BLOCKER4c] Style issues persist after {_QA_MAX_ROUNDS} rounds — delivering (factual gates passed)")
+                else:
+                    # Should not reach here (factual failures reject above), but fail-closed safety
+                    ACTIVE_JOBS.update(job_id, status="error",
+                                      error=f"Tour failed quality checks. Please try again.")
+                    if os.path.exists(temp_path):
+                        os.unlink(temp_path)
+                    return
 
         # Create a safe filename for the output
         safe_location = ''.join(c if c.isalnum() else '_' for c in location)
