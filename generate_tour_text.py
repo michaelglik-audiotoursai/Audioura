@@ -2810,8 +2810,14 @@ Requirements:
             # [T4] DETERMINISTIC TRANSITION TEMPLATES — no LLM content in transitions
             # This eliminates the splice-corruption bug class entirely
             if tour_category == 'museum' and _museum_venue_name:
-                # Museum tours: simple deterministic transition
-                _transition = f"Proceed to the next work: {next_poi['name']}. Ask museum staff if you need directions."
+                # Museum tours: rotating deterministic templates with venue name (satisfies venue coherence)
+                _transition_templates = [
+                    f"Continue exploring {_museum_venue_name} — proceed to {next_poi['name']}.",
+                    f"Your next stop at {_museum_venue_name}: {next_poi['name']}. Ask museum staff for directions.",
+                    f"Proceed to {next_poi['name']}, also here at {_museum_venue_name}.",
+                    f"Next in {_museum_venue_name}'s collection: {next_poi['name']}.",
+                ]
+                _transition = _transition_templates[i % len(_transition_templates)]
             else:
                 # Walking tours: use generated directions if available
                 directions = next_poi.get("directions", "")
