@@ -532,11 +532,13 @@ def _validate_museum_stop_descriptions(poi_list, venue_name, headers):
 def _verify_works_v2(poi_list, venue_name):
     """[D1 v2] In-collection verification using story_miner canonical title matching.
     
-    Uses the new story_miner module for:
-    - Expanded corpus fetch (museum narrative pages + fr.wikipedia)
-    - Canonical title extraction and matching (T0a)
-    - Stop disjointness (T0b)
-    - Per-work evidence snippets
+    Uses venue_resolver for entity resolution (Generic Grounding Step 0+1) and
+    story_miner for canonical title matching (T0a) and story corpus.
+    
+    Sources for canonical titles (union, per LEAD amendment #1):
+    - SPARQL works query (P195/P276) — highest precision
+    - Official site extraction (from P856)
+    - Wikipedia extraction (EN + local language)
     
     Returns (verified_pois, evidence_log, venue_corpus, story_corpus_result) or None.
     """
@@ -550,40 +552,99 @@ def _verify_works_v2(poi_list, venue_name):
         print("  [D1v2] story_miner not available — falling back to legacy D1")
         return None  # Caller will fall back to legacy
 
-    # Determine museum site URL
+    # --- Generic Grounding: resolve venue via Wikidata ---
     _base_site_url = ""
-    if "chagall" in venue_name.lower():
-        _base_site_url = "https://musees-nationaux-alpesmaritimes.fr/chagall/en/collection"
-    elif "matisse" in venue_name.lower():
-        _base_site_url = "https://www.musee-matisse-nice.org/en/the-collection/"
+    _wiki_title = ""
+    _language = "en"
+    _venue_entity = None
     
-    # Determine Wikipedia title
-    _wiki_title = venue_name.replace("Musee", "Musée").replace("National ", "")
-    # Try common variants
-    _wiki_variants = [_wiki_title, f"{_wiki_title} (Nice)", f"Musée Matisse (Nice)" if "matisse" in venue_name.lower() else _wiki_title]
+    try:
+        from venue_resolver import resolve_venue, fetch_venue_works, build_canonical_titles_from_works
+        
+        # Parse city from venue_name (heuristic: last comma-separated segment)
+        _city = ""
+        _venue_search = venue_name  # The search term for Wikidata
+        if "," in venue_name:
+            parts = [p.strip() for p in venue_name.split(",")]
+            # City is typically second-to-last (before country)
+            if len(parts) >= 3:
+                _city = parts[1]
+                _venue_search = parts[0]  # Just the museum name
+            elif len(parts) == 2:
+                _city = parts[1]
+                _venue_search = parts[0]
+        
+        _venue_entity = resolve_venue(_venue_search, _city)
+        
+        if _venue_entity:
+            _base_site_url = _venue_entity.official_url
+            _language = _venue_entity.language
+            # Build Wikipedia title from entity name
+            _wiki_title = _venue_entity.name
+            print(f"  [D1v2] Venue resolved: {_venue_entity.qid} → URL={_base_site_url}, lang={_language}")
+        else:
+            print(f"  [D1v2] Venue resolver returned None — falling back to heuristic")
+    except ImportError:
+        print("  [D1v2] venue_resolver not available — using heuristic fallback")
+    except Exception as e:
+        print(f"  [D1v2] venue_resolver error: {e} — using heuristic fallback")
+    
+    # Fallback: heuristic site URL if resolver didn't provide one
+    if not _base_site_url:
+        if "chagall" in venue_name.lower():
+            _base_site_url = "https://musees-nationaux-alpesmaritimes.fr/chagall/en/collection"
+        elif "matisse" in venue_name.lower():
+            _base_site_url = "https://www.musee-matisse-nice.org/en/the-collection/"
+    
+    if not _wiki_title:
+        _wiki_title = venue_name.replace("Musee", "Musée").replace("National ", "")
+    
+    # Wikipedia variants for fallback
+    _wiki_variants = [_wiki_title]
+    if _venue_entity and _venue_entity.language == "fr":
+        _wiki_variants.append(f"{_wiki_title} (Nice)" if "nice" in venue_name.lower() else _wiki_title)
+    elif "matisse" in venue_name.lower():
+        _wiki_variants.append("Musée Matisse (Nice)")
 
-    # Fetch the expanded narrative corpus
+    # --- SPARQL works (source 1 of 3 for canonical titles) ---
+    sparql_titles = set()
+    sparql_works = []
+    if _venue_entity and _venue_entity.qid:
+        try:
+            sparql_works = fetch_venue_works(_venue_entity.qid, _language)
+            sparql_titles = build_canonical_titles_from_works(sparql_works)
+            print(f"  [D1v2] SPARQL source: {len(sparql_titles)} canonical titles")
+        except Exception as e:
+            print(f"  [D1v2] SPARQL query failed (degrading, not fabricating): {e}")
+
+    # --- Fetch the expanded narrative corpus (sources 2+3: official site + Wikipedia) ---
     corpus_result = fetch_venue_narrative_corpus(
         venue_name=venue_name,
         base_site_url=_base_site_url,
         wikipedia_title=_wiki_title,
+        language=_language,
     )
     
-    # If no pages fetched and we have variants, try them
+    # If no pages fetched, try variants
     if not corpus_result.get('pages') or len(corpus_result.get('combined_text', '')) < 500:
         for variant in _wiki_variants[1:]:
             _alt = fetch_venue_narrative_corpus(
                 venue_name=venue_name,
                 base_site_url=_base_site_url,
                 wikipedia_title=variant,
+                language=_language,
             )
             if _alt.get('combined_text', '') and len(_alt['combined_text']) > len(corpus_result.get('combined_text', '')):
                 corpus_result = _alt
                 break
 
-    canonical_titles = corpus_result['canonical_titles']
+    # --- Union canonical titles (LEAD amendment #1): SPARQL + site + wiki extraction ---
+    site_wiki_titles = corpus_result['canonical_titles']
+    canonical_titles = site_wiki_titles | sparql_titles
     cycle_names = corpus_result['cycle_names']
     combined_text = corpus_result['combined_text']
+    
+    print(f"  [D1v2] Canonical titles union: {len(site_wiki_titles)} site/wiki + {len(sparql_titles)} SPARQL = {len(canonical_titles)} total")
 
     if not canonical_titles:
         print(f"  [D1v2] No canonical titles extracted — falling back to legacy D1")

@@ -256,18 +256,20 @@ def fetch_venue_narrative_corpus(
     venue_name: str,
     base_site_url: str = "",
     wikipedia_title: str = "",
+    language: str = "en",
 ) -> Dict:
     """Fetch narrative-rich corpus for a museum venue.
     
     Extends D1's basic collection-page fetch with:
     - Museum site internal pages (history, about, creation story)
-    - French Wikipedia full article
+    - Wikipedia full article in EN + LOCAL language (from venue_resolver country→lang)
     - Wikipedia History section extraction
     
     Args:
         venue_name: The museum/venue name
-        base_site_url: The museum's known website URL (e.g. musees-nationaux-alpesmaritimes.fr/chagall)
+        base_site_url: The museum's website URL (from Wikidata P856 or heuristic)
         wikipedia_title: Wikipedia article title for the venue
+        language: The venue's local language code (from country→lang, e.g. "fr", "it")
         
     Returns:
         dict with:
@@ -291,8 +293,17 @@ def fetch_venue_narrative_corpus(
             source_urls.append(base_site_url)
 
         # Follow internal links containing narrative keywords (cap 5)
-        _NARRATIVE_KEYWORDS = ('history', 'story', 'creation', 'about', 'exhibition',
-                               'agenda', 'evenement', 'parcours', 'histoire', 'exposition')
+        # Localized keywords based on venue language
+        _NARRATIVE_KEYWORDS_BASE = ('history', 'story', 'creation', 'about', 'exhibition',
+                                    'collection', 'works', 'permanent')
+        _NARRATIVE_KEYWORDS_LOCALIZED = {
+            'fr': ('histoire', 'parcours', 'exposition', 'evenement', 'oeuvres', 'collection', 'creation'),
+            'it': ('storia', 'collezione', 'opere', 'mostra', 'esposizione', 'percorso'),
+            'de': ('geschichte', 'sammlung', 'werke', 'ausstellung'),
+            'es': ('historia', 'coleccion', 'obras', 'exposicion'),
+        }
+        _NARRATIVE_KEYWORDS = _NARRATIVE_KEYWORDS_BASE + _NARRATIVE_KEYWORDS_LOCALIZED.get(language, ())
+        
         _base_domain = urlparse(base_site_url).netloc
         _narrative_urls = []
         for link_text, href in _base_links:
@@ -304,18 +315,6 @@ def fetch_venue_narrative_corpus(
             if any(kw in href.lower() or kw in link_text.lower() for kw in _NARRATIVE_KEYWORDS):
                 if full_url not in source_urls:
                     _narrative_urls.append(full_url)
-
-        # Also add known narrative pages for specific museums
-        if 'chagall' in venue_name.lower():
-            _known_narrative = [
-                # This is the KEY narrative page with the chapel-to-museum story
-                "https://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/chapel-museum-creation-biblical-message",
-                "https://musees-nationaux-alpesmaritimes.fr/chagall/en/the-collection",
-            ]
-            # Prepend known narrative pages (highest priority)
-            for url in reversed(_known_narrative):
-                if url not in source_urls:
-                    _narrative_urls.insert(0, url)
 
         # Fetch narrative pages (cap 5)
         for url in _narrative_urls[:5]:
@@ -335,36 +334,36 @@ def fetch_venue_narrative_corpus(
             source_urls.append(f"https://en.wikipedia.org/wiki/{wikipedia_title.replace(' ', '_')}")
             print(f"  [story_miner] Wikipedia EN: {len(en_article)} chars")
 
-    # --- 3. French Wikipedia ---
-    _fr_titles = []
-    if 'chagall' in venue_name.lower():
-        _fr_titles = ['Musée national Marc-Chagall', 'Musée Marc Chagall']
-    elif wikipedia_title:
-        _fr_titles = [wikipedia_title]
-
-    for fr_title in _fr_titles:
-        try:
-            resp = requests.get(
-                'https://fr.wikipedia.org/w/api.php',
-                params={'action': 'query', 'prop': 'extracts', 'explaintext': '1',
-                        'titles': fr_title, 'format': 'json'},
-                headers={'User-Agent': 'Audioura/2.2'},
-                timeout=10
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                fr_pages = data.get('query', {}).get('pages', {})
-                for pid, pdata in fr_pages.items():
-                    if pid != '-1' and not pdata.get('missing'):
-                        extract = pdata.get('extract', '')
-                        if extract and len(extract) > 500:
-                            fr_url = f"https://fr.wikipedia.org/wiki/{fr_title.replace(' ', '_')}"
-                            pages.append({"url": fr_url, "text": extract, "title": f"Wikipedia FR: {fr_title}"})
-                            source_urls.append(fr_url)
-                            print(f"  [story_miner] Wikipedia FR: {len(extract)} chars")
-                            break
-        except Exception as e:
-            logger.warning(f"story_miner: FR Wikipedia error for '{fr_title}': {e}")
+    # --- 3. Local-language Wikipedia (country→lang, not hardcoded "fr") ---
+    if language and language != "en" and wikipedia_title:
+        _local_titles = [wikipedia_title]
+        # Try with city disambiguator for common ambiguous venue names
+        if "nice" in venue_name.lower() or "nice" in (wikipedia_title or "").lower():
+            _local_titles.append(f"{wikipedia_title} (Nice)")
+        
+        for local_title in _local_titles:
+            try:
+                resp = requests.get(
+                    f'https://{language}.wikipedia.org/w/api.php',
+                    params={'action': 'query', 'prop': 'extracts', 'explaintext': '1',
+                            'titles': local_title, 'format': 'json'},
+                    headers={'User-Agent': 'Audioura/2.2'},
+                    timeout=10
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    local_pages = data.get('query', {}).get('pages', {})
+                    for pid, pdata in local_pages.items():
+                        if pid != '-1' and not pdata.get('missing'):
+                            extract = pdata.get('extract', '')
+                            if extract and len(extract) > 500:
+                                local_url = f"https://{language}.wikipedia.org/wiki/{local_title.replace(' ', '_')}"
+                                pages.append({"url": local_url, "text": extract, "title": f"Wikipedia {language.upper()}: {local_title}"})
+                                source_urls.append(local_url)
+                                print(f"  [story_miner] Wikipedia {language.upper()}: {len(extract)} chars")
+                                break
+            except Exception as e:
+                logger.warning(f"story_miner: {language.upper()} Wikipedia error for '{local_title}': {e}")
 
     # --- Combine and extract ---
     combined_text = "\n\n".join(p["text"] for p in pages)
