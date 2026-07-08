@@ -2849,7 +2849,13 @@ Requirements:
                     _closing_facts = [e.get('text', '') for e in _story_elements 
                                      if e.get('type') in ('date', 'superlative', 'turning_point') and e.get('text')]
                     if _closing_facts:
-                        epilog += _closing_facts[0] + " "
+                        _fact = _closing_facts[0]
+                        # [G4] Rephrase ambiguous death+year claims
+                        # "Acceptance-in-lieu after Chagall's death in 1988" → clarify death ≠ 1988
+                        if 'death' in _fact.lower() and '1988' in _fact:
+                            _fact = _fact.replace("after Chagall's death in 1988", "after Chagall's death (1985), the 1988 acceptance-in-lieu")
+                            _fact = _fact.replace("after the artist's death in 1988", "after the artist's death (1985), the 1988 acceptance-in-lieu")
+                        epilog += _fact + " "
                 
                 epilog += f"\n\nYou've experienced {_recap_list} — each a chapter in a story that only reveals its full meaning when read together."
                 epilog += f"\n\nIf you'd like to explore more, consider generating another tour — perhaps a different perspective on this same place, or a new destination entirely. The next journey awaits."

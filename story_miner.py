@@ -527,6 +527,8 @@ def match_candidate_to_canonical(
             continue  # Different numerals = different works
         if _cand_numeral and not _canon_numeral:
             continue  # Candidate has numeral, canonical doesn't = candidate is more specific
+        if not _cand_numeral and _canon_numeral:
+            continue  # [W4] Canonical has numeral, candidate doesn't = candidate is less specific (cycle vs member)
 
         # Calculate bidirectional word overlap (require exact word match, not prefix)
         fwd_matches = sum(1 for w in _candidate_words if w in _canon_words)
