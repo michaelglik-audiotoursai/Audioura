@@ -1392,9 +1392,15 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             f"across the city. A shorter, denser route is better than a long, spread-out one.\n"
         )
 
+    # For museum tours with D1v2 verification: ask for 2x candidates to improve hit rate
+    _phase3a_count = total_stops
+    if tour_category == 'museum' and _museum_venue_name:
+        _phase3a_count = min(total_stops * 2, 20)
+        print(f"  [R4] Museum tour: asking for {_phase3a_count} candidates (2x for D1v2 filtering)")
+
     phase_3a_prompt = (
         f"You are a knowledgeable local guide for {location}.\n"
-        f"List exactly {total_stops} specific, real, well-known {poi_type_hint} relevant to: {user_request}.\n\n"
+        f"List exactly {_phase3a_count} specific, real, well-known {poi_type_hint} relevant to: {user_request}.\n\n"
         "Requirements:\n"
         "- Use REAL, SPECIFIC names of actual establishments or landmarks.\n"
         "- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.\n"
