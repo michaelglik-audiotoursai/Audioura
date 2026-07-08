@@ -2837,14 +2837,20 @@ Requirements:
         else:
             # For the last POI — EPILOG when Storied, generic conclusion when Beta
             if _storied_mode and _storied_spine:
-                # Build epilog from spine's closing_revelation + POI recap
-                _closing = _storied_spine.get("closing_revelation", "")
+                # [G4] Build epilog ONLY from deterministic content + documented story elements
+                # Do NOT use spine's closing_revelation (may contain fabricated claims)
                 _poi_names = [p["name"] for p in poi_list]
                 _recap_list = ", ".join(_poi_names[:-1]) + f", and {_poi_names[-1]}" if len(_poi_names) > 1 else _poi_names[0]
                 
                 epilog = f"\n\nAs this journey comes to a close, reflect on the path you've taken — from {_poi_names[0]} through to here at {poi_name}. "
-                if _closing:
-                    epilog += f"{_closing} "
+                
+                # Use ONLY documented story elements for closing facts (never GPT-generated spine text)
+                if _story_elements:
+                    _closing_facts = [e.get('text', '') for e in _story_elements 
+                                     if e.get('type') in ('date', 'superlative', 'turning_point') and e.get('text')]
+                    if _closing_facts:
+                        epilog += _closing_facts[0] + " "
+                
                 epilog += f"\n\nYou've experienced {_recap_list} — each a chapter in a story that only reveals its full meaning when read together."
                 epilog += f"\n\nIf you'd like to explore more, consider generating another tour — perhaps a different perspective on this same place, or a new destination entirely. The next journey awaits."
                 

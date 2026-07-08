@@ -142,7 +142,10 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                 # After max rounds, style issues remain — but QA DID complete successfully
                 # (factual gates passed, only style checks failed). Deliver with warning.
                 if content_qa_runner.FACTUAL_FAIL_COUNT == 0:
-                    print(f"[BLOCKER4c] Style issues persist after {_QA_MAX_ROUNDS} rounds — delivering (factual gates passed)")
+                    _style_warning = f"Delivered with {content_qa_runner.FAIL_COUNT} style issue(s) after {_QA_MAX_ROUNDS} correction rounds"
+                    print(f"[BLOCKER4c] {_style_warning}")
+                    # [G1/W1] Set qa_style_warning on the job for auditability
+                    ACTIVE_JOBS.update(job_id, qa_style_warning=_style_warning)
                 else:
                     # Should not reach here (factual failures reject above), but fail-closed safety
                     ACTIVE_JOBS.update(job_id, status="error",
