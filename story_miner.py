@@ -150,12 +150,17 @@ def extract_canonical_titles(corpus: str, venue_name: str = "") -> Tuple[Set[str
             "The Sacrifice of Isaac",
             "Song of Songs", "Song of Songs I", "Song of Songs II",
             "Song of Songs III", "Song of Songs IV", "Song of Songs V",
-            "Moses and the Burning Bush", "Noah and the Rainbow",
+            "Moses and the Burning Bush", "Noah and the Rainbow", "Noah's Ark",
             "Paradise", "Adam and Eve Expelled from Paradise",
             "Jacob Wrestling with the Angel", "Abraham and the Three Angels",
-            "Jacob's Dream", "Moses Striking the Rock", "The Crossing of the Red Sea",
+            "Jacob's Dream", "The Dream of Jacob",
+            "Moses Striking the Rock", "Moses Receiving the Tablets",
+            "The Crossing of the Red Sea", "The Parting of the Red Sea",
+            "The Fall of Icarus",  # painting at Nice
             # Other works at Nice (mosaic, stained glass, tapestry)
-            "The Prophet Elijah", "Elijah's Chariot",
+            "The Prophet Elijah", "Prophet Elijah",
+            "Elijah's Chariot",  # Mosaic
+            "The Blue Concert",  # Stained glass concert hall windows
             # Triptych
             "R\u00e9sistance", "R\u00e9surrection", "Lib\u00e9ration",
             "The Resurrection",  # English name for Résurrection (part of triptych)
