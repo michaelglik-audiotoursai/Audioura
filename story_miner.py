@@ -148,9 +148,9 @@ def extract_canonical_titles(corpus: str, venue_name: str = "") -> Tuple[Set[str
             # English equivalents (VERIFIED: each work confirmed at Nice museum via Wikipedia/museum site)
             # Alias map: variants resolve to one canonical entry to prevent duplicate stops
             "The Creation of Man",  # La Création de l'Homme (1958) — verified in venue Wikipedia article
-            "The Creation of the World",  # Mosaic — verified in venue Wikipedia article  
+            "The Creation of the World",  # Stained glass — verified in venue Wikipedia article  
             "The Sacrifice of Isaac",  # Le Sacrifice d'Isaac — verified in Wikipedia (one of 17 Message Biblique)
-            "Song of Songs",  # Le Cantique des Cantiques (5 paintings) — verified in venue article
+            # "Song of Songs" (bare) moved to cycle_names — it's the 5-canvas cycle, not a single work
             "Song of Songs I", "Song of Songs II", "Song of Songs III",
             "Song of Songs IV", "Song of Songs V",
             "Moses and the Burning Bush",  # Moïse devant le buisson ardent — verified (one of 17)
@@ -226,6 +226,7 @@ def extract_canonical_titles(corpus: str, venue_name: str = "") -> Tuple[Set[str
         'biblical message', 'message biblique', 'the biblical message',
         'le message biblique', 'musee national message biblique',
         'cantique des cantiques',  # when used as cycle name for the series
+        'song of songs',  # The 5-canvas cycle — members I-V are canonical stops
     }
     for title in list(canonical_titles):
         if title.lower() in _KNOWN_CYCLES or 'message biblique' in title.lower():
@@ -420,6 +421,29 @@ def _normalize(text: str) -> str:
     return ' '.join(stripped.split())
 
 
+# --- W4: Canonical alias map (variants → single canonical entry) ---
+# Prevents duplicate stops from variant names resolving to separate entries
+CANONICAL_ALIASES: Dict[str, str] = {
+    # Chagall — variant spellings → canonical
+    "prophet elijah": "The Prophet Elijah",
+    "the prophet elijah": "The Prophet Elijah",
+    "elijah": "The Prophet Elijah",
+    "the resurrection": "Résurrection",
+    "resurrection": "Résurrection",
+    "resistance resurrection liberation": "Résistance",
+    "resistance, resurrection, liberation": "Résistance",
+    # Numerals — Song of Songs cycle members
+    "song of songs i": "Song of Songs I",
+    "song of songs ii": "Song of Songs II",
+    "song of songs iii": "Song of Songs III",
+    "song of songs iv": "Song of Songs IV",
+    "song of songs v": "Song of Songs V",
+}
+
+# Roman numerals that should NEVER be dropped during matching
+_ROMAN_NUMERALS = {'i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'}
+
+
 # --- T0a: Match candidate to canonical title ---
 
 def match_candidate_to_canonical(
@@ -429,37 +453,80 @@ def match_candidate_to_canonical(
 ) -> Optional[Tuple[str, str]]:
     """Try to match a candidate work name against the set of canonical titles.
     
-    Uses fuzzy/proximity matching to map candidates to canonical titles.
+    Resolution order:
+    1. Exact alias lookup (normalized) — deterministic, no ties
+    2. Fuzzy content-word matching — with numeral-awareness
+    
     Returns (matched_canonical_title, evidence_snippet) or None if no match.
     """
     _norm_candidate = _normalize(candidate_name)
-    # [M3 fix] Multilingual stop words — these should not count as content words
+    
+    # Step 1: Exact alias lookup (deterministic, no hash-order ties)
+    if _norm_candidate in CANONICAL_ALIASES:
+        _resolved = CANONICAL_ALIASES[_norm_candidate]
+        if _resolved in canonical_titles:
+            snippet = _find_snippet(_resolved, corpus)
+            return (_resolved, snippet)
+    
+    # Also try exact match against canonical titles (normalized)
+    _canon_norm_map = {_normalize(c): c for c in canonical_titles}
+    if _norm_candidate in _canon_norm_map:
+        _exact = _canon_norm_map[_norm_candidate]
+        snippet = _find_snippet(_exact, corpus)
+        return (_exact, snippet)
+    
+    # Step 2: Fuzzy matching with numeral awareness
     _STOP_WORDS = {
-        # English
         'the', 'and', 'for', 'with', 'from', 'that', 'this', 'are', 'was', 'his',
         'her', 'its', 'who', 'which', 'their', 'not', 'but', 'all', 'can', 'will',
-        # French
         'les', 'des', 'une', 'dans', 'sur', 'par', 'pour', 'avec', 'son', 'ses',
         'est', 'sont', 'qui', 'que', 'aux',
-        # German
         'der', 'die', 'das', 'und', 'ein', 'eine', 'mit', 'von', 'den', 'dem',
-        # Italian
         'del', 'della', 'dei', 'con', 'gli', 'per', 'una',
-        # Spanish
-        'los', 'las', 'del', 'con', 'por', 'una',
+        'los', 'las', 'con', 'por',
     }
-    _candidate_words = [w for w in _norm_candidate.split() if len(w) >= 3 and w not in _STOP_WORDS]
+    
+    def _content_words(text_norm):
+        """Extract content words, preserving roman numerals as distinguishing tokens."""
+        words = text_norm.split()
+        result = []
+        for w in words:
+            if w in _ROMAN_NUMERALS:
+                result.append(w)  # Always keep numerals
+            elif len(w) >= 3 and w not in _STOP_WORDS:
+                result.append(w)
+        return result
+    
+    _candidate_words = _content_words(_norm_candidate)
     if not _candidate_words:
         return None
+    
+    # Extract candidate's numeral (if any)
+    _cand_numeral = None
+    for w in _candidate_words:
+        if w in _ROMAN_NUMERALS:
+            _cand_numeral = w
+            break
 
     best_match = None
     best_score = 0.0
 
     for canonical in canonical_titles:
         _norm_canon = _normalize(canonical)
-        _canon_words = [w for w in _norm_canon.split() if len(w) >= 3 and w not in _STOP_WORDS]
+        _canon_words = _content_words(_norm_canon)
         if not _canon_words:
             continue
+        
+        # [W4] Numeral mismatch check: if candidate has a numeral, canonical must have same one
+        _canon_numeral = None
+        for w in _canon_words:
+            if w in _ROMAN_NUMERALS:
+                _canon_numeral = w
+                break
+        if _cand_numeral and _canon_numeral and _cand_numeral != _canon_numeral:
+            continue  # Different numerals = different works
+        if _cand_numeral and not _canon_numeral:
+            continue  # Candidate has numeral, canonical doesn't = candidate is more specific
 
         # Calculate bidirectional word overlap (require exact word match, not prefix)
         fwd_matches = sum(1 for w in _candidate_words if w in _canon_words)
