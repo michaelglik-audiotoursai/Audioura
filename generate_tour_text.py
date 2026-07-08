@@ -664,9 +664,9 @@ def _verify_works_v2(poi_list, venue_name):
         print(f"  [D1v2] DROPPED '{work_name}' — no canonical title match")
         evidence_log[work_name] = {"status": "DROPPED", "reason": "no canonical match"}
 
-    # Fail-closed: need ≥4 verified
-    if len(verified_pois) < 4:
-        print(f"  [D1v2] Only {len(verified_pois)} verified — need ≥4 (fail-closed)")
+    # Fail-closed: need ≥3 verified (R4 replenishment will add more)
+    if len(verified_pois) < 3:
+        print(f"  [D1v2] Only {len(verified_pois)} verified — need ≥3 (fail-closed)")
         return None
 
     print(f"  [D1v2] {len(verified_pois)}/{len(poi_list)} works verified")
@@ -1502,13 +1502,11 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             if _d1v2_result is not None and _d1v2_result is not None:
                 poi_list, _d1_evidence_log, _d1_venue_corpus, _story_corpus_result = _d1v2_result
             else:
-                # Fallback to legacy D1
-                _d1_result = _verify_works_in_collection(poi_list, _museum_venue_name)
-                if _d1_result is None:
-                    print(f"  [D1] In-collection verification FAILED — not enough verified works")
-                    return None, None, (None, None)
-                else:
-                    poi_list, _d1_evidence_log, _d1_venue_corpus = _d1_result
+                # D1v2 could not verify enough works — fail cleanly (no legacy fallback)
+                # The legacy D1 is weaker and admits wrong-venue works. R4 replenishment
+                # is the correct mechanism to get more stops, not a weaker verifier.
+                print(f"  [D1] D1v2 verification could not verify enough works — clean fail")
+                return None, None, (None, None)
 
             # -------- [R4] Bounded replenishment loop --------
             # If verified < requested, re-prompt for MORE candidates and verify
