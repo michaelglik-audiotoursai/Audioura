@@ -33,9 +33,17 @@ def check(name, condition, detail=""):
         FAIL_COUNT += 1
 
 
-def run_qa(tour_text, tour_file=""):
-    """Run 8 QA checks on tour text."""
+def run_qa(tour_text, tour_file="", story_elements=None):
+    """Run QA checks on tour text.
+    
+    Args:
+        tour_text: The tour text to check
+        tour_file: Path to the tour file (for CLI mode)
+        story_elements: List of story element dicts (for serving mode — in-memory, no file glob)
+    """
     global PASS_COUNT, FAIL_COUNT
+    # Store elements for G4 check access
+    run_qa._story_elements_override = story_elements
 
     # 1. No forbidden phrases from master list
     try:
@@ -332,10 +340,11 @@ def run_qa(tour_text, tour_file=""):
     else:
         check("Venue coherence (stops reference correct venue)", True, "(not a museum tour)")
 
-    # [G4] Prolog/epilog causal-claim trace check
+    # [G4] Prolog/epilog causal-claim trace check (REVISED per LEAD comment 1000410000005486)
     # Every dated or causal claim in Stop 1 Orientation (prolog) + epilog must trace
-    # to a story element. Defense-in-depth: catches GPT-fabricated claims in spine text.
-    _CAUSAL_VERBS = re.compile(r'\b(became|created|founded|transformed|donated|established|inaugurated|opened|built|commissioned|dedicated|added|expanded)\b', re.I)
+    # to ONE SPECIFIC story element. Fabrications recombine real vocabulary into false claims;
+    # per-element matching (not pooled union) catches them.
+    _CAUSAL_VERBS = re.compile(r'\b(became|created|founded|transformed|donated|established|inaugurated|opened|built|commissioned|dedicated|added|expanded|collaborated|collaboration)\b', re.I)
     _YEAR_PATTERN = re.compile(r'\b(1[4-9]\d{2}|20[0-2]\d)\b')
     
     # Extract prolog (Stop 1 Orientation) and epilog text
@@ -366,39 +375,158 @@ def run_qa(tour_text, tour_file=""):
         if has_year or has_causal:
             _claim_sentences.append(sent)
     
-    # Check each claim traces to story elements (if available)
-    _ungrounded_claims = []
-    if _claim_sentences:
-        # Try to load story_elements from the same tour's output dir
-        _story_elements_text = ""
+    # --- Load story elements (FIX #3: in-memory param OR file with exact stem match) ---
+    _story_elements_list = None  # List of element dicts
+    
+    # Priority 1: in-memory param (from run_qa(story_elements=...))
+    # This is set by the serving gate which has the elements from the current job
+    if hasattr(run_qa, '_story_elements_override') and run_qa._story_elements_override:
+        _story_elements_list = run_qa._story_elements_override
+    
+    # Priority 2: CLI — match tour's exact filename stem
+    if _story_elements_list is None and tour_file:
         try:
+            import json as _json
+            _tour_stem = os.path.splitext(os.path.basename(tour_file))[0]
             _elements_dir = os.path.dirname(tour_file) if tour_file else "."
-            _elements_files = [f for f in os.listdir(_elements_dir) if 'story_elements' in f and f.endswith('.json')]
-            if _elements_files:
-                import json as _json
-                with open(os.path.join(_elements_dir, _elements_files[-1]), 'r') as _ef:
-                    _elements = _json.load(_ef)
-                _story_elements_text = " ".join(e.get('text', '') for e in _elements if e.get('text'))
+            _exact_match = os.path.join(_elements_dir, f"{_tour_stem}_story_elements.json")
+            if os.path.exists(_exact_match):
+                with open(_exact_match, 'r') as _ef:
+                    _story_elements_list = _json.load(_ef)
         except Exception:
             pass
-        
-        if _story_elements_text:
-            # Check overlap: each claim sentence must have content-word overlap with elements
+    
+    # --- Check claims against elements ---
+    _ungrounded_claims = []
+    _is_storied = os.environ.get("STORIED_MODE") == "true"
+    
+    if _claim_sentences:
+        if _story_elements_list:
+            # Extract venue/artist names to exclude from proper-noun check
+            _venue_artist_words = set()
+            if tour_file:
+                _base = os.path.basename(tour_file).lower()
+                _venue_artist_words = set(w for w in re.split(r'[_\s]', _base) if len(w) >= 4)
+            # Also from the tour header
+            _header_match = re.search(r'Tour:?\s*(.+)', tour_text[:200])
+            if _header_match:
+                _venue_artist_words.update(w.lower() for w in _header_match.group(1).split() if len(w) >= 4)
+            
             for claim in _claim_sentences:
-                _claim_words = set(w.lower() for w in claim.split() if len(w) >= 4 and w[0].isalpha())
-                _elem_words = set(w.lower() for w in _story_elements_text.split() if len(w) >= 4)
-                _overlap = _claim_words & _elem_words
-                # Need >=40% of claim's content words to appear in elements
-                if len(_claim_words) > 0 and len(_overlap) / len(_claim_words) < 0.4:
+                _claim_words = set()
+                for w in claim.split():
+                    w = w.strip('.,;:!?()[]"')  # Strip punctuation
+                    if w.endswith("'s"): w = w[:-2]  # Strip possessive
+                    w = w.lower()
+                    if len(w) >= 4 and w[0:1].isalpha():
+                        _claim_words.add(w)
+                if not _claim_words:
+                    continue
+                
+                # FIX #1+#2 combined: find the element that best accounts for THIS claim
+                # The matched element must have ≥35% overlap AND contain all proper nouns
+                _matched_element = None
+                for elem in _story_elements_list:
+                    _elem_text = elem.get('text', '')
+                    if not _elem_text or len(_elem_text) < 10:
+                        continue
+                    _elem_words = set()
+                    for w in _elem_text.split():
+                        w = w.strip('.,;:!?()[]"')
+                        if w.endswith("'s"): w = w[:-2]
+                        w = w.lower()
+                        if len(w) >= 4:
+                            _elem_words.add(w)
+                    _overlap = _claim_words & _elem_words
+                    _fwd = len(_overlap) / len(_claim_words) if _claim_words else 0
+                    _rev = len(_overlap) / len(_elem_words) if _elem_words else 0
+                    if max(_fwd, _rev) >= 0.35:
+                        _matched_element = elem
+                        break
+                
+                if not _matched_element:
                     _ungrounded_claims.append(claim[:80])
+                    continue
+                
+                # FIX #2: Proper nouns are fabrication carriers
+                # Only person/place names that could introduce fabrications — not sentence-start caps
+                _COMMON_PROPER = {'this', 'after', 'before', 'during', 'through', 'from', 'with',
+                                  'when', 'where', 'which', 'whose', 'what', 'that', 'each',
+                                  'both', 'some', 'many', 'most', 'also', 'just', 'here',
+                                  'originally', 'eventually', 'finally', 'initially', 'today',
+                                  'french', 'italian', 'jewish', 'biblical', 'christian', 'roman',
+                                  'greek', 'ancient', 'modern', 'national', 'original',
+                                  'vence', 'nice', 'france', 'paris', 'chagall', 'matisse',
+                                  # Abstract nouns that capitalize in titles
+                                  'message', 'museum', 'chapel', 'gallery', 'collection',
+                                  'biblical', 'testament', 'exodus', 'genesis'}
+                
+                # Extract proper nouns: capitalized words NOT at sentence start, ≥3 chars
+                _sentences_in_claim = re.split(r'[.!?]\s+', claim)
+                _claim_proper_nouns = set()
+                for sent in _sentences_in_claim:
+                    words = sent.split()
+                    for word in words[1:]:  # Skip first word of each sentence
+                        _w = word.strip('.,;:!?()[]"')
+                        if _w.endswith("'s"): _w = _w[:-2]
+                        if _w and _w[0].isupper() and len(_w) >= 3:
+                            _wl = _w.lower()
+                            if _wl not in _venue_artist_words and _wl not in _COMMON_PROPER:
+                                _claim_proper_nouns.add(_wl)
+                
+                if _claim_proper_nouns:
+                    _elem_text_lower = _matched_element.get('text', '').lower()
+                    _missing_pn = []
+                    for pn in _claim_proper_nouns:
+                        if pn not in _elem_text_lower:
+                            _missing_pn.append(pn)
+                    if _missing_pn:
+                        _ungrounded_claims.append(f"{claim[:60]}... (proper noun '{_missing_pn[0]}' not in element)")
+                        continue
+                    
+                    # Also check: the SPECIFIC causal verb from the claim must exist in the
+                    # matched element (catches recombination fabrications where a person name
+                    # from one element is combined with an action from a different context)
+                    # Allow synonym matches: added≈donated, built≈created, etc.
+                    _CAUSAL_SYNONYMS = {
+                        'added': ['donated', 'contributed', 'gave', 'added'],
+                        'donated': ['added', 'contributed', 'gave', 'donated'],
+                        'created': ['built', 'founded', 'established', 'created'],
+                        'built': ['created', 'constructed', 'built'],
+                        'founded': ['created', 'established', 'founded'],
+                        'established': ['created', 'founded', 'established'],
+                        'opened': ['inaugurated', 'established', 'opened'],
+                        'inaugurated': ['opened', 'established', 'inaugurated'],
+                    }
+                    _claim_causal = _CAUSAL_VERBS.findall(claim.lower())
+                    if _claim_causal and _claim_proper_nouns:
+                        _any_causal_matches = False
+                        for v in _claim_causal:
+                            # Check exact verb or its synonyms in the element
+                            _to_check = [v] + _CAUSAL_SYNONYMS.get(v, [])
+                            if any(sv in _elem_text_lower for sv in _to_check):
+                                _any_causal_matches = True
+                                break
+                        if not _any_causal_matches:
+                            _ungrounded_claims.append(f"{claim[:60]}... (causal verb '{_claim_causal[0]}' not in matched element)")
+                            continue
+        
+        elif _is_storied and _claim_sentences:
+            # FIX #4: Fail-closed in serving — STORIED mode, claims present, elements missing → FAIL
+            _ungrounded_claims.append("(STORIED mode: claims present but story_elements unavailable — fail-closed)")
     
     _passed_g4 = len(_ungrounded_claims) == 0
-    if _claim_sentences and _story_elements_text:
+    if _claim_sentences and _story_elements_list:
         check("G4 Prolog/epilog claims trace to story elements (FACTUAL)",
               _passed_g4,
               f"{len(_ungrounded_claims)} ungrounded claim(s): {_ungrounded_claims[:2]}")
         if not _passed_g4:
             FACTUAL_FAIL_COUNT += 1
+    elif _is_storied and _claim_sentences and not _story_elements_list:
+        # Fail-closed: STORIED mode, claims present, no elements → FACTUAL FAIL
+        check("G4 Prolog/epilog claims trace to story elements (FACTUAL)",
+              False, "STORIED mode: claims present but story_elements unavailable — fail-closed")
+        FACTUAL_FAIL_COUNT += 1
     else:
         check("G4 Prolog/epilog claims trace to story elements (FACTUAL)",
               True, "(no story_elements available or no dated/causal claims — skipped)")
