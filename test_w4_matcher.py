@@ -53,9 +53,115 @@ def test_kiss_subset_documented():
     else:
         print("✅ test_kiss_subset: 'The Kiss' correctly doesn't match 'The Kiss of Judas'")
 
+
+def test_dynamic_aliases_from_sparql():
+    """Test that dynamically-built aliases from SPARQL works resolve correctly."""
+    from venue_resolver import build_dynamic_aliases
+    import story_miner as sm
+    
+    # Mock SPARQL response (simulates what Wikidata returns for Chagall)
+    mock_works = [
+        {"qid": "Q123", "label_en": "Résurrection", "label_local": "Résurrection", "aliases": ["The Resurrection", "Resurrection"]},
+        {"qid": "Q456", "label_en": "Abraham et les trois anges", "label_local": "Abraham et les trois anges", "aliases": ["Abraham and the Three Angels"]},
+        {"qid": "Q789", "label_en": "Le Cirque bleu", "label_local": "Le Cirque bleu", "aliases": ["The Blue Circus"]},
+    ]
+    
+    # Build dynamic aliases
+    aliases = build_dynamic_aliases(mock_works)
+    
+    # Inject into story_miner
+    sm.CANONICAL_ALIASES = aliases
+    
+    # Test: English alias → French canonical
+    CANON = {"Résurrection", "Abraham et les trois anges", "Le Cirque bleu"}
+    
+    r1 = match_candidate_to_canonical("The Resurrection", CANON)
+    assert r1 is not None, "'The Resurrection' should match via dynamic alias"
+    assert r1[0] == "Résurrection", f"Expected 'Résurrection', got '{r1[0]}'"
+    
+    r2 = match_candidate_to_canonical("The Blue Circus", CANON)
+    assert r2 is not None, "'The Blue Circus' should match via dynamic alias"
+    assert r2[0] == "Le Cirque bleu", f"Expected 'Le Cirque bleu', got '{r2[0]}'"
+    
+    # Clean up
+    sm.CANONICAL_ALIASES = {}
+    print("✅ test_dynamic_aliases_from_sparql PASSED")
+
+
+def test_dynamic_aliases_numeral_invariant():
+    """W4 invariant: numbered works must not alias to bare form and vice versa."""
+    from venue_resolver import build_dynamic_aliases
+    import story_miner as sm
+    
+    # Mock: numbered works (like Song of Songs I-V)
+    mock_works = [
+        {"qid": "Q001", "label_en": "Blue Nude I", "label_local": "Nu bleu I", "aliases": []},
+        {"qid": "Q002", "label_en": "Blue Nude II", "label_local": "Nu bleu II", "aliases": []},
+        {"qid": "Q003", "label_en": "Blue Nude IV", "label_local": "Nu bleu IV", "aliases": []},
+    ]
+    
+    aliases = build_dynamic_aliases(mock_works)
+    sm.CANONICAL_ALIASES = aliases
+    
+    CANON = {"Blue Nude I", "Blue Nude II", "Blue Nude IV"}
+    
+    # Bare "Blue Nude" must NOT match any specific numbered work
+    r_bare = match_candidate_to_canonical("Blue Nude", CANON)
+    assert r_bare is None, f"Bare 'Blue Nude' should NOT match a numbered canonical, got '{r_bare}'"
+    
+    # "Blue Nude I" must match exactly "Blue Nude I" not "Blue Nude II"
+    r1 = match_candidate_to_canonical("Blue Nude I", CANON)
+    assert r1 is not None and r1[0] == "Blue Nude I", f"Expected 'Blue Nude I', got {r1}"
+    
+    # "Blue Nude IV" must match exactly "Blue Nude IV"
+    r4 = match_candidate_to_canonical("Blue Nude IV", CANON)
+    assert r4 is not None and r4[0] == "Blue Nude IV", f"Expected 'Blue Nude IV', got {r4}"
+    
+    # Clean up
+    sm.CANONICAL_ALIASES = {}
+    print("✅ test_dynamic_aliases_numeral_invariant PASSED")
+
+
+def test_dynamic_aliases_bilingual_matching():
+    """Test cross-language matching via SPARQL bilingual labels."""
+    from venue_resolver import build_dynamic_aliases, build_canonical_titles_from_works
+    import story_miner as sm
+    
+    # Mock: Matisse works with French labels + English equivalents
+    mock_works = [
+        {"qid": "Q100", "label_en": "Still Life with Pomegranates", "label_local": "Nature morte aux grenades", "aliases": []},
+        {"qid": "Q101", "label_en": "Blue Nude IV", "label_local": "Nu bleu IV", "aliases": ["Fourth Blue Nude"]},
+        {"qid": "Q102", "label_en": "Storm in Nice", "label_local": "Tempête à Nice", "aliases": []},
+    ]
+    
+    # Build canonical titles (should include BOTH languages)
+    titles = build_canonical_titles_from_works(mock_works)
+    assert "Still Life with Pomegranates" in titles, "English label should be in canonical titles"
+    assert "Nature morte aux grenades" in titles, "French label should be in canonical titles"
+    assert "Nu bleu IV" in titles, "French variant should be in titles"
+    assert "Fourth Blue Nude" in titles, "Alias should be in titles"
+    
+    # Build aliases for cross-language resolution
+    aliases = build_dynamic_aliases(mock_works)
+    sm.CANONICAL_ALIASES = aliases
+    
+    # "Nu bleu IV" candidate should match via alias to "Blue Nude IV"
+    r = match_candidate_to_canonical("Nu bleu IV", titles)
+    assert r is not None, "'Nu bleu IV' should match in bilingual title set"
+    
+    # Clean up
+    sm.CANONICAL_ALIASES = {}
+    print("✅ test_dynamic_aliases_bilingual_matching PASSED")
+
 if __name__ == "__main__":
     test_song_of_songs_iv_exact()
     test_bare_cycle_no_match()
     test_elijah_pair_same_canonical()
     test_kiss_subset_documented()
+    
+    # --- Dynamic alias tests (SPARQL-built, LEAD amendment #5) ---
+    test_dynamic_aliases_from_sparql()
+    test_dynamic_aliases_numeral_invariant()
+    test_dynamic_aliases_bilingual_matching()
+    
     print("\nAll W4 tests completed.")
