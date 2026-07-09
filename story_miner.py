@@ -218,6 +218,15 @@ def fetch_venue_narrative_corpus(
     if base_site_url:
         # Fetch the base/collection page and extract internal links
         _base_text, _base_links = _fetch_page_text(base_site_url)
+        
+        # R1(a) fallback: if P856 URL times out, try HTTPS or known alternative domains
+        if not _base_text and base_site_url.startswith('http://'):
+            _https_url = base_site_url.replace('http://', 'https://')
+            _base_text, _base_links = _fetch_page_text(_https_url)
+            if _base_text:
+                base_site_url = _https_url
+                print(f"  [story_miner] P856 timeout → HTTPS fallback worked: {_https_url}")
+        
         if _base_text:
             pages.append({"url": base_site_url, "text": _base_text, "title": "Collection"})
             source_urls.append(base_site_url)
@@ -270,14 +279,32 @@ def fetch_venue_narrative_corpus(
             if _name_part:
                 _en_titles.append(f"{_name_part} Museum")
                 _en_titles.append(f"Musée {_name_part}")
+                # Also try with city disambiguator to avoid wrong museum (e.g. Belarus vs Nice)
+                if venue_name and ',' in venue_name:
+                    _city_part = venue_name.split(',')[1].strip() if len(venue_name.split(',')) > 1 else ""
+                    if _city_part:
+                        _en_titles.append(f"{_name_part} Museum {_city_part}")
+                        _en_titles.append(f"Musée national {_name_part}")
         # Also try with venue_name directly
         if venue_name and venue_name != wikipedia_title:
             _en_titles.append(venue_name)
         
         en_article = ""
         for _en_title in _en_titles:
-            en_article = fetch_wikipedia_summary(_en_title)
-            if en_article and len(en_article) > 500:
+            _candidate = fetch_wikipedia_summary(_en_title)
+            if _candidate and len(_candidate) > 500:
+                # Validate: article should mention the venue's city (avoid wrong-city museum)
+                _city_from_name = ""
+                if venue_name and ',' in venue_name:
+                    parts = venue_name.split(',')
+                    _city_from_name = parts[1].strip().lower() if len(parts) > 1 else ""
+                
+                if _city_from_name and _city_from_name not in _candidate.lower()[:2000]:
+                    # Wrong museum (e.g. Belarus Chagall museum vs Nice)
+                    print(f"  [story_miner] Wikipedia EN: '{_en_title}' rejected (doesn't mention '{_city_from_name}')")
+                    continue
+                
+                en_article = _candidate
                 pages.append({"url": f"https://en.wikipedia.org/wiki/{_en_title.replace(' ', '_')}",
                              "text": en_article, "title": f"Wikipedia EN: {_en_title}"})
                 source_urls.append(f"https://en.wikipedia.org/wiki/{_en_title.replace(' ', '_')}")
