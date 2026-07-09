@@ -1435,6 +1435,28 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 f"- NEVER list nearby museums or cultural institutions as stops — they are OUTSIDE this venue.\n"
                 f"- Prefer the museum's most iconic/signature pieces that visitors specifically come to see."
             )
+            
+            # Pre-resolve venue to get canonical titles as hints for GPT
+            # This helps GPT propose works that will actually verify
+            try:
+                from venue_resolver import resolve_venue, fetch_venue_works, build_canonical_titles_from_works
+                _city_hint = ""
+                if "," in location:
+                    parts = [p.strip() for p in location.split(",")]
+                    _city_hint = parts[1] if len(parts) >= 2 else ""
+                _pre_entity = resolve_venue(_museum_venue_name, _city_hint)
+                if _pre_entity and _pre_entity.qid:
+                    _pre_works = fetch_venue_works(_pre_entity.qid, _pre_entity.language)
+                    _pre_titles = build_canonical_titles_from_works(_pre_works)
+                    if _pre_titles:
+                        _hint_sample = sorted(_pre_titles)[:12]
+                        _museum_venue_constraint += (
+                            f"\n\nKNOWN WORKS AT THIS VENUE (use these as guidance — include some from this list):\n"
+                            f"  {'; '.join(_hint_sample)}\n"
+                        )
+                        print(f"  [Phase3A] Injected {len(_hint_sample)} canonical title hints from Wikidata")
+            except Exception as _pre_err:
+                print(f"  [Phase3A] Pre-resolution failed (non-fatal): {_pre_err}")
 
     # -------- Scope + compactness constraints for PHASE 3A --------
     _geo_scope = (intent.get('geographic_scope') or '').strip() if intent else ''
@@ -1601,8 +1623,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     f"DO NOT include: {_r4_forbidden_str}\n"
                     f"DO NOT include the name of the exhibition/collection itself.\n"
                     f"Each must be a real, named, individual artwork (painting, mosaic, sculpture, stained glass).\n"
-                    f"Return ONLY a JSON array: [{{\"name\": \"...\", \"address\": \"...\"}}]"
                 )
+                # Add hints from discovered canonical titles (helps GPT propose correct works)
+                if _story_corpus_result and _story_corpus_result.get('canonical_titles'):
+                    _hint_titles = sorted(_story_corpus_result['canonical_titles'] - _r4_all_tried_names)[:10]
+                    if _hint_titles:
+                        _r4_prompt += f"HINT — these works are known to be at this venue: {'; '.join(_hint_titles)}\n"
+                        _r4_prompt += "You may include works from this list AND other works you know are there.\n"
+                _r4_prompt += f"Return ONLY a JSON array: [{{\"name\": \"...\", \"address\": \"...\"}}]"
                 _r4_data = {
                     "model": "gpt-3.5-turbo",
                     "messages": [
