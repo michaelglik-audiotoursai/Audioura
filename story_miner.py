@@ -60,15 +60,33 @@ class _TextExtractor(HTMLParser):
 def _fetch_page_text(url: str, max_chars: int = 30000) -> Tuple[str, List[Tuple[str, str]]]:
     """Fetch a URL and extract clean text + links. Returns (text, links).
     
+    Follows redirects, uses 15s timeout, one retry on timeout.
     Prioritizes paragraph content over navigation for narrative-rich extraction.
     """
-    try:
-        resp = requests.get(url, headers={'User-Agent': 'Audioura/2.2'}, timeout=10)
-        if resp.status_code != 200 or len(resp.text) < 200:
+    for attempt in range(2):  # One retry
+        try:
+            resp = requests.get(url, headers={'User-Agent': 'Audioura/2.2'},
+                              timeout=15, allow_redirects=True)
+            if resp.status_code != 200 or len(resp.text) < 200:
+                if attempt == 0:
+                    continue  # Retry once
+                return "", []
+            break
+        except requests.exceptions.Timeout:
+            if attempt == 0:
+                logger.info(f"story_miner: timeout on {url}, retrying...")
+                continue
+            logger.warning(f"story_miner: timeout on {url} after retry")
             return "", []
-        
-        html = resp.text
-        
+        except Exception as e:
+            logger.warning(f"story_miner: fetch error for {url}: {e}")
+            return "", []
+    else:
+        return "", []
+    
+    html = resp.text
+    
+    try:
         # Extract paragraph content first (narrative-rich)
         paragraph_texts = []
         import re as _re
@@ -236,15 +254,35 @@ def fetch_venue_narrative_corpus(
                 source_urls.append(url)
                 print(f"  [story_miner] Narrative page: {url} ({len(_text)} chars)")
 
-    # --- 2. Wikipedia (English) full article ---
+    # --- 2. Wikipedia (English) full article — ALWAYS fetched regardless of language ---
     if wikipedia_title:
         from rag_retriever import fetch_wikipedia_summary
-        en_article = fetch_wikipedia_summary(wikipedia_title)
-        if en_article and len(en_article) > 500:
-            pages.append({"url": f"https://en.wikipedia.org/wiki/{wikipedia_title.replace(' ', '_')}",
-                         "text": en_article, "title": f"Wikipedia EN: {wikipedia_title}"})
-            source_urls.append(f"https://en.wikipedia.org/wiki/{wikipedia_title.replace(' ', '_')}")
-            print(f"  [story_miner] Wikipedia EN: {len(en_article)} chars")
+        # Try the provided title and common variants
+        _en_titles = [wikipedia_title]
+        # Add variants: with/without accents, with city disambiguator
+        _clean_title = wikipedia_title.replace('é', 'e').replace('è', 'e').replace('ê', 'e').replace('ë', 'e').replace('à', 'a').replace('ô', 'o').replace('î', 'i').replace('ç', 'c').replace('ü', 'u').replace('ö', 'o').replace('ä', 'a')
+        if _clean_title != wikipedia_title:
+            _en_titles.append(_clean_title)
+        # Try "Musée X" → "X Museum" style conversion
+        if wikipedia_title.lower().startswith('mus'):
+            _name_part = re.sub(r'(?i)^mus[ée]+e?\s*(national[e]?\s*)?', '', wikipedia_title).strip()
+            _name_part = _name_part.replace('-', ' ')  # "Marc-Chagall" → "Marc Chagall"
+            if _name_part:
+                _en_titles.append(f"{_name_part} Museum")
+                _en_titles.append(f"Musée {_name_part}")
+        # Also try with venue_name directly
+        if venue_name and venue_name != wikipedia_title:
+            _en_titles.append(venue_name)
+        
+        en_article = ""
+        for _en_title in _en_titles:
+            en_article = fetch_wikipedia_summary(_en_title)
+            if en_article and len(en_article) > 500:
+                pages.append({"url": f"https://en.wikipedia.org/wiki/{_en_title.replace(' ', '_')}",
+                             "text": en_article, "title": f"Wikipedia EN: {_en_title}"})
+                source_urls.append(f"https://en.wikipedia.org/wiki/{_en_title.replace(' ', '_')}")
+                print(f"  [story_miner] Wikipedia EN: {len(en_article)} chars (title: '{_en_title}')")
+                break
 
     # --- 3. Local-language Wikipedia (country→lang, not hardcoded "fr") ---
     if language and language != "en" and wikipedia_title:
