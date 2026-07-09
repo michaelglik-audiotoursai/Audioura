@@ -127,16 +127,30 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
             import content_qa_runner
             import re as _qa_re
             
+            # Load story elements for G4 check (persisted during generate_tour_text)
+            _serving_story_elements = None
+            try:
+                import json as _json
+                _elem_path = temp_path.replace('.txt', '_story_elements.json')
+                if os.path.exists(_elem_path):
+                    with open(_elem_path, 'r') as _ef:
+                        _serving_story_elements = _json.load(_ef)
+                    print(f"[BLOCKER4c] Loaded {len(_serving_story_elements)} story elements for G4 check")
+                else:
+                    print(f"[BLOCKER4c] No story_elements file at {_elem_path} — G4 will use fail-closed")
+            except Exception as _elem_err:
+                print(f"[BLOCKER4c] story_elements load error: {_elem_err}")
+            
             _QA_MAX_ROUNDS = 3
             _qa_passed = False
             
             for _qa_round in range(1, _QA_MAX_ROUNDS + 1):
-                # Run QA
+                # Run QA with story_elements passed in-memory
                 content_qa_runner.PASS_COUNT = 0
                 content_qa_runner.FAIL_COUNT = 0
                 content_qa_runner.FACTUAL_FAIL_COUNT = 0
                 try:
-                    content_qa_runner.run_qa(tour_text)
+                    content_qa_runner.run_qa(tour_text, story_elements=_serving_story_elements)
                 except SystemExit:
                     pass  # run_qa calls sys.exit() — catch it
                 except Exception as _qa_err:
