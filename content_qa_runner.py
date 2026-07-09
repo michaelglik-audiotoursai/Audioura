@@ -332,6 +332,77 @@ def run_qa(tour_text, tour_file=""):
     else:
         check("Venue coherence (stops reference correct venue)", True, "(not a museum tour)")
 
+    # [G4] Prolog/epilog causal-claim trace check
+    # Every dated or causal claim in Stop 1 Orientation (prolog) + epilog must trace
+    # to a story element. Defense-in-depth: catches GPT-fabricated claims in spine text.
+    _CAUSAL_VERBS = re.compile(r'\b(became|created|founded|transformed|donated|established|inaugurated|opened|built|commissioned|dedicated|added|expanded)\b', re.I)
+    _YEAR_PATTERN = re.compile(r'\b(1[4-9]\d{2}|20[0-2]\d)\b')
+    
+    # Extract prolog (Stop 1 Orientation) and epilog text
+    _prolog_text = ""
+    _epilog_text = ""
+    _stop1_match = re.search(r'Stop\s+1:.*?(?=\nStop\s+2:|$)', tour_text, re.DOTALL)
+    if _stop1_match:
+        _s1_text = _stop1_match.group(0)
+        _orient_match = re.search(r'Orientation:\s*(.+?)(?=\n\n)', _s1_text, re.DOTALL)
+        if _orient_match:
+            _prolog_text = _orient_match.group(1)
+    
+    # Epilog: text after last stop's Directions (or after last stop content)
+    _epilog_match = re.search(r'(?:As this journey comes to a close|You\'ve experienced).*', tour_text, re.DOTALL)
+    if _epilog_match:
+        _epilog_text = _epilog_match.group(0)
+    
+    _combined_prolog_epilog = _prolog_text + "\n" + _epilog_text
+    
+    # Find sentences with dated or causal claims
+    _claim_sentences = []
+    for sent in re.split(r'[.!?]\s+', _combined_prolog_epilog):
+        sent = sent.strip()
+        if not sent or len(sent) < 20:
+            continue
+        has_year = _YEAR_PATTERN.search(sent)
+        has_causal = _CAUSAL_VERBS.search(sent)
+        if has_year or has_causal:
+            _claim_sentences.append(sent)
+    
+    # Check each claim traces to story elements (if available)
+    _ungrounded_claims = []
+    if _claim_sentences:
+        # Try to load story_elements from the same tour's output dir
+        _story_elements_text = ""
+        try:
+            _elements_dir = os.path.dirname(tour_file) if tour_file else "."
+            _elements_files = [f for f in os.listdir(_elements_dir) if 'story_elements' in f and f.endswith('.json')]
+            if _elements_files:
+                import json as _json
+                with open(os.path.join(_elements_dir, _elements_files[-1]), 'r') as _ef:
+                    _elements = _json.load(_ef)
+                _story_elements_text = " ".join(e.get('text', '') for e in _elements if e.get('text'))
+        except Exception:
+            pass
+        
+        if _story_elements_text:
+            # Check overlap: each claim sentence must have content-word overlap with elements
+            for claim in _claim_sentences:
+                _claim_words = set(w.lower() for w in claim.split() if len(w) >= 4 and w[0].isalpha())
+                _elem_words = set(w.lower() for w in _story_elements_text.split() if len(w) >= 4)
+                _overlap = _claim_words & _elem_words
+                # Need >=40% of claim's content words to appear in elements
+                if len(_claim_words) > 0 and len(_overlap) / len(_claim_words) < 0.4:
+                    _ungrounded_claims.append(claim[:80])
+    
+    _passed_g4 = len(_ungrounded_claims) == 0
+    if _claim_sentences and _story_elements_text:
+        check("G4 Prolog/epilog claims trace to story elements (FACTUAL)",
+              _passed_g4,
+              f"{len(_ungrounded_claims)} ungrounded claim(s): {_ungrounded_claims[:2]}")
+        if not _passed_g4:
+            FACTUAL_FAIL_COUNT += 1
+    else:
+        check("G4 Prolog/epilog claims trace to story elements (FACTUAL)",
+              True, "(no story_elements available or no dated/causal claims — skipped)")
+
 
 def main():
     print("=" * 60)

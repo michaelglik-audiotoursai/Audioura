@@ -549,8 +549,8 @@ def _verify_works_v2(poi_list, venue_name):
             check_stop_disjointness,
         )
     except ImportError:
-        print("  [D1v2] story_miner not available — falling back to legacy D1")
-        return None  # Caller will fall back to legacy
+        print("  [D1v2] story_miner not available — verification cannot proceed")
+        return None  # Caller handles clean-fail
 
     # --- Generic Grounding: resolve venue via Wikidata ---
     _base_site_url = ""
@@ -645,7 +645,7 @@ def _verify_works_v2(poi_list, venue_name):
     print(f"  [D1v2] Canonical titles union: {len(site_wiki_titles)} site/wiki + {len(sparql_titles)} SPARQL = {len(canonical_titles)} total")
 
     if not canonical_titles:
-        print(f"  [D1v2] No canonical titles extracted — falling back to legacy D1")
+        print(f"  [D1v2] No canonical titles discovered — clean-fail (thin evidence)")
         return None
 
     # Verify each candidate against canonical titles
