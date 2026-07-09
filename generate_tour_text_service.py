@@ -28,6 +28,42 @@ CORS(app)
 TOURS_DIR = "/app/tours"
 ACTIVE_JOBS = get_job_store('tour-generator')
 
+def _persist_icon_metrics(icon_result, job_id):
+    """Persist I-CON results to stop_metrics table (non-blocking)."""
+    import json as _json
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host=os.environ.get("DB_HOST", "postgres-2"),
+            port=os.environ.get("DB_PORT", "5432"),
+            dbname=os.environ.get("DB_NAME", "audiotours"),
+            user=os.environ.get("DB_USER", "admin"),
+            password=os.environ.get("DB_PASSWORD", "admin"),
+        )
+        cur = conn.cursor()
+        
+        for stop in icon_result.get("stops", []):
+            cur.execute(
+                """INSERT INTO stop_metrics 
+                   (job_id, stop_index, stop_title, i_con, class_details, class_historic, class_social, 
+                    paragraphs, evaluator_version, prompt_hash)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                (job_id, stop["stop_index"], stop["stop_title"], stop["i_con"],
+                 stop["class_dist"].get("details", 0), stop["class_dist"].get("historic", 0),
+                 stop["class_dist"].get("social", 0),
+                 _json.dumps(stop["paragraphs"]),
+                 icon_result.get("evaluator_version", "1.0.0"),
+                 icon_result.get("prompt_hash", ""))
+            )
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        print(f"[I-CON] Persisted {len(icon_result.get('stops', []))} stop metrics for job {job_id}")
+    except Exception as e:
+        print(f"[I-CON] Persistence failed: {e}")
+
+
 def ensure_tours_directory():
     """Ensure the tours directory exists."""
     if not os.path.exists(TOURS_DIR):
@@ -168,6 +204,27 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
         # Clean up the temporary file
         os.unlink(temp_path)
         
+        # --- I-CON EVALUATION (STORIED_MODE only, AFTER QA loop) ---
+        # Evaluates the DELIVERED text (what the customer actually hears)
+        _icon_result = None
+        if os.environ.get("STORIED_MODE") == "true":
+            try:
+                from icon_evaluator import evaluate_tour_icon, report_icon_gate
+                with open(output_path, 'r', encoding='utf-8') as _f:
+                    _delivered_text = _f.read()
+                _icon_result = evaluate_tour_icon(_delivered_text)
+                report_icon_gate(_icon_result)
+                
+                # Persist to stop_metrics (non-blocking)
+                try:
+                    _persist_icon_metrics(_icon_result, job_id)
+                except Exception as _pe:
+                    print(f"[I-CON] Persistence error (non-fatal): {_pe}")
+            except ImportError:
+                print("[I-CON] icon_evaluator not available — skipped")
+            except Exception as _ie:
+                print(f"[I-CON] Evaluation error (non-fatal): {_ie}")
+        
         # Update job status — use .update() for database-mode compatibility
         tour_content_str = None
         try:
@@ -180,7 +237,8 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                           progress="Tour text generation completed successfully!",
                           output_file=output_filename,
                           coordinates=coordinates,
-                          **({"tour_content": tour_content_str} if tour_content_str else {}))
+                          **({"tour_content": tour_content_str} if tour_content_str else {}),
+                          **({"i_con_avg": _icon_result["tour_avg"]} if _icon_result else {}))
         
     except Exception as e:
         ACTIVE_JOBS.update(job_id, status="error", error=str(e))
