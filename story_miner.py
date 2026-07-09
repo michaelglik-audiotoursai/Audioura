@@ -412,9 +412,10 @@ def _normalize(text: str) -> str:
     return ' '.join(stripped.split())
 
 
-# EN↔FR bilingual word map for cross-language title matching
-# Covers the most common art/museum title words
-_BILINGUAL_MAP = {
+# EN↔local bilingual word map for cross-language title matching.
+# SEED map: common art terms as fallback. The primary source is SPARQL label pairs
+# built dynamically per venue (see build_bilingual_map_from_sparql).
+_BILINGUAL_MAP_SEED = {
     'creation': 'creation', 'man': 'homme', 'homme': 'man',
     'sacrifice': 'sacrifice', 'isaac': 'isaac',
     'moses': 'moise', 'moise': 'moses',
@@ -439,9 +440,51 @@ _BILINGUAL_MAP = {
     'song': 'cantique', 'songs': 'cantiques',
     'dance': 'danse', 'danse': 'dance',
     'wave': 'vague', 'vague': 'wave',
-    'still life': 'nature morte',
     'nude': 'nu', 'window': 'fenetre',
 }
+
+# Active bilingual map — built per-request from SPARQL + seed
+_BILINGUAL_MAP: Dict[str, str] = dict(_BILINGUAL_MAP_SEED)
+
+
+def build_bilingual_map_from_sparql(works: list) -> Dict[str, str]:
+    """Build bilingual word pairs from SPARQL works that have both EN and local labels.
+    
+    Generic: works for any language pair (fr/it/de/es) — derived from actual data.
+    Returns the updated map (seed + SPARQL-derived pairs).
+    """
+    global _BILINGUAL_MAP
+    derived = dict(_BILINGUAL_MAP_SEED)
+    
+    for work in works:
+        label_en = work.get('label_en', '').lower()
+        label_local = work.get('label_local', '').lower()
+        
+        if not label_en or not label_local or label_en == label_local:
+            continue
+        
+        # Normalize: strip accents for matching
+        en_words = [w for w in _normalize(label_en).split() if len(w) >= 3]
+        local_words = [w for w in _normalize(label_local).split() if len(w) >= 3]
+        
+        # Skip stop words
+        _STOPS = {'the', 'les', 'des', 'une', 'del', 'della', 'dei', 'con', 'gli', 'per',
+                  'der', 'die', 'das', 'und', 'ein', 'eine', 'mit', 'von', 'den', 'dem',
+                  'los', 'las', 'por', 'and', 'for', 'with', 'from'}
+        en_words = [w for w in en_words if w not in _STOPS]
+        local_words = [w for w in local_words if w not in _STOPS]
+        
+        # Pair words by position (aligned titles often have corresponding words)
+        for i, ew in enumerate(en_words):
+            if i < len(local_words):
+                lw = local_words[i]
+                # Only add if they're different (same word = cognate, already matches)
+                if ew != lw and len(ew) >= 3 and len(lw) >= 3:
+                    derived[ew] = lw
+                    derived[lw] = ew
+    
+    _BILINGUAL_MAP = derived
+    return derived
 
 
 def _expand_bilingual(words: List[str]) -> Set[str]:

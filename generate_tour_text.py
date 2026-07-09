@@ -659,6 +659,9 @@ def _verify_works_v2(poi_list, venue_name):
             import story_miner as _sm
             _sm.CANONICAL_ALIASES = build_dynamic_aliases(sparql_works)
             print(f"  [D1v2] Injected {len(_sm.CANONICAL_ALIASES)} dynamic aliases")
+            # Build bilingual word map from SPARQL label pairs (generic, works for any language)
+            _sm.build_bilingual_map_from_sparql(sparql_works)
+            print(f"  [D1v2] Built bilingual map: {len(_sm._BILINGUAL_MAP)} word pairs")
         except Exception as e:
             print(f"  [D1v2] Dynamic alias build failed: {e}")
     
