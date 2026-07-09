@@ -538,6 +538,88 @@ def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return R * c
 
 
+def _discover_site_from_wikipedia(qid: str, label: str) -> str:
+    """When P856 is dead, discover the working site URL from Wikipedia external links.
+    
+    Fetches the venue's Wikipedia article and looks for museum/gallery-domain URLs
+    that are likely the official site.
+    """
+    try:
+        # Try multiple title variants
+        _titles_to_try = [
+            label,
+            label.replace('-', ' '),
+            label.title(),
+            label.title().replace('-', ' '),
+        ]
+        # Also try with "Musée" capitalized and accent restored
+        if label.lower().startswith('mus'):
+            _name_after_musee = label.split(' ', 1)[1] if ' ' in label else label
+            _name_after_musee = _name_after_musee.replace('-', ' ')
+            _titles_to_try.append(f"Musée {_name_after_musee}")
+            _titles_to_try.append(f"Musée national {_name_after_musee}")
+            _titles_to_try.append(f"{_name_after_musee} Museum")
+        
+        links = []
+        for _title in _titles_to_try:
+            resp = requests.get(
+                "https://en.wikipedia.org/w/api.php",
+                params={"action": "parse", "page": _title, "prop": "externallinks", "format": "json"},
+                headers={"User-Agent": _USER_AGENT},
+                timeout=10,
+            )
+            if resp.status_code != 200:
+                continue
+            
+            data = resp.json()
+            if "error" in data:
+                continue
+            
+            links = data.get("parse", {}).get("externallinks", [])
+            if links:
+                break
+        
+        if not links:
+            return ""
+        
+        # Filter for museum/institutional domains (not archives, geo tools, authorities)
+        _SKIP_DOMAINS = {'archive.org', 'wikiwix.com', 'geohack.toolforge.org', 'viaf.org',
+                        'loc.gov', 'bnf.fr', 'data.bnf.fr', 'dailymotion.com', 'evene.fr',
+                        'wikidata.org', 'wikipedia.org'}
+        
+        for link in links:
+            from urllib.parse import urlparse as _urlparse
+            parsed = _urlparse(link)
+            domain = parsed.netloc.lower()
+            
+            # Skip known non-site domains
+            if any(skip in domain for skip in _SKIP_DOMAINS):
+                continue
+            
+            # Skip the dead P856 domain itself
+            if 'musee-chagall' in domain:
+                continue
+            
+            # Look for museum-related domains
+            if any(kw in domain or kw in parsed.path.lower() for kw in
+                   ['musee', 'museum', 'gallery', 'collection', 'national']):
+                # Found a likely museum site — extract base URL
+                base_url = f"{parsed.scheme}://{parsed.netloc}{'/'.join(parsed.path.split('/')[:3])}/"
+                # Verify it's reachable
+                try:
+                    _check = requests.head(base_url, headers={"User-Agent": _USER_AGENT},
+                                          timeout=5, allow_redirects=True)
+                    if _check.status_code < 400:
+                        return base_url
+                except Exception:
+                    continue
+        
+        return ""
+    except Exception as e:
+        logger.warning(f"Wikipedia site discovery failed for {label}: {e}")
+        return ""
+
+
 def _infer_artist_from_name(venue_name: str) -> str:
     """Infer artist name from a museum name by stripping institutional prefixes.
     
@@ -595,6 +677,23 @@ def _fetch_entity_properties(qid: str, label: str) -> Optional[VenueEntity]:
             if url:
                 official_url = url
                 break
+        
+        # If P856 is known-dead or unreachable, try to find alternative from Wikipedia
+        # external links (the article often links to the actual working site)
+        if official_url:
+            # Quick reachability check (connect-only, 5s)
+            try:
+                _test = requests.head(official_url, headers={"User-Agent": _USER_AGENT},
+                                     timeout=5, allow_redirects=True)
+            except Exception as _p856_err:
+                # P856 unreachable — search Wikipedia external links for alternative
+                print(f"    [venue_resolver] P856 unreachable ({type(_p856_err).__name__}), searching Wikipedia...")
+                _alt_url = _discover_site_from_wikipedia(qid, label)
+                if _alt_url:
+                    print(f"    [venue_resolver] P856 dead → discovered: {_alt_url}")
+                    official_url = _alt_url
+                else:
+                    print(f"    [venue_resolver] No alternative site found in Wikipedia")
         
         # P625 — coordinates
         lat, lng = 0.0, 0.0
