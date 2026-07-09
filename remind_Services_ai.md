@@ -14,8 +14,8 @@
 - **ALWAYS** prefix every reply with "🔧 SERVICES KIRO -"
 - **GIT BRANCH**: `storied` (off `main` = `beta-2.1.1+18`). **Never touch `main`.**
 - **VERSION**: `2.2.0+1` (distinct from Beta's 2.1.x)
-- **LAST GIT STATE**: Generic Grounding Phase 1 committed (`fde1ecb`) and pushed to `origin/storied`. venue_resolver.py + pipeline wiring complete. I-CON approach posted, awaiting LEAD.
-- **NEXT ACTION ON RECOVERY**: Read `remind_Services_ai.md`. Check branch is `storied`. Continue Generic Grounding Phase 1 (delete _KNOWN_WORKS after proving generic-only path works, then full E2E Matisse generation). Also check I-CON task for LEAD refinement response. Container should be running — if not: `docker-compose -f docker-compose-master.yml build tour-generator && docker-compose -f docker-compose-master.yml up -d tour-generator`.
+- **LAST GIT STATE**: I-CON module + Generic Grounding Phase 1 complete (`3cc9132`). All pushed to `origin/storied`.
+- **NEXT ACTION ON RECOVERY**: Read `remind_Services_ai.md`. Check branch is `storied`. Check ClickUp for LEAD responses on Generic Grounding self-assessment (wdvrdawcyx) and I-CON calibration report (wdvrdawexa). Container should be running — if not: `docker-compose -f docker-compose-master.yml build tour-generator && docker-compose -f docker-compose-master.yml up -d tour-generator`.
 - **WORKFLOW**: Blanket approval for all service changes. One task = one commit = one review.
 
 ---
