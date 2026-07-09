@@ -67,13 +67,22 @@ def compute_deterministic_signals(paragraph: str, stop_index: int,
     # Signal 1: Date/proper-noun/number density
     years = re.findall(r'\b(1[4-9]\d{2}|20[0-2]\d)\b', paragraph)
     # Proper nouns: capitalized words NOT at sentence start, length >= 2
+    # Excludes common modifiers that look like proper nouns but aren't specific people/places
+    _COMMON_MODIFIERS = {
+        'old', 'new', 'the', 'biblical', 'french', 'italian', 'german', 'spanish',
+        'english', 'european', 'christian', 'jewish', 'catholic', 'protestant',
+        'roman', 'greek', 'ancient', 'modern', 'contemporary', 'national',
+        'testament', 'song', 'songs', 'solomon', 'genesis', 'exodus',
+        'divine', 'holy', 'sacred', 'spiritual', 'celestial', 'eternal',
+    }
     sentences = re.split(r'[.!?]\s+', paragraph)
     proper_nouns = []
     for sent in sentences:
         words = sent.split()
         for w in words[1:]:  # Skip first word (sentence start)
             if w and w[0].isupper() and len(w) >= 2 and w.lower() not in {'the', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'and', 'or', 'but', 'as', 'this', 'that', 'each', 'his', 'her'}:
-                proper_nouns.append(w)
+                if w.lower() not in _COMMON_MODIFIERS:
+                    proper_nouns.append(w)
     numbers = re.findall(r'\b\d+\b', paragraph)
     
     density_score = len(years) * 3 + len(proper_nouns) + len(numbers)
