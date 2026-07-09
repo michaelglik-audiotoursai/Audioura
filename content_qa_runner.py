@@ -209,6 +209,31 @@ def run_qa(tour_text, tour_file="", story_elements=None):
     if _ungrounded:
         FACTUAL_FAIL_COUNT += 1
 
+    # D3(e) Duplicate-stop detection: no two stops may be the same work under different labels
+    # Catches: "Resurrection" / "Résurrection", "Le Roi David" / "King David"
+    _stop_names = [re.sub(r'^Stop\s+\d+:\s*', '', h).strip() for h in _stop_headers]
+    _normalized_names = {}
+    _duplicate_stops = []
+    for name in _stop_names:
+        # Normalize: lowercase, strip accents, strip punctuation
+        import unicodedata as _ud
+        _nfkd = _ud.normalize('NFKD', name.lower())
+        _norm = ''.join(c for c in _nfkd if not _ud.combining(c))
+        _norm = re.sub(r'[^\w\s]', ' ', _norm).strip()
+        _norm = ' '.join(_norm.split())
+        
+        if _norm in _normalized_names:
+            _duplicate_stops.append(f"'{name}' = '{_normalized_names[_norm]}' (same work)")
+        else:
+            _normalized_names[_norm] = name
+    
+    _passed_dedup = len(_duplicate_stops) == 0
+    check("D3(e) No duplicate stops (same work under different labels) (FACTUAL)",
+          _passed_dedup,
+          f"{len(_duplicate_stops)} duplicate(s): {_duplicate_stops[:3]}")
+    if not _passed_dedup:
+        FACTUAL_FAIL_COUNT += 1
+
     # [T6] Splice check: detect mid-token splices and malformed transitions
     _splice_issues = []
     _lines = tour_text.split('\n')

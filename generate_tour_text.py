@@ -651,6 +651,22 @@ def _verify_works_v2(poi_list, venue_name):
     # Verify each candidate against canonical titles
     evidence_log = {}
     verified_pois = []
+    _verified_qids = set()  # [A6] Track QIDs to prevent duplicate stops (same work, different labels)
+    
+    # Build title→QID lookup from SPARQL works for deduplication
+    _title_to_qid = {}
+    for work in sparql_works:
+        qid = work.get('qid', '')
+        if not qid:
+            continue
+        for label_key in ('label_en', 'label_local'):
+            lbl = work.get(label_key, '')
+            if lbl:
+                from story_miner import _normalize as _norm_title
+                _title_to_qid[_norm_title(lbl)] = qid
+        for alias in work.get('aliases', []):
+            if alias:
+                _title_to_qid[_norm_title(alias)] = qid
     
     # Inject dynamic aliases from SPARQL works (replaces hardcoded CANONICAL_ALIASES)
     if sparql_works:
@@ -690,12 +706,25 @@ def _verify_works_v2(poi_list, venue_name):
         match = match_candidate_to_canonical(work_name, canonical_titles, combined_text)
         if match:
             canonical_title, snippet = match
+            
+            # [A6] QID-based dedup: if this canonical title maps to a QID we already have, skip
+            from story_miner import _normalize as _norm_check
+            _matched_qid = _title_to_qid.get(_norm_check(canonical_title), '')
+            if _matched_qid and _matched_qid in _verified_qids:
+                print(f"  [D1v2] DEDUP '{work_name}' → same QID as already-verified work ({_matched_qid})")
+                evidence_log[work_name] = {"status": "DROPPED", "reason": f"duplicate QID {_matched_qid}"}
+                continue
+            
+            if _matched_qid:
+                _verified_qids.add(_matched_qid)
+            
             print(f"  [D1v2] VERIFIED '{work_name}' → canonical: '{canonical_title}'")
             evidence_log[work_name] = {
                 "status": "VERIFIED",
                 "canonical_title": canonical_title,
                 "snippet": snippet,
                 "method": "canonical_title_match",
+                "qid": _matched_qid,
             }
             verified_pois.append(poi)
             continue
