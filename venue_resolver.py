@@ -146,12 +146,14 @@ def fetch_venue_works(venue_qid: str, language: str = "en") -> List[Dict]:
     """Fetch canonical works for a venue via SPARQL (P195/P276).
     
     Returns list of {qid, label_en, label_local, aliases} for each work.
+    Gets labels in BOTH English and the local language for cross-language matching.
     """
     query = f"""
-    SELECT ?work ?workLabel ?workAltLabel WHERE {{
+    SELECT ?work ?workLabel ?workAltLabel ?workLabel_en WHERE {{
       {{ ?work wdt:P195 wd:{venue_qid}. }}
       UNION
       {{ ?work wdt:P276 wd:{venue_qid}. }}
+      OPTIONAL {{ ?work rdfs:label ?workLabel_en. FILTER(LANG(?workLabel_en) = "en") }}
       SERVICE wikibase:label {{ bd:serviceParam wikibase:language "{language},en". }}
     }}
     LIMIT 200
@@ -176,13 +178,14 @@ def fetch_venue_works(venue_qid: str, language: str = "en") -> List[Dict]:
             work_uri = r.get("work", {}).get("value", "")
             work_qid = work_uri.split("/")[-1] if work_uri else ""
             label = r.get("workLabel", {}).get("value", "")
+            label_en = r.get("workLabel_en", {}).get("value", "") or label
             alt_label = r.get("workAltLabel", {}).get("value", "")
             
             if work_qid and label and not label.startswith("Q"):  # Skip unresolved QIDs
                 works.append({
                     "qid": work_qid,
-                    "label_en": label,
-                    "label_local": label,  # Same for now; could add local-lang label
+                    "label_en": label_en,
+                    "label_local": label,
                     "aliases": [a.strip() for a in alt_label.split(",") if a.strip()] if alt_label else [],
                 })
         
@@ -267,16 +270,21 @@ def build_dynamic_aliases(works: List[Dict]) -> Dict[str, str]:
 def build_canonical_titles_from_works(works: List[Dict]) -> Set[str]:
     """Extract canonical titles set from SPARQL works (for union with site+wiki extraction).
     
+    Includes BOTH English and local-language labels for cross-language matching.
     Returns a set of canonical title strings.
     """
     titles = set()
     for work in works:
-        label = work.get("label_en", "")
-        if label and not label.startswith("Q") and len(label) >= 3:
-            titles.add(label)
+        label_en = work.get("label_en", "")
+        if label_en and not label_en.startswith("Q") and len(label_en) >= 3:
+            titles.add(label_en)
         local_label = work.get("label_local", "")
-        if local_label and local_label != label and not local_label.startswith("Q"):
+        if local_label and local_label != label_en and not local_label.startswith("Q") and len(local_label) >= 3:
             titles.add(local_label)
+        # Also add aliases as canonical titles (they're valid names)
+        for alias in work.get("aliases", []):
+            if alias and len(alias) >= 3 and not alias.startswith("Q"):
+                titles.add(alias)
     return titles
 
 

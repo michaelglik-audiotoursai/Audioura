@@ -589,12 +589,10 @@ def _verify_works_v2(poi_list, venue_name):
     except Exception as e:
         print(f"  [D1v2] venue_resolver error: {e} — using heuristic fallback")
     
-    # Fallback: heuristic site URL if resolver didn't provide one
+    # Fallback: if venue resolver didn't provide a site URL and we have nothing,
+    # the degradation ladder will handle fewer verified stops. No hardcoded URLs.
     if not _base_site_url:
-        if "chagall" in venue_name.lower():
-            _base_site_url = "https://musees-nationaux-alpesmaritimes.fr/chagall/en/collection"
-        elif "matisse" in venue_name.lower():
-            _base_site_url = "https://www.musee-matisse-nice.org/en/the-collection/"
+        print(f"  [D1v2] No official site discovered — will rely on Wikipedia + SPARQL")
     
     if not _wiki_title:
         _wiki_title = venue_name.replace("Musee", "Musée").replace("National ", "")
@@ -653,6 +651,16 @@ def _verify_works_v2(poi_list, venue_name):
     # Verify each candidate against canonical titles
     evidence_log = {}
     verified_pois = []
+    
+    # Inject dynamic aliases from SPARQL works (replaces hardcoded CANONICAL_ALIASES)
+    if sparql_works:
+        try:
+            from venue_resolver import build_dynamic_aliases
+            import story_miner as _sm
+            _sm.CANONICAL_ALIASES = build_dynamic_aliases(sparql_works)
+            print(f"  [D1v2] Injected {len(_sm.CANONICAL_ALIASES)} dynamic aliases")
+        except Exception as e:
+            print(f"  [D1v2] Dynamic alias build failed: {e}")
     
     # Also check for rejection using artist article (same logic as before)
     from rag_retriever import fetch_wikipedia_summary

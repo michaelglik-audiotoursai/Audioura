@@ -1,33 +1,112 @@
-# Services Amazon-Q Context Reminder
+# Services Kiro Context Reminder
 ## Who you are
-🔧 **SERVICES AMAZON-Q** — **CRITICAL**: Always start ALL replies with "🔧 SERVICES AMAZON-Q -"
+🔧 **SERVICES KIRO** — **CRITICAL**: Always start ALL replies with "🔧 SERVICES KIRO -"
 
-**UPDATED**: 2026-06-07 (PRODUCTION LIVE: `https://api.audioura.com` — GCP LB + Cloudflare proxy + Python auth-proxy gateway. K1-K9 complete. All backends IAM-locked. Cost-bearing endpoints require X-API-Key header. Tour downloads from R2 verified. CPU throttling fix applied: `--no-cpu-throttling --min-instances=1` on orchestrator, `--no-cpu-throttling` on modernized. Graceful shutdown handler added. See `claude_review_cpu_throttling_graceful_shutdown_2026_06_07.md` for details.)
+**UPDATED**: 2026-07-02 (STORIED BRANCH ACTIVE — local Docker runs `STORIED_MODE=true`. GCloud production unchanged at Beta `beta-2.1.1+18`.)
 
-1. You are Services Amazon-Q responsible for all Docker services in `C:\Users\micha\eclipse-workspace\AudioTours\development\`. You have blanket approval to change code, run Python programs, start/stop Docker services without waiting for approval.
+1. You are **Services Kiro** responsible for all Docker services in `C:\Users\micha\eclipse-workspace\AudioTours\development\`. You have blanket approval to change code, run Python programs, start/stop Docker services without waiting for approval.
 2. You maintain this file and update it after significant changes.
-3. You communicate with Mobile App Amazon-Q via: `c:\Users\micha\eclipse-workspace\amazon-q-communications\audiotours\requirements\`
+3. Task management via ClickUp (Storied space, list 🟦 Services — Kiro).
 
 ---
 
 ## 🚨 CRITICAL IDENTITY RULES
-- **ALWAYS** prefix every reply with "🔧 SERVICES AMAZON-Q -"
-- **GIT RULE**: Do NOT commit code until user confirms mobile testing passed
-- **BRANCH**: `services-migration` (Newsletters merged to main 2026-05-28, tagged v1.2.9+65, new branch created)
-- **MERGE TARGET**: `main` (when services-migration phase complete)
-- **LAST GIT COMMIT**: `c9d7636` — CPU throttling fix + graceful shutdown
-- **NEXT ACTION ON RECOVERY**: Check branch is `services-migration`. Production is live at `https://api.audioura.com`. CPU throttling fixed (--no-cpu-throttling --min-instances=1 on orchestrator, --no-cpu-throttling on modernized). Graceful shutdown handler added to orchestrator. Gateway API key in Secret Manager `gateway-api-key`. Mobile app must send `X-API-Key` header for cost-bearing endpoints (generate, translate, newsletter). Read endpoints (tours-near, download-tour, resolve) are open. All backends IAM-locked. Cloud SQL via unix socket connector (no public IP).
-- **WORKFLOW**: Blanket approval given for all service changes — implement without waiting
+- **ALWAYS** prefix every reply with "🔧 SERVICES KIRO -"
+- **GIT BRANCH**: `storied` (off `main` = `beta-2.1.1+18`). **Never touch `main`.**
+- **VERSION**: `2.2.0+1` (distinct from Beta's 2.1.x)
+- **LAST GIT STATE**: Generic Grounding Phase 1 committed (`fde1ecb`) and pushed to `origin/storied`. venue_resolver.py + pipeline wiring complete. I-CON approach posted, awaiting LEAD.
+- **NEXT ACTION ON RECOVERY**: Read `remind_Services_ai.md`. Check branch is `storied`. Continue Generic Grounding Phase 1 (delete _KNOWN_WORKS after proving generic-only path works, then full E2E Matisse generation). Also check I-CON task for LEAD refinement response. Container should be running — if not: `docker-compose -f docker-compose-master.yml build tour-generator && docker-compose -f docker-compose-master.yml up -d tour-generator`.
+- **WORKFLOW**: Blanket approval for all service changes. One task = one commit = one review.
 
 ---
 
-## ⚙️ OPERATING MODE — SESSION EXECUTION RULES
+## 🏗️ STORIED RELEASE — CURRENT STATE (Jul 5, 2026)
 
-When running any combination of docker, curl, psql, python, or shell commands for the purpose of fixing services-side bugs in this repo:
-- **(a)** Write or use `deploy_test.sh` when applicable — batch the deploy+test cycle into a reusable script
-- **(b)** Batch multiple commands into a single bash invocation when possible
-- **(c)** Present a plan before executing **only** when the plan involves more than 5 commands OR any destructive operation (`DROP`, `DELETE` without `WHERE`, container removal)
-- **Do not ask permission** for routine `docker cp` / `restart` / `logs` / `curl` test cycles on dev containers
+### Two Environments
+| Environment | Branch | URL | Mode | Purpose |
+|---|---|---|---|---|
+| **GCloud (production)** | `main` (`beta-2.1.1+18`) | `https://api.audioura.com` | Beta | Google/Apple closed testing — DO NOT TOUCH |
+| **Local Docker** | `storied` | `http://localhost:5000` | `STORIED_MODE=true` | Storied development + testing |
+
+### Container Status
+- `development-tour-generator-1` — **RUNNING**, `STORIED_MODE=true`, port 5000
+- Container built from `docker-compose -f docker-compose-master.yml build tour-generator` (reproducible, no docker cp needed)
+- `.dockerignore` fixed with exceptions for `requirements_generator.txt`, `story_type_taxonomy.json`, `templates/`
+- OpenAI API key present; Wikipedia accessible from container (200)
+
+### Active Work: Generic Grounding Phase 1 (wdvrdawcyx)
+**ClickUp task:** `wdvrdawcyx` — 🌍 Generic Grounding (urgent, Storied flagship)
+**Latest commit:** `fde1ecb` on `storied`
+**Protocol:** CIL — approach approved with 7 amendments, coding in progress
+
+**What's done (Phase 1 Step 0+1):**
+- venue_resolver.py: Wikidata entity resolution ✅
+  - Multi-strategy search + P31 type filter + geo-disambiguation (haversine) ✅
+  - P856/P625/P17/P571 extraction ✅
+  - P138/P921/P547 artist-link union + name-inference fallback ✅
+  - SPARQL works query (P195/P276) → canonical titles ✅
+  - build_dynamic_aliases() with W4 numeral invariants ✅
+  - User-Agent + retry-then-degrade ✅
+- _verify_works_v2: wired to venue_resolver (canonical titles = union of SPARQL + site + wiki) ✅
+- story_miner.py: generic language parameter, localized keywords, Chagall URLs removed ✅
+- Chagall .replace() band-aid deleted (amendment #7) ✅
+- Acceptance: Matisse 7/8, Chagall 8/10 non-reg, Uffizi 175 SPARQL, Fruitlands resolved ✅
+
+**What's remaining:**
+- Delete _KNOWN_WORKS_BY_VENUE after proving SPARQL+site union is sufficient alone
+- Full E2E generation test (Matisse and Uffizi)
+- Extend test_w4_matcher.py against mocked SPARQL-built aliases
+- Phase 2: Degradation ladder + Postgres cache
+
+**Also in progress:** I-CON (wdvrdawexa) — approach posted, awaiting LEAD refinement
+
+### Task Progress
+- **~90 of 95 S-tasks** complete (code on `storied` branch)
+- **5 deferred**: S79 (blocked by CIL), S80, S94, S95, POC v2
+- **CIL cycle 3 of max 5** in progress on the museum quality overhaul
+
+### Storied Pipeline Features (all active when STORIED_MODE=true)
+1. **Narrative Spine** — gpt-4o generates arc/structure per tour (spine_generator.py)
+2. **Fact Sheets** — RAG-grounded fact injection per stop (fact_extractor.py + rag_retriever.py)
+3. **Story Types** — 6-type taxonomy, no consecutive repeats (story_type_assigner.py)
+4. **Persona Tone** — 4 personas bias story selection + inject tone (onboarding_preference.py)
+5. **De-repetition** — cross-stop detection + rewrite (derepetition_guard.py)
+6. **Tour Hook** — Introduction paragraph before Stop 1 (tour_hook_generator.py)
+7. **Improved Directions** — no fabricated distances (directions_generator.py)
+8. **Tour Sharing** — 8-char share IDs + public GET (tour_sharing.py + sharing_endpoints.py)
+9. **Referrals** — 6-char codes + redemption tracking (referral_engine.py + referral_endpoints.py)
+10. **Attestation** — Play Integrity + App Attest log-only (attestation_verifier.py)
+11. **Cost Ceiling** — $0.15 monitor, logs never aborts (cost_ceiling_monitor.py)
+12. **Tour Cache** — exact-match Postgres cache (tour_cache_layer1.py)
+
+### Key Files Added on Storied Branch
+| File | Purpose |
+|------|---------|
+| `generate_tour_text.py` | Modified: +persona, +spine, +facts, +story_types, +hook, +directions, +cache |
+| `generate_tour_text_service.py` | Modified: +persona lookup via user_id |
+| `tour_orchestrator_service.py` | Modified: +persona wiring, +auto-share, +storied_mode insert |
+| `api-gateway/main.py` | Modified: +ATTESTATION_MODE wiring, +version in /health |
+| `spine_generator.py` | NEW: narrative spine generation |
+| `fact_extractor.py` | NEW: RAG fact sheets |
+| `story_type_assigner.py` | NEW: taxonomy assignment |
+| `onboarding_preference.py` | NEW: 4 personas + weights |
+| `persona_preference_store.py` | NEW: Postgres persona persistence |
+| `derepetition_guard.py` | NEW: cross-stop repetition detection + rewrite |
+| `directions_generator.py` | NEW: non-fabricated directions |
+| `tour_hook_generator.py` | NEW: tour introduction from spine |
+| `tour_sharing.py` + `sharing_endpoints.py` | NEW: share links |
+| `referral_engine.py` + `referral_endpoints.py` | NEW: referral codes |
+| `attestation_verifier.py` | NEW: log-only attestation |
+| `storied_db_migration.sql` | NEW: all 5 new tables + audio_tours ALTER |
+
+### Testing Storied Locally
+Point the Audioura app at `http://<your-LAN-IP>:5000` and generate a tour. You should see:
+- Introduction paragraph before Stop 1
+- Varied narrative styles per stop (art, anecdote, history, etc.)
+- No "vibrant colors and dreamlike imagery" clichés
+- Persona tone if user_id has a stored preference
+
+---
 
 ---
 

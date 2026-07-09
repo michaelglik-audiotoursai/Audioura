@@ -133,94 +133,6 @@ def extract_canonical_titles(corpus: str, venue_name: str = "") -> Tuple[Set[str
             if len(title) >= 8 and len(title.split()) >= 2:
                 canonical_titles.add(title)
 
-    # Pattern 2: Known work names per venue (from museum documentation)
-    # Keyed by substring that appears in venue_name
-    _KNOWN_WORKS_BY_VENUE = {
-        "chagall": [
-            # 17 Message Biblique paintings (French)
-            "La Cr\u00e9ation de l'Homme", "Le Sacrifice d'Isaac",
-            "Le Cantique des Cantiques",
-            "Mo\u00efse devant le buisson ardent", "No\u00e9 et l'arc-en-ciel",
-            "Le Paradis", "Adam et \u00c8ve chass\u00e9s du Paradis",
-            "La lutte de Jacob et de l'Ange", "Abraham et les trois anges",
-            "Le Songe de Jacob", "Le Frappement du rocher",
-            "La Travers\u00e9e de la Mer Rouge",
-            # English equivalents (VERIFIED: each work confirmed at Nice museum via Wikipedia/museum site)
-            # Alias map: variants resolve to one canonical entry to prevent duplicate stops
-            "The Creation of Man",  # La Création de l'Homme (1958) — verified in venue Wikipedia article
-            "The Creation of the World",  # Stained glass — verified in venue Wikipedia article  
-            "The Sacrifice of Isaac",  # Le Sacrifice d'Isaac — verified in Wikipedia (one of 17 Message Biblique)
-            # "Song of Songs" (bare) moved to cycle_names — it's the 5-canvas cycle, not a single work
-            "Song of Songs I", "Song of Songs II", "Song of Songs III",
-            "Song of Songs IV", "Song of Songs V",
-            "Moses and the Burning Bush",  # Moïse devant le buisson ardent — verified (one of 17)
-            "Noah and the Rainbow",  # Noé et l'arc-en-ciel — verified (one of 17)
-            "Paradise",  # Le Paradis — verified (one of 17)
-            "Adam and Eve Expelled from Paradise",  # verified (one of 17)
-            "Jacob Wrestling with the Angel",  # La lutte de Jacob et de l'Ange — verified (chapel page caption)
-            "Abraham and the Three Angels",  # Abraham et les trois anges — verified (one of 17)
-            "Jacob's Dream",  # Le Songe de Jacob — verified (one of 17)
-            "Moses Striking the Rock",  # Le Frappement du rocher — verified (one of 17)
-            "The Crossing of the Red Sea",  # La Traversée de la Mer Rouge — verified (one of 17)
-            # Other works at Nice (mosaic, stained glass)
-            "The Prophet Elijah", "Prophet Elijah",  # Pond mosaic — verified in Wikipedia article (Elijah)
-            "Elijah's Chariot",  # Mosaic — verified in Wikipedia article
-            # Triptych (acquired 1988 dation — verified in venue article history)
-            "R\u00e9sistance", "R\u00e9surrection", "Lib\u00e9ration",
-            "The Resurrection",  # English name for Résurrection
-            "Resistance, Resurrection, Liberation",
-        ],
-        "matisse": [
-            # Key works at Musée Matisse, Nice (Villa des Arènes, Cimiez)
-            # From the museum's permanent collection
-            "Nature morte aux grenades",  # Still Life with Pomegranates (1947)
-            "Nu bleu IV",  # Blue Nude IV (1952)
-            "Fleurs et fruits",  # Flowers and Fruits (1952-53)
-            "La Danse inachev\u00e9e",  # The Unfinished Dance
-            "Temp\u00eate \u00e0 Nice",  # Storm in Nice (1919-20)
-            "Portrait de Madame Matisse",
-            "Rocaille sur fond noir",  # Rocaille on Black Background
-            "Fauteuil rocaille",  # Rocaille Armchair (1946)
-            "La Vague",  # The Wave
-            "Fen\u00eatre \u00e0 Tahiti",  # Window at Tahiti
-            "Lectrice \u00e0 la table jaune",  # Reader at the Yellow Table
-            # English equivalents
-            "Still Life with Pomegranates",
-            "Blue Nude IV", "Blue Nude",
-            "Flowers and Fruits",
-            "Storm in Nice",
-            "The Dance", "The Unfinished Dance",
-            "Portrait of Madame Matisse",
-            "Rocaille Armchair",
-            "The Wave",
-            "Window at Tahiti", "Window in Tahiti",
-            "Reader at the Yellow Table",
-            # Cutouts and late works
-            "Creole Dancer",
-            "The Bee", "L'Abeille",
-            "Apollo", "Apollon",
-            # Bronzes
-            "The Serf", "Le Serf",
-            "Reclining Nude I",
-            "Decorative Figure",
-            "Large Seated Nude",
-            # Chapel of the Rosary designs (studies at Matisse museum)
-            "Chemin de Croix",  # Stations of the Cross (ceramic)
-            "Chasuble designs",
-            "Tree of Life",  # stained glass design
-        ],
-    }
-    
-    # Find matching venue and add its known works
-    _venue_hint = venue_name.lower() if venue_name else ""
-    
-    for _venue_key, _works in _KNOWN_WORKS_BY_VENUE.items():
-        if _venue_key in _venue_hint or _venue_key in corpus.lower()[:500]:
-            for work in _works:
-                canonical_titles.add(work)
-            print(f"  [T0a] Added {len(_works)} known works for venue '{_venue_key}'")
-            break
-
     # Known cycle/collection names
     _KNOWN_CYCLES = {
         'biblical message', 'message biblique', 'the biblical message',
@@ -421,23 +333,9 @@ def _normalize(text: str) -> str:
 
 
 # --- W4: Canonical alias map (variants → single canonical entry) ---
-# Prevents duplicate stops from variant names resolving to separate entries
-CANONICAL_ALIASES: Dict[str, str] = {
-    # Chagall — variant spellings → canonical
-    "prophet elijah": "The Prophet Elijah",
-    "the prophet elijah": "The Prophet Elijah",
-    "elijah": "The Prophet Elijah",
-    "the resurrection": "Résurrection",
-    "resurrection": "Résurrection",
-    "resistance resurrection liberation": "Résistance",
-    "resistance, resurrection, liberation": "Résistance",
-    # Numerals — Song of Songs cycle members
-    "song of songs i": "Song of Songs I",
-    "song of songs ii": "Song of Songs II",
-    "song of songs iii": "Song of Songs III",
-    "song of songs iv": "Song of Songs IV",
-    "song of songs v": "Song of Songs V",
-}
+# Built dynamically from Wikidata SPARQL labels at runtime.
+# Empty by default — populated per-request by venue_resolver.build_dynamic_aliases()
+CANONICAL_ALIASES: Dict[str, str] = {}
 
 # Roman numerals that should NEVER be dropped during matching
 _ROMAN_NUMERALS = {'i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'}
