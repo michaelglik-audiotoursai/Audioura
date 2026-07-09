@@ -34,27 +34,23 @@ _OUTSOURCING_PATTERNS = [
 ]
 
 # Signal 6: Generic-filler lexicon (wallpaper phrases)
+# Only the most egregious aesthetic-only phrases that contain ZERO information.
+# "Invites contemplation" / "resonates with viewers" removed — they're weak but not zero.
 _FILLER_PHRASES = [
     "vibrant hues dance",
     "symphony of colors",
-    "invites you to ponder",
     "let yourself be swept away",
     "explore the depths of",
-    "each brushstroke",
     "seamlessly blend",
     "rich tapestry of",
-    "captivating story",
     "envelop you in a world",
-    "invites contemplation",
-    "visual symphony",
     "transports you to a realm",
-    "resonates with viewers",
-    "master artist",
-    "profound sense of",
     "ethereal grace",
-    "harmoniously across",
-    "fluid lines",
     "exude a sense of wonder",
+    "fluid lines",
+    "harmoniously across",
+    "drawn into a world where",
+    "visual language that resonates",
 ]
 
 
@@ -222,6 +218,7 @@ def evaluate_paragraphs_llm(paragraphs: List[str]) -> List[Dict]:
     """Score paragraphs using GPT-4o-mini (temperature=0 for determinism).
     
     Returns list of {i_con, class_dist, evidence_sentence} per paragraph.
+    Compatible with openai 0.27.x (legacy API).
     """
     import openai
     
@@ -232,8 +229,7 @@ def evaluate_paragraphs_llm(paragraphs: List[str]) -> List[Dict]:
     user_message = "\n".join(user_parts)
     
     try:
-        client = openai.OpenAI()
-        response = client.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4o-mini",
             temperature=0,
             messages=[
@@ -242,10 +238,16 @@ def evaluate_paragraphs_llm(paragraphs: List[str]) -> List[Dict]:
                 {"role": "assistant", "content": _ICON_FEW_SHOT_ASSISTANT},
                 {"role": "user", "content": user_message},
             ],
-            response_format={"type": "json_object"},
         )
         
         content = response.choices[0].message.content
+        
+        # Parse JSON from response (may be wrapped in ```json...``` or bare)
+        content = content.strip()
+        if content.startswith("```"):
+            content = re.sub(r'^```\w*\n?', '', content)
+            content = re.sub(r'\n?```$', '', content)
+        
         result = json.loads(content)
         
         # Handle both {"results": [...]} and bare [...] formats
@@ -255,7 +257,6 @@ def evaluate_paragraphs_llm(paragraphs: List[str]) -> List[Dict]:
             result = result["paragraphs"]
         
         if not isinstance(result, list):
-            # Try to extract from other structures
             logger.warning(f"Unexpected LLM response format: {type(result)}")
             return [{"i_con": 3, "class_dist": {"details": 0.33, "historic": 0.34, "social": 0.33}, "evidence_sentence": ""} for _ in paragraphs]
         
@@ -277,6 +278,7 @@ def evaluate_paragraphs_llm(paragraphs: List[str]) -> List[Dict]:
         
     except Exception as e:
         logger.error(f"I-CON LLM evaluation failed: {e}")
+        print(f"  [I-CON] LLM error: {e}")
         # Fail gracefully: return neutral scores
         return [{"i_con": 3, "class_dist": {"details": 0.33, "historic": 0.34, "social": 0.33}, "evidence_sentence": ""} for _ in paragraphs]
 
@@ -426,6 +428,15 @@ def _parse_tour_stops(tour_text: str) -> List[Dict]:
             
             # Directions: marks end of content
             if stripped.startswith('Directions:'):
+                break
+            
+            # Epilog markers — stop collecting content
+            if any(marker in stripped.lower() for marker in [
+                "as this journey comes to a close",
+                "you've experienced",
+                "if you'd like to explore more",
+                "sources: this tour draws",
+            ]):
                 break
             
             # Content paragraphs (non-empty lines after orientation)
