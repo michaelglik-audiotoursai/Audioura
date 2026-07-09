@@ -1481,12 +1481,23 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     _pre_works = fetch_venue_works(_pre_entity.qid, _pre_entity.language)
                     _pre_titles = build_canonical_titles_from_works(_pre_works)
                     if _pre_titles:
-                        _hint_sample = sorted(_pre_titles)[:12]
+                        # Deduplicate by QID: one title per work (prefer local language label)
+                        _seen_qids = set()
+                        _deduped_hints = []
+                        for w in _pre_works:
+                            qid = w.get('qid', '')
+                            if qid in _seen_qids:
+                                continue
+                            _seen_qids.add(qid)
+                            # Prefer local label (what the museum displays)
+                            _deduped_hints.append(w.get('label_local', '') or w.get('label_en', ''))
+                        _hint_sample = sorted(_deduped_hints)[:12]
                         _museum_venue_constraint += (
                             f"\n\nKNOWN WORKS AT THIS VENUE (use these as guidance — include some from this list):\n"
                             f"  {'; '.join(_hint_sample)}\n"
+                            f"Each work should appear ONLY ONCE in your list — do NOT list the same work under multiple names.\n"
                         )
-                        print(f"  [Phase3A] Injected {len(_hint_sample)} canonical title hints from Wikidata")
+                        print(f"  [Phase3A] Injected {len(_hint_sample)} canonical title hints from Wikidata (QID-deduped)")
             except Exception as _pre_err:
                 print(f"  [Phase3A] Pre-resolution failed (non-fatal): {_pre_err}")
 
