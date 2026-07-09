@@ -151,6 +151,21 @@ def extract_canonical_titles(corpus: str, venue_name: str = "") -> Tuple[Set[str
             if len(title) >= 8 and len(title.split()) >= 2:
                 canonical_titles.add(title)
 
+    # Pattern 2: Museum catalog format — "Medium  Title" (e.g. "Peinture  La Création de l'homme")
+    # Common on museum collection pages where medium precedes the work title
+    _MEDIUM_KEYWORDS = ('Peinture', 'Sculpture', 'Gravure', 'Lithographie', 'Dessin',
+                        'Mosaïque', 'Vitrail', 'Tapisserie', 'Céramique', 'Gouache',
+                        'Painting', 'Drawing', 'Print', 'Mosaic', 'Stained glass')
+    for medium in _MEDIUM_KEYWORDS:
+        _medium_pattern = re.compile(
+            rf'{medium}\s{{2,}}([A-ZÀ-Ü][A-Za-z\u00C0-\u00FF\s\'\'\-\u2019]{{5,60}}?)(?:\s{{2,}}|$)',
+            re.MULTILINE
+        )
+        for match in _medium_pattern.finditer(corpus):
+            title = match.group(1).strip().rstrip(',. ')
+            if len(title) >= 5 and len(title.split()) >= 2:
+                canonical_titles.add(title)
+
     # Known cycle/collection names
     _KNOWN_CYCLES = {
         'biblical message', 'message biblique', 'the biblical message',
@@ -397,6 +412,49 @@ def _normalize(text: str) -> str:
     return ' '.join(stripped.split())
 
 
+# EN↔FR bilingual word map for cross-language title matching
+# Covers the most common art/museum title words
+_BILINGUAL_MAP = {
+    'creation': 'creation', 'man': 'homme', 'homme': 'man',
+    'sacrifice': 'sacrifice', 'isaac': 'isaac',
+    'moses': 'moise', 'moise': 'moses',
+    'burning': 'buisson', 'bush': 'ardent',
+    'prophet': 'prophete', 'prophete': 'prophet',
+    'elijah': 'elie', 'elie': 'elijah',
+    'jacob': 'jacob', 'wrestling': 'lutte', 'lutte': 'wrestling',
+    'angel': 'ange', 'ange': 'angel',
+    'angels': 'anges', 'anges': 'angels',
+    'dream': 'songe', 'songe': 'dream',
+    'crossing': 'traversee', 'traversee': 'crossing',
+    'rainbow': 'arc en ciel', 'noah': 'noe', 'noe': 'noah',
+    'paradise': 'paradis', 'paradis': 'paradise',
+    'resurrection': 'resurrection',
+    'king': 'roi', 'roi': 'king',
+    'david': 'david', 'abraham': 'abraham',
+    'three': 'trois', 'trois': 'three',
+    'red': 'rouge', 'sea': 'mer', 'mer': 'sea',
+    'striking': 'frappement', 'rock': 'rocher',
+    'circus': 'cirque', 'cirque': 'circus',
+    'blue': 'bleu', 'bleu': 'blue',
+    'song': 'cantique', 'songs': 'cantiques',
+    'dance': 'danse', 'danse': 'dance',
+    'wave': 'vague', 'vague': 'wave',
+    'still life': 'nature morte',
+    'nude': 'nu', 'window': 'fenetre',
+}
+
+
+def _expand_bilingual(words: List[str]) -> Set[str]:
+    """Expand a word list with bilingual equivalents for cross-language matching."""
+    expanded = set(words)
+    for w in words:
+        if w in _BILINGUAL_MAP:
+            equiv = _BILINGUAL_MAP[w]
+            # Some equivalents are multi-word
+            expanded.update(equiv.split())
+    return expanded
+
+
 # --- W4: Canonical alias map (variants → single canonical entry) ---
 # Built dynamically from Wikidata SPARQL labels at runtime.
 # Empty by default — populated per-request by venue_resolver.build_dynamic_aliases()
@@ -492,9 +550,12 @@ def match_candidate_to_canonical(
         if not _cand_numeral and _canon_numeral:
             continue  # [W4] Canonical has numeral, candidate doesn't = candidate is less specific (cycle vs member)
 
-        # Calculate bidirectional word overlap (require exact word match, not prefix)
-        fwd_matches = sum(1 for w in _candidate_words if w in _canon_words)
-        rev_matches = sum(1 for w in _canon_words if w in _candidate_words)
+        # Calculate bidirectional word overlap (with bilingual expansion for EN↔FR)
+        _expanded_candidate = _expand_bilingual(_candidate_words)
+        _expanded_canon = _expand_bilingual(_canon_words)
+        
+        fwd_matches = sum(1 for w in _candidate_words if w in _expanded_canon)
+        rev_matches = sum(1 for w in _canon_words if w in _expanded_candidate)
         
         # Also try 5-char prefix matching for inflected forms (French/English)
         if fwd_matches < len(_candidate_words) * 0.5:
