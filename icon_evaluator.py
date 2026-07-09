@@ -177,6 +177,8 @@ _ICON_SYSTEM_PROMPT = """You are a tour-content quality evaluator. For each para
 
    Key rule: "Decoding function" (naming the depicted story; giving a framework for HOW to look at the artwork) rates ≥3 even when the subject is visually self-evident. Score 1 is reserved for aesthetic wallpaper with no decoding value.
 
+   CRITICAL RULE: Naming or describing the depicted story with no dates, no named people beyond the artist, and no documented events is a 3, NEVER a 5. A 5 requires at least one specific, traceable fact (year, named person or place, documented event).
+
 2. class_dist (three values summing to ~1.0):
    - details: dates, names, colors, subject descriptions, menus/prices, building specifics
    - historic: human history, epochs, biography, cultures
@@ -207,8 +209,8 @@ _ICON_FEW_SHOT_ASSISTANT = """[{"i_con": 5, "class_dist": {"details": 0.30, "his
 {"i_con": 3, "class_dist": {"details": 0.50, "historic": 0.30, "social": 0.20}, "evidence_sentence": "The artist's creative process, steeped in tradition yet infused with modern sensibilities, invites contemplation and introspection."},
 {"i_con": 3, "class_dist": {"details": 0.20, "historic": 0.40, "social": 0.40}, "evidence_sentence": "As you ponder The Creation of Man, consider the sacrifices Chagall made to bring his Biblical Message to life."}]"""
 
-# Second few-shot: Stop 2 (scores: 5,3,3,1) and Stop 3 (scores: 3,1,3,1)
-_ICON_FEW_SHOT_USER_2 = """Score these paragraphs (same museum tour, different stops):
+# Second few-shot: Stop 2 (scores: 5,3,3,1) — ONLY Stop 2, Stop 3 is held out for testing
+_ICON_FEW_SHOT_USER_2 = """Score these paragraphs (same museum tour, Stop 2):
 
 ¶1: "In this poignant work by Marc Chagall, The Sacrifice of Isaac, the viewer is drawn into a moment of profound tension and emotional turmoil. The painting depicts the biblical story from the Book of Genesis where Abraham, tormented yet faithful, prepares to sacrifice his beloved son Isaac as a test of his devotion to God. The scene is charged with a sense of urgency and sacrifice, conveyed through Chagall's masterful use of color and composition."
 
@@ -217,21 +219,12 @@ _ICON_FEW_SHOT_USER_2 = """Score these paragraphs (same museum tour, different s
 ¶3: "As you gaze upon The Sacrifice of Isaac, take note of the expressive brushwork and emotive colors that bring the scene to life. The figures of Abraham and Isaac are rendered with a haunting intensity, capturing the anguish and faith intertwined in this pivotal moment. This work not only showcases Chagall's artistic prowess but also invites contemplation on themes of sacrifice, devotion, and the complexities of faith."
 
 ¶4: "After experiencing this powerful painting, consider how Chagall's legacy has shaped the museum's collection and artistic direction. How did the museum evolve after his passing, and what new insights and influences emerged in the wake of his vision?"
-
-¶5: "Each lithograph in the series showcases Chagall's signature style, characterized by floating figures, whimsical animals, and vibrant colors that dance across the paper. The artist's creative process involved a deep exploration of the biblical text, translating its themes into a visual language that resonates with viewers on a profound level."
-
-¶6: "What truly elevates The Song of Songs in the museum's collection is the addition of lithographs donated by Charles Sorlier, which enrich Chagall's exploration of love and faith. These lithographs complete the narrative of Chagall's Biblical Message, offering a deeper understanding of the artist's spiritual connection to his subject matter."
-
-¶7: "As you gaze upon these lithographs, notice the delicate details that Chagall includes, such as recurring motifs like lovers embracing, musical instruments, and symbols of nature. Each piece tells a story within the broader narrative, inviting viewers to immerse themselves in the beauty and complexity of Chagall's interpretation of The Song of Songs. For a deeper insight into Chagall's artistic vision and the thematic underpinnings of this series, be sure to engage with the museum staff for additional context."
 """
 
 _ICON_FEW_SHOT_ASSISTANT_2 = """[{"i_con": 5, "class_dist": {"details": 0.15, "historic": 0.50, "social": 0.35}, "evidence_sentence": "The painting depicts the biblical story from the Book of Genesis where Abraham, tormented yet faithful, prepares to sacrifice his beloved son Isaac as a test of his devotion to God."},
 {"i_con": 3, "class_dist": {"details": 0.20, "historic": 0.45, "social": 0.35}, "evidence_sentence": "The painting stands as a testament to Chagall's commitment to sharing his vision with the world, a transformation of his original plans for a chapel into the museum that now houses his works."},
 {"i_con": 3, "class_dist": {"details": 0.50, "historic": 0.20, "social": 0.30}, "evidence_sentence": "The figures of Abraham and Isaac are rendered with a haunting intensity, capturing the anguish and faith intertwined in this pivotal moment."},
-{"i_con": 1, "class_dist": {"details": 0.10, "historic": 0.40, "social": 0.50}, "evidence_sentence": "How did the museum evolve after his passing, and what new insights and influences emerged in the wake of his vision?"},
-{"i_con": 1, "class_dist": {"details": 0.70, "historic": 0.10, "social": 0.20}, "evidence_sentence": "Each lithograph in the series showcases Chagall's signature style, characterized by floating figures, whimsical animals, and vibrant colors that dance across the paper."},
-{"i_con": 3, "class_dist": {"details": 0.25, "historic": 0.40, "social": 0.35}, "evidence_sentence": "What truly elevates The Song of Songs in the museum's collection is the addition of lithographs donated by Charles Sorlier, which enrich Chagall's exploration of love and faith."},
-{"i_con": 1, "class_dist": {"details": 0.60, "historic": 0.10, "social": 0.30}, "evidence_sentence": "For a deeper insight into Chagall's artistic vision and the thematic underpinnings of this series, be sure to engage with the museum staff for additional context."}]"""
+{"i_con": 1, "class_dist": {"details": 0.10, "historic": 0.40, "social": 0.50}, "evidence_sentence": "How did the museum evolve after his passing, and what new insights and influences emerged in the wake of his vision?"}]"""
 
 
 def _get_prompt_hash() -> str:
@@ -376,6 +369,14 @@ def evaluate_tour_icon(tour_text: str, story_elements: List[Dict] = None) -> Dic
             # Cap: ≥3 filler phrases → 1
             if det_signals["filler_count"] >= 3:
                 final_icon = 1
+            
+            # Demotion cap: LLM says 5 but paragraph has ZERO traceable specifics → 3
+            # A "5" without a traceable specific is definitionally impossible per the matrix
+            if final_icon == 5 and det_signals["dates_count"] == 0 and det_signals["trace_count"] == 0:
+                # Check for proper nouns beyond the artist name (at least 2 required for 5)
+                if det_signals["proper_nouns_count"] < 2:
+                    final_icon = 3
+                    det_signals["flags"].append("demotion_5to3_no_specifics")
             
             # Single filler match: informs only, never caps (LEAD fix 4a)
             
