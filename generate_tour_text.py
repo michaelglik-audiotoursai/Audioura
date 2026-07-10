@@ -532,6 +532,10 @@ def _validate_museum_stop_descriptions(poi_list, venue_name, headers):
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
 
+# Module-level: populated on unresolvable clean-fail for structured error response
+_LAST_CLEAN_FAIL_EVIDENCE = {}
+
+
 
 @dataclass
 class VerificationResult:
@@ -721,8 +725,18 @@ def _verify_works_v2(poi_list, venue_name):
         print(f"  [D1v2] Removed {len(_to_remove)} substring titles (prefer longer forms)")
 
     if not canonical_titles:
-        print(f"  [D1v2] No canonical titles discovered — clean-fail (thin evidence)")
-        return None
+        print(f"  [D1v2] No canonical titles discovered — tier: unresolvable")
+        _has_site = len(corpus_result.get('combined_text', '')) > 1000 if 'corpus_result' in dir() and corpus_result else False
+        _has_wiki = bool(corpus_result.get('pages')) if 'corpus_result' in dir() and corpus_result else False
+        return VerificationResult(
+            pois=[], evidence_log={}, combined_text='',
+            corpus_result=corpus_result if 'corpus_result' in dir() and corpus_result else {},
+            tier='unresolvable',
+            sparql_count=len(sparql_works),
+            site_reachable=_has_site, wiki_available=_has_wiki,
+            entity_resolved=bool(_venue_entity and _venue_entity.qid),
+            qid=_venue_entity.qid if (_venue_entity and _venue_entity.qid) else '',
+        )
 
     # Verify each candidate against canonical titles
     evidence_log = {}
@@ -1821,6 +1835,16 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 if _d1v2_result.tier == 'unresolvable':
                     # Clean fail with structured error
                     print(f"  [D1] Tier: unresolvable — clean fail (entity={_d1v2_result.entity_resolved}, sparql={_d1v2_result.sparql_count})")
+                    global _LAST_CLEAN_FAIL_EVIDENCE
+                    _LAST_CLEAN_FAIL_EVIDENCE = {
+                        "error_type": "thin_evidence",
+                        "entity_resolved": _d1v2_result.entity_resolved,
+                        "qid": _d1v2_result.qid,
+                        "sparql_works": _d1v2_result.sparql_count,
+                        "site_reachable": _d1v2_result.site_reachable,
+                        "wikipedia_available": _d1v2_result.wiki_available,
+                        "tier": "unresolvable",
+                    }
                     return None, None, (None, None)
                 # Extract fields from VerificationResult
                 poi_list = _d1v2_result.pois

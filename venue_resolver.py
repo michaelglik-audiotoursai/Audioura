@@ -780,7 +780,12 @@ def _get_db_connection():
     """Get a Postgres connection for venue_corpus cache. Returns None if unavailable."""
     try:
         import psycopg2
-        db_url = os.environ.get('DATABASE_URL', 'postgresql://admin:admin@postgres-2:5432/audiotours')
+        # Use VENUE_CACHE_DB_URL first, fall back to DATABASE_URL, then container default
+        db_url = os.environ.get('VENUE_CACHE_DB_URL',
+                 os.environ.get('DATABASE_URL', 'postgresql://admin:password123@postgres-2:5432/audiotours'))
+        # Fix localhost references for container-to-container communication
+        if '@localhost:' in db_url:
+            db_url = db_url.replace('@localhost:', '@postgres-2:')
         conn = psycopg2.connect(db_url, connect_timeout=5)
         return conn
     except Exception as e:

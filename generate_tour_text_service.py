@@ -116,8 +116,22 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
         tour_text, _, coordinates = generate_tour_text(location, tour_type, temp_path, total_stops, persona=_persona_value)
         
         if tour_text is None:
-            ACTIVE_JOBS.update(job_id, status="error",
-                              error=f"Tour generation failed for '{location}' — no stops could be generated (all filtered or knowledge insufficient).")
+            # Check for structured evidence from degradation ladder
+            _error_msg = f"Tour generation failed for '{location}' — no stops could be generated (all filtered or knowledge insufficient)."
+            _error_extra = {}
+            try:
+                from generate_tour_text import _LAST_CLEAN_FAIL_EVIDENCE
+                if _LAST_CLEAN_FAIL_EVIDENCE:
+                    _error_extra = {
+                        "error_type": _LAST_CLEAN_FAIL_EVIDENCE.get("error_type", "generation_failed"),
+                        "evidence_summary": _LAST_CLEAN_FAIL_EVIDENCE,
+                    }
+                    _error_msg = "This venue could not be verified with enough works to generate a quality tour."
+                    import generate_tour_text as _gtt
+                    _gtt._LAST_CLEAN_FAIL_EVIDENCE = {}  # Reset for next request
+            except (ImportError, AttributeError):
+                pass
+            ACTIVE_JOBS.update(job_id, status="error", error=_error_msg, **_error_extra)
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
             return
@@ -346,6 +360,11 @@ def get_job_status(job_id):
             response["tour_content"] = job["tour_content"]
     elif job["status"] == "error":
         response["error"] = job["error"]
+        # Phase 2: structured clean-fail fields (if present)
+        if "error_type" in job:
+            response["error_type"] = job["error_type"]
+        if "evidence_summary" in job:
+            response["evidence_summary"] = job["evidence_summary"]
     
     return jsonify(response)
 
