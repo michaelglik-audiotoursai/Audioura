@@ -125,24 +125,28 @@ def check_contained(job_result: dict, test_name: str) -> tuple:
             _raw_titles = build_canonical_titles_from_works(_works)
             _canonical_set = {_norm_title(t) for t in _raw_titles}
     except Exception as e:
-        print(f"    (grounding check skipped: {e})")
+        # FAIL-CLOSED: if grounding infrastructure is broken, the test FAILS
+        assertions.append(("Grounding infrastructure available", False, f"ERROR: {e}"))
+        return False, assertions
+    
+    if not _canonical_set:
+        # FAIL-CLOSED: empty canonical set = can't verify grounding = test FAILS
+        assertions.append(("Grounding infrastructure available", False, "canonical set empty"))
+        return False, assertions
     
     if _canonical_set:
         ungrounded = []
         for title in stop_headers:
             _nt = _norm_title(title)
-            # Check exact match OR prefix match (titles get truncated in generation)
-            _matched = _nt in _canonical_set or any(_nt in ct or ct.startswith(_nt) for ct in _canonical_set)
-            if not _matched:
+            # EXACT equality after normalization — no substring/prefix loosening
+            if _nt not in _canonical_set:
                 ungrounded.append(title)
         grounded_ok = len(ungrounded) == 0
-        assertions.append(("All stops grounded in canonical titles", grounded_ok,
+        assertions.append(("All stops grounded in canonical titles (EXACT)", grounded_ok,
                           f"{len(stop_headers)-len(ungrounded)}/{len(stop_headers)} grounded" +
                           (f", ungrounded: {ungrounded[:2]}" if ungrounded else "")))
         if not grounded_ok:
             passed = False
-    else:
-        assertions.append(("All stops grounded in canonical titles", True, "(canonical set unavailable — skipped)"))
     
     # Check 4: QA FACTUAL=0 (basic stop count proxy)
     stop_count = len(stop_headers)
