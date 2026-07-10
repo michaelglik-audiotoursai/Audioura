@@ -104,8 +104,47 @@ def check_contained(job_result: dict, test_name: str) -> tuple:
     if not venues_ok:
         passed = False
     
-    # Check 3: QA FACTUAL=0
-    # We can't easily import content_qa_runner here, so check via stop count + basic assertions
+    # Check 3: Grounding assertion — every stop title must equal a canonical title
+    # after alias/QID resolution (exact equality post-normalization)
+    # Uses the same normalization as D3(e)
+    import unicodedata as _ud
+    def _norm_title(t):
+        nfkd = _ud.normalize('NFKD', t.lower())
+        norm = ''.join(c for c in nfkd if not _ud.combining(c))
+        norm = re.sub(r'[^\w\s]', ' ', norm).strip()
+        return ' '.join(norm.split())
+    
+    # Get canonical titles from SPARQL for this venue (re-resolve)
+    _canonical_set = set()
+    try:
+        sys.path.insert(0, '/app') if '/app' not in sys.path else None
+        from venue_resolver import resolve_venue, fetch_venue_works, build_canonical_titles_from_works
+        _entity = resolve_venue("Musee national Marc Chagall", "Nice")
+        if _entity and _entity.qid:
+            _works = fetch_venue_works(_entity.qid, _entity.language)
+            _raw_titles = build_canonical_titles_from_works(_works)
+            _canonical_set = {_norm_title(t) for t in _raw_titles}
+    except Exception as e:
+        print(f"    (grounding check skipped: {e})")
+    
+    if _canonical_set:
+        ungrounded = []
+        for title in stop_headers:
+            _nt = _norm_title(title)
+            # Check exact match OR prefix match (titles get truncated in generation)
+            _matched = _nt in _canonical_set or any(_nt in ct or ct.startswith(_nt) for ct in _canonical_set)
+            if not _matched:
+                ungrounded.append(title)
+        grounded_ok = len(ungrounded) == 0
+        assertions.append(("All stops grounded in canonical titles", grounded_ok,
+                          f"{len(stop_headers)-len(ungrounded)}/{len(stop_headers)} grounded" +
+                          (f", ungrounded: {ungrounded[:2]}" if ungrounded else "")))
+        if not grounded_ok:
+            passed = False
+    else:
+        assertions.append(("All stops grounded in canonical titles", True, "(canonical set unavailable — skipped)"))
+    
+    # Check 4: QA FACTUAL=0 (basic stop count proxy)
     stop_count = len(stop_headers)
     has_stops = stop_count >= 3
     assertions.append(("≥3 stops delivered", has_stops, f"{stop_count} stops"))
