@@ -704,7 +704,8 @@ def _verify_works_v2(poi_list, venue_name):
         cycle_names = corpus_result['cycle_names']
         combined_text = corpus_result['combined_text']
     
-    print(f"  [D1v2] Canonical titles union: {len(site_wiki_titles)} site/wiki + {len(sparql_titles)} SPARQL = {len(canonical_titles)} total")
+    if not _cache_hit:
+        print(f"  [D1v2] Canonical titles union: {len(site_wiki_titles)} site/wiki + {len(sparql_titles)} SPARQL = {len(canonical_titles)} total")
     
     # Remove site-extracted titles that are substrings of longer SPARQL titles
     # (prevents truncated site extractions from polluting the canonical set)

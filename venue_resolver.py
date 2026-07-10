@@ -786,11 +786,49 @@ def _get_db_connection():
         # Fix localhost references for container-to-container communication
         if '@localhost:' in db_url:
             db_url = db_url.replace('@localhost:', '@postgres-2:')
+        # Fix auth mismatch: tour-generator uses admin:admin but postgres-2 expects password123
+        if 'admin:admin@' in db_url and 'postgres-2' in db_url:
+            db_url = db_url.replace('admin:admin@', 'admin:password123@')
         conn = psycopg2.connect(db_url, connect_timeout=5)
+        # Auto-create venue_corpus table if not exists (idempotent)
+        _ensure_table(conn)
         return conn
     except Exception as e:
         print(f"  [venue_cache] DB connection failed: {e}")
         return None
+
+
+_TABLE_ENSURED = False
+
+def _ensure_table(conn):
+    """Create venue_corpus table if it doesn't exist (runs once per process)."""
+    global _TABLE_ENSURED
+    if _TABLE_ENSURED:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS venue_corpus (
+                    qid VARCHAR(20) PRIMARY KEY,
+                    venue_name TEXT NOT NULL,
+                    official_url TEXT,
+                    canonical_titles_json JSONB NOT NULL,
+                    story_elements_json JSONB,
+                    sparql_works_json JSONB,
+                    pages_json JSONB,
+                    language VARCHAR(10),
+                    tier VARCHAR(10) NOT NULL,
+                    corpus_version INT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    expires_at TIMESTAMP NOT NULL
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_venue_corpus_expires ON venue_corpus(expires_at)")
+            conn.commit()
+        _TABLE_ENSURED = True
+    except Exception as e:
+        print(f"  [venue_cache] Table creation failed: {e}")
+        conn.rollback()
 
 
 def cache_get(qid: str) -> Optional[Dict]:
