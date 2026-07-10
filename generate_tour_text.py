@@ -529,6 +529,32 @@ def _validate_museum_stop_descriptions(poi_list, venue_name, headers):
     return [first_stop] + all_survivors
 
 
+from dataclasses import dataclass, field
+from typing import Optional, List, Dict, Any
+
+
+@dataclass
+class VerificationResult:
+    """Result of _verify_works_v2 with tier computation for degradation ladder.
+    
+    Tiers (computed from positive evidence only, fail-closed):
+    - rich: >=8 verified works + site corpus found -> full found-mode
+    - medium: 3-7 verified works -> verified stops + interpretive narrative (invented mode)
+    - thin: 1-2 verified works + Wikipedia available -> fewer honest stops, no fabricated names
+    - unresolvable: 0 verified works or entity resolution failed -> clean fail
+    """
+    pois: List[Dict[str, Any]]
+    evidence_log: Dict[str, Any]
+    combined_text: str
+    corpus_result: Dict[str, Any]
+    tier: str  # 'rich', 'medium', 'thin', 'unresolvable' — NO DEFAULT, always explicit
+    sparql_count: int = 0
+    site_reachable: bool = False
+    wiki_available: bool = False
+    entity_resolved: bool = False
+    qid: str = ''
+
+
 def _verify_works_v2(poi_list, venue_name):
     """[D1 v2] In-collection verification using story_miner canonical title matching.
     
@@ -796,10 +822,21 @@ def _verify_works_v2(poi_list, venue_name):
         print(f"  [D1v2] DROPPED '{work_name}' — no canonical title match")
         evidence_log[work_name] = {"status": "DROPPED", "reason": "no canonical match"}
 
-    # Fail-closed: need ≥3 verified (R4 replenishment will add more)
-    if len(verified_pois) < 3:
-        print(f"  [D1v2] Only {len(verified_pois)} verified — need ≥3 (fail-closed)")
-        return None
+    # Degradation ladder: compute tier based on verified count
+    # 0 verified = unresolvable, 1-2 = thin, 3-7 = medium, 8+ = rich
+    # For thin tier (1-2 works): return them — caller decides behavior
+    if len(verified_pois) == 0:
+        print(f"  [D1v2] 0 works verified — tier: unresolvable")
+        _has_site = len(corpus_result.get('combined_text', '')) > 1000
+        _has_wiki = bool(corpus_result.get('pages'))
+        return VerificationResult(
+            pois=[], evidence_log=evidence_log, combined_text=combined_text,
+            corpus_result=corpus_result, tier='unresolvable',
+            sparql_count=len(sparql_works),
+            site_reachable=_has_site, wiki_available=_has_wiki,
+            entity_resolved=bool(_venue_entity and _venue_entity.qid),
+            qid=_venue_entity.qid if (_venue_entity and _venue_entity.qid) else '',
+        )
 
     # [A6+] Normalized-title dedup: site-extracted titles carry no QID, so QID-dedup alone
     # cannot catch a site-title and SPARQL-title of the same work. Use the same normalization
@@ -826,12 +863,48 @@ def _verify_works_v2(poi_list, venue_name):
         print(f"  [D1v2] Title-dedup removed {len(verified_pois) - len(_deduped_pois)} duplicate(s): {len(_deduped_pois)} remain")
     verified_pois = _deduped_pois
 
-    if len(verified_pois) < 3:
-        print(f"  [D1v2] After title-dedup only {len(verified_pois)} verified — need ≥3 (fail-closed)")
-        return None
+    if len(verified_pois) < 3 and len(verified_pois) == 0:
+        print(f"  [D1v2] After title-dedup: 0 verified — unresolvable")
+        _has_site_corpus = len(corpus_result.get('combined_text', '')) > 1000
+        _has_wiki = bool(corpus_result.get('pages'))
+        return VerificationResult(
+            pois=[], evidence_log=evidence_log, combined_text=combined_text,
+            corpus_result=corpus_result, tier='unresolvable',
+            sparql_count=len(sparql_works) if 'sparql_works' in dir() else 0,
+            site_reachable=_has_site_corpus, wiki_available=_has_wiki,
+            entity_resolved=bool(_venue_entity and _venue_entity.qid) if '_venue_entity' in dir() else False,
+            qid=_venue_entity.qid if ('_venue_entity' in dir() and _venue_entity and _venue_entity.qid) else '',
+        )
 
-    print(f"  [D1v2] {len(verified_pois)}/{len(poi_list)} works verified")
-    return verified_pois, evidence_log, combined_text, corpus_result
+    # --- Tier computation (fail-closed: only positive evidence promotes) ---
+    _has_site_corpus = len(corpus_result.get('combined_text', '')) > 1000
+    _has_wiki = bool(corpus_result.get('pages'))
+    _sparql_n = len(sparql_works) if 'sparql_works' in dir() else 0
+    _n_verified = len(verified_pois)
+    
+    if _n_verified >= 8:
+        _tier = 'rich'
+    elif _n_verified >= 3:
+        _tier = 'medium'
+    elif _n_verified >= 1:
+        _tier = 'thin'
+    else:
+        _tier = 'unresolvable'
+    
+    print(f"  [D1v2] {_n_verified}/{len(poi_list)} works verified — tier: {_tier}")
+    
+    return VerificationResult(
+        pois=verified_pois,
+        evidence_log=evidence_log,
+        combined_text=combined_text,
+        corpus_result=corpus_result,
+        tier=_tier,
+        sparql_count=_sparql_n,
+        site_reachable=_has_site_corpus,
+        wiki_available=_has_wiki,
+        entity_resolved=bool(_venue_entity and _venue_entity.qid) if '_venue_entity' in dir() else False,
+        qid=_venue_entity.qid if ('_venue_entity' in dir() and _venue_entity and _venue_entity.qid) else '',
+    )
 
 
 def _verify_works_in_collection(poi_list, venue_name):
@@ -1693,17 +1766,33 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         if tour_category == 'museum' and _museum_venue_name:
             # Try new story_miner-based verification (T0a/T1)
             _d1v2_result = _verify_works_v2(poi_list, _museum_venue_name)
-            if _d1v2_result is not None and _d1v2_result is not None:
+            if isinstance(_d1v2_result, VerificationResult):
+                _verification_tier = _d1v2_result.tier
+                if _d1v2_result.tier == 'unresolvable':
+                    # Clean fail with structured error
+                    print(f"  [D1] Tier: unresolvable — clean fail (entity={_d1v2_result.entity_resolved}, sparql={_d1v2_result.sparql_count})")
+                    return None, None, (None, None)
+                # Extract fields from VerificationResult
+                poi_list = _d1v2_result.pois
+                _d1_evidence_log = _d1v2_result.evidence_log
+                _d1_venue_corpus = _d1v2_result.combined_text
+                _story_corpus_result = _d1v2_result.corpus_result
+                print(f"  [D1] Tier: {_verification_tier} ({len(poi_list)} verified works)")
+            elif _d1v2_result is not None:
+                # Legacy tuple return (backward compat during transition)
                 poi_list, _d1_evidence_log, _d1_venue_corpus, _story_corpus_result = _d1v2_result
+                _verification_tier = 'rich'  # assume rich for legacy
             else:
                 # D1v2 could not verify enough works — fail cleanly (no legacy fallback)
-                # The legacy D1 is weaker and admits wrong-venue works. R4 replenishment
-                # is the correct mechanism to get more stops, not a weaker verifier.
                 print(f"  [D1] D1v2 verification could not verify enough works — clean fail")
                 return None, None, (None, None)
 
             # -------- [R4] Bounded replenishment loop --------
-            # If verified < requested, re-prompt for MORE candidates and verify
+            # For medium/thin tiers: don't pad with unverifiable stops (use only verified)
+            if _verification_tier in ('medium', 'thin'):
+                total_stops = len(poi_list)
+                print(f"  [R4] SKIPPED — tier={_verification_tier}, total_stops capped to {total_stops} verified works")
+            # If verified < requested, re-prompt for MORE candidates and verify (rich tier only)
             _r4_all_tried_names = set(_normalize_name(p['name']) for p in poi_list)
             _r4_all_tried_names.update(_normalize_name(k) for k in _d1_evidence_log.keys())
             _r4_round = 0
