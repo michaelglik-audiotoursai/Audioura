@@ -3162,6 +3162,27 @@ Requirements:
         output_file = f"{safe_location}_{safe_tour_type}_tour_{timestamp}.txt"
     
     with open(output_file, "w", encoding="utf-8") as f:
+        # [POST-ASSEMBLY] Ensure stop titles exactly match verified canonical forms
+        # GPT may truncate long titles; this deterministic correction ensures exactness
+        import re as _pa_re
+        for poi in poi_list:
+            _stop_num = poi.get('stop_number', 0)
+            _canonical_name = poi.get('name', '')
+            if _stop_num and _canonical_name:
+                # Find the actual header in the text and correct if different
+                _header_pattern = _pa_re.compile(rf'^(Stop\s+{_stop_num}:\s*)(.+?)$', _pa_re.MULTILINE)
+                _match = _header_pattern.search(complete_tour)
+                if _match:
+                    _current_title = _match.group(2).strip()
+                    # Strip artist suffix for comparison
+                    _clean_current = _pa_re.sub(r'\s+by\s+[A-Z].*$', '', _current_title).strip()
+                    _clean_canonical = _pa_re.sub(r'\s+by\s+[A-Z].*$', '', _canonical_name).strip()
+                    if _clean_current != _clean_canonical and len(_clean_canonical) > len(_clean_current):
+                        # Title was truncated — replace with canonical
+                        _new_header = _match.group(1) + _canonical_name
+                        complete_tour = complete_tour[:_match.start()] + _new_header + complete_tour[_match.end():]
+                        print(f"  [POST-ASSEMBLY] Corrected Stop {_stop_num} title: '{_clean_current[:40]}' → '{_clean_canonical[:40]}'")
+        
         f.write(complete_tour)
     
     print(f"\nTour text generated successfully!")
