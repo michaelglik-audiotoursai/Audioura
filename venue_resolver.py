@@ -758,3 +758,118 @@ def _fetch_entity_properties(qid: str, label: str) -> Optional[VenueEntity]:
     except Exception as e:
         logger.warning(f"Entity fetch error for {qid}: {e}")
         return None
+
+
+# ============================================================
+# PHASE 2: Venue Corpus Cache Layer
+# ============================================================
+# Caches discovery results in Postgres to avoid re-mining on repeat requests.
+# TTL-based invalidation with separate positive (30d) and negative (5d) TTLs.
+# Note: story_elements_json is Phase-2 interim; migrates to work-level when SQ-S8 lands.
+
+import os
+import json
+from datetime import datetime, timedelta
+
+VENUE_CACHE_TTL_DAYS = int(os.environ.get('VENUE_CACHE_TTL_DAYS', '30'))
+VENUE_CACHE_NEGATIVE_TTL_DAYS = int(os.environ.get('VENUE_CACHE_NEGATIVE_TTL_DAYS', '5'))
+CORPUS_VERSION = 1  # Increment when pipeline improvements invalidate cached data
+
+
+def _get_db_connection():
+    """Get a Postgres connection for venue_corpus cache. Returns None if unavailable."""
+    try:
+        import psycopg2
+        db_url = os.environ.get('DATABASE_URL', 'postgresql://admin:admin@postgres-2:5432/audiotours')
+        conn = psycopg2.connect(db_url, connect_timeout=5)
+        return conn
+    except Exception as e:
+        print(f"  [venue_cache] DB connection failed: {e}")
+        return None
+
+
+def cache_get(qid: str) -> Optional[Dict]:
+    """Retrieve cached venue corpus by QID. Returns None if miss or expired."""
+    conn = _get_db_connection()
+    if not conn:
+        return None
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT venue_name, official_url, canonical_titles_json, story_elements_json,
+                       sparql_works_json, pages_json, language, tier, corpus_version, expires_at
+                FROM venue_corpus
+                WHERE qid = %s AND expires_at > NOW() AND corpus_version = %s
+            """, (qid, CORPUS_VERSION))
+            row = cur.fetchone()
+            if row:
+                print(f"  [venue_cache] HIT for {qid} (tier={row[7]}, expires={row[9]})")
+                return {
+                    'venue_name': row[0],
+                    'official_url': row[1],
+                    'canonical_titles': set(row[2]) if row[2] else set(),
+                    'story_elements': row[3],
+                    'sparql_works': row[4] if row[4] else [],
+                    'pages': row[5],
+                    'language': row[6],
+                    'tier': row[7],
+                }
+            else:
+                print(f"  [venue_cache] MISS for {qid}")
+                return None
+    except Exception as e:
+        print(f"  [venue_cache] Read error: {e}")
+        return None
+    finally:
+        conn.close()
+
+
+def cache_put(qid: str, venue_name: str, official_url: str, canonical_titles,
+              story_elements, sparql_works, pages, language: str, tier: str):
+    """Store venue corpus in cache. Uses positive or negative TTL based on tier."""
+    conn = _get_db_connection()
+    if not conn:
+        return
+    
+    # Negative caching: thin/unresolvable get shorter TTL (lets venue recover)
+    if tier in ('thin', 'unresolvable'):
+        ttl_days = VENUE_CACHE_NEGATIVE_TTL_DAYS
+    else:
+        ttl_days = VENUE_CACHE_TTL_DAYS
+    
+    expires_at = datetime.utcnow() + timedelta(days=ttl_days)
+    
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO venue_corpus (qid, venue_name, official_url, canonical_titles_json,
+                    story_elements_json, sparql_works_json, pages_json, language, tier,
+                    corpus_version, expires_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (qid) DO UPDATE SET
+                    venue_name = EXCLUDED.venue_name,
+                    official_url = EXCLUDED.official_url,
+                    canonical_titles_json = EXCLUDED.canonical_titles_json,
+                    story_elements_json = EXCLUDED.story_elements_json,
+                    sparql_works_json = EXCLUDED.sparql_works_json,
+                    pages_json = EXCLUDED.pages_json,
+                    language = EXCLUDED.language,
+                    tier = EXCLUDED.tier,
+                    corpus_version = EXCLUDED.corpus_version,
+                    created_at = CURRENT_TIMESTAMP,
+                    expires_at = EXCLUDED.expires_at
+            """, (
+                qid, venue_name, official_url,
+                json.dumps(list(canonical_titles)) if canonical_titles else json.dumps([]),
+                json.dumps(story_elements) if story_elements else None,
+                json.dumps(sparql_works) if sparql_works else None,
+                json.dumps(pages) if pages else None,
+                language, tier, CORPUS_VERSION, expires_at
+            ))
+            conn.commit()
+            print(f"  [venue_cache] STORED {qid} (tier={tier}, ttl={ttl_days}d, expires={expires_at.date()})")
+    except Exception as e:
+        print(f"  [venue_cache] Write error: {e}")
+        conn.rollback()
+    finally:
+        conn.close()

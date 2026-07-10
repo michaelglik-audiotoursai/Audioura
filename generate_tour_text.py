@@ -630,10 +630,40 @@ def _verify_works_v2(poi_list, venue_name):
     elif "matisse" in venue_name.lower():
         _wiki_variants.append("Musée Matisse (Nice)")
 
-    # --- SPARQL works (source 1 of 3 for canonical titles) ---
-    sparql_titles = set()
-    sparql_works = []
+    # --- CACHE CHECK: try venue_corpus cache before mining ---
+    _cache_hit = None
     if _venue_entity and _venue_entity.qid:
+        try:
+            from venue_resolver import cache_get
+            _cache_hit = cache_get(_venue_entity.qid)
+        except Exception as e:
+            print(f"  [D1v2] Cache check failed (proceeding with fresh mining): {e}")
+    
+    if _cache_hit:
+        # Cache hit — use cached corpus directly
+        canonical_titles = _cache_hit['canonical_titles']
+        sparql_works = _cache_hit.get('sparql_works') or []
+        sparql_titles = set(build_canonical_titles_from_works(sparql_works)) if sparql_works else set()
+        combined_text = ''  # Will be re-fetched if needed below
+        corpus_result = {
+            'canonical_titles': canonical_titles,
+            'combined_text': _cache_hit.get('pages', {}).get('combined_text', '') if isinstance(_cache_hit.get('pages'), dict) else '',
+            'pages': _cache_hit.get('pages') or [],
+            'cycle_names': set(),
+            'theme_words': set(),
+            'source_urls': [],
+        }
+        combined_text = corpus_result['combined_text']
+        cycle_names = corpus_result['cycle_names']
+        print(f"  [D1v2] Cache HIT: {len(canonical_titles)} canonical titles (tier={_cache_hit['tier']})")
+    else:
+        # Cache miss — fresh mining (existing code below)
+        pass
+
+    # --- SPARQL works (source 1 of 3 for canonical titles) ---
+    sparql_titles = set() if not _cache_hit else sparql_titles
+    sparql_works = [] if not _cache_hit else sparql_works
+    if _venue_entity and _venue_entity.qid and not _cache_hit:
         try:
             sparql_works = fetch_venue_works(_venue_entity.qid, _language)
             sparql_titles = build_canonical_titles_from_works(sparql_works)
@@ -642,31 +672,33 @@ def _verify_works_v2(poi_list, venue_name):
             print(f"  [D1v2] SPARQL query failed (degrading, not fabricating): {e}")
 
     # --- Fetch the expanded narrative corpus (sources 2+3: official site + Wikipedia) ---
-    corpus_result = fetch_venue_narrative_corpus(
-        venue_name=venue_name,
-        base_site_url=_base_site_url,
-        wikipedia_title=_wiki_title,
-        language=_language,
-    )
+    if not _cache_hit:
+        corpus_result = fetch_venue_narrative_corpus(
+            venue_name=venue_name,
+            base_site_url=_base_site_url,
+            wikipedia_title=_wiki_title,
+            language=_language,
+        )
     
-    # If no pages fetched, try variants
-    if not corpus_result.get('pages') or len(corpus_result.get('combined_text', '')) < 500:
-        for variant in _wiki_variants[1:]:
-            _alt = fetch_venue_narrative_corpus(
-                venue_name=venue_name,
-                base_site_url=_base_site_url,
-                wikipedia_title=variant,
-                language=_language,
-            )
-            if _alt.get('combined_text', '') and len(_alt['combined_text']) > len(corpus_result.get('combined_text', '')):
-                corpus_result = _alt
-                break
+    # If no pages fetched, try variants (skip on cache hit — already have data)
+    if not _cache_hit:
+        if not corpus_result.get('pages') or len(corpus_result.get('combined_text', '')) < 500:
+            for variant in _wiki_variants[1:]:
+                _alt = fetch_venue_narrative_corpus(
+                    venue_name=venue_name,
+                    base_site_url=_base_site_url,
+                    wikipedia_title=variant,
+                    language=_language,
+                )
+                if _alt.get('combined_text', '') and len(_alt['combined_text']) > len(corpus_result.get('combined_text', '')):
+                    corpus_result = _alt
+                    break
 
-    # --- Union canonical titles (LEAD amendment #1): SPARQL + site + wiki extraction ---
-    site_wiki_titles = corpus_result['canonical_titles']
-    canonical_titles = site_wiki_titles | sparql_titles
-    cycle_names = corpus_result['cycle_names']
-    combined_text = corpus_result['combined_text']
+        # --- Union canonical titles (LEAD amendment #1): SPARQL + site + wiki extraction ---
+        site_wiki_titles = corpus_result['canonical_titles']
+        canonical_titles = site_wiki_titles | sparql_titles
+        cycle_names = corpus_result['cycle_names']
+        combined_text = corpus_result['combined_text']
     
     print(f"  [D1v2] Canonical titles union: {len(site_wiki_titles)} site/wiki + {len(sparql_titles)} SPARQL = {len(canonical_titles)} total")
     
@@ -892,6 +924,24 @@ def _verify_works_v2(poi_list, venue_name):
         _tier = 'unresolvable'
     
     print(f"  [D1v2] {_n_verified}/{len(poi_list)} works verified — tier: {_tier}")
+    
+    # --- CACHE WRITE: store results for future requests ---
+    if _venue_entity and _venue_entity.qid and not _cache_hit:
+        try:
+            from venue_resolver import cache_put
+            cache_put(
+                qid=_venue_entity.qid,
+                venue_name=venue_name,
+                official_url=_base_site_url or '',
+                canonical_titles=canonical_titles,
+                story_elements=corpus_result.get('story_elements'),
+                sparql_works=sparql_works,
+                pages=corpus_result.get('pages'),
+                language=_language,
+                tier=_tier,
+            )
+        except Exception as e:
+            print(f"  [D1v2] Cache write failed (non-fatal): {e}")
     
     return VerificationResult(
         pois=verified_pois,

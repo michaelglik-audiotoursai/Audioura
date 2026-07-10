@@ -17,6 +17,8 @@ services:
       - REFERRAL_BASE_URL=http://localhost:5000
       - DATABASE_URL=postgresql://admin:admin@localhost:5432/audiotours
       - PYTHONUNBUFFERED=1
+      - VENUE_CACHE_TTL_DAYS=${VENUE_CACHE_TTL_DAYS:-30}
+      - VENUE_CACHE_NEGATIVE_TTL_DAYS=${VENUE_CACHE_NEGATIVE_TTL_DAYS:-5}
     volumes:
       - ./tours:/app/tours
     restart: unless-stopped

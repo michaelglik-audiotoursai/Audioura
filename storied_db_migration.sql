@@ -61,3 +61,25 @@ BEGIN
 END $$;
 
 SELECT 'storied_migration_complete' AS status;
+
+-- 6. Venue Corpus Cache (Generic Grounding Phase 2 — degradation ladder + caching)
+-- Caches discovered venue data (SPARQL works, site/wiki extraction, story elements)
+-- to avoid re-mining on repeat requests. TTL-based invalidation.
+-- Note: story_elements_json is a Phase-2 interim; migrates to work-level when SQ-S8 lands.
+CREATE TABLE IF NOT EXISTS venue_corpus (
+    qid VARCHAR(20) PRIMARY KEY,
+    venue_name TEXT NOT NULL,
+    official_url TEXT,
+    canonical_titles_json JSONB NOT NULL,
+    story_elements_json JSONB,
+    sparql_works_json JSONB,
+    pages_json JSONB,
+    language VARCHAR(10),
+    tier VARCHAR(10) NOT NULL,  -- rich/medium/thin/unresolvable — NO DEFAULT, always explicit
+    corpus_version INT NOT NULL,  -- pipeline version; SQ2+ invalidates stale rows
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_venue_corpus_expires ON venue_corpus(expires_at);
+CREATE INDEX IF NOT EXISTS idx_venue_corpus_tier ON venue_corpus(tier);
