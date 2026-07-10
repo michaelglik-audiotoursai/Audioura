@@ -1,0 +1,19 @@
+{
+  "status": "error",
+  "error": "This venue could not be verified with enough works to generate a quality tour.",
+  "error_type": "thin_evidence",
+  "evidence_summary": {
+    "entity_resolved": true,
+    "qid": "Q5506454",
+    "sparql_works": 0,
+    "site_reachable": true,
+    "wikipedia_available": true,
+    "tier": "unresolvable"
+  },
+  "location": "Fruitlands Museum, Harvard, Massachusetts",
+  "tour_type": "museum",
+  "total_stops": 5,
+  "generated_at": "2026-07-10T19:10:25Z",
+  "commit": "62bb114",
+  "notes": "Phase 2 acceptance artifact: Fruitlands has 0 SPARQL works, entity resolves (Q5506454) but no verifiable collection. Structured clean-fail per LEAD approval."
+}
