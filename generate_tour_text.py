@@ -643,6 +643,24 @@ def _verify_works_v2(poi_list, venue_name):
     combined_text = corpus_result['combined_text']
     
     print(f"  [D1v2] Canonical titles union: {len(site_wiki_titles)} site/wiki + {len(sparql_titles)} SPARQL = {len(canonical_titles)} total")
+    
+    # Remove site-extracted titles that are substrings of longer SPARQL titles
+    # (prevents truncated site extractions from polluting the canonical set)
+    # Uses normalized comparison (accent-stripped, punctuation-stripped) for matching
+    from story_miner import _normalize as _norm_for_dedup
+    _to_remove = set()
+    _norm_map = {t: _norm_for_dedup(t) for t in canonical_titles}
+    for t in canonical_titles:
+        _nt = _norm_map[t]
+        for other in canonical_titles:
+            if t != other:
+                _no = _norm_map[other]
+                if len(_nt) < len(_no) and _nt in _no:
+                    _to_remove.add(t)
+                    break
+    if _to_remove:
+        canonical_titles -= _to_remove
+        print(f"  [D1v2] Removed {len(_to_remove)} substring titles (prefer longer forms)")
 
     if not canonical_titles:
         print(f"  [D1v2] No canonical titles discovered — clean-fail (thin evidence)")
@@ -727,8 +745,18 @@ def _verify_works_v2(poi_list, venue_name):
                 "qid": _matched_qid,
             }
             # Use the EXACT canonical title as the stop name (prevents GPT truncation)
+            # If the matched canonical is a substring of a longer SPARQL title, prefer the SPARQL form
             poi = dict(poi)  # Don't mutate the original
-            poi['name'] = canonical_title
+            _best_title = canonical_title
+            if sparql_titles:
+                from story_miner import _normalize as _nt_check
+                _norm_ct = _nt_check(canonical_title)
+                for st in sparql_titles:
+                    _norm_st = _nt_check(st)
+                    if _norm_ct != _norm_st and _norm_ct in _norm_st:
+                        _best_title = st  # Use the longer SPARQL form
+                        break
+            poi['name'] = _best_title
             verified_pois.append(poi)
             continue
         
