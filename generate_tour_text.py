@@ -726,6 +726,9 @@ def _verify_works_v2(poi_list, venue_name):
                 "method": "canonical_title_match",
                 "qid": _matched_qid,
             }
+            # Use the EXACT canonical title as the stop name (prevents GPT truncation)
+            poi = dict(poi)  # Don't mutate the original
+            poi['name'] = canonical_title
             verified_pois.append(poi)
             continue
         
