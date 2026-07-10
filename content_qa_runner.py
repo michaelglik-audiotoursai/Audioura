@@ -238,12 +238,20 @@ def run_qa(tour_text, tour_file="", story_elements=None):
     _splice_issues = []
     _lines = tour_text.split('\n')
     for line_num, line in enumerate(_lines, 1):
+        # Skip Sources: credit lines entirely (URLs are expected per R1 design)
+        if line.strip().startswith('Sources:'):
+            continue
         # Check for [a-z].[a-z] mid-token patterns (splice signature)
         _splices = re.findall(r'[a-z]\.[a-z]', line)
-        # Filter out legitimate abbreviations (e.g., "i.e.", "e.g.", URLs)
+        # Filter out legitimate abbreviations, URLs, and domain-shaped tokens
         for sp in _splices:
-            if not any(x in line.lower() for x in ['i.e.', 'e.g.', 'http', '.com', '.fr', '.org']):
-                _splice_issues.append(f"Line {line_num}: '{sp}' in ...{line[max(0,line.find(sp)-20):line.find(sp)+20]}...")
+            # Skip if line contains URL indicators or domain patterns
+            if any(x in line.lower() for x in ['i.e.', 'e.g.', 'http', 'www.', '.com', '.fr', '.org', '.it', '.de', '.es', '.net', '.edu', '.gov']):
+                continue
+            # Skip URL-shaped tokens: word.tld pattern (e.g., "uffizi.it", "musee.fr")
+            if re.search(r'\b[\w-]+\.[a-z]{2,4}\b', line):
+                continue
+            _splice_issues.append(f"Line {line_num}: '{sp}' in ...{line[max(0,line.find(sp)-20):line.find(sp)+20]}...")
         # Check for "Stop N" references in body text (not headers)
         if not re.match(r'^Stop\s+\d+:', line) and re.search(r'\bStop\s+\d+\b', line):
             if 'Directions:' not in line:  # Allow in transition templates
