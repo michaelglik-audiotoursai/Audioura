@@ -38,7 +38,7 @@ def _persist_icon_metrics(icon_result, job_id):
             port=os.environ.get("DB_PORT", "5432"),
             dbname=os.environ.get("DB_NAME", "audiotours"),
             user=os.environ.get("DB_USER", "admin"),
-            password=os.environ.get("DB_PASSWORD", "admin"),
+            password=os.environ.get("DB_PASSWORD", "password123"),
         )
         cur = conn.cursor()
         
