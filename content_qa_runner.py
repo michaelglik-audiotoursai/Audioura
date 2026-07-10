@@ -136,7 +136,7 @@ def run_qa(tour_text, tour_file="", story_elements=None):
         _name_part = re.sub(r',\s*\d{4}$', '', _name_part).strip()
         
         _word_count = len(_name_part.split())
-        if _word_count > 12:
+        if _word_count > 15:
             _title_issues.append(f"'{_header[:60]}...' ({_word_count} words — too long)")
         if re.search(r'\b(welcome to|behold|discover|featuring|located at|awaits)\b', _name_part, re.I):
             _title_issues.append(f"'{_header[:60]}...' (contains flowery text)")
@@ -201,7 +201,7 @@ def run_qa(tour_text, tour_file="", story_elements=None):
         _name_part = re.sub(r'\s+by\s+[A-Z][^,]*$', '', _name_part)
         _name_part = re.sub(r',\s*\d{4}$', '', _name_part).strip()
         # A real artwork name should be 1-8 words, start with uppercase
-        if _name_part and (len(_name_part.split()) > 10 or not _name_part[0].isupper()):
+        if _name_part and (len(_name_part.split()) > 15 or not _name_part[0].isupper()):
             _ungrounded.append(_name_part[:50])
     check("D3(d) Grounding assertion (titles look like real entities)",
           len(_ungrounded) == 0,

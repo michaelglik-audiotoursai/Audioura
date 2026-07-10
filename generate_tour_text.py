@@ -801,6 +801,35 @@ def _verify_works_v2(poi_list, venue_name):
         print(f"  [D1v2] Only {len(verified_pois)} verified — need ≥3 (fail-closed)")
         return None
 
+    # [A6+] Normalized-title dedup: site-extracted titles carry no QID, so QID-dedup alone
+    # cannot catch a site-title and SPARQL-title of the same work. Use the same normalization
+    # that D3(e) uses (lowercase, strip accents, strip punctuation, collapse whitespace).
+    import unicodedata as _ud_dedup
+    def _normalize_for_title_dedup(title):
+        _nfkd = _ud_dedup.normalize('NFKD', title.lower())
+        _norm = ''.join(c for c in _nfkd if not _ud_dedup.combining(c))
+        _norm = re.sub(r'[^\w\s]', ' ', _norm).strip()
+        return ' '.join(_norm.split())
+
+    _verified_normalized_titles = set()
+    _deduped_pois = []
+    for _vp in verified_pois:
+        _vp_norm = _normalize_for_title_dedup(_vp.get('name', ''))
+        if _vp_norm in _verified_normalized_titles:
+            print(f"  [D1v2] TITLE-DEDUP dropped '{_vp.get('name', '')[:50]}' (normalized duplicate)")
+            evidence_log[_vp.get('name', '')] = {"status": "DROPPED", "reason": "normalized title duplicate"}
+            continue
+        _verified_normalized_titles.add(_vp_norm)
+        _deduped_pois.append(_vp)
+    
+    if len(_deduped_pois) < len(verified_pois):
+        print(f"  [D1v2] Title-dedup removed {len(verified_pois) - len(_deduped_pois)} duplicate(s): {len(_deduped_pois)} remain")
+    verified_pois = _deduped_pois
+
+    if len(verified_pois) < 3:
+        print(f"  [D1v2] After title-dedup only {len(verified_pois)} verified — need ≥3 (fail-closed)")
+        return None
+
     print(f"  [D1v2] {len(verified_pois)}/{len(poi_list)} works verified")
     return verified_pois, evidence_log, combined_text, corpus_result
 
@@ -2888,10 +2917,10 @@ Requirements:
             if year:
                 poi_header += f", {year}"
         # Also assert the name itself is a short noun phrase (no sentences/descriptions)
-        if len(poi_name.split()) > 12 or any(c in poi_name for c in '.!?;'):
+        if len(poi_name.split()) > 15 or any(c in poi_name for c in '.!?;'):
             print(f"  [F3] ⚠️ NAME TOO LONG/CORRUPT at stop {stop_num}: '{poi_name[:80]}'")
-            # Truncate to first 8 words if corrupted
-            _clean_name = ' '.join(poi_name.split()[:8]).rstrip('.,;:!?')
+            # Truncate to first 12 words if corrupted
+            _clean_name = ' '.join(poi_name.split()[:12]).rstrip('.,;:!?')
             poi_header = f"Stop {stop_num}: {_clean_name}"
             if artist and artist.lower() != "unknown artist":
                 poi_header += f" by {artist}"
@@ -3162,27 +3191,6 @@ Requirements:
         output_file = f"{safe_location}_{safe_tour_type}_tour_{timestamp}.txt"
     
     with open(output_file, "w", encoding="utf-8") as f:
-        # [POST-ASSEMBLY] Ensure stop titles exactly match verified canonical forms
-        # GPT may truncate long titles; this deterministic correction ensures exactness
-        import re as _pa_re
-        for poi in poi_list:
-            _stop_num = poi.get('stop_number', 0)
-            _canonical_name = poi.get('name', '')
-            if _stop_num and _canonical_name:
-                # Find the actual header in the text and correct if different
-                _header_pattern = _pa_re.compile(rf'^(Stop\s+{_stop_num}:\s*)(.+?)$', _pa_re.MULTILINE)
-                _match = _header_pattern.search(complete_tour)
-                if _match:
-                    _current_title = _match.group(2).strip()
-                    # Strip artist suffix for comparison
-                    _clean_current = _pa_re.sub(r'\s+by\s+[A-Z].*$', '', _current_title).strip()
-                    _clean_canonical = _pa_re.sub(r'\s+by\s+[A-Z].*$', '', _canonical_name).strip()
-                    if _clean_current != _clean_canonical and len(_clean_canonical) > len(_clean_current):
-                        # Title was truncated — replace with canonical
-                        _new_header = _match.group(1) + _canonical_name
-                        complete_tour = complete_tour[:_match.start()] + _new_header + complete_tour[_match.end():]
-                        print(f"  [POST-ASSEMBLY] Corrected Stop {_stop_num} title: '{_clean_current[:40]}' → '{_clean_canonical[:40]}'")
-        
         f.write(complete_tour)
     
     print(f"\nTour text generated successfully!")
