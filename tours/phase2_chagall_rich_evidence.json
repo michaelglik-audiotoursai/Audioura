@@ -1,0 +1,37 @@
+{
+  "Abraham et les trois anges": {
+    "status": "VERIFIED",
+    "canonical_title": "Abraham et les trois anges",
+    "snippet": "",
+    "method": "canonical_title_match",
+    "qid": "Q62568400"
+  },
+  "L'Arche de Noé": {
+    "status": "VERIFIED",
+    "canonical_title": "L'Arche de Noé",
+    "snippet": "",
+    "method": "canonical_title_match",
+    "qid": "Q62569562"
+  },
+  "L'Exode": {
+    "status": "VERIFIED",
+    "canonical_title": "L'Exode",
+    "snippet": "",
+    "method": "canonical_title_match",
+    "qid": "Q3733008"
+  },
+  "La Bible : Abraham et Isaac en route vers le lieu du sacrifice": {
+    "status": "VERIFIED",
+    "canonical_title": "La Bible : Abraham et Isaac en route vers le lieu du sacrifice",
+    "snippet": "",
+    "method": "canonical_title_match",
+    "qid": "Q62514150"
+  },
+  "Le Cirque bleu": {
+    "status": "VERIFIED",
+    "canonical_title": "Le Cirque bleu",
+    "snippet": "",
+    "method": "canonical_title_match",
+    "qid": "Q60452453"
+  }
+}

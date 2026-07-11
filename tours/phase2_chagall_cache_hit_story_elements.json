@@ -1,0 +1,65 @@
+[
+  {
+    "type": "date",
+    "text": "Exhibition: Chagall politique, Le Cri de liberté",
+    "snippet": "du 27 janvier au 13 mai 2024",
+    "author": null,
+    "source_url": "https://musees-nationaux-alpesmaritimes.fr/chagall/type-evenement/exposition-passee",
+    "story_mode": "found",
+    "id": "se_001"
+  },
+  {
+    "type": "date",
+    "text": "Exhibition: Chagall et moi ! Les 50 ans du musée Chagall - volet 2",
+    "snippet": "",
+    "author": null,
+    "source_url": "https://musees-nationaux-alpesmaritimes.fr/chagall/type-evenement/exposition-passee",
+    "story_mode": "found",
+    "id": "se_002"
+  },
+  {
+    "type": "context_work",
+    "text": "Celebration of 50 years of the museum",
+    "snippet": "Chagall et moi ! Les 50 ans du musée Chagall - volet 2",
+    "author": null,
+    "source_url": "https://musees-nationaux-alpesmaritimes.fr/chagall/type-evenement/exposition-passee",
+    "story_mode": "found",
+    "id": "se_003"
+  },
+  {
+    "type": "origin",
+    "text": "Presence of a concert hall in the museum",
+    "snippet": "La présence d’une salle de spectacle dans le musée a été souhaitée par Marc Chagall, amoureux de la musique et des arts scéniques.",
+    "author": "null",
+    "source_url": "https://musees-nationaux-alpesmaritimes.fr/chagall/la-saison-culturelle-un-programme-riche-en-evenements",
+    "story_mode": "found",
+    "id": "se_004"
+  },
+  {
+    "type": "intention",
+    "text": "Purpose of the concert hall design by Marc Chagall",
+    "snippet": "Il a dessiné les trois vitraux de La Création du Monde (1971-1972) qui baignent la salle de leur exceptionnelle lumière bleue.",
+    "author": "null",
+    "source_url": "https://musees-nationaux-alpesmaritimes.fr/chagall/la-saison-culturelle-un-programme-riche-en-evenements",
+    "story_mode": "found",
+    "id": "se_005"
+  },
+  {
+    "type": "turning_point",
+    "text": "Significance of the concert hall performances",
+    "snippet": "Dans ce prestigieux écrin se sont notamment produits Olivier Messiaen, Yvonne Loriod et Mstislav Rostropovitch.",
+    "author": "null",
+    "source_url": "https://musees-nationaux-alpesmaritimes.fr/chagall/la-saison-culturelle-un-programme-riche-en-evenements",
+    "story_mode": "found",
+    "id": "se_006"
+  },
+  {
+    "type": "context_work",
+    "text": "Collaboration with Les Ballets de Monte-Carlo",
+    "snippet": "Performances dansées, en partenariat avec Les Ballets de Monte-Carlo",
+    "author": "null",
+    "source_url": "https://musees-nationaux-alpesmaritimes.fr/chagall/la-saison-culturelle-un-programme-riche-en-evenements",
+    "story_mode": "found",
+    "id": "se_007"
+  }
+]
