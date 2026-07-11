@@ -399,14 +399,22 @@ def run_qa(tour_text, tour_file="", story_elements=None):
     
     # Find sentences with dated or causal claims
     _claim_sentences = []
-    for sent in re.split(r'[.!?]\s+', _combined_prolog_epilog):
-        sent = sent.strip()
-        if not sent or len(sent) < 20:
-            continue
-        has_year = _YEAR_PATTERN.search(sent)
-        has_causal = _CAUSAL_VERBS.search(sent)
-        if has_year or has_causal:
-            _claim_sentences.append(sent)
+    # B1 FIX: Also split on paragraph breaks — \n\n separates distinct thoughts
+    for _paragraph in re.split(r'\n\n+', _combined_prolog_epilog):
+        for sent in re.split(r'[.!?]\s+', _paragraph):
+            sent = sent.strip()
+            if not sent or len(sent) < 20:
+                continue
+            # B1 FIX: Skip recap/enumeration sentences — they list stop names, not factual claims
+            if re.search(r"You.ve experienced", sent, re.I):
+                continue
+            # Skip sentences that are mostly a comma-separated list (5+ commas = enumeration)
+            if sent.count(',') >= 5 and len(sent) > 200:
+                continue
+            has_year = _YEAR_PATTERN.search(sent)
+            has_causal = _CAUSAL_VERBS.search(sent)
+            if has_year or has_causal:
+                _claim_sentences.append(sent)
     
     # --- Load story elements (FIX #3: in-memory param OR file with exact stem match) ---
     _story_elements_list = None  # List of element dicts
@@ -492,7 +500,21 @@ def run_qa(tour_text, tour_file="", story_elements=None):
                                   'vence', 'nice', 'france', 'paris', 'chagall', 'matisse',
                                   # Abstract nouns that capitalize in titles
                                   'message', 'museum', 'chapel', 'gallery', 'collection',
-                                  'biblical', 'testament', 'exodus', 'genesis'}
+                                  'biblical', 'testament', 'exodus', 'genesis',
+                                  # B1 FIX: Historical periods — NOT fabrication carriers
+                                  'renaissance', 'baroque', 'impressionist', 'impressionism',
+                                  'expressionist', 'expressionism', 'cubist', 'cubism',
+                                  'fauvist', 'fauvism', 'modernist', 'modernism',
+                                  'neoclassical', 'rococo', 'mannerist', 'mannerism',
+                                  'surrealist', 'surrealism', 'realist', 'realism',
+                                  'romantic', 'romanticism', 'romanesque', 'gothic',
+                                  'post-impressionist', 'post-impressionism',
+                                  'classical', 'medieval', 'byzantine', 'hellenistic',
+                                  # B1 FIX: Exhibition/venue terms from Wikipedia corpus
+                                  'palais', 'salon', 'exposition', 'biennale', 'grand',
+                                  'retrospective', 'atelier', 'académie', 'academie',
+                                  'uffizi', 'florence', 'florentine', 'tuscan', 'tuscany',
+                                  'medici', 'vasari'}
                 
                 # Extract proper nouns: capitalized words NOT at sentence start, ≥3 chars
                 _sentences_in_claim = re.split(r'[.!?]\s+', claim)
