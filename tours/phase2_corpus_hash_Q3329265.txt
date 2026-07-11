@@ -1,0 +1,27 @@
+venue_corpus cache determinism evidence — Q3329265 (Musée national Marc Chagall)
+Generated: 2026-07-11
+
+Cache MISS generation: phase2_chagall_cache_miss.txt (20260711_160812)
+Cache HIT generation: phase2_chagall_cache_hit.txt (20260711_160958)
+
+Corpus hash (md5 of canonical_titles_json): c76c8790f4d880847d3287d862861b86
+Tier: medium (5 verified works)
+Canonical titles in cache (14 total, 5 verified after D1v2 matching):
+  - Le Roi David
+  - La Création de l'homme
+  - Résurrection
+  - Le Cirque bleu
+  - L'Exode
+  - Les Arlequins
+  - Abraham et les trois anges
+  - Le Cantique des Cantiques II
+  - King David
+  - La Bible : Abraham et Isaac en route vers le lieu du sacrifice
+  - Resurrection
+  - L'Arche de Noé
+  - Les amoureux en vert
+  - Le prophète Jérémie
+
+Both tours delivered (status: completed) from identical corpus.
+GPT output varies (non-deterministic) but the INPUTS to verification are byte-identical.
+R4 SKIPPED on both (medium tier caps total_stops to verified count).
