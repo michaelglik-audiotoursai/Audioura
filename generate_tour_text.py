@@ -924,19 +924,25 @@ def _verify_works_v2(poi_list, venue_name):
         )
 
     # --- Tier computation (fail-closed: only positive evidence promotes) ---
+    # Tier based on EVIDENCE STRENGTH (canonical set + SPARQL), not verified_pois count
+    # (verified_pois is bounded by total_stops which is a request param, not evidence)
     _has_site_corpus = len(corpus_result.get('combined_text', '')) > 1000
     _has_wiki = bool(corpus_result.get('pages'))
     _sparql_n = len(sparql_works) if 'sparql_works' in dir() else 0
     _n_verified = len(verified_pois)
+    _n_canonical = len(canonical_titles) if 'canonical_titles' in dir() else 0
     
-    if _n_verified >= 8:
-        _tier = 'rich'
-    elif _n_verified >= 3:
-        _tier = 'medium'
-    elif _n_verified >= 1:
-        _tier = 'thin'
-    else:
+    # Evidence strength = max(SPARQL works, canonical set size)
+    _evidence_strength = max(_sparql_n, _n_canonical)
+    
+    if _n_verified == 0:
         _tier = 'unresolvable'
+    elif _evidence_strength >= 8:
+        _tier = 'rich'
+    elif _evidence_strength >= 3:
+        _tier = 'medium'
+    else:
+        _tier = 'thin'
     
     print(f"  [D1v2] {_n_verified}/{len(poi_list)} works verified — tier: {_tier}")
     

@@ -28,6 +28,7 @@ CORS(app)
 TOURS_DIR = "/app/tours"
 ACTIVE_JOBS = get_job_store('tour-generator')
 
+# TODO(S94): remove in-code password fallback; prod must use DATABASE_URL/DB_PASSWORD env only
 def _persist_icon_metrics(icon_result, job_id):
     """Persist I-CON results to stop_metrics table (non-blocking)."""
     import json as _json
@@ -38,7 +39,7 @@ def _persist_icon_metrics(icon_result, job_id):
             port=os.environ.get("DB_PORT", "5432"),
             dbname=os.environ.get("DB_NAME", "audiotours"),
             user=os.environ.get("DB_USER", "admin"),
-            password=os.environ.get("DB_PASSWORD", "password123  # TODO(S94): remove in-code fallback; prod must use DATABASE_URL/DB_PASSWORD env only"),
+            password=os.environ.get("DB_PASSWORD", "password123"),
         )
         cur = conn.cursor()
         
