@@ -829,6 +829,9 @@ def _verify_works_v2(poi_list, venue_name):
                     if _norm_ct != _norm_st and _norm_ct in _norm_st:
                         _best_title = st  # Use the longer SPARQL form
                         break
+            # Ensure title starts with uppercase (Wikidata sometimes stores lowercase)
+            if _best_title and _best_title[0].islower():
+                _best_title = _best_title[0].upper() + _best_title[1:]
             poi['name'] = _best_title
             verified_pois.append(poi)
             continue

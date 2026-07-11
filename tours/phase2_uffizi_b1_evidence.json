@@ -1,0 +1,108 @@
+{
+  "The Birth of Venus": {
+    "status": "VERIFIED",
+    "canonical_title": "Nascita di Venere",
+    "snippet": "",
+    "method": "canonical_title_match",
+    "qid": "Q151047"
+  },
+  "Primavera": {
+    "status": "VERIFIED",
+    "canonical_title": "La primavera di Botticelli",
+    "snippet": "",
+    "method": "canonical_title_match",
+    "qid": "Q549847"
+  },
+  "Annunciation": {
+    "status": "VERIFIED",
+    "canonical_title": "Annunciation of Leonardo",
+    "snippet": "",
+    "method": "canonical_title_match",
+    "qid": "Q3618186"
+  },
+  "Bacchus": {
+    "status": "DROPPED",
+    "reason": "no canonical match"
+  },
+  "Madonna of the Goldfinch": {
+    "status": "VERIFIED",
+    "canonical_title": "Madonna del Cardellino (Madonna of the Goldfinch)",
+    "snippet": "",
+    "method": "canonical_title_match",
+    "qid": "Q2344505"
+  },
+  "Medusa": {
+    "status": "VERIFIED",
+    "canonical_title": "Medusa",
+    "snippet": "",
+    "method": "canonical_title_match",
+    "qid": "Q2293905"
+  },
+  "Doni Tondo": {
+    "status": "VERIFIED",
+    "canonical_title": "Doni Tondo",
+    "snippet": "",
+    "method": "canonical_title_match",
+    "qid": "Q1473546"
+  },
+  "Venus of Urbino": {
+    "status": "VERIFIED",
+    "canonical_title": "Venus of Urbino",
+    "snippet": "",
+    "method": "canonical_title_match",
+    "qid": "Q727875"
+  },
+  "Judith Slaying Holofernes": {
+    "status": "DROPPED",
+    "reason": "no canonical match"
+  },
+  "Duke and Duchess of Urbino": {
+    "status": "VERIFIED",
+    "canonical_title": "duchessa di Urbino",
+    "snippet": "",
+    "method": "canonical_title_match",
+    "qid": "Q2627028"
+  },
+  "Tronie of a Young Man with Gorget and Beret": {
+    "status": "VERIFIED",
+    "canonical_title": "Tronie of a Young Man with Gorget and Beret",
+    "snippet": "",
+    "method": "R4_replenishment"
+  },
+  "Birth of Venus": {
+    "status": "VERIFIED",
+    "canonical_title": "Nascita di Venere",
+    "snippet": "",
+    "method": "R4_replenishment"
+  },
+  "Adoration of Camaldoli": {
+    "status": "VERIFIED",
+    "canonical_title": "Adoration of Camaldoli",
+    "snippet": "",
+    "method": "R4_replenishment"
+  },
+  "Adoration of the Child with SS. Joseph, Jerome, Hilarion, Magdalena and angels": {
+    "status": "VERIFIED",
+    "canonical_title": "Adoration of the Child with SS. Joseph, Jerome, Hilarion, Magdalena and angels",
+    "snippet": "",
+    "method": "R4_replenishment"
+  },
+  "Adoration of the Christ Child": {
+    "status": "VERIFIED",
+    "canonical_title": "Adoration of the Christ Child",
+    "snippet": "",
+    "method": "R4_replenishment"
+  },
+  "Adoration of the Magi (Dürer)": {
+    "status": "VERIFIED",
+    "canonical_title": "Adoration of the Magi (Dürer)",
+    "snippet": "",
+    "method": "R4_replenishment"
+  },
+  "Adoration of the Shepherds": {
+    "status": "VERIFIED",
+    "canonical_title": "Adoration of the Shepherds",
+    "snippet": "",
+    "method": "R4_replenishment"
+  }
+}

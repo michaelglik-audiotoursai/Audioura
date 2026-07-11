@@ -326,15 +326,18 @@ def run_qa(tour_text, tour_file="", story_elements=None):
             )
             _named_refs = _NAMED_VENUE_PATTERN.findall(_content_only)
             for ref in _named_refs:
-                # If the named venue is NOT the target venue, potentially flag it
-                if _tour_venue and _tour_venue.lower()[:20] not in ref.lower() and ref.lower()[:20] not in _tour_venue.lower():
-                    # [GAP 3] Exemption: if tour is address-contained AND ref matches a stop title
-                    if _is_contained:
-                        _ref_lower = ref.strip().lower()
-                        _is_stop_title = any(_ref_lower in t or t in _ref_lower for t in _stop_titles)
-                        if _is_stop_title:
-                            continue  # Exempt — it's the tour's own stop name
-                    _other_venue_flags.append(f"Stop {i+1}: '{ref.strip()[:60]}'")
+                # If the named venue IS the target venue, skip it
+                # B1 FIX: Compare core venue name (first 2 words) not the full greedy match
+                _ref_core = ' '.join(ref.split()[:2]).lower()
+                if _tour_venue and (_tour_venue.lower()[:20] in ref.lower() or ref.lower()[:20] in _tour_venue.lower() or _ref_core in _tour_venue.lower()):
+                    continue  # It's the tour's own venue — not a foreign reference
+                # [GAP 3] Exemption: if tour is address-contained AND ref matches a stop title
+                if _is_contained:
+                    _ref_lower = ref.strip().lower()
+                    _is_stop_title = any(_ref_lower in t or t in _ref_lower for t in _stop_titles)
+                    if _is_stop_title:
+                        continue  # Exempt — it's the tour's own stop name
+                _other_venue_flags.append(f"Stop {i+1}: '{ref.strip()[:60]}'")
         _passed_9 = len(_other_venue_flags) <= 2
         check("Single-venue consistency (no other NAMED venues)",
               _passed_9,
