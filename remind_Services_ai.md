@@ -14,8 +14,8 @@
 - **ALWAYS** prefix every reply with "🔧 SERVICES KIRO -"
 - **GIT BRANCH**: `storied` (off `main` = `beta-2.1.1+18`). **Never touch `main`.**
 - **VERSION**: `2.2.0+1` (distinct from Beta's 2.1.x)
-- **LAST GIT STATE**: `6ea11dd` — B1 G4 matcher fix committed + Matisse rich artifact.
-- **NEXT ACTION ON RECOVERY**: Read this file top to bottom. Post self-assessment for B1+B3. Container should be running — if not: `docker-compose -f docker-compose-master.yml build tour-generator && docker-compose -f docker-compose-master.yml up -d tour-generator`.
+- **LAST GIT STATE**: `1ea1124` — B1 complete: venue-self-reference fix + SPARQL title capitalization + Uffizi QA-passing artifact.
+- **NEXT ACTION ON RECOVERY**: Read this file top to bottom. Await LEAD response on cycle 3 assessment. Container should be running — if not: `docker-compose -f docker-compose-master.yml build tour-generator && docker-compose -f docker-compose-master.yml up -d tour-generator`.
 - **WORKFLOW**: Blanket approval for all service changes. One task = one commit = one review.
 - **NEVER perform string surgery on assembled text** — corrections on STRUCTURED DATA only.
 - **NEVER fabricate examples** — use verbatim from actual files.
@@ -52,7 +52,8 @@ CIL cycle 3 of 5, 2 remain before escalation to Michael.
 - **Recommendation to LEAD**: Medium tier is architecturally sound but operationally rare for resolvable venues. This is BY DESIGN — venues with enough Wikidata presence to resolve also have rich SPARQL data. The tier ladder protects against the opposite case (famous name but sparse data).
 
 ### REMAINING:
-- Post self-assessment comment on ClickUp with B1+B3 honest findings
+- Await LEAD response on B3 disposition + cycle 3 overall assessment
+- **Report inflation rule added**: NEVER claim PASS without showing QA exit code verbatim
 
 ### ACCEPTED BY LEAD (no further work needed):
 - B2: Legacy fail-open branch deleted ✓
@@ -137,6 +138,7 @@ else: 'thin'
 8. **TODO comments go on separate lines** — NEVER inside string literals
 9. **Tier computation uses evidence_strength** — NOT verified_pois count (bounded by total_stops)
 10. **Artifacts ARE committed** — "status: completed" is a container claim, not evidence
+11. **NEVER claim PASS without QA exit 0** — report inflation is a critical violation; show verbatim exit codes
 
 ---
 
@@ -151,18 +153,12 @@ development-tour-orchestrator-1:5002  # tour_orchestrator_service.py
 
 ## 📊 GIT LOG (recent, on `storied` branch)
 ```
+1ea1124 B1 complete: fix venue-self-reference + SPARQL title capitalization + Uffizi QA-passing artifact
+ad62ab9 Update remind: B1 fixed, B3 investigated, self-assessment posted
 6ea11dd B1: fix G4 matcher false positives (historical periods + venue terms + paragraph-split + recap exclusion)
 45c51b3 Update remind_Services_ai.md for session handoff (Phase 2 CIL cycle 3)
 d0f2def Phase 2 artifact: Chagall rich-tier tour (B5 fixed, evidence_strength=14)
 6003af5 B4+B5: fix TODO-in-string + fix tier computation (evidence strength, not verified count)
 663e469 BLOCKING 1+3: Phase 2 acceptance artifacts (medium-tier + cache corpus pair)
 0a11d91 BLOCKING 2: delete legacy fail-open branch + TODO for S94 password
-d8cb3c9 Fix I-CON stop_metrics DB auth (admin:admin -> admin:password123)
-bcc59db Fix Postgres auth for venue cache + auto-create table + fix cache-hit UnboundLocalError
-75a4614 Phase 2 artifact: Fruitlands structured clean-fail JSON
-62bb114 Phase 2: structured clean-fail JSON + fix DB connection + all unresolvable paths
-9048680 Phase 2: venue_corpus cache layer (migration + read/write + docker-compose TTL)
-1e62601 Phase 2: VerificationResult dataclass + tier computation + R4 tier gating
-55f07e0 T6: exclude Sources lines and URL-shaped tokens from splice check
-b31a6fa Revert post-assembly surgery + normalized-title dedup + fix word-limit thresholds
 ```
