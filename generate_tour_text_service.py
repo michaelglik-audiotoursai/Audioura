@@ -165,7 +165,23 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                 content_qa_runner.FAIL_COUNT = 0
                 content_qa_runner.FACTUAL_FAIL_COUNT = 0
                 try:
-                    content_qa_runner.run_qa(tour_text, story_elements=_serving_story_elements)
+                    # B7: Build venue_context from location for G4 proper-noun exclusion
+                    _venue_ctx = None
+                    try:
+                        _loc_parts = location.split(',')
+                        _venue_name_raw = _loc_parts[0].strip() if _loc_parts else location
+                        _city_raw = _loc_parts[1].strip() if len(_loc_parts) > 1 else ''
+                        _region_raw = _loc_parts[2].strip() if len(_loc_parts) > 2 else ''
+                        _venue_tokens = set(w.lower() for w in re.split(r'[\s\-]+', _venue_name_raw) if len(w) >= 3)
+                        _venue_ctx = {
+                            'venue_tokens': _venue_tokens,
+                            'city': _city_raw,
+                            'region': _region_raw,
+                            'artist': '',  # Will be populated if venue_resolver provides it
+                        }
+                    except Exception:
+                        pass
+                    content_qa_runner.run_qa(tour_text, story_elements=_serving_story_elements, venue_context=_venue_ctx)
                 except SystemExit:
                     pass  # run_qa calls sys.exit() — catch it
                 except Exception as _qa_err:

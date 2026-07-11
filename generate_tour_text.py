@@ -927,16 +927,15 @@ def _verify_works_v2(poi_list, venue_name):
         )
 
     # --- Tier computation (fail-closed: only positive evidence promotes) ---
-    # Tier based on EVIDENCE STRENGTH (canonical set + SPARQL), not verified_pois count
-    # (verified_pois is bounded by total_stops which is a request param, not evidence)
+    # B8: evidence_strength = unique QID count from SPARQL works (not label count)
+    # This prevents bilingual label inflation (e.g., Roi David + King David = 1 QID, not 2)
     _has_site_corpus = len(corpus_result.get('combined_text', '')) > 1000
     _has_wiki = bool(corpus_result.get('pages'))
-    _sparql_n = len(sparql_works) if 'sparql_works' in dir() else 0
     _n_verified = len(verified_pois)
-    _n_canonical = len(canonical_titles) if 'canonical_titles' in dir() else 0
     
-    # Evidence strength = max(SPARQL works, canonical set size)
-    _evidence_strength = max(_sparql_n, _n_canonical)
+    # Count unique QIDs from SPARQL works (the definitive evidence measure)
+    _unique_sparql_qids = set(w.get('qid', '') for w in sparql_works if w.get('qid')) if 'sparql_works' in dir() and sparql_works else set()
+    _evidence_strength = len(_unique_sparql_qids)
     
     if _n_verified == 0:
         _tier = 'unresolvable'
@@ -973,7 +972,7 @@ def _verify_works_v2(poi_list, venue_name):
         combined_text=combined_text,
         corpus_result=corpus_result,
         tier=_tier,
-        sparql_count=_sparql_n,
+        sparql_count=_evidence_strength,
         site_reachable=_has_site_corpus,
         wiki_available=_has_wiki,
         entity_resolved=bool(_venue_entity and _venue_entity.qid) if '_venue_entity' in dir() else False,

@@ -33,13 +33,16 @@ def check(name, condition, detail=""):
         FAIL_COUNT += 1
 
 
-def run_qa(tour_text, tour_file="", story_elements=None):
+def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
     """Run QA checks on tour text.
     
     Args:
         tour_text: The tour text to check
         tour_file: Path to the tour file (for CLI mode)
         story_elements: List of story element dicts (for serving mode — in-memory, no file glob)
+        venue_context: Dict with venue-derived terms for G4 proper-noun exclusion (B7).
+                       Keys: 'venue_tokens' (set of lowercase words from venue name),
+                             'city' (str), 'region' (str), 'artist' (str)
     """
     global PASS_COUNT, FAIL_COUNT
     # Store elements for G4 check access
@@ -492,19 +495,17 @@ def run_qa(tour_text, tour_file="", story_elements=None):
                     _ungrounded_claims.append(claim[:80])
                     continue
                 
-                # FIX #2: Proper nouns are fabrication carriers
-                # Only person/place names that could introduce fabrications — not sentence-start caps
+                # B7: Proper nouns — closed-class art periods + runtime venue-derived terms
                 _COMMON_PROPER = {'this', 'after', 'before', 'during', 'through', 'from', 'with',
                                   'when', 'where', 'which', 'whose', 'what', 'that', 'each',
                                   'both', 'some', 'many', 'most', 'also', 'just', 'here',
                                   'originally', 'eventually', 'finally', 'initially', 'today',
                                   'french', 'italian', 'jewish', 'biblical', 'christian', 'roman',
                                   'greek', 'ancient', 'modern', 'national', 'original',
-                                  'vence', 'nice', 'france', 'paris', 'chagall', 'matisse',
                                   # Abstract nouns that capitalize in titles
                                   'message', 'museum', 'chapel', 'gallery', 'collection',
                                   'biblical', 'testament', 'exodus', 'genesis',
-                                  # B1 FIX: Historical periods — NOT fabrication carriers
+                                  # Historical periods — closed class, NOT fabrication carriers
                                   'renaissance', 'baroque', 'impressionist', 'impressionism',
                                   'expressionist', 'expressionism', 'cubist', 'cubism',
                                   'fauvist', 'fauvism', 'modernist', 'modernism',
@@ -513,11 +514,28 @@ def run_qa(tour_text, tour_file="", story_elements=None):
                                   'romantic', 'romanticism', 'romanesque', 'gothic',
                                   'post-impressionist', 'post-impressionism',
                                   'classical', 'medieval', 'byzantine', 'hellenistic',
-                                  # B1 FIX: Exhibition/venue terms from Wikipedia corpus
-                                  'palais', 'salon', 'exposition', 'biennale', 'grand',
-                                  'retrospective', 'atelier', 'académie', 'academie',
-                                  'uffizi', 'florence', 'florentine', 'tuscan', 'tuscany',
-                                  'medici', 'vasari'}
+                                  # Exhibition terms — closed class
+                                  'palais', 'salon', 'exposition', 'biennale',
+                                  'retrospective', 'atelier'}
+                
+                # B7: Inject venue-derived terms at runtime (discovered, not hardcoded)
+                _venue_ctx = venue_context if venue_context else {}
+                if _venue_ctx:
+                    for token in _venue_ctx.get('venue_tokens', set()):
+                        if len(token) >= 3:
+                            _COMMON_PROPER.add(token.lower())
+                    if _venue_ctx.get('city'):
+                        for w in _venue_ctx['city'].lower().split():
+                            if len(w) >= 3:
+                                _COMMON_PROPER.add(w)
+                    if _venue_ctx.get('region'):
+                        for w in _venue_ctx['region'].lower().split():
+                            if len(w) >= 3:
+                                _COMMON_PROPER.add(w)
+                    if _venue_ctx.get('artist'):
+                        for w in _venue_ctx['artist'].lower().split():
+                            if len(w) >= 3:
+                                _COMMON_PROPER.add(w)
                 
                 # Extract proper nouns: capitalized words NOT at sentence start, ≥3 chars
                 _sentences_in_claim = re.split(r'[.!?]\s+', claim)
