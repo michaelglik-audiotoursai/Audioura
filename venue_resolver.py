@@ -782,7 +782,7 @@ def _get_db_connection():
         import psycopg2
         # Use VENUE_CACHE_DB_URL first, fall back to DATABASE_URL, then container default
         db_url = os.environ.get('VENUE_CACHE_DB_URL',
-                 os.environ.get('DATABASE_URL', 'postgresql://admin:password123@postgres-2:5432/audiotours'))
+                 os.environ.get('DATABASE_URL', 'postgresql://admin:password123  # TODO(S94): remove in-code fallback; prod must use DATABASE_URL/DB_PASSWORD env only@postgres-2:5432/audiotours'))
         # Fix localhost references for container-to-container communication
         if '@localhost:' in db_url:
             db_url = db_url.replace('@localhost:', '@postgres-2:')

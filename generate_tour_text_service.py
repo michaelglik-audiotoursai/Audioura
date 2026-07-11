@@ -38,7 +38,7 @@ def _persist_icon_metrics(icon_result, job_id):
             port=os.environ.get("DB_PORT", "5432"),
             dbname=os.environ.get("DB_NAME", "audiotours"),
             user=os.environ.get("DB_USER", "admin"),
-            password=os.environ.get("DB_PASSWORD", "password123"),
+            password=os.environ.get("DB_PASSWORD", "password123  # TODO(S94): remove in-code fallback; prod must use DATABASE_URL/DB_PASSWORD env only"),
         )
         cur = conn.cursor()
         

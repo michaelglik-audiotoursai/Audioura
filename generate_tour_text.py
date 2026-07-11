@@ -1853,13 +1853,19 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 _d1_venue_corpus = _d1v2_result.combined_text
                 _story_corpus_result = _d1v2_result.corpus_result
                 print(f"  [D1] Tier: {_verification_tier} ({len(poi_list)} verified works)")
-            elif _d1v2_result is not None:
-                # Legacy tuple return (backward compat during transition)
-                poi_list, _d1_evidence_log, _d1_venue_corpus, _story_corpus_result = _d1v2_result
-                _verification_tier = 'rich'  # assume rich for legacy
             else:
-                # D1v2 could not verify enough works — fail cleanly (no legacy fallback)
-                print(f"  [D1] D1v2 verification could not verify enough works — clean fail")
+                # _verify_works_v2 returned None or unexpected type — fail-closed (unresolvable)
+                print(f"  [D1] D1v2 returned unexpected result — demoting to unresolvable (fail-closed)")
+                _LAST_CLEAN_FAIL_EVIDENCE.clear()
+                _LAST_CLEAN_FAIL_EVIDENCE.update({
+                    "error_type": "thin_evidence",
+                    "entity_resolved": False,
+                    "qid": "",
+                    "sparql_works": 0,
+                    "site_reachable": False,
+                    "wikipedia_available": False,
+                    "tier": "unresolvable",
+                })
                 return None, None, (None, None)
 
             # -------- [R4] Bounded replenishment loop --------
