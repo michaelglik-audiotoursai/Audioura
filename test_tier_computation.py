@@ -1,6 +1,6 @@
 """test_tier_computation.py — B3 boundary fixtures for the 4-tier degradation ladder.
 
-Tests the tier computation logic from generate_tour_text.py (~line 930).
+Tests the compute_tier() function from generate_tour_text.py (module-level).
 evidence_strength = unique QID count from SPARQL works.
 
 Tier logic:
@@ -9,35 +9,13 @@ Tier logic:
     elif evidence_strength >= 3: -> 'medium'
     else:                        -> 'thin'
 
-This file reimplements the tier computation inline (the original is embedded
-deep inside a large function) so it can run standalone without imports.
+Imports the PRODUCTION compute_tier — if the implementation drifts, this test catches it.
 """
 
 import sys
 
-
-# ---------------------------------------------------------------------------
-# Inline reimplementation of tier computation (generate_tour_text.py ~line 930)
-# ---------------------------------------------------------------------------
-
-def compute_tier(n_verified: int, evidence_strength: int) -> str:
-    """Return the degradation tier given verification count and evidence strength.
-
-    Parameters
-    ----------
-    n_verified : int
-        Number of verified entries (0 means entity could not be resolved).
-    evidence_strength : int
-        Number of unique QIDs returned from SPARQL works query.
-    """
-    if n_verified == 0:
-        return "unresolvable"
-    elif evidence_strength >= 8:
-        return "rich"
-    elif evidence_strength >= 3:
-        return "medium"
-    else:
-        return "thin"
+# Import from production code (module-level function)
+from generate_tour_text import compute_tier
 
 
 # ---------------------------------------------------------------------------
@@ -88,7 +66,7 @@ def run_tests() -> bool:
 
 if __name__ == "__main__":
     print("=" * 70)
-    print("B3 Tier Computation — Boundary Fixtures")
+    print("B3 Tier Computation — Boundary Fixtures (imports production code)")
     print("=" * 70)
     print()
 

@@ -58,6 +58,31 @@ _MULTI_BUILDING_INSTITUTION_RE = re.compile(
     re.IGNORECASE,
 )
 
+def compute_tier(n_verified: int, evidence_strength: int) -> str:
+    """Return the degradation tier given verification count and evidence strength.
+
+    Parameters
+    ----------
+    n_verified : int
+        Number of verified entries (0 means entity could not be resolved).
+    evidence_strength : int
+        Number of unique QIDs returned from SPARQL works query.
+
+    Returns
+    -------
+    str
+        One of 'unresolvable', 'rich', 'medium', 'thin'.
+    """
+    if n_verified == 0:
+        return "unresolvable"
+    elif evidence_strength >= 8:
+        return "rich"
+    elif evidence_strength >= 3:
+        return "medium"
+    else:
+        return "thin"
+
+
 def _haversine_km(a, b):
     """Straight-line distance in km between two (lat, lng) tuples."""
     lat1, lon1 = a; lat2, lon2 = b
@@ -937,14 +962,7 @@ def _verify_works_v2(poi_list, venue_name):
     _unique_sparql_qids = set(w.get('qid', '') for w in sparql_works if w.get('qid')) if 'sparql_works' in dir() and sparql_works else set()
     _evidence_strength = len(_unique_sparql_qids)
     
-    if _n_verified == 0:
-        _tier = 'unresolvable'
-    elif _evidence_strength >= 8:
-        _tier = 'rich'
-    elif _evidence_strength >= 3:
-        _tier = 'medium'
-    else:
-        _tier = 'thin'
+    _tier = compute_tier(_n_verified, _evidence_strength)
     
     print(f"  [D1v2] {_n_verified}/{len(poi_list)} works verified — tier: {_tier}")
     
