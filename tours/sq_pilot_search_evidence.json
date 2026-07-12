@@ -1,0 +1,65 @@
+{
+  "pilot_date": "2026-07-12",
+  "pilot_environment": "development-tour-generator-1 (in-container, SERP_API_KEY live)",
+  "note": "P856 WDQS checks timeout (8s) for unknown domains → tier3 (expected, per R1). Facebook misclassified as tier1 — social media not in reject list, needs addition in next iteration.",
+  "chagall": {
+    "stop": {"canonical_title": "Le Cantique des Cantiques IV", "artist": "Marc Chagall", "venue_city": "Nice"},
+    "search": {
+      "total_queries": 3,
+      "estimated_cost": 0.003,
+      "story_mining_status": "ok",
+      "query_log": [
+        {"query": "\"Le Cantique des Cantiques IV\" Marc Chagall story behind", "result_count": 8, "latency_ms": 937},
+        {"query": "\"Le Cantique des Cantiques IV\" Marc Chagall history making", "result_count": 8, "latency_ms": 1090},
+        {"query": "\"Le Cantique des Cantiques IV\" Marc Chagall controversy", "result_count": 8, "latency_ms": 786}
+      ],
+      "results_summary": {
+        "total_non_reject": 16,
+        "tier1_count": 3,
+        "tier2_count": 0,
+        "tier3_count": 13,
+        "domains_found": ["facebook.com", "musees-nationaux-alpesmaritimes.fr", "wikiart.org", "boutiquesdemusees.fr", "cbc.ca", "theses.fr", "m.blog.naver.com"]
+      },
+      "extraction_result": {
+        "pages_fetched": 6,
+        "pages_anchored": 0,
+        "extraction_status": "no_elements",
+        "note": "facebook.com pages not genuine T1 (social media — needs reject addition). Real museum domain musees-nationaux-alpesmaritimes.fr classified T3 due to WDQS timeout. This stop needs query refinement or broader title matching."
+      }
+    }
+  },
+  "matisse": {
+    "stop": {"canonical_title": "Blue Nude II", "artist": "Henri Matisse", "venue_city": "Nice"},
+    "search": {
+      "total_queries": 3,
+      "estimated_cost": 0.003,
+      "story_mining_status": "ok",
+      "query_log": [
+        {"query": "\"Blue Nude II\" Henri Matisse story behind", "result_count": 8, "latency_ms": 1071},
+        {"query": "\"Blue Nude II\" Henri Matisse history making", "result_count": 8, "latency_ms": 1110},
+        {"query": "\"Blue Nude II\" Henri Matisse controversy", "result_count": 8, "latency_ms": 1148}
+      ],
+      "results_summary": {
+        "total_non_reject": 22,
+        "tier1_count": 1,
+        "tier2_count": 1,
+        "tier3_count": 20,
+        "key_results": [
+          {"tier": "tier1", "domain": "en.wikipedia.org", "title": "Blue Nudes - Wikipedia"},
+          {"tier": "tier2", "domain": "moma.org", "title": "Henri Matisse. Blue Nude II. 1952 - MoMA"}
+        ],
+        "domains_found": ["centrepompidou.fr", "artlithographies.net", "en.wikipedia.org", "moma.org", "singulart.com", "theskateroom.com", "youtube.com", "wikiart.org", "movementislife.blog"]
+      },
+      "extraction_note": "Wikipedia (T1) + MoMA (T2) = 2 independent T1/T2 sources for this work. Extraction timed out in container shell (120s limit) but pipeline reached fetch+anchor stage. centrepompidou.fr would classify T1 with functioning WDQS but timed out → T3."
+    }
+  },
+  "serper_credits_note": "Credits remaining after pilot: visible in container output as '1' per response header. 6 total queries consumed.",
+  "findings": [
+    "SQ2 pipeline operational: queries synthesized, SERP executed, domains classified",
+    "Matisse found genuine T1+T2 sources (Wikipedia + MoMA) — meets SQ acceptance requirement",
+    "Chagall title too specific for French museum — broader search or LLM refinement round needed",
+    "facebook.com needs addition to reject_photo_hosts/social media reject list",
+    "WDQS P856 timeouts are frequent (8s limit tight) — domain_tier_cache will amortize over time",
+    "Cost: $0.003/stop (3 queries) — well within plus tier $1 budget for 10 stops"
+  ]
+}
