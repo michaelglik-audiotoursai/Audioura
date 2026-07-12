@@ -10,52 +10,13 @@ ensures these pass. These fixtures guarantee the fix survives future refactors.
 Run from development/:  python test_g4_false_positives.py
 """
 
-import re
 import sys
+import os
 
+# Ensure the development directory is importable
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# ---------------------------------------------------------------------------
-# Minimal G4 proper-noun extraction logic (mirrors content_qa_runner.py)
-# ---------------------------------------------------------------------------
-
-# Art-period closed class (B7: these are NOT fabrication carriers)
-_COMMON_PROPER = {
-    'this', 'after', 'before', 'during', 'through', 'from', 'with',
-    'when', 'where', 'which', 'whose', 'what', 'that', 'each',
-    'both', 'some', 'many', 'most', 'also', 'just', 'here',
-    'message', 'museum', 'chapel', 'gallery', 'collection',
-    'biblical', 'testament', 'exodus', 'genesis',
-    # B1 FIX: Historical periods — NOT fabrication carriers
-    'renaissance', 'baroque', 'impressionist', 'impressionism',
-    'expressionist', 'expressionism', 'cubist', 'cubism',
-    'fauvist', 'fauvism', 'modernist', 'modernism',
-    'neoclassical', 'rococo', 'mannerist', 'mannerism',
-    'surrealist', 'surrealism', 'realist', 'realism',
-    'romantic', 'romanticism', 'romanesque', 'gothic',
-    'post-impressionist', 'post-impressionism',
-    'classical', 'medieval', 'byzantine', 'hellenistic',
-    # B1 FIX: Exhibition/venue terms from Wikipedia corpus
-    'palais', 'salon', 'exposition', 'biennale', 'grand',
-    'retrospective', 'atelier',
-}
-
-
-def extract_proper_nouns(sentence: str) -> set:
-    """Extract proper nouns from a sentence using the G4 logic.
-    
-    Returns the set of proper nouns that would be checked against story elements.
-    An empty set means the sentence passes G4 (no ungrounded fabrication risk).
-    """
-    proper_nouns = set()
-    words = re.findall(r'\b\w+\b', sentence)
-    for i, w in enumerate(words):
-        if i == 0:
-            continue  # Skip sentence-start capitalization
-        if w and w[0].isupper() and len(w) >= 3:
-            wl = w.lower()
-            if wl not in _COMMON_PROPER:
-                proper_nouns.add(wl)
-    return proper_nouns
+from content_qa_runner import extract_g4_proper_nouns
 
 
 # ---------------------------------------------------------------------------
@@ -82,44 +43,44 @@ FP2_SENTENCE = (
 
 
 # ---------------------------------------------------------------------------
-# Fixtures
+# Fixtures — test with REAL gate semantics via the production function
 # ---------------------------------------------------------------------------
 
 def run_tests() -> bool:
     """Run all false-positive fixtures. Returns True if all pass (no false alarms)."""
     all_passed = True
 
-    fixtures = [
-        (
-            "FP1: 'Grand Palais' partnership (Matisse) — should NOT extract fabrication-risk nouns",
-            FP1_SENTENCE,
-            # After B1 fix: 'grand' and 'palais' are in _COMMON_PROPER;
-            # 'paris' would be excluded by venue_context at runtime.
-            # Only 'paris' might remain — but that's venue-context territory, not the art-period fix.
-            # The fixture verifies 'palais' and 'grand' are NOT extracted.
-            {'palais', 'grand'},  # These must NOT appear in extracted nouns
-        ),
-        (
-            "FP2: 'Renaissance' period (Uffizi) — should NOT extract fabrication-risk nouns",
-            FP2_SENTENCE,
-            # After B1 fix: 'renaissance' is in _COMMON_PROPER.
-            # 'medici', 'florence', 'europe' would be handled by venue_context at runtime.
-            # The fixture verifies 'renaissance' is NOT extracted.
-            {'renaissance'},  # These must NOT appear in extracted nouns
-        ),
-    ]
+    # FP1: Grand Palais with venue_context for Paris/Matisse
+    # A sentence passes G4 when extracted proper nouns are empty OR all present
+    # in the matched story element text. Here we verify 'grand' and 'palais'
+    # are NOT extracted at all (they're in the closed class).
+    fp1_context = {
+        'city': 'Paris',
+        'artist': 'Matisse',
+        'venue_tokens': set(),
+    }
+    fp1_extracted = extract_g4_proper_nouns(FP1_SENTENCE, venue_context=fp1_context)
+    fp1_bad = {'grand', 'palais'} & fp1_extracted
+    fp1_passed = len(fp1_bad) == 0
+    status = "PASS" if fp1_passed else "FAIL"
+    print(f"  [{status}] FP1: 'Grand Palais' partnership (Matisse) — "
+          f"'grand' and 'palais' should NOT be extracted")
+    print(f"         Extracted: {sorted(fp1_extracted) if fp1_extracted else '(none)'}")
+    if not fp1_passed:
+        print(f"         FALSE POSITIVES: {sorted(fp1_bad)}")
+        all_passed = False
 
-    for desc, sentence, must_not_appear in fixtures:
-        extracted = extract_proper_nouns(sentence)
-        # Check that none of the must_not_appear terms are in extracted set
-        false_positives = extracted & must_not_appear
-        passed = len(false_positives) == 0
-        status = "PASS" if passed else "FAIL"
-        print(f"  [{status}] {desc}")
-        print(f"         Extracted: {sorted(extracted) if extracted else '(none)'}")
-        if not passed:
-            print(f"         FALSE POSITIVES: {sorted(false_positives)}")
-            all_passed = False
+    # FP2: Renaissance period — no venue_context needed for this check
+    fp2_extracted = extract_g4_proper_nouns(FP2_SENTENCE)
+    fp2_bad = {'renaissance'} & fp2_extracted
+    fp2_passed = len(fp2_bad) == 0
+    status = "PASS" if fp2_passed else "FAIL"
+    print(f"  [{status}] FP2: 'Renaissance' period (Uffizi) — "
+          f"'renaissance' should NOT be extracted")
+    print(f"         Extracted: {sorted(fp2_extracted) if fp2_extracted else '(none)'}")
+    if not fp2_passed:
+        print(f"         FALSE POSITIVES: {sorted(fp2_bad)}")
+        all_passed = False
 
     return all_passed
 

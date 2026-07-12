@@ -23,6 +23,94 @@ FAIL_COUNT = 0
 FACTUAL_FAIL_COUNT = 0
 
 
+# ---------------------------------------------------------------------------
+# Module-level G4 proper-noun extraction (extracted from run_qa for testability)
+# ---------------------------------------------------------------------------
+
+# B7: Proper nouns — closed-class art periods + runtime venue-derived terms
+_COMMON_PROPER = {
+    'this', 'after', 'before', 'during', 'through', 'from', 'with',
+    'when', 'where', 'which', 'whose', 'what', 'that', 'each',
+    'both', 'some', 'many', 'most', 'also', 'just', 'here',
+    'originally', 'eventually', 'finally', 'initially', 'today',
+    'french', 'italian', 'jewish', 'biblical', 'christian', 'roman',
+    'greek', 'ancient', 'modern', 'national', 'original',
+    # Abstract nouns that capitalize in titles
+    'message', 'museum', 'chapel', 'gallery', 'collection',
+    'biblical', 'testament', 'exodus', 'genesis',
+    # Historical periods — closed class, NOT fabrication carriers
+    'renaissance', 'baroque', 'impressionist', 'impressionism',
+    'expressionist', 'expressionism', 'cubist', 'cubism',
+    'fauvist', 'fauvism', 'modernist', 'modernism',
+    'neoclassical', 'rococo', 'mannerist', 'mannerism',
+    'surrealist', 'surrealism', 'realist', 'realism',
+    'romantic', 'romanticism', 'romanesque', 'gothic',
+    'post-impressionist', 'post-impressionism',
+    'classical', 'medieval', 'byzantine', 'hellenistic',
+    # Exhibition terms — closed class
+    'grand', 'palais', 'salon', 'exposition', 'biennale',
+    'retrospective', 'atelier',
+}
+
+
+def extract_g4_proper_nouns(claim_text: str, venue_context: dict = None,
+                            venue_artist_words: set = None) -> set:
+    """Extract proper nouns from a claim sentence using the G4 gate logic.
+
+    Returns the set of proper nouns (lowercased) that would need grounding
+    against story element text. An empty set means the claim passes G4.
+
+    Parameters
+    ----------
+    claim_text : str
+        The claim sentence(s) to extract proper nouns from.
+    venue_context : dict, optional
+        Runtime venue context with keys like 'city', 'region', 'artist',
+        'venue_tokens'. Used to build exclusion terms.
+    venue_artist_words : set, optional
+        Pre-computed set of venue/artist words extracted from tour file metadata.
+    """
+    if venue_artist_words is None:
+        venue_artist_words = set()
+
+    # Build working copy of closed-class set with venue context injected
+    common_proper = set(_COMMON_PROPER)
+
+    _venue_ctx = venue_context if venue_context else {}
+    if _venue_ctx:
+        for token in _venue_ctx.get('venue_tokens', set()):
+            if len(token) >= 3:
+                common_proper.add(token.lower())
+        if _venue_ctx.get('city'):
+            for w in _venue_ctx['city'].lower().split():
+                if len(w) >= 3:
+                    common_proper.add(w)
+        if _venue_ctx.get('region'):
+            for w in _venue_ctx['region'].lower().split():
+                if len(w) >= 3:
+                    common_proper.add(w)
+        if _venue_ctx.get('artist'):
+            for w in _venue_ctx['artist'].lower().split():
+                if len(w) >= 3:
+                    common_proper.add(w)
+
+    # Extract proper nouns: capitalized words NOT at sentence start, ≥3 chars
+    _sentences_in_claim = re.split(r'[.!?]\s+', claim_text)
+    _claim_proper_nouns = set()
+    for sent in _sentences_in_claim:
+        words = sent.split()
+        for word in words[1:]:  # Skip first word of each sentence
+            _w = word.strip('.,;:!?()[]"')
+            if _w.endswith("'s"):
+                _w = _w[:-2]
+            if _w and _w[0].isupper() and len(_w) >= 3:
+                _wl = _w.lower()
+                if _wl not in venue_artist_words and _wl not in common_proper:
+                    _claim_proper_nouns.add(_wl)
+
+    return _claim_proper_nouns
+
+
 def check(name, condition, detail=""):
     global PASS_COUNT, FAIL_COUNT
     if condition:
@@ -495,60 +583,11 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
                     _ungrounded_claims.append(claim[:80])
                     continue
                 
-                # B7: Proper nouns — closed-class art periods + runtime venue-derived terms
-                _COMMON_PROPER = {'this', 'after', 'before', 'during', 'through', 'from', 'with',
-                                  'when', 'where', 'which', 'whose', 'what', 'that', 'each',
-                                  'both', 'some', 'many', 'most', 'also', 'just', 'here',
-                                  'originally', 'eventually', 'finally', 'initially', 'today',
-                                  'french', 'italian', 'jewish', 'biblical', 'christian', 'roman',
-                                  'greek', 'ancient', 'modern', 'national', 'original',
-                                  # Abstract nouns that capitalize in titles
-                                  'message', 'museum', 'chapel', 'gallery', 'collection',
-                                  'biblical', 'testament', 'exodus', 'genesis',
-                                  # Historical periods — closed class, NOT fabrication carriers
-                                  'renaissance', 'baroque', 'impressionist', 'impressionism',
-                                  'expressionist', 'expressionism', 'cubist', 'cubism',
-                                  'fauvist', 'fauvism', 'modernist', 'modernism',
-                                  'neoclassical', 'rococo', 'mannerist', 'mannerism',
-                                  'surrealist', 'surrealism', 'realist', 'realism',
-                                  'romantic', 'romanticism', 'romanesque', 'gothic',
-                                  'post-impressionist', 'post-impressionism',
-                                  'classical', 'medieval', 'byzantine', 'hellenistic',
-                                  # Exhibition terms — closed class
-                                  'palais', 'salon', 'exposition', 'biennale',
-                                  'retrospective', 'atelier'}
-                
-                # B7: Inject venue-derived terms at runtime (discovered, not hardcoded)
-                _venue_ctx = venue_context if venue_context else {}
-                if _venue_ctx:
-                    for token in _venue_ctx.get('venue_tokens', set()):
-                        if len(token) >= 3:
-                            _COMMON_PROPER.add(token.lower())
-                    if _venue_ctx.get('city'):
-                        for w in _venue_ctx['city'].lower().split():
-                            if len(w) >= 3:
-                                _COMMON_PROPER.add(w)
-                    if _venue_ctx.get('region'):
-                        for w in _venue_ctx['region'].lower().split():
-                            if len(w) >= 3:
-                                _COMMON_PROPER.add(w)
-                    if _venue_ctx.get('artist'):
-                        for w in _venue_ctx['artist'].lower().split():
-                            if len(w) >= 3:
-                                _COMMON_PROPER.add(w)
-                
-                # Extract proper nouns: capitalized words NOT at sentence start, ≥3 chars
-                _sentences_in_claim = re.split(r'[.!?]\s+', claim)
-                _claim_proper_nouns = set()
-                for sent in _sentences_in_claim:
-                    words = sent.split()
-                    for word in words[1:]:  # Skip first word of each sentence
-                        _w = word.strip('.,;:!?()[]"')
-                        if _w.endswith("'s"): _w = _w[:-2]
-                        if _w and _w[0].isupper() and len(_w) >= 3:
-                            _wl = _w.lower()
-                            if _wl not in _venue_artist_words and _wl not in _COMMON_PROPER:
-                                _claim_proper_nouns.add(_wl)
+                # B7: Proper nouns — delegate to module-level extraction function
+                _claim_proper_nouns = extract_g4_proper_nouns(
+                    claim, venue_context=venue_context,
+                    venue_artist_words=_venue_artist_words
+                )
                 
                 if _claim_proper_nouns:
                     _elem_text_lower = _matched_element.get('text', '').lower()
