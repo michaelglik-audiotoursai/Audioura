@@ -22,12 +22,18 @@ def run_tests() -> bool:
         ("flickr.com", "reject", "photo host"),
         ("theonion.com", "reject", "satire domain"),
         ("shop.matisse-prints.com", "reject", "commerce pattern"),
+        ("facebook.com", "reject", "platform/UGC (F2)"),
+        ("youtube.com", "reject", "platform/UGC (F2)"),
+        ("m.facebook.com", "reject", "subdomain of platform (F2)"),
 
         # Tier 1 (institutional)
         ("en.wikipedia.org", "tier1", "encyclopedic"),
         ("britannica.com", "tier1", "encyclopedic"),
         ("harvard.edu", "tier1", ".edu TLD"),
         ("culture.gouv.fr", "tier1", ".gouv.fr TLD"),
+        ("moma.org", "tier1", "institutional domain seed (F1)"),
+        ("tate.org.uk", "tier1", "institutional domain seed (F1)"),
+        ("metmuseum.org", "tier1", "institutional domain seed (F1)"),
 
         # Tier 2 (quality journalism)
         ("nytimes.com", "tier2", "news org"),

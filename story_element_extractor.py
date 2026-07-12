@@ -170,7 +170,10 @@ def score_corroboration(elements: List[Dict], syndication_threshold: float = 0.8
     
     Groups by normalized claim key, detects syndication via character-shingle Jaccard (R3),
     assigns statuses: documented (≥2 independent T1/T2), reported (1 T1/T2),
-    disputed (conflicting), legend (folklore-typed).
+    legend (folklore-typed).
+    
+    Note: 'disputed' status (sources conflict) deferred to SQ4 where semantic 
+    claim comparison is available. Currently not assigned.
     
     R4: deterministic normalization is PRIMARY grouping. LLM merge logged but never splits
     or creates corroboration that normalization didn't seed.

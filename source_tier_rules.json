@@ -10,8 +10,6 @@
     "jstor.org",
     "pubmed.ncbi.nlm.nih.gov",
     "cairn.info",
-    "tate.org.uk",
-    "moma.org",
     "theartnewspaper.com",
     "artnet.com",
     "frieze.com",
@@ -51,6 +49,29 @@
     "theparisreview.org",
     "literaryhub.com",
     "aeon.co"
+  ],
+  "institutional_domain_seed": [
+    "moma.org",
+    "tate.org.uk",
+    "centrepompidou.fr",
+    "musee-matisse.org",
+    "nga.gov",
+    "metmuseum.org",
+    "louvre.fr",
+    "rijksmuseum.nl",
+    "uffizi.it",
+    "nationalgallery.org.uk"
+  ],
+  "reject_platforms": [
+    "facebook.com",
+    "youtube.com",
+    "x.com",
+    "twitter.com",
+    "linkedin.com",
+    "tiktok.com",
+    "medium.com",
+    "reddit.com",
+    "quora.com"
   ],
   "reject_photo_hosts": [
     "flickr.com",

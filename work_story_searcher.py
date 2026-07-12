@@ -12,6 +12,7 @@ RULES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'source_ti
 GENERATION_TIER = os.environ.get('GENERATION_TIER', 'plus')
 SERP_API_KEY = os.environ.get('SERP_API_KEY', '')
 SERP_PROVIDER = os.environ.get('SERP_PROVIDER', 'serper')
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 CORPUS_VERSION = 1
 
 # Load rules
@@ -84,6 +85,14 @@ def classify_domain(domain: str, domain_cache: dict = None) -> str:
     if any(p in domain for p in _commerce_patterns):
         return 'reject'
 
+    # Step 1b: Platform/UGC hosts → reject (F2: before P856)
+    if domain in _RULES.get('reject_platforms', []):
+        return 'reject'
+    # Also check if domain is a subdomain of a platform
+    for platform in _RULES.get('reject_platforms', []):
+        if domain.endswith('.' + platform):
+            return 'reject'
+
     # Step 2: Wikipedia/mirrors → tier1
     if domain in ('en.wikipedia.org', 'wikipedia.org', 'britannica.com'):
         return 'tier1'
@@ -98,6 +107,10 @@ def classify_domain(domain: str, domain_cache: dict = None) -> str:
     if domain.endswith('.edu') or domain.endswith('.gov') or domain.endswith('.museum'):
         return 'tier1'
     if domain.endswith('.gouv.fr') or domain.endswith('.ac.uk'):
+        return 'tier1'
+
+    # Step 4b: Institutional domain seed (cache-equivalent, data not class rule)
+    if domain in _RULES.get('institutional_domain_seed', []):
         return 'tier1'
 
     # Step 5: Wikidata P856 check with class constraint (R1a)
@@ -121,11 +134,15 @@ def _check_wikidata_p856(domain: str) -> str:
 
     # Build SPARQL ASK with P31/P279* class constraint (R1a)
     classes_values = ' '.join(f'wd:{qid}' for qid in institutional_classes)
+    # F2: Compare registrable HOST for equality, not substring
     sparql = f"""ASK {{
         ?entity wdt:P856 ?url .
         ?entity wdt:P31/wdt:P279* ?class .
         VALUES ?class {{ {classes_values} }}
-        FILTER(CONTAINS(LCASE(STR(?url)), "{domain}"))
+        FILTER(LCASE(STR(?url)) = "https://{domain}/" || 
+               LCASE(STR(?url)) = "http://{domain}/" ||
+               CONTAINS(LCASE(STR(?url)), "://{domain}/") ||
+               CONTAINS(LCASE(STR(?url)), "://www.{domain}/"))
     }}"""
 
     try:
@@ -149,11 +166,12 @@ def synthesize_queries(stop: Dict, tour_type: str = 'contained') -> List[str]:
     """Generate deterministic base queries for a stop.
 
     Parameters: stop dict with keys: canonical_title, artist, venue_city, venue_lang
-    Returns: list of query strings (2-3 per stop)
+    Returns: list of query strings (2-4 per stop)
     """
     title = stop.get('canonical_title', '')
     artist = stop.get('artist', '')
     city = stop.get('venue_city', '')
+    lang = stop.get('venue_lang', 'en')
 
     queries = []
     if tour_type == 'contained':
@@ -168,7 +186,55 @@ def synthesize_queries(stop: Dict, tour_type: str = 'contained') -> List[str]:
         queries.append(f'"{title}" {city} who walked here famous visitors')
         queries.append(f'"{title}" {city} controversy')
 
+    # Localization: add query in venue language if not English
+    if lang and lang != 'en':
+        _LANG_STORY_TERMS = {'fr': 'histoire', 'it': 'storia', 'es': 'historia', 'de': 'Geschichte'}
+        story_term = _LANG_STORY_TERMS.get(lang, 'story')
+        queries.append(f'"{title}" {artist} {story_term}')
+
     return queries
+
+
+# --- LLM Refinement Round (SQ-S1, F5) ---
+def _refine_queries_llm(stop: Dict, tier3_leads: List[str], canonical_title: str) -> List[str]:
+    """Bounded LLM refinement: propose 1-2 queries when T1/T2 yield is thin.
+    Hard rule: every refined query MUST contain the exact canonical title."""
+    if not OPENAI_API_KEY or not tier3_leads:
+        return []
+
+    prompt = f"""Given these search snippets about "{canonical_title}":
+{chr(10).join(f'- {s}' for s in tier3_leads[:5])}
+
+Propose 1-2 refined search queries that might find more authoritative sources.
+Each query MUST contain the exact text: "{canonical_title}"
+Return JSON array of query strings only."""
+
+    try:
+        data = json.dumps({
+            "model": "gpt-4o-mini",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.3,
+            "response_format": {"type": "json_object"},
+        }).encode()
+        req = urllib.request.Request(
+            "https://api.openai.com/v1/chat/completions",
+            data=data,
+            headers={"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = json.loads(resp.read().decode())
+            content = body['choices'][0]['message']['content']
+            parsed = json.loads(content)
+            queries = parsed.get('queries', parsed) if isinstance(parsed, dict) else parsed
+            if not isinstance(queries, list):
+                return []
+            # Hard rule: title containment enforced
+            valid = [q for q in queries if canonical_title.lower() in q.lower()]
+            return valid[:2]
+    except Exception as e:
+        print(f"  [SQ-S1] Refinement LLM failed: {e}")
+        return []
 
 
 # --- SERP Execution ---
@@ -203,8 +269,16 @@ def _serp_search(query: str) -> Tuple[List[Dict], float]:
 
 # --- Main search function ---
 def search_stories_for_stop(stop: Dict, tour_type: str = 'contained',
-                            generation_tier: str = None) -> Dict:
+                            generation_tier: str = None,
+                            query_budget: int = None) -> Dict:
     """Run the full SQ-S1 + SQ-S2 pipeline for one stop.
+
+    Parameters:
+      - stop: dict with canonical_title, artist, venue_city, venue_lang
+      - tour_type: 'contained' or 'distributed'
+      - generation_tier: 'free', 'plus', or 'max'
+      - query_budget: optional remaining tour-level budget (F3). If provided,
+        effective cap = min(tier_cap, query_budget).
 
     Returns a dict with:
       - results: list of {url, title, snippet, domain, tier}
@@ -216,8 +290,14 @@ def search_stories_for_stop(stop: Dict, tour_type: str = 'contained',
     tier = generation_tier or GENERATION_TIER
     query_cap = _RULES.get('query_caps', {}).get(tier, 40)
 
+    # F3: If tour-level budget provided, use it as the effective cap
+    if query_budget is not None:
+        effective_cap = min(query_cap, query_budget)
+    else:
+        effective_cap = query_cap
+
     # R6: free tier = ZERO SERP calls (enforced by construction)
-    if tier == 'free' or query_cap == 0:
+    if tier == 'free' or effective_cap <= 0:
         return {
             'results': [],
             'query_log': [],
@@ -235,8 +315,8 @@ def search_stories_for_stop(stop: Dict, tour_type: str = 'contained',
     domain_cache = {}  # Per-tour domain tier cache
 
     for query in queries:
-        if total_queries >= query_cap:
-            print(f"  [SQ-S2] Query cap ({query_cap}) reached — degrading gracefully")
+        if total_queries >= effective_cap:
+            print(f"  [SQ-S2] Query cap ({effective_cap}) reached — degrading gracefully")
             break
 
         results, latency = _serp_search(query)
@@ -258,6 +338,27 @@ def search_stories_for_stop(stop: Dict, tour_type: str = 'contained',
             r['tier'] = tier_class
             if tier_class != 'reject':
                 all_results.append(r)
+
+    # SQ-S1 refinement round (F5): if T1/T2 yield < 2, try refined queries
+    t1_t2_count = sum(1 for r in all_results if r.get('tier') in ('tier1', 'tier2'))
+    if t1_t2_count < 2 and total_queries < effective_cap:
+        tier3_snippets = [r.get('snippet', '') for r in all_results if r.get('tier') == 'tier3'][:5]
+        refined = _refine_queries_llm(stop, tier3_snippets, stop.get('canonical_title', ''))
+        for query in refined:
+            if total_queries >= effective_cap:
+                break
+            results, latency = _serp_search(query)
+            total_queries += 1
+            query_log.append({'query': query, 'result_count': len(results), 'latency_ms': round(latency, 1), 'refinement': True})
+            if not results:
+                serp_failures += 1
+            for r in results:
+                domain = normalize_domain(r['url'])
+                tier_class = classify_domain(domain, domain_cache)
+                r['domain'] = domain
+                r['tier'] = tier_class
+                if tier_class != 'reject':
+                    all_results.append(r)
 
     # Determine mining status (R5)
     if serp_failures == len(queries) and len(queries) > 0:
@@ -281,6 +382,8 @@ def search_stories_for_tour(stops: List[Dict], tour_type: str = 'contained',
                             generation_tier: str = None) -> Dict:
     """Run story search for all stops in a tour. Aggregates query counts + cost.
 
+    F3: Tour-level aggregate query cap — passes remaining budget to each stop call.
+
     Returns:
       - per_stop: list of per-stop results
       - serper_queries_total: int
@@ -294,8 +397,16 @@ def search_stories_for_tour(stops: List[Dict], tour_type: str = 'contained',
     any_degraded = False
     all_cache_only = True
 
+    # F3: Tour-level aggregate query cap
+    remaining_budget = _RULES.get('query_caps', {}).get(tier, 40)
+
     for stop in stops:
-        result = search_stories_for_stop(stop, tour_type, tier)
+        if remaining_budget <= 0:
+            # Budget exhausted — remaining stops get cache_only
+            result = {'results': [], 'query_log': [], 'story_mining_status': 'cache_only', 'total_queries': 0, 'estimated_cost': 0.0}
+        else:
+            result = search_stories_for_stop(stop, tour_type, tier, query_budget=remaining_budget)
+            remaining_budget -= result['total_queries']
         per_stop.append(result)
         total_queries += result['total_queries']
         total_cost += result['estimated_cost']
@@ -317,3 +428,110 @@ def search_stories_for_tour(stops: List[Dict], tour_type: str = 'contained',
         'serper_cost_estimate': round(total_cost, 4),
         'story_mining_status': overall_status,
     }
+
+
+# --- work_stories cache (SQ-S8, F4) ---
+_WORK_STORIES_TABLE_ENSURED = False
+
+
+def _ensure_work_stories_table(conn):
+    global _WORK_STORIES_TABLE_ENSURED
+    if _WORK_STORIES_TABLE_ENSURED:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS work_stories (
+                    id SERIAL PRIMARY KEY,
+                    work_key VARCHAR(512) NOT NULL UNIQUE,
+                    work_qid VARCHAR(20),
+                    title TEXT NOT NULL,
+                    artist TEXT,
+                    core_data JSONB NOT NULL,
+                    elements_json JSONB,
+                    sources_json JSONB,
+                    query_log JSONB,
+                    core_expires_at TIMESTAMP NOT NULL,
+                    elements_expires_at TIMESTAMP NOT NULL,
+                    corpus_version INT NOT NULL DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_work_stories_qid ON work_stories(work_qid) WHERE work_qid IS NOT NULL")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_work_stories_expires ON work_stories(elements_expires_at)")
+            conn.commit()
+        _WORK_STORIES_TABLE_ENSURED = True
+    except Exception as e:
+        print(f"  [work_stories] Table creation failed: {e}")
+        conn.rollback()
+
+
+def work_stories_get(work_key: str) -> Optional[Dict]:
+    """Read cached story elements for a work. Returns None if miss or expired."""
+    conn = None
+    try:
+        conn = _get_db_connection()
+        if not conn:
+            return None
+        _ensure_work_stories_table(conn)
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT elements_json, sources_json, query_log, title, artist
+                FROM work_stories
+                WHERE work_key = %s AND elements_expires_at > NOW() AND corpus_version = %s
+            """, (work_key, CORPUS_VERSION))
+            row = cur.fetchone()
+            if row:
+                print(f"  [work_stories] HIT for {work_key[:40]}")
+                return {
+                    'elements': row[0] if row[0] else [],
+                    'sources': row[1] if row[1] else [],
+                    'query_log': row[2] if row[2] else [],
+                    'title': row[3],
+                    'artist': row[4],
+                }
+            print(f"  [work_stories] MISS for {work_key[:40]}")
+            return None
+    except Exception as e:
+        print(f"  [work_stories] Read error: {e}")
+        return None
+    finally:
+        if conn:
+            conn.close()
+
+
+def work_stories_put(work_key: str, title: str, artist: str, work_qid: str,
+                     elements: list, sources: list, query_log: list):
+    """Persist mined story elements to cache. Elements TTL ~30d, core 90d."""
+    conn = None
+    try:
+        conn = _get_db_connection()
+        if not conn:
+            return
+        _ensure_work_stories_table(conn)
+        elements_expires = datetime.utcnow() + timedelta(days=30)
+        core_expires = datetime.utcnow() + timedelta(days=90)
+        core_data = json.dumps({'title': title, 'artist': artist, 'work_qid': work_qid})
+
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO work_stories (work_key, work_qid, title, artist, core_data,
+                    elements_json, sources_json, query_log, core_expires_at, elements_expires_at, corpus_version)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (work_key) DO UPDATE SET
+                    elements_json = EXCLUDED.elements_json,
+                    sources_json = EXCLUDED.sources_json,
+                    query_log = EXCLUDED.query_log,
+                    elements_expires_at = EXCLUDED.elements_expires_at,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (work_key, work_qid or None, title, artist, core_data,
+                  json.dumps(elements), json.dumps(sources), json.dumps(query_log),
+                  core_expires, elements_expires, CORPUS_VERSION))
+            conn.commit()
+            print(f"  [work_stories] STORED {work_key[:40]} ({len(elements)} elements)")
+    except Exception as e:
+        print(f"  [work_stories] Write error: {e}")
+    finally:
+        if conn:
+            conn.close()
