@@ -83,3 +83,33 @@ CREATE TABLE IF NOT EXISTS venue_corpus (
 
 CREATE INDEX IF NOT EXISTS idx_venue_corpus_expires ON venue_corpus(expires_at);
 CREATE INDEX IF NOT EXISTS idx_venue_corpus_tier ON venue_corpus(tier);
+
+-- 7. Domain Tier Cache (Story Quality SQ-S2 — source reputation)
+-- Caches Wikidata P856 institutional check results per domain.
+CREATE TABLE IF NOT EXISTS domain_tier_cache (
+    domain VARCHAR(255) PRIMARY KEY,
+    tier VARCHAR(10) NOT NULL,  -- tier1/tier2/tier3/reject
+    checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_domain_tier_expires ON domain_tier_cache(expires_at);
+
+-- 8. Work Stories Cache (Story Quality SQ-S8 — per-work story mining cache)
+CREATE TABLE IF NOT EXISTS work_stories (
+    id SERIAL PRIMARY KEY,
+    work_key VARCHAR(512) NOT NULL UNIQUE,
+    work_qid VARCHAR(20),
+    title TEXT NOT NULL,
+    artist TEXT,
+    core_data JSONB NOT NULL,
+    elements_json JSONB,
+    sources_json JSONB,
+    query_log JSONB,
+    core_expires_at TIMESTAMP NOT NULL,
+    elements_expires_at TIMESTAMP NOT NULL,
+    corpus_version INT NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_work_stories_qid ON work_stories(work_qid) WHERE work_qid IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_work_stories_expires ON work_stories(elements_expires_at);
