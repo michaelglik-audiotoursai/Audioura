@@ -8,6 +8,8 @@ import json, os, re, time, urllib.request, hashlib
 from typing import Dict, List, Optional, Set, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from work_story_searcher import normalize_work_key, work_stories_put
+
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 
 # Element types from STORY_QUALITY_DESIGN.md §SQ-S4
@@ -337,6 +339,19 @@ def extract_and_score_stop(search_results: List[Dict], canonical_title: str,
     
     # Step 5: Corroboration scoring
     scored = score_corroboration(all_elements)
+    
+    # F4: Cache write — persist scored elements for future cache hits
+    _work_key = normalize_work_key(canonical_title, artist)
+    _sources = [{'url': e.get('source_url', ''), 'domain': e.get('source_domain', '')} for e in scored]
+    work_stories_put(
+        work_key=_work_key,
+        title=canonical_title,
+        artist=artist,
+        work_qid='',  # QID populated when available from GG pipeline
+        elements=scored,
+        sources=_sources,
+        query_log=[],  # Query log stored by search_stories_for_stop
+    )
     
     return {
         'elements': scored,

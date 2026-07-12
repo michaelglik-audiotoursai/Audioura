@@ -296,6 +296,19 @@ def search_stories_for_stop(stop: Dict, tour_type: str = 'contained',
     else:
         effective_cap = query_cap
 
+    # F4: Cache read — check work_stories BEFORE search (all tiers including free)
+    _work_key = normalize_work_key(stop.get('canonical_title', ''), stop.get('artist', ''))
+    cached = work_stories_get(_work_key)
+    if cached:
+        return {
+            'results': [],
+            'query_log': cached.get('query_log', []),
+            'story_mining_status': 'cache_only',
+            'total_queries': 0,
+            'estimated_cost': 0.0,
+            'cached_elements': cached.get('elements', []),
+        }
+
     # R6: free tier = ZERO SERP calls (enforced by construction)
     if tier == 'free' or effective_cap <= 0:
         return {
