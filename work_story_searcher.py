@@ -242,6 +242,18 @@ def synthesize_queries(stop: Dict, tour_type: str = 'contained') -> List[str]:
         story_term = _LANG_STORY_TERMS.get(lang, 'story')
         queries.append(f'"{title}" {artist} {story_term}')
 
+    # W9: Collection/venue-level provenance queries
+    # When a work belongs to a named museum/collection, add queries targeting the collection
+    # provenance (the donation fact lives on collection-pages, not object-pages)
+    venue_name = stop.get('venue_name', '')
+    if venue_name and tour_type == 'contained':
+        # Generate collection-level queries (EN + venue lang)
+        queries.append(f'{venue_name} {artist} donation history')
+        if lang and lang != 'en':
+            _LANG_DONATION = {'fr': 'donation', 'it': 'donazione', 'es': 'donación', 'de': 'Schenkung'}
+            donation_term = _LANG_DONATION.get(lang, 'donation')
+            queries.append(f'{venue_name} {artist} {donation_term}')
+
     return queries
 
 

@@ -78,6 +78,42 @@ def check_work_anchor(page_text: str, canonical_title: str, artist: str = '') ->
     return title_matches
 
 
+def check_collection_anchor(page_text: str, artist: str, venue_name: str) -> bool:
+    """W9: Collection-level anchor for provenance/dedication elements.
+    
+    Returns True if the page mentions BOTH the artist AND the museum/collection name.
+    This is a looser anchor than check_work_anchor — it doesn't require the specific work title.
+    Used to accept collection-scoped pages (e.g. fr.wikipedia "Musée Marc Chagall") that carry
+    provenance facts applicable to works in that collection.
+    
+    Guardrail: requires at least 2 content words from venue_name to match (not just artist-level).
+    """
+    if not page_text or not artist or not venue_name:
+        return False
+    
+    page_lower = page_text.lower()
+    
+    # Check artist present
+    artist_words = [w.lower() for w in re.findall(r'\w+', artist) if len(w) >= 3]
+    if not artist_words or not any(w in page_lower for w in artist_words):
+        return False
+    
+    # Check venue/collection name — require ≥2 content words from venue_name
+    _stop_words = {'the', 'a', 'an', 'of', 'in', 'and', 'or', 'le', 'la', 'les',
+                   'de', 'du', 'des', 'un', 'une', 'et', 'l', 'il', 'lo', 'i', 'di',
+                   'national', 'musee', 'museum', 'musée'}
+    venue_words = [w.lower() for w in re.findall(r'\w+', venue_name)
+                   if w.lower() not in _stop_words and len(w) >= 3]
+    
+    if not venue_words:
+        return False
+    
+    venue_matches = sum(1 for w in venue_words if w in page_lower)
+    # Need at least 2 venue content words OR all of them if fewer than 2
+    threshold = min(2, len(venue_words))
+    return venue_matches >= threshold
+
+
 # --- Page fetching ---
 def _fetch_wikipedia_api(url: str, max_chars: int = 15000) -> Optional[str]:
     """Fetch Wikipedia article via API plaintext extract (W1: avoids HTML stub problem)."""
@@ -598,12 +634,12 @@ def score_corroboration(elements: List[Dict], syndication_threshold: float = 0.8
 
 # --- Full extraction pipeline for one stop ---
 def extract_and_score_stop(search_results: List[Dict], canonical_title: str,
-                           artist: str, max_pages: int = 6) -> Dict:
+                           artist: str, max_pages: int = 6, venue_name: str = '') -> Dict:
     """Full SQ-S3/S4/S5 pipeline for one stop.
     
     1. Filter to T1/T2 results only
     2. Fetch pages (parallel, capped)
-    3. Check work-anchor
+    3. Check work-anchor (+ W9 collection-anchor for provenance/dedication)
     4. Extract elements via LLM
     5. Score corroboration
     
@@ -677,11 +713,20 @@ def extract_and_score_stop(search_results: List[Dict], canonical_title: str,
                     'error': str(e),
                 })
     
-    # Step 3: Work-anchor check
+    # Step 3: Work-anchor check + W9 collection-anchor for provenance/dedication
     anchored_pages = [(meta, text) for meta, text in fetched_pages
                       if check_work_anchor(text, canonical_title, artist)]
     
-    if not anchored_pages:
+    # W9: Collection-anchored pages — pages that mention artist+venue but NOT the specific work.
+    # These can only contribute provenance/dedication elements (not general work facts).
+    collection_anchored_pages = []
+    if venue_name:
+        for meta, text in fetched_pages:
+            if not check_work_anchor(text, canonical_title, artist):
+                if check_collection_anchor(text, artist, venue_name):
+                    collection_anchored_pages.append((meta, text))
+    
+    if not anchored_pages and not collection_anchored_pages:
         return {
             'elements': [],
             'fetch_log': fetch_log,
@@ -696,12 +741,22 @@ def extract_and_score_stop(search_results: List[Dict], canonical_title: str,
         elements = extract_elements_from_text(text, canonical_title, artist, meta['url'])
         all_elements.extend(elements)
     
+    # W9: Extract from collection-anchored pages (provenance/dedication types ONLY)
+    _COLLECTION_ANCHOR_TYPES = {'provenance', 'dedication', 'origin'}
+    for meta, text in collection_anchored_pages:
+        coll_elements = extract_elements_from_text(text, canonical_title, artist, meta['url'])
+        # Only keep provenance/dedication/origin-typed elements from collection pages
+        for elem in coll_elements:
+            if elem.get('type') in _COLLECTION_ANCHOR_TYPES:
+                elem['_collection_anchored'] = True  # Mark for audit
+                all_elements.append(elem)
+    
     if not all_elements:
         return {
             'elements': [],
             'fetch_log': fetch_log,
             'pages_fetched': len(fetched_pages),
-            'pages_anchored': len(anchored_pages),
+            'pages_anchored': len(anchored_pages) + len(collection_anchored_pages),
             'extraction_status': 'no_elements',
         }
     

@@ -143,7 +143,8 @@ def run_fresh_mining(name, stop, target_keywords, criterion_label):
 
     # Phase 2: Extraction (first round) — this calls work_stories_put internally
     print(f"\n--- First extraction round ---")
-    ext = extract_and_score_stop(r['results'], stop['canonical_title'], stop['artist'])
+    ext = extract_and_score_stop(r['results'], stop['canonical_title'], stop['artist'],
+                                 venue_name=stop.get('venue_name', ''))
     print(f"Fetched: {ext['pages_fetched']}, Anchored: {ext['pages_anchored']}, Status: {ext['extraction_status']}")
     print(f"Elements: {len(ext['elements'])}")
     for e in ext.get('elements', []):
@@ -314,6 +315,7 @@ chagall_stop = {
     'artist': 'Marc Chagall',
     'venue_city': 'Nice',
     'venue_lang': 'fr',
+    'venue_name': 'Musée national Marc Chagall',
 }
 
 # --- Matisse ---
@@ -324,6 +326,7 @@ matisse_stop = {
     'artist': 'Henri Matisse',
     'venue_city': 'Nice',
     'venue_lang': 'fr',
+    'venue_name': 'Musée Matisse Nice',
 }
 
 print(f"\n{'#'*70}")
