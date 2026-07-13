@@ -271,8 +271,9 @@ def _find_merge_candidates(scored_elements: List[Dict]) -> List[tuple]:
 def _llm_merge_decision(pairs: List[Dict]) -> List[Dict]:
     """Call GPT-4o-mini to decide which candidate pairs describe the same fact.
     
-    Returns list of {pair_idx, verdict: bool, reason: str} decisions.
+    Returns list of {pair_idx, verdict: bool, conflicting: bool, reason: str} decisions.
     The LLM only answers yes/no — it never sees, names, or adds sources (RS4).
+    RS8: Also detects conflicts (same subject, contradictory values → disputed).
     """
     if not pairs:
         return []
@@ -288,31 +289,55 @@ def _llm_merge_decision(pairs: List[Dict]) -> List[Dict]:
     
     prompt = (
         "You are a fact-checking assistant. For each pair of claims below about an artwork, "
-        "answer YES if they describe the SAME factual claim (even if worded differently), "
-        "or NO if they are about different facts.\n\n"
+        "determine:\n"
+        "1. Are they about the SAME factual subject? (same_subject: true/false)\n"
+        "2. If same subject, do they AGREE or CONFLICT? (conflicting: true/false)\n\n"
         "Rules:\n"
-        "- 'Created in 1952' and 'completed in 1952' and 'created in Spring 1952' are the SAME fact.\n"
-        "- 'Gouache cut-outs' and 'gouache on paper, cut and pasted' are the SAME technique.\n"
-        "- Different dates, different people, or different events are DIFFERENT facts.\n\n"
+        "- 'Created in 1952' and 'completed in 1952' and 'created in Spring 1952' = same subject, NOT conflicting.\n"
+        "- 'Gouache cut-outs' and 'gouache on paper, cut and pasted' = same subject, NOT conflicting.\n"
+        "- 'Created in 1952' and 'created in 1958' = same subject, CONFLICTING (different dates).\n"
+        "- Different topics entirely = NOT same subject.\n\n"
         + "\n".join(prompt_pairs) +
-        "\n\nRespond with ONLY a JSON array of objects: [{\"pair\": 1, \"same\": true/false},...]\n"
+        "\n\nRespond with ONLY a JSON array: [{\"pair\": 1, \"same_subject\": true/false, \"conflicting\": true/false},...]\n"
     )
     
     try:
         import openai
-        client = openai.OpenAI(api_key=OPENAI_API_KEY)
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0,
-            max_tokens=500,
-        )
+        # Support both openai v0.x and v1.x+
+        if hasattr(openai, 'OpenAI'):
+            # v1.x+ (new client-based API)
+            client = openai.OpenAI(api_key=OPENAI_API_KEY)
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+                max_tokens=500,
+            )
+            content = response.choices[0].message.content.strip()
+        else:
+            # v0.x (legacy API)
+            openai.api_key = OPENAI_API_KEY
+            response = openai.ChatCompletion.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+                max_tokens=1000,
+            )
+            content = response['choices'][0]['message']['content'].strip()
+        
         import json as _json
-        content = response.choices[0].message.content.strip()
         # Parse JSON from response (handle markdown code blocks)
         if content.startswith('```'):
             content = content.split('\n', 1)[1].rsplit('```', 1)[0]
         decisions = _json.loads(content)
+        # Normalize field names for backward compat
+        for d in decisions:
+            if 'same' in d and 'same_subject' not in d:
+                d['same_subject'] = d['same']
+            if 'same_subject' not in d:
+                d['same_subject'] = d.get('same', False)
+            if 'conflicting' not in d:
+                d['conflicting'] = False
         return decisions
     except Exception as e:
         # LLM failure → no merges (fail-closed)
@@ -345,16 +370,29 @@ def _llm_merge_pass(scored_elements: List[Dict], syndication_threshold: float = 
             'b_idx': j,
         })
     
-    # Call LLM for merge decisions
-    decisions = _llm_merge_decision(llm_pairs)
+    # Call LLM for merge decisions (batch max 5 pairs to avoid response truncation)
+    all_decisions = []
+    BATCH_SIZE = 5
+    for batch_start in range(0, len(llm_pairs), BATCH_SIZE):
+        batch = llm_pairs[batch_start:batch_start + BATCH_SIZE]
+        batch_for_llm = [{'a_text': p['a_text'], 'b_text': p['b_text']} for p in batch]
+        batch_decisions = _llm_merge_decision(batch_for_llm)
+        # Remap pair numbers: LLM returns 1-indexed within batch → adjust to global 1-indexed
+        for d in batch_decisions:
+            local_pair = d.get('pair', 1)  # 1-indexed within batch
+            d['pair'] = local_pair + batch_start  # Global 1-indexed
+        all_decisions.extend(batch_decisions)
+    decisions = all_decisions
     
     # Build merge_log
     merge_log = []
     merge_targets = {}  # j → i (element j merges INTO element i)
+    disputed_pairs = []  # RS8: conflicting pairs → disputed
     
     for decision in decisions:
         pair_num = decision.get('pair', 0) - 1  # 0-indexed
-        same = decision.get('same', False)
+        same_subject = decision.get('same_subject', False)
+        conflicting = decision.get('conflicting', False)
         
         if pair_num < 0 or pair_num >= len(llm_pairs):
             continue
@@ -366,18 +404,26 @@ def _llm_merge_pass(scored_elements: List[Dict], syndication_threshold: float = 
             'pair': [i, j],
             'a_text': pair['a_text'][:80],
             'b_text': pair['b_text'][:80],
-            'verdict': same,
+            'same_subject': same_subject,
+            'conflicting': conflicting,
             'a_domain': scored_elements[i].get('source_domain', ''),
             'b_domain': scored_elements[j].get('source_domain', ''),
         }
         
-        if same:
-            # Check transitive merges: if j already merges somewhere, follow the chain
+        if same_subject and not conflicting:
+            # Merge: same fact, no conflict
             target = i
             while target in merge_targets:
                 target = merge_targets[target]
             merge_targets[j] = target
+            log_entry['action'] = 'merged'
             log_entry['merged_into'] = target
+        elif same_subject and conflicting:
+            # RS8: Same subject but conflicting values → disputed
+            disputed_pairs.append((i, j))
+            log_entry['action'] = 'disputed'
+        else:
+            log_entry['action'] = 'no_merge'
         
         merge_log.append(log_entry)
     
@@ -414,6 +460,14 @@ def _llm_merge_pass(scored_elements: List[Dict], syndication_threshold: float = 
         }
         
         elements_to_remove.add(j)
+    
+    # RS8: Mark disputed pairs
+    for i, j in disputed_pairs:
+        if i not in elements_to_remove and j not in elements_to_remove:
+            scored_elements[i]['corroboration_status'] = 'disputed'
+            scored_elements[j]['corroboration_status'] = 'disputed'
+            scored_elements[i]['dispute_pair'] = j
+            scored_elements[j]['dispute_pair'] = i
     
     # Attach merge_log to first element for evidence
     if merge_log and scored_elements:
@@ -666,3 +720,102 @@ def extract_and_score_stop(search_results: List[Dict], canonical_title: str,
         'extraction_status': 'ok',
         'fact_refinement_queries': fact_refinement_queries,
     }
+
+
+# --- SQ4: Story Ranking (SQ-S6) ---
+
+# Type value weights for ranking
+_TYPE_VALUES = {
+    'origin': 3.0, 'dedication': 3.0, 'turning_point': 3.0,
+    'controversy': 2.5,
+    'technique': 2.0, 'reference_work': 2.0,
+    'reception': 1.5, 'provenance': 1.5,
+    'date': 1.0, 'person': 1.0, 'quote': 1.0,
+    'legend': 2.0,  # Legends are narratively valuable
+    'intention': 2.5,
+}
+
+# Corroboration bonus
+_CORROBORATION_BONUS = {
+    'documented': 2.0,
+    'reported': 1.0,
+    'legend': 0.5,
+    'disputed': 1.5,  # Disputes are engaging (per design §SQ-S6)
+}
+
+
+def rank_stop_elements(elements: List[Dict]) -> List[Dict]:
+    """Rank extracted elements by story value for a single stop.
+    
+    Score = type_value + corroboration_bonus + specificity_bonus.
+    Returns elements sorted by score descending, with 'rank_score' attached.
+    """
+    for elem in elements:
+        score = 0.0
+        
+        # Type value
+        elem_type = elem.get('type', '')
+        score += _TYPE_VALUES.get(elem_type, 1.0)
+        
+        # Corroboration bonus
+        status = elem.get('corroboration_status', 'reported')
+        score += _CORROBORATION_BONUS.get(status, 0.5)
+        
+        # Specificity bonus
+        if elem.get('people'):
+            score += 0.5
+        if elem.get('dates'):
+            score += 0.5
+        if elem.get('type') == 'quote':
+            score += 0.5
+        
+        elem['rank_score'] = round(score, 2)
+    
+    # Sort by score descending
+    elements.sort(key=lambda e: e.get('rank_score', 0), reverse=True)
+    return elements
+
+
+def select_stop_elements(elements: List[Dict], max_selected: int = 3) -> Dict:
+    """Select top elements for a stop and designate runner-ups.
+    
+    Returns: {'selected_elements': [...], 'runner_up_elements': [...]}
+    """
+    ranked = rank_stop_elements(elements)
+    return {
+        'selected_elements': ranked[:max_selected],
+        'runner_up_elements': ranked[max_selected:],
+    }
+
+
+def apply_tour_diversity(stops_selections: List[Dict], max_same_type: int = 2) -> List[Dict]:
+    """Apply B5 tour-level diversity: no story type dominates.
+    
+    Max `max_same_type` stops may share the same top-ranked element type.
+    If violated, demote the 3rd+ stop's top pick to runner-up, promote next.
+    
+    Input: list of {'selected_elements': [...], 'runner_up_elements': [...]} per stop
+    Returns: adjusted list with diversity enforced.
+    """
+    type_counts = {}
+    
+    for stop_sel in stops_selections:
+        selected = stop_sel.get('selected_elements', [])
+        if not selected:
+            continue
+        
+        top_type = selected[0].get('type', '')
+        count = type_counts.get(top_type, 0)
+        
+        if count >= max_same_type:
+            # Demote top pick, promote from runner-ups
+            runners = stop_sel.get('runner_up_elements', [])
+            if runners:
+                demoted = selected[0]
+                promoted = runners[0]
+                stop_sel['selected_elements'] = [promoted] + selected[1:]
+                stop_sel['runner_up_elements'] = [demoted] + runners[1:]
+        else:
+            type_counts[top_type] = count + 1
+    
+    return stops_selections

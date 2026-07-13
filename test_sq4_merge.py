@@ -113,7 +113,7 @@ def run_tests():
     # Test 2: With LLM saying "same fact" for all pairs → merge → documented
     # Mock LLM to approve all merges
     def mock_all_same(pairs):
-        return [{'pair': i+1, 'same': True} for i in range(len(pairs))]
+        return [{'pair': i+1, 'same_subject': True, 'conflicting': False} for i in range(len(pairs))]
 
     with patch('story_element_extractor._llm_merge_decision', side_effect=mock_all_same):
         merged = _llm_merge_pass(cluster_elements.copy())
@@ -224,6 +224,89 @@ def run_tests():
     passed = stripped == 'Song of Songs'
     status = "PASS" if passed else "FAIL"
     print(f"    [{status}] _strip_trailing_numeral('Song of Songs IV') → '{stripped}'")
+    if not passed:
+        all_passed = False
+
+    # --- RS8: Disputed detection ---
+    print()
+    print("  RS8: Disputed status (conflicting values from independent sources):")
+
+    # Two date elements that conflict (same subject, different values)
+    conflict_a = {
+        'text': 'Le Cantique des Cantiques IV was created in 1958.',
+        'type': 'date',
+        'corroboration_status': 'reported',
+        'source_domain': 'musees-nationaux-alpesmaritimes.fr',
+        'source_sentence': 'Created in 1958.',
+        'source_url': 'https://musees-nationaux.fr/page1',
+        '_all_sources': [{'source_domain': 'musees-nationaux-alpesmaritimes.fr'}],
+    }
+    conflict_b = {
+        'text': 'Le Cantique des Cantiques IV was created in 1965-1966.',
+        'type': 'date',
+        'corroboration_status': 'reported',
+        'source_domain': 'pop.culture.gouv.fr',
+        'source_sentence': 'Created in 1965-1966.',
+        'source_url': 'https://pop.culture.gouv.fr/page1',
+        '_all_sources': [{'source_domain': 'pop.culture.gouv.fr'}],
+    }
+
+    # Mock LLM saying "same subject but conflicting"
+    def mock_conflicting(pairs):
+        return [{'pair': i+1, 'same_subject': True, 'conflicting': True} for i in range(len(pairs))]
+
+    with patch('story_element_extractor._llm_merge_decision', side_effect=mock_conflicting):
+        disputed_result = _llm_merge_pass([conflict_a.copy(), conflict_b.copy()])
+
+    disputed_elems = [e for e in disputed_result if e.get('corroboration_status') == 'disputed']
+    passed = len(disputed_elems) == 2
+    status = "PASS" if passed else "FAIL"
+    print(f"    [{status}] Conflicting dates → both marked 'disputed' (got {len(disputed_elems)})")
+    if not passed:
+        all_passed = False
+
+    # Verify dispute_pair reference
+    if disputed_elems:
+        has_pair_ref = all('dispute_pair' in e for e in disputed_elems)
+        passed = has_pair_ref
+        status = "PASS" if passed else "FAIL"
+        print(f"    [{status}] dispute_pair reference present on disputed elements")
+        if not passed:
+            all_passed = False
+
+    # --- Ranking ---
+    print()
+    print("  SQ4 Ranking (rank_stop_elements):")
+
+    from story_element_extractor import rank_stop_elements, select_stop_elements
+
+    test_elements = [
+        {'text': 'date fact', 'type': 'date', 'corroboration_status': 'reported'},
+        {'text': 'origin story', 'type': 'origin', 'corroboration_status': 'documented', 'people': ['Chagall']},
+        {'text': 'technique detail', 'type': 'technique', 'corroboration_status': 'reported'},
+        {'text': 'legend tale', 'type': 'legend', 'corroboration_status': 'legend'},
+    ]
+
+    ranked = rank_stop_elements(test_elements)
+    # Origin + documented + people should rank highest
+    passed = ranked[0]['type'] == 'origin'
+    status = "PASS" if passed else "FAIL"
+    print(f"    [{status}] Origin+documented+people ranks first: {ranked[0].get('type')}")
+    if not passed:
+        all_passed = False
+
+    # Date + reported should rank lowest
+    passed = ranked[-1]['type'] == 'date'
+    status = "PASS" if passed else "FAIL"
+    print(f"    [{status}] Date+reported ranks last: {ranked[-1].get('type')}")
+    if not passed:
+        all_passed = False
+
+    # Select top 2
+    selection = select_stop_elements(test_elements, max_selected=2)
+    passed = len(selection['selected_elements']) == 2
+    status = "PASS" if passed else "FAIL"
+    print(f"    [{status}] select_stop_elements(max=2): {len(selection['selected_elements'])} selected, {len(selection['runner_up_elements'])} runners")
     if not passed:
         all_passed = False
 
