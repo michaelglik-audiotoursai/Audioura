@@ -162,13 +162,28 @@ def _check_wikidata_p856(domain: str) -> str:
 
 
 # --- Query Synthesis (SQ-S1) ---
+def _strip_trailing_numeral(title: str) -> Optional[str]:
+    """Strip trailing Roman or Arabic numeral from a title to get cycle/series-level form.
+    Returns the stripped form if different from original, else None.
+    E.g. "Le Cantique des Cantiques IV" → "Le Cantique des Cantiques"
+         "Blue Nude II" → "Blue Nude"
+         "Landscape 3" → "Landscape"
+    """
+    # Roman numeral pattern (I, II, III, IV, V, VI, VII, VIII, IX, X, etc.)
+    stripped = re.sub(r'\s+(?:[IVXLCDM]+|[0-9]+)\s*$', '', title, flags=re.IGNORECASE).strip()
+    if stripped and stripped != title:
+        return stripped
+    return None
+
+
 def synthesize_queries(stop: Dict, tour_type: str = 'contained') -> List[str]:
     """Generate deterministic base queries for a stop.
 
-    Parameters: stop dict with keys: canonical_title, artist, venue_city, venue_lang
-    Returns: list of query strings (2-4 per stop)
+    Parameters: stop dict with keys: canonical_title, local_title, artist, venue_city, venue_lang
+    Returns: list of query strings (2-6 per stop)
     """
     title = stop.get('canonical_title', '')
+    local_title = stop.get('local_title', '')
     artist = stop.get('artist', '')
     city = stop.get('venue_city', '')
     lang = stop.get('venue_lang', 'en')
@@ -185,6 +200,21 @@ def synthesize_queries(stop: Dict, tour_type: str = 'contained') -> List[str]:
         queries.append(f'"{title}" {city} history story behind')
         queries.append(f'"{title}" {city} who walked here famous visitors')
         queries.append(f'"{title}" {city} controversy')
+
+    # W4: Query granularity — also query the series/cycle-level title (strip trailing numerals)
+    series_title = _strip_trailing_numeral(title)
+    if series_title:
+        if tour_type == 'contained':
+            queries.append(f'"{series_title}" {artist} story behind')
+        else:
+            queries.append(f'"{series_title}" {city} history story behind')
+
+    # W5: Title language split — query BOTH canonical and local_title if different
+    if local_title and local_title.strip().lower() != title.strip().lower():
+        if tour_type == 'contained':
+            queries.append(f'"{local_title}" {artist} story behind')
+        else:
+            queries.append(f'"{local_title}" {city} history story behind')
 
     # Localization: add query in venue language if not English
     if lang and lang != 'en':
@@ -235,6 +265,67 @@ Return JSON array of query strings only."""
     except Exception as e:
         print(f"  [SQ-S1] Refinement LLM failed: {e}")
         return []
+
+
+# --- W7: Fact-Targeted Refinement ---
+# High-value element types that warrant a second search pass when single-source
+_HIGH_VALUE_TYPES = {'dedication', 'origin', 'turning_point'}
+
+
+def synthesize_fact_targeted_queries(stop: Dict, reported_elements: List[Dict]) -> List[str]:
+    """Generate fact-targeted queries when high-value elements are single-source (reported).
+
+    W7 fix: triggers refinement when a high-value element (dedication/origin/turning_point)
+    is 'reported' (single-source), using the element's people/dates for a targeted query.
+
+    Parameters:
+      - stop: dict with canonical_title, artist
+      - reported_elements: list of scored elements with corroboration_status == 'reported'
+        and type in _HIGH_VALUE_TYPES
+
+    Returns: list of fact-targeted query strings (0-2)
+    """
+    title = stop.get('canonical_title', '')
+    artist = stop.get('artist', '')
+    queries = []
+
+    for elem in reported_elements:
+        if elem.get('type') not in _HIGH_VALUE_TYPES:
+            continue
+        if elem.get('corroboration_status') != 'reported':
+            continue
+
+        # Build a fact-targeted query from the element's specifics
+        people = elem.get('people', [])
+        dates = elem.get('dates', [])
+        elem_type = elem.get('type', '')
+
+        # Use the cycle-level title if available (W4 synergy)
+        query_title = _strip_trailing_numeral(title) or title
+
+        # Type-specific query terms
+        type_terms = {
+            'dedication': 'dedication|donation|donated',
+            'origin': 'origin|created|commissioned',
+            'turning_point': 'turning point|breakthrough|transformation',
+        }
+        type_suffix = type_terms.get(elem_type, '')
+
+        # Assemble: title + artist + key person/date + type hint
+        parts = [f'"{query_title}"', artist]
+        if people:
+            parts.append(people[0])  # First named person
+        if dates:
+            parts.append(dates[0])  # First date
+        parts.append(type_suffix.split('|')[0])  # Primary type term
+
+        query = ' '.join(p for p in parts if p)
+        queries.append(query)
+
+        if len(queries) >= 2:
+            break
+
+    return queries
 
 
 # --- SERP Execution ---

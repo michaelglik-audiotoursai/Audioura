@@ -326,7 +326,16 @@ def extract_and_score_stop(search_results: List[Dict], canonical_title: str,
     """
     # Step 1: Filter to T1/T2 only
     eligible = [r for r in search_results if r.get('tier') in ('tier1', 'tier2')]
-    eligible = eligible[:max_pages]
+
+    # URL dedup: same URL surfaced by multiple queries → fetch once
+    seen_urls = set()
+    deduped = []
+    for r in eligible:
+        url = r.get('url', '')
+        if url not in seen_urls:
+            seen_urls.add(url)
+            deduped.append(r)
+    eligible = deduped[:max_pages]
     
     if not eligible:
         return {

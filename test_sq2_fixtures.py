@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from work_story_searcher import (
     classify_domain, normalize_work_key, normalize_domain,
     synthesize_queries, search_stories_for_stop,
+    _strip_trailing_numeral, synthesize_fact_targeted_queries,
 )
 
 
@@ -49,6 +50,7 @@ def run_tests() -> bool:
     _offline_cache = {
         "randomartblog.blogspot.com": "tier3",
         "somesubstack.substack.com": "tier3",
+        "france-today.com": "tier3",
     }
 
     print("  Domain Tier Classification:")
@@ -100,9 +102,11 @@ def run_tests() -> bool:
     print("\n  Query Synthesis:")
     stop = {'canonical_title': 'Song of Songs IV', 'artist': 'Chagall', 'venue_city': 'Nice'}
     queries = synthesize_queries(stop, 'contained')
-    passed = len(queries) >= 2 and all('"Song of Songs IV"' in q for q in queries)
+    # W4: Now produces queries for BOTH "Song of Songs IV" AND "Song of Songs" (series)
+    has_exact = any('"Song of Songs IV"' in q for q in queries)
+    passed = len(queries) >= 2 and has_exact
     status = "PASS" if passed else "FAIL"
-    print(f"    [{status}] contained tour: {len(queries)} queries, all contain exact title: {passed}")
+    print(f"    [{status}] contained tour: {len(queries)} queries, includes exact title: {has_exact}")
     if not passed:
         all_passed = False
 
@@ -110,6 +114,126 @@ def run_tests() -> bool:
     passed = len(queries_walk) >= 2 and 'Nice' in queries_walk[0]
     status = "PASS" if passed else "FAIL"
     print(f"    [{status}] distributed tour: {len(queries_walk)} queries, contains city: {passed}")
+    if not passed:
+        all_passed = False
+
+    # --- W4: Query granularity — series/cycle-level title ---
+    print("\n  W4: Query Granularity (series/cycle title):")
+
+    # Title with Roman numeral → produces both with and without
+    stop_w4 = {'canonical_title': 'Le Cantique des Cantiques IV', 'artist': 'Chagall', 'venue_city': 'Nice'}
+    queries_w4 = synthesize_queries(stop_w4, 'contained')
+    has_full = any('"Le Cantique des Cantiques IV"' in q for q in queries_w4)
+    has_series = any('"Le Cantique des Cantiques"' in q and 'IV' not in q for q in queries_w4)
+    passed = has_full and has_series
+    status = "PASS" if passed else "FAIL"
+    print(f"    [{status}] 'Le Cantique des Cantiques IV' → queries include BOTH full title and series: full={has_full}, series={has_series}")
+    if not passed:
+        all_passed = False
+
+    # Title with Arabic numeral
+    stop_w4b = {'canonical_title': 'Blue Nude II', 'artist': 'Matisse', 'venue_city': 'Nice'}
+    queries_w4b = synthesize_queries(stop_w4b, 'contained')
+    has_full_b = any('"Blue Nude II"' in q for q in queries_w4b)
+    has_series_b = any('"Blue Nude"' in q and 'II' not in q for q in queries_w4b)
+    passed = has_full_b and has_series_b
+    status = "PASS" if passed else "FAIL"
+    print(f"    [{status}] 'Blue Nude II' → queries include BOTH full and series: full={has_full_b}, series={has_series_b}")
+    if not passed:
+        all_passed = False
+
+    # strip_trailing_numeral helper
+    passed = _strip_trailing_numeral("Le Cantique des Cantiques IV") == "Le Cantique des Cantiques"
+    status = "PASS" if passed else "FAIL"
+    print(f"    [{status}] _strip_trailing_numeral('Le Cantique des Cantiques IV') → 'Le Cantique des Cantiques'")
+    if not passed:
+        all_passed = False
+
+    passed = _strip_trailing_numeral("Landscape") is None
+    status = "PASS" if passed else "FAIL"
+    print(f"    [{status}] _strip_trailing_numeral('Landscape') → None (no numeral)")
+    if not passed:
+        all_passed = False
+
+    # --- W5: Title language split ---
+    print("\n  W5: Title Language Split (local_title):")
+
+    stop_w5 = {'canonical_title': 'Le Cantique des Cantiques IV', 'local_title': 'Song of Songs IV',
+                'artist': 'Chagall', 'venue_city': 'Nice'}
+    queries_w5 = synthesize_queries(stop_w5, 'contained')
+    has_canonical = any('"Le Cantique des Cantiques IV"' in q for q in queries_w5)
+    has_local = any('"Song of Songs IV"' in q for q in queries_w5)
+    passed = has_canonical and has_local
+    status = "PASS" if passed else "FAIL"
+    print(f"    [{status}] canonical + local_title → queries include BOTH: canonical={has_canonical}, local={has_local}")
+    if not passed:
+        all_passed = False
+
+    # Same title in both → no duplicate
+    stop_w5_same = {'canonical_title': 'Blue Nude II', 'local_title': 'Blue Nude II',
+                    'artist': 'Matisse', 'venue_city': 'Nice'}
+    queries_w5_same = synthesize_queries(stop_w5_same, 'contained')
+    # Should NOT have an extra duplicate query for same title
+    local_queries = [q for q in queries_w5_same if '"Blue Nude II"' in q and 'story behind' in q]
+    passed = len(local_queries) == 1  # Only one "Blue Nude II" story behind, not duplicated
+    status = "PASS" if passed else "FAIL"
+    print(f"    [{status}] same canonical and local → no duplicate query: count={len(local_queries)}")
+    if not passed:
+        all_passed = False
+
+    # --- W6: Tier-list typo fix ---
+    print("\n  W6: Tier-List Typo Fix (francetoday.com):")
+
+    result = classify_domain("francetoday.com", domain_cache=_offline_cache)
+    passed = result == "tier2"
+    status = "PASS" if passed else "FAIL"
+    print(f"    [{status}] classify_domain('francetoday.com') → {result} (expected tier2)")
+    if not passed:
+        all_passed = False
+
+    # Old typo domain should NOT be tier2
+    result_old = classify_domain("france-today.com", domain_cache=_offline_cache)
+    passed = result_old != "tier2"  # The typo is gone, so it falls to default (tier3 via cache or P856)
+    status = "PASS" if passed else "FAIL"
+    print(f"    [{status}] classify_domain('france-today.com') → {result_old} (expected NOT tier2 — typo removed)")
+    if not passed:
+        all_passed = False
+
+    # --- W7: Fact-targeted refinement trigger ---
+    print("\n  W7: Fact-Targeted Refinement Trigger:")
+
+    # Mock: reported dedication element with people/dates → produces targeted query
+    stop_w7 = {'canonical_title': 'Le Cantique des Cantiques IV', 'artist': 'Chagall'}
+    reported_elems = [
+        {'type': 'dedication', 'corroboration_status': 'reported',
+         'text': 'Chagall dedicated the cycle to Vava',
+         'people': ['Vava'], 'dates': ['1966']},
+    ]
+    fact_queries = synthesize_fact_targeted_queries(stop_w7, reported_elems)
+    passed = len(fact_queries) >= 1
+    status = "PASS" if passed else "FAIL"
+    print(f"    [{status}] reported dedication → generates fact-targeted query: {len(fact_queries)} queries")
+    if not passed:
+        all_passed = False
+    else:
+        # The query should mention key people or dates
+        q = fact_queries[0]
+        has_person_or_date = 'Vava' in q or '1966' in q
+        passed = has_person_or_date
+        status = "PASS" if passed else "FAIL"
+        print(f"    [{status}] fact-targeted query includes person/date: '{q[:60]}...'")
+        if not passed:
+            all_passed = False
+
+    # Non-high-value type (e.g. 'date') → no refinement triggered
+    non_hv_elems = [
+        {'type': 'date', 'corroboration_status': 'reported',
+         'text': 'Created in 1952', 'people': [], 'dates': ['1952']},
+    ]
+    fact_queries_none = synthesize_fact_targeted_queries(stop_w7, non_hv_elems)
+    passed = len(fact_queries_none) == 0
+    status = "PASS" if passed else "FAIL"
+    print(f"    [{status}] non-high-value 'date' type → no refinement: {len(fact_queries_none)} queries")
     if not passed:
         all_passed = False
 
