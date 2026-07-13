@@ -78,15 +78,19 @@ def check_work_anchor(page_text: str, canonical_title: str, artist: str = '') ->
     return title_matches
 
 
-def check_collection_anchor(page_text: str, artist: str, venue_name: str) -> bool:
+def check_collection_anchor(page_text: str, artist: str, venue_name: str,
+                            venue_city: str = '') -> bool:
     """W9: Collection-level anchor for provenance/dedication elements.
     
-    Returns True if the page mentions BOTH the artist AND at least one venue-specific
-    token that is NOT part of the artist name. This prevents degenerating to artist-level.
+    Returns True if the page mentions BOTH the artist AND venue-specific tokens
+    that are NOT part of the artist name, with tightened precision rules:
     
-    For "Musée national Marc Chagall": artist tokens = {marc, chagall};
-    venue tokens (kept) = {musee, national, marc, chagall} → non-artist venue tokens = {musee, national}.
-    Requires ≥1 non-artist venue token present in the page.
+    Requires non-artist venue token match AND EITHER:
+      - venue_city present in page, OR
+      - ≥2 non-artist venue tokens present in the page
+    
+    This prevents generic tokens like "national" alone from matching unrelated articles
+    (e.g. "National Gallery of Canada" when the venue is "Musée national Marc Chagall" in Nice).
     """
     if not page_text or not artist or not venue_name:
         return False
@@ -113,9 +117,18 @@ def check_collection_anchor(page_text: str, artist: str, venue_name: str) -> boo
         venue_matches = sum(1 for w in venue_words if w in page_lower)
         return venue_matches >= 2
     
-    # Require ≥1 non-artist venue token present in the page
-    non_artist_found = any(w in page_lower for w in non_artist_venue)
-    return non_artist_found
+    # Require ≥1 non-artist venue token present in the page (baseline)
+    non_artist_found = [w for w in non_artist_venue if w in page_lower]
+    if not non_artist_found:
+        return False
+    
+    # Tightened precision: require venue_city OR ≥2 non-artist venue tokens
+    # This prevents "national" alone matching "National Gallery of Canada"
+    if venue_city and venue_city.lower() in page_lower:
+        return True  # City match is strong evidence
+    
+    # Otherwise require ≥2 non-artist venue tokens present
+    return len(non_artist_found) >= 2
 
 
 # --- Page fetching ---
@@ -242,6 +255,74 @@ TEXT:
             return result
     except Exception as e:
         print(f"  [SQ-S4] LLM extraction failed: {e}")
+        return []
+
+
+def extract_collection_provenance(page_text: str, artist: str, venue_name: str,
+                                  source_url: str) -> List[Dict]:
+    """W9: Collection-scoped extraction for provenance/dedication facts.
+    
+    Uses a prompt focused on collection-level donations/bequests/gifts rather than
+    a work-specific prompt. This yields elements from museum-about pages that discuss
+    donations at the collection level (e.g. "seventeen paintings offered to the French State").
+    
+    Returns elements typed as 'provenance' or 'dedication'.
+    On LLM failure → empty list (logged, never raises).
+    """
+    if not OPENAI_API_KEY or not page_text:
+        return []
+    
+    prompt = f"""From this text about {venue_name}, extract any facts about donations, bequests, or gifts of artwork by {artist} to this institution. Include: who donated, when, what was donated.
+
+For each fact, provide:
+- type: one of ["provenance", "dedication"]
+- text: brief factual claim (1-2 sentences)
+- source_sentence: the exact sentence from the text that supports this claim
+- people: list of named people mentioned
+- dates: list of dates/years mentioned
+
+Return a JSON object with key "elements" containing an array. If no relevant facts found, return {{"elements": []}}.
+
+TEXT:
+{page_text[:8000]}"""
+
+    try:
+        data = json.dumps({
+            "model": "gpt-4o-mini",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.1,
+            "response_format": {"type": "json_object"},
+        }).encode()
+        
+        req = urllib.request.Request(
+            "https://api.openai.com/v1/chat/completions",
+            data=data,
+            headers={
+                "Authorization": f"Bearer {OPENAI_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            body = json.loads(resp.read().decode())
+            content = body['choices'][0]['message']['content']
+            parsed = json.loads(content)
+            elements = parsed.get('elements', parsed) if isinstance(parsed, dict) else parsed
+            if not isinstance(elements, list):
+                elements = []
+            
+            # Only keep provenance/dedication types, attach source metadata
+            result = []
+            for elem in elements:
+                elem_type = elem.get('type', '')
+                if elem_type not in ('provenance', 'dedication'):
+                    elem['type'] = 'provenance'  # Force to provenance if LLM returns other type
+                elem['source_url'] = source_url
+                elem['source_domain'] = source_url.split('/')[2] if '/' in source_url else ''
+                result.append(elem)
+            return result
+    except Exception as e:
+        print(f"  [W9] Collection provenance extraction failed: {e}")
         return []
 
 
@@ -638,7 +719,8 @@ def score_corroboration(elements: List[Dict], syndication_threshold: float = 0.8
 
 # --- Full extraction pipeline for one stop ---
 def extract_and_score_stop(search_results: List[Dict], canonical_title: str,
-                           artist: str, max_pages: int = 6, venue_name: str = '') -> Dict:
+                           artist: str, max_pages: int = 6, venue_name: str = '',
+                           venue_city: str = '') -> Dict:
     """Full SQ-S3/S4/S5 pipeline for one stop.
     
     1. Filter to T1/T2 results only
@@ -728,7 +810,7 @@ def extract_and_score_stop(search_results: List[Dict], canonical_title: str,
         if work_anch:
             anchored_pages.append((meta, text))
         elif venue_name:
-            coll_anch = check_collection_anchor(text, artist, venue_name)
+            coll_anch = check_collection_anchor(text, artist, venue_name, venue_city)
             if coll_anch:
                 collection_anchored_pages.append((meta, text))
         # Update fetch_log with anchor decisions (Fault B fix from 6831)
@@ -759,17 +841,15 @@ def extract_and_score_stop(search_results: List[Dict], canonical_title: str,
                 entry['types'] = list(set(e.get('type', '') for e in elements))
                 break
     
-    # W9: Extract from collection-anchored pages (provenance/dedication types ONLY)
-    _COLLECTION_ANCHOR_TYPES = {'provenance', 'dedication', 'origin'}
+    # W9: Extract from collection-anchored pages using collection-scoped prompt
     for meta, text in collection_anchored_pages:
-        coll_elements = extract_elements_from_text(text, canonical_title, artist, meta['url'])
-        # Only keep provenance/dedication/origin-typed elements from collection pages
+        coll_elements = extract_collection_provenance(text, artist, venue_name, meta['url'])
+        # All elements from collection-scoped extraction are provenance/dedication
         kept = []
         for elem in coll_elements:
-            if elem.get('type') in _COLLECTION_ANCHOR_TYPES:
-                elem['_collection_anchored'] = True  # Mark for audit
-                all_elements.append(elem)
-                kept.append(elem)
+            elem['_collection_anchored'] = True  # Mark for audit
+            all_elements.append(elem)
+            kept.append(elem)
         # Per-page extraction logging
         for entry in fetch_log:
             if entry.get('url') == meta.get('url', ''):
