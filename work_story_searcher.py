@@ -269,7 +269,7 @@ Return JSON array of query strings only."""
 
 # --- W7: Fact-Targeted Refinement ---
 # High-value element types that warrant a second search pass when single-source
-_HIGH_VALUE_TYPES = {'dedication', 'origin', 'turning_point'}
+_HIGH_VALUE_TYPES = {'dedication', 'origin', 'turning_point', 'provenance'}
 
 
 def synthesize_fact_targeted_queries(stop: Dict, reported_elements: List[Dict]) -> List[str]:
@@ -308,6 +308,7 @@ def synthesize_fact_targeted_queries(stop: Dict, reported_elements: List[Dict]) 
             'dedication': 'dedication|donation|donated',
             'origin': 'origin|created|commissioned',
             'turning_point': 'turning point|breakthrough|transformation',
+            'provenance': 'donation|provenance|donated|gift',
         }
         type_suffix = type_terms.get(elem_type, '')
 
@@ -479,6 +480,65 @@ def search_stories_for_stop(stop: Dict, tour_type: str = 'contained',
         'story_mining_status': status,
         'total_queries': total_queries,
         'estimated_cost': estimated_cost,
+    }
+
+
+def execute_fact_refinement(fact_queries: List[str], existing_results: List[Dict],
+                            query_budget_remaining: int, domain_cache: dict = None) -> Dict:
+    """W7 orchestration: execute fact-targeted queries from extraction feedback.
+    
+    Called AFTER extract_and_score_stop returns fact_refinement_queries.
+    One bounded round, within remaining tour budget. Results classified and returned
+    for a second extraction pass.
+    
+    Parameters:
+      - fact_queries: list of fact-targeted query strings from synthesize_fact_targeted_queries
+      - existing_results: results already fetched (to avoid re-fetching same URLs)
+      - query_budget_remaining: queries still available within tour budget
+      - domain_cache: shared domain tier cache
+    
+    Returns:
+      - new_results: classified results from fact-targeted queries (excluding already-seen URLs)
+      - query_log: log entries for the fact-targeted queries
+      - queries_used: number of queries consumed
+    """
+    if not fact_queries or query_budget_remaining <= 0:
+        return {'new_results': [], 'query_log': [], 'queries_used': 0}
+
+    if domain_cache is None:
+        domain_cache = {}
+
+    existing_urls = {r.get('url', '') for r in existing_results}
+    new_results = []
+    query_log = []
+    queries_used = 0
+
+    for query in fact_queries:
+        if queries_used >= query_budget_remaining:
+            break
+        results, latency = _serp_search(query)
+        queries_used += 1
+        query_log.append({
+            'query': query,
+            'result_count': len(results),
+            'latency_ms': round(latency, 1),
+            'fact_refinement': True,
+        })
+        for r in results:
+            if r.get('url', '') in existing_urls:
+                continue  # Skip already-fetched URLs
+            domain = normalize_domain(r['url'])
+            tier_class = classify_domain(domain, domain_cache)
+            r['domain'] = domain
+            r['tier'] = tier_class
+            if tier_class != 'reject':
+                new_results.append(r)
+                existing_urls.add(r['url'])
+
+    return {
+        'new_results': new_results,
+        'query_log': query_log,
+        'queries_used': queries_used,
     }
 
 

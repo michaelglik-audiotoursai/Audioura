@@ -8,7 +8,7 @@ import json, os, re, time, urllib.request, urllib.parse, hashlib
 from typing import Dict, List, Optional, Set, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from work_story_searcher import normalize_work_key, work_stories_put
+from work_story_searcher import normalize_work_key, work_stories_put, synthesize_fact_targeted_queries
 
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 
@@ -404,6 +404,16 @@ def extract_and_score_stop(search_results: List[Dict], canonical_title: str,
     # Step 5: Corroboration scoring
     scored = score_corroboration(all_elements)
     
+    # W7: Identify high-value reported elements that warrant fact-targeted refinement
+    _HIGH_VALUE_TYPES = {'dedication', 'origin', 'turning_point', 'provenance'}
+    fact_refinement_queries = []
+    reported_hv = [e for e in scored
+                   if e.get('corroboration_status') == 'reported'
+                   and e.get('type') in _HIGH_VALUE_TYPES]
+    if reported_hv:
+        _stop_for_queries = {'canonical_title': canonical_title, 'artist': artist}
+        fact_refinement_queries = synthesize_fact_targeted_queries(_stop_for_queries, reported_hv)
+    
     # F4: Cache write — persist scored elements for future cache hits
     _work_key = normalize_work_key(canonical_title, artist)
     _sources = [{'url': e.get('source_url', ''), 'domain': e.get('source_domain', '')} for e in scored]
@@ -423,4 +433,5 @@ def extract_and_score_stop(search_results: List[Dict], canonical_title: str,
         'pages_fetched': len(fetched_pages),
         'pages_anchored': len(anchored_pages),
         'extraction_status': 'ok',
+        'fact_refinement_queries': fact_refinement_queries,
     }
