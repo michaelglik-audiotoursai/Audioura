@@ -331,7 +331,11 @@ def synthesize_fact_targeted_queries(stop: Dict, reported_elements: List[Dict]) 
             if non_artist_people:
                 parts.append(non_artist_people[0])  # First NON-artist person
         if dates:
-            parts.append(dates[0])  # First date
+            # D5: Only use a date if it appears in the source_sentence (avoid noise dates)
+            source_sentence = elem.get('source_sentence', '')
+            valid_dates = [d for d in dates if d in source_sentence] if source_sentence else dates
+            if valid_dates:
+                parts.append(valid_dates[0])  # First date confirmed in source text
         parts.append(type_suffix.split('|')[0])  # Primary type term
 
         query = ' '.join(p for p in parts if p)

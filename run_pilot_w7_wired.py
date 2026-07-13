@@ -74,6 +74,7 @@ def run_exemplar(name, stop, target_keywords, criterion_label):
     # Phase 3: W7 wiring — execute fact-targeted queries if available
     w7_new_elements = []
     w7_log = []
+    w7_fetch_log = []
     if frq:
         budget_remaining = 40 - r['total_queries']  # Plus tier budget minus already used
         print(f"\n--- W7 fact-targeted refinement (budget_remaining={budget_remaining}) ---")
@@ -93,6 +94,7 @@ def run_exemplar(name, stop, target_keywords, criterion_label):
             ext2 = extract_and_score_stop(ref_result['new_results'], stop['canonical_title'], stop['artist'])
             print(f"Fetched: {ext2['pages_fetched']}, Anchored: {ext2['pages_anchored']}")
             w7_new_elements = ext2.get('elements', [])
+            w7_fetch_log = ext2.get('fetch_log', [])
             print(f"New elements from W7: {len(w7_new_elements)}")
             for e in w7_new_elements:
                 print(f"  [{e.get('corroboration_status','?')}] ({e.get('type','?')}): {e.get('text','')[:80]}")
@@ -127,11 +129,17 @@ def run_exemplar(name, stop, target_keywords, criterion_label):
     return {
         'stop': stop,
         'search': {'total_queries': r['total_queries'], 'results_count': len(r['results']),
-                   'status': r['story_mining_status'], 't1t2_count': len(t1t2)},
+                   'status': r['story_mining_status'], 't1t2_count': len(t1t2),
+                   'query_log': r.get('query_log', []),
+                   'per_query_results': [{'url': x.get('url',''), 'domain': x.get('domain',''),
+                                          'tier': x.get('tier',''), 'title': x.get('title','')[:80]}
+                                         for x in r['results']]},
         'first_extraction': {'pages_fetched': ext['pages_fetched'], 'pages_anchored': ext['pages_anchored'],
-                            'elements_count': len(ext['elements']), 'status': ext['extraction_status']},
+                            'elements_count': len(ext['elements']), 'status': ext['extraction_status'],
+                            'fetch_log': ext.get('fetch_log', [])},
         'w7': {'triggered': len(frq) > 0, 'queries': frq, 'new_results': len(w7_new_elements),
-               'query_log': w7_log},
+               'query_log': w7_log,
+               'fetch_log': w7_fetch_log},
         'final_elements': final_elements,
         'target_elements': target,
         'criterion_met': criterion_met,

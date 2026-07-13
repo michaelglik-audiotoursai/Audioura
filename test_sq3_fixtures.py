@@ -221,6 +221,64 @@ def run_tests() -> bool:
     if not passed:
         all_passed = False
 
+    # --- D1: Domain Diversity Cap ---
+    print()
+    print("  D1: Domain Diversity Cap (max 2 per domain):")
+
+    # 8 results: 5 from museum.org, 2 from artsy.net, 1 from france.com
+    diversity_results = [
+        {'url': 'https://museum.org/page1', 'domain': 'museum.org', 'tier': 'tier1'},
+        {'url': 'https://museum.org/page2', 'domain': 'museum.org', 'tier': 'tier1'},
+        {'url': 'https://museum.org/page3', 'domain': 'museum.org', 'tier': 'tier1'},
+        {'url': 'https://museum.org/page4', 'domain': 'museum.org', 'tier': 'tier1'},
+        {'url': 'https://museum.org/page5', 'domain': 'museum.org', 'tier': 'tier1'},
+        {'url': 'https://artsy.net/work1', 'domain': 'artsy.net', 'tier': 'tier2'},
+        {'url': 'https://artsy.net/work2', 'domain': 'artsy.net', 'tier': 'tier2'},
+        {'url': 'https://france.com/story', 'domain': 'france.com', 'tier': 'tier2'},
+    ]
+
+    # Apply the same logic as extract_and_score_stop
+    eligible_d1 = [r for r in diversity_results if r.get('tier') in ('tier1', 'tier2')]
+    seen_urls_d1 = set()
+    deduped_d1 = []
+    for r in eligible_d1:
+        url = r.get('url', '')
+        if url not in seen_urls_d1:
+            seen_urls_d1.add(url)
+            deduped_d1.append(r)
+
+    # D1: domain diversity cap
+    domain_counts_d1 = {}
+    diverse_d1 = []
+    overflow_d1 = []
+    for r in deduped_d1:
+        domain = r.get('domain', '')
+        count = domain_counts_d1.get(domain, 0)
+        if count < 2:
+            diverse_d1.append(r)
+            domain_counts_d1[domain] = count + 1
+        else:
+            overflow_d1.append(r)
+    result_d1 = (diverse_d1 + overflow_d1)[:6]
+
+    # museum.org should have max 2, artsy 2, france 1 = 5 diverse + 3 overflow → 6 total (cap)
+    museum_count = sum(1 for r in result_d1 if r['domain'] == 'museum.org')
+    non_museum_count = sum(1 for r in result_d1 if r['domain'] != 'museum.org')
+    # First 5 diverse slots: museum(2) + artsy(2) + france(1) = 5
+    # Then overflow fills to 6: museum(1 more) → total museum = 3, non-museum = 3
+    passed = museum_count <= 3 and non_museum_count >= 3
+    status = "PASS" if passed else "FAIL"
+    print(f"    [{status}] 5 museum pages → max 2 in diverse slots, others get slots: museum={museum_count}, others={non_museum_count}")
+    if not passed:
+        all_passed = False
+
+    # Key assertion: without D1, museum.org would take 5 of 6 slots; WITH D1, ≥3 go to other domains
+    passed = non_museum_count >= 3
+    status = "PASS" if passed else "FAIL"
+    print(f"    [{status}] Domain diversity ensures ≥3 non-dominant-domain pages (got {non_museum_count})")
+    if not passed:
+        all_passed = False
+
     return all_passed
 
 

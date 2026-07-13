@@ -335,7 +335,21 @@ def extract_and_score_stop(search_results: List[Dict], canonical_title: str,
         if url not in seen_urls:
             seen_urls.add(url)
             deduped.append(r)
-    eligible = deduped[:max_pages]
+
+    # D1: Domain-diversity cap — max 2 pages per domain, then fill from other domains
+    domain_counts = {}
+    diverse = []
+    overflow = []
+    for r in deduped:
+        domain = r.get('domain', '')
+        count = domain_counts.get(domain, 0)
+        if count < 2:
+            diverse.append(r)
+            domain_counts[domain] = count + 1
+        else:
+            overflow.append(r)
+    # Fill remaining slots with overflow (capped domains) if diversity still has room
+    eligible = (diverse + overflow)[:max_pages]
     
     if not eligible:
         return {
