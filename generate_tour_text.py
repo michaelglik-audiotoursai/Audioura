@@ -2850,6 +2850,47 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 _facts_text = '. '.join(f[:200] for f in _work_facts[:4])
                 description_prompt += f"\nDOCUMENTED FACTS FOR THIS WORK (incorporate at least one):\n{_facts_text}\n"
 
+        # [B6] Scored story elements → generation wiring (per-status phrasing)
+        # Reads ranked elements from work_stories cache and injects them with
+        # status-appropriate instructions: documented→fact, reported→attribution,
+        # legend→"the story goes…", disputed→both sides with sources.
+        if tour_category == 'museum' and poi_name and artist:
+            try:
+                from work_story_searcher import normalize_work_key, work_stories_get
+                from story_element_extractor import select_stop_elements
+                _b6_work_key = normalize_work_key(poi_name, artist)
+                _b6_cached = work_stories_get(_b6_work_key)
+                if _b6_cached and _b6_cached.get('elements'):
+                    _b6_selection = select_stop_elements(_b6_cached['elements'], max_selected=3)
+                    _b6_selected = _b6_selection.get('selected_elements', [])
+                    _b6_runners = _b6_selection.get('runner_up_elements', [])[:2]
+                    if _b6_selected:
+                        _b6_block = "\nSTORY ELEMENTS (use these as primary material, follow phrasing rules per status):\n"
+                        for _elem in _b6_selected:
+                            _status = _elem.get('corroboration_status', 'reported')
+                            _text = _elem.get('text', '')[:200]
+                            _etype = _elem.get('type', '')
+                            if _status == 'documented':
+                                _b6_block += f"  [FACT — state directly, no attribution needed] ({_etype}): {_text}\n"
+                            elif _status == 'reported':
+                                _src_domain = _elem.get('source_domain', 'sources')
+                                _b6_block += f"  [REPORTED — use inline attribution: \"According to {_src_domain}...\"] ({_etype}): {_text}\n"
+                            elif _status == 'legend':
+                                _b6_block += f"  [LEGEND — frame as: \"The story goes that...\"] ({_etype}): {_text}\n"
+                            elif _status == 'disputed':
+                                _b6_block += f"  [DISPUTED — expose both sides with sources] ({_etype}): {_text}\n"
+                            else:
+                                _b6_block += f"  [{_status}] ({_etype}): {_text}\n"
+                        if _b6_runners:
+                            _b6_block += "  TEXTURE (weave in if natural):\n"
+                            for _elem in _b6_runners:
+                                _b6_block += f"    ({_elem.get('type','')}) {_elem.get('text','')[:120]}\n"
+                        description_prompt += _b6_block
+            except ImportError:
+                pass
+            except Exception as _b6_err:
+                print(f"  [B6] Story element wiring error (stop {stop_num}): {_b6_err}")
+
         # Add venue containment constraint for single-venue museum tours
         if tour_category == 'museum' and _museum_venue_name:
             description_prompt += f"""
