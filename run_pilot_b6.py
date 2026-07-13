@@ -165,7 +165,8 @@ def run_fresh_mining(name, stop, target_keywords, criterion_label):
         )
         print(f"W7 new results: {len(ref_result['new_results'])}, queries_used: {ref_result['queries_used']}")
         if ref_result['new_results']:
-            ext2 = extract_and_score_stop(ref_result['new_results'], stop['canonical_title'], stop['artist'])
+            ext2 = extract_and_score_stop(ref_result['new_results'], stop['canonical_title'], stop['artist'],
+                                          venue_name=stop.get('venue_name', ''))
             w7_new_elements = ext2.get('elements', [])
             print(f"New elements from W7: {len(w7_new_elements)}")
 
