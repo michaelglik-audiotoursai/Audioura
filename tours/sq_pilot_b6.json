@@ -1,0 +1,2352 @@
+{
+  "code_sha": "b8d5d968af95146f05a31d670ae3a9bc72bf842d",
+  "code_dirty": false,
+  "commit": "b8d5d96",
+  "deliverables": [
+    "B6_work_stories_WRITE",
+    "B6_work_stories_READ",
+    "B6_elements_generation_wiring",
+    "B6_icon_delta"
+  ],
+  "matisse_fresh": {
+    "search": {
+      "total_queries": 7,
+      "results_count": 37,
+      "status": "ok",
+      "t1t2_count": 23,
+      "query_log": [
+        {
+          "query": "\"Blue Nude II\" Henri Matisse story behind",
+          "result_count": 8,
+          "latency_ms": 962.6
+        },
+        {
+          "query": "\"Blue Nude II\" Henri Matisse history making",
+          "result_count": 8,
+          "latency_ms": 1286.6
+        },
+        {
+          "query": "\"Blue Nude II\" Henri Matisse controversy",
+          "result_count": 8,
+          "latency_ms": 1016.1
+        },
+        {
+          "query": "\"Blue Nude\" Henri Matisse story behind",
+          "result_count": 8,
+          "latency_ms": 1106.7
+        },
+        {
+          "query": "\"Nu bleu II\" Henri Matisse story behind",
+          "result_count": 8,
+          "latency_ms": 1204.5
+        },
+        {
+          "query": "\"Blue Nude\" Henri Matisse story behind",
+          "result_count": 8,
+          "latency_ms": 857.3
+        },
+        {
+          "query": "\"Blue Nude II\" Henri Matisse histoire",
+          "result_count": 8,
+          "latency_ms": 749.0
+        }
+      ],
+      "per_query_results": [
+        {
+          "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
+          "domain": "centrepompidou.fr",
+          "tier": "tier1",
+          "title": "Focus on... \"Blue Nude II\" (\"Nu bleu II\") by Henri Matisse"
+        },
+        {
+          "url": "https://www.artlithographies.net/product-page/nu-bleu-ii-blue-nude-ii",
+          "domain": "artlithographies.net",
+          "tier": "tier3",
+          "title": "Nu Bleu II (Blue Nude II) - Henri MATISSE"
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Blue_Nudes",
+          "domain": "en.wikipedia.org",
+          "tier": "tier1",
+          "title": "Blue Nudes"
+        },
+        {
+          "url": "https://www.moma.org/audio/playlist/6/316",
+          "domain": "moma.org",
+          "tier": "tier1",
+          "title": "Henri Matisse. Blue Nude II. 1952"
+        },
+        {
+          "url": "https://galeriemontblanc.com/en/products/blue-nude-ii-henri-matisse?srsltid=AfmBOoq0Z_eFifaq2WGqb8BtSYvAKrXZbcUJLf2OQsWnpQvYu3sT969l",
+          "domain": "galeriemontblanc.com",
+          "tier": "tier3",
+          "title": "Reproduction of Blue Nude II - Henri Matisse"
+        },
+        {
+          "url": "https://www.singulart.com/blog/en/2019/09/27/blue-nudes-series-and-the-last-stage-of-matisses-career/?srsltid=AfmBOorXE60fCQEVYttJfsFfwtxYlVjZAeCqvNkbf7xglKNnB7i3IidC",
+          "domain": "singulart.com",
+          "tier": "tier3",
+          "title": "Blue Nudes Series and the Last Stage of Matisse's Career"
+        },
+        {
+          "url": "https://theskateroom.com/products/blue-nude-ii-1952?srsltid=AfmBOormz_paR_PId12mLDEfYtryq03iJr3R4MtJ3f9ZfrRW6s6k1bMU",
+          "domain": "theskateroom.com",
+          "tier": "tier3",
+          "title": "Blue Nude II (1952) Skateboard Art - Henri Matisse"
+        },
+        {
+          "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
+          "domain": "centrepompidou.fr",
+          "tier": "tier1",
+          "title": "Focus on... \"Blue Nude II\" (\"Nu bleu II\") by Henri Matisse"
+        },
+        {
+          "url": "https://www.moma.org/audio/playlist/6/316",
+          "domain": "moma.org",
+          "tier": "tier1",
+          "title": "Henri Matisse. Blue Nude II. 1952"
+        },
+        {
+          "url": "https://www.singulart.com/blog/en/2019/09/27/blue-nudes-series-and-the-last-stage-of-matisses-career/?srsltid=AfmBOoq8Fm2RDgOZLd05qlbl0Yab__ACb-LN9fAMu_mGWAYunX8B6awy",
+          "domain": "singulart.com",
+          "tier": "tier3",
+          "title": "Blue Nudes Series and the Last Stage of Matisse's Career"
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Blue_Nudes",
+          "domain": "en.wikipedia.org",
+          "tier": "tier1",
+          "title": "Blue Nudes"
+        },
+        {
+          "url": "https://www.theartstory.org/artist/matisse-henri/",
+          "domain": "theartstory.org",
+          "tier": "tier3",
+          "title": "Henri Matisse Paintings, Bio, Ideas"
+        },
+        {
+          "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/the-secret-history-of-henri-matisses-blue-nudes",
+          "domain": "centrepompidou.fr",
+          "tier": "tier1",
+          "title": "The Secret History of Henri Matisse's \u201cBlue Nudes\u201d"
+        },
+        {
+          "url": "https://www.singulart.com/blog/en/2019/09/27/blue-nudes-series-and-the-last-stage-of-matisses-career/?srsltid=AfmBOopq-Y5f7p1kRiCIlG93GSPUxXaR-iRVJHJJi29NvJzHu-cEEA1x",
+          "domain": "singulart.com",
+          "tier": "tier3",
+          "title": "Blue Nudes Series and the Last Stage of Matisse's Career"
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Henri_Matisse",
+          "domain": "en.wikipedia.org",
+          "tier": "tier1",
+          "title": "Henri Matisse"
+        },
+        {
+          "url": "https://www.movementislife.blog/blog-forte/matisse-and-harlem-i-had-no-idea",
+          "domain": "movementislife.blog",
+          "tier": "tier3",
+          "title": "Matisse and Harlem? I had no idea. - Movement is Life"
+        },
+        {
+          "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/the-secret-history-of-henri-matisses-blue-nudes",
+          "domain": "centrepompidou.fr",
+          "tier": "tier1",
+          "title": "The Secret History of Henri Matisse's \u201cBlue Nudes\u201d"
+        },
+        {
+          "url": "https://www.metmuseum.org/art/collection/search/492813",
+          "domain": "metmuseum.org",
+          "tier": "tier1",
+          "title": "Henri Matisse - Standing Blue Nude"
+        },
+        {
+          "url": "https://www.moma.org/audio/playlist/6/316",
+          "domain": "moma.org",
+          "tier": "tier1",
+          "title": "Henri Matisse. Blue Nude II. 1952"
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Blue_Nudes",
+          "domain": "en.wikipedia.org",
+          "tier": "tier1",
+          "title": "Blue Nudes"
+        },
+        {
+          "url": "https://www.henrimatisse.org/blue-nude.jsp",
+          "domain": "henrimatisse.org",
+          "tier": "tier3",
+          "title": "The Blue Nude, 1907 by Henri Matisse"
+        },
+        {
+          "url": "https://plasticekphrastic.com/2016/02/01/the-matisse-stories/",
+          "domain": "plasticekphrastic.com",
+          "tier": "tier3",
+          "title": "THE MATISSE STORIES | BRIDGING THE GAP"
+        },
+        {
+          "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
+          "domain": "centrepompidou.fr",
+          "tier": "tier1",
+          "title": "Focus on... \"Blue Nude II\" (\"Nu bleu II\") by Henri Matisse"
+        },
+        {
+          "url": "https://www.artsy.net/artwork/henri-matisse-nu-bleu-ii-blue-nude-ii-2",
+          "domain": "artsy.net",
+          "tier": "tier2",
+          "title": "Nu Bleu II (Blue Nude II) (2007) by Henri Matisse"
+        },
+        {
+          "url": "https://prodiart.com/eu/fine-art/matisse/blue-nude-ii-henri/product/print-artwork",
+          "domain": "prodiart.com",
+          "tier": "tier3",
+          "title": "Matisse - Blue Nude II - Fine Art Print | PRODI ART"
+        },
+        {
+          "url": "https://www.moma.org/slideshows/29/553",
+          "domain": "moma.org",
+          "tier": "tier1",
+          "title": "Henri Matisse. Blue Nude II (Nu bleu II), spring 1952"
+        },
+        {
+          "url": "https://www.ebay.com/itm/156988354291",
+          "domain": "ebay.com",
+          "tier": "tier3",
+          "title": "Henri Matisse Nu Bleu II Blue Nude II Lithograph Print ..."
+        },
+        {
+          "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/the-secret-history-of-henri-matisses-blue-nudes",
+          "domain": "centrepompidou.fr",
+          "tier": "tier1",
+          "title": "The Secret History of Henri Matisse's \u201cBlue Nudes\u201d"
+        },
+        {
+          "url": "https://www.metmuseum.org/art/collection/search/492813",
+          "domain": "metmuseum.org",
+          "tier": "tier1",
+          "title": "Henri Matisse - Standing Blue Nude"
+        },
+        {
+          "url": "https://www.moma.org/audio/playlist/6/316",
+          "domain": "moma.org",
+          "tier": "tier1",
+          "title": "Henri Matisse. Blue Nude II. 1952"
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Blue_Nudes",
+          "domain": "en.wikipedia.org",
+          "tier": "tier1",
+          "title": "Blue Nudes"
+        },
+        {
+          "url": "https://www.henrimatisse.org/blue-nude.jsp",
+          "domain": "henrimatisse.org",
+          "tier": "tier3",
+          "title": "The Blue Nude, 1907 by Henri Matisse"
+        },
+        {
+          "url": "https://plasticekphrastic.com/2016/02/01/the-matisse-stories/",
+          "domain": "plasticekphrastic.com",
+          "tier": "tier3",
+          "title": "THE MATISSE STORIES | BRIDGING THE GAP"
+        },
+        {
+          "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/the-secret-history-of-henri-matisses-blue-nudes",
+          "domain": "centrepompidou.fr",
+          "tier": "tier1",
+          "title": "The Secret History of Henri Matisse's \u201cBlue Nudes\u201d"
+        },
+        {
+          "url": "https://www.moma.org/audio/playlist/6/316",
+          "domain": "moma.org",
+          "tier": "tier1",
+          "title": "Henri Matisse. Blue Nude II. 1952"
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Blue_Nudes",
+          "domain": "en.wikipedia.org",
+          "tier": "tier1",
+          "title": "Blue Nudes"
+        },
+        {
+          "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
+          "domain": "centrepompidou.fr",
+          "tier": "tier1",
+          "title": "Focus on... \"Blue Nude II\" (\"Nu bleu II\") by Henri Matisse"
+        }
+      ]
+    },
+    "first_extraction": {
+      "pages_fetched": 5,
+      "pages_anchored": 4,
+      "elements_count": 10,
+      "status": "ok",
+      "fetch_log": [
+        {
+          "url": "https://en.wikipedia.org/wiki/Blue_Nudes",
+          "domain": "en.wikipedia.org",
+          "tier": "tier1",
+          "fetched": true,
+          "chars": 2409
+        },
+        {
+          "url": "https://www.moma.org/audio/playlist/6/316",
+          "domain": "moma.org",
+          "tier": "tier1",
+          "fetched": true,
+          "chars": 1978
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Henri_Matisse",
+          "domain": "en.wikipedia.org",
+          "tier": "tier1",
+          "fetched": true,
+          "chars": 15000
+        },
+        {
+          "url": "https://www.metmuseum.org/art/collection/search/492813",
+          "domain": "metmuseum.org",
+          "tier": "tier1",
+          "fetched": false,
+          "chars": 0
+        },
+        {
+          "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
+          "domain": "centrepompidou.fr",
+          "tier": "tier1",
+          "fetched": true,
+          "chars": 7443
+        },
+        {
+          "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/the-secret-history-of-henri-matisses-blue-nudes",
+          "domain": "centrepompidou.fr",
+          "tier": "tier1",
+          "fetched": true,
+          "chars": 10263
+        }
+      ]
+    },
+    "w7": {
+      "triggered": true,
+      "queries": [
+        "\"Blue Nude\" Henri Matisse donation",
+        "\"Blue Nude\" Henri Matisse 1984 origin"
+      ],
+      "new_results": 6
+    },
+    "final_elements": [
+      {
+        "type": "origin",
+        "text": "Blue Nude II was conceived during Matisse\u2019s time in Nice, where he worked in the spacious studio of the H\u00f4tel R\u00e9gina.",
+        "source_sentence": "Conceived during the artist\u2019s time in Nice, where he worked in the spacious studio of the H\u00f4tel R\u00e9gina, Blue Nude II entered the Centre Pompidou\u2019s collection in 1984.",
+        "people": [
+          "Henri Matisse"
+        ],
+        "dates": [
+          "1984"
+        ],
+        "is_satire": false,
+        "source_url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
+        "source_domain": "www.centrepompidou.fr",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "www.centrepompidou.fr",
+              "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse"
+            }
+          ]
+        },
+        "rank_score": 5.0
+      },
+      {
+        "type": "origin",
+        "text": "Blue Nude (Souvenir of Biskra) is an early 1907 oil painting on canvas by Henri Matisse.",
+        "source_sentence": "Blue Nude (Souvenir of Biskra) (French: \"Nu bleu, Souvenir de Biskra\"), an early 1907 oil painting on canvas by Henri Matisse, is located at the Baltimore Museum of Art as part of the Cone Collection.",
+        "people": [
+          "Henri Matisse"
+        ],
+        "dates": [
+          "1907"
+        ],
+        "is_satire": false,
+        "source_url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)",
+        "source_domain": "en.wikipedia.org",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)"
+            }
+          ]
+        },
+        "rank_score": 5.0
+      },
+      {
+        "type": "technique",
+        "text": "The painted gouache cut-outs that compose the Blue Nudes were inspired by Matisse's collection of African sculpture and his visit to Tahiti.",
+        "source_sentence": "The painted gouache cut-outs that compose the Blue Nudes were inspired by Matisse's collection of African sculpture and his visit to Tahiti, in 1930.",
+        "people": [
+          "Henri Matisse"
+        ],
+        "dates": [
+          "1930"
+        ],
+        "is_satire": false,
+        "source_url": "https://en.wikipedia.org/wiki/Blue_Nudes",
+        "source_domain": "en.wikipedia.org",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Blue_Nudes"
+            }
+          ]
+        },
+        "rank_score": 4.0
+      },
+      {
+        "type": "intention",
+        "text": "In creating Blue Nude II, Matisse aimed to unite color and drawing.",
+        "source_sentence": "And that is how do you unite color and drawing.",
+        "people": [
+          "Henri Matisse"
+        ],
+        "dates": [],
+        "is_satire": false,
+        "source_url": "https://www.moma.org/audio/playlist/6/316",
+        "source_domain": "www.moma.org",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "www.moma.org",
+              "url": "https://www.moma.org/audio/playlist/6/316"
+            }
+          ]
+        },
+        "rank_score": 4.0
+      },
+      {
+        "type": "controversy",
+        "text": "Matisse faced challenges while creating the Blue Nudes, including frustration that led him to stop cutting and turn to drawing.",
+        "source_sentence": "In frustration, Matisse stopped cutting and turned to drawing.",
+        "people": [
+          "Henri Matisse"
+        ],
+        "dates": [],
+        "is_satire": false,
+        "source_url": "https://www.moma.org/audio/playlist/6/316",
+        "source_domain": "www.moma.org",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "www.moma.org",
+              "url": "https://www.moma.org/audio/playlist/6/316"
+            }
+          ]
+        },
+        "rank_score": 4.0
+      },
+      {
+        "type": "reference_work",
+        "text": "The Blue Nude series revisits a seated nude pose that Matisse had explored extensively in both painting and sculpture.",
+        "source_sentence": "The Blue Nude series (1952) revisits a seated nude pose that Matisse had explored extensively in both painting and sculpture, including Seated Nude, Olga (1910), Seated Nude, Arms Around the Right Leg (1918), and Venus with a Shell (particularly in its 1932 version).",
+        "people": [
+          "Henri Matisse"
+        ],
+        "dates": [
+          "1910",
+          "1918",
+          "1932",
+          "1952"
+        ],
+        "is_satire": false,
+        "source_url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
+        "source_domain": "www.centrepompidou.fr",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 2,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "www.centrepompidou.fr",
+              "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse"
+            },
+            {
+              "domain": "www.centrepompidou.fr",
+              "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/the-secret-history-of-henri-matisses-blue-nudes"
+            }
+          ],
+          "merged_from": [
+            9
+          ]
+        },
+        "rank_score": 4.0
+      },
+      {
+        "type": "controversy",
+        "text": "The painting was controversial; in 1913, it was burned in effigy by students critical of the avant-garde outside of the Armory Show in Chicago.",
+        "source_sentence": "The painting, which may be classified as Fauvist, was controversial; in 1913, it was burned in effigy by students critical of the avant-garde outside of the Armory Show in Chicago, to where it had toured from New York.",
+        "people": [],
+        "dates": [
+          "1913"
+        ],
+        "is_satire": false,
+        "source_url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)",
+        "source_domain": "en.wikipedia.org",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)"
+            }
+          ]
+        },
+        "rank_score": 4.0
+      },
+      {
+        "type": "intention",
+        "text": "Matisse is sexualizing the woman yet painting her in a harsh, crude way to repel the viewer.",
+        "source_sentence": "Matisse is sexualizing the woman yet painting her in a harsh, crude way to repel the viewer.",
+        "people": [
+          "Henri Matisse"
+        ],
+        "dates": [],
+        "is_satire": false,
+        "source_url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)",
+        "source_domain": "en.wikipedia.org",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)"
+            }
+          ]
+        },
+        "rank_score": 4.0
+      },
+      {
+        "type": "reception",
+        "text": "After his death, the works were printed in a special 1956 issue of Verve, entitled 'Les Derni\u00e8res \u0152uvres de Matisse'.",
+        "source_sentence": "After his death, the works were printed in a special 1956 issue of Verve, entitled 'Les Derni\u00e8res \u0152uvres de Matisse', though only the ones finished before his death bear his signature.",
+        "people": [
+          "Henri Matisse"
+        ],
+        "dates": [
+          "1956"
+        ],
+        "is_satire": false,
+        "source_url": "https://en.wikipedia.org/wiki/Blue_Nudes",
+        "source_domain": "en.wikipedia.org",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Blue_Nudes"
+            }
+          ]
+        },
+        "rank_score": 3.5
+      },
+      {
+        "type": "reference_work",
+        "text": "Blue Nude was one of the paintings that would later create an international sensation at the Armory Show of 1913 in New York City.",
+        "source_sentence": "Matisse shocked the French public at the 1907 Soci\u00e9t\u00e9 des Artistes Ind\u00e9pendants when he exhibited Blue Nude (Souvenir de Biskra). Blue Nude was one of the paintings that would later create an international sensation at the Armory Show of 1913 in New York City.",
+        "people": [],
+        "dates": [
+          "1907",
+          "1913"
+        ],
+        "is_satire": false,
+        "source_url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)",
+        "source_domain": "en.wikipedia.org",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)"
+            }
+          ]
+        },
+        "rank_score": 3.5
+      },
+      {
+        "type": "date",
+        "text": "Blue Nude II was completed in 1952.",
+        "source_sentence": "The second in the series, Blue Nude II, was completed in 1952.",
+        "people": [],
+        "dates": [
+          "1952"
+        ],
+        "is_satire": false,
+        "source_url": "https://en.wikipedia.org/wiki/Blue_Nudes",
+        "source_domain": "en.wikipedia.org",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Blue_Nudes"
+            }
+          ]
+        },
+        "_merge_log": [
+          {
+            "pair": [
+              4,
+              14
+            ],
+            "a_text": "In creating Blue Nude II, Matisse aimed to unite color and drawing.",
+            "b_text": "Matisse is sexualizing the woman yet painting her in a harsh, crude way to repel",
+            "same_subject": false,
+            "conflicting": false,
+            "a_domain": "www.moma.org",
+            "b_domain": "en.wikipedia.org",
+            "action": "no_merge"
+          },
+          {
+            "pair": [
+              5,
+              11
+            ],
+            "a_text": "Matisse faced challenges while creating the Blue Nudes, including frustration th",
+            "b_text": "The painting was controversial; in 1913, it was burned in effigy by students cri",
+            "same_subject": false,
+            "conflicting": false,
+            "a_domain": "www.moma.org",
+            "b_domain": "en.wikipedia.org",
+            "action": "no_merge"
+          },
+          {
+            "pair": [
+              6,
+              10
+            ],
+            "a_text": "Blue Nude II was conceived during Matisse\u2019s time in Nice, where he worked in the",
+            "b_text": "Blue Nude (Souvenir of Biskra) is an early 1907 oil painting on canvas by Henri ",
+            "same_subject": false,
+            "conflicting": false,
+            "a_domain": "www.centrepompidou.fr",
+            "b_domain": "en.wikipedia.org",
+            "action": "no_merge"
+          },
+          {
+            "pair": [
+              8,
+              9
+            ],
+            "a_text": "The Blue Nude series revisits a seated nude pose that Matisse had explored exten",
+            "b_text": "Blue Nude II is part of a series of four monumental compositions created in 1952",
+            "same_subject": true,
+            "conflicting": false,
+            "a_domain": "www.centrepompidou.fr",
+            "b_domain": "www.centrepompidou.fr",
+            "action": "merged"
+          },
+          {
+            "pair": [
+              8,
+              12
+            ],
+            "a_text": "The Blue Nude series revisits a seated nude pose that Matisse had explored exten",
+            "b_text": "Blue Nude was one of the paintings that would later create an international sens",
+            "same_subject": false,
+            "conflicting": false,
+            "a_domain": "www.centrepompidou.fr",
+            "b_domain": "en.wikipedia.org",
+            "action": "no_merge"
+          },
+          {
+            "pair": [
+              9,
+              12
+            ],
+            "a_text": "Blue Nude II is part of a series of four monumental compositions created in 1952",
+            "b_text": "Blue Nude was one of the paintings that would later create an international sens",
+            "same_subject": false,
+            "conflicting": false,
+            "a_domain": "www.centrepompidou.fr",
+            "b_domain": "en.wikipedia.org",
+            "action": "no_merge"
+          }
+        ],
+        "rank_score": 2.5
+      },
+      {
+        "type": "provenance",
+        "text": "Blue Nude II is part of the collection at the Mus\u00e9e national d\u2019art moderne/Centre de cr\u00e9ation industrielle, Centre Georges Pompidou, Paris.",
+        "source_sentence": "Mus\u00e9e national d\u2019art moderne/Centre de cr\u00e9ation industrielle, Centre Georges Pompidou, Paris.",
+        "people": [],
+        "dates": [],
+        "is_satire": false,
+        "source_url": "https://www.moma.org/audio/playlist/6/316",
+        "source_domain": "www.moma.org",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "www.moma.org",
+              "url": "https://www.moma.org/audio/playlist/6/316"
+            }
+          ]
+        },
+        "rank_score": 2.5
+      },
+      {
+        "type": "technique",
+        "text": "Legend has it that Blue Nude II was created in a single, fluid cut of the scissors.",
+        "source_sentence": "Legend has it that it was created in a single, fluid cut of the scissors!",
+        "people": [],
+        "dates": [],
+        "is_satire": false,
+        "source_url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
+        "source_domain": "www.centrepompidou.fr",
+        "corroboration_status": "legend",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "www.centrepompidou.fr",
+              "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse"
+            }
+          ]
+        },
+        "rank_score": 2.5
+      },
+      {
+        "type": "interpretation",
+        "text": "Some scholars argue that Matisse is depicting North Africa as a sexually available in the sense that one could dominate/rape/consume it in the same way you could a woman.",
+        "source_sentence": "Some scholars argue that Matisse is depicting North Africa as a sexually available in the sense that one could dominate/rape/consume it in the same way you could a woman.",
+        "people": [
+          "Henri Matisse"
+        ],
+        "dates": [],
+        "is_satire": false,
+        "source_url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)",
+        "source_domain": "en.wikipedia.org",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)"
+            }
+          ]
+        },
+        "rank_score": 2.5
+      },
+      {
+        "type": "subject",
+        "text": "The subject of the painting is a nude woman reclining in a Mediterranean landscape, presumably Biskra.",
+        "source_sentence": "The subject of the painting is a nude woman reclining in a Mediterranean landscape, presumably Biskra.",
+        "people": [],
+        "dates": [],
+        "is_satire": false,
+        "source_url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)",
+        "source_domain": "en.wikipedia.org",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "en.wikipedia.org",
+              "url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)"
+            }
+          ]
+        },
+        "rank_score": 2.0
+      }
+    ],
+    "criterion_met": false,
+    "work_stories_write": {
+      "work_key": "blue nude ii|||henri matisse",
+      "elements_count": 6,
+      "status": "STORED"
+    }
+  },
+  "chagall_fresh": {
+    "search": {
+      "total_queries": 7,
+      "results_count": 33,
+      "status": "ok",
+      "t1t2_count": 10,
+      "query_log": [
+        {
+          "query": "\"Le Cantique des Cantiques IV\" Marc Chagall story behind",
+          "result_count": 8,
+          "latency_ms": 907.7
+        },
+        {
+          "query": "\"Le Cantique des Cantiques IV\" Marc Chagall history making",
+          "result_count": 8,
+          "latency_ms": 1246.7
+        },
+        {
+          "query": "\"Le Cantique des Cantiques IV\" Marc Chagall controversy",
+          "result_count": 8,
+          "latency_ms": 865.4
+        },
+        {
+          "query": "\"Le Cantique des Cantiques\" Marc Chagall story behind",
+          "result_count": 8,
+          "latency_ms": 1115.0
+        },
+        {
+          "query": "\"Song of Songs IV\" Marc Chagall story behind",
+          "result_count": 8,
+          "latency_ms": 1250.1
+        },
+        {
+          "query": "\"Song of Songs\" Marc Chagall story behind",
+          "result_count": 8,
+          "latency_ms": 1065.2
+        },
+        {
+          "query": "\"Le Cantique des Cantiques IV\" Marc Chagall histoire",
+          "result_count": 8,
+          "latency_ms": 2766.3
+        }
+      ],
+      "per_query_results": [
+        {
+          "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee",
+          "domain": "musees-nationaux-alpesmaritimes.fr",
+          "tier": "tier1",
+          "title": "The song of songs. The colour revealed"
+        },
+        {
+          "url": "https://www.wikiart.org/en/marc-chagall/song-of-songs-iv-1958-6",
+          "domain": "wikiart.org",
+          "tier": "tier3",
+          "title": "Song of Songs IV, 1958 - Marc Chagall"
+        },
+        {
+          "url": "https://www.boutiquesdemusees.fr/en/ext/product/musee-de-grenoble/15265-notebook-marc-chagall-song-of-songs-iv.html",
+          "domain": "boutiquesdemusees.fr",
+          "tier": "tier3",
+          "title": "Notebook Marc Chagall - Song of Songs IV \u00b7 Boutiques de mus\u00e9es"
+        },
+        {
+          "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv",
+          "domain": "musees-nationaux-alpesmaritimes.fr",
+          "tier": "tier1",
+          "title": "Le Cantique des Cantiques IV | Mus\u00e9e National Marc Chagall"
+        },
+        {
+          "url": "https://www.boutiquesdemusees.fr/en/ext/product/musee-national-art-moderne-centre-pompidou/4144-le-cantique-des-cantiques-iv-poster.html",
+          "domain": "boutiquesdemusees.fr",
+          "tier": "tier3",
+          "title": "Poster Song of songs IV \u00b7 Boutiques de mus\u00e9es"
+        },
+        {
+          "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee",
+          "domain": "musees-nationaux-alpesmaritimes.fr",
+          "tier": "tier1",
+          "title": "The song of songs. The colour revealed"
+        },
+        {
+          "url": "https://www.wikiart.org/en/marc-chagall/song-of-songs-iv-1958-6",
+          "domain": "wikiart.org",
+          "tier": "tier3",
+          "title": "Song of Songs IV, 1958 - Marc Chagall"
+        },
+        {
+          "url": "https://www.boutiquesdemusees.fr/en/ext/product/musee-national-marc-chagall/4144-le-cantique-des-cantiques-iv-poster.html",
+          "domain": "boutiquesdemusees.fr",
+          "tier": "tier3",
+          "title": "Poster Song of songs IV \u00b7 Boutiques de mus\u00e9es"
+        },
+        {
+          "url": "https://www.firstonline.info/en/chagall-paris-new-york-la-sua-lunga-storia-in-una-mostra-immersiva-allatelier-des-lumieres-di-parigi/",
+          "domain": "firstonline.info",
+          "tier": "tier3",
+          "title": "Chagall, Paris-New York: his long history in an immersive ..."
+        },
+        {
+          "url": "https://www.masterworksfineart.com/artists/marc-chagall/lithograph/le-cantique-des-cantiques-the-song-of-songs-1975/id/w-5133?srsltid=AfmBOoo3jMiQJ9JpVGLELNgFH9grS8bsO0rLcmIors3gtteCVNCsHJqX",
+          "domain": "masterworksfineart.com",
+          "tier": "tier3",
+          "title": "Marc Chagall, Le cantique des cantiques (The Song of ..."
+        },
+        {
+          "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee",
+          "domain": "musees-nationaux-alpesmaritimes.fr",
+          "tier": "tier1",
+          "title": "The song of songs. The colour revealed"
+        },
+        {
+          "url": "https://www.myartbroker.com/artist-marc-chagall/artwork-le-cantique-des-cantiques-signed-print",
+          "domain": "myartbroker.com",
+          "tier": "tier3",
+          "title": "Le Cantique Des Cantiques Signed Print - Marc Chagall"
+        },
+        {
+          "url": "https://www.mourloteditions.com/products/le-cantique-des-cantiques-by-marc-chagall?srsltid=AfmBOooZ9n9Iz9Kp7lRhN5p_c8hY9CeGtOKZhJZZvwbf-PuvlGdbLe3H",
+          "domain": "mourloteditions.com",
+          "tier": "tier3",
+          "title": "Le Cantique des Cantiques (after) Marc Chagall, 1975"
+        },
+        {
+          "url": "https://www.artsy.net/artwork/marc-chagall-le-cantique-des-cantiques",
+          "domain": "artsy.net",
+          "tier": "tier2",
+          "title": "Le cantique des cantiques (1975) by Marc Chagall"
+        },
+        {
+          "url": "https://www.boutiquesdemusees.fr/en/product/4143-le-cantique-des-cantiques-iii-poster.html",
+          "domain": "boutiquesdemusees.fr",
+          "tier": "tier3",
+          "title": "Poster Marc Chagall - Song of songs III"
+        },
+        {
+          "url": "https://www.boutiquesdemusees.fr/en/content/410233-marc-chagall-line-the-song-of-songs-masterpiece-of-love-and-spirituality.html",
+          "domain": "boutiquesdemusees.fr",
+          "tier": "tier3",
+          "title": "Marc Chagall Line The Song of Songs: Masterpiece ..."
+        },
+        {
+          "url": "https://letsexploreart.wordpress.com/2014/02/13/magic-hour-chagalls-song-of-songs-iv/",
+          "domain": "letsexploreart.wordpress.com",
+          "tier": "tier3",
+          "title": "Magic Hour: Chagall's \u201cSong of Songs IV\u201d | let's explore art"
+        },
+        {
+          "url": "https://www.wikiart.org/en/marc-chagall/song-of-songs-iv-1958-6",
+          "domain": "wikiart.org",
+          "tier": "tier3",
+          "title": "Song of Songs IV, 1958 - Marc Chagall"
+        },
+        {
+          "url": "https://www.musee-virtuel-vin.fr/en/cantique-des-cantiques",
+          "domain": "musee-virtuel-vin.fr",
+          "tier": "tier3",
+          "title": "The Song of Songs or Song of Solomon: \u201cFor thy love ..."
+        },
+        {
+          "url": "https://artisticafineart.com/products/the-song-of-songs-iv-by-marc-chagall?srsltid=AfmBOoo76l3oc20L_Ms0M_9TgmwWJG1LpM_K23YzbmKcaeXCKX3hJruI",
+          "domain": "artisticafineart.com",
+          "tier": "tier3",
+          "title": "The Song of Songs IV by Marc Chagall - 10 X 12 Inches ..."
+        },
+        {
+          "url": "https://ofhisglory.com/category/song-of-songs/",
+          "domain": "ofhisglory.com",
+          "tier": "tier3",
+          "title": "Song of Songs - and in his temple all cry, \u201cGlory!\u201d"
+        },
+        {
+          "url": "https://www.boutiquesdemusees.fr/en/content/410233-marc-chagall-line-the-song-of-songs-masterpiece-of-love-and-spirituality.html",
+          "domain": "boutiquesdemusees.fr",
+          "tier": "tier3",
+          "title": "Marc Chagall Line The Song of Songs: Masterpiece ..."
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Song_of_Songs",
+          "domain": "en.wikipedia.org",
+          "tier": "tier1",
+          "title": "Song of Songs"
+        },
+        {
+          "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee",
+          "domain": "musees-nationaux-alpesmaritimes.fr",
+          "tier": "tier1",
+          "title": "The song of songs. The colour revealed"
+        },
+        {
+          "url": "https://www.artsy.net/artwork/marc-chagall-song-of-songs",
+          "domain": "artsy.net",
+          "tier": "tier2",
+          "title": "Song of Songs (1956) by Marc Chagall - For Sale"
+        },
+        {
+          "url": "https://letsexploreart.wordpress.com/2014/02/13/magic-hour-chagalls-song-of-songs-iv/",
+          "domain": "letsexploreart.wordpress.com",
+          "tier": "tier3",
+          "title": "Magic Hour: Chagall's \u201cSong of Songs IV\u201d | let's explore art"
+        },
+        {
+          "url": "https://thevcs.org/seek-and-you-shall-find",
+          "domain": "thevcs.org",
+          "tier": "tier3",
+          "title": "Seek and You Shall Find | VCS"
+        },
+        {
+          "url": "https://bid.modernauctions.com/online-auctions/palm-beach-modern/marc-chagall-song-of-songs-lithograph-signed-1303761",
+          "domain": "bid.modernauctions.com",
+          "tier": "tier3",
+          "title": "Marc Chagall \"Song of Songs\" Lithograph, Signed"
+        },
+        {
+          "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv",
+          "domain": "musees-nationaux-alpesmaritimes.fr",
+          "tier": "tier1",
+          "title": "Le Cantique des Cantiques IV | Mus\u00e9e National Marc Chagall"
+        },
+        {
+          "url": "https://www.boutiquesdemusees.fr/fr/content/410233-ligne-marc-chagall-le-cantique-des-cantiques-chef-oeuvre-amour-et-de-spiritualite.html",
+          "domain": "boutiquesdemusees.fr",
+          "tier": "tier3",
+          "title": "Ligne Marc Chagall Le Cantique des Cantiques : Chef-d' ..."
+        },
+        {
+          "url": "https://www.wikiart.org/en/marc-chagall/song-of-songs-iv-1958-6",
+          "domain": "wikiart.org",
+          "tier": "tier3",
+          "title": "Song of Songs IV, 1958 - Marc Chagall"
+        },
+        {
+          "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/periode/le-cantique-des-cantiques",
+          "domain": "musees-nationaux-alpesmaritimes.fr",
+          "tier": "tier1",
+          "title": "Le Cantique des Cantiques | Mus\u00e9e National Marc Chagall"
+        },
+        {
+          "url": "https://leblogdephil.com/wp-content/uploads/2018/09/cantiquedescantiqueschagall11.pdf",
+          "domain": "leblogdephil.com",
+          "tier": "tier3",
+          "title": "Marc Chagall (1887-1985) Le Cantique des Cantiques Cinq ..."
+        }
+      ]
+    },
+    "first_extraction": {
+      "pages_fetched": 6,
+      "pages_anchored": 3,
+      "elements_count": 10,
+      "status": "ok",
+      "fetch_log": [
+        {
+          "url": "https://www.artsy.net/artwork/marc-chagall-le-cantique-des-cantiques",
+          "domain": "artsy.net",
+          "tier": "tier2",
+          "fetched": true,
+          "chars": 15000
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Song_of_Songs",
+          "domain": "en.wikipedia.org",
+          "tier": "tier1",
+          "fetched": true,
+          "chars": 15000
+        },
+        {
+          "url": "https://www.artsy.net/artwork/marc-chagall-song-of-songs",
+          "domain": "artsy.net",
+          "tier": "tier2",
+          "fetched": true,
+          "chars": 15000
+        },
+        {
+          "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv",
+          "domain": "musees-nationaux-alpesmaritimes.fr",
+          "tier": "tier1",
+          "fetched": true,
+          "chars": 2508
+        },
+        {
+          "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee",
+          "domain": "musees-nationaux-alpesmaritimes.fr",
+          "tier": "tier1",
+          "fetched": true,
+          "chars": 3448
+        },
+        {
+          "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/periode/le-cantique-des-cantiques",
+          "domain": "musees-nationaux-alpesmaritimes.fr",
+          "tier": "tier1",
+          "fetched": true,
+          "chars": 3520
+        }
+      ]
+    },
+    "w7": {
+      "triggered": true,
+      "queries": [
+        "\"Le Cantique des Cantiques\" Marc Chagall Valentina Chagall 1966 donation"
+      ],
+      "new_results": 8
+    },
+    "final_elements": [
+      {
+        "type": "technique",
+        "text": "The artwork is created using oil on canvas paper.",
+        "source_sentence": "L\u00e9gende : Marc Chagall, Le Cantique des Cantiques IV , 1958, huile sur papier entoil\u00e9, 144,5 cm x 210,5 cm, donation Marc et Valentina Chagall, 1966, mus\u00e9e national Marc Chagall, Nice.",
+        "people": [
+          "Marc Chagall",
+          "Valentina Chagall"
+        ],
+        "dates": [
+          "1958",
+          "1966"
+        ],
+        "is_satire": false,
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 2,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "musees-nationaux-alpesmaritimes.fr",
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv"
+            },
+            {
+              "domain": "musees-nationaux-alpesmaritimes.fr",
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v"
+            }
+          ],
+          "merged_from": [
+            10
+          ]
+        },
+        "rank_score": 4.0
+      },
+      {
+        "type": "provenance",
+        "text": "The artwork was donated by Marc and Valentina Chagall in 1966.",
+        "source_sentence": "L\u00e9gende : Marc Chagall, Le Cantique des Cantiques IV , 1958, huile sur papier entoil\u00e9, 144,5 cm x 210,5 cm, donation Marc et Valentina Chagall, 1966, mus\u00e9e national Marc Chagall, Nice.",
+        "people": [
+          "Marc Chagall",
+          "Valentina Chagall"
+        ],
+        "dates": [
+          "1966"
+        ],
+        "is_satire": false,
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 2,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "musees-nationaux-alpesmaritimes.fr",
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv"
+            }
+          ]
+        },
+        "rank_score": 3.5
+      },
+      {
+        "type": "intention",
+        "text": "Chagall r\u00e9ussit \u00e0 rendre sensible les trois dimensions du Cantique : musicale, sacr\u00e9e et charnelle.",
+        "source_sentence": "Chagall r\u00e9ussit \u00e0 rendre sensible les trois dimensions du Cantique : musicale, sacr\u00e9e et charnelle.",
+        "people": [],
+        "dates": [],
+        "is_satire": false,
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/periode/le-cantique-des-cantiques",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "musees-nationaux-alpesmaritimes.fr",
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/periode/le-cantique-des-cantiques"
+            }
+          ]
+        },
+        "rank_score": 3.5
+      },
+      {
+        "type": "date",
+        "text": "Le Cantique des Cantiques was created in 1975.",
+        "source_sentence": "Le cantique des cantiques (1975) by Marc Chagall | Artsy.",
+        "people": [
+          "Marc Chagall"
+        ],
+        "dates": [
+          "1975"
+        ],
+        "is_satire": false,
+        "source_url": "https://www.artsy.net/artwork/marc-chagall-le-cantique-des-cantiques",
+        "source_domain": "www.artsy.net",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "www.artsy.net",
+              "url": "https://www.artsy.net/artwork/marc-chagall-le-cantique-des-cantiques"
+            }
+          ]
+        },
+        "_merge_log": [
+          {
+            "pair": [
+              0,
+              1
+            ],
+            "a_text": "Le Cantique des Cantiques was created in 1975.",
+            "b_text": "Le Cantique des Cantiques IV was created in 1958.",
+            "same_subject": false,
+            "conflicting": false,
+            "a_domain": "www.artsy.net",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "action": "no_merge"
+          },
+          {
+            "pair": [
+              2,
+              7
+            ],
+            "a_text": "The artwork is created using oil on canvas paper.",
+            "b_text": "Un cama\u00efeu de rouge et de rose \u00e9voque la douceur de la chair et la sensualit\u00e9, m",
+            "same_subject": false,
+            "conflicting": false,
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "action": "no_merge"
+          },
+          {
+            "pair": [
+              2,
+              10
+            ],
+            "a_text": "The artwork is created using oil on canvas paper.",
+            "b_text": "The artwork is created using oil on canvas.",
+            "same_subject": true,
+            "conflicting": false,
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "action": "merged"
+          },
+          {
+            "pair": [
+              4,
+              11
+            ],
+            "a_text": "Le Cantique des Cantiques IV is part of the biblical message cycle.",
+            "b_text": "The composition features two hills representing Vitebsk and Jerusalem.",
+            "same_subject": false,
+            "conflicting": false,
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "action": "no_merge"
+          },
+          {
+            "pair": [
+              4,
+              12
+            ],
+            "a_text": "Le Cantique des Cantiques IV is part of the biblical message cycle.",
+            "b_text": "The artwork includes a throne of King David surrounded by lions, with 'J\u00e9rusalem",
+            "same_subject": true,
+            "conflicting": false,
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "action": "merged"
+          },
+          {
+            "pair": [
+              4,
+              13
+            ],
+            "a_text": "Le Cantique des Cantiques IV is part of the biblical message cycle.",
+            "b_text": "A prominent feature of the painting is a bright sun in the shape of a Star of Da",
+            "same_subject": false,
+            "conflicting": false,
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "action": "no_merge"
+          },
+          {
+            "pair": [
+              4,
+              14
+            ],
+            "a_text": "Le Cantique des Cantiques IV is part of the biblical message cycle.",
+            "b_text": "The painting depicts a bride surrounded by flowers and fruits, symbolizing promi",
+            "same_subject": true,
+            "conflicting": false,
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "action": "merged"
+          },
+          {
+            "pair": [
+              4,
+              15
+            ],
+            "a_text": "Le Cantique des Cantiques IV is part of the biblical message cycle.",
+            "b_text": "The representation in the painting is non-realistic, giving the most important c",
+            "same_subject": true,
+            "conflicting": false,
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "action": "merged"
+          },
+          {
+            "pair": [
+              7,
+              10
+            ],
+            "a_text": "Un cama\u00efeu de rouge et de rose \u00e9voque la douceur de la chair et la sensualit\u00e9, m",
+            "b_text": "The artwork is created using oil on canvas.",
+            "same_subject": false,
+            "conflicting": false,
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "action": "no_merge"
+          },
+          {
+            "pair": [
+              11,
+              12
+            ],
+            "a_text": "The composition features two hills representing Vitebsk and Jerusalem.",
+            "b_text": "The artwork includes a throne of King David surrounded by lions, with 'J\u00e9rusalem",
+            "same_subject": true,
+            "conflicting": false,
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "action": "merged"
+          },
+          {
+            "pair": [
+              11,
+              13
+            ],
+            "a_text": "The composition features two hills representing Vitebsk and Jerusalem.",
+            "b_text": "A prominent feature of the painting is a bright sun in the shape of a Star of Da",
+            "same_subject": false,
+            "conflicting": false,
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "action": "no_merge"
+          },
+          {
+            "pair": [
+              11,
+              14
+            ],
+            "a_text": "The composition features two hills representing Vitebsk and Jerusalem.",
+            "b_text": "The painting depicts a bride surrounded by flowers and fruits, symbolizing promi",
+            "same_subject": false,
+            "conflicting": false,
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "action": "no_merge"
+          },
+          {
+            "pair": [
+              11,
+              15
+            ],
+            "a_text": "The composition features two hills representing Vitebsk and Jerusalem.",
+            "b_text": "The representation in the painting is non-realistic, giving the most important c",
+            "same_subject": false,
+            "conflicting": false,
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "action": "no_merge"
+          },
+          {
+            "pair": [
+              12,
+              13
+            ],
+            "a_text": "The artwork includes a throne of King David surrounded by lions, with 'J\u00e9rusalem",
+            "b_text": "A prominent feature of the painting is a bright sun in the shape of a Star of Da",
+            "same_subject": false,
+            "conflicting": false,
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "action": "no_merge"
+          },
+          {
+            "pair": [
+              12,
+              14
+            ],
+            "a_text": "The artwork includes a throne of King David surrounded by lions, with 'J\u00e9rusalem",
+            "b_text": "The painting depicts a bride surrounded by flowers and fruits, symbolizing promi",
+            "same_subject": false,
+            "conflicting": false,
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "action": "no_merge"
+          },
+          {
+            "pair": [
+              12,
+              15
+            ],
+            "a_text": "The artwork includes a throne of King David surrounded by lions, with 'J\u00e9rusalem",
+            "b_text": "The representation in the painting is non-realistic, giving the most important c",
+            "same_subject": false,
+            "conflicting": false,
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "action": "no_merge"
+          },
+          {
+            "pair": [
+              13,
+              14
+            ],
+            "a_text": "A prominent feature of the painting is a bright sun in the shape of a Star of Da",
+            "b_text": "The painting depicts a bride surrounded by flowers and fruits, symbolizing promi",
+            "same_subject": false,
+            "conflicting": false,
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "action": "no_merge"
+          },
+          {
+            "pair": [
+              13,
+              15
+            ],
+            "a_text": "A prominent feature of the painting is a bright sun in the shape of a Star of Da",
+            "b_text": "The representation in the painting is non-realistic, giving the most important c",
+            "same_subject": true,
+            "conflicting": false,
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "action": "merged"
+          },
+          {
+            "pair": [
+              14,
+              15
+            ],
+            "a_text": "The painting depicts a bride surrounded by flowers and fruits, symbolizing promi",
+            "b_text": "The representation in the painting is non-realistic, giving the most important c",
+            "same_subject": false,
+            "conflicting": false,
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "action": "no_merge"
+          }
+        ],
+        "rank_score": 3.0
+      },
+      {
+        "type": "date",
+        "text": "Le Cantique des Cantiques IV was created in 1958.",
+        "source_sentence": "L\u00e9gende : Marc Chagall, Le Cantique des Cantiques IV , 1958, huile sur papier entoil\u00e9, 144,5 cm x 210,5 cm, donation Marc et Valentina Chagall, 1966, mus\u00e9e national Marc Chagall, Nice.",
+        "people": [
+          "Marc Chagall",
+          "Marc Chagall",
+          "Valentina Chagall"
+        ],
+        "dates": [
+          "1958",
+          "1966"
+        ],
+        "is_satire": false,
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 2,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "musees-nationaux-alpesmaritimes.fr",
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv"
+            }
+          ]
+        },
+        "rank_score": 3.0
+      },
+      {
+        "type": "reference_work",
+        "text": "Le Cantique des Cantiques IV is part of the biblical message cycle.",
+        "source_sentence": "Le Cycle du Message Biblique Le Cantique des Cantiques Le Cantique des Cantiques IV",
+        "people": [],
+        "dates": [],
+        "is_satire": false,
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 6,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "musees-nationaux-alpesmaritimes.fr",
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv"
+            },
+            {
+              "domain": "musees-nationaux-alpesmaritimes.fr",
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v"
+            },
+            {
+              "domain": "musees-nationaux-alpesmaritimes.fr",
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v"
+            },
+            {
+              "domain": "musees-nationaux-alpesmaritimes.fr",
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v"
+            },
+            {
+              "domain": "musees-nationaux-alpesmaritimes.fr",
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v"
+            },
+            {
+              "domain": "musees-nationaux-alpesmaritimes.fr",
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v"
+            }
+          ],
+          "merged_from": [
+            11,
+            12,
+            13,
+            14,
+            15
+          ]
+        },
+        "rank_score": 3.0
+      },
+      {
+        "type": "legend",
+        "text": "The composition features David and Bathsheba embraced on the back of a winged horse flying over the city of Jerusalem.",
+        "source_sentence": "Reprise d'un des d\u00e9cors pour le ballet Aleko , la composition met en sc\u00e8ne David et Bethsab\u00e9e enlac\u00e9s sur le dos d\u2019un cheval ail\u00e9 survolant la ville de J\u00e9rusalem.",
+        "people": [
+          "David",
+          "Bethsab\u00e9e"
+        ],
+        "dates": [],
+        "is_satire": false,
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
+        "corroboration_status": "legend",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "musees-nationaux-alpesmaritimes.fr",
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv"
+            }
+          ]
+        },
+        "rank_score": 3.0
+      },
+      {
+        "type": "technique",
+        "text": "Un cama\u00efeu de rouge et de rose \u00e9voque la douceur de la chair et la sensualit\u00e9, mais aussi celle du sang.",
+        "source_sentence": "Un cama\u00efeu de rouge et de rose \u00e9voque la douceur de la chair et la sensualit\u00e9, mais aussi celle du sang, rappelant ainsi la violence de l\u2019histoire biblique.",
+        "people": [],
+        "dates": [],
+        "is_satire": false,
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/periode/le-cantique-des-cantiques",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "musees-nationaux-alpesmaritimes.fr",
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/periode/le-cantique-des-cantiques"
+            }
+          ]
+        },
+        "rank_score": 3.0
+      },
+      {
+        "type": "legend",
+        "text": "Les gazelles jaune et bleu visibles en haut, \u00e0 gauche, \u00e9voquent un verset teint\u00e9 d\u2019\u00e9rotisme du Cantique des Cantiques.",
+        "source_sentence": "Les gazelles jaune et bleu visibles en haut, \u00e0 gauche, \u00e9voquent ce verset teint\u00e9 d\u2019\u00e9rotisme du Cantique des Cantiques : \u00ab Tes deux seins sont comme deux faons/ Comme les jumeaux d'une gazelle/ Qui paissent au milieu des lis. \u00bb",
+        "people": [],
+        "dates": [],
+        "is_satire": false,
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/periode/le-cantique-des-cantiques",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
+        "corroboration_status": "legend",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "musees-nationaux-alpesmaritimes.fr",
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/periode/le-cantique-des-cantiques"
+            }
+          ]
+        },
+        "rank_score": 2.5
+      },
+      {
+        "type": "legend",
+        "text": "La fianc\u00e9e recherche son bien-aim\u00e9 dans les rues de J\u00e9rusalem, la nuit.",
+        "source_sentence": "Verticalement le long de la marge droite du tableau figure une ville plong\u00e9e dans l\u2019obscurit\u00e9 et la silhouette d\u2019une jeune femme nue : dans le Cantique des Cantiques, la fianc\u00e9e recherche son bien-aim\u00e9 dans les rues de J\u00e9rusalem, la nuit.",
+        "people": [],
+        "dates": [],
+        "is_satire": false,
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/periode/le-cantique-des-cantiques",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
+        "corroboration_status": "legend",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "musees-nationaux-alpesmaritimes.fr",
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/periode/le-cantique-des-cantiques"
+            }
+          ]
+        },
+        "rank_score": 2.5
+      }
+    ],
+    "criterion_met": false,
+    "work_stories_write": {
+      "work_key": "le cantique des cantiques iv|||marc chagall",
+      "elements_count": 8,
+      "status": "STORED"
+    }
+  },
+  "matisse_warm_cache": {
+    "story_mining_status": "cache_only",
+    "total_queries": 0,
+    "cached_elements_count": 6,
+    "cache_hit_proven": true,
+    "cached_elements": [
+      {
+        "text": "Blue Nude (Souvenir of Biskra) is an early 1907 oil painting on canvas by Henri Matisse.",
+        "type": "origin",
+        "dates": [
+          "1907"
+        ],
+        "people": [
+          "Henri Matisse"
+        ],
+        "is_satire": false,
+        "source_url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)",
+        "source_domain": "en.wikipedia.org",
+        "source_sentence": "Blue Nude (Souvenir of Biskra) (French: \"Nu bleu, Souvenir de Biskra\"), an early 1907 oil painting on canvas by Henri Matisse, is located at the Baltimore Museum of Art as part of the Cone Collection.",
+        "syndication_log": {
+          "sources": [
+            {
+              "url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)",
+              "domain": "en.wikipedia.org"
+            }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
+      },
+      {
+        "text": "The painting was controversial; in 1913, it was burned in effigy by students critical of the avant-garde outside of the Armory Show in Chicago.",
+        "type": "controversy",
+        "dates": [
+          "1913"
+        ],
+        "people": [],
+        "is_satire": false,
+        "source_url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)",
+        "source_domain": "en.wikipedia.org",
+        "source_sentence": "The painting, which may be classified as Fauvist, was controversial; in 1913, it was burned in effigy by students critical of the avant-garde outside of the Armory Show in Chicago, to where it had toured from New York.",
+        "syndication_log": {
+          "sources": [
+            {
+              "url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)",
+              "domain": "en.wikipedia.org"
+            }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
+      },
+      {
+        "text": "Blue Nude was one of the paintings that would later create an international sensation at the Armory Show of 1913 in New York City.",
+        "type": "reference_work",
+        "dates": [
+          "1907",
+          "1913"
+        ],
+        "people": [],
+        "is_satire": false,
+        "source_url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)",
+        "source_domain": "en.wikipedia.org",
+        "source_sentence": "Matisse shocked the French public at the 1907 Soci\u00e9t\u00e9 des Artistes Ind\u00e9pendants when he exhibited Blue Nude (Souvenir de Biskra). Blue Nude was one of the paintings that would later create an international sensation at the Armory Show of 1913 in New York City.",
+        "syndication_log": {
+          "sources": [
+            {
+              "url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)",
+              "domain": "en.wikipedia.org"
+            }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
+      },
+      {
+        "text": "The subject of the painting is a nude woman reclining in a Mediterranean landscape, presumably Biskra.",
+        "type": "subject",
+        "dates": [],
+        "people": [],
+        "is_satire": false,
+        "source_url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)",
+        "source_domain": "en.wikipedia.org",
+        "source_sentence": "The subject of the painting is a nude woman reclining in a Mediterranean landscape, presumably Biskra.",
+        "syndication_log": {
+          "sources": [
+            {
+              "url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)",
+              "domain": "en.wikipedia.org"
+            }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
+      },
+      {
+        "text": "Matisse is sexualizing the woman yet painting her in a harsh, crude way to repel the viewer.",
+        "type": "intention",
+        "dates": [],
+        "people": [
+          "Henri Matisse"
+        ],
+        "is_satire": false,
+        "source_url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)",
+        "source_domain": "en.wikipedia.org",
+        "source_sentence": "Matisse is sexualizing the woman yet painting her in a harsh, crude way to repel the viewer.",
+        "syndication_log": {
+          "sources": [
+            {
+              "url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)",
+              "domain": "en.wikipedia.org"
+            }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
+      },
+      {
+        "text": "Some scholars argue that Matisse is depicting North Africa as a sexually available in the sense that one could dominate/rape/consume it in the same way you could a woman.",
+        "type": "interpretation",
+        "dates": [],
+        "people": [
+          "Henri Matisse"
+        ],
+        "is_satire": false,
+        "source_url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)",
+        "source_domain": "en.wikipedia.org",
+        "source_sentence": "Some scholars argue that Matisse is depicting North Africa as a sexually available in the sense that one could dominate/rape/consume it in the same way you could a woman.",
+        "syndication_log": {
+          "sources": [
+            {
+              "url": "https://en.wikipedia.org/wiki/Blue_Nude_(Souvenir_de_Biskra)",
+              "domain": "en.wikipedia.org"
+            }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
+      }
+    ]
+  },
+  "chagall_warm_cache": {
+    "story_mining_status": "cache_only",
+    "total_queries": 0,
+    "cached_elements_count": 8,
+    "cache_hit_proven": true,
+    "cached_elements": [
+      {
+        "text": "Le Cantique des Cantiques IV was created in 1965-1966.",
+        "type": "origin",
+        "dates": [
+          "1965",
+          "1966"
+        ],
+        "people": [
+          "Marc Chagall",
+          "Valentina Chagall"
+        ],
+        "is_satire": false,
+        "_merge_log": [
+          {
+            "pair": [
+              3,
+              4
+            ],
+            "a_text": "The composition features two hills representing Vitebsk and Jerusalem.",
+            "action": "no_merge",
+            "b_text": "The artwork includes a throne of King David surrounded by lions, with 'J\u00e9rusalem",
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "conflicting": false,
+            "same_subject": false
+          },
+          {
+            "pair": [
+              3,
+              5
+            ],
+            "a_text": "The composition features two hills representing Vitebsk and Jerusalem.",
+            "action": "no_merge",
+            "b_text": "A prominent feature of the painting is a bright sun in the shape of a Star of Da",
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "conflicting": false,
+            "same_subject": false
+          },
+          {
+            "pair": [
+              3,
+              6
+            ],
+            "a_text": "The composition features two hills representing Vitebsk and Jerusalem.",
+            "action": "no_merge",
+            "b_text": "The painting depicts a bride surrounded by flowers and fruits, symbolizing promi",
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "conflicting": false,
+            "same_subject": false
+          },
+          {
+            "pair": [
+              3,
+              7
+            ],
+            "a_text": "The composition features two hills representing Vitebsk and Jerusalem.",
+            "action": "no_merge",
+            "b_text": "The representation in the painting is non-realistic, giving the most important c",
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "conflicting": false,
+            "same_subject": false
+          },
+          {
+            "pair": [
+              4,
+              5
+            ],
+            "a_text": "The artwork includes a throne of King David surrounded by lions, with 'J\u00e9rusalem",
+            "action": "no_merge",
+            "b_text": "A prominent feature of the painting is a bright sun in the shape of a Star of Da",
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "conflicting": false,
+            "same_subject": false
+          },
+          {
+            "pair": [
+              4,
+              6
+            ],
+            "a_text": "The artwork includes a throne of King David surrounded by lions, with 'J\u00e9rusalem",
+            "action": "no_merge",
+            "b_text": "The painting depicts a bride surrounded by flowers and fruits, symbolizing promi",
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "conflicting": false,
+            "same_subject": false
+          },
+          {
+            "pair": [
+              4,
+              7
+            ],
+            "a_text": "The artwork includes a throne of King David surrounded by lions, with 'J\u00e9rusalem",
+            "action": "no_merge",
+            "b_text": "The representation in the painting is non-realistic, giving the most important c",
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "conflicting": false,
+            "same_subject": false
+          },
+          {
+            "pair": [
+              5,
+              6
+            ],
+            "a_text": "A prominent feature of the painting is a bright sun in the shape of a Star of Da",
+            "action": "no_merge",
+            "b_text": "The painting depicts a bride surrounded by flowers and fruits, symbolizing promi",
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "conflicting": false,
+            "same_subject": false
+          },
+          {
+            "pair": [
+              5,
+              7
+            ],
+            "a_text": "A prominent feature of the painting is a bright sun in the shape of a Star of Da",
+            "action": "no_merge",
+            "b_text": "The representation in the painting is non-realistic, giving the most important c",
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "conflicting": false,
+            "same_subject": false
+          },
+          {
+            "pair": [
+              6,
+              7
+            ],
+            "a_text": "The painting depicts a bride surrounded by flowers and fruits, symbolizing promi",
+            "action": "no_merge",
+            "b_text": "The representation in the painting is non-realistic, giving the most important c",
+            "a_domain": "musees-nationaux-alpesmaritimes.fr",
+            "b_domain": "musees-nationaux-alpesmaritimes.fr",
+            "conflicting": false,
+            "same_subject": false
+          }
+        ],
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
+        "source_sentence": "L\u00e9gende : Marc Chagall, Le Cantique des Cantiques V , 1965-1966, huile sur papier entoil\u00e9, 150 cm x 226 cm, donation Marc et Valentina Chagall, 1966, mus\u00e9e national Marc Chagall, Nice.",
+        "syndication_log": {
+          "sources": [
+            {
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v",
+              "domain": "musees-nationaux-alpesmaritimes.fr"
+            }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "rank_score": 5.0
+      },
+      {
+        "text": "The artwork was donated by Marc and Valentina Chagall in 1966.",
+        "type": "dedication",
+        "dates": [
+          "1966"
+        ],
+        "people": [
+          "Marc Chagall",
+          "Valentina Chagall"
+        ],
+        "is_satire": false,
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
+        "source_sentence": "L\u00e9gende : Marc Chagall, Le Cantique des Cantiques V , 1965-1966, huile sur papier entoil\u00e9, 150 cm x 226 cm, donation Marc et Valentina Chagall, 1966, mus\u00e9e national Marc Chagall, Nice.",
+        "syndication_log": {
+          "sources": [
+            {
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v",
+              "domain": "musees-nationaux-alpesmaritimes.fr"
+            }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "rank_score": 5.0
+      },
+      {
+        "text": "The artwork is created using oil on canvas.",
+        "type": "technique",
+        "dates": [
+          "1965",
+          "1966"
+        ],
+        "people": [
+          "Marc Chagall",
+          "Valentina Chagall"
+        ],
+        "is_satire": false,
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
+        "source_sentence": "L\u00e9gende : Marc Chagall, Le Cantique des Cantiques V , 1965-1966, huile sur papier entoil\u00e9, 150 cm x 226 cm, donation Marc et Valentina Chagall, 1966, mus\u00e9e national Marc Chagall, Nice.",
+        "syndication_log": {
+          "sources": [
+            {
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v",
+              "domain": "musees-nationaux-alpesmaritimes.fr"
+            }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "rank_score": 4.0
+      },
+      {
+        "text": "The composition features two hills representing Vitebsk and Jerusalem.",
+        "type": "reference_work",
+        "dates": [],
+        "people": [
+          "Marc Chagall"
+        ],
+        "is_satire": false,
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
+        "source_sentence": "La composition s\u2019organise autour de deux collines. Chacune d\u2019elles \u00e9voque une ville : \u00e0 droite, la ville natale de Chagall, Vitebsk toujours reconnaissable par la pr\u00e9sence de la cath\u00e9drale au d\u00f4me vert qui la surmonte et \u00e0 gauche, J\u00e9rusalem.",
+        "syndication_log": {
+          "sources": [
+            {
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v",
+              "domain": "musees-nationaux-alpesmaritimes.fr"
+            }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "rank_score": 3.5
+      },
+      {
+        "text": "The artwork includes a throne of King David surrounded by lions, with 'J\u00e9rusalem' inscribed in Hebrew.",
+        "type": "reference_work",
+        "dates": [],
+        "people": [
+          "Marc Chagall",
+          "King David"
+        ],
+        "is_satire": false,
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
+        "source_sentence": "Pour \u00e9viter toute confusion, l\u2019artiste a repr\u00e9sent\u00e9, \u00e0 l\u2019extr\u00eame gauche, le tr\u00f4ne du roi David entour\u00e9 des lions de la tribu de Judas sur lequel est inscrit \u00ab J\u00e9rusalem \u00bb en h\u00e9breu.",
+        "syndication_log": {
+          "sources": [
+            {
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v",
+              "domain": "musees-nationaux-alpesmaritimes.fr"
+            }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "rank_score": 3.5
+      },
+      {
+        "text": "A prominent feature of the painting is a bright sun in the shape of a Star of David.",
+        "type": "reference_work",
+        "dates": [],
+        "people": [],
+        "is_satire": false,
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
+        "source_sentence": "Dans un ciel surpeupl\u00e9 de figures dansantes figure un soleil aux couleurs \u00e9clatantes, en forme d'\u00e9toile de David.",
+        "syndication_log": {
+          "sources": [
+            {
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v",
+              "domain": "musees-nationaux-alpesmaritimes.fr"
+            }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "rank_score": 3.0
+      },
+      {
+        "text": "The painting depicts a bride surrounded by flowers and fruits, symbolizing promises of descent.",
+        "type": "reference_work",
+        "dates": [],
+        "people": [],
+        "is_satire": false,
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
+        "source_sentence": "Il avance dans le ciel vers une mari\u00e9e entour\u00e9e de fleurs et de fruits, promesses de descendance.",
+        "syndication_log": {
+          "sources": [
+            {
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v",
+              "domain": "musees-nationaux-alpesmaritimes.fr"
+            }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "rank_score": 3.0
+      },
+      {
+        "text": "The representation in the painting is non-realistic, giving the most important characters a larger size.",
+        "type": "reference_work",
+        "dates": [],
+        "people": [],
+        "is_satire": false,
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
+        "source_sentence": "La repr\u00e9sentation, non r\u00e9aliste, donne aux personnages les plus importants une taille sup\u00e9rieure aux autres.",
+        "syndication_log": {
+          "sources": [
+            {
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v",
+              "domain": "musees-nationaux-alpesmaritimes.fr"
+            }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "rank_score": 3.0
+      }
+    ]
+  },
+  "generation": {
+    "matisse": {
+      "generated_text": "As you stand before Henri Matisse\u2019s vibrant \"Blue Nude II,\" take a moment to appreciate the dynamic interplay of color and form. This striking piece, created during Matisse's time in Nice in 1952, was born in the expansive studio of the H\u00f4tel R\u00e9gina. It is part of a series that includes \"Blue Nude (Souvenir of Biskra),\" an earlier work from 1907 that inspired Matisse's exploration of the human form through vivid color.\n\nAccording to www.centrepompidou.fr, \"Blue Nude II\" reflects Matisse's aim to unite color and drawing, a goal he pursued diligently throughout his career. The painted gouache cut-outs that compose the Blue Nudes were influenced by Matisse's fascination with African sculpture and his transformative visit to Tahiti, as noted by en.wikipedia.org. However, the creation of these pieces was not without its challenges; Matisse faced significant frustration that drove him to abandon cutting at times.\n\nLegend has it that these struggles only deepened his resolve, leading to some of his most iconic works. As you gaze at the deep blues and bold shapes, consider how Matisse pushed the boundaries of artistic expression, forever altering the landscape of modern art.",
+      "element_block_injected": "STORY ELEMENTS (use these as primary material, follow phrasing rules per status):\n  [REPORTED \u2014 use inline attribution: \"According to www.centrepompidou.fr...\"] (origin): Blue Nude II was conceived during Matisse\u2019s time in Nice, where he worked in the spacious studio of the H\u00f4tel R\u00e9gina.\n  [REPORTED \u2014 use inline attribution: \"According to en.wikipedia.org...\"] (origin): Blue Nude (Souvenir of Biskra) is an early 1907 oil painting on canvas by Henri Matisse.\n  [REPORTED \u2014 use inline attribution: \"According to en.wikipedia.org...\"] (technique): The painted gouache cut-outs that compose the Blue Nudes were inspired by Matisse's collection of African sculpture and his visit to Tahiti.\n  TEXTURE (weave in if natural):\n    (intention) In creating Blue Nude II, Matisse aimed to unite color and drawing.\n    (controversy) Matisse faced challenges while creating the Blue Nudes, including frustration that led him to stop cutting and turn to d\n",
+      "i_con": {
+        "tour_avg": 4.33,
+        "tour_min": 4.33,
+        "stops": [
+          {
+            "stop_title": "Blue Nude II",
+            "stop_index": 0,
+            "i_con": 4.33,
+            "class_dist": {
+              "details": 0.392,
+              "historic": 0.338,
+              "social": 0.269
+            },
+            "paragraphs": [
+              {
+                "text": "As you stand before Henri Matisse\u2019s vibrant \"Blue Nude II,\" take a moment to appreciate the dynamic interplay of color and form. This striking piece, created during Matisse's time in Nice in 1952, was",
+                "i_con": 5,
+                "class_dist": {
+                  "details": 0.4,
+                  "historic": 0.4,
+                  "social": 0.2
+                },
+                "evidence_sentence": "This striking piece, created during Matisse's time in Nice in 1952, was born in the expansive studio of the H\u00f4tel R\u00e9gina.",
+                "flags": []
+              },
+              {
+                "text": "According to www.centrepompidou.fr, \"Blue Nude II\" reflects Matisse's aim to unite color and drawing, a goal he pursued diligently throughout his career. The painted gouache cut-outs that compose the ",
+                "i_con": 5,
+                "class_dist": {
+                  "details": 0.5,
+                  "historic": 0.3,
+                  "social": 0.2
+                },
+                "evidence_sentence": "The painted gouache cut-outs that compose the Blue Nudes were influenced by Matisse's fascination with African sculpture and his transformative visit to Tahiti, as noted by en.wikipedia.org.",
+                "flags": []
+              },
+              {
+                "text": "Legend has it that these struggles only deepened his resolve, leading to some of his most iconic works. As you gaze at the deep blues and bold shapes, consider how Matisse pushed the boundaries of art",
+                "i_con": 3,
+                "class_dist": {
+                  "details": 0.2,
+                  "historic": 0.3,
+                  "social": 0.5
+                },
+                "evidence_sentence": "As you gaze at the deep blues and bold shapes, consider how Matisse pushed the boundaries of artistic expression, forever altering the landscape of modern art.",
+                "flags": []
+              }
+            ]
+          }
+        ],
+        "prompt_hash": "75c2fd73c456",
+        "evaluator_version": "1.0.0"
+      }
+    },
+    "chagall": {
+      "generated_text": "As you stand in front of \"Le Cantique des Cantiques IV\" by Marc Chagall, take a moment to observe the vibrant colors and intricate details that fill the canvas. Created in 1958, this masterpiece captures the essence of love and spirituality through Chagall's unique lens.\n\nAccording to musees-nationaux-alpesmaritimes.fr, the artwork is crafted using oil on canvas paper, allowing for a rich texture and depth that draws the eye. The scene unfolds with a harmonious blend of blues, reds, and greens, showcasing the artist\u2019s ability to intertwine the musical, sacred, and sensual dimensions of the biblical Canticle. It is said that Chagall r\u00e9ussit \u00e0 rendre sensible les trois dimensions du Cantique : musicale, sacr\u00e9e et charnelle, inviting viewers to experience a profound sense of connection.\n\nThe provenance of this piece is equally notable; it was donated by Marc and Valentina Chagall in 1966, ensuring its place in the artistic legacy of the Chagall family. As you take in the imagery, allow yourself to be enveloped by the emotional resonance and the captivating narrative that unfolds within this iconic work.",
+      "element_block_injected": "STORY ELEMENTS (use these as primary material, follow phrasing rules per status):\n  [REPORTED \u2014 use inline attribution: \"According to musees-nationaux-alpesmaritimes.fr...\"] (technique): The artwork is created using oil on canvas paper.\n  [REPORTED \u2014 use inline attribution: \"According to musees-nationaux-alpesmaritimes.fr...\"] (provenance): The artwork was donated by Marc and Valentina Chagall in 1966.\n  [REPORTED \u2014 use inline attribution: \"According to musees-nationaux-alpesmaritimes.fr...\"] (intention): Chagall r\u00e9ussit \u00e0 rendre sensible les trois dimensions du Cantique : musicale, sacr\u00e9e et charnelle.\n  TEXTURE (weave in if natural):\n    (date) Le Cantique des Cantiques was created in 1975.\n    (date) Le Cantique des Cantiques IV was created in 1958.\n",
+      "i_con": {
+        "tour_avg": 5.0,
+        "tour_min": 5.0,
+        "stops": [
+          {
+            "stop_title": "Le Cantique des Cantiques IV",
+            "stop_index": 0,
+            "i_con": 5.0,
+            "class_dist": {
+              "details": 0.4,
+              "historic": 0.367,
+              "social": 0.233
+            },
+            "paragraphs": [
+              {
+                "text": "As you stand in front of \"Le Cantique des Cantiques IV\" by Marc Chagall, take a moment to observe the vibrant colors and intricate details that fill the canvas. Created in 1958, this masterpiece captu",
+                "i_con": 5,
+                "class_dist": {
+                  "details": 0.4,
+                  "historic": 0.4,
+                  "social": 0.2
+                },
+                "evidence_sentence": "Created in 1958, this masterpiece captures the essence of love and spirituality through Chagall's unique lens.",
+                "flags": []
+              },
+              {
+                "text": "According to musees-nationaux-alpesmaritimes.fr, the artwork is crafted using oil on canvas paper, allowing for a rich texture and depth that draws the eye. The scene unfolds with a harmonious blend o",
+                "i_con": 5,
+                "class_dist": {
+                  "details": 0.5,
+                  "historic": 0.2,
+                  "social": 0.3
+                },
+                "evidence_sentence": "The scene unfolds with a harmonious blend of blues, reds, and greens, showcasing the artist\u2019s ability to intertwine the musical, sacred, and sensual dimensions of the biblical Canticle.",
+                "flags": []
+              },
+              {
+                "text": "The provenance of this piece is equally notable; it was donated by Marc and Valentina Chagall in 1966, ensuring its place in the artistic legacy of the Chagall family. As you take in the imagery, allo",
+                "i_con": 5,
+                "class_dist": {
+                  "details": 0.3,
+                  "historic": 0.5,
+                  "social": 0.2
+                },
+                "evidence_sentence": "It was donated by Marc and Valentina Chagall in 1966, ensuring its place in the artistic legacy of the Chagall family.",
+                "flags": []
+              }
+            ]
+          }
+        ],
+        "prompt_hash": "75c2fd73c456",
+        "evaluator_version": "1.0.0"
+      }
+    },
+    "chagall_cache_hit": {
+      "generated_text": "As you stand before Marc Chagall's vibrant \"Le Cantique des Cantiques IV,\" created between 1965 and 1966, take a moment to appreciate the rich tapestry of colors that envelops the canvas. The artwork, a masterful oil on canvas, invites you into a world where the sacred and personal intertwine.\n\nAccording to musees-nationaux-alpesmaritimes.fr, Chagall dedicated this piece to his beloved wife, Valentina, and it was gifted to the museum in 1966. Look closely, and you will see two hills emerging in the composition, symbolizing Vitebsk, Chagall's hometown, and Jerusalem, the city of spiritual significance. In the center, a majestic throne adorned with lions represents King David, while the word 'J\u00e9rusalem' is inscribed in Hebrew, grounding the work in its cultural and historical context.\n\nThe story goes that Chagall drew inspiration from the biblical \"Song of Songs,\" imbuing the piece with themes of love and devotion. As you absorb the intricate details and bold colors, consider how this work not only reflects Chagall's artistic journey but also the deep connections he maintained with his heritage and loved ones.",
+      "element_block_injected": "STORY ELEMENTS (use these as primary material, follow phrasing rules per status):\n  [REPORTED \u2014 use inline attribution: \"According to musees-nationaux-alpesmaritimes.fr...\"] (origin): Le Cantique des Cantiques IV was created in 1965-1966.\n  [REPORTED \u2014 use inline attribution: \"According to musees-nationaux-alpesmaritimes.fr...\"] (dedication): The artwork was donated by Marc and Valentina Chagall in 1966.\n  [REPORTED \u2014 use inline attribution: \"According to musees-nationaux-alpesmaritimes.fr...\"] (technique): The artwork is created using oil on canvas.\n  TEXTURE (weave in if natural):\n    (reference_work) The composition features two hills representing Vitebsk and Jerusalem.\n    (reference_work) The artwork includes a throne of King David surrounded by lions, with 'J\u00e9rusalem' inscribed in Hebrew.\n",
+      "i_con": {
+        "tour_avg": 3.67,
+        "tour_min": 3.67,
+        "stops": [
+          {
+            "stop_title": "Le Cantique des Cantiques IV",
+            "stop_index": 0,
+            "i_con": 3.67,
+            "class_dist": {
+              "details": 0.418,
+              "historic": 0.327,
+              "social": 0.255
+            },
+            "paragraphs": [
+              {
+                "text": "As you stand before Marc Chagall's vibrant \"Le Cantique des Cantiques IV,\" created between 1965 and 1966, take a moment to appreciate the rich tapestry of colors that envelops the canvas. The artwork,",
+                "i_con": 3,
+                "class_dist": {
+                  "details": 0.4,
+                  "historic": 0.3,
+                  "social": 0.3
+                },
+                "evidence_sentence": "The artwork, a masterful oil on canvas, invites you into a world where the sacred and personal intertwine.",
+                "flags": [
+                  "filler_present"
+                ]
+              },
+              {
+                "text": "According to musees-nationaux-alpesmaritimes.fr, Chagall dedicated this piece to his beloved wife, Valentina, and it was gifted to the museum in 1966. Look closely, and you will see two hills emerging",
+                "i_con": 5,
+                "class_dist": {
+                  "details": 0.5,
+                  "historic": 0.3,
+                  "social": 0.2
+                },
+                "evidence_sentence": "Look closely, and you will see two hills emerging in the composition, symbolizing Vitebsk, Chagall's hometown, and Jerusalem, the city of spiritual significance.",
+                "flags": []
+              },
+              {
+                "text": "The story goes that Chagall drew inspiration from the biblical \"Song of Songs,\" imbuing the piece with themes of love and devotion. As you absorb the intricate details and bold colors, consider how th",
+                "i_con": 3,
+                "class_dist": {
+                  "details": 0.3,
+                  "historic": 0.4,
+                  "social": 0.3
+                },
+                "evidence_sentence": "The story goes that Chagall drew inspiration from the biblical 'Song of Songs,' imbuing the piece with themes of love and devotion.",
+                "flags": []
+              }
+            ]
+          }
+        ],
+        "prompt_hash": "75c2fd73c456",
+        "evaluator_version": "1.0.0"
+      }
+    }
+  },
+  "stop_metrics_icon": {
+    "matisse": {
+      "i_con": 4.33,
+      "baseline": 3.81
+    },
+    "chagall": {
+      "i_con": 5.0,
+      "baseline": 3.99
+    },
+    "chagall_cache_hit": {
+      "i_con": 3.67,
+      "baseline": 3.51
+    }
+  }
+}
