@@ -225,6 +225,17 @@ def synthesize_queries(stop: Dict, tour_type: str = 'contained') -> List[str]:
         else:
             queries.append(f'"{english_title}" {city} history story behind')
 
+    # E1: Composed English-series query (LEAD-identified lever, RS6)
+    # When english_title stripped of numerals produces a DIFFERENT (shorter) form,
+    # add the English series-level query: "Song of Songs" Marc Chagall story behind
+    if english_title:
+        english_series = _strip_trailing_numeral(english_title)
+        if english_series and english_series.strip().lower() != english_title.strip().lower():
+            if tour_type == 'contained':
+                queries.append(f'"{english_series}" {artist} story behind')
+            else:
+                queries.append(f'"{english_series}" {city} history story behind')
+
     # Localization: add query in venue language if not English
     if lang and lang != 'en':
         _LANG_STORY_TERMS = {'fr': 'histoire', 'it': 'storia', 'es': 'historia', 'de': 'Geschichte'}

@@ -215,18 +215,227 @@ def _normalize_claim_key(text: str) -> str:
     return text
 
 
+# --- SQ4 M1: LLM Merge Pass ---
+
+def _find_merge_candidates(scored_elements: List[Dict]) -> List[tuple]:
+    """Find pairs of reported elements that are candidates for LLM merge.
+    
+    Candidate gate (RS3-aware): pairs are candidates if ANY of:
+    1. Normalized keys share ≥3 content words
+    2. source_sentence Jaccard similarity 0.3–0.84 (below syndication, above noise)
+    3. Same element type (date, technique, etc.) about the same work — always candidates
+       (RS3: widens the gate for the 1952 cluster where tokens barely overlap)
+    
+    RS2: legend elements are NEVER candidates for merge with non-legend elements.
+    """
+    candidates = []
+    for i in range(len(scored_elements)):
+        for j in range(i + 1, len(scored_elements)):
+            a, b = scored_elements[i], scored_elements[j]
+            
+            # RS2: Never cross a legend boundary
+            a_legend = a.get('corroboration_status') == 'legend'
+            b_legend = b.get('corroboration_status') == 'legend'
+            if a_legend or b_legend:
+                continue  # Legend elements never merge with anything
+            
+            # Only merge reported elements (documented already has ≥2 sources)
+            if a.get('corroboration_status') != 'reported' or b.get('corroboration_status') != 'reported':
+                continue
+            
+            # Gate 1: same type — always candidates (RS3 widening for date/technique clusters)
+            if a.get('type') == b.get('type') and a.get('type') in ('date', 'technique', 'origin', 'provenance', 'dedication'):
+                candidates.append((i, j))
+                continue
+            
+            # Gate 2: ≥3 shared content words in normalized key
+            a_key = _normalize_claim_key(a.get('text', ''))
+            b_key = _normalize_claim_key(b.get('text', ''))
+            a_words = set(a_key.split())
+            b_words = set(b_key.split())
+            if len(a_words & b_words) >= 3:
+                candidates.append((i, j))
+                continue
+            
+            # Gate 3: Jaccard on source_sentence (0.3–0.84 range)
+            sim = jaccard_similarity(
+                a.get('source_sentence', ''),
+                b.get('source_sentence', '')
+            )
+            if 0.3 <= sim < 0.85:
+                candidates.append((i, j))
+    
+    return candidates
+
+
+def _llm_merge_decision(pairs: List[Dict]) -> List[Dict]:
+    """Call GPT-4o-mini to decide which candidate pairs describe the same fact.
+    
+    Returns list of {pair_idx, verdict: bool, reason: str} decisions.
+    The LLM only answers yes/no — it never sees, names, or adds sources (RS4).
+    """
+    if not pairs:
+        return []
+    
+    # Build prompt with all candidate pairs
+    prompt_pairs = []
+    for idx, pair in enumerate(pairs):
+        prompt_pairs.append(
+            f"Pair {idx+1}:\n"
+            f"  A: \"{pair['a_text']}\"\n"
+            f"  B: \"{pair['b_text']}\"\n"
+        )
+    
+    prompt = (
+        "You are a fact-checking assistant. For each pair of claims below about an artwork, "
+        "answer YES if they describe the SAME factual claim (even if worded differently), "
+        "or NO if they are about different facts.\n\n"
+        "Rules:\n"
+        "- 'Created in 1952' and 'completed in 1952' and 'created in Spring 1952' are the SAME fact.\n"
+        "- 'Gouache cut-outs' and 'gouache on paper, cut and pasted' are the SAME technique.\n"
+        "- Different dates, different people, or different events are DIFFERENT facts.\n\n"
+        + "\n".join(prompt_pairs) +
+        "\n\nRespond with ONLY a JSON array of objects: [{\"pair\": 1, \"same\": true/false},...]\n"
+    )
+    
+    try:
+        import openai
+        client = openai.OpenAI(api_key=OPENAI_API_KEY)
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+            max_tokens=500,
+        )
+        import json as _json
+        content = response.choices[0].message.content.strip()
+        # Parse JSON from response (handle markdown code blocks)
+        if content.startswith('```'):
+            content = content.split('\n', 1)[1].rsplit('```', 1)[0]
+        decisions = _json.loads(content)
+        return decisions
+    except Exception as e:
+        # LLM failure → no merges (fail-closed)
+        print(f"  [SQ4-M1] LLM merge call failed: {e}")
+        return []
+
+
+def _llm_merge_pass(scored_elements: List[Dict], syndication_threshold: float = 0.85) -> List[Dict]:
+    """SQ4 M1: LLM merge-only pass on scored elements.
+    
+    After deterministic grouping, finds candidate pairs of 'reported' elements
+    and asks GPT-4o-mini if they describe the same fact. If yes, merges their
+    source sets and recomputes status (RS4: count distinct domains post-merge).
+    
+    RS2: legend elements are NEVER merged into non-legend groups.
+    RS4: independence recomputed deterministically post-merge.
+    """
+    candidates = _find_merge_candidates(scored_elements)
+    
+    if not candidates:
+        return scored_elements
+    
+    # Build pairs for LLM
+    llm_pairs = []
+    for i, j in candidates:
+        llm_pairs.append({
+            'a_text': scored_elements[i].get('text', ''),
+            'b_text': scored_elements[j].get('text', ''),
+            'a_idx': i,
+            'b_idx': j,
+        })
+    
+    # Call LLM for merge decisions
+    decisions = _llm_merge_decision(llm_pairs)
+    
+    # Build merge_log
+    merge_log = []
+    merge_targets = {}  # j → i (element j merges INTO element i)
+    
+    for decision in decisions:
+        pair_num = decision.get('pair', 0) - 1  # 0-indexed
+        same = decision.get('same', False)
+        
+        if pair_num < 0 or pair_num >= len(llm_pairs):
+            continue
+        
+        pair = llm_pairs[pair_num]
+        i, j = pair['a_idx'], pair['b_idx']
+        
+        log_entry = {
+            'pair': [i, j],
+            'a_text': pair['a_text'][:80],
+            'b_text': pair['b_text'][:80],
+            'verdict': same,
+            'a_domain': scored_elements[i].get('source_domain', ''),
+            'b_domain': scored_elements[j].get('source_domain', ''),
+        }
+        
+        if same:
+            # Check transitive merges: if j already merges somewhere, follow the chain
+            target = i
+            while target in merge_targets:
+                target = merge_targets[target]
+            merge_targets[j] = target
+            log_entry['merged_into'] = target
+        
+        merge_log.append(log_entry)
+    
+    # Apply merges: union source sets, recompute status (RS4)
+    elements_to_remove = set()
+    for j, target_i in merge_targets.items():
+        # Union the source sets
+        target_sources = scored_elements[target_i].get('_all_sources', [])
+        merge_sources = scored_elements[j].get('_all_sources', [])
+        all_sources = target_sources + merge_sources
+        
+        # RS4: Count distinct domains after syndication dedup
+        unique_domains = set()
+        for src in all_sources:
+            domain = src.get('source_domain', '')
+            if domain:
+                unique_domains.add(domain)
+        
+        n_independent = len(unique_domains)
+        scored_elements[target_i]['_all_sources'] = all_sources
+        scored_elements[target_i]['independent_source_count'] = n_independent
+        
+        # Recompute status
+        if n_independent >= 2:
+            scored_elements[target_i]['corroboration_status'] = 'documented'
+        
+        # Update syndication_log
+        scored_elements[target_i]['syndication_log'] = {
+            'total_in_group': len(all_sources),
+            'independent_after_dedup': n_independent,
+            'sources': [{'domain': s.get('source_domain', ''), 'url': s.get('source_url', '')}
+                       for s in all_sources],
+            'merged_from': [j],
+        }
+        
+        elements_to_remove.add(j)
+    
+    # Attach merge_log to first element for evidence
+    if merge_log and scored_elements:
+        scored_elements[0]['_merge_log'] = merge_log
+    
+    # Remove merged elements
+    result = [e for idx, e in enumerate(scored_elements) if idx not in elements_to_remove]
+    
+    return result
+
+
 def score_corroboration(elements: List[Dict], syndication_threshold: float = 0.85) -> List[Dict]:
     """Score corroboration across extracted elements.
     
     Groups by normalized claim key, detects syndication via character-shingle Jaccard (R3),
+    then runs an LLM merge-only pass (SQ4 M1) on candidate pairs,
     assigns statuses: documented (≥2 independent T1/T2), reported (1 T1/T2),
-    legend (folklore-typed).
+    legend (folklore-typed), disputed (conflicting claims from independent sources).
     
-    Note: 'disputed' status (sources conflict) deferred to SQ4 where semantic 
-    claim comparison is available. Currently not assigned.
-    
-    R4: deterministic normalization is PRIMARY grouping. LLM merge logged but never splits
-    or creates corroboration that normalization didn't seed.
+    R4: deterministic normalization is PRIMARY grouping. LLM merge pass is SECOND layer —
+    may only MERGE near-duplicate groups, never split or create corroboration.
+    Legend elements are NEVER merged into non-legend groups (RS2).
     """
     if not elements:
         return []
@@ -269,28 +478,28 @@ def score_corroboration(elements: List[Dict], syndication_threshold: float = 0.8
                 domains_seen[source_id] = (source_sent, domain)
                 independent_sources.append(elem)
         
-        # Step 3: Assign corroboration status
+        # Step 3: Assign corroboration status (pre-merge)
         n_independent = len(independent_sources)
         
         # Check for legend/folklore typing
         representative = group[0]
         elem_type = representative.get('type', '')
         
-        if elem_type == 'legend':
+        # W3: Deterministic legend-phrase override (regardless of LLM typing)
+        _LEGEND_PHRASES = ['legend has it', 'the story goes', 'according to legend',
+                           'allegedly', 'legend says', 'it is said that', 'rumor has it']
+        _source_sent_lower = representative.get('source_sentence', '').lower()
+        is_legend = (elem_type == 'legend' or
+                     any(phrase in _source_sent_lower for phrase in _LEGEND_PHRASES))
+        
+        if is_legend:
             status = 'legend'
         elif n_independent >= 2:
             status = 'documented'
         elif n_independent == 1:
             status = 'reported'
         else:
-            status = 'reported'  # Edge case: all syndicated → single effective source
-        
-        # W3: Deterministic legend-phrase override (regardless of LLM typing)
-        _LEGEND_PHRASES = ['legend has it', 'the story goes', 'according to legend',
-                           'allegedly', 'legend says', 'it is said that', 'rumor has it']
-        _source_sent_lower = representative.get('source_sentence', '').lower()
-        if any(phrase in _source_sent_lower for phrase in _LEGEND_PHRASES):
-            status = 'legend'
+            status = 'reported'
         
         # Attach status to representative element
         representative['corroboration_status'] = status
@@ -301,7 +510,15 @@ def score_corroboration(elements: List[Dict], syndication_threshold: float = 0.8
             'sources': [{'domain': e.get('source_domain', ''), 'url': e.get('source_url', '')}
                        for e in independent_sources]
         }
+        representative['_all_sources'] = independent_sources  # Keep for merge pass
         scored_elements.append(representative)
+    
+    # Step 4: LLM merge pass (SQ4 M1) — merge semantically-equivalent reported elements
+    scored_elements = _llm_merge_pass(scored_elements, syndication_threshold)
+    
+    # Clean up internal fields
+    for elem in scored_elements:
+        elem.pop('_all_sources', None)
     
     return scored_elements
 
