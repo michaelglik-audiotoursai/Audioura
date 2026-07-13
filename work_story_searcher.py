@@ -216,6 +216,15 @@ def synthesize_queries(stop: Dict, tour_type: str = 'contained') -> List[str]:
         else:
             queries.append(f'"{local_title}" {city} history story behind')
 
+    # Q3: English title query — when english_title is present and differs from canonical,
+    # add a query on it (the form winning sources often use, e.g. "Song of Songs")
+    english_title = stop.get('english_title', '')
+    if english_title and english_title.strip().lower() != title.strip().lower():
+        if tour_type == 'contained':
+            queries.append(f'"{english_title}" {artist} story behind')
+        else:
+            queries.append(f'"{english_title}" {city} history story behind')
+
     # Localization: add query in venue language if not English
     if lang and lang != 'en':
         _LANG_STORY_TERMS = {'fr': 'histoire', 'it': 'storia', 'es': 'historia', 'de': 'Geschichte'}
@@ -315,7 +324,12 @@ def synthesize_fact_targeted_queries(stop: Dict, reported_elements: List[Dict]) 
         # Assemble: title + artist + key person/date + type hint
         parts = [f'"{query_title}"', artist]
         if people:
-            parts.append(people[0])  # First named person
+            # Q1: Skip any person whose name matches the artist to avoid duplication
+            # (people[0] is usually the artist themselves)
+            artist_lower = artist.lower().strip() if artist else ''
+            non_artist_people = [p for p in people if p.lower().strip() != artist_lower]
+            if non_artist_people:
+                parts.append(non_artist_people[0])  # First NON-artist person
         if dates:
             parts.append(dates[0])  # First date
         parts.append(type_suffix.split('|')[0])  # Primary type term

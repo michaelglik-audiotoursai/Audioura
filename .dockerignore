@@ -62,6 +62,7 @@ Temp/
 !requirements_orchestrator.txt
 !requirements.txt
 !story_type_taxonomy.json
+!source_tier_rules.json
 !templates/
 !templates/**
 

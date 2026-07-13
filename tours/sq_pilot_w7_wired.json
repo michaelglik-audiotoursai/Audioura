@@ -1,33 +1,54 @@
 {
-  "commit": "12665a9",
+  "code_sha": "de10243",
+  "code_dirty": true,
+  "commit": "de10243",
   "fixes": [
-    "W7_wiring"
+    "Q1_person_picker_skip_artist",
+    "Q3_english_title_query",
+    "code_sha_field"
   ],
   "chagall": {
     "stop": {
       "canonical_title": "Le Cantique des Cantiques IV",
-      "local_title": "Song of Songs IV",
+      "local_title": "Le Cantique des Cantiques IV",
+      "english_title": "Song of Songs IV",
       "artist": "Marc Chagall",
       "venue_city": "Nice",
       "venue_lang": "fr"
     },
     "search": {
       "total_queries": 6,
-      "results_count": 26,
+      "results_count": 28,
       "status": "ok",
-      "t1t2_count": 6
+      "t1t2_count": 7
     },
     "first_extraction": {
       "pages_fetched": 3,
       "pages_anchored": 2,
-      "elements_count": 13,
+      "elements_count": 11,
       "status": "ok"
     },
     "w7": {
-      "triggered": false,
-      "queries": [],
-      "new_results": 0,
-      "query_log": []
+      "triggered": true,
+      "queries": [
+        "\"Le Cantique des Cantiques\" Marc Chagall Valentina Chagall 1966 donation",
+        "\"Le Cantique des Cantiques\" Marc Chagall origin"
+      ],
+      "new_results": 7,
+      "query_log": [
+        {
+          "query": "\"Le Cantique des Cantiques\" Marc Chagall Valentina Chagall 1966 donation",
+          "result_count": 8,
+          "latency_ms": 946.0,
+          "fact_refinement": true
+        },
+        {
+          "query": "\"Le Cantique des Cantiques\" Marc Chagall origin",
+          "result_count": 8,
+          "latency_ms": 948.8,
+          "fact_refinement": true
+        }
+      ]
     },
     "final_elements": [
       {
@@ -35,7 +56,6 @@
         "text": "Le Cantique des Cantiques IV was created in 1958.",
         "source_sentence": "L\u00e9gende : Marc Chagall, Le Cantique des Cantiques IV , 1958, huile sur papier entoil\u00e9, 144,5 cm x 210,5 cm, donation Marc et Valentina Chagall, 1966, mus\u00e9e national Marc Chagall, Nice.",
         "people": [
-          "Marc Chagall",
           "Marc Chagall",
           "Valentina Chagall"
         ],
@@ -49,7 +69,7 @@
         "corroboration_status": "reported",
         "independent_source_count": 1,
         "syndication_log": {
-          "total_in_group": 1,
+          "total_in_group": 2,
           "independent_after_dedup": 1,
           "sources": [
             {
@@ -61,7 +81,7 @@
       },
       {
         "type": "technique",
-        "text": "The artwork is created using oil on canvas.",
+        "text": "The artwork is created using oil on canvas paper.",
         "source_sentence": "L\u00e9gende : Marc Chagall, Le Cantique des Cantiques IV , 1958, huile sur papier entoil\u00e9, 144,5 cm x 210,5 cm, donation Marc et Valentina Chagall, 1966, mus\u00e9e national Marc Chagall, Nice.",
         "people": [
           "Marc Chagall",
@@ -77,7 +97,7 @@
         "corroboration_status": "reported",
         "independent_source_count": 1,
         "syndication_log": {
-          "total_in_group": 1,
+          "total_in_group": 2,
           "independent_after_dedup": 1,
           "sources": [
             {
@@ -89,7 +109,7 @@
       },
       {
         "type": "provenance",
-        "text": "The painting was donated by Marc and Valentina Chagall in 1966.",
+        "text": "The artwork was donated by Marc and Valentina Chagall in 1966.",
         "source_sentence": "L\u00e9gende : Marc Chagall, Le Cantique des Cantiques IV , 1958, huile sur papier entoil\u00e9, 144,5 cm x 210,5 cm, donation Marc et Valentina Chagall, 1966, mus\u00e9e national Marc Chagall, Nice.",
         "people": [
           "Marc Chagall",
@@ -104,7 +124,7 @@
         "corroboration_status": "reported",
         "independent_source_count": 1,
         "syndication_log": {
-          "total_in_group": 1,
+          "total_in_group": 2,
           "independent_after_dedup": 1,
           "sources": [
             {
@@ -115,13 +135,10 @@
         }
       },
       {
-        "type": "reference_work",
-        "text": "The composition features David and Bathsheba embraced on the back of a winged horse flying over the city of Jerusalem.",
-        "source_sentence": "Reprise d'un des d\u00e9cors pour le ballet Aleko , la composition met en sc\u00e8ne David et Bethsab\u00e9e enlac\u00e9s sur le dos d\u2019un cheval ail\u00e9 survolant la ville de J\u00e9rusalem.",
-        "people": [
-          "David",
-          "Bethsab\u00e9e"
-        ],
+        "type": "origin",
+        "text": "Le Cantique des Cantiques IV is part of the Cycle du Message Biblique.",
+        "source_sentence": "Le Cycle du Message Biblique Le Cantique des Cantiques Le Cantique des Cantiques IV",
+        "people": [],
         "dates": [],
         "is_satire": false,
         "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv",
@@ -140,55 +157,17 @@
         }
       },
       {
-        "type": "legend",
-        "text": "The horse in the artwork symbolizes the strength of human love and the power of desire.",
-        "source_sentence": "Le cheval tient une place centrale dans la composition et peut avoir plusieurs sens : il incarne la force de l\u2019amour humain, capable de s\u2019\u00e9lever jusqu\u2019au divin, mais aussi la puissance du d\u00e9sir et de l\u2019amour charnel.",
-        "people": [],
-        "dates": [],
-        "is_satire": false,
-        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv",
-        "source_domain": "musees-nationaux-alpesmaritimes.fr",
-        "corroboration_status": "legend",
-        "independent_source_count": 1,
-        "syndication_log": {
-          "total_in_group": 1,
-          "independent_after_dedup": 1,
-          "sources": [
-            {
-              "domain": "musees-nationaux-alpesmaritimes.fr",
-              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv"
-            }
-          ]
-        }
-      },
-      {
-        "type": "legend",
-        "text": "The artwork also references Pegasus, the winged horse from Greek mythology, symbolizing poetry.",
-        "source_sentence": "Il est enfin P\u00e9gase, le cheval ail\u00e9 de la mythologie grecque, symbole de la po\u00e9sie.",
-        "people": [],
-        "dates": [],
-        "is_satire": false,
-        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv",
-        "source_domain": "musees-nationaux-alpesmaritimes.fr",
-        "corroboration_status": "legend",
-        "independent_source_count": 1,
-        "syndication_log": {
-          "total_in_group": 1,
-          "independent_after_dedup": 1,
-          "sources": [
-            {
-              "domain": "musees-nationaux-alpesmaritimes.fr",
-              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv"
-            }
-          ]
-        }
-      },
-      {
-        "type": "technique",
-        "text": "The effect of a comet produced by the treatment of the wedding dress's train contributes to the dynamism of the composition.",
-        "source_sentence": "L'effet de com\u00e8te produit par le traitement de la tra\u00eene de la robe de mari\u00e9e contribue au dynamisme de la composition.",
-        "people": [],
-        "dates": [],
+        "type": "dimensions",
+        "text": "The dimensions of the artwork are 144.5 cm x 210.5 cm.",
+        "source_sentence": "L\u00e9gende : Marc Chagall, Le Cantique des Cantiques IV , 1958, huile sur papier entoil\u00e9, 144,5 cm x 210,5 cm, donation Marc et Valentina Chagall, 1966, mus\u00e9e national Marc Chagall, Nice.",
+        "people": [
+          "Marc Chagall",
+          "Valentina Chagall"
+        ],
+        "dates": [
+          "1958",
+          "1966"
+        ],
         "is_satire": false,
         "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv",
         "source_domain": "musees-nationaux-alpesmaritimes.fr",
@@ -252,7 +231,7 @@
       {
         "type": "technique",
         "text": "Un cama\u00efeu de rouge et de rose \u00e9voque la douceur de la chair et la sensualit\u00e9, mais aussi celle du sang.",
-        "source_sentence": "Un cama\u00efeu de rouge et de rose \u00e9voque la douceur de la chair et la sensualit\u00e9, mais aussi celle du sang, rappelant ainsi la violence de l\u2019histoire biblique.",
+        "source_sentence": "Un cama\u00efeu de rouge et de rose \u00e9voque la douceur de la chair et la sensualit\u00e9, mais aussi celle du sang.",
         "people": [],
         "dates": [],
         "is_satire": false,
@@ -319,8 +298,8 @@
       },
       {
         "type": "legend",
-        "text": "La silhouette d\u2019une jeune femme nue figure verticalement le long de la marge droite du tableau.",
-        "source_sentence": "Verticalement le long de la marge droite du tableau figure une ville plong\u00e9e dans l\u2019obscurit\u00e9 et la silhouette d\u2019une jeune femme nue.",
+        "text": "La silhouette d\u2019une jeune femme nue figure dans le tableau, \u00e9voquant la recherche de son bien-aim\u00e9 dans les rues de J\u00e9rusalem.",
+        "source_sentence": "Verticalement le long de la marge droite du tableau figure une ville plong\u00e9e dans l\u2019obscurit\u00e9 et la silhouette d\u2019une jeune femme nue : dans le Cantique des Cantiques, la fianc\u00e9e recherche son bien-aim\u00e9 dans les rues de J\u00e9rusalem, la nuit.",
         "people": [],
         "dates": [],
         "is_satire": false,
@@ -338,6 +317,99 @@
             }
           ]
         }
+      },
+      {
+        "type": "reference_work",
+        "text": "The composition features two hills representing Vitebsk and Jerusalem.",
+        "source_sentence": "La composition s\u2019organise autour de deux collines. Chacune d\u2019elles \u00e9voque une ville : \u00e0 droite, la ville natale de Chagall, Vitebsk toujours reconnaissable par la pr\u00e9sence de la cath\u00e9drale au d\u00f4me vert qui la surmonte et \u00e0 gauche, J\u00e9rusalem.",
+        "people": [
+          "Marc Chagall"
+        ],
+        "dates": [],
+        "is_satire": false,
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "musees-nationaux-alpesmaritimes.fr",
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v"
+            }
+          ]
+        }
+      },
+      {
+        "type": "reference_work",
+        "text": "The artwork includes a throne of King David surrounded by lions, with 'J\u00e9rusalem' inscribed in Hebrew.",
+        "source_sentence": "Pour \u00e9viter toute confusion, l\u2019artiste a repr\u00e9sent\u00e9, \u00e0 l\u2019extr\u00eame gauche, le tr\u00f4ne du roi David entour\u00e9 des lions de la tribu de Judas sur lequel est inscrit \u00ab J\u00e9rusalem \u00bb en h\u00e9breu.",
+        "people": [
+          "Marc Chagall",
+          "King David"
+        ],
+        "dates": [],
+        "is_satire": false,
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "musees-nationaux-alpesmaritimes.fr",
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v"
+            }
+          ]
+        }
+      },
+      {
+        "type": "reference_work",
+        "text": "A bright sun in the shape of a Star of David dominates the left side of the canvas.",
+        "source_sentence": "Dans un ciel surpeupl\u00e9 de figures dansantes figure un soleil aux couleurs \u00e9clatantes, en forme d'\u00e9toile de David.",
+        "people": [],
+        "dates": [],
+        "is_satire": false,
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "musees-nationaux-alpesmaritimes.fr",
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v"
+            }
+          ]
+        }
+      },
+      {
+        "type": "reference_work",
+        "text": "The representation gives the most important characters a larger size than the others.",
+        "source_sentence": "La repr\u00e9sentation, non r\u00e9aliste, donne aux personnages les plus importants une taille sup\u00e9rieure aux autres.",
+        "people": [],
+        "dates": [],
+        "is_satire": false,
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "musees-nationaux-alpesmaritimes.fr",
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v"
+            }
+          ]
+        }
       }
     ],
     "target_elements": [
@@ -346,7 +418,6 @@
         "text": "Le Cantique des Cantiques IV was created in 1958.",
         "source_sentence": "L\u00e9gende : Marc Chagall, Le Cantique des Cantiques IV , 1958, huile sur papier entoil\u00e9, 144,5 cm x 210,5 cm, donation Marc et Valentina Chagall, 1966, mus\u00e9e national Marc Chagall, Nice.",
         "people": [
-          "Marc Chagall",
           "Marc Chagall",
           "Valentina Chagall"
         ],
@@ -360,7 +431,7 @@
         "corroboration_status": "reported",
         "independent_source_count": 1,
         "syndication_log": {
-          "total_in_group": 1,
+          "total_in_group": 2,
           "independent_after_dedup": 1,
           "sources": [
             {
@@ -372,7 +443,62 @@
       },
       {
         "type": "technique",
-        "text": "The artwork is created using oil on canvas.",
+        "text": "The artwork is created using oil on canvas paper.",
+        "source_sentence": "L\u00e9gende : Marc Chagall, Le Cantique des Cantiques IV , 1958, huile sur papier entoil\u00e9, 144,5 cm x 210,5 cm, donation Marc et Valentina Chagall, 1966, mus\u00e9e national Marc Chagall, Nice.",
+        "people": [
+          "Marc Chagall",
+          "Valentina Chagall"
+        ],
+        "dates": [
+          "1958",
+          "1966"
+        ],
+        "is_satire": false,
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 2,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "musees-nationaux-alpesmaritimes.fr",
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv"
+            }
+          ]
+        }
+      },
+      {
+        "type": "provenance",
+        "text": "The artwork was donated by Marc and Valentina Chagall in 1966.",
+        "source_sentence": "L\u00e9gende : Marc Chagall, Le Cantique des Cantiques IV , 1958, huile sur papier entoil\u00e9, 144,5 cm x 210,5 cm, donation Marc et Valentina Chagall, 1966, mus\u00e9e national Marc Chagall, Nice.",
+        "people": [
+          "Marc Chagall",
+          "Valentina Chagall"
+        ],
+        "dates": [
+          "1966"
+        ],
+        "is_satire": false,
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 2,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "musees-nationaux-alpesmaritimes.fr",
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv"
+            }
+          ]
+        }
+      },
+      {
+        "type": "dimensions",
+        "text": "The dimensions of the artwork are 144.5 cm x 210.5 cm.",
         "source_sentence": "L\u00e9gende : Marc Chagall, Le Cantique des Cantiques IV , 1958, huile sur papier entoil\u00e9, 144,5 cm x 210,5 cm, donation Marc et Valentina Chagall, 1966, mus\u00e9e national Marc Chagall, Nice.",
         "people": [
           "Marc Chagall",
@@ -399,18 +525,13 @@
         }
       },
       {
-        "type": "provenance",
-        "text": "The painting was donated by Marc and Valentina Chagall in 1966.",
-        "source_sentence": "L\u00e9gende : Marc Chagall, Le Cantique des Cantiques IV , 1958, huile sur papier entoil\u00e9, 144,5 cm x 210,5 cm, donation Marc et Valentina Chagall, 1966, mus\u00e9e national Marc Chagall, Nice.",
-        "people": [
-          "Marc Chagall",
-          "Valentina Chagall"
-        ],
-        "dates": [
-          "1966"
-        ],
+        "type": "reference_work",
+        "text": "The representation gives the most important characters a larger size than the others.",
+        "source_sentence": "La repr\u00e9sentation, non r\u00e9aliste, donne aux personnages les plus importants une taille sup\u00e9rieure aux autres.",
+        "people": [],
+        "dates": [],
         "is_satire": false,
-        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv",
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v",
         "source_domain": "musees-nationaux-alpesmaritimes.fr",
         "corroboration_status": "reported",
         "independent_source_count": 1,
@@ -420,7 +541,7 @@
           "sources": [
             {
               "domain": "musees-nationaux-alpesmaritimes.fr",
-              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-iv"
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/le-cantique-des-cantiques-v"
             }
           ]
         }
@@ -432,6 +553,7 @@
     "stop": {
       "canonical_title": "Blue Nude II",
       "local_title": "Nu bleu II",
+      "english_title": "Blue Nude II",
       "artist": "Henri Matisse",
       "venue_city": "Nice",
       "venue_lang": "fr"
@@ -445,20 +567,20 @@
     "first_extraction": {
       "pages_fetched": 4,
       "pages_anchored": 3,
-      "elements_count": 14,
+      "elements_count": 15,
       "status": "ok"
     },
     "w7": {
       "triggered": true,
       "queries": [
-        "\"Blue Nude\" Henri Matisse Henri Matisse 1984 origin"
+        "\"Blue Nude\" Henri Matisse 1984 origin"
       ],
       "new_results": 0,
       "query_log": [
         {
-          "query": "\"Blue Nude\" Henri Matisse Henri Matisse 1984 origin",
+          "query": "\"Blue Nude\" Henri Matisse 1984 origin",
           "result_count": 8,
-          "latency_ms": 1308.9,
+          "latency_ms": 814.0,
           "fact_refinement": true
         }
       ]
@@ -562,7 +684,7 @@
       },
       {
         "type": "reception",
-        "text": "The series was later shown at the Museum of Modern Art (MoMA) from October 2014 to February 2015.",
+        "text": "The series was later shown at the Museum of Modern Art (MoMA) from October 2014 to February 2015 as part of the exhibition Henri Matisse: The Cut-Outs.",
         "source_sentence": "The series was later shown at the Museum of Modern Art (MoMA) from October 2014 to February 2015 as part of the exhibition Henri Matisse: The Cut-Outs.",
         "people": [],
         "dates": [
@@ -587,7 +709,7 @@
       },
       {
         "type": "date",
-        "text": "Blue Nude II was created in 1952.",
+        "text": "Henri Matisse's 'Blue Nude II' was created in 1952.",
         "source_sentence": "Henri Matisse, \u00ab Nu bleu II \u00bb, 1952",
         "people": [
           "Henri Matisse"
@@ -601,7 +723,7 @@
         "corroboration_status": "reported",
         "independent_source_count": 1,
         "syndication_log": {
-          "total_in_group": 2,
+          "total_in_group": 1,
           "independent_after_dedup": 1,
           "sources": [
             {
@@ -613,7 +735,7 @@
       },
       {
         "type": "technique",
-        "text": "Blue Nude II was created using gouache-painted paper, cut out and mounted on canvas.",
+        "text": "'Blue Nude II' was created using gouache-painted paper, cut out and mounted on canvas.",
         "source_sentence": "With the four Blue Nudes of 1952, however, that working method came fully into view, asserting itself as an art form in its own right.",
         "people": [
           "Henri Matisse"
@@ -639,7 +761,7 @@
       },
       {
         "type": "intention",
-        "text": "Matisse sought the overall harmony of the composition in Blue Nude II by fitting elements within the bounds of the sheet.",
+        "text": "Matisse sought overall harmony in the composition of 'Blue Nude II' by fitting elements within the bounds of the sheet.",
         "source_sentence": "By fitting these elements within the bounds of the sheet, Matisse was seeking the overall harmony of the composition.",
         "people": [
           "Henri Matisse"
@@ -662,8 +784,32 @@
         }
       },
       {
+        "type": "reception",
+        "text": "'Blue Nude II' is part of a series that is deeply embedded in our visual culture.",
+        "source_sentence": "Yet the story behind it \u2013 and the nuances of the work itself \u2013 remain surprisingly little known.",
+        "people": [
+          "Henri Matisse"
+        ],
+        "dates": [],
+        "is_satire": false,
+        "source_url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/the-secret-history-of-henri-matisses-blue-nudes",
+        "source_domain": "www.centrepompidou.fr",
+        "corroboration_status": "reported",
+        "independent_source_count": 1,
+        "syndication_log": {
+          "total_in_group": 1,
+          "independent_after_dedup": 1,
+          "sources": [
+            {
+              "domain": "www.centrepompidou.fr",
+              "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/the-secret-history-of-henri-matisses-blue-nudes"
+            }
+          ]
+        }
+      },
+      {
         "type": "reference_work",
-        "text": "Blue Nude II is part of a series of four monumental compositions created in 1952.",
+        "text": "'Blue Nude II' is one of four monumental compositions created in 1952, each measuring between 102 and 112 cm high.",
         "source_sentence": "In fact, it belongs to a series of four monumental compositions, each created in 1952 and measuring between 102 and 112 cm high.",
         "people": [
           "Henri Matisse"
@@ -688,17 +834,17 @@
         }
       },
       {
-        "type": "quote",
-        "text": "Matisse described his technique as 'Cutting directly into colour reminds me of a sculptor\u2019s direct carving.'",
-        "source_sentence": "\u2018Cutting directly into colour reminds me of a sculptor\u2019s direct carving,\u2019 Matisse said in 1947, as the public discovered the plates of Jazz, his artist\u2019s book.",
+        "type": "origin",
+        "text": "Blue Nude II was conceived during Matisse\u2019s time in Nice, where he worked in the spacious studio of the H\u00f4tel R\u00e9gina.",
+        "source_sentence": "Conceived during the artist\u2019s time in Nice, where he worked in the spacious studio of the H\u00f4tel R\u00e9gina, Blue Nude II entered the Centre Pompidou\u2019s collection in 1984.",
         "people": [
           "Henri Matisse"
         ],
         "dates": [
-          "1947"
+          "1984"
         ],
         "is_satire": false,
-        "source_url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/the-secret-history-of-henri-matisses-blue-nudes",
+        "source_url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
         "source_domain": "www.centrepompidou.fr",
         "corroboration_status": "reported",
         "independent_source_count": 1,
@@ -708,20 +854,20 @@
           "sources": [
             {
               "domain": "www.centrepompidou.fr",
-              "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/the-secret-history-of-henri-matisses-blue-nudes"
+              "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse"
             }
           ]
         }
       },
       {
-        "type": "origin",
-        "text": "Blue Nude II was conceived during Matisse's time in Nice, where he worked in the spacious studio of the H\u00f4tel R\u00e9gina.",
-        "source_sentence": "Conceived during the artist\u2019s time in Nice, where he worked in the spacious studio of the H\u00f4tel R\u00e9gina, Blue Nude II entered the Centre Pompidou\u2019s collection in 1984.",
+        "type": "date",
+        "text": "Blue Nude II was created in 1952.",
+        "source_sentence": "Henri Matisse, \"Nu bleu II\", 1952, 103,8 X 86 cm \u00a9 Centre Pompidou",
         "people": [
           "Henri Matisse"
         ],
         "dates": [
-          "1984"
+          "1952"
         ],
         "is_satire": false,
         "source_url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
@@ -763,8 +909,8 @@
       },
       {
         "type": "reference_work",
-        "text": "Blue Nude II is part of a series of four and revisits a seated nude pose that Matisse had explored extensively in both painting and sculpture.",
-        "source_sentence": "The Blue Nude series (1952) revisits a seated nude pose that Matisse had explored extensively in both painting and sculpture.",
+        "text": "The Blue Nude series revisits a seated nude pose that Matisse had explored extensively in both painting and sculpture.",
+        "source_sentence": "The Blue Nude series (1952) revisits a seated nude pose that Matisse had explored extensively in both painting and sculpture...",
         "people": [
           "Henri Matisse"
         ],
@@ -790,7 +936,7 @@
       {
         "type": "reception",
         "text": "Blue Nude II is one of Henri Matisse\u2019s most renowned paper cut-outs.",
-        "source_sentence": "Blue Nude II is one of Henri Matisse\u2019s most renowned paper cut-outs.",
+        "source_sentence": "Part of a series of four, Blue Nude II is one of Henri Matisse\u2019s most renowned paper cut-outs.",
         "people": [
           "Henri Matisse"
         ],
@@ -865,7 +1011,7 @@
       },
       {
         "type": "reception",
-        "text": "The series was later shown at the Museum of Modern Art (MoMA) from October 2014 to February 2015.",
+        "text": "The series was later shown at the Museum of Modern Art (MoMA) from October 2014 to February 2015 as part of the exhibition Henri Matisse: The Cut-Outs.",
         "source_sentence": "The series was later shown at the Museum of Modern Art (MoMA) from October 2014 to February 2015 as part of the exhibition Henri Matisse: The Cut-Outs.",
         "people": [],
         "dates": [
@@ -890,7 +1036,7 @@
       },
       {
         "type": "technique",
-        "text": "Blue Nude II was created using gouache-painted paper, cut out and mounted on canvas.",
+        "text": "'Blue Nude II' was created using gouache-painted paper, cut out and mounted on canvas.",
         "source_sentence": "With the four Blue Nudes of 1952, however, that working method came fully into view, asserting itself as an art form in its own right.",
         "people": [
           "Henri Matisse"
@@ -939,7 +1085,7 @@
       {
         "type": "reception",
         "text": "Blue Nude II is one of Henri Matisse\u2019s most renowned paper cut-outs.",
-        "source_sentence": "Blue Nude II is one of Henri Matisse\u2019s most renowned paper cut-outs.",
+        "source_sentence": "Part of a series of four, Blue Nude II is one of Henri Matisse\u2019s most renowned paper cut-outs.",
         "people": [
           "Henri Matisse"
         ],
@@ -962,5 +1108,6 @@
       }
     ],
     "criterion_met": false
-  }
+  },
+  "code_sha_note": "Pilot ran code from this commit (Q1+Q3+code_sha). Dirty flag true because pilot ran before final amend."
 }
