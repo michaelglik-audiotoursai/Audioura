@@ -155,6 +155,33 @@ def run_tests() -> bool:
     if not passed:
         all_passed = False
 
+    # --- W2: Artist-token anchor for contained tours ---
+    print("\n  W2: Artist-Token Anchor (Contained Tours):")
+
+    # W2: Bible article should NOT anchor to Chagall painting
+    bible_page = "The Song of Songs, also called the Song of Solomon, is a biblical poem about love between a man and a woman. It is part of the Hebrew Bible."
+    passed = not check_work_anchor(bible_page, "Song of Songs", artist="Marc Chagall")
+    status = "PASS" if passed else "FAIL"
+    print(f"    [{status}] W2: Bible article without Chagall → NOT anchored (artist token required)")
+    if not passed:
+        all_passed = False
+
+    # --- W3: Legend phrase detection ---
+    print("\n  W3: Legend Phrase Detection:")
+
+    # W3: "Legend has it" forces legend status regardless of LLM type
+    elements_legend_phrase = [
+        {'text': 'Work was created in a single cut', 'type': 'technique',
+         'source_sentence': 'Legend has it that the work was created in a single, fluid cut of the scissors.',
+         'source_url': 'https://museum.org/a', 'source_domain': 'museum.org'},
+    ]
+    scored_w3 = score_corroboration(elements_legend_phrase)
+    passed = len(scored_w3) == 1 and scored_w3[0].get('corroboration_status') == 'legend'
+    status = "PASS" if passed else "FAIL"
+    print(f"    [{status}] W3: 'Legend has it' in source_sentence → forces 'legend' status: {scored_w3[0].get('corroboration_status') if scored_w3 else 'none'}")
+    if not passed:
+        all_passed = False
+
     return all_passed
 
 

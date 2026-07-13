@@ -4,7 +4,7 @@ Fetches Tier 1-2 pages, checks work-anchor (canonical title present),
 extracts story elements via LLM, and scores corroboration across sources.
 Syndication detection is deterministic (character-shingle Jaccard, R3).
 """
-import json, os, re, time, urllib.request, hashlib
+import json, os, re, time, urllib.request, urllib.parse, hashlib
 from typing import Dict, List, Optional, Set, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -43,10 +43,11 @@ def jaccard_similarity(text_a: str, text_b: str, shingle_size: int = 5) -> float
 
 
 # --- Work-anchor check (M3 matcher rules) ---
-def check_work_anchor(page_text: str, canonical_title: str) -> bool:
+def check_work_anchor(page_text: str, canonical_title: str, artist: str = '') -> bool:
     """Check if a page references the canonical work title.
     Uses content-word matching — stop words ('the', 'a', 'of', 'in', 'and') are not evidence.
-    Artist-generic pages that never mention THIS work are dropped."""
+    Artist-generic pages that never mention THIS work are dropped.
+    For contained tours, also requires artist mention (W2: prevents Bible article anchoring to Chagall paintings)."""
     if not canonical_title or not page_text:
         return False
     
@@ -64,13 +65,60 @@ def check_work_anchor(page_text: str, canonical_title: str) -> bool:
     # Require majority of content words present
     matches = sum(1 for w in title_words if w in page_lower)
     threshold = max(1, len(title_words) * 0.6)  # 60% of content words
-    return matches >= threshold
+    title_matches = matches >= threshold
+    
+    # W2: For contained tours (artist provided), also require artist token
+    if artist and title_matches:
+        artist_words = [w.lower() for w in re.findall(r'\w+', artist) if len(w) >= 3]
+        if artist_words:
+            artist_found = any(w in page_lower for w in artist_words)
+            if not artist_found:
+                return False
+    
+    return title_matches
 
 
 # --- Page fetching ---
+def _fetch_wikipedia_api(url: str, max_chars: int = 15000) -> Optional[str]:
+    """Fetch Wikipedia article via API plaintext extract (W1: avoids HTML stub problem)."""
+    try:
+        # Extract article title from URL
+        title = url.split('/wiki/')[-1].split('#')[0].split('?')[0]
+        title = urllib.parse.unquote(title).replace('_', ' ')
+        
+        # Determine language from subdomain
+        lang = 'en'
+        if 'wikipedia.org' in url:
+            parts = url.split('//')[-1].split('.wikipedia.org')[0]
+            if parts and parts != 'www':
+                lang = parts
+        
+        api_url = f"https://{lang}.wikipedia.org/w/api.php?action=query&titles={urllib.parse.quote(title)}&prop=extracts&explaintext=1&format=json&exlimit=1"
+        req = urllib.request.Request(api_url, headers={
+            'User-Agent': 'AudiouraBot/1.0 (story-quality-pipeline)'
+        })
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+            pages = data.get('query', {}).get('pages', {})
+            for page_id, page_data in pages.items():
+                if page_id == '-1':
+                    return None  # Page not found
+                extract = page_data.get('extract', '')
+                if extract:
+                    print(f"  [SQ-S3] Wikipedia API: {len(extract)} chars for '{title}'")
+                    return extract[:max_chars]
+            return None
+    except Exception as e:
+        print(f"  [SQ-S3] Wikipedia API failed for {url[:60]}: {e}")
+        return None
+
+
 def fetch_page_text(url: str, max_chars: int = 15000) -> Optional[str]:
     """Fetch a URL and extract text content (HTML stripped). Cap at max_chars.
     On failure → None (logged, never raises)."""
+    # W1: Wikipedia API for *.wikipedia.org domains
+    if 'wikipedia.org/wiki/' in url:
+        return _fetch_wikipedia_api(url, max_chars)
     try:
         req = urllib.request.Request(url, headers={
             'User-Agent': 'Mozilla/5.0 (AudiouraBot/1.0; story-quality-pipeline)'
@@ -237,6 +285,13 @@ def score_corroboration(elements: List[Dict], syndication_threshold: float = 0.8
         else:
             status = 'reported'  # Edge case: all syndicated → single effective source
         
+        # W3: Deterministic legend-phrase override (regardless of LLM typing)
+        _LEGEND_PHRASES = ['legend has it', 'the story goes', 'according to legend',
+                           'allegedly', 'legend says', 'it is said that', 'rumor has it']
+        _source_sent_lower = representative.get('source_sentence', '').lower()
+        if any(phrase in _source_sent_lower for phrase in _LEGEND_PHRASES):
+            status = 'legend'
+        
         # Attach status to representative element
         representative['corroboration_status'] = status
         representative['independent_source_count'] = n_independent
@@ -311,7 +366,7 @@ def extract_and_score_stop(search_results: List[Dict], canonical_title: str,
     
     # Step 3: Work-anchor check
     anchored_pages = [(meta, text) for meta, text in fetched_pages
-                      if check_work_anchor(text, canonical_title)]
+                      if check_work_anchor(text, canonical_title, artist)]
     
     if not anchored_pages:
         return {
