@@ -220,13 +220,13 @@ def _normalize_claim_key(text: str) -> str:
 def _find_merge_candidates(scored_elements: List[Dict]) -> List[tuple]:
     """Find pairs of reported elements that are candidates for LLM merge.
     
-    Candidate gate (RS3-aware): pairs are candidates if ANY of:
-    1. Normalized keys share ≥3 content words
-    2. source_sentence Jaccard similarity 0.3–0.84 (below syndication, above noise)
-    3. Same element type (date, technique, etc.) about the same work — always candidates
-       (RS3: widens the gate for the 1952 cluster where tokens barely overlap)
+    Candidate gate (B1 fix — same-type ONLY):
+    - Pairs must share the same element `type` (date↔date, technique↔technique)
+    - Cross-type pairs are NEVER candidates (a date and a technique are different claims)
+    - RS2: legend elements are NEVER candidates for merge with anything
     
-    RS2: legend elements are NEVER candidates for merge with non-legend elements.
+    This prevents the over-collapse where all elements about the same artwork
+    get merged into a single blob.
     """
     candidates = []
     for i in range(len(scored_elements)):
@@ -243,27 +243,11 @@ def _find_merge_candidates(scored_elements: List[Dict]) -> List[tuple]:
             if a.get('corroboration_status') != 'reported' or b.get('corroboration_status') != 'reported':
                 continue
             
-            # Gate 1: same type — always candidates (RS3 widening for date/technique clusters)
-            if a.get('type') == b.get('type') and a.get('type') in ('date', 'technique', 'origin', 'provenance', 'dedication'):
-                candidates.append((i, j))
+            # B1 FIX: SAME TYPE ONLY — a date and a technique are NEVER the same claim
+            if a.get('type') != b.get('type'):
                 continue
             
-            # Gate 2: ≥3 shared content words in normalized key
-            a_key = _normalize_claim_key(a.get('text', ''))
-            b_key = _normalize_claim_key(b.get('text', ''))
-            a_words = set(a_key.split())
-            b_words = set(b_key.split())
-            if len(a_words & b_words) >= 3:
-                candidates.append((i, j))
-                continue
-            
-            # Gate 3: Jaccard on source_sentence (0.3–0.84 range)
-            sim = jaccard_similarity(
-                a.get('source_sentence', ''),
-                b.get('source_sentence', '')
-            )
-            if 0.3 <= sim < 0.85:
-                candidates.append((i, j))
+            candidates.append((i, j))
     
     return candidates
 
@@ -290,13 +274,17 @@ def _llm_merge_decision(pairs: List[Dict]) -> List[Dict]:
     prompt = (
         "You are a fact-checking assistant. For each pair of claims below about an artwork, "
         "determine:\n"
-        "1. Are they about the SAME factual subject? (same_subject: true/false)\n"
-        "2. If same subject, do they AGREE or CONFLICT? (conflicting: true/false)\n\n"
-        "Rules:\n"
-        "- 'Created in 1952' and 'completed in 1952' and 'created in Spring 1952' = same subject, NOT conflicting.\n"
-        "- 'Gouache cut-outs' and 'gouache on paper, cut and pasted' = same subject, NOT conflicting.\n"
-        "- 'Created in 1952' and 'created in 1958' = same subject, CONFLICTING (different dates).\n"
-        "- Different topics entirely = NOT same subject.\n\n"
+        "1. Do they describe the SAME SPECIFIC FACTUAL CLAIM? (same_subject: true/false)\n"
+        "2. If same subject, do they give INCOMPATIBLE values? (conflicting: true/false)\n\n"
+        "IMPORTANT — 'same factual claim' means the SAME predicate about the SAME subject:\n"
+        "- SAME: 'Created in 1952' vs 'completed in 1952' vs 'created in Spring 1952' (all = creation date)\n"
+        "- SAME: 'Gouache cut-outs' vs 'gouache on paper, cut and pasted' (both = medium/technique)\n"
+        "- DIFFERENT: 'Created in 1952' vs 'gouache on paper' (date ≠ medium)\n"
+        "- DIFFERENT: 'Shown at MoMA 2014' vs 'created in 1952' (exhibition ≠ creation date)\n"
+        "- DIFFERENT: 'Part of Musée national collection' vs 'created in 1952' (provenance ≠ date)\n"
+        "- DIFFERENT: 'Inspired by African sculpture' vs 'shown at MoMA' (inspiration ≠ exhibition)\n"
+        "- CONFLICTING: 'Created in 1952' vs 'created in 1958' (same predicate, incompatible values)\n\n"
+        "Only answer same_subject:true when BOTH the subject AND the predicate match.\n\n"
         + "\n".join(prompt_pairs) +
         "\n\nRespond with ONLY a JSON array: [{\"pair\": 1, \"same_subject\": true/false, \"conflicting\": true/false},...]\n"
     )
@@ -384,10 +372,13 @@ def _llm_merge_pass(scored_elements: List[Dict], syndication_threshold: float = 
         all_decisions.extend(batch_decisions)
     decisions = all_decisions
     
-    # Build merge_log
-    merge_log = []
-    merge_targets = {}  # j → i (element j merges INTO element i)
+    # B3 FIX: Use connected-components instead of broken union-find
+    # Each element lands in exactly ONE group; recompute independence once per final group
+    
+    # Build adjacency from merge decisions
+    merge_edges = []  # (i, j) pairs that should be in the same group
     disputed_pairs = []  # RS8: conflicting pairs → disputed
+    merge_log = []
     
     for decision in decisions:
         pair_num = decision.get('pair', 0) - 1  # 0-indexed
@@ -411,15 +402,9 @@ def _llm_merge_pass(scored_elements: List[Dict], syndication_threshold: float = 
         }
         
         if same_subject and not conflicting:
-            # Merge: same fact, no conflict
-            target = i
-            while target in merge_targets:
-                target = merge_targets[target]
-            merge_targets[j] = target
+            merge_edges.append((i, j))
             log_entry['action'] = 'merged'
-            log_entry['merged_into'] = target
         elif same_subject and conflicting:
-            # RS8: Same subject but conflicting values → disputed
             disputed_pairs.append((i, j))
             log_entry['action'] = 'disputed'
         else:
@@ -427,13 +412,45 @@ def _llm_merge_pass(scored_elements: List[Dict], syndication_threshold: float = 
         
         merge_log.append(log_entry)
     
-    # Apply merges: union source sets, recompute status (RS4)
+    # Build connected components from merge edges
+    # Each element appears in exactly one component
+    parent = list(range(len(scored_elements)))
+    
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]  # Path compression
+            x = parent[x]
+        return x
+    
+    def union(x, y):
+        px, py = find(x), find(y)
+        if px != py:
+            parent[py] = px
+    
+    for i, j in merge_edges:
+        union(i, j)
+    
+    # Group elements by their component root
+    components = {}
+    for idx in range(len(scored_elements)):
+        root = find(idx)
+        if root not in components:
+            components[root] = []
+        components[root].append(idx)
+    
+    # For each component with >1 element, merge source sets and recompute status (RS4)
     elements_to_remove = set()
-    for j, target_i in merge_targets.items():
-        # Union the source sets
-        target_sources = scored_elements[target_i].get('_all_sources', [])
-        merge_sources = scored_elements[j].get('_all_sources', [])
-        all_sources = target_sources + merge_sources
+    for root, members in components.items():
+        if len(members) <= 1:
+            continue
+        
+        # Representative = first element in the component
+        representative_idx = members[0]
+        
+        # Union all sources from the component
+        all_sources = []
+        for idx in members:
+            all_sources.extend(scored_elements[idx].get('_all_sources', []))
         
         # RS4: Count distinct domains after syndication dedup
         unique_domains = set()
@@ -443,25 +460,27 @@ def _llm_merge_pass(scored_elements: List[Dict], syndication_threshold: float = 
                 unique_domains.add(domain)
         
         n_independent = len(unique_domains)
-        scored_elements[target_i]['_all_sources'] = all_sources
-        scored_elements[target_i]['independent_source_count'] = n_independent
+        scored_elements[representative_idx]['_all_sources'] = all_sources
+        scored_elements[representative_idx]['independent_source_count'] = n_independent
         
         # Recompute status
         if n_independent >= 2:
-            scored_elements[target_i]['corroboration_status'] = 'documented'
+            scored_elements[representative_idx]['corroboration_status'] = 'documented'
         
         # Update syndication_log
-        scored_elements[target_i]['syndication_log'] = {
+        scored_elements[representative_idx]['syndication_log'] = {
             'total_in_group': len(all_sources),
             'independent_after_dedup': n_independent,
             'sources': [{'domain': s.get('source_domain', ''), 'url': s.get('source_url', '')}
                        for s in all_sources],
-            'merged_from': [j],
+            'merged_from': [idx for idx in members[1:]],
         }
         
-        elements_to_remove.add(j)
+        # Mark non-representative members for removal
+        for idx in members[1:]:
+            elements_to_remove.add(idx)
     
-    # RS8: Mark disputed pairs
+    # RS8: Mark disputed pairs (only if both elements still exist after merge)
     for i, j in disputed_pairs:
         if i not in elements_to_remove and j not in elements_to_remove:
             scored_elements[i]['corroboration_status'] = 'disputed'

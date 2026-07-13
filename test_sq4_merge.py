@@ -142,7 +142,7 @@ def run_tests():
     if not passed:
         all_passed = False
 
-    # --- RS2 + RS3 combined: legend in a cluster with non-legends ---
+    # --- RS2+RS3 Combined: Legend among reporteds (single-cut + technique cluster):**
     print()
     print("  RS2+RS3 Combined: Legend among reporteds (single-cut + technique cluster):")
 
@@ -190,6 +190,65 @@ def run_tests():
     passed = non_legend_pair
     status = "PASS" if passed else "FAIL"
     print(f"    [{status}] Two reported techniques (idx 1,2) ARE candidates for merge")
+    if not passed:
+        all_passed = False
+
+    # --- B5 NEW: Cross-type separation (date ≠ technique, NEVER in same group) ---
+    print()
+    print("  B5: Cross-type separation (date and technique NEVER merge):")
+
+    cross_type_elements = [
+        {  # date element
+            'text': 'Blue Nude II was completed in 1952.',
+            'type': 'date',
+            'corroboration_status': 'reported',
+            'source_domain': 'en.wikipedia.org',
+            '_all_sources': [{'source_domain': 'en.wikipedia.org'}],
+        },
+        {  # technique element (should NEVER merge with date)
+            'text': 'Blue Nude II is a gouache on paper, cut and pasted.',
+            'type': 'technique',
+            'corroboration_status': 'reported',
+            'source_domain': 'www.moma.org',
+            '_all_sources': [{'source_domain': 'www.moma.org'}],
+        },
+        {  # reception element (should NEVER merge with date or technique)
+            'text': 'The series was shown at MoMA from October 2014 to February 2015.',
+            'type': 'reception',
+            'corroboration_status': 'reported',
+            'source_domain': 'www.centrepompidou.fr',
+            '_all_sources': [{'source_domain': 'www.centrepompidou.fr'}],
+        },
+    ]
+
+    cross_candidates = _find_merge_candidates(cross_type_elements)
+    passed = len(cross_candidates) == 0
+    status = "PASS" if passed else "FAIL"
+    print(f"    [{status}] date + technique + reception → 0 merge candidates (cross-type blocked)")
+    if not passed:
+        all_passed = False
+        print(f"      Got candidates: {cross_candidates}")
+
+    # B5 NEW: Final element count must be > 1 after merge (no single-blob collapse)
+    print()
+    print("  B5: No single-blob collapse (multi-type input → multi-element output):")
+
+    multi_type_input = [
+        {'text': 'Created in 1952.', 'type': 'date', 'corroboration_status': 'reported',
+         'source_domain': 'a.org', '_all_sources': [{'source_domain': 'a.org'}]},
+        {'text': 'Gouache on paper.', 'type': 'technique', 'corroboration_status': 'reported',
+         'source_domain': 'b.org', '_all_sources': [{'source_domain': 'b.org'}]},
+        {'text': 'Shown at MoMA.', 'type': 'reception', 'corroboration_status': 'reported',
+         'source_domain': 'c.org', '_all_sources': [{'source_domain': 'c.org'}]},
+    ]
+
+    # Since all are different types, merge should produce NO merges → 3 elements remain
+    with patch('story_element_extractor._llm_merge_decision', return_value=[]):
+        no_merge_result = _llm_merge_pass(multi_type_input)
+
+    passed = len(no_merge_result) == 3
+    status = "PASS" if passed else "FAIL"
+    print(f"    [{status}] 3 different-type elements → 3 output elements (no collapse): got {len(no_merge_result)}")
     if not passed:
         all_passed = False
 
