@@ -2106,6 +2106,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 print(f"  [BLOCKER4b] ⚠️ Address scatter: {len(_unique_addresses)} distinct addresses "
                       f"for {len(poi_list)} stops — a contained museum tour should have 1-2 addresses.")
                 print(f"  [BLOCKER4b] Rejecting — this looks like a city-wide museum tour, not interior rooms.")
+                # [PALAIS-FIX B2] Structured clean-fail evidence for BLOCKER4b
+                _LAST_CLEAN_FAIL_EVIDENCE.clear()
+                _LAST_CLEAN_FAIL_EVIDENCE.update({
+                    "error_type": "address_scatter",
+                    "venue_name": _museum_venue_name,
+                    "unique_addresses": len(_unique_addresses),
+                    "tier": _verification_tier if '_verification_tier' in dir() else 'unknown',
+                })
                 return None, None, (None, None)
 
         # -------- PHASE 4.5: knowledge validation (names + descriptions) --------
@@ -2987,6 +2995,14 @@ Orientation: [Brief orientation text explaining the best viewing position]
 
 DO NOT include any section headers other than "Orientation:" - the description should flow naturally after the orientation section.
 DO NOT include directions to the next stop - these will be added separately.
+"""
+
+        # [PALAIS-FIX B1] Hedged narration for unverified stops
+        if not poi.get('verified', True):
+            description_prompt += """
+IMPORTANT: This artwork's presence at this venue has NOT been independently verified.
+Use hedged phrasing: "attributed to...", "believed to be on display...", "reportedly features...".
+Do NOT state the work's presence as certain fact.
 """
 
         # [S43] Storied: inject persona tone override into description prompt

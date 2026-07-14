@@ -44,17 +44,20 @@ def _persist_icon_metrics(icon_result, job_id):
         cur = conn.cursor()
         
         for stop in icon_result.get("stops", []):
+            # [PALAIS-FIX B1] Propagate verified flag to stop_metrics
+            _verified = stop.get("verified", True)
             cur.execute(
                 """INSERT INTO stop_metrics 
                    (job_id, stop_index, stop_title, i_con, class_details, class_historic, class_social, 
-                    paragraphs, evaluator_version, prompt_hash)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                    paragraphs, evaluator_version, prompt_hash, verified)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                 (job_id, stop["stop_index"], stop["stop_title"], stop["i_con"],
                  stop["class_dist"].get("details", 0), stop["class_dist"].get("historic", 0),
                  stop["class_dist"].get("social", 0),
                  _json.dumps(stop["paragraphs"]),
                  icon_result.get("evaluator_version", "1.0.0"),
-                 icon_result.get("prompt_hash", ""))
+                 icon_result.get("prompt_hash", ""),
+                 _verified)
             )
         
         conn.commit()
