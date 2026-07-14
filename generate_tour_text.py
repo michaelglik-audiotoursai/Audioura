@@ -1874,11 +1874,23 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     }
                     return None, None, (None, None)
                 # Extract fields from VerificationResult
+                _pre_d1v2_candidates = list(poi_list)  # Save original GPT candidates before filtering
                 poi_list = _d1v2_result.pois
                 _d1_evidence_log = _d1v2_result.evidence_log
                 _d1_venue_corpus = _d1v2_result.combined_text
                 _story_corpus_result = _d1v2_result.corpus_result
                 print(f"  [D1] Tier: {_verification_tier} ({len(poi_list)} verified works)")
+                
+                # [PALAIS-FIX] For thin tier with sparse Wikidata: restore GPT candidates
+                # The venue IS real (Wikidata-resolved) but its artwork catalog is incomplete.
+                # Keep all GPT-proposed works in degraded mode rather than zero-stop-rejecting.
+                if _verification_tier == 'thin' and len(poi_list) < 3 and len(_pre_d1v2_candidates) >= 3:
+                    print(f"  [D1] THIN tier degraded mode: restoring {len(_pre_d1v2_candidates)} GPT candidates "
+                          f"(Wikidata catalog too sparse for strict filtering)")
+                    # Put verified works first, then unverified
+                    _verified_names = set(p['name'].lower() for p in poi_list)
+                    _unverified = [p for p in _pre_d1v2_candidates if p['name'].lower() not in _verified_names]
+                    poi_list = list(poi_list) + _unverified[:5]  # Cap at verified + 5 unverified
             else:
                 # _verify_works_v2 returned None or unexpected type — fail-closed (unresolvable)
                 print(f"  [D1] D1v2 returned unexpected result — demoting to unresolvable (fail-closed)")
@@ -1896,9 +1908,20 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
 
             # -------- [R4] Bounded replenishment loop --------
             # For medium/thin tiers: don't pad with unverifiable stops (use only verified)
+            # Exception: if thin tier has too few verified works (< 3), allow GPT-proposed
+            # works to proceed in degraded mode — the venue is Wikidata-resolved, so it's
+            # a real museum; Wikidata just has sparse artwork listings for it.
             if _verification_tier in ('medium', 'thin'):
-                total_stops = len(poi_list)
-                print(f"  [R4] SKIPPED — tier={_verification_tier}, total_stops capped to {total_stops} verified works")
+                if _verification_tier == 'thin' and len(poi_list) < 3:
+                    # Sparse Wikidata coverage — trust GPT for this Wikidata-verified venue
+                    # Cap to a reasonable number but don't zero-stop-reject
+                    _thin_cap = min(total_stops, 5)
+                    print(f"  [R4] THIN tier with sparse coverage ({len(poi_list)} verified) — "
+                          f"allowing GPT-proposed works (cap={_thin_cap}) for Wikidata-resolved venue")
+                    total_stops = _thin_cap
+                else:
+                    total_stops = len(poi_list)
+                    print(f"  [R4] SKIPPED — tier={_verification_tier}, total_stops capped to {total_stops} verified works")
             # If verified < requested, re-prompt for MORE candidates and verify (rich tier only)
             _r4_all_tried_names = set(_normalize_name(p['name']) for p in poi_list)
             _r4_all_tried_names.update(_normalize_name(k) for k in _d1_evidence_log.keys())
@@ -2029,7 +2052,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         if indicator in _pname and _venue_norm not in _pname and _pname not in _venue_norm:
                             _suspect_venues.append(p['name'])
                             break
-                if len(_suspect_venues) >= len(poi_list) // 2:
+                if len(_suspect_venues) >= max(1, len(poi_list) // 2):
                     print(f"  [BLOCKER1] ⚠️ Phase 3A returned {len(_suspect_venues)} stops that look like "
                           f"OTHER venues (not interior rooms of '{_museum_venue_name}'):")
                     for sv in _suspect_venues:
