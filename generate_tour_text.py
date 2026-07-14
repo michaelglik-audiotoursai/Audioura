@@ -1883,14 +1883,35 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 
                 # [PALAIS-FIX] For thin tier with sparse Wikidata: restore GPT candidates
                 # The venue IS real (Wikidata-resolved) but its artwork catalog is incomplete.
-                # Keep all GPT-proposed works in degraded mode rather than zero-stop-rejecting.
+                # Keep GPT-proposed works in degraded mode rather than zero-stop-rejecting.
                 if _verification_tier == 'thin' and len(poi_list) < 3 and len(_pre_d1v2_candidates) >= 3:
-                    print(f"  [D1] THIN tier degraded mode: restoring {len(_pre_d1v2_candidates)} GPT candidates "
-                          f"(Wikidata catalog too sparse for strict filtering)")
-                    # Put verified works first, then unverified
+                    # D1: Only restore candidates whose evidence-log status is "DROPPED / no canonical match"
+                    # NEVER restore REJECTED candidates (positive evidence they hang at another venue)
                     _verified_names = set(p['name'].lower() for p in poi_list)
-                    _unverified = [p for p in _pre_d1v2_candidates if p['name'].lower() not in _verified_names]
-                    poi_list = list(poi_list) + _unverified[:5]  # Cap at verified + 5 unverified
+                    # D2: Also exclude by evidence-log keys (handles canonical-rename variants)
+                    _evidence_keys_normalized = set(_normalize_name(k) for k in _d1_evidence_log.keys()
+                                                   if _d1_evidence_log[k].get('status') == 'VERIFIED')
+                    _unverified = []
+                    for p in _pre_d1v2_candidates:
+                        _cand_name = p['name']
+                        _cand_norm = _normalize_name(_cand_name)
+                        # Skip if already in verified list (exact or normalized match)
+                        if _cand_name.lower() in _verified_names or _cand_norm in _evidence_keys_normalized:
+                            continue
+                        # D1: Skip if evidence-log shows REJECTED (located at other venue)
+                        _ev_entry = _d1_evidence_log.get(_cand_name, {})
+                        if isinstance(_ev_entry, dict) and _ev_entry.get('status') == 'REJECTED':
+                            continue
+                        # D3: Tag as unverified for narration hedging + stop_metrics
+                        p['verified'] = False
+                        _unverified.append(p)
+                    # Cap at 5 unverified additions
+                    _restored = _unverified[:5]
+                    poi_list = list(poi_list) + _restored
+                    # D3: Accurate log line — print actual restored count, not pre-filter count
+                    print(f"  [D1] THIN tier degraded mode: restored {len(_restored)} unverified GPT candidates "
+                          f"(filtered from {len(_pre_d1v2_candidates)} total, "
+                          f"Wikidata catalog too sparse for strict filtering)")
             else:
                 # _verify_works_v2 returned None or unexpected type — fail-closed (unresolvable)
                 print(f"  [D1] D1v2 returned unexpected result — demoting to unresolvable (fail-closed)")
@@ -1916,12 +1937,15 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     # Sparse Wikidata coverage — trust GPT for this Wikidata-verified venue
                     # Cap to a reasonable number but don't zero-stop-reject
                     _thin_cap = min(total_stops, 5)
-                    print(f"  [R4] THIN tier with sparse coverage ({len(poi_list)} verified) — "
-                          f"allowing GPT-proposed works (cap={_thin_cap}) for Wikidata-resolved venue")
+                    print(f"  [R4] THIN tier with sparse coverage ({len(poi_list)} stops, "
+                          f"{sum(1 for p in poi_list if p.get('verified', True))} verified) — "
+                          f"allowing up to {_thin_cap} stops for Wikidata-resolved venue")
                     total_stops = _thin_cap
                 else:
+                    _n_verified_in_list = sum(1 for p in poi_list if p.get('verified', True))
                     total_stops = len(poi_list)
-                    print(f"  [R4] SKIPPED — tier={_verification_tier}, total_stops capped to {total_stops} verified works")
+                    print(f"  [R4] SKIPPED — tier={_verification_tier}, total_stops={total_stops} "
+                          f"({_n_verified_in_list} verified + {total_stops - _n_verified_in_list} unverified)")
             # If verified < requested, re-prompt for MORE candidates and verify (rich tier only)
             _r4_all_tried_names = set(_normalize_name(p['name']) for p in poi_list)
             _r4_all_tried_names.update(_normalize_name(k) for k in _d1_evidence_log.keys())
@@ -2041,7 +2065,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             _VENUE_INDICATORS = ('musée', 'museum', 'galerie', 'gallery', 'palais',
                                  'villa', 'château', 'castle', 'cathedral', 'church',
                                  'basilica', 'temple', 'theatre', 'theater', 'opera',
-                                 'bibliothèque', 'library', 'institut', 'centre')
+                                 'bibliothèque', 'library', 'institut', 'centre',
+                                 'opéra', 'théâtre', 'chapelle', 'cathédrale')
             if _museum_venue_name:
                 _venue_norm = _museum_venue_name.lower()
                 _suspect_venues = []
@@ -2059,6 +2084,15 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         print(f"    ✗ {sv}")
                     print(f"  [BLOCKER1] This indicates the model misread the request as 'a tour OF the city' "
                           f"rather than 'a tour INSIDE the venue'. Rejecting — will retry or fail cleanly.")
+                    # Structured clean-fail evidence (D3: was missing → mobile got Type: null)
+                    _LAST_CLEAN_FAIL_EVIDENCE.clear()
+                    _LAST_CLEAN_FAIL_EVIDENCE.update({
+                        "error_type": "venue_misread",
+                        "venue_name": _museum_venue_name,
+                        "suspect_venues": _suspect_venues[:5],
+                        "total_stops": len(poi_list),
+                        "tier": _verification_tier if '_verification_tier' in dir() else 'unknown',
+                    })
                     return None, None, (None, None)
             # [BLOCKER4b] Address-scatter check: a contained museum tour should have
             # at most 2-3 distinct addresses (all inside one building).
