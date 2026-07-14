@@ -560,6 +560,9 @@ from typing import Optional, List, Dict, Any
 # Module-level: populated on unresolvable clean-fail for structured error response
 _LAST_CLEAN_FAIL_EVIDENCE = {}
 
+# [B1b] Module-level: populated after successful generation with final poi_list (including verified flags)
+_LAST_POI_LIST = []
+
 
 
 @dataclass
@@ -2821,6 +2824,16 @@ Then provide a detailed description of the exhibit that is EXACTLY 300 words lon
 - Interesting details that would engage visitors
 """
 
+        # [PALAIS-FIX B1] Hedged narration for unverified stops — moved EARLY for GPT attention
+        if not poi.get('verified', True):
+            description_prompt += """
+CRITICAL HEDGING REQUIREMENT: This artwork's presence at this venue has NOT been independently verified.
+You MUST use hedged phrasing for EVERY claim about this artwork: "attributed to...", "believed to be on display...",
+"reportedly features...", "said to depict...". For example, instead of "This painting shows a vibrant scene of...",
+write "This work, believed to be on display here, reportedly depicts a scene of...".
+Do NOT state the work's presence as certain fact. EVERY sentence about the work must contain hedging language.
+"""
+
         # [S24] Storied: inject story-type tone + forbidden-phrase ban
         if story_type:
             try:
@@ -2995,14 +3008,6 @@ Orientation: [Brief orientation text explaining the best viewing position]
 
 DO NOT include any section headers other than "Orientation:" - the description should flow naturally after the orientation section.
 DO NOT include directions to the next stop - these will be added separately.
-"""
-
-        # [PALAIS-FIX B1] Hedged narration for unverified stops
-        if not poi.get('verified', True):
-            description_prompt += """
-IMPORTANT: This artwork's presence at this venue has NOT been independently verified.
-Use hedged phrasing: "attributed to...", "believed to be on display...", "reportedly features...".
-Do NOT state the work's presence as certain fact.
 """
 
         # [S43] Storied: inject persona tone override into description prompt
@@ -3522,6 +3527,10 @@ Requirements:
     print(f"\nPreview of the generated tour:\n")
     print(complete_tour[:preview_length] + "...\n")
     
+    # [B1b] Expose poi_list at module level for stop_metrics verified-flag mapping
+    global _LAST_POI_LIST
+    _LAST_POI_LIST = list(poi_list)
+
     return complete_tour, output_file, first_poi_coordinates
 
 if __name__ == "__main__":

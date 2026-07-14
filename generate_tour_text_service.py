@@ -263,6 +263,17 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                 _icon_result = evaluate_tour_icon(_delivered_text)
                 report_icon_gate(_icon_result)
                 
+                # [B1b] Map poi_list verified flags to i-con stops for stop_metrics
+                if _icon_result and _icon_result.get("stops"):
+                    try:
+                        from generate_tour_text import _LAST_POI_LIST as poi_list
+                        if poi_list:
+                            for i, stop_result in enumerate(_icon_result["stops"]):
+                                if i < len(poi_list):
+                                    stop_result["verified"] = poi_list[i].get("verified", True)
+                    except (ImportError, AttributeError):
+                        pass
+
                 # Persist to stop_metrics (non-blocking)
                 try:
                     _persist_icon_metrics(_icon_result, job_id)
