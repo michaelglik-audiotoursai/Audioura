@@ -2,7 +2,7 @@
 ## Who you are
 🔧 **SERVICES KIRO** — **CRITICAL**: Always start ALL replies with "🔧 SERVICES KIRO -"
 
-**UPDATED**: 2026-07-12 (Phase 2 CLOSED. SQ1 is next priority.)
+**UPDATED**: 2026-07-13 (B6 DELIVERED — `b8d5d96`+`ad5208d` pushed. All 4 items proven in committed artifact. Awaiting LEAD re-verification.)
 
 1. You are **Services Kiro** responsible for all Docker services in `C:\Users\micha\eclipse-workspace\AudioTours\development\`. You have blanket approval to change code, run Python programs, start/stop Docker services without waiting for approval.
 2. You maintain this file and update it after significant changes.
@@ -14,8 +14,8 @@
 - **ALWAYS** prefix every reply with "🔧 SERVICES KIRO -"
 - **GIT BRANCH**: `storied` (off `main` = `beta-2.1.1+18`). **Never touch `main`.**
 - **VERSION**: `2.2.0+1` (distinct from Beta's 2.1.x)
-- **LAST GIT STATE**: `e2c6ebd` — Phase 2 final remediation complete. All items accepted.
-- **NEXT ACTION ON RECOVERY**: Read this file top to bottom. Execute the SQ1 approach post (see IMMEDIATE WORK below).
+- **LAST GIT STATE**: `ad5208d` — B6 pilot (child of `b8d5d96` code commit). work_stories WRITE+READ, elements→generation per-status wiring, i-con delta all proven.
+- **NEXT ACTION ON RECOVERY**: Read this file, then run the full QUEUE PROTOCOL (see 📋 QUEUE PROTOCOL below). SQ4 is CLOSED (LEAD acceptance `1000410000006988`) — do not re-open. Current open work is in the 🟦 list (as of 2026-07-14: `wdvrdawkxp` PALAIS-FIX hardening, then `wdvrdawkxq` evidence-not-requirement design).
 - **WORKFLOW**: Blanket approval for all service changes. One task = one commit = one review.
 - **NEVER perform string surgery on assembled text** — corrections on STRUCTURED DATA only.
 - **NEVER fabricate examples** — use verbatim from actual files.
@@ -24,36 +24,56 @@
 
 ---
 
-## 🔥 IMMEDIATE WORK: SQ1 on wdvrdawdje (Story Quality)
+## 🔥 IMMEDIATE WORK: B6 Hard Gate (Michael's ruling `1000410000006774`)
 
-### Michael's directive (2026-07-11):
-> "SQ1 on wdvrdawdje takes priority over the Phase 3 approach post."
+**Source:** Michael's ruling (comment `1000410000006774`) + LEAD verdict (comment `1000410000006768`)
+**Context:** SQ4 merge machinery ACCEPTED (B1-B5 fixed). Criterion 2 MET via documented `origin` element + `legend` guardrail. B6 descope DENIED — all four items required in ONE commit.
 
-### What to do NOW:
-1. **Read `development/STORY_QUALITY_DESIGN.md`** in full — it is the spec (Michael approved 2026-07-07)
-2. **Post SQ1–SQ3 implementation approach** as a ClickUp comment on task `wdvrdawdje` for LEAD refinement BEFORE coding
-3. Do NOT code until LEAD refines the approach
+### Four B6 deliverables (ALL required together):
 
-### SQ1 scope (from task description):
-- `work_story_searcher.py`: deterministic query synthesis (+ bounded LLM refinement round, exact-canonical-title rule) + SERP integration
-- **Blocked on SERP key(s) from Michael** — stub with a fixture-based SERP mock until then so SQ2–SQ3 aren't blocked
-- CIL protocol applies: approach → LEAD refines → implement + pilot + self-assess → LEAD review
+**1. `work_stories` live WRITE** — pilot JSON must carry evidence of the store record (not just log-line claims; actual `[work_stories] STORED` evidence in the artifact).
 
-### Guard rails (veto-on-sight):
-- No theme-word matching
-- No artist-article-as-evidence (work-anchored only)
-- No string surgery on assembled text
-- No fail-open anywhere (SERP/network error → proceed with venue-corpus elements + log, never skip the gate)
+**2. `work_stories` live cache-HIT READ** — a warm-cache pilot run proving the read serves cached elements with **zero SERP queries**, in the committed artifact. Strategy: run pilot TWICE — first run mines fresh (proves WRITE), second run on same work hits cache (proves READ with `story_mining_status: cache_only`, `total_queries: 0`).
+
+**3. Elements→generation wiring** — scored elements reach `generate_tour_text`, with per-status phrasing:
+- `documented` → state as fact (no attribution needed)
+- `reported` → inline attribution ("According to [source]…")
+- `legend` → "The story goes that…"
+- `disputed` → expose both sides with sources
+
+**4. i-con delta** — `stop_metrics` i_con rows for the SQ4-generated Matisse + Chagall stops vs the LOCKED advisory baseline:
+- Matisse: 3.81
+- Uffizi: 3.66
+- Chagall: 3.99
+- Chagall cache-hit: 3.51
+
+### Implementation plan:
+1. Modify `generate_tour_text_service.py` (or the generation prompt) to accept ranked elements and include per-status instructions
+2. Modify pilot driver to: (a) run fresh mining, (b) capture STORED evidence, (c) run a second time on same work to prove cache-HIT read with zero SERP, (d) run generation with elements, (e) run i-con evaluator, (f) capture stop_metrics
+3. Commit code + BOTH pilot artifacts (fresh + warm)
+4. Pilot as CHILD commit of code commit (N1 procedural rule)
+
+### Standing gates:
+- Clean `code_sha` (pilot as child commit)
+- Per-tour Serper query-count + cost logged
+- D2: full per-query domains+tiers for ALL results
+- QA exit 0 on element-backed generation
+
+### Key files to modify:
+- `generate_tour_text_service.py` — inject story elements into generation prompt
+- `generate_tour_text.py` — accept elements, format per-status instructions
+- `run_pilot_w7_wired.py` — add warm-cache second run + generation + i-con evaluation
+- `icon_evaluator.py` — already exists, just needs to be called on generated text
 
 ---
 
-## 📋 PHASE 2 CLOSE CONDITIONS (carry to first Phase 3 commit)
-
-These two items are MANDATORY in the first commit of Phase 3 (wdvrdawcyx), whenever that starts:
-1. Extract `compute_tier(n_verified, evidence_strength)` to module level in `generate_tour_text.py`; call it from the pipeline; import it in `test_tier_computation.py`
-2. Commit the two G4 false-positive sentences as permanent unit fixtures
-
-Phase 3 itself requires an approach comment before coding (walking-tour generalization, §SQ-S6b theme threads apply).
+## 📋 ACCEPTED (not to be re-litigated):
+- B1-B5 merge fixes (same-type-only gate, connected-components, no cross-type merge, no blob)
+- RS1/RS2 legend guardrail (single fluid cut stays at `legend`)
+- RS6 E1 fired (English-series query generated)
+- D2 per-query domains present
+- Criterion 2 MET (documented `origin` element + legend guardrail)
+- Accuracy: documented element is `origin` ("Blue Nude II was conceived during Matisse's time in Nice…" from wiki+centrepompidou), NOT `date`
 
 ---
 
@@ -61,11 +81,8 @@ Phase 3 itself requires an approach comment before coding (walking-tour generali
 
 | Task | Status | Next |
 |------|--------|------|
-| wdvrdawdje (Story Quality) | **ACTIVE — SQ1 approach post** | Read STORY_QUALITY_DESIGN.md, post approach |
-| wdvrdawcyx (Generic Grounding) | Phase 2 CLOSED (conditional) | Phase 3 approach post (after SQ1) |
-| wdvrdawb3q (Regression test) | CLOSED | None |
-| wdvrdawexa (I-CON) | CLOSED | None |
-| wdvrdawbj4 (Story Mining) | CLOSED | None |
+| wdvrdawdje (Story Quality) | **ACTIVE — SQ4 CIL cycle 3, B6 DELIVERED (awaiting LEAD)** | LEAD re-verifies B6 from committed artifacts |
+| wdvrdawcyx (Generic Grounding) | Phase 2 CLOSED, conditions met | Phase 3 approach post (after SQ4 closes) |
 
 ---
 
@@ -79,43 +96,21 @@ Phase 3 itself requires an approach comment before coding (walking-tour generali
 - `development-tour-generator-1` — port 5000, `STORIED_MODE=true`
 - Rebuild: `docker-compose -f docker-compose-master.yml build tour-generator && docker-compose -f docker-compose-master.yml up -d tour-generator`
 - Postgres: `development-postgres-2-1` — password `password123`, user `admin`, db `audiotours`
+- **openai library in container is v0.x** — use `openai.ChatCompletion.create()` not `openai.OpenAI()`
 
 ---
 
-## 🏗️ PHASE 2 ARCHITECTURE (what was built — reference only)
-
-### Degradation Ladder (4 tiers)
-- RICH (evidence_strength ≥8): full found-mode, R4 replenishment enabled
-- MEDIUM (evidence_strength 3-7): verified stops only, R4 DISABLED
-- THIN (evidence_strength 1-2): fewer honest stops, no fabricated names
-- UNRESOLVABLE (0 verified OR entity resolution failed): structured clean-fail JSON
-
-### Tier Computation (B8 — unique QID count)
-```python
-_unique_sparql_qids = set(w.get('qid', '') for w in sparql_works if w.get('qid'))
-_evidence_strength = len(_unique_sparql_qids)
-if _n_verified == 0: 'unresolvable'
-elif _evidence_strength >= 8: 'rich'
-elif _evidence_strength >= 3: 'medium'
-else: 'thin'
+## 📊 GIT LOG (recent, on `storied` branch)
 ```
-
-### G4 Proper-Noun Grounding (B7 — runtime venue context)
-- `_COMMON_PROPER`: art-period closed class only (renaissance, baroque, etc.)
-- Venue-derived terms injected at runtime via `venue_context` param to `run_qa()`
-- No hardcoded venue/city/artist terms
-
-### venue_corpus Cache
-- Table: `venue_corpus` in Postgres (QID PK, corpus_version, no DEFAULT on tier)
-- Positive TTL: 30d, Negative: 5d
-- Auth: `admin:password123@postgres-2:5432/audiotours`
-
-### Key Files
-- `generate_tour_text.py`: VerificationResult, tier computation, cache, R4 gating
-- `venue_resolver.py`: cache_get/cache_put, entity resolution
-- `generate_tour_text_service.py`: structured error response, venue_context wiring
-- `content_qa_runner.py`: G4 with venue_context, D3 checks, single-venue consistency
-- `test_tier_computation.py`: 11 boundary fixtures (all 4 tiers)
+ad5208d B6 pilot: work_stories WRITE+READ proven, elements→generation wired (per-status), i-con delta +0.52/+1.01/+0.16 vs baseline
+b8d5d96 B6: elements→generation wiring (per-status phrasing) + B6 pilot driver + B6 wiring fixture
+931f7c4 SQ4 pilot: B1-B5 fix proven — 18 distinct elements, no single-blob, documented date cluster + legend guardrail
+6aefe0a SQ4 B1-B5 fix: same-type-only merge gate, connected-components union, improved LLM prompt with negative examples, cross-type separation fixtures
+fcbf68d SQ4 Commit 1: LLM merge pass (M1) + E1 english-series query + merge fixtures (RS2 legend boundary, RS3 real 1952 cluster)
+39aeae9 D1+D2+D3+D5: domain diversity cap, pilot includes fetch_log+per-query tiers, museedevence.fr seeded, date validation in W7
+327eec5 Q1+Q3+code_sha: person picker skips artist, english_title query, pilot records git HEAD
+3f2e046 W7 wiring: fact_refinement_queries in extract output, execute_fact_refinement orchestration
+```
 
 ---
 
@@ -124,13 +119,17 @@ else: 'thin'
 2. **NEVER relax checks** — failed checks → corrective actions
 3. **NEVER fabricate examples** — use verbatim text from actual files
 4. **Hardcoded per-venue config abandoned completely** — everything discovered at runtime
-5. **Queue scan by LIST** (ID: `1000410000000733`), not assignee
+5. **Queue scan = LIST scan + comment scan, always both** (see 📋 QUEUE PROTOCOL) — checking comments on one task is NOT a queue scan
 6. **Git branch**: `storied`. Never touch `main`.
 7. **Fail-closed**: infrastructure unavailable = FAILURE, never skip
 8. **TODO comments go on separate lines** — NEVER inside string literals
-9. **Tier computation uses evidence_strength (unique QIDs)** — NOT labels or verified_pois count
-10. **Artifacts ARE committed** — "status: completed" is a container claim, not evidence
-11. **NEVER claim PASS without QA exit 0** — report inflation is a critical violation
+9. **Artifacts ARE committed** — "status: completed" is a container claim, not evidence
+10. **NEVER claim PASS without QA exit 0** — report inflation is a critical violation
+11. **Pilot as CHILD commit** — code_sha == HEAD, not amend-sibling pattern
+12. **Delivered = production call site + wiring fixture** — function-without-callsite is report inflation
+13. **Same-type-only merge** — cross-type pairs NEVER candidates (B1 fix)
+14. **Report accurately** — name the element the evidence actually supports (documented=origin, not date)
+15. **work_stories deferred 3×** → hard gate. No further SQ close until exercised or Michael descopes.
 
 ---
 
@@ -143,14 +142,18 @@ development-tour-orchestrator-1:5002  # tour_orchestrator_service.py
 
 ---
 
-## 📊 GIT LOG (recent, on `storied` branch)
-```
-e2c6ebd Items 4+5: Chagall regenerated + exact-stem story_elements siblings
-16e0c06 B7+B8+B3: runtime venue-context, evidence_strength=unique QIDs, tier fixtures
-1ea1124 B1 complete: fix venue-self-reference + SPARQL title capitalization + Uffizi artifact
-6ea11dd B1: fix G4 matcher false positives (historical periods + venue terms + paragraph-split)
-6003af5 B4+B5: fix TODO-in-string + fix tier computation
-d0f2def Phase 2 artifact: Chagall rich-tier tour
-663e469 BLOCKING 1+3: Phase 2 acceptance artifacts
-0a11d91 BLOCKING 2: delete legacy fail-open branch
-```
+## 📋 QUEUE PROTOCOL (BINDING — Michael's directive 2026-07-14)
+
+**Any invocation — "work on your queue", "check for new directives", "continue", session recovery — means the SAME full protocol. There is no comment-only mode.**
+
+**Step 1 — LIST scan (new tasks):** `clickup_filter_tasks` on list `1000410000000733` (🟦 Services — Kiro). Every task with status `to do` or `in progress` (or bounced back by LEAD) is queue work. New tasks arrive WITHOUT any comment on tasks you already watch — a list scan is the ONLY way to see them.
+
+**Step 2 — Comment scan (new directives on known tasks):** for each open/active task, fetch comments UNPAGINATED, newest-first. Before declaring "no new directives," verify the max comment ID exceeds your own last post ID. Always cite the comment ID you are responding to.
+
+**Step 3 — Execute:** work the highest-priority actionable item (priority order: urgent > high > normal; LEAD bounces outrank new work). Design tasks marked "approach comment BEFORE coding" get a CIL approach comment first, never code. One task = one focused commit → move to 🔵 Claude — Review.
+
+**Step 4 — Report:** list what the LIST scan found (task IDs + statuses) and what the comment scan found (max comment IDs), THEN your action. "Queue is clear" requires evidence of BOTH scans.
+
+**Failure log:** 2026-07-14 — declared "queue clear" after comment-scan-only while 2 new high-priority tasks (`wdvrdawkxp`, `wdvrdawkxq`) sat in the list. This protocol exists because of that miss.
+
+- My last post: `1000410000006790` (update after every post)

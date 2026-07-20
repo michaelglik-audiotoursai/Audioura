@@ -1,0 +1,94 @@
+{
+  "Abraham et les trois anges": {
+    "status": "VERIFIED",
+    "canonical_title": "Abraham et les trois anges",
+    "snippet": "Peinture\n\nLa Création de l'homme\n  \n\n\n  \n      \n  \n\n\n  \n    \n    \n          \n          \n\n  \n\n  \n    Peinture\n\nAbraham et les trois anges\n  \n\n\n  \n      \n  \n\n\n  \n    \n    \n          \n          \n\n  \n\n  \n    Peinture\n\nLe Cantique des Cantiques I",
+    "method": "canonical_title_match",
+    "qid": "Q62568400"
+  },
+  "L'Arche de Noé": {
+    "status": "VERIFIED",
+    "canonical_title": "L'Arche de Noé",
+    "snippet": "",
+    "method": "canonical_title_match",
+    "qid": "Q62569562"
+  },
+  "L'Exode": {
+    "status": "VERIFIED",
+    "canonical_title": "L'Exode",
+    "snippet": "e du Calvaire, abandonnée et fermée au culte. Il imagine pour la chapelle elle-même un vaste ensemble de peinture sur les thèmes de la Genèse et de l'Exode, chacune adaptée à la dimension des murs, et, pour la sacristie, cinq peintures plus petites pour le Cantique des Cantiques. Pourtant, avec l'avancem",
+    "method": "canonical_title_match",
+    "qid": "Q3733008"
+  },
+  "La Bible : Abraham et Isaac en route vers le lieu du sacrifice": {
+    "status": "VERIFIED",
+    "canonical_title": "La Bible : Abraham et Isaac en route vers le lieu du sacrifice",
+    "snippet": "Peinture\n\nLa Création de l'homme\n  \n\n\n  \n      \n  \n\n\n  \n    \n    \n          \n          \n\n  \n\n  \n    Peinture\n\nAbraham et les trois anges\n  \n\n\n  \n      \n  \n\n\n  \n    \n    \n          \n          \n\n  \n\n  \n    Peinture\n\nLe Cantique des Cantiques I",
+    "method": "canonical_title_match",
+    "qid": "Q62514150"
+  },
+  "Le Cirque bleu": {
+    "status": "VERIFIED",
+    "canonical_title": "Le Cirque bleu",
+    "snippet": "Activité jeune public \n                   Biennales et Festivals \n                   Cinéma au musée \n                   Cirque \n                   Concert \n                   Concert Opéra \n                   Concert du Conservatoire \n                   Concert festival MANCA",
+    "method": "canonical_title_match",
+    "qid": "Q60452453"
+  },
+  "Le Roi David": {
+    "status": "VERIFIED",
+    "canonical_title": "King David",
+    "snippet": "",
+    "method": "canonical_title_match",
+    "qid": "Q3930871"
+  },
+  "Le prophète Jérémie": {
+    "status": "VERIFIED",
+    "canonical_title": "Le prophète Jérémie",
+    "snippet": "",
+    "method": "canonical_title_match",
+    "qid": "Q3795357"
+  },
+  "Résurrection": {
+    "status": "VERIFIED",
+    "canonical_title": "Resurrection",
+    "snippet": "",
+    "method": "canonical_title_match",
+    "qid": "Q3933555"
+  },
+  "La Création de l'homme": {
+    "status": "VERIFIED",
+    "canonical_title": "La Création de l'homme",
+    "snippet": "Peinture\n\nLa Création de l'homme\n  \n\n\n  \n      \n  \n\n\n  \n    \n    \n          \n          \n\n  \n\n  \n    Peinture\n\nAbraham et les trois anges",
+    "method": "R4_replenishment"
+  },
+  "Le Cantique des Cantiques I": {
+    "status": "VERIFIED",
+    "canonical_title": "Le Cantique des Cantiques I",
+    "snippet": "s thèmes de la Genèse et de l'Exode, chacune adaptée à la dimension des murs, et, pour la sacristie, cinq peintures plus petites pour le Cantique des Cantiques. Pourtant, avec l'avancement du travail, il préfère mettre l'accent sur la portée humaniste de ses œuvres en évitant de les accrocher dans un édifice",
+    "method": "R4_replenishment"
+  },
+  "Le Cantique des Cantiques II": {
+    "status": "VERIFIED",
+    "canonical_title": "Le Cantique des Cantiques II",
+    "snippet": "s thèmes de la Genèse et de l'Exode, chacune adaptée à la dimension des murs, et, pour la sacristie, cinq peintures plus petites pour le Cantique des Cantiques. Pourtant, avec l'avancement du travail, il préfère mettre l'accent sur la portée humaniste de ses œuvres en évitant de les accrocher dans un édifice",
+    "method": "R4_replenishment"
+  },
+  "Le Cirque": {
+    "status": "VERIFIED",
+    "canonical_title": "Le Cirque",
+    "snippet": "Activité jeune public \n                   Biennales et Festivals \n                   Cinéma au musée \n                   Cirque \n                   Concert \n                   Concert Opéra \n                   Concert du Conservatoire \n                   Concert festival MANCA",
+    "method": "R4_replenishment"
+  },
+  "Les Arlequins": {
+    "status": "VERIFIED",
+    "canonical_title": "Les Arlequins",
+    "snippet": "Peinture\n\nRésurrection\n  \n\n\n  \n      \n  \n\n\n  \n    \n    \n          \n          \n\n  \n\n  \n    Peinture\n\nLes Arlequins\n  \n\n\n  \n      \n  \n\n\n  \n    \n    \n          \n          \n\n  \n\n  \n    Peinture\n\nLe Cirque",
+    "method": "R4_replenishment"
+  },
+  "Les amoureux en vert": {
+    "status": "VERIFIED",
+    "canonical_title": "Les amoureux en vert",
+    "snippet": "Côte d’Azur.\n\nLa salle de concert du musée national Marc Chagall\nLa présence d’une salle de spectacle dans le musée a été souhaitée par Marc Chagall, amoureux de la musique et des arts scéniques. Il a dessiné les trois vitraux de La Création du Monde (1971-1972) qui baignent la salle de leur exceptionnelle",
+    "method": "R4_replenishment"
+  }
+}

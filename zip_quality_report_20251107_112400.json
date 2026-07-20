@@ -1,0 +1,56 @@
+{
+  "timestamp": "2025-11-07T11:24:00.719966",
+  "summary": {
+    "files_analyzed": 3,
+    "average_size_bytes": 1755704.3333333333,
+    "average_audio_files": 8.0,
+    "complete_packages": 3,
+    "clean_text": 3,
+    "voice_ready": 0,
+    "quality_score": 0.6666666666666666
+  },
+  "detailed_results": [
+    {
+      "zip_path": "recent_test.zip",
+      "total_files": 11,
+      "total_size": 2300627,
+      "audio_files": 8,
+      "html_files": 1,
+      "text_files": 2,
+      "missing_required": [],
+      "search_content_length": 4201,
+      "html_entities_found": [],
+      "underscore_count": 0,
+      "voice_features": 1,
+      "audio_ids_found": 5
+    },
+    {
+      "zip_path": "apple_test_latest.zip",
+      "total_files": 10,
+      "total_size": 1483243,
+      "audio_files": 8,
+      "html_files": 1,
+      "text_files": 1,
+      "missing_required": [],
+      "search_content_length": 2160,
+      "html_entities_found": [],
+      "underscore_count": 0,
+      "voice_features": 1,
+      "audio_ids_found": 5
+    },
+    {
+      "zip_path": "apple_test_second.zip",
+      "total_files": 10,
+      "total_size": 1483243,
+      "audio_files": 8,
+      "html_files": 1,
+      "text_files": 1,
+      "missing_required": [],
+      "search_content_length": 2160,
+      "html_entities_found": [],
+      "underscore_count": 0,
+      "voice_features": 1,
+      "audio_ids_found": 5
+    }
+  ]
+}

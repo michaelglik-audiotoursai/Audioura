@@ -9,575 +9,575 @@
       "venue_lang": "fr"
     },
     "search_summary": {
-      "queries": 4,
-      "status": "ok",
-      "results": 20
+      "queries": 0,
+      "status": "cache_only",
+      "results": 0
     },
     "extraction_summary": {
-      "pages_fetched": 6,
-      "pages_anchored": 6,
-      "extraction_status": "ok"
+      "extraction_status": "cache_hit",
+      "pages_fetched": 0,
+      "pages_anchored": 0
     },
     "elements": [
       {
-        "type": "date",
         "text": "Blue Nude II was created in 1952.",
-        "source_sentence": "Blue Nude II Artist Henri Matisse Year 1952",
-        "people": [
-          "Henri Matisse"
-        ],
+        "type": "date",
         "dates": [
           "1952"
+        ],
+        "people": [
+          "Henri Matisse"
         ],
         "is_satire": false,
         "source_url": "https://en.wikipedia.org/wiki/Blue_Nudes",
         "source_domain": "en.wikipedia.org",
-        "corroboration_status": "documented",
-        "independent_source_count": 2,
+        "source_sentence": "Blue Nude II Artist Henri Matisse Year 1952",
         "syndication_log": {
-          "total_in_group": 4,
-          "independent_after_dedup": 2,
           "sources": [
             {
-              "domain": "en.wikipedia.org",
-              "url": "https://en.wikipedia.org/wiki/Blue_Nudes"
+              "url": "https://en.wikipedia.org/wiki/Blue_Nudes",
+              "domain": "en.wikipedia.org"
             },
             {
-              "domain": "www.centrepompidou.fr",
-              "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse"
+              "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
+              "domain": "www.centrepompidou.fr"
             }
-          ]
-        }
+          ],
+          "total_in_group": 4,
+          "independent_after_dedup": 2
+        },
+        "corroboration_status": "documented",
+        "independent_source_count": 2
       },
       {
-        "type": "technique",
         "text": "The artwork is made using gouache-painted paper cut-outs stuck to paper mounted on canvas.",
+        "type": "technique",
+        "dates": [],
+        "people": [
+          "Henri Matisse"
+        ],
+        "is_satire": false,
+        "source_url": "https://en.wikipedia.org/wiki/Blue_Nudes",
+        "source_domain": "en.wikipedia.org",
         "source_sentence": "Type Gouache -painted paper cut-outs stuck to paper mounted on canvas",
-        "people": [
-          "Henri Matisse"
-        ],
-        "dates": [],
-        "is_satire": false,
-        "source_url": "https://en.wikipedia.org/wiki/Blue_Nudes",
-        "source_domain": "en.wikipedia.org",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
         "syndication_log": {
-          "total_in_group": 2,
-          "independent_after_dedup": 1,
           "sources": [
             {
-              "domain": "en.wikipedia.org",
-              "url": "https://en.wikipedia.org/wiki/Blue_Nudes"
+              "url": "https://en.wikipedia.org/wiki/Blue_Nudes",
+              "domain": "en.wikipedia.org"
             }
-          ]
-        }
+          ],
+          "total_in_group": 2,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
       },
       {
-        "type": "provenance",
         "text": "The dimensions of Blue Nude II are 116.2 cm \u00d7 88.9 cm (45.7 in \u00d7 35 in).",
-        "source_sentence": "Dimensions 116.2 cm \u00d7 88.9 cm (45.7 in \u00d7 35 in)",
-        "people": [],
+        "type": "provenance",
         "dates": [],
+        "people": [],
         "is_satire": false,
         "source_url": "https://en.wikipedia.org/wiki/Blue_Nudes",
         "source_domain": "en.wikipedia.org",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
+        "source_sentence": "Dimensions 116.2 cm \u00d7 88.9 cm (45.7 in \u00d7 35 in)",
         "syndication_log": {
-          "total_in_group": 2,
-          "independent_after_dedup": 1,
           "sources": [
             {
-              "domain": "en.wikipedia.org",
-              "url": "https://en.wikipedia.org/wiki/Blue_Nudes"
+              "url": "https://en.wikipedia.org/wiki/Blue_Nudes",
+              "domain": "en.wikipedia.org"
             }
-          ]
-        }
+          ],
+          "total_in_group": 2,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
       },
       {
-        "type": "date",
         "text": "Blue Nude II was created in Spring 1952.",
-        "source_sentence": "Henri Matisse. Blue Nude II . 1952 Henri Matisse (French, 1869\u20131954). *Blue Nude II (Nu bleu II).* Spring 1952.",
-        "people": [
-          "Henri Matisse"
-        ],
+        "type": "date",
         "dates": [
           "1952"
         ],
+        "people": [
+          "Henri Matisse"
+        ],
         "is_satire": false,
         "source_url": "https://www.moma.org/audio/playlist/6/316",
         "source_domain": "www.moma.org",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
+        "source_sentence": "Henri Matisse. Blue Nude II . 1952 Henri Matisse (French, 1869\u20131954). *Blue Nude II (Nu bleu II).* Spring 1952.",
         "syndication_log": {
-          "total_in_group": 2,
-          "independent_after_dedup": 1,
           "sources": [
             {
-              "domain": "www.moma.org",
-              "url": "https://www.moma.org/audio/playlist/6/316"
+              "url": "https://www.moma.org/audio/playlist/6/316",
+              "domain": "www.moma.org"
             }
-          ]
-        }
+          ],
+          "total_in_group": 2,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
       },
       {
-        "type": "technique",
         "text": "Blue Nude II is created using gouache on paper, cut and pasted, mounted on canvas.",
-        "source_sentence": "Gouache on paper, cut and pasted, on white paper, mounted on canvas.",
-        "people": [
-          "Henri Matisse"
-        ],
-        "dates": [],
-        "is_satire": false,
-        "source_url": "https://www.moma.org/audio/playlist/6/316",
-        "source_domain": "www.moma.org",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
-        "syndication_log": {
-          "total_in_group": 1,
-          "independent_after_dedup": 1,
-          "sources": [
-            {
-              "domain": "www.moma.org",
-              "url": "https://www.moma.org/audio/playlist/6/316"
-            }
-          ]
-        }
-      },
-      {
-        "type": "provenance",
-        "text": "The artwork is part of the collection at Mus\u00e9e national d\u2019art moderne/Centre de cr\u00e9ation industrielle, Centre Georges Pompidou, Paris.",
-        "source_sentence": "Mus\u00e9e national d\u2019art moderne/Centre de cr\u00e9ation industrielle, Centre Georges Pompidou, Paris.",
-        "people": [],
-        "dates": [],
-        "is_satire": false,
-        "source_url": "https://www.moma.org/audio/playlist/6/316",
-        "source_domain": "www.moma.org",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
-        "syndication_log": {
-          "total_in_group": 1,
-          "independent_after_dedup": 1,
-          "sources": [
-            {
-              "domain": "www.moma.org",
-              "url": "https://www.moma.org/audio/playlist/6/316"
-            }
-          ]
-        }
-      },
-      {
-        "type": "reception",
-        "text": "Matisse\u2019s cut-outs, including Blue Nude II, often appear effortless, but the work was arduous and sometimes he struggled.",
-        "source_sentence": "Matisse\u2019s cut-outs often appear effortless. But the work was arduous, and sometimes he struggled.",
-        "people": [
-          "Henri Matisse"
-        ],
-        "dates": [],
-        "is_satire": false,
-        "source_url": "https://www.moma.org/audio/playlist/6/316",
-        "source_domain": "www.moma.org",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
-        "syndication_log": {
-          "total_in_group": 2,
-          "independent_after_dedup": 1,
-          "sources": [
-            {
-              "domain": "www.moma.org",
-              "url": "https://www.moma.org/audio/playlist/6/316"
-            }
-          ]
-        }
-      },
-      {
-        "type": "intention",
-        "text": "Matisse aimed to unite color and drawing in his work, which was a challenge throughout his life.",
-        "source_sentence": "It gets to the essence of what's been a challenge his whole life. And that is how do you unite color and drawing.",
-        "people": [
-          "Henri Matisse",
-          "Jodi Hauptman"
-        ],
-        "dates": [],
-        "is_satire": false,
-        "source_url": "https://www.moma.org/audio/playlist/6/316",
-        "source_domain": "www.moma.org",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
-        "syndication_log": {
-          "total_in_group": 1,
-          "independent_after_dedup": 1,
-          "sources": [
-            {
-              "domain": "www.moma.org",
-              "url": "https://www.moma.org/audio/playlist/6/316"
-            }
-          ]
-        }
-      },
-      {
-        "type": "legend",
-        "text": "Matisse learned from his drawing process and then returned to cutting for Blue Nude II.",
-        "source_sentence": "So he learns something from the drawing, and then he goes back to cutting.",
-        "people": [
-          "Henri Matisse",
-          "Jodi Hauptman"
-        ],
-        "dates": [],
-        "is_satire": false,
-        "source_url": "https://www.moma.org/audio/playlist/6/316",
-        "source_domain": "www.moma.org",
-        "corroboration_status": "legend",
-        "independent_source_count": 1,
-        "syndication_log": {
-          "total_in_group": 1,
-          "independent_after_dedup": 1,
-          "sources": [
-            {
-              "domain": "www.moma.org",
-              "url": "https://www.moma.org/audio/playlist/6/316"
-            }
-          ]
-        }
-      },
-      {
         "type": "technique",
-        "text": "Blue Nude II is a gouache on paper, cut and pasted, mounted on canvas.",
+        "dates": [],
+        "people": [
+          "Henri Matisse"
+        ],
+        "is_satire": false,
+        "source_url": "https://www.moma.org/audio/playlist/6/316",
+        "source_domain": "www.moma.org",
         "source_sentence": "Gouache on paper, cut and pasted, on white paper, mounted on canvas.",
-        "people": [
-          "Henri Matisse"
-        ],
-        "dates": [],
-        "is_satire": false,
-        "source_url": "https://www.moma.org/audio/playlist/6/316",
-        "source_domain": "www.moma.org",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
         "syndication_log": {
-          "total_in_group": 1,
-          "independent_after_dedup": 1,
           "sources": [
             {
-              "domain": "www.moma.org",
-              "url": "https://www.moma.org/audio/playlist/6/316"
+              "url": "https://www.moma.org/audio/playlist/6/316",
+              "domain": "www.moma.org"
             }
-          ]
-        }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
       },
       {
+        "text": "The artwork is part of the collection at Mus\u00e9e national d\u2019art moderne/Centre de cr\u00e9ation industrielle, Centre Georges Pompidou, Paris.",
         "type": "provenance",
-        "text": "Blue Nude II is part of the collection at the Mus\u00e9e national d\u2019art moderne/Centre de cr\u00e9ation industrielle, Centre Georges Pompidou, Paris.",
-        "source_sentence": "Mus\u00e9e national d\u2019art moderne/Centre de cr\u00e9ation industrielle, Centre Georges Pompidou, Paris.",
+        "dates": [],
         "people": [],
-        "dates": [],
         "is_satire": false,
         "source_url": "https://www.moma.org/audio/playlist/6/316",
         "source_domain": "www.moma.org",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
+        "source_sentence": "Mus\u00e9e national d\u2019art moderne/Centre de cr\u00e9ation industrielle, Centre Georges Pompidou, Paris.",
         "syndication_log": {
-          "total_in_group": 1,
-          "independent_after_dedup": 1,
           "sources": [
             {
-              "domain": "www.moma.org",
-              "url": "https://www.moma.org/audio/playlist/6/316"
+              "url": "https://www.moma.org/audio/playlist/6/316",
+              "domain": "www.moma.org"
             }
-          ]
-        }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
       },
       {
+        "text": "Matisse\u2019s cut-outs, including Blue Nude II, often appear effortless, but the work was arduous and sometimes he struggled.",
+        "type": "reception",
+        "dates": [],
+        "people": [
+          "Henri Matisse"
+        ],
+        "is_satire": false,
+        "source_url": "https://www.moma.org/audio/playlist/6/316",
+        "source_domain": "www.moma.org",
+        "source_sentence": "Matisse\u2019s cut-outs often appear effortless. But the work was arduous, and sometimes he struggled.",
+        "syndication_log": {
+          "sources": [
+            {
+              "url": "https://www.moma.org/audio/playlist/6/316",
+              "domain": "www.moma.org"
+            }
+          ],
+          "total_in_group": 2,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
+      },
+      {
+        "text": "Matisse aimed to unite color and drawing in his work, which was a challenge throughout his life.",
         "type": "intention",
+        "dates": [],
+        "people": [
+          "Henri Matisse",
+          "Jodi Hauptman"
+        ],
+        "is_satire": false,
+        "source_url": "https://www.moma.org/audio/playlist/6/316",
+        "source_domain": "www.moma.org",
+        "source_sentence": "It gets to the essence of what's been a challenge his whole life. And that is how do you unite color and drawing.",
+        "syndication_log": {
+          "sources": [
+            {
+              "url": "https://www.moma.org/audio/playlist/6/316",
+              "domain": "www.moma.org"
+            }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
+      },
+      {
+        "text": "Matisse learned from his drawing process and then returned to cutting for Blue Nude II.",
+        "type": "legend",
+        "dates": [],
+        "people": [
+          "Henri Matisse",
+          "Jodi Hauptman"
+        ],
+        "is_satire": false,
+        "source_url": "https://www.moma.org/audio/playlist/6/316",
+        "source_domain": "www.moma.org",
+        "source_sentence": "So he learns something from the drawing, and then he goes back to cutting.",
+        "syndication_log": {
+          "sources": [
+            {
+              "url": "https://www.moma.org/audio/playlist/6/316",
+              "domain": "www.moma.org"
+            }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "legend",
+        "independent_source_count": 1
+      },
+      {
+        "text": "Blue Nude II is a gouache on paper, cut and pasted, mounted on canvas.",
+        "type": "technique",
+        "dates": [],
+        "people": [
+          "Henri Matisse"
+        ],
+        "is_satire": false,
+        "source_url": "https://www.moma.org/audio/playlist/6/316",
+        "source_domain": "www.moma.org",
+        "source_sentence": "Gouache on paper, cut and pasted, on white paper, mounted on canvas.",
+        "syndication_log": {
+          "sources": [
+            {
+              "url": "https://www.moma.org/audio/playlist/6/316",
+              "domain": "www.moma.org"
+            }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
+      },
+      {
+        "text": "Blue Nude II is part of the collection at the Mus\u00e9e national d\u2019art moderne/Centre de cr\u00e9ation industrielle, Centre Georges Pompidou, Paris.",
+        "type": "provenance",
+        "dates": [],
+        "people": [],
+        "is_satire": false,
+        "source_url": "https://www.moma.org/audio/playlist/6/316",
+        "source_domain": "www.moma.org",
+        "source_sentence": "Mus\u00e9e national d\u2019art moderne/Centre de cr\u00e9ation industrielle, Centre Georges Pompidou, Paris.",
+        "syndication_log": {
+          "sources": [
+            {
+              "url": "https://www.moma.org/audio/playlist/6/316",
+              "domain": "www.moma.org"
+            }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
+      },
+      {
         "text": "In creating Blue Nude II, Matisse aimed to unite color and drawing.",
+        "type": "intention",
+        "dates": [],
+        "people": [
+          "Henri Matisse"
+        ],
+        "is_satire": false,
+        "source_url": "https://www.moma.org/audio/playlist/6/316",
+        "source_domain": "www.moma.org",
         "source_sentence": "And that is how do you unite color and drawing.",
-        "people": [
-          "Henri Matisse"
-        ],
-        "dates": [],
-        "is_satire": false,
-        "source_url": "https://www.moma.org/audio/playlist/6/316",
-        "source_domain": "www.moma.org",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
         "syndication_log": {
-          "total_in_group": 1,
-          "independent_after_dedup": 1,
           "sources": [
             {
-              "domain": "www.moma.org",
-              "url": "https://www.moma.org/audio/playlist/6/316"
+              "url": "https://www.moma.org/audio/playlist/6/316",
+              "domain": "www.moma.org"
             }
-          ]
-        }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
       },
       {
-        "type": "controversy",
         "text": "Matisse faced challenges while creating the Blue Nudes, which included frustration that led him to stop cutting and turn to drawing.",
-        "source_sentence": "In frustration, Matisse stopped cutting and turned to drawing.",
+        "type": "controversy",
+        "dates": [],
         "people": [
           "Henri Matisse"
         ],
-        "dates": [],
         "is_satire": false,
         "source_url": "https://www.moma.org/audio/playlist/6/316",
         "source_domain": "www.moma.org",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
+        "source_sentence": "In frustration, Matisse stopped cutting and turned to drawing.",
         "syndication_log": {
-          "total_in_group": 1,
-          "independent_after_dedup": 1,
           "sources": [
             {
-              "domain": "www.moma.org",
-              "url": "https://www.moma.org/audio/playlist/6/316"
+              "url": "https://www.moma.org/audio/playlist/6/316",
+              "domain": "www.moma.org"
             }
-          ]
-        }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
       },
       {
-        "type": "reference_work",
         "text": "Blue Nude II is part of a series of works known as the Blue Nudes.",
-        "source_sentence": "This article is about the cut-outs and the series of four lithographs.",
+        "type": "reference_work",
+        "dates": [],
         "people": [
           "Henri Matisse"
         ],
-        "dates": [],
         "is_satire": false,
         "source_url": "https://en.wikipedia.org/wiki/Blue_Nudes",
         "source_domain": "en.wikipedia.org",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
+        "source_sentence": "This article is about the cut-outs and the series of four lithographs.",
         "syndication_log": {
-          "total_in_group": 1,
-          "independent_after_dedup": 1,
           "sources": [
             {
-              "domain": "en.wikipedia.org",
-              "url": "https://en.wikipedia.org/wiki/Blue_Nudes"
+              "url": "https://en.wikipedia.org/wiki/Blue_Nudes",
+              "domain": "en.wikipedia.org"
             }
-          ]
-        }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
       },
       {
-        "type": "origin",
         "text": "Blue Nude II was conceived during Matisse\u2019s time in Nice, where he worked in the spacious studio of the H\u00f4tel R\u00e9gina.",
-        "source_sentence": "Conceived during the artist\u2019s time in Nice, where he worked in the spacious studio of the H\u00f4tel R\u00e9gina, Blue Nude II entered the Centre Pompidou\u2019s collection in 1984.",
-        "people": [
-          "Henri Matisse"
-        ],
+        "type": "origin",
         "dates": [
           "1984"
         ],
+        "people": [
+          "Henri Matisse"
+        ],
         "is_satire": false,
         "source_url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
         "source_domain": "www.centrepompidou.fr",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
+        "source_sentence": "Conceived during the artist\u2019s time in Nice, where he worked in the spacious studio of the H\u00f4tel R\u00e9gina, Blue Nude II entered the Centre Pompidou\u2019s collection in 1984.",
         "syndication_log": {
-          "total_in_group": 2,
-          "independent_after_dedup": 1,
           "sources": [
             {
-              "domain": "www.centrepompidou.fr",
-              "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse"
+              "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
+              "domain": "www.centrepompidou.fr"
             }
-          ]
-        }
+          ],
+          "total_in_group": 2,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
       },
       {
-        "type": "technique",
         "text": "Legend has it that Blue Nude II was created in a single, fluid cut of the scissors.",
-        "source_sentence": "Legend has it that it was created in a single, fluid cut of the scissors!",
+        "type": "technique",
+        "dates": [],
         "people": [],
-        "dates": [],
         "is_satire": false,
         "source_url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
         "source_domain": "www.centrepompidou.fr",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
+        "source_sentence": "Legend has it that it was created in a single, fluid cut of the scissors!",
         "syndication_log": {
-          "total_in_group": 2,
-          "independent_after_dedup": 1,
           "sources": [
             {
-              "domain": "www.centrepompidou.fr",
-              "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse"
+              "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
+              "domain": "www.centrepompidou.fr"
             }
-          ]
-        }
+          ],
+          "total_in_group": 2,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
       },
       {
-        "type": "reference_work",
         "text": "The Blue Nude series revisits a seated nude pose that Matisse had explored extensively in both painting and sculpture.",
-        "source_sentence": "The Blue Nude series (1952) revisits a seated nude pose that Matisse had explored extensively in both painting and sculpture.",
-        "people": [
-          "Henri Matisse"
-        ],
-        "dates": [
-          "1952"
-        ],
-        "is_satire": false,
-        "source_url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
-        "source_domain": "www.centrepompidou.fr",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
-        "syndication_log": {
-          "total_in_group": 1,
-          "independent_after_dedup": 1,
-          "sources": [
-            {
-              "domain": "www.centrepompidou.fr",
-              "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse"
-            }
-          ]
-        }
-      },
-      {
-        "type": "reception",
-        "text": "Blue Nude II is one of Henri Matisse\u2019s most renowned paper cut-outs.",
-        "source_sentence": "Part of a series of four, Blue Nude II is one of Henri Matisse\u2019s most renowned paper cut-outs.",
-        "people": [
-          "Henri Matisse"
-        ],
-        "dates": [],
-        "is_satire": false,
-        "source_url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
-        "source_domain": "www.centrepompidou.fr",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
-        "syndication_log": {
-          "total_in_group": 2,
-          "independent_after_dedup": 1,
-          "sources": [
-            {
-              "domain": "www.centrepompidou.fr",
-              "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse"
-            }
-          ]
-        }
-      },
-      {
         "type": "reference_work",
-        "text": "Blue Nude II is part of a series of four and revisits a seated nude pose that Matisse had explored extensively in both painting and sculpture.",
-        "source_sentence": "The Blue Nude series (1952) revisits a seated nude pose that Matisse had explored extensively in both painting and sculpture.",
-        "people": [
-          "Henri Matisse"
-        ],
         "dates": [
           "1952"
+        ],
+        "people": [
+          "Henri Matisse"
         ],
         "is_satire": false,
         "source_url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
         "source_domain": "www.centrepompidou.fr",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
+        "source_sentence": "The Blue Nude series (1952) revisits a seated nude pose that Matisse had explored extensively in both painting and sculpture.",
         "syndication_log": {
-          "total_in_group": 1,
-          "independent_after_dedup": 1,
           "sources": [
             {
-              "domain": "www.centrepompidou.fr",
-              "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse"
+              "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
+              "domain": "www.centrepompidou.fr"
             }
-          ]
-        }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
+      },
+      {
+        "text": "Blue Nude II is one of Henri Matisse\u2019s most renowned paper cut-outs.",
+        "type": "reception",
+        "dates": [],
+        "people": [
+          "Henri Matisse"
+        ],
+        "is_satire": false,
+        "source_url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
+        "source_domain": "www.centrepompidou.fr",
+        "source_sentence": "Part of a series of four, Blue Nude II is one of Henri Matisse\u2019s most renowned paper cut-outs.",
+        "syndication_log": {
+          "sources": [
+            {
+              "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
+              "domain": "www.centrepompidou.fr"
+            }
+          ],
+          "total_in_group": 2,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
+      },
+      {
+        "text": "Blue Nude II is part of a series of four and revisits a seated nude pose that Matisse had explored extensively in both painting and sculpture.",
+        "type": "reference_work",
+        "dates": [
+          "1952"
+        ],
+        "people": [
+          "Henri Matisse"
+        ],
+        "is_satire": false,
+        "source_url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
+        "source_domain": "www.centrepompidou.fr",
+        "source_sentence": "The Blue Nude series (1952) revisits a seated nude pose that Matisse had explored extensively in both painting and sculpture.",
+        "syndication_log": {
+          "sources": [
+            {
+              "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
+              "domain": "www.centrepompidou.fr"
+            }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
       }
     ],
     "target_elements": [
       {
-        "type": "technique",
         "text": "The artwork is made using gouache-painted paper cut-outs stuck to paper mounted on canvas.",
-        "source_sentence": "Type Gouache -painted paper cut-outs stuck to paper mounted on canvas",
+        "type": "technique",
+        "dates": [],
         "people": [
           "Henri Matisse"
         ],
-        "dates": [],
         "is_satire": false,
         "source_url": "https://en.wikipedia.org/wiki/Blue_Nudes",
         "source_domain": "en.wikipedia.org",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
+        "source_sentence": "Type Gouache -painted paper cut-outs stuck to paper mounted on canvas",
         "syndication_log": {
-          "total_in_group": 2,
-          "independent_after_dedup": 1,
           "sources": [
             {
-              "domain": "en.wikipedia.org",
-              "url": "https://en.wikipedia.org/wiki/Blue_Nudes"
+              "url": "https://en.wikipedia.org/wiki/Blue_Nudes",
+              "domain": "en.wikipedia.org"
             }
-          ]
-        }
+          ],
+          "total_in_group": 2,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
       },
       {
-        "type": "reception",
         "text": "Matisse\u2019s cut-outs, including Blue Nude II, often appear effortless, but the work was arduous and sometimes he struggled.",
-        "source_sentence": "Matisse\u2019s cut-outs often appear effortless. But the work was arduous, and sometimes he struggled.",
+        "type": "reception",
+        "dates": [],
         "people": [
           "Henri Matisse"
         ],
-        "dates": [],
         "is_satire": false,
         "source_url": "https://www.moma.org/audio/playlist/6/316",
         "source_domain": "www.moma.org",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
+        "source_sentence": "Matisse\u2019s cut-outs often appear effortless. But the work was arduous, and sometimes he struggled.",
         "syndication_log": {
-          "total_in_group": 2,
-          "independent_after_dedup": 1,
           "sources": [
             {
-              "domain": "www.moma.org",
-              "url": "https://www.moma.org/audio/playlist/6/316"
+              "url": "https://www.moma.org/audio/playlist/6/316",
+              "domain": "www.moma.org"
             }
-          ]
-        }
+          ],
+          "total_in_group": 2,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
       },
       {
-        "type": "technique",
         "text": "Legend has it that Blue Nude II was created in a single, fluid cut of the scissors.",
-        "source_sentence": "Legend has it that it was created in a single, fluid cut of the scissors!",
-        "people": [],
+        "type": "technique",
         "dates": [],
+        "people": [],
         "is_satire": false,
         "source_url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
         "source_domain": "www.centrepompidou.fr",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
+        "source_sentence": "Legend has it that it was created in a single, fluid cut of the scissors!",
         "syndication_log": {
-          "total_in_group": 2,
-          "independent_after_dedup": 1,
           "sources": [
             {
-              "domain": "www.centrepompidou.fr",
-              "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse"
+              "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
+              "domain": "www.centrepompidou.fr"
             }
-          ]
-        }
+          ],
+          "total_in_group": 2,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
       },
       {
-        "type": "reception",
         "text": "Blue Nude II is one of Henri Matisse\u2019s most renowned paper cut-outs.",
-        "source_sentence": "Part of a series of four, Blue Nude II is one of Henri Matisse\u2019s most renowned paper cut-outs.",
+        "type": "reception",
+        "dates": [],
         "people": [
           "Henri Matisse"
         ],
-        "dates": [],
         "is_satire": false,
         "source_url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
         "source_domain": "www.centrepompidou.fr",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
+        "source_sentence": "Part of a series of four, Blue Nude II is one of Henri Matisse\u2019s most renowned paper cut-outs.",
         "syndication_log": {
-          "total_in_group": 2,
-          "independent_after_dedup": 1,
           "sources": [
             {
-              "domain": "www.centrepompidou.fr",
-              "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse"
+              "url": "https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-blue-nude-ii-nu-bleu-ii-by-henri-matisse",
+              "domain": "www.centrepompidou.fr"
             }
-          ]
-        }
+          ],
+          "total_in_group": 2,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
       }
     ],
     "criterion_2_met": false
@@ -590,208 +590,208 @@
       "venue_lang": "fr"
     },
     "search_summary": {
-      "queries": 4,
-      "status": "ok",
-      "results": 26
+      "queries": 0,
+      "status": "cache_only",
+      "results": 0
     },
     "extraction_summary": {
-      "pages_fetched": 6,
-      "pages_anchored": 6,
-      "extraction_status": "ok"
+      "extraction_status": "cache_hit",
+      "pages_fetched": 0,
+      "pages_anchored": 0
     },
     "elements": [
       {
-        "type": "date",
         "text": "Song of Songs was created in 1956.",
-        "source_sentence": "Song of Songs (1956) by Marc Chagall - For Sale | Artsy.",
-        "people": [],
+        "type": "date",
         "dates": [
           "1956"
         ],
+        "people": [],
         "is_satire": false,
         "source_url": "https://www.artsy.net/artwork/marc-chagall-song-of-songs",
         "source_domain": "www.artsy.net",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
+        "source_sentence": "Song of Songs (1956) by Marc Chagall - For Sale | Artsy.",
         "syndication_log": {
-          "total_in_group": 1,
-          "independent_after_dedup": 1,
           "sources": [
             {
-              "domain": "www.artsy.net",
-              "url": "https://www.artsy.net/artwork/marc-chagall-song-of-songs"
+              "url": "https://www.artsy.net/artwork/marc-chagall-song-of-songs",
+              "domain": "www.artsy.net"
             }
-          ]
-        }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
       },
       {
-        "type": "origin",
         "text": "The biblical poem Song of Songs inspired five masterpieces by Marc Chagall.",
-        "source_sentence": "The biblical poem Song of Songs inspired five masterpieces by Marc Chagall.",
-        "people": [],
+        "type": "origin",
         "dates": [],
+        "people": [],
         "is_satire": false,
         "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee",
         "source_domain": "musees-nationaux-alpesmaritimes.fr",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
+        "source_sentence": "The biblical poem Song of Songs inspired five masterpieces by Marc Chagall.",
         "syndication_log": {
-          "total_in_group": 2,
-          "independent_after_dedup": 1,
           "sources": [
             {
-              "domain": "musees-nationaux-alpesmaritimes.fr",
-              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee"
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee",
+              "domain": "musees-nationaux-alpesmaritimes.fr"
             }
-          ]
-        }
+          ],
+          "total_in_group": 2,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
       },
       {
-        "type": "date",
         "text": "The paintings were painted between 1957 and 1966.",
-        "source_sentence": "Painted between 1957 and 1966, they were donated to the State and are among the jewels of the museum's collection.",
-        "people": [],
+        "type": "date",
         "dates": [
           "1957",
           "1966"
         ],
+        "people": [],
         "is_satire": false,
         "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee",
         "source_domain": "musees-nationaux-alpesmaritimes.fr",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
+        "source_sentence": "Painted between 1957 and 1966, they were donated to the State and are among the jewels of the museum's collection.",
         "syndication_log": {
-          "total_in_group": 2,
-          "independent_after_dedup": 1,
           "sources": [
             {
-              "domain": "musees-nationaux-alpesmaritimes.fr",
-              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee"
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee",
+              "domain": "musees-nationaux-alpesmaritimes.fr"
             }
-          ]
-        }
+          ],
+          "total_in_group": 2,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
       },
       {
-        "type": "dedication",
         "text": "The donation of the Biblical Message and Song of Songs cycle was made by Marc and Valentina Chagall in 1966.",
-        "source_sentence": "This exhibition is organised on the occasion of the 50th anniversary of the donation to France of the Biblical Message and Song of Songs cycle, made by Marc and Valentina Chagall in 1966.",
+        "type": "dedication",
+        "dates": [
+          "1966"
+        ],
         "people": [
           "Marc Chagall",
           "Valentina Chagall"
         ],
-        "dates": [
-          "1966"
-        ],
         "is_satire": false,
         "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee",
         "source_domain": "musees-nationaux-alpesmaritimes.fr",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
+        "source_sentence": "This exhibition is organised on the occasion of the 50th anniversary of the donation to France of the Biblical Message and Song of Songs cycle, made by Marc and Valentina Chagall in 1966.",
         "syndication_log": {
-          "total_in_group": 2,
-          "independent_after_dedup": 1,
           "sources": [
             {
-              "domain": "musees-nationaux-alpesmaritimes.fr",
-              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee"
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee",
+              "domain": "musees-nationaux-alpesmaritimes.fr"
             }
-          ]
-        }
+          ],
+          "total_in_group": 2,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
       },
       {
-        "type": "technique",
         "text": "The paintings were thoroughly cleaned and their paint layers consolidated, revealing their flamboyant colours once again.",
+        "type": "technique",
+        "dates": [],
+        "people": [],
+        "is_satire": false,
+        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee",
+        "source_domain": "musees-nationaux-alpesmaritimes.fr",
         "source_sentence": "The paintings were thoroughly cleaned and their paint layers consolidated, revealing their flamboyant colours once again.",
-        "people": [],
-        "dates": [],
-        "is_satire": false,
-        "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee",
-        "source_domain": "musees-nationaux-alpesmaritimes.fr",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
         "syndication_log": {
+          "sources": [
+            {
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee",
+              "domain": "musees-nationaux-alpesmaritimes.fr"
+            }
+          ],
           "total_in_group": 2,
-          "independent_after_dedup": 1,
-          "sources": [
-            {
-              "domain": "musees-nationaux-alpesmaritimes.fr",
-              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee"
-            }
-          ]
-        }
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
       },
       {
-        "type": "technique",
         "text": "In-depth analysis of the works using scientific imaging techniques such as radiography and elemental analysis of the pigments was conducted.",
-        "source_sentence": "This operation also involved in-depth analysis of the works using scientific imaging techniques such as radiography and elemental analysis of the pigments in the works.",
-        "people": [],
+        "type": "technique",
         "dates": [],
+        "people": [],
         "is_satire": false,
         "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee",
         "source_domain": "musees-nationaux-alpesmaritimes.fr",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
+        "source_sentence": "This operation also involved in-depth analysis of the works using scientific imaging techniques such as radiography and elemental analysis of the pigments in the works.",
         "syndication_log": {
-          "total_in_group": 1,
-          "independent_after_dedup": 1,
           "sources": [
             {
-              "domain": "musees-nationaux-alpesmaritimes.fr",
-              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee"
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee",
+              "domain": "musees-nationaux-alpesmaritimes.fr"
             }
-          ]
-        }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
       },
       {
-        "type": "technique",
         "text": "The restoration involved in-depth analysis of the works using scientific imaging techniques such as radiography and elemental analysis of the pigments.",
-        "source_sentence": "This operation also involved in-depth analysis of the works using scientific imaging techniques such as radiography and elemental analysis of the pigments in the works.",
-        "people": [],
+        "type": "technique",
         "dates": [],
+        "people": [],
         "is_satire": false,
         "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee",
         "source_domain": "musees-nationaux-alpesmaritimes.fr",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
+        "source_sentence": "This operation also involved in-depth analysis of the works using scientific imaging techniques such as radiography and elemental analysis of the pigments in the works.",
         "syndication_log": {
-          "total_in_group": 1,
-          "independent_after_dedup": 1,
           "sources": [
             {
-              "domain": "musees-nationaux-alpesmaritimes.fr",
-              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee"
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee",
+              "domain": "musees-nationaux-alpesmaritimes.fr"
             }
-          ]
-        }
+          ],
+          "total_in_group": 1,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
       }
     ],
     "target_elements": [
       {
-        "type": "dedication",
         "text": "The donation of the Biblical Message and Song of Songs cycle was made by Marc and Valentina Chagall in 1966.",
-        "source_sentence": "This exhibition is organised on the occasion of the 50th anniversary of the donation to France of the Biblical Message and Song of Songs cycle, made by Marc and Valentina Chagall in 1966.",
+        "type": "dedication",
+        "dates": [
+          "1966"
+        ],
         "people": [
           "Marc Chagall",
           "Valentina Chagall"
         ],
-        "dates": [
-          "1966"
-        ],
         "is_satire": false,
         "source_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee",
         "source_domain": "musees-nationaux-alpesmaritimes.fr",
-        "corroboration_status": "reported",
-        "independent_source_count": 1,
+        "source_sentence": "This exhibition is organised on the occasion of the 50th anniversary of the donation to France of the Biblical Message and Song of Songs cycle, made by Marc and Valentina Chagall in 1966.",
         "syndication_log": {
-          "total_in_group": 2,
-          "independent_after_dedup": 1,
           "sources": [
             {
-              "domain": "musees-nationaux-alpesmaritimes.fr",
-              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee"
+              "url": "http://musees-nationaux-alpesmaritimes.fr/chagall/en/agenda/evenement/le-cantique-des-cantiques-la-couleur-revelee",
+              "domain": "musees-nationaux-alpesmaritimes.fr"
             }
-          ]
-        }
+          ],
+          "total_in_group": 2,
+          "independent_after_dedup": 1
+        },
+        "corroboration_status": "reported",
+        "independent_source_count": 1
       }
     ],
     "criterion_1_met": false
