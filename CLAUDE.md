@@ -219,6 +219,46 @@ ls -t KIRO_RESPONSE_*.md KIRO_REVIEW_*.md | head   # latest round
    points at one server IP (currently Mac Mini 192.168.0.137) — switch in app
    settings when testing against the laptop.
 
+## DISPATCH PROTOCOL — two machines, multiple agents (adopted 2026-07-23)
+
+ClickUp is the control panel, but it is NOT a self-serve queue (no reliable
+concurrent claiming across machines). **All work is explicitly dispatched by
+Michael or Claude.**
+
+**Agent IDs:** `Mac Mini Kiro` (this machine) · `Services Kiro` (Windows laptop)
+· `Mobile Kiro` (Windows laptop) · `Claude` (reviewer/dispatcher).
+
+**Lists per space** (current space: Storied; Development folder):
+🔵 Claude — Review (`1000410000000732`) · 🟦 Services — Kiro (`1000410000000733`)
+· 🟩 Mobile — Kiro (`1000410000000734`) · 👤 Michael (`1000410000000735`).
+
+**Flow:**
+1. **Michael** creates a Feature task describing requirements and puts it in
+   🔵 Claude — Review (or says "Claude, work on your queue").
+2. **Claude** decomposes it into independent per-agent tasks in the target
+   agent's list. Every task description starts with `**Agent:** <ID>` and
+   specifies: git branch (`kiro/<task_id>`), acceptance criteria, test plan.
+   Dependent tasks are created only when unblocked (or clearly marked blocked).
+3. **Kiro** on "work on your queue": read own list top-to-bottom, take only
+   tasks bearing YOUR Agent ID with status *to do*. Set *in progress* +
+   comment when starting. Work on the specified branch; push when pausing.
+   When done: comment with commit hash + response doc name, move the task to
+   🔵 Claude — Review.
+4. **Claude** on "work on your queue": review tasks in 🔵 Claude — Review
+   against the actual git diff. APPROVED → comment, mark complete, handle
+   merge to `storied`. Rejected → comment what's wrong, move back to the
+   agent's list as *to do*.
+5. **Michael** only touches the 👤 Michael list (field tests, approvals,
+   business decisions).
+
+**Git rules:** one branch per task named after the task ID; never share a
+branch across machines; pull when starting, push when stopping; only Claude
+merges to `storied` after review.
+
+**Mac Mini Kiro ClickUp access:** via MCP (`~/.kiro/settings/mcp.json`,
+mcp-remote → https://mcp.clickup.com/mcp, browser OAuth as
+michael.glik@gmail.com). Node.js installed via brew.
+
 ## ENVIRONMENT NOTES
 
 - Mac Mini, **Apple M4 (arm64)**. Images build arm64 locally. If a build fails
