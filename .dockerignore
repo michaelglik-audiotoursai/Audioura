@@ -61,10 +61,16 @@ Temp/
 !requirements_generator.txt
 !requirements_orchestrator.txt
 !requirements.txt
+!requirements-modernized.txt
+!requirements-tour-processor.txt
+!requirements-news.txt
+!requirements-newsletter.txt
 !story_type_taxonomy.json
 !source_tier_rules.json
 !templates/
 !templates/**
+!*_fixed.py
+!build_mp3_simple.py
 
 # Git/IDE
 .git/

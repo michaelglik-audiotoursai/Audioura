@@ -44,7 +44,8 @@ _NEIGHBORHOOD_TO_CITY = {
 # Word-boundary anchored to avoid false positives ("touring" vs "tour").
 _EXPLICIT_NON_MUSEUM_TOUR_RE = re.compile(
     r'\b(walking|restaurant|food|dining|culinary|self[- ]guided|architecture|architectural'
-    r'|pub\s+crawl|bike|cycling|biking|shopping)'
+    r'|pub\s+crawl|bike|cycling|biking|shopping'
+    r'|movie|film|book|literary|novel)'
     r'\s+tour\b',
     re.IGNORECASE,
 )
@@ -57,6 +58,108 @@ _MULTI_BUILDING_INSTITUTION_RE = re.compile(
     r'|buildings|branches|historic\s+houses|fire\s+stations)\b',
     re.IGNORECASE,
 )
+
+# Transport mode detection — graduated distance tiers for non-walking tours
+# (KIRO_REVIEW_07 + KIRO_REVIEW_08: replaces binary wide_area_transport with tiered modes)
+_TRANSPORT_MODE_KEYWORDS = {
+    'animal':  re.compile(r'\b(camel(?:back)?|horse(?:back)?)\b(?:\s+\w+)?\s*tour\b', re.IGNORECASE),
+    'bike':    re.compile(r'\b(bike|biking|cycling)\b(?:\s+\w+)?\s*tour\b', re.IGNORECASE),
+    'vehicle': re.compile(r'\b(auto|car|driving|jeep|off[- ]road|motorcycle|scooter)\b(?:\s+\w+)?\s*tour\b', re.IGNORECASE),
+    'country_scale': re.compile(r'\broad\s*trip\b|\bcross[- ]country\b|\bsafari\b|\bnational(?:\s+parks?)?\s+tour\b', re.IGNORECASE),
+}
+
+# Total route distance caps per transport mode (km)
+_TRANSPORT_TOTAL_HARD_KM = {
+    # 'on_foot' uses existing WALKING_TOTAL_HARD_KM constant
+    'animal':   20,
+    'bike':     30,
+    'vehicle':  400,
+    # 'country_scale' has no distance limit — uses containment check instead
+}
+
+# Country enclave table for country_scale containment validation
+_COUNTRY_ENCLAVES = {
+    'italy':        ['vatican city', 'san marino'],
+    'south africa': ['lesotho'],
+    'france':       ['monaco'],
+    'spain':        ['andorra'],
+    'switzerland':  ['liechtenstein'],
+    'austria':      ['liechtenstein'],
+}
+
+
+def _detect_transport_mode(location):
+    """Detect transport mode from location text (Layer 1 — keyword matching).
+    Returns one of: 'animal', 'bike', 'vehicle', 'country_scale', or 'on_foot' (default)."""
+    for mode, pattern in _TRANSPORT_MODE_KEYWORDS.items():
+        if pattern.search(location):
+            return mode
+    return 'on_foot'
+
+
+def _stop_in_country_scope(stop_address, country_scope):
+    """Check if a stop's address is within the given country or its enclaves."""
+    if not country_scope or not stop_address:
+        return False
+    target = country_scope.strip().lower()
+    # Extract country from address (typically the last comma-separated part)
+    parts = [p.strip().lower() for p in stop_address.split(',')]
+    stop_country = parts[-1] if parts else ''
+    if stop_country == target:
+        return True
+    return stop_country in _COUNTRY_ENCLAVES.get(target, [])
+
+
+# Unusual transport modes that get the verification call (cost control — common modes skip it)
+_UNUSUAL_TRANSPORT_MODES = {'animal'}
+
+
+def _verify_transport_accessibility(poi_list, transport_mode, location, api_key):
+    """For unusual transport modes only, ask a single cheap AI call which candidate
+    stops are NOT plausibly reachable via the stated mode. Advisory: on any failure,
+    keep all stops — never crash, never empty the tour."""
+    if transport_mode not in _UNUSUAL_TRANSPORT_MODES:
+        return poi_list  # no-op for common modes
+
+    if not poi_list:
+        return poi_list
+
+    stop_list_str = "\n".join(f"- {p['name']} ({p.get('address', '')})" for p in poi_list)
+    prompt = (
+        f"These are candidate stops for a {transport_mode} tour in {location}.\n\n"
+        f"Which of these stops would NOT be plausibly reachable as part of a {transport_mode} route "
+        f"(e.g. inside a building, a shopping mall or paved commercial district, a resort/hotel, "
+        f"or a location that would realistically require a car to reach)?\n\nStops:\n{stop_list_str}\n\n"
+        "Return ONLY a JSON array of the stop names to EXCLUDE. Empty array [] if all stops are fine."
+    )
+
+    try:
+        response = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "model": "gpt-3.5-turbo",
+                "messages": [
+                    {"role": "system", "content": "You return ONLY a valid JSON array. No markdown, no commentary."},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.3,
+                "max_tokens": 200,
+            },
+            timeout=15,
+        )
+        if response.status_code == 200:
+            excluded_names = json.loads(response.json()["choices"][0]["message"]["content"])
+            if excluded_names:
+                print(f"  [TRANSPORT-VERIFY] Excluding {len(excluded_names)} stop(s) not reachable by {transport_mode}: {excluded_names}")
+                excluded_set = set(n.lower() for n in excluded_names)
+                return [p for p in poi_list if p['name'].lower() not in excluded_set]
+            else:
+                print(f"  [TRANSPORT-VERIFY] All stops OK for {transport_mode}")
+    except Exception as e:
+        print(f"  [TRANSPORT-VERIFY] Verification failed (advisory, keeping all stops): {e}")
+    return poi_list  # fail permissively
+
 
 def compute_tier(n_verified: int, evidence_strength: int) -> str:
     """Return the degradation tier given verification count and evidence strength.
@@ -150,7 +253,9 @@ Please provide ONLY a JSON response with these fields:
     "needs_research": true/false,
     "venue_name": "The full official name of the institution ONLY when the ENTIRE tour is bounded by one specific building or campus (e.g. a single museum, historic house, gallery, or library). Use the institution's complete official name including suffixes like 'Museum', 'Gallery', 'Library' — never a shortened nickname (e.g. 'Museum of Fine Arts, Boston' not 'MFA'). Return null if the tour spans a city, district, neighborhood, multiple venues, or any open-ended area. If you are unsure whether the request names a specific bounded institution or just a region, return null.",
     "geographic_scope": "The most specific bounded area the tour must stay within, in the user's own terms — a street or corridor, a square, a named district or quarter, a waterfront, a campus, a market, a cluster of blocks, or a single building. Copy the phrasing the request uses. If the request only names a whole city or town with no tighter anchor, return that city/town name. Never invent a tighter scope than the request states.",
-    "scope_precision": "One of exactly these four strings: BUILDING (one structure) | CORRIDOR (one street or strip) | DISTRICT (a neighbourhood, quarter, square, or named area) | CITY (a whole town with no tighter anchor given)."
+    "scope_precision": "One of exactly these four strings: BUILDING (one structure) | CORRIDOR (one street or strip) | DISTRICT (a neighbourhood, quarter, square, or named area) | CITY (a whole town with no tighter anchor given).",
+    "transport_mode": "How the visitor physically moves between stops. One of: on_foot (walking, default), animal (camel, horseback), bike (cycling), vehicle (car, jeep, scooter, driving), country_scale (road trip, cross-country, safari, national parks tour). Default: on_foot.",
+    "country_scope": "If this is a country-scale tour (road trip, safari, cross-country, national parks), the country name (e.g. 'Italy', 'USA'). Null otherwise."
 }}
 
 Examples:
@@ -174,6 +279,9 @@ Examples:
 - "tour of the old mill district in Lowell" → geographic_scope: "the old mill district, Lowell", scope_precision: "DISTRICT"
 - "walking tour around the harbor in Gloucester" → geographic_scope: "the harbor waterfront, Gloucester", scope_precision: "DISTRICT"
 - "walking tour in Newton, MA" → geographic_scope: "Newton, MA", scope_precision: "CITY"
+- "Camel tour in the desert of Abu Dhabi" → transport_mode: "animal", country_scope: null
+- "Road trip across Italy" → transport_mode: "country_scale", country_scope: "Italy"
+- "Horseback tour of the ranch trails, Wyoming" → transport_mode: "animal", country_scope: null
 """
 
     headers = {
@@ -1438,6 +1546,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     else:
         user_request = f"{tour_type} {_location_normalized}"
     intent = analyze_tour_intent(user_request, api_key)
+
+    # Transport mode detection (Layer 1: keyword, Layer 2: intent field)
+    _transport_keyword = _detect_transport_mode(location)
+    _transport_from_intent = (intent.get('transport_mode', 'on_foot') if intent else 'on_foot')
+    # Keyword match takes priority; fall back to intent's answer
+    transport_mode = _transport_keyword if _transport_keyword != 'on_foot' else _transport_from_intent
+    _country_scope = intent.get('country_scope') if intent else None
+    print(f"  [TRANSPORT] mode={transport_mode}, country_scope={_country_scope} (keyword={_transport_keyword}, intent={_transport_from_intent})")
     
     if intent:
         print(f"✅ Intent Analysis Results:")
@@ -1503,7 +1619,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # Safety net (_EXPLICIT_NON_MUSEUM_TOUR_RE) prevents GPT-hallucinated venue_names
         # on "walking tour starting at X" / "restaurant tour near X" requests from
         # silently flipping the category. See S15 Claude review §3.
-        if intent.get('venue_name') and not _EXPLICIT_NON_MUSEUM_TOUR_RE.search(location) and not _MULTI_BUILDING_INSTITUTION_RE.search(location):
+        if intent.get('venue_name') and transport_mode == 'on_foot' and not _EXPLICIT_NON_MUSEUM_TOUR_RE.search(location) and not _MULTI_BUILDING_INSTITUTION_RE.search(location):
             tour_category = 'museum'
             print(f"  [S15] Forced tour_category=museum from venue_name='{intent['venue_name']}'")
         else:
@@ -1512,11 +1628,19 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     print(f"  [S15] venue_name='{intent['venue_name']}' overridden — location contains multi-building institution keyword")
                 else:
                     print(f"  [S15] venue_name='{intent['venue_name']}' overridden — location contains explicit non-museum phrase")
-            tour_category = _classify_tour_category(location, tour_type)
+            # Touchpoint 1: suppress tour_type when pre_category or transport_mode gives a strong signal
+            _effective_tour_type = "" if (_pre_category in ('restaurant', 'specialized') or transport_mode != 'on_foot') else tour_type
+            tour_category = _classify_tour_category(location, _effective_tour_type)
+            if tour_category == 'specialized':
+                tour_category = 'book'
     else:
         print("⚠️ Intent analysis failed, using fallback detection")
         intent = None
-        tour_category = _classify_tour_category(location, tour_type)
+        # Touchpoint 1: suppress tour_type when pre_category or transport_mode gives a strong signal
+        _effective_tour_type = "" if (_pre_category in ('restaurant', 'specialized') or transport_mode != 'on_foot') else tour_type
+        tour_category = _classify_tour_category(location, _effective_tour_type)
+        if tour_category == 'specialized':
+            tour_category = 'book'
     
     # PHASE 2: Detect tour type and get appropriate template
     # NOTE: tour_category already set above — do NOT call _classify_tour_category again here
@@ -1650,6 +1774,22 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # named institution. Falls back to regex strip for robustness if intent is unavailable.
     _museum_venue_constraint = ""
     _museum_venue_name = ""
+
+    # Transport-mode stop constraint (KIRO_REVIEW_09, Issue 1 Part A)
+    _TRANSPORT_STOP_CONSTRAINTS = {
+        'animal': ("\nCRITICAL CONSTRAINT — THIS IS A CAMELBACK/HORSEBACK TOUR:\n"
+                   "Every stop MUST be reachable on horse/camel-back along an outdoor route "
+                   "(trails, dunes, oases, open landscape). Do NOT suggest stops that require "
+                   "entering a building, a paved shopping district, or any location primarily "
+                   "accessed by car — those are not reachable as part of this ride.\n"),
+        'bike': ("\nCRITICAL CONSTRAINT — THIS IS A BIKING TOUR:\n"
+                 "Stops should be reachable via bike paths, roads, or trails suitable for cycling "
+                 "— avoid stops requiring highway travel or building interiors inaccessible by bike.\n"),
+        'vehicle': ("\nCRITICAL CONSTRAINT — THIS IS A DRIVING TOUR:\n"
+                    "Stops should be reachable by car and have parking or roadside access.\n"),
+    }
+    _transport_stop_constraint = _TRANSPORT_STOP_CONSTRAINTS.get(transport_mode, "")
+
     if tour_category == 'museum':
         # Prefer PHASE 1 intent result (most accurate, handles all formats).
         # IMPORTANT: only apply the single-venue constraint when intent explicitly provides
@@ -1767,6 +1907,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         "- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.\n"
         "- Include a complete street address with ZIP code where applicable.\n"
         + _museum_venue_constraint
+        + _transport_stop_constraint
         + _scope_constraint
         + _compactness_constraint
         + "\n\nReturn ONLY a JSON array, no other text, no markdown fences:\n"
@@ -1852,6 +1993,9 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         print(f"OK PHASE 3A parsed {len(poi_list)} candidate POI(s):")
         for p in poi_list:
             print(f"   - {p['name']}" + (f" @ {p['address']}" if p['address'] else ""))
+
+        # [TRANSPORT-VERIFY] For unusual transport modes, verify stops are reachable
+        poi_list = _verify_transport_accessibility(poi_list, transport_mode, location, api_key)
 
         # -------- [D1] In-collection verification for museum tours --------
         _d1_evidence_log = {}
@@ -2222,8 +2366,9 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             replacement_prompt = (
                 f"You are a knowledgeable local guide for {location}.\n"
                 f"Suggest exactly {needed} additional specific, real, well-known {poi_type_hint} in {location}.\n"
-                f"DO NOT include any of these already-used or rejected names: {forbidden_str}.\n\n"
-                "Requirements:\n"
+                f"DO NOT include any of these already-used or rejected names: {forbidden_str}.\n"
+                + _transport_stop_constraint +
+                "\nRequirements:\n"
                 "- REAL, SPECIFIC names; never generic placeholders.\n"
                 "- Complete street address with ZIP where applicable.\n\n"
                 "Return ONLY a JSON array, no other text:\n"
@@ -2283,6 +2428,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 elif tour_category != 'museum' or not _museum_venue_name:
                     survived = [p for p in survived if _address_matches_location(p.get('address', ''), location)]
                 
+                # [TRANSPORT-VERIFY] Also verify Part C replacements for transport accessibility
+                if survived:
+                    survived = _verify_transport_accessibility(survived, transport_mode, location, api_key)
+
                 # [Cycle 4] D1 re-verification for museum tour Part C candidates
                 # Filter out candidates that are OTHER museums/venues (not artworks)
                 if tour_category == 'museum' and _museum_venue_name and survived:
@@ -2518,20 +2667,24 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # Straight-line distance is a guaranteed LOWER BOUND on walking distance, so a
         # leg over the hard limit is unarguably too far to walk.
         # ADVISORY: never raises ValueError, never removes all stops.
-        if tour_category == 'walking':
+        # Touchpoint 4: graduated distance tiers by transport_mode (KIRO_REVIEW_08)
+        if tour_category == 'walking' and transport_mode != 'country_scale':
             pts = [(p, _parse_coords(p.get('coordinates', ''))) for p in poi_list]
             pts_valid = [(p, c) for p, c in pts if c]
             if len(pts_valid) >= 3:
+                _total_limit = _TRANSPORT_TOTAL_HARD_KM.get(transport_mode, WALKING_TOTAL_HARD_KM)
                 legs = [_haversine_km(pts_valid[i][1], pts_valid[i+1][1]) for i in range(len(pts_valid) - 1)]
                 total_route_km = sum(legs)
                 medoid = min(pts_valid, key=lambda pc: sum(_haversine_km(pc[1], o) for _, o in pts_valid))[1]
                 outliers = []
-                for i, leg in enumerate(legs):
-                    if leg > WALKING_LEG_HARD_KM:
-                        a, b = pts_valid[i], pts_valid[i+1]
-                        farther = a[0] if _haversine_km(a[1], medoid) > _haversine_km(b[1], medoid) else b[0]
-                        outliers.append(farther)
-                if total_route_km > WALKING_TOTAL_HARD_KM and not outliers:
+                # Per-leg check only applies to on_foot — animal/bike/vehicle skip straight to total check
+                if transport_mode == 'on_foot':
+                    for i, leg in enumerate(legs):
+                        if leg > WALKING_LEG_HARD_KM:
+                            a, b = pts_valid[i], pts_valid[i+1]
+                            farther = a[0] if _haversine_km(a[1], medoid) > _haversine_km(b[1], medoid) else b[0]
+                            outliers.append(farther)
+                if total_route_km > _total_limit and not outliers:
                     outliers = [max(pts_valid, key=lambda pc: _haversine_km(pc[1], medoid))[0]]
                 # Dedupe (a stop can be flagged by two adjacent legs)
                 seen_ids = set()
@@ -2631,6 +2784,25 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     print(f"   GEO-CHECK: all {len(poi_list)} stops within walking distance (max leg {max(legs):.2f} km, total {total_route_km:.2f} km)")
             else:
                 print(f"   GEO-CHECK: skipped (fewer than 3 stops have coordinates)")
+
+        # Country-scale containment check (KIRO_REVIEW_08)
+        # For country_scale tours, validate each stop is within the target country (or its enclaves)
+        if tour_category == 'walking' and transport_mode == 'country_scale' and _country_scope:
+            out_of_country = []
+            for p in poi_list:
+                addr = p.get('address', '')
+                if addr and not _stop_in_country_scope(addr, _country_scope):
+                    out_of_country.append(p)
+                    print(f"   COUNTRY-CHECK: '{p['name']}' address '{addr}' NOT in '{_country_scope}' — flagged")
+                else:
+                    print(f"   COUNTRY-CHECK: '{p['name']}' OK (in '{_country_scope}' or enclave)")
+            if out_of_country and (len(poi_list) - len(out_of_country)) >= 2:
+                for p in out_of_country:
+                    forbidden_norms.add(_normalize_name(p['name']))
+                poi_list = [p for p in poi_list if p not in out_of_country]
+                print(f"   COUNTRY-CHECK: {len(out_of_country)} out-of-country stop(s) removed; {len(poi_list)} remain")
+            elif out_of_country:
+                print(f"   COUNTRY-CHECK: all stops flagged — keeping original list (advisory only)")
 
         # -------- Coordinates for the first POI (used by orchestrator) --------
         if poi_list and poi_list[0].get("coordinates"):
@@ -2832,6 +3004,21 @@ You MUST use hedged phrasing for EVERY claim about this artwork: "attributed to.
 "reportedly features...", "said to depict...". For example, instead of "This painting shows a vibrant scene of...",
 write "This work, believed to be on display here, reportedly depicts a scene of...".
 Do NOT state the work's presence as certain fact. EVERY sentence about the work must contain hedging language.
+"""
+
+        # [HEDGE-NM] Hedging safety net for non-museum categories (movie/book/walking/restaurant/etc.)
+        if tour_category != 'museum':
+            description_prompt += """
+IMPORTANT — GROUNDING HONESTY: No fact-checking has been performed on specific claims about
+real people, events, or history for this stop. When you include a specific claim
+(a named chef/owner, a specific historical event, a notable visitor, a specific date or
+incident), use hedged, attributive framing rather than stating it as verified fact:
+"local accounts describe...", "the story often told is...", "according to [publication/type
+of source]...", "is said to have...". Do NOT invent specific names, dates, or incidents and
+present them as confirmed history. General, well-known facts (a neighborhood's founding era,
+a cuisine's regional origin, a book's publication year) can be stated plainly — the hedging
+requirement is specifically for claims about particular people or particular events tied to
+this specific stop, which is where fabrication risk is highest.
 """
 
         # [S24] Storied: inject story-type tone + forbidden-phrase ban
@@ -3120,12 +3307,14 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
     print(f"\nPHASE 6: Assembling the complete tour...")
     
     # Create a better title that doesn't duplicate information
+    # Use tour_category (internally corrected) not tour_type (raw client value) for display
+    _display_category = tour_category.replace('_', ' ').title()
     if tour_type.lower() in location.lower():
         # If tour type is already in the location name, don't repeat it
         tour_title = f"Step-by-Step Audio Guided Tour: {location}"
     else:
-        # Otherwise, create a title that incorporates the tour type naturally
-        tour_title = f"Step-by-Step Audio Guided Tour: {location} - {tour_type.title()} Tour"
+        # Otherwise, create a title that incorporates the category naturally
+        tour_title = f"Step-by-Step Audio Guided Tour: {location} - {_display_category} Tour"
     
     complete_tour = tour_title + "\n" + f"Tour-Category: {tour_category}" + "\n\n"
 
@@ -3391,7 +3580,7 @@ Requirements:
                 if tour_type.lower() in location.lower():
                     conclusion = f"Thank you for joining this tour of {location}. We hope you have enjoyed the journey through art, history, and nature, and that you leave inspired by the beauty and creativity that surrounds you."
                 else:
-                    conclusion = f"Thank you for joining this {tour_type} tour of {location}. We hope you have enjoyed the journey through art, history, and nature, and that you leave inspired by the beauty and creativity that surrounds you."
+                    conclusion = f"Thank you for joining this {tour_category} tour of {location}. We hope you have enjoyed the journey through art, history, and nature, and that you leave inspired by the beauty and creativity that surrounds you."
                 poi_content += conclusion
         
         # Add to complete tour

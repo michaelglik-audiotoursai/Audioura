@@ -1,0 +1,9 @@
+FROM python:3.9-slim
+WORKDIR /app
+COPY requirements-modernized.txt .
+RUN pip install --no-cache-dir -r requirements-modernized.txt
+COPY tour_generation_modernized.py /app/
+COPY job_store.py /app/
+RUN mkdir -p /app/tours
+EXPOSE 5021
+CMD ["python", "tour_generation_modernized.py"]

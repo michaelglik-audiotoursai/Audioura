@@ -1451,7 +1451,7 @@ def download_tour(job_id):
             safe_filename = job["output_zip"].replace('\n', '_').replace('\r', '_').replace('/', '_').replace('\\', '_').replace(':', '_').replace('*', '_').replace('?', '_').replace('"', '_').replace('<', '_').replace('>', '_').replace('|', '_')
             
             print(f"Sending file from active jobs: {zip_path}")
-            return send_file(zip_path, as_attachment=True, download_name=safe_filename)
+            return send_file(zip_path, as_attachment=True, attachment_filename=safe_filename)
     
     # Try to find in database (for translated tours or older tours)
     try:
@@ -1499,7 +1499,7 @@ def download_tour(job_id):
             return send_file(
                 zip_buffer,
                 as_attachment=True,
-                download_name=safe_filename,
+                attachment_filename=safe_filename,
                 mimetype='application/zip'
             )
         else:

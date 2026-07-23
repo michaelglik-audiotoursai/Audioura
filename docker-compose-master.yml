@@ -36,13 +36,61 @@ services:
       dockerfile: Dockerfile.orchestrator
     ports:
       - "5002:5002"
+    environment:
+      - TOUR_GENERATOR_URL=http://tour-generator:5000
+      - MODERNIZED_URL=http://tour-generation-modernized-1:5021
+      - TRANSLATION_URL=http://translation-service:5030
+      - USER_API_URL=http://user-api-2:5000
+      - TOUR_UPDATE_URL=http://tour-update:5001
+      - DB_HOST=postgres-2
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
     volumes:
       - ./tours:/app/tours
     restart: unless-stopped
     depends_on:
       - tour-generator
+      - tour-generation-modernized-1
       - user-api-2
       - coordinates-fromai
+
+  tour-generation-modernized-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.modernized
+    ports:
+      - "5021:5021"
+    volumes:
+      - ./tours:/app/tours
+    restart: unless-stopped
+
+  polly-tts-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.polly-tts
+    ports:
+      - "5018:5018"
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  translation-service:
+    build:
+      context: ./translation-service
+      dockerfile: Dockerfile
+    ports:
+      - "5030:5030"
+    environment:
+      - DB_HOST=postgres-2
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+    env_file:
+      - .env
+    restart: unless-stopped
 
   tour-processor:
     build:
