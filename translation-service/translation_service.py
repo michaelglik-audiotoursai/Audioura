@@ -170,7 +170,7 @@ class TranslationService:
             
             # Get original tour with tour_content
             cursor.execute(
-                "SELECT id, tour_name, request_string, audio_tour, number_requested, lat, lng, tour_content, content_language, tour_blob_uri FROM audio_tours WHERE id = %s", 
+                "SELECT id, tour_name, request_string, audio_tour, number_requested, lat, lng, tour_content, content_language, tour_blob_uri, stops_count FROM audio_tours WHERE id = %s", 
                 (original_tour_id,)
             )
             original_tour = cursor.fetchone()
@@ -274,13 +274,15 @@ class TranslationService:
             ])
             
             # Create new tour record
+            _original_stops_count = original_tour[10] if len(original_tour) > 10 else None
             cursor.execute("""
                 INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, 
-                                       lat, lng, content_language, original_tour_id, tour_content)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                                       lat, lng, content_language, original_tour_id, tour_content, stops_count)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
             """, (
                 translated_name, translated_request, translated_zip_data, original_tour[4],
-                original_tour[5], original_tour[6], target_language, original_tour_id, translated_tour_content
+                original_tour[5], original_tour[6], target_language, original_tour_id, translated_tour_content,
+                _original_stops_count
             ))
             
             new_tour_id = cursor.fetchone()[0]
@@ -1586,13 +1588,15 @@ Say 'What are my options' to hear this help again"""
         conn = self.get_db_connection()
         try:
             cursor = conn.cursor()
+            _fallback_stops_count = original_tour[10] if len(original_tour) > 10 else None
             cursor.execute("""
                 INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, 
-                                       lat, lng, content_language, original_tour_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                                       lat, lng, content_language, original_tour_id, stops_count)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
             """, (
                 translated_name, translated_request, translated_zip_data, original_tour[4],
-                original_tour[5], original_tour[6], target_language, original_tour[0]
+                original_tour[5], original_tour[6], target_language, original_tour[0],
+                _fallback_stops_count
             ))
             
             new_tour_id = cursor.fetchone()[0]

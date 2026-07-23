@@ -62,7 +62,7 @@ _MULTI_BUILDING_INSTITUTION_RE = re.compile(
 # Transport mode detection — graduated distance tiers for non-walking tours
 # (KIRO_REVIEW_07 + KIRO_REVIEW_08: replaces binary wide_area_transport with tiered modes)
 _TRANSPORT_MODE_KEYWORDS = {
-    'animal':  re.compile(r'\b(camel(?:back)?|horse(?:back)?)\b(?:\s+\w+)?\s*tour\b', re.IGNORECASE),
+    'animal':  re.compile(r'\b(camel(?:back)?|horse(?:back)?|dog|dogsled(?:ding)?|sled\s*dog|mushing|husky)\b(?:\s+\w+)?\s*tour\b', re.IGNORECASE),
     'bike':    re.compile(r'\b(bike|biking|cycling)\b(?:\s+\w+)?\s*tour\b', re.IGNORECASE),
     'vehicle': re.compile(r'\b(auto|car|driving|jeep|off[- ]road|motorcycle|scooter)\b(?:\s+\w+)?\s*tour\b', re.IGNORECASE),
     'country_scale': re.compile(r'\broad\s*trip\b|\bcross[- ]country\b|\bsafari\b|\bnational(?:\s+parks?)?\s+tour\b', re.IGNORECASE),
@@ -254,7 +254,7 @@ Please provide ONLY a JSON response with these fields:
     "venue_name": "The full official name of the institution ONLY when the ENTIRE tour is bounded by one specific building or campus (e.g. a single museum, historic house, gallery, or library). Use the institution's complete official name including suffixes like 'Museum', 'Gallery', 'Library' — never a shortened nickname (e.g. 'Museum of Fine Arts, Boston' not 'MFA'). Return null if the tour spans a city, district, neighborhood, multiple venues, or any open-ended area. If you are unsure whether the request names a specific bounded institution or just a region, return null.",
     "geographic_scope": "The most specific bounded area the tour must stay within, in the user's own terms — a street or corridor, a square, a named district or quarter, a waterfront, a campus, a market, a cluster of blocks, or a single building. Copy the phrasing the request uses. If the request only names a whole city or town with no tighter anchor, return that city/town name. Never invent a tighter scope than the request states.",
     "scope_precision": "One of exactly these four strings: BUILDING (one structure) | CORRIDOR (one street or strip) | DISTRICT (a neighbourhood, quarter, square, or named area) | CITY (a whole town with no tighter anchor given).",
-    "transport_mode": "How the visitor physically moves between stops. One of: on_foot (walking, default), animal (camel, horseback), bike (cycling), vehicle (car, jeep, scooter, driving), country_scale (road trip, cross-country, safari, national parks tour). Default: on_foot.",
+    "transport_mode": "How the visitor physically moves between stops. One of: on_foot (walking, default), animal (ANY animal-powered movement: camel, horseback, dog sled, elephant, donkey, husky, etc.), bike (cycling), vehicle (car, jeep, scooter, driving, or any motorized/robotic conveyance: segway, robot, drone-follow, golf cart), country_scale (road trip, cross-country, safari, national parks tour). Default: on_foot.",
     "country_scope": "If this is a country-scale tour (road trip, safari, cross-country, national parks), the country name (e.g. 'Italy', 'USA'). Null otherwise."
 }}
 
@@ -282,6 +282,9 @@ Examples:
 - "Camel tour in the desert of Abu Dhabi" → transport_mode: "animal", country_scope: null
 - "Road trip across Italy" → transport_mode: "country_scale", country_scope: "Italy"
 - "Horseback tour of the ranch trails, Wyoming" → transport_mode: "animal", country_scope: null
+- "dog sledding tour near Big Lake, AK" → transport_mode: "animal", country_scope: null
+- "robot riding tour of the tech campus" → transport_mode: "vehicle", country_scope: null
+- "segway tour of Golden Gate Park" → transport_mode: "vehicle", country_scope: null
 """
 
     headers = {
@@ -1554,6 +1557,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     transport_mode = _transport_keyword if _transport_keyword != 'on_foot' else _transport_from_intent
     _country_scope = intent.get('country_scope') if intent else None
     print(f"  [TRANSPORT] mode={transport_mode}, country_scope={_country_scope} (keyword={_transport_keyword}, intent={_transport_from_intent})")
+
+    # Guardrail: detect potential unrecognized transport modes in the location text
+    _unrecognized_mode_re = re.compile(r'\b(\w+)(?:back)?\s+(?:riding|ridding|sledding|drawn)\s+tour\b', re.IGNORECASE)
+    _unrecognized_match = _unrecognized_mode_re.search(location)
+    if _unrecognized_match and transport_mode == 'on_foot':
+        _candidate_word = _unrecognized_match.group(1).lower()
+        if _candidate_word not in ('self', 'walking', 'sight'):  # exclude false positives
+            print(f"  [TRANSPORT] UNRECOGNIZED MODE CANDIDATE: '{_candidate_word}' — using intent LLM answer: {_transport_from_intent}")
     
     if intent:
         print(f"✅ Intent Analysis Results:")
@@ -2495,7 +2506,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 "between any two consecutive stops.\n"
                 "For each stop in the NEW order, provide all the JSON fields below.\n"
                 "For stop #1, 'directions_from_previous' should describe how to reach it from a reasonable arrival point (T station, parking, main street).\n"
-                "For subsequent stops, 'directions_from_previous' should be turn-by-turn walking directions from the IMMEDIATELY PREVIOUS stop in the new order.\n\n"
+                f"For subsequent stops, 'directions_from_previous' should be {'turn-by-turn walking directions' if transport_mode == 'on_foot' else f'route directions suitable for {transport_mode} travel'} from the IMMEDIATELY PREVIOUS stop in the new order.\n\n"
                 "Return ONLY a JSON array, no markdown fences, no commentary:\n"
                 "[\n  {\n"
                 '    "name": "<must match one of the input names exactly>",\n'
@@ -2985,7 +2996,9 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
 
         print(f"\nGenerating description for Stop {stop_num}: {poi_name} by {artist}, {year}...")
 
-        description_prompt = f"""Create a detailed description for {poi_name} in a walking tour of {location} focusing on {tour_type}.
+        description_prompt = ""
+        if tour_category == 'museum':
+            description_prompt = f"""Create a detailed description for {poi_name} in a walking tour of {location} focusing on {tour_type}.
 
 Start with an orientation section that explains where the visitor should position themselves to best view and appreciate this exhibit.
 
@@ -2994,6 +3007,21 @@ Then provide a detailed description of the exhibit that is EXACTLY 300 words lon
 - Information about the artist and their creative process
 - How this piece fits into the broader context of {tour_type}
 - Interesting details that would engage visitors
+"""
+        else:
+            _mode_context = f" (traveling by {transport_mode})" if transport_mode != 'on_foot' else ""
+            description_prompt = f"""Create a detailed description for the stop "{poi_name}" on a {tour_category} tour{_mode_context} of {location}.
+
+Start with an orientation section that explains how the visitor arrives at this stop and what they should look for.
+
+Then provide a detailed description that is EXACTLY 300 words long. Include:
+- What makes this stop notable or interesting for this tour
+- Historical or cultural context relevant to the location
+- Sensory details and atmosphere that would engage visitors
+- How this stop connects to the tour's overall theme
+
+Do NOT use museum/gallery framing (no "exhibit", no "viewing platform", no "artwork" unless it genuinely is one).
+Do NOT invent specific named people or attribute quotes unless they are well-documented public figures associated with this location.
 """
 
         # [PALAIS-FIX B1] Hedged narration for unverified stops — moved EARLY for GPT attention
@@ -3308,7 +3336,30 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
     
     # Create a better title that doesn't duplicate information
     # Use tour_category (internally corrected) not tour_type (raw client value) for display
-    _display_category = tour_category.replace('_', ' ').title()
+    # For non-on_foot transport modes, derive a mode-specific display name
+    _TRANSPORT_DISPLAY_NAMES = {
+        'on_foot': None,  # uses tour_category as before
+        'bike': 'Cycling',
+        'vehicle': 'Driving',
+        'country_scale': 'Road Trip',
+    }
+    # For animal mode, derive from the specific keyword matched
+    _ANIMAL_DISPLAY_NAMES = {
+        'camel': 'Camelback', 'camelback': 'Camelback',
+        'horse': 'Horseback', 'horseback': 'Horseback',
+        'dog': 'Dog Sledding', 'dogsled': 'Dog Sledding', 'dogsledding': 'Dog Sledding',
+        'mushing': 'Dog Sledding', 'husky': 'Dog Sledding',
+    }
+    if transport_mode == 'animal':
+        # Find which keyword matched to get the right display name
+        import re as _re_title
+        _animal_match = _re_title.search(r'\b(camel(?:back)?|horse(?:back)?|dog|dogsled(?:ding)?|mushing|husky)\b', location, _re_title.IGNORECASE)
+        _display_category = _ANIMAL_DISPLAY_NAMES.get(_animal_match.group(1).lower(), 'Animal') if _animal_match else 'Animal'
+    elif transport_mode in _TRANSPORT_DISPLAY_NAMES and _TRANSPORT_DISPLAY_NAMES[transport_mode]:
+        _display_category = _TRANSPORT_DISPLAY_NAMES[transport_mode]
+    else:
+        _display_category = tour_category.replace('_', ' ').title()
+
     if tour_type.lower() in location.lower():
         # If tour type is already in the location name, don't repeat it
         tour_title = f"Step-by-Step Audio Guided Tour: {location}"
@@ -3475,28 +3526,30 @@ Requirements:
         print(f"    Walking Directions: {bool(poi.get('directions'))}")
         
         # Add orientation section
-        poi_content += "Orientation: "
+        _orientation_prefix = "Orientation: "
         if i == 0:
             # For the first POI, include directions from the entrance
             # [C5-3] Museum tours: skip fabricated entrance directions entirely
             if tour_category != 'museum' or not _museum_venue_name:
                 entrance_directions = poi.get("directions", "")
                 if entrance_directions:
-                    poi_content += entrance_directions + " "
+                    _orientation_prefix += entrance_directions + " "
         
         # Add the orientation text — [R3] only if substantive (museum tours)
+        # Strip any leading "Orientation:" from the LLM text to avoid duplication
+        _clean_orientation = re.sub(r'^Orientation:\s*', '', orientation, flags=re.IGNORECASE).strip()
         if tour_category == 'museum' and _museum_venue_name:
             # R3: Orientation only if it contains a grounded viewing note
             _has_substance = bool(re.search(
                 r'(?i)(mosaic|reflected|window|pond|corner|ceiling|floor|left wall|right wall|'
                 r'lower|upper|behind|above|below|stained glass|tapestry|sculpture)',
-                orientation
+                _clean_orientation
             ))
-            if _has_substance and orientation != "Position yourself to best view this artwork.":
-                poi_content += f"Orientation: {orientation}\n\n"
+            if _has_substance and _clean_orientation != "Position yourself to best view this artwork.":
+                poi_content += f"{_orientation_prefix}{_clean_orientation}\n\n"
             # else: skip orientation entirely — go straight to description
         else:
-            poi_content += f"Orientation: {orientation}\n\n"
+            poi_content += f"{_orientation_prefix}{_clean_orientation}\n\n"
         
         # [R2] For Stop 1: inject prolog before description
         if i == 0 and _saved_prolog:

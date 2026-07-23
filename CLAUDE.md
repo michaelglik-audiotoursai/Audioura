@@ -146,102 +146,88 @@ The Mac Mini is now a full development environment. To continue working:
 ---
 
 # SESSION HANDOFF — Audioura review (read this first)
+## Last updated: 2026-07-22 (post Round 11 approval)
 
 **You are Claude Code on the Mac Mini**, working in `~/Audioura` on branch
-`storied`. A previous session was lost (terminal/crash/timeout). No chat memory
-carried over — **that's expected**. None of the *work* was lost: it lives in the
-files on disk and the `KIRO_*` markdown documents, not in chat. Reload context
-from those, not from memory.
+`storied`. Chat sessions can be lost (crash/timeout) — **that's expected**.
+The work lives in the files on disk and the `KIRO_*` markdown documents, not
+in chat. Reload context from those, not from memory.
 
 ## The workflow
 
-Collaborative loop: **you (Claude) review → Kiro executes → Michael coordinates.**
-Nothing is committed until Michael approves. Review notes are written to disk so
-any session (or crash) can resume:
-- `~/Audioura/KIRO_REVIEW_*.md` — your review rounds
-- `~/Audioura/KIRO_RESPONSE_*.md` — Kiro's execution reports
+Collaborative loop: **Claude reviews → Kiro executes → Michael coordinates/approves.**
+Review notes are written to disk so any session (or crash) can resume:
+- `~/Audioura/KIRO_REVIEW_*.md` — Claude's review rounds (verdicts appended at bottom)
+- `~/Audioura/KIRO_RESPONSE_*.md` — Kiro's execution reports (addenda at bottom)
 
-## FIRST STEPS (do these before trusting any summary)
-
-The summary below is Kiro's account of what it did. The **git diff is ground
-truth.** Verify one against the other:
-
+**The git diff/log is ground truth** — always verify report claims against it:
 ```
 cd ~/Audioura
-git diff --stat                         # real uncommitted state
-git status
-ls -t KIRO_RESPONSE_*.md KIRO_REVIEW_*.md | head   # confirm latest round
+git status && git log --oneline -5
+ls -t KIRO_RESPONSE_*.md KIRO_REVIEW_*.md | head   # latest round
 ```
 
-Then read the latest response doc (currently
-`KIRO_RESPONSE_10_transport_verify_gaps.md`) and verify its claims against the
-actual diffs in `generate_tour_text.py` and `docker-compose-master.yml` before
-approving anything.
+## WHERE THINGS STAND — Rounds 1–11 complete and APPROVED
 
-## WHERE THINGS STAND — 10 rounds of review (Kiro's summary)
+1. **Docker infra (R1–4):** wired tour-generation-modernized (5021),
+   polly-tts (5018), translation-service (5030) into
+   `docker-compose-master.yml`; fixed `.dockerignore`, `Dockerfile.orchestrator`
+   entitlements, Flask 1.1.4 send_file param.
+2. **Tour-type classification (R5–8):** fixed museum-forcing regression; added
+   transport mode detection (`_TRANSPORT_MODE_KEYWORDS`) with distance tiers
+   (animal 20km, bike 30km, vehicle 400km, country-scale containment).
+3. **Field-test fixes (R9–10):** title category fix, transport-stop constraint,
+   `_verify_transport_accessibility()` incl. Part C replacement loop.
+4. **Field-test round 11 (dog tour, Big Lake AK) — APPROVED 2026-07-22:**
+   - `stops_count` persisted on INSERT + both UPDATE paths
+     (`tour_orchestrator_service.py`) and inherited by translations
+     (`translation-service/translation_service.py`).
+   - dog/dogsled/mushing/husky added to animal transport regex
+     (`generate_tour_text.py:65`).
+   - Mode-derived display titles (`Dog Sledding Tour`, `Camelback`, `Cycling`…).
+   - DB `tour_name` now parsed from generated content's effective category, not
+     the app's raw `tour_type` (fixes "museum" leaking into names/translations).
+   - Intent-LLM prompt broadened for unknown transports (robot/segway/drone) +
+     `[TRANSPORT] UNRECOGNIZED MODE CANDIDATE` log guardrail.
+   - Museum narrative register gated to museum category only; no invented
+     named people in non-museum prompts; Orientation dedupe; transport-aware
+     directions language.
+   - Verified on regenerated tours 8 (en) / 9 (ru): stops_count=2 both, no
+     museum wording, one Orientation per stop. Both test suites green.
 
-1. **Docker infra (R1–4):** wired missing services into
-   `docker-compose-master.yml`: tour-generation-modernized-1 (5021), polly-tts-1
-   (5018), translation-service (5030). Fixed `.dockerignore`; added
-   `entitlements.py` to `Dockerfile.orchestrator`; fixed Flask send_file param
-   (`download_name` → `attachment_filename`, Flask 1.1.4).
-2. **Tour-type classification (R5–8):** fixed regression forcing all tours to
-   "museum". Added movie/film/book/literary/novel to S15 regex. Added transport
-   mode detection (`_TRANSPORT_MODE_KEYWORDS`) with distance tiers (animal 20km,
-   bike 30km, vehicle 400km, country-scale containment). Four touchpoints:
-   effective_tour_type suppression, S15 bypass, museum-containment bypass,
-   tiered GEO-CHECK.
-3. **Field-test issues (R9):** fixed title showing "Museum" instead of correct
-   category. Added transport-stop constraint prompt +
-   `_verify_transport_accessibility()` for unusual modes (camel/horse).
-4. **Transport verify gaps (R10):** regex now handles "camelback riding tour"
-   (compound + modifier). Extracted `_verify_transport_accessibility()` into a
-   reusable function; applied to the Part C replacement loop so excluded resorts
-   aren't silently re-added.
+## CURRENT STATE / NEXT STEPS
 
-**Current state:** `KIRO_RESPONSE_10_transport_verify_gaps.md` is ready for
-review. Changes are in `generate_tour_text.py` and `docker-compose-master.yml`,
-plus new files (`Dockerfile.modernized`, `requirements-modernized.txt`, restored
-`*_fixed.py`). **Nothing committed/pushed yet.**
-
-## WHAT I NEED YOU TO DO
-
-1. Run the FIRST STEPS above and read
-   `KIRO_RESPONSE_10_transport_verify_gaps.md`.
-2. Verify Round-10 changes in `generate_tour_text.py` against that report;
-   flag anything the report claims that the diff doesn't show.
-3. **Checkpoint-commit now — do not wait for final approval.** Ten rounds
-   uncommitted is fragile (a lost session already happened; a disk issue would
-   lose everything). Run:
-   ```
-   git add -A && git commit -m "WIP: Kiro rounds 1-10, pending review"
-   ```
-   We can amend/squash later. Then continue the review.
-4. Confirm the stack actually runs, not just that the diff looks right:
-   ```
-   docker compose -f docker-compose-master.yml build
-   docker compose -f docker-compose-master.yml up -d
-   docker compose ps
-   docker compose logs orchestrator
-   ```
-5. Once review passes and the stack is up: `git push origin storied`.
-
-## PREVENT THE NEXT AMNESIA
-
-After each round, update a running `REVIEW_STATE.md` (round #, files touched,
-what's approved, what's pending) and keep the key project context in `CLAUDE.md`
-so the next session auto-loads it. Commit often.
+1. **Committed locally as checkpoint** (rounds 1–11, see `git log`). **NOT
+   pushed yet** — push waits for Michael's iPhone field test:
+   - tour list shows "Dog Sledding" (not museum); stop count correct; audio
+     plays; ru translation has no «музеям».
+   - After pass: `git push origin storied`.
+2. **Known open items (not blockers):**
+   - Issue 8.2: canonical-location cross-check for real venues (Happy Trails
+     Kennel got Eagle River coords) — needs infrastructure, deferred.
+   - App-side ticket: iPhone app should prefer server's `actual_stops` over
+     requested count.
+   - Translated title redundancy cosmetic ("тур на собачьих упряжках … - тур
+     на собачьих упряжках").
+   - `audio_tours.language` column says 'en' even for ru rows (pre-existing).
+   - Python 3.9 base image past EOL — future bump to 3.11/3.12.
+3. **Dual-machine development starting:** Windows laptop (amd64) is back.
+   Rules: GitHub is the only sync channel; branch-per-task per machine; each
+   machine builds its own Docker images (never share images across arch);
+   `.env` synced manually via USB (Mac copy is newest — has OPENAI_API_KEY);
+   each machine has its own Postgres (disposable dev data); the iPhone app
+   points at one server IP (currently Mac Mini 192.168.0.137) — switch in app
+   settings when testing against the laptop.
 
 ## ENVIRONMENT NOTES
 
-- Mac Mini, **Apple M4 (arm64)**. Images build arm64 locally — usually fine. If a
-  build fails on an amd64-only image, enable Rosetta in Docker Desktop →
-  Settings → General, or set `platform: linux/amd64` on that one service.
-  (Images built here won't run unchanged on the returning amd64 laptop.)
-- `.env` is in `~/Audioura/.env` (Kiro added `OPENAI_API_KEY`; it's newer than
-  the Windows copy — **do not overwrite it**). It's gitignored; a local backup is
-  at `~/Audioura/.env.backup`.
-- Repo root **is** the dev directory on the Mac (no `development/` subfolder).
-  `docker-compose-master.yml` sits directly in `~/Audioura`.
-- Python 3.9 base image is past end-of-life — a future bump to 3.11/3.12 is worth
-  noting, not today's task.
+- Mac Mini, **Apple M4 (arm64)**. Images build arm64 locally. If a build fails
+  on an amd64-only image: Docker Desktop → Settings → enable Rosetta, or set
+  `platform: linux/amd64` on that service.
+- `.env` at `~/Audioura/.env` (gitignored; backup `~/Audioura/.env.backup`).
+  **Do not overwrite with the old Windows copy.**
+- Repo root **is** the dev directory on the Mac (no `development/` subfolder);
+  `docker-compose-master.yml` sits directly in `~/Audioura`. (The Windows clone
+  historically used `development/` — verify layout after pulling there.)
+- Postgres container: `development-postgres-2-1`, db `audiotours`, user admin.
+- ClickUp list: `1000410000000733` (🟦 Services — Kiro).

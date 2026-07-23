@@ -301,7 +301,7 @@ def log_job_update(job_id, status, progress):
     else:
         print(f"WARNING: Attempted to update non-existent job: {job_id}")
 
-def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None):
+def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None, stops_count=None):
     """Store the audio tour in the database with original tour content."""
     print(f"\n==== STORING AUDIO TOUR IN DATABASE: {datetime.now().isoformat()} ====")
     print(f"Tour name: {tour_name}")
@@ -444,19 +444,19 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
                 cur.execute(
                     """
                     UPDATE audio_tours 
-                    SET audio_tour = %s, number_requested = number_requested + 1, lat = %s, lng = %s, tour_content = %s
+                    SET audio_tour = %s, number_requested = number_requested + 1, lat = %s, lng = %s, tour_content = %s, stops_count = %s
                     WHERE id = %s
                     """,
-                    (psycopg2.Binary(zip_data), lat, lng, tour_content, existing_tour[0])
+                    (psycopg2.Binary(zip_data), lat, lng, tour_content, stops_count, existing_tour[0])
                 )
             elif has_audio_tour and has_lat and has_number_requested:
                 cur.execute(
                     """
                     UPDATE audio_tours 
-                    SET audio_tour = %s, number_requested = number_requested + 1, lat = %s, lng = %s
+                    SET audio_tour = %s, number_requested = number_requested + 1, lat = %s, lng = %s, stops_count = %s
                     WHERE id = %s
                     """,
-                    (psycopg2.Binary(zip_data), lat, lng, existing_tour[0])
+                    (psycopg2.Binary(zip_data), lat, lng, stops_count, existing_tour[0])
                 )
             else:
                 # Fallback if columns don't exist
@@ -475,11 +475,11 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
             if has_audio_tour and has_lat and has_number_requested and has_tour_content:
                 cur.execute(
                     """
-                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng, tour_content, content_language, storied_mode)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng, tour_content, content_language, storied_mode, stops_count)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, tour_content, 'en',
-                     os.getenv('STORIED_MODE', 'false').lower() == 'true')
+                     os.getenv('STORIED_MODE', 'false').lower() == 'true', stops_count)
                 )
             elif has_audio_tour and has_lat and has_number_requested:
                 cur.execute(
@@ -765,7 +765,27 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         
         # Step 5: Store in database with original tour content
         log_job_update(job_id, ACTIVE_JOBS[job_id]["status"], "Step 5/5: Storing modernized tour in database...")
-        tour_name = f"{location} - {tour_type} Tour"
+        
+        # Derive tour_name from the generated content's title (uses effective category, not raw tour_type)
+        # Parse the " - <X> Tour" suffix from the content's first line, fall back to raw tour_type
+        _effective_tour_suffix = f"{tour_type} Tour"
+        if tour_content_raw := ACTIVE_JOBS[job_id].get("tour_content", ""):
+            _first_line = tour_content_raw.split('\n')[0] if tour_content_raw else ""
+            if ' - ' in _first_line and _first_line.endswith(' Tour'):
+                _effective_tour_suffix = _first_line.rsplit(' - ', 1)[-1]
+        elif tour_file:
+            # Read first line from tour file to get effective category
+            _tf_path = os.path.join(TOURS_DIR, tour_file)
+            if os.path.exists(_tf_path):
+                try:
+                    with open(_tf_path, 'r', encoding='utf-8') as _tf:
+                        _first_line = _tf.readline().strip()
+                    if ' - ' in _first_line and _first_line.endswith(' Tour'):
+                        _effective_tour_suffix = _first_line.rsplit(' - ', 1)[-1]
+                except Exception:
+                    pass
+        tour_name = f"{location} - {_effective_tour_suffix}"
+        print(f"Tour name (from effective category): {tour_name}")
         
         # Extract coordinates
         lat = None
@@ -800,7 +820,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             print(f"Warning: No tour file available for content extraction")
         
         # Store in database with tour content
-        store_success = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content)
+        store_success = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"))
         
         if store_success:
             print(f"Tour stored successfully with coordinates: lat={lat}, lng={lng}")
