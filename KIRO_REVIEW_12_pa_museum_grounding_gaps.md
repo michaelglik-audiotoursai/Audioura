@@ -121,3 +121,15 @@ docker compose -f docker-compose-master.yml build tour-generator && docker compo
 # regenerate both PA museums (10 stops) and one regression art museum (Palais Lascaris, 6 stops)
 # verify: AAMP resolves to Philadelphia; NCC ≥6 stops; Palais unchanged; DB stops_count matches ZIPs
 ```
+
+---
+
+# DECISION UPDATE (2026-07-24)
+
+Michael decided **YES** on the hedged-fill question (ClickUp task wdvrdawzyv,
+now complete): implement Issue 2 point 4 AND ship with `EXHIBIT_FILL_HEDGED=true`
+(set via environment, keep it a flag).
+
+**Amended acceptance for Issue 2:** NCC 10-stop request returns **10 stops** —
+verified exhibits first, remainder filled with hedged unverified exhibits
+(hedging per existing PALAIS-FIX B1 pattern). DB stops_count = delivered = 10.
