@@ -676,6 +676,46 @@ _LAST_POI_LIST = []
 
 
 
+def _is_artist_human(artist_qid: str) -> bool:
+    """Check if a Wikidata entity is a human (P31=Q5).
+    
+    Used to validate that a resolved 'artist' is actually a person/creator
+    before running the artist-placement rejection check. Prevents nonsense
+    rejections when P921/P138 points to a concept (e.g. 'United States Constitution').
+    """
+    if not artist_qid:
+        return False
+    try:
+        import requests as _req
+        resp = _req.get(
+            "https://www.wikidata.org/w/api.php",
+            params={
+                "action": "wbgetentities",
+                "ids": artist_qid,
+                "props": "claims",
+                "format": "json",
+            },
+            headers={"User-Agent": "Audioura/2.2 (tour-generation; contact: support@audioura.com)"},
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            return False
+        
+        data = resp.json()
+        entity = data.get("entities", {}).get(artist_qid, {})
+        claims = entity.get("claims", {})
+        
+        # Check P31 (instance-of) for Q5 (human)
+        for claim in claims.get("P31", []):
+            value = claim.get("mainsnak", {}).get("datavalue", {}).get("value", {})
+            if value.get("id") == "Q5":
+                return True
+        
+        return False
+    except Exception:
+        return False
+
+
 @dataclass
 class VerificationResult:
     """Result of _verify_works_v2 with tier computation for degradation ladder.
@@ -915,15 +955,25 @@ def _verify_works_v2(poi_list, venue_name):
     from rag_retriever import fetch_wikipedia_summary
     import re as _d1v2_re
     
-    # Extract artist name for rejection checks
-    _cleaned = _d1v2_re.sub(
-        r"(?i)(mus[ée]+e?|museum|gallery|national|the|of|art|centre|center)\s*",
-        " ", venue_name
-    ).strip()
-    _venue_artist = " ".join(w for w in _cleaned.split() if w and len(w) > 1).strip()
+    # Extract artist name for rejection checks — USE ENTITY DATA, not regex on venue name
+    # Only run artist-placement check when the resolved artist is a real person/creator
+    _venue_artist = ""
     artist_article = ""
-    if _venue_artist:
-        artist_article = fetch_wikipedia_summary(_venue_artist)
+    if _venue_entity and _venue_entity.artist_qid:
+        # Validate: artist must be a human (P31=Q5) to be a real creator
+        if _is_artist_human(_venue_entity.artist_qid):
+            _venue_artist = _venue_entity.artist_name
+            if _venue_artist:
+                artist_article = fetch_wikipedia_summary(_venue_artist)
+                print(f"  [D1v2] Artist-check: valid creator '{_venue_artist}' ({_venue_entity.artist_qid})")
+        else:
+            print(f"  [D1v2] artist-check skipped (no valid creator) — "
+                  f"artist_qid={_venue_entity.artist_qid} ({_venue_entity.artist_name}) is not a human")
+    elif _venue_entity:
+        print(f"  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity")
+    else:
+        # No entity resolved — skip artist check entirely (better than regex guessing)
+        print(f"  [D1v2] artist-check skipped (no valid creator) — venue not resolved")
 
     _rejection_indicators = ['hadassah', 'jerusalem', 'metropolitan opera',
                              'new york', 'pompidou', 'louvre', 'hermitage',
@@ -1076,9 +1126,46 @@ def _verify_works_v2(poi_list, venue_name):
     _unique_sparql_qids = set(w.get('qid', '') for w in sparql_works if w.get('qid')) if 'sparql_works' in dir() and sparql_works else set()
     _evidence_strength = len(_unique_sparql_qids)
     
-    _tier = compute_tier(_n_verified, _evidence_strength)
+    # Detect exhibit_museum tier: entity resolved + SPARQL works scarce (< 5)
+    # but we still verified candidates against exhibit-name corpus (sections/quotes)
+    _is_exhibit_museum = (
+        _venue_entity and _venue_entity.qid and
+        _evidence_strength < 5 and
+        _n_verified >= 1 and
+        len(canonical_titles) > len(sparql_titles)  # More titles from site/wiki than SPARQL
+    )
+    
+    if _is_exhibit_museum:
+        _tier = 'exhibit_museum'
+        print(f"  [D1v2] Exhibit museum detected: {_evidence_strength} SPARQL QIDs, "
+              f"{len(canonical_titles)} total titles (mostly from site/wiki sections)")
+    else:
+        _tier = compute_tier(_n_verified, _evidence_strength)
     
     print(f"  [D1v2] {_n_verified}/{len(poi_list)} works verified — tier: {_tier}")
+    
+    # --- EXHIBIT_FILL_HEDGED: allow unverified exhibit candidates to fill (flag-gated) ---
+    # When tier is exhibit_museum and flag is ON, re-add dropped candidates as "hedged"
+    # (unverified but plausible exhibits). Default OFF — Michael decides.
+    import os as _os_env
+    _exhibit_fill_hedged = _os_env.environ.get('EXHIBIT_FILL_HEDGED', 'false').lower() in ('true', '1', 'yes')
+    
+    if _tier == 'exhibit_museum' and _exhibit_fill_hedged and _n_verified < len(poi_list):
+        _hedged_count = 0
+        for poi in poi_list:
+            work_name = poi.get('name', '')
+            if work_name and evidence_log.get(work_name, {}).get('status') == 'DROPPED':
+                # Only hedged-fill candidates that were dropped for "no canonical match"
+                # (not theme words or cycle names)
+                if evidence_log[work_name].get('reason') == 'no canonical match':
+                    poi = dict(poi)
+                    verified_pois.append(poi)
+                    evidence_log[work_name] = {"status": "HEDGED", "reason": "exhibit_fill_hedged flag"}
+                    _hedged_count += 1
+                    if len(verified_pois) >= len(poi_list):
+                        break
+        if _hedged_count:
+            print(f"  [D1v2] EXHIBIT_FILL_HEDGED: added {_hedged_count} unverified exhibits")
     
     # --- CACHE WRITE: store results for future requests ---
     if _venue_entity and _venue_entity.qid and not _cache_hit:
@@ -2014,7 +2101,12 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         _story_corpus_result = None
         if tour_category == 'museum' and _museum_venue_name:
             # Try new story_miner-based verification (T0a/T1)
-            _d1v2_result = _verify_works_v2(poi_list, _museum_venue_name)
+            # Pass full location string so D1v2 can parse city for venue disambiguation
+            _d1v2_venue_arg = _museum_venue_name
+            if ',' not in _d1v2_venue_arg and ',' in _location_normalized:
+                # Append city/state from location if venue name alone lacks it
+                _d1v2_venue_arg = _location_normalized
+            _d1v2_result = _verify_works_v2(poi_list, _d1v2_venue_arg)
             if isinstance(_d1v2_result, VerificationResult):
                 _verification_tier = _d1v2_result.tier
                 if _d1v2_result.tier == 'unresolvable':

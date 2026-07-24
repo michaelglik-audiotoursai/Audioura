@@ -127,6 +127,8 @@ def extract_canonical_titles(corpus: str, venue_name: str = "") -> Tuple[Set[str
     
     Canonical titles are identified by patterns in the corpus text where
     they appear AS work titles (with dates, in lists, in image captions).
+    Also extracts exhibit names from section headers and bold/quoted names
+    for exhibit-type museums.
     """
     canonical_titles: Set[str] = set()
     cycle_names: Set[str] = set()
@@ -165,6 +167,60 @@ def extract_canonical_titles(corpus: str, venue_name: str = "") -> Tuple[Set[str
             title = match.group(1).strip().rstrip(',. ')
             if len(title) >= 5 and len(title.split()) >= 2:
                 canonical_titles.add(title)
+
+    # Pattern 3: Exhibit-name extraction — for exhibit/experience museums
+    # Wikipedia section headers (== Section Name == or === Section Name ===)
+    _section_pattern = re.compile(r'^={2,4}\s*(.+?)\s*={2,4}\s*$', re.MULTILINE)
+    _exhibit_from_sections = set()
+    for match in _section_pattern.finditer(corpus):
+        section_name = match.group(1).strip()
+        # Filter out generic Wikipedia sections
+        _GENERIC_SECTIONS = {
+            'history', 'see also', 'references', 'external links', 'notes',
+            'further reading', 'bibliography', 'gallery', 'location',
+            'architecture', 'overview', 'mission', 'about', 'staff',
+            'board of directors', 'governance', 'funding', 'hours',
+            'admission', 'transit', 'getting there', 'accessibility',
+            'education', 'programs', 'events', 'membership', 'impact',
+            'criticism', 'controversy', 'awards', 'reception',
+        }
+        if (section_name.lower() not in _GENERIC_SECTIONS and
+            len(section_name) >= 5 and len(section_name) <= 80 and
+            not section_name.startswith('http') and
+            not re.match(r'^\d+', section_name)):
+            _exhibit_from_sections.add(section_name)
+
+    # Pattern 4: Quoted exhibit/installation names ("Name" or 'Name' or "Name")
+    _quoted_pattern = re.compile(r'["\u201c]([A-Z][A-Za-z\u00C0-\u00FF\s\'\'\-\u2019:,]{4,60}?)["\u201d]')
+    _exhibit_from_quoted = set()
+    for match in _quoted_pattern.finditer(corpus):
+        name = match.group(1).strip().rstrip(',. ')
+        if len(name) >= 5 and len(name.split()) >= 2:
+            _exhibit_from_quoted.add(name)
+
+    # Pattern 5: Bold exhibit names (common in Wikipedia/HTML-derived text)
+    # In plaintext Wikipedia extracts, bold appears as the title itself in first line
+    # or as section-leading proper nouns. Detect named entities at line starts.
+    _bold_pattern = re.compile(r"'''(.+?)'''")  # MediaWiki bold
+    for match in _bold_pattern.finditer(corpus):
+        name = match.group(1).strip()
+        if len(name) >= 5 and len(name) <= 80 and name[0].isupper():
+            _exhibit_from_quoted.add(name)
+
+    # Pattern 6: List-item exhibit names (common on museum /exhibits pages)
+    # "• Exhibit Name" or "- Exhibit Name" or "* Exhibit Name" at line start
+    _list_item_pattern = re.compile(r'^[\s]*[•\-\*]\s+([A-Z][A-Za-z\u00C0-\u00FF\s\'\'\-\u2019:,&]{4,60}?)(?:\s*[-–—:]|\s*$)', re.MULTILINE)
+    for match in _list_item_pattern.finditer(corpus):
+        name = match.group(1).strip().rstrip(',. ')
+        if len(name) >= 5 and len(name.split()) >= 2:
+            _exhibit_from_quoted.add(name)
+
+    # Combine exhibit names into canonical_titles
+    _exhibit_names = _exhibit_from_sections | _exhibit_from_quoted
+    if _exhibit_names:
+        print(f"  [T0a] Exhibit-name extraction: {len(_exhibit_from_sections)} from sections, "
+              f"{len(_exhibit_from_quoted)} from quoted/bold/list")
+        canonical_titles |= _exhibit_names
 
     # Known cycle/collection names
     _KNOWN_CYCLES = {
@@ -249,7 +305,8 @@ def fetch_venue_narrative_corpus(
         # Follow internal links containing narrative keywords (cap 5)
         # Localized keywords based on venue language
         _NARRATIVE_KEYWORDS_BASE = ('history', 'story', 'creation', 'about', 'exhibition',
-                                    'collection', 'works', 'permanent')
+                                    'collection', 'works', 'permanent', 'exhibits',
+                                    'galleries', 'interactive', 'experience', 'installations')
         _NARRATIVE_KEYWORDS_LOCALIZED = {
             'fr': ('histoire', 'parcours', 'exposition', 'evenement', 'oeuvres', 'collection', 'creation'),
             'it': ('storia', 'collezione', 'opere', 'mostra', 'esposizione', 'percorso'),
@@ -260,6 +317,7 @@ def fetch_venue_narrative_corpus(
         
         _base_domain = urlparse(base_site_url).netloc
         _narrative_urls = []
+        _exhibit_urls = []  # Prioritized: exhibit/gallery pages go first
         for link_text, href in _base_links:
             if not href or href.startswith('#') or href.startswith('mailto:'):
                 continue
@@ -268,15 +326,48 @@ def fetch_venue_narrative_corpus(
                 continue
             if any(kw in href.lower() or kw in link_text.lower() for kw in _NARRATIVE_KEYWORDS):
                 if full_url not in source_urls:
-                    _narrative_urls.append(full_url)
+                    # Prioritize exhibit/gallery pages (more likely to have exhibit names)
+                    _EXHIBIT_PRIORITY_KW = ('exhibit', 'galleries', 'installations', 'experience')
+                    if any(ekw in href.lower() or ekw in link_text.lower() for ekw in _EXHIBIT_PRIORITY_KW):
+                        _exhibit_urls.append(full_url)
+                    else:
+                        _narrative_urls.append(full_url)
 
-        # Fetch narrative pages (cap 5)
-        for url in _narrative_urls[:5]:
-            _text, _ = _fetch_page_text(url)
+        # Deduplicate while preserving order: exhibits first, then other narrative pages
+        _seen_urls = set()
+        _ordered_urls = []
+        for url in _exhibit_urls + _narrative_urls:
+            if url not in _seen_urls:
+                _seen_urls.add(url)
+                _ordered_urls.append(url)
+
+        # Fetch narrative pages (cap 5, exhibits prioritized)
+        for url in _ordered_urls[:5]:
+            _text, _links = _fetch_page_text(url)
             if _text and len(_text) > 300:
                 pages.append({"url": url, "text": _text, "title": url.split('/')[-1]})
                 source_urls.append(url)
                 print(f"  [story_miner] Narrative page: {url} ({len(_text)} chars)")
+                
+                # Extract exhibit names from sub-page links on exhibit pages
+                # e.g. /exhibits-programs/signers-hall → "Signers Hall"
+                if any(ekw in url.lower() for ekw in ('exhibit', 'galleries')):
+                    for _lt, _lhref in _links:
+                        if not _lhref:
+                            continue
+                        _full_link = urljoin(url, _lhref)
+                        # Only follow links that are sub-pages of the exhibit URL
+                        if _full_link.startswith(url.rstrip('/') + '/'):
+                            _slug = _full_link.rstrip('/').split('/')[-1]
+                            # Convert URL slug to title: "signers-hall" → "Signers Hall"
+                            _exhibit_title = _slug.replace('-', ' ').title()
+                            # Filter out generic slugs
+                            if (len(_exhibit_title) >= 5 and
+                                _exhibit_title.lower() not in ('learn more', 'read more', 'tickets', 'visit', 'about')):
+                                # Append to page text so T0a can extract it
+                                _text += f"\n== {_exhibit_title} =="
+                    # Re-store with enriched text
+                    pages[-1]["text"] = _text
 
     # --- 2. Wikipedia (English) full article — ALWAYS fetched regardless of language ---
     if wikipedia_title:

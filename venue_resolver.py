@@ -79,11 +79,27 @@ def resolve_venue(venue_string: str, city: str = "") -> Optional[VenueEntity]:
     Returns:
         VenueEntity with structured data, or None if unresolvable.
     """
-    # Step 1: Search Wikidata for candidates — try multiple query strategies
-    candidates = _search_entities(venue_string)
+    # Step 1: Search Wikidata for candidates — city-qualified FIRST, then bare
+    # Wikipedia naming conventions: "X in City", "X (City)", "X, City"
+    candidates = []
+    
+    if city:
+        # Try city-qualified queries first (Wikipedia disambiguation conventions)
+        for _qual_query in [
+            f"{venue_string} in {city}",
+            f"{venue_string} ({city})",
+            f"{venue_string} {city}",
+        ]:
+            candidates = _search_entities(_qual_query)
+            if candidates:
+                print(f"  [venue_resolver] City-qualified search hit: '{_qual_query}' → {len(candidates)} candidates")
+                break
     
     if not candidates:
-        # Try with city appended
+        candidates = _search_entities(venue_string)
+    
+    if not candidates:
+        # Try with city appended (different from above — just simple append)
         candidates = _search_entities(f"{venue_string} {city}")
     
     if not candidates:
@@ -106,6 +122,12 @@ def resolve_venue(venue_string: str, city: str = "") -> Optional[VenueEntity]:
         print(f"  [venue_resolver] No Wikidata candidates for '{venue_string}'")
         return None
     
+    # Step 1b: Filter out disambiguation pages (never mine these as corpus)
+    candidates = _filter_disambiguation_pages(candidates)
+    if not candidates:
+        print(f"  [venue_resolver] All candidates were disambiguation pages for '{venue_string}'")
+        return None
+    
     # Step 2: Filter by P31 instance-of (museum/gallery types) BEFORE geo
     museum_candidates = []
     for qid, label in candidates[:10]:
@@ -118,11 +140,29 @@ def resolve_venue(venue_string: str, city: str = "") -> Optional[VenueEntity]:
         print(f"  [venue_resolver] No museum-typed candidates, trying geo-disambiguation on all")
         museum_candidates = candidates[:5]
     
-    # Step 3: Geo-disambiguate if city provided
-    if city and len(museum_candidates) > 1:
-        best = _geo_disambiguate(museum_candidates, city)
-        if best:
-            museum_candidates = [best]
+    # Step 3: Geo-disambiguate if city provided — ALWAYS validate city match
+    if city:
+        if len(museum_candidates) > 1:
+            best = _geo_disambiguate(museum_candidates, city)
+            if best:
+                museum_candidates = [best]
+        elif len(museum_candidates) == 1:
+            # Even with 1 candidate, validate it's actually in the requested city
+            _qid, _label = museum_candidates[0]
+            if not _validate_city_match(_qid, city):
+                print(f"  [venue_resolver] Single candidate {_qid} ({_label}) failed city validation for '{city}'")
+                # Try city-qualified search as last resort
+                _city_candidates = _search_entities(f"{venue_string} in {city}")
+                _city_candidates = _filter_disambiguation_pages(_city_candidates)
+                if _city_candidates:
+                    # Re-filter for museum types
+                    for _cqid, _clabel in _city_candidates[:5]:
+                        _ctype = _get_instance_of(_cqid)
+                        if _ctype and _ctype in _MUSEUM_TYPES:
+                            if _validate_city_match(_cqid, city):
+                                museum_candidates = [(_cqid, _clabel)]
+                                print(f"  [venue_resolver] City-validated replacement: {_cqid} ({_clabel})")
+                                break
     
     if not museum_candidates:
         return None
@@ -289,6 +329,91 @@ def build_canonical_titles_from_works(works: List[Dict]) -> Set[str]:
 
 
 # --- Internal helpers ---
+
+def _filter_disambiguation_pages(candidates: List[Tuple[str, str]]) -> List[Tuple[str, str]]:
+    """Filter out Wikidata entities that are Wikipedia disambiguation pages.
+    
+    Detects disambiguation pages by:
+    1. P31 = Q4167410 (Wikimedia disambiguation page)
+    2. Description containing "disambiguation" or "Wikimedia"
+    """
+    if not candidates:
+        return []
+    
+    filtered = []
+    for qid, label in candidates:
+        try:
+            resp = requests.get(
+                _WIKIDATA_API,
+                params={
+                    "action": "wbgetentities",
+                    "ids": qid,
+                    "props": "claims|descriptions",
+                    "languages": "en",
+                    "format": "json",
+                },
+                headers={"User-Agent": _USER_AGENT},
+                timeout=10,
+            )
+            if resp.status_code != 200:
+                filtered.append((qid, label))  # Can't check — keep it
+                continue
+            
+            data = resp.json()
+            entity = data.get("entities", {}).get(qid, {})
+            claims = entity.get("claims", {})
+            descriptions = entity.get("descriptions", {})
+            
+            # Check P31 for Q4167410 (Wikimedia disambiguation page)
+            is_disambig = False
+            for claim in claims.get("P31", []):
+                value = claim.get("mainsnak", {}).get("datavalue", {}).get("value", {})
+                if value.get("id") == "Q4167410":
+                    is_disambig = True
+                    break
+            
+            # Also check description
+            if not is_disambig:
+                en_desc = descriptions.get("en", {}).get("value", "").lower()
+                if "disambiguation" in en_desc or "wikimedia" in en_desc:
+                    is_disambig = True
+            
+            if is_disambig:
+                print(f"  [venue_resolver] DISAMBIGUATION PAGE detected: {qid} ({label}) — skipping")
+            else:
+                filtered.append((qid, label))
+                
+        except Exception:
+            filtered.append((qid, label))  # Can't check — keep it
+    
+    return filtered
+
+
+def _validate_city_match(qid: str, city: str) -> bool:
+    """Validate that a Wikidata entity is located in the specified city.
+    
+    Checks P131 (located in administrative territory) and P625 coordinates
+    against the city. Returns True if the entity is confirmed in the city.
+    """
+    if not city:
+        return True  # No city constraint — always valid
+    
+    # Check P131 chain first (most reliable)
+    if _is_located_in(qid, city):
+        return True
+    
+    # Fallback: check coordinates proximity
+    city_lat, city_lng = _geocode_city(city)
+    if city_lat == 0.0 and city_lng == 0.0:
+        return False  # Can't verify
+    
+    entity_lat, entity_lng = _get_coordinates(qid)
+    if entity_lat == 0.0 and entity_lng == 0.0:
+        return False  # Entity has no coordinates
+    
+    dist = _haversine(city_lat, city_lng, entity_lat, entity_lng)
+    return dist < 30  # Within 30km of city center
+
 
 def _search_entities(query: str) -> List[Tuple[str, str]]:
     """Search Wikidata for entities matching a query string."""
@@ -773,7 +898,7 @@ from datetime import datetime, timedelta
 
 VENUE_CACHE_TTL_DAYS = int(os.environ.get('VENUE_CACHE_TTL_DAYS', '30'))
 VENUE_CACHE_NEGATIVE_TTL_DAYS = int(os.environ.get('VENUE_CACHE_NEGATIVE_TTL_DAYS', '5'))
-CORPUS_VERSION = 1  # Increment when pipeline improvements invalidate cached data
+CORPUS_VERSION = 2  # Increment when pipeline improvements invalidate cached data
 
 
 # TODO(S94): remove in-code password fallback; prod must use DATABASE_URL/DB_PASSWORD env only
@@ -818,12 +943,14 @@ def _ensure_table(conn):
                     sparql_works_json JSONB,
                     pages_json JSONB,
                     language VARCHAR(10),
-                    tier VARCHAR(10) NOT NULL,
+                    tier VARCHAR(20) NOT NULL,
                     corpus_version INT NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     expires_at TIMESTAMP NOT NULL
                 )
             """)
+            # Ensure tier column is wide enough for 'exhibit_museum' (14 chars)
+            cur.execute("ALTER TABLE venue_corpus ALTER COLUMN tier TYPE VARCHAR(20)")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_venue_corpus_expires ON venue_corpus(expires_at)")
             conn.commit()
         _TABLE_ENSURED = True
