@@ -1,6 +1,33 @@
 # Audioura — Working Context for Claude (LEAD)
 
-**Last updated:** 2026-07-13 end of LEAD session. **NEXT SESSION = MOBILE TESTING + BUG FIXING.** Read §0 first.
+**Last updated:** 2026-07-20 (laptop → repair center; development moves to MAC MINI). **Read §M first, then §0.**
+
+---
+
+## §M. MAC MINI HANDOFF (2026-07-20) — READ FIRST
+
+**Situation:** Michael's Windows laptop went to repair. Development continues on the Mac Mini. All code is pushed: `storied` == `origin/storied` @ `078a2a3`. Kiro's Mac setup docs: `mac_mini_migration.md` (in repo) + `claude_setup_mac.sh` / `claude_migration_to_mac_mini.md` (E: drive only — LEAD could not verify those two).
+
+### M1. Environment bring-up — VERIFY BEFORE TRUSTING (LEAD-found gap)
+`mac_mini_migration.md` Step 4 starts a FRESH Postgres (named volume, **no init scripts in docker-compose-master.yml**) but has **NO migration step** — the DB comes up EMPTY. Before Step 5/6, Mac Kiro must apply, in order: base table setup (`setup_audio_tours_table.sql` / `recreate_all_tables.sql` as appropriate), `storied_db_migration.sql` (verify 5 tables — see task S94 description), `icon_migration.sql` (stop_metrics), `palais_stop_metrics_migration.sql` (verified column), plus news tables if news is exercised. Then verify: `\dt` shows audio_tours, stop_metrics, venue_corpus, work_stories; `stop_metrics` has `verified` column. Laptop's DB data (caches, tour history) did NOT migrate — venue_corpus/work_stories rebuild on demand (small SERP cost); acceptable.
+`.env` is NOT in git — Michael must recreate it from his key store / E: copy (OPENAI_API_KEY, SERP_API_KEY, STORIED_MODE=true, PYTHONUNBUFFERED=1).
+
+### M2. PALAIS-FIX review cycle — WHERE WE ARE (first LEAD action next session)
+Full trail on ClickUp task `wdvrdawkxp` (🟦 list `1000410000000733`):
+1. `49c5a9a` initial fix — LEAD certification CONDITIONAL PASS (`development/PALAIS_LASCARIS_LEAD_CERTIFICATION.md`; LEAD fixture `test_palais_fix_lead_fixture.py`).
+2. `5ba87ed` hardening — LEAD bounce `7181` (4 gaps).
+3. `280f125`+`d19ba96` rework — LEAD bounce `7191`: **B1a** stop_metrics INSERT references nonexistent `verified` column (no migration → EVERY insert silently fails = persistence regression); **B1b** `icon_evaluator` never sets `verified` on stops → flag always True even with column; **B1c** hedging unproven in pilot output; **B4** artifact said `code_dirty:true` while Kiro reported `false` (CRLF noise — must be reported honestly), regression exits missing from artifact.
+4. `832d071` "fix(palais): B1a-B1c stop_metrics verified column + hedging prompt relocation" — **COMMITTED, PENDING LEAD VERIFICATION. This is the first thing to review.** Verify against bounce `7191` items specifically: migration file correct AND a step to apply it; service maps poi verified→icon stops (B1b) — check `icon_evaluator.py` or service-side mapping actually WRITES the key the INSERT reads; hedging proof in a committed pilot. **Report-accuracy count = 3 consecutive cycles (see `7191`) — one more inflated claim ⇒ recommend Michael declare a HARD GATE.**
+5. After `wdvrdawkxp` closes → `wdvrdawkxq` (evidence-not-requirement design, Michael's binding ruling: external listings upgrade confidence, never gate generation) — approach comment BEFORE coding.
+
+### M3. Other open state
+- **Queue protocol** (binding, Michael 2026-07-14): in `remind_Services_ai.md` — "work on your queue" = LIST scan of `1000410000000733` + comment scan + execute + report both. Mac Kiro must follow it too.
+- **Mobile:** `wdvrdawkxt` (first TOUR_STATUS poll 404) open on 🟩 list. Language "bug" was RETRACTED — app translates AFTER English generation by design (`tour_generator_screen.dart` → `_processAdditionalLanguages`).
+- **Device retest owed:** Palais Lascaris in Russian on Android once services run on Mac; expect generation success + translation step firing; send log to LEAD.
+- **Store:** Apple call (case 102920316863) was due 7/14 — status unknown to LEAD; Play items `wdvrdaw7md/7me/7mf`; privacy `wdvrdaw6em`.
+- **Mission hub:** `wdvrdawkgy` mobile testing (§0 below still applies once environment is back).
+
+**How to resume:** "Use this as my context: claude_code_review.md" in a new Cowork session with the cloned repo folder connected. LEAD verification discipline unchanged: `git show <ref>:<file>` into isolated /tmp, never checkout into the live tree; artifacts must be committed with `code_sha`.
 
 ---
 
