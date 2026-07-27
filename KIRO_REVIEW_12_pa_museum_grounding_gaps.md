@@ -133,3 +133,48 @@ now complete): implement Issue 2 point 4 AND ship with `EXHIBIT_FILL_HEDGED=true
 **Amended acceptance for Issue 2:** NCC 10-stop request returns **10 stops** —
 verified exhibits first, remainder filled with hedged unverified exhibits
 (hedging per existing PALAIS-FIX B1 pattern). DB stops_count = delivered = 10.
+
+---
+
+# VERDICT (2026-07-27) — APPROVED with reviewer fix-forward
+
+Reviewed commit `b037f2f` on `kiro/round12-museum-grounding` against the
+actual diff (generate_tour_text.py +112, story_miner.py +103,
+venue_resolver.py +147). Both regression suites green
+(test_sq4_merge.py ALL PASSED; test_palais_fix_lead_fixture.py 13/13).
+
+**Issue 1 (venue disambiguation) — PASS.** City-qualified Wikidata search
+runs first; disambiguation pages filtered (P31=Q4167410 + description);
+single candidates city-validated via P131 chain with 30km coordinate
+fallback; CORPUS_VERSION bumped to 2. Note (non-blocking): when the single
+candidate fails city validation AND no city-qualified replacement is found,
+the failed candidate is kept (graceful degradation, logged) — acceptable
+since _validate_city_match returns False on missing Wikidata data.
+
+**Issue 2 (exhibit-museum tier) — PASS.** T0a extracts exhibit names from
+section headers (with generic-section blocklist), quoted/bold names, list
+items, and URL slugs on prioritized /exhibits pages. exhibit_museum tier
+detected when SPARQL works < 5 but site/wiki titles dominate; R4
+replenishment correctly falls through for the new tier (NCC evidence:
++7 verified round 1, total 10). tier column widened to VARCHAR(20).
+
+**Issue 3 (artist-check contamination) — PASS.** Regex artist extraction
+replaced with entity-based P31=Q5 human validation; non-human "artists"
+(e.g. Q11698 US Constitution) skip the placement check with log line.
+No 'places near tate' rejections in either PA rerun.
+
+**Defect found and fixed by reviewer (commit `9cd5708`):** the
+EXHIBIT_FILL_HEDGED block appended hedged POIs WITHOUT `verified=False`,
+but B1 hedged narration triggers on exactly that flag — with the flag ON
+(Michael's shipped decision), unverified exhibits would have been narrated
+as unhedged fact, violating the amended acceptance. Fix: one-line tag in
+the fill loop. Also wired `EXHIBIT_FILL_HEDGED=${EXHIBIT_FILL_HEDGED:-true}`
+into docker-compose-master.yml, which Kiro had left unset (response doc
+said "OFF by default" despite the recorded YES decision).
+
+**Carry-forward (non-blocking, noted by Kiro too):** generic Wikipedia
+section headers ("Civic education") can enter the exhibit corpus and
+verify coincidental GPT candidates — future blocklist refinement.
+
+Merged to `storied`. Push to origin still gated on Michael's iPhone field
+test (Round 11 gate).
