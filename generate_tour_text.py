@@ -1159,6 +1159,7 @@ def _verify_works_v2(poi_list, venue_name):
                 # (not theme words or cycle names)
                 if evidence_log[work_name].get('reason') == 'no canonical match':
                     poi = dict(poi)
+                    poi['verified'] = False  # triggers PALAIS-FIX B1 hedged narration
                     verified_pois.append(poi)
                     evidence_log[work_name] = {"status": "HEDGED", "reason": "exhibit_fill_hedged flag"}
                     _hedged_count += 1

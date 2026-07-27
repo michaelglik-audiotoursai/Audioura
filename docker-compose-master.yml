@@ -21,6 +21,7 @@ services:
       - PYTHONUNBUFFERED=1
       - VENUE_CACHE_TTL_DAYS=${VENUE_CACHE_TTL_DAYS:-30}
       - VENUE_CACHE_NEGATIVE_TTL_DAYS=${VENUE_CACHE_NEGATIVE_TTL_DAYS:-5}
+      - EXHIBIT_FILL_HEDGED=${EXHIBIT_FILL_HEDGED:-true}
     volumes:
       - ./tours:/app/tours
     restart: unless-stopped
