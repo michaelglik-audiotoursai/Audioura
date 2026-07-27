@@ -146,7 +146,19 @@ The Mac Mini is now a full development environment. To continue working:
 ---
 
 # SESSION HANDOFF — Audioura review (read this first)
-## Last updated: 2026-07-22 (post Round 11 approval)
+## Last updated: 2026-07-27 (post Round 12 approval + PALAIS-FIX closure)
+
+**2026-07-27 delta (details in ClickUp trails + `KIRO_REVIEW_12_*.md`):**
+- Round 12 (PA museum grounding) APPROVED with LEAD fix-forward `9cd5708`;
+  merged to `storied`. PALAIS-FIX `wdvrdawkxp` CLOSED — LEAD found and fixed
+  the Phase 3B `verified`-flag strip (`ddf0527`), live proof in `d1ac9af`.
+- Mac DB migrations applied (stop_metrics/verified now exist — M1 gap closed).
+- `storied` local = rounds 1–12 + origin handoff merge; still NOT pushed
+  (iPhone field-test gate).
+- Active queue order for Kiro: `wdvrdawkxq` (listings) → `wdvrdax1v7`
+  (classify-fix) → `wdvrdawcyx` (Phase 3) → SQ4b.
+- **LIVE-ARTIFACT HARD GATE adopted (Michael, 2026-07-27)** — see
+  `remind_Services_ai.md`; summary below in DISPATCH PROTOCOL.
 
 **You are Claude Code on the Mac Mini**, working in `~/Audioura` on branch
 `storied`. Chat sessions can be lost (crash/timeout) — **that's expected**.
@@ -254,6 +266,14 @@ Michael or Claude.**
 **Git rules:** one branch per task named after the task ID; never share a
 branch across machines; pull when starting, push when stopping; only Claude
 merges to `storied` after review.
+
+**Live-artifact hard gate (Michael's binding ruling, 2026-07-27):** no
+"COMPLETE" claim on grounding-pipeline tasks without a committed artifact
+from a real end-to-end run (code_sha + behavior-specific log lines + DB
+evidence where relevant + verbatim regression exits). Offline fixtures are
+supporting evidence only. "Unproven, handing to LEAD" is always an
+acceptable report; an unproven claim stated as complete is not. Full text
+in `remind_Services_ai.md`.
 
 **Mac Mini Kiro ClickUp access:** via MCP (`~/.kiro/settings/mcp.json`,
 mcp-remote → https://mcp.clickup.com/mcp, browser OAuth as

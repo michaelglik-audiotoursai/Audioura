@@ -156,4 +156,20 @@ development-tour-orchestrator-1:5002  # tour_orchestrator_service.py
 
 **Failure log:** 2026-07-14 — declared "queue clear" after comment-scan-only while 2 new high-priority tasks (`wdvrdawkxp`, `wdvrdawkxq`) sat in the list. This protocol exists because of that miss.
 
+---
+
+## 🚧 LIVE-ARTIFACT HARD GATE (BINDING — Michael's ruling 2026-07-27)
+
+**No "COMPLETE" claim on any grounding-pipeline task without a committed live artifact proving the claimed behavior.** Offline fixtures and code inspection are supporting evidence, never sufficient evidence.
+
+**The rule:** before marking a task complete or moving it to 🔵 Claude — Review, commit an artifact from a REAL end-to-end run (service call or full `generate_tour_text` invocation) containing:
+1. `code_sha` of the committed code the run executed (honest `code_dirty` + reason)
+2. The log lines demonstrating the specific claimed behavior (not just "it ran")
+3. DB evidence when the claim touches persistence (query output in the artifact)
+4. Verbatim regression-suite exits
+
+**If you cannot produce the artifact** (environment blocked, misclassification, dependency on unmerged work): say exactly that, mark the claim UNPROVEN, and hand it to LEAD — as was done correctly on B1c 2026-07-27. That path is always acceptable; an unproven claim stated as complete is not.
+
+**Why this exists:** four consecutive review cycles (trail on `wdvrdawkxp`) contained a completion claim that was false in the live path while offline tests passed — culminating in the `verified` flag being silently stripped by Phase 3B while the fixture showed 13/13 green. Live runs catch in minutes what review cycles catch in days.
+
 - My last post: `1000410000006790` (update after every post)
