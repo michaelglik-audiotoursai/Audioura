@@ -2680,6 +2680,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     merged['type_specialty'] = (entry.get('type_specialty') or '').strip()
                     merged['specific_examples'] = (entry.get('specific_examples') or '').strip()
                     merged['operational_details'] = (entry.get('operational_details') or '').strip()
+                    # [PALAIS-FIX B1] verified flag must survive the Phase 3B rebuild —
+                    # it drives hedged narration and stop_metrics persistence downstream
+                    if orig and 'verified' in orig:
+                        merged['verified'] = orig['verified']
                     new_list.append(merged)
                 print(f"OK PHASE 3B: ordered {len(new_list)} stop(s) with structured details and directions")
                 return new_list
