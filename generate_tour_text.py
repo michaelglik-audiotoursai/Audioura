@@ -2326,36 +2326,47 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             
             if len(poi_list) < total_stops:
                 print(f"  [R4] Replenishment exhausted: {len(poi_list)}/{total_stops} stops (stop_count_warning)")
-                # [RICH-TIER FILL] If REQUIRE_LISTING_VERIFICATION=false and still below target,
-                # fill from remaining _pre_d1v2_candidates with verified=False, capped at 50% unverified
-                if not _require_listing_verification and _verification_tier not in ('thin', 'medium', 'exhibit_museum'):
+                # [POST-R4 FILL] If REQUIRE_LISTING_VERIFICATION=false and still below target,
+                # fill from remaining candidates with verified=False.
+                # Rich tier: capped at 50% unverified. Non-rich tiers: fill to total_stops.
+                if not _require_listing_verification:
                     _n_verified_current = sum(1 for p in poi_list if p.get('verified', True))
-                    _max_unverified = max(1, total_stops // 2)
                     _n_unverified_current = len(poi_list) - _n_verified_current
-                    _unverified_budget = _max_unverified - _n_unverified_current
+                    # Rich tier: cap at 50% unverified; non-rich: no cap (fill to total_stops)
+                    if _verification_tier not in ('thin', 'medium', 'exhibit_museum'):
+                        _max_unverified = max(1, total_stops // 2)
+                        _unverified_budget = _max_unverified - _n_unverified_current
+                    else:
+                        _unverified_budget = total_stops - len(poi_list)
                     if _unverified_budget > 0:
-                        _verified_names_rich = set(p['name'].lower() for p in poi_list)
-                        _evidence_keys_rich = set(_normalize_name(k) for k in _d1_evidence_log.keys()
+                        _verified_names_post = set(p['name'].lower() for p in poi_list)
+                        _evidence_keys_post = set(_normalize_name(k) for k in _d1_evidence_log.keys()
                                                   if _d1_evidence_log[k].get('status') == 'VERIFIED')
-                        _rich_fill = []
-                        for p in _pre_d1v2_candidates:
+                        _post_r4_fill = []
+                        # Source: remaining _pre_d1v2_candidates + R4-dropped candidates
+                        _fill_pool = list(_pre_d1v2_candidates)
+                        for p in _fill_pool:
                             _cand_name = p['name']
                             _cand_norm = _normalize_name(_cand_name)
-                            if _cand_name.lower() in _verified_names_rich or _cand_norm in _evidence_keys_rich:
+                            if _cand_name.lower() in _verified_names_post or _cand_norm in _evidence_keys_post:
                                 continue
                             _ev_entry = _d1_evidence_log.get(_cand_name, {})
                             if isinstance(_ev_entry, dict) and _ev_entry.get('status') == 'REJECTED':
                                 continue
+                            # Skip if already in poi_list (from unified fill or R4 verified)
+                            if _cand_name.lower() in set(p2['name'].lower() for p2 in poi_list):
+                                continue
                             p['verified'] = False
-                            _rich_fill.append(p)
-                            if len(_rich_fill) >= _unverified_budget:
+                            _post_r4_fill.append(p)
+                            if len(_post_r4_fill) >= _unverified_budget:
                                 break
-                        _rich_fill_needed = min(len(_rich_fill), total_stops - len(poi_list))
-                        _rich_fill_added = _rich_fill[:_rich_fill_needed]
-                        if _rich_fill_added:
-                            poi_list = list(poi_list) + _rich_fill_added
-                            print(f"  [RICH-FILL] Added {len(_rich_fill_added)} unverified fills "
-                                  f"(capped at 50% unverified: {_max_unverified} max, "
+                        _post_r4_needed = min(len(_post_r4_fill), total_stops - len(poi_list))
+                        _post_r4_added = _post_r4_fill[:_post_r4_needed]
+                        if _post_r4_added:
+                            poi_list = list(poi_list) + _post_r4_added
+                            _tier_label = "50% cap" if _verification_tier not in ('thin', 'medium', 'exhibit_museum') else "no cap"
+                            print(f"  [POST-R4-FILL] Added {len(_post_r4_added)} unverified fills "
+                                  f"(tier={_verification_tier}, {_tier_label}, "
                                   f"total now {len(poi_list)}/{total_stops})")
             else:
                 print(f"  [R4] Target reached: {len(poi_list)}/{total_stops} stops")

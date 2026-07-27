@@ -341,7 +341,92 @@ results.append(("L2 exhibit_museum fills have verified=False",
                 all(p.get('verified') == False for p in exhibit_filled)))
 
 
-# ========== Print results ==========
+# ========== [BOUNCE FIX] Post-R4 fallback fill for non-rich tiers ==========
+
+# Scenario: exhibit_museum tier, total_stops=8 requested, but only 3 pre-D1v2 candidates
+# available (Phase 3A under-proposed). After unified fill adds those 3, R4 runs but
+# its candidates fail verification. Post-R4 fill should NOT be blocked for non-rich tiers.
+
+def post_r4_fill_logic(pre_d1v2_candidates, verified_pois, tier, total_stops, evidence_log=None):
+    """Replicates the POST-R4 fallback fill path.
+    This fires AFTER R4 replenishment exhausts without reaching total_stops."""
+    poi_list = list(verified_pois)
+    _n_verified_current = sum(1 for p in poi_list if p.get('verified', True))
+    _n_unverified_current = len(poi_list) - _n_verified_current
+
+    # Rich tier: cap at 50%; non-rich: fill to total_stops
+    if tier not in ('thin', 'medium', 'exhibit_museum'):
+        _max_unverified = max(1, total_stops // 2)
+        _unverified_budget = _max_unverified - _n_unverified_current
+    else:
+        _unverified_budget = total_stops - len(poi_list)
+
+    if _unverified_budget <= 0:
+        return poi_list
+
+    _verified_names = set(p['name'].lower() for p in poi_list)
+    _rejected_names = set()
+    if evidence_log:
+        for cname, ev in evidence_log.items():
+            if isinstance(ev, dict) and ev.get('status') == 'REJECTED':
+                _rejected_names.add(cname.lower())
+
+    _fill = []
+    for p in pre_d1v2_candidates:
+        pname_lower = p['name'].lower()
+        if pname_lower in _verified_names:
+            continue
+        if pname_lower in _rejected_names:
+            continue
+        if pname_lower in set(p2['name'].lower() for p2 in poi_list):
+            continue
+        p['verified'] = False
+        _fill.append(p)
+        if len(_fill) >= _unverified_budget:
+            break
+    _needed = min(len(_fill), total_stops - len(poi_list))
+    poi_list = list(poi_list) + _fill[:_needed]
+    return poi_list
+
+
+# Test: exhibit_museum with only 2 verified + request 8 stops + pre-D1v2 has 6 candidates
+# After unified fill adds 4, imagine R4 ran and failed. Post-R4 fill should still add more.
+# Simulate: poi_list already has 2 verified + 2 fills = 4 stops. Still need 4 more.
+# Post-R4 has 4 remaining candidates available.
+post_r4_verified = [_new_poi("Verified A"), _new_poi("Verified B")]
+post_r4_current = [_new_poi("Verified A"), _new_poi("Verified B"),
+                   _new_poi("Fill C", verified=False), _new_poi("Fill D", verified=False)]
+# Remaining pre-D1v2 candidates not yet used
+post_r4_remaining = [_new_poi("Fill E"), _new_poi("Fill F"),
+                     _new_poi("Fill G"), _new_poi("Rejected X")]
+post_r4_evidence = {
+    "Rejected X": {"status": "REJECTED", "reason": "located_elsewhere"},
+}
+
+post_r4_result = post_r4_fill_logic(
+    post_r4_remaining, post_r4_current, 'exhibit_museum', 8, post_r4_evidence
+)
+
+# Post-R4 fill should add 3 more (E, F, G — Rejected X excluded) to reach 7/8
+results.append(("POST-R4-FILL fires for exhibit_museum tier (not just rich)",
+                len(post_r4_result) == 7))
+
+# All post-R4 fills have verified=False
+post_r4_new_fills = [p for p in post_r4_result if p['name'] in {'Fill E', 'Fill F', 'Fill G'}]
+results.append(("POST-R4-FILL candidates have verified=False",
+                all(p.get('verified') == False for p in post_r4_new_fills)))
+
+# REJECTED candidate still excluded
+results.append(("POST-R4-FILL excludes REJECTED candidates",
+                "Rejected X" not in [p['name'] for p in post_r4_result]))
+
+# Rich tier respects 50% cap
+post_r4_rich_result = post_r4_fill_logic(
+    post_r4_remaining, post_r4_current, 'rich', 8, post_r4_evidence
+)
+# 2 verified out of 4 current, 50% of 8 = 4 max unverified, already have 2 unverified = budget 2
+results.append(("POST-R4-FILL rich tier respects 50% cap",
+                len(post_r4_rich_result) <= 6))  # 4 current + max 2 more = 6
 
 print("=" * 78)
 print("PALAIS-FIX LEAD FIXTURE — B3 hardening + L2 medium-tier fill tests")
