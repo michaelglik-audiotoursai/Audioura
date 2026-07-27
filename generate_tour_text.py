@@ -1144,29 +1144,10 @@ def _verify_works_v2(poi_list, venue_name):
     
     print(f"  [D1v2] {_n_verified}/{len(poi_list)} works verified — tier: {_tier}")
     
-    # --- EXHIBIT_FILL_HEDGED: allow unverified exhibit candidates to fill (flag-gated) ---
-    # When tier is exhibit_museum and flag is ON, re-add dropped candidates as "hedged"
-    # (unverified but plausible exhibits). Default OFF — Michael decides.
-    import os as _os_env
-    _exhibit_fill_hedged = _os_env.environ.get('EXHIBIT_FILL_HEDGED', 'false').lower() in ('true', '1', 'yes')
-    
-    if _tier == 'exhibit_museum' and _exhibit_fill_hedged and _n_verified < len(poi_list):
-        _hedged_count = 0
-        for poi in poi_list:
-            work_name = poi.get('name', '')
-            if work_name and evidence_log.get(work_name, {}).get('status') == 'DROPPED':
-                # Only hedged-fill candidates that were dropped for "no canonical match"
-                # (not theme words or cycle names)
-                if evidence_log[work_name].get('reason') == 'no canonical match':
-                    poi = dict(poi)
-                    poi['verified'] = False  # triggers PALAIS-FIX B1 hedged narration
-                    verified_pois.append(poi)
-                    evidence_log[work_name] = {"status": "HEDGED", "reason": "exhibit_fill_hedged flag"}
-                    _hedged_count += 1
-                    if len(verified_pois) >= len(poi_list):
-                        break
-        if _hedged_count:
-            print(f"  [D1v2] EXHIBIT_FILL_HEDGED: added {_hedged_count} unverified exhibits")
+    # --- REQUIRE_LISTING_VERIFICATION: unified fill control ---
+    # When REQUIRE_LISTING_VERIFICATION=true: strict mode (cap at verified count, old behavior)
+    # When false (default): fills are allowed — caller handles unified fill logic for all tiers.
+    # (The old EXHIBIT_FILL_HEDGED logic is superseded by the unified caller-side fill in R4.)
     
     # --- CACHE WRITE: store results for future requests ---
     if _venue_entity and _venue_entity.qid and not _cache_hit:
@@ -2135,7 +2116,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 # [PALAIS-FIX] For thin tier with sparse Wikidata: restore GPT candidates
                 # The venue IS real (Wikidata-resolved) but its artwork catalog is incomplete.
                 # Keep GPT-proposed works in degraded mode rather than zero-stop-rejecting.
-                if _verification_tier == 'thin' and len(poi_list) < 3 and len(_pre_d1v2_candidates) >= 3:
+                # NOTE: This legacy path only applies when REQUIRE_LISTING_VERIFICATION=true.
+                # When false, the unified fill logic below handles ALL tiers.
+                _require_listing_verification = os.environ.get('REQUIRE_LISTING_VERIFICATION', 'false').lower() in ('true', '1', 'yes')
+                if _require_listing_verification and _verification_tier == 'thin' and len(poi_list) < 3 and len(_pre_d1v2_candidates) >= 3:
                     # D1: Only restore candidates whose evidence-log status is "DROPPED / no canonical match"
                     # NEVER restore REJECTED candidates (positive evidence they hang at another venue)
                     _verified_names = set(p['name'].lower() for p in poi_list)
@@ -2183,20 +2167,56 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             # Exception: if thin tier has too few verified works (< 3), allow GPT-proposed
             # works to proceed in degraded mode — the venue is Wikidata-resolved, so it's
             # a real museum; Wikidata just has sparse artwork listings for it.
-            if _verification_tier in ('medium', 'thin'):
-                if _verification_tier == 'thin' and len(poi_list) < 3:
-                    # Sparse Wikidata coverage — trust GPT for this Wikidata-verified venue
-                    # Cap to a reasonable number but don't zero-stop-reject
-                    _thin_cap = min(total_stops, 5)
-                    print(f"  [R4] THIN tier with sparse coverage ({len(poi_list)} stops, "
-                          f"{sum(1 for p in poi_list if p.get('verified', True))} verified) — "
-                          f"allowing up to {_thin_cap} stops for Wikidata-resolved venue")
-                    total_stops = _thin_cap
-                else:
-                    _n_verified_in_list = sum(1 for p in poi_list if p.get('verified', True))
-                    total_stops = len(poi_list)
-                    print(f"  [R4] SKIPPED — tier={_verification_tier}, total_stops={total_stops} "
-                          f"({_n_verified_in_list} verified + {total_stops - _n_verified_in_list} unverified)")
+            # -------- [UNIFIED FILL] All tiers — flag-gated --------
+            # REQUIRE_LISTING_VERIFICATION=true  → old behavior (cap at verified count)
+            # REQUIRE_LISTING_VERIFICATION=false (default) → allow fills up to total_stops
+            _require_listing_verification = os.environ.get('REQUIRE_LISTING_VERIFICATION', 'false').lower() in ('true', '1', 'yes')
+
+            if _require_listing_verification:
+                # OLD BEHAVIOR: cap at verified for medium/thin, thin sparse gets capped at 5
+                if _verification_tier in ('medium', 'thin'):
+                    if _verification_tier == 'thin' and len(poi_list) < 3:
+                        _thin_cap = min(total_stops, 5)
+                        print(f"  [R4] THIN tier with sparse coverage ({len(poi_list)} stops, "
+                              f"{sum(1 for p in poi_list if p.get('verified', True))} verified) — "
+                              f"allowing up to {_thin_cap} stops for Wikidata-resolved venue")
+                        total_stops = _thin_cap
+                    else:
+                        _n_verified_in_list = sum(1 for p in poi_list if p.get('verified', True))
+                        total_stops = len(poi_list)
+                        print(f"  [R4] SKIPPED (REQUIRE_LISTING_VERIFICATION=true) — tier={_verification_tier}, "
+                              f"total_stops={total_stops} ({_n_verified_in_list} verified)")
+            else:
+                # NEW BEHAVIOR: unified fill — allow fills for ALL tiers up to total_stops
+                # Fill from _pre_d1v2_candidates with PALAIS-FIX D1/D2 filtering
+                if len(poi_list) < total_stops and _verification_tier in ('thin', 'medium', 'exhibit_museum'):
+                    _verified_names_fill = set(p['name'].lower() for p in poi_list)
+                    _evidence_keys_fill = set(_normalize_name(k) for k in _d1_evidence_log.keys()
+                                              if _d1_evidence_log[k].get('status') == 'VERIFIED')
+                    _fill_candidates = []
+                    for p in _pre_d1v2_candidates:
+                        _cand_name = p['name']
+                        _cand_norm = _normalize_name(_cand_name)
+                        # Skip if already in verified list (exact or normalized match)
+                        if _cand_name.lower() in _verified_names_fill or _cand_norm in _evidence_keys_fill:
+                            continue
+                        # PALAIS-FIX D1: Skip REJECTED candidates (located at other venue)
+                        _ev_entry = _d1_evidence_log.get(_cand_name, {})
+                        if isinstance(_ev_entry, dict) and _ev_entry.get('status') == 'REJECTED':
+                            continue
+                        # Every fill candidate is explicitly unverified
+                        p['verified'] = False
+                        _fill_candidates.append(p)
+                    _fill_needed = total_stops - len(poi_list)
+                    _fill_added = _fill_candidates[:_fill_needed]
+                    if _fill_added:
+                        poi_list = list(poi_list) + _fill_added
+                        print(f"  [UNIFIED-FILL] tier={_verification_tier}: added {len(_fill_added)} unverified fills "
+                              f"(from {len(_pre_d1v2_candidates)} pre-D1v2 candidates, "
+                              f"total now {len(poi_list)}/{total_stops})")
+                    else:
+                        print(f"  [UNIFIED-FILL] tier={_verification_tier}: no eligible fill candidates")
+
             # If verified < requested, re-prompt for MORE candidates and verify (rich tier only)
             _r4_all_tried_names = set(_normalize_name(p['name']) for p in poi_list)
             _r4_all_tried_names.update(_normalize_name(k) for k in _d1_evidence_log.keys())
@@ -2306,6 +2326,37 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             
             if len(poi_list) < total_stops:
                 print(f"  [R4] Replenishment exhausted: {len(poi_list)}/{total_stops} stops (stop_count_warning)")
+                # [RICH-TIER FILL] If REQUIRE_LISTING_VERIFICATION=false and still below target,
+                # fill from remaining _pre_d1v2_candidates with verified=False, capped at 50% unverified
+                if not _require_listing_verification and _verification_tier not in ('thin', 'medium', 'exhibit_museum'):
+                    _n_verified_current = sum(1 for p in poi_list if p.get('verified', True))
+                    _max_unverified = max(1, total_stops // 2)
+                    _n_unverified_current = len(poi_list) - _n_verified_current
+                    _unverified_budget = _max_unverified - _n_unverified_current
+                    if _unverified_budget > 0:
+                        _verified_names_rich = set(p['name'].lower() for p in poi_list)
+                        _evidence_keys_rich = set(_normalize_name(k) for k in _d1_evidence_log.keys()
+                                                  if _d1_evidence_log[k].get('status') == 'VERIFIED')
+                        _rich_fill = []
+                        for p in _pre_d1v2_candidates:
+                            _cand_name = p['name']
+                            _cand_norm = _normalize_name(_cand_name)
+                            if _cand_name.lower() in _verified_names_rich or _cand_norm in _evidence_keys_rich:
+                                continue
+                            _ev_entry = _d1_evidence_log.get(_cand_name, {})
+                            if isinstance(_ev_entry, dict) and _ev_entry.get('status') == 'REJECTED':
+                                continue
+                            p['verified'] = False
+                            _rich_fill.append(p)
+                            if len(_rich_fill) >= _unverified_budget:
+                                break
+                        _rich_fill_needed = min(len(_rich_fill), total_stops - len(poi_list))
+                        _rich_fill_added = _rich_fill[:_rich_fill_needed]
+                        if _rich_fill_added:
+                            poi_list = list(poi_list) + _rich_fill_added
+                            print(f"  [RICH-FILL] Added {len(_rich_fill_added)} unverified fills "
+                                  f"(capped at 50% unverified: {_max_unverified} max, "
+                                  f"total now {len(poi_list)}/{total_stops})")
             else:
                 print(f"  [R4] Target reached: {len(poi_list)}/{total_stops} stops")
 
@@ -2328,7 +2379,15 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         if indicator in _pname and _venue_norm not in _pname and _pname not in _venue_norm:
                             _suspect_venues.append(p['name'])
                             break
-                if len(_suspect_venues) >= max(1, len(poi_list) // 2):
+                # Count only VERIFIED stops for the suspect-venue check
+                _n_verified_for_blocker = sum(1 for p in poi_list if p.get('verified', True))
+                if _n_verified_for_blocker == 0:
+                    # No verified stops: keep current behavior (use full list)
+                    _blocker1_threshold = max(1, len(poi_list) // 2)
+                else:
+                    _blocker1_threshold = max(1, _n_verified_for_blocker // 2)
+
+                if len(_suspect_venues) >= _blocker1_threshold:
                     print(f"  [BLOCKER1] ⚠️ Phase 3A returned {len(_suspect_venues)} stops that look like "
                           f"OTHER venues (not interior rooms of '{_museum_venue_name}'):")
                     for sv in _suspect_venues:

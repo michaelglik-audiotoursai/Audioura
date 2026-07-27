@@ -246,10 +246,105 @@ results.append(("B1 verified 'Raquel' does NOT have verified=False",
                 b1_raquel is not None and b1_raquel.get('verified', True) is True))
 
 
+# (Print results moved to end of file, after all assertions)
+
+
+# ========== [L2] Medium-tier unified fill — verified=False contract ==========
+
+# Scenario: A medium-tier museum with 4 verified works and 6 unverified candidates.
+# With REQUIRE_LISTING_VERIFICATION=false, unverified fills should be allowed.
+# Every fill candidate MUST have verified=False.
+
+def unified_fill_logic(candidates, verified, tier, total_stops, evidence_log=None):
+    """Replicates the UNIFIED-FILL logic from the listings-as-evidence change.
+    This is the NEW path (REQUIRE_LISTING_VERIFICATION=false)."""
+    poi_list = list(verified)
+    _pre_d1v2_candidates = list(candidates)
+
+    if tier in ('thin', 'medium', 'exhibit_museum') and len(poi_list) < total_stops:
+        _verified_names = set(p['name'].lower() for p in poi_list)
+        _evidence_keys = set()
+        _rejected_names = set()
+        if evidence_log:
+            for cname, ev in evidence_log.items():
+                if isinstance(ev, dict):
+                    if ev.get('status') == 'VERIFIED':
+                        _evidence_keys.add(cname.lower())
+                    if ev.get('status') == 'REJECTED':
+                        _rejected_names.add(cname.lower())
+
+        _fill_candidates = []
+        for p in _pre_d1v2_candidates:
+            pname_lower = p['name'].lower()
+            if pname_lower in _verified_names or pname_lower in _evidence_keys:
+                continue
+            if pname_lower in _rejected_names:
+                continue
+            p['verified'] = False
+            _fill_candidates.append(p)
+        _fill_needed = total_stops - len(poi_list)
+        poi_list = list(poi_list) + _fill_candidates[:_fill_needed]
+
+    return poi_list
+
+
+# Medium tier: 4 verified + request for 10 stops → should fill up to 10
+medium_evidence = {
+    "Work A": {"status": "VERIFIED", "canonical_title": "Work A"},
+    "Work B": {"status": "VERIFIED", "canonical_title": "Work B"},
+    "Work C": {"status": "VERIFIED", "canonical_title": "Work C"},
+    "Work D": {"status": "VERIFIED", "canonical_title": "Work D"},
+    "Rejected Work": {"status": "REJECTED", "reason": "located_elsewhere"},
+    "Dropped Work E": {"status": "DROPPED", "reason": "no canonical match"},
+    "Dropped Work F": {"status": "DROPPED", "reason": "no canonical match"},
+    "Dropped Work G": {"status": "DROPPED", "reason": "no canonical match"},
+}
+medium_verified = [_new_poi("Work A"), _new_poi("Work B"), _new_poi("Work C"), _new_poi("Work D")]
+medium_candidates = [
+    _new_poi("Work A"), _new_poi("Work B"), _new_poi("Work C"), _new_poi("Work D"),
+    _new_poi("Rejected Work"), _new_poi("Dropped Work E"),
+    _new_poi("Dropped Work F"), _new_poi("Dropped Work G"),
+    _new_poi("Unknown Work H"), _new_poi("Unknown Work I"),
+]
+
+medium_result = unified_fill_logic(medium_candidates, medium_verified, 'medium', 10, medium_evidence)
+
+# Medium tier fills up to requested stops (or max available: 4 verified + 5 eligible = 9)
+# 10 candidates - 4 already verified - 1 REJECTED = 5 eligible fills
+results.append(("L2 medium-tier fill reaches max available (4 verified + 5 fills = 9)",
+                len(medium_result) == 9))
+
+# REJECTED candidate is NOT filled
+medium_result_names = [p['name'] for p in medium_result]
+results.append(("L2 REJECTED candidate NOT filled in medium tier",
+                "Rejected Work" not in medium_result_names))
+
+# All filled stops have verified=False
+medium_filled_stops = [p for p in medium_result if p['name'] not in
+                       {'Work A', 'Work B', 'Work C', 'Work D'}]
+results.append(("L2 ALL medium-tier fills have verified=False",
+                all(p.get('verified') == False for p in medium_filled_stops)))
+
+# Verified originals do NOT have verified=False
+medium_verified_stops = [p for p in medium_result if p['name'] in
+                         {'Work A', 'Work B', 'Work C', 'Work D'}]
+results.append(("L2 verified originals do NOT have verified=False",
+                all(p.get('verified', True) is True for p in medium_verified_stops)))
+
+# Exhibit_museum tier also fills
+exhibit_result = unified_fill_logic(medium_candidates, medium_verified, 'exhibit_museum', 8, medium_evidence)
+results.append(("L2 exhibit_museum tier also fills to requested stops",
+                len(exhibit_result) == 8))
+exhibit_filled = [p for p in exhibit_result if p['name'] not in
+                  {'Work A', 'Work B', 'Work C', 'Work D'}]
+results.append(("L2 exhibit_museum fills have verified=False",
+                all(p.get('verified') == False for p in exhibit_filled)))
+
+
 # ========== Print results ==========
 
 print("=" * 78)
-print("PALAIS-FIX LEAD FIXTURE — B3 hardening tests")
+print("PALAIS-FIX LEAD FIXTURE — B3 hardening + L2 medium-tier fill tests")
 print("=" * 78)
 fails = 0
 for name, ok in results:
