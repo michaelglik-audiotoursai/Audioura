@@ -507,9 +507,15 @@ sync bookkeeping, not something you wait on.
 
 #### LOCAL-1 — Phase 3 follow-ups: dedupe shared helpers, gate HEDGE-NM on verified, fix DB fallback URL
 
-**Agent:** Mac Mini Kiro
+**⚠️ CLAIMED BY LEAD, 2026-07-28 — Kiro, do NOT pick this up.** Michael asked for
+these fixed before he field-tests, so LEAD is implementing directly rather than
+routing through the normal Kiro-executes flow, to avoid a round-trip delay. If
+you're reading this during a queue scan: skip this entry, nothing to do here.
+Will be marked done below once verified.
+
+**Agent:** Mac Mini Kiro (~~reassigned to LEAD, see above~~)
 **Branch:** `kiro/local1-phase3-followups` (off current `storied`, which now includes
-Phase 3 @ `8831e0c`)
+Phase 3 @ `8831e0c`) — ~~superseded, LEAD is committing directly to storied~~
 **Priority:** normal — none of these are live-broken, all found during the Phase 3
 approval review. Pick up whenever, no urgency ahead of other queued work.
 
