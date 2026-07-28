@@ -116,8 +116,34 @@ dispatch) — if not, ask Michael/LEAD to paste the description into this file.
 
 **Last known ClickUp state:** list = 🟦 Services — Kiro (733), status = "in progress"
 (refinement posted, approved to code, sequenced after wdvrdawkxq + wdvrdax1v7).
-**TRUE current state:** unchanged. No offline drift.
-**Sync action:** none needed.
+**TRUE current state:** unchanged in ClickUp terms, BUT — found during LEAD's
+2026-07-27 23:xx periodic offline check: **branch `kiro/wdvrdawcyx-phase3` already has
+2 commits** (`bf0ac0a` "Walking-tour generalization via Wikidata in-area queries",
+`fa4c83b` "Phase 3: G4 QA gate exempts walking tours from story_elements fail-closed"),
+timestamped 15:15-15:22 on 2026-07-27 — i.e. Kiro started this BEFORE the sequencing-
+override comments (10065/10066) landed telling them to prioritize the regression sweep
+first. Not a protocol violation, just message-ordering; Kiro correctly pivoted to the
+regression sweep afterward (18:12+) and this branch has sat untouched since.
+
+**NOT submitted as ready** — no `READY FOR REVIEW` marker, so this is NOT reviewed or
+approved. Noting two things for whenever it IS picked back up in sequence (after
+`wdvrdax1v7`):
+
+1. **`content_qa_runner.py` conflict, need to rebase/drop:** this branch's own G4 fix
+   (`fa4c83b`) was written independently, forked from the same base (`196b714`) as the
+   regression-sweep branch, before either knew about the other. It only exempts
+   `tour_category == 'walking'` — narrower than what's already merged into `storied`
+   (`f159a4a`, which also handles `exhibit_museum` tier and was independently verified
+   by LEAD). When Phase 3 resumes: **drop this branch's G4 hunk entirely** and rebase
+   onto current `storied` — the better version is already there. Do not try to merge
+   both; they'll conflict on the same lines and the wdvrdawcyx version is now stale.
+2. **`area_resolver.py` (1004 lines, new) + `generate_tour_text.py` (+39 lines,
+   isolated `elif tour_category == 'walking'` branch calling `resolve_area` /
+   `discover_landmarks` / `verify_landmarks`)** — structurally reasonable at a glance
+   (doesn't touch the museum path), but NOT reviewed in depth — that's real work for
+   whenever this task is actually submitted through the normal process.
+
+**Sync action:** none needed (no ClickUp state drift — this is a git-only finding).
 
 ---
 
