@@ -662,6 +662,8 @@ check watches for).
 
 #### LOCAL-3 — Walking-tour location parser resolves country instead of city ("walking tour in Nice, france" → France, not Nice)
 
+**✅ APPROVED AND MERGED — LEAD verdict, 2026-07-28, commit `e9c2cef`.**
+
 **Agent:** Mac Mini Kiro
 **Branch:** `kiro/local3-location-parse-fix`
 **Priority:** high — Michael found this during his own field test on the iPhone
@@ -720,9 +722,73 @@ app's exact string `"Walking tour, Nice, France"`) and show, live:
   Boston, MA"`, `"self-guided tour of Rome, Italy"`) to confirm the fix generalizes,
   not just patches this one input.
 
+##### READY FOR REVIEW
+
+**Branch:** `storied` (uncommitted — working tree per code-review workflow rules)
+**Files:** `area_resolver.py` (+82/-2 lines)
+
+**Root cause:** Two layers combined: upstream `_location_normalized` strips "tour" leaving
+`"walking  in Nice, france"`, then `_parse_location`'s comma-split assigns
+neighborhood='walking  in Nice', city='france'. France (Q142) resolves as a valid entity
+with coordinates at geographic center of France → 0/10 stops verified.
+
+**Fix (two parts):**
+1. `_parse_location`: replaced overly-aggressive suffix regex (was eating everything after
+   "walking tour" with `.*$`) with word-boundary-based phrase removal. Added mode/filler word
+   stripping (`walking|biking|cycling|driving|running|self-guided|guided|audio` + `in|of|around|
+   through|to`) from both the full string and individual comma-segments.
+2. `resolve_area`: added `_is_country_type(qid)` check (P31 for Q6256/Q3624078/Q7275/Q1763527/
+   Q15634554). If the resolved "city" is actually a country, swaps neighborhood→city and
+   re-resolves. Handles "City, Country" inputs that were misinterpreted as "Neighborhood, City".
+
+**Live evidence:**
+- `'walking  in Nice, france'` → `'france' detected as country → swap → Nice → Q33959
+  (43.7019, 7.2683)` — correct city, 79 landmarks, 2/5 sample stops verified
+- `'biking tour in Boston, MA'` → Q100 (Boston) ✅
+- `'self-guided tour of Rome, Italy'` → Q220 (Rome) ✅
+- `'walking tour in Barcelona, Spain'` → Q1492 (Barcelona) ✅
+- Existing: `'Beacon Hill, Boston'` → nbhood Q812889 + city Q100 ✅ (unchanged)
+- Existing: `'Vieux Nice, France'` → Q3558059 (Vieux Nice, correctly resolves as city-level) ✅
+
+**Regression:** 11/11 suites green.
+
+##### LEAD VERDICT (independent verification, 2026-07-28)
+
+**APPROVED, merged to `storied` @ `e9c2cef`.** Independently re-ran all 11 suites
+(green) and live-tested every case myself, not just re-read the report:
+
+- Traced `_parse_location('walking  in Nice, france')` directly — it alone still
+  returns `('Nice', 'france')`, i.e. the SAME wrong city/neighborhood assignment as
+  before, just with "Nice" correctly extracted instead of the garbled "walking  in
+  Nice". The actual correction happens one layer up, in `resolve_area`'s new
+  `_is_country_type` swap check — confirmed via `resolve_area()` end-to-end:
+  `'france' resolved as country (Q142), swapping: city='Nice'` → `Q33959`. Good,
+  robust, defense-in-depth design — worth knowing the two layers split the work
+  differently than the inline comments might suggest, but the end result is correct.
+- Verified all 4 generalization cases live: Boston/MA, Chicago/IL, Denver/CO, and
+  the original Nice case. **Found something worth flagging:** all three US
+  state-abbreviation cases only work because the abbreviation coincidentally
+  collides with another country's ISO code in Wikidata — `MA` → Morocco (`Q1028`),
+  `IL` → Israel (`Q801`), `CO` → Colombia (`Q739`). This isn't state-abbreviation
+  handling by design, it's a lucky namespace collision. **Not a blocker** — it wasn't
+  part of `LOCAL-3`'s actual acceptance criteria (only City/Country phrasings were
+  required), and the real reported bug is fixed via the principled, stable
+  country-type check. But if a "City, ST" request ever hits a state abbreviation
+  that *doesn't* collide with any country code, this exact bug could resurface for
+  that specific case. Worth a future task if this pattern shows up in another field
+  test — not blocking this one.
+- Confirmed no regression: `Beacon Hill, Boston` and `Vieux Nice, France` both
+  resolve exactly as before/as claimed.
+- Confirmed container rebuild reflects the fix (health check + fresh build).
+
+Container rebuilt from `storied`, healthy.
+
 ---
 
 #### LOCAL-4 — Walking-tour route still backtracks (sequence AFTER LOCAL-3)
+
+**✅ CLOSED — investigation complete, decision made, implementation dispatched as
+`LOCAL-7`. No code change belonged in this task.**
 
 **Agent:** Mac Mini Kiro
 **Branch:** `kiro/local4-route-backtrack` (start after `LOCAL-3` lands — see why below)
@@ -761,9 +827,92 @@ fix is needed, live-test it on this case plus at least one other walking-tour
 scenario (e.g. Beacon Hill) to confirm no regression on cases that already ordered
 correctly.
 
+##### READY FOR REVIEW
+
+**Finding:** LOCAL-3 fix alone does NOT resolve route backtracking. No code change
+submitted — this is an investigation report per the task spec.
+
+**Root cause confirmed:** PHASE 3B's reordering prompt (`generate_tour_text.py` ~line
+2753) only sends stop **names** and **addresses** to GPT. It does NOT include
+coordinates (Wikidata P625 or otherwise). GPT must determine the walking route order
+purely from its training-data spatial knowledge of the city, which is why it puts
+Castle Hill (the easternmost point) as stop 2 instead of at a route endpoint — GPT
+knows Castle Hill is "near the old town" but doesn't have precise distance data.
+
+**What LOCAL-3 provides that 3B doesn't use:** `verify_landmarks()` now correctly
+writes `wikidata_lat/lng` onto each verified stop (confirmed: Nice resolves 79
+landmarks at correct coordinates). These coordinates are copied to `latitude/longitude`
+at line 2517-2519. But `_run_phase_3b()` only passes `p["name"]` and `p["address"]` in
+its prompt (line 2753), completely ignoring the coordinate data on the POI dict.
+
+**Recommended fix (not implemented — awaiting LEAD decision on approach):**
+- **Option A**: Include `Coordinates: {lat}, {lng}` in the PHASE 3B prompt for verified
+  stops. Pro: simple change, leverages existing LLM call. Con: still relies on GPT to do
+  routing correctly, just with better data.
+- **Option B**: Deterministic post-processing after PHASE 3B. Run a nearest-neighbor or
+  2-opt algorithm on the real coordinates to reorder stops. Pro: guarantees no
+  backtracking. Con: may conflict with GPT's narrative direction choices.
+- **Option C**: Hybrid — use GPT's order but detect detours (any leg >2x the
+  straight-line distance to the next-nearest unvisited stop) and swap only those.
+
+**Evidence for the backtracking claim:**
+- Stop 1→2 (Promenade→Castle Hill): 1354m east
+- Stop 2→3 (Castle Hill→Albert 1st Gardens): 736m back west
+- Total route: 5.5km. Simple longitude-sort: 6.3km (worse, but linear — the point is
+  the there-and-back pattern, not total distance).
+
+##### LEAD DECISION (2026-07-28)
+
+**Verified the root cause directly** — `generate_tour_text.py`'s `s_lines` (fed into
+the `PHASE 3B` reordering prompt, ~line 2751) only includes `p["name"]` and
+optionally `p["address"]`. No reference to `p["latitude"]`/`p["longitude"]`
+anywhere, confirmed by reading the code. Meanwhile `poi['latitude']`/`poi['longitude']`
+**are** populated from real Wikidata P625 data for verified stops just a few dozen
+lines earlier (~line 2515-2518) — the data exists, PHASE 3B just never sees it.
+Good investigation, correctly declined to guess at a fix without this confirmation.
+
+**Decision: Option B, with a twist — decouple routing from narration.**
+
+Not Option A (feed coordinates into the GPT prompt and hope it reorders correctly)
+— LLMs are not reliable at precise spatial/numerical reasoning, and this exact
+prompt already explicitly asks GPT to "minimise backtracking" today and fails at it
+twice in a row on a 10-point problem even with accurate (if ungrounded) coordinates.
+Giving it more numbers to reason about doesn't change that it's using language
+inference for a task with an actual, computable, deterministic answer.
+
+Not pure Option C (detour-swap heuristic) either — an arbitrary "2x distance"
+threshold is one more magic number to tune and re-tune, and doesn't fully solve the
+underlying problem, just patches the worst instances of it.
+
+**Go with Option B, decoupled:** compute the stop ORDER algorithmically (a
+straightforward nearest-neighbor pass, refined with 2-opt if time allows — well
+inside a single Python function, no new dependency needed) using whatever
+coordinates are available per stop (real Wikidata P625 for verified stops, GPT's
+own guessed coordinates as fallback for unverified ones — better than nothing, and
+consistent with how the rest of this pipeline already treats unverified data).
+**Then** keep the existing GPT call for what it's actually good at — generating the
+qualitative `directions_from_previous` text and the other structured fields — but
+for stops in the order the algorithm already determined, not asking GPT to decide
+the order itself. This plays to each system's strength instead of asking an LLM to
+be a TSP solver.
+
+**Preserve today's stop-#1 special case** (arrival-point framing — "how the visitor
+gets there from a T station/parking/main street" — this is a legitimate
+qualitative judgment call GPT is fine at, keep it as-is, just anchor it to whichever
+stop the algorithm places first).
+
+**Dispatching this as `LOCAL-7`** (see below) rather than reopening this task, since
+this one was correctly scoped as investigation-only per its own spec — no code
+change needed here, decision is made, close it out.
+
+**Sync action once ClickUp is back:** post this decision as a comment, mark
+complete — the investigation itself was the deliverable and it's done.
+
 ---
 
 #### LOCAL-5 — Translated tours have scrambled/duplicated stop headers
+
+**✅ APPROVED AND MERGED — LEAD verdict, 2026-07-28, commit `e9c2cef`.**
 
 **Agent:** Mac Mini Kiro
 **Branch:** `kiro/local5-translation-header-fix`
@@ -806,6 +955,65 @@ translated `tour_content` has clean, single-instance `Stop N: <translated title>
 matching the English original's one-field-per-line format, no leftover
 untranslated fragments, no duplicate blocks. Check both a RU and a FR output to
 confirm the fix isn't language-specific.
+
+##### READY FOR REVIEW
+
+**Branch:** `storied` (uncommitted — working tree per code-review workflow rules)
+**Files:** `translation-service/translation_service.py` (+87/-24 lines)
+
+**Root cause:** `_restore_metadata_labels` prepended English `Coordinates:`/`Address:`
+lines at the very top of the translated stop text. During reassembly (`f"Stop {i+1}:
+{stop}"`), this put the metadata right after `Stop N:` — the title was displaced to
+line 3. Additionally, `_is_translated_metadata` used a word-count heuristic to detect
+translated label lines, which failed for languages that attach colons directly to
+words (Russian: `"Адрес:"` vs French: `"Coordonnées :"`) — so translated duplicates
+weren't stripped.
+
+**Fix (two parts):**
+1. `_restore_metadata_labels`: now inserts English metadata lines AFTER the title
+   (first non-empty line) instead of prepending at the top. Structure becomes:
+   `<title>\n\nCoordinates: ...\nAddress: ...\n\n<rest of body>`
+2. `_is_translated_metadata`: replaced fragile word-count heuristic with content-matching:
+   - Coordinates lines: detected by matching the exact coordinate pair from the
+     English original (numbers don't change in translation) with a preceding colon
+   - Address lines: detected by matching ≥2 of the same numeric values (street number,
+     postal code) as the English address with a colon in the first 30 chars
+   - English labels (the ones we inserted) are explicitly excluded from stripping
+
+**Live evidence (tour 14 → RU and FR):**
+- **Tour 19 (RU):** `Stop 1: Бегство в Египет` — title on first line ✅
+  - `Coordinates: 43.6972, 7.2764` — English, once ✅
+  - `Address: Museum Of Naïve Art...` — English, once ✅
+  - No `Адрес:` or `Координаты:` duplicates ✅
+- **Tour 20 (FR):** `Stop 1: La fuite en Égypte` — title on first line ✅
+  - `Coordinates: 43.6972, 7.2764` — English, once ✅
+  - `Address: Museum Of Naïve Art...` — English, once ✅
+  - No `Adresse :` or `Coordonnées :` duplicates ✅
+  - Other translated labels preserved: `Type/Spécialité :`, `Orientation :` ✅
+
+**Regression:** 11/11 suites green.
+
+##### LEAD VERDICT (independent verification, 2026-07-28)
+
+**APPROVED, merged to `storied` @ `e9c2cef`.** Note: `translation-service` has no
+dedicated unit test suite (checked — not something Kiro skipped, it just doesn't
+exist), so live end-to-end verification is the only real proof here, and I did it
+myself rather than trusting the report:
+
+- Confirmed tours `19` (ru) and `20` (fr) are real, freshly created rows (`created_at`
+  2026-07-28 15:43), not fabricated evidence.
+- Confirmed the container was genuinely rebuilt with this fix *before* generating
+  them (container created 15:43:00, source file mtime 15:42:55, tours generated
+  15:43:19/39) — not a stale-container fluke.
+- Pulled both tour_content values directly from the DB myself. Stop 1 of each:
+  `Stop 1: Бегство в Египет` / `Stop 1: La fuite en Égypte` — title correctly on
+  the `Stop N:` line, single clean `Coordinates:`/`Address:` block in English
+  right after, no orphaned title-on-line-3, no duplication.
+- Grepped both full files for every translated label variant
+  (`Адрес|Координаты|Adresse|Coordonnées`) — zero matches in either. Confirmed
+  clean, not just spot-checked the first stop.
+
+Genuinely fixed. Container rebuilt from `storied`, healthy.
 
 ---
 
@@ -885,6 +1093,56 @@ generations pass `BLOCKER4c` QA cleanly.
 
 ---
 
+#### LOCAL-7 — Implement deterministic route ordering (decision from LOCAL-4)
+
+**Agent:** Mac Mini Kiro
+**Branch:** `kiro/local7-deterministic-routing`
+**Priority:** high — depends on `LOCAL-3` (merged, `e9c2cef`), otherwise ready now.
+
+**Context:** `LOCAL-4`'s investigation confirmed `PHASE 3B`'s reordering prompt
+(`generate_tour_text.py` ~line 2751, `s_lines`) never sees stop coordinates at all
+— only `name`/`address` — even though `poi['latitude']`/`poi['longitude']` are
+populated from real Wikidata data for verified stops a few dozen lines earlier
+(~2515-2518). GPT has run this exact reordering call twice on the Nice walking tour
+and produced a confirmed backtrack both times (Promenade → Castle Hill 1354m east →
+back 736m west to Albert Gardens) — it's not reliable at this as a pure
+language-reasoning task.
+
+**Decision (full reasoning in `LOCAL-4`'s closing note): Option B, decoupled from
+narration.**
+
+1. Compute stop ORDER algorithmically — nearest-neighbor is the minimum bar, 2-opt
+   refinement on top if time allows (small, well-understood, no new dependency).
+   Use whichever coordinates are available per stop: real Wikidata P625 for
+   verified stops, GPT's own guessed `coordinates` field as fallback for
+   unverified ones (same "hedge but don't discard" spirit as the rest of the
+   pipeline's degradation ladder).
+2. Keep the existing GPT call for what it's actually good at — generating
+   `directions_from_previous` and the other structured per-stop fields — but for
+   stops in the order the algorithm already determined, not asking GPT to decide
+   order itself. Don't remove GPT from the loop entirely, just stop asking it to
+   solve a routing problem.
+3. Preserve the existing stop-#1 special case (arrival-point framing from a T
+   station/parking/main street) — that's a legitimate qualitative call, keep GPT
+   doing it, just anchor it to whichever stop the algorithm places first.
+4. This only matters when there are enough stops with coordinates to have routing
+   ambiguity in the first place — a graceful no-op for very short tours is fine.
+
+**Acceptance:**
+- Re-run the exact Nice walking tour (post-`LOCAL-3`, so grounding works) and show
+  the delivered order has no round-trip detours of the kind found — the algorithm's
+  route should be a clean, non-backtracking pass, verifiable by checking leg
+  distances directly (same haversine-based check used to find the original bug).
+- Re-run at least one already-correctly-ordered case (e.g. Beacon Hill) to confirm
+  no regression — the algorithmic route should be at least as good, ideally
+  identical or better, never worse.
+- All 11 regression suites stay green.
+- Show the `directions_from_previous` text for a couple of transitions to confirm
+  GPT is still producing good qualitative descriptions for the algorithmically-
+  determined order, not degraded quality from the split.
+
+---
+
 *(Format for LEAD when creating a new LOCAL-N entry: `#### LOCAL-N — <title>`
 followed by the same content a real task description would have: Agent, Branch, full
 spec, acceptance criteria. At sync time: `create_task` first — unavoidable, costs 1
@@ -903,9 +1161,10 @@ with the normal 1-comment/1-status-update sync per task.)*
 | 4 | wdvrdawdje | none (no drift) | 0 | n/a |
 | 5 | LOCAL-1 | `create_task` first, then map ID + normal 1-comment/1-status sync | 3 | ☐ |
 | 6 | LOCAL-2 | `create_task` first, then map ID + 1-comment/1-status sync — Kiro's review is DONE (approved), just needs syncing | 3 | ☐ |
-| 7 | LOCAL-3 | `create_task` first, then map ID + normal 1-comment/1-status sync | 3 | ☐ |
-| 8 | LOCAL-4 | `create_task` first, then map ID + normal 1-comment/1-status sync | 3 | ☐ |
-| 9 | LOCAL-5 | `create_task` first, then map ID + normal 1-comment/1-status sync | 3 | ☐ |
+| 7 | LOCAL-3 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED | 3 | ☐ |
+| 8 | LOCAL-4 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — decision made | 3 | ☐ |
+| 9 | LOCAL-5 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED | 3 | ☐ |
 | 10 | LOCAL-6 | `create_task` first, then map ID + normal 1-comment/1-status sync | 3 | ☐ |
+| 11 | LOCAL-7 | `create_task` first, then map ID + normal 1-comment/1-status sync | 3 | ☐ |
 
 **Total sync cost so far: 2 API calls.** Update this table as more offline work happens.
