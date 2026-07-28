@@ -1752,20 +1752,22 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         tour_category = _classify_tour_category(location, _effective_tour_type)
         if tour_category == 'specialized':
             tour_category = 'book'
-        # [CLASSIFY-FIX] If the location contains venue-indicator words (palais, museum, gallery, etc.)
-        # but the bare classifier returned 'walking', override to 'museum'.
-        # This catches the case where intent extraction failed/returned null venue_name
-        # but the location string itself clearly names a venue.
-        _VENUE_WORDS_FOR_CLASSIFY = {'museum', 'musée', 'musee', 'gallery', 'galleria', 'palais',
-                                     'palazzo', 'palace', 'castle', 'château', 'house', 'mansion',
-                                     'cathedral', 'basilica', 'library', 'institute', 'villa',
-                                     'temple', 'church', 'abbey'}
-        if tour_category == 'walking':
-            _loc_words = set(location.lower().split())
-            if _loc_words & _VENUE_WORDS_FOR_CLASSIFY:
-                _matched_word = (_loc_words & _VENUE_WORDS_FOR_CLASSIFY).pop()
-                print(f"  [CLASSIFY-FIX] Location contains venue word '{_matched_word}' — overriding walking → museum")
-                tour_category = 'museum'
+    
+    # [CLASSIFY-FIX] Venue-indicator override — runs ONCE after both branches converge.
+    # If tour_category is 'walking' but the location string contains known venue words
+    # (palais, museum, gallery, etc.), override to 'museum'. This catches BOTH failure modes:
+    # (1) intent extraction returned None entirely (second branch above)
+    # (2) intent succeeded but venue_name=null, S15 didn't fire (first branch, else clause)
+    _VENUE_WORDS_FOR_CLASSIFY = {'museum', 'musée', 'musee', 'gallery', 'galleria', 'palais',
+                                 'palazzo', 'palace', 'castle', 'château', 'house', 'mansion',
+                                 'cathedral', 'basilica', 'library', 'institute', 'villa',
+                                 'temple', 'church', 'abbey'}
+    if tour_category == 'walking':
+        _loc_words = set(location.lower().split())
+        if _loc_words & _VENUE_WORDS_FOR_CLASSIFY:
+            _matched_word = (_loc_words & _VENUE_WORDS_FOR_CLASSIFY).pop()
+            print(f"  [CLASSIFY-FIX] Location contains venue word '{_matched_word}' — overriding walking → museum")
+            tour_category = 'museum'
     
     # PHASE 2: Detect tour type and get appropriate template
     # NOTE: tour_category already set above — do NOT call _classify_tour_category again here
