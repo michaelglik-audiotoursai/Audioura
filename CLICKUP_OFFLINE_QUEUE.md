@@ -103,28 +103,73 @@ and confirmed healthy.
 ## Task: wdvrdax1v7 — CLASSIFY-FIX (museum misclassification investigation + DATABASE_URL)
 
 **Last known ClickUp state:** list = 🟦 Services — Kiro (733), status = "to do".
-**TRUE current state:** READY FOR REVIEW — branch pushed, commit cc861c1.
-**Sync action:** `update_task(status=in_progress→complete)` + `create_comment` (text below).
+**TRUE current state:** **SPLIT VERDICT.** DATABASE_URL fix APPROVED, independently
+verified, and MERGED to `storied` @ `20f101f`. Classification investigation BOUNCED —
+Kiro's "no fix needed" conclusion is wrong; LEAD found a real, live, reproducing bug
+during independent verification (details below). Container rebuilt from `storied`,
+suites green, healthy.
+**Sync action:** see verdict text below — this needs TWO things once ClickUp is back:
+(1) approve+close on the DATABASE_URL half, (2) reopen/bounce the classification half
+with the new finding. Both go in one `create_comment`, task stays "in progress" (not
+complete) until the classification half is actually fixed.
 
-#### READY FOR REVIEW
+#### LEAD VERDICT (independent verification, 2026-07-27 ~23:4x, during ClickUp outage)
 
-**Branch:** `kiro/wdvrdax1v7-classify-fix`
-**Commit:** `cc861c1`
+**DATABASE_URL fix — APPROVED, merged.** Verified the password against the actual
+running Postgres container (`docker exec development-postgres-2-1 env | grep
+POSTGRES_PASSWORD` → `password123`, matches). Rebuilt + restarted the container from
+this branch and ran a live Palais Lascaris generation: zero "Connection refused" in
+the logs (previously present on every run). Regression suites (5 of the 11, spot-check)
+green. This is correct, matches the existing pattern used by other services in
+`docker-compose-master.yml`. Merged to `storied` @ `20f101f`.
 
-**DATABASE_URL fix:**
-- `docker-compose-master.yml`: Changed `DATABASE_URL=postgresql://admin:admin@localhost:5432/audiotours` → `postgresql://admin:password123@postgres-2:5432/audiotours`
-- `generate_tour_text_service.py`: Fallback URL updated to match (`postgres-2:5432`, `password123`)
-- **Evidence:** `[venue_cache] HIT for Q34653010` in container logs (no more "Connection refused"). DB query confirms `venue_corpus` accessible from inside Docker.
+**Classification investigation — BOUNCE. Kiro's conclusion is wrong, and here's the
+proof, not just a disagreement:**
 
-**Classification investigation — CONFIRMED WORKING, no fix needed:**
-- Palais Lascaris with `tour_type='museum'` → `Detected tour category: MUSEUM`
-- S15 venue-name forcing (line 1702-1704) keys off `intent['venue_name']` from LLM intent extraction, independent of tour_type. When the LLM identifies a venue_name in the request, the category is forced to MUSEUM regardless of what `_classify_tour_category()` returns.
-- LEAD already confirmed this (comment 10046): "Your own committed pilot proves S15's venue-name forcing already handles this case correctly end-to-end."
+Kiro's submission cited a SINGLE successful run (plus LEAD's own earlier single
+confirmation, comment `10046`) to conclude "no fix needed." But the task I actually
+specified (before ClickUp went down, in the original refinement on this task) asked
+for **5 repeated runs** specifically because intent-extraction is an LLM call and
+therefore non-deterministic — a single success doesn't rule out intermittent failure.
+Kiro didn't have that spec (ClickUp was down before they could read the full
+description) — understandable, but the gap is real regardless of why it happened.
 
-**Regression suites:** 23/23 palais, SQ4 ALL PASS, B6 14/14, G4 FP + scoping ALL PASS, tier 11/11.
+**LEAD ran it 10 times** (`analyze_tour_intent('Palais Lascaris, Nice', ...)` called
+directly, isolating just the intent-extraction step): **8 succeeded** (`venue_name:
+"Palais Lascaris"`), **2 failed**:
+- Run 2: hard JSON parse failure — the LLM echoed the prompt's literal placeholder
+  text back verbatim instead of filling in values (`"poi_type": "specific type of
+  locations requested (e.g., restaurants, shops...)"` — that's schema text, not a
+  real answer), producing `Expecting ',' delimiter` and `intent = None`.
+- Run 8: valid JSON, but `venue_name: null` — the LLM simply declined to extract a
+  venue name that time (temperature=0.3 introduces real variance on what should be a
+  near-deterministic extraction task).
 
-**UNPROVEN (per hard gate, noted honestly):**
-- I don't have the full task description (ClickUp was down before I could read it). If there are additional requirements beyond DATABASE_URL + classification investigation, they're unknown to me. Marking this submission as covering what I could identify from context.
+**Traced what happens downstream in both failure cases** — this is not a crash
+(confirmed the S15 forcing block at `generate_tour_text.py:1705` sits inside the
+`if intent:` guard, indent-verified, so a `None` intent doesn't throw). But the
+`else:` clause (line 1719, "⚠️ Intent analysis failed, using fallback detection")
+calls `_classify_tour_category()` directly — the SAME bare classifier that returns
+`walking` for "Palais Lascaris, Nice" without an explicit museum keyword, bypassing
+S15 entirely. **So ~20% of requests for this exact venue would silently misclassify
+as walking, even with `tour_type='museum'` explicitly set** — reproducing the
+original field-test bug, just probabilistically instead of every time, which is
+exactly why one successful test (Kiro's, or my earlier one) didn't catch it.
+
+**Required fix:** `analyze_tour_intent()` (`generate_tour_text.py:235`) needs either
+(a) a retry-on-malformed-JSON path — at minimum for the hard-parse-failure case,
+which is a clearly degenerate output, one retry is cheap and likely resolves most of
+these; and/or (b) lower `temperature` from `0.3` toward `0` for this specific call,
+since it's an extraction task, not a creative one, and the variance is actively
+causing misclassifications. Live-artifact proof required: re-run the same 10x
+isolated test post-fix and show a materially lower (ideally zero) failure rate.
+
+**Regression suites (spot-check, not full 11):** palais fixture 23/23, sq4_merge
+ALL PASS — both re-run by LEAD independently on the merged `storied` state.
+
+**Sync action once ClickUp is back:** post ONE consolidated comment covering both
+halves (approve DATABASE_URL as already merged; bounce classification with this
+finding), leave task status as "in progress" — do not close.
 
 ---
 
@@ -196,7 +241,7 @@ referenced, then proceed with the normal 1-comment/1-status-update sync per task
 | # | Task ID | Action | API calls | Synced? |
 |---|---------|--------|-----------|---------|
 | 1 | wdvrdawkxq | `update_task(status=complete)` + `create_comment` (verbatim text above) | 2 | ☐ |
-| 2 | wdvrdax1v7 | none (no drift) | 0 | n/a |
+| 2 | wdvrdax1v7 | `create_comment` (split verdict text above) — status stays "in progress" | 1 | ☐ |
 | 3 | wdvrdawcyx | none (no drift) | 0 | n/a |
 | 4 | wdvrdawdje | none (no drift) | 0 | n/a |
 
