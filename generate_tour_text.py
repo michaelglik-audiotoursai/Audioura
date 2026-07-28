@@ -302,8 +302,15 @@ Examples:
         "max_tokens": 400
     }
     
-    # Retry on malformed JSON (LLM occasionally echoes schema text instead of filling values)
+    # Retry on malformed JSON or null venue_name when request implies a venue
+    # (LLM occasionally echoes schema text or declines to extract an obvious venue)
     _MAX_INTENT_RETRIES = 2
+    _VENUE_INDICATOR_WORDS = {'museum', 'musée', 'musee', 'gallery', 'galleria', 'palais',
+                              'palazzo', 'palace', 'castle', 'château', 'house', 'mansion',
+                              'cathedral', 'basilica', 'library', 'institute', 'center',
+                              'centre', 'villa', 'temple', 'church', 'abbey', 'priory'}
+    _request_implies_venue = any(w in user_request.lower().split() for w in _VENUE_INDICATOR_WORDS)
+    
     for _intent_attempt in range(_MAX_INTENT_RETRIES):
         try:
             response = requests.post(
@@ -316,7 +323,17 @@ Examples:
                 result = response.json()
                 intent_text = result["choices"][0]["message"]["content"]
                 print(f"Intent analysis response: {intent_text}")
-                return json.loads(intent_text)
+                parsed = json.loads(intent_text)
+                
+                # Check for null venue_name when request implies a venue
+                if (_request_implies_venue and 
+                    not parsed.get('venue_name') and
+                    _intent_attempt < _MAX_INTENT_RETRIES - 1):
+                    print(f"  [INTENT] venue_name=null but request implies a venue "
+                          f"(attempt {_intent_attempt + 1}/{_MAX_INTENT_RETRIES}) — retrying")
+                    continue  # Retry
+                
+                return parsed
             else:
                 print(f"Intent analysis failed: {response.status_code}")
                 return None
@@ -1735,6 +1752,22 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         tour_category = _classify_tour_category(location, _effective_tour_type)
         if tour_category == 'specialized':
             tour_category = 'book'
+    
+    # [CLASSIFY-FIX] Venue-indicator override — runs ONCE after both branches converge.
+    # If tour_category is 'walking' but the location string contains known venue words
+    # (palais, museum, gallery, etc.), override to 'museum'. This catches BOTH failure modes:
+    # (1) intent extraction returned None entirely (second branch above)
+    # (2) intent succeeded but venue_name=null, S15 didn't fire (first branch, else clause)
+    _VENUE_WORDS_FOR_CLASSIFY = {'museum', 'musée', 'musee', 'gallery', 'galleria', 'palais',
+                                 'palazzo', 'palace', 'castle', 'château', 'house', 'mansion',
+                                 'cathedral', 'basilica', 'library', 'institute', 'villa',
+                                 'temple', 'church', 'abbey'}
+    if tour_category == 'walking':
+        _loc_words = set(location.lower().split())
+        if _loc_words & _VENUE_WORDS_FOR_CLASSIFY:
+            _matched_word = (_loc_words & _VENUE_WORDS_FOR_CLASSIFY).pop()
+            print(f"  [CLASSIFY-FIX] Location contains venue word '{_matched_word}' — overriding walking → museum")
+            tour_category = 'museum'
     
     # PHASE 2: Detect tour type and get appropriate template
     # NOTE: tour_category already set above — do NOT call _classify_tour_category again here
