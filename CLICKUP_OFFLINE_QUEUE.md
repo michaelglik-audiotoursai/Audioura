@@ -174,15 +174,25 @@ finding), leave task status as "in progress" — do not close.
 #### READY FOR REVIEW
 
 **Branch:** `kiro/wdvrdax1v7-classify-fix`  
-**Commits:** `cc861c1` (DATABASE_URL, already merged) + `c658d86` (classification fix)
+**Commits:** `cc861c1` (DATABASE_URL, merged) + `c658d86` (temp=0 + retry, merged) + `096e6f5` (null-venue override)
 
-**Classification fix (c658d86) — responding to LEAD bounce:**
-- `analyze_tour_intent()` temperature: 0.3 → 0 (extraction task, not creative — eliminates the ~20% variance)
-- Added retry loop (max 2 attempts) on `json.JSONDecodeError` — catches the degenerate "LLM echoes schema text" failure mode that produced `Expecting ',' delimiter`
-- **Evidence:** 10/10 runs of Palais Lascaris with tour_type='museum' complete successfully as museum tours. All suites pass (23/23, SQ4, B6 14/14).
+**Null-venue_name fix (096e6f5) — responding to LEAD round 2 bounce:**
 
-**UNPROVEN (per hard gate):**
-- Cannot show a before/after delta on 10x isolated `analyze_tour_intent()` calls because the fix (temperature=0) makes the call deterministic by design. The 10/10 end-to-end success rate IS the evidence. If LEAD wants to verify by calling `analyze_tour_intent()` directly 10x in isolation with the new code, that would be the definitive proof that the null-venue_name and JSON-parse failures no longer reproduce.
+Root cause proven by 10x isolated test: with non-museum tour_type phrasing ("Palais Lascaris, Nice, art and historical instruments tour"), the LLM **deterministically** returns `venue_name: null` — 10/10 times. This isn't stochastic. The retry-on-null fires (correctly detected) but can't help because the LLM consistently declines to extract the venue from this phrasing.
+
+**Fix:** venue-indicator word override in the fallback classifier path. After `_classify_tour_category()` returns 'walking', check if the location string contains known venue words (palais, museum, gallery, etc.). If yes → override to 'museum'. This catches the exact field-test failure mode at the classifier level, regardless of whether intent extraction succeeds.
+
+**Defense-in-depth (both modes now covered):**
+- JSON parse failure → temperature=0 + retry (already merged, c658d86)
+- Null venue_name → venue-indicator override in fallback (this commit, 096e6f5)
+
+**Evidence (10x isolated test with non-museum tour_type):**
+- Pre-fix: 0/10 venue extracted (LLM returns null every time)
+- Post-fix: the override fires `[CLASSIFY-FIX] Location contains venue word 'palais' — overriding walking → museum`
+- All regression suites: 23/23 palais, SQ4 ALL PASS
+
+**UNPROVEN (honest):**
+- Haven't re-run the full 10x test POST-fix to prove the override fires in the isolated `analyze_tour_intent()` call (it fires downstream in `generate_tour_text()`, not in the intent function itself). The fix is in a different code path than the intent function — it's in the fallback branch that runs AFTER intent returns null.
 
 #### LEAD VERDICT (independent verification, 2026-07-28, during ClickUp outage)
 
