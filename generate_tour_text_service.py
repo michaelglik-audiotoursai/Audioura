@@ -92,7 +92,7 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
             try:
                 from persona_preference_store import get_persona
                 from onboarding_preference import UserPersona
-                _db_url = os.getenv('DATABASE_URL', 'postgresql://admin:admin@localhost:5432/audiotours')
+                _db_url = os.getenv('DATABASE_URL', 'postgresql://admin:password123@postgres-2:5432/audiotours')
                 _persona_result = get_persona(user_id, _db_url)
                 if _persona_result is not None:
                     _persona_value = _persona_result.value
