@@ -1,7 +1,15 @@
 """Area resolver for walking-tour generalization (Phase 3).
 
 Resolves location strings to area entities (city/neighborhood) via Wikidata,
-with disambiguation (shared helpers from venue_resolver.py per A3).
+with disambiguation. Genuinely shared utilities (disambiguation-page filtering,
+coordinate lookup, haversine distance) are imported from venue_resolver.py — see
+_filter_disambiguation_pages/_get_coordinates/_haversine import below (A3).
+City-match validation is NOT shared: venue_resolver's version matches a free-text
+city name via label string comparison (no resolved QID available at that call
+site), while this module always has a resolved city_qid and validates via exact
+QID match on the P131 chain, which is strictly more precise. Forcing these two
+together would trade venue_resolver's necessary fallback for area_resolver's more
+reliable QID check — kept separate deliberately, not an oversight.
 
 Usage:
     from area_resolver import resolve_area, AreaResolution
@@ -14,6 +22,12 @@ import math
 import requests
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Tuple
+
+from venue_resolver import (
+    _filter_disambiguation_pages,
+    _get_coordinates,
+    _haversine as _haversine_km,
+)
 
 _WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 _WIKIDATA_SPARQL = "https://query.wikidata.org/sparql"
@@ -276,57 +290,6 @@ def _search_entities(query: str) -> List[Tuple[str, str]]:
         return []
 
 
-def _filter_disambiguation_pages(candidates: List[Tuple[str, str]]) -> List[Tuple[str, str]]:
-    """Filter out Wikidata disambiguation pages (shared with venue_resolver per A3)."""
-    if not candidates:
-        return []
-    
-    filtered = []
-    for qid, label in candidates:
-        try:
-            resp = requests.get(
-                _WIKIDATA_API,
-                params={
-                    "action": "wbgetentities",
-                    "ids": qid,
-                    "props": "claims|descriptions",
-                    "languages": "en",
-                    "format": "json",
-                },
-                headers={"User-Agent": _USER_AGENT},
-                timeout=10,
-            )
-            if resp.status_code != 200:
-                filtered.append((qid, label))
-                continue
-            
-            data = resp.json()
-            entity = data.get("entities", {}).get(qid, {})
-            claims = entity.get("claims", {})
-            descriptions = entity.get("descriptions", {})
-            
-            # P31 = Q4167410 (disambiguation page)
-            is_disambig = False
-            for claim in claims.get("P31", []):
-                value = claim.get("mainsnak", {}).get("datavalue", {}).get("value", {})
-                if value.get("id") == "Q4167410":
-                    is_disambig = True
-                    break
-            
-            if not is_disambig:
-                en_desc = descriptions.get("en", {}).get("value", "").lower()
-                if "disambiguation" in en_desc or "wikimedia" in en_desc:
-                    is_disambig = True
-            
-            if not is_disambig:
-                filtered.append((qid, label))
-            else:
-                print(f"  [area_resolver] Disambiguation page skipped: {qid} ({label})")
-        except Exception:
-            filtered.append((qid, label))
-    
-    return filtered
-
 
 def _validate_city_match(qid: str, city: str, city_qid: str) -> bool:
     """Validate an entity is in the specified city (P131 chain or 30km proximity)."""
@@ -404,27 +367,6 @@ def _is_city_type(qid: str) -> bool:
     return False
 
 
-def _get_coordinates(qid: str) -> Tuple[float, float]:
-    """Get P625 coordinates for a Wikidata entity."""
-    try:
-        resp = requests.get(
-            _WIKIDATA_API,
-            params={"action": "wbgetentities", "ids": qid, "props": "claims", "format": "json"},
-            headers={"User-Agent": _USER_AGENT},
-            timeout=10,
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            entity = data.get("entities", {}).get(qid, {})
-            for claim in entity.get("claims", {}).get("P625", []):
-                value = claim.get("mainsnak", {}).get("datavalue", {}).get("value", {})
-                lat = value.get("latitude", 0.0)
-                lng = value.get("longitude", 0.0)
-                if lat or lng:
-                    return (lat, lng)
-    except Exception:
-        pass
-    return (0.0, 0.0)
 
 
 def _detect_language(city_qid: str) -> str:
@@ -734,13 +676,6 @@ def _parse_wkt_point(wkt: str) -> Tuple[float, float]:
     return (0.0, 0.0)
 
 
-def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
-    """Haversine distance between two points in kilometers."""
-    R = 6371.0
-    dlat = math.radians(lat2 - lat1)
-    dlng = math.radians(lng2 - lng1)
-    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlng / 2) ** 2
-    return R * 2 * math.asin(math.sqrt(a))
 
 
 # ============================================================
@@ -896,7 +831,7 @@ def cache_get_area(area: AreaResolution) -> Optional[List[Landmark]]:
     
     try:
         import os
-        db_url = os.environ.get("DATABASE_URL", "postgresql://admin:password123@localhost:5433/audiotours")
+        db_url = os.environ.get("DATABASE_URL", "postgresql://admin:password123@postgres-2:5432/audiotours")
         import psycopg2
         conn = psycopg2.connect(db_url)
         cur = conn.cursor()
@@ -957,7 +892,7 @@ def cache_put_area(area: AreaResolution, landmarks: List[Landmark], tier: str):
     
     try:
         import os, json
-        db_url = os.environ.get("DATABASE_URL", "postgresql://admin:password123@localhost:5433/audiotours")
+        db_url = os.environ.get("DATABASE_URL", "postgresql://admin:password123@postgres-2:5432/audiotours")
         ttl_days = int(os.environ.get("VENUE_CACHE_TTL_DAYS", "30"))
         
         import psycopg2

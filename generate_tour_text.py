@@ -3293,7 +3293,16 @@ Do NOT state the work's presence as certain fact. EVERY sentence about the work 
 """
 
         # [HEDGE-NM] Hedging safety net for non-museum categories (movie/book/walking/restaurant/etc.)
-        if tour_category != 'museum':
+        # [A5] Walking tours (Phase 3) have real per-stop verification via area_resolver's
+        # verify_landmarks() — a verified=True landmark should read as confidently as a
+        # verified museum work, not get the blanket "no fact-checking performed" framing.
+        # Other non-museum categories (restaurant/movie/book/etc.) never set 'verified' at
+        # all, so they're untouched here and keep the unconditional safety net they've
+        # always had — poi.get('verified', True) would silently exempt them otherwise.
+        _hedge_nm_applies = tour_category != 'museum' and (
+            tour_category != 'walking' or not poi.get('verified', True)
+        )
+        if _hedge_nm_applies:
             description_prompt += """
 IMPORTANT — GROUNDING HONESTY: No fact-checking has been performed on specific claims about
 real people, events, or history for this stop. When you include a specific claim
