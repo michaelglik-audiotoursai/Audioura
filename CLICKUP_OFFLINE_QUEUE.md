@@ -809,6 +809,82 @@ confirm the fix isn't language-specific.
 
 ---
 
+#### LOCAL-6 — Prose/narrative quality improvements (not bugs — enhancement)
+
+**Agent:** Mac Mini Kiro
+**Branch:** `kiro/local6-prose-improvements`
+**Priority:** normal — quality enhancement on top of an already-working base, not
+a defect. Sequence after `LOCAL-3`/`LOCAL-5` (the actual bugs).
+
+**Context:** Michael did an honest quality/business evaluation of the delivered
+tours and found the core writing genuinely commercially competitive — atmospheric,
+sensory, good factual discipline. Four specific, cheap prompt-craft refinements
+were identified to sharpen that strength further, not fix anything broken. All four
+are prompt-text changes in `generate_tour_text.py`, no new infrastructure needed.
+
+**1. Vary the sentence-opening pattern across stops.** Currently many stops open
+with near-identical rhythm ("Picture this: a cozy, bustling bistro..." / "Amidst
+the boutiques and cafes, one particular building..."). Across a 9-10 stop tour
+this becomes noticeably template-y. Both description-prompt templates (museum:
+`generate_tour_text.py` ~line 3258-3268; non-museum: ~line 3269-3283) should
+instruct GPT to vary its opening move stop-to-stop — rotate between a question, a
+direct-address scene-drop, a historical fact lead-in, a sensory detail, etc. Since
+each stop's description is generated in an independent GPT call
+(`_generate_description`, called per-POI), simply saying "vary it" in each
+individual prompt won't coordinate across calls — consider explicitly assigning a
+different opening style per stop index (e.g. cycle through a fixed list of
+opening-style instructions keyed by `idx % N`) so the variety is actually enforced
+across the tour, not left to chance.
+
+**2. Give the "directions between stops" some narrative content, not just
+logistics.** The `PHASE 3B` reordering prompt (~line 2762-2763, `generate_tour_text.py`)
+asks for `directions_from_previous` as pure turn-by-turn logistics. The walk
+*between* stops is currently dead air content-wise. Add an instruction (either
+here or in a follow-up pass) for the directions/transition text to include one
+brief observational or connective line — e.g. "as you cross to the next street,
+notice how the architecture shifts..." — so transit time becomes part of the
+experience rather than pure navigation. Careful: don't make this so long it reads
+like a full extra stop; one added sentence is the target.
+
+**3. Reframe hedged claims as narrative, not just softened disclaimers.** The two
+hedging blocks (`[PALAIS-FIX B1]` ~line 3286-3293, `[HEDGE-NM]` ~line 3295-3306+)
+currently produce flat institutional hedging ("believed to be," "reportedly"). Same
+underlying honesty, better listening experience: reframe as "there's a story that
+this piece..., though its exact history here is debated/uncertain" — turning
+uncertainty into a small intentional mystery rather than a disclaimer. This matters
+most for venues where most stops end up unverified (small/obscure museums), where
+right now a listener hears the same hedge phrasing repeated most of the tour.
+**Do not weaken the actual grounding contract** — verified stops must still read as
+confidently as they do now; this is purely about the tone of the *unverified* path.
+
+**4. Light per-category "personality" pass.** Right now the non-museum template
+(~line 3269-3283) is shared across restaurant/walking/movie/book tours with only
+`tour_category` swapped into the text — they read with the same underlying tone.
+Add category-specific tone guidance: restaurant tours leaning sensory/convivial,
+museum tours contemplative, walking tours historical-narrative, etc. This is a
+perception lever for a paid product — right now the three tour types read like the
+same engine with nouns swapped, rather than distinct products.
+
+**Acceptance:** for each of the four, generate a live tour (reuse existing test
+locations is fine — Palais Lascaris, Beacon Hill, or the Nice tours from Michael's
+field test) and show the actual prose difference in the committed artifact — not
+just "the prompt now says X," the generated text has to actually read differently.
+Specifically:
+- Two consecutive stops in the same tour with genuinely different opening sentence
+  structures (not just different words, different *structure*).
+- At least one stop's directions/transition text carrying a connective observation.
+- A hedged stop reading as an intentional narrative aside rather than a flat
+  disclaimer, without reading as MORE uncertain than the current hedging.
+- Two different tour categories (e.g. restaurant vs. museum) showing a
+  perceptible tone difference beyond vocabulary substitution.
+
+All 11 regression suites must stay green — these are prompt changes, not logic
+changes, so regressions would most likely show up as QA gate failures
+(`content_qa_runner.py`), not test failures, so also spot-check a couple of full
+generations pass `BLOCKER4c` QA cleanly.
+
+---
+
 *(Format for LEAD when creating a new LOCAL-N entry: `#### LOCAL-N — <title>`
 followed by the same content a real task description would have: Agent, Branch, full
 spec, acceptance criteria. At sync time: `create_task` first — unavoidable, costs 1
@@ -830,5 +906,6 @@ with the normal 1-comment/1-status-update sync per task.)*
 | 7 | LOCAL-3 | `create_task` first, then map ID + normal 1-comment/1-status sync | 3 | ☐ |
 | 8 | LOCAL-4 | `create_task` first, then map ID + normal 1-comment/1-status sync | 3 | ☐ |
 | 9 | LOCAL-5 | `create_task` first, then map ID + normal 1-comment/1-status sync | 3 | ☐ |
+| 10 | LOCAL-6 | `create_task` first, then map ID + normal 1-comment/1-status sync | 3 | ☐ |
 
 **Total sync cost so far: 2 API calls.** Update this table as more offline work happens.
