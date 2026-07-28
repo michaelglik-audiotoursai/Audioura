@@ -103,15 +103,15 @@ and confirmed healthy.
 ## Task: wdvrdax1v7 — CLASSIFY-FIX (museum misclassification investigation + DATABASE_URL)
 
 **Last known ClickUp state:** list = 🟦 Services — Kiro (733), status = "to do".
-**TRUE current state:** **SPLIT VERDICT.** DATABASE_URL fix APPROVED, independently
-verified, and MERGED to `storied` @ `20f101f`. Classification investigation BOUNCED —
-Kiro's "no fix needed" conclusion is wrong; LEAD found a real, live, reproducing bug
-during independent verification (details below). Container rebuilt from `storied`,
-suites green, healthy.
-**Sync action:** see verdict text below — this needs TWO things once ClickUp is back:
-(1) approve+close on the DATABASE_URL half, (2) reopen/bounce the classification half
-with the new finding. Both go in one `create_comment`, task stays "in progress" (not
-complete) until the classification half is actually fixed.
+**TRUE current state:** **STILL SPLIT, ROUND 2.** DATABASE_URL merged (`20f101f`).
+Classification round 1 (temp=0 + retry, `c658d86`): PARTIALLY fixed — JSON-parse
+failure mode eliminated (merged, `3ca5632`), null-`venue_name` mode NOT fixed (still
+reproduces at the same rate, bounced again). Container rebuilt from `storied` @
+`3ca5632`, suites green, healthy.
+**Sync action:** see verdict text below — three things once ClickUp is back: (1)
+approve+close DATABASE_URL, (2) credit the JSON-parse-fix half as merged, (3) bounce
+the null-venue_name half with the specific remaining requirement. One `create_comment`
+covering all three, task stays "in progress."
 
 #### LEAD VERDICT (independent verification, 2026-07-27 ~23:4x, during ClickUp outage)
 
@@ -183,6 +183,56 @@ finding), leave task status as "in progress" — do not close.
 
 **UNPROVEN (per hard gate):**
 - Cannot show a before/after delta on 10x isolated `analyze_tour_intent()` calls because the fix (temperature=0) makes the call deterministic by design. The 10/10 end-to-end success rate IS the evidence. If LEAD wants to verify by calling `analyze_tour_intent()` directly 10x in isolation with the new code, that would be the definitive proof that the null-venue_name and JSON-parse failures no longer reproduce.
+
+#### LEAD VERDICT (independent verification, 2026-07-28, during ClickUp outage)
+
+**PARTIAL FIX — MERGED (the good part), BOUNCE (the remaining gap).**
+
+Did exactly the isolated 10x test Kiro invited ("that would be the definitive proof").
+Rebuilt the container from this branch, ran `analyze_tour_intent('Palais Lascaris,
+Nice', ...)` 10 times in isolation:
+
+- **JSON-parse-failure mode: FIXED.** 0/10 hard parse failures this run (was 1/10
+  before). The retry-on-`JSONDecodeError` correctly catches the "LLM echoes schema
+  text" degenerate output. Credited — this half of the fix is real and verified.
+- **Null-`venue_name` mode: NOT FIXED.** 1/10 runs still returned valid JSON with
+  `venue_name: None` — same rate as before the fix. This isn't a `JSONDecodeError` (no
+  exception raised, `json.loads()` succeeds fine), so the retry loop never triggers
+  for it at all. `temperature=0` reduced overall variance but did not eliminate this
+  specific failure mode — `temperature=0` is not a hard determinism guarantee, and
+  this result proves it isn't sufficient here.
+
+**Why this wasn't caught by the 10/10 end-to-end claim:** traced it down. I checked
+`_classify_tour_category('Palais Lascaris, Nice', 'museum')` directly → returns
+`'museum'` on its own, because the literal word "museum" is IN the tour_type string.
+So for this specific test phrasing (`tour_type='museum'` explicit), even when intent
+extraction returns `venue_name: None`, the bare-classifier fallback still lands on
+`museum` by keyword match — no visible failure end-to-end, which is exactly why
+10/10 pipeline runs looked clean. **But** `_classify_tour_category('Palais Lascaris,
+Nice', 'art and historical instruments')` → `'walking'` — the ORIGINAL field-reported
+bug pattern (camel tour, dog tour, and the actual first Palais Lascaris complaint)
+uses exactly this kind of non-museum-labeled `tour_type` string, with no keyword
+safety net. For those phrasings, a null-`venue_name` result would still misclassify
+live, at roughly the same ~10% rate just measured. The fix closes the gap for
+`tour_type='museum'` only by accident of wording, not by design.
+
+**Merged the good part:** `c658d86`'s temp=0 + retry change is a real, net-positive
+improvement (fully eliminates the parse-failure mode, doesn't regress anything) —
+merged to `storied` @ `3ca5632`. Suites re-verified: sq4_merge, palais fixture 23/23.
+Container rebuilt and healthy.
+
+**Required for the remaining gap:** extend recovery to the null-`venue_name` case too
+— not necessarily a blind retry-on-null (that'd double the cost of every legitimately
+venue-less request like "restaurants in North End, Boston"), but something that
+specifically catches "a real single venue was likely meant but the LLM declined to
+name it." Kiro's own judgment on the mechanism; requirement is the evidence, not the
+implementation. **Live-artifact bar:** re-run the same isolated 10x test, AND repeat
+it with `tour_type` set to a non-museum phrase (e.g. `'art and historical
+instruments'`) for the same venue, since that's the combination that actually
+reproduces the field-reported bug. Show the failure rate materially reduced on both.
+
+**Sync action once ClickUp is back:** one comment — credit the JSON-parse fix as
+merged, bounce with this specific remaining requirement. Task stays "in progress."
 
 ---
 
