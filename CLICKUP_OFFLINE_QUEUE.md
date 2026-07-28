@@ -157,9 +157,21 @@ approved. Noting two things for whenever it IS picked back up in sequence (after
 
 ## New tasks created or requiring dispatch WHILE ClickUp is down
 
-*(none yet — add sections here as they come up, following the same format: real ClickUp
-ID if reusing an existing task, or `LOCAL-1`/`LOCAL-2`/... placeholder if genuinely new,
-with a note to `create_task` first at sync time before anything else.)*
+**For Kiro:** any section below headed `#### LOCAL-N` is a real assignment for
+**Mac Mini Kiro**, dispatched during the outage because ClickUp's `create_task` isn't
+reachable. Treat it exactly like a normal task in your list — it will have the same
+`**Agent:** Mac Mini Kiro`, branch name, and acceptance criteria a real ClickUp task
+description would have. Branch, execute, test (live-artifact hard gate still applies),
+and mark `##### READY FOR REVIEW` under it when done, same as any other task in this
+file. You do NOT need a real ClickUp ID to start work — LEAD will create the actual
+task (`clickup_create_task`) and backfill the ID once the API recovers; that's LEAD's
+sync bookkeeping, not something you wait on.
+
+*(none yet — add sections here as they come up. Format for LEAD when creating one:
+`#### LOCAL-N — <title>` followed by the same content a real task description would
+have: Agent, Branch, full spec, acceptance criteria. At sync time: `create_task` first
+—unavoidable, costs 1 API call — then map `LOCAL-N` → the real ID everywhere it's
+referenced, then proceed with the normal 1-comment/1-status-update sync per task.)*
 
 ---
 
