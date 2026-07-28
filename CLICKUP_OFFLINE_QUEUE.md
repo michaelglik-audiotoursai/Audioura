@@ -617,6 +617,196 @@ correct, or surfaces something wrong that needs a real follow-up commit. Mark
 merge — that heading is still the "I'm done, please look" signal LEAD's periodic
 check watches for).
 
+##### READY FOR REVIEW
+
+**Reviewed by:** Mac Mini Kiro · **Date:** 2026-07-28 10:35 ET
+**Verdict:** ✅ **APPROVED — would have passed the merge gate.**
+
+**What was checked (independently, not trusting LEAD's claims):**
+
+1. **Diff vs. claims:** `git show b0f8c65` — all three changes match descriptions exactly. No hidden/undocumented modifications.
+
+2. **Fix 1 reasoning (non-merge of `_validate_city_match`):** Read both implementations line-by-line.
+   - `venue_resolver.py`: `(qid, city)` — label substring match via `_is_located_in`, 1 P131 level.
+   - `area_resolver.py`: `(qid, city, city_qid)` — exact QID match (`admin_qid == city_qid`), 2 P131 levels.
+   - **Agree with non-merge.** QID comparison is strictly more precise (immune to label language/formatting variants). No safe unification exists without adding complexity for zero benefit.
+
+3. **Fix 2 reasoning (HEDGE-NM boolean):** Traced all four cases manually:
+   - Museum → `False` ✅ | Walking+verified → `False` ✅ | Walking+unverified → `True` ✅ | Other non-museum → `True` (short-circuits) ✅
+   - The `.get('verified', True)` default trap for categories that never set the key is correctly avoided by scoping to `walking` only.
+
+4. **Fix 1 regression (museum resolution):**
+   - Palais Lascaris → Q34653010 ✅ | National Constitution Center → Q538275 ✅ | African American Museum → Q770826 ✅
+   - Confirmed `area_resolver._filter_disambiguation_pages is venue_resolver._filter_disambiguation_pages` (identity check `is`).
+
+5. **Fix 2 regression (non-walking categories):**
+   - Restaurant, movie, book categories: HEDGE-NM fires unconditionally — tested locally AND inside Docker container. No regression.
+
+6. **Fix 2 edge case (LEAD's flagged gap — obscure verified landmark):**
+   - Jamaica Plain, Boston: "Sumner Hill Historic District" (Q7637980) — real but obscure.
+   - `verify_landmarks` → `verified=True`. HEDGE-NM evaluates `False` → reads confidently.
+   - Fictional stop in same list → `verified=False` → HEDGE-NM fires. **Gap closed.**
+
+7. **Fix 3 regression (LEAD's flagged gap — DB write path):**
+   - Jamaica Plain (Q985993) was NOT in `venue_corpus` pre-test (confirmed via SELECT).
+   - `cache_put_area()` → successfully written. Read-back via `cache_get_area()` → 49 landmarks returned.
+   - Full roundtrip with corrected `postgres-2:5432` URL: **write path works. Gap closed.**
+
+8. **Full 11-suite regression:** ALL PASS (independently run on Mac Mini).
+
+**What was found:** Nothing wrong. All three fixes are correct, well-reasoned, and properly scoped. Both verification gaps LEAD flagged are now independently closed with live evidence.
+
+**Minor non-blocking observation:** `_hedge_nm_applies` uses a leading-underscore name for a local variable (suggests module-private by convention). Cosmetic only, zero impact.
+
+---
+
+#### LOCAL-3 — Walking-tour location parser resolves country instead of city ("walking tour in Nice, france" → France, not Nice)
+
+**Agent:** Mac Mini Kiro
+**Branch:** `kiro/local3-location-parse-fix`
+**Priority:** high — Michael found this during his own field test on the iPhone
+app; it silently defeats Phase 3 grounding for exactly the kind of request the
+feature is meant to handle.
+
+**Symptom:** Michael requested `"Walking tour, Nice, France"` on the live app. The
+delivered tour generated fine (10 stops, real-sounding content), but every single
+stop came back `verified=False` — none of Phase 3's landmark-grounding machinery
+actually fired for a well-known city with plenty of real Wikidata landmarks.
+
+**Root cause (traced from container logs, job `4fb0424a-3e42-4d82-a0f5-dbeef0ad65c1`,
+request string `"walking tour in Nice, france"`):**
+```
+[area_resolver] Parsed: city='france', neighborhood='walking  in Nice'
+[area_resolver] City resolved: france → Q142 (47.0000, 2.0000)
+[area_resolver] Neighborhood 'walking  in Nice' not on Wikidata — using city center
+[area_resolver] Resolved: center=(47.0000, 2.0000), radius=2.0km, lang=fr
+[landmark_discovery] SPARQL coordinate query: 4 landmarks
+[verify_landmarks] 0/10 stops verified against 4 discovered landmarks (tier: medium)
+```
+`Q142` is **France the country** — coordinates `(47.0, 2.0)` are the geographic
+center of France, nowhere near Nice. The whole landmark search ran against the
+wrong geography.
+
+**Why this happens:** two layers combine badly.
+1. Upstream, `generate_tour_text.py`'s `_location_normalized = re.sub(r'\b[Tt]ours?\b',
+   '', location)...` strips the standalone word "tour" from anywhere in the string
+   (not just as a suffix). For `"walking tour in Nice, france"` this leaves
+   `"walking  in Nice, france"` (double space where "tour " was) — the mode word
+   "walking" is left orphaned, stuck to "in Nice" instead of the country.
+2. `area_resolver.py`'s own `_parse_location()` (line ~204) has a regex meant to
+   strip tour-type suffixes (`walking tour|tour|historic district`) — but since
+   step 1 already removed "tour," this regex is a no-op on the already-mangled
+   string, and the naive comma-split (`parts[0]` = neighborhood, `parts[1]` = city)
+   takes "walking  in Nice" as the neighborhood and "france" — the actual
+   country — as the city.
+
+**Required fix:** `_parse_location()` needs to recognize when its "city" candidate
+is actually a country (or, more robustly, strip leading transport-mode/filler words
+— "walking," "driving," "biking," "self-guided," "in," "of," "around" — from the
+front of the first comma-segment before treating the rest as a neighborhood). The
+real city name ("Nice") is present in the string; the parser just isn't finding it
+because of the orphaned mode word. Consider whether the upstream `_location_normalized`
+tour-word-stripping (shared by many other code paths — do not touch broadly without
+testing) needs a companion fix, or whether this is best solved entirely inside
+`_parse_location` to keep the blast radius scoped to Phase 3.
+
+**Acceptance:** re-run the exact request `"walking tour in Nice, france"` (or the
+app's exact string `"Walking tour, Nice, France"`) and show, live:
+- `[area_resolver] City resolved: Nice → <real Nice QID>` (not France)
+- `discover_landmarks` returns a non-trivial set of real Nice landmarks
+- `verify_landmarks` verifies a reasonable fraction of the 10 proposed stops (not 0/10)
+- All 11 regression suites stay green
+- Spot-check 2-3 other phrasings that could hit the same bug (e.g. `"biking tour in
+  Boston, MA"`, `"self-guided tour of Rome, Italy"`) to confirm the fix generalizes,
+  not just patches this one input.
+
+---
+
+#### LOCAL-4 — Walking-tour route still backtracks (sequence AFTER LOCAL-3)
+
+**Agent:** Mac Mini Kiro
+**Branch:** `kiro/local4-route-backtrack` (start after `LOCAL-3` lands — see why below)
+**Priority:** normal — real, but its full extent can't be judged until LOCAL-3 is
+fixed.
+
+**Symptom:** the same Nice walking tour's delivered stop order was: Promenade des
+Anglais (43.6954, 7.2653) → **Castle Hill** (43.6945, 7.2821, ~1.4km east, the far
+end of the bay) → **Albert 1st Gardens** (43.6973, 7.2738, ~0.8km back toward the
+center) → Opera House → Place Masséna → Cours Saleya → Old Town → Russian Cathedral
+→ Chagall Museum → MAMAC. That's a confirmed there-and-back detour to the
+easternmost point instead of saving it for one end of the route.
+
+**Why this needs LOCAL-3 first:** because of the location-parsing bug, none of
+these stops were Wikidata-verified — the coordinates above are GPT's own guesses
+(which happen to be accurate for well-known Nice landmarks), not grounded P625
+data. Container logs confirm `PHASE 3B` ran the GPT-based reordering step **twice**
+(`PHASE 3B: Requesting structured details...` then `PHASE 3B (re-order after
+GEO-CHECK)`) and still produced this backtrack. It's not yet known whether real
+Wikidata coordinates (once LOCAL-3 is fixed) would give the reordering call enough
+grounding to avoid this, or whether the GPT-based "minimize backtracking" prompt
+itself just isn't reliable for a 10-point routing problem regardless of data
+quality.
+
+**Required investigation:** after `LOCAL-3` lands, re-run the identical request and
+check whether this specific backtrack persists. If it does, GPT-based reordering
+alone isn't sufficient and needs a deterministic fallback (e.g. nearest-neighbor or
+a simple 2-opt pass over the verified/GPT coordinates) rather than relying purely on
+a natural-language "minimize backtracking" instruction. If it resolves on its own
+once real coordinates are available, this task can close with just the
+confirmation and no code change.
+
+**Acceptance:** re-run the Nice walking tour post-LOCAL-3, plot/check the stop
+order against real coordinates, confirm no round-trip detours of this kind. If a
+fix is needed, live-test it on this case plus at least one other walking-tour
+scenario (e.g. Beacon Hill) to confirm no regression on cases that already ordered
+correctly.
+
+---
+
+#### LOCAL-5 — Translated tours have scrambled/duplicated stop headers
+
+**Agent:** Mac Mini Kiro
+**Branch:** `kiro/local5-translation-header-fix`
+**Priority:** high — visible defect in every translated tour, found across two
+different languages (RU and FR), so it's systemic to translation-service, not a
+one-off.
+
+**Symptom:** every translated tour checked (job `13`/ru walking tour, `15`/ru
+museum tour, `16`/fr museum tour) has the stop header scrambled. Example (tour 16,
+fr):
+```
+Stop 1: Coordinates: 43.6972, 7.2764
+Address: Museum Of Naïve Art, 13 Rue Saint-François de Paule, 06300 Nice, France
+La fuite en Égypte
+
+Adresse : Musée d'Art Naïf, 13 Rue Saint-François de Paule, 06300 Nice, France
+
+Coordonnées : 43.6972, 7.2764
+```
+The original English `Address:`/`Coordinates:` leak in **untranslated** and get
+jammed onto the `Stop N:` line (which should just be `Stop N: <title>`), and the
+translated title ends up orphaned on its own line below. Then a **second**,
+correctly-translated address/coordinates block appears further down with
+translated field labels. Same pattern in both Russian tours checked — this is
+translation-service's reassembly logic, not a one-off glitch, and not a
+translation-*quality* problem (the actual prose translation reads fluently in
+French — this is purely structural).
+
+**Required fix:** find wherever `translation-service` splits the original English
+`tour_content` into per-stop segments before translating and reassembles them
+afterward. The duplication (English address/coordinates AND a separately-translated
+copy both appearing) suggests either the "Stop N: <title>" extraction regex is
+grabbing the wrong line, or the address/coordinates block is being preserved
+verbatim in one pass and independently translated in another, with both ending up
+in the output.
+
+**Acceptance:** re-translate one of these three tours (or a fresh one) and show the
+translated `tour_content` has clean, single-instance `Stop N: <translated title>` /
+`Address: <translated address>` / `Coordinates: <coords>` structure per stop —
+matching the English original's one-field-per-line format, no leftover
+untranslated fragments, no duplicate blocks. Check both a RU and a FR output to
+confirm the fix isn't language-specific.
+
 ---
 
 *(Format for LEAD when creating a new LOCAL-N entry: `#### LOCAL-N — <title>`
@@ -636,6 +826,9 @@ with the normal 1-comment/1-status-update sync per task.)*
 | 3 | wdvrdawcyx | `create_comment` (approval verdict above) + `update_task(status=complete)` | 2 | ☐ |
 | 4 | wdvrdawdje | none (no drift) | 0 | n/a |
 | 5 | LOCAL-1 | `create_task` first, then map ID + normal 1-comment/1-status sync | 3 | ☐ |
-| 6 | LOCAL-2 | `create_task` first, then map ID + normal 1-comment/1-status sync (once Kiro reviews) | 3 | ☐ |
+| 6 | LOCAL-2 | `create_task` first, then map ID + 1-comment/1-status sync — Kiro's review is DONE (approved), just needs syncing | 3 | ☐ |
+| 7 | LOCAL-3 | `create_task` first, then map ID + normal 1-comment/1-status sync | 3 | ☐ |
+| 8 | LOCAL-4 | `create_task` first, then map ID + normal 1-comment/1-status sync | 3 | ☐ |
+| 9 | LOCAL-5 | `create_task` first, then map ID + normal 1-comment/1-status sync | 3 | ☐ |
 
 **Total sync cost so far: 2 API calls.** Update this table as more offline work happens.
