@@ -1,0 +1,65 @@
+{
+  "pilot": "phase3_walking_tours",
+  "code_sha": "d44effcc9efb50a3cde65da78ab9b7362204514f",
+  "code_dirty": false,
+  "suites": {
+    "test_palais_fix_lead_fixture.py": {
+      "exit": 0,
+      "pass": true
+    },
+    "test_b6_generation_wiring.py": {
+      "exit": 0,
+      "pass": true
+    },
+    "test_f4_cache_roundtrip.py": {
+      "exit": 0,
+      "pass": true
+    },
+    "test_g4_false_positives.py": {
+      "exit": 0,
+      "pass": true
+    },
+    "test_sq2_fixtures.py": {
+      "exit": 0,
+      "pass": true
+    },
+    "test_sq3_fixtures.py": {
+      "exit": 0,
+      "pass": true
+    },
+    "test_sq4_merge.py": {
+      "exit": 0,
+      "pass": true
+    },
+    "test_w4_matcher.py": {
+      "exit": 0,
+      "pass": true
+    },
+    "test_w7_wiring.py": {
+      "exit": 0,
+      "pass": true
+    },
+    "test_w9_collection_anchor.py": {
+      "exit": 0,
+      "pass": true
+    },
+    "test_tier_computation.py": {
+      "exit": 0,
+      "pass": true
+    }
+  },
+  "tours": {
+    "Beacon Hill, Boston": {
+      "status": "completed",
+      "chars": 19959
+    },
+    "Vieux Nice, Nice, France": {
+      "status": "completed",
+      "chars": 19132
+    },
+    "Concord, Massachusetts": {
+      "status": "completed",
+      "chars": 19973
+    }
+  }
+}
