@@ -98,9 +98,72 @@ if __name__ == "__main__":
     success = run_tests()
 
     print()
-    if success:
-        print("ALL TESTS PASSED — no false-positive regressions")
-        sys.exit(0)
-    else:
+    if not success:
         print("SOME TESTS FAILED — B1 fix may have regressed")
         sys.exit(1)
+
+    print("ALL TESTS PASSED — no false-positive regressions")
+
+
+# ========== G4 fail-closed scoping test ==========
+# Tests the G4 branching logic directly (not through full QA runner,
+# which has many other checks that interfere with short test texts).
+# Verifies: (a) walking skips, (b) rich museum fails closed, (c) exhibit_museum skips.
+
+import re
+
+print("\n--- G4 Fail-Closed Scoping ---")
+
+def g4_would_fail_closed(tour_text, story_elements_list, venue_context, is_storied=True):
+    """Replicate the exact G4 fail-closed branching logic from content_qa_runner.py."""
+    # Simulate: we HAVE claim_sentences (the condition for this branch to fire)
+    _claim_sentences = ["In 1966, Marc and Valentina Chagall donated paintings."]  # non-empty
+    
+    if is_storied and _claim_sentences and not story_elements_list:
+        _tour_category_match = re.search(r'Tour-Category:\s*(\w+)', tour_text)
+        _tour_category = _tour_category_match.group(1).lower() if _tour_category_match else 'unknown'
+        _ctx_tier = (venue_context or {}).get('tier', '') if venue_context else ''
+        _is_exhibit_museum = (_ctx_tier == 'exhibit_museum')
+        
+        if _tour_category != 'museum':
+            return False  # skips gracefully (walking/restaurant/etc.)
+        elif _is_exhibit_museum:
+            return False  # skips gracefully (exhibit_museum)
+        else:
+            return True   # FAILS CLOSED (rich/medium/thin museum)
+    return False  # other paths don't fail closed
+
+
+# (a) Walking tour: should NOT fail closed
+walking_result = g4_would_fail_closed(
+    "Tour-Category: walking\nStop 1: Test", None, {'tier': ''})
+assert walking_result == False, "Walking tour should skip G4"
+print("  [PASS] (a) Walking tour skips G4 gracefully")
+
+# (b) Rich museum: SHOULD fail closed
+rich_result = g4_would_fail_closed(
+    "Tour-Category: museum\nStop 1: Test", None, {'tier': 'rich'})
+assert rich_result == True, "Rich museum without story_elements should FAIL closed"
+print("  [PASS] (b) Rich museum tour FAILS G4 closed (story_elements expected)")
+
+# (c) exhibit_museum: should NOT fail closed
+exhibit_result = g4_would_fail_closed(
+    "Tour-Category: museum\nStop 1: Test", None, {'tier': 'exhibit_museum'})
+assert exhibit_result == False, "exhibit_museum should skip G4"
+print("  [PASS] (c) exhibit_museum tier skips G4 gracefully")
+
+# (d) Medium museum: SHOULD fail closed (story_elements expected for medium)
+medium_result = g4_would_fail_closed(
+    "Tour-Category: museum\nStop 1: Test", None, {'tier': 'medium'})
+assert medium_result == True, "Medium museum without story_elements should FAIL closed"
+print("  [PASS] (d) Medium museum tour FAILS G4 closed")
+
+# (e) When story_elements ARE provided: never hits this branch at all
+with_elements_result = g4_would_fail_closed(
+    "Tour-Category: museum\nStop 1: Test", [{"type": "origin", "text": "test"}], {'tier': 'rich'})
+assert with_elements_result == False, "With story_elements provided, this branch never fires"
+print("  [PASS] (e) With story_elements present, fail-closed branch is unreachable")
+
+print("\nG4 FAIL-CLOSED SCOPING: ALL PASS")
+
+sys.exit(0)

@@ -638,12 +638,29 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
         if not _passed_g4:
             FACTUAL_FAIL_COUNT += 1
     elif _is_storied and _claim_sentences and not _story_elements_list:
-        # Previously: fail-closed when STORIED mode has claims but no story_elements.
-        # Now: story_elements are only available for rich-tier museum tours with full story mining.
-        # Walking tours, exhibit_museum tours, and any venue without story mining → skip gracefully.
-        # The G4 gate only adds value when story_elements EXIST to check against.
-        check("G4 Prolog/epilog claims trace to story elements (FACTUAL)",
-              True, "(no story_elements file — G4 grounding check skipped)")
+        # Fail-closed: STORIED mode, claims present, no elements → FACTUAL FAIL
+        # EXCEPT: walking tours and exhibit_museum tours structurally never have story_elements.
+        # For those categories/tiers, skip gracefully. For rich/medium/thin museum tours,
+        # an empty story_elements is a real signal (extractor failed) — keep fail-closed.
+        _tour_category_match = re.search(r'Tour-Category:\s*(\w+)', tour_text)
+        _tour_category = _tour_category_match.group(1).lower() if _tour_category_match else 'unknown'
+        # exhibit_museum detection via venue_context (passed from service layer with tier info)
+        _ctx_tier = (venue_context or {}).get('tier', '') if venue_context else ''
+        _is_exhibit_museum = (_ctx_tier == 'exhibit_museum')
+        
+        if _tour_category != 'museum':
+            # Non-museum tours (walking, restaurant, etc.) — story_elements not expected
+            check("G4 Prolog/epilog claims trace to story elements (FACTUAL)",
+                  True, f"(tour_category={_tour_category} — story_elements not expected, skipped)")
+        elif _is_exhibit_museum:
+            # exhibit_museum tier — sparse venue, story mining not available
+            check("G4 Prolog/epilog claims trace to story elements (FACTUAL)",
+                  True, "(exhibit_museum tier — story_elements not expected, skipped)")
+        else:
+            # Rich/medium/thin museum tour — story_elements SHOULD exist; fail-closed
+            check("G4 Prolog/epilog claims trace to story elements (FACTUAL)",
+                  False, "STORIED mode: claims present but story_elements unavailable — fail-closed")
+            FACTUAL_FAIL_COUNT += 1
     else:
         check("G4 Prolog/epilog claims trace to story elements (FACTUAL)",
               True, "(no story_elements available or no dated/causal claims — skipped)")

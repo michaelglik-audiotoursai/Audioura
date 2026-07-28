@@ -176,11 +176,19 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                         _city_raw = _loc_parts[1].strip() if len(_loc_parts) > 1 else ''
                         _region_raw = _loc_parts[2].strip() if len(_loc_parts) > 2 else ''
                         _venue_tokens = set(w.lower() for w in re.split(r'[\s\-]+', _venue_name_raw) if len(w) >= 3)
+                        # Get tier from generation module (exposed via module-level var)
+                        _gen_tier = ''
+                        try:
+                            from generate_tour_text import _LAST_VERIFICATION_TIER
+                            _gen_tier = _LAST_VERIFICATION_TIER or ''
+                        except (ImportError, AttributeError):
+                            pass
                         _venue_ctx = {
                             'venue_tokens': _venue_tokens,
                             'city': _city_raw,
                             'region': _region_raw,
                             'artist': '',  # Will be populated if venue_resolver provides it
+                            'tier': _gen_tier,
                         }
                     except Exception:
                         pass

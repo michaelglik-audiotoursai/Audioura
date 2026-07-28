@@ -674,6 +674,9 @@ _LAST_CLEAN_FAIL_EVIDENCE = {}
 # [B1b] Module-level: populated after successful generation with final poi_list (including verified flags)
 _LAST_POI_LIST = []
 
+# Module-level: populated after D1v2 verification with the computed tier
+_LAST_VERIFICATION_TIER = ""
+
 
 
 def _is_artist_human(artist_qid: str) -> bool:
@@ -2110,6 +2113,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             _d1v2_result = _verify_works_v2(poi_list, _d1v2_venue_arg)
             if isinstance(_d1v2_result, VerificationResult):
                 _verification_tier = _d1v2_result.tier
+                global _LAST_VERIFICATION_TIER
+                _LAST_VERIFICATION_TIER = _verification_tier
                 if _d1v2_result.tier == 'unresolvable':
                     # Clean fail with structured error
                     print(f"  [D1] Tier: unresolvable — clean fail (entity={_d1v2_result.entity_resolved}, sparql={_d1v2_result.sparql_count})")
