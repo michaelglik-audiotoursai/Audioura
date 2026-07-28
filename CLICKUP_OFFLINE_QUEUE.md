@@ -580,6 +580,45 @@ healthy.
 
 ---
 
+#### LOCAL-2 — Review LEAD's self-implemented LOCAL-1 fixes (b0f8c65)
+
+**Agent:** Mac Mini Kiro
+**Priority:** high — Michael wants this reviewed before his field test, same as
+LOCAL-1's fixes themselves.
+**No branch needed** — this is a read/review task, not an implementation task.
+
+**Context:** LEAD implemented the three `LOCAL-1` fixes directly (commit `b0f8c65`,
+already merged to `storied`) instead of routing through the normal Kiro-executes /
+Claude-reviews split, to move faster per Michael's request. That means those changes
+shipped without independent review — the golden rule violation Michael flagged.
+This task is the fix for that: **read `LEAD_CHANGES_local1_phase3_followups.md`**
+(committed at repo root, full symptom/analysis/implementation/verification writeup
+for all three fixes) and review it with the same rigor you'd want applied to your
+own submissions.
+
+**What to actually do:**
+1. Read the diffs yourself (`git show b0f8c65`) — don't just read LEAD's
+   description of them.
+2. Specifically check the two things the document flags as needing independent
+   verification: (a) the `_validate_city_match` non-merge reasoning (Fix 1) — do
+   you agree the two versions solve genuinely different problems, or is there a
+   safe way to unify them? (b) the `[HEDGE-NM]` boolean condition (Fix 2) — trace
+   it for all four category/verified-flag combinations yourself.
+3. The document also names two verification gaps LEAD didn't close: a non-famous
+   verified landmark for the hedging fix, and a fresh (never-cached) area for the
+   DB-write path. Close either if you have time; not required.
+4. Report back: what you checked, what you found (if anything), and whether you'd
+   have approved this had you been gating the merge instead of reviewing after
+   the fact.
+
+**Acceptance:** a genuine independent review — either confirms the fixes are
+correct, or surfaces something wrong that needs a real follow-up commit. Mark
+`##### READY FOR REVIEW` here when done (even though there's no code of yours to
+merge — that heading is still the "I'm done, please look" signal LEAD's periodic
+check watches for).
+
+---
+
 *(Format for LEAD when creating a new LOCAL-N entry: `#### LOCAL-N — <title>`
 followed by the same content a real task description would have: Agent, Branch, full
 spec, acceptance criteria. At sync time: `create_task` first — unavoidable, costs 1
@@ -597,5 +636,6 @@ with the normal 1-comment/1-status-update sync per task.)*
 | 3 | wdvrdawcyx | `create_comment` (approval verdict above) + `update_task(status=complete)` | 2 | ☐ |
 | 4 | wdvrdawdje | none (no drift) | 0 | n/a |
 | 5 | LOCAL-1 | `create_task` first, then map ID + normal 1-comment/1-status sync | 3 | ☐ |
+| 6 | LOCAL-2 | `create_task` first, then map ID + normal 1-comment/1-status sync (once Kiro reviews) | 3 | ☐ |
 
 **Total sync cost so far: 2 API calls.** Update this table as more offline work happens.
