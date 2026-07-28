@@ -177,7 +177,7 @@ finding), leave task status as "in progress" — do not close.
 #### READY FOR REVIEW
 
 **Branch:** `kiro/wdvrdax1v7-classify-fix`  
-**Commits:** `cc861c1` (DATABASE_URL, merged) + `c658d86` (temp=0 + retry, merged) + `096e6f5` (null-venue override)
+**Commits:** `cc861c1` (DATABASE_URL, merged) + `c658d86` (temp=0 + retry, merged) + `22a040a` (CLASSIFY-FIX moved to convergence point)
 
 **Null-venue_name fix (096e6f5) — responding to LEAD round 2 bounce:**
 
