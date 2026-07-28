@@ -1352,6 +1352,48 @@ Container rebuilt from `storied`, healthy.
 
 ---
 
+#### LOCAL-8 — Ban generic "Nestled in.../In the heart of..." openers (fast-follow from LOCAL-6)
+
+**Agent:** Mac Mini Kiro
+**Branch:** `kiro/local8-opener-ban`
+**Priority:** normal — quality polish on an already-merged enhancement, not a defect.
+
+**Context:** LOCAL-6's Fix 1 (varied per-stop opening styles, cycled by `idx % 7`)
+was reviewed and merged (`1fecaae`) — the code is correct (7 distinct style
+instructions genuinely injected per stop, confirmed by reading
+`generate_tour_text.py`'s `_generate_description`), but live-tested output shows
+GPT doesn't reliably follow the assigned style. Two independent live generations
+(Nice restaurant tour, Nice naive-art museum tour) both showed 3-4 of 6 stops
+falling back to the same generic locative-clause opener regardless of their
+assigned style:
+- Restaurant tour: `grep -c "Nestled in\|In the heart of"` → 5/6 stops.
+- Museum tour: same grep → 4/6 stops.
+This is the exact "template-y" sameness the fix was meant to eliminate, still
+present just with different vocabulary.
+
+**Why this should work (evidence already in-repo):** LOCAL-6's Fix 3 (hedging
+reframe) shows the proven pattern — it includes an explicit negative constraint
+("avoid robotically repeating 'believed to be' or 'reportedly' — vary your
+uncertainty markers") and live-tested output showed ZERO leakage of the old
+phrasing. Fix 1 has no equivalent negative constraint — it only says what TO do
+per stop, never what NOT to do.
+
+**Spec:** in the `_OPENING_STYLES` block (`generate_tour_text.py` ~line 3410-3420)
+and/or the instruction text injected after it (~line 3421-3424), add an explicit
+ban: something like "Do NOT open with 'Nestled in...', 'In the heart of...', or
+any other generic locative-clause opener, regardless of which style above you're
+using." Keep the existing 7-style cycling logic unchanged — this is additive, a
+negative constraint layered on top of the existing positive one.
+
+**Acceptance:** generate at least 2 live tours (reuse Nice restaurant + Nice
+museum as before, or any 6+ stop tour) and grep for the banned phrases —
+target is 0 occurrences (or a clear, large drop from the current 5/6 and 4/6
+baselines). Also spot-check that the assigned per-stop style is now actually
+legible in the opening sentence (not just "not generic," genuinely varied).
+All 11 regression suites must stay green (prompt-only change, same as LOCAL-6).
+
+---
+
 *(Format for LEAD when creating a new LOCAL-N entry: `#### LOCAL-N — <title>`
 followed by the same content a real task description would have: Agent, Branch, full
 spec, acceptance criteria. At sync time: `create_task` first — unavoidable, costs 1
@@ -1373,7 +1415,8 @@ with the normal 1-comment/1-status-update sync per task.)*
 | 7 | LOCAL-3 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED | 3 | ☐ |
 | 8 | LOCAL-4 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — decision made | 3 | ☐ |
 | 9 | LOCAL-5 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED | 3 | ☐ |
-| 10 | LOCAL-6 | `create_task` first, then map ID + normal 1-comment/1-status sync | 3 | ☐ |
+| 10 | LOCAL-6 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED | 3 | ☐ |
 | 11 | LOCAL-7 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED | 3 | ☐ |
+| 12 | LOCAL-8 | `create_task` first, then map ID + normal 1-comment/1-status sync — new, dispatched, not yet started | 3 | ☐ |
 
 **Total sync cost so far: 2 API calls.** Update this table as more offline work happens.
