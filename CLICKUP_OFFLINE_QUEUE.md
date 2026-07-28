@@ -1091,6 +1091,114 @@ changes, so regressions would most likely show up as QA gate failures
 (`content_qa_runner.py`), not test failures, so also spot-check a couple of full
 generations pass `BLOCKER4c` QA cleanly.
 
+##### READY FOR REVIEW
+
+**Branch:** `storied` (uncommitted — working tree per code-review workflow rules)
+**Files:** `generate_tour_text.py` (+65/-17 lines — purely prompt text, zero logic changes)
+
+**Implementation summary:**
+
+1. **Fix 1 — Varied sentence openings:** 7-entry `_OPENING_STYLES` list (sensory detail,
+   question, historical fact, direct address, contrast, anecdote, significance statement).
+   Cycled by `idx % 7` — deterministic per stop position, so stops 0-6 always get different
+   styles. Injected after both museum and non-museum templates converge (shared code path).
+   Instruction explicitly says "do NOT open with a generic introduction or the same structure
+   as other stops."
+
+2. **Fix 2 — Narrative directions:** Added to the PHASE 3B prompt: "each
+   'directions_from_previous' should END with one brief observational or connective sentence
+   — something the visitor might notice in transit." JSON field description updated to
+   `"<turn-by-turn directions + one observational sentence>"`. Explicitly scoped to ONE
+   sentence to avoid bloating transition text into a second stop description.
+
+3. **Fix 3 — Hedging reframed as narrative:**
+   - B1 (unverified museum works): "The story goes that this piece...", "If the records are
+     right...", "There's a fascinating claim that..., though its exact provenance remains
+     a matter of debate." Also: "avoid robotically repeating 'believed to be' or
+     'reportedly' — vary your uncertainty markers."
+   - HEDGE-NM (non-museum/unverified-walking): "The story passed down through the
+     neighborhood is that...", "Local tradition holds that..., though the details have
+     shifted in each retelling", "One account — perhaps embellished over the years —
+     describes...", "If you ask a local, they'll tell you that...".
+   - Grounding contract PRESERVED: still says "Do NOT invent specific names, dates, or
+     incidents" and "NEVER state the work's presence as certain fact" — only the *tone* of
+     the uncertainty is changed (mystery → disclaimer), not the *degree*.
+
+4. **Fix 4 — Per-category tone:** `_CATEGORY_TONE` dict with distinct personality per type:
+   - museum: "Contemplative and reverent — linger on details, invite the listener to slow
+     down and truly look."
+   - restaurant: "Warm, sensory, and convivial — evoke tastes, aromas, textures, the buzz
+     of a busy kitchen."
+   - walking: "Historical-narrative and grounded — anchor each place in its real history
+     and layers of time."
+   - movie: "Cinematic and evocative — draw parallels between the real place and its
+     on-screen life."
+   - book: "Literary and reflective — connect place to prose, atmosphere to narrative."
+
+**Regression:** 11/11 suites green.
+
+**UNPROVEN (honest):** The acceptance criteria require showing actual generated prose
+differences (two consecutive stops with different structure, a connective directions line,
+etc.). This requires live GPT API calls. The prompt changes are correct by inspection —
+they will change the output — but I cannot produce the live artifacts without costing API
+credits. If LEAD or Michael wants to see the actual prose difference, a single generation
+of any walking or restaurant tour post-merge would demonstrate all four fixes firing.
+Recommend running a fresh Beacon Hill or Nice walking tour as the acceptance artifact.
+
+**TRUE current state:** **APPROVED AND MERGED to `storied`, with one documented residual
+gap flagged for a fast-follow (not a blocker).**
+
+##### LEAD VERDICT (independent verification, 2026-07-28)
+
+Read the diff (`+65/-17`, matches the claim), confirmed `idx`/`tour_category` are valid in
+`_generate_description`'s scope, ran all 11 regression suites locally (green), rebuilt
+`audioura-tour-generator-1` and hash-confirmed the container is running the exact
+uncommitted source (`md5sum` match, host vs. container). Then closed Kiro's own honestly-flagged
+gap by running 3 live generations myself — a restaurant tour (Nice), a museum tour (Musée
+d'art naïf, Nice), and a re-run of the Palais Lascaris pilot specifically to force unverified
+stops and exercise the hedging path:
+
+- **Fix 4 (per-category tone) — confirmed, strong.** Side-by-side, the restaurant tour reads
+  warm/sensory/convivial ("the clinking of wine glasses mingles with lively chatter and the
+  sizzle of food") and the museum tour reads contemplative/philosophical ("What lies beneath
+  the surface of this seemingly straightforward depiction?"). Clearly distinct products, not
+  the same engine with nouns swapped.
+- **Fix 3 (hedging reframed as narrative) — confirmed, strong, and this is the standout fix.**
+  Forced 3 unverified stops in the Palais Lascaris re-run (Virgin and Child, Annunciation,
+  Adoration of the Shepherds) and pulled the actual generated text: *"The story goes that this
+  piece... is a poignant testament..."*, *"If the records are right, what you're looking at is
+  a masterful depiction..."* — real output, not inspection-only. Grepped for the old flat
+  disclaimer phrasing ("believed to be", "reportedly") across all three test files: zero
+  matches. Grounding contract intact — still framed as uncertain ("is said to grace", "shrouded
+  in mystery"), never stated as confirmed fact, exactly per spec.
+- **Fix 2 (connective observation in `directions_from_previous`) — confirmed, present but
+  inconsistent.** ~2 of 5 transitions in the restaurant tour clearly land it ("You'll pass by
+  charming shops and cafes along the way, soaking in the historic ambiance of Old Nice.",
+  "It's a charming walk through the old city streets..."); the others default to a plain
+  arrival sign-off ("Enjoy your meal!"). Not a logic problem — GPT compliance is just
+  inconsistent. Acceptable; the instruction is correctly present and does fire some of the time.
+- **Fix 1 (varied openings) — confirmed partially working, real residual gap found.** The code
+  correctly cycles 7 distinct style instructions by `idx % 7` (verified by reading the source).
+  In live output, 2 of 6 stops per tour show strong, clearly distinct structure matching their
+  assigned style (a historical-fact-dated opener, a direct-address "As you stand before..."
+  opener). But **3–4 of 6 stops in both test tours defaulted back to the same generic
+  "Nestled in..." / "In the heart of..." locative-clause opener regardless of their assigned
+  style** — `grep -c "Nestled in\|In the heart of"` hit 5/6 stops in the restaurant tour and
+  4/6 in the museum tour. This is the exact template-y pattern the fix was meant to eliminate,
+  now reproduced with hard counts. Root cause is prompt compliance, not code: GPT isn't
+  weighting the per-stop style instruction strongly enough over its habitual opener. Fix 3
+  shows the proven remedy for this class of problem (an explicit negative constraint — "avoid
+  robotically repeating X" — is what made Fix 3 land cleanly with zero old-phrase leakage).
+  Recommend a fast-follow: add "do NOT open with 'Nestled in' or 'In the heart of'" as an
+  explicit ban alongside the existing per-stop style instruction.
+
+**Net:** 3 of 4 fixes land cleanly with strong live evidence; the 4th (opening variety) works
+some of the time and has a concrete, well-understood residual gap with a proven fix pattern
+already sitting in this same diff (Fix 3). Not a reason to bounce a prompt-only enhancement —
+merging now, dispatching the opener fast-follow separately.
+
+**Regression:** 11/11 suites green (re-verified locally, not just trusted from the report).
+
 ---
 
 #### LOCAL-7 — Implement deterministic route ordering (decision from LOCAL-4)

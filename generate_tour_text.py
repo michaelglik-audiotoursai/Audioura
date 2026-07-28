@@ -2873,7 +2873,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 + "\n".join(s_lines) + "\n\n"
                 "For each stop IN THE EXACT ORDER ABOVE, provide all the JSON fields below.\n"
                 "For stop #1, 'directions_from_previous' should describe how to reach it from a reasonable arrival point (T station, parking, main street).\n"
-                f"For subsequent stops, 'directions_from_previous' should be {'turn-by-turn walking directions' if transport_mode == 'on_foot' else f'route directions suitable for {transport_mode} travel'} from the IMMEDIATELY PREVIOUS stop in the list.\n\n"
+                f"For subsequent stops, 'directions_from_previous' should be {'turn-by-turn walking directions' if transport_mode == 'on_foot' else f'route directions suitable for {transport_mode} travel'} from the IMMEDIATELY PREVIOUS stop in the list.\n"
+                "IMPORTANT: each 'directions_from_previous' should END with one brief observational or connective sentence — "
+                "something the visitor might notice in transit (a change in architecture, a glimpse of something ahead, the sound of a market). "
+                "Keep this to ONE sentence after the navigation, not a full paragraph.\n\n"
                 "Return ONLY a JSON array, no markdown fences, no commentary:\n"
                 "[\n  {\n"
                 '    "name": "<must match one of the input names exactly>",\n'
@@ -2882,7 +2885,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 '    "type_specialty": "<short type/specialty description>",\n'
                 '    "specific_examples": "<2-3 concrete examples of what visitors will see/experience>",\n'
                 '    "operational_details": "<hours, prices, reservations, busy times>",\n'
-                '    "directions_from_previous": "<turn-by-turn>"\n'
+                '    "directions_from_previous": "<turn-by-turn directions + one observational sentence>"\n'
                 "  }\n]"
             )
             req_data = {
@@ -3404,14 +3407,56 @@ Do NOT use museum/gallery framing (no "exhibit", no "viewing platform", no "artw
 Do NOT invent specific named people or attribute quotes unless they are well-documented public figures associated with this location.
 """
 
+        # [LOCAL-6 Fix 1] Varied sentence openings — cycle through styles by stop index
+        # so consecutive stops in the same tour open with genuinely different structure.
+        _OPENING_STYLES = [
+            "Open with a vivid sensory detail — a sound, smell, texture, or visual that immediately places the listener at this location.",
+            "Open with a direct question that draws the listener in — something that invites curiosity about this place.",
+            "Open with a specific historical fact or date that anchors the listener in time before describing the present.",
+            "Open by addressing the listener directly in a scene-setting moment — 'As you stand here...' or 'Look up and notice...'",
+            "Open with a brief, surprising contrast — what this place once was versus what it is now, or how it differs from its surroundings.",
+            "Open with a local anecdote or piece of folklore connected to this spot — a story a resident might tell.",
+            "Open with the broader significance of this place in a single declarative sentence before zooming into detail.",
+        ]
+        _opening_style = _OPENING_STYLES[idx % len(_OPENING_STYLES)]
+        description_prompt += f"""
+OPENING STYLE (mandatory for this stop): {_opening_style}
+This instruction overrides any default opening pattern — do NOT open with a generic introduction or the same structure as other stops.
+"""
+
+        # [LOCAL-6 Fix 4] Per-category personality/tone — distinct product feel per tour type
+        _CATEGORY_TONE = {
+            'museum': "Contemplative and reverent — linger on details, invite the listener to slow down and truly look. "
+                      "Speak as someone who has spent hours in this room and wants to share what they've noticed.",
+            'restaurant': "Warm, sensory, and convivial — evoke tastes, aromas, textures, the buzz of a busy kitchen. "
+                          "Speak as a food-loving local who knows the story behind the menu.",
+            'walking': "Historical-narrative and grounded — anchor each place in its real history and layers of time. "
+                       "Speak as a knowledgeable neighbor walking alongside the listener through familiar streets.",
+            'movie': "Cinematic and evocative — draw parallels between the real place and its on-screen life. "
+                     "Speak as someone who sees the film/show layered onto the physical location.",
+            'book': "Literary and reflective — connect place to prose, atmosphere to narrative. "
+                    "Speak as a reader who has stood where the characters stood and felt the world come alive.",
+        }
+        _cat_tone = _CATEGORY_TONE.get(tour_category, '')
+        if _cat_tone:
+            description_prompt += f"""
+CATEGORY VOICE: {_cat_tone}
+This tone should permeate the entire description — not as a single inserted sentence, but as the underlying sensibility.
+"""
+
         # [PALAIS-FIX B1] Hedged narration for unverified stops — moved EARLY for GPT attention
+        # [LOCAL-6 Fix 3] Reframed as narrative aside instead of flat institutional disclaimer
         if not poi.get('verified', True):
             description_prompt += """
-CRITICAL HEDGING REQUIREMENT: This artwork's presence at this venue has NOT been independently verified.
-You MUST use hedged phrasing for EVERY claim about this artwork: "attributed to...", "believed to be on display...",
-"reportedly features...", "said to depict...". For example, instead of "This painting shows a vibrant scene of...",
-write "This work, believed to be on display here, reportedly depicts a scene of...".
-Do NOT state the work's presence as certain fact. EVERY sentence about the work must contain hedging language.
+NARRATIVE HONESTY — UNVERIFIED WORK: This artwork's presence at this venue has NOT been
+independently confirmed. Frame this uncertainty as part of the story — not as a bureaucratic
+disclaimer, but as an intriguing layer of the narrative. Use phrasing like:
+"The story goes that this piece...", "If the records are right, what you're looking at is...",
+"There's a fascinating claim that this work..., though its exact provenance here remains a
+matter of debate among scholars."
+The uncertainty itself is interesting — present it that way. NEVER state the work's presence
+as certain fact, but also avoid robotically repeating "believed to be" or "reportedly" — vary
+your uncertainty markers and weave them into the storytelling naturally.
 """
 
         # [HEDGE-NM] Hedging safety net for non-museum categories (movie/book/walking/restaurant/etc.)
@@ -3426,16 +3471,19 @@ Do NOT state the work's presence as certain fact. EVERY sentence about the work 
         )
         if _hedge_nm_applies:
             description_prompt += """
-IMPORTANT — GROUNDING HONESTY: No fact-checking has been performed on specific claims about
-real people, events, or history for this stop. When you include a specific claim
-(a named chef/owner, a specific historical event, a notable visitor, a specific date or
-incident), use hedged, attributive framing rather than stating it as verified fact:
-"local accounts describe...", "the story often told is...", "according to [publication/type
-of source]...", "is said to have...". Do NOT invent specific names, dates, or incidents and
-present them as confirmed history. General, well-known facts (a neighborhood's founding era,
-a cuisine's regional origin, a book's publication year) can be stated plainly — the hedging
-requirement is specifically for claims about particular people or particular events tied to
-this specific stop, which is where fabrication risk is highest.
+NARRATIVE HONESTY — UNVERIFIED CLAIMS: No independent fact-checking has been performed on
+specific claims about people, events, or history for this stop. When you include a specific
+claim (a named person, a particular event, a date), frame uncertainty as part of the narrative
+rather than as a flat disclaimer:
+Instead of "reportedly" or "believed to be" (which sound clinical), use storytelling framing:
+"The story passed down through the neighborhood is that...",
+"Local tradition holds that..., though the details have shifted in each retelling",
+"One account — perhaps embellished over the years — describes...",
+"If you ask a local, they'll tell you that...".
+The uncertainty itself adds texture — present it as an intriguing element, not a legal caveat.
+General, well-known facts (a neighborhood's founding era, a cuisine's regional origin) can be
+stated plainly. The narrative-honesty requirement applies specifically to particular people or
+events tied to this specific stop. Do NOT invent specific names, dates, or incidents.
 """
 
         # [S24] Storied: inject story-type tone + forbidden-phrase ban
