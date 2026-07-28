@@ -246,10 +246,198 @@ results.append(("B1 verified 'Raquel' does NOT have verified=False",
                 b1_raquel is not None and b1_raquel.get('verified', True) is True))
 
 
-# ========== Print results ==========
+# (Print results moved to end of file, after all assertions)
+
+
+# ========== [L2] Medium-tier unified fill — verified=False contract ==========
+
+# Scenario: A medium-tier museum with 4 verified works and 6 unverified candidates.
+# With REQUIRE_LISTING_VERIFICATION=false, unverified fills should be allowed.
+# Every fill candidate MUST have verified=False.
+
+def unified_fill_logic(candidates, verified, tier, total_stops, evidence_log=None):
+    """Replicates the UNIFIED-FILL logic from the listings-as-evidence change.
+    This is the NEW path (REQUIRE_LISTING_VERIFICATION=false)."""
+    poi_list = list(verified)
+    _pre_d1v2_candidates = list(candidates)
+
+    if tier in ('thin', 'medium', 'exhibit_museum') and len(poi_list) < total_stops:
+        _verified_names = set(p['name'].lower() for p in poi_list)
+        _evidence_keys = set()
+        _rejected_names = set()
+        if evidence_log:
+            for cname, ev in evidence_log.items():
+                if isinstance(ev, dict):
+                    if ev.get('status') == 'VERIFIED':
+                        _evidence_keys.add(cname.lower())
+                    if ev.get('status') == 'REJECTED':
+                        _rejected_names.add(cname.lower())
+
+        _fill_candidates = []
+        for p in _pre_d1v2_candidates:
+            pname_lower = p['name'].lower()
+            if pname_lower in _verified_names or pname_lower in _evidence_keys:
+                continue
+            if pname_lower in _rejected_names:
+                continue
+            p['verified'] = False
+            _fill_candidates.append(p)
+        _fill_needed = total_stops - len(poi_list)
+        poi_list = list(poi_list) + _fill_candidates[:_fill_needed]
+
+    return poi_list
+
+
+# Medium tier: 4 verified + request for 10 stops → should fill up to 10
+medium_evidence = {
+    "Work A": {"status": "VERIFIED", "canonical_title": "Work A"},
+    "Work B": {"status": "VERIFIED", "canonical_title": "Work B"},
+    "Work C": {"status": "VERIFIED", "canonical_title": "Work C"},
+    "Work D": {"status": "VERIFIED", "canonical_title": "Work D"},
+    "Rejected Work": {"status": "REJECTED", "reason": "located_elsewhere"},
+    "Dropped Work E": {"status": "DROPPED", "reason": "no canonical match"},
+    "Dropped Work F": {"status": "DROPPED", "reason": "no canonical match"},
+    "Dropped Work G": {"status": "DROPPED", "reason": "no canonical match"},
+}
+medium_verified = [_new_poi("Work A"), _new_poi("Work B"), _new_poi("Work C"), _new_poi("Work D")]
+medium_candidates = [
+    _new_poi("Work A"), _new_poi("Work B"), _new_poi("Work C"), _new_poi("Work D"),
+    _new_poi("Rejected Work"), _new_poi("Dropped Work E"),
+    _new_poi("Dropped Work F"), _new_poi("Dropped Work G"),
+    _new_poi("Unknown Work H"), _new_poi("Unknown Work I"),
+]
+
+medium_result = unified_fill_logic(medium_candidates, medium_verified, 'medium', 10, medium_evidence)
+
+# Medium tier fills up to requested stops (or max available: 4 verified + 5 eligible = 9)
+# 10 candidates - 4 already verified - 1 REJECTED = 5 eligible fills
+results.append(("L2 medium-tier fill reaches max available (4 verified + 5 fills = 9)",
+                len(medium_result) == 9))
+
+# REJECTED candidate is NOT filled
+medium_result_names = [p['name'] for p in medium_result]
+results.append(("L2 REJECTED candidate NOT filled in medium tier",
+                "Rejected Work" not in medium_result_names))
+
+# All filled stops have verified=False
+medium_filled_stops = [p for p in medium_result if p['name'] not in
+                       {'Work A', 'Work B', 'Work C', 'Work D'}]
+results.append(("L2 ALL medium-tier fills have verified=False",
+                all(p.get('verified') == False for p in medium_filled_stops)))
+
+# Verified originals do NOT have verified=False
+medium_verified_stops = [p for p in medium_result if p['name'] in
+                         {'Work A', 'Work B', 'Work C', 'Work D'}]
+results.append(("L2 verified originals do NOT have verified=False",
+                all(p.get('verified', True) is True for p in medium_verified_stops)))
+
+# Exhibit_museum tier also fills
+exhibit_result = unified_fill_logic(medium_candidates, medium_verified, 'exhibit_museum', 8, medium_evidence)
+results.append(("L2 exhibit_museum tier also fills to requested stops",
+                len(exhibit_result) == 8))
+exhibit_filled = [p for p in exhibit_result if p['name'] not in
+                  {'Work A', 'Work B', 'Work C', 'Work D'}]
+results.append(("L2 exhibit_museum fills have verified=False",
+                all(p.get('verified') == False for p in exhibit_filled)))
+
+
+# ========== [BOUNCE FIX] Post-R4 fallback fill for non-rich tiers ==========
+
+# Scenario: exhibit_museum tier, total_stops=8 requested. UNIFIED-FILL already
+# consumed all _pre_d1v2_candidates. R4 ran 2 rounds generating NEW candidates,
+# but match_candidate_to_canonical failed on them → they're in _r4_all_dropped_pois.
+# POST-R4 FILL should use these R4-dropped candidates as the fill source.
+
+def post_r4_fill_logic(r4_dropped_candidates, current_pois, tier, total_stops, evidence_log=None):
+    """Replicates the POST-R4 fallback fill path.
+    Sources from _r4_all_dropped_pois (R4-generated candidates that failed verification),
+    NOT from _pre_d1v2_candidates (which UNIFIED-FILL already exhausted).
+    """
+    poi_list = list(current_pois)
+    _n_verified_current = sum(1 for p in poi_list if p.get('verified', True))
+    _n_unverified_current = len(poi_list) - _n_verified_current
+
+    # Rich tier: cap at 50%; non-rich: fill to total_stops
+    if tier not in ('thin', 'medium', 'exhibit_museum'):
+        _max_unverified = max(1, total_stops // 2)
+        _unverified_budget = _max_unverified - _n_unverified_current
+    else:
+        _unverified_budget = total_stops - len(poi_list)
+
+    if _unverified_budget <= 0:
+        return poi_list
+
+    _verified_names = set(p['name'].lower() for p in poi_list)
+    _rejected_names = set()
+    if evidence_log:
+        for cname, ev in evidence_log.items():
+            if isinstance(ev, dict) and ev.get('status') == 'REJECTED':
+                _rejected_names.add(cname.lower())
+
+    _fill = []
+    for p in r4_dropped_candidates:
+        pname_lower = p['name'].lower()
+        if pname_lower in _verified_names:
+            continue
+        if pname_lower in _rejected_names:
+            continue
+        if pname_lower in set(p2['name'].lower() for p2 in poi_list):
+            continue
+        p['verified'] = False
+        _fill.append(p)
+        if len(_fill) >= _unverified_budget:
+            break
+    _needed = min(len(_fill), total_stops - len(poi_list))
+    poi_list = list(poi_list) + _fill[:_needed]
+    return poi_list
+
+
+# Test: exhibit_museum, UNIFIED-FILL already consumed all pre-D1v2 candidates (6 stops current).
+# R4 ran and generated 5 new candidates, all failed verification → in _r4_all_dropped_pois.
+# Requesting 10 stops total → need 4 more from R4 drops.
+post_r4_current = [
+    _new_poi("Verified A"), _new_poi("Verified B"),
+    _new_poi("Fill C", verified=False), _new_poi("Fill D", verified=False),
+    _new_poi("Fill E", verified=False), _new_poi("Fill F", verified=False),
+]  # 6 stops (2 verified + 4 from UNIFIED-FILL)
+
+# R4 generated these but match_candidate_to_canonical returned None for all
+r4_dropped = [
+    _new_poi("R4 Candidate 1"), _new_poi("R4 Candidate 2"),
+    _new_poi("R4 Candidate 3"), _new_poi("R4 Rejected X"),
+    _new_poi("R4 Candidate 4"),
+]
+post_r4_evidence = {
+    "R4 Rejected X": {"status": "REJECTED", "reason": "located_elsewhere"},
+}
+
+post_r4_result = post_r4_fill_logic(
+    r4_dropped, post_r4_current, 'exhibit_museum', 10, post_r4_evidence
+)
+
+# Should fill 4 more (R4 Candidate 1,2,3,4 — Rejected X excluded) → total 10
+results.append(("POST-R4-FILL uses R4-dropped candidates (not pre-D1v2)",
+                len(post_r4_result) == 10))
+
+# All POST-R4 fills have verified=False
+post_r4_new = [p for p in post_r4_result if p['name'].startswith('R4 Candidate')]
+results.append(("POST-R4-FILL R4-dropped candidates have verified=False",
+                all(p.get('verified') == False for p in post_r4_new)))
+
+# REJECTED R4 candidate excluded
+results.append(("POST-R4-FILL excludes REJECTED R4 candidates",
+                "R4 Rejected X" not in [p['name'] for p in post_r4_result]))
+
+# Rich tier respects 50% cap with R4 drops
+post_r4_rich = post_r4_fill_logic(
+    r4_dropped, post_r4_current, 'rich', 10, post_r4_evidence
+)
+# 2 verified out of 6 current, 50% of 10 = 5 max unverified, already have 4 = budget 1
+results.append(("POST-R4-FILL rich tier respects 50% cap on R4 drops",
+                len(post_r4_rich) <= 7))  # 6 current + max 1 more = 7
 
 print("=" * 78)
-print("PALAIS-FIX LEAD FIXTURE — B3 hardening tests")
+print("PALAIS-FIX LEAD FIXTURE — B3 hardening + L2 medium-tier fill tests")
 print("=" * 78)
 fails = 0
 for name, ok in results:
