@@ -200,6 +200,121 @@ def _parse_coords(s):
     return (float(m.group(1)), float(m.group(2))) if m else None
 
 
+def _compute_route_order(poi_list):
+    """[LOCAL-7] Compute a deterministic walking-route order using nearest-neighbor + 2-opt.
+    
+    Uses real Wikidata P625 coordinates for verified stops; falls back to GPT-guessed
+    coordinates for unverified ones. Stops with no usable coordinates keep their
+    relative position. Returns the reordered list (new list, does not mutate input).
+    
+    Graceful no-op: returns input unchanged if <3 stops have coordinates.
+    """
+    # Extract coordinates for each stop
+    coords = []
+    for i, poi in enumerate(poi_list):
+        lat = poi.get('latitude') or poi.get('wikidata_lat')
+        lng = poi.get('longitude') or poi.get('wikidata_lng')
+        # Fallback: parse 'coordinates' string field (GPT-generated)
+        if not lat or not lng:
+            parsed = _parse_coords(poi.get('coordinates', ''))
+            if parsed:
+                lat, lng = parsed
+        if lat and lng and (float(lat) != 0.0 or float(lng) != 0.0):
+            coords.append((i, (float(lat), float(lng))))
+        else:
+            coords.append((i, None))
+    
+    # Separate stops with coordinates from those without
+    with_coords = [(idx, c) for idx, c in coords if c is not None]
+    without_coords = [idx for idx, c in coords if c is None]
+    
+    # Need at least 3 stops with coordinates for routing to matter
+    if len(with_coords) < 3:
+        print(f"  [ROUTE-ORDER] Only {len(with_coords)} stops with coordinates — skipping algorithmic routing")
+        return poi_list
+    
+    # --- Nearest-neighbor ---
+    n = len(with_coords)
+    # Start from the stop closest to the centroid (reasonable starting point)
+    centroid_lat = sum(c[0] for _, c in with_coords) / n
+    centroid_lng = sum(c[1] for _, c in with_coords) / n
+    centroid = (centroid_lat, centroid_lng)
+    
+    # Find starting stop: closest to centroid
+    start_idx = min(range(n), key=lambda i: _haversine_km(with_coords[i][1], centroid))
+    
+    visited = [False] * n
+    order = [start_idx]
+    visited[start_idx] = True
+    
+    for _ in range(n - 1):
+        current = order[-1]
+        current_coord = with_coords[current][1]
+        best_next = None
+        best_dist = float('inf')
+        for j in range(n):
+            if not visited[j]:
+                d = _haversine_km(current_coord, with_coords[j][1])
+                if d < best_dist:
+                    best_dist = d
+                    best_next = j
+        if best_next is not None:
+            order.append(best_next)
+            visited[best_next] = True
+    
+    # --- 2-opt improvement ---
+    def _route_distance(route):
+        total = 0.0
+        for i in range(len(route) - 1):
+            total += _haversine_km(with_coords[route[i]][1], with_coords[route[i+1]][1])
+        return total
+    
+    improved = True
+    while improved:
+        improved = False
+        for i in range(1, n - 1):
+            for j in range(i + 1, n):
+                new_order = order[:i] + order[i:j+1][::-1] + order[j+1:]
+                if _route_distance(new_order) < _route_distance(order):
+                    order = new_order
+                    improved = True
+    
+    # Map back to original poi_list indices
+    ordered_indices = [with_coords[o][0] for o in order]
+    
+    # Insert stops without coordinates: place each one between its nearest neighbors
+    # in the ordered list (simple heuristic: maintain their relative position among
+    # the coordinate-bearing stops they were between in the original list)
+    if without_coords:
+        # Place each no-coord stop right after the last coord-stop that preceded it in the original order
+        result_indices = list(ordered_indices)
+        for nc_idx in without_coords:
+            # Find the last coord-bearing stop before nc_idx in the original order
+            insert_after = None
+            for oi in range(nc_idx - 1, -1, -1):
+                if oi in ordered_indices:
+                    # Find position of oi in result_indices
+                    insert_after = result_indices.index(oi)
+                    break
+            if insert_after is not None:
+                result_indices.insert(insert_after + 1, nc_idx)
+            else:
+                # No preceding coord stop — insert at beginning
+                result_indices.insert(0, nc_idx)
+    else:
+        result_indices = ordered_indices
+    
+    # Build reordered list
+    reordered = [poi_list[i] for i in result_indices]
+    
+    # Log the routing result
+    total_dist = _route_distance(order)
+    print(f"  [ROUTE-ORDER] Computed route for {len(with_coords)} stops with coords "
+          f"({len(without_coords)} without): {total_dist:.2f}km total")
+    
+    return reordered
+
+
 def _address_matches_location(address, loc):
     """Return True if any address token (after postcode stripping, short-token filtering,
     and neighborhood aliasing) appears in the location string, or if we cannot determine
@@ -2753,14 +2868,12 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 for p in current_poi_list
             ]
             prompt = (
-                f"For a tour of {location}, the following {len(current_poi_list)} stop(s) have been selected:\n"
+                f"For a tour of {location}, the following {len(current_poi_list)} stop(s) have been selected "
+                "in the order shown (this order has been optimised algorithmically — do NOT change it):\n"
                 + "\n".join(s_lines) + "\n\n"
-                "Reorder them for an OPTIMAL walking route (minimise backtracking).\n"
-                "- Keep the overall route as short as possible; minimise the longest single leg "
-                "between any two consecutive stops.\n"
-                "For each stop in the NEW order, provide all the JSON fields below.\n"
+                "For each stop IN THE EXACT ORDER ABOVE, provide all the JSON fields below.\n"
                 "For stop #1, 'directions_from_previous' should describe how to reach it from a reasonable arrival point (T station, parking, main street).\n"
-                f"For subsequent stops, 'directions_from_previous' should be {'turn-by-turn walking directions' if transport_mode == 'on_foot' else f'route directions suitable for {transport_mode} travel'} from the IMMEDIATELY PREVIOUS stop in the new order.\n\n"
+                f"For subsequent stops, 'directions_from_previous' should be {'turn-by-turn walking directions' if transport_mode == 'on_foot' else f'route directions suitable for {transport_mode} travel'} from the IMMEDIATELY PREVIOUS stop in the list.\n\n"
                 "Return ONLY a JSON array, no markdown fences, no commentary:\n"
                 "[\n  {\n"
                 '    "name": "<must match one of the input names exactly>",\n'
@@ -2851,6 +2964,12 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             except Exception as e:
                 print(f"! PHASE 3B exception: {e}; keeping current order")
                 return current_poi_list
+
+        # [LOCAL-7] Deterministic route ordering: compute optimal walking order
+        # BEFORE asking GPT for structured details/directions. Uses real Wikidata
+        # coordinates for verified stops, GPT's guessed coordinates as fallback.
+        if tour_category == 'walking' and len(poi_list) >= 3:
+            poi_list = _compute_route_order(poi_list)
 
         print(f"\nPHASE 3B: Requesting structured details and walking directions for {len(poi_list)} stop(s)...")
         api_call_logger.log("PHASE_3B_REQUEST", {
@@ -3044,6 +3163,9 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
 
                     # Re-order the combined set (survivors + replacements)
                     if len(poi_list) > 1:
+                        # [LOCAL-7] Re-apply deterministic route ordering after geo-check replacements
+                        if tour_category == 'walking' and len(poi_list) >= 3:
+                            poi_list = _compute_route_order(poi_list)
                         print(f"\nPHASE 3B (re-order after GEO-CHECK): {len(poi_list)} stop(s)...")
                         poi_list = _run_phase_3b(poi_list)
 

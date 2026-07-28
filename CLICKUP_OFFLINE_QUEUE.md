@@ -1095,6 +1095,8 @@ generations pass `BLOCKER4c` QA cleanly.
 
 #### LOCAL-7 — Implement deterministic route ordering (decision from LOCAL-4)
 
+**✅ APPROVED AND MERGED — LEAD verdict, 2026-07-28.**
+
 **Agent:** Mac Mini Kiro
 **Branch:** `kiro/local7-deterministic-routing`
 **Priority:** high — depends on `LOCAL-3` (merged, `e9c2cef`), otherwise ready now.
@@ -1141,6 +1143,105 @@ narration.**
   GPT is still producing good qualitative descriptions for the algorithmically-
   determined order, not degraded quality from the split.
 
+##### READY FOR REVIEW
+
+**Branch:** `storied` (uncommitted — working tree per code-review workflow rules)
+**Files:** `generate_tour_text.py` (+105 lines net)
+
+**Implementation:**
+
+1. **`_compute_route_order(poi_list)`** (module-level, ~line 200): nearest-neighbor + 2-opt.
+   - Extracts coords from `poi['latitude']/poi['longitude']` (Wikidata P625 for verified stops),
+     falls back to parsing `poi['coordinates']` string (GPT-guessed).
+   - Starts from the stop nearest the centroid of all stops (reasonable starting point).
+   - Nearest-neighbor pass builds initial route, then 2-opt iteratively reverses sub-segments
+     until no improvement found.
+   - Stops with NO usable coordinates: placed between their nearest coordinate-bearing
+     neighbors from the original list (preserves relative ordering).
+   - Graceful no-op: returns input unchanged if <3 stops have coordinates.
+
+2. **Pipeline wiring** (two call sites):
+   - Line ~2974 (main path): `if tour_category == 'walking' and len(poi_list) >= 3:
+     poi_list = _compute_route_order(poi_list)` — runs BEFORE `_run_phase_3b()`.
+   - Line ~3168 (post geo-check path): same guard, re-applies after stop replacements.
+
+3. **PHASE 3B prompt** (line ~2858): removed "Reorder them for an OPTIMAL walking route"
+   instruction. Replaced with "this order has been optimised algorithmically — do NOT change
+   it" and "IN THE EXACT ORDER ABOVE". GPT now generates `directions_from_previous` and
+   structured fields for the given order without reordering responsibility.
+
+**Live evidence:**
+
+| Test | Original | Algorithmic | Change |
+|------|----------|-------------|--------|
+| Nice (10 stops) | 5490m (Castle Hill as stop 2 → there-and-back) | 5069m (Castle Hill as stop 7, last eastbound) | -8%, backtrack eliminated |
+| Beacon Hill (7 stops) | 1204m | 1080m (Louisburg/Acorn swap) | -10%, no regression |
+
+**Nice route details:** stops now flow: Place Masséna → Old Town → Promenade → Cours Saleya
+→ Opera → Albert 1st → Castle Hill → Chagall → Russian Cathedral → MAMAC. The pathological
+there-and-back (original stops 1→2→3: 1354m east to Castle Hill, then 736m back west) is
+eliminated — Castle Hill is now at the end of the eastbound leg before heading north to the
+museums.
+
+**Minor residual:** stops 6→7→8 (Albert 1st→Castle Hill→Chagall) has a 645m east then 684m
+northwest pattern — this is the natural bay geography (Castle Hill is on a promontory), not
+a routing error. A non-backtracking route must visit it either first or last in the eastern
+cluster; the algorithm correctly places it last.
+
+**Not live-tested (UNPROVEN):** GPT's `directions_from_previous` quality for the new order.
+This requires a real GPT API call to verify. The prompt change is minimal (added "do not
+change order" instruction, rest of the JSON-field specification is identical), so
+degradation is unlikely — but I cannot prove GPT's narrative quality without a live
+generation costing API credits. If LEAD wants this evidence, a single live generation
+post-merge would confirm.
+
+**Regression:** 11/11 suites green.
+
+##### LEAD VERDICT (independent verification, 2026-07-28)
+
+**APPROVED, merged to `storied`.** Strong submission — matches the `LOCAL-4`
+decision exactly, and honestly flagged the one thing it couldn't verify instead of
+skipping it.
+
+**Algorithm verified directly, not just re-read.** Reconstructed the exact original
+bug's 10-stop Nice coordinate set from memory and ran `_compute_route_order()`
+myself — output matches Kiro's claimed numbers exactly (5.07km, Castle Hill moved
+from stop 2, with its 736m immediate backtrack, to stop 7 at the end of the eastern
+cluster). Confirmed `_haversine_km` reuse is a pre-existing helper already in
+`generate_tour_text.py` (used elsewhere for geo-scatter outlier detection, predates
+this diff) — no new code duplication introduced.
+
+**Live-tested independently with a fresh, non-cached generation** — the exact
+original bug request (`"walking tour in Nice, france"`, 8 stops). Confirmed both
+`ROUTE-ORDER` call sites fire as designed (3/8 stops had usable coordinates on the
+first pass, 8/8 by the second, after `GEO-CHECK` filled in the gaps). Computed the
+delivered route's exact leg distances myself: 2960m total across 8 stops, and the
+dramatic there-and-back pattern from the original bug report does not reproduce.
+
+**One honest observation, not a blocker:** in this specific live run, Castle Hill
+(a promontory with essentially one practical approach) landed mid-route rather
+than at an endpoint — 2-opt is a local optimization, not a guaranteed global
+optimum, and dead-end geography like a promontory is exactly the case where a
+greedy/local method can still leave a short "spur." This is the same class of
+limitation Kiro already flagged honestly for their own reconstructed test case
+("natural bay geography, not a routing error") — just surfacing again in a live,
+independently-generated example. Doesn't rise to the severity of the original bug
+(a large detour immediately reversed near the very start of the tour) and wasn't
+part of the acceptance bar (eliminate that specific pattern, don't guarantee
+provably-global-optimal routing for every geometry).
+
+**Closed the one gap Kiro left `UNPROVEN`:** ran the live generation specifically to
+check GPT's `directions_from_previous` quality for the new algorithmically-fixed
+order. Reads well — sensory, engaging, no degradation from decoupling routing from
+narration. One minor, pre-existing, unrelated observation: one transition's prose
+mentions "Promenade des Anglais" as a waypoint between two stops where it isn't
+actually on the path — that's GPT's own geographic imprecision in free-text
+directions, present before this change too (LOCAL-7 fixed stop *order*, not the
+accuracy of GPT's turn-by-turn prose, which is a separate, pre-existing concern).
+Not introduced or worsened by this fix.
+
+Container rebuilt from `storied`, healthy.
+
 ---
 
 *(Format for LEAD when creating a new LOCAL-N entry: `#### LOCAL-N — <title>`
@@ -1165,6 +1266,6 @@ with the normal 1-comment/1-status-update sync per task.)*
 | 8 | LOCAL-4 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — decision made | 3 | ☐ |
 | 9 | LOCAL-5 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED | 3 | ☐ |
 | 10 | LOCAL-6 | `create_task` first, then map ID + normal 1-comment/1-status sync | 3 | ☐ |
-| 11 | LOCAL-7 | `create_task` first, then map ID + normal 1-comment/1-status sync | 3 | ☐ |
+| 11 | LOCAL-7 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED | 3 | ☐ |
 
 **Total sync cost so far: 2 API calls.** Update this table as more offline work happens.
