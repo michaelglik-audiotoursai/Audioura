@@ -19,6 +19,20 @@ stop retrying against the API — read/write this file instead, following the ex
 protocol logic (list-scan equivalent, comment-scan equivalent, execute, report) just
 against markdown instead of the API. See `remind_Services_ai.md` for the formal addendum.
 
+### How Kiro signals "done, ready for review" (no ClickUp move/comment available)
+
+1. Push your branch to GitHub as normal — unaffected by the ClickUp outage, and gives
+   LEAD an independently-verifiable signal (a real commit), not just a claim.
+2. Under that task's section in this file, append a subsection titled exactly
+   `#### READY FOR REVIEW` containing what you would have posted as a ClickUp comment
+   (commit hash(es), what changed, evidence per the live-artifact hard gate). Update the
+   "TRUE current state" line too.
+3. That's it — no status field to flip here, the `READY FOR REVIEW` heading itself is
+   the signal LEAD's periodic check greps for.
+
+LEAD is checking this file automatically every ~25 minutes (self-scheduled) while the
+outage is active — you do not need to separately notify Michael or wait for a prompt.
+
 **When ClickUp is back:** work top-to-bottom through the "Sync Plan" table at the bottom.
 Do the minimum-API version — one `update_task` (final status only, do not replay
 intermediate transitions) + one `create_comment` (the consolidated text below, posted
