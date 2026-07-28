@@ -343,14 +343,17 @@ results.append(("L2 exhibit_museum fills have verified=False",
 
 # ========== [BOUNCE FIX] Post-R4 fallback fill for non-rich tiers ==========
 
-# Scenario: exhibit_museum tier, total_stops=8 requested, but only 3 pre-D1v2 candidates
-# available (Phase 3A under-proposed). After unified fill adds those 3, R4 runs but
-# its candidates fail verification. Post-R4 fill should NOT be blocked for non-rich tiers.
+# Scenario: exhibit_museum tier, total_stops=8 requested. UNIFIED-FILL already
+# consumed all _pre_d1v2_candidates. R4 ran 2 rounds generating NEW candidates,
+# but match_candidate_to_canonical failed on them → they're in _r4_all_dropped_pois.
+# POST-R4 FILL should use these R4-dropped candidates as the fill source.
 
-def post_r4_fill_logic(pre_d1v2_candidates, verified_pois, tier, total_stops, evidence_log=None):
+def post_r4_fill_logic(r4_dropped_candidates, current_pois, tier, total_stops, evidence_log=None):
     """Replicates the POST-R4 fallback fill path.
-    This fires AFTER R4 replenishment exhausts without reaching total_stops."""
-    poi_list = list(verified_pois)
+    Sources from _r4_all_dropped_pois (R4-generated candidates that failed verification),
+    NOT from _pre_d1v2_candidates (which UNIFIED-FILL already exhausted).
+    """
+    poi_list = list(current_pois)
     _n_verified_current = sum(1 for p in poi_list if p.get('verified', True))
     _n_unverified_current = len(poi_list) - _n_verified_current
 
@@ -372,7 +375,7 @@ def post_r4_fill_logic(pre_d1v2_candidates, verified_pois, tier, total_stops, ev
                 _rejected_names.add(cname.lower())
 
     _fill = []
-    for p in pre_d1v2_candidates:
+    for p in r4_dropped_candidates:
         pname_lower = p['name'].lower()
         if pname_lower in _verified_names:
             continue
@@ -389,44 +392,49 @@ def post_r4_fill_logic(pre_d1v2_candidates, verified_pois, tier, total_stops, ev
     return poi_list
 
 
-# Test: exhibit_museum with only 2 verified + request 8 stops + pre-D1v2 has 6 candidates
-# After unified fill adds 4, imagine R4 ran and failed. Post-R4 fill should still add more.
-# Simulate: poi_list already has 2 verified + 2 fills = 4 stops. Still need 4 more.
-# Post-R4 has 4 remaining candidates available.
-post_r4_verified = [_new_poi("Verified A"), _new_poi("Verified B")]
-post_r4_current = [_new_poi("Verified A"), _new_poi("Verified B"),
-                   _new_poi("Fill C", verified=False), _new_poi("Fill D", verified=False)]
-# Remaining pre-D1v2 candidates not yet used
-post_r4_remaining = [_new_poi("Fill E"), _new_poi("Fill F"),
-                     _new_poi("Fill G"), _new_poi("Rejected X")]
+# Test: exhibit_museum, UNIFIED-FILL already consumed all pre-D1v2 candidates (6 stops current).
+# R4 ran and generated 5 new candidates, all failed verification → in _r4_all_dropped_pois.
+# Requesting 10 stops total → need 4 more from R4 drops.
+post_r4_current = [
+    _new_poi("Verified A"), _new_poi("Verified B"),
+    _new_poi("Fill C", verified=False), _new_poi("Fill D", verified=False),
+    _new_poi("Fill E", verified=False), _new_poi("Fill F", verified=False),
+]  # 6 stops (2 verified + 4 from UNIFIED-FILL)
+
+# R4 generated these but match_candidate_to_canonical returned None for all
+r4_dropped = [
+    _new_poi("R4 Candidate 1"), _new_poi("R4 Candidate 2"),
+    _new_poi("R4 Candidate 3"), _new_poi("R4 Rejected X"),
+    _new_poi("R4 Candidate 4"),
+]
 post_r4_evidence = {
-    "Rejected X": {"status": "REJECTED", "reason": "located_elsewhere"},
+    "R4 Rejected X": {"status": "REJECTED", "reason": "located_elsewhere"},
 }
 
 post_r4_result = post_r4_fill_logic(
-    post_r4_remaining, post_r4_current, 'exhibit_museum', 8, post_r4_evidence
+    r4_dropped, post_r4_current, 'exhibit_museum', 10, post_r4_evidence
 )
 
-# Post-R4 fill should add 3 more (E, F, G — Rejected X excluded) to reach 7/8
-results.append(("POST-R4-FILL fires for exhibit_museum tier (not just rich)",
-                len(post_r4_result) == 7))
+# Should fill 4 more (R4 Candidate 1,2,3,4 — Rejected X excluded) → total 10
+results.append(("POST-R4-FILL uses R4-dropped candidates (not pre-D1v2)",
+                len(post_r4_result) == 10))
 
-# All post-R4 fills have verified=False
-post_r4_new_fills = [p for p in post_r4_result if p['name'] in {'Fill E', 'Fill F', 'Fill G'}]
-results.append(("POST-R4-FILL candidates have verified=False",
-                all(p.get('verified') == False for p in post_r4_new_fills)))
+# All POST-R4 fills have verified=False
+post_r4_new = [p for p in post_r4_result if p['name'].startswith('R4 Candidate')]
+results.append(("POST-R4-FILL R4-dropped candidates have verified=False",
+                all(p.get('verified') == False for p in post_r4_new)))
 
-# REJECTED candidate still excluded
-results.append(("POST-R4-FILL excludes REJECTED candidates",
-                "Rejected X" not in [p['name'] for p in post_r4_result]))
+# REJECTED R4 candidate excluded
+results.append(("POST-R4-FILL excludes REJECTED R4 candidates",
+                "R4 Rejected X" not in [p['name'] for p in post_r4_result]))
 
-# Rich tier respects 50% cap
-post_r4_rich_result = post_r4_fill_logic(
-    post_r4_remaining, post_r4_current, 'rich', 8, post_r4_evidence
+# Rich tier respects 50% cap with R4 drops
+post_r4_rich = post_r4_fill_logic(
+    r4_dropped, post_r4_current, 'rich', 10, post_r4_evidence
 )
-# 2 verified out of 4 current, 50% of 8 = 4 max unverified, already have 2 unverified = budget 2
-results.append(("POST-R4-FILL rich tier respects 50% cap",
-                len(post_r4_rich_result) <= 6))  # 4 current + max 2 more = 6
+# 2 verified out of 6 current, 50% of 10 = 5 max unverified, already have 4 = budget 1
+results.append(("POST-R4-FILL rich tier respects 50% cap on R4 drops",
+                len(post_r4_rich) <= 7))  # 6 current + max 1 more = 7
 
 print("=" * 78)
 print("PALAIS-FIX LEAD FIXTURE — B3 hardening + L2 medium-tier fill tests")
