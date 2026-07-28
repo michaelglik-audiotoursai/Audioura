@@ -1392,6 +1392,77 @@ baselines). Also spot-check that the assigned per-stop style is now actually
 legible in the opening sentence (not just "not generic," genuinely varied).
 All 11 regression suites must stay green (prompt-only change, same as LOCAL-6).
 
+##### READY FOR REVIEW
+
+**Branch:** `storied` (uncommitted — working tree)
+**Files:** `generate_tour_text.py` (+7 lines)
+
+**Change:** Added explicit BANNED OPENERS block after the existing OPENING STYLE injection
+(~line 3425). Bans:
+- "Nestled in/among/between..."
+- "In the heart of..." / "At the heart of..."
+- "Located in..." / "Situated in..." / "Tucked away in..."
+- Any generic locative-clause opener
+
+Also adds a recovery instruction: "If your first instinct is a locative-clause opener,
+delete it and lead with the specific detail, question, or sensory element the style above
+requires instead." — this gives GPT a concrete fallback path rather than just saying "don't."
+
+**Reasoning:** Same pattern that made Fix 3 (hedging reframe) land cleanly in live tests.
+Fix 3 includes "avoid robotically repeating 'believed to be'" → 0 instances in output.
+Fix 1 only said what TO do → GPT fell back to its defaults 5/6 times. Adding the explicit
+negative constraint should produce the same compliance.
+
+**Regression:** 11/11 suites green.
+
+**UNPROVEN:** Live generation with grep needed to confirm the ban fires (same as LOCAL-6 —
+requires GPT API call). Recommend running the same Nice restaurant + museum tours as the
+baseline to directly compare against the 5/6 and 4/6 numbers.
+
+**TRUE current state:** **APPROVED AND MERGED to `storied`.** Real, measurable
+improvement confirmed live; not full elimination, but that's an inherent GPT-compliance
+limit, not a code defect.
+
+##### LEAD VERDICT (independent verification, 2026-07-28)
+
+Diff is small and correct by inspection (+7 lines, purely additive text appended to the
+existing OPENING STYLE injection, no structural change). All 11 regression suites
+re-run locally, green. Rebuilt `audioura-tour-generator-1`, hash-confirmed the container
+is running the exact uncommitted source.
+
+**Methodology note worth keeping:** my first live-verification attempt was
+invalid — I reused the exact same `(location, tour_type, total_stops)` triple as the
+`LOCAL-6` baseline test, and `generate_tour_text.py`'s `[S20]` cache layer
+(`tour_cache_layer1.get_cached_tour`) served the stale `LOCAL-6`-era cached text
+verbatim (`CACHE HIT` in the logs) instead of calling GPT at all — meaning the new
+banned-opener prompt was never actually exercised the first time, despite looking like
+a real generation. Caught it by noticing the output was byte-identical to the earlier
+test. Re-ran with `total_stops=7` instead of `6` on both tours specifically to force a
+cache miss (confirmed `CACHE MISS`/`CACHE STORE` in the logs this time) before trusting
+any result. Any future live-verification against these two exact test tours needs to
+either vary a cache-key parameter or accept it'll silently hit cache.
+
+**Real results, genuinely fresh generations:**
+- Museum tour (Musée d'art naïf, Nice): **0/6 stops** hit a banned opener phrase —
+  down from the `LOCAL-6` baseline of 4/6. Full elimination this run.
+- Restaurant tour (Nice old city): **3/7 stops** still hit "Nestled in..." / "In the
+  heart of..." — down from the `LOCAL-6` baseline of 5/6. Real improvement, not full
+  elimination — GPT still defaults to the banned pattern roughly 40% of the time
+  despite the explicit ban. This is a probabilistic compliance ceiling, not a logic
+  bug (the instruction is present, unconditional, and unambiguous in the prompt).
+- Read the full museum-tour text for a quality check: prose is rich and on-tone
+  (contemplative, per `LOCAL-6` Fix 4), no degradation from the added instruction.
+
+**Net:** real, verified progress (restaurant: -40%, museum: -100% this run), consistent
+with the acceptance bar ("target is 0, or a clear, large drop from baseline"). Approving
+rather than demanding full elimination, since GPT prompt-compliance is inherently
+probabilistic and this is now the second fast-follow on the same residual — further
+prompt-engineering here is subject to diminishing returns; if this keeps mattering,
+worth considering a mechanical post-generation check (regex-detect + regenerate that
+one stop) rather than a third round of prompt wording.
+
+**Regression:** 11/11 suites green (re-verified locally).
+
 ---
 
 *(Format for LEAD when creating a new LOCAL-N entry: `#### LOCAL-N — <title>`
@@ -1417,6 +1488,6 @@ with the normal 1-comment/1-status-update sync per task.)*
 | 9 | LOCAL-5 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED | 3 | ☐ |
 | 10 | LOCAL-6 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED | 3 | ☐ |
 | 11 | LOCAL-7 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED | 3 | ☐ |
-| 12 | LOCAL-8 | `create_task` first, then map ID + normal 1-comment/1-status sync — new, dispatched, not yet started | 3 | ☐ |
+| 12 | LOCAL-8 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED | 3 | ☐ |
 
 **Total sync cost so far: 2 API calls.** Update this table as more offline work happens.

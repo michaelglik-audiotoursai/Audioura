@@ -3422,6 +3422,12 @@ Do NOT invent specific named people or attribute quotes unless they are well-doc
         description_prompt += f"""
 OPENING STYLE (mandatory for this stop): {_opening_style}
 This instruction overrides any default opening pattern — do NOT open with a generic introduction or the same structure as other stops.
+BANNED OPENERS (never use these, regardless of which style is assigned above):
+- "Nestled in..." / "Nestled among..." / "Nestled between..."
+- "In the heart of..." / "At the heart of..."
+- "Located in..." / "Situated in..." / "Tucked away in..."
+- Any variation that opens with a generic locative clause placing the stop geographically before saying anything interesting about it.
+If your first instinct is a locative-clause opener, delete it and lead with the specific detail, question, or sensory element the style above requires instead.
 """
 
         # [LOCAL-6 Fix 4] Per-category personality/tone — distinct product feel per tour type
