@@ -103,18 +103,15 @@ and confirmed healthy.
 ## Task: wdvrdax1v7 — CLASSIFY-FIX (museum misclassification investigation + DATABASE_URL)
 
 **Last known ClickUp state:** list = 🟦 Services — Kiro (733), status = "to do".
-**TRUE current state:** **STILL SPLIT, ROUND 3.** DATABASE_URL merged (`20f101f`).
-JSON-parse failure mode merged (`3ca5632`). Null-`venue_name` fix round 2 (`096e6f5`,
-venue-indicator override) BOUNCED — live-tested (monkeypatch + real pipeline run) and
-confirmed the override never fires for the actual failure mode; it's in the wrong
-branch. `storied` stays at `3ca5632`, nothing new merged this round. Container
-rebuilt from `3ca5632`, suites green, healthy. Precise fix location specified in the
-round-3 verdict below to avoid another wrong-branch resubmission.
-**Sync action:** see verdict text below — three things once ClickUp is back: (1)
-approve+close DATABASE_URL, (2) credit the JSON-parse-fix half as merged, (3) bounce
-the null-venue_name half — round 2 attempt (096e6f5) also failed, with the specific
-branch-placement finding and required fix location. One `create_comment` covering
-all three, task stays "in progress."
+**TRUE current state:** **CLOSED — APPROVED, ROUND 4.** DATABASE_URL merged
+(`20f101f`), JSON-parse retry merged (`3ca5632`), null-`venue_name` override — after
+one wrong-branch bounce, resubmitted correctly and merged (`14641f2`). Live-verified
+via the exact monkeypatch reproduction that disproved round 3; confirmed no
+regression on the two adjacent cases (intent=None still works, legitimate venue-free
+walking tours don't false-positive). Container rebuilt from `storied` @ `14641f2`,
+suites green, healthy. Task fully done.
+**Sync action:** ONE consolidated `create_comment` covering the full history (see
+round-4 verdict below) + `update_task(status="complete")`.
 
 #### LEAD VERDICT (independent verification, 2026-07-27 ~23:4x, during ClickUp outage)
 
@@ -313,6 +310,52 @@ category: MUSEUM` for the null-venue_name case — not just the isolated
 **Sync action once ClickUp is back:** update the same consolidated comment — do not
 mention `096e6f5` as fixed; note it as bounced with the branch-placement finding.
 
+#### LEAD VERDICT ROUND 4 (independent verification, 2026-07-28, during ClickUp outage)
+
+**APPROVED. TASK CLOSED.** Kiro moved the exact one-line-of-logic fix to the exact
+location I specified — no guessing needed this time, and it shows.
+
+**Verified the indentation directly** (not just re-read the diff): the
+`[CLASSIFY-FIX]` block now sits at indent level 4, the same level as the `if intent:`
+/ `else:` statements themselves — outside and after both branches, not nested inside
+either. Confirmed via `git show branch:generate_tour_text.py` line-by-line indent
+dump, same technique that caught the round-3 placement bug.
+
+**Reran the exact monkeypatch reproduction that disproved round 3, on this branch:**
+```
+FAKE INTENT CALLED with request: Palais Lascaris, Nice
+   Venue Name: None
+  [CLASSIFY-FIX] Location contains venue word 'palais' — overriding walking → museum
+Detected tour category: MUSEUM
+```
+Fires correctly now. Also checked the two adjacent cases to make sure nothing broke:
+- **intent=None entirely** (the original working case): still fires, still `MUSEUM`.
+  No regression on the path that worked before.
+- **Legitimate venue-free walking tour** ("Beacon Hill, Boston", no venue-indicator
+  word in the location): stays `WALKING`, correctly. The override doesn't overreach
+  into false-positive territory.
+
+**Regression suites:** palais fixture 23/23, sq4_merge, b6_generation_wiring,
+g4_false_positives, w7_wiring, tier_computation — all green, independently re-run.
+
+**Merged to `storied` @ `14641f2`.** Container rebuilt and healthy.
+
+**This closes `wdvrdax1v7` entirely** — DATABASE_URL (`20f101f`), JSON-parse retry
+(`3ca5632`), and now the null-venue_name override (`14641f2`) are all in `storied`.
+Four review rounds on the classification half, but the last one landed clean because
+the required fix was specified precisely instead of left open — worth remembering for
+how much guidance to give on a resubmission after a live-proven wrong-branch bounce.
+
+**Sequence:** `wdvrdawcyx` (Phase 3) is next. Recall from the earlier note in that
+task's section: its own branch has a stale, narrower G4 fix that needs to be dropped/
+rebased against current `storied` — that's still true and still pending whenever
+Phase 3 resumes.
+
+**Sync action once ClickUp is back:** ONE consolidated comment covering the full
+task history (DATABASE_URL approved, JSON-parse fix approved, null-venue round 2
+bounced, round 3 bounced with branch-placement proof, round 4 approved+merged) —
+mark task **complete**.
+
 ---
 
 ## Task: wdvrdawcyx — GENERIC GROUNDING Phase 3 (walking-tour generalization)
@@ -383,7 +426,7 @@ referenced, then proceed with the normal 1-comment/1-status-update sync per task
 | # | Task ID | Action | API calls | Synced? |
 |---|---------|--------|-----------|---------|
 | 1 | wdvrdawkxq | `update_task(status=complete)` + `create_comment` (verbatim text above) | 2 | ☐ |
-| 2 | wdvrdax1v7 | `create_comment` (split verdict text above) — status stays "in progress" | 1 | ☐ |
+| 2 | wdvrdax1v7 | `create_comment` (round-4 consolidated verdict above) + `update_task(status=complete)` | 2 | ☐ |
 | 3 | wdvrdawcyx | none (no drift) | 0 | n/a |
 | 4 | wdvrdawdje | none (no drift) | 0 | n/a |
 
