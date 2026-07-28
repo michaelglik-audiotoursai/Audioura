@@ -103,15 +103,18 @@ and confirmed healthy.
 ## Task: wdvrdax1v7 — CLASSIFY-FIX (museum misclassification investigation + DATABASE_URL)
 
 **Last known ClickUp state:** list = 🟦 Services — Kiro (733), status = "to do".
-**TRUE current state:** **STILL SPLIT, ROUND 2.** DATABASE_URL merged (`20f101f`).
-Classification round 1 (temp=0 + retry, `c658d86`): PARTIALLY fixed — JSON-parse
-failure mode eliminated (merged, `3ca5632`), null-`venue_name` mode NOT fixed (still
-reproduces at the same rate, bounced again). Container rebuilt from `storied` @
-`3ca5632`, suites green, healthy.
+**TRUE current state:** **STILL SPLIT, ROUND 3.** DATABASE_URL merged (`20f101f`).
+JSON-parse failure mode merged (`3ca5632`). Null-`venue_name` fix round 2 (`096e6f5`,
+venue-indicator override) BOUNCED — live-tested (monkeypatch + real pipeline run) and
+confirmed the override never fires for the actual failure mode; it's in the wrong
+branch. `storied` stays at `3ca5632`, nothing new merged this round. Container
+rebuilt from `3ca5632`, suites green, healthy. Precise fix location specified in the
+round-3 verdict below to avoid another wrong-branch resubmission.
 **Sync action:** see verdict text below — three things once ClickUp is back: (1)
 approve+close DATABASE_URL, (2) credit the JSON-parse-fix half as merged, (3) bounce
-the null-venue_name half with the specific remaining requirement. One `create_comment`
-covering all three, task stays "in progress."
+the null-venue_name half — round 2 attempt (096e6f5) also failed, with the specific
+branch-placement finding and required fix location. One `create_comment` covering
+all three, task stays "in progress."
 
 #### LEAD VERDICT (independent verification, 2026-07-27 ~23:4x, during ClickUp outage)
 
@@ -243,6 +246,72 @@ reproduces the field-reported bug. Show the failure rate materially reduced on b
 
 **Sync action once ClickUp is back:** one comment — credit the JSON-parse fix as
 merged, bounce with this specific remaining requirement. Task stays "in progress."
+
+#### LEAD VERDICT ROUND 3 (independent verification, 2026-07-28, during ClickUp outage)
+
+**BOUNCE — not merged this round. The override doesn't fire for the failure mode it
+claims to fix. Proved live, not just by code reading.**
+
+**First, a methodology note on the "10/10 deterministic" claim:** Kiro's test used the
+request string `"Palais Lascaris, Nice, art and historical instruments tour"` — but
+that's not what the real pipeline ever sends. Checked directly:
+`_classify_tour_category('Palais Lascaris, Nice', '')` → `'walking'`, which means the
+existing Bug2Fix suppression (`generate_tour_text.py` ~line 1619) strips `tour_type`
+entirely before it reaches `analyze_tour_intent()` for this exact venue — the real
+`user_request` is always just `"Palais Lascaris, Nice"`, regardless of what tour_type
+the caller passes. So the "non-museum tour_type causes deterministic failure" framing
+doesn't match production behavior; the real failure (confirmed by both my original
+10x test and a fresh live pipeline run just now) is the same ~10-20% *stochastic* null
+rate regardless of tour_type wording — not a tour_type-dependent determinism.
+
+**Second, and the actual blocker: traced where the `[CLASSIFY-FIX]` override lives.**
+There are two symmetric fallback branches in `generate_tour_text.py`:
+- Line 1736 `else:` — intent extraction **succeeded** (valid dict) but
+  `intent.get('venue_name')` is falsy / S15's other conditions failed.
+- Line 1747 `else:` — intent extraction **failed entirely** (`analyze_tour_intent()`
+  returned `None`).
+
+The `[CLASSIFY-FIX]` block (lines 1755-1768) exists **only** in the second branch. The
+actual failure mode — `analyze_tour_intent()` returns a valid dict with
+`venue_name: None` — goes through the **first** branch, which has no override at all.
+
+**Proved this live**, not just by reading: monkeypatched `analyze_tour_intent` to
+return exactly the dict shape both my test and Kiro's describe (valid dict,
+`venue_name: None`), then ran the real `generate_tour_text('Palais Lascaris, Nice',
+'art and historical instruments', ..., 9)` end to end (bumped `total_stops` to avoid
+a cache hit from the earlier trials). Log output:
+```
+✅ Intent Analysis Results:
+   ...
+   Venue Name: None
+
+Detected tour category: WALKING
+Using walking template for Palais Lascaris, Nice - art and historical instruments
+```
+No `[CLASSIFY-FIX]` line anywhere. The override did not fire. **The classification bug
+is unfixed for the actual reproducing scenario, live-confirmed.**
+
+**Not merging `096e6f5` this round** — its headline claim doesn't hold, and merging a
+non-functional safety net risks it being trusted as coverage it doesn't provide.
+`storied` stays at `3ca5632` (DATABASE_URL + JSON-parse-retry only, both still good).
+
+**Required fix, precisely scoped this time to avoid a round 4 in the same place:**
+the `[CLASSIFY-FIX]` block needs to run **unconditionally**, after both branches
+converge — right before the `print(f"\nDetected tour category: ...")` line (currently
+~1773), not duplicated inside just one of the two `else:` blocks. Factor it out once,
+call it after the `if intent: ... else: ...` structure closes, so it applies whether
+`tour_category` was set by the "intent succeeded, venue_name/S15 failed" path or the
+"intent extraction failed entirely" path. Reuse the retry-on-null addition inside
+`analyze_tour_intent()` from this commit — that part is fine and worth keeping, it
+just isn't sufficient alone.
+
+**Live-artifact bar for the resubmission:** repeat this exact monkeypatch reproduction
+(or the real 10x pipeline run) and show `[CLASSIFY-FIX]` firing and `Detected tour
+category: MUSEUM` for the null-venue_name case — not just the isolated
+`analyze_tour_intent()` call, the full downstream classification decision.
+
+**Sync action once ClickUp is back:** update the same consolidated comment — do not
+mention `096e6f5` as fixed; note it as bounced with the branch-placement finding.
 
 ---
 
