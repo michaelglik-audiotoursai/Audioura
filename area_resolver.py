@@ -108,6 +108,21 @@ def resolve_area(location_string: str) -> Optional[AreaResolution]:
         return None
     
     city_lat, city_lng = city_coords
+    
+    # [LOCAL-3] If the resolved "city" is actually a country (e.g. "Nice, france" was
+    # parsed as neighborhood="Nice", city="france"), swap: the neighborhood is really
+    # the city. This handles "City, Country" inputs that were misinterpreted as
+    # "Neighborhood, City" by the comma-split logic.
+    if neighborhood and _is_country_type(city_qid):
+        print(f"  [area_resolver] '{city}' resolved as country ({city_qid}), swapping: city='{neighborhood}'")
+        city = neighborhood
+        neighborhood = ""
+        city_qid, city_coords = _resolve_city(city)
+        if not city_qid:
+            print(f"  [area_resolver] Could not resolve swapped city: '{city}'")
+            return None
+        city_lat, city_lng = city_coords
+    
     print(f"  [area_resolver] City resolved: {city} → {city_qid} ({city_lat:.4f}, {city_lng:.4f})")
     
     # Resolve neighborhood if present
@@ -200,10 +215,30 @@ def discover_landmarks(area: AreaResolution) -> List[Landmark]:
 
 def _parse_location(location_string: str) -> Tuple[str, str]:
     """Parse 'Neighborhood, City' or 'City, State/Country' into (neighborhood, city)."""
-    # Remove common tour-type suffixes
-    clean = re.sub(r'\s*(walking tour|tour|historic district).*$', '', location_string, flags=re.IGNORECASE).strip()
+    # Remove common tour-type phrases (as standalone phrases, not eating the rest of the string)
+    clean = re.sub(r'\b(?:walking tour|biking tour|driving tour|audio tour|guided tour|self[- ]guided tour|tour|historic district)\b', '', location_string, flags=re.IGNORECASE).strip()
+    
+    # [LOCAL-3] Strip leading transport-mode and filler words from the entire string.
+    # Upstream normalization may leave orphaned mode words (e.g. "walking  in Nice, france"
+    # after "tour" is stripped). These break the comma-split logic by attaching to the
+    # neighborhood segment. Strip them here so the parser sees clean location names.
+    _MODE_FILLER_RE = re.compile(
+        r'^(?:(?:walking|biking|cycling|driving|running|self[- ]guided|guided|audio)\s+)*'
+        r'(?:(?:tour|tours)\s+)?'
+        r'(?:(?:in|of|around|through|to)\s+)?',
+        re.IGNORECASE
+    )
+    clean = _MODE_FILLER_RE.sub('', clean).strip()
     
     parts = [p.strip() for p in clean.split(',')]
+    
+    # [LOCAL-3] Also strip filler words from individual segments after split —
+    # handles cases where the filler word is only on one segment (e.g. already-split
+    # "in Nice" as parts[0]).
+    _SEGMENT_FILLER_RE = re.compile(r'^(?:in|of|around|through|to)\s+', re.IGNORECASE)
+    parts = [_SEGMENT_FILLER_RE.sub('', p).strip() for p in parts]
+    # Remove empty segments that result from stripping
+    parts = [p for p in parts if p]
     
     if len(parts) >= 2:
         # "Beacon Hill, Boston" or "Beacon Hill, Boston, MA"
@@ -214,9 +249,18 @@ def _parse_location(location_string: str) -> Tuple[str, str]:
         if len(parts) >= 3 and len(parts[2]) <= 3:
             city = f"{parts[1]}, {parts[2]}"
         return neighborhood, city
-    else:
+    elif parts:
         # Single name — treat as city
         return "", parts[0]
+    else:
+        # Everything was stripped — fall back to original input minus obvious tour words
+        fallback = re.sub(r'\b(?:tour|tours)\b', '', location_string, flags=re.IGNORECASE).strip().strip(',').strip()
+        parts = [p.strip() for p in fallback.split(',') if p.strip()]
+        if len(parts) >= 2:
+            return parts[0], parts[1]
+        elif parts:
+            return "", parts[0]
+        return "", location_string
 
 
 def _resolve_city(city: str) -> Tuple[str, Tuple[float, float]]:
@@ -361,6 +405,38 @@ def _is_city_type(qid: str) -> bool:
             for claim in entity.get("claims", {}).get("P31", []):
                 value = claim.get("mainsnak", {}).get("datavalue", {}).get("value", {})
                 if value.get("id") in city_types:
+                    return True
+    except Exception:
+        pass
+    return False
+
+
+def _is_country_type(qid: str) -> bool:
+    """Check if a Wikidata entity is a country/sovereign state type.
+    
+    [LOCAL-3] Used to detect when _parse_location's 'city' candidate is actually a
+    country (e.g. 'france' → Q142), so resolve_area can swap the neighborhood→city.
+    """
+    country_types = {
+        "Q6256",      # country
+        "Q3624078",   # sovereign state
+        "Q7275",      # state (political entity)
+        "Q1763527",   # constituent country
+        "Q15634554",  # state with limited recognition
+    }
+    try:
+        resp = requests.get(
+            _WIKIDATA_API,
+            params={"action": "wbgetentities", "ids": qid, "props": "claims", "format": "json"},
+            headers={"User-Agent": _USER_AGENT},
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            entity = data.get("entities", {}).get(qid, {})
+            for claim in entity.get("claims", {}).get("P31", []):
+                value = claim.get("mainsnak", {}).get("datavalue", {}).get("value", {})
+                if value.get("id") in country_types:
                     return True
     except Exception:
         pass

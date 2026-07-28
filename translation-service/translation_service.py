@@ -48,11 +48,15 @@ class TranslationService:
     )
 
     def _restore_metadata_labels(self, original_text, translated_text, target_language):
-        """Prepend original English Coordinates/Address lines to the top of the translated stop.
+        """Insert original English Coordinates/Address lines after the title line of the translated stop.
         Mobile app parses these fields by exact English string match to place map pins.
-        Prepending is language-agnostic: no regex on translated text, works for any language
-        including RTL scripts (Arabic, Hebrew) and any future AWS Translate separator variants
-        (e.g. French non-breaking space \xa0 before colon). Saves 2 AWS Translate calls per stop.
+        [LOCAL-5] Previously prepended at the very top, which caused the metadata to be jammed
+        onto the 'Stop N:' line during reassembly (the title ended up on line 3 instead of line 1).
+        Now inserts AFTER the first non-empty line (the title), preserving correct structure:
+            <title>
+            Address: ...
+            Coordinates: ...
+            <rest of translated body>
         The translated label lines (e.g. Coordonnees\xa0:) are stripped from the body so the
         .txt file does not contain duplicate coordinate entries."""
         if target_language == 'en':
@@ -68,28 +72,69 @@ class TranslationService:
         if not english_lines:
             return translated_text
         # Strip translated equivalents from body to avoid duplicate entries.
-        # We match lines that start with the same word-count prefix as the English label
-        # followed by any non-word separator — covers all known AWS Translate variants.
+        # [LOCAL-5] Previous word-count heuristic was fragile for languages that attach colons
+        # directly to words (Russian: "Адрес:" vs French: "Coordonnées :"). New approach:
+        # 1. For Coordinates: match any line containing the exact coordinate pair from the
+        #    English original (numbers don't change in translation).
+        # 2. For Address: match any line with a colon that contains the address value text
+        #    (street number + partial address content from the English line).
+        # 3. Fall back to the old heuristic for edge cases.
         body_lines = translated_text.split('\n')
-        label_word_counts = [len(label.split()) for label in self._METADATA_LABELS]
+        
+        # Extract the raw values from the English metadata lines for matching
+        _coord_pattern = None
+        _addr_value = None
+        for eline in english_lines:
+            if eline.lower().startswith('coordinates'):
+                # Extract the coordinate pair for matching in translated text
+                cm = re.search(r'([-\d.]+\s*,\s*[-\d.]+)', eline)
+                if cm:
+                    _coord_pattern = cm.group(1).replace(' ', '')  # normalize spaces
+            elif eline.lower().startswith('address'):
+                # Extract the address value (after "Address: ")
+                _addr_value = re.sub(r'^Address\s*:\s*', '', eline, flags=re.IGNORECASE).strip()
+        
         def _is_translated_metadata(line):
             stripped = line.strip()
-            for wc in label_word_counts:
-                words = stripped.split()
-                if len(words) > wc:
-                    prefix = ' '.join(words[:wc])
-                    remainder = stripped[len(prefix):].lstrip()
-                    if remainder and not remainder[0].isalnum():
-                        # Check the English label is NOT present (don't strip the prepended lines)
-                        if not any(
-                            re.match(rf'^{re.escape(lbl)}\s*:', stripped, re.IGNORECASE)
-                            for lbl in self._METADATA_LABELS
-                        ):
-                            return True
+            if not stripped:
+                return False
+            # Don't strip lines that ARE the English metadata labels we prepended
+            if any(re.match(rf'^{re.escape(lbl)}\s*:', stripped, re.IGNORECASE)
+                   for lbl in self._METADATA_LABELS):
+                return False
+            # Match translated coordinates line: any line containing the exact coordinate pair
+            if _coord_pattern:
+                line_no_spaces = stripped.replace(' ', '').replace('\xa0', '')
+                if _coord_pattern.replace(' ', '') in line_no_spaces:
+                    # Confirm it looks like a label line (has a colon before the numbers)
+                    if ':' in stripped.split(_coord_pattern.split(',')[0])[0]:
+                        return True
+            # Match translated address line: contains key address fragments
+            if _addr_value:
+                # Check if the line contains significant address fragments (street number, postal code)
+                addr_numbers = re.findall(r'\d+', _addr_value)
+                if addr_numbers and len(addr_numbers) >= 2:
+                    # Line contains at least 2 of the same numbers as the original address
+                    line_numbers = re.findall(r'\d+', stripped)
+                    matches = sum(1 for n in addr_numbers if n in line_numbers)
+                    if matches >= 2 and ':' in stripped[:30]:
+                        return True
             return False
         clean_body = [l for l in body_lines if not _is_translated_metadata(l)]
-        # Prepend English lines at the very top — unconditionally first, no dependency on line order
-        return '\n'.join(english_lines + clean_body)
+        # [LOCAL-5] Insert English metadata lines AFTER the title (first non-empty line),
+        # not at the top. This preserves the structure: Stop N: <title>\n<metadata>\n<body>
+        title_line = None
+        rest_lines = []
+        for i, line in enumerate(clean_body):
+            if line.strip():
+                title_line = line
+                rest_lines = clean_body[i+1:]
+                break
+        if title_line is not None:
+            return '\n'.join([title_line] + [''] + english_lines + [''] + rest_lines)
+        else:
+            # No title found — fall back to prepending (shouldn't happen in normal operation)
+            return '\n'.join(english_lines + clean_body)
 
     def translate_text(self, text, target_language, preserve_voice_commands=False):
         """Translate text using AWS Translate with optional voice command preservation"""
