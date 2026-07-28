@@ -158,6 +158,30 @@ development-tour-orchestrator-1:5002  # tour_orchestrator_service.py
 
 ---
 
+## 🔌 CLICKUP OUTAGE PROTOCOL (temporary, active as of 2026-07-27)
+
+ClickUp's API is rate-limited (`RATE_LIMIT_EXCEEDED`, ~19hr lockout hit 2026-07-27
+~22:50). **If any `clickup_*` call fails with this error, stop retrying against the
+API immediately** — do not burn further calls probing whether it's cleared.
+
+**While it's down:** `CLICKUP_OFFLINE_QUEUE.md` (repo root) is the queue. Read it the
+same way you'd do a list-scan + comment-scan: it has one section per active task with
+the TRUE current state (which may be ahead of whatever ClickUp last showed), and a
+"New tasks" section for anything dispatched while offline. Do your work exactly as
+normal (branch, code, tests, live-artifact hard gate all still apply) — just write
+your response as a new subsection in that file instead of a ClickUp comment, and
+update the task's "TRUE current state" line instead of calling `update_task`/`move_task`.
+
+**When ClickUp comes back:** do NOT replay the full offline history comment-by-comment.
+Work the "Sync Plan" table at the bottom of `CLICKUP_OFFLINE_QUEUE.md` — one
+`update_task` (final status only) + one `create_comment` (consolidated summary,
+already drafted in the file) per task. This is the whole point of the file: minimum
+API calls to reconcile, not a full replay.
+
+This section can be deleted once the outage is fully synced and confirmed clear.
+
+---
+
 ## 🚧 LIVE-ARTIFACT HARD GATE (BINDING — Michael's ruling 2026-07-27)
 
 **No "COMPLETE" claim on any grounding-pipeline task without a committed live artifact proving the claimed behavior.** Offline fixtures and code inspection are supporting evidence, never sufficient evidence.
