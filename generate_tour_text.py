@@ -298,28 +298,39 @@ Examples:
             {"role": "system", "content": "You are a tour planning assistant. Respond only with valid JSON."},
             {"role": "user", "content": intent_prompt}
         ],
-        "temperature": 0.3,
+        "temperature": 0,  # Extraction task — zero variance for deterministic results
         "max_tokens": 400
     }
     
-    try:
-        response = requests.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers=headers,
-            data=json.dumps(data)
-        )
-        
-        if response.status_code == 200:
-            result = response.json()
-            intent_text = result["choices"][0]["message"]["content"]
-            print(f"Intent analysis response: {intent_text}")
-            return json.loads(intent_text)
-        else:
-            print(f"Intent analysis failed: {response.status_code}")
+    # Retry on malformed JSON (LLM occasionally echoes schema text instead of filling values)
+    _MAX_INTENT_RETRIES = 2
+    for _intent_attempt in range(_MAX_INTENT_RETRIES):
+        try:
+            response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers=headers,
+                data=json.dumps(data)
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                intent_text = result["choices"][0]["message"]["content"]
+                print(f"Intent analysis response: {intent_text}")
+                return json.loads(intent_text)
+            else:
+                print(f"Intent analysis failed: {response.status_code}")
+                return None
+        except json.JSONDecodeError as e:
+            print(f"Intent analysis JSON parse error (attempt {_intent_attempt + 1}/{_MAX_INTENT_RETRIES}): {e}")
+            if _intent_attempt < _MAX_INTENT_RETRIES - 1:
+                print(f"  Retrying intent analysis...")
+                continue  # Retry
             return None
-    except Exception as e:
-        print(f"Intent analysis error: {e}")
-        return None
+        except Exception as e:
+            print(f"Intent analysis error: {e}")
+            return None
+    # If we get here without returning, all retries failed
+    return None
 
 def validate_poi_knowledge(poi_list, intent, location, api_key):
     """
