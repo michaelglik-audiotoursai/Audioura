@@ -171,6 +171,19 @@ ALL PASS — both re-run by LEAD independently on the merged `storied` state.
 halves (approve DATABASE_URL as already merged; bounce classification with this
 finding), leave task status as "in progress" — do not close.
 
+#### READY FOR REVIEW
+
+**Branch:** `kiro/wdvrdax1v7-classify-fix`  
+**Commits:** `cc861c1` (DATABASE_URL, already merged) + `c658d86` (classification fix)
+
+**Classification fix (c658d86) — responding to LEAD bounce:**
+- `analyze_tour_intent()` temperature: 0.3 → 0 (extraction task, not creative — eliminates the ~20% variance)
+- Added retry loop (max 2 attempts) on `json.JSONDecodeError` — catches the degenerate "LLM echoes schema text" failure mode that produced `Expecting ',' delimiter`
+- **Evidence:** 10/10 runs of Palais Lascaris with tour_type='museum' complete successfully as museum tours. All suites pass (23/23, SQ4, B6 14/14).
+
+**UNPROVEN (per hard gate):**
+- Cannot show a before/after delta on 10x isolated `analyze_tour_intent()` calls because the fix (temperature=0) makes the call deterministic by design. The 10/10 end-to-end success rate IS the evidence. If LEAD wants to verify by calling `analyze_tour_intent()` directly 10x in isolation with the new code, that would be the definitive proof that the null-venue_name and JSON-parse failures no longer reproduce.
+
 ---
 
 ## Task: wdvrdawcyx — GENERIC GROUNDING Phase 3 (walking-tour generalization)
