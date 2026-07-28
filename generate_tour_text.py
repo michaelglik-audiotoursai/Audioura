@@ -2489,6 +2489,45 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 })
                 return None, None, (None, None)
 
+        # -------- [WALK-D1] Landmark verification for walking tours (Phase 3) --------
+        elif tour_category == 'walking':
+            try:
+                from area_resolver import resolve_area, discover_landmarks, verify_landmarks, cache_get_area, cache_put_area
+                
+                _area = resolve_area(_location_normalized)
+                if _area and _area.resolved:
+                    # Check cache first
+                    _cached_landmarks = cache_get_area(_area)
+                    if _cached_landmarks:
+                        _landmarks = _cached_landmarks
+                    else:
+                        _landmarks = discover_landmarks(_area)
+                        # Cache the results
+                        if _landmarks:
+                            _walk_tier = "rich" if sum(1 for l in _landmarks if l.qid) >= 8 else "medium"
+                            cache_put_area(_area, _landmarks, _walk_tier)
+                    
+                    if _landmarks:
+                        _walk_result = verify_landmarks(poi_list, _area, _landmarks)
+                        _verification_tier = _walk_result['tier']
+                        _d1_evidence_log = _walk_result['evidence_log']
+                        
+                        # A7: Replace coordinates with Wikidata P625 for verified stops
+                        for poi in _walk_result['pois']:
+                            if poi.get('wikidata_lat') and poi.get('wikidata_lng'):
+                                poi['latitude'] = poi['wikidata_lat']
+                                poi['longitude'] = poi['wikidata_lng']
+                        
+                        poi_list = _walk_result['pois']
+                        _pre_d1v2_candidates = list(poi_list)  # For unified fill compatibility
+                        
+                        print(f"  [WALK-D1] Verified {sum(1 for p in poi_list if p.get('verified'))} stops, "
+                              f"tier={_verification_tier}")
+                else:
+                    print(f"  [WALK-D1] Area resolution failed for '{_location_normalized}' — proceeding unverified")
+            except Exception as e:
+                print(f"  [WALK-D1] Error in walking-tour verification (non-fatal): {e}")
+
         # -------- PHASE 4.5: knowledge validation (names + descriptions) --------
         print(f"\nPHASE 4.5: Validating AI knowledge for {location}...")
         # NOTE: at this point descriptions are not yet generated (PHASE 5 is later).
