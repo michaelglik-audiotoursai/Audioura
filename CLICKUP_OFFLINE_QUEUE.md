@@ -507,17 +507,13 @@ sync bookkeeping, not something you wait on.
 
 #### LOCAL-1 — Phase 3 follow-ups: dedupe shared helpers, gate HEDGE-NM on verified, fix DB fallback URL
 
-**⚠️ CLAIMED BY LEAD, 2026-07-28 — Kiro, do NOT pick this up.** Michael asked for
-these fixed before he field-tests, so LEAD is implementing directly rather than
-routing through the normal Kiro-executes flow, to avoid a round-trip delay. If
-you're reading this during a queue scan: skip this entry, nothing to do here.
-Will be marked done below once verified.
+**✅ DONE — implemented and verified directly by LEAD, 2026-07-28.** Kiro: nothing
+to do here, no need to pick this up.
 
-**Agent:** Mac Mini Kiro (~~reassigned to LEAD, see above~~)
-**Branch:** `kiro/local1-phase3-followups` (off current `storied`, which now includes
-Phase 3 @ `8831e0c`) — ~~superseded, LEAD is committing directly to storied~~
-**Priority:** normal — none of these are live-broken, all found during the Phase 3
-approval review. Pick up whenever, no urgency ahead of other queued work.
+**Agent:** ~~Mac Mini Kiro~~ → LEAD (Michael wanted this fixed before field-testing;
+implemented directly to avoid a Kiro round-trip delay)
+**Branch:** committed directly to `storied` (`b0f8c65`)
+**Priority:** was normal, done anyway per Michael's request.
 
 **Context:** Phase 3 (walking-tour generalization) is approved and merged. Three
 things came out of that review that need fixing, none of them blocking:
@@ -546,6 +542,41 @@ things came out of that review that need fixing, none of them blocking:
 showing (a) a verified walking-tour stop narrated plainly (no unnecessary hedge
 phrasing) and (b) an unverified one still hedged — same distinction B1 already proves
 for museum tours. Mark `#### READY FOR REVIEW` here when done.
+
+##### DONE (LEAD, 2026-07-28, commit `b0f8c65`)
+
+1. **A3 dedup — done with a scope correction.** `_filter_disambiguation_pages`,
+   `_get_coordinates`, `_haversine` (aliased `_haversine_km`) are now imported from
+   `venue_resolver.py`, confirmed genuinely identical logic before merging.
+   `_validate_city_match` was deliberately **left separate** on closer inspection —
+   the two versions solve different problems (venue_resolver matches a free-text
+   city name via label comparison; area_resolver always has a resolved `city_qid`
+   and validates via exact QID match on the P131 chain, which is strictly more
+   precise). Forcing them together would have traded away that precision for no
+   real benefit. Documented in `area_resolver.py`'s module docstring.
+
+2. **A5 hedging gate — done, scoped carefully.** A naive `if not poi.get('verified',
+   True)` applied to all non-museum categories would have silently broken the
+   existing safety net for restaurant/movie/book tours, which never set the
+   `verified` key at all and would default to "verified" via the `.get(..., True)`
+   fallback. Scoped the exemption specifically to `tour_category == 'walking'`,
+   the only non-museum category where Phase 3 actually sets the flag meaningfully
+   in both directions.
+
+3. **DB fallback URL — done**, matches the corrected `postgres-2:5432` pattern.
+
+**Live verification (not just code-read):** rebuilt the container, ran two fresh
+non-cached Beacon Hill generations. Confirmed the DB fix (cache HIT, zero connection
+errors) and the A5 fix directly in generated content — Massachusetts State House
+(verified): *"Built in 1798 by the renowned architect Charles Bulfinch"*, stated
+plainly, no hedge language. Acorn Street and Charles Street (unverified): *"believed
+to be one of the oldest continuously inhabited streets"*, *"Reportedly dating back
+to the early 19th century, this structure is believed to be..."* — still correctly
+hedged. All 11 regression suites re-confirmed green post-fix. Container rebuilt and
+healthy.
+
+**Sync action once ClickUp is back:** `create_task` (backfill the real ID) +
+`create_comment` (this DONE section) + `update_task(status=complete)`.
 
 ---
 
