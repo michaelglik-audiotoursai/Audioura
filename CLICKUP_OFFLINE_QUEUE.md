@@ -1861,6 +1861,35 @@ site). Fix B amplifies A's impact for non-English museums. Fix D provides gracef
 degradation for the remaining cases where neither Wikipedia nor the venue corpus has
 exhibit-level detail.
 
+##### LEAD VERDICT (independent verification, 2026-07-29) — APPROVED
+
+The corrected diagnosis holds up. Independently verified the two most checkable new
+claims myself, not taking them on faith:
+- `grep -n "def extract_story_elements_from_pages" story_element_extractor.py` →
+  zero matches, exit code 1. The function genuinely does not exist (closest relative
+  is a differently-named, differently-signatured `extract_elements_from_text`) — the
+  `§3` import has been silently throwing `ImportError` this whole time, exactly as
+  claimed.
+- `SELECT count(*) FROM work_stories` → 0 rows, confirmed live against the actual
+  Postgres instance. The B6 cache genuinely has never been populated by normal
+  generation.
+
+This is a well-substantiated, honest correction — Kiro explicitly acknowledged the
+prior error ("LEAD is right... My prior claim was wrong") rather than quietly
+revising without owning it. No code changes in this task (investigate-only, as
+scoped) — merging the diagnosis into `storied` as documentation.
+
+**Next step, dispatched separately as `LOCAL-12`:** taking Kiro's own priority
+ordering (A > B > D > C) but scoping down for a first pass — (A) route the
+already-fetched corpus into fact-sheet generation instead of relying solely on
+per-exhibit Wikipedia lookups, and (D) the demand-side specificity/adaptive-length
+gate, both cheap and low-risk. Deferring (B) non-English title matching and (C) the
+dead `§3` import as a second pass — fixing A+D first will reveal how much of the
+remaining gap they actually close before spending more effort on B/C.
+
+**TRUE current state:** APPROVED, diagnosis merged to `storied` as documentation.
+Follow-up fix dispatched as `LOCAL-12`.
+
 ---
 
 #### LOCAL-11 — Surface venue-level "why this museum matters" facts as a cheap narrative hook (generic across all museums)
@@ -2003,6 +2032,50 @@ that specific observable has not yet been seen with human eyes tonight.
 
 ---
 
+#### LOCAL-12 — Fix per-exhibit fact retrieval: route already-fetched corpus into fact-sheet generation, plus a specificity gate
+
+**Agent:** Mac Mini Kiro
+**Branch:** `kiro/local12-fact-retrieval-fix`
+**Priority:** high — follow-up fix from `LOCAL-10`'s corrected, independently-verified
+diagnosis (both new claims checked directly: the `§3` import genuinely doesn't exist,
+the B6 cache genuinely has 0 rows).
+
+**Context:** Museum stops read as generic/interchangeable because
+`fetch_poi_rag_context` relies exclusively on each exhibit having its own standalone
+Wikipedia article — most don't (6/8 failed for the Asian Arts Museum). Meanwhile the
+museum's own corpus text (already fetched for exhibit-title extraction, same
+`combined_text`/`per_work_contexts` `LOCAL-11` reuses) sits unused for fact-sheet
+generation. Taking Kiro's own priority ordering (A > B > D > C) but scoping this first
+pass to the two cheapest, lowest-risk fixes — (B) and (C) from the full diagnosis are
+deferred to a likely `LOCAL-13` once we see how much these two alone close the gap.
+
+**Spec:**
+1. **(Fix A)** Route the already-fetched venue corpus
+   (`_story_corpus_result.combined_text` / `per_work_contexts`) into
+   `generate_fact_sheet()` as primary context, instead of relying solely on a
+   standalone-Wikipedia-article lookup per exhibit. The content is already in memory
+   for every museum tour — this is a wiring fix, not a new fetch.
+2. **(Fix D)** Specificity/adaptive-length gate: when confirmed facts for a stop are
+   fewer than 2 and no corpus context was injected, reduce the description length
+   target and instruct GPT not to pad with generic appreciation language — honest
+   brevity over confident-sounding filler.
+3. Do NOT touch the `§3` dead import or the non-English title-matching threshold in
+   this pass — those are explicitly deferred, out of scope here.
+
+**Acceptance:**
+- Regenerate the Asian Arts Museum tour and show at least 2 previously-generic stops
+  (e.g. "Disque", "Fauteuil") now carry a real, specific fact pulled from the venue
+  corpus rather than pure appreciation prose.
+- Show at least one stop where confirmed facts are still <2 producing a shorter,
+  honest description rather than a padded 300-word one.
+- All 11 regression suites stay green.
+- Live-artifact note: if venue resolution is still externally blocked when you run
+  this (see `LOCAL-9`/`LOCAL-11` verdicts above — Wikidata rate-limiting suspected),
+  try a different museum for the live check rather than retrying the same blocked
+  query repeatedly.
+
+---
+
 *(Format for LEAD when creating a new LOCAL-N entry: `#### LOCAL-N — <title>`
 followed by the same content a real task description would have: Agent, Branch, full
 spec, acceptance criteria. At sync time: `create_task` first — unavoidable, costs 1
@@ -2027,8 +2100,9 @@ with the normal 1-comment/1-status-update sync per task.)*
 | 10 | LOCAL-6 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED | 3 | ☐ |
 | 11 | LOCAL-7 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED | 3 | ☐ |
 | 12 | LOCAL-8 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED | 3 | ☐ |
-| 13 | LOCAL-9 | `create_task` first, then map ID + normal 1-comment/1-status sync — new, dispatched, not yet started | 3 | ☐ |
-| 14 | LOCAL-10 | `create_task` first, then map ID + normal 1-comment/1-status sync — new, dispatched, not yet started | 3 | ☐ |
-| 15 | LOCAL-11 | `create_task` first, then map ID + normal 1-comment/1-status sync — new, dispatched, not yet started | 3 | ☐ |
+| 13 | LOCAL-9 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED | 3 | ☐ |
+| 14 | LOCAL-10 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED (2 rounds, corrected diagnosis) | 3 | ☐ |
+| 15 | LOCAL-11 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED | 3 | ☐ |
+| 16 | LOCAL-12 | `create_task` first, then map ID + normal 1-comment/1-status sync — new, dispatched, not yet started | 3 | ☐ |
 
 **Total sync cost so far: 2 API calls.** Update this table as more offline work happens.
