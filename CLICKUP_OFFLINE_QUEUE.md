@@ -2188,6 +2188,72 @@ deCordova) can confirm at review time.
 
 ---
 
+#### LOCAL-13 — Regenerate the original "Asian arts museum, nice, France" test end-to-end and report real API cost
+
+**Agent:** Mac Mini Kiro
+**Branch:** none needed — this is a verification run against already-merged `storied`,
+not a code change.
+**Priority:** high — Michael wants this specific comparison and is asking for a real
+cost figure before deciding whether to regenerate more tours like this.
+
+**Context:** This is the exact venue whose original generation (DB `audio_tours.id=21`,
+`request_string='Asian arts museum, nice, France'`, tour_type=`museum`, 8 stops,
+created 2026-07-29 03:18:57) is what triggered `LOCAL-9` (nav-title fabrication bug),
+`LOCAL-10` (story-richness diagnosis), `LOCAL-11` (venue-identity hook), and `LOCAL-12`
+(fact-retrieval fix) — all four are now merged into `storied`. Michael wants to know:
+did the actual tour get better, and what does it cost to generate now.
+
+**Spec:**
+1. Regenerate the EXACT same request against the current `audioura-tour-generator-1`
+   container (already running merged `storied` — confirm with
+   `docker exec audioura-tour-generator-1 md5sum /app/generate_tour_text.py` against
+   the host's `git show storied:generate_tour_text.py | md5sum` before trusting the
+   run): `generate_tour_text("Asian arts museum, nice, France", "museum", <output>, 8)`.
+   (Confirmed 8 via direct query — `total_stops` column, not a `grep` count off the
+   content, which was the earlier, wrong 7-stop assumption.)
+2. **Cache warning — read carefully:** the exact `(location, tour_type, total_stops)`
+   triple was already generated and cached — table is `tour_cache` (NOT
+   `tour_cache_layer1`; that's only the Python module name that manages the table,
+   `tour_cache_layer1.py`). Confirmed live row:
+   ```sql
+   -- cache_key = 959f666f3aaf681223781c3e9e81a27c34368da73f31300ec3c98474eca7fe54
+   -- location  = 'Asian arts museum, nice, France', tour_type = 'museum', total_stops = 8
+   -- created_at = 2026-07-29 03:18:03, hit_count = 0
+   ```
+   A naive rerun will silently return this stale pre-fix content as a `CACHE HIT`,
+   proving nothing. Before regenerating, delete that exact row:
+   ```sql
+   DELETE FROM tour_cache
+   WHERE cache_key = '959f666f3aaf681223781c3e9e81a27c34368da73f31300ec3c98474eca7fe54';
+   ```
+   (or equivalently `WHERE location = 'Asian arts museum, nice, France' AND tour_type = 'museum' AND total_stops = 8` if the cache_key ever drifts — but the literal key above is confirmed current as of this dispatch). Do NOT change the request
+   parameters to dodge the cache (e.g. don't bump stop count) — Michael wants an
+   apples-to-apples comparison against the original, not a different tour.
+3. Capture the exact `Total API cost: $X.XX (N tokens)` line the pipeline already
+   prints during generation — this is the real, actual cost figure Michael asked for,
+   not an estimate.
+4. If venue resolution fails with "No Wikidata candidates" (external flakiness seen
+   repeatedly during LOCAL-9/11/12 review, ~24h ago at time of this dispatch — may
+   well have cleared by now), retry once after confirming it's not a code regression
+   (same check LEAD used: compare against `--context ~/Audioura` unmodified — though
+   here there's nothing uncommitted, so a second attempt a few minutes later is the
+   right move, not repeated hammering).
+5. Report back: the full regenerated tour text, the real API cost line, and a direct
+   comparison against the original problems — is "Infos pratiques"/"Le musée en vidéo"
+   still appearing as fake stops (LOCAL-9), does "L'art en exil - Hàm Nghi" get its own
+   correct stop, is there any fabricated attribution akin to the Zhang Huan/Samsara
+   case, do stops now carry more specific facts (LOCAL-11/12), does the intro mention
+   anything genuinely specific to this museum (Kenzo Tange, mandala plan, tea
+   ceremonies — LOCAL-11).
+
+**Acceptance:** a genuine fresh generation (not a cache hit — show the `CACHE MISS`/
+`CACHE STORE` log lines as proof), the real cost figure, and an honest side-by-side
+comparison against the original bugs. This is a verification/reporting task — no code
+changes expected unless something new and broken turns up, in which case report it
+as a new finding rather than trying to fix it inline.
+
+---
+
 ## Sync Plan (minimum-API checklist — work this top to bottom once ClickUp recovers)
 
 | # | Task ID | Action | API calls | Synced? |
