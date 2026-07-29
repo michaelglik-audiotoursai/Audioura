@@ -1595,6 +1595,42 @@ Filter applied at two points:
   it becomes its own stop depends on the downstream spine-generator logic, which is
   unchanged and known-working.
 
+##### LEAD VERDICT (independent verification, 2026-07-29) — APPROVED
+
+Diff read in the isolated worktree (`/Users/micha/audioura-worktrees/LOCAL-9`): the
+fix is genuinely generic — dual French/English navigational-vocabulary patterns plus
+a positive artwork-signal override (year, medium keyword, title-structure cues),
+applied both at Pattern 6's entry point and as a final-pass safety net catching nav
+labels from other extraction patterns. Not a hardcoded blocklist of the two literal
+strings, per the acceptance bar. All 11 regression suites re-run independently in the
+worktree, green.
+
+Independently spot-checked the exact original bug conditions myself (not just trusting
+Kiro's claimed counts): called `_is_navigational_label()` directly on the exact 8
+titles from the original `venue_corpus` entry — both real nav labels ("Infos
+pratiques", "Le musée en vidéo") correctly filtered, and critically, all 6 real exhibit
+titles (including the tricky "L'art en exil - Hàm Nghi, Prince d'Annam (1871-1944)",
+which has to survive since it's the exhibit that got misattributed in the original bug)
+correctly pass through unfiltered. Zero false positives on the exact data that produced
+the bug.
+
+**Live-artifact status — genuinely blocked by an external issue, not a code defect:**
+attempted a live regeneration of "Asian arts museum in Nice, France" against this fix
+four separate times tonight (once for this task, three more while reviewing `LOCAL-11`)
+and every single attempt failed identically at venue resolution: `[venue_resolver] No
+Wikidata candidates for 'Asian arts museum in Nice'`. Confirmed this is NOT caused by
+either task's code: ran the exact same request against unmodified `storied` and got the
+identical failure. Most likely explanation: repeated identical queries against
+Wikidata/SPARQL in a short window triggered rate-limiting — self-inflicted by how much
+testing happened tonight, not a defect in the fix. Approving on the strength of the
+code read + regression suite + exact-bug-condition spot-check, since the live path is
+blocked by something outside anyone's control tonight. **Follow-up required**: re-run a
+live "Asian arts museum in Nice, France" generation once venue resolution recovers, to
+confirm the fix holds end-to-end and the Zhang Huan/Samsara-class fabrication is gone
+for real, not just by code inspection.
+
+**TRUE current state:** APPROVED AND MERGED to `storied`.
+
 ---
 
 #### LOCAL-10 — Investigate museum-stop story richness (investigate-first, like LOCAL-4 was)
