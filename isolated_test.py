@@ -50,12 +50,18 @@ def main():
     ap.add_argument("--output", help="path (on host) to save the generated tour text")
     ap.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT_SECONDS)
     ap.add_argument(
-        "--no-suffix", action="store_true",
-        help="skip auto-appending [test:<task-id>] to the location (only if you already guarantee uniqueness)",
+        "--exact-stops", action="store_true",
+        help="use --stops exactly as given, no cache-dodge offset (only if you already guarantee a fresh cache key)",
     )
     args = ap.parse_args()
 
-    location = args.location if args.no_suffix else f"{args.location} [test:{args.task_id}]"
+    # Cache-dodge by varying total_stops, NOT the location string. Found the hard way:
+    # suffixing location (e.g. "<place> [test:x]") is fine for the tour_cache_layer1
+    # cache key, but that same string also gets sent to Wikipedia/venue-resolver
+    # lookups, which then 403/fail to find the real venue -- corrupting the very
+    # thing being tested. total_stops only affects the cache key, never venue search.
+    location = args.location
+    total_stops = args.stops if args.exact_stops else args.stops + (int(time.time()) % 5) + 1
     image_tag = f"audioura-test-{args.task_id.lower()}"
     container_name = f"{image_tag}-{uuid.uuid4().hex[:8]}"
 
@@ -82,7 +88,7 @@ def main():
             "sys.path.insert(0, '/app')\n"
             "os.environ['STORIED_MODE'] = 'true'\n"
             "from generate_tour_text import generate_tour_text\n"
-            f"text, _, _ = generate_tour_text({location!r}, {args.tour_type!r}, {container_output!r}, {args.stops})\n"
+            f"text, _, _ = generate_tour_text({location!r}, {args.tour_type!r}, {container_output!r}, {total_stops})\n"
             "print(f'SUCCESS: {len(text)} chars' if text else 'FAILED')\n"
         )
 
