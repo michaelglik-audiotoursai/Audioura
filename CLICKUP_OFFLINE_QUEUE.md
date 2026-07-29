@@ -1557,104 +1557,153 @@ recommended next step.
 
 ##### READY FOR REVIEW
 
-**Diagnosis: Per-exhibit RAG retrieval is structurally too thin — and the description prompt has no mechanism to demand specifics when facts ARE available.**
+**Branch:** `kiro/local10-story-richness-investigation`
+**Supersedes:** `c611365` (prior incorrect diagnosis)
 
-The problem is a combination of both hypotheses, but the primary bottleneck is retrieval.
+**Corrected Supply-Side Diagnosis: The Pipeline Runs but Retrieval Fails at Three Levels**
 
----
+LEAD is right — `STORIED_MODE=true` is hardcoded in `docker-compose-master.yml`,
+confirmed live (`docker exec audioura-tour-generator-1 env | grep STORIED_MODE` →
+`true`). The pipeline at `generate_tour_text.py:3293-3356` genuinely executes. My
+prior claim was wrong. The real question is: why does it come back empty so often?
 
-**Finding 1: The fact-retrieval pipeline is incomplete in production.**
+**Root Cause #1 (PRIMARY): `fetch_poi_rag_context` relies exclusively on individual
+Wikipedia article lookups — most museum exhibits don't have Wikipedia articles.**
 
-The system has three potential sources of per-exhibit story material:
-1. **Fact sheets** (via `fact_extractor.py` → `rag_retriever.py`) — only active when `STORIED_MODE=true`
-2. **Story elements** (via `story_element_extractor.py` → LLM extraction from corpus pages) — only active when `STORIED_MODE=true`
-3. **B6 scored story elements** (via `work_story_searcher.py` → `work_stories_get()`) — reads from a DB cache that is populated ONLY by manually-run pilot scripts (`run_pilot_b6.py`, etc.), never by the main generation pipeline
+`fact_extractor.py:generate_fact_sheets_parallel` calls `rag_retriever.fetch_poi_rag_context`
+per POI. For museum tours, this function (line 106-140) does exactly one thing: calls
+`fetch_wikipedia_summary(poi_name)`. If the exhibit has its own Wikipedia article
+(Mona Lisa → 37k chars, The Birth of Venus → 25k chars), it succeeds. If not — which
+is the case for the vast majority of museum works worldwide — both `artist_context`
+and `period_context` come back empty, and `generate_fact_sheet` (line 34) returns None
+with the logged warning "No RAG context for X — cannot generate fact sheet."
 
-**In the standard deployment (`docker-compose.yml`), `STORIED_MODE` is NOT set** (only `docker-compose-master.yml` sets it). This means:
-- `_storied_fact_sheets` = `None` → the `fact_sheet` variable passed to `_generate_description()` is always `None`
-- `_storied_spine` = `None` → `spine_stop` is always `None`
-- `_story_elements` = `[]` (never extracted)
-- Story types are never assigned (`story_type` = `None`)
-- The B6 `work_stories_get()` path requires prior pilot-script population (which doesn't happen for arbitrary museums)
+**Empirical evidence (live, not hypothetical):**
+- Asian Arts Museum of Nice: 6/8 exhibits failed RAG lookup. Every failing title
+  ("Les paysages de l'âme", "La geste de Bouddha", "Hokusai – Voyage au pied du mont
+  Fuji", "L'art en exil - Hàm Nghi", "Infos pratiques", "Le musée en vidéo") has no
+  Wikipedia article. The 2 that succeeded ("fauteuil", "disque") matched generic French
+  Wikipedia articles about the WORD itself (armchairs, discs) — not about these specific
+  museum objects. So even the "successful" 2/8 used irrelevant context.
+- Chagall Museum (Nice): 5/5 succeeded — but only because `_extract_artist_from_venue`
+  produces "Marc Chagall" and `fetch_wikipedia_summary("Marc Chagall")` returns a rich
+  article. The artist bio is used as a generic `artist_context` for ALL works, regardless
+  of whether the individual work (e.g. "Abraham et les trois anges") has its own article.
+  This means fact sheets for Chagall works are generated from Marc Chagall's general bio
+  (truncated to 800 chars), NOT from work-specific information.
+- Cross-museum test: "La fuite en Égypte" (Musée d'Art Naïf) → 0 chars. "Still Life
+  with Aubergines" (Musée Matisse) → 0 chars. Only world-famous works with dedicated
+  Wikipedia articles succeed.
 
-**The only per-exhibit material that makes it into the PHASE 5 prompt in production is:**
-- The `_d1_venue_corpus` sentence-matching (C5-1 block at line 3560) — keyword overlap search against the scraped corpus
-- The `_story_corpus_result['per_work_contexts']` (§4 block at line 3572) — normalized title matching
+**The critical gap:** `story_miner.py`'s `fetch_venue_narrative_corpus` already fetches
+rich per-venue content (120,790 chars for the Asian Arts Museum including 5 narrative
+pages from the official site, notably `les-oeuvres-commentees` = "commented works").
+This content IS available in `_story_corpus_result` and `_d1_venue_corpus` by the time
+fact-sheet generation runs. But `fetch_poi_rag_context` never consults it — it only
+does standalone Wikipedia lookups per exhibit name, completely ignoring the venue corpus
+already in memory.
 
-Both are low-recall: C5-1 splits the entire venue corpus on `.` and matches keywords ≥4 chars from the work title. For works with common words ("The Dream", "Disque", "Fauteuil"), this either matches nothing specific or matches irrelevant sentences. §4 requires the work title to appear verbatim in the corpus (8-char prefix match), which fails for most exhibits.
+**Root Cause #2: `_extract_per_work_contexts` matching threshold is too aggressive
+for non-English exhibit titles.**
 
----
+Even when the venue corpus IS consulted (the `§4` injection at line 3572-3586),
+`_extract_per_work_contexts` in `story_miner.py:471-493` uses a 60%-of-significant-
+words threshold. For French titles like "La geste de Bouddha", only 2 significant words
+(≥4 chars) are extracted: `['geste', 'bouddha']`. The threshold becomes `max(1, 2*0.6)
+= 1.2`, requiring BOTH words in the same sentence. The corpus contains 8 occurrences
+of "bouddha" and 6 of "geste" — but "geste" appears in a completely different context
+(artistic gesture/movement in acrobatics descriptions), never in the same sentence as
+"bouddha". Result: 0 matching sentences for an exhibit the corpus genuinely discusses
+(a rich description of the 2nd-century Pakistani Bouddha sculpture: "Conservée au
+musée départemental des arts asiatiques de Nice, cette statue en schiste gris de
+Bouddha, datée du IIe siècle, constitue un témoignage éloquent de la rencontre entre
+art grec et art indien").
 
-**Finding 2: Evidence from real tours confirms the hypothesis.**
+**Root Cause #3: `§3` story-element extraction ALWAYS silently fails — function
+doesn't exist.**
 
-**Museum of Naïve Art, Nice** — stops like "The Dream", "The Wedding", "The Red Umbrella":
-- These are generic painting titles with no Wikipedia articles.
-- `fetch_poi_rag_context("The Dream", "Museum Of Naïve Art")` would get empty `poi_context` (no standalone article), fall back to the venue's Wikipedia page as `period_context`, and use the venue-extracted artist as `artist_context`.
-- Result: GPT gets a generic venue article and writes completely fabricated visual descriptions ("bold brushstrokes", "vivid colors", "symbolic elements") with zero specific facts.
+`generate_tour_text.py:3310` imports `extract_story_elements_from_pages` and
+`persist_story_elements` from `story_element_extractor.py`. Neither function exists in
+that module (confirmed: `grep -c "def extract_story_elements_from_pages"
+story_element_extractor.py` → 0, `grep -c "def persist_story_elements"
+story_element_extractor.py` → 0). The import raises `ImportError`, caught silently at
+line 3322, printing "[§3] story_element_extractor not available". This happens on
+EVERY generation (confirmed in live container logs: all 3 recent generations show this
+message). The spine generator then falls back to `mode=invented` (no factual
+grounding in the narrative arc).
 
-**Asian Arts Museum, Nice** — stops like "Disque", "Fauteuil", "Hokusai – Voyage au pied du mont Fuji":
-- Even the one stop with real facts (La geste de Bouddha — II-III century, Pakistan, schist, acquired 2001) merely LISTS them rather than building narrative. The prompt says "Include the artistic, historical, and cultural significance" but doesn't demand a story arc or insist on using the facts as narrative anchors.
-- "Disque" gets a completely generic art-appreciation riff with zero factual content.
+**B6 `work_stories` Cache — Empirical Finding:**
 
-**Palais Lascaris, Nice** — stops like "Raquel", "The Annunciation":
-- "Raquel" is described as "a captivating painting... created by an unknown artist" with invented visual details ("soft hues of blue and gold", "subtle touches of crimson"). Zero provenance, zero specific historical context.
-- Every stop follows the same template: generic scene-setting → craftsmanship appreciation → "broader context" paragraph → closing rhetorical question.
+- `work_stories` table exists but has **0 rows** (confirmed:
+  `docker exec development-postgres-2-1 psql -U admin -d audiotours -c "SELECT COUNT(*)
+  FROM work_stories;"` → 0).
+- `work_stories_put` (the WRITE function) is only called from
+  `story_element_extractor.py:885`, inside `extract_and_score_stop()`. This function is
+  NEVER called from `generate_tour_text.py` or any other live-pipeline file — only from
+  test files and `run_pilot_*.py` scripts. So the cache is never populated during
+  normal generation.
+- `work_stories_get` (the READ function) IS wired into the live pipeline at
+  `generate_tour_text.py:3595`, BUT it's guarded by `if tour_category == 'museum' and
+  poi_name and artist:`. For multi-artist museums (like Asian Arts), `artist` is always
+  empty string (confirmed from logs: "Stop 1: Hokusai – Voyage au pied du mont Fuji
+  by , ..."). The guard fails, the read is never attempted.
+- **Net finding:** the B6 cache is correctly wired for reading in the live pipeline, but
+  (a) never populated by it (only pilot scripts write), AND (b) the guard condition
+  prevents reads for any museum where per-work artist attribution isn't available —
+  which is most non-single-artist museums. Even if the table were populated, the Asian
+  Arts Museum stops would never read from it.
 
-**African American Museum, Philadelphia** — stops like "Eloise Owens Strothers", "Joseph E. Coleman":
-- GPT fabricates confident-sounding visual descriptions ("striking piece", "interconnected hands", "deep indigos to vibrant crimsons") for exhibits it knows nothing about.
-- The descriptions are structurally identical: generic intro → invented visual details → vague cultural significance → rhetorical question.
+**Demand-Side Observation (preserved from prior submission):**
 
-**National Constitution Center, Philadelphia** — stops like "Americas Founding", "The First Amendment":
-- GPT invents a "monumental painting by John Trumbull" for the "Americas Founding" stop and claims a "framed parchment" for the First Amendment stop — both likely fabricated exhibit formats.
+The museum description prompt (`generate_tour_text.py:3371-3393`) asks for "EXACTLY
+300 words" covering "artistic, historical, and cultural significance," "information
+about the artist and their creative process," and "how this piece fits into the broader
+context" — with no gate requiring any of this to be grounded in actual retrieved facts.
+When no fact sheet is generated and no `per_work_contexts` match, GPT fills the 300
+words entirely from its parametric knowledge, defaulting to the same generic template:
+scene-setting → craftsmanship appreciation → "bridge between cultures" cliché →
+closing rhetorical question.
 
----
+**Evidence Across Multiple Museum Tours (methodology from prior submission):**
 
-**Finding 3: The description prompt itself lacks a specificity gate.**
+The identical template pattern appears across: Asian Arts Museum Nice (6/8 stops
+generic), Musée d'Art Naïf Nice (all stops except well-known paintings), Palais
+Lascaris Nice (stops without Wikipedia articles), Musée Matisse Nice (lesser-known
+works), and Chagall Museum Nice (even with artist bio context, works without their
+own articles default to bio-derived filler rather than work-specific narrative).
 
-Even when the story_miner corpus DOES contain per-work facts (as with La geste de Bouddha in the Asian arts tour), the prompt doesn't:
-1. **Require** the model to use injected facts as narrative anchors
-2. **Penalize** generic filler — the 300-word target creates pressure to pad
-3. **Gate quality** — there's no conditional logic that says "if you have <2 confirmed facts for this work, produce a shorter honest description instead of a 300-word padded one"
+**Recommended Direction:**
 
-The museum description prompt (line 3385) says:
-```
-Include:
-- The artistic, historical, and cultural significance of the work
-- Information about the artist and their creative process
-- How this piece fits into the broader context of {tour_type}
-- Interesting details that would engage visitors
-```
+**(A) Bridge the corpus-to-fact-sheet gap (primary, biggest impact):**
+Route the already-fetched venue corpus (`_story_corpus_result.combined_text` and
+`per_work_contexts`) INTO the fact-sheet generation as primary context, instead of
+relying solely on standalone Wikipedia lookups per exhibit. The content is already in
+memory — it's just never passed to `generate_fact_sheet()`. This would immediately
+fix the 6/8 failure case for the Asian Arts Museum and any museum whose official site
+has exhibit descriptions.
 
-This is a recipe for generic art-appreciation prose. It asks for "significance" and "context" (which GPT fills with clichés) rather than demanding "specific documented facts about this piece" or "one surprising thing that only someone who researched this work would know."
+**(B) Fix `_extract_per_work_contexts` matching for non-English titles:**
+Lower the threshold or switch to substring/n-gram matching so that a corpus sentence
+containing "Bouddha" matches the exhibit "La geste de Bouddha" even when "geste"
+doesn't co-occur. This fixes the secondary "§4 injection" path and would immediately
+unlock the rich Bouddha statue description already present in the corpus.
 
----
+**(C) Implement `extract_story_elements_from_pages` or remove the dead import:**
+The `§3` path is a dead branch that always fails silently. Either implement the
+missing function to actually extract story elements from the corpus pages (enabling
+grounded spine generation with `mode=found`), or remove it to avoid confusion.
 
-**Root cause summary:**
+**(D) Specificity/adaptive-length gate (demand side):**
+When confirmed facts < 2 and no corpus context was injected, reduce the description
+length target and/or add an explicit instruction to NOT pad with generic appreciation
+language. This prevents GPT from filling 300 words with template filler when it has
+nothing real to say.
 
-| Factor | Impact | How often |
-|--------|--------|-----------|
-| STORIED_MODE off in prod → no fact sheets, no spine, no story types | Critical | 100% of standard deployments |
-| B6 work_stories cache empty → no SERP-mined story elements | Critical | All museums except those manually piloted |
-| C5-1 corpus keyword match → low recall for generic titles | High | ~70% of museum stops |
-| §4 per_work_contexts → normalized title rarely matches | High | ~60% of museum stops |
-| Description prompt rewards word-count over specificity | Medium | 100% — structural incentive to pad |
-| No quality gate: model outputs 300 words regardless of available facts | Medium | 100% |
-
----
-
-**Recommended direction (for LEAD decision):**
-
-**Option A (highest impact, moderate effort): Always-on fact retrieval.**
-- Enable the fact-sheet + story-element pipeline unconditionally (not gated by `STORIED_MODE`), at least for museum tours.
-- Wire `search_stories_for_stop()` into the main generation flow (currently only in pilot scripts) with a query budget appropriate for production (e.g., `generation_tier='free'` for zero SERP cost, relying on venue corpus + Wikipedia).
-- This is the "supply side" fix — give GPT something real to talk about.
-
-**Option B (lower effort, complementary): Specificity gate + adaptive length.**
-- When injected facts < 2 confirmed items, reduce target from 300 words to ~150 words and change prompt to: "Describe only what is documented. Acknowledge gaps honestly rather than padding with generic appreciation."
-- Add a mandatory instruction: "Your FIRST paragraph must state at least one specific documented fact. If you have none, say so."
-- This is the "demand side" fix — stop GPT from producing confident-sounding filler when it has no material.
-
-**Recommended: Do both.** Option A solves the input problem; Option B prevents filler even when retrieval is thin. Together they eliminate the template-identical generic prose pattern.
+**Priority recommendation:** A > B > D > C. Fix A alone would solve the primary
+failure mode (exhibits with no Wikipedia article but described on the museum's own
+site). Fix B amplifies A's impact for non-English museums. Fix D provides graceful
+degradation for the remaining cases where neither Wikipedia nor the venue corpus has
+exhibit-level detail.
 
 ---
 
