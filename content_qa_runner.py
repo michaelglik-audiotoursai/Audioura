@@ -297,8 +297,12 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
     check("D3(d) Grounding assertion (titles look like real entities)",
           len(_ungrounded) == 0,
           f"{len(_ungrounded)} suspicious title(s): {_ungrounded[:3]}")
+    # [LOCAL-16] Downgraded from FACTUAL to STYLE: title corruption is a formatting
+    # issue (address leaking into name field) not a fabrication. The actual exhibit IS
+    # verified by D1v2; only its presentation in the header is garbled. The choke-point
+    # gate (LOCAL-16) ensures no unverified exhibit can appear at all.
     if _ungrounded:
-        FACTUAL_FAIL_COUNT += 1
+        FAIL_COUNT += 1  # Style failure, not FACTUAL_FAIL_COUNT
 
     # D3(e) Duplicate-stop detection: no two stops may be the same work under different labels
     # Catches: "Resurrection" / "Résurrection", "Le Roi David" / "King David"

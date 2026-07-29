@@ -999,3 +999,58 @@ def apply_tour_diversity(stops_selections: List[Dict], max_same_type: int = 2) -
             type_counts[top_type] = count + 1
     
     return stops_selections
+
+
+# --- Wrappers expected by generate_tour_text.py §3 ---
+
+def extract_story_elements_from_pages(pages: List[Dict], venue_name: str,
+                                       api_key: str = '', max_pages: int = 5) -> List[Dict]:
+    """Extract story elements from corpus pages (wrapper for §3 integration).
+
+    Args:
+        pages: List of page dicts from _story_corpus_result['pages'].
+               Each page has 'url', 'text', and optionally 'canonical_title', 'artist'.
+        venue_name: The museum/venue name (used as fallback canonical_title).
+        api_key: OpenAI API key (uses env var if empty).
+        max_pages: Maximum pages to process.
+
+    Returns:
+        Flat list of story element dicts (merged from all pages).
+    """
+    if api_key:
+        global OPENAI_API_KEY
+        OPENAI_API_KEY = api_key
+
+    all_elements = []
+    for page in pages[:max_pages]:
+        page_text = page.get('text', '')
+        if not page_text or len(page_text) < 50:
+            continue
+        canonical_title = page.get('canonical_title', venue_name)
+        artist = page.get('artist', '')
+        source_url = page.get('url', '')
+        elements = extract_elements_from_text(page_text, canonical_title, artist, source_url)
+        all_elements.extend(elements)
+
+    # Score corroboration if we have enough elements
+    if len(all_elements) >= 2:
+        try:
+            all_elements = score_corroboration(all_elements)
+        except Exception:
+            pass
+
+    return all_elements
+
+
+def persist_story_elements(elements: List[Dict], output_path: str) -> None:
+    """Persist story elements to a JSON file for downstream QA (G4 check).
+
+    Args:
+        elements: List of story element dicts.
+        output_path: File path to write JSON to.
+    """
+    try:
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(elements, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"  [§3] Failed to persist story elements: {e}")

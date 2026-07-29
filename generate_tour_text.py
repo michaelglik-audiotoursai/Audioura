@@ -2928,7 +2928,19 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         entry['name'] = canonical_by_norm[norm]['name']
                         parsed_normalized.append(entry)
                     else:
-                        unknown.append(entry.get('name', ''))
+                        # [LOCAL-16 Item 4] Fuzzy match: GPT sometimes wraps the canonical name
+                        # in descriptive text ("Discover the elusive 'Fauteuil' exhibit at...")
+                        # Check if any canonical name is a substring of the returned name.
+                        _fuzzy_match = None
+                        for _canon_norm, _canon_poi in canonical_by_norm.items():
+                            if _canon_norm and len(_canon_norm) >= 4 and _canon_norm in norm:
+                                _fuzzy_match = _canon_poi
+                                break
+                        if _fuzzy_match:
+                            entry['name'] = _fuzzy_match['name']
+                            parsed_normalized.append(entry)
+                        else:
+                            unknown.append(entry.get('name', ''))
                 if unknown:
                     print(f"! PHASE 3B introduced unknown names (ignored): {unknown}")
                 if not parsed_normalized:
@@ -3290,6 +3302,135 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 "description": "",
             })
     
+    # ======================================================================
+    # [LOCAL-16] STRUCTURAL CHOKE-POINT: D1v2-verified-only gate for museums
+    # ======================================================================
+    # After ALL candidate-gathering and fill logic has run (UNIFIED-FILL, R4,
+    # POST-R4-FILL, Part C, Phase 3B, etc.), for museum tours with a resolved
+    # venue, FILTER poi_list to ONLY entries that are D1v2-VERIFIED.
+    #
+    # This is the single, central enforcement point that makes it structurally
+    # impossible for ANY current or future fill/fallback path to sneak an
+    # unverified stop into Phase 5 description generation. Rounds 0-2 showed
+    # that maintaining "never fabricate" in every individual pathway fails —
+    # fix one, and a sibling pathway fabricates. This gate enforces once.
+    #
+    # If this reduces stops below total_stops, accept the honest shortfall.
+    # An honest short tour beats a fabricated full one.
+    # ======================================================================
+    if tour_category == 'museum' and _museum_venue_name and _d1_evidence_log:
+        _before_gate = len(poi_list)
+        _verified_gate_names = set()
+        # Build the set of D1v2-VERIFIED canonical titles (normalized)
+        for _ev_key, _ev_val in _d1_evidence_log.items():
+            if isinstance(_ev_val, dict) and _ev_val.get('status') == 'VERIFIED':
+                _verified_gate_names.add(_normalize_name(_ev_key))
+                # Also add canonical_title if present (handles renames)
+                _canon = _ev_val.get('canonical_title', '')
+                if _canon:
+                    _verified_gate_names.add(_normalize_name(_canon))
+
+        _gated_poi_list = []
+        _removed_stops = []
+        for _p in poi_list:
+            _p_norm = _normalize_name(_p.get('name', ''))
+            if _p_norm in _verified_gate_names:
+                _gated_poi_list.append(_p)
+            elif _p.get('verified', False) is True:
+                # Explicitly marked verified (e.g. by R4 re-verification) — keep
+                _gated_poi_list.append(_p)
+            else:
+                _removed_stops.append(_p.get('name', '?'))
+
+        if _removed_stops:
+            print(f"\n{'='*60}")
+            print(f"[LOCAL-16 GATE] D1v2-verified-only filter for museum tour")
+            print(f"  Before: {_before_gate} stops")
+            print(f"  Removed {len(_removed_stops)} UNVERIFIED stop(s):")
+            for _rs in _removed_stops:
+                print(f"    ✗ {_rs}")
+            print(f"  After: {len(_gated_poi_list)} verified stop(s)")
+            print(f"{'='*60}")
+            poi_list = _gated_poi_list
+        else:
+            print(f"\n[LOCAL-16 GATE] All {_before_gate} stops are D1v2-verified ✓")
+
+        # [LOCAL-17 Fix 2] Canonical-title deduplication
+        # Two different candidate names can both be D1v2-verified but map to the
+        # SAME canonical title (e.g. "Portrait of Hàm Nghi, Prince d'Annam" and
+        # "l'art en exil - Hàm Nghi, Prince d'Annam (1871-1944)" match the same
+        # catalog entry). Keep only the first occurrence per canonical title.
+        _seen_canonical = set()
+        _deduped_poi_list = []
+        _dedup_removed = []
+        for _p in poi_list:
+            _p_name = _p.get('name', '')
+            # Look up canonical title from evidence log
+            _ev_entry = _d1_evidence_log.get(_p_name, {})
+            _canon_title = _ev_entry.get('canonical_title', '') if isinstance(_ev_entry, dict) else ''
+            # Normalize: use canonical title if available, otherwise the stop name itself
+            _dedup_key = _normalize_name(_canon_title) if _canon_title else _normalize_name(_p_name)
+            if _dedup_key in _seen_canonical:
+                _dedup_removed.append(f"{_p_name} (canonical: {_canon_title or _p_name})")
+            else:
+                _seen_canonical.add(_dedup_key)
+                _deduped_poi_list.append(_p)
+
+        if _dedup_removed:
+            print(f"\n  [LOCAL-17 DEDUP] Removed {len(_dedup_removed)} duplicate canonical title(s):")
+            for _dr in _dedup_removed:
+                print(f"    ✗ {_dr}")
+            poi_list = _deduped_poi_list
+
+        # Re-number stops after filtering + dedup
+        for i, p in enumerate(poi_list):
+            p["stop_number"] = i + 1
+        # Adjust total_stops down to match reality — honest shortfall
+        if len(poi_list) < total_stops:
+            print(f"  [LOCAL-16 GATE] Accepting honest shortfall: {len(poi_list)}/{total_stops} stops")
+            total_stops = len(poi_list)
+
+        if len(poi_list) == 0:
+            print(f"X [LOCAL-16 GATE] All stops removed — no D1v2-verified stops available")
+            return None, None, (None, None)
+
+    # -------- [LOCAL-16 Item 4] Stop-title sanitization for museum tours --------
+    # Address text or flowery descriptions sometimes leak into stop names during Phase 3B.
+    # For museum tours, a stop name should be the artwork/exhibit title only.
+    if tour_category == 'museum' and _museum_venue_name:
+        _TITLE_CORRUPT_PATTERNS = [
+            # "Located at/in/on/within..." prefix
+            re.compile(r'^Located\s+(at|in|on|within|inside)\s+', re.IGNORECASE),
+            # "At the Asian Arts Museum..." prefix
+            re.compile(r'^At\s+the\s+', re.IGNORECASE),
+            # Address patterns embedded in title
+            re.compile(r'\d{3,5}\s+(Promenade|Avenue|Boulevard|Rue|Street|Road)\b.*$', re.IGNORECASE),
+            # "Stop N" reference embedded in name
+            re.compile(r"['\"]?Stop\s+\d+['\"]?", re.IGNORECASE),
+            # Entire sentence-like patterns (contains "is a", "features", "which")
+            re.compile(r'\b(is\s+a|features?\s+the|which\s+)', re.IGNORECASE),
+        ]
+        for _p in poi_list:
+            _orig_name = _p.get('name', '')
+            _cleaned_name = _orig_name
+            # If the name is too long (>12 words), try to extract the actual title
+            if len(_orig_name.split()) > 12:
+                # Try to find a quoted title within the corrupted text (single or double quotes)
+                _q_match = re.search(r'''["']([^"']{3,80})["']''', _orig_name)
+                if _q_match:
+                    _cleaned_name = _q_match.group(1)
+                else:
+                    # Fall back to first 8 words, stripped of punctuation
+                    _cleaned_name = ' '.join(_orig_name.split()[:8]).rstrip('.,;:!?')
+            # Apply corruption pattern removal
+            for _pat in _TITLE_CORRUPT_PATTERNS:
+                _cleaned_name = _pat.sub('', _cleaned_name).strip()
+            # Strip trailing punctuation and extra whitespace
+            _cleaned_name = _cleaned_name.strip(' ,;:.')
+            if _cleaned_name != _orig_name and _cleaned_name:
+                print(f"  [LOCAL-16 Title Fix] '{_orig_name[:60]}' → '{_cleaned_name}'")
+                _p['name'] = _cleaned_name
+
     # -------- [S11] Storied: generate spine + fact sheets when STORIED_MODE=true --------
     _storied_spine = None
     _storied_fact_sheets = None
@@ -3305,11 +3446,13 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
 
             # [§3] Extract story elements before spine generation (if corpus available)
             _story_elements = []
-            if _story_corpus_result and _story_corpus_result.get('pages'):
+            _pages_available = _story_corpus_result.get('pages') if _story_corpus_result else None
+            if _story_corpus_result and _pages_available:
+                print(f"  [§3] Corpus pages available: {len(_pages_available)} page(s), attempting extraction...")
                 try:
                     from story_element_extractor import extract_story_elements_from_pages, persist_story_elements
                     _story_elements = extract_story_elements_from_pages(
-                        pages=_story_corpus_result['pages'],
+                        pages=_pages_available,
                         venue_name=_venue_name,
                         api_key=api_key,
                         max_pages=5,
@@ -3318,10 +3461,13 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     if _story_elements and output_file:
                         _elem_path = output_file.replace('.txt', '_story_elements.json')
                         persist_story_elements(_story_elements, _elem_path)
+                        print(f"  [§3] Persisted {len(_story_elements)} story elements to {_elem_path}")
                 except ImportError:
                     print(f"  [§3] story_element_extractor not available")
                 except Exception as _se_err:
                     print(f"  [§3] Story element extraction error: {_se_err}")
+            else:
+                print(f"  [§3] No corpus pages — _story_corpus_result={bool(_story_corpus_result)}, pages={type(_pages_available).__name__ if _pages_available else None}")
 
             _storied_spine = generate_spine(
                 venue_name=_venue_name,
@@ -3455,6 +3601,25 @@ This tone should permeate the entire description — not as a single inserted se
 
         # [PALAIS-FIX B1] Hedged narration for unverified stops — moved EARLY for GPT attention
         # [LOCAL-6 Fix 3] Reframed as narrative aside instead of flat institutional disclaimer
+        #
+        # [LOCAL-16 ROOT CAUSE NOTE] Why the "attribution guard" (Fix 4, round 2) failed
+        # on "Le Printemps" → "Mei-Ling Chen" / "Harmony in Bloom":
+        # The attribution guard is ONLY a soft prompt instruction + attribution_confident
+        # flag in the fact sheet. For UNVERIFIED fill candidates:
+        #   1. fact_extractor's fetch_poi_rag_context() finds no real corpus → returns
+        #      attribution_confident=False → facts injected as "CONTEXTUAL INFORMATION"
+        #      (or not at all if no facts found).
+        #   2. The Phase 5 prompt says "Do NOT invent visual specifics or biographical
+        #      claims not in the fact sheet" — but GPT routinely overrides soft prompt
+        #      constraints when the stop has NO real facts to anchor against.
+        #   3. The post-hoc regex was pattern-matching on specific cliché phrasings
+        #      ("the renowned artist", "by master") but "Mei-Ling Chen" used novel phrasing
+        #      that escaped the patterns.
+        # ROOT CAUSE: prompt-level "don't fabricate" constraints are unreliable when GPT
+        # has zero factual grounding for a stop. The only reliable fix is to never let
+        # unverified stops reach Phase 5 at all — which the LOCAL-16 GATE above now enforces
+        # for museum tours. This hedging block remains as defense-in-depth for non-museum
+        # categories and any hypothetical edge case where the gate doesn't fire.
         if not poi.get('verified', True):
             description_prompt += """
 NARRATIVE HONESTY — UNVERIFIED WORK: This artwork's presence at this venue has NOT been
@@ -3763,6 +3928,10 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
         for future in as_completed(futures):
             idx, orientation, description, word_count, tokens_used, call_cost = future.result()
             poi_list[idx]["orientation"] = orientation
+            # [LOCAL-16 Item 4] Strip any "Stop N:" prefix GPT may have echoed into description
+            description = re.sub(r'^Stop\s+\d+:\s*', '', description, count=1, flags=re.IGNORECASE).strip()
+            # Also strip venue-location sentences that GPT sometimes prepends
+            description = re.sub(r'^Located\s+(at|in|on|within|inside)\s+[^.]+\.\s*', '', description, count=1, flags=re.IGNORECASE).strip()
             poi_list[idx]["description"] = description
             poi_list[idx]["word_count"] = word_count
             total_tokens += tokens_used
@@ -3923,6 +4092,20 @@ Requirements:
     for i, poi in enumerate(poi_list):
         stop_num = i + 1   # always sequential; ignore whatever AI emitted
         poi_name = poi["name"]
+        # [LOCAL-16 Item 4] Last-resort name sanitization at assembly time
+        # If the name is a full sentence (>12 words), try to recover the canonical title
+        if len(poi_name.split()) > 12 and tour_category == 'museum':
+            # Try to extract quoted title (single or double quotes)
+            _q_assembly = re.search(r'''["'\u201c\u201d]([^"'\u201c\u201d]{3,80})["'\u201c\u201d]''', poi_name)
+            if _q_assembly:
+                poi_name = _q_assembly.group(1)
+                poi["name"] = poi_name
+                print(f"  [LOCAL-16 Title Fix] Assembly-time recovery for stop {stop_num}: '{poi_name}'")
+            else:
+                # Truncate to first 8 words
+                poi_name = ' '.join(poi_name.split()[:8]).rstrip('.,;:!?')
+                poi["name"] = poi_name
+                print(f"  [LOCAL-16 Title Fix] Assembly-time truncation for stop {stop_num}: '{poi_name}'")
         artist = poi["artist"]
         year = poi["year"]
         orientation = poi.get("orientation", "Position yourself to best view this location.")
