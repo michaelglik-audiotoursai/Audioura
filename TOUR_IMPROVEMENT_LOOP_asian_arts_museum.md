@@ -53,6 +53,7 @@ signal for subscription-tier decisions.
 |---|---|---|---|---|---|---|
 | 0 (baseline, LOCAL-9→12 fixes applied) | 2026-07-29 | **+15.6 / 100** | $0.0353 | $0.00226 | 2 fabricated stops (UNIFIED-FILL inventing fictional fill), 1 real regression (stop 4 lost hard facts), 2 structural defects (`[Venue Name]` leak, corrupted address field), 1 voice-break | 7e61c13 |
 | 1 (BOUNCED) | 2026-07-29 | **-9.4 / 100** | $0.0436 | n/a (negative) | Kiro claimed 3/4 fixed + honest 7/8 shortfall; LEAD independently regenerated twice (own run + re-read Kiro's own evidence file) and found the real delivered tour is functionally unchanged from round 0 — new fabrication pathways fully offset the fixed one. See findings below. | 318fa2e (not merged) |
+| 2 (BOUNCED) | 2026-07-29 | **+15.6 / 100** | $0.0377 | $0.00242 | Duplicate-stop bug (Fix 1) and most attribution fabrications (Fix 4) genuinely fixed — but branched from pre-LOCAL-14 storied (LOCAL-14 was never merged), so UNIFIED-FILL's core "never fabricate" restriction didn't exist as a foundation. Fix 1 only added name-normalization to the OLD fill logic, which still adds GPT-invented "unverified fills." Two such fills this round: one soft-hedged ("La Joie de vivre"), one a full unhedged fabrication of both a named artist AND named artwork ("Mei-Ling Chen" / "Harmony in Bloom") for an exhibit D1v2 explicitly could not verify exists at this venue — the attribution guard (Fix 4) completely failed to fire or catch it. Net score: statistically identical to round 0. See findings below. | 697ad89 (not merged) |
 
 ## Round 1 scope (LOCAL-14, dispatched 2026-07-29)
 
@@ -142,3 +143,63 @@ instead of ungrounded GPT invention, (c) a stricter reject-and-regenerate
 approach for corrupted stop names instead of post-hoc regex salvage, (d) a
 Phase-5 guard against inventing a named artist/attribution for a work whose
 fact sheet doesn't support one.
+
+## Round 2 verdict (BOUNCED, not merged)
+
+Round 2 branched from `storied` at the round-2 dispatch commit — which does
+**not** include round 1's code, since round 1 (LOCAL-14) was bounced and never
+merged. This matters: the round-2 task described "the fill-from-verified loop
+LOCAL-14 added" as an existing foundation to build a name-normalization fix on
+top of, but that foundation was never actually in the codebase Kiro branched
+from. Kiro patched the dedup check in the ORIGINAL (pre-round-1) UNIFIED-FILL
+logic, which still explicitly adds GPT-invented "unverified fills" — the code
+comment literally still reads "Every fill candidate is explicitly unverified"
+and the log line still says "added N unverified fills." Round 2 fixed the
+duplicate-name comparison bug (confirmed: no duplicate stop in either Kiro's or
+LEAD's independent regeneration this round) and the attribution guard clearly
+works for MOST stops (five separate stops correctly say "unknown artisan" /
+"anonymous artist" instead of inventing a name) — genuine, real progress on two
+of four items.
+
+But the deeper problem — ANY fallback path that adds a stop without D1v2
+canonical-title verification remains capable of full fabrication — was not
+closed, just relocated again (round 0: nav-label scraping; round 1: Part C +
+a duplicate; round 2: UNIFIED-FILL's own "unverified fill" mechanism, now with
+the name-collision bug fixed but the fabrication risk itself untouched). LEAD's
+independent regeneration reproduced the exact same 2-unverified-fills pattern
+Kiro's own evidence showed, and reading the FULL text (not just log lines)
+found:
+- Stop 7 ("La Joie de vivre" — a D1v2-DROPPED, unverified candidate): presented
+  as a full, richly-detailed stop with only a soft "the story goes" hedge — not
+  strong enough to communicate that the exhibit's very existence is unconfirmed.
+  Notably, "La Joie de vivre" is also the title of a real, famous, unrelated
+  WESTERN artwork (Matisse/Picasso association) — a confusing coincidence, or
+  GPT drawing on real-world art history and misplacing it at this venue.
+- Stop 8 ("Le Printemps" — the other D1v2-DROPPED candidate): the attribution
+  guard (Fix 4) completely failed here. GPT confidently invented BOTH a named
+  artist ("the renowned artist Mei-Ling Chen") AND a named artwork title
+  ("Harmony in Bloom") with zero hedging — the single most elaborate,
+  confident fabrication seen across all 3 rounds so far, for an exhibit
+  Wikidata couldn't verify exists at this museum at all. Whether the guard's
+  gating condition failed to trigger, or GPT simply overrode the explicit
+  prompt constraint and the post-generation regex safety net also failed to
+  match the exact phrasing used, is worth root-causing in round 3.
+
+**LEAD's independent score: +15.6/100 — statistically identical to round 0.**
+Three data points now (round 0: 15.6, round 1: -9.4, round 2: 15.6) show the
+same underlying pattern each time: fixing one fabrication-fallback pathway
+just relocates the problem to a sibling pathway, because there is no single,
+uniform enforcement point. Not merged. Container restored to clean approved
+storied (md5sum confirmed).
+
+**Round 3 should NOT be another itemized symptom-fix list.** Recommend a
+structural fix instead: add ONE single choke-point check — after ALL
+candidate-gathering/filling logic runs (UNIFIED-FILL, R4, POST-R4-FILL, Part C,
+whatever else exists), for `tour_category == 'museum'`, filter `poi_list` down
+to ONLY entries with a D1v2-VERIFIED canonical-title match before any Phase 5
+description generation happens. No fill mechanism should be able to sneak an
+unverified stop through — verification should be enforced once, centrally, not
+maintained separately in every fallback path (which is exactly how this keeps
+recurring). Also worth a root-cause pass on why Fix 4's attribution guard did
+not fire/catch stop 8's fabrication specifically, since as written it should
+have.
