@@ -118,6 +118,105 @@ def _fetch_page_text(url: str, max_chars: int = 30000) -> Tuple[str, List[Tuple[
         return "", []
 
 
+# --- Navigational / administrative label filter (LOCAL-9) ---
+
+# Pattern-based keywords indicating a navigation/admin page label, NOT an artwork.
+# Covers French and English administrative vocabulary found on museum websites.
+# Deliberately broad patterns — an artwork title that accidentally contains one of
+# these words would still be kept if it also has an artwork-like signal (date, medium,
+# proper-noun structure suggesting a named work).
+_NAV_LABEL_PATTERNS_FR = re.compile(
+    r'\b(?:'
+    r'infos?\s+pratiques?|informations?\s+pratiques?|'
+    r'plan\s+d[eu\']?\s*(?:visite|acc[eè]s|salle)|'
+    r'horaires?|tarifs?|billetterie|r[eé]servation|'
+    r'acc[eè]s|comment\s+venir|nous\s+trouver|'
+    r'mus[eé]e\s+en\s+vid[eé]o|vid[eé]os?\s+du\s+mus[eé]e|'
+    r'actualit[eé]s?|agenda|[eé]v[eé]nements?|programmation|'
+    r'newsletter|contactez(?:\s*[-–]\s*nous)?|nous\s+contacter|'
+    r'mentions?\s+l[eé]gales?|politique\s+de\s+confidentialit[eé]|'
+    r'plan\s+du\s+site|accessibilit[eé]|'
+    r'groupes?\s+(?:et\s+)?scolaires?|m[eé]diation|'
+    r'[eé]ditions?|publications?|boutique|librairie|'
+    r'partenaires?|m[eé]c[eè]nat|soutenir|devenir\s+ami|'
+    r'espace\s+(?:presse|enseignants?|pro)|'
+    r'pr[eê]t\s+d[e\']?\s*[oœ]uvres?|'
+    r'location\s+d[e\']?\s*(?:espaces?|salles?)'
+    r')\b', re.IGNORECASE
+)
+
+_NAV_LABEL_PATTERNS_EN = re.compile(
+    r'\b(?:'
+    r'visit(?:or)?\s+info(?:rmation)?|plan\s+your\s+visit|'
+    r'opening\s+hours?|admission|tickets?|book(?:ing)?|'
+    r'getting\s+(?:here|there)|directions?|find\s+us|'
+    r'museum\s+(?:on\s+video|shop|store|caf[eé])|'
+    r'what\'?s?\s+on|current\s+exhibitions?|upcoming|'
+    r'news(?:letter)?|press\s+(?:room|releases?)|'
+    r'contact\s+us|privacy\s+policy|terms?\s+(?:of\s+use|and\s+conditions?)|'
+    r'accessibility\s+(?:statement|guide|info(?:rmation)?)|site\s*map|'
+    r'group\s+visits?|school\s+(?:visits?|programs?)|education|'
+    r'support\s+us|become\s+a\s+(?:member|friend)|donate|'
+    r'venue\s+hire|facility\s+rental'
+    r')\b', re.IGNORECASE
+)
+
+# Artwork-like positive signals: if a candidate has any of these, it's likely a real
+# title even if it superficially resembles a nav label.
+_YEAR_PATTERN = re.compile(r'\b(?:1[5-9]\d{2}|20[0-2]\d)\b')  # 1500-2029
+_MEDIUM_SIGNAL = re.compile(
+    r'\b(?:'
+    r'peinture|sculpture|gravure|lithographi|dessin|mosa[iï]que|vitrail|'
+    r'tapisserie|c[eé]ramique|gouache|aquarelle|huile|encre|bronze|marbre|'
+    r'painting|drawing|print|mosaic|stained\s+glass|tapestry|ceramic|'
+    r'watercolor|oil\s+on|ink\s+on|acrylic|installation|fresco|bas[- ]relief'
+    r')\b', re.IGNORECASE
+)
+# Artwork title structural signals: possessive/genitive ("de l'", "du", "of the"),
+# named-entity patterns (multi-word starting uppercase), poetic constructions
+_ARTWORK_TITLE_SIGNAL = re.compile(
+    r'(?:'
+    r'\b(?:portrait|autoportrait|vue|paysage|nature\s+morte|'
+    r'sc[eè]ne|all[eé]gorie|hommage|composition|triptyque|'
+    r'still\s+life|landscape|seascape|cityscape|self[- ]portrait)\b|'
+    r'\b(?:Voyage|Geste|Exil|Message|Cantique|Paradis)\b|'
+    r'[-–—]\s*(?:Prince|Roi|Reine|Duke|King|Queen)|'  # subtitle pattern
+    r'\(\s*\d{4}\s*[-–]\s*\d{4}\s*\)'  # lifespan in parens
+    r')', re.IGNORECASE
+)
+
+
+def _is_navigational_label(candidate: str) -> bool:
+    """Return True if candidate looks like a website nav/admin label, not an artwork.
+    
+    Strategy: if the candidate matches a known navigational pattern AND lacks any
+    artwork-like signal (date, medium keyword, artwork title structure), it's filtered.
+    This is deliberately conservative — when in doubt, keep the candidate (false
+    negatives are less harmful than dropping real exhibit titles).
+    """
+    # Check for navigational pattern match (FR or EN)
+    has_nav_signal = bool(
+        _NAV_LABEL_PATTERNS_FR.search(candidate) or
+        _NAV_LABEL_PATTERNS_EN.search(candidate)
+    )
+    
+    if not has_nav_signal:
+        return False  # Not navigational — keep it
+    
+    # Has a nav signal — but does it also have artwork signals that override?
+    has_artwork_signal = bool(
+        _YEAR_PATTERN.search(candidate) or
+        _MEDIUM_SIGNAL.search(candidate) or
+        _ARTWORK_TITLE_SIGNAL.search(candidate)
+    )
+    
+    if has_artwork_signal:
+        return False  # Artwork signal overrides — keep it
+    
+    # Nav signal present, no artwork signal — filter it out
+    return True
+
+
 # --- Canonical title extraction (T0a) ---
 
 def extract_canonical_titles(corpus: str, venue_name: str = "") -> Tuple[Set[str], Set[str], Set[str]]:
@@ -209,11 +308,16 @@ def extract_canonical_titles(corpus: str, venue_name: str = "") -> Tuple[Set[str
 
     # Pattern 6: List-item exhibit names (common on museum /exhibits pages)
     # "• Exhibit Name" or "- Exhibit Name" or "* Exhibit Name" at line start
+    # LOCAL-9: Apply navigational-label filter here — this pattern is the primary
+    # entry point for French museum-site nav labels rendered as bullet lists.
     _list_item_pattern = re.compile(r'^[\s]*[•\-\*]\s+([A-Z][A-Za-z\u00C0-\u00FF\s\'\'\-\u2019:,&]{4,60}?)(?:\s*[-–—:]|\s*$)', re.MULTILINE)
     for match in _list_item_pattern.finditer(corpus):
         name = match.group(1).strip().rstrip(',. ')
         if len(name) >= 5 and len(name.split()) >= 2:
-            _exhibit_from_quoted.add(name)
+            if not _is_navigational_label(name):
+                _exhibit_from_quoted.add(name)
+            else:
+                print(f"  [T0a] Filtered nav label from list-items: '{name}'")
 
     # Combine exhibit names into canonical_titles
     _exhibit_names = _exhibit_from_sections | _exhibit_from_quoted
@@ -245,6 +349,15 @@ def extract_canonical_titles(corpus: str, venue_name: str = "") -> Tuple[Set[str
     canonical_titles = {t for t in canonical_titles
                        if len(t.split()) >= 2 and len(t) >= 8
                        and t.lower() not in _THEME_WORDS}
+
+    # LOCAL-9: Final-pass navigational-label filter on all combined candidates.
+    # This catches any nav labels that entered via Pattern 4 (quoted) or Pattern 5
+    # (bold), not just Pattern 6 which has its own inline check.
+    _nav_filtered = {t for t in canonical_titles if _is_navigational_label(t)}
+    if _nav_filtered:
+        print(f"  [T0a] Final-pass nav filter removed {len(_nav_filtered)}: "
+              f"{sorted(_nav_filtered)[:5]}")
+        canonical_titles -= _nav_filtered
 
     print(f"  [T0a] Extracted {len(canonical_titles)} canonical titles, "
           f"{len(cycle_names)} cycle names")
