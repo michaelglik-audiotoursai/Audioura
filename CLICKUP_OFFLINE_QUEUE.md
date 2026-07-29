@@ -1555,6 +1555,107 @@ often doesn't.
 default to generic prose, with real examples from more than one museum tour, and a
 recommended next step.
 
+##### READY FOR REVIEW
+
+**Diagnosis: Per-exhibit RAG retrieval is structurally too thin — and the description prompt has no mechanism to demand specifics when facts ARE available.**
+
+The problem is a combination of both hypotheses, but the primary bottleneck is retrieval.
+
+---
+
+**Finding 1: The fact-retrieval pipeline is incomplete in production.**
+
+The system has three potential sources of per-exhibit story material:
+1. **Fact sheets** (via `fact_extractor.py` → `rag_retriever.py`) — only active when `STORIED_MODE=true`
+2. **Story elements** (via `story_element_extractor.py` → LLM extraction from corpus pages) — only active when `STORIED_MODE=true`
+3. **B6 scored story elements** (via `work_story_searcher.py` → `work_stories_get()`) — reads from a DB cache that is populated ONLY by manually-run pilot scripts (`run_pilot_b6.py`, etc.), never by the main generation pipeline
+
+**In the standard deployment (`docker-compose.yml`), `STORIED_MODE` is NOT set** (only `docker-compose-master.yml` sets it). This means:
+- `_storied_fact_sheets` = `None` → the `fact_sheet` variable passed to `_generate_description()` is always `None`
+- `_storied_spine` = `None` → `spine_stop` is always `None`
+- `_story_elements` = `[]` (never extracted)
+- Story types are never assigned (`story_type` = `None`)
+- The B6 `work_stories_get()` path requires prior pilot-script population (which doesn't happen for arbitrary museums)
+
+**The only per-exhibit material that makes it into the PHASE 5 prompt in production is:**
+- The `_d1_venue_corpus` sentence-matching (C5-1 block at line 3560) — keyword overlap search against the scraped corpus
+- The `_story_corpus_result['per_work_contexts']` (§4 block at line 3572) — normalized title matching
+
+Both are low-recall: C5-1 splits the entire venue corpus on `.` and matches keywords ≥4 chars from the work title. For works with common words ("The Dream", "Disque", "Fauteuil"), this either matches nothing specific or matches irrelevant sentences. §4 requires the work title to appear verbatim in the corpus (8-char prefix match), which fails for most exhibits.
+
+---
+
+**Finding 2: Evidence from real tours confirms the hypothesis.**
+
+**Museum of Naïve Art, Nice** — stops like "The Dream", "The Wedding", "The Red Umbrella":
+- These are generic painting titles with no Wikipedia articles.
+- `fetch_poi_rag_context("The Dream", "Museum Of Naïve Art")` would get empty `poi_context` (no standalone article), fall back to the venue's Wikipedia page as `period_context`, and use the venue-extracted artist as `artist_context`.
+- Result: GPT gets a generic venue article and writes completely fabricated visual descriptions ("bold brushstrokes", "vivid colors", "symbolic elements") with zero specific facts.
+
+**Asian Arts Museum, Nice** — stops like "Disque", "Fauteuil", "Hokusai – Voyage au pied du mont Fuji":
+- Even the one stop with real facts (La geste de Bouddha — II-III century, Pakistan, schist, acquired 2001) merely LISTS them rather than building narrative. The prompt says "Include the artistic, historical, and cultural significance" but doesn't demand a story arc or insist on using the facts as narrative anchors.
+- "Disque" gets a completely generic art-appreciation riff with zero factual content.
+
+**Palais Lascaris, Nice** — stops like "Raquel", "The Annunciation":
+- "Raquel" is described as "a captivating painting... created by an unknown artist" with invented visual details ("soft hues of blue and gold", "subtle touches of crimson"). Zero provenance, zero specific historical context.
+- Every stop follows the same template: generic scene-setting → craftsmanship appreciation → "broader context" paragraph → closing rhetorical question.
+
+**African American Museum, Philadelphia** — stops like "Eloise Owens Strothers", "Joseph E. Coleman":
+- GPT fabricates confident-sounding visual descriptions ("striking piece", "interconnected hands", "deep indigos to vibrant crimsons") for exhibits it knows nothing about.
+- The descriptions are structurally identical: generic intro → invented visual details → vague cultural significance → rhetorical question.
+
+**National Constitution Center, Philadelphia** — stops like "Americas Founding", "The First Amendment":
+- GPT invents a "monumental painting by John Trumbull" for the "Americas Founding" stop and claims a "framed parchment" for the First Amendment stop — both likely fabricated exhibit formats.
+
+---
+
+**Finding 3: The description prompt itself lacks a specificity gate.**
+
+Even when the story_miner corpus DOES contain per-work facts (as with La geste de Bouddha in the Asian arts tour), the prompt doesn't:
+1. **Require** the model to use injected facts as narrative anchors
+2. **Penalize** generic filler — the 300-word target creates pressure to pad
+3. **Gate quality** — there's no conditional logic that says "if you have <2 confirmed facts for this work, produce a shorter honest description instead of a 300-word padded one"
+
+The museum description prompt (line 3385) says:
+```
+Include:
+- The artistic, historical, and cultural significance of the work
+- Information about the artist and their creative process
+- How this piece fits into the broader context of {tour_type}
+- Interesting details that would engage visitors
+```
+
+This is a recipe for generic art-appreciation prose. It asks for "significance" and "context" (which GPT fills with clichés) rather than demanding "specific documented facts about this piece" or "one surprising thing that only someone who researched this work would know."
+
+---
+
+**Root cause summary:**
+
+| Factor | Impact | How often |
+|--------|--------|-----------|
+| STORIED_MODE off in prod → no fact sheets, no spine, no story types | Critical | 100% of standard deployments |
+| B6 work_stories cache empty → no SERP-mined story elements | Critical | All museums except those manually piloted |
+| C5-1 corpus keyword match → low recall for generic titles | High | ~70% of museum stops |
+| §4 per_work_contexts → normalized title rarely matches | High | ~60% of museum stops |
+| Description prompt rewards word-count over specificity | Medium | 100% — structural incentive to pad |
+| No quality gate: model outputs 300 words regardless of available facts | Medium | 100% |
+
+---
+
+**Recommended direction (for LEAD decision):**
+
+**Option A (highest impact, moderate effort): Always-on fact retrieval.**
+- Enable the fact-sheet + story-element pipeline unconditionally (not gated by `STORIED_MODE`), at least for museum tours.
+- Wire `search_stories_for_stop()` into the main generation flow (currently only in pilot scripts) with a query budget appropriate for production (e.g., `generation_tier='free'` for zero SERP cost, relying on venue corpus + Wikipedia).
+- This is the "supply side" fix — give GPT something real to talk about.
+
+**Option B (lower effort, complementary): Specificity gate + adaptive length.**
+- When injected facts < 2 confirmed items, reduce target from 300 words to ~150 words and change prompt to: "Describe only what is documented. Acknowledge gaps honestly rather than padding with generic appreciation."
+- Add a mandatory instruction: "Your FIRST paragraph must state at least one specific documented fact. If you have none, say so."
+- This is the "demand side" fix — stop GPT from producing confident-sounding filler when it has no material.
+
+**Recommended: Do both.** Option A solves the input problem; Option B prevents filler even when retrieval is thin. Together they eliminate the template-identical generic prose pattern.
+
 ---
 
 #### LOCAL-11 — Surface venue-level "why this museum matters" facts as a cheap narrative hook (generic across all museums)
