@@ -1967,6 +1967,40 @@ requires the Docker Compose stack + OpenAI API key. The unit tests confirm the m
 logic is correct and the integration is syntactically/structurally sound. The prolog
 prompt modification is minimal (adds ~2 sentences of context when facts exist).
 
+##### LEAD VERDICT (independent verification, 2026-07-29) — APPROVED
+
+Diff read in the isolated worktree: `extract_venue_identity()` mines already-fetched
+`combined_text` via the same excluded-sections approach described in the spec
+(Architecture/Design/Mission/History), zero new API calls or fetches, capped at 3
+facts per category, with an explicit `_is_generic_filler()` guard rejecting boilerplate
+("world-class", "must-see", etc.). Wiring in `generate_tour_text.py` is correctly
+gated to `tour_category == 'museum'`, wrapped in try/except (non-fatal on error), and
+only injects into the *existing* prolog LLM call — no new GPT call added. Matches the
+cost-discipline constraint exactly.
+
+Independently re-ran `test_venue_identity.py` myself in the isolated worktree: 11/11
+pass, confirmed. The strongest piece of evidence for genericity: the fictional-museum
+test case (a made-up venue with a fabricated Renzo Piano attribution) correctly
+extracts facts using the same pattern logic — this is not hardcoded to the Asian Arts
+Museum or Palais Lascaris, it's genuinely pattern-based.
+
+**Live-artifact status — same external blocker as `LOCAL-9`, not a code defect:**
+attempted live regeneration against Asian Arts Museum three times and Palais Lascaris
+once. Every Asian Arts Museum attempt hit identical venue-resolution failure
+(`No Wikidata candidates for 'Asian arts museum in Nice'`) — confirmed via a control
+run on unmodified `storied` that this is NOT caused by this change. The Palais Lascaris
+attempt got much further — resolved the venue, reached `tier=exhibit_museum` with
+10/10 stops populated — before failing on an unrelated, pre-existing GPT
+candidate-generation nondeterminism check (`BLOCKER1`, venue-mismatch heuristic
+misfiring on "The Lascaris Library") that has nothing to do with this task. Approving
+on code correctness + independently-reproduced unit tests + a live run that got deep
+into the pipeline before hitting an unrelated issue. **Follow-up required**: once
+venue resolution recovers, re-run both museums live and actually read the generated
+intro paragraph to confirm the venue-identity facts land in the prose as intended —
+that specific observable has not yet been seen with human eyes tonight.
+
+**TRUE current state:** APPROVED AND MERGED to `storied`.
+
 ---
 
 *(Format for LEAD when creating a new LOCAL-N entry: `#### LOCAL-N — <title>`
