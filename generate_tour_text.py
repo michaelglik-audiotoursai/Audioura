@@ -3812,6 +3812,22 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
     
     complete_tour = tour_title + "\n" + f"Tour-Category: {tour_category}" + "\n\n"
 
+    # -------- [LOCAL-11] Venue-identity mining (free path — no new API calls) --------
+    _venue_identity_prompt_block = ""
+    if tour_category == 'museum' and _story_corpus_result and _story_corpus_result.get('combined_text'):
+        try:
+            from story_miner import extract_venue_identity, format_venue_identity_for_prompt
+            _venue_identity = extract_venue_identity(
+                _story_corpus_result['combined_text'],
+                _museum_venue_name or location,
+            )
+            _venue_identity_prompt_block = format_venue_identity_for_prompt(
+                _venue_identity,
+                _museum_venue_name or location,
+            )
+        except Exception as _vi_err:
+            print(f"  [LOCAL-11] Venue-identity mining error (non-fatal): {_vi_err}")
+
     # -------- [PROLOG] Storied: prepend journey prolog --------
     if _storied_mode and _storied_spine:
         try:
@@ -3825,17 +3841,23 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                 if role and angle:
                     _chapter_previews.append(f"{role}: {angle}")
             
+            # [LOCAL-11] Inject venue-identity facts into prolog prompt when available
+            _identity_section = ""
+            if _venue_identity_prompt_block:
+                _identity_section = f"\n\n{_venue_identity_prompt_block}"
+            
             _prolog_prompt = f"""Write a compelling 80-150 word tour introduction that frames this experience as a journey — a book of connected chapters.
 
 Theme/connecting thread: {_connecting_thread}
 Tour hook: {_tour_hook}
-Chapter previews: {'; '.join(_chapter_previews)}
+Chapter previews: {'; '.join(_chapter_previews)}{_identity_section}
 
 Requirements:
 - Write in second-person present tense ("You are about to embark...")
 - Name the journey's central theme/goal
 - Preview how the stops connect into one arc (each reveals a different facet)
 - Make it read like a book's opening page — compelling, with a sense of discovery
+- If venue-identity facts are provided above, weave 1-2 specific details naturally into the opening (architecture, programs, or design) — they ground the intro in THIS specific place
 - 80-150 words exactly
 - Do NOT end with a question
 - Return ONLY the paragraph, no quotes or labels"""
