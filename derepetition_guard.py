@@ -231,6 +231,8 @@ def rewrite_repeated_sentence(
         f"- Keep the same factual content.\n"
         f"- Write 1–2 sentences maximum.\n"
         f"- DO NOT USE these phrases: {', '.join(ban_list)}\n"
+        f"- NEVER use first-person ('I', 'my', 'we', 'our', 'me') — this is a third-person audio guide.\n"
+        f"- NEVER reference 'Stop N', 'the next stop', or other meta-tour structure.\n"
         f"- Make it fresh, specific, and engaging.\n\n"
         f"Return ONLY the rewritten sentence(s), no quotes or explanation."
     )

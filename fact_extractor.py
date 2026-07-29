@@ -185,6 +185,14 @@ def generate_fact_sheets_parallel(
             if (poi_lower[:8] in title_lower or title_lower[:8] in poi_lower):
                 excerpts.extend(s[:200] for s in sentences[:5])
                 break
+            # [LOCAL-14] Also match if significant words overlap (for titles like
+            # "La geste de Bouddha" where the prefix "la geste" might not be in the
+            # per_work_contexts key if it was stored as "geste de Bouddha" etc.)
+            _poi_sig = set(w for w in poi_lower.split() if len(w) >= 4)
+            _title_sig = set(w for w in title_lower.split() if len(w) >= 4)
+            if _poi_sig and _title_sig and len(_poi_sig & _title_sig) >= max(1, min(len(_poi_sig), len(_title_sig)) // 2):
+                excerpts.extend(s[:200] for s in sentences[:5])
+                break
 
         # 2. Keyword search in venue_corpus (same approach as C5-1 in description prompt)
         if venue_corpus and not excerpts:
@@ -194,7 +202,7 @@ def generate_fact_sheets_parallel(
                     s.strip() for s in venue_corpus.split('.')
                     if any(kw in s.lower() for kw in key_words)
                 ]
-                excerpts.extend(s[:200] for s in corpus_sentences[:5])
+                excerpts.extend(s[:200] for s in corpus_sentences[:8])
 
         return '. '.join(excerpts) if excerpts else ""
 

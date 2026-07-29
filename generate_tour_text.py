@@ -2351,35 +2351,34 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         print(f"  [R4] SKIPPED (REQUIRE_LISTING_VERIFICATION=true) — tier={_verification_tier}, "
                               f"total_stops={total_stops} ({_n_verified_in_list} verified)")
             else:
-                # NEW BEHAVIOR: unified fill — allow fills for ALL tiers up to total_stops
-                # Fill from _pre_d1v2_candidates with PALAIS-FIX D1/D2 filtering
+                # NEW BEHAVIOR (LOCAL-14): NEVER synthesize unverified fills.
+                # When D1v2 drops a candidate as unverifiable, it stays dropped.
+                # A short, honest tour beats a padded, fabricated one.
+                # Only add candidates that are VERIFIED in the evidence log but not yet in poi_list
+                # (e.g. canonical-title matches that were verified but not yet added to the final list).
                 if len(poi_list) < total_stops and _verification_tier in ('thin', 'medium', 'exhibit_museum'):
                     _verified_names_fill = set(p['name'].lower() for p in poi_list)
-                    _evidence_keys_fill = set(_normalize_name(k) for k in _d1_evidence_log.keys()
-                                              if _d1_evidence_log[k].get('status') == 'VERIFIED')
-                    _fill_candidates = []
+                    _fill_from_verified = []
                     for p in _pre_d1v2_candidates:
                         _cand_name = p['name']
                         _cand_norm = _normalize_name(_cand_name)
-                        # Skip if already in verified list (exact or normalized match)
-                        if _cand_name.lower() in _verified_names_fill or _cand_norm in _evidence_keys_fill:
-                            continue
-                        # PALAIS-FIX D1: Skip REJECTED candidates (located at other venue)
+                        # Only include if the evidence log shows it as VERIFIED
                         _ev_entry = _d1_evidence_log.get(_cand_name, {})
-                        if isinstance(_ev_entry, dict) and _ev_entry.get('status') == 'REJECTED':
+                        if not (isinstance(_ev_entry, dict) and _ev_entry.get('status') == 'VERIFIED'):
                             continue
-                        # Every fill candidate is explicitly unverified
-                        p['verified'] = False
-                        _fill_candidates.append(p)
+                        # Skip if already in the final list
+                        if _cand_name.lower() in _verified_names_fill:
+                            continue
+                        _fill_from_verified.append(p)
                     _fill_needed = total_stops - len(poi_list)
-                    _fill_added = _fill_candidates[:_fill_needed]
+                    _fill_added = _fill_from_verified[:_fill_needed]
                     if _fill_added:
                         poi_list = list(poi_list) + _fill_added
-                        print(f"  [UNIFIED-FILL] tier={_verification_tier}: added {len(_fill_added)} unverified fills "
-                              f"(from {len(_pre_d1v2_candidates)} pre-D1v2 candidates, "
-                              f"total now {len(poi_list)}/{total_stops})")
+                        print(f"  [UNIFIED-FILL] tier={_verification_tier}: added {len(_fill_added)} VERIFIED fills "
+                              f"(total now {len(poi_list)}/{total_stops})")
                     else:
-                        print(f"  [UNIFIED-FILL] tier={_verification_tier}: no eligible fill candidates")
+                        print(f"  [UNIFIED-FILL] tier={_verification_tier}: no additional verified candidates available — "
+                              f"accepting {len(poi_list)}/{total_stops} stops (honest shortfall, no fabrication)")
 
             # If verified < requested, re-prompt for MORE candidates and verify (rich tier only)
             _r4_all_tried_names = set(_normalize_name(p['name']) for p in poi_list)
@@ -2491,50 +2490,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             
             if len(poi_list) < total_stops:
                 print(f"  [R4] Replenishment exhausted: {len(poi_list)}/{total_stops} stops (stop_count_warning)")
-                # [POST-R4 FILL] If REQUIRE_LISTING_VERIFICATION=false and still below target,
-                # fill from remaining candidates with verified=False.
-                # Rich tier: capped at 50% unverified. Non-rich tiers: fill to total_stops.
+                # [POST-R4 FILL] LOCAL-14: DISABLED — never fill with R4-dropped candidates.
+                # R4-dropped candidates are GPT inventions that failed verification.
+                # Adding them back as "unverified fills" produces fabricated stops
+                # (e.g. "Untitled Sculpture by Unknown Artist", "The Lotus Pond" by "Mei Lin").
+                # Accept the honest shortfall instead.
                 if not _require_listing_verification:
-                    _n_verified_current = sum(1 for p in poi_list if p.get('verified', True))
-                    _n_unverified_current = len(poi_list) - _n_verified_current
-                    # Rich tier: cap at 50% unverified; non-rich: no cap (fill to total_stops)
-                    if _verification_tier not in ('thin', 'medium', 'exhibit_museum'):
-                        _max_unverified = max(1, total_stops // 2)
-                        _unverified_budget = _max_unverified - _n_unverified_current
-                    else:
-                        _unverified_budget = total_stops - len(poi_list)
-                    if _unverified_budget > 0:
-                        _verified_names_post = set(p['name'].lower() for p in poi_list)
-                        _evidence_keys_post = set(_normalize_name(k) for k in _d1_evidence_log.keys()
-                                                  if _d1_evidence_log[k].get('status') == 'VERIFIED')
-                        _post_r4_fill = []
-                        # Source: R4-dropped candidates (generated by R4 but failed verification)
-                        # These are the ONLY genuinely new candidates at this point —
-                        # _pre_d1v2_candidates was already exhausted by UNIFIED-FILL.
-                        _fill_pool = list(_r4_all_dropped_pois)
-                        for p in _fill_pool:
-                            _cand_name = p['name']
-                            _cand_norm = _normalize_name(_cand_name)
-                            if _cand_name.lower() in _verified_names_post or _cand_norm in _evidence_keys_post:
-                                continue
-                            _ev_entry = _d1_evidence_log.get(_cand_name, {})
-                            if isinstance(_ev_entry, dict) and _ev_entry.get('status') == 'REJECTED':
-                                continue
-                            # Skip if already in poi_list (from unified fill or R4 verified)
-                            if _cand_name.lower() in set(p2['name'].lower() for p2 in poi_list):
-                                continue
-                            p['verified'] = False
-                            _post_r4_fill.append(p)
-                            if len(_post_r4_fill) >= _unverified_budget:
-                                break
-                        _post_r4_needed = min(len(_post_r4_fill), total_stops - len(poi_list))
-                        _post_r4_added = _post_r4_fill[:_post_r4_needed]
-                        if _post_r4_added:
-                            poi_list = list(poi_list) + _post_r4_added
-                            _tier_label = "50% cap" if _verification_tier not in ('thin', 'medium', 'exhibit_museum') else "no cap"
-                            print(f"  [POST-R4-FILL] Added {len(_post_r4_added)} unverified fills "
-                                  f"(tier={_verification_tier}, {_tier_label}, "
-                                  f"total now {len(poi_list)}/{total_stops})")
+                    print(f"  [POST-R4-FILL] SKIPPED (LOCAL-14): accepting {len(poi_list)}/{total_stops} stops — "
+                          f"will not fill with unverified R4-dropped candidates to avoid fabrication")
             else:
                 print(f"  [R4] Target reached: {len(poi_list)}/{total_stops} stops")
 
@@ -3873,12 +3836,14 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
             
             _prolog_prompt = f"""Write a compelling 80-150 word tour introduction that frames this experience as a journey — a book of connected chapters.
 
+Venue: {_museum_venue_name or location}
 Theme/connecting thread: {_connecting_thread}
 Tour hook: {_tour_hook}
 Chapter previews: {'; '.join(_chapter_previews)}{_identity_section}
 
 Requirements:
 - Write in second-person present tense ("You are about to embark...")
+- Use the EXACT venue name "{_museum_venue_name or location}" — NEVER use placeholders like [Venue Name] or [Museum Name]
 - Name the journey's central theme/goal
 - Preview how the stops connect into one arc (each reveals a different facet)
 - Make it read like a book's opening page — compelling, with a sense of discovery
@@ -3906,6 +3871,10 @@ Requirements:
                 _prolog_text = _prolog_resp.json()["choices"][0]["message"]["content"].strip()
                 if _prolog_text.startswith('"') and _prolog_text.endswith('"'):
                     _prolog_text = _prolog_text[1:-1].strip()
+                # [LOCAL-14] Post-process: replace any [Venue Name] / [Museum Name] placeholders
+                _venue_display = _museum_venue_name or location
+                _prolog_text = re.sub(r'\[Venue Name\]|\[Museum Name\]|\[venue name\]|\[museum name\]',
+                                      _venue_display, _prolog_text, flags=re.IGNORECASE)
                 # [R2] Do NOT emit standalone Introduction block — save for Stop 1
                 _saved_prolog = _prolog_text
                 print(f"  [R2] Prolog saved for Stop 1 ({len(_prolog_text.split())} words)")
@@ -3962,7 +3931,15 @@ Requirements:
             if year:
                 poi_header += f", {year}"
         # Also assert the name itself is a short noun phrase (no sentences/descriptions)
-        if len(poi_name.split()) > 15 or any(c in poi_name for c in '.!?;'):
+        # [LOCAL-14] Strengthened: also detect address-like patterns and "at Stop N" references
+        _name_is_corrupt = (
+            len(poi_name.split()) > 15 or
+            any(c in poi_name for c in '.!?;') or
+            re.search(r'\bStop\s+\d+\b', poi_name, re.IGNORECASE) or
+            re.search(r'\blocated at\b|\binvites visitors\b|\bdes Anglais\b', poi_name, re.IGNORECASE) or
+            (len(poi_name) > 80 and ',' in poi_name)
+        )
+        if _name_is_corrupt:
             print(f"  [F3] ⚠️ NAME TOO LONG/CORRUPT at stop {stop_num}: '{poi_name[:80]}'")
             # Truncate to first 12 words if corrupted
             _clean_name = ' '.join(poi_name.split()[:12]).rstrip('.,;:!?')
@@ -3976,8 +3953,29 @@ Requirements:
         poi_content = poi_header + "\n\n"
         
         # Add address if available
-        if poi.get("address"):
-            poi_content += f"Address: {poi['address']}\n\n"
+        # [LOCAL-14] Sanitize address: strip any leaked narrative text
+        _address = poi.get("address", "")
+        if _address and tour_category == 'museum':
+            # Address lines should be short geographic strings. If the address contains
+            # narrative verbiage (sentence-like text > 100 chars), extract just the street address.
+            if len(_address) > 120:
+                # Try to extract a clean address from the corrupted field
+                # Pattern: look for a street number + street name + postal code/city
+                _addr_match = re.search(
+                    r'(\d+[^,]*(?:rue|avenue|boulevard|promenade|place|street|road|chemin)[^,]*,'
+                    r'[^,]*\d{4,5}[^,]*)',
+                    _address, re.IGNORECASE
+                )
+                if _addr_match:
+                    _address = _addr_match.group(1).strip().rstrip('.')
+                else:
+                    # Fallback: truncate at first sentence-ending punctuation after a comma
+                    _parts = _address.split('.')
+                    if _parts and len(_parts[0]) < 120:
+                        _address = _parts[0].strip()
+                    # else keep the full address as-is
+        if _address:
+            poi_content += f"Address: {_address}\n\n"
         
         # Add coordinates if available
         # Museum tours with a single venue: first stop only (all exhibits in same building)
@@ -4170,6 +4168,11 @@ Requirements:
                             if _sentence_b:
                                 _rewritten = rewrite_repeated_sentence(_sentence_b, f"Stop {_stop_b}", _story_type_b, api_key)
                                 if _rewritten and _rewritten != _sentence_b:
+                                    # [LOCAL-14] Reject rewrites that introduce first-person or meta-references
+                                    _first_person_pattern = re.compile(r'\b(I |I\'|my |me |we |our |myself)\b', re.IGNORECASE)
+                                    if _first_person_pattern.search(_rewritten):
+                                        print(f"  [S29] ⚠️ Rejected rewrite for Stop {_stop_b}: first-person voice detected")
+                                        continue
                                     # [D2] Scoped replacement: only within the target stop's block
                                     import re as _d2_re_inner
                                     _stop_blocks = _d2_re_inner.split(r'(Stop \d+:)', complete_tour)

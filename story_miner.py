@@ -582,7 +582,11 @@ def fetch_venue_narrative_corpus(
 
 
 def _extract_per_work_contexts(corpus: str, canonical_titles: Set[str]) -> Dict[str, List[str]]:
-    """Extract context sentences for each canonical work title from the corpus."""
+    """Extract context sentences for each canonical work title from the corpus.
+    
+    LOCAL-14 fix: lowered threshold from 60% to 40% for non-English title matching,
+    and added full-title substring match as an alternative path.
+    """
     contexts = {}
     sentences = [s.strip() for s in re.split(r'[.!?]\s+', corpus) if len(s.strip()) > 20]
     
@@ -595,13 +599,20 @@ def _extract_per_work_contexts(corpus: str, canonical_titles: Set[str]) -> Dict[
         matching_sentences = []
         for sent in sentences:
             _norm_sent = _normalize(sent)
-            # Match if ≥60% of title's significant words appear in the sentence
+            # Path 1: Full title appears as substring in the sentence
+            if _norm_title in _norm_sent:
+                matching_sentences.append(sent[:300])
+                continue
+            # Path 2: Match if ≥40% of title's significant words appear in sentence
+            # (lowered from 60% — for 2-word French titles like "geste bouddha",
+            # 60% requires both words, but they often appear in different sentences)
             matches = sum(1 for w in _title_words if w in _norm_sent)
-            if matches >= max(1, len(_title_words) * 0.6):
+            _threshold = max(1, int(len(_title_words) * 0.4))
+            if matches >= _threshold:
                 matching_sentences.append(sent[:300])
         
         if matching_sentences:
-            contexts[title] = matching_sentences[:5]  # Cap at 5 per work
+            contexts[title] = matching_sentences[:8]  # Cap at 8 per work (raised from 5)
     
     return contexts
 
