@@ -3341,6 +3341,9 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 venue_name=_venue_name,
                 tour_category=tour_category,
                 api_key=api_key,
+                # [LOCAL-12 Fix A] Route already-fetched venue corpus into fact-sheet generation
+                venue_corpus=_d1_venue_corpus if _d1_venue_corpus else "",
+                per_work_contexts=_story_corpus_result.get('per_work_contexts', {}) if _story_corpus_result else {},
             )
             if _storied_fact_sheets:
                 _valid_sheets = sum(1 for fs in _storied_fact_sheets if fs is not None)
@@ -3658,15 +3661,37 @@ FACTUAL INTEGRITY RULE: Do NOT invent visual specifics or biographical claims no
 NOTE: "The Biblical Message" (Message Biblique) is the name of the COMPLETE CYCLE of 17 large-scale paintings by Chagall, illustrating Genesis, Exodus, and the Song of Songs. Describe it as a cycle/series of paintings, NOT as a single painting. The museum was PURPOSE-BUILT to house this cycle (inaugurated 1973).
 """
 
+        # [LOCAL-12 Fix D] Specificity gate: adaptive description length.
+        # When confirmed facts are fewer than 2 AND no corpus context was injected,
+        # reduce description target and instruct GPT not to pad with generic prose.
+        _confirmed_count = len(fact_sheet.get('confirmed_facts', [])) if fact_sheet else 0
+        _had_corpus = fact_sheet.get('had_corpus_context', False) if fact_sheet else False
+        _specificity_short = (_confirmed_count < 2 and not _had_corpus)
+
+        if _specificity_short:
+            _word_target = "120"
+            _word_target_instruction = (
+                f"Write EXACTLY {_word_target} words (NOT 300). You have very limited verified information "
+                f"about this specific exhibit. Be honest and concise: describe only what you can confirm, "
+                f"note what is unknown, and do NOT pad with generic appreciation language like "
+                f"'a testament to the artist's genius' or 'invites contemplation'. "
+                f"Brevity with real content is better than length with filler."
+            )
+        else:
+            _word_target = "300"
+            _word_target_instruction = ""
+
         description_prompt += f"""
 Format your response as follows:
 Orientation: [Brief orientation text explaining the best viewing position]
 
-[Detailed 300-word description of the exhibit]
+[Detailed {_word_target}-word description of the exhibit]
 
 DO NOT include any section headers other than "Orientation:" - the description should flow naturally after the orientation section.
 DO NOT include directions to the next stop - these will be added separately.
 """
+        if _word_target_instruction:
+            description_prompt += f"\nLENGTH CONSTRAINT: {_word_target_instruction}\n"
 
         # [S43] Storied: inject persona tone override into description prompt
         if _storied_mode and _persona_tone:
