@@ -1465,6 +1465,156 @@ one stop) rather than a third round of prompt wording.
 
 ---
 
+#### LOCAL-9 — Filter non-exhibit navigational titles out of the museum candidate list
+
+**Agent:** Mac Mini Kiro
+**Branch:** `kiro/local9-filter-nav-titles`
+**Priority:** high — real bug found during Michael's "Asian arts museum in Nice, France"
+field test, not a quality nice-to-have.
+
+**Context:** Generating that tour, the corpus-derived candidate title list
+(`venue_corpus.canonical_titles_json`, museum QID `Q3330160`) came back as:
+`["fauteuil", "disque", "la geste de Bouddha", "les paysages de l'âme",
+"Hokusai – Voyage au pied du mont Fuji", "Le musée en vidéo", "l'art en exil - Hàm
+Nghi, Prince d'Annam (1871-1944)", "Infos pratiques"]`. Two of those eight —
+**"Infos pratiques"** (practical info) and **"Le musée en vidéo"** (the museum on
+video) — are website navigation labels scraped from `maa.departement06.fr`, not
+artworks. Two real bugs followed directly from this:
+1. The real exhibit "L'art en exil - Hàm Nghi, Prince d'Annam" never became its own
+   stop — its content got misattributed onto the "Infos pratiques" stop instead, so
+   the delivered tour has zero actual visitor information (hours/tickets/directions)
+   where it should.
+2. "Le musée en vidéo" — never a real artwork — got a fully confident, unhedged
+   description inventing a Zhang Huan video installation called "Samsara" showing
+   there. LEAD verified via web search: Zhang Huan's real *Samsara* (2007) is incense
+   ash on canvas, not video, with no documented connection to this museum. This is a
+   genuine fabrication slipping past the B1/HEDGE-NM grounding safety net, because a
+   navigation-page title was never recognized as needing that safety net in the first
+   place — it wasn't flagged unverified, GPT just filled the gap with a plausible but
+   false attribution.
+
+**Root cause, pinned exactly (`story_miner.py`):**
+- `extract_canonical_titles()`'s `_GENERIC_SECTIONS` blocklist (~line 178-186) only
+  covers English Wikipedia section names ("hours", "admission", "transit"...) — no
+  equivalent for French museum-site navigation.
+- More importantly, **Pattern 6** (~line 210-216, the list-item extractor — almost
+  certainly how these got picked up, since French departmental museum sites render
+  nav menus as bullet lists in scraped text) has **no semantic filter at all**, just
+  a bare `len(name) >= 5 and len(name.split()) >= 2` check that any nav-menu item
+  trivially passes.
+
+**Spec:** extend the filtering to recognize the *pattern* of a navigational/
+administrative page label (no date, no medium keyword, no artwork-like signal) rather
+than hardcoding "Infos pratiques"/"Le musée en vidéo" as literal strings — this exact
+site template (`departement06.fr`) is used by multiple French departmental museums, so
+a narrow hardcoded fix would just resurface elsewhere with different wording. This must
+be a **generic** fix, not a fix for this one museum.
+
+**Acceptance:**
+- Regenerate the exact "Asian arts museum in Nice, France" tour: no "Infos
+  pratiques"/"Le musée en vidéo"-style stops appear; "L'art en exil - Hàm Nghi..."
+  gets its own correctly-attributed stop; explicitly confirm no fabricated
+  attribution (like the Zhang Huan/Samsara case) appears anywhere in the regenerated
+  output.
+- Spot-check at least one other museum tour to confirm the filter doesn't
+  over-trigger and start dropping *real* exhibit titles.
+- All 11 regression suites stay green.
+
+---
+
+#### LOCAL-10 — Investigate museum-stop story richness (investigate-first, like LOCAL-4 was)
+
+**Agent:** Mac Mini Kiro
+**Branch:** `kiro/local10-story-richness-investigation`
+**Priority:** normal — quality gap, not a live bug. Do not prescribe a fix yet.
+
+**Context:** Michael's honest read of the (bug-free) stops in the Asian arts museum
+tour: even where content is correctly attributed, nearly every stop follows one
+template almost word-for-word — scene-setting → craftsmanship appreciation →
+"bridge between cultures" cliché → a closing rhetorical question. Even the one stop
+with genuinely specific facts (the Buddha sculpture: II-III century, Pakistan,
+schist, acquired 2001) just lists them rather than building any narrative around
+them. This is a different, deeper problem than `LOCAL-6`/`LOCAL-8`'s prose fixes
+(opening variety, tone, hedging-as-narrative) can reach — those work at the sentence
+level; this is about whether GPT has any actual story material per exhibit, and it
+often doesn't.
+
+**Spec:** don't fix yet — diagnose first. Specifically:
+- Is the per-exhibit fact-sheet/RAG retrieval too thin for most exhibits (recall
+  "No RAG context for X — cannot generate fact sheet" seen in earlier live tests) —
+  i.e. is GPT working from almost nothing and defaulting to generic art-appreciation
+  filler?
+- Or is source material available but the description prompt doesn't ask for /
+  reward the kind of specific, surprising detail that makes a story land?
+- Report back with a diagnosis and a recommended direction (e.g. expanding source
+  coverage per exhibit vs. adding a specificity/quality gate before accepting GPT's
+  output) — same shape as `LOCAL-4`'s investigation for the route-backtracking root
+  cause. LEAD will decide the actual fix direction once the diagnosis is in.
+
+**Acceptance:** a clear, evidenced diagnosis (not a fix) of why exhibit-level stops
+default to generic prose, with real examples from more than one museum tour, and a
+recommended next step.
+
+---
+
+#### LOCAL-11 — Surface venue-level "why this museum matters" facts as a cheap narrative hook (generic across all museums)
+
+**Agent:** Mac Mini Kiro
+**Branch:** `kiro/local11-venue-identity-hook`
+**Priority:** normal. Can run in parallel with `LOCAL-10` (different mechanism,
+different files) though `LOCAL-10`'s findings on how often per-exhibit stories are
+thin should inform how aggressively this hook gets used later.
+
+**Context:** Michael found, searching independently, that this museum has genuinely
+notable "why visit" material that never appears anywhere in the generated tour: its
+building was designed by Pritzker-winning architect Kenzo Tange on a sacred Tibetan
+mandala floor plan, and it hosts authentic Japanese tea ceremonies (Chanoyu) as
+signature live programming. LEAD confirmed the underlying data is very likely already
+available for free: `story_miner.py:452`'s `combined_text` holds the full fetched
+Wikipedia/site text, and `extract_canonical_titles()` *deliberately excludes*
+sections like "Architecture", "Design", "Mission", "History" from becoming exhibit
+titles (correctly — they aren't exhibits) — but nothing currently captures that
+excluded text for anything else. It's simply discarded. This is very likely a mining
+gap on data already fetched, not a new-API-call problem.
+
+**Spec:**
+1. Extend `story_miner.py` to also mine `combined_text` for venue-identity signals —
+   reusing the same sections already excluded from exhibit-title extraction
+   (Architecture, Design, Mission, History overview) plus the opening summary — for
+   concrete, specific "why is this place special" facts: distinctive
+   architecture/architect, unusual design philosophy, a signature recurring cultural
+   program (tea ceremonies being exactly this case), notable curatorial approach.
+   Not generic filler ("a wonderful museum with many treasures").
+2. **Cost discipline — read this carefully, it's the main constraint Michael set:**
+   the free path (mining already-fetched text) is the *only* thing this task builds.
+   Do NOT add a new mandatory API call or web search per museum. If the free path
+   often comes up empty, report that back as a finding — it is not license to add a
+   paid fallback unasked.
+3. When a genuine fact is found: weave it into the existing tour-intro paragraph as
+   a couple of concrete sentences, replacing generic boilerplate — not a new
+   dedicated stop, not a prose-length increase.
+4. When nothing genuine is found: leave the existing generic intro alone.
+   Use-it-if-you-have-it, not a quota — an unnecessarily padded or invented "why this
+   museum matters" blurb is worse than the current generic boilerplate.
+5. Must generalize: verify against at least two museums with genuinely different
+   character (this one, plus e.g. Palais Lascaris) to prove it isn't hardcoded to
+   the Asian Arts Museum.
+
+**Acceptance:**
+- Regenerate the Asian Arts Museum tour: the intro now mentions something genuinely
+  specific to this venue (the Kenzo Tange architecture, the mandala design, or the
+  tea ceremonies) pulled from the corpus already being fetched — not a hardcoded
+  string.
+- Regenerate at least one other museum tour: same mechanism produces
+  museum-appropriate content there too, OR gracefully falls back to the existing
+  generic intro if nothing strong is found in that corpus.
+- Report how often the free corpus-mining path actually finds something usable
+  across the museums tested, to inform whether a paid fallback is ever justified
+  later (a finding for LEAD, not something to build now).
+- All 11 regression suites stay green.
+
+---
+
 *(Format for LEAD when creating a new LOCAL-N entry: `#### LOCAL-N — <title>`
 followed by the same content a real task description would have: Agent, Branch, full
 spec, acceptance criteria. At sync time: `create_task` first — unavoidable, costs 1
@@ -1489,5 +1639,8 @@ with the normal 1-comment/1-status-update sync per task.)*
 | 10 | LOCAL-6 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED | 3 | ☐ |
 | 11 | LOCAL-7 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED | 3 | ☐ |
 | 12 | LOCAL-8 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED | 3 | ☐ |
+| 13 | LOCAL-9 | `create_task` first, then map ID + normal 1-comment/1-status sync — new, dispatched, not yet started | 3 | ☐ |
+| 14 | LOCAL-10 | `create_task` first, then map ID + normal 1-comment/1-status sync — new, dispatched, not yet started | 3 | ☐ |
+| 15 | LOCAL-11 | `create_task` first, then map ID + normal 1-comment/1-status sync — new, dispatched, not yet started | 3 | ☐ |
 
 **Total sync cost so far: 2 API calls.** Update this table as more offline work happens.
