@@ -32,6 +32,7 @@ from pathlib import Path
 import continuous_dev_lib as cdl
 
 WATCH_DIR = cdl.WATCH_DIR
+WORKTREE_BASE = WATCH_DIR.parent / "audioura-worktrees"
 LOG_FILE = WATCH_DIR / "kiro_sessions_ran.md"
 LOCK_FILE = WATCH_DIR / ".kiro_dispatcher.lock"
 SESSION_LOG_DIR = WATCH_DIR / "kiro_session_logs"
@@ -198,11 +199,11 @@ def strip_ansi(text):
     return ANSI_RE.sub("", text)
 
 
-def find_session_id(prompt_title_prefix, after_iso):
+def find_session_id(prompt_title_prefix, cwd):
     try:
         out = subprocess.run(
             ["kiro-cli", "chat", "--list-sessions", "--format", "json"],
-            cwd=str(WATCH_DIR),
+            cwd=str(cwd),
             capture_output=True,
             text=True,
             timeout=30,
@@ -212,7 +213,7 @@ def find_session_id(prompt_title_prefix, after_iso):
         return None
     best = None
     for entry in data:
-        if entry.get("cwd") != str(WATCH_DIR):
+        if entry.get("cwd") != str(cwd):
             continue
         for sess in entry.get("sessions", []):
             title = sess.get("title", "")
@@ -220,6 +221,42 @@ def find_session_id(prompt_title_prefix, after_iso):
                 if best is None or sess.get("updatedAt", "") > best.get("updatedAt", ""):
                     best = sess
     return best.get("sessionId") if best else None
+
+
+BRANCH_LINE_RE = re.compile(r"\*\*Branch:\*\*\s*(\S+)")
+
+
+def branch_name_for(task_id, prompt):
+    m = BRANCH_LINE_RE.search(prompt)
+    if m:
+        return m.group(1)
+    return f"kiro/{task_id.lower()}"
+
+
+def setup_worktree(task_id, branch):
+    """
+    Isolates one task's work in its own git worktree + branch, checked out
+    from current storied HEAD. This is the fix for a real collision found
+    2026-07-29: two concurrent worker() runs sharing WATCH_DIR as their cwd
+    mixed their file edits together mid-flight. Each task gets its own
+    directory now -- no shared mutable working-tree state between tasks.
+    """
+    WORKTREE_BASE.mkdir(parents=True, exist_ok=True)
+    path = WORKTREE_BASE / task_id
+    if path.exists():
+        return path  # reused from a prior attempt (e.g. a bounce/retry)
+
+    branch_exists = subprocess.run(
+        ["git", "rev-parse", "--verify", branch],
+        cwd=str(WATCH_DIR), capture_output=True,
+    ).returncode == 0
+
+    if branch_exists:
+        cmd = ["git", "worktree", "add", str(path), branch]
+    else:
+        cmd = ["git", "worktree", "add", "-b", branch, str(path), "storied"]
+    subprocess.run(cmd, cwd=str(WATCH_DIR), capture_output=True, text=True, check=True)
+    return path
 
 
 def worker(task_path_str):
@@ -237,6 +274,15 @@ def worker(task_path_str):
         locked_append(f"- FAILED    | task={task_filename} | reason=empty_task_file")
         return
 
+    branch = branch_name_for(task_id, prompt)
+    try:
+        worktree_path = setup_worktree(task_id, branch)
+    except subprocess.CalledProcessError as e:
+        locked_append(
+            f"- FAILED    | task={task_filename} | reason=worktree_setup_failed: {e.stderr.strip()[:200]}"
+        )
+        return
+
     SESSION_LOG_DIR.mkdir(parents=True, exist_ok=True)
     ts_slug = datetime.now().strftime("%Y%m%dT%H%M%S")
     session_log_path = SESSION_LOG_DIR / f"{task_id}_{ts_slug}.log"
@@ -251,7 +297,7 @@ def worker(task_path_str):
         try:
             result = subprocess.run(
                 cmd,
-                cwd=str(WATCH_DIR),
+                cwd=str(worktree_path),
                 capture_output=True,
                 text=True,
                 timeout=MAX_RUNTIME_SECONDS,
@@ -271,10 +317,11 @@ def worker(task_path_str):
 
     session_id = None
     if status == "COMPLETED":
-        session_id = find_session_id(prompt.strip(), start_iso)
+        session_id = find_session_id(prompt.strip(), worktree_path)
 
     locked_append(
         f"- {status:<10}| task={task_filename} | id=T{task_id} | "
+        f"branch={branch} | worktree={worktree_path} | "
         f"session={session_id or 'unknown'} | started={start_iso} | "
         f"duration={duration_s}s | exit={exit_code} | log={session_log_path}"
     )
