@@ -2582,6 +2582,79 @@ Total API cost: $0.0349 (17464 tokens)
 
 ---
 
+#### LOCAL-16 — Tour improvement loop, round 3 (Asian arts museum, nice, France) — structural fix
+
+**Agent:** Mac Mini Kiro
+**Branch:** kiro/local16-tour-improvement-round3
+**Priority:** high — round 3. Read
+`~/Audioura/TOUR_IMPROVEMENT_LOOP_asian_arts_museum.md`'s round 2 verdict in full
+before starting; this round is a change of strategy, not another symptom patch.
+
+**Context:** Rounds 0, 1, and 2 all scored ~+15.6/100 or worse (round 1: -9.4).
+Every round fixes one fabrication-fallback pathway (nav-label scraping, then
+Part C, then UNIFIED-FILL's own fill logic) only to have a sibling pathway (or
+the same one, reintroduced because a prior round wasn't merged) produce an
+equally severe fabrication. Round 2's worst finding: UNIFIED-FILL added an
+unverified candidate ("Le Printemps," which D1v2 explicitly could not match to
+any real canonical title), and Phase 5 confidently invented BOTH a named artist
+("Mei-Ling Chen") and a named artwork ("Harmony in Bloom") for it — zero
+hedging, the most severe fabrication found in any round so far.
+
+**Do NOT submit another itemized list of narrow patches.** This round requires
+a structural fix:
+
+1. **Single choke-point verification gate.** After ALL candidate-gathering and
+   fill logic has run (UNIFIED-FILL, R4 replenishment, POST-R4-FILL, Part C, and
+   any other path that adds to `poi_list`) — for `tour_category == 'museum'` —
+   filter `poi_list` down to ONLY entries with a confirmed D1v2 canonical-title
+   match (i.e. present with `status == 'VERIFIED'` in `_d1_evidence_log`) BEFORE
+   any Phase 5 description generation runs. No fill mechanism should be able to
+   sneak an unverified stop past this point. If this reduces stops below
+   `total_stops`, accept the honest shortfall (adjust `total_stops` down) rather
+   than backfilling with anything unverified, for museum tours specifically.
+   This replaces maintaining "never fabricate" separately in every fallback path
+   — enforce it once, centrally, so a future new fallback path can't reintroduce
+   the same bug class again.
+2. **Root-cause why the Fix-4 attribution guard failed on "Le Printemps."** As
+   written (prompt constraint + post-generation regex strip), it should have
+   caught "the renowned artist Mei-Ling Chen." Trace whether the guard's gating
+   condition (`_has_artist_info`/`_attribution_ok_for_guard`/
+   `_facts_mention_artist`) evaluated wrong for an unverified-fill candidate
+   specifically (e.g. stale variable reuse from a prior loop iteration, or
+   `fact_sheet` being in an unexpected shape for fill candidates that skip
+   normal fact-sheet generation), or whether GPT overrode the prompt and the
+   post-generation regex simply didn't match this exact phrasing. Fix the actual
+   root cause, not just this one phrasing pattern — item 1 above should make
+   this moot for museum tours anyway (unverified stops won't reach Phase 5 at
+   all), so treat item 2 as defense-in-depth, not the primary fix.
+3. Keep the duplicate-name-dedup fix from round 2 (name-normalization on both
+   sides of the UNIFIED-FILL comparison) — this part was confirmed correct and
+   should not regress.
+4. Title/address corruption (still recurring — "at Stop 4," addresses leaking
+   into stop titles) remains unresolved across all 3 rounds. If time allows
+   after items 1-3, take another pass, but items 1-2 are the priority — a
+   corrupted-but-honest title is a much smaller problem than a confidently
+   fabricated artist and artwork.
+
+**Acceptance (live-artifact hard gate, same as every round):**
+- Fresh regeneration (delete the current `tour_cache` row first, show CACHE
+  MISS/STORE).
+- Read the FULL rendered tour stop-by-stop yourself. Specifically verify: does
+  every single stop's exhibit correspond to a D1v2-VERIFIED canonical title?
+  If the tour comes up short of `total_stops`, is that shortfall honest (no
+  stop invented to hit the count)?
+- All 11 core regression suites green + `test_venue_identity.py` +
+  `test_local12_fact_retrieval_fix.py`.
+- A live spot-check regeneration of a second, different venue.
+- Report the real API cost line, whether the structural gate is in place, and
+  the root cause found (or not found) for item 2. Do not compute or claim your
+  own score — LEAD scores independently as always.
+
+Leave your submission as a `##### READY FOR REVIEW` heading under LOCAL-16 in
+`CLICKUP_OFFLINE_QUEUE.md`, same convention as every other task.
+
+---
+
 ## Sync Plan (minimum-API checklist — work this top to bottom once ClickUp recovers)
 
 | # | Task ID | Action | API calls | Synced? |
