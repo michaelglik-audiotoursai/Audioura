@@ -2207,6 +2207,6 @@ deCordova) can confirm at review time.
 | 13 | LOCAL-9 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED | 3 | ☐ |
 | 14 | LOCAL-10 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED (2 rounds, corrected diagnosis) | 3 | ☐ |
 | 15 | LOCAL-11 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED | 3 | ☐ |
-| 16 | LOCAL-12 | `create_task` first, then map ID + normal 1-comment/1-status sync — new, dispatched, not yet started | 3 | ☐ |
+| 16 | LOCAL-12 | `create_task` first, then map ID + 1-comment/1-status(complete) sync — APPROVED | 3 | ☐ |
 
 **Total sync cost so far: 2 API calls.** Update this table as more offline work happens.
