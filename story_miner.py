@@ -739,6 +739,242 @@ def _find_snippet(title: str, corpus: str, context_chars: int = 150) -> str:
     return ""
 
 
+# --- LOCAL-11: Venue-identity mining (free path — uses already-fetched corpus) ---
+
+def extract_venue_identity(combined_text: str, venue_name: str = "") -> Dict[str, List[str]]:
+    """Mine already-fetched combined_text for venue-identity facts.
+    
+    Targets sections deliberately excluded from exhibit-title extraction
+    (Architecture, Design, Mission, History, opening summary) for concrete,
+    specific "why is this place special" facts:
+      - Distinctive architecture / named architect
+      - Unusual design philosophy (floor plan, spatial concept)
+      - Signature recurring cultural program (tea ceremonies, concerts, workshops)
+      - Notable curatorial approach or founding story
+    
+    Returns:
+        dict with categorized facts:
+            architecture: [str] — e.g. "designed by Kenzo Tange on a mandala plan"
+            programs: [str] — e.g. "hosts authentic Japanese tea ceremonies (Chanoyu)"
+            founding: [str] — e.g. "founded by Henri Matisse who donated..."
+            design: [str] — e.g. "built around a sacred Tibetan mandala floor plan"
+        Empty lists if nothing specific found. Never returns generic filler.
+    
+    Cost: ZERO additional API calls or fetches. Mines text already in memory.
+    """
+    results: Dict[str, List[str]] = {
+        "architecture": [],
+        "programs": [],
+        "founding": [],
+        "design": [],
+    }
+    
+    if not combined_text or len(combined_text) < 200:
+        return results
+    
+    # --- Extract relevant sections from the corpus ---
+    # Wikipedia-style sections: == Section == or === Section ===
+    _section_re = re.compile(r'^={2,4}\s*(.+?)\s*={2,4}\s*$', re.MULTILINE)
+    
+    # Identity-relevant section names (these are excluded from exhibit-title extraction)
+    _IDENTITY_SECTIONS = {
+        'architecture', 'building', 'design', 'the building',
+        'history', 'histoire', 'founding', 'creation', 'origins',
+        'mission', 'about', 'overview', 'description',
+        'programmes', 'programs', 'activities', 'events',
+        'collections', 'collection', 'la collection',
+    }
+    
+    # Parse sections and their text content
+    sections = []
+    section_starts = list(_section_re.finditer(combined_text))
+    for i, match in enumerate(section_starts):
+        section_name = match.group(1).strip().lower()
+        start_pos = match.end()
+        end_pos = section_starts[i + 1].start() if i + 1 < len(section_starts) else len(combined_text)
+        section_text = combined_text[start_pos:end_pos].strip()
+        if section_name in _IDENTITY_SECTIONS:
+            sections.append((section_name, section_text))
+    
+    # Also grab the opening text (before first section header) — usually the Wikipedia lead
+    if section_starts:
+        _opening = combined_text[:section_starts[0].start()].strip()
+    else:
+        _opening = combined_text[:3000].strip()  # No sections? Use first 3000 chars
+    
+    # Combine identity-relevant text (opening + identity sections)
+    _identity_corpus = _opening + "\n\n" + "\n\n".join(
+        text for _, text in sections
+    )
+    
+    # --- Mine for architecture facts ---
+    # Look for named architects (Pritzker-winners, notable names)
+    _architect_patterns = [
+        # "designed by <Name>" / "conçu par <Name>"
+        re.compile(r'(?:designed|conceived|created|built|constructed|conçu|réalisé|construit)\s+by\s+([A-Z][A-Za-z\u00C0-\u00FF\s\-]{3,40}?)(?:\s*[,.(]|\s+in\s+|\s+and\s+|\s+who\b)', re.IGNORECASE),
+        # "<Name>, architect" / "architect <Name>"
+        re.compile(r'architect[e]?\s+([A-Z][A-Za-z\u00C0-\u00FF\s\-]{5,40}?)(?:\s*[,.(]|\s+designed|\s+who\b)', re.IGNORECASE),
+        re.compile(r'([A-Z][A-Za-z\u00C0-\u00FF\s\-]{5,40}?),?\s+(?:the\s+)?architect', re.IGNORECASE),
+        # "architectural design by"
+        re.compile(r'(?:architectural\s+)?design(?:ed)?\s+by\s+([A-Z][A-Za-z\u00C0-\u00FF\s\-]{3,40}?)(?:\s*[,.(]|\s+in\s+)', re.IGNORECASE),
+    ]
+    
+    _found_architects = set()
+    for pat in _architect_patterns:
+        for m in pat.finditer(_identity_corpus):
+            architect_name = m.group(1).strip().rstrip(',.')
+            # Filter out generic words that aren't architect names
+            _GENERIC_WORDS = {'the', 'a', 'an', 'this', 'that', 'its', 'new', 'old', 'local'}
+            if (len(architect_name) >= 5 and
+                len(architect_name.split()) >= 2 and
+                architect_name.split()[0].lower() not in _GENERIC_WORDS):
+                _found_architects.add(architect_name)
+    
+    # For each architect, try to get context sentence
+    for architect in _found_architects:
+        # Find the sentence containing this architect name
+        _sent = _extract_identity_sentence(_identity_corpus, architect)
+        if _sent:
+            results["architecture"].append(_sent)
+    
+    # --- Mine for design philosophy ---
+    _design_patterns = [
+        # Mandala, sacred geometry, floor plan descriptions
+        re.compile(r'([^.]*(?:mandala|sacred\s+geometry|floor\s*plan|spatial\s+concept|circular\s+layout|octagonal|hexagonal|labyrinth)[^.]*\.)', re.IGNORECASE),
+        # Specific architectural styles or concepts
+        re.compile(r'([^.]*(?:inspired\s+by|modeled\s+(?:on|after)|based\s+on\s+(?:a|the)\s+)[^.]*(?:temple|monastery|palace|garden|pagoda|mosque|cathedral)[^.]*\.)', re.IGNORECASE),
+        # Light/space/material philosophy
+        re.compile(r'([^.]*(?:natural\s+light|deliberately|designed\s+to\s+(?:evoke|create|reflect)|architectural\s+philosophy)[^.]*\.)', re.IGNORECASE),
+    ]
+    
+    for pat in _design_patterns:
+        for m in pat.finditer(_identity_corpus):
+            sentence = m.group(1).strip()
+            if len(sentence) >= 30 and len(sentence) <= 300:
+                # Skip if it's too generic
+                if not _is_generic_filler(sentence):
+                    results["design"].append(sentence)
+    
+    # --- Mine for signature programs ---
+    _program_patterns = [
+        # Tea ceremonies, concerts, workshops, performances
+        re.compile(r'([^.]*(?:tea\s+ceremon|chanoyu|concert[s]?\s+(?:are|were|is)|hosts?\s+(?:regular|weekly|monthly|annual)|signature\s+program|flagship\s+event|recurring\s+(?:event|program|performance)|live\s+performance)[^.]*\.)', re.IGNORECASE),
+        # "offers|presents|features <specific program>"
+        re.compile(r'([^.]*(?:museum|venue|center|centre|gallery|palais|palazzo)\s+(?:also\s+)?(?:offers|presents|features|hosts|organizes|includes)\s+[^.]*(?:workshop|concert|ceremony|performance|demonstration|festival|residenc)[^.]*\.)', re.IGNORECASE),
+    ]
+    
+    for pat in _program_patterns:
+        for m in pat.finditer(_identity_corpus):
+            sentence = m.group(1).strip()
+            if len(sentence) >= 25 and len(sentence) <= 300:
+                if not _is_generic_filler(sentence):
+                    results["programs"].append(sentence)
+    
+    # --- Mine for founding story ---
+    _founding_patterns = [
+        # "founded by / established by / created by <person> in <year>"
+        re.compile(r'([^.]*(?:founded|established|created|inaugurated|opened)\s+(?:by|in)\s+[^.]*\d{4}[^.]*\.)', re.IGNORECASE),
+        # "donated (his/her/their) collection"
+        re.compile(r'([^.]*(?:donat(?:ed|ion)|bequest(?:ed)?|gift(?:ed)?)\s+(?:his|her|their|the)\s+(?:entire\s+)?(?:collection|works|paintings)[^.]*\.)', re.IGNORECASE),
+        # Specific founding intent phrases
+        re.compile(r'([^.]*(?:wanted\s+to\s+create|vision\s+was|intended\s+(?:as|to)|purpose\s+was|conceived\s+as)[^.]*\.)', re.IGNORECASE),
+    ]
+    
+    for pat in _founding_patterns:
+        for m in pat.finditer(_identity_corpus):
+            sentence = m.group(1).strip()
+            if len(sentence) >= 30 and len(sentence) <= 300:
+                if not _is_generic_filler(sentence):
+                    results["founding"].append(sentence)
+    
+    # --- Deduplicate and cap ---
+    for key in results:
+        # Deduplicate near-identical sentences
+        seen = set()
+        unique = []
+        for sent in results[key]:
+            _norm_sent = re.sub(r'\s+', ' ', sent.lower().strip())
+            if _norm_sent not in seen:
+                seen.add(_norm_sent)
+                unique.append(sent)
+        results[key] = unique[:3]  # Cap at 3 facts per category
+    
+    # Report
+    _total = sum(len(v) for v in results.values())
+    if _total > 0:
+        _summary = {k: len(v) for k, v in results.items() if v}
+        print(f"  [LOCAL-11] Venue-identity mining: {_total} facts found {_summary}")
+    else:
+        print(f"  [LOCAL-11] Venue-identity mining: no specific facts found in corpus")
+    
+    return results
+
+
+def _extract_identity_sentence(corpus: str, keyword: str) -> Optional[str]:
+    """Extract the most informative sentence containing the keyword."""
+    # Split into sentences
+    sentences = re.split(r'(?<=[.!?])\s+', corpus)
+    for sent in sentences:
+        if keyword.lower() in sent.lower() and len(sent) >= 30 and len(sent) <= 300:
+            # Prefer sentences that also contain verbs of creation/design
+            _design_verbs = ('design', 'built', 'creat', 'conceiv', 'construct',
+                           'architect', 'commission', 'plan', 'inaugurat')
+            if any(v in sent.lower() for v in _design_verbs):
+                return sent.strip()
+    # Fallback: any sentence with the keyword
+    for sent in sentences:
+        if keyword.lower() in sent.lower() and len(sent) >= 30 and len(sent) <= 300:
+            return sent.strip()
+    return None
+
+
+def _is_generic_filler(sentence: str) -> bool:
+    """Detect generic filler that adds no specific identity value."""
+    _FILLER_PATTERNS = [
+        r'wonderful\s+museum',
+        r'many\s+treasures',
+        r'rich\s+collection',
+        r'wide\s+variety',
+        r'something\s+for\s+everyone',
+        r'world[\s-]class',
+        r'must[\s-]see',
+        r'not\s+to\s+be\s+missed',
+        r'well\s+worth\s+a\s+visit',
+        r'important\s+(?:museum|institution|cultural)',
+        r'one\s+of\s+the\s+(?:most|finest|best)',
+    ]
+    _lower = sentence.lower()
+    return any(re.search(p, _lower) for p in _FILLER_PATTERNS)
+
+
+def format_venue_identity_for_prompt(identity_facts: Dict[str, List[str]], venue_name: str = "") -> str:
+    """Format extracted venue-identity facts into a concise prompt injection.
+    
+    Returns a short paragraph suitable for injecting into the prolog prompt,
+    or empty string if no usable facts were found.
+    """
+    all_facts = []
+    
+    # Prioritize: architecture > design > programs > founding
+    for key in ("architecture", "design", "programs", "founding"):
+        for fact in identity_facts.get(key, []):
+            all_facts.append(fact)
+    
+    if not all_facts:
+        return ""
+    
+    # Cap at 3 most interesting facts to avoid overwhelming the prompt
+    _selected = all_facts[:3]
+    
+    _venue_label = venue_name.split(',')[0].strip() if venue_name else "This venue"
+    
+    return (
+        f"Venue-specific identity facts about {_venue_label} (weave 1-2 of these "
+        f"concretely into the introduction — do NOT use generic praise):\n"
+        + "\n".join(f"- {fact}" for fact in _selected)
+    )
+
+
 # --- T0b: Stop disjointness check ---
 
 def check_stop_disjointness(
