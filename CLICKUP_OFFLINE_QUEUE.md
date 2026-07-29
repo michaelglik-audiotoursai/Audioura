@@ -1555,6 +1555,60 @@ often doesn't.
 default to generic prose, with real examples from more than one museum tour, and a
 recommended next step.
 
+##### READY FOR REVIEW (committed `c611365` on `kiro/local10-story-richness-investigation`)
+
+Kiro's diagnosis: "dual failure — supply + demand sides." Supply (claimed primary):
+the per-exhibit fact-retrieval pipeline (`fact_extractor`, `story_element_extractor`,
+`work_story_searcher`) is "entirely gated behind `STORIED_MODE=true`, which is OFF in
+the standard `docker-compose.yml`," and the B6 `work_stories` DB cache is "only
+populated by manually-run pilot scripts, never during normal generation." Demand
+(secondary): the description prompt asks for 300 words of "significance"/"context"
+without requiring factual grounding. Evidence cited: identical generic pattern across
+5 museum tours. Recommended direction: (A) always-on fact retrieval for museum tours,
+(B) a specificity/adaptive-length gate when confirmed facts < 2.
+
+##### LEAD VERDICT (independent verification, 2026-07-29) — BOUNCED
+
+**The primary claimed root cause is factually wrong, verified two ways:**
+- `docker-compose-master.yml`'s `tour-generator` service literally hardcodes
+  `STORIED_MODE=true` in its `environment:` block — it is not off, it's on by default.
+- Confirmed live: `docker exec audioura-tour-generator-1 env | grep STORIED_MODE` →
+  `STORIED_MODE=true` in the actual running production container.
+- Traced the code directly: `generate_tour_text.py:3293-3356` shows fact-sheet
+  generation (`generate_fact_sheets_parallel`, `extract_story_elements_from_pages`)
+  genuinely executing inside `if _storied_mode:` — and `_storied_mode` reads exactly
+  this env var. Since it's true in production, this pipeline **does run**, it isn't
+  gated off.
+
+This doesn't mean the pipeline works well — quite the opposite, and this session has
+independently seen "No RAG context for X — cannot generate fact sheet" messages in
+real live generations multiple times tonight, which is consistent with Kiro's broader
+point. But "the pipeline is switched off" and "the pipeline runs but frequently fails
+to retrieve useful per-exhibit context" are different diagnoses that point to
+different fixes — the first says "flip a flag," the second says "fix retrieval
+quality/coverage inside a pipeline that's already active." Dispatching a fix based on
+the wrong one would waste a full task cycle on a no-op.
+
+Also checked the B6/`work_story_searcher` claim rather than taking it on faith: it's
+NOT purely a manual-pilot-only tool as implied — `work_stories_get`/`work_stories_put`
+are imported and called directly from `generate_tour_text.py:3595` and
+`story_element_extractor.py:11`, i.e. wired into the live pipeline. Whether the DB
+table actually ends up populated during *normal* (non-pilot) runs is a real, open
+question — but it needs to be checked empirically (query the DB after a live,
+non-pilot generation), not asserted.
+
+**Required for resubmission:** redo the "supply side" diagnosis starting from the
+correct premise (the pipeline runs). Specifically trace *why*
+`generate_fact_sheets_parallel` / the underlying RAG lookup comes back empty for so
+many exhibits despite running — that's the real question. Check the B6 cache's actual
+population empirically rather than asserting it. The demand-side observation (prompt
+lacks a specificity gate) and the 5-museum-tour evidence-gathering methodology both
+look sound and can be kept.
+
+**TRUE current state:** BOUNCED, redispatched with the corrected premise. Branch
+`kiro/local10-story-richness-investigation` (commit `c611365`) preserved on origin for
+reference, not merged.
+
 ---
 
 #### LOCAL-11 — Surface venue-level "why this museum matters" facts as a cheap narrative hook (generic across all museums)
