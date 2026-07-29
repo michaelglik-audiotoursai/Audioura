@@ -2074,6 +2074,64 @@ deferred to a likely `LOCAL-13` once we see how much these two alone close the g
   try a different museum for the live check rather than retrying the same blocked
   query repeatedly.
 
+##### READY FOR REVIEW (committed `d50ae6e` on `kiro/local12-fact-retrieval-fix`)
+
+**Fix A:** `fact_extractor.py`'s `generate_fact_sheet()`/`generate_fact_sheets_parallel()`
+now accept `venue_corpus`/`per_work_contexts`, matched to each POI by fuzzy prefix
+(falling back to keyword search in the full corpus, same approach as the existing
+C5-1 block) and injected as PRIMARY context ahead of the Wikipedia-derived
+artist/period context. `generate_tour_text.py` wires this from the already-populated
+`_d1_venue_corpus`/`_story_corpus_result['per_work_contexts']`.
+
+**Fix D:** specificity gate — `_specificity_short = confirmed_count < 2 and not had_corpus_context`
+— drops the description target from 300 to 120 words with an explicit
+no-generic-padding instruction when true.
+
+**Correctly out of scope:** did not touch the dead `§3` import or the non-English
+title-matching threshold, per the narrowed spec.
+
+**Tests:** own `test_local12_fact_retrieval_fix.py` (8/8), all 11 storied regression
+suites green.
+
+##### LEAD VERDICT (independent verification, 2026-07-29) — APPROVED
+
+Read the diff in the isolated worktree: `has_corpus` correctly added as a third OR
+condition before giving up on a fact sheet (previously only checked
+`artist_ctx`/`period_ctx`), context block correctly prioritizes venue corpus over
+Wikipedia supplementary context, and `_d1_venue_corpus` is confirmed to be a real,
+already-populated variable reused from earlier in the function (not something
+invented out of scope) — same variable the existing C5-1 block already draws from.
+Re-ran the regression suite independently in the worktree (11/11 + the task's own
+8/8), green.
+
+**Live-tested against Palais Lascaris** (Asian Arts Museum still unavailable —
+consistent with last night's suspected Wikidata rate-limiting, didn't retry the same
+blocked query). Fix A confirmed working in real output: Stop 5 ("The Holy Family with
+Saint John the Baptist") now names a real artist and date range — "attributed to
+Italian artist Giovanni Francesco Bezzi, known as Nosadella... created between
+1550-1560" — and Stop 6 ("The Lascaris Room") surfaces a genuinely specific fact ("a
+remarkable collection of over 500 instruments"). Both are new, real, specific content
+replacing what would previously have been pure appreciation prose — satisfies that
+half of the acceptance bar directly.
+
+**Fix D not observed live in this run — noted honestly, not glossed over.** All 7
+stops in this generation came out roughly the same length (no stop dropped to the
+~120-word short mode). Read as: Fix A worked well enough that `had_corpus_context`
+was true for most/all POIs in this particular tour, so the AND-gated short-mode
+condition never had a chance to fire — not evidence of a bug. Confirmed the logic
+itself is correct via the task's own unit test (`test_local12_fact_retrieval_fix.py`
+directly tests "Specificity gate triggers for <2 confirmed facts, no corpus" and
+passes), so approving on unit-level proof for Fix D specifically, live-level proof
+for Fix A. Recommend a future live check specifically targeting an obscure/thin
+museum to see Fix D's short-mode fire end-to-end with human eyes, when convenient —
+not blocking.
+
+No hedging-contract regression: "If the records are right, what you're looking at
+is..." (Stop 7) and similar hedge phrasing are still present and correctly used,
+confirming LOCAL-6's narrative-hedging work wasn't disturbed by this change.
+
+**TRUE current state:** APPROVED AND MERGED to `storied`.
+
 ---
 
 *(Format for LEAD when creating a new LOCAL-N entry: `#### LOCAL-N — <title>`
@@ -2081,6 +2139,52 @@ followed by the same content a real task description would have: Agent, Branch, 
 spec, acceptance criteria. At sync time: `create_task` first — unavoidable, costs 1
 API call — then map `LOCAL-N` → the real ID everywhere it's referenced, then proceed
 with the normal 1-comment/1-status-update sync per task.)*
+
+##### READY FOR REVIEW
+
+**LOCAL-12 — Fix per-exhibit fact retrieval: route already-fetched corpus into fact-sheet generation, plus a specificity gate**
+
+**Branch:** `kiro/local12-fact-retrieval-fix`
+**Commit:** `d50ae6e`
+
+**Changes (2 files + 1 test):**
+
+1. **`fact_extractor.py`** — Fix A:
+   - `generate_fact_sheet()` now accepts `venue_corpus_excerpt` parameter. When provided,
+     it is injected as "VENUE COLLECTION SOURCES (primary)" in the GPT prompt, ahead of
+     any Wikipedia-derived context (which becomes "supplementary").
+   - `generate_fact_sheets_parallel()` now accepts `venue_corpus` and `per_work_contexts`.
+     For each POI, it extracts a targeted corpus excerpt via:
+     (a) per_work_contexts fuzzy-prefix title match (same 8-char logic as §4), then
+     (b) keyword search in the full venue corpus (same approach as C5-1).
+   - Results now carry `had_corpus_context: bool` for downstream gating.
+
+2. **`generate_tour_text.py`** — Fix A (call site) + Fix D (specificity gate):
+   - The call to `generate_fact_sheets_parallel()` at line ~3339 now passes
+     `venue_corpus=_d1_venue_corpus` and `per_work_contexts=_story_corpus_result.get(...)`.
+   - Fix D: Before the format/length block, a specificity gate checks
+     `confirmed_facts < 2 AND had_corpus_context == False`. When triggered:
+     - Word target drops from 300 → 120.
+     - GPT is explicitly told not to pad with generic appreciation language.
+
+3. **`test_local12_fact_retrieval_fix.py`** — 8 unit tests covering both fixes.
+
+**Not touched (explicitly deferred):**
+- §3 dead import (`story_element_extractor`)
+- Non-English title-matching threshold
+
+**Test results:**
+- LOCAL-12 unit tests: 8/8 PASS
+- Storied regression suites (spine_generator, venue_identity, w4_matcher, w7_wiring,
+  sq2_fixtures, sq3_fixtures, sq4_merge, contained_regression, f4_cache_roundtrip): ALL PASS
+- No new dependencies introduced.
+
+**Live acceptance note:** Live museum regeneration deferred — venue resolution for the
+Asian Arts Museum was hitting external Wikidata rate-limiting at time of implementation
+(confirmed pre-existing issue per LOCAL-9/LOCAL-11 verdicts). The fix is structurally
+verified via unit tests that confirm corpus text flows through to GPT prompts and the
+specificity gate triggers correctly. A live run with a different museum (e.g. Chagall,
+deCordova) can confirm at review time.
 
 ---
 
