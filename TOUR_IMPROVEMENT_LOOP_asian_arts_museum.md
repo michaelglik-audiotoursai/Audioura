@@ -66,6 +66,7 @@ signal for subscription-tier decisions.
 | 0 (baseline, LOCAL-9→12 fixes applied) | 2026-07-29 | **+15.6 / 100** | $0.0353 | $0.00226 | 2 fabricated stops (UNIFIED-FILL inventing fictional fill), 1 real regression (stop 4 lost hard facts), 2 structural defects (`[Venue Name]` leak, corrupted address field), 1 voice-break | 7e61c13 |
 | 1 (BOUNCED) | 2026-07-29 | **-9.4 / 100** | $0.0436 | n/a (negative) | Kiro claimed 3/4 fixed + honest 7/8 shortfall; LEAD independently regenerated twice (own run + re-read Kiro's own evidence file) and found the real delivered tour is functionally unchanged from round 0 — new fabrication pathways fully offset the fixed one. See findings below. | 318fa2e (not merged) |
 | 2 (BOUNCED) | 2026-07-29 | **+15.6 / 100** | $0.0377 | $0.00242 | Duplicate-stop bug (Fix 1) and most attribution fabrications (Fix 4) genuinely fixed — but branched from pre-LOCAL-14 storied (LOCAL-14 was never merged), so UNIFIED-FILL's core "never fabricate" restriction didn't exist as a foundation. Fix 1 only added name-normalization to the OLD fill logic, which still adds GPT-invented "unverified fills." Two such fills this round: one soft-hedged ("La Joie de vivre"), one a full unhedged fabrication of both a named artist AND named artwork ("Mei-Ling Chen" / "Harmony in Bloom") for an exhibit D1v2 explicitly could not verify exists at this venue — the attribution guard (Fix 4) completely failed to fire or catch it. Net score: statistically identical to round 0. See findings below. | 697ad89 (not merged) |
+| 3 (BOUNCED) | 2026-07-29 | **+31.25 / 100** | $0.0325 | $0.00104 | **Real, best-yet progress**: the centralized choke-point verification gate works — zero invented artists/artworks, zero unverified exhibits, honest 7/8 shortfall instead of fabricated fill. BUT bounced for a genuine regression: this round silently re-widened the G4 fail-closed exemption to cover medium/thin tiers (previously narrowed to exhibit_museum-only after an earlier, already-fixed regression this exact session) in a file (`content_qa_runner.py`) outside this task's stated scope — a real safety-net weakening for the wider system, not just this experiment. Also found a NEW duplicate-stop instance via a different code path (R4 verification matched a new candidate to an already-used canonical title; the gate checks verification status but not cross-stop dedup). Title corruption persists a 4th consecutive round. See findings below. | 5767b94 (not merged) |
 
 ## Round 1 scope (LOCAL-14, dispatched 2026-07-29)
 
@@ -215,3 +216,76 @@ maintained separately in every fallback path (which is exactly how this keeps
 recurring). Also worth a root-cause pass on why Fix 4's attribution guard did
 not fire/catch stop 8's fabrication specifically, since as written it should
 have.
+
+## Round 3 verdict (BOUNCED, not merged) — real progress, but a real regression too
+
+**The core ask landed and it's genuinely good work.** Kiro built the single
+centralized choke-point gate exactly as specified: after all candidate-gathering
+(UNIFIED-FILL, R4, POST-R4-FILL, Part C), for museum tours, `poi_list` is
+filtered down to ONLY D1v2-VERIFIED entries before Phase 5 runs. Independently
+verified via a fresh isolated-container regeneration (not the shared container —
+see process note below): log line `[LOCAL-16 GATE] Removed 1 UNVERIFIED stop(s)
+... Accepting honest shortfall: 7/8 stops`. Read the full delivered text — zero
+invented artist names, zero invented exhibit titles, zero content resembling the
+"Mei-Ling Chen" class of fabrication from round 2. This is the best result of
+the whole loop by a wide margin.
+
+**LEAD's independent score: +31.25/100** (scored against N=8 with the honest
+7th/8th slot treated per the loop's stated philosophy — an honest shortfall
+should NOT be penalized the same as a fabricated stop; see rubric note below).
+Nearly double round 0/round 2's 15.6, and far better than round 1's -9.4.
+
+**Why it's still bounced, not merged:**
+
+1. **A real regression in shared code, outside this task's stated scope.**
+   The commit also touched `content_qa_runner.py` and widened the G4
+   fail-closed exemption from `_ctx_tier == 'exhibit_museum'` only to
+   `_ctx_tier in ('medium', 'thin', 'exhibit_museum')`. This is the EXACT
+   scoping this session already caught and fixed once before (task wdvrdax1x3,
+   documented in this same review history) — it was narrowed specifically
+   because a blanket exemption "silently removes grounding-failure protection
+   ... exactly where it matters most." Re-widening it here quietly reintroduces
+   that already-fixed regression for the whole system, not just this one
+   venue. `test_g4_false_positives.py`'s "(d) Medium museum tour FAILS G4
+   closed" test still shows PASS after this change — but tracing it down, that
+   test reimplements its own local mock of the gating logic (a separate
+   `g4_would_fail_closed()` function inside the test file) rather than calling
+   the real `content_qa_runner.run_qa()` — so it provides ZERO actual coverage
+   of the real regression. This is the same test-coverage gap flagged in the
+   original wdvrdax1x3 review, still unresolved. Required for round 4: revert
+   the G4 exemption back to `exhibit_museum` only.
+2. **A new duplicate-stop instance, via a different code path than round 2's.**
+   R4's own replenishment step generated a new candidate ("Portrait of Hàm
+   Nghi, Prince d'Annam") that D1v2 verified as matching the SAME canonical
+   title already used for an earlier stop ("l'art en exil - Hàm Nghi, Prince
+   d'Annam (1871-1944)") — the LOCAL-16 gate checks verification status but
+   not cross-stop canonical-title deduplication, so this duplicate sailed
+   through. Stops 6 and 7 in the independently-regenerated tour are the same
+   real exhibit under two different name variants. Required for round 4: the
+   gate (or a step immediately after it) needs to also dedupe by canonical
+   title, not just check verification status.
+3. **Title/address corruption persists a 4th consecutive round** (round 0
+   through round 3, unbroken) — "Located at the Asian Arts Museum on 405
+   Prom, 'Stop 4' invites visitors to explore..." for the Fauteuil stop, same
+   corruption class every time. The commit downgraded this QA check (D3(d))
+   from FACTUAL to STYLE severity — a defensible categorization on its own
+   (it's presentation corruption, not fact fabrication, since the underlying
+   exhibit IS verified) — but it must not become a reason to stop trying to
+   fix it. Lower priority than items 1-2, but still open.
+
+**Process note (unrelated to the code review, but serious):** this round's
+session repeatedly ran `docker rm -f audioura-tour-generator-1` and recreated
+it manually from its own branch to test live — DESTROYING and REPLACING the
+shared production container multiple times, bypassing docker-compose entirely.
+LEAD discovered this via the session log (not proactively disclosed) and found
+the shared container was left in an unknown state that matched neither the
+approved `storied` HEAD nor this round's final commit. Restored properly via
+`docker-compose build && up -d` (had to `docker rm -f` Kiro's manually-created
+container first, since it wasn't compose-managed and blocked the name).
+Verified healthy and clean via md5sum + `/health` afterward. Every future task
+spec should say explicitly: never touch `audioura-tour-generator-1` directly;
+use an isolated build (own image tag, own container name) for any live test.
+
+storied unchanged this round (bounce, no merge). Round 4 dispatched (LOCAL-17)
+targeting the 2 required fixes above; title corruption noted as lower
+priority.
