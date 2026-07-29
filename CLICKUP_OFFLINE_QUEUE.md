@@ -2409,6 +2409,86 @@ Leave your submission as a `##### READY FOR REVIEW` heading under LOCAL-14 in
 
 ---
 
+#### LOCAL-15 — Tour improvement loop, round 2 (Asian arts museum, nice, France)
+
+**Agent:** Mac Mini Kiro
+**Branch:** kiro/local15-tour-improvement-round2
+**Priority:** high — round 2 of the scored improvement loop (see
+`~/Audioura/TOUR_IMPROVEMENT_LOOP_asian_arts_museum.md` for rubric, loop mechanics,
+and the full round-1 bounce writeup this task follows up on).
+
+**Context:** LOCAL-14 (round 1) was BOUNCED. Its diff was real and all 13 suites
+genuinely passed, but LEAD independently regenerated the tour twice (once using
+Kiro's own quoted evidence, once from scratch) and found the real delivered score
+is unchanged from round 0 (-9.4/100 both times) — new problems fully offset what
+got fixed. Do NOT re-verify by grepping selected log lines only; read the FULL
+rendered tour text stop-by-stop before claiming anything is fixed, exactly as LEAD
+did to catch these.
+
+**Spec — four items, in priority order (root causes LEAD traced into exact code
+locations, not just symptoms):**
+
+1. **UNIFIED-FILL duplicate-stop bug** (`generate_tour_text.py` ~line 2360-2376,
+   the `_fill_from_verified` loop LOCAL-14 added). Its dedup check does
+   `_cand_name.lower() in _verified_names_fill`, comparing the RAW candidate name
+   (e.g. "Voyage au pied du mont Fuji") against names already placed in `poi_list`
+   — but the already-placed entry is keyed under its CANONICAL name ("Hokusai –
+   Voyage au pied du mont Fuji"). The exact-string match misses that these are the
+   same real exhibit, so it gets added twice. Fix: normalize both sides through
+   `_normalize_name()` (already used elsewhere in this file for exactly this kind
+   of comparison) before comparing, not raw `.lower()`.
+2. **"Part C" is a completely untouched third fabrication pathway**
+   (`generate_tour_text.py` ~line 2696-2812, the `while len(poi_list) <
+   total_stops` replacement loop). It asks GPT-3.5 directly for "specific, real,
+   well-known" candidates with ZERO D1v2/Wikidata canonical-title verification,
+   and for museum tours it explicitly skips even the address-match check (line
+   ~2771: `elif tour_category != 'museum' or not _museum_venue_name:`). This is
+   exactly the same fabrication risk LOCAL-14 was supposed to eliminate — it
+   fires MORE now, since LOCAL-14 deliberately creates more shortfalls upstream.
+   Fix: for `tour_category == 'museum'`, either skip Part C entirely (accept the
+   honest shortfall, same principle as UNIFIED-FILL/POST-R4-FILL), or require
+   Part C candidates to pass the same D1v2 canonical-title check against
+   `venue_corpus` before being accepted — never accept an ungrounded invention.
+3. **Address/title corruption persists — it moved, not disappeared.** LEAD's
+   independent regeneration showed the corruption landing in the stop TITLE line
+   itself (not just the address field the LOCAL-14 sanitizer targets), e.g.
+   `Located at the Asian Arts Museum on 405 Promenade, 'Stop 4' features the
+   striking piece titled "Fauteuil. des Anglais, 06200 Nice, France` — including a
+   stray `'Stop 4'` meta-reference baked into the name. Post-hoc regex salvage
+   isn't reliable. Fix: when the F3 corruption check fires on a stop name, instead
+   of truncating the garbled string, re-request just that stop's name/address pair
+   from GPT with an explicit "return ONLY a short venue-relative name, no
+   sentences, no addresses" instruction, and validate the result before accepting.
+4. **New fabrication vector: Phase 5 can invent a false attribution for a
+   D1v2-VERIFIED work.** LEAD's rerun confidently attributed "Les paysages de
+   l'âme" (a verified-real work, previously honestly described as anonymous/13th
+   century) to "contemporary artist Mei Ling" — a specific, named, false claim
+   with no corpus support. D1v2 only verifies the work's TITLE is real; nothing
+   currently stops the Phase 5 description prompt from inventing specifics about
+   it. Fix: when a stop's fact sheet has no confirmed artist/date/era, add an
+   explicit prompt constraint against naming an artist or asserting a specific
+   era, similar in spirit to this round's first-person-rejection fix for
+   `derepetition_guard.py`.
+
+**Acceptance (live-artifact hard gate, same as every round):**
+- Fresh regeneration (delete the current `tour_cache` row first — re-check the
+  cache_key, it changes each round — show CACHE MISS/STORE).
+- **Read the full rendered tour stop-by-stop yourself before claiming anything is
+  fixed** — check for duplicate exhibits across stops (compare canonical/
+  normalized names, not just adjacent-stop titles), check every stop's title line
+  for leaked narrative/address text, check every attribution claim against the
+  fact sheet it's supposedly grounded in.
+- All 11 core regression suites green + `test_venue_identity.py` +
+  `test_local12_fact_retrieval_fix.py`.
+- A live spot-check regeneration of a second, different venue.
+- Report the real API cost line and which of the 4 items landed vs. didn't — do
+  not compute or claim your own score, LEAD scores independently as always.
+
+Leave your submission as a `##### READY FOR REVIEW` heading under LOCAL-15 in
+`CLICKUP_OFFLINE_QUEUE.md`, same convention as every other task.
+
+---
+
 ## Sync Plan (minimum-API checklist — work this top to bottom once ClickUp recovers)
 
 | # | Task ID | Action | API calls | Synced? |
