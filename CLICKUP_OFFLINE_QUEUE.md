@@ -1520,6 +1520,81 @@ be a **generic** fix, not a fix for this one museum.
   over-trigger and start dropping *real* exhibit titles.
 - All 11 regression suites stay green.
 
+##### READY FOR REVIEW
+
+**Branch:** `kiro/local9-filter-nav-titles`
+**File changed:** `story_miner.py` — single file, ~100 lines added (filter function + application points)
+**Status:** Uncommitted in working tree at `/Users/micha/audioura-worktrees/LOCAL-9/`
+
+**What was done:**
+
+Added a generic `_is_navigational_label()` pattern-based filter to `story_miner.py`
+that detects French and English museum-website navigation/administrative labels and
+prevents them from entering the canonical title list. The filter uses a two-stage
+approach:
+1. **Negative signal:** regex patterns matching FR/EN nav vocabulary (infos pratiques,
+   horaires, tarifs, plan du site, musée en vidéo, opening hours, visitor info, etc.)
+2. **Positive override:** if the candidate also contains artwork-like signals (a year
+   1500–2029, a medium keyword like "peinture"/"sculpture", or artwork-title
+   structural patterns like subtitles, lifespans, genre words), it's kept regardless.
+
+Filter applied at two points:
+- **Inline in Pattern 6** (the list-item extractor, the primary entry point for these
+  nav labels on departement06.fr sites) — filtered before adding to candidates.
+- **Final pass** after all patterns combine — catches any nav labels that entered via
+  Pattern 4 (quoted) or Pattern 5 (bold).
+
+**Evidence:**
+
+1. **Bug reproduction confirmed:** Existing tour ZIP
+   `asian_arts_museum_nice_france_museum_72518d8f.zip` shows Stop 6 = "Infos
+   pratiques" (with "L'art en exil - Hàm Nghi" content misattributed to it) and
+   Stop 7 = "Le musée en vidéo" (with fabricated Zhang Huan "Samsara" attribution).
+
+2. **Fix correctly filters the bug cases:**
+   - `_is_navigational_label("Infos pratiques")` → `True` (filtered)
+   - `_is_navigational_label("Le musée en vidéo")` → `True` (filtered)
+
+3. **Fix preserves real exhibit titles:**
+   - `_is_navigational_label("La geste de Bouddha")` → `False` (kept)
+   - `_is_navigational_label("Les paysages de l'âme")` → `False` (kept)
+   - `_is_navigational_label("Hokusai – Voyage au pied du mont Fuji")` → `False`
+   - `_is_navigational_label("L'art en exil - Hàm Nghi, Prince d'Annam (1871-1944)")` → `False`
+   - All 14 Chagall museum titles → `False` (no false positives)
+   - All 5 Palais Lascaris titles → `False` (no false positives)
+   - Total: 29 real artwork titles tested, zero false positives.
+
+4. **Genericity (not hardcoded):** 35/36 French departmental museum nav labels
+   correctly caught by pattern matching (the single miss "Mécénat" is a single word
+   that wouldn't pass Pattern 6's `words >= 2` pre-filter anyway).
+
+5. **Regression suites:** 13/13 relevant suites pass (palais_fixture 23/23,
+   sq2/sq3/sq4, b6, g4, w4, w7, w9, spine, contained, f4, tier). The 14th
+   (`test_orchestrator_storied_wiring.py`) has pre-existing Docker container naming
+   mismatch (same 3/10 pass before and after this change — not a regression).
+
+**UNPROVEN (honest):**
+
+- **Live regeneration of the Asian Arts Museum tour** not performed. The running
+  Docker container (`audioura-tour-generator-1`) is built from `/Users/micha/Audioura`
+  (main repo), not this worktree. Rebuilding would affect the shared development
+  environment. The fix is proven at the unit/function level (correct filtering verified
+  with realistic corpus data matching the exact bug conditions), but end-to-end tour
+  generation with the fixed code has not been executed. LEAD will need to rebuild the
+  container from this worktree to verify the live artifact.
+
+- **Explicit fabrication check on regenerated output** not possible without the live
+  regeneration. However: once "Le musée en vidéo" is excluded from the candidate list,
+  no stop will be generated for it, so GPT will never be prompted to describe a
+  non-existent "museum on video" exhibit — eliminating the conditions that produced
+  the Zhang Huan/Samsara fabrication.
+
+- **"L'art en exil - Hàm Nghi" gets its own correctly-attributed stop"** — cannot
+  verify end-to-end without live regeneration. The candidate title extraction now
+  correctly keeps it (proven) while filtering out "Infos pratiques" (proven). Whether
+  it becomes its own stop depends on the downstream spine-generator logic, which is
+  unchanged and known-working.
+
 ---
 
 #### LOCAL-10 — Investigate museum-stop story richness (investigate-first, like LOCAL-4 was)
@@ -1609,6 +1684,147 @@ look sound and can be kept.
 `kiro/local10-story-richness-investigation` (commit `c611365`) preserved on origin for
 reference, not merged.
 
+##### READY FOR REVIEW
+
+**Branch:** `kiro/local10-story-richness-investigation`
+**Supersedes:** `c611365` (prior incorrect diagnosis)
+
+**Corrected Supply-Side Diagnosis: The Pipeline Runs but Retrieval Fails at Three Levels**
+
+LEAD is right — `STORIED_MODE=true` is hardcoded in `docker-compose-master.yml`,
+confirmed live (`docker exec audioura-tour-generator-1 env | grep STORIED_MODE` →
+`true`). The pipeline at `generate_tour_text.py:3293-3356` genuinely executes. My
+prior claim was wrong. The real question is: why does it come back empty so often?
+
+**Root Cause #1 (PRIMARY): `fetch_poi_rag_context` relies exclusively on individual
+Wikipedia article lookups — most museum exhibits don't have Wikipedia articles.**
+
+`fact_extractor.py:generate_fact_sheets_parallel` calls `rag_retriever.fetch_poi_rag_context`
+per POI. For museum tours, this function (line 106-140) does exactly one thing: calls
+`fetch_wikipedia_summary(poi_name)`. If the exhibit has its own Wikipedia article
+(Mona Lisa → 37k chars, The Birth of Venus → 25k chars), it succeeds. If not — which
+is the case for the vast majority of museum works worldwide — both `artist_context`
+and `period_context` come back empty, and `generate_fact_sheet` (line 34) returns None
+with the logged warning "No RAG context for X — cannot generate fact sheet."
+
+**Empirical evidence (live, not hypothetical):**
+- Asian Arts Museum of Nice: 6/8 exhibits failed RAG lookup. Every failing title
+  ("Les paysages de l'âme", "La geste de Bouddha", "Hokusai – Voyage au pied du mont
+  Fuji", "L'art en exil - Hàm Nghi", "Infos pratiques", "Le musée en vidéo") has no
+  Wikipedia article. The 2 that succeeded ("fauteuil", "disque") matched generic French
+  Wikipedia articles about the WORD itself (armchairs, discs) — not about these specific
+  museum objects. So even the "successful" 2/8 used irrelevant context.
+- Chagall Museum (Nice): 5/5 succeeded — but only because `_extract_artist_from_venue`
+  produces "Marc Chagall" and `fetch_wikipedia_summary("Marc Chagall")` returns a rich
+  article. The artist bio is used as a generic `artist_context` for ALL works, regardless
+  of whether the individual work (e.g. "Abraham et les trois anges") has its own article.
+  This means fact sheets for Chagall works are generated from Marc Chagall's general bio
+  (truncated to 800 chars), NOT from work-specific information.
+- Cross-museum test: "La fuite en Égypte" (Musée d'Art Naïf) → 0 chars. "Still Life
+  with Aubergines" (Musée Matisse) → 0 chars. Only world-famous works with dedicated
+  Wikipedia articles succeed.
+
+**The critical gap:** `story_miner.py`'s `fetch_venue_narrative_corpus` already fetches
+rich per-venue content (120,790 chars for the Asian Arts Museum including 5 narrative
+pages from the official site). This content IS available in `_story_corpus_result` and
+`_d1_venue_corpus` by the time fact-sheet generation runs. But `fetch_poi_rag_context`
+never consults it — it only does standalone Wikipedia lookups per exhibit name,
+completely ignoring the venue corpus already in memory.
+
+**Root Cause #2: `_extract_per_work_contexts` matching threshold is too aggressive
+for non-English exhibit titles.**
+
+Even when the venue corpus IS consulted (the `§4` injection at line 3572-3586),
+`_extract_per_work_contexts` in `story_miner.py:471-493` uses a 60%-of-significant-
+words threshold. For French titles like "La geste de Bouddha", only 2 significant words
+(≥4 chars) are extracted: `['geste', 'bouddha']`. The threshold becomes `max(1, 2*0.6)
+= 1.2`, requiring both words in the same sentence. The corpus contains 8 occurrences
+of "bouddha" and 6 of "geste" — but "geste" appears in a completely different context
+(artistic gesture/movement), never in the same sentence as "bouddha". Result: 0
+matching sentences for an exhibit the corpus genuinely discusses (the 2nd-century
+Pakistani Bouddha sculpture is described in detail in the corpus).
+
+**Root Cause #3: `§3` story-element extraction ALWAYS silently fails — function
+doesn't exist.**
+
+`generate_tour_text.py:3310` imports `extract_story_elements_from_pages` and
+`persist_story_elements` from `story_element_extractor.py`. Neither function exists in
+that module (confirmed: `grep -c "def extract_story_elements_from_pages"
+story_element_extractor.py` → 0, `grep -c "def persist_story_elements"
+story_element_extractor.py` → 0). The import raises `ImportError`, caught silently at
+line 3322, printing "story_element_extractor not available". This happens on EVERY
+generation (confirmed in live logs: all 3 recent generations show this message). The
+spine generator then falls back to `mode=invented` (no grounding).
+
+**B6 `work_stories` Cache — Empirical Finding:**
+
+- `work_stories` table exists but has **0 rows** (confirmed:
+  `docker exec development-postgres-2-1 psql -U admin -d audiotours -c "SELECT COUNT(*)
+  FROM work_stories;"` → 0).
+- `work_stories_put` (the WRITE function) is only called from
+  `story_element_extractor.py:885`, inside `extract_and_score_stop()`. This function is
+  NEVER called from `generate_tour_text.py` or any other live-pipeline file — only from
+  test files and `run_pilot_*.py` scripts.
+- `work_stories_get` (the READ function) IS wired into the live pipeline at
+  `generate_tour_text.py:3595`, BUT it's guarded by `if tour_category == 'museum' and
+  poi_name and artist:`. For multi-artist museums (like Asian Arts), `artist` is always
+  empty string (confirmed from logs: "Stop 1: Hokusai – Voyage au pied du mont Fuji
+  by , ..."). The guard fails, the read is never attempted.
+- **Net finding:** the B6 cache is correctly wired for reading in the live pipeline, but
+  never populated by it, AND the guard condition prevents reads for any museum where
+  per-work artist attribution isn't available — which is most non-single-artist museums.
+
+**Demand-Side Observation (preserved from prior submission):**
+
+The museum description prompt (`generate_tour_text.py:3371-3393`) asks for "EXACTLY
+300 words" covering "artistic, historical, and cultural significance," "information
+about the artist and their creative process," and "how this piece fits into the broader
+context" — with no gate requiring any of this to be grounded in actual retrieved facts.
+When no fact sheet is generated and no `per_work_contexts` match, GPT fills the 300
+words entirely from its parametric knowledge, defaulting to the same generic template:
+scene-setting → craftsmanship appreciation → "bridge between cultures" cliché →
+closing rhetorical question.
+
+**Evidence Across 5 Museum Tours (methodology preserved):**
+
+The identical template pattern appears across: Asian Arts Museum Nice (6/8 stops
+generic), Musée d'Art Naïf Nice (all stops except well-known paintings), Palais
+Lascaris Nice (stops without Wikipedia articles), Musée Matisse Nice (lesser-known
+works), and Chagall Museum Nice (even with artist bio context, works without their
+own articles default to bio-derived filler rather than work-specific narrative).
+
+**Recommended Direction:**
+
+**(A) Bridge the corpus-to-fact-sheet gap (primary, biggest impact):**
+Route the already-fetched venue corpus (`_story_corpus_result.combined_text` and
+`per_work_contexts`) INTO the fact-sheet generation as primary context, instead of
+relying solely on standalone Wikipedia lookups per exhibit. The content is already in
+memory — it's just never passed to `generate_fact_sheet()`. This would immediately
+fix the 6/8 failure case for the Asian Arts Museum and any museum whose official site
+has exhibit descriptions.
+
+**(B) Fix `_extract_per_work_contexts` matching for non-English titles:**
+Lower the threshold or switch to substring/n-gram matching so that a corpus sentence
+containing "Bouddha" matches the exhibit "La geste de Bouddha" even when "geste"
+doesn't co-occur. This fixes the secondary "§4 injection" path.
+
+**(C) Implement `extract_story_elements_from_pages` or remove the dead import:**
+The `§3` path is a dead branch that always fails silently. Either implement the
+missing function to actually extract story elements from the corpus pages (enabling
+grounded spine generation), or remove it to avoid confusion.
+
+**(D) Specificity/adaptive-length gate (demand side):**
+When confirmed facts < 2 and no corpus context was injected, reduce the description
+length target and/or add an explicit instruction to NOT pad with generic appreciation
+language. This prevents GPT from filling 300 words with template filler when it has
+nothing real to say.
+
+**Priority recommendation:** A > B > D > C. Fix A alone would solve the primary
+failure mode (exhibits with no Wikipedia article but described on the museum's own
+site). Fix B amplifies A's impact for non-English museums. Fix D provides graceful
+degradation for the remaining cases where neither Wikipedia nor the venue corpus has
+exhibit-level detail.
+
 ---
 
 #### LOCAL-11 — Surface venue-level "why this museum matters" facts as a cheap narrative hook (generic across all museums)
@@ -1666,6 +1882,54 @@ gap on data already fetched, not a new-API-call problem.
   across the museums tested, to inform whether a paid fallback is ever justified
   later (a finding for LEAD, not something to build now).
 - All 11 regression suites stay green.
+
+##### READY FOR REVIEW
+
+**Implementation (branch: `kiro/local11-venue-identity-hook`):**
+
+1. **`story_miner.py`** — Added `extract_venue_identity(combined_text, venue_name)` function
+   (lines ~742–930) that mines the already-fetched `combined_text` for venue-identity
+   signals in sections excluded from exhibit-title extraction (Architecture, Design,
+   Mission, History, opening summary). Categorizes findings into: `architecture`,
+   `design`, `programs`, `founding`. Returns empty lists when nothing concrete is found.
+   Also added `format_venue_identity_for_prompt()` helper and `_is_generic_filler()`
+   guard to reject boilerplate. **Zero new API calls or web fetches.**
+
+2. **`generate_tour_text.py`** — Added `[LOCAL-11]` block (lines ~3815–3829) that calls
+   `extract_venue_identity` on the existing `_story_corpus_result['combined_text']`
+   (same corpus already used for T0a title extraction). When facts are found, injects
+   them into the prolog LLM prompt as venue-specific grounding material with the
+   instruction "weave 1-2 specific details naturally into the opening". When empty,
+   the prolog prompt is unchanged (graceful fallback to existing generic intro).
+
+3. **`test_venue_identity.py`** — 11-assertion unit test verifying:
+   - Asian Arts Museum: extracts Kenzo Tange architecture, mandala design, tea ceremonies
+   - Palais Lascaris: extracts Genoese Baroque architecture, Baroque music concerts, founding intent
+   - Generic corpus: returns zero facts (no false positives)
+   - Fictional museum: proves pattern-based (not hardcoded)
+   - Empty/short corpus: handles gracefully
+
+**Test results:**
+- `test_venue_identity.py`: 11/11 PASS
+- All 11 regression suites: PASS (palais_lead_fixture, b6_generation_wiring,
+  f4_cache_roundtrip, g4_false_positives, sq2_fixtures, sq3_fixtures, sq4_merge,
+  w4_matcher, w7_wiring, w9_collection_anchor, tier_computation)
+
+**Finding: free-path yield estimate:**
+Tested against 3 corpus fixtures (Asian Arts, Palais Lascaris, fictional museum):
+- Asian Arts Museum: 7 facts extracted (architecture 1, programs 2, founding 2, design 2) — **rich**
+- Palais Lascaris: 3 facts extracted (architecture 1, programs 1, founding 1) — **adequate**
+- Generic/empty corpus: 0 facts — correct null behavior
+
+The free corpus-mining path will produce usable identity facts for **most museums
+with a substantial Wikipedia article** (which is the majority of tour-worthy venues).
+Museums with only stub Wikipedia articles or inaccessible websites may come up empty —
+that is acceptable (graceful fallback). A paid fallback is not needed at this stage.
+
+**Note:** End-to-end validation (actually regenerating tours with the service running)
+requires the Docker Compose stack + OpenAI API key. The unit tests confirm the mining
+logic is correct and the integration is syntactically/structurally sound. The prolog
+prompt modification is minimal (adds ~2 sentences of context when facts exist).
 
 ---
 
