@@ -291,3 +291,59 @@ michael.glik@gmail.com). Node.js installed via brew.
   historically used `development/` — verify layout after pulling there.)
 - Postgres container: `development-postgres-2-1`, db `audiotours`, user admin.
 - ClickUp list: `1000410000000733` (🟦 Services — Kiro).
+
+## CONTINUOUS DEVELOPMENT — CONTROL INTERFACE (adopted 2026-07-28)
+
+Background: bugs Michael finds while testing get written up as
+`new_kiro_session_is_required_N.md` task files at the repo root.
+`~/Audioura/kiro_dispatcher.py` watches for unclaimed ones and forks a
+detached, headless `kiro-cli chat --trust-all-tools --no-interactive`
+session per file — logging start/completion to `kiro_sessions_ran.md`.
+Claude (LEAD) runs a recurring watcher loop that reviews completed
+submissions (full rigor: diff read, regression suite, live verification —
+never trust the report) and either merges + rebuilds the shared container,
+or writes a new task file with the required fix so the next dispatch cycle
+picks it up automatically. Full design/rationale lives in this session's
+conversation history and the `round12-review-state.md` memory file — this
+section is only the control surface.
+
+**State/control files, all under `~/Audioura/.continuous_dev/`:**
+- `PAUSE` — sentinel file. If present, the watcher skips all
+  dispatch/review work on its next tick (but keeps ticking lightly so it
+  notices removal). Michael can `touch`/`rm` this directly, no need to ask
+  Claude.
+- `STATUS.md` — auto-updated every tick: active bug-threads, round counts
+  per thread, any stagnation flags, whether currently paused. Read anytime
+  with `cat ~/Audioura/.continuous_dev/STATUS.md` — no need to wait for a
+  narrated summary.
+- `last_boot.txt` — records the machine's boot time as of the last tick,
+  used to detect a reboot happened and recover cleanly (see below).
+
+**Plain-language triggers Michael can use in any session (current or future):**
+- **"status" / "what's the continuous dev status"** → read `STATUS.md` and
+  summarize.
+- **"pause continuous dev"** → create the `PAUSE` sentinel.
+- **"resume continuous dev"** → remove the `PAUSE` sentinel.
+- **"stop continuous dev"** → full teardown: cancel the recurring
+  watcher job (`CronDelete`/`ScheduleWakeup stop`), confirm no dispatcher
+  processes are left running.
+- **"restart continuous dev"** → re-arm the watcher loop from scratch;
+  this is also the recovery step after a detected reboot (see below).
+- **"check now"** → run one watcher tick immediately, out of band from
+  the schedule.
+
+**Reboot handling (deliberately simplified 2026-07-28):** full
+launchd-based unattended durability was considered and set aside as
+unnecessary — reboots are rare enough that detect-and-recover is the
+right amount of engineering, not full self-resurrection. On each tick,
+compare the current boot time against `last_boot.txt`; a mismatch means a
+reboot happened since the last tick. Recovery: any task with a `STARTED`
+record but no terminal (`COMPLETED`/`FAILED`/`TIMEOUT`) record is
+abandoned (its process died with the reboot) — mark it `ABANDONED
+(reboot detected)` in `kiro_sessions_ran.md` and let normal dispatch logic
+re-claim and re-run it fresh on the next scan. Task files themselves are
+plain files on disk and always survive a reboot untouched — nothing is
+ever lost, only the in-flight attempt is discarded and restarted. The
+watcher loop itself does NOT restart automatically after a reboot (it was
+session-bound and died with the session) — use the "restart continuous
+dev" trigger above once someone notices the machine came back.

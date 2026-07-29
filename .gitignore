@@ -28,6 +28,13 @@ debug_*
 *_step*.txt
 *_tech_test_*.json
 *.bak
+
+# continuous-development local runtime state (machine-specific, not repo history)
+.continuous_dev/
+.kiro_dispatcher.lock
+kiro_sessions_ran.md
+kiro_session_logs/
+new_kiro_session_is_required_*.md
 *.bak[0-9]
 *.bak_*
 *.backup
