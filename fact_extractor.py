@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 
 
 def generate_fact_sheet(
-    poi_name: str, rag_context: dict, api_key: str
+    poi_name: str, rag_context: dict, api_key: str,
+    venue_corpus_excerpt: str = "",
 ) -> Optional[dict]:
     """Generate a structured fact sheet for a POI using RAG context.
 
@@ -23,6 +24,8 @@ def generate_fact_sheet(
         poi_name: Name of the point of interest.
         rag_context: dict with 'artist_context' and 'period_context' from rag_retriever.
         api_key: OpenAI API key.
+        venue_corpus_excerpt: Pre-fetched venue corpus text relevant to this POI.
+            When provided, used as PRIMARY context (higher priority than Wikipedia lookups).
 
     Returns:
         dict with keys: confirmed_facts, uncertain_facts, date_created, medium, surprising_detail.
@@ -31,16 +34,28 @@ def generate_fact_sheet(
     artist_ctx = rag_context.get("artist_context", "")
     period_ctx = rag_context.get("period_context", "")
 
-    if not artist_ctx and not period_ctx:
+    # [LOCAL-12 Fix A] Venue corpus is primary context when available
+    has_corpus = bool(venue_corpus_excerpt and venue_corpus_excerpt.strip())
+
+    if not artist_ctx and not period_ctx and not has_corpus:
         logger.warning(f"No RAG context for {poi_name} — cannot generate fact sheet")
         return None
 
+    # Build context block: venue corpus first (primary), then Wikipedia (supplementary)
+    context_parts = []
+    if has_corpus:
+        context_parts.append(f"VENUE COLLECTION SOURCES (primary — these come from the museum's own documentation):\n{venue_corpus_excerpt[:1200]}")
+    if artist_ctx:
+        context_parts.append(f"Artist/Creator (supplementary): {artist_ctx[:800]}")
+    if period_ctx:
+        context_parts.append(f"Venue/Period (supplementary): {period_ctx[:800]}")
+    context_block = "\n\n".join(context_parts)
+
     prompt = (
-        f"You are a meticulous museum researcher. Given the following Wikipedia context "
+        f"You are a meticulous museum researcher. Given the following context "
         f"about an exhibit/room called '{poi_name}', extract verified facts.\n\n"
         f"--- CONTEXT ---\n"
-        f"Artist/Creator: {artist_ctx[:800]}\n\n"
-        f"Venue/Period: {period_ctx[:800]}\n"
+        f"{context_block}\n"
         f"--- END CONTEXT ---\n\n"
         f"Return ONLY valid JSON with this schema:\n"
         f'{{\n'
@@ -124,6 +139,8 @@ def generate_fact_sheets_parallel(
     tour_category: str,
     api_key: str,
     max_workers: int = 5,
+    venue_corpus: str = "",
+    per_work_contexts: dict = None,
 ) -> list:
     """Generate fact sheets for all POIs in parallel.
 
@@ -137,6 +154,11 @@ def generate_fact_sheets_parallel(
         tour_category: 'museum', 'walking', 'restaurant', or 'book'.
         api_key: OpenAI API key.
         max_workers: Max concurrent threads (default 5).
+        venue_corpus: Already-fetched combined venue corpus text (from story_miner).
+            When provided, used as primary context for fact extraction — avoids
+            relying solely on standalone Wikipedia lookups per exhibit.
+        per_work_contexts: Dict {title: [sentences]} — per-work contextual sentences
+            extracted from the venue corpus. Used to provide targeted context per POI.
 
     Returns:
         List of fact_sheet dicts (or None for failed POIs), in original order.
@@ -144,15 +166,55 @@ def generate_fact_sheets_parallel(
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from rag_retriever import fetch_poi_rag_context
 
+    if per_work_contexts is None:
+        per_work_contexts = {}
+
+    def _extract_corpus_for_poi(poi_name: str) -> str:
+        """[LOCAL-12 Fix A] Extract relevant corpus excerpt for a specific POI.
+
+        Priority: per_work_contexts match > keyword search in venue_corpus.
+        Returns the best available corpus excerpt for this POI.
+        """
+        excerpts = []
+
+        # 1. Check per_work_contexts for a title match (fuzzy prefix)
+        poi_lower = poi_name.lower().strip()
+        for title, sentences in per_work_contexts.items():
+            title_lower = title.lower().strip()
+            # Match if either is a prefix of the other (first 8 chars), same as §4 logic
+            if (poi_lower[:8] in title_lower or title_lower[:8] in poi_lower):
+                excerpts.extend(s[:200] for s in sentences[:5])
+                break
+
+        # 2. Keyword search in venue_corpus (same approach as C5-1 in description prompt)
+        if venue_corpus and not excerpts:
+            key_words = [w for w in poi_lower.split() if len(w) >= 4 and w not in ('the', 'and', 'for', 'with')]
+            if key_words:
+                corpus_sentences = [
+                    s.strip() for s in venue_corpus.split('.')
+                    if any(kw in s.lower() for kw in key_words)
+                ]
+                excerpts.extend(s[:200] for s in corpus_sentences[:5])
+
+        return '. '.join(excerpts) if excerpts else ""
+
     def _process_one(idx_poi):
         idx, poi = idx_poi
         poi_name = poi.get("name", str(poi)) if isinstance(poi, dict) else str(poi)
         try:
+            # [LOCAL-12 Fix A] Get venue corpus excerpt for this POI
+            corpus_excerpt = _extract_corpus_for_poi(poi_name)
+
             rag_ctx = fetch_poi_rag_context(poi_name, venue_name, tour_category)
-            fact_sheet = generate_fact_sheet(poi_name, rag_ctx, api_key)
+            fact_sheet = generate_fact_sheet(
+                poi_name, rag_ctx, api_key,
+                venue_corpus_excerpt=corpus_excerpt,
+            )
             # [BLOCKER 2] Pass attribution_confident from RAG to the fact sheet
             if fact_sheet and isinstance(fact_sheet, dict):
                 fact_sheet['attribution_confident'] = rag_ctx.get('attribution_confident', False)
+                # [LOCAL-12] Mark whether corpus context was available
+                fact_sheet['had_corpus_context'] = bool(corpus_excerpt)
             return idx, fact_sheet
         except Exception as e:
             logger.error(f"Fact sheet failed for POI #{idx} ({poi_name}): {e}")
@@ -170,5 +232,6 @@ def generate_fact_sheets_parallel(
             results[idx] = fact_sheet
 
     success_count = sum(1 for r in results if r is not None)
-    logger.info(f"Fact sheets: {success_count}/{len(poi_list)} successful for {venue_name}")
+    corpus_count = sum(1 for r in results if r and r.get('had_corpus_context'))
+    logger.info(f"Fact sheets: {success_count}/{len(poi_list)} successful for {venue_name} ({corpus_count} with corpus context)")
     return results
