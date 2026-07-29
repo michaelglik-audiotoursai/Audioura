@@ -52,7 +52,7 @@ signal for subscription-tier decisions.
 | Round | Date | Score | Cost | $/point | Verdict | Commit |
 |---|---|---|---|---|---|---|
 | 0 (baseline, LOCAL-9→12 fixes applied) | 2026-07-29 | **+15.6 / 100** | $0.0353 | $0.00226 | 2 fabricated stops (UNIFIED-FILL inventing fictional fill), 1 real regression (stop 4 lost hard facts), 2 structural defects (`[Venue Name]` leak, corrupted address field), 1 voice-break | 7e61c13 |
-| 1 (in progress) | 2026-07-29 | — | — | — | dispatched as LOCAL-14 | — |
+| 1 (BOUNCED) | 2026-07-29 | **-9.4 / 100** | $0.0436 | n/a (negative) | Kiro claimed 3/4 fixed + honest 7/8 shortfall; LEAD independently regenerated twice (own run + re-read Kiro's own evidence file) and found the real delivered tour is functionally unchanged from round 0 — new fabrication pathways fully offset the fixed one. See findings below. | 318fa2e (not merged) |
 
 ## Round 1 scope (LOCAL-14, dispatched 2026-07-29)
 
@@ -78,3 +78,67 @@ signal for subscription-tier decisions.
 Acceptance: fresh regeneration (cache row deleted first), all 11 suites green, a
 live spot-check on a second venue showing no regression, and an honest report of
 which of the 4 items above landed vs. didn't — no self-scoring.
+
+## Round 1 verdict (BOUNCED, not merged)
+
+Kiro's diff was real and all 13 suites (11 core + venue_identity + local12) did
+genuinely pass — confirmed independently. Kiro's own live evidence (quoted in
+CLICKUP_OFFLINE_QUEUE.md) was also real (not fabricated reporting) — the gap was
+methodology: Kiro grepped selected log lines ("UNIFIED-FILL added 1 VERIFIED fill,
+total now 7/8", "POST-R4-FILL SKIPPED") and treated that as proof of "7/8 stops,
+honest shortfall, zero fabrication" without reading the full 8-stop rendered text
+or tracing what happens after POST-R4-FILL. It doesn't hold up:
+
+1. **UNIFIED-FILL still produces a duplicate stop.** Its dedup check compares
+   `_cand_name.lower()` (the raw candidate name, e.g. "Voyage au pied du mont
+   Fuji") against names already in `poi_list` — but the already-placed stop is
+   keyed under its CANONICAL name ("Hokusai – Voyage au pied du mont Fuji"). The
+   exact match fails, so the same real exhibit gets added a second time under its
+   raw name. Reproduced in BOTH Kiro's run and LEAD's independent rerun (always
+   lands as stop 7, always duplicates stop 1).
+2. **A third, completely untouched fabrication pathway exists: "Part C"**
+   (`generate_tour_text.py` ~line 2696-2812, `while len(poi_list) < total_stops`).
+   This fires whenever R4/UNIFIED-FILL/POST-R4-FILL still leave a shortfall (which
+   LOCAL-14's fix deliberately creates more often, since it refuses to fabricate
+   there) — and asks GPT-3.5 directly for "specific, real, well-known" venue
+   candidates with ZERO D1v2/Wikidata canonical-title verification. For museum
+   tours it doesn't even run the address-match check (line 2771 explicitly skips
+   it when `tour_category == 'museum' and _museum_venue_name`). This produced
+   "Le souffle de la Chine - De Schongqing à Marseille" (Kiro's run) and
+   "L'Afrique en visages" (LEAD's independent run) — two different but equally
+   ungrounded, confidently-written invented exhibits. LOCAL-14 fixed 2 of 3
+   fabrication pathways and missed this one entirely.
+3. **Address/title corruption is NOT fixed, and got worse.** In LEAD's rerun the
+   corruption moved from the address FIELD into the stop TITLE line itself, e.g.
+   stop 3 rendered as `Located at the Asian Arts Museum on 405 Promenade, 'Stop
+   4' features the striking piece titled "Fauteuil. des Anglais, 06200 Nice,
+   France` — including a stray `'Stop 4'` meta-reference baked into the name.
+   The post-hoc regex sanitization Kiro added doesn't reliably catch this.
+4. **New fabrication vector found in Phase 5 description generation itself**:
+   stop 5 ("Les paysages de l'âme", a D1v2-VERIFIED work) was confidently
+   attributed to "contemporary artist Mei Ling" in LEAD's rerun — a specific,
+   named, false attribution with no corpus support (the original tour correctly
+   described this as anonymous, 13th century). D1v2 verification only confirms
+   the WORK TITLE is real; nothing currently stops Phase 5 from inventing
+   specific false claims (artist, era) about a verified work. "Mei Lin/Mei Ling"
+   also happened to be the exact fictional name from round 0's UNIFIED-FILL bug —
+   possibly GPT's own generic-plausible-name tendency, not a code artifact, but
+   worth knowing it recurs.
+5. Item 3 (stop 4 fact regression) is real but unreliable — Kiro's run showed
+   good specific facts (schist, 2nd century, Greco-Indian), LEAD's independent
+   rerun reverted to fully generic prose for the same stop. Corpus-availability-
+   dependent, as Kiro itself flagged, not a solid fix yet.
+
+**LEAD's independent score from LEAD's own regenerated text: -9.4/100** —
+statistically unchanged from round 0's -9.4. Real, honest engineering effort
+landed, but net measured trust-quality is flat: newly-exposed pathways (duplicate
+stop, Part C, Phase-5 attribution fabrication) fully offset what got fixed.
+
+Not merged. Container restored to clean approved `storied` (confirmed via
+md5sum match). Round 2 should target, in priority order: (a) normalize names
+before the UNIFIED-FILL dedup check, (b) gate or disable Part C for museum tours
+the same way UNIFIED-FILL/POST-R4-FILL were fixed — accept honest shortfall
+instead of ungrounded GPT invention, (c) a stricter reject-and-regenerate
+approach for corrupted stop names instead of post-hoc regex salvage, (d) a
+Phase-5 guard against inventing a named artist/attribution for a work whose
+fact sheet doesn't support one.
