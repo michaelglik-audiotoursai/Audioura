@@ -40,6 +40,18 @@ signal for subscription-tier decisions.
   ago, stop and report to Michael — this overrides continuing even if score is still
   < 75 (noise-tolerant: small round-to-round jitter from LLM stochasticity doesn't
   count as "no improvement" by itself, but 3 rounds flat does).
+
+  **TEMPORARILY SUSPENDED 2026-07-29 ~13:0x, per Michael's explicit request** before
+  he left for ~2 hours: "change the rules just for this time and continue running
+  the cycle... this will teach me if having 3 rounds of no progress is futile
+  enough in case if after 3 rounds of no progress there progress will come." Round
+  3 (LOCAL-16) is currently in progress and would be the 3rd data point (0: 15.6,
+  1: -9.4, 2: 15.6) — normally a plateau-stop candidate depending on round 3's
+  result. Per his instruction, do NOT stop on plateau during this window — keep
+  bouncing/redispatching through as many non-improving rounds as needed. Score>=75
+  and the cost caps below remain ACTIVE and are still hard stops. Revert to the
+  original 3-round rule (or get Michael's updated call) once he's back and checks
+  in — do not treat this suspension as permanent.
 - **Cost:** stop for Michael's explicit approval before any further round if
   cost-per-tour exceeds **3× the original ($0.0353 × 3 = $0.1059)** OR the absolute
   ceiling of **$0.50/tour** — whichever triggers first (in practice the 3× relative
