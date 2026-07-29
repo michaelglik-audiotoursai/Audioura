@@ -2354,15 +2354,19 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 # NEW BEHAVIOR: unified fill — allow fills for ALL tiers up to total_stops
                 # Fill from _pre_d1v2_candidates with PALAIS-FIX D1/D2 filtering
                 if len(poi_list) < total_stops and _verification_tier in ('thin', 'medium', 'exhibit_museum'):
-                    _verified_names_fill = set(p['name'].lower() for p in poi_list)
+                    # [LOCAL-15 Fix 1] Use _normalize_name() on BOTH sides of the dedup check.
+                    # Previously used p['name'].lower() for already-placed stops, which missed
+                    # canonical-vs-raw name matches (e.g. "Hokusai – Voyage au pied du mont Fuji"
+                    # vs "Voyage au pied du mont Fuji" — same exhibit, different key form).
+                    _verified_names_fill = set(_normalize_name(p['name']) for p in poi_list)
                     _evidence_keys_fill = set(_normalize_name(k) for k in _d1_evidence_log.keys()
                                               if _d1_evidence_log[k].get('status') == 'VERIFIED')
                     _fill_candidates = []
                     for p in _pre_d1v2_candidates:
                         _cand_name = p['name']
                         _cand_norm = _normalize_name(_cand_name)
-                        # Skip if already in verified list (exact or normalized match)
-                        if _cand_name.lower() in _verified_names_fill or _cand_norm in _evidence_keys_fill:
+                        # Skip if already in verified list (normalized match on both sides)
+                        if _cand_norm in _verified_names_fill or _cand_norm in _evidence_keys_fill:
                             continue
                         # PALAIS-FIX D1: Skip REJECTED candidates (located at other venue)
                         _ev_entry = _d1_evidence_log.get(_cand_name, {})
@@ -2728,6 +2732,21 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 raise ValueError(f"PHASE 3C rejected all stops for location '{location}'")
 
         # -------- Part C: replacement loop (bounded) --------
+        # [LOCAL-15 Fix 2] Museum tours: skip Part C entirely — accept honest shortfall.
+        # Part C asks GPT-3.5 directly for candidates with ZERO D1v2/Wikidata verification,
+        # and for museum tours it explicitly skipped even the address check. This produced
+        # fabricated exhibit names that passed no ground-truth validation. Same principle
+        # as UNIFIED-FILL/POST-R4-FILL: never invent ungrounded stops for museums.
+        if tour_category == 'museum' and _museum_venue_name:
+            if len(poi_list) < total_stops:
+                _shortfall = total_stops - len(poi_list)
+                print(f"\nPart C: SKIPPED for museum tour (honest shortfall of {_shortfall} stop(s) — "
+                      f"no ungrounded GPT invention for single-venue museums)")
+                # Adjust total_stops down to match what we actually have
+                total_stops = len(poi_list)
+        else:
+            pass  # Non-museum tours proceed to Part C below
+
         attempts = 0
 
         while len(poi_list) < total_stops and attempts < MAX_REPLACEMENT_ATTEMPTS:
@@ -3559,6 +3578,31 @@ CONTEXTUAL INFORMATION (use as background only — do NOT assert these as facts 
 MANDATORY INCLUSION — work this surprising detail into the description naturally:
 {_surprising}
 """
+        # [LOCAL-15 Fix 4] Phase 5 attribution guard: when fact sheet has no confirmed artist
+        # (attribution_confident=False AND artist field is empty/unknown), explicitly forbid
+        # GPT from inventing a named artist. This prevents the "Mei Ling" fabrication class
+        # where GPT confidently attributes a verified-real but anonymous work to an invented person.
+        _has_artist_info = (artist and artist.lower() not in ('', 'unknown artist', 'unknown', 'anonymous'))
+        _attribution_ok_for_guard = (fact_sheet.get('attribution_confident', False) if fact_sheet else False)
+        _facts_mention_artist = False
+        if tour_category == 'museum':
+            # Check if any confirmed fact mentions an artist name (heuristic: contains "by" or "artist")
+            if fact_sheet and fact_sheet.get('confirmed_facts'):
+                for _f in fact_sheet['confirmed_facts']:
+                    if re.search(r'(?i)\b(artist|painter|sculptor|craftsman|by\s+[A-Z])', _f):
+                        _facts_mention_artist = True
+                        break
+            if not _has_artist_info and not _attribution_ok_for_guard and not _facts_mention_artist:
+                description_prompt += """
+CRITICAL ATTRIBUTION CONSTRAINT: No confirmed artist/creator is known for this work.
+DO NOT invent or name ANY specific artist, craftsperson, or creator.
+DO NOT attribute this work to any named individual.
+You may describe the work's style, period, cultural origin, and technique, but
+NEVER name a specific person as the creator unless they appear in the VERIFIED FACTS above.
+If you feel compelled to mention a creator, use ONLY phrases like "the unknown artisan",
+"its anonymous creator", or "the craftsperson (whose name is lost to history)".
+Violating this constraint (naming a specific artist) is a critical factual error.
+"""
         # [C5-1] Inject D1 venue corpus evidence as additional grounding
         if tour_category == 'museum' and _d1_venue_corpus and poi_name:
             import re as _c51_re
@@ -3740,6 +3784,47 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
 
                 word_count = len(description.split())
                 print(f"Stop {stop_num} description word count: {word_count} words")
+                # [LOCAL-15 Fix 3b] Strip any "Stop N:" prefixes GPT echoes into description text.
+                # These create false header matches in D3(a) and can contain address/narrative
+                # corruption (e.g. "Stop 4: Fauteuil, located within the Asian Arts Museum...").
+                description = re.sub(r'^Stop\s+\d+:\s*', '', description, flags=re.MULTILINE)
+                # Also strip lines that are pure address/narrative preambles starting with "Located at"
+                description = re.sub(r'^Located\s+at\s+[^\n]*\n', '', description, flags=re.MULTILINE)
+                
+                # [LOCAL-15 Fix 4b] Post-generation attribution validation: detect and strip
+                # fabricated artist names from descriptions when no artist is confirmed.
+                # GPT-3.5 sometimes ignores the prompt constraint and invents names anyway.
+                if tour_category == 'museum' and not _has_artist_info and not _attribution_ok_for_guard and not _facts_mention_artist:
+                    # Pattern: "artist [Name]", "by [Name]", "created by [Name]", "painted by [Name]"
+                    # Also "renowned artist [Name]", "contemporary artist [Name]", etc.
+                    _ARTIST_FABRICATION_PATTERNS = [
+                        r'(?i)\b(?:renowned|famous|contemporary|celebrated|prolific|talented|skilled)\s+artist\s+([A-Z][a-zÀ-ÿ]+(?:\s+|-)[A-Z][a-zÀ-ÿ]+)',
+                        r'(?i)\bartist\s+([A-Z][a-zÀ-ÿ]+(?:\s+|-)[A-Z][a-zÀ-ÿ]+)',
+                        r'(?i)\bpainted by\s+([A-Z][a-zÀ-ÿ]+(?:\s+|-)[A-Z][a-zÀ-ÿ]+)',
+                        r'(?i)\bcreated by\s+([A-Z][a-zÀ-ÿ]+(?:\s+|-)[A-Z][a-zÀ-ÿ]+)',
+                        r'(?i)\bcrafted by\s+([A-Z][a-zÀ-ÿ]+(?:\s+|-)[A-Z][a-zÀ-ÿ]+)',
+                    ]
+                    _found_fabricated_artist = None
+                    for _afp in _ARTIST_FABRICATION_PATTERNS:
+                        _afm = re.search(_afp, description)
+                        if _afm:
+                            _found_fabricated_artist = _afm.group(1)
+                            break
+                    if _found_fabricated_artist:
+                        print(f"  [F4-ATTR] ⚠️ Stop {stop_num}: FABRICATED ARTIST detected: '{_found_fabricated_artist}' — stripping")
+                        # Replace the specific fabricated name with anonymous phrasing
+                        description = re.sub(
+                            re.escape(_found_fabricated_artist),
+                            'an anonymous artist',
+                            description
+                        )
+                        # Also strip phrases like "renowned artist" prefix when followed by replacement
+                        description = re.sub(
+                            r'(?i)\b(?:renowned|famous|contemporary|celebrated|prolific|talented|skilled)\s+(artist\s+an anonymous artist)',
+                            r'an anonymous artist',
+                            description
+                        )
+                
                 return idx, orientation, description, word_count, tokens_used, call_cost
             else:
                 print(f"Stop {stop_num} error: API returned status code {description_response.status_code}")
@@ -3961,12 +4046,88 @@ Requirements:
                 poi_header += f" by {artist}"
             if year:
                 poi_header += f", {year}"
-        # Also assert the name itself is a short noun phrase (no sentences/descriptions)
-        if len(poi_name.split()) > 15 or any(c in poi_name for c in '.!?;'):
-            print(f"  [F3] ⚠️ NAME TOO LONG/CORRUPT at stop {stop_num}: '{poi_name[:80]}'")
-            # Truncate to first 12 words if corrupted
-            _clean_name = ' '.join(poi_name.split()[:12]).rstrip('.,;:!?')
-            poi_header = f"Stop {stop_num}: {_clean_name}"
+        # [LOCAL-15 Fix 3] Aggressive name-corruption detection: address/narrative leaked into title.
+        # Detects patterns like "Located at...", embedded addresses (digits + street words),
+        # stray 'Stop N' meta-references, and sentence-length names. Instead of truncating
+        # (which produces garbled half-names), reject the corrupt string and re-request
+        # a clean short name from GPT for museum tours, or fall back to the original
+        # canonical name from the poi_list entry.
+        _NAME_CORRUPTION_PATTERNS = [
+            r'(?i)\bLocated\s+(at|in|on|within)\b',  # narrative intro leaked in
+            r'(?i)\bfeatures?\s+the\b',              # "features the striking piece..."
+            r'(?i)\bcan\s+be\s+found\b',             # "can be found at the..."
+            r'(?i)\bStop\s+\d+',                     # "Stop 4" meta-reference (with or without quotes)
+            r'(?i)\b\d{4,5}\b.*\b(promenade|street|avenue|road|boulevard|rue|place|allée|prom)\b',  # address with ZIP
+            r'(?i)\b(promenade|street|avenue|road|boulevard|rue|place|allée|prom)\b.*\b\d{4,5}\b',  # address with ZIP (reversed)
+            r'(?i),\s*\d{5}\s',                      # ZIP code pattern
+            r'(?i)\bFrance\b',                       # country name in a title
+            r'(?i)\bwithin\s+the\s+\w+\s+(arts?|museum)\b',  # "within the Asian Arts Museum"
+        ]
+        # Check for problematic punctuation but allow abbreviations like "St.", "Mt.", "Dr.", "Nr."
+        _has_problem_punct = any(c in poi_name for c in '!?;')
+        if not _has_problem_punct and '.' in poi_name:
+            # Allow periods only in recognized abbreviations
+            _name_no_abbrevs = re.sub(r'\b(St|Mt|Dr|Nr|Fr|Ft|Lt|Cpt|Sgt|Sr|Jr)\.\s', '', poi_name)
+            if '.' in _name_no_abbrevs:
+                _has_problem_punct = True
+        _name_is_corrupt = (
+            len(poi_name.split()) > 15
+            or _has_problem_punct
+            or any(re.search(pat, poi_name) for pat in _NAME_CORRUPTION_PATTERNS)
+        )
+        if _name_is_corrupt:
+            print(f"  [F3] ⚠️ NAME CORRUPT at stop {stop_num}: '{poi_name[:80]}'")
+            _f3_clean_name = None
+            # For museum tours: re-request a clean name from GPT
+            if tour_category == 'museum' and _museum_venue_name:
+                try:
+                    _f3_resp = requests.post(
+                        "https://api.openai.com/v1/chat/completions",
+                        headers=headers,
+                        json={
+                            "model": "gpt-3.5-turbo",
+                            "messages": [
+                                {"role": "system", "content": "You return ONLY the exhibit name, nothing else. No addresses, no sentences, no descriptions."},
+                                {"role": "user", "content": (
+                                    f"The following text was supposed to be just an exhibit/artwork name at "
+                                    f"{_museum_venue_name}, but it got corrupted with address text or narrative:\n"
+                                    f"\"{poi_name}\"\n\n"
+                                    f"Extract ONLY the short exhibit/artwork name (typically 2-8 words). "
+                                    f"Return ONLY the name, nothing else."
+                                )},
+                            ],
+                            "temperature": 0.0,
+                            "max_tokens": 50,
+                        },
+                        timeout=10,
+                    )
+                    if _f3_resp.status_code == 200:
+                        _f3_extracted = _f3_resp.json()["choices"][0]["message"]["content"].strip().strip('"\'')
+                        # Validate: must be short, no address patterns
+                        # Allow abbreviation periods (St., Mt., etc.)
+                        _f3_has_bad_punct = any(c in _f3_extracted for c in '!?;')
+                        if not _f3_has_bad_punct and '.' in _f3_extracted:
+                            _f3_no_abbrevs = re.sub(r'\b(St|Mt|Dr|Nr|Fr|Ft|Lt|Cpt|Sgt|Sr|Jr)\.\s', '', _f3_extracted)
+                            if '.' in _f3_no_abbrevs:
+                                _f3_has_bad_punct = True
+                        if (_f3_extracted
+                            and len(_f3_extracted.split()) <= 12
+                            and not any(re.search(pat, _f3_extracted) for pat in _NAME_CORRUPTION_PATTERNS)
+                            and not _f3_has_bad_punct):
+                            _f3_clean_name = _f3_extracted
+                            print(f"  [F3] ✓ Re-requested clean name: '{_f3_clean_name}'")
+                        else:
+                            print(f"  [F3] Re-request returned suspect result: '{_f3_extracted[:60]}' — falling back to truncation")
+                except Exception as _f3_err:
+                    print(f"  [F3] Re-request failed ({_f3_err}) — falling back to truncation")
+            if _f3_clean_name:
+                poi_name = _f3_clean_name
+                poi['name'] = _f3_clean_name
+            else:
+                # Fallback: truncate to first 12 words (legacy behavior, last resort)
+                poi_name = ' '.join(poi_name.split()[:12]).rstrip('.,;:!?')
+                poi['name'] = poi_name
+            poi_header = f"Stop {stop_num}: {poi_name}"
             if artist and artist.lower() != "unknown artist":
                 poi_header += f" by {artist}"
             if year:
