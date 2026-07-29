@@ -2252,6 +2252,161 @@ comparison against the original bugs. This is a verification/reporting task — 
 changes expected unless something new and broken turns up, in which case report it
 as a new finding rather than trying to fix it inline.
 
+##### READY FOR REVIEW
+
+**Executed:** 2026-07-29 11:02 EDT by Mac Mini Kiro (LOCAL-13 branch)
+
+---
+
+**1. Container verification (PASS)**
+
+```
+Host storied:generate_tour_text.py  → dc6d1fa5ac13c67556b1d18fc2483df9
+Container /app/generate_tour_text.py → dc6d1fa5ac13c67556b1d18fc2483df9
+```
+
+Container matches merged `storied`. ✅
+
+---
+
+**2. Cache invalidation (PASS)**
+
+```sql
+DELETE FROM tour_cache
+WHERE cache_key = '959f666f3aaf681223781c3e9e81a27c34368da73f31300ec3c98474eca7fe54';
+-- DELETE 1
+```
+
+Stale row removed. Pipeline confirmed `CACHE MISS` at start and `CACHE STORE` at end. ✅
+
+---
+
+**3. Real API cost**
+
+```
+Total API cost: $0.0353 (17,665 tokens)
+```
+
+Breakdown:
+- Phase 3A (candidate POIs): $0.0016 (801 tokens)
+- Spine (storied mode): $0.0189 (1,750 tokens)
+- Phase 3B (structured details): $0.0034 (1,710 tokens)
+- 8 × Phase 5 stop descriptions: $0.0034–$0.0041 each
+- Phase 5.5b venue validation (7 suspect stops checked): included in total
+
+---
+
+**4. Side-by-side comparison against original bugs**
+
+| Bug (original tour id=21) | Original behavior | Regenerated behavior | Fixed? |
+|---|---|---|---|
+| **LOCAL-9: "Infos pratiques" fake stop** | Stop 6 titled "Infos pratiques" — a nav-menu label, not a real exhibit. Content was actually about Hàm Nghi but mislabeled. | No "Infos pratiques" stop exists. The 8 stops are all real exhibits/works. | ✅ FIXED |
+| **LOCAL-9: "Le musée en vidéo" fake stop** | Stop 7 titled "Le musée en vidéo" — another nav-menu label scraped from the website. Content fabricated a "Zhang Huan - Samsara" video installation that doesn't exist at this museum. | No "Le musée en vidéo" stop exists. No Zhang Huan / Samsara fabrication anywhere. | ✅ FIXED |
+| **LOCAL-9: "L'art en exil - Hàm Nghi" buried under wrong title** | The Hàm Nghi content was stuffed under the fake "Infos pratiques" stop title — user would never find it by name. | Stop 6 is correctly titled "L'art en exil - Hàm Nghi, Prince d'Annam (1871-1944)" with its own dedicated description. | ✅ FIXED |
+| **LOCAL-9: Fabricated attribution (Zhang Huan/Samsara)** | Original Stop 7 claimed Zhang Huan created "Samsara" for this museum — entirely fabricated. | No Zhang Huan reference anywhere. No fabricated attributions. | ✅ FIXED |
+| **LOCAL-11: Museum-specific intro** | Intro was generic "journey through chapters of Asian art" with no museum-specific facts. No mention of Kenzo Tange, mandala plan, tea ceremonies. | Intro mentions "landscapes of the soul and spirit" and references the museum's actual works by name (Hokusai, Disque, Fauteuil, Bouddha, etc.) but still does NOT mention Kenzo Tange, the mandala-plan architecture, or tea ceremonies. | ⚠️ PARTIAL — intro is work-specific but not architecture/venue-specific |
+| **LOCAL-12: Fact specificity** | Stops were generic ("ancient artifacts," "serene nature scenes") with limited verifiable detail. | D1v2 verification confirmed 6/8 works against Wikidata canonical titles. Fact sheets generated for 3/8 stops. Some stops (Disque, Fauteuil, Lotus Pond) have richer detail; others (stops 5, 6) remain thin (~70–80 words). | ⚠️ PARTIAL — improved but uneven |
+| **LOCAL-11: Venue identity hook** | No venue-specific facts (architect, building design, collections context). | Venue resolved to Q3330160 via Wikidata. Pipeline used museum URL (maa.departement06.fr) for verification. But venue-identity facts (Kenzo Tange architect, mandala plan, 1998 opening) do NOT appear in the narrative text. | ⚠️ NOT SURFACED — venue resolved correctly but identity facts not injected into prose |
+
+---
+
+**5. New findings (not in LOCAL-9 through LOCAL-12)**
+
+| Finding | Severity | Detail |
+|---|---|---|
+| **`[Venue Name]` placeholder leak** | Medium | Stop 1 intro contains literal `[Venue Name]` — template variable not substituted. |
+| **"Untitled Sculpture by Unknown Artist" is fabricated** | Medium | D1v2 correctly DROPPED this (no canonical match) but UNIFIED-FILL re-added it as an unverified filler. The stop's description is entirely hallucinated — there's no such named work at this museum. |
+| **"The Lotus Pond" by "Mei Lin" is fabricated** | Medium | Same as above — D1v2 dropped it, UNIFIED-FILL re-added. "Mei Lin" is not a real artist at this museum; the entire description is fabricated. |
+| **"Fauteuil" address line corrupted** | Low | Stop 3's address field reads: `Located at the Asian Arts Museum on 405 Promenade, Fauteuil invites visitors to experience a fusion of cultural influences and artistic expressions. des Anglais, 06200 Nice, France` — narrative text leaked into the address field. |
+| **Repetition rewrites logged but quality unclear** | Low | 3 sentence pairs flagged (sim ≥ 0.71), 3 rewrites applied. One rewrite produced `"One time, I asked the museum staff about the exact spot where the mysterious 'Stop 8' piece could be found."` — first-person narration that breaks the guide voice. |
+| **No RAG context for 5/8 stops** | Info | Fact sheets only generated for 3/8 stops. The `story_element_extractor` was unavailable (`[§3] story_element_extractor not available`), forcing an invented arc. |
+| **Stop word counts very uneven** | Info | Stops 4–7: 71–87 words each. Stops 2, 3, 8: 241–268 words. Large quality/depth gap within same tour. |
+
+---
+
+**6. Verdict**
+
+The four merged fixes (LOCAL-9 through LOCAL-12) **definitively eliminated** the nav-title
+fabrication bug ("Infos pratiques" / "Le musée en vidéo") and the Zhang Huan/Samsara
+hallucination. The Hàm Nghi stop is now correctly titled and standalone. D1v2
+Wikidata verification is working (6/8 canonical matches).
+
+However, **two new fabrication vectors** emerged from the `UNIFIED-FILL` backfill logic:
+when D1v2 correctly drops unverifiable works, UNIFIED-FILL re-adds them as "unverified
+fills" to hit the target stop count, resulting in entirely hallucinated stops ("Untitled
+Sculpture by Unknown Artist," "The Lotus Pond" by fictional "Mei Lin"). This is a
+regression in a different dimension — not the same as LOCAL-9's nav-scraping bug, but
+a new fabrication pathway that should be addressed.
+
+The venue-identity hook (LOCAL-11) correctly resolves the museum via Wikidata but does
+not inject architectural/historical facts (Kenzo Tange, mandala plan, 1998) into the
+narrative — the hook helps verification but doesn't yet enrich the prose.
+
+**Real generation cost: $0.0353 (17,665 tokens) — well under $0.05 per tour.**
+
+---
+
+#### LOCAL-14 — Tour improvement loop, round 1 (Asian arts museum, nice, France)
+
+**Agent:** Mac Mini Kiro
+**Branch:** kiro/local14-tour-improvement-round1
+**Priority:** high — first round of a new scored improvement loop (see
+`~/Audioura/TOUR_IMPROVEMENT_LOOP_asian_arts_museum.md` for the full rubric and loop
+mechanics). LEAD scores every round independently from the real regenerated text —
+do NOT self-score, just implement and report evidence.
+
+**Context:** LOCAL-13 verified LOCAL-9 through LOCAL-12 killed the nav-label/
+Zhang-Huan fabrication bug, but LEAD's scoring of the regenerated tour found the
+score is still only ~15.6/100 (of a possible 100+) because a *new*, structurally
+identical fabrication vector opened up in `UNIFIED-FILL`, plus a real content
+regression and a few structural defects.
+
+**Spec — four items, in priority order:**
+
+1. **UNIFIED-FILL fabrication (highest priority).** When `D1v2` correctly drops a
+   candidate as unverifiable, `UNIFIED-FILL` currently re-adds it anyway as an
+   invented filler to hit the target stop count — this produced "Untitled Sculpture
+   by Unknown Artist" and "The Lotus Pond" by a fictional "Mei Lin" in the last run.
+   Fix: never synthesize a name/work that doesn't exist. Either fall back to another
+   genuinely still-available D1v2-verified candidate not yet used in this tour, or
+   deliver fewer real stops than requested. A short, honest tour beats a padded,
+   fabricated one — same principle as LOCAL-12's specificity gate.
+2. **Structural defects:**
+   - Stop 1's intro left a literal `[Venue Name]` template placeholder unsubstituted.
+   - Stop 3 (Fauteuil)'s address field has narrative text leaked into it: `"Located
+     at the Asian Arts Museum on 405 Promenade, Fauteuil invites visitors to
+     experience a fusion of cultural influences and artistic expressions. des
+     Anglais, 06200 Nice, France"` — should just be the clean address.
+   - The repetition-rewrite logic (the "sim >= 0.71, rewrite" pass) produced a
+     first-person voice break in stop 7: `"One time, I asked the museum staff about
+     the exact spot where the mysterious 'Stop 8' piece could be found."` — guide
+     voice must stay third-person; fix the rewrite prompt/logic so it can't
+     introduce first-person narration.
+3. **Stop 4 regression.** The original tour's "La geste de Bouddha" stop had real
+   specific facts (II-III century, Pakistan, schiste stone, acquired 2001) — the
+   regenerated version lost all of these and reads as generic mood prose instead.
+   Investigate why (fact-sheet generation not finding this content anymore? D1v2
+   match confidence issue? RAG fetch regression?) and restore the specificity.
+4. **Stretch, non-blocking:** venue-identity facts (architect, founding story, etc.)
+   still don't surface in the intro despite LOCAL-11's hook correctly resolving the
+   venue (Q3330160) — wire resolved facts into the intro prose if time allows, not
+   required for this round's acceptance.
+
+**Acceptance (live-artifact hard gate applies in full):**
+- Fresh regeneration only — `DELETE FROM tour_cache WHERE cache_key =
+  '959f666f3aaf681223781c3e9e81a27c34368da73f31300ec3c98474eca7fe54'` (or whatever
+  the current key is, re-check first) before regenerating, show CACHE MISS/CACHE
+  STORE log lines as proof.
+- All 11 core regression suites green.
+- A live spot-check regeneration of a **second, different venue** (e.g. Palais
+  Lascaris or Musée d'art naïf, both already used earlier this session) showing no
+  regression from these changes — this loop must not become overfit to one venue.
+- Report honestly which of items 1-3 landed vs. didn't, and the new real API cost
+  line. Do not compute or claim a new score yourself — LEAD scores independently.
+
+Leave your submission as a `##### READY FOR REVIEW` heading under LOCAL-14 in
+`CLICKUP_OFFLINE_QUEUE.md`, same convention as every other task.
+
 ---
 
 ## Sync Plan (minimum-API checklist — work this top to bottom once ClickUp recovers)
