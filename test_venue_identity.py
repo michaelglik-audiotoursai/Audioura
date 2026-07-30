@@ -213,6 +213,84 @@ The museum hosts weekly flamenco performances featuring guest artists from Andal
     print(f"  [PASS] Fictional museum: extracted architect '{result['architecture'][0][:60]}...'")
 
 
+# ============================================================================
+# LOCAL-42 tests: venue intro enrichment
+# ============================================================================
+
+def test_local42_inauguration_year_in_architecture():
+    """LOCAL-42: Inauguration year extracted into architecture, not just founding."""
+    result = extract_venue_identity(ASIAN_ARTS_CORPUS, "Musée des Arts asiatiques, Nice")
+    _all_arch = " ".join(result["architecture"])
+    # The architect sentence already mentions "opened in 1998"
+    assert "1998" in _all_arch, \
+        f"Expected '1998' in architecture facts, got: {result['architecture']}"
+    print(f"  [PASS] LOCAL-42: Inauguration year '1998' in architecture bucket")
+
+
+def test_local42_year_survives_founding_suppression():
+    """LOCAL-42: When founding is deleted (LOCAL-21 scenario), year remains in architecture."""
+    result = extract_venue_identity(ASIAN_ARTS_CORPUS, "Musée des Arts asiatiques, Nice")
+    # Simulate LOCAL-21 suppression
+    if 'founding' in result:
+        del result['founding']
+    # Year should still be accessible through architecture
+    _all_arch = " ".join(result["architecture"])
+    assert "1998" in _all_arch, \
+        f"After founding suppression, '1998' should survive in architecture: {result['architecture']}"
+    print(f"  [PASS] LOCAL-42: Year survives founding suppression")
+
+
+def test_local42_format_has_directives():
+    """LOCAL-42: format_venue_identity_for_prompt includes directive instructions."""
+    facts = {
+        "architecture": ["The building was designed by Japanese architect Kenzo Tange and opened in 1998."],
+        "design": ["The structure is built on a lake and its form is based on a sacred Tibetan mandala floor plan."],
+        "programs": ["The museum hosts authentic Japanese tea ceremonies (Chanoyu) every weekend."],
+        "founding": [],
+    }
+    formatted = format_venue_identity_for_prompt(facts, "Musée des Arts asiatiques, Nice")
+    # Should have directive about architect
+    assert "architect" in formatted.lower(), f"Expected architect directive in: {formatted}"
+    # Should mention naming the architect
+    assert "who they are" in formatted.lower() or "significance" in formatted.lower(), \
+        f"Expected gloss instruction in: {formatted}"
+    # Should mention year
+    assert "inaugurated" in formatted.lower() or "completed" in formatted.lower(), \
+        f"Expected year directive in: {formatted}"
+    # Should mention style
+    assert "style" in formatted.lower() or "spatial concept" in formatted.lower(), \
+        f"Expected style directive in: {formatted}"
+    print(f"  [PASS] LOCAL-42: format_venue_identity_for_prompt includes directives")
+
+
+def test_local42_format_no_directives_when_no_architect():
+    """LOCAL-42: When no architect found, directives omit architect instruction."""
+    facts = {
+        "architecture": [],
+        "design": ["The building features a circular atrium with natural light flooding in from above."],
+        "programs": [],
+        "founding": [],
+    }
+    formatted = format_venue_identity_for_prompt(facts, "Generic Place")
+    # Should NOT have architect directive (no architect was found)
+    assert "name the architect" not in formatted.lower(), \
+        f"Should not instruct to name architect when none found: {formatted}"
+    # But should still mention style
+    assert "style" in formatted.lower() or "spatial" in formatted.lower(), \
+        f"Expected style directive: {formatted}"
+    print(f"  [PASS] LOCAL-42: No architect directive when no architect found")
+
+
+def test_local42_palais_lascaris_has_year():
+    """LOCAL-42: Palais Lascaris corpus yields construction year in architecture."""
+    result = extract_venue_identity(PALAIS_LASCARIS_CORPUS, "Palais Lascaris, Nice")
+    _all_facts = " ".join(f for facts in result.values() for f in facts)
+    # Should find 1648 or 1942 somewhere
+    assert "1648" in _all_facts or "1942" in _all_facts, \
+        f"Expected a year (1648 or 1942) in Palais Lascaris facts: {result}"
+    print(f"  [PASS] LOCAL-42: Palais Lascaris has year in extracted facts")
+
+
 if __name__ == "__main__":
     print("=" * 70)
     print("LOCAL-11: Venue-Identity Mining Unit Tests")
@@ -231,6 +309,12 @@ if __name__ == "__main__":
         test_filler_detection,
         test_format_for_prompt,
         test_not_hardcoded,
+        # LOCAL-42 tests
+        test_local42_inauguration_year_in_architecture,
+        test_local42_year_survives_founding_suppression,
+        test_local42_format_has_directives,
+        test_local42_format_no_directives_when_no_architect,
+        test_local42_palais_lascaris_has_year,
     ]
     
     passed = 0
