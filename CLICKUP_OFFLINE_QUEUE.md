@@ -3095,3 +3095,52 @@ container on :5000 and fails identically on clean storied.
 **ClickUp to post when the limit clears:** wdvrdax5j9 (LOCAL-19, already
 posted), wdvrdax5ja (LOCAL-22 verdict above), wdvrdax5j8 (LOCAL-21 when
 complete). LOCAL-23 and LOCAL-24 still need tasks created.
+
+##### LOCAL-24 — BOUNCED (excellent filter, one-word crash) → redispatched as LOCAL-25
+
+**The filter is right and must be kept.** LEAD independently reproduced:
+Asian Arts Museum corpus **22 → 7 titles**, retaining exactly the genuine
+works and correctly excluding `Promenade des Anglais` (street), `Origin of
+the museum's pieces` / `The museum's collections` (Wikipedia section
+headings), three `Monstre(s)` workshop duplicates, and the EN
+cross-language duplicate. Deterministic 7-rule classifier, no LLM.
+11/11 suites green. corpus_version bumped 3→4.
+
+**Blocker:** `generate_tour_text.py:2529` passes `venue_name=venue_name`,
+but that name does not exist in `generate_tour_text()` scope — the correct
+variable is `_museum_venue_name` (used by the R4 prompt ~30 lines earlier).
+
+```
+[R4] Replenishment exhausted: 7/8 stops (stop_count_warning)
+Error in PHASE 3A/3B pipeline: name 'venue_name' is not defined
+X Unable to generate tour: Insufficient data available...
+RESULT CHARS: NONE
+```
+
+No tour is produced at all. The crash sits in the UNIFIED-FILL path, which
+only runs when a shortfall REMAINS after R4 — so it is invisible whenever
+R4 reaches target, which is how the submitting session missed it. With the
+corpus now correctly filtered to 7 works against 8 requested, shortfall is
+the NORMAL case, so this would crash in production constantly.
+
+Required: fix the scope error, audit all four enforcement points for the
+same class of error, force a shortfall in the acceptance run so the path is
+genuinely exercised, and add a regression test covering it.
+
+##### Loop score update — current storied (774ca73), N=8: **~39/100**
+
+First run with LOCAL-21+22+23 all merged. Best of the loop (prev 36, 31.25).
+Firsts this run: **8/8 stops**, all headings clean, venue identity finally
+surfaced (**Kenzo Tange**, snowflake design, 1998 inauguration), and the
+**first genuine cross-stop callback** (stop 8 explicitly references stop 1's
+Hokusai) — the correlation-bonus mechanism the 75 gate depends on.
+
+Two defects cost ~25 points and both look fixable:
+1. **Stop 5 shipped a literal template placeholder**: `[120-word description
+   of the exhibit]` — the stop has no content. New regression, unassigned.
+2. Stop 8 was the programme "En harmonie avec la nature" with invented
+   artwork detail — **LOCAL-24/25 fixes exactly this**.
+Smaller: stop 3 describes a generic French armchair (Wikipedia's `fauteuil`
+article, not the museum's object); stop 6 attributes Buddhist iconography
+(urna, elongated earlobes) to a Hàm Nghi portrait. Both source
+contamination. Without the two big defects the same tour scores ~64.
