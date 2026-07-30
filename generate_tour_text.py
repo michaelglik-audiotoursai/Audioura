@@ -68,11 +68,37 @@ _TRANSPORT_MODE_KEYWORDS = {
     'country_scale': re.compile(r'\broad\s*trip\b|\bcross[- ]country\b|\bsafari\b|\bnational(?:\s+parks?)?\s+tour\b', re.IGNORECASE),
 }
 
+# [LOCAL-46] Flat set of all transport-mode keywords for stripping from location strings.
+# Derived from _TRANSPORT_MODE_KEYWORDS above — single source of truth, kept in sync.
+# Includes walking/hiking variants that also pollute area resolution.
+_TRANSPORT_STRIP_WORDS = {
+    # From 'animal' mode
+    'camel', 'camelback', 'horse', 'horseback', 'dog', 'dogsled', 'dogsledding',
+    'sledding', 'mushing', 'husky',
+    # From 'bike' mode
+    'bike', 'biking', 'cycling',
+    # From 'vehicle' mode
+    'auto', 'car', 'driving', 'jeep', 'motorcycle', 'scooter',
+    # From 'country_scale' mode (words that aren't geographic)
+    'safari',
+    # Walking/hiking variants (not in _TRANSPORT_MODE_KEYWORDS but same bug class)
+    'walking', 'hiking', 'running',
+    # Boat/water variants (future-proofing same pattern)
+    'boat', 'kayak', 'kayaking', 'canoe', 'canoeing', 'sailing',
+    # General
+    'segway',
+}
+# Compiled regex for stripping transport words from location strings (word boundaries)
+_TRANSPORT_STRIP_RE = re.compile(
+    r'\b(' + '|'.join(re.escape(w) for w in sorted(_TRANSPORT_STRIP_WORDS, key=len, reverse=True)) + r')\b',
+    re.IGNORECASE
+)
+
 # Total route distance caps per transport mode (km)
 _TRANSPORT_TOTAL_HARD_KM = {
     # 'on_foot' uses existing WALKING_TOTAL_HARD_KM constant
     'animal':   20,
-    'bike':     30,
+    'bike':     120,   # [LOCAL-46] 30→120: regional biking tours (French Riviera) cover 80-100km
     'vehicle':  400,
     # 'country_scale' has no distance limit — uses containment check instead
 }
@@ -2400,6 +2426,17 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     _location_normalized = re.sub(r'\b[Tt]ours?\b', '', location).strip().strip(',').strip()
     if _location_normalized != location:
         print(f"  [BLOCKER1] Stripped 'tour' from location: '{location}' → '{_location_normalized}'")
+
+    # [LOCAL-46 Bug A] Strip transport-mode keywords from the normalized location.
+    # After "tour" is stripped, orphaned words like "biking" remain and poison
+    # area resolution (e.g. "French Riviera biking" cannot resolve on Wikidata).
+    # Uses _TRANSPORT_STRIP_RE derived from _TRANSPORT_MODE_KEYWORDS — single source of truth.
+    _loc_before_transport_strip = _location_normalized
+    _location_normalized = _TRANSPORT_STRIP_RE.sub('', _location_normalized)
+    # Collapse multiple spaces and clean up
+    _location_normalized = re.sub(r'\s{2,}', ' ', _location_normalized).strip().strip(',').strip()
+    if _location_normalized != _loc_before_transport_strip:
+        print(f"  [LOCAL-46] Stripped transport words: '{_loc_before_transport_strip}' → '{_location_normalized}'")
     
     _pre_category = _classify_tour_category(_location_normalized, "")
     if _pre_category in ('restaurant', 'walking', 'specialized'):
@@ -2532,7 +2569,15 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # PHASE 2: Detect tour type and get appropriate template
     # NOTE: tour_category already set above — do NOT call _classify_tour_category again here
     # (that was the bug: it overwrote the venue_name-based 'museum' decision with 'walking').
-    print(f"\nDetected tour category: {tour_category.upper()}")
+    # [LOCAL-46 Bug B] Display the transport mode as the detected category when applicable.
+    # The logical tour_category stays 'walking' (same verification/template path) but the
+    # reported category reflects what the user actually asked for.
+    _display_category = tour_category
+    if tour_category == 'walking' and transport_mode != 'on_foot':
+        _display_category = transport_mode.upper()  # e.g. "BIKE", "VEHICLE", "ANIMAL"
+    else:
+        _display_category = tour_category.upper()
+    print(f"\nDetected tour category: {_display_category}")
     print(f"Using {tour_category} template for {location} - {tour_type}")
     
     # ============================================================
@@ -2771,14 +2816,51 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
 
     _compactness_constraint = ''
     if tour_category == 'walking':
-        _compactness_constraint = (
-            f"\nWALKING-TOUR COMPACTNESS — this is a walking tour:\n"
-            f"- All stops must form ONE compact cluster, close enough to walk between comfortably.\n"
-            f"- No stop should be more than a 10–15 minute walk (roughly {WALKING_LEG_TARGET_KM:.0f} km) "
-            f"from its nearest neighbour in the tour.\n"
-            f"- Prefer a tight set of stops in one walkable area over famous landmarks scattered "
-            f"across the city. A shorter, denser route is better than a long, spread-out one.\n"
-        )
+        if transport_mode == 'on_foot':
+            _compactness_constraint = (
+                f"\nWALKING-TOUR COMPACTNESS — this is a walking tour:\n"
+                f"- All stops must form ONE compact cluster, close enough to walk between comfortably.\n"
+                f"- No stop should be more than a 10–15 minute walk (roughly {WALKING_LEG_TARGET_KM:.0f} km) "
+                f"from its nearest neighbour in the tour.\n"
+                f"- Prefer a tight set of stops in one walkable area over famous landmarks scattered "
+                f"across the city. A shorter, denser route is better than a long, spread-out one.\n"
+            )
+        elif transport_mode == 'bike':
+            # [LOCAL-46] Biking tour: wider spacing, route coherence still matters
+            _bike_limit = _TRANSPORT_TOTAL_HARD_KM.get('bike', 120)
+            _compactness_constraint = (
+                f"\nBIKING-TOUR ROUTE — this is a cycling/biking tour:\n"
+                f"- Stops should form a coherent route that a cyclist can follow in sequence.\n"
+                f"- Adjacent stops may be up to 5–10 km apart (a comfortable cycling leg).\n"
+                f"- Total route length should stay under {_bike_limit} km.\n"
+                f"- Prefer scenic roads, coastal paths, or designated cycling routes.\n"
+                f"- Stops should be accessible by bicycle (not inside buildings or pedestrian-only zones).\n"
+            )
+        elif transport_mode == 'vehicle':
+            _vehicle_limit = _TRANSPORT_TOTAL_HARD_KM.get('vehicle', 400)
+            _compactness_constraint = (
+                f"\nDRIVING-TOUR ROUTE — this is a driving/vehicle tour:\n"
+                f"- Stops should form a coherent driving route in logical sequence.\n"
+                f"- Adjacent stops may be 10–50 km apart.\n"
+                f"- Total route length should stay under {_vehicle_limit} km.\n"
+                f"- Stops should be accessible by car with parking available nearby.\n"
+            )
+        elif transport_mode == 'animal':
+            _animal_limit = _TRANSPORT_TOTAL_HARD_KM.get('animal', 20)
+            _compactness_constraint = (
+                f"\nANIMAL-POWERED TOUR ROUTE — this is an animal-powered tour:\n"
+                f"- Stops should form a coherent trail route suitable for the animal.\n"
+                f"- Adjacent stops should be 1–3 km apart.\n"
+                f"- Total route length should stay under {_animal_limit} km.\n"
+                f"- Stops should be on trails or terrain accessible to the animal.\n"
+            )
+        elif transport_mode == 'country_scale':
+            _compactness_constraint = (
+                f"\nCROSS-COUNTRY ROUTE — this is a long-distance tour:\n"
+                f"- Stops should form a coherent route across the region/country.\n"
+                f"- Include major landmarks and points of interest along the way.\n"
+                f"- Route should be geographically logical (no random zig-zagging).\n"
+            )
 
     # -------- [LOCAL-30] DETERMINISTIC SELECTION: documented works fill first --------
     # When a museum venue has enough catalogue/SPARQL works to fill the tour,
