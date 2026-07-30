@@ -162,9 +162,14 @@ if __name__ == "__main__":
         "Daim et Daine symbolisant le premier sermon de Bouddha",
         "la geste de Bouddha",
         "les paysages de l'âme",
-        "disque",
-        "fauteuil",
+        # LOCAL-28: "disque" and "fauteuil" are now excluded as bare generic nouns
         "Hokusai – Voyage au pied du mont Fuji",
+    ]
+    
+    # LOCAL-28: Bare generic nouns that must now be excluded
+    must_exclude_bare_nouns = [
+        ("disque", "bare_generic_noun"),
+        ("fauteuil", "bare_generic_noun"),
     ]
     
     pass_count = 0
@@ -201,6 +206,16 @@ if __name__ == "__main__":
             pass_count += 1
         else:
             print(f"  FAIL: '{title}' → {result['kind']} (expected work, got rule={result['rule']})")
+            fail_count += 1
+    
+    print("\n--- LOCAL-28: Bare generic noun exclusion ---")
+    for title, expected_rule in must_exclude_bare_nouns:
+        result = classify_corpus_entry(title, venue_name="Musée des Arts asiatiques, Nice")
+        if result['kind'] == 'excluded' and result['rule'] == expected_rule:
+            print(f"  PASS: '{title}' → excluded ({result['rule']})")
+            pass_count += 1
+        else:
+            print(f"  FAIL: '{title}' → {result['kind']} (expected excluded/{expected_rule}, got {result['rule']})")
             fail_count += 1
     
     print("\n--- Near-duplicate collapse ---")

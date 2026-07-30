@@ -376,6 +376,378 @@ def extract_canonical_titles(corpus: str, venue_name: str = "") -> Tuple[Set[str
     return canonical_titles, cycle_names, theme_words
 
 
+# ===========================================================================
+# LOCAL-28: Structured catalogue parser for museum "oeuvres commentées" pages
+# ===========================================================================
+# Many museum sites publish a dedicated page listing their key works with
+# structured metadata (title, material, period, origin, description).
+# This parser extracts that structure from already-fetched pages, providing
+# high-confidence candidates with hard facts instead of bare title strings.
+#
+# Generic: detects the pattern by URL path and content structure, not by
+# hardcoding any specific museum.
+# ===========================================================================
+
+# URL path patterns that indicate a catalogue/highlighted-works page.
+# Checked against the page URL to determine which pages to structurally parse.
+_CATALOGUE_PAGE_URL_PATTERNS = re.compile(
+    r'(?:'
+    r'oeuvres?[-_]comment[eé]es?|'
+    r'les[-_]oeuvres|'
+    r'(?:chefs?[-_]d[-\']?oeuvres?)|'
+    r'highlights?|'
+    r'masterpieces?|'
+    r'selected[-_]works?|'
+    r'collection[-_]highlights?|'
+    r'opere[-_](?:scelte|principali)|'
+    r'capolavori|'
+    r'obras[-_](?:destacadas|maestras)|'
+    r'hauptwerke|'
+    r'meisterwerke'
+    r')', re.IGNORECASE
+)
+
+# Heading pattern: detects work title sections (## Title or ### Title in markdown-ified text,
+# or HTML h2/h3 headings in raw HTML)
+_CATALOGUE_HEADING_RE = re.compile(
+    r'^#{2,3}\s+(.+?)$', re.MULTILINE
+)
+
+# HTML heading pattern for raw HTML parsing
+_CATALOGUE_HTML_HEADING_RE = re.compile(
+    r'<h[23][^>]*>\s*(.*?)\s*</h[23]>', re.DOTALL | re.IGNORECASE
+)
+
+# Metadata extraction patterns (generic across languages)
+_MATERIAL_PATTERNS = re.compile(
+    r'(?:mat[eé]riau[x]?\s*[:：]?\s*|'
+    r'(?:acier|cuivre|cuir|soie|laque|schiste|chlorite|bois|bronze|marbre|'
+    r'porcelaine|c[eé]ramique|jade|ivoire|laiton|terre\s+cuite|gr[eè]s|'
+    r'fer|argent|or|papier|encre|gouache|huile|aquarelle|pastel|'
+    r'feuille\s+d.or|dorure|xylogravure|broderie)(?:\s*[,]\s*(?:acier|cuivre|cuir|soie|laque|'
+    r'schiste|chlorite|bois|bronze|marbre|porcelaine|c[eé]ramique|jade|ivoire|'
+    r'laiton|terre\s+cuite|gr[eè]s|fer|argent|or|papier|encre|'
+    r'gouache|huile|aquarelle|pastel|feuille\s+d.or|dorure|'
+    r'xylogravure|polychrome|broderie|laqué|laquée))*)',
+    re.IGNORECASE
+)
+
+_PERIOD_PATTERNS = re.compile(
+    r'(?:'
+    r'(?:I{1,3}|IV|VI{0,3}|IX|X{0,3}I{0,3}V?)\s*e\s+si[eè]cle|'  # Roman numeral century
+    r'\d{1,2}(?:er?|[eè]me|st|nd|rd|th)\s+(?:si[eè]cle|century)|'  # Ordinal century
+    r'(?:[EÉ]poque\s+d[e\']?\s*|[Pp]eriod\s+of\s+)?(?:Edo|Heian|Meiji|Kamakura|Muromachi|Nara|Momoyama)|'
+    r'(?:seconde?\s+moiti[eé]\s+du\s+|premi[eè]re\s+moiti[eé]\s+du\s+|'
+    r'(?:d[eé]but|fin|milieu)\s+du\s+)?\s*[IVXLC]+e\s+si[eè]cle|'
+    r'vers?\s+\d{4}|'  # "vers 1850"
+    r'\d{4}\s*[-–]\s*\d{4}|'  # Year range
+    r'dat[eé]e?\s+(?:du|de\s+la|de\s+l[\u2019\'])\s+[^.]{5,40}|'  # "datée du XVIe siècle"
+    r'(?:\d{1,2}(?:er?|e)?[-–]\d{1,2}(?:er?|e)?\s+si[eè]cles?)|'  # "IIe-IIIe siècles"
+    r'\d{4}'  # Plain year
+    r')', re.IGNORECASE
+)
+
+_ORIGIN_PATTERNS = re.compile(
+    r'(?:'
+    r'(?:Japon|Japan|Chine|China|Inde|India|Pakistan|Cor[eé]e|Korea|'
+    r'Cambodge|Cambodia|Tha[ïi]lande|Thailand|Vietnam|Birmanie|Myanmar|'
+    r'Tibet|N[eé]pal|Sri\s+Lanka|Indon[eé]sie|Indonesia|'
+    r'Bengale|Bihar|Gandhara|Rajasthan|Tamil\s+Nadu)'
+    r')', re.IGNORECASE
+)
+
+# Non-work headings to filter out (navigation, form labels, generic site headings)
+_CATALOGUE_EXCLUDE_HEADINGS = re.compile(
+    r'^(?:'
+    r'formulaire|recherche|menu|accueil|partenaire|information|'
+    r'suivez|newsletter|tous\s+nos\s+sites|'
+    r'information\s+compl[eé]mentaire'
+    r')', re.IGNORECASE
+)
+
+
+def extract_catalogue_works_from_pages(pages: List[Dict]) -> List[Dict]:
+    """Parse structurally-rich catalogue pages to extract documented works.
+    
+    Detects pages that are "oeuvres commentées" / "highlights" / "collection"
+    pages by URL pattern, then extracts per-work structured metadata.
+    
+    Generic: works for any venue — detection is by page URL + content structure.
+    
+    Args:
+        pages: List of {url, text, title} dicts from the corpus
+        
+    Returns:
+        List of work dicts, each with:
+            title: str — work title as published by the museum
+            material: str — material/medium (if found)
+            period: str — date/period (if found)
+            origin: str — geographic/cultural origin (if found)
+            description: str — first ~500 chars of descriptive text
+            source_url: str — page URL where this was found
+            confidence: str — 'catalogue' (high confidence, museum-published)
+    """
+    catalogue_works = []
+    
+    for page in pages:
+        url = page.get('url', '')
+        text = page.get('text', '')
+        
+        if not url or not text:
+            continue
+        
+        # Check if this page's URL matches catalogue patterns
+        url_lower = url.lower()
+        if not _CATALOGUE_PAGE_URL_PATTERNS.search(url_lower):
+            continue
+        
+        print(f"  [LOCAL-28] Catalogue page detected: {url}")
+        
+        # Strategy: split text on heading patterns and extract per-section metadata
+        # The text from _fetch_page_text is a mix of paragraph content + full text.
+        # Headings appear as lines starting with the heading text (from HTMLParser).
+        
+        works_from_page = _parse_catalogue_sections(text, url)
+        if works_from_page:
+            catalogue_works.extend(works_from_page)
+            print(f"  [LOCAL-28] Extracted {len(works_from_page)} documented works from {url}")
+    
+    return catalogue_works
+
+
+def _parse_catalogue_sections(text: str, source_url: str) -> List[Dict]:
+    """Parse a catalogue page text into individual work sections.
+    
+    Heuristic: headings are lines that appear between sections of descriptive
+    prose. We look for proper-noun-initial short lines (5-80 chars) followed
+    by paragraphs containing metadata signals (materials, dates, origins).
+    """
+    works = []
+    
+    # Split on what looks like section headings in the extracted text.
+    # The _fetch_page_text function produces paragraph content first, then full text.
+    # Headings typically appear as short lines (< 80 chars) starting with a capital
+    # letter, often preceded by a blank line.
+    
+    lines = text.split('\n')
+    sections = []
+    current_heading = None
+    current_body_lines = []
+    
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        
+        # Detect headings: short lines (5-60 chars) starting with uppercase,
+        # NOT matching excluded patterns, NOT sentence-like (no trailing period),
+        # and containing a proper-noun-like structure
+        is_heading = (
+            5 <= len(stripped) <= 60 and
+            stripped[0].isupper() and
+            not stripped.endswith('.') and
+            not stripped.endswith(',') and
+            not stripped.endswith(';') and
+            not _CATALOGUE_EXCLUDE_HEADINGS.match(stripped) and
+            not stripped.startswith('http') and
+            not stripped.startswith('©') and
+            not stripped.startswith('Voix off') and
+            not stripped.startswith('Commentaires') and
+            not stripped.startswith('Transcription') and
+            not stripped.startswith('Publié le') and
+            not re.match(r'^\d+\.', stripped) and  # numbered list items
+            # Must NOT look like a regular sentence (contains verbs/connecting words)
+            not re.search(r'\b(?:est|sont|was|were|is|are|has|have|dans|from|with|'
+                          r'cette|cette|ces|this|that|these|those)\b', stripped, re.IGNORECASE) and
+            _looks_like_work_title(stripped)
+        )
+        
+        if is_heading and current_heading is not None:
+            # Close previous section
+            body = '\n'.join(current_body_lines)
+            if len(body) > 100:  # Only keep sections with substantial text
+                sections.append((current_heading, body))
+            current_heading = stripped
+            current_body_lines = []
+        elif is_heading and current_heading is None:
+            current_heading = stripped
+            current_body_lines = []
+        else:
+            current_body_lines.append(stripped)
+    
+    # Don't forget the last section
+    if current_heading is not None:
+        body = '\n'.join(current_body_lines)
+        if len(body) > 100:
+            sections.append((current_heading, body))
+    
+    # Now extract metadata from each section
+    for heading, body in sections:
+        # Extract metadata from the combined heading + body
+        material = _extract_material(body)
+        period = _extract_period(heading + ' ' + body)
+        origin = _extract_origin(heading + ' ' + body)
+        
+        # Skip sections that have no artwork metadata signals at all
+        # (they're probably navigation or about-page sections)
+        if not material and not period and not origin and len(body) < 200:
+            continue
+        
+        # Take first ~500 chars of body as description
+        description = body[:500].strip()
+        if len(body) > 500:
+            # Try to break at a sentence boundary
+            last_period = description.rfind('.')
+            if last_period > 200:
+                description = description[:last_period + 1]
+        
+        works.append({
+            'title': heading,
+            'material': material,
+            'period': period,
+            'origin': origin,
+            'description': description,
+            'source_url': source_url,
+            'confidence': 'catalogue',
+        })
+    
+    return works
+
+
+def _looks_like_work_title(text: str) -> bool:
+    """Check if a short line looks like an artwork/exhibit title.
+    
+    Positive signals: contains proper nouns, article + noun pattern,
+    foreign names, specific artwork-like patterns.
+    Negative signals: common navigation labels, generic site text.
+    """
+    lower = text.lower()
+    
+    # Strong negative signals (not a work title)
+    if _is_navigational_label(text):
+        return False
+    if re.match(r'^(?:page|retour|accueil|fermer|ouvrir|partager|ajouter)', lower):
+        return False
+    if re.match(r'^(?:facebook|twitter|linkedin|instagram|e-mail)', lower):
+        return False
+    if 'fenêtre modale' in lower or 'agrandir' in lower:
+        return False
+    
+    # Positive signals (looks like an artwork title)
+    # Contains article + proper noun (La/Le/Les/L' + Capital)
+    if re.match(r"^(?:L[ae']s?\s+|Un[e]?\s+)", text):
+        return True
+    # Contains a proper noun or is a multi-word proper phrase
+    if text[0].isupper() and len(text.split()) >= 2:
+        return True
+    # Single capitalized word that's longer than 6 chars (could be a work name)
+    if text[0].isupper() and len(text) >= 6 and ' ' not in text:
+        return True
+    
+    return False
+
+
+def _extract_material(text: str) -> str:
+    """Extract material/medium mentions from text."""
+    # Look for material-related keywords in the text
+    materials_found = []
+    
+    # Common material terms (must be matched with word boundaries to avoid false positives)
+    _MATERIALS = [
+        'acier', 'cuivre', 'cuir', 'soie', 'laque', 'schiste', 'chlorite',
+        'bois', 'bronze', 'marbre', 'porcelaine', 'céramique', 'jade',
+        'ivoire', 'laiton', 'terre cuite', 'grès', 'fer', 'argent',
+        'papier', 'encre', 'gouache', 'huile', 'aquarelle', 'pastel',
+        'feuille d\'or', 'dorure', 'xylogravure', 'soie brodée',
+        'bois laqué', 'cuir laqué', 'polychrome', 'laqué', 'laquée',
+    ]
+    
+    text_lower = text.lower()
+    for mat in _MATERIALS:
+        # Use word boundary matching to avoid partial matches (e.g., "or" in "color")
+        if re.search(r'\b' + re.escape(mat) + r'\b', text_lower):
+            materials_found.append(mat)
+    
+    # Also try to find a structured material line (often near the top)
+    # Pattern: "Matériau: X, Y, Z" or just a comma-separated list of materials
+    first_300 = text[:300].lower()
+    material_line_match = re.search(
+        r'((?:acier|cuivre|cuir|soie|laque|schiste|chlorite|bois|bronze)(?:\s*[,]\s*(?:acier|cuivre|cuir|soie|laque|feuille d.or|dorure|encre|papier|or|argent))+)',
+        first_300
+    )
+    if material_line_match:
+        return material_line_match.group(1).strip()
+    
+    if materials_found:
+        return ', '.join(materials_found[:4])
+    return ''
+
+
+def _extract_period(text: str) -> str:
+    """Extract date/period mentions from text."""
+    match = _PERIOD_PATTERNS.search(text)
+    if match:
+        return match.group(0).strip()
+    return ''
+
+
+def _extract_origin(text: str) -> str:
+    """Extract geographic/cultural origin from text."""
+    match = _ORIGIN_PATTERNS.search(text)
+    if match:
+        return match.group(0).strip()
+    return ''
+
+
+# ===========================================================================
+# LOCAL-28: Bare-noun filter for single-word generic nouns
+# ===========================================================================
+# Single-word common nouns (like "disque", "fauteuil") that pass through the
+# classifier because they don't match any exclusion pattern, but produce
+# fabrication because GPT has no real content to work with.
+# ===========================================================================
+
+_BARE_GENERIC_NOUNS_FR = {
+    'disque', 'fauteuil', 'table', 'chaise', 'vase', 'lampe', 'tapis',
+    'miroir', 'coffre', 'pendule', 'horloge', 'lustre', 'statue',
+    'portrait', 'paysage', 'nature', 'fleur', 'fruit', 'animal',
+    'oiseau', 'poisson', 'arbre', 'maison', 'jardin', 'fontaine',
+    'pont', 'tour', 'église', 'château', 'palais',
+}
+
+_BARE_GENERIC_NOUNS_EN = {
+    'disc', 'disk', 'armchair', 'chair', 'table', 'vase', 'lamp',
+    'carpet', 'mirror', 'chest', 'clock', 'statue', 'portrait',
+    'landscape', 'flower', 'fruit', 'animal', 'bird', 'fish',
+    'tree', 'house', 'garden', 'fountain', 'bridge', 'tower',
+    'church', 'castle', 'palace',
+}
+
+_ALL_BARE_GENERIC_NOUNS = _BARE_GENERIC_NOUNS_FR | _BARE_GENERIC_NOUNS_EN
+
+
+def is_bare_generic_noun(title: str) -> bool:
+    """Check if a title is a single bare generic noun that would produce fabrication.
+    
+    Only triggers for single-word titles (or titles where all words are generic nouns).
+    Multi-word compound titles like "La geste de Bouddha" pass through.
+    """
+    words = title.strip().lower().split()
+    if not words:
+        return False
+    
+    # Single word: check against generic noun list
+    if len(words) == 1:
+        return words[0] in _ALL_BARE_GENERIC_NOUNS
+    
+    # Two words where first is just an article: "le disque", "un fauteuil"
+    _ARTICLES = {'le', 'la', 'les', 'l', "l'", 'un', 'une', 'des', 'the', 'a', 'an'}
+    if len(words) == 2 and words[0] in _ARTICLES:
+        return words[1] in _ALL_BARE_GENERIC_NOUNS
+    
+    return False
+
+
 # --- LOCAL-23: Joconde/POP (French national museum collections database) ---
 
 def _fetch_joconde_titles(museo_code: str, venue_name: str = "", max_titles: int = 30) -> List[Dict]:
@@ -843,8 +1215,44 @@ def fetch_venue_narrative_corpus(
         if jt['title'] and len(jt['title']) >= 3:
             canonical_titles.add(jt['title'])
 
+    # LOCAL-28: Extract structured catalogue works from "oeuvres commentées" type pages
+    catalogue_works = extract_catalogue_works_from_pages(pages)
+    per_work_contexts = {}  # LOCAL-28: Initialize here (will be filled by catalogue + extraction)
+    if catalogue_works:
+        print(f"  [LOCAL-28] Catalogue extraction: {len(catalogue_works)} documented works with metadata")
+        for cw in catalogue_works:
+            # Add catalogue work titles to canonical_titles (highest confidence)
+            canonical_titles.add(cw['title'])
+            # Also store metadata-enriched context for each work
+            _meta_parts = []
+            if cw.get('material'):
+                _meta_parts.append(f"Material: {cw['material']}")
+            if cw.get('period'):
+                _meta_parts.append(f"Period: {cw['period']}")
+            if cw.get('origin'):
+                _meta_parts.append(f"Origin: {cw['origin']}")
+            if cw.get('description'):
+                _meta_parts.append(cw['description'][:300])
+            if _meta_parts:
+                per_work_contexts[cw['title']] = _meta_parts
+
+    # LOCAL-28: Remove bare generic nouns that produce fabrication
+    _bare_nouns_removed = {t for t in canonical_titles if is_bare_generic_noun(t)}
+    if _bare_nouns_removed:
+        canonical_titles -= _bare_nouns_removed
+        print(f"  [LOCAL-28] Removed {len(_bare_nouns_removed)} bare generic nouns: "
+              f"{sorted(_bare_nouns_removed)}")
+
     # Extract per-work context sentences
-    per_work_contexts = _extract_per_work_contexts(combined_text, canonical_titles)
+    _extracted_contexts = _extract_per_work_contexts(combined_text, canonical_titles)
+    # LOCAL-28: Merge extracted contexts with catalogue-enriched contexts
+    # Catalogue contexts take precedence (structured metadata > raw sentence matches)
+    for title, ctx in _extracted_contexts.items():
+        if title not in per_work_contexts:
+            per_work_contexts[title] = ctx
+        else:
+            # Append extracted sentences after the catalogue metadata
+            per_work_contexts[title].extend(ctx[:3])
 
     # LOCAL-23: Build title_sources provenance map
     # Maps each canonical title to the source(s) where it was found + trust tier
@@ -898,6 +1306,7 @@ def fetch_venue_narrative_corpus(
         "source_urls": source_urls,
         "per_work_contexts": per_work_contexts,
         "title_sources": title_sources,  # LOCAL-23: provenance map
+        "catalogue_works": catalogue_works,  # LOCAL-28: structured metadata from catalogue pages
     }
 
 
@@ -1135,6 +1544,10 @@ def classify_corpus_entry(
     # Rule 7: Museum-meta phrases
     if _MUSEUM_META_PATTERNS.match(title):
         return {"kind": "excluded", "rule": "museum_meta_phrase", "title": title}
+    
+    # Rule 8 (LOCAL-28): Bare generic nouns — single common nouns without artwork signals
+    if is_bare_generic_noun(title):
+        return {"kind": "excluded", "rule": "bare_generic_noun", "title": title}
     
     # Default: if it passed all exclusion rules, it's a work
     return {"kind": "work", "rule": "default_pass", "title": title}
