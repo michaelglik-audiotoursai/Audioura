@@ -1751,6 +1751,155 @@ def _verify_works_in_collection(poi_list, venue_name):
     return verified_pois, _evidence_log, _venue_corpus
 
 
+# ============================================================
+# [LOCAL-27] Truthfulness guards: sourced-or-omit for metadata
+# ============================================================
+
+def _fetch_visitor_info_from_site(base_site_url: str, language: str = "en") -> str:
+    """Attempt to fetch practical visitor information (hours, admission) from the venue's official site.
+    
+    Returns a sourced string with hours/admission info, or empty string if not reliably extractable.
+    The function looks for known tarif/horaire pages and extracts structured data.
+    It NEVER generates or interpolates — it only returns text literally found on the site.
+    """
+    if not base_site_url:
+        return ""
+    
+    from urllib.parse import urljoin, urlparse
+    
+    # Known URL patterns for visitor info pages across museum sites
+    _VISITOR_INFO_PATHS = [
+        '/tarifs-et-horaires', '/horaires-et-tarifs', '/infos-pratiques',
+        '/informations-pratiques', '/plan-your-visit', '/visit',
+        '/visitor-information', '/hours-admission', '/hours-and-admission',
+        '/opening-hours', '/practical-information',
+        '/tarifs', '/horaires', '/visite',
+    ]
+    
+    _base_domain = urlparse(base_site_url).netloc
+    _fetched_text = ""
+    
+    for path in _VISITOR_INFO_PATHS:
+        _url = urljoin(base_site_url, path)
+        try:
+            resp = requests.get(_url, headers={'User-Agent': 'Audioura/2.2'},
+                              timeout=10, allow_redirects=True)
+            if resp.status_code == 200 and len(resp.text) > 200:
+                # Extract just the text content
+                _text = re.sub(r'<script[^>]*>.*?</script>', '', resp.text, flags=re.DOTALL)
+                _text = re.sub(r'<style[^>]*>.*?</style>', '', _text, flags=re.DOTALL)
+                _text = re.sub(r'<[^>]+>', ' ', _text)
+                _text = re.sub(r'\s+', ' ', _text).strip()
+                if len(_text) > 100:
+                    _fetched_text = _text[:5000]
+                    print(f"  [LOCAL-27] Visitor info page found: {_url}")
+                    break
+        except Exception:
+            continue
+    
+    if not _fetched_text:
+        print(f"  [LOCAL-27] No visitor info page found for {base_site_url}")
+        return ""
+    
+    # Extract structured hours/admission from the page text
+    # We look for patterns that clearly indicate hours and admission prices
+    _info_parts = []
+    
+    # Hours patterns (French and English)
+    _hours_patterns = [
+        # French patterns
+        re.compile(r'(?:ouvert|ouverture)[^.]{0,100}(?:\d{1,2}h?\d{0,2}\s*[-–àa]\s*\d{1,2}h?\d{0,2})', re.IGNORECASE),
+        re.compile(r'(?:fermé|fermeture)[^.]{0,80}(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)', re.IGNORECASE),
+        re.compile(r'\d{1,2}h?\d{0,2}\s*[-–àa]\s*\d{1,2}h?\d{0,2}[^.]{0,60}(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|tous les jours)', re.IGNORECASE),
+        # English patterns
+        re.compile(r'(?:open|hours)[^.]{0,100}(?:\d{1,2}(?::\d{2})?\s*(?:am|pm|AM|PM)\s*[-–to]+\s*\d{1,2}(?::\d{2})?\s*(?:am|pm|AM|PM))', re.IGNORECASE),
+        re.compile(r'(?:closed)\s+(?:on\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)', re.IGNORECASE),
+    ]
+    
+    # Admission patterns (French and English)
+    _admission_patterns = [
+        re.compile(r'(?:gratuit|free|admission\s+free|entr[eé]e\s+(?:libre|gratuite))', re.IGNORECASE),
+        re.compile(r'(?:tarif|admission|entry|ticket)[^.]{0,60}(?:\d+\s*(?:€|EUR|dollars?|\$|£)|\d+(?:\.\d{2})?)', re.IGNORECASE),
+        re.compile(r'(?:\d+\s*(?:€|EUR))[^.]{0,60}(?:tarif|plein|réduit|adult|enfant|child)', re.IGNORECASE),
+    ]
+    
+    for pattern in _hours_patterns:
+        matches = pattern.findall(_fetched_text)
+        if matches:
+            # Take the first clear match — truncate to reasonable length
+            _match_text = matches[0] if isinstance(matches[0], str) else matches[0][0] if matches[0] else ''
+            if _match_text and len(_match_text) > 10:
+                _info_parts.append(_match_text.strip()[:150])
+                break
+    
+    for pattern in _admission_patterns:
+        matches = pattern.findall(_fetched_text)
+        if matches:
+            _match_text = matches[0] if isinstance(matches[0], str) else matches[0][0] if matches[0] else ''
+            if _match_text and len(_match_text) > 3:
+                _info_parts.append(_match_text.strip()[:100])
+                break
+    
+    if _info_parts:
+        _result = '. '.join(_info_parts)
+        print(f"  [LOCAL-27] Extracted visitor info: {_result[:80]}...")
+        return _result
+    
+    print(f"  [LOCAL-27] Could not extract structured hours/admission from visitor info page")
+    return ""
+
+
+def _check_type_prose_contradiction(poi_list: list) -> list:
+    """[LOCAL-27] Check that each stop's declared type_specialty is consistent with its prose description.
+    
+    Returns list of contradiction warnings. Clears type_specialty on contradicting stops.
+    """
+    # Period/era keywords that would contradict each other
+    _PERIOD_GROUPS = {
+        'contemporary': {'contemporary', 'modern', '20th century', '21st century', 'post-war'},
+        'ancient': {'ancient', 'antiquity', 'roman', 'greek', 'egyptian', 'tang dynasty',
+                   'song dynasty', 'ming dynasty', 'han dynasty', 'byzantine'},
+        'medieval': {'medieval', 'middle ages', 'gothic', 'romanesque', '12th century',
+                    '13th century', '14th century'},
+        'renaissance': {'renaissance', '15th century', '16th century', 'baroque'},
+    }
+    
+    warnings = []
+    for poi in poi_list:
+        _type = (poi.get('type_specialty') or '').lower()
+        _desc = (poi.get('description') or '').lower()
+        
+        if not _type or not _desc:
+            continue
+        
+        # Find which period group the declared type belongs to
+        _declared_period = None
+        for period_name, keywords in _PERIOD_GROUPS.items():
+            if any(kw in _type for kw in keywords):
+                _declared_period = period_name
+                break
+        
+        if not _declared_period:
+            continue
+        
+        # Check if the prose mentions a DIFFERENT period
+        for period_name, keywords in _PERIOD_GROUPS.items():
+            if period_name == _declared_period:
+                continue
+            # Count how many times a contradicting period is mentioned in prose
+            _contradictions = sum(1 for kw in keywords if kw in _desc)
+            if _contradictions >= 2:
+                _warning = (f"Stop '{poi.get('name', '?')}': type_specialty says "
+                           f"'{_type}' but prose references {period_name} ({_contradictions} mentions)")
+                warnings.append(_warning)
+                print(f"  [LOCAL-27] CONTRADICTION: {_warning}")
+                # Clear the contradicting type_specialty
+                poi['type_specialty'] = ''
+                break
+    
+    return warnings
+
+
 def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None):
     """
     Generate audio tour text using OpenAI API with geo coordinates.
@@ -3094,6 +3243,31 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 f'- {p["name"]}' + (f' (Address: {p["address"]})' if p.get('address') else '')
                 for p in current_poi_list
             ]
+            # [LOCAL-27] Museum tours: do NOT ask GPT to invent type_specialty,
+            # specific_examples, or operational_details. These fields must be
+            # sourced from verified data or omitted entirely.
+            _is_museum_tour = (tour_category == 'museum' and _museum_venue_name)
+            if _is_museum_tour:
+                _json_schema_block = (
+                    "[\n  {\n"
+                    '    "name": "<must match one of the input names exactly>",\n'
+                    '    "address": "<complete street address with ZIP>",\n'
+                    '    "coordinates": "<lat, lng in decimal format>",\n'
+                    '    "directions_from_previous": "<turn-by-turn directions + one observational sentence>"\n'
+                    "  }\n]"
+                )
+            else:
+                _json_schema_block = (
+                    "[\n  {\n"
+                    '    "name": "<must match one of the input names exactly>",\n'
+                    '    "address": "<complete street address with ZIP>",\n'
+                    '    "coordinates": "<lat, lng in decimal format>",\n'
+                    '    "type_specialty": "<short type/specialty description>",\n'
+                    '    "specific_examples": "<2-3 concrete examples of what visitors will see/experience>",\n'
+                    '    "operational_details": "<hours, prices, reservations, busy times>",\n'
+                    '    "directions_from_previous": "<turn-by-turn directions + one observational sentence>"\n'
+                    "  }\n]"
+                )
             prompt = (
                 f"For a tour of {location}, the following {len(current_poi_list)} stop(s) have been selected "
                 "in the order shown (this order has been optimised algorithmically — do NOT change it):\n"
@@ -3105,15 +3279,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 "something the visitor might notice in transit (a change in architecture, a glimpse of something ahead, the sound of a market). "
                 "Keep this to ONE sentence after the navigation, not a full paragraph.\n\n"
                 "Return ONLY a JSON array, no markdown fences, no commentary:\n"
-                "[\n  {\n"
-                '    "name": "<must match one of the input names exactly>",\n'
-                '    "address": "<complete street address with ZIP>",\n'
-                '    "coordinates": "<lat, lng in decimal format>",\n'
-                '    "type_specialty": "<short type/specialty description>",\n'
-                '    "specific_examples": "<2-3 concrete examples of what visitors will see/experience>",\n'
-                '    "operational_details": "<hours, prices, reservations, busy times>",\n'
-                '    "directions_from_previous": "<turn-by-turn directions + one observational sentence>"\n'
-                "  }\n]"
+                + _json_schema_block
             )
             req_data = {
                 "model": "gpt-3.5-turbo",
@@ -3181,9 +3347,17 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     merged['stop_number'] = idx + 1
                     merged['directions'] = (entry.get('directions_from_previous') or '').strip()
                     merged['coordinates'] = (entry.get('coordinates') or (orig.get('coordinates', '') if orig else '')).strip()
-                    merged['type_specialty'] = (entry.get('type_specialty') or '').strip()
-                    merged['specific_examples'] = (entry.get('specific_examples') or '').strip()
-                    merged['operational_details'] = (entry.get('operational_details') or '').strip()
+                    # [LOCAL-27] For museum tours: never populate type_specialty,
+                    # specific_examples, or operational_details from GPT output.
+                    # These will be sourced from corpus data downstream or omitted.
+                    if _is_museum_tour:
+                        merged['type_specialty'] = ''
+                        merged['specific_examples'] = ''
+                        merged['operational_details'] = ''
+                    else:
+                        merged['type_specialty'] = (entry.get('type_specialty') or '').strip()
+                        merged['specific_examples'] = (entry.get('specific_examples') or '').strip()
+                        merged['operational_details'] = (entry.get('operational_details') or '').strip()
                     # [PALAIS-FIX B1] verified flag must survive the Phase 3B rebuild —
                     # it drives hedged narration and stop_metrics persistence downstream
                     if orig and 'verified' in orig:
@@ -3208,6 +3382,70 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         })
 
         poi_list = _run_phase_3b(poi_list)
+
+        # -------- [LOCAL-27] Corpus-sourced metadata for museum tours --------
+        # After Phase 3B, populate type_specialty from VERIFIED corpus data only.
+        # Never invent: if corpus doesn't confirm the metadata, leave it blank.
+        if tour_category == 'museum' and _museum_venue_name and _story_corpus_result:
+            _per_work_ctx = _story_corpus_result.get('per_work_contexts', {})
+            _combined_corpus = _story_corpus_result.get('combined_text', '')
+            try:
+                from story_miner import _normalize
+            except ImportError:
+                import unicodedata
+                def _normalize(text):
+                    if not text: return ""
+                    nfkd = unicodedata.normalize('NFKD', text.lower())
+                    return ''.join(c for c in nfkd if not unicodedata.combining(c))
+            for poi in poi_list:
+                _poi_norm = _normalize(poi['name'])
+                # Try to derive type_specialty from corpus sentences about this work
+                _corpus_type = ''
+                for _title, _sents in _per_work_ctx.items():
+                    if _poi_norm[:8] in _normalize(_title) or _normalize(_title)[:8] in _poi_norm:
+                        # Look for medium/technique/period mentions in corpus sentences
+                        for _s in _sents[:5]:
+                            _s_lower = _s.lower()
+                            _medium_matches = re.findall(
+                                r'\b(oil on canvas|gouache|lithograph|mosaic|stained glass|'
+                                r'sculpture|bronze|marble|ceramic|watercolor|watercolour|'
+                                r'tempera|fresco|etching|woodcut|tapestry|pastel|charcoal|'
+                                r'ink|acrylic|mixed media|installation|photograph|'
+                                r'huile sur toile|peinture|gravure|mosaïque|vitrail)\b',
+                                _s_lower
+                            )
+                            if _medium_matches:
+                                _corpus_type = _medium_matches[0].title()
+                                break
+                        if _corpus_type:
+                            break
+                if _corpus_type:
+                    poi['type_specialty'] = _corpus_type
+                    print(f"  [LOCAL-27] type_specialty for '{poi['name']}' sourced from corpus: {_corpus_type}")
+                # specific_examples: only populate if we have concrete corpus evidence
+                # (per_work_contexts sentences that name specific verifiable items)
+                # Otherwise leave blank — better absent than invented
+            print(f"  [LOCAL-27] Corpus-sourced metadata applied to {len(poi_list)} stops")
+
+        # -------- [LOCAL-27] Source visitor info from official site (museum tours only) --------
+        if tour_category == 'museum' and _museum_venue_name:
+            # Attempt to fetch real visitor info from the venue's official website
+            _sourced_visitor_info = ''
+            # Get official URL from corpus result source_urls (first URL is typically the official site)
+            _official_url_for_info = ''
+            if _story_corpus_result and _story_corpus_result.get('source_urls'):
+                _official_url_for_info = _story_corpus_result['source_urls'][0]
+            if _official_url_for_info:
+                _sourced_visitor_info = _fetch_visitor_info_from_site(_official_url_for_info)
+            if _sourced_visitor_info and poi_list:
+                # Only populate first stop's operational_details — with SOURCED data
+                poi_list[0]['operational_details'] = _sourced_visitor_info
+                print(f"  [LOCAL-27] Museum Information sourced from official site for stop 1")
+            else:
+                # Explicitly ensure no fabricated operational_details exists
+                for poi in poi_list:
+                    poi['operational_details'] = ''
+                print(f"  [LOCAL-27] No visitor info sourced — Museum Information field OMITTED")
 
         # -------- Coordinates fallback: request for any stop missing coordinates --------
         # PHASE 3B sometimes omits coordinates for one or more stops. Request them
@@ -4110,6 +4348,17 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                 print(f"  [PHASE 5.7] Scrubbed dangling Stop reference(s) from {_field_key} "
                       f"of stop {p['stop_number']}: '{p['name']}'")
     print(f"OK PHASE 5.7: Dangling-reference scrub complete ({_final_stop_count} stops)")
+
+    # -------- [LOCAL-27] PHASE 5.8: Self-contradiction check --------
+    # Verify that declared type_specialty is consistent with prose description.
+    # If contradicting, clear the type_specialty rather than ship a lie.
+    if tour_category == 'museum' and _museum_venue_name:
+        print(f"\nPHASE 5.8: Type/prose contradiction check (LOCAL-27)...")
+        _contradictions = _check_type_prose_contradiction(poi_list)
+        if _contradictions:
+            print(f"  [LOCAL-27] Fixed {len(_contradictions)} type/prose contradiction(s)")
+        else:
+            print(f"  [LOCAL-27] No type/prose contradictions detected")
 
     # PHASE 6: Assemble the complete tour
     print(f"\nPHASE 6: Assembling the complete tour...")
