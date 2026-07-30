@@ -4464,15 +4464,40 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
 
         description_prompt = ""
         if tour_category == 'museum':
-            description_prompt = f"""Create a detailed description for {poi_name} in a walking tour of {location} focusing on {tour_type}.
-
-Start with an orientation section that explains where the visitor should position themselves to best view and appreciate this exhibit.
+            # [LOCAL-41] Audio-native prompt: no rhetorical questions, no mid-tour
+            # re-introductions, orientation states WHY not just where, varied
+            # connective language instead of "broader context" template.
+            _stop_context_line = ""
+            if stop_num > 1:
+                # [LOCAL-41 Fix 3] Listener is already inside. Do NOT re-introduce the venue.
+                _stop_context_line = (
+                    "\nIMPORTANT: The listener is ALREADY inside this museum and has been "
+                    "walking for several stops. Do NOT re-introduce the museum or its city. "
+                    "Do NOT say 'As you step into [museum name]' or 'Welcome to'. "
+                    "Begin directly with this specific exhibit.\n"
+                )
+            # [LOCAL-41 Fix 4] Rotate connective framing — never say "broader context" every stop
+            _CONNECTIVE_FRAMINGS = [
+                f"- How this work reveals a facet of {tour_type} the listener may not have considered",
+                f"- What this work tells us about the tradition of {tour_type} that other stops do not",
+                f"- A specific link between this work and something the listener encountered at an earlier stop, if one exists naturally",
+                f"- The technique or choice this artist made that distinguishes this work from its neighbors in the collection",
+            ]
+            _connective = _CONNECTIVE_FRAMINGS[idx % len(_CONNECTIVE_FRAMINGS)]
+            description_prompt = f"""Create a detailed audio description for {poi_name} at {location}, focusing on {tour_type}.
+{_stop_context_line}
+Start with a brief orientation that tells the listener WHERE to stand or look AND WHY — what becomes visible, legible, or striking from that position that they would miss otherwise.
 
 Then provide a detailed description of the exhibit that is EXACTLY 300 words long. Include:
 - The artistic, historical, and cultural significance of the work
 - Information about the artist and their creative process
-- How this piece fits into the broader context of {tour_type}
+{_connective}
 - Interesting details that would engage visitors
+
+AUDIO RULES (this will be heard, not read):
+- NEVER end with a rhetorical question. End on a statement — an image, a fact, or a thought the listener can carry forward.
+- NEVER list more than three items in a row. Listeners lose track after three.
+- Write for the EAR: short-to-medium sentences, concrete language, no parenthetical asides.
 """
         else:
             _mode_context = f" (traveling by {transport_mode})" if transport_mode != 'on_foot' else ""
@@ -4488,18 +4513,26 @@ Then provide a detailed description that is EXACTLY 300 words long. Include:
 
 Do NOT use museum/gallery framing (no "exhibit", no "viewing platform", no "artwork" unless it genuinely is one).
 Do NOT invent specific named people or attribute quotes unless they are well-documented public figures associated with this location.
+
+AUDIO RULES (this will be heard, not read):
+- NEVER end with a rhetorical question. End on a statement — an image, a fact, or a thought the listener can carry forward.
+- NEVER list more than three items in a row. Listeners lose track after three.
+- Write for the EAR: short-to-medium sentences, concrete language, no parenthetical asides.
 """
 
         # [LOCAL-6 Fix 1] Varied sentence openings — cycle through styles by stop index
         # so consecutive stops in the same tour open with genuinely different structure.
+        # [LOCAL-41] Removed "direct question" opener — rhetorical questions are confusing
+        # in audio (the listener cannot answer; narration just stops). All openers must be
+        # statements or scene-setting, never questions.
         _OPENING_STYLES = [
             "Open with a vivid sensory detail — a sound, smell, texture, or visual that immediately places the listener at this location.",
-            "Open with a direct question that draws the listener in — something that invites curiosity about this place.",
             "Open with a specific historical fact or date that anchors the listener in time before describing the present.",
             "Open by addressing the listener directly in a scene-setting moment — 'As you stand here...' or 'Look up and notice...'",
             "Open with a brief, surprising contrast — what this place once was versus what it is now, or how it differs from its surroundings.",
             "Open with a local anecdote or piece of folklore connected to this spot — a story a resident might tell.",
             "Open with the broader significance of this place in a single declarative sentence before zooming into detail.",
+            "Open with a physical detail of the object itself — its scale, its material, a visible mark of age or craftsmanship that rewards close looking.",
         ]
         _opening_style = _OPENING_STYLES[idx % len(_OPENING_STYLES)]
         description_prompt += f"""
@@ -4929,7 +4962,7 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                             orientation = orientation_text
                             description = ""
                     else:
-                        orientation = "Position yourself directly in front of the exhibit for the best view."
+                        orientation = "Look for this work in the galleries — ask museum staff for its current location."
                         description = description_text.strip()
 
                     # [LOCAL-26] Validate: reject if description is a placeholder echo
@@ -5086,14 +5119,14 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                     return idx, orientation, description, word_count, tokens_used, call_cost
                 else:
                     print(f"Stop {stop_num} error: API returned status code {description_response.status_code}")
-                    return idx, "Position yourself directly in front of the exhibit for the best view.", f"[Description for {poi_name} could not be generated.]", 0, 0, 0.0
+                    return idx, "Look for this work in the galleries — ask museum staff for its current location.", f"[Description for {poi_name} could not be generated.]", 0, 0, 0.0
 
             except Exception as e:
                 print(f"Stop {stop_num} error: {str(e)}")
-                return idx, "Position yourself directly in front of the exhibit for the best view.", f"[Description for {poi_name} could not be generated.]", 0, 0, 0.0
+                return idx, "Look for this work in the galleries — ask museum staff for its current location.", f"[Description for {poi_name} could not be generated.]", 0, 0, 0.0
 
         # Should not reach here, but safety fallback
-        return idx, "Position yourself directly in front of the exhibit for the best view.", f"{poi_name} — an exhibit at this venue.", 0, 0, 0.0
+        return idx, "Look for this work in the galleries — ask museum staff for its current location.", f"{poi_name} — an exhibit at this venue.", 0, 0, 0.0
 
     max_workers = min(len(poi_list), 5)
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -5188,6 +5221,43 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
             print(f"  [LOCAL-27] Fixed {len(_contradictions)} type/prose contradiction(s)")
         else:
             print(f"  [LOCAL-27] No type/prose contradictions detected")
+
+    # -------- [LOCAL-41] PHASE 5.9: Audio-native post-processing --------
+    # Strip trailing rhetorical questions from descriptions (GPT sometimes
+    # ignores the "no questions" instruction). Also strip the formulaic
+    # "Within the broader context of the museum" scaffolding phrase.
+    print(f"\nPHASE 5.9: Audio-native cleanup (LOCAL-41)...")
+    _audio_fixes = 0
+    _broader_context_count = 0
+    for p in poi_list:
+        for _field_key in ('description', 'orientation'):
+            _text = p.get(_field_key, '') or ''
+            if not _text:
+                continue
+            _original = _text
+
+            # Strip trailing rhetorical questions (last sentence ending with ?)
+            # Only strip if it's the last sentence — mid-text questions are sometimes OK
+            _sentences = re.split(r'(?<=[.!?])\s+', _text.strip())
+            while _sentences and _sentences[-1].rstrip().endswith('?'):
+                _sentences.pop()
+                _audio_fixes += 1
+            _text = ' '.join(_sentences)
+
+            # Replace "Within the broader context of the museum/collection"
+            # with nothing (the surrounding prose usually flows without it)
+            _text_new = re.sub(
+                r'[Ww]ithin the broader context of (the museum|the collection|this museum|this collection|' + re.escape(tour_type) + r')[,.]?\s*',
+                '', _text
+            )
+            if _text_new != _text:
+                _broader_context_count += 1
+                _text = _text_new
+
+            if _text != _original:
+                p[_field_key] = _text.strip()
+    print(f"  [LOCAL-41] Stripped {_audio_fixes} trailing question(s), "
+          f"removed {_broader_context_count} 'broader context' instance(s)")
 
     # PHASE 6: Assemble the complete tour
     print(f"\nPHASE 6: Assembling the complete tour...")
@@ -5504,9 +5574,17 @@ Requirements:
                 # [G4] Build epilog ONLY from deterministic content + documented story elements
                 # Do NOT use spine's closing_revelation (may contain fabricated claims)
                 _poi_names = [p["name"] for p in poi_list]
-                _recap_list = ", ".join(_poi_names[:-1]) + f", and {_poi_names[-1]}" if len(_poi_names) > 1 else _poi_names[0]
                 
-                epilog = f"\n\nAs this journey comes to a close, reflect on the path you've taken — from {_poi_names[0]} through to here at {poi_name}. "
+                # [LOCAL-41] Audio-native closing: synthesize 2–3 stops in service of a
+                # point, never enumerate all stops. Listeners hearing a full list feel
+                # they missed something — it manufactures anxiety where the tour should land.
+                _first = _poi_names[0]
+                _last = poi_name
+                # Pick one interior highlight (middle stop, roughly)
+                _mid_idx = len(_poi_names) // 2
+                _mid = _poi_names[_mid_idx] if len(_poi_names) > 2 else None
+                
+                epilog = f"\n\nAs this journey comes to a close, reflect on the path you've taken — from {_first} through to here at {_last}. "
                 
                 # Use ONLY documented story elements for closing facts (never GPT-generated spine text)
                 if _story_elements:
@@ -5516,7 +5594,11 @@ Requirements:
                         _fact = _closing_facts[0]
                         epilog += _fact + " "
                 
-                epilog += f"\n\nYou've experienced {_recap_list} — each a chapter in a story that only reveals its full meaning when read together."
+                # [LOCAL-41] Short synthesis naming at most 2–3 stops, never an inventory.
+                if _mid:
+                    epilog += f"\n\nFrom the craftsmanship of {_first} to the stillness of {_mid} to this final encounter with {_last} — each revealed a different facet of this collection, and together they tell a larger story than any one alone."
+                else:
+                    epilog += f"\n\nFrom {_first} to {_last} — each stop revealed a different facet of this collection, and together they tell a larger story than any one alone."
                 epilog += f"\n\nIf you'd like to explore more, consider generating another tour — perhaps a different perspective on this same place, or a new destination entirely. The next journey awaits."
                 
                 poi_content += epilog
