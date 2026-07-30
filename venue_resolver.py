@@ -898,7 +898,7 @@ from datetime import datetime, timedelta
 
 VENUE_CACHE_TTL_DAYS = int(os.environ.get('VENUE_CACHE_TTL_DAYS', '30'))
 VENUE_CACHE_NEGATIVE_TTL_DAYS = int(os.environ.get('VENUE_CACHE_NEGATIVE_TTL_DAYS', '5'))
-CORPUS_VERSION = 3  # Increment when pipeline improvements invalidate cached data
+CORPUS_VERSION = 4  # LOCAL-24: Work-vs-nonwork filter added; invalidate stale cached data
 
 
 # TODO(S94): remove in-code password fallback; prod must use DATABASE_URL/DB_PASSWORD env only

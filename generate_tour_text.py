@@ -1052,6 +1052,35 @@ def _verify_works_v2(poi_list, venue_name):
         canonical_titles -= _to_remove
         print(f"  [D1v2] Removed {len(_to_remove)} substring titles (prefer longer forms)")
 
+    # --- LOCAL-24: Work-vs-Nonwork Filter ---
+    # Classify all canonical titles and remove non-works (programs, workshops,
+    # section headings, streets, museum-meta labels). Tag galleries distinctly.
+    from story_miner import filter_corpus_titles
+    _title_sources = corpus_result.get('title_sources', {}) if 'corpus_result' in dir() and corpus_result else {}
+    _filter_result = filter_corpus_titles(
+        raw_titles=canonical_titles,
+        sparql_works=sparql_works,
+        source_urls_map=_title_sources,
+        venue_name=venue_name,
+        venue_address="",  # Could be enriched from venue entity if available
+        preferred_language=_language if '_language' in dir() else "en",
+    )
+    # Replace canonical_titles with only classified works (galleries are tracked separately)
+    canonical_titles = _filter_result['works']
+    _gallery_titles = _filter_result['galleries']
+    _excluded_titles = _filter_result['excluded']
+    _cross_lang_aliases = _filter_result['aliases']
+    
+    # Store classification in corpus_result for downstream audit
+    # CRITICAL: Also update corpus_result['canonical_titles'] so R4 replenishment
+    # uses the FILTERED set (prevents excluded titles from being re-verified via R4)
+    if 'corpus_result' in dir() and corpus_result and isinstance(corpus_result, dict):
+        corpus_result['filter_result'] = _filter_result
+        corpus_result['canonical_titles'] = canonical_titles  # LOCAL-24: filtered set
+    
+    print(f"  [D1v2-LOCAL24] After filter: {len(canonical_titles)} works, "
+          f"{len(_gallery_titles)} galleries, {len(_excluded_titles)} excluded")
+
     if not canonical_titles:
         print(f"  [D1v2] No canonical titles discovered — tier: unresolvable")
         _has_site = len(corpus_result.get('combined_text', '')) > 1000 if 'corpus_result' in dir() and corpus_result else False
@@ -2492,6 +2521,16 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         _ev_entry = _d1_evidence_log.get(_cand_name, {})
                         if isinstance(_ev_entry, dict) and _ev_entry.get('status') == 'REJECTED':
                             continue
+                        # LOCAL-24: Apply work-vs-nonwork filter to fill candidates
+                        # Prevents programs/workshops from entering the tour as unverified fills
+                        from story_miner import classify_corpus_entry
+                        _fill_class = classify_corpus_entry(
+                            title=_cand_name,
+                            venue_name=venue_name,
+                        )
+                        if _fill_class['kind'] == 'excluded':
+                            print(f"  [UNIFIED-FILL] LOCAL-24 blocked: '{_cand_name}' ({_fill_class['rule']})")
+                            continue
                         # Every fill candidate is explicitly unverified
                         p['verified'] = False
                         _fill_candidates.append(p)
@@ -2532,6 +2571,15 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             continue
                         # Skip if already in poi_list
                         if _cand_name.lower() in set(p2['name'].lower() for p2 in poi_list):
+                            continue
+                        # LOCAL-24: Apply work-vs-nonwork filter
+                        from story_miner import classify_corpus_entry
+                        _post_fill_class = classify_corpus_entry(
+                            title=_cand_name,
+                            venue_name=venue_name,
+                        )
+                        if _post_fill_class['kind'] == 'excluded':
+                            print(f"  [POST-R4-FILL] LOCAL-24 blocked: '{_cand_name}' ({_post_fill_class['rule']})")
                             continue
                         p['verified'] = False
                         _post_r4_fill.append(p)
