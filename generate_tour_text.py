@@ -4477,22 +4477,39 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     "Begin directly with this specific exhibit.\n"
                 )
             # [LOCAL-41 Fix 4] Rotate connective framing — never say "broader context" every stop
-            _CONNECTIVE_FRAMINGS = [
-                f"- How this work reveals a facet of {tour_type} the listener may not have considered",
-                f"- What this work tells us about the tradition of {tour_type} that other stops do not",
-                f"- A specific link between this work and something the listener encountered at an earlier stop, if one exists naturally",
-                f"- The technique or choice this artist made that distinguishes this work from its neighbors in the collection",
-            ]
-            _connective = _CONNECTIVE_FRAMINGS[idx % len(_CONNECTIVE_FRAMINGS)]
             description_prompt = f"""Create a detailed audio description for {poi_name} at {location}, focusing on {tour_type}.
 {_stop_context_line}
 Start with a brief orientation that tells the listener WHERE to stand or look AND WHY — what becomes visible, legible, or striking from that position that they would miss otherwise.
 
 Then provide a detailed description of the exhibit that is EXACTLY 300 words long. Include:
-- The artistic, historical, and cultural significance of the work
-- Information about the artist and their creative process
-{_connective}
-- Interesting details that would engage visitors
+- What the work physically depicts or consists of — what the visitor sees
+- One specific technique, material choice, or compositional decision and WHY it matters
+- One piece of historical or cultural context that changes how the visitor understands it
+- If relevant: how this piece connects to the broader collection or {tour_type}
+
+EXPLAIN-WHAT-YOU-NAME RULE (critical):
+Every concept, motif, symbol, technique, cultural reference, or person you mention
+MUST get at least one clause of explanation. If you cannot explain it in a clause, cut it.
+- BAD: "the rich cultural heritage of Bengal" (names but explains nothing)
+- GOOD: "the Pala dynasty tradition of Bengal, where Buddhist monasteries commissioned
+  bronze casting between the 8th and 12th centuries"
+- BAD: "delicate floral motifs adorning the crown" (what do they mean?)
+- GOOD: "lotus petals on the crown — a symbol of spiritual purity in Hindu iconography,
+  also found on temple lintels across Southeast Asia"
+- BAD: "Each intricate detail tells a story of creation and rebirth"
+  (asserts meaning without delivering it)
+- GOOD: "The four arms each hold a specific object: the axe that severs attachment,
+  the rope that pulls devotees from illusion, the tusk broken as a writing implement,
+  and the sweetmeat representing the reward of a disciplined life"
+The stop's own subject (the exhibit itself) needs no gloss — the whole stop explains it.
+But a person referenced in passing (e.g. Ulysses Grant) needs one clause: "the American
+Civil War general who became president." If most visitors won't know it, explain it or cut it.
+
+NO UNSUPPORTED PRAISE: Do not end paragraphs with evaluative claims ("a truly remarkable
+achievement", "a testament to the artist's genius") unless you have just provided the
+specific evidence that earns the evaluation. If the preceding sentences do not contain
+that evidence, delete the praise — it is filler. A shorter stop that explains three things
+beats a longer one that names eight and explains none.
 
 AUDIO RULES (this will be heard, not read):
 - NEVER end with a rhetorical question. End on a statement — an image, a fact, or a thought the listener can carry forward.
@@ -4506,10 +4523,26 @@ AUDIO RULES (this will be heard, not read):
 Start with an orientation section that explains how the visitor arrives at this stop and what they should look for.
 
 Then provide a detailed description that is EXACTLY 300 words long. Include:
-- What makes this stop notable or interesting for this tour
-- Historical or cultural context relevant to the location
-- Sensory details and atmosphere that would engage visitors
-- How this stop connects to the tour's overall theme
+- What makes this stop notable or interesting — with specific evidence, not adjectives
+- Historical or cultural context: name a date, a person, an event, a cause-and-effect
+- One concrete sensory detail that places the listener HERE (a sound, material, smell)
+- How this stop connects to the tour's theme — show the connection, don't just assert it
+
+EXPLAIN-WHAT-YOU-NAME RULE (critical):
+Every concept, motif, symbol, person, or cultural reference you mention MUST get at least
+one clause of explanation. If you cannot explain it in a clause, cut the reference.
+- BAD: "the vibrant world of this ancient masterpiece" (vibrant how? which world?)
+- GOOD: "the gilt lacquer catches overhead light differently depending on your angle —
+  the craftsman applied seven layers, sanding each to translucence before the next"
+- BAD: "a person of great historical significance" (say WHO and WHY)
+- GOOD: "Commodore Perry, whose 1853 arrival with four warships forced Japan to open
+  its ports after two centuries of isolation"
+The stop's own subject needs no gloss. But anything mentioned in passing that most
+visitors won't know MUST get one explanatory clause or be cut entirely.
+
+NO UNSUPPORTED PRAISE: Do not end paragraphs with evaluative claims unless the preceding
+sentences contain the specific evidence that earns them. Delete praise that isn't earned
+by evidence immediately before it.
 
 Do NOT use museum/gallery framing (no "exhibit", no "viewing platform", no "artwork" unless it genuinely is one).
 Do NOT invent specific named people or attribute quotes unless they are well-documented public figures associated with this location.
@@ -4875,6 +4908,18 @@ BANNED PHRASES — do NOT use any of these in your description:
 - "invites you to explore/discover/reflect" / "immerse yourself in"
 - "can't help but" / "feast for the eyes" / "step into a world"
 Instead, use SPECIFIC, CONCRETE language: name colors precisely (cerulean, ochre, vermilion), describe actual compositional choices, mention documented historical context.
+
+UNEARNED ADJECTIVES — these words are BANNED unless the same sentence or the one before it
+contains the specific evidence that earns them:
+- "vibrant" — ONLY permitted if you name the specific colors/contrasts that make it vibrant
+- "stunning" — ONLY if you describe what causes the visual impact (scale? technique? contrast?)
+- "remarkable" — ONLY if you state what distinguishes it from comparable works
+- "mesmerizing" — ONLY if you explain the optical or compositional mechanism
+- "exquisite" — ONLY if you describe the craftsmanship detail (grain, jointwork, brushstroke)
+- "breathtaking" — ONLY if you name the physical feature that produces the effect
+- "captivating" — ONLY if you explain what holds attention and why
+If you cannot provide that evidence in the same breath, delete the adjective. A bare noun
+is better than a noun preceded by an unearned superlative.
 """
             description_prompt += """
 FACTUAL INTEGRITY RULE: Do NOT invent visual specifics or biographical claims not in the fact sheet above. You may describe the general biblical SUBJECT (e.g. "depicts the parting of the Red Sea") but do NOT assert specific visual details as facts (colors, composition) unless grounded in the facts above. Never call a work "the artist's final masterpiece" or similar unverifiable superlatives.
