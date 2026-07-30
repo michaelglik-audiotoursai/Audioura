@@ -999,3 +999,229 @@ def apply_tour_diversity(stops_selections: List[Dict], max_same_type: int = 2) -
             type_counts[top_type] = count + 1
     
     return stops_selections
+
+
+
+# ============================================================================
+# LOCAL-18/21: Adapter layer — bridges production caller interface to real engine
+# ============================================================================
+# Production (generate_tour_text.py line ~3310) expects:
+#   from story_element_extractor import extract_story_elements_from_pages, persist_story_elements
+# The real engine exposes extract_elements_from_text, score_corroboration, etc.
+# This adapter wraps them with the expected signatures, using the FREE path:
+# already-fetched corpus pages (no new API cost for fetching).
+
+
+def extract_story_elements_from_pages(
+    pages: List[Dict],
+    venue_name: str,
+    api_key: str = '',
+    max_pages: int = 5,
+    canonical_titles: Optional[set] = None,
+) -> List[Dict]:
+    """Adapter: extract + score story elements from already-fetched corpus pages.
+
+    This is the function production expects (§3 in generate_tour_text.py).
+    It wraps the real engine functions using the FREE path (pages already fetched
+    by story_miner — no new web fetches, only LLM extraction calls on existing text).
+
+    Args:
+        pages: List of page dicts from story_miner: [{"url": ..., "text": ..., "title": ...}]
+        venue_name: Venue/museum name (used as artist fallback and for collection-anchor).
+        api_key: OpenAI API key. Falls back to OPENAI_API_KEY env var.
+        max_pages: Max pages to process (cost control).
+        canonical_titles: Optional set of canonical work titles for work-anchor check.
+            When not provided, uses venue_name as the canonical title (broad match).
+
+    Returns:
+        List of scored, ranked story elements with IDs assigned.
+        Empty list on failure (never raises).
+    """
+    global OPENAI_API_KEY
+    if api_key:
+        OPENAI_API_KEY = api_key
+
+    if not pages:
+        print(f"  [§3-adapter] No pages to extract from")
+        return []
+
+    # Sort pages by content quality: Wikipedia first, then by substantive text length
+    # (museum event/agenda pages are often long but content-poor)
+    def _page_quality_score(page):
+        url = page.get('url', '')
+        text = page.get('text', '')
+        score = 0
+        # Wikipedia pages are highest quality for story extraction
+        # Prefer pages in the venue's own language (e.g. fr.wikipedia for French venues)
+        if 'wikipedia.org' in url:
+            score += 10000
+            # Bonus for non-English Wikipedia (often more detailed for local venues)
+            if not url.startswith('https://en.') and '.wikipedia.org' in url:
+                score += 2000
+        # Official museum "about" / "history" / "collection" pages
+        _high_value_patterns = ('/about', '/history', '/collection', '/oeuvres',
+                                '/permanent', '/histoire', '/museo', '/propos')
+        if any(p in url.lower() for p in _high_value_patterns):
+            score += 5000
+        # Penalize event/agenda pages (long but content-poor)
+        _low_value_patterns = ('/agenda', '/evenement', '/exposition', '/event',
+                               '/calendar', '/programme', '/saison', '/ticket',
+                               '/visit', '/visite', '/horaires', '/tarif',
+                               '/actualite', '/news', '/shop', '/boutique')
+        if any(p in url.lower() for p in _low_value_patterns):
+            score -= 5000
+        # Prefer pages with more prose-like text (longer sentences)
+        sentences = [s for s in text.split('.') if len(s.strip()) > 40]
+        score += len(sentences) * 10
+        # Prefer pages with substantive content over nav/boilerplate
+        # (pages with many short lines are likely HTML artifacts)
+        lines = text.split('\n')
+        long_lines = sum(1 for l in lines if len(l.strip()) > 60)
+        score += long_lines * 5
+        return score
+
+    sorted_pages = sorted(pages, key=_page_quality_score, reverse=True)
+    pages_to_process = sorted_pages[:max_pages]
+    print(f"  [§3-adapter] Extracting story elements from {len(pages_to_process)}/{len(pages)} corpus pages for '{venue_name}'")
+    for i, p in enumerate(pages_to_process[:3]):
+        print(f"    page[{i}] score={_page_quality_score(p)} url={p.get('url', '?')[:80]}")
+
+    # Determine canonical title for anchor check:
+    # If canonical_titles provided, use the first one; otherwise use venue_name
+    if canonical_titles and len(canonical_titles) > 0:
+        _primary_title = sorted(canonical_titles)[0]  # deterministic pick
+    else:
+        _primary_title = venue_name
+
+    # Extract artist from venue name (best-effort heuristic for single-artist museums)
+    _artist = _extract_artist_from_venue_name(venue_name)
+
+    all_elements = []
+    pages_used = 0
+
+    for page in pages_to_process:
+        page_text = page.get('text', '')
+        page_url = page.get('url', '')
+        if not page_text or len(page_text.strip()) < 100:
+            continue
+
+        # Work-anchor check (relaxed for adapter: venue_name match counts)
+        # Use broad anchor: either canonical_title or venue_name present
+        has_anchor = check_work_anchor(page_text, _primary_title, _artist)
+        if not has_anchor and canonical_titles:
+            # Try other canonical titles
+            for ct in list(canonical_titles)[:5]:
+                if check_work_anchor(page_text, ct, _artist):
+                    has_anchor = True
+                    _primary_title = ct  # use matching title for extraction
+                    break
+        if not has_anchor:
+            # W9: Try collection-anchor (provenance/dedication)
+            has_anchor = check_collection_anchor(page_text, _artist, venue_name)
+
+        if not has_anchor:
+            # Relaxed fallback: if venue name tokens appear in text, still process
+            # (already-fetched pages from story_miner were already venue-relevant)
+            _venue_tokens = set(w.lower() for w in venue_name.split() if len(w) > 3)
+            _page_lower = page_text[:2000].lower()
+            _token_hits = sum(1 for t in _venue_tokens if t in _page_lower)
+            if _token_hits < max(1, len(_venue_tokens) // 2):
+                continue  # genuinely irrelevant page
+
+        # Extract elements from this page
+        # [LOCAL-21] Use collection-provenance extraction for museum-about pages
+        # (Wikipedia pages about the museum, official /about and /history pages).
+        # These discuss the collection as a whole, not a specific artwork, so
+        # extract_elements_from_text (work-specific) would yield nothing.
+        _is_museum_about_page = (
+            ('wikipedia.org' in page_url and 
+             any(tok in page_url.lower() for tok in ['musée', 'musee', 'museum', 'museo'])) or
+            any(p in page_url.lower() for p in ('/about', '/history', '/histoire', '/collection', '/propos'))
+        )
+        if _is_museum_about_page:
+            # Collection-level extraction (provenance, donations, founding)
+            elements = extract_collection_provenance(page_text, _artist, venue_name, page_url)
+            # Also try work-specific extraction with venue name as anchor
+            # (may catch dates/techniques mentioned in passing)
+            elements_work = extract_elements_from_text(page_text, venue_name, _artist, page_url)
+            if elements_work:
+                elements.extend(elements_work)
+        else:
+            elements = extract_elements_from_text(page_text, _primary_title, _artist, page_url)
+        if elements:
+            all_elements.extend(elements)
+            pages_used += 1
+
+    if not all_elements:
+        print(f"  [§3-adapter] No elements extracted from {len(pages_to_process)} pages")
+        return []
+
+    print(f"  [§3-adapter] Raw elements: {len(all_elements)} from {pages_used} pages")
+
+    # Score corroboration (syndication detection + LLM merge)
+    scored = score_corroboration(all_elements)
+    print(f"  [§3-adapter] After corroboration scoring: {len(scored)} elements")
+
+    # Rank
+    ranked = rank_stop_elements(scored)
+
+    # Assign stable IDs for spine generator reference
+    for i, elem in enumerate(ranked):
+        elem['id'] = f"se_{i+1:03d}"
+
+    print(f"  [§3-adapter] Final: {len(ranked)} ranked elements (top type: {ranked[0].get('type', '?') if ranked else 'none'})")
+    return ranked
+
+
+def persist_story_elements(elements: List[Dict], output_path: str) -> bool:
+    """Adapter: persist story elements to a JSON file.
+
+    Args:
+        elements: List of scored/ranked story element dicts.
+        output_path: File path to write JSON.
+
+    Returns:
+        True on success, False on failure (never raises).
+    """
+    try:
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(elements, f, indent=2, ensure_ascii=False)
+        print(f"  [§3-adapter] Persisted {len(elements)} elements → {output_path}")
+        return True
+    except Exception as e:
+        print(f"  [§3-adapter] Persist failed: {e}")
+        return False
+
+
+def _extract_artist_from_venue_name(venue_name: str) -> str:
+    """Best-effort extraction of artist name from venue name.
+
+    Handles patterns like 'Musée National Marc Chagall', 'Van Gogh Museum',
+    'The Dalí Theatre-Museum', etc.
+    """
+    # Common museum/gallery suffixes to strip
+    _SUFFIXES = ('museum', 'gallery', 'centre', 'center', 'institute',
+                 'foundation', 'collection', 'house', 'studio',
+                 'theatre', 'theater', 'musée', 'museo', 'galerie')
+    _PREFIXES = ('the', 'musée', 'museo', 'museum', 'national', 'royal',
+                 'modern', 'contemporary', 'fondation', 'galerie')
+
+    words = venue_name.split()
+    # Strip city/location suffix (e.g. ", Nice, France")
+    # Take only words before first comma
+    _name_part = venue_name.split(',')[0].strip()
+    words = _name_part.split()
+    
+    # Strip known prefixes and suffixes
+    cleaned = []
+    for w in words:
+        w_lower = w.lower().rstrip('.,;-–')
+        if w_lower not in _SUFFIXES and w_lower not in _PREFIXES:
+            cleaned.append(w)
+
+    # If we stripped down to 1-3 proper words, that's likely the artist
+    if 1 <= len(cleaned) <= 3:
+        return ' '.join(cleaned)
+
+    # Fallback: return empty (extraction will proceed without artist constraint)
+    return ''

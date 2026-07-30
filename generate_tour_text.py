@@ -3492,11 +3492,28 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         venue_name=_venue_name,
                         api_key=api_key,
                         max_pages=5,
+                        canonical_titles=_story_corpus_result.get('canonical_titles'),
                     )
-                    # Persist story elements
+                    # Persist story elements to file
                     if _story_elements and output_file:
                         _elem_path = output_file.replace('.txt', '_story_elements.json')
                         persist_story_elements(_story_elements, _elem_path)
+                    # [LOCAL-21] Update venue_corpus cache with extracted story elements
+                    if _story_elements and _d1v2_result and hasattr(_d1v2_result, 'qid') and _d1v2_result.qid:
+                        try:
+                            from venue_resolver import _get_db_connection
+                            _se_conn = _get_db_connection()
+                            if _se_conn:
+                                with _se_conn.cursor() as _se_cur:
+                                    _se_cur.execute(
+                                        "UPDATE venue_corpus SET story_elements_json = %s WHERE qid = %s",
+                                        (json.dumps(_story_elements), _d1v2_result.qid)
+                                    )
+                                    _se_conn.commit()
+                                    print(f"  [§3] Updated venue_corpus.story_elements_json for {_d1v2_result.qid} ({len(_story_elements)} elements)")
+                                _se_conn.close()
+                        except Exception as _db_err:
+                            print(f"  [§3] DB update non-fatal: {_db_err}")
                 except ImportError:
                     print(f"  [§3] story_element_extractor not available")
                 except Exception as _se_err:
@@ -4058,6 +4075,11 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                 _story_corpus_result['combined_text'],
                 _museum_venue_name or location,
             )
+            # [LOCAL-21] When story elements exist, suppress founding facts from venue-identity
+            # injection to avoid G4 conflicts (founding dates/verbs trigger G4 but may not match
+            # story_elements). Architecture/design/programs are safe (no causal verbs).
+            if _story_elements and 'founding' in _venue_identity:
+                del _venue_identity['founding']
             _venue_identity_prompt_block = format_venue_identity_for_prompt(
                 _venue_identity,
                 _museum_venue_name or location,
@@ -4083,11 +4105,33 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
             if _venue_identity_prompt_block:
                 _identity_section = f"\n\n{_venue_identity_prompt_block}"
             
+            # [LOCAL-21] When story elements exist, constrain prolog to ONLY use facts
+            # from those elements. This prevents G4 failures where the prolog LLM invents
+            # dates/causal claims that can't trace back to story elements.
+            _grounding_constraint = ""
+            if _story_elements:
+                _elem_facts = "\n".join(
+                    f"  - ({e.get('type','?')}) {e.get('text','')}"
+                    for e in _story_elements[:10]
+                )
+                _grounding_constraint = f"""
+
+GROUNDING CONSTRAINT — CRITICAL:
+The following are the ONLY documented facts you may reference. Do NOT invent any dates, 
+names of people, founding events, or causal claims (who created/founded/donated/built what) 
+that are not present in this list:
+{_elem_facts}
+
+If you want to mention a year, person, or event, it MUST appear verbatim in the facts above.
+You may use evocative, atmospheric language without factual claims (e.g. "a journey through 
+light and colour" is fine; "founded in 1973 by André Malraux" is NOT fine unless that fact 
+appears above). Prefer thematic/emotional framing over specific historical claims."""
+
             _prolog_prompt = f"""Write a compelling 80-150 word tour introduction that frames this experience as a journey — a book of connected chapters.
 
 Theme/connecting thread: {_connecting_thread}
 Tour hook: {_tour_hook}
-Chapter previews: {'; '.join(_chapter_previews)}{_identity_section}
+Chapter previews: {'; '.join(_chapter_previews)}{_identity_section}{_grounding_constraint}
 
 Requirements:
 - Write in second-person present tense ("You are about to embark...")
