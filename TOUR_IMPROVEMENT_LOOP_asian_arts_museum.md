@@ -123,6 +123,33 @@ acceptance bar. **The 75 target must be treated as NOT met until it reproduces.*
 REMAINING: (a) **LOCAL-29's cross-contamination fix did NOT work** — stop 3 still says '12th-century Bengali' where the catalogue says '2nde moitié du Xe siècle, Chlorite'; wrong century plus an unverified provenance asserted as fact, and the actual material (chlorite) never appears. (b) Still zero cross-stop callbacks in any run, so the correlation bonus remains entirely unearned. (c) Most stops remain a strong factual opening followed by 150–250w of atmosphere, which is why they score ADEQUATE rather than RICH — the ceiling above here is real headroom. | 5a135b2 |
 | 10 (LOCAL-31 merged) | 2026-07-30 | **BASE 81.25 · TOTAL 89.4 · REPRODUCIBLE ×3** | ~$0.03 | — | Ganesh factual error ELIMINATED. LOCAL-31 root-caused it at the EXTRACTION layer (the catalogue parser's heading heuristic failed to split adjacent entries, so Kannon's `XIIe siècle` bled onto Ganesh) and now refuses to assert a period it cannot attribute to the entry's own text — logs `Dropping period 'XIIe siècle' ... likely cross-entry bleed`. Wrong century and the unsourced 'Bengali' provenance are both gone from all three runs. **Stop lists byte-identical across all three runs (same md5), two of them cache HITs.** `Museum Information: Closed on Tuesday. Free admission` correct in all three. Zero fabrications (run 2's 'renowned architect Kenzo Tange' is legitimate — he designed the building). Zero invented metadata fields. REMAINING: (a) chlorite is in the catalogue but still never reaches the prose — LOCAL-31 removed the false fact but did not deliver the true one, a wasted RICH; (b) still zero cross-stop callbacks in any run, so the correlation bonus stays entirely unearned; (c) stops remain ADEQUATE — strong factual opening plus 150–250w of atmosphere — which is the real headroom above here. | ffcf3f8 |
 
+
+### Generalization spot-check (2026-07-30) — THE GAINS ARE OVERFITTED
+
+The loop rules require a second-venue check every round to catch overfitting. LEAD ran two: **both are worse
+than before this work.**
+
+**Palais Lascaris — 1-stop tour.** Requested 8, delivered 1. Its corpus fell from 14 titles to 7, and six of
+those seven are section headings or nav labels the LOCAL-24 classifier failed to exclude: `Highlights of the
+Collection`, `Current use`, `Photo gallery`, `The bequest of the collection of Antoine Gautier`, `Pièces
+importantes`, `Legs d'Antoine Gautier`. Only 1/8 verified; R4 proposed 7 replacements and all were dropped.
+The classifier's rules were derived from the junk THIS museum produced ('Infos pratiques', 'Monstres de
+poche') and do not transfer.
+
+**Musée Matisse — mostly good, visitor info garbled.** 8/8 stops, genuine Matisse works (Nu bleu IV,
+Odalisque au coffret rouge, Nature morte aux grenades…), one exhibition title among them. But
+`Museum Information: Open every day except Tuesday : from 10:00 to 17:00 du 1 er novembre au 31 mars from
+10:00 to 18:00. Free` — mixed languages, malformed.
+
+**Palais Lascaris visitor info is pure nav junk:** `tarifs Télécharger le recueil 2026 Télécharger la
+délibération 25.10`. LOCAL-27's rule was *sourced or omitted*; this is neither, and is worse than an absent
+field.
+
+**Conclusion: the 89.4 is real for the Asian Arts Museum and does not currently generalize.** Dispatched
+LOCAL-32 to generalize the heading/nav classifier (positional rather than phrase-matched, EN+FR) and to add
+a validity gate to visitor-info extraction, with all three venues as the acceptance bar. **A field test on an
+arbitrary venue would likely expose this.**
+
 ## Round 1 scope (LOCAL-14, dispatched 2026-07-29)
 
 1. **UNIFIED-FILL fabrication (highest priority):** when D1v2 correctly drops a
