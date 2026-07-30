@@ -3569,6 +3569,24 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # PHASE 5: Generate detailed descriptions for each POI (parallelized)
     print(f"\nPHASE 5: Generating detailed descriptions for each POI (parallel)...")
 
+    # [LOCAL-26] Helper: detect when GPT echoed back a template placeholder instead of content
+    def _detect_placeholder_leak(text):
+        """Return True if text appears to be a placeholder echo rather than real content."""
+        if not text or not text.strip():
+            return True
+        stripped = text.strip()
+        # Bracketed line matching "[...word description...]"
+        if re.search(r'\[.*\bword\b.*\bdescription\b.*\]', stripped, re.IGNORECASE):
+            return True
+        # Output wholly enclosed in square brackets (entire text is a placeholder)
+        if stripped.startswith('[') and stripped.endswith(']') and '\n' not in stripped:
+            return True
+        # Output far below the minimum useful length (< 30 words when we asked for 120+)
+        word_count = len(stripped.split())
+        if word_count < 30:
+            return True
+        return False
+
     def _generate_description(args):
         idx, poi, spine_stop, fact_sheet, story_type = args
         stop_num = idx + 1
@@ -3879,9 +3897,9 @@ NOTE: "The Biblical Message" (Message Biblique) is the name of the COMPLETE CYCL
 
         description_prompt += f"""
 Format your response as follows:
-Orientation: [Brief orientation text explaining the best viewing position]
+Orientation: (write a brief orientation text explaining the best viewing position here)
 
-[Detailed {_word_target}-word description of the exhibit]
+Then write the description directly — a flowing, {_word_target}-word narrative about the exhibit. Do NOT wrap it in brackets, placeholders, or formatting markers. Just write the prose.
 
 DO NOT include any section headers other than "Orientation:" - the description should flow naturally after the orientation section.
 DO NOT include directions to the next stop - these will be added separately.
@@ -3905,45 +3923,62 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
             "max_tokens": 1000
         }
 
-        try:
-            description_response = requests.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers=headers,
-                data=json.dumps(description_data)
-            )
+        # [LOCAL-26] Retry loop with placeholder-leak validation
+        _max_retries = 2
+        for _attempt in range(_max_retries + 1):
+            try:
+                description_response = requests.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers=headers,
+                    data=json.dumps(description_data)
+                )
 
-            if description_response.status_code == 200:
-                description_result = description_response.json()
-                description_text = description_result["choices"][0]["message"]["content"]
+                if description_response.status_code == 200:
+                    description_result = description_response.json()
+                    description_text = description_result["choices"][0]["message"]["content"]
 
-                tokens_used = description_result["usage"]["total_tokens"]
-                call_cost = tokens_used / 1000 * 0.002
-                print(f"Stop {stop_num} API call cost: ${call_cost:.4f} ({tokens_used} tokens)")
+                    tokens_used = description_result["usage"]["total_tokens"]
+                    call_cost = tokens_used / 1000 * 0.002
+                    print(f"Stop {stop_num} API call cost: ${call_cost:.4f} ({tokens_used} tokens)")
 
-                parts = description_text.split("Orientation:", 1)
-                if len(parts) > 1:
-                    orientation_text = parts[1].strip()
-                    description_parts = orientation_text.split("\n\n", 1)
-                    if len(description_parts) > 1:
-                        orientation = description_parts[0].strip()
-                        description = description_parts[1].strip()
+                    parts = description_text.split("Orientation:", 1)
+                    if len(parts) > 1:
+                        orientation_text = parts[1].strip()
+                        description_parts = orientation_text.split("\n\n", 1)
+                        if len(description_parts) > 1:
+                            orientation = description_parts[0].strip()
+                            description = description_parts[1].strip()
+                        else:
+                            orientation = orientation_text
+                            description = ""
                     else:
-                        orientation = orientation_text
-                        description = ""
-                else:
-                    orientation = "Position yourself directly in front of the exhibit for the best view."
-                    description = description_text.strip()
+                        orientation = "Position yourself directly in front of the exhibit for the best view."
+                        description = description_text.strip()
 
-                word_count = len(description.split())
-                print(f"Stop {stop_num} description word count: {word_count} words")
-                return idx, orientation, description, word_count, tokens_used, call_cost
-            else:
-                print(f"Stop {stop_num} error: API returned status code {description_response.status_code}")
+                    # [LOCAL-26] Validate: reject if description is a placeholder echo
+                    _placeholder_leaked = _detect_placeholder_leak(description)
+                    if _placeholder_leaked:
+                        if _attempt < _max_retries:
+                            print(f"  [LOCAL-26] Stop {stop_num}: placeholder leak detected (attempt {_attempt+1}), retrying...")
+                            continue  # retry
+                        else:
+                            # All retries exhausted — produce honest short description, never ship placeholder
+                            print(f"  [LOCAL-26] Stop {stop_num}: placeholder leak persists after {_max_retries+1} attempts, using fallback")
+                            description = f"{poi_name} — an exhibit at this venue. Detailed information was not available at generation time."
+
+                    word_count = len(description.split())
+                    print(f"Stop {stop_num} description word count: {word_count} words")
+                    return idx, orientation, description, word_count, tokens_used, call_cost
+                else:
+                    print(f"Stop {stop_num} error: API returned status code {description_response.status_code}")
+                    return idx, "Position yourself directly in front of the exhibit for the best view.", f"[Description for {poi_name} could not be generated.]", 0, 0, 0.0
+
+            except Exception as e:
+                print(f"Stop {stop_num} error: {str(e)}")
                 return idx, "Position yourself directly in front of the exhibit for the best view.", f"[Description for {poi_name} could not be generated.]", 0, 0, 0.0
 
-        except Exception as e:
-            print(f"Stop {stop_num} error: {str(e)}")
-            return idx, "Position yourself directly in front of the exhibit for the best view.", f"[Description for {poi_name} could not be generated.]", 0, 0, 0.0
+        # Should not reach here, but safety fallback
+        return idx, "Position yourself directly in front of the exhibit for the best view.", f"{poi_name} — an exhibit at this venue.", 0, 0, 0.0
 
     max_workers = min(len(poi_list), 5)
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
