@@ -1007,6 +1007,7 @@ def _verify_works_v2(poi_list, venue_name):
             base_site_url=_base_site_url,
             wikipedia_title=_wiki_title,
             language=_language,
+            venue_qid=_venue_entity.qid if _venue_entity else "",
         )
     
     # If no pages fetched, try variants (skip on cache hit — already have data)
@@ -1018,6 +1019,7 @@ def _verify_works_v2(poi_list, venue_name):
                     base_site_url=_base_site_url,
                     wikipedia_title=variant,
                     language=_language,
+                    venue_qid=_venue_entity.qid if _venue_entity else "",
                 )
                 if _alt.get('combined_text', '') and len(_alt['combined_text']) > len(corpus_result.get('combined_text', '')):
                     corpus_result = _alt
