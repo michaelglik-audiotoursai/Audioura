@@ -2326,14 +2326,17 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 })
                 return None, None, (None, None)
 
-            # -------- [R4] Bounded replenishment loop --------
-            # For medium/thin tiers: don't pad with unverifiable stops (use only verified)
-            # Exception: if thin tier has too few verified works (< 3), allow GPT-proposed
-            # works to proceed in degraded mode — the venue is Wikidata-resolved, so it's
-            # a real museum; Wikidata just has sparse artwork listings for it.
-            # -------- [UNIFIED FILL] All tiers — flag-gated --------
-            # REQUIRE_LISTING_VERIFICATION=true  → old behavior (cap at verified count)
-            # REQUIRE_LISTING_VERIFICATION=false (default) → allow fills up to total_stops
+            # -------- [R4] Bounded replenishment loop (runs FIRST, before any fill) --------
+            # [LOCAL-19 FIX] R4 now runs BEFORE UNIFIED-FILL so it sees only verified
+            # stops. Previously UNIFIED-FILL padded the count with unverified candidates,
+            # making R4's `while len(poi_list) < total_stops` condition false — R4 never
+            # ran, and the unverified fills were later stripped by the LOCAL-16 gate,
+            # leaving a permanent shortfall.
+            #
+            # New ordering:
+            #   1. R4 replenishment (verified-only count → triggers correctly)
+            #   2. UNIFIED-FILL (last-resort unverified padding)
+            #   3. LOCAL-16 GATE (strips unverified for museum tours before Phase 5)
             _require_listing_verification = os.environ.get('REQUIRE_LISTING_VERIFICATION', 'false').lower() in ('true', '1', 'yes')
 
             if _require_listing_verification:
@@ -2350,38 +2353,9 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         total_stops = len(poi_list)
                         print(f"  [R4] SKIPPED (REQUIRE_LISTING_VERIFICATION=true) — tier={_verification_tier}, "
                               f"total_stops={total_stops} ({_n_verified_in_list} verified)")
-            else:
-                # NEW BEHAVIOR: unified fill — allow fills for ALL tiers up to total_stops
-                # Fill from _pre_d1v2_candidates with PALAIS-FIX D1/D2 filtering
-                if len(poi_list) < total_stops and _verification_tier in ('thin', 'medium', 'exhibit_museum'):
-                    _verified_names_fill = set(p['name'].lower() for p in poi_list)
-                    _evidence_keys_fill = set(_normalize_name(k) for k in _d1_evidence_log.keys()
-                                              if _d1_evidence_log[k].get('status') == 'VERIFIED')
-                    _fill_candidates = []
-                    for p in _pre_d1v2_candidates:
-                        _cand_name = p['name']
-                        _cand_norm = _normalize_name(_cand_name)
-                        # Skip if already in verified list (exact or normalized match)
-                        if _cand_name.lower() in _verified_names_fill or _cand_norm in _evidence_keys_fill:
-                            continue
-                        # PALAIS-FIX D1: Skip REJECTED candidates (located at other venue)
-                        _ev_entry = _d1_evidence_log.get(_cand_name, {})
-                        if isinstance(_ev_entry, dict) and _ev_entry.get('status') == 'REJECTED':
-                            continue
-                        # Every fill candidate is explicitly unverified
-                        p['verified'] = False
-                        _fill_candidates.append(p)
-                    _fill_needed = total_stops - len(poi_list)
-                    _fill_added = _fill_candidates[:_fill_needed]
-                    if _fill_added:
-                        poi_list = list(poi_list) + _fill_added
-                        print(f"  [UNIFIED-FILL] tier={_verification_tier}: added {len(_fill_added)} unverified fills "
-                              f"(from {len(_pre_d1v2_candidates)} pre-D1v2 candidates, "
-                              f"total now {len(poi_list)}/{total_stops})")
-                    else:
-                        print(f"  [UNIFIED-FILL] tier={_verification_tier}: no eligible fill candidates")
 
-            # If verified < requested, re-prompt for MORE candidates and verify (rich tier only)
+            # R4 replenishment: re-prompt GPT for fresh candidates and verify against corpus
+            # Runs against verified-only count (UNIFIED-FILL has NOT yet padded poi_list)
             _r4_all_tried_names = set(_normalize_name(p['name']) for p in poi_list)
             _r4_all_tried_names.update(_normalize_name(k) for k in _d1_evidence_log.keys())
             _r4_round = 0
@@ -2491,52 +2465,156 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             
             if len(poi_list) < total_stops:
                 print(f"  [R4] Replenishment exhausted: {len(poi_list)}/{total_stops} stops (stop_count_warning)")
-                # [POST-R4 FILL] If REQUIRE_LISTING_VERIFICATION=false and still below target,
-                # fill from remaining candidates with verified=False.
-                # Rich tier: capped at 50% unverified. Non-rich tiers: fill to total_stops.
-                if not _require_listing_verification:
-                    _n_verified_current = sum(1 for p in poi_list if p.get('verified', True))
-                    _n_unverified_current = len(poi_list) - _n_verified_current
-                    # Rich tier: cap at 50% unverified; non-rich: no cap (fill to total_stops)
-                    if _verification_tier not in ('thin', 'medium', 'exhibit_museum'):
-                        _max_unverified = max(1, total_stops // 2)
-                        _unverified_budget = _max_unverified - _n_unverified_current
-                    else:
-                        _unverified_budget = total_stops - len(poi_list)
-                    if _unverified_budget > 0:
-                        _verified_names_post = set(p['name'].lower() for p in poi_list)
-                        _evidence_keys_post = set(_normalize_name(k) for k in _d1_evidence_log.keys()
-                                                  if _d1_evidence_log[k].get('status') == 'VERIFIED')
-                        _post_r4_fill = []
-                        # Source: R4-dropped candidates (generated by R4 but failed verification)
-                        # These are the ONLY genuinely new candidates at this point —
-                        # _pre_d1v2_candidates was already exhausted by UNIFIED-FILL.
-                        _fill_pool = list(_r4_all_dropped_pois)
-                        for p in _fill_pool:
-                            _cand_name = p['name']
-                            _cand_norm = _normalize_name(_cand_name)
-                            if _cand_name.lower() in _verified_names_post or _cand_norm in _evidence_keys_post:
-                                continue
-                            _ev_entry = _d1_evidence_log.get(_cand_name, {})
-                            if isinstance(_ev_entry, dict) and _ev_entry.get('status') == 'REJECTED':
-                                continue
-                            # Skip if already in poi_list (from unified fill or R4 verified)
-                            if _cand_name.lower() in set(p2['name'].lower() for p2 in poi_list):
-                                continue
-                            p['verified'] = False
-                            _post_r4_fill.append(p)
-                            if len(_post_r4_fill) >= _unverified_budget:
-                                break
-                        _post_r4_needed = min(len(_post_r4_fill), total_stops - len(poi_list))
-                        _post_r4_added = _post_r4_fill[:_post_r4_needed]
-                        if _post_r4_added:
-                            poi_list = list(poi_list) + _post_r4_added
-                            _tier_label = "50% cap" if _verification_tier not in ('thin', 'medium', 'exhibit_museum') else "no cap"
-                            print(f"  [POST-R4-FILL] Added {len(_post_r4_added)} unverified fills "
-                                  f"(tier={_verification_tier}, {_tier_label}, "
-                                  f"total now {len(poi_list)}/{total_stops})")
             else:
                 print(f"  [R4] Target reached: {len(poi_list)}/{total_stops} stops")
+
+            # -------- [UNIFIED-FILL] Runs AFTER R4 (unverified last-resort padding) --------
+            # [LOCAL-19] Moved here from before R4. Now R4 has already had its chance
+            # to find verified replacements. UNIFIED-FILL only pads remaining gaps.
+            if not _require_listing_verification:
+                if len(poi_list) < total_stops and _verification_tier in ('thin', 'medium', 'exhibit_museum'):
+                    _verified_names_fill = set(p['name'].lower() for p in poi_list)
+                    _evidence_keys_fill = set(_normalize_name(k) for k in _d1_evidence_log.keys()
+                                              if _d1_evidence_log[k].get('status') == 'VERIFIED')
+                    _fill_candidates = []
+                    for p in _pre_d1v2_candidates:
+                        _cand_name = p['name']
+                        _cand_norm = _normalize_name(_cand_name)
+                        # Skip if already in verified list (exact or normalized match)
+                        if _cand_name.lower() in _verified_names_fill or _cand_norm in _evidence_keys_fill:
+                            continue
+                        # Skip if already in poi_list (R4 may have added it as verified)
+                        if _cand_name.lower() in set(p2['name'].lower() for p2 in poi_list):
+                            continue
+                        # PALAIS-FIX D1: Skip REJECTED candidates (located at other venue)
+                        _ev_entry = _d1_evidence_log.get(_cand_name, {})
+                        if isinstance(_ev_entry, dict) and _ev_entry.get('status') == 'REJECTED':
+                            continue
+                        # Every fill candidate is explicitly unverified
+                        p['verified'] = False
+                        _fill_candidates.append(p)
+                    _fill_needed = total_stops - len(poi_list)
+                    _fill_added = _fill_candidates[:_fill_needed]
+                    if _fill_added:
+                        poi_list = list(poi_list) + _fill_added
+                        print(f"  [UNIFIED-FILL] tier={_verification_tier}: added {len(_fill_added)} unverified fills "
+                              f"(from {len(_pre_d1v2_candidates)} pre-D1v2 candidates, "
+                              f"total now {len(poi_list)}/{total_stops})")
+                    else:
+                        print(f"  [UNIFIED-FILL] tier={_verification_tier}: no eligible fill candidates")
+
+            # -------- [POST-R4-FILL] From R4-dropped candidates --------
+            if not _require_listing_verification and len(poi_list) < total_stops:
+                _n_verified_current = sum(1 for p in poi_list if p.get('verified', True))
+                _n_unverified_current = len(poi_list) - _n_verified_current
+                # Rich tier: cap at 50% unverified; non-rich: no cap (fill to total_stops)
+                if _verification_tier not in ('thin', 'medium', 'exhibit_museum'):
+                    _max_unverified = max(1, total_stops // 2)
+                    _unverified_budget = _max_unverified - _n_unverified_current
+                else:
+                    _unverified_budget = total_stops - len(poi_list)
+                if _unverified_budget > 0:
+                    _verified_names_post = set(p['name'].lower() for p in poi_list)
+                    _evidence_keys_post = set(_normalize_name(k) for k in _d1_evidence_log.keys()
+                                              if _d1_evidence_log[k].get('status') == 'VERIFIED')
+                    _post_r4_fill = []
+                    # Source: R4-dropped candidates (generated by R4 but failed verification)
+                    _fill_pool = list(_r4_all_dropped_pois)
+                    for p in _fill_pool:
+                        _cand_name = p['name']
+                        _cand_norm = _normalize_name(_cand_name)
+                        if _cand_name.lower() in _verified_names_post or _cand_norm in _evidence_keys_post:
+                            continue
+                        _ev_entry = _d1_evidence_log.get(_cand_name, {})
+                        if isinstance(_ev_entry, dict) and _ev_entry.get('status') == 'REJECTED':
+                            continue
+                        # Skip if already in poi_list
+                        if _cand_name.lower() in set(p2['name'].lower() for p2 in poi_list):
+                            continue
+                        p['verified'] = False
+                        _post_r4_fill.append(p)
+                        if len(_post_r4_fill) >= _unverified_budget:
+                            break
+                    _post_r4_needed = min(len(_post_r4_fill), total_stops - len(poi_list))
+                    _post_r4_added = _post_r4_fill[:_post_r4_needed]
+                    if _post_r4_added:
+                        poi_list = list(poi_list) + _post_r4_added
+                        _tier_label = "50% cap" if _verification_tier not in ('thin', 'medium', 'exhibit_museum') else "no cap"
+                        print(f"  [POST-R4-FILL] Added {len(_post_r4_added)} unverified fills "
+                              f"(tier={_verification_tier}, {_tier_label}, "
+                              f"total now {len(poi_list)}/{total_stops})")
+
+            # -------- [LOCAL-16 GATE] D1v2-verified-only filter for museum tours --------
+            # No unverified stop may reach Phase 5 for museum tours. This is the
+            # centralized choke-point: after ALL candidate-gathering (R4, UNIFIED-FILL,
+            # POST-R4-FILL), strip anything not D1v2-verified. Accept honest shortfall.
+            # Also deduplicates by canonical title (round 3 finding).
+            if tour_category == 'museum':
+                _pre_gate_count = len(poi_list)
+                _seen_canonical = set()
+                _gate_survivors = []
+                _gate_removed = []
+
+                # Build a reverse lookup: normalized poi name → canonical_title
+                # D1v2 renames poi['name'] to the canonical form, so the evidence_log
+                # key (original GPT name) differs from poi['name']. We need to find
+                # the canonical_title for each poi by checking:
+                #   1. Direct key lookup (works for R4 stops)
+                #   2. Canonical_title match (works for D1v2 renamed stops)
+                def _find_canonical_for_poi(poi_name):
+                    """Find the canonical title for a poi by any method."""
+                    # Direct lookup (R4 uses poi name as key)
+                    ev = _d1_evidence_log.get(poi_name, {})
+                    if isinstance(ev, dict) and ev.get('canonical_title'):
+                        return ev['canonical_title']
+                    # Reverse lookup: poi was renamed TO canonical, so check if
+                    # any evidence entry has canonical_title matching poi_name
+                    _poi_norm = _normalize_name(poi_name)
+                    for _key, _val in _d1_evidence_log.items():
+                        if isinstance(_val, dict) and _val.get('status') == 'VERIFIED':
+                            _ct = _val.get('canonical_title', '')
+                            if _ct and _normalize_name(_ct) == _poi_norm:
+                                return _ct
+                    return None
+
+                for p in poi_list:
+                    # Check verification status
+                    if not p.get('verified', True):
+                        _gate_removed.append(p['name'])
+                        continue
+                    # Canonical-title dedup: if two stops map to the same canonical,
+                    # keep only the first one encountered
+                    _canon = _find_canonical_for_poi(p['name'])
+                    if _canon:
+                        _canon_norm = _normalize_name(_canon)
+                        if _canon_norm in _seen_canonical:
+                            _gate_removed.append(f"{p['name']} (dup canonical: {_canon})")
+                            continue
+                        _seen_canonical.add(_canon_norm)
+                    _gate_survivors.append(p)
+
+                if _gate_removed:
+                    print(f"  [LOCAL-16 GATE] D1v2-verified-only filter for museum tour")
+                    print(f"    Removed {len(_gate_removed)} stop(s):")
+                    for _rm in _gate_removed:
+                        print(f"      ✗ {_rm}")
+                    poi_list = _gate_survivors
+                    print(f"    After: {len(poi_list)} verified stop(s)")
+                    if len(poi_list) < total_stops:
+                        print(f"    [LOCAL-16 GATE] Accepting honest shortfall: {len(poi_list)}/{total_stops} stops")
+                        # Cap total_stops to prevent Part C and other downstream loops
+                        # from re-filling with unverified candidates
+                        total_stops = len(poi_list)
+                    if len(poi_list) == 0:
+                        _LAST_CLEAN_FAIL_EVIDENCE.clear()
+                        _LAST_CLEAN_FAIL_EVIDENCE.update({
+                            "error_type": "all_unverified",
+                            "tier": _verification_tier,
+                            "pre_gate_count": _pre_gate_count,
+                        })
+                        return None, None, (None, None)
+                else:
+                    print(f"  [LOCAL-16 GATE] All {len(poi_list)} stops are D1v2-verified ✓")
 
         # -------- [BLOCKER 1] Single-venue validation --------
         # For a named single museum, check if POIs look like other museums/venues
