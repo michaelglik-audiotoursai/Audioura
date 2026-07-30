@@ -118,6 +118,9 @@ Root causes: (a) candidate selection does not deterministically prefer documente
 bare-noun corpus entries, and (b) the sourced visitor-info fetch is conditional in some way that makes it
 fire or not at random. Dispatched **LOCAL-30** to make both deterministic, with a three-consecutive-runs
 acceptance bar. **The 75 target must be treated as NOT met until it reproduces.**
+| 9 (LOCAL-29+30 merged) | 2026-07-30 | **BASE 78.1 · TOTAL 82–86 · REPRODUCIBLE** | ~$0.03 | — | **TARGET MET AND HELD ACROSS THREE CONSECUTIVE RUNS**, deliberately including two cache HITs — the exact condition that broke round 8. All three runs delivered the identical 8 documented œuvres commentées in the same order, with `Museum Information: Closed on Tuesday. Free admission` present, correct, and now in ENGLISH. Worst case 82.0, best 85.9, base 78.1 in all three.
+**LOCAL-30 root-caused the round-8 swing** and it was not model randomness: the cache-hit path returned an empty `combined_text`, so D1v2 had nothing to verify against, which let bare nouns like `Disque` through and degraded everything downstream. Run 1 of round 8 was a fresh scrape; run 2 was a cache hit — same code, genuinely different internal state.
+REMAINING: (a) **LOCAL-29's cross-contamination fix did NOT work** — stop 3 still says '12th-century Bengali' where the catalogue says '2nde moitié du Xe siècle, Chlorite'; wrong century plus an unverified provenance asserted as fact, and the actual material (chlorite) never appears. (b) Still zero cross-stop callbacks in any run, so the correlation bonus remains entirely unearned. (c) Most stops remain a strong factual opening followed by 150–250w of atmosphere, which is why they score ADEQUATE rather than RICH — the ceiling above here is real headroom. | 5a135b2 |
 
 ## Round 1 scope (LOCAL-14, dispatched 2026-07-29)
 
