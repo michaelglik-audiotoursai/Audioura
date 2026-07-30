@@ -49,6 +49,13 @@ FORBIDDEN_PHRASES: List[re.Pattern] = [
     re.compile(r"beacon\s+of\s+(creativity|hope|light)", re.IGNORECASE),
     re.compile(r"gaze\s+upon\s+this", re.IGNORECASE),
     re.compile(r"power\s+of\s+art\s+to", re.IGNORECASE),
+    # [LOCAL-40] Unsupported praise patterns — assertions that name without explaining
+    re.compile(r"echoing\s+the\s+eternal\s+cycles", re.IGNORECASE),
+    re.compile(r"fully\s+immerse\s+yourself\s+in\s+the", re.IGNORECASE),
+    re.compile(r"the\s+rich\s+cultural\s+heritage\s+of", re.IGNORECASE),
+    re.compile(r"each\s+(intricate\s+)?detail\s+tells\s+a\s+story", re.IGNORECASE),
+    re.compile(r"to\s+fully\s+(appreciate|immerse|experience)", re.IGNORECASE),
+    re.compile(r"a\s+(stunning|exquisite|mesmerizing)\s+example\s+of", re.IGNORECASE),
 ]
 
 

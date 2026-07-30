@@ -283,6 +283,47 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
           len(_shingle_issues) == 0,
           f"{len(_shingle_issues)} repeated shingle(s): {[s[0] for s in _shingle_issues[:3]]}")
 
+    # [LOCAL-40] D3(c2) Unearned adjectives: flag superlatives without supporting evidence.
+    # An adjective is "unearned" when it appears in a sentence that contains no concrete
+    # noun, date, technique, or named thing as evidence. We check per-sentence.
+    _UNEARNED_ADJ_RE = re.compile(
+        r'\b(vibrant|stunning|remarkable|mesmerizing|exquisite|breathtaking|captivating)\b', re.IGNORECASE)
+    # Evidence markers: dates, measurements, named techniques, specific nouns
+    _EVIDENCE_MARKERS_RE = re.compile(
+        r'(\b\d{2,4}\b|'               # dates/numbers (2+ digits)
+        r'\bcm\b|\bmm\b|\bmeters?\b|'  # measurements
+        r'\blacquer\b|\bschist\b|\bchlorite\b|\bbronze\b|\bsilk\b|\bgilt\b|'  # materials
+        r'\bcerulean\b|\bochre\b|\bvermilion\b|\bcrimson\b|\bindigo\b|'  # specific colors
+        r'\bcentury\b|\bdynasty\b|\bperiod\b|'  # historical markers
+        r'\bbecause\b|\bsince\b|\bdue to\b|'    # causal connectors
+        r'\blayers?\b|\bcoats?\b|\bjoints?\b|\bgrains?\b)',  # craft specifics
+        re.IGNORECASE
+    )
+    # Proper nouns checked separately (case-sensitive — must be capitalized)
+    _PROPER_NOUN_RE = re.compile(r'\b[A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})+\b')
+    _unearned_adj_issues = []
+    if stops:
+        _STRUCT_RE = re.compile(r'^(Address|Coordinates|Type/?Specialty|Specific Examples?|Operational|Orientation|Museum Information|Stop \d+|Directions|Sources|Please resume):')
+        for stop_idx, stop in enumerate(stops):
+            _content_lines = [l for l in stop.split('\n')
+                            if l.strip() and not _STRUCT_RE.match(l.strip())]
+            _content_text = ' '.join(_content_lines)
+            # Split into sentences
+            _sentences = re.split(r'(?<=[.!?])\s+', _content_text)
+            for sent in _sentences:
+                _adj_matches = _UNEARNED_ADJ_RE.findall(sent)
+                if _adj_matches:
+                    _has_evidence = bool(_EVIDENCE_MARKERS_RE.search(sent)) or bool(_PROPER_NOUN_RE.search(sent))
+                    if not _has_evidence:
+                        _unearned_adj_issues.append(
+                            f"Stop {stop_idx+1}: '{_adj_matches[0]}' without evidence in: ...{sent[:80]}...")
+    # Allow up to 2 across the tour (GPT will occasionally slip one through);
+    # 3+ means the prompt constraint is not binding.
+    _adj_threshold = 2
+    check("D3(c2) No unearned adjectives (explain or cut) [LOCAL-40]",
+          len(_unearned_adj_issues) <= _adj_threshold,
+          f"{len(_unearned_adj_issues)} unearned adjective(s): {_unearned_adj_issues[:3]}")
+
     # D3(d) Grounding assertion: if D1 evidence was persisted, check stop titles appear in it
     # (This check is informational until evidence files are consistently written)
     # For now: check that stop titles are short, real-looking noun phrases (proxy for grounding)
