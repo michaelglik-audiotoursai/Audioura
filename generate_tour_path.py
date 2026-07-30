@@ -57,7 +57,7 @@ Then provide a detailed description of the exhibit that is EXACTLY {word_count} 
 Format your response as follows:
 Orientation: [Brief orientation text explaining the best viewing position]
 
-[Detailed {word_count}-word description of the exhibit]
+Then write the description directly — a flowing, {word_count}-word narrative about the exhibit. Do NOT wrap it in brackets, placeholders, or formatting markers. Just write the prose.
 
 DO NOT include any section headers other than "Orientation:" - the description should flow naturally after the orientation section.
 DO NOT include directions to the next stop - these will be added separately.
