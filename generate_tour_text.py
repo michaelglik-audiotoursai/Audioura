@@ -3859,26 +3859,30 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 # Otherwise leave blank — better absent than invented
             print(f"  [LOCAL-27] Corpus-sourced metadata applied to {len(poi_list)} stops")
 
-        # -------- [LOCAL-27] Source visitor info from official site (museum tours only) --------
+        # -------- [LOCAL-35] Source visitor info from official site (museum tours only) --------
+        # LOCAL-35 replaces LOCAL-27/29/33 approach with structured field extraction.
+        # Extracts: closed_days, hours (seasonal), admission (conditional).
+        # Never flattens conditional pricing; hours required when published.
         if tour_category == 'museum' and _museum_venue_name:
-            # Attempt to fetch real visitor info from the venue's official website
             _sourced_visitor_info = ''
-            # Get official URL from corpus result source_urls (first URL is typically the official site)
             _official_url_for_info = ''
             if _story_corpus_result and _story_corpus_result.get('source_urls'):
                 _official_url_for_info = _story_corpus_result['source_urls'][0]
             if _official_url_for_info:
-                # [LOCAL-29 Fix B] Pass language="en" to trigger FR→EN translation
-                _sourced_visitor_info = _fetch_visitor_info_from_site(_official_url_for_info, language="en")
+                try:
+                    from visitor_facts_extractor import fetch_visitor_info_structured
+                    _sourced_visitor_info = fetch_visitor_info_structured(
+                        _official_url_for_info, language="en")
+                except ImportError:
+                    print(f"  [LOCAL-35] visitor_facts_extractor not available, falling back to old method")
+                    _sourced_visitor_info = _fetch_visitor_info_from_site(_official_url_for_info, language="en")
             if _sourced_visitor_info and poi_list:
-                # Only populate first stop's operational_details — with SOURCED data
                 poi_list[0]['operational_details'] = _sourced_visitor_info
-                print(f"  [LOCAL-27] Museum Information sourced from official site for stop 1")
+                print(f"  [LOCAL-35] Museum Information sourced from official site for stop 1")
             else:
-                # Explicitly ensure no fabricated operational_details exists
                 for poi in poi_list:
                     poi['operational_details'] = ''
-                print(f"  [LOCAL-27] No visitor info sourced — Museum Information field OMITTED")
+                print(f"  [LOCAL-35] No visitor info sourced — Museum Information field OMITTED")
 
         # -------- Coordinates fallback: request for any stop missing coordinates --------
         # PHASE 3B sometimes omits coordinates for one or more stops. Request them
