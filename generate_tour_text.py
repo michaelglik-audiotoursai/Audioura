@@ -1186,6 +1186,38 @@ def _verify_works_v2(poi_list, venue_name):
     verified_pois = []
     _verified_qids = set()  # [A6] Track QIDs to prevent duplicate stops (same work, different labels)
     
+    # LOCAL-28: Pre-inject catalogue works as verified candidates
+    # These are museum-published documented works with structured metadata —
+    # highest confidence, no GPT guessing needed.
+    _catalogue_works = corpus_result.get('catalogue_works', [])
+    _catalogue_titles_injected = set()
+    if _catalogue_works:
+        from story_miner import _normalize as _norm_cat
+        for cw in _catalogue_works:
+            _cat_title = cw.get('title', '')
+            if not _cat_title or _cat_title in _catalogue_titles_injected:
+                continue
+            # Check against existing canonical titles (they should be there from corpus extraction)
+            if _cat_title in canonical_titles or any(
+                _norm_cat(_cat_title) == _norm_cat(ct) for ct in canonical_titles
+            ):
+                verified_pois.append({
+                    'name': _cat_title,
+                    'address': '',  # Will be resolved later
+                })
+                _catalogue_titles_injected.add(_cat_title)
+                evidence_log[_cat_title] = {
+                    "status": "VERIFIED",
+                    "canonical_title": _cat_title,
+                    "snippet": cw.get('description', '')[:200],
+                    "method": "catalogue_work",
+                    "material": cw.get('material', ''),
+                    "period": cw.get('period', ''),
+                    "origin": cw.get('origin', ''),
+                }
+        if _catalogue_titles_injected:
+            print(f"  [LOCAL-28] Pre-injected {len(_catalogue_titles_injected)} catalogue works as verified POIs")
+    
     # Build title→QID lookup from SPARQL works for deduplication
     _title_to_qid = {}
     for work in sparql_works:
