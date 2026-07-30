@@ -4655,9 +4655,9 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             # [LOCAL-41 Fix 4] Rotate connective framing — never say "broader context" every stop
             description_prompt = f"""Create a detailed audio description for {poi_name} at {location}, focusing on {tour_type}.
 {_stop_context_line}
-Start with a brief orientation that tells the listener WHERE to stand or look AND WHY — what becomes visible, legible, or striking from that position that they would miss otherwise.
+Start with a brief orientation that names "{poi_name}" specifically (not "the exhibit" or "this piece") and tells the listener WHERE to stand or look AND WHY — what becomes visible, legible, or striking from that position that they would miss otherwise.
 
-Then provide a detailed description of the exhibit that is EXACTLY 300 words long. Include:
+Then provide a detailed description of the exhibit. Include:
 - What the work physically depicts or consists of — what the visitor sees
 - One specific technique, material choice, or compositional decision and WHY it matters
 - One piece of historical or cultural context that changes how the visitor understands it
@@ -4691,6 +4691,30 @@ AUDIO RULES (this will be heard, not read):
 - NEVER end with a rhetorical question. End on a statement — an image, a fact, or a thought the listener can carry forward.
 - NEVER list more than three items in a row. Listeners lose track after three.
 - Write for the EAR: short-to-medium sentences, concrete language, no parenthetical asides.
+
+NO PREACHING — NEVER INSTRUCT THE LISTENER (critical):
+- NEVER end a stop by telling the listener what to feel, notice, consider, reflect on,
+  or carry away. End on a FACT or an OBSERVATION, not an instruction.
+- BANNED CLOSINGS (do not use any variation of these):
+  "Consider what other..." / "Let the whispers of the past guide..."
+  "As you stand before this masterpiece, consider..." / "Take a moment to..."
+  "Allow yourself to..." / "Reflect on..." / "Ponder..." / "Imagine..."
+  "Let this be a reminder..." / "Carry this with you as..."
+- The listener is an adult. Do NOT tell them what they "should" feel or do.
+- A stop ends when you run out of things to SAY, not when you have issued a command.
+
+NO CONDESCENSION:
+- NEVER write "To truly appreciate/understand [X], one must..." — this presupposes
+  ignorance. Instead, JUST STATE the context: "During samurai culture in 19th century
+  Japan, armor was not just practical but also a symbol of status and honor."
+- NEVER write "It is worth noting that..." or "It is important to understand that..."
+  — just state the thing directly.
+
+NO DESCRIBING THE OBVIOUS:
+- The listener is STANDING IN FRONT of the object. Do NOT describe what is plainly
+  visible ("The surface shimmers under the museum's soft lighting").
+- Description earns its place ONLY when it points at something the visitor would
+  otherwise MISS — a hidden detail, its meaning, its history, its technique.
 """
         else:
             _mode_context = f" (traveling by {transport_mode})" if transport_mode != 'on_foot' else ""
@@ -4698,7 +4722,7 @@ AUDIO RULES (this will be heard, not read):
 
 Start with an orientation section that explains how the visitor arrives at this stop and what they should look for.
 
-Then provide a detailed description that is EXACTLY 300 words long. Include:
+Then provide a detailed description. Include:
 - What makes this stop notable or interesting — with specific evidence, not adjectives
 - Historical or cultural context: name a date, a person, an event, a cause-and-effect
 - One concrete sensory detail that places the listener HERE (a sound, material, smell)
@@ -4727,6 +4751,19 @@ AUDIO RULES (this will be heard, not read):
 - NEVER end with a rhetorical question. End on a statement — an image, a fact, or a thought the listener can carry forward.
 - NEVER list more than three items in a row. Listeners lose track after three.
 - Write for the EAR: short-to-medium sentences, concrete language, no parenthetical asides.
+
+NO PREACHING — NEVER INSTRUCT THE LISTENER (critical):
+- NEVER end a stop by telling the listener what to feel, notice, consider, reflect on,
+  or carry away. End on a FACT or an OBSERVATION, not an instruction.
+- BANNED CLOSINGS: "Consider what other..." / "Let the whispers guide..."
+  "Take a moment to..." / "Allow yourself to..." / "Reflect on..." / "Ponder..."
+  "Imagine..." / "Let this be a reminder..." / "Carry this with you as..."
+- The listener is an adult. Do NOT tell them what they "should" feel or do.
+- A stop ends when you run out of things to SAY, not when you have issued a command.
+
+NO CONDESCENSION:
+- NEVER write "To truly appreciate/understand [X], one must..." — just state the context.
+- NEVER write "It is worth noting that..." or "It is important to understand that..."
 """
 
         # [LOCAL-6 Fix 1] Varied sentence openings — cycle through styles by stop index
@@ -4757,8 +4794,8 @@ If your first instinct is a locative-clause opener, delete it and lead with the 
 
         # [LOCAL-6 Fix 4] Per-category personality/tone — distinct product feel per tour type
         _CATEGORY_TONE = {
-            'museum': "Contemplative and reverent — linger on details, invite the listener to slow down and truly look. "
-                      "Speak as someone who has spent hours in this room and wants to share what they've noticed.",
+            'museum': "Contemplative and precise — linger on details, share what you've noticed after hours in this room. "
+                      "Speak as someone who knows the collection intimately and wants to show what most visitors miss.",
             'restaurant': "Warm, sensory, and convivial — evoke tastes, aromas, textures, the buzz of a busy kitchen. "
                           "Speak as a food-loving local who knows the story behind the menu.",
             'walking': "Historical-narrative and grounded — anchor each place in its real history and layers of time. "
@@ -5066,7 +5103,7 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
         # Add venue containment constraint for single-venue museum tours
         if tour_category == 'museum' and _museum_venue_name:
             description_prompt += f"""
-CRITICAL CONSTRAINT: This artwork/exhibit MUST be something that is physically on display at '{_museum_venue_name}'. Describe the ARTWORK itself — its visual qualities, technique, symbolism, and story. If you know which room or hall it's in, mention that briefly. If you don't know the exact room, do NOT fabricate one — just describe the work and tell the visitor to ask museum staff for its current location.
+CRITICAL CONSTRAINT: This artwork/exhibit MUST be something that is physically on display at '{_museum_venue_name}'. Describe the ARTWORK itself — its visual qualities, technique, symbolism, and story. If you know which room or hall it's in, mention that briefly. If you don't know the exact room, do NOT fabricate one — just describe the work directly.
 """
             # [D5] No artist bio repetition in descriptions
             description_prompt += """
@@ -5109,6 +5146,7 @@ NOTE: "The Biblical Message" (Message Biblique) is the name of the COMPLETE CYCL
         # [LOCAL-12 Fix D] Specificity gate: adaptive description length.
         # When confirmed facts are fewer than 2 AND no corpus context was injected,
         # reduce description target and instruct GPT not to pad with generic prose.
+        # [LOCAL-44] Length scales with substance: short stops stay short, rich stops may run longer.
         _confirmed_count = len(fact_sheet.get('confirmed_facts', [])) if fact_sheet else 0
         _had_corpus = fact_sheet.get('had_corpus_context', False) if fact_sheet else False
         _specificity_short = (_confirmed_count < 2 and not _had_corpus)
@@ -5122,8 +5160,16 @@ NOTE: "The Biblical Message" (Message Biblique) is the name of the COMPLETE CYCL
                 f"'a testament to the artist's genius' or 'invites contemplation'. "
                 f"Brevity with real content is better than length with filler."
             )
+        elif _confirmed_count >= 5 or (_had_corpus and _confirmed_count >= 3):
+            # Rich stop: more confirmed facts justify longer treatment
+            _word_target = "350"
+            _word_target_instruction = (
+                f"You have rich verified material for this stop. Write up to {_word_target} words, "
+                f"using the extra space ONLY for additional sourced facts or explained connections — "
+                f"NOT for padding, praise, or instructing the listener."
+            )
         else:
-            _word_target = "300"
+            _word_target = "280"
             _word_target_instruction = ""
 
         description_prompt += f"""
@@ -5183,7 +5229,7 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                             orientation = orientation_text
                             description = ""
                     else:
-                        orientation = "Look for this work in the galleries — ask museum staff for its current location."
+                        orientation = "Look for this work in the galleries."
                         description = description_text.strip()
 
                     # [LOCAL-26] Validate: reject if description is a placeholder echo
@@ -5340,14 +5386,14 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                     return idx, orientation, description, word_count, tokens_used, call_cost
                 else:
                     print(f"Stop {stop_num} error: API returned status code {description_response.status_code}")
-                    return idx, "Look for this work in the galleries — ask museum staff for its current location.", f"[Description for {poi_name} could not be generated.]", 0, 0, 0.0
+                    return idx, "Look for this work in the galleries.", f"[Description for {poi_name} could not be generated.]", 0, 0, 0.0
 
             except Exception as e:
                 print(f"Stop {stop_num} error: {str(e)}")
-                return idx, "Look for this work in the galleries — ask museum staff for its current location.", f"[Description for {poi_name} could not be generated.]", 0, 0, 0.0
+                return idx, "Look for this work in the galleries.", f"[Description for {poi_name} could not be generated.]", 0, 0, 0.0
 
         # Should not reach here, but safety fallback
-        return idx, "Look for this work in the galleries — ask museum staff for its current location.", f"{poi_name} — an exhibit at this venue.", 0, 0, 0.0
+        return idx, "Look for this work in the galleries.", f"{poi_name} — an exhibit at this venue.", 0, 0, 0.0
 
     max_workers = min(len(poi_list), 5)
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -5479,6 +5525,52 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                 p[_field_key] = _text.strip()
     print(f"  [LOCAL-41] Stripped {_audio_fixes} trailing question(s), "
           f"removed {_broader_context_count} 'broader context' instance(s)")
+
+    # -------- [LOCAL-44] PHASE 5.10: Anti-preaching post-processing --------
+    # Strip trailing sentences that instruct the listener what to feel, notice,
+    # consider, or carry away. GPT often ignores prompt bans on these closings.
+    print(f"\nPHASE 5.10: Anti-preaching cleanup (LOCAL-44)...")
+    _PREACHING_CLOSERS = [
+        # Imperative/instructive closings
+        re.compile(r'^(As you stand (before|here|in front of).*?,?\s*)?(consider|reflect|ponder|imagine|let)\b', re.IGNORECASE),
+        re.compile(r'^take\s+a\s+moment\s+to\b', re.IGNORECASE),
+        re.compile(r'^allow\s+(yourself|your\s+(mind|imagination))\s+to\b', re.IGNORECASE),
+        re.compile(r'^let\s+(the|this|these|your)\b', re.IGNORECASE),
+        re.compile(r'^carry\s+(this|these|the)\b.*\b(with you|forward|away)\b', re.IGNORECASE),
+        re.compile(r'^(perhaps|maybe)\s+(you\'ll|you\s+will|one\s+day|next\s+time)', re.IGNORECASE),
+        # "What other X await your discovery"
+        re.compile(r'\bwhat\s+other\s+\w+\s+(await|might|could)\b', re.IGNORECASE),
+        # "To truly appreciate" condescension
+        re.compile(r'^to\s+(truly|fully|really)\s+(appreciate|understand|grasp|comprehend)\b', re.IGNORECASE),
+        # "It is worth noting / important to understand"
+        re.compile(r'^it\s+is\s+(worth|important)\s+(noting|to\s+(note|understand|remember))\b', re.IGNORECASE),
+    ]
+    _preaching_count = 0
+    for p in poi_list:
+        _desc = p.get('description', '') or ''
+        if not _desc:
+            continue
+        # Check last 1-2 sentences for preaching pattern
+        _sentences = re.split(r'(?<=[.!?])\s+', _desc.strip())
+        _removed = 0
+        while _sentences:
+            _last = _sentences[-1].strip()
+            _is_preaching = False
+            for _pp in _PREACHING_CLOSERS:
+                if _pp.search(_last):
+                    _is_preaching = True
+                    break
+            if _is_preaching:
+                _sentences.pop()
+                _removed += 1
+                if _removed >= 2:
+                    break  # Never strip more than 2 trailing sentences
+            else:
+                break
+        if _removed:
+            _preaching_count += _removed
+            p['description'] = ' '.join(_sentences).strip()
+    print(f"  [LOCAL-44] Stripped {_preaching_count} preaching closer(s)")
 
     # PHASE 6: Assemble the complete tour
     print(f"\nPHASE 6: Assembling the complete tour...")
@@ -5774,15 +5866,22 @@ Requirements:
             
             # [T4] DETERMINISTIC TRANSITION TEMPLATES — no LLM content in transitions
             # This eliminates the splice-corruption bug class entirely
+            # [LOCAL-44] Removed "Ask museum staff for directions" (people know that).
+            # Venue name appears at most twice across all transitions in a single-venue tour.
             if tour_category == 'museum' and _museum_venue_name:
-                # Museum tours: rotating deterministic templates with venue name (satisfies venue coherence)
-                _transition_templates = [
-                    f"Continue exploring {_museum_venue_name} — proceed to {next_poi['name']}.",
-                    f"Your next stop at {_museum_venue_name}: {next_poi['name']}. Ask museum staff for directions.",
-                    f"Proceed to {next_poi['name']}, also here at {_museum_venue_name}.",
-                    f"Next in {_museum_venue_name}'s collection: {next_poi['name']}.",
-                ]
-                _transition = _transition_templates[i % len(_transition_templates)]
+                # Museum tours: mostly name-only transitions; venue name only on first and last
+                if i == 0:
+                    _transition = f"Continue through {_museum_venue_name} — next is {next_poi['name']}."
+                elif i == len(poi_list) - 2:
+                    _transition = f"Your final stop in {_museum_venue_name}: {next_poi['name']}."
+                else:
+                    # Interior transitions: just name the next stop, no venue repetition
+                    _interior_templates = [
+                        f"Next: {next_poi['name']}.",
+                        f"Proceed to {next_poi['name']}.",
+                        f"Continue to {next_poi['name']}.",
+                    ]
+                    _transition = _interior_templates[(i - 1) % len(_interior_templates)]
             else:
                 # Walking tours: use generated directions if available
                 directions = next_poi.get("directions", "")
@@ -5817,7 +5916,7 @@ Requirements:
                 _mid_idx = len(_poi_names) // 2
                 _mid = _poi_names[_mid_idx] if len(_poi_names) > 2 else None
                 
-                epilog = f"\n\nAs this journey comes to a close, reflect on the path you've taken — from {_first} through to here at {_last}. "
+                epilog = f"\n\n"
                 
                 # Use ONLY documented story elements for closing facts (never GPT-generated spine text)
                 if _story_elements:
@@ -5827,12 +5926,12 @@ Requirements:
                         _fact = _closing_facts[0]
                         epilog += _fact + " "
                 
-                # [LOCAL-41] Short synthesis naming at most 2–3 stops, never an inventory.
+                # [LOCAL-44] End on a factual observation tying the collection together.
+                # No instructions, no promotional language, no "consider/reflect/imagine".
                 if _mid:
-                    epilog += f"\n\nFrom the craftsmanship of {_first} to the stillness of {_mid} to this final encounter with {_last} — each revealed a different facet of this collection, and together they tell a larger story than any one alone."
+                    epilog += f"\n\nFrom {_first} through {_mid} to {_last} — three facets of a collection that spans centuries and continents."
                 else:
-                    epilog += f"\n\nFrom {_first} to {_last} — each stop revealed a different facet of this collection, and together they tell a larger story than any one alone."
-                epilog += f"\n\nIf you'd like to explore more, consider generating another tour — perhaps a different perspective on this same place, or a new destination entirely. The next journey awaits."
+                    epilog += f"\n\nFrom {_first} to {_last} — a collection that spans more ground than these stops alone."
                 
                 poi_content += epilog
                 
@@ -5851,12 +5950,8 @@ Requirements:
                 
                 print(f"  [EPILOG] Journey epilog added to last stop")
             else:
-                # Beta: standard conclusion
-                if tour_type.lower() in location.lower():
-                    conclusion = f"Thank you for joining this tour of {location}. We hope you have enjoyed the journey through art, history, and nature, and that you leave inspired by the beauty and creativity that surrounds you."
-                else:
-                    conclusion = f"Thank you for joining this {tour_category} tour of {location}. We hope you have enjoyed the journey through art, history, and nature, and that you leave inspired by the beauty and creativity that surrounds you."
-                poi_content += conclusion
+                # Beta: factual closing (no preaching)
+                poi_content += ""  # No separate conclusion needed — last stop ends on its own content
         
         # Add to complete tour
         complete_tour += poi_content + "\n\n"

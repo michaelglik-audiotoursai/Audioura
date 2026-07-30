@@ -54,8 +54,19 @@ FORBIDDEN_PHRASES: List[re.Pattern] = [
     re.compile(r"fully\s+immerse\s+yourself\s+in\s+the", re.IGNORECASE),
     re.compile(r"the\s+rich\s+cultural\s+heritage\s+of", re.IGNORECASE),
     re.compile(r"each\s+(intricate\s+)?detail\s+tells\s+a\s+story", re.IGNORECASE),
-    re.compile(r"to\s+fully\s+(appreciate|immerse|experience)", re.IGNORECASE),
+    re.compile(r"to\s+fully\s+(appreciate|understand|immerse|experience)", re.IGNORECASE),
     re.compile(r"a\s+(stunning|exquisite|mesmerizing)\s+example\s+of", re.IGNORECASE),
+    # [LOCAL-44] Preaching/instructive patterns — telling the listener what to feel or do
+    re.compile(r"as\s+you\s+stand\s+(before|here|in\s+front)[^,]*,?\s*(consider|reflect|ponder|let)", re.IGNORECASE),
+    re.compile(r"let\s+the\s+whispers?\s+of\s+the\s+past", re.IGNORECASE),
+    re.compile(r"take\s+a\s+moment\s+to\s+(appreciate|reflect|consider|absorb)", re.IGNORECASE),
+    re.compile(r"allow\s+(yourself|your\s+imagination)\s+to", re.IGNORECASE),
+    re.compile(r"carry\s+(this|these|the)\s+\w+\s+with\s+you", re.IGNORECASE),
+    re.compile(r"what\s+other\s+(tales?|stories?|secrets?|treasures?|wonders?)\s+(of|await|might)", re.IGNORECASE),
+    re.compile(r"to\s+truly\s+(appreciate|understand)\s+(the\s+significance|this)", re.IGNORECASE),
+    re.compile(r"it\s+is\s+(worth|important)\s+(noting|to\s+note|to\s+understand)", re.IGNORECASE),
+    re.compile(r"the\s+next\s+journey\s+awaits", re.IGNORECASE),
+    re.compile(r"ask\s+museum\s+staff\s+for\s+directions", re.IGNORECASE),
 ]
 
 
