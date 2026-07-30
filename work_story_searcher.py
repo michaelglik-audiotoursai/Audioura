@@ -257,6 +257,54 @@ def synthesize_queries(stop: Dict, tour_type: str = 'contained') -> List[str]:
     return queries
 
 
+def synthesize_class_targeted_queries(stop: Dict, tour_type: str = 'contained',
+                                       category: str = '') -> Dict[str, List[str]]:
+    """[LOCAL-37] Generate queries targeted at each of the three classes.
+    
+    Extends synthesize_queries with class-specific query strategies:
+    - Details: material, dimensions, technique, medium
+    - Historical: category-level origin, era, evolution (NOT object-specific)
+    - Social: people, commissions, reception, controversy
+    
+    Args:
+        stop: dict with canonical_title, artist, venue_city, etc.
+        tour_type: 'contained' or 'distributed'
+        category: the object category for Historical-class queries
+        
+    Returns:
+        Dict {"details": [...], "historic": [...], "social": [...]}
+    """
+    title = stop.get('canonical_title', '') or stop.get('name', '')
+    artist = stop.get('artist', '')
+    city = stop.get('venue_city', '')
+    
+    queries = {"details": [], "historic": [], "social": []}
+    
+    # ── Details: physical properties of the entity ──
+    if title:
+        queries["details"].append(f'"{title}" material dimensions technique medium')
+        if artist:
+            queries["details"].append(f'"{title}" {artist} technique materials')
+    
+    # ── Historical: CATEGORY level (the key insight) ──
+    if category:
+        queries["historic"].append(f'"{category}" origin era history evolution')
+        queries["historic"].append(f'"{category}" ancient tradition cultural significance')
+    if title:
+        queries["historic"].append(f'"{title}" history period era style')
+    
+    # ── Social: the people ──
+    if title:
+        queries["social"].append(f'"{title}" commissioned owned reception provenance')
+    if artist:
+        queries["social"].append(f'"{artist}" "{title}" patron collector who')
+        queries["social"].append(f'"{artist}" controversy relationship circle')
+    elif title:
+        queries["social"].append(f'"{title}" who made commissioned owned donated')
+    
+    return queries
+
+
 # --- LLM Refinement Round (SQ-S1, F5) ---
 def _refine_queries_llm(stop: Dict, tier3_leads: List[str], canonical_title: str) -> List[str]:
     """Bounded LLM refinement: propose 1-2 queries when T1/T2 yield is thin.
