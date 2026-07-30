@@ -88,6 +88,80 @@ _COUNTRY_ENCLAVES = {
 }
 
 
+# ============================================================
+# [LOCAL-22] Name-corruption guard: reject GPT names that are
+# sentences, descriptions, or contain meta-references.
+# This is the ROOT-CAUSE fix — prevents corruption from entering
+# poi_list rather than trying to sanitize it downstream.
+# ============================================================
+_NAME_CORRUPTION_INDICATORS = re.compile(
+    r'(?i)'
+    r'(?:'
+    # Sentence-like openings: "Located at...", "This stop...", "Visit the..."
+    r'^(located\s+at|situated\s+(at|in|on)|this\s+(stop|place|location|exhibit)|'
+    r'visit\s+the|explore\s+the|discover\s+the|experience\s+the|'
+    r'featuring\s|invites?\s+(visitors?|you)|offers?\s+(visitors?|a)|'
+    r'showcasing\s|known\s+for\s|famous\s+for\s|home\s+to\s|'
+    r'dedicated\s+to\s|a\s+(celebration|journey|tribute|showcase))'
+    r'|'
+    # Contains 'Stop N' self-reference (meta-reference)
+    r"'Stop\s+\d+'|\"Stop\s+\d+\"|Stop\s+\d+\s+(invites?|offers?|features?|showcases?)"
+    r')'
+)
+
+# Address fragment patterns that should never appear in a name
+_ADDRESS_IN_NAME_RE = re.compile(
+    r'(?i)'
+    r'(?:'
+    # Postal codes (French, US, UK, etc.)
+    r'\b\d{5}\b'
+    r'|'
+    # Street-address patterns ("123 Main St", "405 Promenade")
+    r'\b\d{1,5}\s+(rue|avenue|boulevard|promenade|street|road|drive|lane|place|way)\b'
+    r'|'
+    # "des Anglais" style French address fragments
+    r'\bdes\s+[A-Z][a-zà-ú]+'
+    r')'
+)
+
+
+def _is_name_corrupted(name):
+    """Return True if a candidate POI name looks like a sentence/description
+    rather than a clean entity name. Used to REJECT bad GPT outputs at ingestion.
+    
+    Criteria for corruption:
+    1. Contains > 12 words (entity names are short noun phrases)
+    2. Contains sentence punctuation (periods, semicolons) mid-string
+    3. Matches known corruption patterns (sentence openings, meta-refs)
+    4. Contains address fragments (postal codes, street numbers)
+    """
+    if not name:
+        return True
+    
+    words = name.split()
+    
+    # Criterion 1: Too many words for an entity name
+    if len(words) > 12:
+        return True
+    
+    # Criterion 2: Contains sentence-terminating punctuation mid-string
+    # (Allow commas for things like "The Starry Night, 1889" or apostrophes)
+    # Strip trailing punctuation first — some names legitimately end with a period
+    _inner = name.rstrip('.!?;')
+    if any(c in _inner for c in '.!?;'):
+        return True
+    
+    # Criterion 3: Matches sentence/description patterns
+    if _NAME_CORRUPTION_INDICATORS.search(name):
+        return True
+    
+    # Criterion 4: Contains address fragments
+    if _ADDRESS_IN_NAME_RE.search(name):
+        return True
+    
+    return False
+
+
 def _detect_transport_mode(location):
     """Detect transport mode from location text (Layer 1 — keyword matching).
     Returns one of: 'animal', 'bike', 'vehicle', 'country_scale', or 'on_foot' (default)."""
@@ -773,18 +847,30 @@ def _validate_museum_stop_descriptions(poi_list, venue_name, headers):
     first_stop = poi_list[0]
     candidates = poi_list[1:]  # only check stops 1..N
 
-    # Single-venue museum tours: verify EVERY stop's description is inside the venue.
-    # The name-only pre-filter (_is_suspect) missed exhibits that belong to a DIFFERENT
-    # museum but whose names contain no institutional marker (e.g. "Thoreau's Bedroom"
-    # is housed at the Concord Museum, not The Old Manse).
-    # Cost is tiny: typical 3-7 stops × 1 gpt-3.5-turbo call each.
-    if len(candidates) <= 12:
-        suspect = list(candidates)
+    # [LOCAL-22 Fix A] D1v2-verified stops are NEVER deleted by the prose validator.
+    # Authority hierarchy: corpus-verified evidence > GPT-3.5-turbo prose judgment.
+    # Only unverified fills (verified=False explicitly) get sent to the GPT check.
+    d1v2_verified = []
+    unverified_candidates = []
+    for p in candidates:
+        if p.get('verified', True):  # True or absent = verified (D1v2 default)
+            d1v2_verified.append(p)
+        else:
+            unverified_candidates.append(p)
+    
+    _n_verified_kept = len(d1v2_verified)
+    _n_unverified_check = len(unverified_candidates)
+    print(f"   Authority: {_n_verified_kept} D1v2-verified (kept unconditionally), "
+          f"{_n_unverified_check} unverified (will check)")
+
+    # Single-venue museum tours: verify EVERY unverified stop's description is inside the venue.
+    if len(unverified_candidates) <= 12:
+        suspect = list(unverified_candidates)
         clean = []
     else:
         # Fallback to name-based pre-filter only for unusually large tours (cost guard)
-        suspect = [p for p in candidates if _is_suspect(p.get('name', ''))]
-        clean = [p for p in candidates if not _is_suspect(p.get('name', ''))]
+        suspect = [p for p in unverified_candidates if _is_suspect(p.get('name', ''))]
+        clean = [p for p in unverified_candidates if not _is_suspect(p.get('name', ''))]
     print(f"   Pre-filter: {len(clean)} clean, {len(suspect)} suspect (will call OpenAI for suspect only)")
 
     # Run OpenAI checks only on suspect stops (parallel)
@@ -802,8 +888,8 @@ def _validate_museum_stop_descriptions(poi_list, venue_name, headers):
             else:
                 print(f"   X  REMOVED '{poi['name']}' — not inside venue: {reason}")
 
-    # Reassemble in original order: stop 0 always first, then clean + checked survivors
-    all_survivors = clean + checked_survivors
+    # Reassemble in original order: stop 0 always first, then d1v2_verified + clean + checked survivors
+    all_survivors = d1v2_verified + clean + checked_survivors
     all_survivors.sort(key=lambda p: poi_list.index(p))
     return [first_stop] + all_survivors
 
@@ -2226,6 +2312,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             if re.match(r'^(Restaurant|Store|Shop|Location|Business|Walking Tour)\s*\d*$', name):
                 print(f"   ! Rejected generic name from PHASE 3A: '{name}'")
                 continue
+            # [LOCAL-22] Root-cause guard: reject names that are sentences/descriptions
+            if _is_name_corrupted(name):
+                print(f"   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: '{name[:80]}'")
+                continue
             poi_list.append(_new_poi(name, c.get("address") or ""))
 
         if len(poi_list) == 0:
@@ -2422,6 +2512,11 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             continue
                         name = (c.get("name") or "").strip()
                         if not name or _normalize_name(name) in _r4_all_tried_names:
+                            continue
+                        # [LOCAL-22] Root-cause guard: reject names that are sentences/descriptions
+                        if _is_name_corrupted(name):
+                            print(f"    [LOCAL-22] Rejected corrupted name from R4: '{name[:80]}'")
+                            _r4_all_tried_names.add(_normalize_name(name))
                             continue
                         _r4_all_tried_names.add(_normalize_name(name))
                         _r4_new_pois.append(_new_poi(name, c.get("address") or ""))
@@ -2869,6 +2964,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     if not name:
                         continue
                     if re.match(r'^(Restaurant|Store|Shop|Location|Business|Walking Tour)\s*\d*$', name):
+                        continue
+                    # [LOCAL-22] Root-cause guard: reject names that are sentences/descriptions
+                    if _is_name_corrupted(name):
+                        print(f"   ! [LOCAL-22] Rejected corrupted name from Part C: '{name[:80]}'")
                         continue
                     norm = _normalize_name(name)
                     if norm in forbidden_norms:
@@ -3841,6 +3940,14 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
         for future in as_completed(futures):
             idx, orientation, description, word_count, tokens_used, call_cost = future.result()
             poi_list[idx]["orientation"] = orientation
+            # [LOCAL-22] Strip any "Stop N:" prefix that GPT echoed into description text.
+            # This is the ROOT CAUSE of the stop-title corruption: GPT's description response
+            # sometimes starts with "Stop N: Located at..." which, when rendered into the
+            # final text file, creates a line matching ^Stop\s+\d+: — the QA regex
+            # then picks it up as the stop heading instead of the real one.
+            if description:
+                # Strip from beginning of text AND from beginning of any line within
+                description = re.sub(r'^Stop\s+\d+:\s*', '', description, flags=re.IGNORECASE | re.MULTILINE).strip()
             poi_list[idx]["description"] = description
             poi_list[idx]["word_count"] = word_count
             total_tokens += tokens_used
@@ -3876,6 +3983,31 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
             if len(poi_list) <= max(1, _before // 2):
                 print(f"  [PHASE 5.6] >50% of stops were outside '{_scope_for_check}' — "
                       f"scope is likely a small single venue; delivering {len(poi_list)} verified stop(s).")
+
+    # -------- PHASE 5.7: Dangling-reference scrub --------
+    # [LOCAL-22] If any stops were removed by 5.5b or 5.6, re-number and clean up
+    # "Stop N" references in descriptions/orientations where N > final stop count.
+    _final_stop_count = len(poi_list)
+    for i, p in enumerate(poi_list):
+        p['stop_number'] = i + 1
+    # Scrub dangling "Stop N" references from descriptions and orientations
+    for p in poi_list:
+        for _field_key in ('description', 'orientation'):
+            _text = p.get(_field_key, '') or ''
+            if not _text:
+                continue
+            # Remove sentences referencing Stop N where N > final count
+            _scrubbed = _text
+            for _n in range(_final_stop_count + 1, _final_stop_count + 20):
+                # "whereabouts of Stop N" or "find Stop N" or "at Stop N"
+                _scrubbed = re.sub(
+                    rf'(?i)[^.]*\bStop\s+{_n}\b[^.]*\.\s*', '', _scrubbed
+                )
+            if _scrubbed != _text:
+                p[_field_key] = _scrubbed.strip()
+                print(f"  [PHASE 5.7] Scrubbed dangling Stop reference(s) from {_field_key} "
+                      f"of stop {p['stop_number']}: '{p['name']}'")
+    print(f"OK PHASE 5.7: Dangling-reference scrub complete ({_final_stop_count} stops)")
 
     # PHASE 6: Assemble the complete tour
     print(f"\nPHASE 6: Assembling the complete tour...")
@@ -4210,13 +4342,28 @@ Requirements:
     # [D2] Strip GPT self-references to "Stop N" in description bodies
     if _storied_mode:
         import re as _d2_re
-        # Split into stop blocks, clean description text only (not headers)
+        # Build set of REAL header lines (we know exactly which lines are headers)
+        _real_headers = set()
+        for i, poi in enumerate(poi_list):
+            _rh = f"Stop {i + 1}: {poi['name']}"
+            if poi['artist'] and poi['artist'].lower() != "unknown artist":
+                _rh += f" by {poi['artist']}"
+            if poi['year']:
+                _rh += f", {poi['year']}"
+            _real_headers.add(_rh)
+        
         _d2_lines = complete_tour.split('\n')
         _d2_cleaned = []
         for _line in _d2_lines:
-            # Don't touch headers (lines starting with "Stop N:")
-            if _d2_re.match(r'^Stop\s+\d+:', _line):
+            # Only preserve lines that are KNOWN real headers
+            if _line.strip() in _real_headers:
                 _d2_cleaned.append(_line)
+            elif _d2_re.match(r'^Stop\s+\d+:', _line):
+                # Line looks like a header but isn't a real one — it's GPT leakage
+                # Strip the "Stop N:" prefix and replace remaining "Stop N" references
+                _cleaned = _d2_re.sub(r'^Stop\s+\d+:\s*', '', _line, count=1)
+                _cleaned = _d2_re.sub(r'\bStop\s+\d+\b', 'this work', _cleaned)
+                _d2_cleaned.append(_cleaned)
             else:
                 # Replace self-referential "Stop N" with context-appropriate text
                 _d2_cleaned.append(_d2_re.sub(r'\bStop\s+\d+\b', 'this work', _line))
@@ -4248,26 +4395,32 @@ Requirements:
                             if _sentence_b:
                                 _rewritten = rewrite_repeated_sentence(_sentence_b, f"Stop {_stop_b}", _story_type_b, api_key)
                                 if _rewritten and _rewritten != _sentence_b:
-                                    # [D2] Scoped replacement: only within the target stop's block
-                                    import re as _d2_re_inner
-                                    _stop_blocks = _d2_re_inner.split(r'(Stop \d+:)', complete_tour)
-                                    _replaced = False
-                                    _rebuilt = []
-                                    for _bi, _block in enumerate(_stop_blocks):
-                                        if not _replaced and _sentence_b in _block:
-                                            # Check this is the right stop block
-                                            _prev_header = _stop_blocks[_bi - 1] if _bi > 0 else ''
-                                            if f"Stop {_stop_b}:" in _prev_header or f"Stop {_stop_b}:" in _block:
-                                                _block = _block.replace(_sentence_b, _rewritten, 1)
-                                                _replaced = True
-                                        _rebuilt.append(_block)
-                                    if _replaced:
-                                        complete_tour = ''.join(_rebuilt)
+                                    # [LOCAL-22] Strip any "Stop N:" prefix from rewritten text
+                                    # The rewrite GPT sometimes echoes "Stop N:" context into its output
+                                    _rewritten = re.sub(r'^Stop\s+\d+:\s*', '', _rewritten, flags=re.IGNORECASE | re.MULTILINE).strip()
+                                    # Also strip "Stop N" meta-references
+                                    _rewritten = re.sub(r'\bStop\s+\d+\b', 'this work', _rewritten)
+                                    # [LOCAL-22] Safe scoped replacement: find the target stop's
+                                    # block by locating its header, then replace ONLY within that block.
+                                    # Do NOT use re.split on Stop headers (corrupts header boundaries).
+                                    _header_pattern = re.compile(rf'^Stop\s+{_stop_b}:', re.MULTILINE)
+                                    _header_match = _header_pattern.search(complete_tour)
+                                    if _header_match:
+                                        _block_start = _header_match.start()
+                                        # Find the NEXT stop header to delimit the block end
+                                        _next_header = re.search(r'^Stop\s+\d+:', complete_tour[_block_start + 1:], re.MULTILINE)
+                                        _block_end = (_block_start + 1 + _next_header.start()) if _next_header else len(complete_tour)
+                                        _block_text = complete_tour[_block_start:_block_end]
+                                        if _sentence_b in _block_text:
+                                            _new_block = _block_text.replace(_sentence_b, _rewritten, 1)
+                                            complete_tour = complete_tour[:_block_start] + _new_block + complete_tour[_block_end:]
+                                            _rewrite_count += 1
+                                            print(f"REPETITION FIXED: Stop {_stop_b} sentence rewritten")
+                                        else:
+                                            # Sentence not in expected block — skip (don't corrupt)
+                                            print(f"  [S29] Sentence not found in Stop {_stop_b} block — skipping")
                                     else:
-                                        # Fallback: if block matching failed, do scoped replace
-                                        complete_tour = complete_tour.replace(_sentence_b, _rewritten, 1)
-                                    _rewrite_count += 1
-                                    print(f"REPETITION FIXED: Stop {_stop_b} sentence rewritten")
+                                        print(f"  [S29] Stop {_stop_b} header not found — skipping")
                         if _rewrite_count > 0:
                             print(f"  [S29] {_rewrite_count} sentence(s) rewritten")
                     except ImportError:
@@ -4280,6 +4433,33 @@ Requirements:
             print(f"  [S27] derepetition_guard not available — repetition check skipped")
         except Exception as e:
             print(f"  [S27] Repetition check error: {e}")
+
+    # -------- [LOCAL-22] Final stop-header sanitization --------
+    # After ALL post-processing (D2, S29), ensure no fake "Stop N:" lines exist.
+    # Only the REAL headers (one per stop, produced at PHASE 6 assembly) may start with "Stop N:".
+    _real_header_set = set()
+    for i, poi in enumerate(poi_list):
+        _h = f"Stop {i + 1}: {poi['name']}"
+        if poi['artist'] and poi['artist'].lower() != "unknown artist":
+            _h += f" by {poi['artist']}"
+        if poi['year']:
+            _h += f", {poi['year']}"
+        _real_header_set.add(_h)
+    
+    _final_lines = complete_tour.split('\n')
+    _sanitized_lines = []
+    _corruption_fixed = 0
+    for _line in _final_lines:
+        if re.match(r'^Stop\s+\d+:', _line) and _line.strip() not in _real_header_set:
+            # This line looks like a header but isn't a real one — strip the prefix
+            _fixed = re.sub(r'^Stop\s+\d+:\s*', '', _line)
+            _sanitized_lines.append(_fixed)
+            _corruption_fixed += 1
+        else:
+            _sanitized_lines.append(_line)
+    if _corruption_fixed:
+        complete_tour = '\n'.join(_sanitized_lines)
+        print(f"  [LOCAL-22] Final sanitization: removed {_corruption_fixed} fake Stop N: header(s)")
 
     # Print word count statistics
     print("\n=== Word Count Statistics ===")
