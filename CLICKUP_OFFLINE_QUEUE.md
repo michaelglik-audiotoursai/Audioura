@@ -2972,3 +2972,126 @@ status each) + 12 calls for LOCAL-1 through LOCAL-12 (one `create_task` each, wi
 `status=complete` set directly at creation instead of a separate `update_task` call —
 cheaper than originally budgeted). Total: 18 API calls, vs. the ~42 originally
 estimated. wdvrdawdje required no action (no drift while offline).
+
+---
+
+#### LOCAL-23 — Multi-source corpus expansion with a trust hierarchy
+
+**Agent:** Mac Mini Kiro · **Branch:** `kiro/local23-multi-source-corpus`
+**Dispatched:** 2026-07-29 ~21:2x · **Priority:** high
+**ClickUp:** NOT POSTED — API rate-limited (~253 min) at dispatch time.
+Post to 🟦 Services — Kiro when the limit clears; this file is the record.
+
+**Origin:** Michael's directive after seeing the venue resolve to only 6
+canonical titles — *"there are more than 6 works in that museum... I can go
+to Google and google them."* Confirmed correct: the 6 is an artifact of how
+little we look, not a fact about the museum.
+
+**Confirmed causes (LEAD):**
+1. `story_miner.py:458` hard-caps the site crawl at 5 pages
+   (`for url in _ordered_urls[:5]`) regardless of site size.
+2. Poor page-type prioritisation — 4 of 6 fetched pages were
+   agenda/publications listings; only `/les-oeuvres-commentees` was
+   collection content. Several resulting "works" are exhibition titles
+   (`l'art en exil - Hàm Nghi...`) or bare nouns (`disque`, `fauteuil`).
+3. Joconde/POP (`pop.culture.gouv.fr`) is NEVER queried — present in the
+   codebase only inside test fixtures, where it is already registered as a
+   trusted tier-1 domain. For a French public museum this is the
+   authoritative catalogue.
+
+**Trust order (Michael):** Tier 1 = Wikipedia + the museum's own official
+site, co-equal. Tier 2 = other institutional sources (Joconde/POP etc.).
+Most famous works first. Keep searching until the customer's requested stop
+count is satisfiable. **If titles cannot be verified, keep the smaller set**
+— a larger corpus must never become a fabrication vector.
+
+**Why it matters:** R4 replenishment (fixed in LOCAL-19, merged @ 04e726d)
+verifies candidates against the corpus, so it can never exceed corpus size.
+On this venue it currently finds nothing because all 6 titles were already
+in use. Expanding the corpus is what makes R4 useful here and makes an
+honest 8-stop tour — and Michael's 75-score gate — achievable.
+
+**Scope note:** confined to `story_miner.py` / `venue_resolver.py` to avoid
+conflicting with LOCAL-21 and LOCAL-22, which both touch
+`generate_tour_text.py`.
+
+**Submission:** `SUBMISSION_LOCAL-23.md` in the task's worktree.
+
+---
+
+#### LEAD VERDICTS — 2026-07-30 early hours (ClickUp rate-limited ~189 min, clears ~04:55)
+
+##### LOCAL-23 — APPROVED, MERGED @ 3fb8936
+
+Independently verified: deleted the venue_corpus row, rebuilt from branch,
+re-scraped, regenerated. **6 → 22 canonical titles** reproduced
+(corpus_version=3). Chain works end to end:
+- R4 now finds real matches (was 0-for-21 earlier in the evening).
+- Tour 6 → **7 stops**; new stop 6 = `Daim et Daine symbolisant le premier
+  sermon de Bouddha`, a genuine work sourced from Wikipedia.
+- **Fact sheets 0/8 → 7/8.** Stop 2 now carries real Gandhara art history
+  ("grey schist, 2nd century, Greek and Indian influences, conquests of
+  Alexander the Great") where it was boilerplate before. The single stop
+  WITHOUT a fact sheet is the one that still reads generic — clean evidence
+  the mechanism drives quality.
+- **LEAD score ≈ 36/100** (28.1 base + modest correlation credit for a
+  genuine stop-3→4 hook). Best of the loop; previous best 31.25.
+- 12/12 suites green.
+
+Merged despite a real flaw (below) because the alternative — 6 stops and
+zero fact sheets — is strictly worse, and at score 36 we are far from the
+75 field-test gate, so no customer risk in the interim.
+
+**Flaw → dispatched as LOCAL-24:** the wider net admits non-works.
+`Promenade des Anglais` (the street outside), `Origin of the museum's
+pieces` and `The museum's collections` (Wikipedia SECTION HEADINGS — the
+LOCAL-9 nav-label bug class returning), three near-duplicate workshop names,
+and an EN/FR duplicate of the same work. One reached the tour: stop 7
+`En harmonie avec la nature` is a programme, not an object, and Phase 5 then
+invented an artist for it ("the esteemed Japanese artist Hiroshi Yoshida")
+and re-described stop 6's deer. A polluted corpus entry produced a
+fabricated attribution.
+
+##### LOCAL-22 — APPROVED, MERGED @ 5587550
+
+**Root cause found, in a different layer than 7 rounds of fixes assumed.**
+Not GPT writing a sentence into the `name` field — the **S29 derepetition
+rewrite, post-assembly**. Confirmed by LEAD in the pre-fix source
+(`generate_tour_text.py:~4256`): `_d2_re_inner.split(r'(Stop \d+:)',
+complete_tour)` plus an unscoped fallback `complete_tour.replace(...)`. When
+GPT's rewritten sentence echoes `Stop 3: Located at the Asian Arts
+Museum...` (it gets stop context in its prompt), split-and-rejoin injects a
+fake header line.
+
+Explains everything prior attempts missed: why name-field sanitisation never
+worked (corruption enters AFTER names are set), why it always carried an
+address fragment plus a `'Stop N'` self-reference, and why it is
+intermittent.
+
+Fix is structural: build the set of REAL headers from `poi_list` (ground
+truth) and strip any header-shaped line not in it; replace the fragile split
+with header-locating scoped replacement. 11/11 suites on branch, 11/11 on
+storied post-merge. Their run renders `Stop 3: Fauteuil` cleanly — the exact
+stop corrupted in LEAD's LOCAL-17 run.
+
+Caveat: defect is probabilistic, so one clean run is not proof. Confidence
+rests on the diagnosis being verified in source and the fix using ground
+truth. Watch the next few regenerations.
+
+Closes a defect that survived 7 rounds and was reported fixed 3 times.
+
+##### LOCAL-21 — review IN PROGRESS at time of writing
+
+G4 confirmed NOT weakened (`_ctx_tier == 'exhibit_museum'` only) — the
+constraint that mattered most. Chagall run delivered 7/7 real works, clean
+headings, sources credited. Two claims still unverified: story_elements
+growth beyond 1 of 16 venues (LEAD tested the venue that already had them —
+a flaw in LEAD's test design), and whether a tour with story elements passes
+the SERVICE QA gate (a direct `generate_tour_text()` call bypasses it; a
+service-path job was still running at time of writing). `test_contained_
+regression.py` failure investigated and dismissed — it hits the shared
+container on :5000 and fails identically on clean storied.
+
+**ClickUp to post when the limit clears:** wdvrdax5j9 (LOCAL-19, already
+posted), wdvrdax5ja (LOCAL-22 verdict above), wdvrdax5j8 (LOCAL-21 when
+complete). LOCAL-23 and LOCAL-24 still need tasks created.
