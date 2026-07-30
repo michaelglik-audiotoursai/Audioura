@@ -665,6 +665,23 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
         check("G4 Prolog/epilog claims trace to story elements (FACTUAL)",
               True, "(no story_elements available or no dated/causal claims — skipped)")
 
+    # -------- [LOCAL-36] Practical facts provenance reporting --------
+    # Report what practical claims remain in the delivered tour. These should
+    # have already been gated by practical_facts_gate in the pipeline.
+    # Here we just audit their presence.
+    try:
+        from practical_facts_gate import extract_practical_claims as _extract_pf
+        _pf_claims = _extract_pf(tour_text)
+        if _pf_claims:
+            _pf_summary = ', '.join(f"{c.claim_type}={c.value[:30]}" for c in _pf_claims[:4])
+            print(f"  [LOCAL-36] Practical claims present in tour: {len(_pf_claims)} ({_pf_summary})")
+        else:
+            print(f"  [LOCAL-36] No practical claims in tour (OK — omission is safe)")
+    except ImportError:
+        pass
+    except Exception:
+        pass
+
 
 def main():
     print("=" * 60)

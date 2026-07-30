@@ -1937,6 +1937,58 @@ def _is_valid_visitor_info(text: str) -> bool:
     
     return has_valid_fact
 
+
+# [LOCAL-36] Raw source fetcher for practical facts gate provenance
+def _fetch_visitor_info_raw_source(base_site_url: str) -> str:
+    """Fetch the raw text content from the venue's visitor info page.
+    
+    Unlike _fetch_visitor_info_from_site which extracts and translates,
+    this returns the raw source text for verification by the practical facts gate.
+    The gate needs the original source content to verify that claims are supported.
+    """
+    if not base_site_url:
+        return ""
+    
+    from urllib.parse import urljoin, urlparse
+    
+    _VISITOR_INFO_PATHS_RELATIVE = [
+        'tarifs-et-horaires', 'horaires-et-tarifs', 'infos-pratiques',
+        'informations-pratiques', 'plan-your-visit', 'visit',
+        'visitor-information', 'hours-admission', 'hours-and-admission',
+        'opening-hours', 'practical-information',
+        'tarifs', 'horaires', 'visite',
+    ]
+    
+    _parsed_info_url = urlparse(base_site_url)
+    _info_path_segments = [s for s in _parsed_info_url.path.rstrip('/').split('/') if s]
+    _is_deep_path = len(_info_path_segments) > 1
+    
+    _urls_to_try = []
+    if _is_deep_path:
+        _venue_base = base_site_url.rstrip('/')
+        for slug in _VISITOR_INFO_PATHS_RELATIVE:
+            _urls_to_try.append(_venue_base + '/' + slug)
+    else:
+        for slug in _VISITOR_INFO_PATHS_RELATIVE:
+            _urls_to_try.append(urljoin(base_site_url, '/' + slug))
+    
+    for _url in _urls_to_try:
+        try:
+            resp = requests.get(_url, headers={'User-Agent': 'Audioura/2.2'},
+                              timeout=10, allow_redirects=True)
+            if resp.status_code == 200 and len(resp.text) > 200:
+                _text = re.sub(r'<script[^>]*>.*?</script>', '', resp.text, flags=re.DOTALL)
+                _text = re.sub(r'<style[^>]*>.*?</style>', '', _text, flags=re.DOTALL)
+                _text = re.sub(r'<[^>]+>', ' ', _text)
+                _text = re.sub(r'\s+', ' ', _text).strip()
+                if len(_text) > 100:
+                    return _text[:5000]
+        except Exception:
+            continue
+    
+    return ""
+
+
 def _fetch_visitor_info_from_site(base_site_url: str, language: str = "en") -> str:
     """Attempt to fetch practical visitor information (hours, admission) from the venue's official site.
     
@@ -3860,6 +3912,9 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             print(f"  [LOCAL-27] Corpus-sourced metadata applied to {len(poi_list)} stops")
 
         # -------- [LOCAL-27] Source visitor info from official site (museum tours only) --------
+        # [LOCAL-36] Track provenance: store source URL + raw fetched text for verification gate
+        _visitor_info_source_url = ''
+        _visitor_info_source_text = ''
         if tour_category == 'museum' and _museum_venue_name:
             # Attempt to fetch real visitor info from the venue's official website
             _sourced_visitor_info = ''
@@ -3869,7 +3924,11 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 _official_url_for_info = _story_corpus_result['source_urls'][0]
             if _official_url_for_info:
                 # [LOCAL-29 Fix B] Pass language="en" to trigger FR→EN translation
+                # [LOCAL-36] Also capture the raw source text for verification
                 _sourced_visitor_info = _fetch_visitor_info_from_site(_official_url_for_info, language="en")
+                _visitor_info_source_url = _official_url_for_info
+                # Re-fetch raw source for gate verification (the formatted info is translated/extracted)
+                _visitor_info_source_text = _fetch_visitor_info_raw_source(_official_url_for_info)
             if _sourced_visitor_info and poi_list:
                 # Only populate first stop's operational_details — with SOURCED data
                 poi_list[0]['operational_details'] = _sourced_visitor_info
@@ -5480,6 +5539,33 @@ Requirements:
     if _corruption_fixed:
         complete_tour = '\n'.join(_sanitized_lines)
         print(f"  [LOCAL-22] Final sanitization: removed {_corruption_fixed} fake Stop N: header(s)")
+
+    # -------- [LOCAL-36] Practical facts QA gate --------
+    # Verify provenance of every practical claim before delivery.
+    # Claims without traceable source are DROPPED — silence is correct.
+    try:
+        from practical_facts_gate import gate_and_fix as _practical_gate
+        _pf_source_url = ''
+        _pf_source_text = ''
+        try:
+            _pf_source_url = _visitor_info_source_url
+            _pf_source_text = _visitor_info_source_text
+        except NameError:
+            pass
+        complete_tour, _pf_result = _practical_gate(
+            complete_tour,
+            source_url=_pf_source_url,
+            source_text=_pf_source_text,
+            verbose=True,
+        )
+        if not _pf_result.passed:
+            print(f"  [LOCAL-36] PRACTICAL FACTS GATE: {len(_pf_result.dropped_claims)} claim(s) dropped")
+        else:
+            print(f"  [LOCAL-36] PRACTICAL FACTS GATE: PASSED ({len(_pf_result.verified_claims)} verified)")
+    except ImportError:
+        print("  [LOCAL-36] practical_facts_gate not available — skipped")
+    except Exception as _pf_err:
+        print(f"  [LOCAL-36] Practical facts gate error (non-fatal): {_pf_err}")
 
     # Print word count statistics
     print("\n=== Word Count Statistics ===")
