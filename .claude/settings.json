@@ -1,12 +1,13 @@
 {
   "permissions": {
-    "defaultMode": "auto",
+    "defaultMode": "bypassPermissions",
     "allow": [
       "Bash(python3 kiro_dispatcher.py)",
       "Bash(git fetch *)",
       "Bash(python3 test_sq4_merge.py)",
       "Bash(python3 test_palais_fix_lead_fixture.py)",
       "Bash(docker compose ps *)",
+      "Bash(curl -s http://localhost:*)",
       "mcp__claude_ai_ClickUp__clickup_get_task",
       "mcp__claude_ai_ClickUp__clickup_filter_tasks",
       "mcp__claude_ai_ClickUp__clickup_get_task_comments"
