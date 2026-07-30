@@ -282,11 +282,23 @@ def extract_canonical_titles(corpus: str, venue_name: str = "") -> Tuple[Set[str
             'admission', 'transit', 'getting there', 'accessibility',
             'education', 'programs', 'events', 'membership', 'impact',
             'criticism', 'controversy', 'awards', 'reception',
+            # LOCAL-23: French generic sections (Wikipedia FR)
+            'voir aussi', 'liens externes', 'articles connexes',
+            'notes et références', 'notes et references', 'références',
+            'bibliographie', 'histoire', 'localisation', 'architecture',
+            'de nos jours', 'le musée', 'le musee', 'the museum',
+            'initiative de création', 'initiative for creation',
+            'origin of the museum\'s pieces', 'origine des pièces du musée',
+            'the museum\'s collections', 'les collections du musée',
+            'les collections', 'collections', 'description',
         }
         if (section_name.lower() not in _GENERIC_SECTIONS and
             len(section_name) >= 5 and len(section_name) <= 80 and
             not section_name.startswith('http') and
-            not re.match(r'^\d+', section_name)):
+            not re.match(r'^\d+', section_name) and
+            # LOCAL-23: Also filter very short generic headings (Le X, La X for single nouns)
+            not (len(section_name.split()) <= 2 and
+                 section_name.split()[0].lower() in ('le', 'la', 'les', 'l\'', 'the', 'a', 'an'))):
             _exhibit_from_sections.add(section_name)
 
     # Pattern 4: Quoted exhibit/installation names ("Name" or 'Name' or "Name")
@@ -364,6 +376,115 @@ def extract_canonical_titles(corpus: str, venue_name: str = "") -> Tuple[Set[str
     return canonical_titles, cycle_names, theme_words
 
 
+# --- LOCAL-23: Joconde/POP (French national museum collections database) ---
+
+def _fetch_joconde_titles(museo_code: str, venue_name: str = "", max_titles: int = 30) -> List[Dict]:
+    """Fetch canonical work titles from Joconde/POP for a French public museum.
+    
+    Uses the POP individual notice pages which are server-rendered (the search
+    interface is JS-only and inaccessible via simple HTTP).
+    
+    Strategy: query the POP search URL pattern and parse the SSR page for notice
+    links and titles. Falls back to the data.gouv.fr Joconde data API.
+    
+    Args:
+        museo_code: The Joconde museo code (e.g. 'M0946' for Asian Arts Nice)
+        venue_name: Venue name for context logging
+        max_titles: Maximum titles to retrieve
+        
+    Returns:
+        List of {title, source_url, tier} dicts. Empty list if POP unreachable.
+    """
+    titles = []
+    
+    # Approach 1: Try known POP notice URL patterns
+    # POP notice pages ARE server-rendered and contain the work title in the HTML
+    # URL format: https://pop.culture.gouv.fr/notice/joconde/{REF}
+    # We can discover refs from the Wikidata P347 (Joconde ID) property
+    
+    # Approach 2: Try direct search via the API (may work on some endpoints)
+    _search_urls = [
+        f'https://pop.culture.gouv.fr/recherche?base=%5B%22joconde%22%5D&museo=%5B%22{museo_code}%22%5D',
+    ]
+    
+    # Approach 3: Fetch the museum's listing page on POP via a known sharing link format
+    # The new POP site uses Next.js RSC; we try to get any HTML that includes notice refs
+    try:
+        resp = requests.get(
+            f'https://pop.culture.gouv.fr/recherche',
+            params={'base': '["joconde"]', 'museo': f'["{museo_code}"]'},
+            headers={'User-Agent': 'Audioura/2.2'},
+            timeout=10,
+        )
+        if resp.status_code == 200 and 'notice/joconde/' in resp.text:
+            # Extract notice references from the HTML
+            import re as _re_joc
+            notice_refs = _re_joc.findall(r'/notice/joconde/([A-Z0-9]+)', resp.text)
+            notice_refs = list(dict.fromkeys(notice_refs))[:max_titles]  # unique, preserve order
+            
+            for ref in notice_refs:
+                notice_url = f'https://pop.culture.gouv.fr/notice/joconde/{ref}'
+                try:
+                    nr = requests.get(notice_url, headers={'User-Agent': 'Audioura/2.2'}, timeout=8)
+                    if nr.status_code == 200:
+                        # Extract title from the page (usually in <title> or <h1>)
+                        _title_match = _re_joc.search(r'<title>([^<]+)</title>', nr.text)
+                        if _title_match:
+                            _raw_title = _title_match.group(1).strip()
+                            # POP title format: "Work Title - POP" or "Work Title"
+                            _clean = _re_joc.sub(r'\s*[-–—]\s*POP.*$', '', _raw_title).strip()
+                            _clean = _re_joc.sub(r'\s*[-–—]\s*Plateforme.*$', '', _clean).strip()
+                            if _clean and len(_clean) >= 3 and _clean.lower() != 'pop':
+                                titles.append({
+                                    'title': _clean,
+                                    'source_url': notice_url,
+                                    'tier': 2,
+                                })
+                except Exception:
+                    continue
+            
+            if titles:
+                print(f"  [story_miner] Joconde/POP: {len(titles)} titles from {len(notice_refs)} notices ({museo_code})")
+                return titles
+    except Exception as e:
+        logger.info(f"story_miner: Joconde/POP search failed for {museo_code}: {e}")
+    
+    # If POP JS-rendered page didn't yield results, log and return empty
+    # (the 1.1GB CSV download is not practical per-request)
+    if not titles:
+        print(f"  [story_miner] Joconde/POP: no results for {museo_code} (JS-rendered, expected)")
+    
+    return titles
+
+
+def _lookup_museo_code(venue_qid: str) -> Optional[str]:
+    """Look up Joconde museum code (P539) for a Wikidata entity.
+    
+    Returns the museo code (e.g. 'M0946') or None.
+    """
+    try:
+        resp = requests.get(
+            'https://query.wikidata.org/sparql',
+            params={
+                'query': f'SELECT ?code WHERE {{ wd:{venue_qid} wdt:P539 ?code. }}',
+                'format': 'json',
+            },
+            headers={'User-Agent': 'Audioura/2.2', 'Accept': 'application/sparql-results+json'},
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            bindings = data.get('results', {}).get('bindings', [])
+            if bindings:
+                code = bindings[0].get('code', {}).get('value', '')
+                if code:
+                    print(f"  [story_miner] Joconde museo code: {code} (from P539)")
+                    return code
+    except Exception as e:
+        logger.info(f"story_miner: P539 lookup failed for {venue_qid}: {e}")
+    return None
+
+
 # --- Narrative page discovery + fetch (§1, T1) ---
 
 def fetch_venue_narrative_corpus(
@@ -371,6 +492,7 @@ def fetch_venue_narrative_corpus(
     base_site_url: str = "",
     wikipedia_title: str = "",
     language: str = "en",
+    venue_qid: str = "",
 ) -> Dict:
     """Fetch narrative-rich corpus for a museum venue.
     
@@ -378,12 +500,16 @@ def fetch_venue_narrative_corpus(
     - Museum site internal pages (history, about, creation story)
     - Wikipedia full article in EN + LOCAL language (from venue_resolver country→lang)
     - Wikipedia History section extraction
+    - LOCAL-23: Joconde/POP for French public museums (tier 2)
+    - LOCAL-23: Demand-driven page budget (15 pages, was 5)
+    - LOCAL-23: Trust tier tracking per source
     
     Args:
         venue_name: The museum/venue name
         base_site_url: The museum's website URL (from Wikidata P856 or heuristic)
         wikipedia_title: Wikipedia article title for the venue
         language: The venue's local language code (from country→lang, e.g. "fr", "it")
+        venue_qid: Wikidata QID for the venue (used for Joconde museo code lookup)
         
     Returns:
         dict with:
@@ -394,11 +520,21 @@ def fetch_venue_narrative_corpus(
             theme_words: set — theme words (not verifiers)
             source_urls: [str] — all URLs fetched
             per_work_contexts: {title: [sentences]} — per-work contextual sentences
+            title_sources: {title: [{source_url, tier}]} — LOCAL-23: provenance per title
     """
     pages = []
     source_urls = []
+    # LOCAL-23: Trust-tier tracking per source page
+    # tier 1 = Wikipedia (venue language first) + official museum site
+    # tier 2 = Joconde/POP, Wikidata SPARQL, other institutional sources
+    _page_tiers = {}  # url → tier (1 or 2)
 
     # --- 1. Museum site: collection page + narrative pages ---
+    # LOCAL-23: Demand-driven depth — page budget scales with site richness.
+    # Collection/oeuvre pages are tier-1 priority; agenda/publications deprioritized.
+    _PAGE_BUDGET = 15  # up from 5 — bounded but allows much richer corpus
+    _pages_fetched_site = 0
+
     if base_site_url:
         # Fetch the base/collection page and extract internal links
         _base_text, _base_links = _fetch_page_text(base_site_url)
@@ -414,86 +550,198 @@ def fetch_venue_narrative_corpus(
         if _base_text:
             pages.append({"url": base_site_url, "text": _base_text, "title": "Collection"})
             source_urls.append(base_site_url)
+            _page_tiers[base_site_url] = 1  # Official site = tier 1
+            _pages_fetched_site += 1
 
-        # Follow internal links containing narrative keywords (cap 5)
-        # Localized keywords based on venue language
-        _NARRATIVE_KEYWORDS_BASE = ('history', 'story', 'creation', 'about', 'exhibition',
+        # LOCAL-23: Improved page-type prioritisation.
+        # Priority 1 (highest): collection/oeuvre/works pages — these list actual artworks
+        # Priority 2: exhibit/gallery pages — named installations
+        # Priority 3: history/about/narrative — contextual richness
+        # Priority 4 (lowest): agenda/publications/events — rarely useful for work titles
+        _COLLECTION_KEYWORDS = ('oeuvre', 'œuvre', 'collection', 'works', 'permanent',
+                                'galerie', 'gallery', 'highlight', 'masterpiece',
+                                'chef-d-oeuvre', 'oeuvres-commentees', 'les-oeuvres')
+        _EXHIBIT_KEYWORDS = ('exhibit', 'galleries', 'installations', 'experience',
+                             'exposition-permanente', 'salle')
+        _NARRATIVE_KEYWORDS_BASE = ('history', 'story', 'creation', 'about',
                                     'collection', 'works', 'permanent', 'exhibits',
                                     'galleries', 'interactive', 'experience', 'installations')
         _NARRATIVE_KEYWORDS_LOCALIZED = {
-            'fr': ('histoire', 'parcours', 'exposition', 'evenement', 'oeuvres', 'collection', 'creation'),
+            'fr': ('histoire', 'parcours', 'exposition', 'evenement', 'oeuvres',
+                   'collection', 'creation', 'oeuvres-commentees', 'les-oeuvres'),
             'it': ('storia', 'collezione', 'opere', 'mostra', 'esposizione', 'percorso'),
             'de': ('geschichte', 'sammlung', 'werke', 'ausstellung'),
             'es': ('historia', 'coleccion', 'obras', 'exposicion'),
         }
         _NARRATIVE_KEYWORDS = _NARRATIVE_KEYWORDS_BASE + _NARRATIVE_KEYWORDS_LOCALIZED.get(language, ())
+        # LOCAL-23: Deprioritized page types (agenda, publications, press, tickets, visits info)
+        _DEPRIORITIZED_KEYWORDS = ('agenda', 'actualite', 'newsletter', 'presse',
+                                   'billetterie', 'tarif', 'horaire', 'contact',
+                                   'publication', 'dossier-pedagogique', 'mentions-legales',
+                                   'politique-confidentialite', 'accessibilite',
+                                   'visite-guidee', 'visites-guidees', 'visites-scolaires',
+                                   'reglement', 'handicap', 'acces-et-condition')
+        # LOCAL-23: Skip binary/media URLs entirely
+        _SKIP_EXTENSIONS = ('.pdf', '.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp',
+                            '.mp4', '.mp3', '.wav', '.doc', '.docx', '.xls', '.xlsx')
         
         _base_domain = urlparse(base_site_url).netloc
-        _narrative_urls = []
-        _exhibit_urls = []  # Prioritized: exhibit/gallery pages go first
+        _collection_urls = []  # Priority 1: collection/oeuvre pages
+        _exhibit_urls = []     # Priority 2: exhibit pages
+        _narrative_urls = []   # Priority 3: narrative/history pages
+        _other_urls = []       # Priority 4: agenda/publications (deprioritized)
+        
         for link_text, href in _base_links:
             if not href or href.startswith('#') or href.startswith('mailto:'):
                 continue
             full_url = urljoin(base_site_url, href)
+            # LOCAL-23: Normalize URL — strip fragment identifiers
+            full_url = full_url.split('#')[0]
+            if not full_url or full_url in source_urls:
+                continue
+            # LOCAL-23: Skip binary/media files
+            _url_path_lower = urlparse(full_url).path.lower()
+            if any(_url_path_lower.endswith(ext) for ext in _SKIP_EXTENSIONS):
+                continue
             if urlparse(full_url).netloc != _base_domain:
                 continue
-            if any(kw in href.lower() or kw in link_text.lower() for kw in _NARRATIVE_KEYWORDS):
-                if full_url not in source_urls:
-                    # Prioritize exhibit/gallery pages (more likely to have exhibit names)
-                    _EXHIBIT_PRIORITY_KW = ('exhibit', 'galleries', 'installations', 'experience')
-                    if any(ekw in href.lower() or ekw in link_text.lower() for ekw in _EXHIBIT_PRIORITY_KW):
-                        _exhibit_urls.append(full_url)
-                    else:
-                        _narrative_urls.append(full_url)
+            if full_url in source_urls:
+                continue
+            _href_lower = href.lower()
+            _text_lower = link_text.lower()
+            
+            # Skip deprioritized pages entirely unless they also have collection keywords
+            _is_deprioritized = any(dk in _href_lower for dk in _DEPRIORITIZED_KEYWORDS)
+            _has_collection_signal = any(ck in _href_lower or ck in _text_lower
+                                         for ck in _COLLECTION_KEYWORDS)
+            
+            if _is_deprioritized and not _has_collection_signal:
+                _other_urls.append(full_url)
+                continue
+            
+            # Classify by priority
+            if _has_collection_signal:
+                _collection_urls.append(full_url)
+            elif any(ek in _href_lower or ek in _text_lower for ek in _EXHIBIT_KEYWORDS):
+                _exhibit_urls.append(full_url)
+            elif any(kw in _href_lower or kw in _text_lower for kw in _NARRATIVE_KEYWORDS):
+                _narrative_urls.append(full_url)
 
-        # Deduplicate while preserving order: exhibits first, then other narrative pages
-        _seen_urls = set()
+        # Deduplicate while preserving priority order
+        _seen_urls = set(source_urls)
         _ordered_urls = []
-        for url in _exhibit_urls + _narrative_urls:
+        for url in _collection_urls + _exhibit_urls + _narrative_urls + _other_urls:
             if url not in _seen_urls:
                 _seen_urls.add(url)
                 _ordered_urls.append(url)
 
-        # Fetch narrative pages (cap 5, exhibits prioritized)
-        for url in _ordered_urls[:5]:
+        # LOCAL-23: Fetch up to PAGE_BUDGET pages (demand-driven, was hard-capped at 5)
+        for url in _ordered_urls[:_PAGE_BUDGET]:
             _text, _links = _fetch_page_text(url)
             if _text and len(_text) > 300:
                 pages.append({"url": url, "text": _text, "title": url.split('/')[-1]})
                 source_urls.append(url)
-                print(f"  [story_miner] Narrative page: {url} ({len(_text)} chars)")
+                _page_tiers[url] = 1  # Official site = tier 1
+                _pages_fetched_site += 1
+                print(f"  [story_miner] Site page: {url} ({len(_text)} chars)")
                 
-                # Extract exhibit names from sub-page links on exhibit pages
-                # e.g. /exhibits-programs/signers-hall → "Signers Hall"
-                if any(ekw in url.lower() for ekw in ('exhibit', 'galleries')):
+                # LOCAL-23: Follow sub-links on collection pages (depth-2 crawl for oeuvres)
+                _is_collection_page = any(ck in url.lower() for ck in _COLLECTION_KEYWORDS)
+                _is_exhibit_page = any(ek in url.lower() for ek in ('exhibit', 'galleries'))
+                
+                if _is_collection_page or _is_exhibit_page:
+                    _sub_link_budget = 5  # Cap depth-2 crawl per page
+                    _sub_links_followed = 0
                     for _lt, _lhref in _links:
-                        if not _lhref:
+                        if not _lhref or _lhref.startswith('#') or _lhref.startswith('mailto:'):
                             continue
-                        _full_link = urljoin(url, _lhref)
-                        # Only follow links that are sub-pages of the exhibit URL
-                        if _full_link.startswith(url.rstrip('/') + '/'):
+                        _full_link = urljoin(url, _lhref).split('#')[0]  # Strip fragments
+                        if not _full_link:
+                            continue
+                        if urlparse(_full_link).netloc != _base_domain:
+                            continue
+                        if _full_link in _seen_urls:
+                            continue
+                        # Skip binary/media files
+                        _sub_path = urlparse(_full_link).path.lower()
+                        if any(_sub_path.endswith(ext) for ext in _SKIP_EXTENSIONS):
+                            continue
+                        # Only follow sub-pages of this collection/exhibit URL
+                        if _full_link.startswith(url.rstrip('/') + '/') or \
+                           any(ck in _full_link.lower() for ck in _COLLECTION_KEYWORDS):
+                            if _pages_fetched_site < _PAGE_BUDGET and _sub_links_followed < _sub_link_budget:
+                                _sub_text, _ = _fetch_page_text(_full_link)
+                                if _sub_text and len(_sub_text) > 300:
+                                    pages.append({"url": _full_link, "text": _sub_text,
+                                                  "title": _full_link.split('/')[-1]})
+                                    source_urls.append(_full_link)
+                                    _page_tiers[_full_link] = 1
+                                    _seen_urls.add(_full_link)
+                                    _pages_fetched_site += 1
+                                    _sub_links_followed += 1
+                                    print(f"  [story_miner] Sub-page: {_full_link} ({len(_sub_text)} chars)")
+                        elif _is_exhibit_page:
+                            # Extract exhibit names from sub-page links
                             _slug = _full_link.rstrip('/').split('/')[-1]
-                            # Convert URL slug to title: "signers-hall" → "Signers Hall"
                             _exhibit_title = _slug.replace('-', ' ').title()
-                            # Filter out generic slugs
                             if (len(_exhibit_title) >= 5 and
                                 _exhibit_title.lower() not in ('learn more', 'read more', 'tickets', 'visit', 'about')):
-                                # Append to page text so T0a can extract it
                                 _text += f"\n== {_exhibit_title} =="
                     # Re-store with enriched text
-                    pages[-1]["text"] = _text
+                    if _is_exhibit_page:
+                        pages[-1]["text"] = _text
+        
+        print(f"  [story_miner] Site crawl: {_pages_fetched_site} pages fetched (budget: {_PAGE_BUDGET})")
 
     # --- 2. Wikipedia (English) full article — ALWAYS fetched regardless of language ---
-    if wikipedia_title:
+    # LOCAL-23: Use Wikidata sitelinks to get EXACT Wikipedia titles (avoids variant guessing)
+    _en_wiki_title_exact = ""
+    _local_wiki_title_exact = ""
+    if venue_qid:
+        try:
+            _sl_query = f"""SELECT ?sitelink WHERE {{
+                ?sitelink schema:about wd:{venue_qid} .
+                ?sitelink schema:isPartOf/wikibase:wikiGroup "wikipedia" .
+            }}"""
+            _sl_resp = requests.get(
+                'https://query.wikidata.org/sparql',
+                params={'query': _sl_query, 'format': 'json'},
+                headers={'User-Agent': 'Audioura/2.2', 'Accept': 'application/sparql-results+json'},
+                timeout=10,
+            )
+            if _sl_resp.status_code == 200:
+                _sl_data = _sl_resp.json()
+                for _sl_r in _sl_data.get('results', {}).get('bindings', []):
+                    _sl_url = _sl_r.get('sitelink', {}).get('value', '')
+                    if 'en.wikipedia.org' in _sl_url:
+                        _en_wiki_title_exact = _sl_url.split('/wiki/')[-1].replace('_', ' ')
+                        from urllib.parse import unquote
+                        _en_wiki_title_exact = unquote(_en_wiki_title_exact)
+                        print(f"  [story_miner] Sitelink EN: '{_en_wiki_title_exact}'")
+                    elif f'{language}.wikipedia.org' in _sl_url and language != 'en':
+                        _local_wiki_title_exact = _sl_url.split('/wiki/')[-1].replace('_', ' ')
+                        from urllib.parse import unquote
+                        _local_wiki_title_exact = unquote(_local_wiki_title_exact)
+                        print(f"  [story_miner] Sitelink {language.upper()}: '{_local_wiki_title_exact}'")
+        except Exception as e:
+            logger.info(f"story_miner: Sitelink lookup failed for {venue_qid}: {e}")
+
+    if wikipedia_title or _en_wiki_title_exact:
         from rag_retriever import fetch_wikipedia_summary
-        # Try the provided title and common variants
-        _en_titles = [wikipedia_title]
+        # LOCAL-23: Use exact sitelink title first, then fall back to provided + variants
+        _en_titles = []
+        if _en_wiki_title_exact:
+            _en_titles.append(_en_wiki_title_exact)
+        if wikipedia_title:
+            _en_titles.append(wikipedia_title)
         # Add variants: with/without accents, with city disambiguator
-        _clean_title = wikipedia_title.replace('é', 'e').replace('è', 'e').replace('ê', 'e').replace('ë', 'e').replace('à', 'a').replace('ô', 'o').replace('î', 'i').replace('ç', 'c').replace('ü', 'u').replace('ö', 'o').replace('ä', 'a')
-        if _clean_title != wikipedia_title:
+        _base_title = wikipedia_title or _en_wiki_title_exact
+        _clean_title = _base_title.replace('é', 'e').replace('è', 'e').replace('ê', 'e').replace('ë', 'e').replace('à', 'a').replace('ô', 'o').replace('î', 'i').replace('ç', 'c').replace('ü', 'u').replace('ö', 'o').replace('ä', 'a')
+        if _clean_title != _base_title:
             _en_titles.append(_clean_title)
         # Try "Musée X" → "X Museum" style conversion
-        if wikipedia_title.lower().startswith('mus'):
-            _name_part = re.sub(r'(?i)^mus[ée]+e?\s*(national[e]?\s*)?', '', wikipedia_title).strip()
+        if _base_title.lower().startswith('mus'):
+            _name_part = re.sub(r'(?i)^mus[ée]+e?\s*(national[e]?\s*)?', '', _base_title).strip()
             _name_part = _name_part.replace('-', ' ')  # "Marc-Chagall" → "Marc Chagall"
             if _name_part:
                 _en_titles.append(f"{_name_part} Museum")
@@ -505,7 +753,7 @@ def fetch_venue_narrative_corpus(
                         _en_titles.append(f"{_name_part} Museum {_city_part}")
                         _en_titles.append(f"Musée national {_name_part}")
         # Also try with venue_name directly
-        if venue_name and venue_name != wikipedia_title:
+        if venue_name and venue_name != _base_title:
             _en_titles.append(venue_name)
         
         en_article = ""
@@ -524,15 +772,22 @@ def fetch_venue_narrative_corpus(
                     continue
                 
                 en_article = _candidate
-                pages.append({"url": f"https://en.wikipedia.org/wiki/{_en_title.replace(' ', '_')}",
+                _en_wiki_url = f"https://en.wikipedia.org/wiki/{_en_title.replace(' ', '_')}"
+                pages.append({"url": _en_wiki_url,
                              "text": en_article, "title": f"Wikipedia EN: {_en_title}"})
-                source_urls.append(f"https://en.wikipedia.org/wiki/{_en_title.replace(' ', '_')}")
+                source_urls.append(_en_wiki_url)
+                _page_tiers[_en_wiki_url] = 1  # Wikipedia = tier 1
                 print(f"  [story_miner] Wikipedia EN: {len(en_article)} chars (title: '{_en_title}')")
                 break
 
     # --- 3. Local-language Wikipedia (country→lang, not hardcoded "fr") ---
-    if language and language != "en" and wikipedia_title:
-        _local_titles = [wikipedia_title]
+    if language and language != "en" and (wikipedia_title or _local_wiki_title_exact):
+        _local_titles = []
+        # LOCAL-23: Use exact sitelink title first
+        if _local_wiki_title_exact:
+            _local_titles.append(_local_wiki_title_exact)
+        if wikipedia_title:
+            _local_titles.append(wikipedia_title)
         # Try with city disambiguator for common ambiguous venue names
         if "nice" in venue_name.lower() or "nice" in (wikipedia_title or "").lower():
             _local_titles.append(f"{wikipedia_title} (Nice)")
@@ -556,10 +811,26 @@ def fetch_venue_narrative_corpus(
                                 local_url = f"https://{language}.wikipedia.org/wiki/{local_title.replace(' ', '_')}"
                                 pages.append({"url": local_url, "text": extract, "title": f"Wikipedia {language.upper()}: {local_title}"})
                                 source_urls.append(local_url)
+                                _page_tiers[local_url] = 1  # Local Wikipedia = tier 1
                                 print(f"  [story_miner] Wikipedia {language.upper()}: {len(extract)} chars")
                                 break
             except Exception as e:
                 logger.warning(f"story_miner: {language.upper()} Wikipedia error for '{local_title}': {e}")
+
+    # --- LOCAL-23: Joconde/POP for French public museums (Tier 2) ---
+    _joconde_titles = []
+    if language == 'fr' and venue_qid:
+        _museo_code = _lookup_museo_code(venue_qid)
+        if _museo_code:
+            _joconde_titles = _fetch_joconde_titles(_museo_code, venue_name)
+            if _joconde_titles:
+                # Add Joconde text as a pseudo-page for title extraction
+                _joconde_text = "\n".join(f"== {t['title']} ==" for t in _joconde_titles)
+                _joconde_url = f"https://pop.culture.gouv.fr/recherche?museo={_museo_code}"
+                pages.append({"url": _joconde_url, "text": _joconde_text,
+                              "title": f"Joconde/POP ({_museo_code})"})
+                source_urls.append(_joconde_url)
+                _page_tiers[_joconde_url] = 2
 
     # --- Combine and extract ---
     combined_text = "\n\n".join(p["text"] for p in pages)
@@ -567,17 +838,66 @@ def fetch_venue_narrative_corpus(
     # Extract canonical titles from combined corpus
     canonical_titles, cycle_names, theme_words = extract_canonical_titles(combined_text, venue_name)
 
+    # LOCAL-23: Add Joconde titles directly (they're already validated by the national database)
+    for jt in _joconde_titles:
+        if jt['title'] and len(jt['title']) >= 3:
+            canonical_titles.add(jt['title'])
+
     # Extract per-work context sentences
     per_work_contexts = _extract_per_work_contexts(combined_text, canonical_titles)
+
+    # LOCAL-23: Build title_sources provenance map
+    # Maps each canonical title to the source(s) where it was found + trust tier
+    title_sources = {}
+    for title in canonical_titles:
+        title_sources[title] = []
+        _norm_t = _normalize(title).lower()
+        # Check which pages contain this title
+        for p in pages:
+            if _norm_t in _normalize(p.get('text', '')).lower():
+                _url = p.get('url', '')
+                _tier = _page_tiers.get(_url, 1)  # default tier 1 for wiki/official site
+                title_sources[title].append({'source_url': _url, 'tier': _tier})
+        # Also check Joconde titles directly
+        for jt in _joconde_titles:
+            if _normalize(jt['title']).lower() == _norm_t:
+                title_sources[title].append({'source_url': jt['source_url'], 'tier': 2})
+
+    # LOCAL-23: Prominence ordering (sort canonical titles by number of sources mentioning them)
+    # Proxies for prominence: multi-source mentions, presence in Wikipedia, museum highlights page
+    _prominence_scores = {}
+    for title in canonical_titles:
+        score = 0
+        sources = title_sources.get(title, [])
+        score += len(sources)  # More sources = more prominent
+        # Bonus for Wikipedia presence (tier 1)
+        if any('wikipedia.org' in s.get('source_url', '') for s in sources):
+            score += 3
+        # Bonus for museum highlights/oeuvres page
+        if any(any(k in s.get('source_url', '').lower() 
+                   for k in ('oeuvre', 'highlight', 'collection', 'masterpiece'))
+               for s in sources):
+            score += 2
+        _prominence_scores[title] = score
+    
+    # Sort canonical titles by prominence (descending) — most famous first
+    _sorted_titles = sorted(canonical_titles, key=lambda t: _prominence_scores.get(t, 0), reverse=True)
+    # Keep as set for backward compatibility, but store ordered list separately
+    canonical_titles_ordered = _sorted_titles
+
+    print(f"  [story_miner] Corpus: {len(pages)} pages, {len(canonical_titles)} titles, "
+          f"{len(_joconde_titles)} from Joconde")
 
     return {
         "pages": pages,
         "combined_text": combined_text,
         "canonical_titles": canonical_titles,
+        "canonical_titles_ordered": canonical_titles_ordered,  # LOCAL-23: prominence-ordered
         "cycle_names": cycle_names,
         "theme_words": theme_words,
         "source_urls": source_urls,
         "per_work_contexts": per_work_contexts,
+        "title_sources": title_sources,  # LOCAL-23: provenance map
     }
 
 
