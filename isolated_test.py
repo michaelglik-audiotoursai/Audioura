@@ -76,7 +76,7 @@ def main():
     print("Slot acquired. Building image...")
     try:
         build = run(
-            ["docker", "build", "-f", DOCKERFILE, "-t", image_tag, args.context],
+            ["docker", "build", "--no-cache", "-f", DOCKERFILE, "-t", image_tag, args.context],
             timeout=600,
         )
         if build.returncode != 0:
