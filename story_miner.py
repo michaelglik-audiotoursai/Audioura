@@ -526,6 +526,12 @@ def _parse_catalogue_from_html(url: str) -> List[Dict]:
     
     Primary strategy: uses actual HTML heading elements as section boundaries,
     which is how museum catalogue pages structure their content.
+    
+    [LOCAL-29] Fixed: uses re.split() to divide the HTML into sections at each
+    h2 boundary, ensuring one section's content never bleeds into the next.
+    Previously, a lookahead-based regex could allow metadata from adjacent
+    entries to contaminate each other (e.g., XIIe siècle from Kannon bleeding
+    into Ganesh's Xe siècle slot).
     """
     try:
         resp = requests.get(url, headers={'User-Agent': 'Audioura/2.2'},
@@ -538,16 +544,27 @@ def _parse_catalogue_from_html(url: str) -> List[Dict]:
     html = resp.text
     works = []
     
-    # Extract h2 headings and the content between them
-    # Pattern: <h2...>Title</h2> followed by content until next <h2
-    _h2_pattern = re.compile(
-        r'<h2[^>]*>\s*(.*?)\s*</h2>(.*?)(?=<h2[^>]*>|</main>|</article>|</body>)',
-        re.DOTALL | re.IGNORECASE
-    )
+    # [LOCAL-29] Split HTML into sections at h2 boundaries.
+    # Each section is: <h2...>Title</h2> followed by body until next <h2>.
+    # Using re.split gives clean, non-overlapping sections.
+    _h2_split_pattern = re.compile(r'(<h2[^>]*>.*?</h2>)', re.DOTALL | re.IGNORECASE)
+    parts = _h2_split_pattern.split(html)
     
-    for match in _h2_pattern.finditer(html):
-        raw_title = match.group(1)
-        raw_body = match.group(2)
+    # parts alternates: [pre-content, h2-tag, body, h2-tag, body, ...]
+    # Pair each h2-tag (odd index) with the body that follows it (even index+1)
+    sections = []
+    for i in range(len(parts)):
+        if re.match(r'<h2[^>]*>', parts[i], re.IGNORECASE):
+            heading_html = parts[i]
+            body_html = parts[i + 1] if (i + 1) < len(parts) else ''
+            sections.append((heading_html, body_html))
+    
+    for heading_html, raw_body in sections:
+        # Extract title from heading
+        title_match = re.search(r'<h2[^>]*>\s*(.*?)\s*</h2>', heading_html, re.DOTALL | re.IGNORECASE)
+        if not title_match:
+            continue
+        raw_title = title_match.group(1)
         
         # Clean HTML tags from title
         title = re.sub(r'<[^>]+>', '', raw_title).strip()
@@ -563,7 +580,7 @@ def _parse_catalogue_from_html(url: str) -> List[Dict]:
         if title.lower().startswith(('formulaire', 'information', 'partenaire', 'suivez')):
             continue
         
-        # Clean body: extract paragraph text
+        # Clean body: extract paragraph text (ONLY from this section's body)
         body_paragraphs = re.findall(r'<p[^>]*>(.*?)</p>', raw_body, re.DOTALL)
         body_text = '\n'.join(
             re.sub(r'<[^>]+>', '', p).strip()
@@ -572,17 +589,17 @@ def _parse_catalogue_from_html(url: str) -> List[Dict]:
             and not re.sub(r'<[^>]+>', '', p).strip().startswith('{')  # Skip CSS
         )
         
-        # Also look for metadata in alt text and image captions
+        # Also look for metadata in alt text and image captions (within THIS section only)
         alt_texts = re.findall(r'alt="([^"]*)"', raw_body)
         caption_text = ' '.join(alt_texts)
         
-        # Combined text for metadata extraction
+        # Combined text for metadata extraction (bounded to THIS section)
         full_text = caption_text + '\n' + body_text
         
         if len(body_text) < 50:
             continue
         
-        # Extract metadata
+        # Extract metadata (from THIS section's content only)
         material = _extract_material(full_text)
         period = _extract_period(title + ' ' + full_text)
         origin = _extract_origin(title + ' ' + full_text)

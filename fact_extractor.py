@@ -170,29 +170,36 @@ def generate_fact_sheets_parallel(
         per_work_contexts = {}
 
     def _extract_corpus_for_poi(poi_name: str) -> str:
-        """[LOCAL-12 Fix A] Extract relevant corpus excerpt for a specific POI.
+        """[LOCAL-12 Fix A] [LOCAL-29] Extract relevant corpus excerpt for a specific POI.
 
-        Priority: per_work_contexts match > keyword search in venue_corpus.
+        Priority: per_work_contexts match (bounded per-title) > keyword search in venue_corpus.
         Returns the best available corpus excerpt for this POI.
+        
+        LOCAL-29: Tightened matching to prevent cross-contamination between adjacent
+        catalogue entries. Uses 10-char prefix + bidirectional containment, and
+        keyword search now requires ALL key words to match (not ANY).
         """
         excerpts = []
 
-        # 1. Check per_work_contexts for a title match (fuzzy prefix)
+        # 1. Check per_work_contexts for a title match (strict bounded lookup)
         poi_lower = poi_name.lower().strip()
         for title, sentences in per_work_contexts.items():
             title_lower = title.lower().strip()
-            # Match if either is a prefix of the other (first 8 chars), same as §4 logic
-            if (poi_lower[:8] in title_lower or title_lower[:8] in poi_lower):
+            # Match if 10-char prefix is contained bidirectionally, or exact match
+            if (poi_lower == title_lower or
+                (poi_lower[:10] in title_lower and title_lower[:10] in poi_lower)):
                 excerpts.extend(s[:200] for s in sentences[:5])
                 break
 
-        # 2. Keyword search in venue_corpus (same approach as C5-1 in description prompt)
+        # 2. Keyword search in venue_corpus — only if per_work_contexts had no match
+        # [LOCAL-29] Require ALL significant keywords to match (not ANY) to prevent
+        # cross-contamination from adjacent entries that share one keyword.
         if venue_corpus and not excerpts:
-            key_words = [w for w in poi_lower.split() if len(w) >= 4 and w not in ('the', 'and', 'for', 'with')]
+            key_words = [w for w in poi_lower.split() if len(w) >= 4 and w not in ('the', 'and', 'for', 'with', 'from', 'this', 'that')]
             if key_words:
                 corpus_sentences = [
                     s.strip() for s in venue_corpus.split('.')
-                    if any(kw in s.lower() for kw in key_words)
+                    if all(kw in s.lower() for kw in key_words[:3])  # ALL of first 3 keywords
                 ]
                 excerpts.extend(s[:200] for s in corpus_sentences[:5])
 
