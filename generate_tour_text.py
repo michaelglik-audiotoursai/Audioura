@@ -1847,6 +1847,96 @@ def _verify_works_in_collection(poi_list, venue_name):
 # [LOCAL-27] Truthfulness guards: sourced-or-omit for metadata
 # ============================================================
 
+
+def _is_valid_visitor_info(text: str) -> bool:
+    """[LOCAL-32/33] Validity gate for visitor information text.
+    
+    Returns True only if the text contains at least one recognisable fact:
+    - A closed day (e.g., "Closed on Tuesday", "Fermé le mardi")
+    - Opening hours with times (e.g., "10:00 to 17:00", "10am-5pm")
+    - Admission/pricing info (e.g., "Free admission", "€8", "$15")
+    
+    Rejects:
+    - Raw nav fragments ("tarifs Télécharger le recueil 2026")
+    - Garbled mixed-language text without coherent facts
+    - Text that's just download links or button labels
+    """
+    if not text or len(text.strip()) < 5:
+        return False
+    
+    _text_lower = text.lower()
+    
+    # REJECTION signals — if these dominate, it's nav junk
+    _NAV_JUNK_PATTERNS = re.compile(
+        r'(?:'
+        r't[eé]l[eé]charger|download|recueil|d[eé]lib[eé]ration|'
+        r'cliquez?\s+(?:ici|here)|en\s+savoir\s+plus|'
+        r'read\s+more|learn\s+more|voir\s+(?:les?|tous)|'
+        r"retrouvez|s[\u2019']inscrire|sign\s+up"
+        r')', re.IGNORECASE
+    )
+    _nav_junk_count = len(_NAV_JUNK_PATTERNS.findall(text))
+    if _nav_junk_count >= 2:
+        return False
+    
+    # VALID FACT detection — need at least one
+    has_valid_fact = False
+    
+    # 1. Closed day detection (EN and FR)
+    _closed_day_re = re.compile(
+        r'(?:'
+        r'closed?\s+(?:on\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|'
+        r'ferm[eé]\s+(?:le\s+)?(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)|'
+        r'(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+closed'
+        r')', re.IGNORECASE
+    )
+    if _closed_day_re.search(text):
+        has_valid_fact = True
+    
+    # 2. Opening hours with actual times
+    _hours_re = re.compile(
+        r'(?:'
+        r'\d{1,2}[h:]\d{0,2}\s*[-–àa to]+\s*\d{1,2}[h:]\d{0,2}|'  # 10h-17h or 10:00 to 17:00
+        r'\d{1,2}(?::\d{2})?\s*(?:am|pm)\s*[-–to]+\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)|'  # 10am-5pm
+        r'(?:open|ouvert)\s+(?:every|tous\s+les|daily|all)\s+(?:day|jours?)'  # "Open every day"
+        r')', re.IGNORECASE
+    )
+    if _hours_re.search(text):
+        has_valid_fact = True
+    
+    # 3. Admission/pricing info
+    _admission_re = re.compile(
+        r'(?:'
+        r'free\s+admission|admission\s+free|entr[eé]e\s+(?:libre|gratuite)|gratuit|'
+        r'(?:admission|entry|ticket)\s*[:.]?\s*\$?\d+|'
+        r'\d+\s*(?:€|EUR|\$|£)|'
+        r'(?:\$|€|£)\s*\d+'
+        r')', re.IGNORECASE
+    )
+    if _admission_re.search(text):
+        has_valid_fact = True
+    
+    # 4. Check coherence: text should not be excessively fragmented
+    words = text.split()
+    if len(words) > 3:
+        short_word_ratio = sum(1 for w in words if len(w) <= 2) / len(words)
+        if short_word_ratio > 0.6:
+            return False
+    
+    # 5. Mixed-language month names = garbled seasonal range
+    _en_months = {'january', 'february', 'march', 'april', 'may', 'june',
+                  'july', 'august', 'september', 'october', 'november', 'december'}
+    _fr_months = {'janvier', 'février', 'fevrier', 'mars', 'avril', 'mai', 'juin',
+                  'juillet', 'août', 'aout', 'septembre', 'octobre', 'novembre', 'décembre', 'decembre'}
+    _text_words = set(_text_lower.split())
+    has_en_month = bool(_text_words & _en_months)
+    has_fr_month = bool(_text_words & _fr_months)
+    if has_en_month and has_fr_month:
+        if not (_closed_day_re.search(text) or _admission_re.search(text)):
+            return False
+    
+    return has_valid_fact
+
 def _fetch_visitor_info_from_site(base_site_url: str, language: str = "en") -> str:
     """Attempt to fetch practical visitor information (hours, admission) from the venue's official site.
     
@@ -1864,19 +1954,38 @@ def _fetch_visitor_info_from_site(base_site_url: str, language: str = "en") -> s
     from urllib.parse import urljoin, urlparse
     
     # Known URL patterns for visitor info pages across museum sites
-    _VISITOR_INFO_PATHS = [
-        '/tarifs-et-horaires', '/horaires-et-tarifs', '/infos-pratiques',
-        '/informations-pratiques', '/plan-your-visit', '/visit',
-        '/visitor-information', '/hours-admission', '/hours-and-admission',
-        '/opening-hours', '/practical-information',
-        '/tarifs', '/horaires', '/visite',
+    _VISITOR_INFO_PATHS_RELATIVE = [
+        'tarifs-et-horaires', 'horaires-et-tarifs', 'infos-pratiques',
+        'informations-pratiques', 'plan-your-visit', 'visit',
+        'visitor-information', 'hours-admission', 'hours-and-admission',
+        'opening-hours', 'practical-information',
+        'tarifs', 'horaires', 'visite',
     ]
     
     _base_domain = urlparse(base_site_url).netloc
     _fetched_text = ""
     
-    for path in _VISITOR_INFO_PATHS:
-        _url = urljoin(base_site_url, path)
+    # LOCAL-33: Scope visitor-info probing to the venue's own section.
+    # When base_site_url is deep (portal site), visitor info paths on the
+    # domain root belong to the portal, not the venue. Only try sibling
+    # pages within the venue's path prefix.
+    _parsed_info_url = urlparse(base_site_url)
+    _info_path_segments = [s for s in _parsed_info_url.path.rstrip('/').split('/') if s]
+    _is_deep_path = len(_info_path_segments) > 1
+    
+    _urls_to_try = []
+    if _is_deep_path:
+        # Deep path: only try as siblings/children of the venue URL
+        _venue_base = base_site_url.rstrip('/')
+        for slug in _VISITOR_INFO_PATHS_RELATIVE:
+            _urls_to_try.append(_venue_base + '/' + slug)
+        print(f"  [LOCAL-33] Visitor info scoped to venue section (deep path)")
+    else:
+        # Bare domain: try as root-level paths (original behavior)
+        for slug in _VISITOR_INFO_PATHS_RELATIVE:
+            _urls_to_try.append(urljoin(base_site_url, '/' + slug))
+    
+    for _url in _urls_to_try:
         try:
             resp = requests.get(_url, headers={'User-Agent': 'Audioura/2.2'},
                               timeout=10, allow_redirects=True)
@@ -1943,14 +2052,25 @@ def _fetch_visitor_info_from_site(base_site_url: str, language: str = "en") -> s
     _raw_result = '. '.join(_info_parts)
     print(f"  [LOCAL-27] Extracted visitor info: {_raw_result[:80]}...")
     
+    # [LOCAL-32/33] Validity gate: verify the extracted text parses into recognisable
+    # hours/closure/admission facts. If it doesn't, it's raw nav junk — omit entirely.
+    if not _is_valid_visitor_info(_raw_result):
+        print(f"  [LOCAL-33] Visitor info FAILED validity gate — omitting (raw: '{_raw_result[:100]}')")
+        return ""
+    
     # [LOCAL-29 Fix B] Translate to tour language if source is in a different language.
     # Use structured extraction + deterministic translation for common patterns,
     # so we keep the sourced data without relying on GPT to paraphrase.
     if language and language.lower() != "fr":
         _translated = _translate_visitor_info_to_language(_raw_result, language)
         if _translated:
-            print(f"  [LOCAL-29] Visitor info translated to '{language}': {_translated[:80]}...")
-            return _translated
+            # Also validate the translated result
+            if _is_valid_visitor_info(_translated):
+                print(f"  [LOCAL-29] Visitor info translated to '{language}': {_translated[:80]}...")
+                return _translated
+            else:
+                print(f"  [LOCAL-33] Translated visitor info FAILED validity gate — omitting")
+                return ""
     
     return _raw_result
 
@@ -2014,10 +2134,44 @@ def _translate_visitor_info_to_language(raw_info: str, target_language: str) -> 
     result = re.sub(r'(\d{1,2})h(\d{2})', r'\1:\2', result)
     result = re.sub(r'(\d{1,2})h\b', r'\1:00', result)
     
+    # --- LOCAL-32/33: Month translations ---
+    _FR_TO_EN_MONTHS = {
+        'janvier': 'January', 'février': 'February', 'fevrier': 'February',
+        'mars': 'March', 'avril': 'April', 'mai': 'May', 'juin': 'June',
+        'juillet': 'July', 'août': 'August', 'aout': 'August',
+        'septembre': 'September', 'octobre': 'October',
+        'novembre': 'November', 'décembre': 'December', 'decembre': 'December',
+    }
+    for fr_month, en_month in _FR_TO_EN_MONTHS.items():
+        result = re.sub(r'\b' + fr_month + r'\b', en_month, result, flags=re.IGNORECASE)
+    
+    # --- LOCAL-32/33: Ordinal formatting (1 er → 1st, etc.) ---
+    result = re.sub(r'(\d+)\s*(?:er|ère)\b', r'\1st', result)
+    result = re.sub(r'(\d+)\s*(?:ème|e)\b', r'\1th', result)
+    
+    # --- LOCAL-32/33: Remaining French connectors in date ranges ---
+    result = re.sub(r'\bdu\b', 'from', result, flags=re.IGNORECASE)
+    result = re.sub(r'\bau\b', 'to', result, flags=re.IGNORECASE)
+    
+    # --- LOCAL-32/33: Clean up multiple spaces and awkward punctuation ---
+    result = re.sub(r'\s{2,}', ' ', result)
+    result = re.sub(r'\s+([.,;:])', r'\1', result)
+    
     # If result is still mostly French (more than 50% unchanged), return empty
     # to signal that translation was incomplete
     if result == raw_info:
         return ""
+    
+    # LOCAL-32/33: Post-translation coherence check — if significant French fragments remain,
+    # truncate to just the coherent English portion or return empty
+    _residual_french = re.findall(r'\b(?:du|au|le|la|les|er|ère|ème)\b', result)
+    if len(_residual_french) > 3:
+        # Too much residual French — try to salvage by taking just the first sentence
+        _first_sentence = result.split('.')[0].strip()
+        if _first_sentence and _is_valid_visitor_info(_first_sentence):
+            result = _first_sentence
+        else:
+            return ""
     
     return result.strip()
 
