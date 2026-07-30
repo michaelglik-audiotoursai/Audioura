@@ -150,6 +150,31 @@ LOCAL-32 to generalize the heading/nav classifier (positional rather than phrase
 a validity gate to visitor-info extraction, with all three venues as the acceptance bar. **A field test on an
 arbitrary venue would likely expose this.**
 
+
+### LOCAL-32 NOT MERGED — and the real Palais Lascaris cause found (2026-07-30 ~03:00)
+
+LOCAL-32 was tested from its branch WITHOUT merging, to protect the verified Asian-museum result. Outcome:
+- Asian Arts Museum: **8/8, no regression**, museum info still correct.
+- Musée Matisse: 8/8 real works, visitor info now rendered in **English** (was mixed-language) — a genuine gain.
+- Palais Lascaris: **still 1 stop.** Primary objective not met.
+
+Not merged, for two reasons: it does not fix the headline defect, and it had rebased onto rewritten history
+(its base `dd2b951` vs storied's identical `9deb4d3`), so `story_miner.py` conflicted badly. The merge was
+aborted and storied restored clean at 11/11.
+
+**REAL ROOT CAUSE (LEAD): the crawler is reading the City of Nice municipal website.** Palais Lascaris's
+`official_url` is `https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais` — a page on a
+city portal, not a museum site. So the crawl wanders into `/type-lieu/salles-de-sport/`, `/sport/parcours/`,
+`/administration/actes-administratifs-et-reglementaires/`, `/administration/tarifs-des-services-municipaux/`
+(the source of the `tarifs Télécharger le recueil 2026` visitor-info junk) and `/actualites/`. Only 2 canonical
+titles could be extracted; `[D1v2] 1/7 works verified — tier: thin`. **The classifier was working correctly on
+garbage input.**
+
+This is not venue-specific: many municipal museums are hosted as a subsection of a city website, so it will
+recur. Dispatched **LOCAL-33** to scope the crawl to the venue's own URL path prefix when `official_url` is a
+deep path (leaving bare-domain venues like maa.departement06.fr unchanged), apply the same scoping to
+visitor-info extraction, and lean harder on Wikipedia when a venue's own site section is thin.
+
 ## Round 1 scope (LOCAL-14, dispatched 2026-07-29)
 
 1. **UNIFIED-FILL fabrication (highest priority):** when D1v2 correctly drops a
