@@ -180,6 +180,31 @@ Palais corpus now carries real provenance: `Sacqueboute ténor by Anton Schnitze
 Tested from the branch BEFORE merging — the practice that caught LOCAL-32, which was discarded for not fixing the defect and for rebasing onto rewritten history.
 REMAINING (LOCAL-34 dispatched): stop 4 titled `Most famous guitars` uses the section heading rather than the instrument's name (the object is real — Antonio de Torres, Almería 1884); `Raquel` still unexplained as stop 1; Palais visitor info absent (correct-by-omission, but worth confirming nothing sourceable exists). | ac76981 |
 
+
+### BLOCKED 2026-07-30 ~07:55 — OpenAI quota exhausted
+
+All tour generation now fails with `429 insufficient_quota`. Confirmed account-wide with a minimal direct API
+call, not a code fault and not transient. **No further live verification is possible until credit is added.**
+
+Spend logged tonight: 30 Kiro generations at $1.03 (avg $0.0343), plus ~21 LEAD verification runs — roughly
+$1.75–2.00 of generation total. The account was evidently near its limit rather than us burning a large sum.
+
+**State of play:**
+- `a8bc2b0` is the last FULLY VERIFIED commit (tagged `last-verified-a8bc2b0`): Asian base 81.25 / total 89.4,
+  three byte-identical runs (md5 197659fa), Matisse 8/8, Palais Lascaris 6 stops.
+- `4a0718f` adds LOCAL-36 (practical-facts QA gate) and LOCAL-37 (three-class story retrieval). Both merged
+  clean with 11/11 suites and G4 correctly scoped, **but their live verification never ran** — quota died
+  mid-check. Treat as unverified.
+- LOCAL-35 (visitor facts) is written and its values were verified against the primary source — Matisse €12,
+  10:00–17:00 Nov–Mar / 10:00–18:00 Apr–Oct, all correct, and **more accurate than the ground-truth table LEAD
+  supplied**. It could not merge: 4-hunk semantic conflict with LOCAL-36 (35 replaces the mechanism 36 wraps).
+  Rebase dispatched as LOCAL-39.
+- LOCAL-38 (SQ4b theme threads) and LOCAL-39 were running when quota died; they can still write code but
+  cannot produce live acceptance evidence.
+
+**Known-wrong fact still in the product:** Musée Matisse is reported as free admission. It costs €12 (free for
+Métropole residents). The fix exists in LOCAL-35/39 but is not merged.
+
 ## Round 1 scope (LOCAL-14, dispatched 2026-07-29)
 
 1. **UNIFIED-FILL fabrication (highest priority):** when D1v2 correctly drops a
