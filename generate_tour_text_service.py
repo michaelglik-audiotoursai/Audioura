@@ -192,6 +192,11 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                         }
                     except Exception:
                         pass
+                    # [LOCAL-22] Print all Stop N: headings BEFORE QA for verification
+                    _debug_headers = re.findall(r'^(Stop\s+\d+:.+)$', tour_text, re.MULTILINE)
+                    print(f"  Rendered Stop headings ({len(_debug_headers)}):")
+                    for _dh in _debug_headers:
+                        print(f"    {_dh[:120]}")
                     content_qa_runner.run_qa(tour_text, story_elements=_serving_story_elements, venue_context=_venue_ctx)
                 except SystemExit:
                     pass  # run_qa calls sys.exit() — catch it
