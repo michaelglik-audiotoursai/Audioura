@@ -1234,14 +1234,46 @@ def _verify_works_v2(poi_list, venue_name):
                     'address': '',  # Will be resolved later
                 })
                 _catalogue_titles_injected.add(_cat_title)
+                # [LOCAL-31] Validate period/material against the entry's own description.
+                # The text-based parser may attribute metadata from an adjacent entry
+                # when section boundaries aren't clean. Only trust period/material
+                # if they actually appear within the entry's own description text.
+                _cw_desc = cw.get('description', '')
+                _cw_period = cw.get('period', '')
+                _cw_material = cw.get('material', '')
+                _cw_origin = cw.get('origin', '')
+                
+                # Period validation: must appear in the entry's own description
+                if _cw_period and _cw_desc:
+                    _period_in_desc = _cw_period.lower() in _cw_desc.lower()
+                    if not _period_in_desc:
+                        # Check if any part of the period string is in the description
+                        # e.g., "Xe siècle" might appear as "Xe siècle" in description
+                        _period_core = re.search(r'[IVXLC]+e\s+si[eè]cle|\d{4}', _cw_period)
+                        if _period_core:
+                            _period_in_desc = _period_core.group(0).lower() in _cw_desc.lower()
+                    if not _period_in_desc:
+                        print(f"  [LOCAL-31] Dropping period '{_cw_period}' for '{_cat_title}' — "
+                              f"not found in entry's own description (likely cross-entry bleed)")
+                        _cw_period = ''
+                
+                # Material validation: at least one keyword must appear in description
+                if _cw_material and _cw_desc:
+                    _mat_words = [m.strip().lower() for m in _cw_material.split(',')]
+                    _mat_in_desc = any(mw in _cw_desc.lower() for mw in _mat_words if len(mw) > 3)
+                    if not _mat_in_desc:
+                        print(f"  [LOCAL-31] Dropping material '{_cw_material}' for '{_cat_title}' — "
+                              f"not found in entry's own description (likely cross-entry bleed)")
+                        _cw_material = ''
+                
                 evidence_log[_cat_title] = {
                     "status": "VERIFIED",
                     "canonical_title": _cat_title,
-                    "snippet": cw.get('description', '')[:200],
+                    "snippet": _cw_desc[:200],
                     "method": "catalogue_work",
-                    "material": cw.get('material', ''),
-                    "period": cw.get('period', ''),
-                    "origin": cw.get('origin', ''),
+                    "material": _cw_material,
+                    "period": _cw_period,
+                    "origin": _cw_origin,
                 }
         if _catalogue_titles_injected:
             print(f"  [LOCAL-28] Pre-injected {len(_catalogue_titles_injected)} catalogue works as verified POIs")
