@@ -1059,18 +1059,46 @@ def _verify_works_v2(poi_list, venue_name):
         canonical_titles = _cache_hit['canonical_titles']
         sparql_works = _cache_hit.get('sparql_works') or []
         sparql_titles = set(build_canonical_titles_from_works(sparql_works)) if sparql_works else set()
-        combined_text = ''  # Will be re-fetched if needed below
+        # [LOCAL-30] Reconstruct combined_text from cached pages (pages is a list of dicts)
+        _cached_pages = _cache_hit.get('pages') or []
+        if isinstance(_cached_pages, list):
+            combined_text = '\n\n'.join(p.get('text', '') for p in _cached_pages if isinstance(p, dict) and p.get('text'))
+        elif isinstance(_cached_pages, dict):
+            combined_text = _cached_pages.get('combined_text', '')
+        else:
+            combined_text = ''
+        # [LOCAL-30] Reconstruct source_urls from official_url (always available in cache)
+        _cache_source_urls = []
+        if _cache_hit.get('official_url'):
+            _cache_source_urls = [_cache_hit['official_url']]
+        # [LOCAL-30] Re-extract catalogue works from cached pages
+        _cache_catalogue_works = []
+        if _cached_pages and isinstance(_cached_pages, list):
+            from story_miner import extract_catalogue_works_from_pages
+            _cache_catalogue_works = extract_catalogue_works_from_pages(_cached_pages)
+        # [LOCAL-30] Reconstruct theme_words from canonical_titles
+        # Theme words are single lowercase words that appear in multiple titles
+        _cache_theme_words = set()
+        if canonical_titles:
+            from collections import Counter as _Counter
+            _all_words = []
+            for _ct in canonical_titles:
+                _all_words.extend(w.lower() for w in _ct.split() if len(w) > 3)
+            _word_counts = _Counter(_all_words)
+            _cache_theme_words = {w for w, c in _word_counts.items() if c >= 3}
         corpus_result = {
             'canonical_titles': canonical_titles,
-            'combined_text': _cache_hit.get('pages', {}).get('combined_text', '') if isinstance(_cache_hit.get('pages'), dict) else '',
-            'pages': _cache_hit.get('pages') or [],
+            'combined_text': combined_text,
+            'pages': _cached_pages,
             'cycle_names': set(),
-            'theme_words': set(),
-            'source_urls': [],
+            'theme_words': _cache_theme_words,
+            'source_urls': _cache_source_urls,
+            'per_work_contexts': {},
+            'catalogue_works': _cache_catalogue_works,
         }
-        combined_text = corpus_result['combined_text']
         cycle_names = corpus_result['cycle_names']
-        print(f"  [D1v2] Cache HIT: {len(canonical_titles)} canonical titles (tier={_cache_hit['tier']})")
+        print(f"  [D1v2] Cache HIT: {len(canonical_titles)} canonical titles (tier={_cache_hit['tier']})"
+              f", {len(_cache_catalogue_works)} catalogue works, combined_text={len(combined_text)} chars")
     else:
         # Cache miss — fresh mining (existing code below)
         pass
@@ -2433,113 +2461,218 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             f"across the city. A shorter, denser route is better than a long, spread-out one.\n"
         )
 
+    # -------- [LOCAL-30] DETERMINISTIC SELECTION: documented works fill first --------
+    # When a museum venue has enough catalogue/SPARQL works to fill the tour,
+    # use those directly as Phase 3A output. No GPT randomness, no fabrication.
+    # This is the ONLY path that guarantees reproducibility.
+    _deterministic_fill_used = False
+    if tour_category == 'museum' and _museum_venue_name:
+        try:
+            from venue_resolver import resolve_venue, fetch_venue_works, build_canonical_titles_from_works, cache_get as _det_cache_get
+            from story_miner import extract_catalogue_works_from_pages, fetch_venue_narrative_corpus
+            
+            _det_city_hint = ""
+            if "," in location:
+                parts = [p.strip() for p in location.split(",")]
+                _det_city_hint = parts[1] if len(parts) >= 2 else ""
+            _det_entity = resolve_venue(_museum_venue_name, _det_city_hint)
+            
+            if _det_entity and _det_entity.qid:
+                # Gather documented works from all sources
+                _det_documented = []  # List of {title, source} dicts
+                _det_seen_titles_norm = set()
+                
+                from story_miner import _normalize as _det_norm
+                
+                # Source 1: Catalogue works (highest confidence — museum-published)
+                _det_cache = _det_cache_get(_det_entity.qid) if _det_entity.qid else None
+                _det_catalogue_works = []
+                if _det_cache and _det_cache.get('pages'):
+                    _det_pages = _det_cache['pages']
+                    if isinstance(_det_pages, list):
+                        _det_catalogue_works = extract_catalogue_works_from_pages(_det_pages)
+                
+                for cw in _det_catalogue_works:
+                    _t = cw.get('title', '').strip()
+                    _tn = _det_norm(_t)
+                    if _t and _tn not in _det_seen_titles_norm:
+                        _det_documented.append({'title': _t, 'source': 'catalogue',
+                                                'material': cw.get('material', ''),
+                                                'period': cw.get('period', ''),
+                                                'origin': cw.get('origin', '')})
+                        _det_seen_titles_norm.add(_tn)
+                
+                # Source 2: SPARQL works (Wikidata-verified, second highest)
+                _det_sparql = fetch_venue_works(_det_entity.qid, _det_entity.language)
+                _det_sparql_seen_qids = set()
+                for w in _det_sparql:
+                    _wqid = w.get('qid', '')
+                    if _wqid in _det_sparql_seen_qids:
+                        continue
+                    _det_sparql_seen_qids.add(_wqid)
+                    _t = w.get('label_local', '') or w.get('label_en', '')
+                    _tn = _det_norm(_t)
+                    if _t and _tn not in _det_seen_titles_norm:
+                        _det_documented.append({'title': _t, 'source': 'sparql'})
+                        _det_seen_titles_norm.add(_tn)
+                
+                # Source 3: Cached canonical titles that survived LOCAL-24 filter
+                if _det_cache and _det_cache.get('canonical_titles'):
+                    for _ct in _det_cache['canonical_titles']:
+                        _tn = _det_norm(_ct)
+                        if _ct and _tn not in _det_seen_titles_norm:
+                            _det_documented.append({'title': _ct, 'source': 'canonical'})
+                            _det_seen_titles_norm.add(_tn)
+                
+                print(f"  [LOCAL-30] Deterministic selection: {len(_det_documented)} documented works "
+                      f"({len(_det_catalogue_works)} catalogue, {len(_det_sparql_seen_qids)} SPARQL)")
+                
+                # If documented works >= total_stops, fill deterministically
+                if len(_det_documented) >= total_stops:
+                    # Priority order: catalogue first (richest metadata), then SPARQL, then canonical
+                    _priority = {'catalogue': 0, 'sparql': 1, 'canonical': 2}
+                    _det_documented.sort(key=lambda d: _priority.get(d['source'], 9))
+                    
+                    # Apply bare-noun filter (shouldn't be needed but defence-in-depth)
+                    from story_miner import is_bare_generic_noun
+                    _det_documented = [d for d in _det_documented if not is_bare_generic_noun(d['title'])]
+                    
+                    # Take total_stops * 2 (D1v2 will filter, so give it room)
+                    _det_take = min(len(_det_documented), total_stops * 2)
+                    poi_list = [_new_poi(d['title']) for d in _det_documented[:_det_take]]
+                    
+                    print(f"  [LOCAL-30] DETERMINISTIC BYPASS: {len(poi_list)} documented works → Phase 3A SKIPPED")
+                    print(f"   Stops proposed (deterministic, no GPT):")
+                    for p in poi_list[:total_stops]:
+                        _src = next((d['source'] for d in _det_documented if d['title'] == p['name']), '?')
+                        print(f"     - {p['name']} [{_src}]")
+                    _deterministic_fill_used = True
+                else:
+                    print(f"  [LOCAL-30] Documented works ({len(_det_documented)}) < total_stops ({total_stops}) "
+                          f"— will use documented as base, GPT fills remainder")
+        except Exception as _det_err:
+            print(f"  [LOCAL-30] Deterministic selection check failed (falling through to Phase 3A): {_det_err}")
+            import traceback
+            traceback.print_exc()
+
     # For museum tours with D1v2 verification: ask for 2x candidates to improve hit rate
     _phase3a_count = total_stops
     if tour_category == 'museum' and _museum_venue_name:
         _phase3a_count = min(total_stops * 2, 20)
         print(f"  [R4] Museum tour: asking for {_phase3a_count} candidates (2x for D1v2 filtering)")
 
-    phase_3a_prompt = (
-        f"You are a knowledgeable local guide for {location}.\n"
-        f"List exactly {_phase3a_count} specific, real, well-known {poi_type_hint} relevant to: {user_request}.\n\n"
-        "Requirements:\n"
-        "- Use REAL, SPECIFIC names of actual establishments or landmarks.\n"
-        "- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.\n"
-        "- Include a complete street address with ZIP code where applicable.\n"
-        + _museum_venue_constraint
-        + _transport_stop_constraint
-        + _scope_constraint
-        + _compactness_constraint
-        + "\n\nReturn ONLY a JSON array, no other text, no markdown fences:\n"
-        '[{"name": "...", "address": "..."}, ...]'
-    )
-    phase_3a_data = {
-        "model": "gpt-3.5-turbo",
-        "messages": [
-            {"role": "system", "content": "You return ONLY a valid JSON array. No markdown, no commentary."},
-            {"role": "user", "content": phase_3a_prompt}
-        ],
-        "temperature": 0.5,
-        "max_tokens": 800,
-    }
-    api_call_logger.log("PHASE_3A_REQUEST", {
-        "location": location,
-        "total_stops": total_stops,
-        "poi_type_hint": poi_type_hint,
-    })
-
-    try:
-        info_response = requests.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers=headers,
-            data=json.dumps(phase_3a_data),
-        )
-        if info_response.status_code != 200:
-            print(f"X PHASE 3A failed: status {info_response.status_code}")
-            print(info_response.text)
-            return None, None, (None, None)
-
-        info_result = info_response.json()
-        info_text = info_result["choices"][0]["message"]["content"]
-        tokens_used = info_result["usage"]["total_tokens"]
-        total_tokens += tokens_used
-        total_cost += tokens_used / 1000 * 0.002
-        print(f"PHASE 3A API call cost: ${tokens_used / 1000 * 0.002:.4f} ({tokens_used} tokens)")
-
-        api_call_logger.log_openai_call(phase_3a_prompt, total_stops, info_text, info_response.status_code)
-
-        with open("openai_simple_debug.txt", "w", encoding="utf-8") as simple_debug:
-            simple_debug.write("=== EXACT PROMPT SENT TO OPENAI (PHASE 3A) ===\n")
-            simple_debug.write(phase_3a_prompt)
-            simple_debug.write("\n\n=== OPENAI RESPONSE ===\n")
-            simple_debug.write(info_text)
-            simple_debug.write(f"\n\n=== ANALYSIS ===\nRequested stops: {total_stops}\n")
-            simple_debug.write(f"See full chain log: {api_call_logger.get_log_path()}\n")
-
-        # Insufficient-knowledge detection (kept from previous behaviour)
-        insufficient_knowledge_indicators = [
-            "I don't have sufficient knowledge",
-            "I am unable to provide",
-            "I cannot provide real-time information",
-            "insufficient data available",
-            "I don't know actual locations",
-            "I lack specific knowledge",
-        ]
-        for indicator in insufficient_knowledge_indicators:
-            if indicator.lower() in info_text.lower():
-                print(f"X AI KNOWLEDGE INSUFFICIENT: {info_text[:200]}...")
-                return None, None, (None, None)
-
-        candidates = _parse_json_array_loose(info_text)
-        if not candidates or not isinstance(candidates, list):
-            print(f"X PHASE 3A returned unparseable response: {info_text[:300]}")
-            return None, None, (None, None)
-
-        for c in candidates:
-            if not isinstance(c, dict):
-                continue
-            name = (c.get("name") or "").strip()
-            if not name:
-                continue
-            if re.match(r'^(Restaurant|Store|Shop|Location|Business|Walking Tour)\s*\d*$', name):
-                print(f"   ! Rejected generic name from PHASE 3A: '{name}'")
-                continue
-            # [LOCAL-22] Root-cause guard: reject names that are sentences/descriptions
-            if _is_name_corrupted(name):
-                print(f"   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: '{name[:80]}'")
-                continue
-            poi_list.append(_new_poi(name, c.get("address") or ""))
-
-        if len(poi_list) == 0:
-            print(f"X PHASE 3A: no usable POIs after parsing")
-            return None, None, (None, None)
-
+    if _deterministic_fill_used:
+        # Skip Phase 3A entirely — poi_list already filled deterministically
+        print(f"\nPHASE 3A: SKIPPED (deterministic fill from {len(poi_list)} documented works)")
         print(f"OK PHASE 3A parsed {len(poi_list)} candidate POI(s):")
         for p in poi_list:
-            print(f"   - {p['name']}" + (f" @ {p['address']}" if p['address'] else ""))
+            print(f"   - {p['name']}")
+    else:
+        pass  # Fall through to normal Phase 3A GPT call below
 
-        # [TRANSPORT-VERIFY] For unusual transport modes, verify stops are reachable
-        poi_list = _verify_transport_accessibility(poi_list, transport_mode, location, api_key)
+    if not _deterministic_fill_used:
+        phase_3a_prompt = (
+            f"You are a knowledgeable local guide for {location}.\n"
+            f"List exactly {_phase3a_count} specific, real, well-known {poi_type_hint} relevant to: {user_request}.\n\n"
+            "Requirements:\n"
+            "- Use REAL, SPECIFIC names of actual establishments or landmarks.\n"
+            "- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.\n"
+            "- Include a complete street address with ZIP code where applicable.\n"
+            + _museum_venue_constraint
+            + _transport_stop_constraint
+            + _scope_constraint
+            + _compactness_constraint
+            + "\n\nReturn ONLY a JSON array, no other text, no markdown fences:\n"
+            '[{"name": "...", "address": "..."}, ...]'
+        )
+        phase_3a_data = {
+            "model": "gpt-3.5-turbo",
+            "messages": [
+                {"role": "system", "content": "You return ONLY a valid JSON array. No markdown, no commentary."},
+                {"role": "user", "content": phase_3a_prompt}
+            ],
+            "temperature": 0.5,
+            "max_tokens": 800,
+        }
+        api_call_logger.log("PHASE_3A_REQUEST", {
+            "location": location,
+            "total_stops": total_stops,
+            "poi_type_hint": poi_type_hint,
+        })
+
+    try:
+        if not _deterministic_fill_used:
+            info_response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers=headers,
+                data=json.dumps(phase_3a_data),
+            )
+            if info_response.status_code != 200:
+                print(f"X PHASE 3A failed: status {info_response.status_code}")
+                print(info_response.text)
+                return None, None, (None, None)
+
+            info_result = info_response.json()
+            info_text = info_result["choices"][0]["message"]["content"]
+            tokens_used = info_result["usage"]["total_tokens"]
+            total_tokens += tokens_used
+            total_cost += tokens_used / 1000 * 0.002
+            print(f"PHASE 3A API call cost: ${tokens_used / 1000 * 0.002:.4f} ({tokens_used} tokens)")
+
+            api_call_logger.log_openai_call(phase_3a_prompt, total_stops, info_text, info_response.status_code)
+
+            with open("openai_simple_debug.txt", "w", encoding="utf-8") as simple_debug:
+                simple_debug.write("=== EXACT PROMPT SENT TO OPENAI (PHASE 3A) ===\n")
+                simple_debug.write(phase_3a_prompt)
+                simple_debug.write("\n\n=== OPENAI RESPONSE ===\n")
+                simple_debug.write(info_text)
+                simple_debug.write(f"\n\n=== ANALYSIS ===\nRequested stops: {total_stops}\n")
+                simple_debug.write(f"See full chain log: {api_call_logger.get_log_path()}\n")
+
+            # Insufficient-knowledge detection (kept from previous behaviour)
+            insufficient_knowledge_indicators = [
+                "I don't have sufficient knowledge",
+                "I am unable to provide",
+                "I cannot provide real-time information",
+                "insufficient data available",
+                "I don't know actual locations",
+                "I lack specific knowledge",
+            ]
+            for indicator in insufficient_knowledge_indicators:
+                if indicator.lower() in info_text.lower():
+                    print(f"X AI KNOWLEDGE INSUFFICIENT: {info_text[:200]}...")
+                    return None, None, (None, None)
+
+            candidates = _parse_json_array_loose(info_text)
+            if not candidates or not isinstance(candidates, list):
+                print(f"X PHASE 3A returned unparseable response: {info_text[:300]}")
+                return None, None, (None, None)
+
+            for c in candidates:
+                if not isinstance(c, dict):
+                    continue
+                name = (c.get("name") or "").strip()
+                if not name:
+                    continue
+                if re.match(r'^(Restaurant|Store|Shop|Location|Business|Walking Tour)\s*\d*$', name):
+                    print(f"   ! Rejected generic name from PHASE 3A: '{name}'")
+                    continue
+                # [LOCAL-22] Root-cause guard: reject names that are sentences/descriptions
+                if _is_name_corrupted(name):
+                    print(f"   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: '{name[:80]}'")
+                    continue
+                poi_list.append(_new_poi(name, c.get("address") or ""))
+
+            if len(poi_list) == 0:
+                print(f"X PHASE 3A: no usable POIs after parsing")
+                return None, None, (None, None)
+
+            print(f"OK PHASE 3A parsed {len(poi_list)} candidate POI(s):")
+            for p in poi_list:
+                print(f"   - {p['name']}" + (f" @ {p['address']}" if p['address'] else ""))
+
+            # [TRANSPORT-VERIFY] For unusual transport modes, verify stops are reachable
+            poi_list = _verify_transport_accessibility(poi_list, transport_mode, location, api_key)
 
         # -------- [D1] In-collection verification for museum tours --------
         _d1_evidence_log = {}
