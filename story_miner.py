@@ -936,6 +936,512 @@ def _normalize(text: str) -> str:
     return ' '.join(stripped.split())
 
 
+# ============================================================================
+# LOCAL-24: Work-vs-Nonwork Classifier
+# ============================================================================
+# Deterministic rules to classify corpus entries as:
+#   kind="work"    — a specific artwork, installation, exhibit object
+#   kind="gallery" — a permanent gallery/room (legitimate stop, but not a "work")
+#   kind="excluded"— programs, workshops, section headings, streets, meta-labels
+#
+# Design: rules-only, no LLM pass. Each exclusion cites the rule that fired.
+# ============================================================================
+
+# --- Rule 1: Wikipedia section headings (nav-label class from LOCAL-9) ---
+# These are generic Wikipedia section names that the extract_canonical_titles
+# Pattern 3 erroneously picks up.  The _GENERIC_SECTIONS set catches many,
+# but the following are museum-article-specific headings that slip through.
+_WIKI_SECTION_HEADING_PATTERNS = re.compile(
+    r"^(?:"
+    r"origin\s+of\s+the\s+museum|"
+    r"the\s+museum['\u2019]?s?\s+collections?|"
+    r"history\s+of\s+the\s+(?:museum|collection)|"
+    r"collections?\s+(?:of|du|des|de)\s+|"
+    r"presentation\s+(?:du|of|des)|"
+    r"(?:the|les?|la)\s+collections?$"
+    r")", re.IGNORECASE
+)
+
+# --- Rule 2: Street/address/geographic features (venue's own location) ---
+_STREET_ADDRESS_PATTERNS = re.compile(
+    r'^(?:'
+    r'promenade\s+|avenue\s+|boulevard\s+|rue\s+|'
+    r'place\s+|cours\s+|impasse\s+|chemin\s+|'
+    r'quai\s+|route\s+|all[eé]e\s+|passage\s+'
+    r')', re.IGNORECASE
+)
+# Also match specific known street names that commonly appear
+_KNOWN_STREETS = {
+    'promenade des anglais',
+}
+
+# --- Rule 3: Workshop/program/event patterns ---
+# Agenda items, ateliers, workshops, temporary programs.
+# These come from museum site /agenda, /ateliers, /activites pages.
+_WORKSHOP_PROGRAM_PATTERNS = re.compile(
+    r'(?:'
+    r'\b(?:atelier|workshop|activit[eé]|stage)\b.*(?:enfants?|jeune|kids?|family|famille)|'
+    r'\b(?:atelier|workshop)\s+(?:cr[eé]atif|d[eé]couverte|p[eé]dagogique|num[eé]rique)|'
+    r'\b(?:visite|visit)\s+(?:guid[eé]e|comment[eé]e|concert[eé]e|flash|libre)|'
+    r'\b(?:conf[eé]rence|lecture|colloque|s[eé]minaire|journ[eé]e)\b|'
+    r'\b(?:spectacle|concert|performance|projection|cin[eé]ma)\b|'
+    r'\b(?:f[eê]te|c[eé]l[eé]bration|anniversaire|nuit\s+(?:des\s+mus[eé]es|blanche))\b'
+    r')', re.IGNORECASE
+)
+
+# Patterns indicating a themed program name (not an artwork)
+_THEMED_PROGRAM_PATTERNS = re.compile(
+    r'^(?:'
+    r'(?:en|pour|avec|vers?)\s+.{5,}|'  # "En harmonie avec...", "Pour ne pas perdre..."
+    r'super[- ]?h[eé]ros?|'
+    r'voyage\s+en\s+|'  # "Voyage en Asie" (program name pattern)
+    r'monstres?\s+(?:de\s+poche|et\s+cie)|'  # workshop names
+    r'(?:la\s+)?nuit\s+|'  # "La nuit au musée" etc.
+    r'journ[eé]e\s+|'  # "Journée du patrimoine" etc.
+    r'(?:les?\s+)?(?:petits?|grands?)\s+(?:ateliers?|aventures?|d[eé]couvertes?)'
+    r')', re.IGNORECASE
+)
+
+# --- Rule 4: URL path signals (if source_url contains these path segments) ---
+_NONWORK_URL_PATHS = re.compile(
+    r'/(?:agenda|ateliers?|activites?|evenements?|animations?|'
+    r'stages?|workshops?|programs?|events?|'
+    r'scolaires?|pedagogique|educatif|'
+    r'spectacles?|concerts?|conferences?|'
+    r'publications?|editions?|boutique)(?:/|$)',
+    re.IGNORECASE
+)
+
+# --- Rule 5: Gallery/permanent-room patterns ---
+# These are legitimate stops (you can stand in them) but are NOT works.
+# They get kind="gallery" rather than excluded.
+_GALLERY_PATTERNS = re.compile(
+    r"^(?:"
+    r"(?:l['\u2019]?|le|la|les)\s+(?:asie|japon|chine|inde|cor[e\xe9]e|cambodge|vietnam|tha[i\xef]lande)|"
+    r".+(?:du\s+soleil\s+levant|d['\u2019]?asie|d['\u2019]?orient)|"
+    r"(?:salle|room|gallery|galerie)\s+|"
+    r"(?:les?\s+)?(?:quatre|trois|deux|cinq)\s+(?:grands?|principaux)\s+|"
+    r"rites?\s+et\s+c[e\xe9]r[e\xe9]monies?|"
+    r"(?:les?\s+)?(?:arts?\s+(?:sacr[e\xe9]|religieux|bouddhique))"
+    r")", re.IGNORECASE
+)
+
+# Specific known gallery titles for Asian Arts Museum
+_KNOWN_GALLERY_TITLES_NORM = {
+    'l asie du sud est',
+    'le japon pays du soleil levant',
+    'les quatre grands courants religieux d asie',
+    'rites et ceremonies en asie',
+}
+
+# --- Rule 6: Plural generic nouns (indicative of category names, not specific works) ---
+_PLURAL_GENERIC_NOUNS = re.compile(
+    r'^(?:les\s+)?(?:'
+    r'collections?|expositions?|œuvres?|oeuvres?|'
+    r'activit[eé]s?|animations?|ateliers?|'
+    r'spectacles?|conf[eé]rences?|publications?'
+    r')$', re.IGNORECASE
+)
+
+# --- Rule 7: Museum-meta phrases ---
+_MUSEUM_META_PATTERNS = re.compile(
+    r'^(?:'
+    r'(?:the|le|la|les)\s+mus[eé]e|'
+    r'(?:about|presentation|description)\s+(?:the|du|de)|'
+    r'nos?\s+collections?|notre\s+mus[eé]e|'
+    r'mission\s+(?:du|de|and|et)|'
+    r'(?:our|their)\s+(?:collection|museum|mission)'
+    r')', re.IGNORECASE
+)
+
+
+def classify_corpus_entry(
+    title: str,
+    source_urls: List[str] = None,
+    venue_name: str = "",
+    venue_address: str = "",
+    sparql_confirmed: bool = False,
+) -> Dict:
+    """Classify a corpus title as work, gallery, or excluded.
+    
+    Args:
+        title: The candidate title string
+        source_urls: URLs where this title was found (for URL-path-based rules)
+        venue_name: The venue name (for address-matching)
+        venue_address: Known venue address (for street-name detection)
+        sparql_confirmed: True if this title came from Wikidata SPARQL (P195/P276)
+        
+    Returns:
+        dict with:
+            kind: "work" | "gallery" | "excluded"
+            rule: str — which rule determined the classification
+            title: str — the original title
+    """
+    if source_urls is None:
+        source_urls = []
+    
+    _norm = _normalize(title)
+    _title_lower = title.lower().strip()
+    
+    # SPARQL-confirmed works (from Wikidata P195 "collection" or P276 "location")
+    # are ALWAYS works — Wikidata curators have validated they are artworks/objects
+    # housed at this venue. No further classification needed.
+    if sparql_confirmed:
+        return {"kind": "work", "rule": "sparql_confirmed", "title": title}
+    
+    # Rule 1: Wikipedia section headings
+    if _WIKI_SECTION_HEADING_PATTERNS.search(_title_lower):
+        return {"kind": "excluded", "rule": "wiki_section_heading", "title": title}
+    
+    # Rule 2: Street/address/geographic
+    if _STREET_ADDRESS_PATTERNS.match(title):
+        return {"kind": "excluded", "rule": "street_address", "title": title}
+    if _norm in _KNOWN_STREETS or any(_norm == _normalize(s) for s in _KNOWN_STREETS):
+        return {"kind": "excluded", "rule": "known_street", "title": title}
+    # Check if title matches the venue's known address
+    if venue_address and _normalize(venue_address) and _norm in _normalize(venue_address):
+        return {"kind": "excluded", "rule": "venue_address", "title": title}
+    
+    # Rule 3: Workshop/program/event
+    if _WORKSHOP_PROGRAM_PATTERNS.search(title):
+        return {"kind": "excluded", "rule": "workshop_program", "title": title}
+    if _THEMED_PROGRAM_PATTERNS.search(title):
+        return {"kind": "excluded", "rule": "themed_program", "title": title}
+    
+    # Rule 4 (was 5): Gallery/permanent room — checked BEFORE URL-path exclusion
+    # so gallery names are preserved even if found on agenda/events pages
+    if _GALLERY_PATTERNS.search(title):
+        return {"kind": "gallery", "rule": "gallery_pattern", "title": title}
+    if _norm in _KNOWN_GALLERY_TITLES_NORM:
+        return {"kind": "gallery", "rule": "known_gallery", "title": title}
+    
+    # Rule 5 (was 4): URL path signals
+    for url in source_urls:
+        if _NONWORK_URL_PATHS.search(url):
+            # URL path suggests this came from an agenda/events/workshop page
+            # Only exclude if there's no artwork-like signal in the title itself
+            has_artwork_signal = bool(
+                _YEAR_PATTERN.search(title) or
+                _MEDIUM_SIGNAL.search(title) or
+                _ARTWORK_TITLE_SIGNAL.search(title)
+            )
+            if not has_artwork_signal:
+                return {"kind": "excluded", "rule": f"url_path_nonwork ({url.split('/')[-2] if '/' in url else url})", "title": title}
+    
+    # Rule 6: Plural generic nouns (bare category names)
+    if _PLURAL_GENERIC_NOUNS.match(title):
+        return {"kind": "excluded", "rule": "plural_generic_noun", "title": title}
+    
+    # Rule 7: Museum-meta phrases
+    if _MUSEUM_META_PATTERNS.match(title):
+        return {"kind": "excluded", "rule": "museum_meta_phrase", "title": title}
+    
+    # Default: if it passed all exclusion rules, it's a work
+    return {"kind": "work", "rule": "default_pass", "title": title}
+
+
+def dedup_cross_language(
+    titles: Set[str],
+    sparql_works: List[Dict] = None,
+    preferred_language: str = "fr",
+) -> Tuple[Set[str], Dict[str, str]]:
+    """Cross-language deduplication: same work in two languages → keep local-language title.
+    
+    Uses multiple strategies:
+    1. SPARQL work data (label_en + label_local for each work) for exact pair detection
+    2. Semantic matching via bilingual word map for titles not in SPARQL
+    
+    Args:
+        titles: Set of canonical title strings
+        sparql_works: List of SPARQL work dicts (with label_en and label_local)
+        preferred_language: Which language to prefer ("fr", "en", etc.)
+        
+    Returns:
+        (deduped_titles, aliases) where aliases maps removed_title → kept_title
+    """
+    if not sparql_works:
+        sparql_works = []
+    
+    aliases = {}  # removed_title → canonical_title it maps to
+    to_remove = set()
+    
+    # Strategy 1: Use SPARQL EN↔local pairs for exact matching
+    for work in sparql_works:
+        label_en = work.get('label_en', '').strip()
+        label_local = work.get('label_local', '').strip()
+        
+        if not label_en or not label_local or label_en == label_local:
+            continue
+        
+        # Check if both variants are in our title set
+        en_in = label_en in titles
+        local_in = label_local in titles
+        
+        if en_in and local_in:
+            # Both present — keep preferred language
+            if preferred_language != "en":
+                to_remove.add(label_en)
+                aliases[label_en] = label_local
+            else:
+                to_remove.add(label_local)
+                aliases[label_local] = label_en
+        elif en_in and not local_in:
+            # Only EN present — check if there's a near-match to local in the set
+            _norm_local = _normalize(label_local)
+            for t in titles:
+                if t != label_en and _normalize(t) == _norm_local:
+                    to_remove.add(label_en)
+                    aliases[label_en] = t
+                    break
+    
+    # Strategy 2: Semantic matching for titles not covered by SPARQL
+    # Detect pairs where one title is a direct translation of another.
+    # Heuristic: if a title looks English and another looks French/local,
+    # and they share key content words (via bilingual map), they're duplicates.
+    remaining = titles - to_remove
+    _en_titles = set()
+    _local_titles = set()
+    
+    # Language markers — exclude cognates (same word in both languages)
+    _EN_ONLY_MARKERS = {'the', 'of', 'and', 'in', 'for', 'with', 'symbolizing',
+                        'first', 'stag', 'hind', 'deer', 'that', 'this', 'which',
+                        'from', 'into', 'over', 'under', 'between'}
+    _FR_ONLY_MARKERS = {'le', 'la', 'les', 'de', 'du', 'des', 'et', 'dans',
+                        'symbolisant', 'premier', 'daim', 'daine', 'qui', 'que',
+                        'sur', 'sous', 'entre', 'avec', 'pour', 'vers'}
+    
+    for t in remaining:
+        _t_words = set(t.lower().split())
+        # Remove possessive suffixes for matching
+        _t_words_clean = set()
+        for w in _t_words:
+            _t_words_clean.add(w.rstrip("'s").rstrip("\u2019s"))
+        
+        en_score = len(_t_words_clean & _EN_ONLY_MARKERS)
+        fr_score = len(_t_words_clean & _FR_ONLY_MARKERS)
+        
+        if en_score > 0 and fr_score == 0:
+            _en_titles.add(t)
+        elif fr_score > 0 and en_score == 0:
+            _local_titles.add(t)
+    
+    # For each EN title, check if there's a local title that's a translation
+    for en_t in _en_titles:
+        _en_norm = _normalize(en_t)
+        _en_words = set(_en_norm.split())
+        # Expand with bilingual map
+        _en_expanded = _expand_bilingual(list(_en_words))
+        
+        best_match = None
+        best_overlap = 0
+        
+        for loc_t in _local_titles:
+            if loc_t in to_remove:
+                continue
+            _loc_norm = _normalize(loc_t)
+            _loc_words = set(_loc_norm.split())
+            # Expand local words with bilingual map too
+            _loc_expanded = _expand_bilingual(list(_loc_words))
+            
+            # Calculate bidirectional word overlap with bilingual expansion
+            overlap_en_to_loc = len(_en_expanded & _loc_words)
+            overlap_loc_to_en = len(_loc_expanded & _en_words)
+            total_overlap = overlap_en_to_loc + overlap_loc_to_en
+            
+            # Also check direct word matches (cognates like "sermon", "Buddha")
+            direct_overlap = len(_en_words & _loc_words)
+            total_overlap += direct_overlap * 2  # Weight direct matches higher
+            
+            # Require significant overlap relative to title length
+            min_words = min(len(_en_words), len(_loc_words))
+            if min_words >= 3 and total_overlap >= min_words * 1.5:
+                if total_overlap > best_overlap:
+                    best_overlap = total_overlap
+                    best_match = loc_t
+        
+        if best_match:
+            if preferred_language != "en":
+                to_remove.add(en_t)
+                aliases[en_t] = best_match
+            else:
+                to_remove.add(best_match)
+                aliases[best_match] = en_t
+    
+    deduped = titles - to_remove
+    return deduped, aliases
+
+
+def dedup_near_duplicates(titles: Set[str]) -> Tuple[Set[str], Dict[str, str]]:
+    """Collapse near-duplicate titles (singular/plural variants, minor spelling diffs).
+    
+    Conservative: only collapses entries that are clearly the same work with
+    trivial typographical differences (accents, hyphens, singular/plural).
+    Does NOT collapse titles that differ by prepositions or articles, as these
+    may be distinct artworks in large museum collections.
+    
+    Returns:
+        (deduped_titles, collapse_map) where collapse_map maps removed → kept
+    """
+    collapse_map = {}
+    to_remove = set()
+    
+    def _singularize(word: str) -> str:
+        """Rough French/English singularization for matching."""
+        if word.endswith('s') and len(word) > 3:
+            return word[:-1]
+        return word
+    
+    # Sort by length descending so we prefer longer titles
+    sorted_titles = sorted(titles, key=lambda t: len(t), reverse=True)
+    
+    for i, t1 in enumerate(sorted_titles):
+        if t1 in to_remove:
+            continue
+        _n1 = _normalize(t1)
+        _n1_words = _n1.split()
+        _n1_stems = set(_singularize(w) for w in _n1_words)
+        
+        for j in range(i + 1, len(sorted_titles)):
+            t2 = sorted_titles[j]
+            if t2 in to_remove:
+                continue
+            _n2 = _normalize(t2)
+            _n2_words = _n2.split()
+            _n2_stems = set(_singularize(w) for w in _n2_words)
+            
+            if not _n1_stems or not _n2_stems:
+                continue
+            
+            # Strategy 1: EXACT normalized match (accent/punctuation differences only)
+            if _n1 == _n2:
+                to_remove.add(t2)
+                collapse_map[t2] = t1
+                continue
+            
+            # Strategy 2: Identical stem sets (singular/plural only difference)
+            if _n1_stems == _n2_stems:
+                to_remove.add(t2)
+                collapse_map[t2] = t1
+                continue
+            
+            # Strategy 3: One is a strict subset (e.g. "Grand Canal" vs "The Grand Canal")
+            # Only if the extra words are common articles/prepositions
+            _MINOR_WORDS = {'the', 'a', 'an', 'le', 'la', 'les', 'un', 'une', 'des',
+                            'of', 'de', 'du', 'in', 'at', 'on', 'en', 'dans', 'au', 'aux'}
+            if _n2_stems < _n1_stems:  # t2 is a subset of t1
+                diff = _n1_stems - _n2_stems
+                if diff and all(w in _MINOR_WORDS for w in diff):
+                    # t2 is just t1 without articles — collapse
+                    to_remove.add(t2)
+                    collapse_map[t2] = t1
+                    continue
+    
+    deduped = titles - to_remove
+    return deduped, collapse_map
+
+
+def filter_corpus_titles(
+    raw_titles: Set[str],
+    sparql_works: List[Dict] = None,
+    source_urls_map: Dict[str, List] = None,
+    venue_name: str = "",
+    venue_address: str = "",
+    preferred_language: str = "fr",
+) -> Dict:
+    """Main entry point: classify, dedup, and filter corpus titles.
+    
+    LOCAL-24: Implements the full work-vs-nonwork pipeline:
+    1. Classify each title (work / gallery / excluded)
+    2. Cross-language dedup (prefer local language)
+    3. Near-duplicate collapse
+    4. Return structured result with full audit trail
+    
+    Args:
+        raw_titles: Set of all candidate titles from corpus extraction
+        sparql_works: List of SPARQL work dicts (for cross-lang dedup)
+        source_urls_map: {title: [{source_url, tier}]} provenance map
+        venue_name: Venue name for address detection
+        venue_address: Known venue address string
+        preferred_language: Language preference for cross-lang dedup
+        
+    Returns:
+        dict with:
+            works: set — titles classified as genuine works
+            galleries: set — titles classified as galleries (tagged, not excluded)
+            excluded: list of {title, rule, kind} — rejected entries with audit trail
+            aliases: dict — cross-language alias map (removed → kept)
+            collapsed: dict — near-duplicate collapse map (removed → kept)
+    """
+    if sparql_works is None:
+        sparql_works = []
+    if source_urls_map is None:
+        source_urls_map = {}
+    
+    # Build a set of SPARQL-confirmed titles for the classifier
+    from venue_resolver import build_canonical_titles_from_works
+    sparql_titles = build_canonical_titles_from_works(sparql_works) if sparql_works else set()
+    
+    # Step 1: Classify each title
+    works = set()
+    galleries = set()
+    excluded = []
+    
+    for title in raw_titles:
+        # Get source URLs for this title
+        sources = source_urls_map.get(title, [])
+        urls = [s.get('source_url', '') for s in sources if isinstance(s, dict)]
+        
+        # Is this title SPARQL-confirmed?
+        is_sparql = title in sparql_titles
+        
+        result = classify_corpus_entry(
+            title=title,
+            source_urls=urls,
+            venue_name=venue_name,
+            venue_address=venue_address,
+            sparql_confirmed=is_sparql,
+        )
+        
+        if result['kind'] == 'work':
+            works.add(title)
+        elif result['kind'] == 'gallery':
+            galleries.add(title)
+        else:
+            excluded.append(result)
+    
+    print(f"  [LOCAL-24] Classification: {len(works)} works, {len(galleries)} galleries, "
+          f"{len(excluded)} excluded")
+    for ex in excluded:
+        print(f"    EXCLUDED: '{ex['title']}' — rule: {ex['rule']}")
+    for g in sorted(galleries):
+        print(f"    GALLERY:  '{g}'")
+    
+    # Step 2: Cross-language dedup (on works only)
+    works, lang_aliases = dedup_cross_language(works, sparql_works, preferred_language)
+    if lang_aliases:
+        print(f"  [LOCAL-24] Cross-language dedup removed {len(lang_aliases)}:")
+        for removed, kept in lang_aliases.items():
+            print(f"    '{removed}' → alias of '{kept}'")
+    
+    # Step 3: Near-duplicate collapse (on works)
+    works, collapse_map = dedup_near_duplicates(works)
+    if collapse_map:
+        print(f"  [LOCAL-24] Near-duplicate collapse removed {len(collapse_map)}:")
+        for removed, kept in collapse_map.items():
+            print(f"    '{removed}' → collapsed into '{kept}'")
+    
+    # Also dedup galleries
+    galleries, gallery_collapse = dedup_near_duplicates(galleries)
+    
+    return {
+        'works': works,
+        'galleries': galleries,
+        'excluded': excluded,
+        'aliases': lang_aliases,
+        'collapsed': collapse_map,
+    }
+
+
 # EN↔local bilingual word map for cross-language title matching.
 # SEED map: common art terms as fallback. The primary source is SPARQL label pairs
 # built dynamically per venue (see build_bilingual_map_from_sparql).
@@ -965,6 +1471,24 @@ _BILINGUAL_MAP_SEED = {
     'dance': 'danse', 'danse': 'dance',
     'wave': 'vague', 'vague': 'wave',
     'nude': 'nu', 'window': 'fenetre',
+    # LOCAL-24: Additional bilingual pairs for cross-language dedup
+    'stag': 'daim', 'daim': 'stag',
+    'hind': 'daine', 'daine': 'hind',
+    'deer': 'cerf', 'cerf': 'deer',
+    'symbolizing': 'symbolisant', 'symbolisant': 'symbolizing',
+    'first': 'premier', 'premier': 'first',
+    'sermon': 'sermon',  # cognate
+    'buddha': 'bouddha', 'bouddha': 'buddha',
+    'landscape': 'paysage', 'paysage': 'landscape',
+    'landscapes': 'paysages', 'paysages': 'landscapes',
+    'soul': 'ame', 'ame': 'soul',
+    'voyage': 'voyage',  # cognate
+    'disc': 'disque', 'disque': 'disc',
+    'armchair': 'fauteuil', 'fauteuil': 'armchair',
+    'exile': 'exil', 'exil': 'exile',
+    'prince': 'prince',  # cognate
+    'story': 'geste', 'geste': 'story',
+    'mountain': 'mont', 'mont': 'mountain',
 }
 
 # Active bilingual map — built per-request from SPARQL + seed
