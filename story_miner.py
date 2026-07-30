@@ -291,8 +291,23 @@ def extract_canonical_titles(corpus: str, venue_name: str = "") -> Tuple[Set[str
             'origin of the museum\'s pieces', 'origine des pièces du musée',
             'the museum\'s collections', 'les collections du musée',
             'les collections', 'collections', 'description',
+            # LOCAL-32/33: Additional structural sections (EN and FR Wikipedia)
+            'current use', 'photo gallery', 'photographs', 'images',
+            'notable features', 'selected works', 'permanent collection',
+            'temporary exhibitions', 'the building', 'restoration',
+            'pièces importantes', 'pieces importantes',
+            'usage actuel', 'utilisation actuelle',
+            'galerie de photos', 'galerie photos',
+            'instruments de musique', 'instruments',
         }
+        # LOCAL-32/33: Also detect "bequest/donation/legacy of..." and "highlights of..."
+        # patterns that are structural headings regardless of what follows
+        _is_structural_prefix = bool(re.match(
+            r'^(?:the\s+)?(?:bequest|donation|legacy|highlights?|acquisition|fond[s]?|legs?)\s+(?:of|d[e\'\u2019]|du|des)\s+',
+            section_name, re.IGNORECASE
+        ))
         if (section_name.lower() not in _GENERIC_SECTIONS and
+            not _is_structural_prefix and
             len(section_name) >= 5 and len(section_name) <= 80 and
             not section_name.startswith('http') and
             not re.match(r'^\d+', section_name) and
@@ -330,6 +345,60 @@ def extract_canonical_titles(corpus: str, venue_name: str = "") -> Tuple[Set[str
                 _exhibit_from_quoted.add(name)
             else:
                 print(f"  [T0a] Filtered nav label from list-items: '{name}'")
+
+    # Pattern 7 (LOCAL-33): Named instruments/artworks with maker attribution.
+    # Captures entries in French museum inventory lists like:
+    #   "une sacqueboute ténor d'Anton Schnitzer (Nuremberg, 1581)"
+    #   "une basse de violon de Paolo Antonio Testore (Milan, 1696)"
+    # AND English Wikipedia format:
+    #   "a tenor sackbut by Anton Schnitzer (Nuremberg, 1581)"
+    #   "a bass violin by Paolo Antonio Testore (Milan, 1696)"
+    # Produces titles like "Sacqueboute ténor de Anton Schnitzer (1581)"
+    
+    # French format: un/une/des [type] de/d' [Maker] (City, Year)
+    _maker_attribution_fr = re.compile(
+        r'(?:une?|des|plusieurs)\s+'
+        r'([a-zà-ÿ][a-zà-ÿ\s\-\']{2,30}?)\s+'  # instrument type (lowercase)
+        r'(?:de|d[\'\u2019])\s*'
+        r'([A-ZÀ-Ü][A-Za-zà-ÿ\s\.\-]{3,40}?)'  # Maker name (capitalized)
+        r'\s*\(([A-ZÀ-Ü][a-zà-ÿ]+(?:\s+[a-zà-ÿ]+)?),?\s*'  # City
+        r'(?:v\.\s*)?(\d{4})\s*\)',  # Year
+        re.MULTILINE
+    )
+    # English format: a/an/several [type] by [Maker] (City, Year)
+    _maker_attribution_en = re.compile(
+        r'(?:an?|several|the)\s+'
+        r'([a-z][a-z\s\-\']{2,35}?)\s+'  # instrument type (lowercase)
+        r'by\s+'
+        r'([A-ZÀ-Ü][A-Za-zà-ÿ\s\.\-]{3,40}?)'  # Maker name (capitalized)
+        r'\s*\(([A-ZÀ-Ü][a-zà-ÿ]+(?:\s+[a-zà-ÿ]+)?),?\s*'  # City
+        r'(?:c\.\s*)?(\d{4})\s*\)',  # Year
+        re.MULTILINE
+    )
+    _maker_items_found = 0
+    _seen_makers = set()  # Dedup across FR and EN
+    for pattern in (_maker_attribution_fr, _maker_attribution_en):
+        for match in pattern.finditer(corpus):
+            _instr_type = match.group(1).strip()
+            _maker = match.group(2).strip().rstrip(' ,.')
+            _city = match.group(3).strip()
+            _year = match.group(4)
+            # Skip if instrument type contains structural words
+            if any(w in _instr_type.lower() for w in ('dont', 'celle', 'celui', 'plus', 'célèbres', 'including')):
+                continue
+            # Dedup by maker+year
+            _dedup_key = f"{_maker.lower()}_{_year}"
+            if _dedup_key in _seen_makers:
+                continue
+            _seen_makers.add(_dedup_key)
+            # Build a clean title
+            _clean_type = _instr_type.strip().capitalize()
+            _title = f"{_clean_type} by {_maker} ({_city}, {_year})"
+            if len(_title) >= 15 and len(_maker) >= 4:
+                _exhibit_from_quoted.add(_title)
+                _maker_items_found += 1
+    if _maker_items_found:
+        print(f"  [T0a] Pattern 7 (maker attribution): {_maker_items_found} items")
 
     # Combine exhibit names into canonical_titles
     _exhibit_names = _exhibit_from_sections | _exhibit_from_quoted
@@ -1071,6 +1140,21 @@ def fetch_venue_narrative_corpus(
                             '.mp4', '.mp3', '.wav', '.doc', '.docx', '.xls', '.xlsx')
         
         _base_domain = urlparse(base_site_url).netloc
+        # LOCAL-33: Scope crawl to venue's own section when official_url is a
+        # deep path on a larger portal (e.g., city municipal site). When the URL
+        # has >1 path segment, constrain links to that path prefix.  When it's a
+        # bare domain (or single segment like /fr), allow whole-site crawl.
+        _parsed_base = urlparse(base_site_url)
+        _base_path_segments = [s for s in _parsed_base.path.rstrip('/').split('/') if s]
+        if len(_base_path_segments) > 1:
+            # Deep path: scope to one level above the terminal segment.
+            # e.g. /fr/culture/musees-et-galeries/palais-lascaris-le-palais
+            # → prefix = /fr/culture/musees-et-galeries/palais-lascaris
+            # We use the full path of the base_site_url as the minimum prefix.
+            _crawl_scope_prefix = _parsed_base.path.rstrip('/')
+            print(f"  [LOCAL-33] Deep-path URL detected — crawl scoped to: {_crawl_scope_prefix}*")
+        else:
+            _crawl_scope_prefix = ""  # No scoping — whole site
         _collection_urls = []  # Priority 1: collection/oeuvre pages
         _exhibit_urls = []     # Priority 2: exhibit pages
         _narrative_urls = []   # Priority 3: narrative/history pages
@@ -1090,6 +1174,11 @@ def fetch_venue_narrative_corpus(
                 continue
             if urlparse(full_url).netloc != _base_domain:
                 continue
+            # LOCAL-33: Scope to venue's path prefix on portal sites
+            if _crawl_scope_prefix:
+                _link_path = urlparse(full_url).path.rstrip('/')
+                if not _link_path.startswith(_crawl_scope_prefix):
+                    continue
             if full_url in source_urls:
                 continue
             _href_lower = href.lower()
@@ -1147,6 +1236,11 @@ def fetch_venue_narrative_corpus(
                             continue
                         if _full_link in _seen_urls:
                             continue
+                        # LOCAL-33: Scope to venue's path prefix on portal sites
+                        if _crawl_scope_prefix:
+                            _sub_link_path = urlparse(_full_link).path.rstrip('/')
+                            if not _sub_link_path.startswith(_crawl_scope_prefix):
+                                continue
                         # Skip binary/media files
                         _sub_path = urlparse(_full_link).path.lower()
                         if any(_sub_path.endswith(ext) for ext in _SKIP_EXTENSIONS):
@@ -1475,12 +1569,37 @@ def _normalize(text: str) -> str:
 # but the following are museum-article-specific headings that slip through.
 _WIKI_SECTION_HEADING_PATTERNS = re.compile(
     r"^(?:"
+    # Original patterns (French museum-specific)
     r"origin\s+of\s+the\s+museum|"
     r"the\s+museum['\u2019]?s?\s+collections?|"
     r"history\s+of\s+the\s+(?:museum|collection)|"
     r"collections?\s+(?:of|du|des|de)\s+|"
     r"presentation\s+(?:du|of|des)|"
-    r"(?:the|les?|la)\s+collections?$"
+    r"(?:the|les?|la)\s+collections?$|"
+    # LOCAL-32/33: Generalised structural-heading patterns (EN Wikipedia)
+    r"highlights?\s+of\s+(?:the\s+)?|"  # "Highlights of the Collection"
+    r"current\s+use|"                    # "Current use"
+    r"photo\s+galler(?:y|ies)|"          # "Photo gallery"
+    r"(?:the\s+)?bequest\s+of\s+|"       # "The bequest of the collection of..."
+    r"(?:the\s+)?donation\s+of\s+|"      # "The donation of..."
+    r"notable\s+(?:works?|pieces?|items?|features?)|"
+    r"(?:the\s+)?building|"              # "The building"
+    r"external\s+links?|see\s+also|references?|further\s+reading|"
+    r"(?:the\s+)?permanent\s+collection|"
+    r"temporary\s+exhibitions?|"
+    r"selected\s+works?|"
+    r"list\s+of\s+|"
+    r"description\s+of\s+|"
+    # LOCAL-32/33: Generalised structural-heading patterns (FR Wikipedia)
+    r"pi[eè]ces?\s+importantes?|"        # "Pièces importantes"
+    r"legs?\s+(?:d[e'\u2019]|du|des)|"   # "Legs d'Antoine Gautier"
+    r"(?:la\s+)?collection\s+(?:d[e'\u2019]|du|des)|"
+    r"usage\s+actuel|utilisation\s+actuelle|"  # "Current use" in FR
+    r"galerie\s+(?:de\s+)?photos?|"      # "Photo gallery" in FR
+    r"(?:le\s+)?b[aâ]timent|"            # "Le bâtiment" (The building)
+    r"(?:les?\s+)?instruments?\s+(?:de\s+musique|anciens?)|"  # nav for instrument museums
+    r"liens?\s+externes?|voir\s+aussi|"
+    r"(?:les?\s+)?(?:fonds?|donations?)\s+(?:d[e'\u2019]|du|des)"
     r")", re.IGNORECASE
 )
 
@@ -1577,6 +1696,103 @@ _MUSEUM_META_PATTERNS = re.compile(
 )
 
 
+# --- Rule 9 (LOCAL-32/33): Structural heading detection ---
+# Vocabulary of generic nouns that appear in document section headings.
+# A title composed ENTIRELY of these words (possibly with articles/prepositions)
+# is structural rather than a named artwork.
+_STRUCTURAL_HEADING_NOUNS_EN = {
+    'use', 'history', 'background', 'overview', 'description', 'introduction',
+    'highlights', 'collection', 'collections', 'gallery', 'galleries',
+    'bequest', 'donation', 'legacy', 'acquisition', 'acquisitions',
+    'architecture', 'building', 'restoration', 'renovation',
+    'importance', 'significance', 'features', 'notable', 'current',
+    'photo', 'photos', 'photograph', 'photographs', 'images',
+    'instruments', 'objects', 'pieces', 'items', 'works', 'artwork',
+    'rooms', 'floors', 'layout', 'plan', 'map',
+    'exhibitions', 'exhibition', 'display', 'displays',
+    'references', 'bibliography', 'sources', 'links', 'notes',
+}
+
+_STRUCTURAL_HEADING_NOUNS_FR = {
+    'usage', 'utilisation', 'histoire', 'contexte', 'aperçu', 'description',
+    'introduction', 'présentation', 'presentation',
+    'points', 'forts',  # "points forts" = highlights
+    'collection', 'collections', 'galerie', 'galeries',
+    'legs', 'donation', 'donations', 'fonds', 'acquisition', 'acquisitions',
+    'architecture', 'bâtiment', 'batiment', 'restauration', 'rénovation',
+    'importance', 'pièces', 'pieces', 'importantes', 'remarquables',
+    'photo', 'photos', 'photographie', 'photographies', 'images',
+    'instruments', 'objets', 'œuvres', 'oeuvres',
+    'salles', 'étages', 'plan', 'carte',
+    'expositions', 'exposition', 'vitrines',
+    'références', 'references', 'bibliographie', 'sources', 'liens', 'notes',
+    'recueil', 'délibération', 'deliberation', 'télécharger', 'telecharger',
+}
+
+_STRUCTURAL_HEADING_ALL = _STRUCTURAL_HEADING_NOUNS_EN | _STRUCTURAL_HEADING_NOUNS_FR
+
+# Articles and prepositions that are structural filler (don't signal artwork content)
+_STRUCTURAL_FILLER_WORDS = {
+    'the', 'a', 'an', 'of', 'and', 'in', 'at', 'on', 'for', 'to', 'from', 'with',
+    'le', 'la', 'les', 'l', "l'", 'un', 'une', 'des', 'de', 'du', 'd', "d'",
+    'et', 'en', 'dans', 'au', 'aux', 'par', 'pour', 'sur', 'avec',
+}
+
+
+def _is_structural_heading(title: str) -> bool:
+    """Detect structural/navigational headings by composition analysis.
+    
+    LOCAL-32/33: A title is structural if:
+    1. It is short (≤6 words excluding articles/prepositions)
+    2. ALL its content words are from the structural vocabulary
+    3. It lacks artwork-specific signals (dates, artist names, medium keywords)
+    
+    This catches headings like "Current use", "Photo gallery", "Pièces importantes",
+    "Highlights of the Collection" without needing venue-specific phrase lists.
+    """
+    words = title.strip().lower().split()
+    if not words or len(words) > 8:
+        return False  # Too long to be a structural heading
+    
+    # Don't exclude single-word titles here (handled by bare_generic_noun rule)
+    if len(words) == 1:
+        return False
+    
+    # Check for artwork-specific signals that override structural classification
+    has_artwork_signal = bool(
+        _YEAR_PATTERN.search(title) or
+        _MEDIUM_SIGNAL.search(title) or
+        _ARTWORK_TITLE_SIGNAL.search(title)
+    )
+    if has_artwork_signal:
+        return False
+    
+    # Check if title contains a proper noun (capitalized word that isn't a known heading word)
+    # Proper nouns suggest a named artwork, person, or place
+    original_words = title.strip().split()
+    for w in original_words:
+        # Skip first word (always capitalized) and articles
+        if w == original_words[0]:
+            continue
+        if w.lower() in _STRUCTURAL_FILLER_WORDS:
+            continue
+        # If a word is capitalized AND not in our structural vocabulary, it's likely
+        # a proper noun (person, place, artwork name) — keep the title
+        if w[0].isupper() and w.lower() not in _STRUCTURAL_HEADING_ALL:
+            return False
+    
+    # Extract content words (excluding articles/prepositions)
+    content_words = [w for w in words if w not in _STRUCTURAL_FILLER_WORDS]
+    
+    if not content_words:
+        return False
+    
+    # ALL content words must be structural vocabulary
+    all_structural = all(w in _STRUCTURAL_HEADING_ALL for w in content_words)
+    
+    return all_structural
+
+
 def classify_corpus_entry(
     title: str,
     source_urls: List[str] = None,
@@ -1661,6 +1877,16 @@ def classify_corpus_entry(
     # Rule 8 (LOCAL-28): Bare generic nouns — single common nouns without artwork signals
     if is_bare_generic_noun(title):
         return {"kind": "excluded", "rule": "bare_generic_noun", "title": title}
+    
+    # Rule 9 (LOCAL-32/33): Structural heading detection — short generic phrases that
+    # describe document structure rather than specific artworks.
+    if _is_structural_heading(title):
+        return {"kind": "excluded", "rule": "structural_heading", "title": title}
+    
+    # Rule 10 (LOCAL-32/33): Navigational labels — catches nav/admin labels that
+    # slipped through earlier rules
+    if _is_navigational_label(title):
+        return {"kind": "excluded", "rule": "navigational_label", "title": title}
     
     # Default: if it passed all exclusion rules, it's a work
     return {"kind": "work", "rule": "default_pass", "title": title}
