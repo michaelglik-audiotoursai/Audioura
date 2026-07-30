@@ -4306,12 +4306,15 @@ CONTEXTUAL INFORMATION (use as background only — do NOT assert these as facts 
 MANDATORY INCLUSION — work this surprising detail into the description naturally:
 {_surprising}
 """
-        # [C5-1] [LOCAL-29 Fix A] Inject BOUNDED per-work catalogue metadata as grounding.
-        # Previously this did a raw keyword search over the entire combined corpus,
-        # which caused metadata from adjacent catalogue entries to bleed into the
-        # wrong stop (e.g., Kannon's XIIe siècle leaking into Ganesh's stop).
-        # Now we use ONLY the properly-bounded per_work_contexts (which are keyed
-        # per-title from the catalogue parser) plus the evidence_log metadata fields.
+        # [C5-1] [LOCAL-29 Fix A] [LOCAL-31 Fix] Inject BOUNDED per-work catalogue metadata.
+        # LOCAL-29 fixed the extraction boundaries. LOCAL-31 fixes the injection to be
+        # structurally binding: period and material are injected as HARD constraints that
+        # GPT must include verbatim, not as soft "GROUNDED FACTS" that it can ignore.
+        # Also: origin/provenance is now injected with explicit framing rules to prevent
+        # the model from asserting unsourced cultural identity.
+        _c51_period = None
+        _c51_material = None
+        _c51_origin = None
         if tour_category == 'museum' and poi_name:
             _c51_grounded = []
             # Source 1: evidence_log catalogue metadata (period, material, origin) — per-work
@@ -4319,11 +4322,11 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 _ev = _d1_evidence_log[poi_name]
                 if isinstance(_ev, dict) and _ev.get('method') == 'catalogue_work':
                     if _ev.get('period'):
-                        _c51_grounded.append(f"Period/Date: {_ev['period']}")
+                        _c51_period = _ev['period']
                     if _ev.get('material'):
-                        _c51_grounded.append(f"Material/Medium: {_ev['material']}")
+                        _c51_material = _ev['material']
                     if _ev.get('origin'):
-                        _c51_grounded.append(f"Origin/Provenance: {_ev['origin']}")
+                        _c51_origin = _ev['origin']
             # Source 2: per_work_contexts (bounded by catalogue section boundaries)
             if _story_corpus_result and _story_corpus_result.get('per_work_contexts'):
                 _pwc = _story_corpus_result['per_work_contexts']
@@ -4335,9 +4338,38 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                             or _poi_norm == _title_norm):
                         _c51_grounded.extend(s[:200] for s in _sents[:3])
                         break
-            if _c51_grounded:
-                _grounded_facts = '. '.join(_c51_grounded)
-                description_prompt += f"\nGROUNDED FACTS FROM MUSEUM SOURCES (use these dates/details as MANDATORY content — these are verified for THIS SPECIFIC WORK only):\n{_grounded_facts}\n"
+
+            # [LOCAL-31] Build the hard-binding injection block.
+            # Period and material are MANDATORY VERBATIM inclusions.
+            # Origin is framed as catalogued geographic attribution, not cultural identity.
+            if _c51_period or _c51_material or _c51_origin or _c51_grounded:
+                _binding_block = "\n--- CATALOGUE RECORD FOR THIS SPECIFIC WORK (from the museum's own documentation) ---\n"
+                if _c51_period:
+                    _binding_block += f"DATE/PERIOD: {_c51_period}\n"
+                    _binding_block += f'  → You MUST state this date in the description. Say "{_c51_period}" or its English equivalent. Do NOT use any other century or date.\n'
+                if _c51_material:
+                    _binding_block += f"MATERIAL: {_c51_material}\n"
+                    _binding_block += f'  → You MUST mention "{_c51_material}" in the description. This is verified — do not substitute another material.\n'
+                if _c51_origin:
+                    _binding_block += f"CATALOGUED REGION: {_c51_origin}\n"
+                    _binding_block += (
+                        f'  → The museum catalogues this as originating from the {_c51_origin} region. '
+                        f'You may mention this geographic origin IF you frame it as the catalogue\'s attribution '
+                        f'(e.g., "catalogued as originating from {_c51_origin}"). '
+                        f'Do NOT assert cultural identity (no "Bengali artwork", no "Bengali culture") — '
+                        f'state only what the catalogue states. If you are uncertain, omit provenance entirely.\n'
+                    )
+                if _c51_grounded:
+                    _binding_block += "ADDITIONAL CONTEXT:\n" + '. '.join(_c51_grounded) + "\n"
+                _binding_block += "--- END CATALOGUE RECORD ---\n"
+                _binding_block += (
+                    "HARD RULES:\n"
+                    "1. The DATE/PERIOD above is the ONLY correct date for this work. Any other century is WRONG.\n"
+                    "2. The MATERIAL above MUST appear in your description.\n"
+                    "3. Do NOT invent provenance, cultural identity, or geographic origin beyond what is stated above.\n"
+                    "4. If the catalogue gives no origin, you must not assert one.\n"
+                )
+                description_prompt += _binding_block
         
         # [§4] Story element injection — per-work facts from story_elements
         # [LOCAL-29] Tightened matching: use [:10] prefix AND require >= 60% word overlap
@@ -4537,6 +4569,144 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                             # All retries exhausted — produce honest short description, never ship placeholder
                             print(f"  [LOCAL-26] Stop {stop_num}: placeholder leak persists after {_max_retries+1} attempts, using fallback")
                             description = f"{poi_name} — an exhibit at this venue. Detailed information was not available at generation time."
+
+                    # [LOCAL-31] Post-generation metadata binding validation.
+                    # If the catalogue record specified a period or material, verify
+                    # they actually appear in the generated description. If not:
+                    # - Wrong period (adjacent entry's date) → retry with emphasis
+                    # - Missing material → patch it into the text
+                    if _c51_period or _c51_material:
+                        _desc_lower = description.lower()
+                        # Check period: extract century number from catalogue period
+                        _period_ok = True
+                        if _c51_period:
+                            # Extract the core period identifier for checking
+                            import re as _re31
+                            _century_match = _re31.search(r'((?:I{1,3}|IV|VI{0,3}|IX|X{0,3}I{0,3}V?)e)\s+si[eè]cle', _c51_period)
+                            if _century_match:
+                                _expected_century = _century_match.group(1).lower()
+                                # Check if this century appears OR its Arabic equivalent
+                                _roman_to_arabic = {'ie': '1', 'iie': '2', 'iiie': '3', 'ive': '4',
+                                                    've': '5', 'vie': '6', 'viie': '7', 'viiie': '8',
+                                                    'ixe': '9', 'xe': '10', 'xie': '11', 'xiie': '12',
+                                                    'xiiie': '13', 'xive': '14', 'xve': '15', 'xvie': '16',
+                                                    'xviie': '17', 'xviiie': '18', 'xixe': '19', 'xxe': '20'}
+                                _arabic_century = _roman_to_arabic.get(_expected_century, '')
+                                _ordinal_variants = []
+                                if _arabic_century:
+                                    _ordinal_variants = [
+                                        f"{_arabic_century}th century", f"{_arabic_century}th-century",
+                                        f"{_arabic_century}th cent",
+                                    ]
+                                    # Special ordinals
+                                    if _arabic_century == '1': _ordinal_variants.extend(['1st century', '1st-century'])
+                                    elif _arabic_century == '2': _ordinal_variants.extend(['2nd century', '2nd-century'])
+                                    elif _arabic_century == '3': _ordinal_variants.extend(['3rd century', '3rd-century'])
+                                _period_found = (
+                                    _expected_century in _desc_lower or
+                                    _c51_period.lower() in _desc_lower or
+                                    any(v in _desc_lower for v in _ordinal_variants)
+                                )
+                                if not _period_found:
+                                    _period_ok = False
+                                    # Check if a WRONG century appears (cross-contamination)
+                                    _wrong_century = _re31.search(r'(\d{1,2})(?:st|nd|rd|th)[\s-]century', _desc_lower)
+                                    if _wrong_century and _wrong_century.group(1) != _arabic_century:
+                                        print(f"  [LOCAL-31] Stop {stop_num}: WRONG CENTURY detected "
+                                              f"(got {_wrong_century.group(1)}th, expected {_arabic_century}th). Retrying...")
+                                        if _attempt < _max_retries:
+                                            continue  # retry will re-emphasize the correct period
+                                    else:
+                                        print(f"  [LOCAL-31] Stop {stop_num}: catalogue period '{_c51_period}' missing from description.")
+
+                        # Check material
+                        _material_ok = True
+                        if _c51_material:
+                            _mat_lower = _c51_material.lower()
+                            if _mat_lower not in _desc_lower:
+                                _material_ok = False
+                                print(f"  [LOCAL-31] Stop {stop_num}: catalogue material '{_c51_material}' missing from description.")
+
+                        # [LOCAL-31] Patch missing material/period into the description
+                        # Rather than burning a full retry (expensive, may still fail),
+                        # insert a factual sentence at the start of the description body.
+                        if not _period_ok or not _material_ok:
+                            _patch_parts = []
+                            if not _material_ok and _c51_material:
+                                _patch_parts.append(f"crafted in {_c51_material}")
+                            if not _period_ok and _c51_period:
+                                _patch_parts.append(f"dating from the {_c51_period}")
+                                # Also fix any WRONG century that was detected in the text
+                                if _arabic_century:
+                                    # Replace wrong ordinal century with correct one
+                                    _wrong_ordinal = _re31.compile(
+                                        r'\b\d{1,2}(?:st|nd|rd|th)[\s-]century',
+                                        _re31.IGNORECASE
+                                    )
+                                    _correct_ordinal = f"{_arabic_century}th-century"
+                                    if _arabic_century == '1': _correct_ordinal = "1st-century"
+                                    elif _arabic_century == '2': _correct_ordinal = "2nd-century"
+                                    elif _arabic_century == '3': _correct_ordinal = "3rd-century"
+                                    description = _wrong_ordinal.sub(_correct_ordinal, description)
+                            if _patch_parts:
+                                _patch_sentence = f"This work, {', '.join(_patch_parts)}, "
+                                # Insert after first sentence
+                                _first_period_idx = description.find('. ')
+                                if _first_period_idx > 20:
+                                    description = (description[:_first_period_idx + 2]
+                                                   + _patch_sentence
+                                                   + description[_first_period_idx + 2:].lstrip())
+                                else:
+                                    description = _patch_sentence + description[0].lower() + description[1:]
+                                print(f"  [LOCAL-31] Stop {stop_num}: patched missing metadata into description.")
+
+                        # [LOCAL-31] Check for unsourced provenance assertion
+                        # If no origin in catalogue, but description asserts one, flag it
+                        if not _c51_origin:
+                            # No catalogue origin — check if model invented one
+                            _provenance_assertions = _re31.findall(
+                                r'\b(Bengali|Indian|Chinese|Japanese|Thai|Cambodian|'
+                                r'Vietnamese|Burmese|Tibetan|Nepalese|Korean)\s+'
+                                r'(?:artwork|art|culture|tradition|heritage|civilization)',
+                                description, _re31.IGNORECASE
+                            )
+                            if _provenance_assertions:
+                                print(f"  [LOCAL-31] Stop {stop_num}: UNSOURCED PROVENANCE "
+                                      f"'{_provenance_assertions[0]}' — removing assertion.")
+                                for _pa in _provenance_assertions:
+                                    # Replace "Bengali artwork" → "this artwork"
+                                    description = _re31.sub(
+                                        rf'\b{_re31.escape(_pa)}\s+(artwork|art|culture|tradition|heritage|civilization)',
+                                        r'this \1',
+                                        description, flags=_re31.IGNORECASE
+                                    )
+                        elif _c51_origin:
+                            # Has catalogue origin — check if model over-asserted it as cultural identity
+                            # Map French catalogue origin names to their English adjective forms
+                            _origin_adjective_map = {
+                                'bengale': 'bengali', 'bihar': 'bihari', 'japon': 'japanese',
+                                'chine': 'chinese', 'inde': 'indian', 'corée': 'korean',
+                                'cambodge': 'cambodian', 'thaïlande': 'thai', 'vietnam': 'vietnamese',
+                                'birmanie': 'burmese', 'tibet': 'tibetan', 'népal': 'nepalese',
+                                'indonésie': 'indonesian', 'rajasthan': 'rajasthani',
+                                'tamil nadu': 'tamil', 'gandhara': 'gandharan',
+                            }
+                            _origin_lower = _c51_origin.lower()
+                            _adj_form = _origin_adjective_map.get(_origin_lower, _origin_lower + 'i')
+                            # Check for over-assertion patterns: "Bengali culture", "ancient Bengali artwork"
+                            _identity_pattern = _re31.compile(
+                                rf'\b(?:ancient\s+)?{_re31.escape(_adj_form)}\s+'
+                                r'(?:culture|civilization|heritage|tradition|artistic\s+tradition)',
+                                _re31.IGNORECASE
+                            )
+                            _identity_assertions = _identity_pattern.findall(description)
+                            if _identity_assertions:
+                                print(f"  [LOCAL-31] Stop {stop_num}: over-asserted origin "
+                                      f"'{_identity_assertions[0]}' — softening to catalogued attribution.")
+                                description = _identity_pattern.sub(
+                                    f"the artistic traditions of the {_c51_origin} region",
+                                    description
+                                )
 
                     word_count = len(description.split())
                     print(f"Stop {stop_num} description word count: {word_count} words")
