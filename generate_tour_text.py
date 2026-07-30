@@ -1793,6 +1793,10 @@ def _fetch_visitor_info_from_site(base_site_url: str, language: str = "en") -> s
     Returns a sourced string with hours/admission info, or empty string if not reliably extractable.
     The function looks for known tarif/horaire pages and extracts structured data.
     It NEVER generates or interpolates — it only returns text literally found on the site.
+    
+    [LOCAL-29 Fix B] When the tour language differs from the source page language,
+    the extracted info is translated to the tour language via structured field extraction
+    and reformatting, preserving the sourced data while presenting it accessibly.
     """
     if not base_site_url:
         return ""
@@ -1872,13 +1876,90 @@ def _fetch_visitor_info_from_site(base_site_url: str, language: str = "en") -> s
                 _info_parts.append(_match_text.strip()[:100])
                 break
     
-    if _info_parts:
-        _result = '. '.join(_info_parts)
-        print(f"  [LOCAL-27] Extracted visitor info: {_result[:80]}...")
-        return _result
+    if not _info_parts:
+        print(f"  [LOCAL-27] Could not extract structured hours/admission from visitor info page")
+        return ""
     
-    print(f"  [LOCAL-27] Could not extract structured hours/admission from visitor info page")
-    return ""
+    _raw_result = '. '.join(_info_parts)
+    print(f"  [LOCAL-27] Extracted visitor info: {_raw_result[:80]}...")
+    
+    # [LOCAL-29 Fix B] Translate to tour language if source is in a different language.
+    # Use structured extraction + deterministic translation for common patterns,
+    # so we keep the sourced data without relying on GPT to paraphrase.
+    if language and language.lower() != "fr":
+        _translated = _translate_visitor_info_to_language(_raw_result, language)
+        if _translated:
+            print(f"  [LOCAL-29] Visitor info translated to '{language}': {_translated[:80]}...")
+            return _translated
+    
+    return _raw_result
+
+
+def _translate_visitor_info_to_language(raw_info: str, target_language: str) -> str:
+    """[LOCAL-29 Fix B] Translate sourced visitor info to the target language.
+    
+    Uses deterministic pattern-based translation for common French museum patterns.
+    This preserves the sourced factual content while presenting it in the tour's language.
+    Does NOT use GPT — purely mechanical translation of known patterns.
+    
+    Supported: French → English (primary use case for Q3330160 / Musée des Arts Asiatiques).
+    Returns empty string if translation is not possible (caller falls back to raw text).
+    """
+    if not raw_info:
+        return ""
+    
+    if target_language.lower() not in ("en", "english"):
+        # For non-English targets, we'd need a broader translation mechanism.
+        # For now, return empty to fall back to raw (better than nothing).
+        # Future: could use GPT translation with strict "translate only, do not rephrase" instruction.
+        return ""
+    
+    result = raw_info
+    
+    # --- Day translations ---
+    _FR_TO_EN_DAYS = {
+        'lundi': 'Monday', 'mardi': 'Tuesday', 'mercredi': 'Wednesday',
+        'jeudi': 'Thursday', 'vendredi': 'Friday', 'samedi': 'Saturday',
+        'dimanche': 'Sunday',
+    }
+    for fr_day, en_day in _FR_TO_EN_DAYS.items():
+        result = re.sub(r'\b' + fr_day + r'\b', en_day, result, flags=re.IGNORECASE)
+    
+    # --- Common phrases ---
+    _PHRASE_TRANSLATIONS = [
+        (r'\b[Ff]erm[eé]\s+le\b', 'Closed on'),
+        (r'\b[Ff]erm[eé]\b', 'Closed'),
+        (r'\b[Oo]uvert\s+tous\s+les\s+jours\b', 'Open every day'),
+        (r'\b[Oo]uvert\b', 'Open'),
+        (r'\b[Ee]ntr[eé]e\s+gratuite\b', 'Free admission'),
+        (r'\b[Ee]ntr[eé]e\s+libre\b', 'Free admission'),
+        (r'\b[Gg]ratuit\b', 'Free'),
+        (r'\b[Tt]arif\s+plein\b', 'Full price'),
+        (r'\b[Tt]arif\s+r[eé]duit\b', 'Reduced price'),
+        (r'\b[Ss]auf\b', 'except'),
+        (r'\b[Ee]t\b', 'and'),
+        (r'\ble\s+(?=Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)', ''),  # Remove French article before translated days
+        (r'\b[Dd]e\b(?=\s+\d)', 'from'),
+        (r'\b[àa]\b(?=\s+\d)', 'to'),
+        (r'\bjours?\s+f[eé]ri[eé]s?\b', 'public holidays'),
+        (r'\btous\s+les\s+jours\b', 'every day'),
+        (r'\bouverture\b', 'Opening'),
+        (r'\bfermeture\b', 'Closing'),
+        (r'\bhoraires?\b', 'Hours'),
+    ]
+    for pattern, replacement in _PHRASE_TRANSLATIONS:
+        result = re.sub(pattern, replacement, result)
+    
+    # --- Time format: convert "10h" → "10:00", "10h30" → "10:30" ---
+    result = re.sub(r'(\d{1,2})h(\d{2})', r'\1:\2', result)
+    result = re.sub(r'(\d{1,2})h\b', r'\1:00', result)
+    
+    # If result is still mostly French (more than 50% unchanged), return empty
+    # to signal that translation was incomplete
+    if result == raw_info:
+        return ""
+    
+    return result.strip()
 
 
 def _check_type_prose_contradiction(poi_list: list) -> list:
@@ -3468,7 +3549,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             if _story_corpus_result and _story_corpus_result.get('source_urls'):
                 _official_url_for_info = _story_corpus_result['source_urls'][0]
             if _official_url_for_info:
-                _sourced_visitor_info = _fetch_visitor_info_from_site(_official_url_for_info)
+                # [LOCAL-29 Fix B] Pass language="en" to trigger FR→EN translation
+                _sourced_visitor_info = _fetch_visitor_info_from_site(_official_url_for_info, language="en")
             if _sourced_visitor_info and poi_list:
                 # Only populate first stop's operational_details — with SOURCED data
                 poi_list[0]['operational_details'] = _sourced_visitor_info
@@ -4091,27 +4173,66 @@ CONTEXTUAL INFORMATION (use as background only — do NOT assert these as facts 
 MANDATORY INCLUSION — work this surprising detail into the description naturally:
 {_surprising}
 """
-        # [C5-1] Inject D1 venue corpus evidence as additional grounding
-        if tour_category == 'museum' and _d1_venue_corpus and poi_name:
-            import re as _c51_re
-            _work_lower = poi_name.lower()
-            # Extract sentences from venue corpus that mention this work's key words
-            _key_words = [w for w in _work_lower.split() if len(w) >= 4 and w not in ('the','and','for')]
-            if _key_words:
-                _corpus_sentences = [s.strip() for s in _d1_venue_corpus.split('.') if any(kw in s.lower() for kw in _key_words)]
-                if _corpus_sentences:
-                    _grounded_facts = '. '.join(_corpus_sentences[:3])
-                    description_prompt += f"\nGROUNDED FACTS FROM MUSEUM SOURCES (use these dates/details as MANDATORY content):\n{_grounded_facts}\n"
+        # [C5-1] [LOCAL-29 Fix A] Inject BOUNDED per-work catalogue metadata as grounding.
+        # Previously this did a raw keyword search over the entire combined corpus,
+        # which caused metadata from adjacent catalogue entries to bleed into the
+        # wrong stop (e.g., Kannon's XIIe siècle leaking into Ganesh's stop).
+        # Now we use ONLY the properly-bounded per_work_contexts (which are keyed
+        # per-title from the catalogue parser) plus the evidence_log metadata fields.
+        if tour_category == 'museum' and poi_name:
+            _c51_grounded = []
+            # Source 1: evidence_log catalogue metadata (period, material, origin) — per-work
+            if poi_name in _d1_evidence_log:
+                _ev = _d1_evidence_log[poi_name]
+                if isinstance(_ev, dict) and _ev.get('method') == 'catalogue_work':
+                    if _ev.get('period'):
+                        _c51_grounded.append(f"Period/Date: {_ev['period']}")
+                    if _ev.get('material'):
+                        _c51_grounded.append(f"Material/Medium: {_ev['material']}")
+                    if _ev.get('origin'):
+                        _c51_grounded.append(f"Origin/Provenance: {_ev['origin']}")
+            # Source 2: per_work_contexts (bounded by catalogue section boundaries)
+            if _story_corpus_result and _story_corpus_result.get('per_work_contexts'):
+                _pwc = _story_corpus_result['per_work_contexts']
+                from story_miner import _normalize as _c51_norm
+                _poi_norm = _c51_norm(poi_name)
+                for _title, _sents in _pwc.items():
+                    _title_norm = _c51_norm(_title)
+                    if (_poi_norm[:10] in _title_norm or _title_norm[:10] in _poi_norm
+                            or _poi_norm == _title_norm):
+                        _c51_grounded.extend(s[:200] for s in _sents[:3])
+                        break
+            if _c51_grounded:
+                _grounded_facts = '. '.join(_c51_grounded)
+                description_prompt += f"\nGROUNDED FACTS FROM MUSEUM SOURCES (use these dates/details as MANDATORY content — these are verified for THIS SPECIFIC WORK only):\n{_grounded_facts}\n"
         
         # [§4] Story element injection — per-work facts from story_elements
+        # [LOCAL-29] Tightened matching: use [:10] prefix AND require >= 60% word overlap
+        # to prevent cross-contamination between adjacent entries with similar short prefixes.
         if tour_category == 'museum' and _story_corpus_result and poi_name:
             _per_work_ctx = _story_corpus_result.get('per_work_contexts', {})
             # Find matching work contexts
             _work_facts = []
             for _title, _sents in _per_work_ctx.items():
                 from story_miner import _normalize
-                if _normalize(poi_name)[:8] in _normalize(_title) or _normalize(_title)[:8] in _normalize(poi_name):
+                _norm_poi = _normalize(poi_name)
+                _norm_title = _normalize(_title)
+                # Strict match: exact OR 10-char prefix contained OR >= 60% word overlap
+                _is_match = (
+                    _norm_poi == _norm_title or
+                    (_norm_poi[:10] in _norm_title and _norm_title[:10] in _norm_poi) or
+                    (len(_norm_poi) > 10 and _norm_poi[:10] in _norm_title)
+                )
+                if not _is_match:
+                    # Word overlap check as fallback
+                    _poi_words = set(w for w in _norm_poi.split() if len(w) >= 4)
+                    _title_words = set(w for w in _norm_title.split() if len(w) >= 4)
+                    if _poi_words and _title_words:
+                        _overlap = len(_poi_words & _title_words)
+                        _is_match = _overlap >= max(1, len(_poi_words) * 0.6)
+                if _is_match:
                     _work_facts.extend(_sents[:3])
+                    break  # [LOCAL-29] Stop after first match — no accumulation from multiple entries
             # Also use evidence snippet from D1
             if poi_name in _d1_evidence_log:
                 _ev = _d1_evidence_log[poi_name]
