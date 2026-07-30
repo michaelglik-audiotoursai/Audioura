@@ -2972,3 +2972,47 @@ status each) + 12 calls for LOCAL-1 through LOCAL-12 (one `create_task` each, wi
 `status=complete` set directly at creation instead of a separate `update_task` call —
 cheaper than originally budgeted). Total: 18 API calls, vs. the ~42 originally
 estimated. wdvrdawdje required no action (no drift while offline).
+
+---
+
+#### LOCAL-23 — Multi-source corpus expansion with a trust hierarchy
+
+**Agent:** Mac Mini Kiro · **Branch:** `kiro/local23-multi-source-corpus`
+**Dispatched:** 2026-07-29 ~21:2x · **Priority:** high
+**ClickUp:** NOT POSTED — API rate-limited (~253 min) at dispatch time.
+Post to 🟦 Services — Kiro when the limit clears; this file is the record.
+
+**Origin:** Michael's directive after seeing the venue resolve to only 6
+canonical titles — *"there are more than 6 works in that museum... I can go
+to Google and google them."* Confirmed correct: the 6 is an artifact of how
+little we look, not a fact about the museum.
+
+**Confirmed causes (LEAD):**
+1. `story_miner.py:458` hard-caps the site crawl at 5 pages
+   (`for url in _ordered_urls[:5]`) regardless of site size.
+2. Poor page-type prioritisation — 4 of 6 fetched pages were
+   agenda/publications listings; only `/les-oeuvres-commentees` was
+   collection content. Several resulting "works" are exhibition titles
+   (`l'art en exil - Hàm Nghi...`) or bare nouns (`disque`, `fauteuil`).
+3. Joconde/POP (`pop.culture.gouv.fr`) is NEVER queried — present in the
+   codebase only inside test fixtures, where it is already registered as a
+   trusted tier-1 domain. For a French public museum this is the
+   authoritative catalogue.
+
+**Trust order (Michael):** Tier 1 = Wikipedia + the museum's own official
+site, co-equal. Tier 2 = other institutional sources (Joconde/POP etc.).
+Most famous works first. Keep searching until the customer's requested stop
+count is satisfiable. **If titles cannot be verified, keep the smaller set**
+— a larger corpus must never become a fabrication vector.
+
+**Why it matters:** R4 replenishment (fixed in LOCAL-19, merged @ 04e726d)
+verifies candidates against the corpus, so it can never exceed corpus size.
+On this venue it currently finds nothing because all 6 titles were already
+in use. Expanding the corpus is what makes R4 useful here and makes an
+honest 8-stop tour — and Michael's 75-score gate — achievable.
+
+**Scope note:** confined to `story_miner.py` / `venue_resolver.py` to avoid
+conflicting with LOCAL-21 and LOCAL-22, which both touch
+`generate_tour_text.py`.
+
+**Submission:** `SUBMISSION_LOCAL-23.md` in the task's worktree.
