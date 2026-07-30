@@ -4192,6 +4192,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     _storied_spine = None
     _storied_fact_sheets = None
     _saved_prolog = ""  # [R2] Prolog text to be folded into Stop 1 (no standalone Introduction block)
+    _three_class_results = {}  # [LOCAL-37] poi_name → three-class retrieval result
+    _diversity_adjusted_selections = {}  # [LOCAL-37] poi_name → diversity-adjusted element selection
     if _storied_mode:
         print(f"\n[Storied] STORIED_MODE=true — generating spine + fact sheets...")
         try:
@@ -4237,6 +4239,51 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     print(f"  [§3] story_element_extractor not available")
                 except Exception as _se_err:
                     print(f"  [§3] Story element extraction error: {_se_err}")
+
+            # [LOCAL-37] Three-class retrieval: tag elements + fetch category context
+            _three_class_results = {}  # poi_name → retrieval result
+            try:
+                from three_class_retrieval import (
+                    retrieve_three_classes_for_stop, tag_elements_by_class,
+                    compute_tour_class_balance, CLASS_DETAILS, CLASS_HISTORIC, CLASS_SOCIAL,
+                )
+                
+                # Tag existing story elements by class
+                if _story_elements:
+                    _story_elements = tag_elements_by_class(_story_elements)
+                
+                # Retrieve category-level context for each stop (free path only)
+                _catalogue_works = (_story_corpus_result.get('catalogue_works', [])
+                                    if _story_corpus_result else [])
+                _per_work_ctx = (_story_corpus_result.get('per_work_contexts', {})
+                                 if _story_corpus_result else {})
+                _venue_lang = 'en'
+                if _d1v2_result and hasattr(_d1v2_result, 'language'):
+                    _venue_lang = _d1v2_result.language or 'en'
+                
+                for poi in poi_list:
+                    _stop_dict = {
+                        'name': poi.get('name', ''),
+                        'canonical_title': poi.get('name', ''),
+                        'artist': artist if 'artist' in dir() else '',
+                    }
+                    _tcr = retrieve_three_classes_for_stop(
+                        _stop_dict,
+                        per_work_contexts=_per_work_ctx,
+                        catalogue_works=_catalogue_works,
+                        language=_venue_lang,
+                    )
+                    _three_class_results[poi.get('name', '')] = _tcr
+                    if _tcr.get('category'):
+                        print(f"  [LOCAL-37] {poi.get('name', '')[:30]}: category='{_tcr['category']}' "
+                              f"has_context={bool(_tcr.get('category_context', {}).get(CLASS_HISTORIC, ''))}")
+                
+                print(f"  [LOCAL-37] Three-class retrieval: {len(_three_class_results)} stops processed, "
+                      f"{sum(1 for v in _three_class_results.values() if v.get('category'))} with category")
+            except ImportError as _tcr_err:
+                print(f"  [LOCAL-37] three_class_retrieval not available: {_tcr_err}")
+            except Exception as _tcr_err:
+                print(f"  [LOCAL-37] Three-class retrieval error (non-fatal): {_tcr_err}")
 
             _storied_spine = generate_spine(
                 venue_name=_venue_name,
@@ -4284,6 +4331,47 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             print(f"  [S25] story_type_assigner not available: {e}")
         except Exception as e:
             print(f"  [S25] Error assigning story types: {e}")
+
+    # -------- [LOCAL-37] Tour-level class diversity (wire apply_tour_diversity) --------
+    _diversity_adjusted_selections = {}  # poi_name → {selected_elements, runner_up_elements}
+    if _storied_mode and tour_category == 'museum':
+        try:
+            from story_element_extractor import apply_tour_diversity, select_stop_elements
+            from work_story_searcher import normalize_work_key, work_stories_get
+            
+            # Pre-compute selections for all stops
+            _all_selections = []
+            _selection_names = []
+            for poi in poi_list:
+                poi_name = poi.get('name', '')
+                _artist_for_sel = poi.get('artist', '')
+                _wk = normalize_work_key(poi_name, _artist_for_sel)
+                _cached = work_stories_get(_wk)
+                if _cached and _cached.get('elements'):
+                    _sel = select_stop_elements(_cached['elements'], max_selected=3)
+                    _all_selections.append(_sel)
+                    _selection_names.append(poi_name)
+                else:
+                    _all_selections.append({'selected_elements': [], 'runner_up_elements': []})
+                    _selection_names.append(poi_name)
+            
+            # Apply diversity (modifies in place)
+            if _all_selections:
+                _all_selections = apply_tour_diversity(_all_selections, max_same_type=2)
+                # Store adjusted selections for use in per-stop B6 wiring
+                for i, sel in enumerate(_all_selections):
+                    _diversity_adjusted_selections[_selection_names[i]] = sel
+                
+                # Log diversity result
+                _swaps = sum(1 for s in _all_selections if s.get('_class_diversity_swap'))
+                if _swaps:
+                    print(f"  [LOCAL-37] Tour diversity: {_swaps} class-rebalancing swaps applied")
+                else:
+                    print(f"  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)")
+        except ImportError as e:
+            print(f"  [LOCAL-37] Tour diversity import failed: {e}")
+        except Exception as e:
+            print(f"  [LOCAL-37] Tour diversity error (non-fatal): {e}")
 
     # PHASE 5: Generate detailed descriptions for each POI (parallelized)
     print(f"\nPHASE 5: Generating detailed descriptions for each POI (parallel)...")
@@ -4597,38 +4685,78 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
         # Reads ranked elements from work_stories cache and injects them with
         # status-appropriate instructions: documented→fact, reported→attribution,
         # legend→"the story goes…", disputed→both sides with sources.
+        # [LOCAL-37] Uses diversity-adjusted selections when available.
         if tour_category == 'museum' and poi_name and artist:
             try:
                 from work_story_searcher import normalize_work_key, work_stories_get
                 from story_element_extractor import select_stop_elements
-                _b6_work_key = normalize_work_key(poi_name, artist)
-                _b6_cached = work_stories_get(_b6_work_key)
-                if _b6_cached and _b6_cached.get('elements'):
-                    _b6_selection = select_stop_elements(_b6_cached['elements'], max_selected=3)
+                from three_class_retrieval import classify_element, CLASS_DETAILS, CLASS_HISTORIC, CLASS_SOCIAL
+                
+                # [LOCAL-37] Use pre-computed diversity-adjusted selection if available
+                _b6_selection = _diversity_adjusted_selections.get(poi_name) if _diversity_adjusted_selections else None
+                if not _b6_selection:
+                    # Fallback to direct cache read
+                    _b6_work_key = normalize_work_key(poi_name, artist)
+                    _b6_cached = work_stories_get(_b6_work_key)
+                    if _b6_cached and _b6_cached.get('elements'):
+                        _b6_selection = select_stop_elements(_b6_cached['elements'], max_selected=3)
+                
+                if _b6_selection:
                     _b6_selected = _b6_selection.get('selected_elements', [])
                     _b6_runners = _b6_selection.get('runner_up_elements', [])[:2]
                     if _b6_selected:
                         _b6_block = "\nSTORY ELEMENTS (use these as primary material, follow phrasing rules per status):\n"
+                        # [LOCAL-37] Show class distribution for transparency
+                        _b6_classes_used = set()
                         for _elem in _b6_selected:
                             _status = _elem.get('corroboration_status', 'reported')
                             _text = _elem.get('text', '')[:200]
                             _etype = _elem.get('type', '')
+                            _eclass = classify_element(_elem)
+                            _b6_classes_used.add(_eclass)
+                            _class_tag = f"[{_eclass.upper()}]"
                             if _status == 'documented':
-                                _b6_block += f"  [FACT — state directly, no attribution needed] ({_etype}): {_text}\n"
+                                _b6_block += f"  {_class_tag} [FACT — state directly, no attribution needed] ({_etype}): {_text}\n"
                             elif _status == 'reported':
                                 _src_domain = _elem.get('source_domain', 'sources')
-                                _b6_block += f"  [REPORTED — use inline attribution: \"According to {_src_domain}...\"] ({_etype}): {_text}\n"
+                                _b6_block += f"  {_class_tag} [REPORTED — use inline attribution: \"According to {_src_domain}...\"] ({_etype}): {_text}\n"
                             elif _status == 'legend':
-                                _b6_block += f"  [LEGEND — frame as: \"The story goes that...\"] ({_etype}): {_text}\n"
+                                _b6_block += f"  {_class_tag} [LEGEND — frame as: \"The story goes that...\"] ({_etype}): {_text}\n"
                             elif _status == 'disputed':
-                                _b6_block += f"  [DISPUTED — expose both sides with sources] ({_etype}): {_text}\n"
+                                _b6_block += f"  {_class_tag} [DISPUTED — expose both sides with sources] ({_etype}): {_text}\n"
                             else:
-                                _b6_block += f"  [{_status}] ({_etype}): {_text}\n"
+                                _b6_block += f"  {_class_tag} [{_status}] ({_etype}): {_text}\n"
                         if _b6_runners:
                             _b6_block += "  TEXTURE (weave in if natural):\n"
                             for _elem in _b6_runners:
-                                _b6_block += f"    ({_elem.get('type','')}) {_elem.get('text','')[:120]}\n"
+                                _eclass = classify_element(_elem)
+                                _b6_block += f"    [{_eclass.upper()}] ({_elem.get('type','')}) {_elem.get('text','')[:120]}\n"
+                        
+                        # [LOCAL-37] Instruct GPT to balance across classes
+                        _missing_classes = {CLASS_DETAILS, CLASS_HISTORIC, CLASS_SOCIAL} - _b6_classes_used
+                        if len(_b6_classes_used) < 3:
+                            _b6_block += (
+                                "\n  CLASS BALANCE: Your description should include material from "
+                                "multiple classes (Details=physical facts, Historical=era/style context, "
+                                "Social=people). Avoid producing only vague historical atmosphere.\n"
+                            )
                         description_prompt += _b6_block
+                
+                # [LOCAL-37] Inject category-level historical context if available
+                _tcr_result = _three_class_results.get(poi_name) if _three_class_results else None
+                if _tcr_result and _tcr_result.get('category_context', {}).get(CLASS_HISTORIC):
+                    _cat_ctx = _tcr_result['category_context'][CLASS_HISTORIC]
+                    _category_name = _tcr_result.get('category', '')
+                    if _cat_ctx and len(_cat_ctx) > 100:
+                        # Inject with framing guard
+                        _cat_excerpt = _cat_ctx[:600]
+                        description_prompt += (
+                            f"\nCATEGORY CONTEXT (about '{_category_name}' in general — "
+                            f"frame as category facts, NEVER claim these facts are about this specific object):\n"
+                            f"{_cat_excerpt}\n"
+                            f"RULE: When using this context, say 'objects of this type...' or "
+                            f"'{_category_name} pieces were typically...', NEVER 'this {_category_name} was...'\n"
+                        )
             except ImportError:
                 pass
             except Exception as _b6_err:

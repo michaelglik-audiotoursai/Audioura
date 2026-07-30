@@ -969,14 +969,20 @@ def select_stop_elements(elements: List[Dict], max_selected: int = 3) -> Dict:
 
 
 def apply_tour_diversity(stops_selections: List[Dict], max_same_type: int = 2) -> List[Dict]:
-    """Apply B5 tour-level diversity: no story type dominates.
+    """Apply B5 tour-level diversity: no story type dominates AND no class dominates.
     
-    Max `max_same_type` stops may share the same top-ranked element type.
-    If violated, demote the 3rd+ stop's top pick to runner-up, promote next.
+    Two-pass enforcement:
+    1. Original element-type diversity: max `max_same_type` stops share the same
+       top-ranked element type.
+    2. [LOCAL-37] Three-class diversity: max 3 stops can be dominated by the same
+       class (Details/Historical/Social). Prevents 8 historic-mush stops in a row.
     
     Input: list of {'selected_elements': [...], 'runner_up_elements': [...]} per stop
     Returns: adjusted list with diversity enforced.
     """
+    from three_class_retrieval import classify_element, CLASS_DETAILS, CLASS_HISTORIC, CLASS_SOCIAL
+    
+    # ── Pass 1: element-type diversity (original logic) ──
     type_counts = {}
     
     for stop_sel in stops_selections:
@@ -997,6 +1003,41 @@ def apply_tour_diversity(stops_selections: List[Dict], max_same_type: int = 2) -
                 stop_sel['runner_up_elements'] = [demoted] + runners[1:]
         else:
             type_counts[top_type] = count + 1
+    
+    # ── Pass 2: three-class diversity (LOCAL-37) ──
+    # A tour cannot be historic-dominant on every stop.
+    MAX_SAME_CLASS = 3
+    class_counts = {CLASS_DETAILS: 0, CLASS_HISTORIC: 0, CLASS_SOCIAL: 0}
+    
+    for stop_sel in stops_selections:
+        selected = stop_sel.get('selected_elements', [])
+        if not selected:
+            continue
+        
+        # Determine dominant class from selected elements
+        class_tally = {CLASS_DETAILS: 0, CLASS_HISTORIC: 0, CLASS_SOCIAL: 0}
+        for elem in selected:
+            cls = classify_element(elem)
+            class_tally[cls] += 1
+        dominant = max(class_tally, key=class_tally.get)
+        
+        count = class_counts.get(dominant, 0)
+        if count >= MAX_SAME_CLASS:
+            # Try to promote a runner-up from a different class
+            runners = stop_sel.get('runner_up_elements', [])
+            for i, runner in enumerate(runners):
+                runner_cls = classify_element(runner)
+                if runner_cls != dominant:
+                    demoted = selected[0]
+                    stop_sel['selected_elements'] = [runner] + selected[1:]
+                    stop_sel['runner_up_elements'] = [demoted] + runners[:i] + runners[i+1:]
+                    stop_sel['_class_diversity_swap'] = {
+                        'demoted_class': dominant,
+                        'promoted_class': runner_cls,
+                    }
+                    break
+        else:
+            class_counts[dominant] = count + 1
     
     return stops_selections
 
