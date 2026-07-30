@@ -3016,3 +3016,82 @@ conflicting with LOCAL-21 and LOCAL-22, which both touch
 `generate_tour_text.py`.
 
 **Submission:** `SUBMISSION_LOCAL-23.md` in the task's worktree.
+
+---
+
+#### LEAD VERDICTS — 2026-07-30 early hours (ClickUp rate-limited ~189 min, clears ~04:55)
+
+##### LOCAL-23 — APPROVED, MERGED @ 3fb8936
+
+Independently verified: deleted the venue_corpus row, rebuilt from branch,
+re-scraped, regenerated. **6 → 22 canonical titles** reproduced
+(corpus_version=3). Chain works end to end:
+- R4 now finds real matches (was 0-for-21 earlier in the evening).
+- Tour 6 → **7 stops**; new stop 6 = `Daim et Daine symbolisant le premier
+  sermon de Bouddha`, a genuine work sourced from Wikipedia.
+- **Fact sheets 0/8 → 7/8.** Stop 2 now carries real Gandhara art history
+  ("grey schist, 2nd century, Greek and Indian influences, conquests of
+  Alexander the Great") where it was boilerplate before. The single stop
+  WITHOUT a fact sheet is the one that still reads generic — clean evidence
+  the mechanism drives quality.
+- **LEAD score ≈ 36/100** (28.1 base + modest correlation credit for a
+  genuine stop-3→4 hook). Best of the loop; previous best 31.25.
+- 12/12 suites green.
+
+Merged despite a real flaw (below) because the alternative — 6 stops and
+zero fact sheets — is strictly worse, and at score 36 we are far from the
+75 field-test gate, so no customer risk in the interim.
+
+**Flaw → dispatched as LOCAL-24:** the wider net admits non-works.
+`Promenade des Anglais` (the street outside), `Origin of the museum's
+pieces` and `The museum's collections` (Wikipedia SECTION HEADINGS — the
+LOCAL-9 nav-label bug class returning), three near-duplicate workshop names,
+and an EN/FR duplicate of the same work. One reached the tour: stop 7
+`En harmonie avec la nature` is a programme, not an object, and Phase 5 then
+invented an artist for it ("the esteemed Japanese artist Hiroshi Yoshida")
+and re-described stop 6's deer. A polluted corpus entry produced a
+fabricated attribution.
+
+##### LOCAL-22 — APPROVED, MERGED @ 5587550
+
+**Root cause found, in a different layer than 7 rounds of fixes assumed.**
+Not GPT writing a sentence into the `name` field — the **S29 derepetition
+rewrite, post-assembly**. Confirmed by LEAD in the pre-fix source
+(`generate_tour_text.py:~4256`): `_d2_re_inner.split(r'(Stop \d+:)',
+complete_tour)` plus an unscoped fallback `complete_tour.replace(...)`. When
+GPT's rewritten sentence echoes `Stop 3: Located at the Asian Arts
+Museum...` (it gets stop context in its prompt), split-and-rejoin injects a
+fake header line.
+
+Explains everything prior attempts missed: why name-field sanitisation never
+worked (corruption enters AFTER names are set), why it always carried an
+address fragment plus a `'Stop N'` self-reference, and why it is
+intermittent.
+
+Fix is structural: build the set of REAL headers from `poi_list` (ground
+truth) and strip any header-shaped line not in it; replace the fragile split
+with header-locating scoped replacement. 11/11 suites on branch, 11/11 on
+storied post-merge. Their run renders `Stop 3: Fauteuil` cleanly — the exact
+stop corrupted in LEAD's LOCAL-17 run.
+
+Caveat: defect is probabilistic, so one clean run is not proof. Confidence
+rests on the diagnosis being verified in source and the fix using ground
+truth. Watch the next few regenerations.
+
+Closes a defect that survived 7 rounds and was reported fixed 3 times.
+
+##### LOCAL-21 — review IN PROGRESS at time of writing
+
+G4 confirmed NOT weakened (`_ctx_tier == 'exhibit_museum'` only) — the
+constraint that mattered most. Chagall run delivered 7/7 real works, clean
+headings, sources credited. Two claims still unverified: story_elements
+growth beyond 1 of 16 venues (LEAD tested the venue that already had them —
+a flaw in LEAD's test design), and whether a tour with story elements passes
+the SERVICE QA gate (a direct `generate_tour_text()` call bypasses it; a
+service-path job was still running at time of writing). `test_contained_
+regression.py` failure investigated and dismissed — it hits the shared
+container on :5000 and fails identically on clean storied.
+
+**ClickUp to post when the limit clears:** wdvrdax5j9 (LOCAL-19, already
+posted), wdvrdax5ja (LOCAL-22 verdict above), wdvrdax5j8 (LOCAL-21 when
+complete). LOCAL-23 and LOCAL-24 still need tasks created.
