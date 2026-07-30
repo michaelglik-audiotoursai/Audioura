@@ -473,6 +473,9 @@ def extract_catalogue_works_from_pages(pages: List[Dict]) -> List[Dict]:
     pages by URL pattern, then extracts per-work structured metadata.
     
     Generic: works for any venue — detection is by page URL + content structure.
+    Uses TWO strategies:
+    1. Re-fetch the page HTML and parse h2/h3 headings directly (preferred)
+    2. Fall back to heuristic line-based section detection from text
     
     Args:
         pages: List of {url, text, title} dicts from the corpus
@@ -503,16 +506,109 @@ def extract_catalogue_works_from_pages(pages: List[Dict]) -> List[Dict]:
         
         print(f"  [LOCAL-28] Catalogue page detected: {url}")
         
-        # Strategy: split text on heading patterns and extract per-section metadata
-        # The text from _fetch_page_text is a mix of paragraph content + full text.
-        # Headings appear as lines starting with the heading text (from HTMLParser).
+        # Strategy 1: Re-fetch and parse HTML headings directly
+        # This gives clean h2/h3 headings that are the actual work title separators
+        works_from_page = _parse_catalogue_from_html(url)
         
-        works_from_page = _parse_catalogue_sections(text, url)
+        # Strategy 2: Fall back to heuristic text-based section parsing
+        if not works_from_page:
+            works_from_page = _parse_catalogue_sections(text, url)
+        
         if works_from_page:
             catalogue_works.extend(works_from_page)
             print(f"  [LOCAL-28] Extracted {len(works_from_page)} documented works from {url}")
     
     return catalogue_works
+
+
+def _parse_catalogue_from_html(url: str) -> List[Dict]:
+    """Parse a catalogue page directly from its HTML for h2/h3 headings + content.
+    
+    Primary strategy: uses actual HTML heading elements as section boundaries,
+    which is how museum catalogue pages structure their content.
+    """
+    try:
+        resp = requests.get(url, headers={'User-Agent': 'Audioura/2.2'},
+                          timeout=15, allow_redirects=True)
+        if resp.status_code != 200:
+            return []
+    except Exception:
+        return []
+    
+    html = resp.text
+    works = []
+    
+    # Extract h2 headings and the content between them
+    # Pattern: <h2...>Title</h2> followed by content until next <h2
+    _h2_pattern = re.compile(
+        r'<h2[^>]*>\s*(.*?)\s*</h2>(.*?)(?=<h2[^>]*>|</main>|</article>|</body>)',
+        re.DOTALL | re.IGNORECASE
+    )
+    
+    for match in _h2_pattern.finditer(html):
+        raw_title = match.group(1)
+        raw_body = match.group(2)
+        
+        # Clean HTML tags from title
+        title = re.sub(r'<[^>]+>', '', raw_title).strip()
+        # Decode HTML entities
+        title = title.replace('&amp;', '&').replace('&#39;', "'").replace('&nbsp;', ' ')
+        title = re.sub(r'&[a-z]+;', '', title).strip()
+        
+        # Skip non-work headings
+        if not title or len(title) < 5 or len(title) > 80:
+            continue
+        if _CATALOGUE_EXCLUDE_HEADINGS.match(title):
+            continue
+        if title.lower().startswith(('formulaire', 'information', 'partenaire', 'suivez')):
+            continue
+        
+        # Clean body: extract paragraph text
+        body_paragraphs = re.findall(r'<p[^>]*>(.*?)</p>', raw_body, re.DOTALL)
+        body_text = '\n'.join(
+            re.sub(r'<[^>]+>', '', p).strip()
+            for p in body_paragraphs
+            if len(re.sub(r'<[^>]+>', '', p).strip()) > 30
+            and not re.sub(r'<[^>]+>', '', p).strip().startswith('{')  # Skip CSS
+        )
+        
+        # Also look for metadata in alt text and image captions
+        alt_texts = re.findall(r'alt="([^"]*)"', raw_body)
+        caption_text = ' '.join(alt_texts)
+        
+        # Combined text for metadata extraction
+        full_text = caption_text + '\n' + body_text
+        
+        if len(body_text) < 50:
+            continue
+        
+        # Extract metadata
+        material = _extract_material(full_text)
+        period = _extract_period(title + ' ' + full_text)
+        origin = _extract_origin(title + ' ' + full_text)
+        
+        # Skip if this doesn't look like a work (no metadata and short text)
+        if not material and not period and not origin and len(body_text) < 150:
+            continue
+        
+        # Take first ~500 chars of body as description
+        description = body_text[:500].strip()
+        if len(body_text) > 500:
+            last_period = description.rfind('.')
+            if last_period > 200:
+                description = description[:last_period + 1]
+        
+        works.append({
+            'title': title,
+            'material': material,
+            'period': period,
+            'origin': origin,
+            'description': description,
+            'source_url': url,
+            'confidence': 'catalogue',
+        })
+    
+    return works
 
 
 def _parse_catalogue_sections(text: str, source_url: str) -> List[Dict]:
