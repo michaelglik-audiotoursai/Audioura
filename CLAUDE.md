@@ -146,19 +146,84 @@ The Mac Mini is now a full development environment. To continue working:
 ---
 
 # SESSION HANDOFF — Audioura review (read this first)
-## Last updated: 2026-07-27 (post Round 12 approval + PALAIS-FIX closure)
+## Last updated: 2026-07-29 evening (tour-quality loop root cause found)
 
-**2026-07-27 delta (details in ClickUp trails + `KIRO_REVIEW_12_*.md`):**
-- Round 12 (PA museum grounding) APPROVED with LEAD fix-forward `9cd5708`;
-  merged to `storied`. PALAIS-FIX `wdvrdawkxp` CLOSED — LEAD found and fixed
-  the Phase 3B `verified`-flag strip (`ddf0527`), live proof in `d1ac9af`.
-- Mac DB migrations applied (stop_metrics/verified now exist — M1 gap closed).
-- `storied` local = rounds 1–12 + origin handoff merge; still NOT pushed
-  (iPhone field-test gate).
-- Active queue order for Kiro: `wdvrdawkxq` (listings) → `wdvrdax1v7`
-  (classify-fix) → `wdvrdawcyx` (Phase 3) → SQ4b.
-- **LIVE-ARTIFACT HARD GATE adopted (Michael, 2026-07-27)** — see
+### FIRST ACTIONS ON A FRESH SESSION
+1. `git log --oneline -3` and `cat .continuous_dev/STATUS.md`.
+2. Say/expect **"restart continuous dev"** — the watcher loop is
+   session-scoped and dies with the session. Detached `kiro-cli` worker
+   processes SURVIVE a restart; only the review loop needs re-arming.
+3. Check in-flight work: `tail -6 kiro_sessions_ran.md`, `git worktree list`,
+   and each `~/audioura-worktrees/LOCAL-NN/SUBMISSION_LOCAL-NN.md`.
+
+**Permissions:** `.claude/settings.json` has
+`"permissions.defaultMode": "bypassPermissions"` (committed `b8eb3eb` at
+Michael's explicit request). `defaultMode` is read **at session start** —
+mid-session edits do nothing, which is why a restart was needed. Allow-rules
+DO hot-reload. Shift+Tab only reaches "auto-accept edits", which does not
+cover Bash — that was the original source of the prompt fatigue.
+
+**2026-07-29 delta — the loop's premise was wrong, and this is the headline:**
+Rounds 1–4 of the tour-improvement loop all fought fabrication symptoms in
+the fill logic. LEAD traced the real ceiling to the **data layer**:
+- **Corpus size caps the score.** max = `(100/N)*(2C-N)` before bonuses,
+  C = venue canonical titles, N = requested stops. Asian Arts Museum has
+  C=6, N=8 → base cap 50.
+- **CORRECTION (Michael challenged this, he was right):** 75 IS reachable
+  at N=8 — the rubric's **cross-stop correlation bonus (+50%, explicitly
+  "can push total >100")** and venue-identity bonus (+10%) were omitted
+  from that first calculation. With all-RICH stops: 55 with no callbacks,
+  **75.6 with callbacks on half the stops, 96.2 with callbacks throughout.**
+  Break-even per-stop quality: 1.24 (impossible) without the correlation
+  bonus, 0.83 with it. So **75 mandates building the dominant-story
+  feature** — it cannot be reached by per-stop quality alone.
+- **Zero per-stop source material.** Every stop logged `No RAG context —
+  cannot generate fact sheet`. Phase 5 writes from parametric memory only.
+- **`story_elements_json` was empty for all 16 venues** via three silent
+  breaks: `corpus_result.get('story_elements')` reads a key `story_miner`
+  never emits; `extract_story_elements_from_pages`/`persist_story_elements`
+  did not exist (ImportError swallowed by try/except); and the complete
+  SQ3/SQ4 engine in `story_element_extractor.py` had **zero production
+  callers**. The oft-cited "11/11 suites green" included suites exercising
+  dead code — green tests over orphaned modules prove nothing.
+- **`STORY_QUALITY_DESIGN.md` already specifies everything.** §SQ-S6b IS the
+  "dominant story" (theme threads, deterministic entity clustering then one
+  grounded LLM naming pass, coverage-proportional multi-thread blending,
+  degradation rules). §2c/2d specify the swipe/personalization feature and
+  `stop_metrics.class_details/class_historic/class_social` — **live, 315
+  classified rows**. SQ4b == deferred ClickUp task `wdvrdawdje`.
+
+**Michael's gate (2026-07-29):** he runs the iPhone field test only once the
+internal score reaches **75 at N=8 on the Asian Arts Museum**. Deliberately
+not softened to N=6 — that would let a weaker system pass.
+
+**State:** `storied` @ `33e306f`, **26 commits unpushed** (field-test gate).
+LOCAL-19 merged @ `04e726d` (R4 replenishment now actually runs, and it
+carried the LOCAL-16 verified-only gate which had never reached storied).
+In flight: **LOCAL-21** (story wiring r2), **LOCAL-22** (title corruption at
+source — unfixed for 7 rounds, claimed fixed 3×), **LOCAL-23** (multi-source
+corpus expansion: Tier 1 = Wikipedia + museum's own site co-equal, Tier 2 =
+Joconde/POP; most famous first; keep the smaller set if unverifiable).
+
+**ClickUp rate-limited ~2026-07-29 21:2x for ~253 min (clears ~01:40).**
+Use `CLICKUP_OFFLINE_QUEUE.md` and post retroactively — established pattern.
+Open ClickUp tasks: `wdvrdax5j8` (LOCAL-18/21), `wdvrdax5j9` (LOCAL-19,
+approved), `wdvrdax5ja` (LOCAL-20/22). LOCAL-23 has no ClickUp task yet.
+
+**Discussion to resume with Michael (in order):** (1) how to build the
+dominant story — he wants ideas, and SQ-S6b already has his own worked
+example; (2) a generic approach for ANY feature, not just tours —
+Subscription, and swipe-to-sway-stops correlated to story properties
+(Historical / details / social); (3) document that approach so it can be
+replicated on the Windows machine for parallel feature development.
+**Blocker for (3): nothing reaches Windows until `storied` is pushed.**
+
+- **LIVE-ARTIFACT HARD GATE (Michael, 2026-07-27)** — see
   `remind_Services_ai.md`; summary below in DISPATCH PROTOCOL.
+- **Concurrency lesson (2026-07-29):** dispatch task prompts must tell each
+  agent to write to its own `SUBMISSION_LOCAL-NN.md`, NOT the shared
+  `CLICKUP_OFFLINE_QUEUE.md` — absolute paths defeat worktree isolation.
+  Verified working with 3 concurrent agents; no collision.
 
 **You are Claude Code on the Mac Mini**, working in `~/Audioura` on branch
 `storied`. Chat sessions can be lost (crash/timeout) — **that's expected**.
