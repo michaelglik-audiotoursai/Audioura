@@ -5275,20 +5275,32 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                     f"  - ({e.get('type','?')}) {e.get('text','')}"
                     for e in _story_elements[:10]
                 )
-                _grounding_constraint = f"""
+                # [LOCAL-42] Venue-identity facts (architect, year, style) are corpus-sourced
+                # and explicitly whitelisted — they are NOT hallucination.
+                _vi_exception = ""
+                if _venue_identity_prompt_block:
+                    _vi_exception = """
+
+EXCEPTION: The VENUE-IDENTITY FACTS provided above are sourced from the crawled corpus 
+and are verified. You MAY and SHOULD use those facts (architect name, inauguration year, 
+architectural style) even if they do not appear in the story-elements list below."""
+                
+                _grounding_constraint = f"""{_vi_exception}
 
 GROUNDING CONSTRAINT — CRITICAL:
-The following are the ONLY documented facts you may reference. Do NOT invent any dates, 
-names of people, founding events, or causal claims (who created/founded/donated/built what) 
-that are not present in this list:
+The following are the ONLY documented facts you may reference for artwork-specific claims. 
+Do NOT invent any dates, names of people, founding events, or causal claims (who 
+created/founded/donated/built what) that are not present in this list OR in the 
+venue-identity facts above:
 {_elem_facts}
 
-If you want to mention a year, person, or event, it MUST appear verbatim in the facts above.
-You may use evocative, atmospheric language without factual claims (e.g. "a journey through 
-light and colour" is fine; "founded in 1973 by André Malraux" is NOT fine unless that fact 
-appears above). Prefer thematic/emotional framing over specific historical claims."""
+If you want to mention a year, person, or event, it MUST appear verbatim in the facts above 
+OR in the venue-identity section. You may use evocative, atmospheric language without factual 
+claims (e.g. "a journey through light and colour" is fine; "founded in 1973 by André Malraux" 
+is NOT fine unless that fact appears above). Prefer thematic/emotional framing over specific 
+historical claims that lack sourcing."""
 
-            _prolog_prompt = f"""Write a compelling 80-150 word tour introduction that frames this experience as a journey — a book of connected chapters.
+            _prolog_prompt = f"""Write a compelling 80-190 word tour introduction that frames this experience as a journey — a book of connected chapters.
 
 Theme/connecting thread: {_connecting_thread}
 Tour hook: {_tour_hook}
@@ -5299,8 +5311,8 @@ Requirements:
 - Name the journey's central theme/goal
 - Preview how the stops connect into one arc (each reveals a different facet)
 - Make it read like a book's opening page — compelling, with a sense of discovery
-- If venue-identity facts are provided above, weave 1-2 specific details naturally into the opening (architecture, programs, or design) — they ground the intro in THIS specific place
-- 80-150 words exactly
+- If venue-identity facts are provided above, integrate them prominently into the opening paragraph — they ground the intro in THIS specific place and are sourced facts (not hallucination)
+- 80-190 words exactly
 - Do NOT end with a question
 - Return ONLY the paragraph, no quotes or labels"""
 
@@ -5315,7 +5327,7 @@ Requirements:
                         {"role": "user", "content": _prolog_prompt},
                     ],
                     "temperature": 0.8,
-                    "max_tokens": 300,
+                    "max_tokens": 380,
                 },
                 timeout=15,
             )

@@ -2523,7 +2523,8 @@ def extract_venue_identity(combined_text: str, venue_name: str = "") -> Dict[str
         re.compile(r'(?:designed|conceived|created|built|constructed|conçu|réalisé|construit)\s+by\s+([A-Z][A-Za-z\u00C0-\u00FF\s\-]{3,40}?)(?:\s*[,.(]|\s+in\s+|\s+and\s+|\s+who\b)', re.IGNORECASE),
         # "<Name>, architect" / "architect <Name>"
         re.compile(r'architect[e]?\s+([A-Z][A-Za-z\u00C0-\u00FF\s\-]{5,40}?)(?:\s*[,.(]|\s+designed|\s+who\b)', re.IGNORECASE),
-        re.compile(r'([A-Z][A-Za-z\u00C0-\u00FF\s\-]{5,40}?),?\s+(?:the\s+)?architect', re.IGNORECASE),
+        # [LOCAL-42 fix] Require "architect" as standalone word, not part of "architecture"
+        re.compile(r'([A-Z][A-Za-z\u00C0-\u00FF\s\-]{5,40}?),?\s+(?:the\s+)?architect(?!ur)\b', re.IGNORECASE),
         # "architectural design by"
         re.compile(r'(?:architectural\s+)?design(?:ed)?\s+by\s+([A-Z][A-Za-z\u00C0-\u00FF\s\-]{3,40}?)(?:\s*[,.(]|\s+in\s+)', re.IGNORECASE),
     ]
@@ -2545,6 +2546,29 @@ def extract_venue_identity(combined_text: str, venue_name: str = "") -> Dict[str
         _sent = _extract_identity_sentence(_identity_corpus, architect)
         if _sent:
             results["architecture"].append(_sent)
+    
+    # --- [LOCAL-42] Mine for inauguration / construction year ---
+    # These are physical facts about the building (not "founding events") and belong
+    # in architecture even when founding is suppressed by LOCAL-21.
+    _inauguration_patterns = [
+        # "opened in YYYY" / "inaugurated in YYYY" / "completed in YYYY" / "built in YYYY"
+        re.compile(r'([^.]*(?:opened|inaugurated|completed|built)\s+(?:in|on|between)\s+[^.]*\d{4}[^.]*\.)', re.IGNORECASE),
+    ]
+    _found_years = set()
+    for pat in _inauguration_patterns:
+        for m in pat.finditer(_identity_corpus):
+            sentence = m.group(1).strip()
+            # Extract the year to avoid duplicates
+            # Accept years from 1500-2029 (historical buildings to modern)
+            _year_match = re.search(r'\b(1[5-9]\d{2}|20[0-2]\d)\b', sentence)
+            if _year_match and len(sentence) >= 20 and len(sentence) <= 300:
+                _year = _year_match.group(1)
+                if _year not in _found_years:
+                    _found_years.add(_year)
+                    # Only add if not already covered by an architect sentence
+                    _already_covered = any(_year in s for s in results["architecture"])
+                    if not _already_covered:
+                        results["architecture"].append(sentence)
     
     # --- Mine for design philosophy ---
     _design_patterns = [
@@ -2659,6 +2683,10 @@ def _is_generic_filler(sentence: str) -> bool:
 def format_venue_identity_for_prompt(identity_facts: Dict[str, List[str]], venue_name: str = "") -> str:
     """Format extracted venue-identity facts into a concise prompt injection.
     
+    [LOCAL-42] Enhanced: produces directive instructions that tell the LLM
+    specifically how to surface architect, year, and style — not just
+    "weave 1-2 details." This generalizes to any venue with these facts.
+    
     Returns a short paragraph suitable for injecting into the prolog prompt,
     or empty string if no usable facts were found.
     """
@@ -2672,15 +2700,58 @@ def format_venue_identity_for_prompt(identity_facts: Dict[str, List[str]], venue
     if not all_facts:
         return ""
     
-    # Cap at 3 most interesting facts to avoid overwhelming the prompt
-    _selected = all_facts[:3]
+    # Cap at 4 most interesting facts (increased from 3 for LOCAL-42)
+    _selected = all_facts[:4]
     
     _venue_label = venue_name.split(',')[0].strip() if venue_name else "This venue"
     
+    # [LOCAL-42] Build directive instructions based on what we found
+    _directives = []
+    _arch_facts = identity_facts.get("architecture", [])
+    _design_facts = identity_facts.get("design", [])
+    
+    # Check if we have a named architect
+    _has_architect = any(
+        re.search(r'[A-Z][a-z]+\s+[A-Z][a-z]+', f) and
+        any(v in f.lower() for v in ('architect', 'design', 'built', 'conceiv', 'creat'))
+        for f in _arch_facts
+    )
+    
+    # Check if we have a year
+    _has_year = any(re.search(r'\b(1[89]\d{2}|20[0-2]\d)\b', f) for f in _arch_facts)
+    
+    # Check if we have style/material description
+    _has_style = bool(_design_facts)
+    
+    if _has_architect:
+        _directives.append(
+            "Name the architect with a brief clause explaining who they are "
+            "(e.g. their significance or a major achievement) — make the name "
+            "meaningful to someone who hasn't heard of them"
+        )
+    if _has_year:
+        _directives.append(
+            "State when the building was completed/inaugurated"
+        )
+    if _has_style:
+        _directives.append(
+            "Describe the architectural style or spatial concept concretely "
+            "(materials, geometry, relationship to landscape)"
+        )
+    
+    _directive_block = ""
+    if _directives:
+        _directive_block = (
+            "\n\nHow to use these facts in the introduction:\n"
+            + "\n".join(f"  • {d}" for d in _directives)
+            + "\nIntegrate these INSIDE the narrative framing — do not list them as a spec sheet."
+        )
+    
     return (
-        f"Venue-specific identity facts about {_venue_label} (weave 1-2 of these "
-        f"concretely into the introduction — do NOT use generic praise):\n"
+        f"VENUE-IDENTITY FACTS about {_venue_label} (sourced from corpus — these are verified, "
+        f"use them):\n"
         + "\n".join(f"- {fact}" for fact in _selected)
+        + _directive_block
     )
 
 
