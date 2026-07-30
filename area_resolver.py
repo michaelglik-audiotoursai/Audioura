@@ -130,6 +130,14 @@ def resolve_area(location_string: str) -> Optional[AreaResolution]:
     center_lat, center_lng = city_lat, city_lng
     radius_km = CITY_RADIUS_KM
     
+    # [LOCAL-46] If the resolved entity is a region (not a city), use a wider radius.
+    # Regions like "French Riviera" cover 50-100km+ of coastline — a 2km radius
+    # would miss almost everything. Skip the check if already confirmed as a city type
+    # (avoids redundant API call for common city resolutions).
+    if not _is_city_type(city_qid) and _is_region_type(city_qid):
+        radius_km = REGION_RADIUS_KM
+        print(f"  [area_resolver] Entity is a region — using wider radius: {radius_km}km")
+    
     if neighborhood:
         neighborhood_qid, nbhood_coords = _resolve_neighborhood(neighborhood, city, city_qid)
         if neighborhood_qid and nbhood_coords[0] != 0.0:
@@ -218,6 +226,20 @@ def _parse_location(location_string: str) -> Tuple[str, str]:
     # Remove common tour-type phrases (as standalone phrases, not eating the rest of the string)
     clean = re.sub(r'\b(?:walking tour|biking tour|driving tour|audio tour|guided tour|self[- ]guided tour|tour|historic district)\b', '', location_string, flags=re.IGNORECASE).strip()
     
+    # [LOCAL-46] Strip ALL transport-mode keywords from anywhere in the string.
+    # After "tour" is stripped above, orphaned transport words remain (e.g. "French
+    # Riviera biking" → "French Riviera biking" because "biking tour" was split into
+    # separate "biking" + stripped "tour"). This comprehensive list matches the
+    # _TRANSPORT_STRIP_WORDS set in generate_tour_text.py — kept aligned to avoid drift.
+    _TRANSPORT_WORDS_RE = re.compile(
+        r'\b(?:biking|cycling|bike|walking|hiking|running|driving|horseback|horse|'
+        r'camel|camelback|dog|dogsled|dogsledding|sledding|mushing|husky|'
+        r'auto|car|jeep|motorcycle|scooter|segway|safari|'
+        r'boat|kayak|kayaking|canoe|canoeing|sailing)\b',
+        re.IGNORECASE
+    )
+    clean = _TRANSPORT_WORDS_RE.sub('', clean)
+    
     # [LOCAL-3] Strip leading transport-mode and filler words from the entire string.
     # Upstream normalization may leave orphaned mode words (e.g. "walking  in Nice, france"
     # after "tour" is stripped). These break the comma-split logic by attaching to the
@@ -230,12 +252,15 @@ def _parse_location(location_string: str) -> Tuple[str, str]:
     )
     clean = _MODE_FILLER_RE.sub('', clean).strip()
     
+    # Collapse multiple spaces left by stripped words
+    clean = re.sub(r'\s{2,}', ' ', clean).strip()
+    
     parts = [p.strip() for p in clean.split(',')]
     
     # [LOCAL-3] Also strip filler words from individual segments after split —
     # handles cases where the filler word is only on one segment (e.g. already-split
     # "in Nice" as parts[0]).
-    _SEGMENT_FILLER_RE = re.compile(r'^(?:in|of|around|through|to)\s+', re.IGNORECASE)
+    _SEGMENT_FILLER_RE = re.compile(r'^(?:in|of|around|through|to|near)\s+', re.IGNORECASE)
     parts = [_SEGMENT_FILLER_RE.sub('', p).strip() for p in parts]
     # Remove empty segments that result from stripping
     parts = [p for p in parts if p]
@@ -264,7 +289,11 @@ def _parse_location(location_string: str) -> Tuple[str, str]:
 
 
 def _resolve_city(city: str) -> Tuple[str, Tuple[float, float]]:
-    """Resolve a city name to its Wikidata QID + coordinates."""
+    """Resolve a city (or region) name to its Wikidata QID + coordinates.
+    
+    [LOCAL-46] Also resolves named regions (e.g. 'French Riviera' → Côte d'Azur Q182095).
+    Priority: city/town > region > any entity with coordinates.
+    """
     # Search Wikidata
     candidates = _search_entities(city)
     if not candidates:
@@ -280,6 +309,14 @@ def _resolve_city(city: str) -> Tuple[str, Tuple[float, float]]:
         if _is_city_type(qid):
             lat, lng = _get_coordinates(qid)
             if lat != 0.0 or lng != 0.0:
+                return qid, (lat, lng)
+    
+    # [LOCAL-46] Second pass: accept named regions (Côte d'Azur, Tuscany, etc.)
+    for qid, label in candidates[:5]:
+        if _is_region_type(qid):
+            lat, lng = _get_coordinates(qid)
+            if lat != 0.0 or lng != 0.0:
+                print(f"  [area_resolver] Resolved as region: {label} → {qid}")
                 return qid, (lat, lng)
     
     # Fallback: first candidate with coordinates
@@ -437,6 +474,51 @@ def _is_country_type(qid: str) -> bool:
             for claim in entity.get("claims", {}).get("P31", []):
                 value = claim.get("mainsnak", {}).get("datavalue", {}).get("value", {})
                 if value.get("id") in country_types:
+                    return True
+    except Exception:
+        pass
+    return False
+
+
+# [LOCAL-46] Region radius: for named geographic regions (coastlines, riviera, valleys),
+# use a much wider bounding radius than city-level tours.
+REGION_RADIUS_KM = 15.0
+
+def _is_region_type(qid: str) -> bool:
+    """Check if a Wikidata entity is a geographic region (not city, not country).
+    
+    [LOCAL-46] Handles named regions like Côte d'Azur (Q182095), Tuscany, etc.
+    These are larger than cities but smaller than countries — they need a wider
+    bounding radius for landmark discovery but are valid tour areas.
+    """
+    region_types = {
+        "Q82794",     # geographic region
+        "Q1620908",   # geographic area
+        "Q15642541",  # coastal region
+        "Q34763",     # peninsula
+        "Q39816",     # valley
+        "Q35145263",  # coastal plain
+        "Q185113",    # coast (general)
+        "Q93352",     # coast (specific — e.g. French Riviera)
+        "Q917448",    # riviera
+        "Q11828004",  # historical region
+        "Q3455524",   # historical administrative region
+        "Q36784",     # administrative region (France: Provence-Alpes-Côte d'Azur)
+        "Q200266",    # metropolitan area
+    }
+    try:
+        resp = requests.get(
+            _WIKIDATA_API,
+            params={"action": "wbgetentities", "ids": qid, "props": "claims", "format": "json"},
+            headers={"User-Agent": _USER_AGENT},
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            entity = data.get("entities", {}).get(qid, {})
+            for claim in entity.get("claims", {}).get("P31", []):
+                value = claim.get("mainsnak", {}).get("datavalue", {}).get("value", {})
+                if value.get("id") in region_types:
                     return True
     except Exception:
         pass

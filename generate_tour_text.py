@@ -68,11 +68,37 @@ _TRANSPORT_MODE_KEYWORDS = {
     'country_scale': re.compile(r'\broad\s*trip\b|\bcross[- ]country\b|\bsafari\b|\bnational(?:\s+parks?)?\s+tour\b', re.IGNORECASE),
 }
 
+# [LOCAL-46] Flat set of all transport-mode keywords for stripping from location strings.
+# Derived from _TRANSPORT_MODE_KEYWORDS above — single source of truth, kept in sync.
+# Includes walking/hiking variants that also pollute area resolution.
+_TRANSPORT_STRIP_WORDS = {
+    # From 'animal' mode
+    'camel', 'camelback', 'horse', 'horseback', 'dog', 'dogsled', 'dogsledding',
+    'sledding', 'mushing', 'husky',
+    # From 'bike' mode
+    'bike', 'biking', 'cycling',
+    # From 'vehicle' mode
+    'auto', 'car', 'driving', 'jeep', 'motorcycle', 'scooter',
+    # From 'country_scale' mode (words that aren't geographic)
+    'safari',
+    # Walking/hiking variants (not in _TRANSPORT_MODE_KEYWORDS but same bug class)
+    'walking', 'hiking', 'running',
+    # Boat/water variants (future-proofing same pattern)
+    'boat', 'kayak', 'kayaking', 'canoe', 'canoeing', 'sailing',
+    # General
+    'segway',
+}
+# Compiled regex for stripping transport words from location strings (word boundaries)
+_TRANSPORT_STRIP_RE = re.compile(
+    r'\b(' + '|'.join(re.escape(w) for w in sorted(_TRANSPORT_STRIP_WORDS, key=len, reverse=True)) + r')\b',
+    re.IGNORECASE
+)
+
 # Total route distance caps per transport mode (km)
 _TRANSPORT_TOTAL_HARD_KM = {
     # 'on_foot' uses existing WALKING_TOTAL_HARD_KM constant
     'animal':   20,
-    'bike':     30,
+    'bike':     120,   # [LOCAL-46] 30→120: regional biking tours (French Riviera) cover 80-100km
     'vehicle':  400,
     # 'country_scale' has no distance limit — uses containment check instead
 }
@@ -2400,6 +2426,17 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     _location_normalized = re.sub(r'\b[Tt]ours?\b', '', location).strip().strip(',').strip()
     if _location_normalized != location:
         print(f"  [BLOCKER1] Stripped 'tour' from location: '{location}' → '{_location_normalized}'")
+
+    # [LOCAL-46 Bug A] Strip transport-mode keywords from the normalized location.
+    # After "tour" is stripped, orphaned words like "biking" remain and poison
+    # area resolution (e.g. "French Riviera biking" cannot resolve on Wikidata).
+    # Uses _TRANSPORT_STRIP_RE derived from _TRANSPORT_MODE_KEYWORDS — single source of truth.
+    _loc_before_transport_strip = _location_normalized
+    _location_normalized = _TRANSPORT_STRIP_RE.sub('', _location_normalized)
+    # Collapse multiple spaces and clean up
+    _location_normalized = re.sub(r'\s{2,}', ' ', _location_normalized).strip().strip(',').strip()
+    if _location_normalized != _loc_before_transport_strip:
+        print(f"  [LOCAL-46] Stripped transport words: '{_loc_before_transport_strip}' → '{_location_normalized}'")
     
     _pre_category = _classify_tour_category(_location_normalized, "")
     if _pre_category in ('restaurant', 'walking', 'specialized'):
@@ -2532,7 +2569,15 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # PHASE 2: Detect tour type and get appropriate template
     # NOTE: tour_category already set above — do NOT call _classify_tour_category again here
     # (that was the bug: it overwrote the venue_name-based 'museum' decision with 'walking').
-    print(f"\nDetected tour category: {tour_category.upper()}")
+    # [LOCAL-46 Bug B] Display the transport mode as the detected category when applicable.
+    # The logical tour_category stays 'walking' (same verification/template path) but the
+    # reported category reflects what the user actually asked for.
+    _display_category = tour_category
+    if tour_category == 'walking' and transport_mode != 'on_foot':
+        _display_category = transport_mode.upper()  # e.g. "BIKE", "VEHICLE", "ANIMAL"
+    else:
+        _display_category = tour_category.upper()
+    print(f"\nDetected tour category: {_display_category}")
     print(f"Using {tour_category} template for {location} - {tour_type}")
     
     # ============================================================
@@ -2771,14 +2816,145 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
 
     _compactness_constraint = ''
     if tour_category == 'walking':
-        _compactness_constraint = (
-            f"\nWALKING-TOUR COMPACTNESS — this is a walking tour:\n"
-            f"- All stops must form ONE compact cluster, close enough to walk between comfortably.\n"
-            f"- No stop should be more than a 10–15 minute walk (roughly {WALKING_LEG_TARGET_KM:.0f} km) "
-            f"from its nearest neighbour in the tour.\n"
-            f"- Prefer a tight set of stops in one walkable area over famous landmarks scattered "
-            f"across the city. A shorter, denser route is better than a long, spread-out one.\n"
-        )
+        if transport_mode == 'on_foot':
+            _compactness_constraint = (
+                f"\nWALKING-TOUR COMPACTNESS — this is a walking tour:\n"
+                f"- All stops must form ONE compact cluster, close enough to walk between comfortably.\n"
+                f"- No stop should be more than a 10–15 minute walk (roughly {WALKING_LEG_TARGET_KM:.0f} km) "
+                f"from its nearest neighbour in the tour.\n"
+                f"- Prefer a tight set of stops in one walkable area over famous landmarks scattered "
+                f"across the city. A shorter, denser route is better than a long, spread-out one.\n"
+            )
+        elif transport_mode == 'bike':
+            # [LOCAL-46] Biking tour: wider spacing, route coherence still matters
+            _bike_limit = _TRANSPORT_TOTAL_HARD_KM.get('bike', 120)
+            _compactness_constraint = (
+                f"\nBIKING-TOUR ROUTE — this is a cycling/biking tour:\n"
+                f"- Stops should form a coherent route that a cyclist can follow in sequence.\n"
+                f"- Adjacent stops may be up to 5–10 km apart (a comfortable cycling leg).\n"
+                f"- Total route length should stay under {_bike_limit} km.\n"
+                f"- Prefer scenic roads, coastal paths, or designated cycling routes.\n"
+                f"- Stops should be accessible by bicycle (not inside buildings or pedestrian-only zones).\n"
+            )
+        elif transport_mode == 'vehicle':
+            _vehicle_limit = _TRANSPORT_TOTAL_HARD_KM.get('vehicle', 400)
+            _compactness_constraint = (
+                f"\nDRIVING-TOUR ROUTE — this is a driving/vehicle tour:\n"
+                f"- Stops should form a coherent driving route in logical sequence.\n"
+                f"- Adjacent stops may be 10–50 km apart.\n"
+                f"- Total route length should stay under {_vehicle_limit} km.\n"
+                f"- Stops should be accessible by car with parking available nearby.\n"
+            )
+        elif transport_mode == 'animal':
+            _animal_limit = _TRANSPORT_TOTAL_HARD_KM.get('animal', 20)
+            _compactness_constraint = (
+                f"\nANIMAL-POWERED TOUR ROUTE — this is an animal-powered tour:\n"
+                f"- Stops should form a coherent trail route suitable for the animal.\n"
+                f"- Adjacent stops should be 1–3 km apart.\n"
+                f"- Total route length should stay under {_animal_limit} km.\n"
+                f"- Stops should be on trails or terrain accessible to the animal.\n"
+            )
+        elif transport_mode == 'country_scale':
+            _compactness_constraint = (
+                f"\nCROSS-COUNTRY ROUTE — this is a long-distance tour:\n"
+                f"- Stops should form a coherent route across the region/country.\n"
+                f"- Include major landmarks and points of interest along the way.\n"
+                f"- Route should be geographically logical (no random zig-zagging).\n"
+            )
+
+    # -------- [LOCAL-30] DETERMINISTIC SELECTION: documented works fill first --------
+    # When a museum venue has enough catalogue/SPARQL works to fill the tour,
+    # use those directly as Phase 3A output. No GPT randomness, no fabrication.
+    # This is the ONLY path that guarantees reproducibility.
+    _deterministic_fill_used = False
+    if tour_category == 'museum' and _museum_venue_name:
+        try:
+            from venue_resolver import resolve_venue, fetch_venue_works, build_canonical_titles_from_works, cache_get as _det_cache_get
+            from story_miner import extract_catalogue_works_from_pages, fetch_venue_narrative_corpus
+            
+            _det_city_hint = ""
+            if "," in location:
+                parts = [p.strip() for p in location.split(",")]
+                _det_city_hint = parts[1] if len(parts) >= 2 else ""
+            _det_entity = resolve_venue(_museum_venue_name, _det_city_hint)
+            
+            if _det_entity and _det_entity.qid:
+                # Gather documented works from all sources
+                _det_documented = []  # List of {title, source} dicts
+                _det_seen_titles_norm = set()
+                
+                from story_miner import _normalize as _det_norm
+                
+                # Source 1: Catalogue works (highest confidence — museum-published)
+                _det_cache = _det_cache_get(_det_entity.qid) if _det_entity.qid else None
+                _det_catalogue_works = []
+                if _det_cache and _det_cache.get('pages'):
+                    _det_pages = _det_cache['pages']
+                    if isinstance(_det_pages, list):
+                        _det_catalogue_works = extract_catalogue_works_from_pages(_det_pages)
+                
+                for cw in _det_catalogue_works:
+                    _t = cw.get('title', '').strip()
+                    _tn = _det_norm(_t)
+                    if _t and _tn not in _det_seen_titles_norm:
+                        _det_documented.append({'title': _t, 'source': 'catalogue',
+                                                'material': cw.get('material', ''),
+                                                'period': cw.get('period', ''),
+                                                'origin': cw.get('origin', '')})
+                        _det_seen_titles_norm.add(_tn)
+                
+                # Source 2: SPARQL works (Wikidata-verified, second highest)
+                _det_sparql = fetch_venue_works(_det_entity.qid, _det_entity.language)
+                _det_sparql_seen_qids = set()
+                for w in _det_sparql:
+                    _wqid = w.get('qid', '')
+                    if _wqid in _det_sparql_seen_qids:
+                        continue
+                    _det_sparql_seen_qids.add(_wqid)
+                    _t = w.get('label_local', '') or w.get('label_en', '')
+                    _tn = _det_norm(_t)
+                    if _t and _tn not in _det_seen_titles_norm:
+                        _det_documented.append({'title': _t, 'source': 'sparql'})
+                        _det_seen_titles_norm.add(_tn)
+                
+                # Source 3: Cached canonical titles that survived LOCAL-24 filter
+                if _det_cache and _det_cache.get('canonical_titles'):
+                    for _ct in _det_cache['canonical_titles']:
+                        _tn = _det_norm(_ct)
+                        if _ct and _tn not in _det_seen_titles_norm:
+                            _det_documented.append({'title': _ct, 'source': 'canonical'})
+                            _det_seen_titles_norm.add(_tn)
+                
+                print(f"  [LOCAL-30] Deterministic selection: {len(_det_documented)} documented works "
+                      f"({len(_det_catalogue_works)} catalogue, {len(_det_sparql_seen_qids)} SPARQL)")
+                
+                # If documented works >= total_stops, fill deterministically
+                if len(_det_documented) >= total_stops:
+                    # Priority order: catalogue first (richest metadata), then SPARQL, then canonical
+                    _priority = {'catalogue': 0, 'sparql': 1, 'canonical': 2}
+                    _det_documented.sort(key=lambda d: _priority.get(d['source'], 9))
+                    
+                    # Apply bare-noun filter (shouldn't be needed but defence-in-depth)
+                    from story_miner import is_bare_generic_noun
+                    _det_documented = [d for d in _det_documented if not is_bare_generic_noun(d['title'])]
+                    
+                    # Take total_stops * 2 (D1v2 will filter, so give it room)
+                    _det_take = min(len(_det_documented), total_stops * 2)
+                    poi_list = [_new_poi(d['title']) for d in _det_documented[:_det_take]]
+                    
+                    print(f"  [LOCAL-30] DETERMINISTIC BYPASS: {len(poi_list)} documented works → Phase 3A SKIPPED")
+                    print(f"   Stops proposed (deterministic, no GPT):")
+                    for p in poi_list[:total_stops]:
+                        _src = next((d['source'] for d in _det_documented if d['title'] == p['name']), '?')
+                        print(f"     - {p['name']} [{_src}]")
+                    _deterministic_fill_used = True
+                else:
+                    print(f"  [LOCAL-30] Documented works ({len(_det_documented)}) < total_stops ({total_stops}) "
+                          f"— will use documented as base, GPT fills remainder")
+        except Exception as _det_err:
+            print(f"  [LOCAL-30] Deterministic selection check failed (falling through to Phase 3A): {_det_err}")
+            import traceback
+            traceback.print_exc()
 
     # -------- [LOCAL-30] DETERMINISTIC SELECTION: documented works fill first --------
     # When a museum venue has enough catalogue/SPARQL works to fill the tour,
