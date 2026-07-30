@@ -106,6 +106,9 @@ REQUIREMENTS for story-grounded spine:
 - Chapters with no grounding element are allowed only as connective tissue (no factual claims)
 - The closing_revelation MUST close the documented arc (return to the origin story's conclusion)
 - NEVER invent dates, intentions, quotes, or provenance not in the elements above
+- The tour_hook field MUST contain ONLY facts that appear verbatim in the elements above.
+  Do NOT add years, names, founding events, or causal claims beyond what the elements state.
+  If elements are sparse, use thematic/atmospheric framing instead of inventing history.
 """
         prompt += _story_injection
         print(f"  [§3] Story elements injected into spine prompt ({len(story_elements)} elements, mode=found)")
