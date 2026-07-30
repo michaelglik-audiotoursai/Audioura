@@ -59,6 +59,38 @@ signal for subscription-tier decisions.
 - Michael may check the current index value at any time; no need to wait for a round
   to finish.
 
+## 2026-07-29 evening — root cause found, loop premise revised
+
+LEAD traced the loop's ceiling to the DATA layer, not the fill logic:
+
+- The venue's verified catalogue holds **6 canonical titles**. The tour asks
+  for 8. Two slots can never be filled → -25 before anything else. Even a
+  flawless run tops out at **50/100** against a 75 target. Rounds 1-4
+  optimised inside a box whose lid was already fixed.
+- Every stop logged `No RAG context — cannot generate fact sheet`. Phase 5
+  wrote prose with **no source material at all** — the real reason every
+  stop scores THIN and invented artists keep appearing.
+- `venue_corpus.story_elements_json` was empty for **all 16 venues**. Three
+  silent breaks: `corpus_result.get('story_elements')` reads a key
+  `story_miner` never emits; `extract_story_elements_from_pages` /
+  `persist_story_elements` did not exist (ImportError swallowed by
+  try/except); and the real SQ3/SQ4 engine in `story_element_extractor.py`
+  had **zero production callers** — only tests and one pilot script. The
+  "11/11 suites green" everyone cited included suites exercising dead code.
+
+Dispatched LOCAL-18/19/20 against these. Results:
+
+| Task | Verdict | Outcome |
+|---|---|---|
+| LOCAL-19 | **APPROVED, merged @ 04e726d** | R4 replenishment confirmed executing live (3 rounds, honest 6/9) instead of `Target reached`. Carries the LOCAL-16 verified-only gate, which had never reached storied. Only branch shipping zero unverified content. |
+| LOCAL-18 | BOUNCED → LOCAL-21 | Wired the real engine; story elements 0/16 → 1/16 venues (Chagall, 3 typed). But shipped 4 unverified stops, produced zero elements for this venue, and the QA gate now REJECTS tours once real elements exist. |
+| LOCAL-20 | BOUNCED → LOCAL-22 | Fix A (verified stops immune to the 5.5b prose validator) is right but never fired, so unproven. Fix B disproven — title corruption reproduced verbatim, 7th consecutive round. |
+
+Strategic revision: the lever is **corpus and story supply**, not fallback
+policing. Reaching 75 on this venue is arithmetically impossible; either
+expand the corpus or cap requested stops at what a venue can support.
+
+
 ## Round history
 
 | Round | Date | Score | Cost | $/point | Verdict | Commit |
