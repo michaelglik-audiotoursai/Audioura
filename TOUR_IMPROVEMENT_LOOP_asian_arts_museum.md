@@ -174,6 +174,11 @@ This is not venue-specific: many municipal museums are hosted as a subsection of
 recur. Dispatched **LOCAL-33** to scope the crawl to the venue's own URL path prefix when `official_url` is a
 deep path (leaving bare-domain venues like maa.departement06.fr unchanged), apply the same scoping to
 visitor-info extraction, and lean harder on Wikipedia when a venue's own site section is thin.
+| 11 (LOCAL-33 merged) | 2026-07-30 | **Asian base 81.25 / total 89.4 HELD · generalization FIXED** | ~$0.03 | — | **Palais Lascaris 1 → 6 stops.** Root cause was never the classifier: the venue's `official_url` is a page on the City of Nice municipal portal, so the crawler was reading sports halls, municipal bylaws and the city's services-tariffs page (source of the `tarifs Télécharger le recueil 2026` visitor-info junk). LOCAL-33 scopes crawling to the venue's own URL path prefix when `official_url` is a deep path, and leaves bare-domain venues (maa.departement06.fr) on whole-site crawling — so the load-bearing venue takes a different code path and cannot be affected. Verified: only `/fr/culture/musees-et-galeries/palais-lascaris-le-palais` was fetched.
+Palais corpus now carries real provenance: `Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)`, `Harpe by Naderman (Paris, 1780)`, `Basse de violon by Paolo Antonio Testore (Milan, 1696)`, `Violes d'amour by Joannes Florenus Guidanti (Bologne, 1717)`.
+**Asian museum re-verified POST-merge across three runs — stop lists byte-identical (md5 197659fa, unchanged from pre-merge), `Closed on Tuesday. Free admission` in all three.** Musée Matisse also unchanged at 8/8 with English visitor info.
+Tested from the branch BEFORE merging — the practice that caught LOCAL-32, which was discarded for not fixing the defect and for rebasing onto rewritten history.
+REMAINING (LOCAL-34 dispatched): stop 4 titled `Most famous guitars` uses the section heading rather than the instrument's name (the object is real — Antonio de Torres, Almería 1884); `Raquel` still unexplained as stop 1; Palais visitor info absent (correct-by-omission, but worth confirming nothing sourceable exists). | ac76981 |
 
 ## Round 1 scope (LOCAL-14, dispatched 2026-07-29)
 
