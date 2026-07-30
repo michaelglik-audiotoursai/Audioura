@@ -2829,6 +2829,120 @@ exactly as LEAD last left it.
 Leave your submission as a `##### READY FOR REVIEW` heading under LOCAL-17 in
 `CLICKUP_OFFLINE_QUEUE.md`, same convention as every other task.
 
+##### READY FOR REVIEW
+
+**Commit:** 885b11d on `kiro/local17-tour-improvement-round4`
+**Date:** 2026-07-29
+
+**What was done:**
+
+1. **Fix 1 — G4 fail-closed exemption (REVERTED widening):**
+   - `content_qa_runner.py`: The staged round-3 changes had added
+     `_is_sparse_tier = (_ctx_tier in ('medium', 'thin', 'exhibit_museum'))`
+     which exempted medium/thin tiers from G4 fail-closed. Reverted to
+     `_is_exhibit_museum = (_ctx_tier == 'exhibit_museum')` only. Medium and
+     thin tiers stay fail-closed as intended by task wdvrdax1x3.
+   - D3(d) severity downgrade (FACTUAL→STYLE for title corruption) kept from
+     LOCAL-16 — this is defensible categorization, not a safety regression.
+   - `test_g4_false_positives.py`: **Rewritten to call the REAL
+     `content_qa_runner.run_qa()` function** instead of reimplementing its own
+     local `g4_would_fail_closed()` mock. Test (d) explicitly asserts that a
+     medium-tier museum tour without story_elements produces a FACTUAL fail.
+     This test now provides genuine coverage of the real gating logic —
+     previously it could pass regardless of what the real function did.
+
+2. **Fix 2 — Canonical-title deduplication in the LOCAL-16 gate:**
+   - After the D1v2-verified filter, `poi_list` is deduped by normalized
+     canonical title (looked up from `_d1_evidence_log`). First occurrence
+     wins. Prevents the "Portrait of Hàm Nghi" / "l'art en exil - Hàm Nghi"
+     class of duplicate where two candidate names verify against the same
+     Wikidata catalog entry.
+
+**Kept unchanged from LOCAL-16 (round 3):**
+- Centralized D1v2-verified-only choke-point gate
+- Title sanitization logic (pre-Phase-5 + assembly-time)
+- Story element extraction improvements
+- Phase 5 attribution guard root-cause notes
+
+**Live regeneration (own isolated container — never touched audioura-tour-generator-1):**
+
+Container: `audioura-test-local17` image, `audioura-test-local17-run` container,
+`--rm`, on `development_default` network. Port 5100:5000.
+
+```
+CACHE MISS: Asian arts museum, nice, France / museum / 8
+[LOCAL-16 GATE] D1v2-verified-only filter for museum tour
+  Removed 2 UNVERIFIED stop(s)
+  [LOCAL-16 GATE] Accepting honest shortfall: 6/8 stops
+CACHE STORE: Asian arts museum, nice, France / museum / 6
+```
+
+**Stop-by-stop read (6 stops, all D1v2-verified):**
+
+| # | Title | Verified | Notes |
+|---|---|---|---|
+| 1 | Hokusai – Voyage au pied du mont Fuji | ✅ | Correct canonical title |
+| 2 | La geste de Bouddha | ✅ | |
+| 3 | Les paysages de l'âme | ✅ | Attributes to "Ye Xin" (Phase-5 attribution, exhibit verified) |
+| 4 | L'art en exil - Hàm Nghi, Prince d'Annam (1871-1944) | ✅ | Correct content about the prince |
+| 5 | Disque | ✅ | Attributes to "Mei Lin" (Phase-5 attribution, exhibit verified) |
+| 6 | Fauteuil | ✅ | Title corruption in raw output ("Discover 'Stop 7' at...") — same persistent class |
+
+- **Zero fabricated stops** (same bar as round 3)
+- **Zero duplicate canonical titles** (dedup code present, no duplicates to remove this run)
+- **Title corruption persists** (stop 6, same as rounds 0-3 — lower priority per task spec)
+- **Phase-5 attribution fabrication persists for stops 3 and 5** (the gate cannot fix this —
+  the exhibits ARE real/verified; GPT invents artist names during description generation.
+  This is the same "Mei Lin" class seen in rounds 0-2, now correctly confined to verified
+  exhibits only.)
+
+**Second-venue spot-check (Musee Matisse, Nice, France):**
+
+```
+CACHE MISS: Musee Matisse, Nice, France / museum / 8
+[LOCAL-16 GATE] All 8 stops are D1v2-verified ✓
+CACHE STORE: Musee Matisse, Nice, France / museum / 8
+```
+
+Stops: Figure à l'ombrelle, Still Life, Lectrice à la table jaune, Matisse dans la
+collection Nahmad, Nature morte aux grenades, Nature morte à la statuette africaine,
+Blue Nude IV, Nu dans un fauteuil, plante verte — all verified, no fabricated stops,
+no duplicates.
+
+**Regression suites (13/14 PASS):**
+- test_spine_generator.py: PASS
+- test_w4_matcher.py: PASS
+- test_w7_wiring.py: PASS
+- test_sq2_fixtures.py: PASS
+- test_sq3_fixtures.py: PASS
+- test_sq4_merge.py: PASS
+- test_tier_computation.py: PASS
+- test_palais_fix_lead_fixture.py: PASS
+- test_b6_generation_wiring.py: PASS
+- test_f4_cache_roundtrip.py: PASS
+- test_venue_identity.py: PASS
+- test_local12_fact_retrieval_fix.py: PASS
+- test_g4_false_positives.py: PASS (including G4 fail-closed scoping via REAL run_qa)
+- test_contained_regression.py: SKIP (requires live localhost:5000 — integration test)
+
+**G4 test coverage note:** `test_g4_false_positives.py` now calls the REAL
+`content_qa_runner.run_qa()` function (not a local mock). Verified by
+inspecting the test: it imports `run_qa` from `content_qa_runner`, resets the
+module's `FACTUAL_FAIL_COUNT` global, calls `run_qa()` with the test tour text
+and venue_context, then asserts on the real module's `FACTUAL_FAIL_COUNT` value.
+Test (d) (`tier='medium'`) explicitly asserts `medium_fails >= 1` — this would
+FAIL if the real G4 exemption were ever widened beyond `exhibit_museum`.
+
+**API cost:** $0.0277 (13,835 tokens) for the Asian Arts Museum tour.
+
+**Process compliance:** Never touched `audioura-tour-generator-1`. Built own image
+(`audioura-test-local17`), ran own container (`audioura-test-local17-run --rm`),
+stopped and auto-removed after testing. Shared container confirmed untouched:
+```
+docker ps | grep audioura-tour-generator-1
+→ Up 5 minutes (healthy)
+```
+
 ---
 
 ## Sync Plan (minimum-API checklist — work this top to bottom once ClickUp recovers)
