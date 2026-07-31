@@ -130,6 +130,51 @@ def generate_news():
         # Generate unique article ID
         article_id = str(uuid.uuid4())
         
+        # ── NEWS CACHE CHECK ────────────────────────────────────────────────
+        # Before paying for generation, check if identical content is already cached.
+        # Cache key = SHA256(normalized_article_text | major_points_count).
+        # Matches tour_cache_layer1 pattern: check → hit → meter at $0.00 → return.
+        _cache_hit = False
+        _cached_article_id = None
+        try:
+            _db_url = f"postgresql://{os.getenv('DB_USER', 'admin')}:{os.getenv('DB_PASSWORD', 'password123')}@{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', '5433')}/{os.getenv('DB_NAME', 'audiotours')}"
+            from news_cache_layer1 import get_cached_news
+            _cache_result = get_cached_news(article_text, major_points_count, _db_url)
+            if _cache_result is not None:
+                _cached_article_id, _cached_audio = _cache_result
+                _cache_hit = True
+                logging.info(f"[NEWS_CACHE] HIT — reusing article_id={_cached_article_id} for request from {secret_id}")
+        except Exception as _cache_err:
+            # D14: instrumentation fails open — cache miss does not block generation
+            logging.warning(f"[NEWS_CACHE] Check failed (proceeding without cache): {_cache_err}")
+        
+        if _cache_hit:
+            # ── CACHE HIT PATH ──────────────────────────────────────────────
+            # Meter at $0.00 with cache_hit=true, matching the tour path.
+            try:
+                from cost_meter import record_operation
+                from cost_rates import CACHE_HIT_COST_USD
+                record_operation(
+                    operation_type="news_cache_hit",
+                    our_cost_usd=CACHE_HIT_COST_USD,
+                    cache_hit=True,
+                    user_id=secret_id,
+                    job_id=_cached_article_id,
+                    breakdown={"tts": 0.0, "llm": 0.0, "source": "news_cache"},
+                )
+                logging.info(f"[COST_METER] CACHE_HIT | news_cache_hit | $0.00 | user={secret_id} | job={_cached_article_id}")
+            except Exception as _meter_err:
+                # D14: instrumentation fails open
+                logging.warning(f"[NEWS_CACHE] Metering failed (non-fatal): {_meter_err}")
+            
+            return jsonify({
+                "status": "success",
+                "article_id": _cached_article_id,
+                "message": "News article served from cache",
+                "cache_hit": True
+            })
+        # ── END CACHE CHECK ─────────────────────────────────────────────────
+        
         conn = get_db_connection()
         cursor = conn.cursor()
         
@@ -196,6 +241,24 @@ def generate_news():
             raise Exception(f"News processor failed: {processor_response.text}")
         
         logging.info(f'News generation completed successfully for {article_id}')
+        
+        # ── CACHE STORE ──────────────────────────────────────────────────────
+        # Store the freshly generated article in the cache for future hits.
+        try:
+            _db_url = f"postgresql://{os.getenv('DB_USER', 'admin')}:{os.getenv('DB_PASSWORD', 'password123')}@{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', '5433')}/{os.getenv('DB_NAME', 'audiotours')}"
+            from news_cache_layer1 import store_news
+            store_news(
+                article_text=article_text,
+                major_points_count=major_points_count,
+                article_id=article_id,
+                db_url=_db_url,
+                request_string=request_string,
+                content_length=len(article_text),
+            )
+        except Exception as _store_err:
+            # D14: instrumentation fails open — cache store failure does not block response
+            logging.warning(f"[NEWS_CACHE] Store failed (non-fatal): {_store_err}")
+        # ── END CACHE STORE ─────────────────────────────────────────────────
         
         # ── [LOCAL-69] Meter news generation cost ───────────────────────────
         # Cost model (verified by code trace):
@@ -268,7 +331,8 @@ def generate_news():
         return jsonify({
             "status": "success",
             "article_id": article_id,
-            "message": "News article processed successfully"
+            "message": "News article processed successfully",
+            "cache_hit": False
         })
         
     except Exception as e:

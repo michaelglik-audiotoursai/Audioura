@@ -54,7 +54,7 @@ def test_cost_meter_valid_types():
     expected = {
         "tour_generate", "tour_cache_hit",
         "translation_generate", "translation_cache_hit",
-        "news_generate", "photo_extension",
+        "news_generate", "news_cache_hit", "photo_extension",
     }
     assert expected == VALID_OPERATION_TYPES, f"Mismatch: {expected - VALID_OPERATION_TYPES}"
     print("PASS: test_cost_meter_valid_types")

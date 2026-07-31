@@ -10,6 +10,7 @@ Operation types:
     translation_generate    — fresh translation (Google Translate + TTS)
     translation_cache_hit   — translation already existed (cost ≈ 0)
     news_generate           — fresh news audio generation
+    news_cache_hit          — news served from cache (cost ≈ 0)
     photo_extension         — (future) photo-based tour extension
 
 Usage:
@@ -44,6 +45,7 @@ VALID_OPERATION_TYPES = frozenset([
     "translation_generate",
     "translation_cache_hit",
     "news_generate",
+    "news_cache_hit",
     "photo_extension",
 ])
 
