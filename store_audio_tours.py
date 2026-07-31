@@ -88,17 +88,21 @@ def store_audio_tour(tour_name, request_string, zip_path, lat=None, lng=None):
             (tour_name, request_string)
         )
         existing_tour = cur.fetchone()
-        
+
+        # LOCAL-50: persist zip_filename for deterministic resolution
+        zip_filename = os.path.basename(zip_path)
+
         if existing_tour:
             # Update existing tour
             if has_audio_tour and has_lat and has_number_requested:
                 cur.execute(
                     """
                     UPDATE audio_tours 
-                    SET audio_tour = %s, number_requested = number_requested + 1, lat = %s, lng = %s
+                    SET audio_tour = %s, number_requested = number_requested + 1, lat = %s, lng = %s,
+                        zip_filename = %s
                     WHERE id = %s
                     """,
-                    (psycopg2.Binary(zip_data), lat, lng, existing_tour[0])
+                    (psycopg2.Binary(zip_data), lat, lng, zip_filename, existing_tour[0])
                 )
             else:
                 # Fallback if columns don't exist
@@ -110,16 +114,16 @@ def store_audio_tour(tour_name, request_string, zip_path, lat=None, lng=None):
                     """,
                     (tour_name, request_string, existing_tour[0])
                 )
-            print(f"Updated existing tour: {tour_name}")
+            print(f"Updated existing tour: {tour_name} (zip={zip_filename})")
         else:
             # Insert new tour
             if has_audio_tour and has_lat and has_number_requested:
                 cur.execute(
                     """
-                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng)
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng, zip_filename)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
                     """,
-                    (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng)
+                    (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, zip_filename)
                 )
             else:
                 # Fallback if columns don't exist
@@ -130,7 +134,7 @@ def store_audio_tour(tour_name, request_string, zip_path, lat=None, lng=None):
                     """,
                     (tour_name, request_string)
                 )
-            print(f"Inserted new tour: {tour_name}")
+            print(f"Inserted new tour: {tour_name} (zip={zip_filename})")
         
         # Commit the transaction
         conn.commit()
