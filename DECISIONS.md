@@ -158,3 +158,62 @@ feature risk. Only code is isolated on `subscribed`.
 LOCAL-61's commit swept up loose debug output from the repo root, violating
 the standing hygiene rule in `remind_mobile_ai.md`. Untracking is reversible
 and keeps the files; deleting them is not, so it was not done.
+
+---
+
+## D11 — my bounce of LOCAL-60 over `search: 0.00` was wrong; withdrawn
+
+**Decision: `search: 0.00` is correct. Criterion withdrawn, LOCAL-60 approved.**
+
+I bounced LOCAL-60 partly demanding `search > 0` in the cost breakdown,
+assuming corpus mining costs money. It does not. `story_miner.py` has **no
+cost accounting at all** — it performs plain HTTP fetches of Wikipedia and
+museum websites, which are free. The `search` component comes from
+`work_story_searcher.py` (`total_queries * 0.001`, a paid API), and
+`generate_tour_text.py` imports only its *cache* helpers
+(`normalize_work_key`, `work_stories_get`), never the paid path.
+
+LOCAL-60 explained this correctly rather than fabricating a number. The rest
+of that bounce — the simulated ledger row — was justified and was fixed.
+
+Lesson for future bounces: verify that an acceptance criterion is
+*satisfiable* before demanding it. I invented a requirement from an
+assumption about how the code works, having just been burned by the opposite
+error.
+
+## D12 — commit `2f7e2fd` on `storied` is titled "x"
+
+**Decision: leave it, document it here. No history rewrite.**
+
+A shell fallback in my merge command (`-m "x"`) was intended to fail and
+instead succeeded, so the LOCAL-60 merge into `storied` carries a
+meaningless message. It is already pushed. Amending would require a
+force-push — an irreversible operation that needs Michael — over a cosmetic
+problem.
+
+For the record: **`2f7e2fd` is the merge of `kiro/local60-cost-metering`
+into `storied`** (per-operation cost metering).
+
+Side effect: LOCAL-60's code is now on both `storied` and `subscribed`
+rather than `subscribed` alone. `cost_meter.py` is general infrastructure —
+useful on the mainline and carrying no Subscribed product behaviour — so I
+am not reverting it. LOCAL-80 (dispatcher base-branch fix) remains the real
+fix for the isolation problem.
+
+## D13 — fixed LOCAL-63's build break myself instead of bouncing
+
+**Decision: applied the one-line `.dockerignore` fix directly.**
+
+`.dockerignore:13` `build_*.py` excluded `build_manifest.py`, so LOCAL-63's
+image could not build at all — exit code 2. A full bounce round-trip for one
+`!build_manifest.py` line would have cost ~10 minutes of queue time for a
+change I could verify immediately. Also passed `GIT_SHA` through
+docker-compose, without which the new health endpoint reported
+`code_sha: "unknown"` and the guard was pointless.
+
+Verified after: `manifest_ok: true`, container FRESH,
+`code_sha: 6ccad55f9ccc474c76a85d7b3f5eeb5b509e4749`.
+
+**Third `.dockerignore`-caused build failure this session.** LOCAL-64 now
+carries a task to check every Dockerfile `COPY` source against
+`.dockerignore` so this class of bug dies permanently.
