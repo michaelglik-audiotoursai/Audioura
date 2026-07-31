@@ -20,19 +20,30 @@ import traceback
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 
-# Ensure project root is on path
+# Ensure project root and tests/ are on path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from db_connection import get_db_config
+
+# Set env defaults from shared helper BEFORE importing service modules
+# (entitlements, wallet_ledger use os.getenv with Docker-internal defaults)
+_cfg = get_db_config()
+os.environ.setdefault("DB_HOST", _cfg["host"])
+os.environ.setdefault("DB_PORT", _cfg["port"])
+os.environ.setdefault("DB_NAME", _cfg["dbname"])
+os.environ.setdefault("DB_USER", _cfg["user"])
+os.environ.setdefault("DB_PASSWORD", _cfg["password"])
+
 import psycopg2
 
-# Database connection matching service config
+# Database connection via shared helper (defaults to port 5433)
 DB_CONFIG = {
-    'host': os.getenv('DB_HOST', 'localhost'),
-    'database': os.getenv('DB_NAME', 'audiotours'),
-    'user': os.getenv('DB_USER', 'admin'),
-    'password': os.getenv('DB_PASSWORD', 'password123'),
-    'port': os.getenv('DB_PORT', '5432'),
+    'host': _cfg['host'],
+    'database': _cfg['dbname'],
+    'user': _cfg['user'],
+    'password': _cfg['password'],
+    'port': _cfg['port'],
 }
 
 PASS_COUNT = 0
