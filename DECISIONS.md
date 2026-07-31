@@ -263,30 +263,139 @@ ceiling without that caveat. An in-flight check (accumulated cost between
 stops, stopping early) is the real version, and is proposed as a follow-up
 rather than built now.
 
+---
+
 ## D16 — `ppu` is the canonical tier identifier, not `pay_per_use`
 
-**Decision: `ppu` is the canonical identifier for the Pay-Per-Use tier
-everywhere in the system. `pay_per_use` must not appear as a machine
-identifier anywhere.**
+**Decision: `ppu` wins. LOCAL-68 reconciles all 17 occurrences.**
 
-**The problem.** Two vocabularies emerged independently:
-- `ppu`: used by `plans.plan_id` (DB primary key), `users.plan` (FK target),
-  `entitlements.py` dispatch, `subscriptions.tier` constraint.
-- `pay_per_use`: used by `wallet_ledger.py` tier parameter and
-  `wallet_api.py` response and plan config.
+Two vocabularies emerged for one tier because three tasks built in parallel:
 
-Each component was internally consistent so nothing failed until values
-crossed boundaries — an API response saying `pay_per_use` would never match
-a `users.plan` value of `ppu`, and a remedy of `switch_to_ppu` sits next to
-a plan called `pay_per_use`.
+```
+plans.plan_id (DB, LOCAL-61)           'ppu'
+entitlements.py dispatch (LOCAL-67)    'ppu'
+entitlements remedy (LOCAL-67)         'switch_to_ppu'
+wallet_ledger.py tier (LOCAL-66)       'pay_per_use'
+wallet_api.py response (LOCAL-68)      'pay_per_use'
+```
 
-**Rationale.** `ppu` is the `plans.plan_id` primary key and a foreign key
-target from `users.plan`. It is the hardest value to change (schema, data,
-constraints) and the system of record. All other code adapts to match it.
+Nothing fails today — each component is internally consistent. It breaks the
+moment a value crosses a boundary: the app is told its plan is
+`pay_per_use`, handed a remedy named `switch_to_ppu`, and any server-side
+comparison against `users.plan` quietly fails to match.
 
-The human-facing `display_name` stays "Pay-Per-Use" — only the machine
-identifier changes.
+`ppu` is canonical because it is the `plans.plan_id` primary key and the
+target of a foreign key from `users.plan`. Changing it means a migration
+with an FK rewrite; changing the wallet layer's string is a rename.
+`display_name` stays human-facing ("Pay-Per-Use") — only the identifier
+changes.
 
-**Guard:** `test_plan_matches_users_table` in `tests/test_wallet_api.py`
-asserts the API's `plan` value equals a valid `plans.plan_id` for every
-tier. This test fails if the vocabulary splits again.
+The durable fix is the test, not the rename: LOCAL-68 must assert that the
+API's `plan` value for a user equals that user's `users.plan` in the
+database. Without it, parallel tasks will re-diverge.
+
+## D17 — merged LOCAL-67 while bouncing LOCAL-68, though they share the split
+
+**Decision: merge LOCAL-67 now, fix the vocabulary in LOCAL-68.**
+
+Both touch the naming split, but LOCAL-67 already uses the canonical `ppu`
+throughout — it is on the correct side. Holding it back would idle a
+correct, tested component (23/23 passing) to wait for a rename in someone
+else's file.
+
+LOCAL-68 was bounced anyway for a `Dockerfile.orchestrator` conflict with
+LOCAL-67, so the rename costs no extra round-trip.
+
+---
+
+## D18 — news has no cache, and that is now a tracked gap not a silent one
+
+**Decision: merge LOCAL-69's metering as-is; the cache is LOCAL-73.**
+
+LOCAL-69 established the real news cost model and corrected LOCAL-60's
+claim that the path is TTS-only — it also makes a conditional GPT-3.5 call
+when the extracted title exceeds 12 words. Measured live:
+
+```
+news_generate  $0.006300  {llm: 0.0,     tts: 0.0063}
+news_generate  $0.011352  {llm: 0.00032, tts: 0.011032}
+```
+
+An article costs roughly a tenth of a tour.
+
+It also reported, without being asked to fix it, that **no cache layer
+exists for news**. So two users requesting the same article each pay full
+generation cost — we pay Amazon twice to synthesise identical text, and bill
+twice for it. That contradicts Michael's rule, stated for tours but applying
+equally to articles: *"it cost to us and to our clients nothing when/if they
+download a tour already pre-created."*
+
+Merging the metering anyway, because measuring the gap is strictly better
+than not measuring it, and the pricing engine needs the operation type to
+exist. LOCAL-73 builds the cache.
+
+## D19 — the hardcoded-5432 problem gets its own task
+
+**Decision: LOCAL-77, because it is masking real failures, not merely
+annoying.**
+
+Three suites hardcode `localhost:5432` while Postgres publishes **5433**:
+`test_local30_acceptance.py`, `test_local67_entitlement_gate.py`,
+`test_wallet_ledger.py`. Each looked like total failure and was in fact a
+connection refusal.
+
+The danger is not the wasted minute. It is that a connection-refused failure
+is indistinguishable from a real one, so it trains everyone to dismiss red
+results — and one of those red results was real. LOCAL-68's rename genuinely
+broke `test_wallet_ledger.py`, and that signal could easily have been waved
+off as "the port thing again".
+
+LOCAL-77 requires a distinct message and exit code for an unreachable
+database, so the two can never again look alike.
+
+---
+
+## D20 — the $2/month fee must NOT be deducted from credits
+
+**Decision: the monthly fee is billed by Apple against the card. Credits pay
+for usage only. Record the fee in the transaction list for transparency, but
+it must not reduce the credit balance.**
+
+LOCAL-82's end-to-end run exposed the current behaviour:
+
+```
+step 2   PPU monthly fee debited ($2.00)   balance  -$2.00
+step 3   Top-up $10                        balance   $8.00
+```
+
+So a $10 top-up yields $8.00 of usable credit — while Apple has *also*
+charged $2.00 to the card for the auto-renewing subscription. The user pays
+**$12 and receives $8 of usage**. They are billed for the fee twice.
+
+Michael's spec lists them as separate things: *"$10 USD credits ... $2USD per
+month fee."* Credits are the usage wallet; the fee is a platform charge.
+Under IAP they are two distinct product types — an auto-renewable
+subscription and a consumable — and Apple collects both directly. Deducting
+the fee from credits invents a third charge that nobody authorised.
+
+**Consequences:**
+- `monthly_fee()` must record a movement that is visible in the Wallet
+  transaction list but does not change `balance_cents`, or must not touch the
+  wallet at all with the fee surfaced from subscription state instead.
+- A $10 top-up must leave a $10.00 balance.
+- LOCAL-82's E2E expectations change accordingly: step 2 leaves the balance
+  at $0.00, step 3 at $10.00.
+
+If Michael intends the fee to come out of credits, this is a one-line
+reversal — but it should be his explicit choice, not an artefact of the
+ledger treating every movement as a balance change.
+
+## D21 — merged LOCAL-82 despite it asserting the behaviour D20 changes
+
+**Decision: merge it. The test accurately describes what the code does today,
+and it is the artefact that found the charging gap.**
+
+Rewriting its expectations before the behaviour changes would be writing a
+test against code that does not exist. LOCAL-83 changes the behaviour and
+updates the expectations in the same commit, so the suite is never green
+against a state nobody intends.
