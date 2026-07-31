@@ -64,7 +64,7 @@ def _get_db_url() -> Optional[str]:
 
 def _ensure_table(conn) -> None:
     """Create cost_ledger table if not present (idempotent, for dev convenience).
-    Production should use migration/sql/005_cost_ledger.sql.
+    Production should use migration/sql/005_cost_ledger.sql + 007_cost_ledger_description.sql.
     """
     with conn.cursor() as cur:
         cur.execute("""
@@ -76,8 +76,13 @@ def _ensure_table(conn) -> None:
                 cache_hit BOOLEAN NOT NULL DEFAULT FALSE,
                 job_id VARCHAR(128),
                 breakdown JSONB,
+                description VARCHAR(256),
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )
+        """)
+        # Add description column if table already exists without it (migration path)
+        cur.execute("""
+            ALTER TABLE cost_ledger ADD COLUMN IF NOT EXISTS description VARCHAR(256)
         """)
         # Index for user-level queries and time-range aggregations
         cur.execute("""
@@ -98,6 +103,7 @@ def record_operation(
     user_id: Optional[str] = None,
     job_id: Optional[str] = None,
     breakdown: Optional[dict] = None,
+    description: Optional[str] = None,
 ) -> Optional[str]:
     """Record a billable operation in the cost ledger.
 
@@ -109,6 +115,8 @@ def record_operation(
         job_id: Correlation ID (job_id from the orchestrator or generation service).
         breakdown: Optional JSON-serializable dict with component costs
                    e.g. {"llm": 0.05, "tts": 0.01, "search": 0.005}
+        description: Human-readable label for Wallet display,
+                     e.g. "Article: How I Built This" or "Tour: French Riviera biking".
 
     Returns:
         The ledger row UUID as a string, or None on failure.
@@ -133,16 +141,20 @@ def record_operation(
     row_id = str(uuid.uuid4())
     breakdown_json = json.dumps(breakdown) if breakdown else None
 
+    # Truncate description to 256 chars (DB column limit)
+    if description and len(description) > 256:
+        description = description[:253] + "..."
+
     try:
         conn = psycopg2.connect(db_url)
         _ensure_table(conn)
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO cost_ledger (id, operation_type, user_id, our_cost_usd, cache_hit, job_id, breakdown, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO cost_ledger (id, operation_type, user_id, our_cost_usd, cache_hit, job_id, breakdown, description, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (row_id, operation_type, user_id, our_cost_usd, cache_hit, job_id, breakdown_json, datetime.now(timezone.utc)),
+                (row_id, operation_type, user_id, our_cost_usd, cache_hit, job_id, breakdown_json, description, datetime.now(timezone.utc)),
             )
         conn.commit()
         conn.close()
