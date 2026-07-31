@@ -1,0 +1,80 @@
+{
+  "timestamp": "2026-07-31T00:44:15.122938",
+  "services": [
+    {
+      "name": "Newsletter Processor",
+      "status": "OFFLINE",
+      "code": "HTTPConnectionPool(host='localhost', port=5017): Max retries exceeded with url: /health (Caused by NewConnectionError(\"HTTPConnection(host='localhost', port=5017): Failed to establish a new connection: [Errno 61] Connection refused\"))"
+    },
+    {
+      "name": "News Orchestrator",
+      "status": "ONLINE",
+      "code": 200
+    },
+    {
+      "name": "News Generator",
+      "status": "ONLINE",
+      "code": 200
+    },
+    {
+      "name": "News Processor",
+      "status": "ONLINE",
+      "code": 200
+    },
+    {
+      "name": "Polly TTS",
+      "status": "ONLINE",
+      "code": 200
+    },
+    {
+      "name": "Tour Orchestrator",
+      "status": "ONLINE",
+      "code": 200
+    },
+    {
+      "name": "Tour Processor",
+      "status": "ONLINE",
+      "code": 200
+    },
+    {
+      "name": "Map Delivery",
+      "status": "ONLINE",
+      "code": 200
+    },
+    {
+      "name": "Coordinates",
+      "status": "ONLINE",
+      "code": 200
+    },
+    {
+      "name": "Treats",
+      "status": "ONLINE",
+      "code": 200
+    }
+  ],
+  "components": [
+    {
+      "name": "Database",
+      "working": true
+    },
+    {
+      "name": "Audio Generation",
+      "working": true
+    },
+    {
+      "name": "Recent Processing",
+      "working": false
+    },
+    {
+      "name": "Pattern Recognition",
+      "working": false
+    }
+  ],
+  "overall_health": 0.7,
+  "summary": {
+    "services_online": 9,
+    "total_services": 10,
+    "components_working": 2,
+    "total_components": 4
+  }
+}

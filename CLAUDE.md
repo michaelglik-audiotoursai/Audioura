@@ -176,6 +176,19 @@ than it feels:
 Michael's own words, 2026-07-31: *"when no serious risk that can not be
 undone: even git push can be undone!"*
 
+**Do not hand decisions back to Michael either.** Deferring a judgement call
+is the same failure as asking permission — it stalls the queue and puts work
+on him. Michael, 2026-07-31: *"do not make any strategy to be mine: make
+your own judgement... Every time when you think of delegating decisions to
+me, ask yourself, how risky it is and is it irreversible... If not, make
+decision and record it for me to review when I come back."*
+
+Design choices, naming, version schemes, defaults, product wording,
+architecture — **decide them**, write the reasoning to `DECISIONS.md`, and
+move on. He overturns what he dislikes; that is cheaper for him than being
+asked. Phrases like "that's your call" or "your decision" about a reversible
+choice are a smell — replace them with a decision and a rationale.
+
 **If one action is gated, guard it and keep working on everything else.**
 The pattern that works: park the gated task file outside the dispatcher glob
 (`PARKED_kiro_task_LOCAL-NN.md`) and have it self-abort unless a sentinel
