@@ -1,87 +1,77 @@
 ##### READY FOR REVIEW
 
-# LOCAL-73: News Article Cache
+# LOCAL-73: News Article Cache — Rebased onto `subscribed`
 
-**Commit:** `9d0dbfa` on `kiro/local73-news-cache`  
-**Depends on:** LOCAL-69 (merged into `subscribed` via `storied`)
-
----
-
-## Design decisions
-
-### Cache key: content-hash, not URL
-
-**Key = SHA256(whitespace-normalized article_text | major_points_count)**
-
-Why not URL?
-- Articles get republished at different URLs (same content, new URL)
-- Same URL can serve updated content over time
-- The text IS the article — hashing it gives exact identity
-
-Content normalization: collapse all whitespace to single spaces, strip leading/trailing. This handles trivial reformatting (trailing newlines, double spaces) without changing meaning.
-
-`major_points_count` in the key because different point counts produce different narration shapes (different topic splits, different audio files).
-
-### TTL: 24 hours (configurable)
-
-News is inherently perishable. Serving yesterday's article when the source has been corrected is worse than paying twice. 24h is conservative — most news consumption happens within hours of publication.
-
-Configurable via `NEWS_CACHE_TTL_HOURS` env var (no redeploy needed). Michael can tune from the field.
-
-TTL enforced at **read time** (the UPDATE query includes `WHERE created_at > NOW() - INTERVAL '24 hours'`). Stale entries remain in the table until opportunistic cleanup removes them — no background job needed.
-
-### Architecture: reference, not blob duplication
-
-`news_cache` stores only the `article_id` reference. The actual audio ZIP lives in `news_audios` (where it already is after generation). This avoids doubling storage for the large binary.
-
-On cache hit: look up the `article_id` → fetch ZIP from `news_audios` → return it.
+**Branch:** `kiro/local73-news-cache`  
+**Base:** `origin/subscribed` (includes LOCAL-69, LOCAL-77, LOCAL-68)  
+**Depends on:** LOCAL-69 (news metering) — preserved in full during rebase
 
 ---
 
-## Files changed
+## Rebase summary
+
+Rebased onto current `origin/subscribed` (commit `3411407`). The only conflict was
+in `news_orchestrator_service.py` — LOCAL-69's metering block vs LOCAL-73's
+cache-store + metering block. Resolution:
+
+1. **LOCAL-73's cache check** stays (before the pipeline) — unchanged
+2. **LOCAL-73's cache store** stays (after the pipeline) — stores article_id reference
+3. **LOCAL-69's detailed metering** replaces LOCAL-73's simple metering — preserves
+   `description` field, segmented TTS cost calculation, and LLM cost logic
+
+Also updated `tests/test_local69_news_metering.py`: flipped `test_no_news_cache_hit_type()`
+→ `test_news_cache_hit_type_exists()` since LOCAL-73 adds the type that LOCAL-69
+documented as missing.
+
+---
+
+## Files changed (vs `origin/subscribed`)
 
 | File | Change |
 |------|--------|
 | `news_cache_layer1.py` | **NEW** — cache module: `_cache_key()`, `get_cached_news()`, `store_news()`, `invalidate_expired()` |
 | `migration/sql/008_news_cache.sql` | **NEW** — DDL for `news_cache` table |
 | `cost_meter.py` | Added `"news_cache_hit"` to `VALID_OPERATION_TYPES` |
-| `news_orchestrator_service.py` | Cache check before generation; cache store + metering after |
+| `news_orchestrator_service.py` | Cache check before pipeline; cache store after; LOCAL-69 metering preserved |
 | `tests/test_local73_news_cache.py` | **NEW** — 39 tests (30 unit, 9 integration) |
 | `tests/test_local60_cost_metering.py` | Updated expected types set to include `news_cache_hit` |
+| `tests/test_local69_news_metering.py` | Updated: `news_cache_hit` now exists (was "not yet") |
+| `Dockerfile.news-orchestrator` | Added `COPY news_cache_layer1.py .` |
+| `SUBMISSION_LOCAL-73.md` | This file |
 
 ---
 
-## Live evidence — TTS not re-run (MEASURED, NOT INFERRED)
+## Live evidence — TTS not re-run (MEASURED on rebased code)
 
 ### Method
 
-Copied updated `news_cache_layer1.py`, `news_orchestrator_service.py`, and `cost_meter.py`
-into the running `news-orchestrator-1` container via `docker cp`, then restarted the
-container. The news-generator, news-processor, and polly-tts containers are live and
+Injected rebased `news_orchestrator_service.py`, `news_cache_layer1.py`, and `cost_meter.py`
+into the running `news-orchestrator-1` container via `docker cp` + restart. The
+news-generator, news-processor, and `audioura-polly-tts-1` containers are live and
 unmodified — they process real articles through the full pipeline.
 
-Polly TTS call count measured by counting `POST /synthesize` log entries in the
-`audioura-polly-tts-1-1` container before and after each request.
+Polly TTS call count measured by counting `POST /synthesize` log entries in
+`audioura-polly-tts-1-1` before and after each request.
 
 ### Sequence
 
-**Baseline:** Polly call count = 212
+**Baseline:** Polly call count = **229**
 
 #### Request 1 — Fresh generation (cache miss)
 
 ```
 $ curl -s -X POST http://localhost:5012/generate-news -H "Content-Type: application/json" \
-  -d '{"article_text": "Scientists at MIT announced today a groundbreaking discovery in quantum computing. The research team led by Dr. Sarah Chen has developed a new qubit architecture that maintains coherence for over 10 milliseconds at room temperature. This achievement could accelerate the timeline for practical quantum computers by a decade. The team published their findings in Nature Physics. Industry experts say this could revolutionize drug discovery and cryptography.", "request_string": "MIT Quantum Computing Breakthrough", "secret_id": "LIVE-CACHE-PROOF", "major_points_count": 3}'
+  -d '{"article_text": "Researchers at Stanford University published groundbreaking findings on Thursday regarding a new approach to carbon capture. The team led by Professor James Wu demonstrated a membrane technology that can extract CO2 from ambient air at 40 percent lower energy cost than existing direct air capture methods. The study, published in Science, shows the membrane operates at room temperature using only solar power. Industry analysts estimate this could reduce the cost of carbon removal from $600 per ton to under $350, making large-scale deployment economically viable for the first time.", "request_string": "Stanford Carbon Capture Breakthrough", "secret_id": "REBASE-PROOF-73", "major_points_count": 3}'
 
 {
-    "article_id": "53918de7-7558-44c7-ae10-3be9185a6d1b",
+    "article_id": "a53c0ecf-4c9c-4130-ba14-4884ebf80c3d",
     "cache_hit": false,
     "message": "News article processed successfully",
     "status": "success"
 }
 ```
 
-Polly call count after: **219** (7 TTS calls for the article)
+Polly count after: **236** (7 TTS calls for the article)
 
 #### Request 2 — Same article text (cache hit)
 
@@ -89,80 +79,139 @@ Polly call count after: **219** (7 TTS calls for the article)
 $ curl -s -X POST http://localhost:5012/generate-news [same payload]
 
 {
-    "article_id": "53918de7-7558-44c7-ae10-3be9185a6d1b",
+    "article_id": "a53c0ecf-4c9c-4130-ba14-4884ebf80c3d",
     "cache_hit": true,
     "message": "News article served from cache",
     "status": "success"
 }
 ```
 
-Polly call count after: **219** (ZERO additional TTS calls)
+Polly count after: **236** (ZERO additional TTS calls)
 
-#### Cost ledger state after both requests
+#### Cost ledger after both requests
 
 ```
- operation_type | our_cost_usd | cache_hit |                job_id                |          created_at
-----------------+--------------+-----------+--------------------------------------+-------------------------------
- news_generate  |     0.003648 | f         | 53918de7-7558-44c7-ae10-3be9185a6d1b | 2026-07-31 21:43:51.09078+00
- news_cache_hit |     0.000000 | t         | 53918de7-7558-44c7-ae10-3be9185a6d1b | 2026-07-31 21:44:15.013151+00
+ operation_type | our_cost_usd | cache_hit |                job_id                |                  description                  |          created_at
+----------------+--------------+-----------+--------------------------------------+-----------------------------------------------+-------------------------------
+ news_generate  |     0.011944 | f         | a53c0ecf-4c9c-4130-ba14-4884ebf80c3d | Article: Stanford Carbon Capture Breakthrough | 2026-07-31 22:41:19.918582+00
+ news_cache_hit |     0.000000 | t         | a53c0ecf-4c9c-4130-ba14-4884ebf80c3d |                                               | 2026-07-31 22:41:30.758282+00
 ```
 
-**This is the acceptance criterion:** first request metered `news_generate` at $0.003648,
-second request metered `news_cache_hit` at $0.000000. Polly call count did not increase.
+**Acceptance criterion met:** first request metered `news_generate` at $0.011944 with
+LOCAL-69's description field, second request metered `news_cache_hit` at $0.000000.
+Polly call count did not increase (236 → 236).
 
 #### Audio byte-identity confirmation
 
 ```
-Download 1 MD5: 2f662c666739e525d1c6bca661e1046f (755,534 bytes)
-Download 2 MD5: 2f662c666739e525d1c6bca661e1046f (755,534 bytes)
+Download 1 MD5: 62c82096fc74b76c18fb0ab8bcda0097 (937,405 bytes)
+Download 2 MD5: 62c82096fc74b76c18fb0ab8bcda0097 (937,405 bytes)
 Byte-identical: YES
 ```
 
 ### TTL invalidation (live)
 
 ```
-# Backdate cache entry to 25h ago (past 24h TTL)
-UPDATE news_cache SET created_at = NOW() - INTERVAL '25 hours' WHERE article_id = '53918de7-...';
+# Backdate cache entry 25h (past 24h TTL)
+UPDATE news_cache SET created_at = NOW() - INTERVAL '25 hours'
+  WHERE article_id = 'a53c0ecf-4c9c-4130-ba14-4884ebf80c3d';
 
-# Same article text, third request — cache miss due to TTL expiry
+# Request 3 — same text, cache expired → full regeneration
 {
-    "article_id": "55b79c0a-af46-4c74-8ecd-3d6303872b38",
+    "article_id": "504b49cc-b5df-4ab4-ac96-9c7babd6277b",
     "cache_hit": false,
     "message": "News article processed successfully",
     "status": "success"
 }
 
-Polly calls before: 219 → after: 226 (7 new TTS calls — full regeneration)
+Polly count: 236 → 243 (7 new TTS calls — full regeneration on TTL expiry)
 ```
 
-Final ledger shows three rows: generate, cache_hit, generate — as expected.
+Final ledger (3 rows): `news_generate` → `news_cache_hit` → `news_generate` — as expected.
 
 ---
 
-## Test suites
-
-### LOCAL-73 unit + integration: 39/39 pass
+## Test suites (all pass on rebased code)
 
 ```
 $ DATABASE_URL="postgresql://admin:password123@localhost:5433/audiotours" \
-  DB_PORT=5433 DB_HOST=localhost \
-  python3 tests/test_local73_news_cache.py --integration
-
-  30/30 unit checks passed
-  9/9 integration checks passed
+  DB_PORT=5433 DB_HOST=localhost python3 tests/test_local73_news_cache.py --integration
   39/39 checks passed
-```
 
-### Regression suites pass
-
-```
 $ python3 tests/test_local60_cost_metering.py
-=== ALL TESTS PASSED ===
+  === ALL TESTS PASSED ===
 
 $ python3 tests/test_local64_cost_ceiling.py
-Results: 31 passed, 0 failed
-=== ALL TESTS PASSED ===
+  Results: 31 passed, 0 failed === ALL TESTS PASSED ===
+
+$ python3 tests/test_local69_news_metering.py
+  === ALL LOCAL-69 TESTS PASSED ===
+
+$ python3 tests/test_wallet_ledger.py
+  RESULTS: 8 passed, 0 failed, 8 total
+
+$ python3 tests/test_wallet_api.py
+  Results: 53/53 passed, 0 failed ALL TESTS PASSED ✓
+
+$ python3 tests/test_local67_entitlement_gate.py
+  RESULTS: 23/23 passed, 0 failed
 ```
+
+---
+
+## Limitations — what is and is NOT proven
+
+### Proven live (real services, real DB, real Polly, rebased code)
+
+| What | How |
+|------|-----|
+| Cache miss → full pipeline → Polly called 7 times | Polly log count: 229 → 236 |
+| Cache hit → $0.00 metered, Polly NOT called | Polly log count: 236 → 236 (zero increase) |
+| Ledger: `news_generate` with real cost + LOCAL-69 `description` | Queried cost_ledger directly |
+| Ledger: `news_cache_hit` at $0.00 with `cache_hit=true` | Queried cost_ledger directly |
+| Audio byte-identical across downloads | MD5 match on 937KB ZIP |
+| TTL invalidation → full regeneration | Backdated 25h, Polly count 236 → 243 |
+| LOCAL-69's `description` field preserved through rebase | Ledger shows "Article: Stanford Carbon Capture Breakthrough" |
+
+### Proven with integration tests (real Postgres, mocked services)
+
+| What | How |
+|------|-----|
+| Cache key determinism + whitespace normalization | 39/39 tests pass |
+| hit_count increments on each cache hit | Integration test verifies hit_count=3 after 3 reads |
+| Expired entries not served (TTL enforcement at read time) | Backdated entry returns None |
+| `invalidate_expired()` removes stale entries | Integration test confirms deletion |
+| LOCAL-69 test suite passes (`news_cache_hit` now valid) | 12/12 tests pass |
+
+### NOT proven / cannot verify in this environment
+
+| What | Why |
+|------|-----|
+| Cloud Run inter-service auth (`_get_auth_headers`) | Local Docker uses unauthenticated HTTP; GCP metadata server not available |
+| Container Dockerfile builds correctly with `news_cache_layer1.py` | Live proof used `docker cp` to inject module; Dockerfile updated but not rebuilt |
+| Multi-user concurrency on cache | Single-user test; UPSERT handles race conditions by design but not load-tested |
+| Cache behaviour under very long article text (>100KB) | SHA256 handles any input length; not tested with extreme sizes |
+
+---
+
+## Design decisions (unchanged from pre-rebase)
+
+### Cache key: content-hash, not URL
+
+**Key = SHA256(whitespace-normalized article_text | major_points_count)**
+
+- Articles get republished at different URLs → URL not reliable
+- Same URL can serve updated content → URL not fresh
+- `major_points_count` in key because different counts produce different narration shapes
+
+### TTL: 24 hours (configurable via `NEWS_CACHE_TTL_HOURS` env var)
+
+News is perishable. 24h is conservative — most consumption happens within hours.
+TTL enforced at read time (UPDATE WHERE created_at > NOW() - INTERVAL). No background job.
+
+### Architecture: reference, not blob duplication
+
+`news_cache` stores only `article_id` reference. Audio ZIP lives in `news_audios` (no duplication).
 
 ---
 
@@ -176,55 +225,3 @@ Columns: cache_key (PK, VARCHAR 64), article_id, article_text_hash,
          hit_count, content_length
 Indexes: idx_news_cache_created_at, idx_news_cache_article_id
 ```
-
----
-
-## Limitations — what is and is NOT proven
-
-### Proven live (real services, real DB, real Polly)
-
-| What | How |
-|------|-----|
-| Cache miss → full pipeline → Polly called 7 times | Polly log count: 212 → 219 |
-| Cache hit → $0.00 metered, Polly NOT called | Polly log count: 219 → 219 (zero increase) |
-| Ledger rows: `news_generate` with real cost, `news_cache_hit` at $0.00 | Queried cost_ledger directly |
-| Audio byte-identical across downloads | MD5 match on 755KB ZIP |
-| TTL invalidation → full regeneration | Backdated 25h, Polly count 219 → 226 |
-
-### Proven with integration tests (real Postgres, mocked services)
-
-| What | How |
-|------|-----|
-| Cache key determinism + whitespace normalization | 39/39 tests pass |
-| hit_count increments on each cache hit | Integration test verifies hit_count=3 after 3 reads |
-| Expired entries not served (TTL enforcement at read time) | Backdated entry returns None |
-| `invalidate_expired()` removes stale entries | Integration test confirms deletion |
-
-### NOT proven / cannot verify in this environment
-
-| What | Why |
-|------|-----|
-| Cloud Run inter-service auth (`_get_auth_headers`) | Local Docker uses unauthenticated HTTP; GCP metadata server not available |
-| Container Dockerfile includes `news_cache_layer1.py` | Live proof used `docker cp` to inject the module; production deploy needs `Dockerfile.news-orchestrator` updated to `COPY news_cache_layer1.py .` |
-| Multi-user concurrency on cache | Single-user test; UPSERT handles race conditions by design but not load-tested |
-| Cache behaviour under very long article text (>100KB) | SHA256 handles any input length; not tested with extreme sizes |
-| `tests/db_connection.py` shared helper from LOCAL-77 | LOCAL-73 tests use inline `_get_db_url()` — migration to shared helper is a follow-up |
-
-### Known pre-existing issue (not introduced by LOCAL-73)
-
-`tests/test_news_quota_integration.py` T2 ("over quota → 429") fails with 401 — this is a
-pre-existing entitlements/auth issue from LOCAL-69's container state. The test file was not
-modified by LOCAL-73 (last commit: `0afe7ca`).
-
----
-
-## Dockerfile update needed for production
-
-`Dockerfile.news-orchestrator` must be updated to include the cache module:
-
-```dockerfile
-COPY news_cache_layer1.py .
-```
-
-This was bypassed for live proof via `docker cp`. The deployed image needs this COPY line
-before the cache will survive a container recreation.

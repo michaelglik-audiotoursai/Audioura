@@ -203,21 +203,17 @@ def test_news_generate_in_valid_types():
     print("PASS: test_news_generate_in_valid_types")
 
 
-def test_no_news_cache_hit_type():
-    """Document that there is NO news_cache_hit operation type yet.
+def test_news_cache_hit_type_exists():
+    """Verify news_cache_hit is now a valid operation type.
 
-    This is intentional — there is currently no cache layer for news articles.
-    Two users requesting the same article generate independently. A cache
-    would need deduplication at the orchestrator level (check if article_text
-    hash exists in news_audios before calling generator+processor).
-
-    Follow-up task proposed: add article deduplication and news_cache_hit metering.
+    LOCAL-73 added the news cache layer. The cache hit path meters at $0.00
+    with operation_type='news_cache_hit', matching the tour_cache_hit pattern.
     """
     from cost_meter import VALID_OPERATION_TYPES
-    assert "news_cache_hit" not in VALID_OPERATION_TYPES, (
-        "news_cache_hit should NOT exist yet — no cache layer for news"
+    assert "news_cache_hit" in VALID_OPERATION_TYPES, (
+        "news_cache_hit must exist — LOCAL-73 added the news cache layer"
     )
-    print("PASS: test_no_news_cache_hit_type (cache gap documented)")
+    print("PASS: test_news_cache_hit_type_exists (cache layer active)")
 
 
 def test_migration_007_valid():
@@ -278,7 +274,7 @@ if __name__ == "__main__":
     test_news_cost_calculation_with_llm()
     test_news_cost_model_arithmetic()
     test_news_generate_in_valid_types()
-    test_no_news_cache_hit_type()
+    test_news_cache_hit_type_exists()
     test_migration_007_valid()
     test_description_format()
     test_ensure_table_includes_description()
