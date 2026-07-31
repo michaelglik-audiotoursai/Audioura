@@ -208,7 +208,12 @@ class TranslationService:
             return None
     
     def translate_tour_with_audio(self, original_tour_id, target_language):
-        """Translate a tour with full audio generation preserving original HTML structure"""
+        """Translate a tour with full audio generation preserving original HTML structure.
+        
+        Returns:
+            tuple: (translated_tour_id or None, cache_hit: bool)
+                   cache_hit=True when a translation already existed and was returned as-is.
+        """
         conn = self.get_db_connection()
         try:
             cursor = conn.cursor()
@@ -221,7 +226,7 @@ class TranslationService:
             original_tour = cursor.fetchone()
             if not original_tour:
                 logging.error(f"Original tour {original_tour_id} not found")
-                return None
+                return None, False
             
             tour_content = original_tour[7]  # tour_content column
             original_zip_data = original_tour[3]  # audio_tour column
@@ -243,7 +248,7 @@ class TranslationService:
                 # Verify ZIP has actual audio before attempting fallback
                 if not original_zip_data:
                     logging.error(f"Tour {original_tour_id} has no tour_content AND no ZIP data — cannot translate")
-                    return None
+                    return None, False
                 try:
                     import io as _io
                     zip_bytes = original_zip_data.tobytes() if hasattr(original_zip_data, 'tobytes') else bytes(original_zip_data)
@@ -251,10 +256,11 @@ class TranslationService:
                         audio_files_in_zip = [n for n in _z.namelist() if n.startswith('audio_') and n.endswith('.mp3')]
                     if not audio_files_in_zip:
                         logging.error(f"Tour {original_tour_id} ZIP has no audio files and no tour_content — cannot translate")
-                        return None
+                        return None, False
                 except Exception:
                     pass
-                return self._translate_tour_from_zip(original_tour, target_language, zip_data_override=original_zip_data)
+                _zip_result = self._translate_tour_from_zip(original_tour, target_language, zip_data_override=original_zip_data)
+                return (_zip_result, False) if _zip_result else (None, False)
             
             logging.info(f"Using stored tour content: {len(tour_content)} characters")
             
@@ -266,7 +272,7 @@ class TranslationService:
             existing = cursor.fetchone()
             if existing:
                 logging.info(f"Translation already exists: {existing[0]}")
-                return existing[0]
+                return existing[0], True  # [LOCAL-60] Return cache_hit=True
             
             # Translate tour name and request string
             translated_name = self.translate_text(original_tour[1], target_language)
@@ -334,12 +340,12 @@ class TranslationService:
             conn.commit()
             
             logging.info(f"Created translated tour {new_tour_id} in {target_language} with {len(translated_stops)} stops")
-            return new_tour_id
+            return new_tour_id, False  # [LOCAL-60] Fresh translation, cache_hit=False
             
         except Exception as e:
             logging.error(f"Tour translation with audio error: {e}")
             conn.rollback()
-            return None
+            return None, False
         finally:
             conn.close()
     
@@ -1691,9 +1697,11 @@ def translate_content_with_audio():
         if lang == 'en':
             results[lang] = {'status': 'original', 'id': content_id}
             continue
-            
+        
+        # [LOCAL-60] translate_tour_with_audio now returns (id, cache_hit) tuple
+        _cache_hit = False
         if content_type == 'tour':
-            translated_id = translation_service.translate_tour_with_audio(content_id, lang)
+            translated_id, _cache_hit = translation_service.translate_tour_with_audio(content_id, lang)
         elif content_type == 'article':
             translated_id = translation_service.translate_article(content_id, lang)
         else:
@@ -1716,7 +1724,7 @@ def translate_content_with_audio():
             except Exception as e:
                 logging.warning(f"Could not fetch translated name for {translated_id}: {e}")
             
-            result_entry = {'status': 'translated', 'id': translated_id}
+            result_entry = {'status': 'translated', 'id': translated_id, 'cache_hit': _cache_hit}
             if translated_name:
                 result_entry['name'] = translated_name
             results[lang] = result_entry

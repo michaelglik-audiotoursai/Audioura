@@ -561,7 +561,8 @@ def search_stories_for_stop(stop: Dict, tour_type: str = 'contained',
         status = 'ok'
 
     # Cost estimate: Serper ~$1/1000 queries
-    estimated_cost = total_queries * 0.001
+    from cost_rates import search_cost
+    estimated_cost = search_cost(total_queries)
 
     return {
         'results': all_results,

@@ -112,7 +112,8 @@ DO NOT include directions to the next stop - these will be added separately.
             
             # Calculate cost (GPT-3.5-turbo pricing)
             tokens_used = result["usage"]["total_tokens"]
-            cost = tokens_used / 1000 * 0.002  # $0.002 per 1K tokens
+            from cost_rates import llm_cost
+            cost = llm_cost(tokens_used)
             
             # Parse orientation and description
             parts = description_text.split("Orientation:", 1)

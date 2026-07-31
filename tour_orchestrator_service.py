@@ -884,12 +884,51 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                     
                     if translation_response.status_code == 200:
                         translation_result = translation_response.json()
-                        translated_tour_id = translation_result.get('translated_tour_ids', {}).get(language)
+                        # [LOCAL-60] Extract translated_tour_ids for backward compat
+                        _translations = translation_result.get('translations', {})
+                        _lang_result = _translations.get(language, {})
+                        translated_tour_id = _lang_result.get('id')
+                        _translation_cache_hit = _lang_result.get('cache_hit', False)
+                        
+                        # Backward compat: older response format
+                        if not translated_tour_id:
+                            translated_tour_id = translation_result.get('translated_tour_ids', {}).get(language)
                         
                         if translated_tour_id:
-                            print(f"Translation successful! Translated tour ID: {translated_tour_id}")
+                            print(f"Translation successful! Translated tour ID: {translated_tour_id} (cache_hit={_translation_cache_hit})")
                             ACTIVE_JOBS[job_id]["translated_tour_id"] = translated_tour_id
                             ACTIVE_JOBS[job_id]["final_tour_id"] = translated_tour_id
+                            
+                            # [LOCAL-60] Meter translation cost
+                            try:
+                                from cost_meter import record_operation
+                                from cost_rates import CACHE_HIT_COST_USD
+                                if _translation_cache_hit:
+                                    record_operation(
+                                        operation_type="translation_cache_hit",
+                                        our_cost_usd=CACHE_HIT_COST_USD,
+                                        cache_hit=True,
+                                        user_id=user_id,
+                                        job_id=job_id,
+                                        breakdown={"translate": 0.0, "tts": 0.0},
+                                    )
+                                else:
+                                    # Estimate translation cost (Google Translate + Polly TTS)
+                                    # Typical tour: ~17k chars translate + ~8k chars TTS
+                                    from cost_rates import translation_cost, tts_cost
+                                    _est_translate = translation_cost(17000)
+                                    _est_tts = tts_cost(8000)
+                                    _total_translation_cost = _est_translate + _est_tts
+                                    record_operation(
+                                        operation_type="translation_generate",
+                                        our_cost_usd=_total_translation_cost,
+                                        cache_hit=False,
+                                        user_id=user_id,
+                                        job_id=job_id,
+                                        breakdown={"translate": _est_translate, "tts": _est_tts},
+                                    )
+                            except Exception as _meter_err:
+                                print(f"[LOCAL-60] Translation cost metering failed (non-fatal): {_meter_err}")
                         else:
                             print(f"Warning: Translation completed but no tour ID returned")
                             ACTIVE_JOBS[job_id]["final_tour_id"] = english_tour_id

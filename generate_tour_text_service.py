@@ -140,6 +140,28 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                 os.unlink(temp_path)
             return
         
+        # [LOCAL-60] Record operation cost immediately after generation (before QA gate)
+        # This ensures cache hits are always metered even if QA subsequently rejects.
+        try:
+            from cost_meter import record_operation
+            from generate_tour_text import _LAST_GENERATION_COST
+            _cost_info = _LAST_GENERATION_COST
+            _is_cache_hit = _cost_info.get("cache_hit", False)
+            _op_type = "tour_cache_hit" if _is_cache_hit else "tour_generate"
+            _our_cost = _cost_info.get("total_cost", 0.0)
+            _breakdown = _cost_info.get("breakdown", {})
+            record_operation(
+                operation_type=_op_type,
+                our_cost_usd=_our_cost,
+                cache_hit=_is_cache_hit,
+                user_id=user_id,
+                job_id=job_id,
+                breakdown=_breakdown,
+            )
+            print(f"[LOCAL-60] Cost metered: {_op_type} | ${_our_cost:.6f} | cache_hit={_is_cache_hit}")
+        except Exception as _meter_err:
+            print(f"[LOCAL-60] Cost metering failed (non-fatal): {_meter_err}")
+
         # [BLOCKER4c] QA gate — corrections on structured data, never deliver on exit 1
         if os.getenv('STORIED_MODE', 'false').lower() == 'true' and tour_text:
             import content_qa_runner
