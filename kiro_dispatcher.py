@@ -22,6 +22,7 @@ Usage:
 import argparse
 import fcntl
 import json
+import os
 import re
 import subprocess
 import sys
@@ -118,7 +119,51 @@ def recover_abandoned_tasks():
     return recovered
 
 
-def render_status(candidates, launched, paused, reboot_recovered):
+def pid_is_alive(pid):
+    """Check whether a process with the given PID is still running."""
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, ProcessLookupError):
+        return False
+
+
+PID_FROM_STARTED_RE = re.compile(r"dispatcher_pid=(\d+)")
+
+
+def check_worker_liveness():
+    """
+    For any task whose last record is STARTED, verify the recorded
+    dispatcher_pid is still alive. If it is not, append ABANDONED so the
+    task re-dispatches. The worktree is reused on retry, so in-flight work
+    is preserved — do not delete it.
+
+    This runs every dispatch tick (not only on reboot detection) so a worker
+    that dies mid-flight between reboots is caught within one tick interval.
+    """
+    abandoned = []
+    if not LOG_FILE.exists():
+        return abandoned
+
+    for task_path in find_task_files():
+        status, line = last_status_for(task_path.name)
+        if status != "STARTED":
+            continue
+        # Extract the PID from the STARTED line
+        pid_m = PID_FROM_STARTED_RE.search(line or "")
+        if not pid_m:
+            continue
+        pid = int(pid_m.group(1))
+        if not pid_is_alive(pid):
+            locked_append(
+                f"- ABANDONED | task={task_path.name} | at={now_iso()} | "
+                f"reason=worker_died | dead_pid={pid}"
+            )
+            abandoned.append(task_path.name)
+    return abandoned
+
+
+def render_status(candidates, launched, paused, reboot_recovered, liveness_abandoned=None):
     cdl.ensure_control_dir()
     lines = [
         f"_Last dispatch tick: {now_iso()}_",
@@ -131,6 +176,10 @@ def render_status(candidates, launched, paused, reboot_recovered):
     if reboot_recovered:
         lines.append(
             f"- Reboot detected this tick -- re-armed for redispatch: {', '.join(reboot_recovered)}"
+        )
+    if liveness_abandoned:
+        lines.append(
+            f"- Dead workers detected this tick: {', '.join(liveness_abandoned)}"
         )
     block = "\n".join(lines)
 
@@ -158,11 +207,15 @@ def dispatch():
     if cdl.check_and_record_reboot():
         reboot_recovered = recover_abandoned_tasks()
 
+    # Liveness check: detect workers that died mid-flight (not only on reboot).
+    liveness_abandoned = check_worker_liveness()
+
     paused = cdl.is_paused()
     candidates = find_task_files()
 
     if paused:
-        render_status(candidates, [], paused=True, reboot_recovered=reboot_recovered)
+        render_status(candidates, [], paused=True, reboot_recovered=reboot_recovered,
+                      liveness_abandoned=liveness_abandoned)
         print("Paused -- skipping dispatch.")
         return
 
@@ -170,6 +223,13 @@ def dispatch():
     for task_path in candidates:
         if already_claimed(task_path.name):
             continue
+
+        # Parse the base branch from the task file for the STARTED record.
+        try:
+            prompt_text = task_path.read_text()
+        except OSError:
+            continue
+        base = base_branch_for(prompt_text)
 
         started_at = now_iso()
         cmd = [sys.executable, str(Path(__file__).resolve()), "--worker", str(task_path)]
@@ -183,11 +243,12 @@ def dispatch():
         )
         locked_append(
             f"- STARTED   | task={task_path.name} | at={started_at} | "
-            f"dispatcher_pid={proc.pid}"
+            f"base={base} | dispatcher_pid={proc.pid}"
         )
         launched.append(task_path.name)
 
-    render_status(candidates, launched, paused=False, reboot_recovered=reboot_recovered)
+    render_status(candidates, launched, paused=False, reboot_recovered=reboot_recovered,
+                  liveness_abandoned=liveness_abandoned)
 
     if launched:
         print(f"Dispatched {len(launched)} new task(s): {', '.join(launched)}")
@@ -224,6 +285,7 @@ def find_session_id(prompt_title_prefix, cwd):
 
 
 BRANCH_LINE_RE = re.compile(r"\*\*Branch:\*\*\s*(\S+)")
+BASE_LINE_RE = re.compile(r"\*\*Base:\*\*\s*(\S+)")
 
 
 def branch_name_for(task_id, prompt):
@@ -233,13 +295,51 @@ def branch_name_for(task_id, prompt):
     return f"kiro/{task_id.lower()}"
 
 
-def setup_worktree(task_id, branch):
+def base_branch_for(prompt):
+    """
+    Extracts the **Base:** field from a task file header. Defaults to
+    'storied' when absent, so every existing task file keeps working.
+    """
+    m = BASE_LINE_RE.search(prompt)
+    if m:
+        return m.group(1)
+    return "storied"
+
+
+def validate_base_branch(base, cwd):
+    """
+    Verifies the base branch exists locally. Returns (ok, error_message).
+    A typo must fail loudly at dispatch, not silently produce a worktree
+    off the wrong branch.
+    """
+    result = subprocess.run(
+        ["git", "rev-parse", "--verify", base],
+        cwd=str(cwd), capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        return False, (
+            f"Base branch '{base}' does not exist. "
+            f"Available local branches: "
+            + subprocess.run(
+                ["git", "branch", "--format=%(refname:short)"],
+                cwd=str(cwd), capture_output=True, text=True,
+            ).stdout.strip().replace("\n", ", ")
+        )
+    return True, None
+
+
+def setup_worktree(task_id, branch, base):
     """
     Isolates one task's work in its own git worktree + branch, checked out
-    from current storied HEAD. This is the fix for a real collision found
-    2026-07-29: two concurrent worker() runs sharing WATCH_DIR as their cwd
-    mixed their file edits together mid-flight. Each task gets its own
-    directory now -- no shared mutable working-tree state between tasks.
+    from the specified base branch. This is the fix for a real collision
+    found 2026-07-29: two concurrent worker() runs sharing WATCH_DIR as
+    their cwd mixed their file edits together mid-flight. Each task gets
+    its own directory now -- no shared mutable working-tree state between
+    tasks.
+
+    The base branch is read from the task file's **Base:** field (defaults
+    to 'storied' when absent). This fixes the hardcoded-base bug that
+    caused subscribed-track tasks to silently branch from storied.
     """
     WORKTREE_BASE.mkdir(parents=True, exist_ok=True)
     path = WORKTREE_BASE / task_id
@@ -254,7 +354,7 @@ def setup_worktree(task_id, branch):
     if branch_exists:
         cmd = ["git", "worktree", "add", str(path), branch]
     else:
-        cmd = ["git", "worktree", "add", "-b", branch, str(path), "storied"]
+        cmd = ["git", "worktree", "add", "-b", branch, str(path), base]
     subprocess.run(cmd, cwd=str(WATCH_DIR), capture_output=True, text=True, check=True)
     return path
 
@@ -275,8 +375,19 @@ def worker(task_path_str):
         return
 
     branch = branch_name_for(task_id, prompt)
+    base = base_branch_for(prompt)
+
+    # Validate the base branch exists before creating a worktree.
+    # A typo must fail loudly, not silently produce a worktree off the wrong branch.
+    ok, err_msg = validate_base_branch(base, WATCH_DIR)
+    if not ok:
+        locked_append(
+            f"- FAILED    | task={task_filename} | reason=bad_base_branch: {err_msg[:200]}"
+        )
+        return
+
     try:
-        worktree_path = setup_worktree(task_id, branch)
+        worktree_path = setup_worktree(task_id, branch, base)
     except subprocess.CalledProcessError as e:
         locked_append(
             f"- FAILED    | task={task_filename} | reason=worktree_setup_failed: {e.stderr.strip()[:200]}"
@@ -321,7 +432,7 @@ def worker(task_path_str):
 
     locked_append(
         f"- {status:<10}| task={task_filename} | id=T{task_id} | "
-        f"branch={branch} | worktree={worktree_path} | "
+        f"branch={branch} | base={base} | worktree={worktree_path} | "
         f"session={session_id or 'unknown'} | started={start_iso} | "
         f"duration={duration_s}s | exit={exit_code} | log={session_log_path}"
     )
