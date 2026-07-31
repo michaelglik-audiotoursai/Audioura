@@ -305,3 +305,50 @@ else's file.
 
 LOCAL-68 was bounced anyway for a `Dockerfile.orchestrator` conflict with
 LOCAL-67, so the rename costs no extra round-trip.
+
+---
+
+## D18 — news has no cache, and that is now a tracked gap not a silent one
+
+**Decision: merge LOCAL-69's metering as-is; the cache is LOCAL-73.**
+
+LOCAL-69 established the real news cost model and corrected LOCAL-60's
+claim that the path is TTS-only — it also makes a conditional GPT-3.5 call
+when the extracted title exceeds 12 words. Measured live:
+
+```
+news_generate  $0.006300  {llm: 0.0,     tts: 0.0063}
+news_generate  $0.011352  {llm: 0.00032, tts: 0.011032}
+```
+
+An article costs roughly a tenth of a tour.
+
+It also reported, without being asked to fix it, that **no cache layer
+exists for news**. So two users requesting the same article each pay full
+generation cost — we pay Amazon twice to synthesise identical text, and bill
+twice for it. That contradicts Michael's rule, stated for tours but applying
+equally to articles: *"it cost to us and to our clients nothing when/if they
+download a tour already pre-created."*
+
+Merging the metering anyway, because measuring the gap is strictly better
+than not measuring it, and the pricing engine needs the operation type to
+exist. LOCAL-73 builds the cache.
+
+## D19 — the hardcoded-5432 problem gets its own task
+
+**Decision: LOCAL-77, because it is masking real failures, not merely
+annoying.**
+
+Three suites hardcode `localhost:5432` while Postgres publishes **5433**:
+`test_local30_acceptance.py`, `test_local67_entitlement_gate.py`,
+`test_wallet_ledger.py`. Each looked like total failure and was in fact a
+connection refusal.
+
+The danger is not the wasted minute. It is that a connection-refused failure
+is indistinguishable from a real one, so it trains everyone to dismiss red
+results — and one of those red results was real. LOCAL-68's rename genuinely
+broke `test_wallet_ledger.py`, and that signal could easily have been waved
+off as "the port thing again".
+
+LOCAL-77 requires a distinct message and exit code for an unreachable
+database, so the two can never again look alike.
