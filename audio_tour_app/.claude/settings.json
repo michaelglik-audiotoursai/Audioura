@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s http://localhost:*)",
+      "Bash(git fetch *)",
+      "Bash(docker compose ps *)",
+      "mcp__claude_ai_ClickUp__clickup_get_task",
+      "mcp__claude_ai_ClickUp__clickup_filter_tasks",
+      "mcp__claude_ai_ClickUp__clickup_get_task_comments"
+    ]
+  }
+}
