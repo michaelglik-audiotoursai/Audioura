@@ -3201,6 +3201,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         _d1_evidence_log = {}
         _d1_venue_corpus = ""
         _story_corpus_result = None
+        _d1v2_result = None  # [LOCAL-72] Initialize for non-museum paths (prevents NameError in three_class_retrieval)
         if tour_category == 'museum' and _museum_venue_name:
             # Try new story_miner-based verification (T0a/T1)
             # Pass full location string so D1v2 can parse city for venue disambiguation
@@ -4537,14 +4538,27 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         per_work_contexts=_per_work_ctx,
                         catalogue_works=_catalogue_works,
                         language=_venue_lang,
+                        tour_category=tour_category,
+                        tour_location=location,
                     )
                     _three_class_results[poi.get('name', '')] = _tcr
                     if _tcr.get('category'):
                         print(f"  [LOCAL-37] {poi.get('name', '')[:30]}: category='{_tcr['category']}' "
                               f"has_context={bool(_tcr.get('category_context', {}).get(CLASS_HISTORIC, ''))}")
+                    # [LOCAL-47] Log retrieval tier for outdoor stops
+                    if tour_category != 'museum' and _tcr.get('retrieval_tier'):
+                        _n_facts = len(_tcr.get('retrieval_facts', []))
+                        print(f"  [LOCAL-47] {poi.get('name', '')[:30]}: tier={_tcr['retrieval_tier']}, facts={_n_facts}")
                 
                 print(f"  [LOCAL-37] Three-class retrieval: {len(_three_class_results)} stops processed, "
                       f"{sum(1 for v in _three_class_results.values() if v.get('category'))} with category")
+                # [LOCAL-47] Summary for outdoor tours
+                if tour_category != 'museum':
+                    _tier_counts = {}
+                    for _v in _three_class_results.values():
+                        _t = _v.get('retrieval_tier', 'empty')
+                        _tier_counts[_t] = _tier_counts.get(_t, 0) + 1
+                    print(f"  [LOCAL-47] Outdoor retrieval tiers: {_tier_counts}")
             except ImportError as _tcr_err:
                 _import_logger.error("[LOCAL-37] MISSING: three_class_retrieval — three-class context DISABLED: %s", _tcr_err)
                 print(f"  [LOCAL-37] three_class_retrieval not available: {_tcr_err}")
@@ -4752,6 +4766,16 @@ NO DESCRIBING THE OBVIOUS:
 """
         else:
             _mode_context = f" (traveling by {transport_mode})" if transport_mode != 'on_foot' else ""
+            
+            # [LOCAL-72] Adaptive word target based on retrieval tier
+            _outdoor_tcr = _three_class_results.get(poi_name) if _three_class_results else None
+            _outdoor_tier = _outdoor_tcr.get('retrieval_tier', 'empty') if _outdoor_tcr else 'empty'
+            _outdoor_facts = _outdoor_tcr.get('retrieval_facts', []) if _outdoor_tcr else []
+            
+            # [LOCAL-72] No hard word cap. Rich/medium stops get facts injected (below),
+            # but we don't constrain the LLM's natural length. The baseline produced
+            # 300-500 words per stop; constraining that thins content.
+            
             description_prompt = f"""Create a detailed description for the stop "{poi_name}" on a {tour_category} tour{_mode_context} of {location}.
 
 Start with an orientation section that explains how the visitor arrives at this stop and what they should look for.
@@ -4798,6 +4822,29 @@ NO PREACHING — NEVER INSTRUCT THE LISTENER (critical):
 NO CONDESCENSION:
 - NEVER write "To truly appreciate/understand [X], one must..." — just state the context.
 - NEVER write "It is worth noting that..." or "It is important to understand that..."
+"""
+            # [LOCAL-47] Inject retrieved facts for outdoor stops
+            if _outdoor_facts:
+                _facts_block = "\n".join(f"  - {f}" for f in _outdoor_facts[:5])
+                description_prompt += f"""
+RETRIEVED FACTS (incorporate these checkable facts into your description — they are confirmed from sources):
+{_facts_block}
+
+SUBSTANCE RULE: Your description MUST include at least 2 of the facts above. Each fact you use
+must appear as a specific, checkable claim (with a date, a name, or a number). Do NOT
+paraphrase them into vague atmosphere. If you cannot find a way to include them naturally,
+state them directly.
+"""
+            # [LOCAL-72] 80-word cap REMOVED — it stripped facts in practice.
+            # When retrieval is empty, we still allow full-length descriptions.
+            # The model can use its own knowledge; the substance rule only applies
+            # when we have retrieved facts to inject.
+            # [LOCAL-47] Inject category-level context for outdoor stops
+            if _outdoor_tcr and _outdoor_tcr.get('category_context', {}).get('historic'):
+                _hist_ctx = _outdoor_tcr['category_context']['historic'][:500]
+                description_prompt += f"""
+HISTORICAL CONTEXT (from verified sources about this area — use specific facts from this, not vague atmosphere):
+{_hist_ctx}
 """
 
         # [LOCAL-6 Fix 1] Varied sentence openings — cycle through styles by stop index
@@ -5139,6 +5186,32 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
         if tour_category == 'museum' and _museum_venue_name:
             description_prompt += f"""
 CRITICAL CONSTRAINT: This artwork/exhibit MUST be something that is physically on display at '{_museum_venue_name}'. Describe the ARTWORK itself — its visual qualities, technique, symbolism, and story. If you know which room or hall it's in, mention that briefly. If you don't know the exact room, do NOT fabricate one — just describe the work directly.
+"""
+            # [LOCAL-48] Exhibition-vs-object verification (Musée Matisse fabrication fix)
+            description_prompt += """
+EXHIBITION VS OBJECT RULE (critical — prevents fabrication):
+A catalogue entry may be an EXHIBITION, a GALLERY, or a PROGRAMME rather than a physical object.
+Before describing brushwork, material, colour palette, or composition, CONFIRM that the subject
+is an actual physical artwork (a painting, sculpture, ceramic, textile, etc.).
+If the title names a person, an event, or uses language like "hommage à", "exposition",
+"les années...", it is likely an EXHIBITION or PROGRAMME, not a canvas or object.
+- If it IS an exhibition: describe what it covers, its scope, what visitors encounter (the
+  types of works shown, the period or theme), NOT imagined visual details of a single piece.
+- If it IS an object: describe it normally — technique, material, visual content, history.
+Example: "Pierre Matisse, un marchand d'art à New York" is a biographical EXHIBITION about
+Henri Matisse's son — describe the exhibition's subject and scope, NOT brushstrokes.
+"""
+            # [LOCAL-48] Thin-corpus honesty guard (Palais Lascaris fabrication fix)
+            description_prompt += f"""
+THIN-CORPUS HONESTY RULE (critical — prevents fabrication):
+If you do not have verified, specific information about this particular work's visual content,
+material, or history, DO NOT INVENT details. Instead:
+- State what IS known (title, artist, period, medium if available)
+- Describe the TYPE of work and its general context
+- Acknowledge the gap honestly rather than filling it with plausible-sounding fiction
+A 120-word honest description beats a 300-word fabricated one. When your knowledge is thin,
+be SHORT and FACTUAL. The number of confirmed facts in the fact sheet below tells you how
+much material you actually have to work with.
 """
             # [D5] No artist bio repetition in descriptions
             description_prompt += """
@@ -6087,6 +6160,31 @@ Requirements:
             print(f"  [S27] derepetition_guard not available — repetition check skipped")
         except Exception as e:
             print(f"  [S27] Repetition check error: {e}")
+
+    # -------- [LOCAL-47] Tour-title / location repetition cap --------
+    if tour_category != 'museum':
+        try:
+            from derepetition_guard import cap_location_repetition, count_phrase_occurrences
+            # Extract the core location phrase (strip "tour", "biking", etc.)
+            _loc_phrase_clean = re.sub(
+                r'\b(tour|tours|biking|cycling|bike|walking|walk|self[- ]guided)\b',
+                '', location, flags=re.IGNORECASE
+            ).strip().strip(',').strip()
+            # Also try the full location string
+            _loc_count_full = count_phrase_occurrences(complete_tour, location)
+            _loc_count_clean = count_phrase_occurrences(complete_tour, _loc_phrase_clean) if _loc_phrase_clean != location else 0
+            
+            # Cap the most-repeated variant
+            if _loc_count_full > 2:
+                complete_tour = cap_location_repetition(complete_tour, location, max_occurrences=2)
+                print(f"  [LOCAL-47] Capped '{location}' from {_loc_count_full} to ≤2 occurrences")
+            if _loc_phrase_clean and _loc_count_clean > 2:
+                complete_tour = cap_location_repetition(complete_tour, _loc_phrase_clean, max_occurrences=2)
+                print(f"  [LOCAL-47] Capped '{_loc_phrase_clean}' from {_loc_count_clean} to ≤2 occurrences")
+        except ImportError:
+            print(f"  [LOCAL-47] derepetition_guard not available — location cap skipped")
+        except Exception as _cap_err:
+            print(f"  [LOCAL-47] Location cap error: {_cap_err}")
 
     # -------- [LOCAL-22] Final stop-header sanitization --------
     # After ALL post-processing (D2, S29), ensure no fake "Stop N:" lines exist.
