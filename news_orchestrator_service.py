@@ -197,6 +197,74 @@ def generate_news():
         
         logging.info(f'News generation completed successfully for {article_id}')
         
+        # ── [LOCAL-69] Meter news generation cost ───────────────────────────
+        # Cost model (verified by code trace):
+        #   - Polly TTS: multiple segments (summary, topics, per-topic, help, full article)
+        #     All text passes through clean_text_for_polly() which truncates to 5000 chars/segment.
+        #   - LLM (GPT-3.5-turbo): conditional short-title generation when title > 12 words
+        #     via voice_control → voice_nlp_service → OpenAI API (~60 tokens max).
+        #   - No search API cost (article text arrives pre-extracted).
+        #
+        # TTS character estimate: we know article_text length. The processor generates:
+        #   audio_1 (summary ~200 chars), audio-topics (topics list ~300 chars),
+        #   per-topic audios (N × ~300 chars), audio-help (fixed ~700 chars),
+        #   audio-99 (full article, capped at 5000 chars by clean_text_for_polly).
+        # Conservative estimate: min(article_text_chars * 1.2, 5000 + N*500 + 1200)
+        # Simplification: use article_text length as the TTS input proxy.
+        try:
+            from cost_meter import record_operation
+            from cost_rates import tts_cost, llm_cost, POLLY_COST_PER_CHAR
+
+            # Use original request_string for Wallet display (before generator overwrites it).
+            # Falls back to the generator's extracted title if request_string was generic.
+            _display_title = request_string if request_string and request_string != 'News Article' else "News Article"
+
+            # TTS cost: the processor sends cleaned text through Polly.
+            # Each segment is capped at 5000 chars. Segments: summary, topics list,
+            # N topic audios, help commands (~700 fixed), full article (capped 5000).
+            # Best proxy: take the original article length (before cleaning removes ~20%),
+            # cap at what Polly actually processes. Total TTS chars ≈ article_text * 1.5
+            # (summary + topics + full article overlap). But full article is capped at 5000.
+            _tts_chars = min(len(article_text), 5000) + 1200  # full article cap + overhead (summary + help)
+            if major_points_count > 0:
+                _tts_chars += major_points_count * 400  # topics list + per-topic audio
+            _tts_cost = tts_cost(_tts_chars)
+
+            # LLM cost: short title generation only fires when title > 12 words.
+            # We check the original request_string — if the generator finds a longer
+            # title, it may also trigger LLM, but we can't know until after processing.
+            # Use article text word count as proxy for title length post-extraction.
+            _title_words = len(_display_title.split()) if _display_title else 0
+            _llm_cost = 0.0
+            if _title_words > 12:
+                # GPT-3.5-turbo, ~100 tokens prompt + ~60 tokens response
+                _llm_cost = llm_cost(160)  # 160 tokens × $0.002/1K = $0.00032
+
+            _total_cost = _tts_cost + _llm_cost
+            _breakdown = {"tts": round(_tts_cost, 6), "llm": round(_llm_cost, 6)}
+
+            # Human-readable description for Wallet display
+            _description = f"Article: {_display_title[:200]}"
+
+            record_operation(
+                operation_type="news_generate",
+                our_cost_usd=_total_cost,
+                cache_hit=False,
+                user_id=secret_id,
+                job_id=article_id,
+                breakdown=_breakdown,
+                description=_description,
+            )
+            logging.info(
+                f"[LOCAL-69] News cost metered: ${_total_cost:.6f} | "
+                f"tts=${_tts_cost:.6f} ({_tts_chars} chars) | llm=${_llm_cost:.6f} | "
+                f"article={article_id} | user={secret_id}"
+            )
+        except Exception as _meter_err:
+            # Metering is instrumentation — fails open (D14 rule).
+            logging.error(f"[LOCAL-69] News cost metering failed (non-fatal): {_meter_err}")
+        # ── end metering ────────────────────────────────────────────────────
+        
         return jsonify({
             "status": "success",
             "article_id": article_id,

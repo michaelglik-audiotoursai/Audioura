@@ -262,3 +262,46 @@ magnitude below $1.30. But it should not be described as enforcing his
 ceiling without that caveat. An in-flight check (accumulated cost between
 stops, stopping early) is the real version, and is proposed as a follow-up
 rather than built now.
+
+---
+
+## D16 — `ppu` is the canonical tier identifier, not `pay_per_use`
+
+**Decision: `ppu` wins. LOCAL-68 reconciles all 17 occurrences.**
+
+Two vocabularies emerged for one tier because three tasks built in parallel:
+
+```
+plans.plan_id (DB, LOCAL-61)           'ppu'
+entitlements.py dispatch (LOCAL-67)    'ppu'
+entitlements remedy (LOCAL-67)         'switch_to_ppu'
+wallet_ledger.py tier (LOCAL-66)       'pay_per_use'
+wallet_api.py response (LOCAL-68)      'pay_per_use'
+```
+
+Nothing fails today — each component is internally consistent. It breaks the
+moment a value crosses a boundary: the app is told its plan is
+`pay_per_use`, handed a remedy named `switch_to_ppu`, and any server-side
+comparison against `users.plan` quietly fails to match.
+
+`ppu` is canonical because it is the `plans.plan_id` primary key and the
+target of a foreign key from `users.plan`. Changing it means a migration
+with an FK rewrite; changing the wallet layer's string is a rename.
+`display_name` stays human-facing ("Pay-Per-Use") — only the identifier
+changes.
+
+The durable fix is the test, not the rename: LOCAL-68 must assert that the
+API's `plan` value for a user equals that user's `users.plan` in the
+database. Without it, parallel tasks will re-diverge.
+
+## D17 — merged LOCAL-67 while bouncing LOCAL-68, though they share the split
+
+**Decision: merge LOCAL-67 now, fix the vocabulary in LOCAL-68.**
+
+Both touch the naming split, but LOCAL-67 already uses the canonical `ppu`
+throughout — it is on the correct side. Holding it back would idle a
+correct, tested component (23/23 passing) to wait for a rename in someone
+else's file.
+
+LOCAL-68 was bounced anyway for a `Dockerfile.orchestrator` conflict with
+LOCAL-67, so the rename costs no extra round-trip.
