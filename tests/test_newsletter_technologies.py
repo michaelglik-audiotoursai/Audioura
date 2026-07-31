@@ -31,10 +31,8 @@ def cleanup_test_newsletter(url):
     clean_newsletter_url = clean_url(url)
     
     try:
-        conn = psycopg2.connect(
-            host='localhost', database='audiotours', user='admin', 
-            password='password123', port='5433'
-        )
+        from db_connection import get_connection
+        conn = get_connection()
         cursor = conn.cursor()
         
         # Get newsletter ID using cleaned URL
@@ -125,10 +123,8 @@ def verify_newsletter_articles(newsletter_url, newsletter_name):
     clean_newsletter_url = clean_url(newsletter_url)
     
     try:
-        conn = psycopg2.connect(
-            host='localhost', database='audiotours', user='admin', 
-            password='password123', port='5433'
-        )
+        from db_connection import get_connection
+        conn = get_connection()
         cursor = conn.cursor()
         
         # Get newsletter and articles using cleaned URL

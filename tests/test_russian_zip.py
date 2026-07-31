@@ -7,12 +7,8 @@ from bs4 import BeautifulSoup
 
 def test_russian_audio():
     # Get Russian tour ZIP data
-    conn = psycopg2.connect(
-        host="development-postgres-2-1",
-        database="audiotours",
-        user="admin", 
-        password="password123"
-    )
+    from db_connection import get_connection
+    conn = get_connection()
     
     cursor = conn.cursor()
     cursor.execute("SELECT audio_tour FROM audio_tours WHERE id = 94")

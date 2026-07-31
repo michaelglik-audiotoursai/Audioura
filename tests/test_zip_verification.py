@@ -11,13 +11,8 @@ import psycopg2
 from datetime import datetime
 
 def get_db_connection():
-    return psycopg2.connect(
-        host=os.getenv('DB_HOST', 'localhost'),
-        database=os.getenv('DB_NAME', 'audiotours'),
-        user=os.getenv('DB_USER', 'admin'),
-        password=os.getenv('DB_PASSWORD', 'password123'),
-        port=os.getenv('DB_PORT', '5433')
-    )
+    from db_connection import get_connection
+    return get_connection()
 
 def get_recent_articles():
     """Get recent finished articles for ZIP testing"""

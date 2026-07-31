@@ -17,7 +17,7 @@ os.environ.setdefault('DB_HOST', 'localhost')
 os.environ.setdefault('DB_NAME', 'audiotours')
 os.environ.setdefault('DB_USER', 'admin')
 os.environ.setdefault('DB_PASSWORD', 'test')
-os.environ.setdefault('DB_PORT', '5432')
+os.environ.setdefault('DB_PORT', '5433')
 
 from news_orchestrator_service import app
 import psycopg2

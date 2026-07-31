@@ -70,13 +70,10 @@ LOCAL_URL = os.getenv("NEWS_LOCAL_URL", "http://localhost:5009")  # set to your 
 
 API_KEY = os.getenv("GATEWAY_API_KEY", "")
 
-DB = dict(
-    host=os.getenv("DB_HOST", "localhost"),
-    dbname=os.getenv("DB_NAME", "audiotours"),
-    user=os.getenv("DB_USER", "admin"),
-    password=os.getenv("DB_PASSWORD", "password123"),
-    port=os.getenv("DB_PORT", "5432"),
-)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from db_connection import get_db_config as _db_cfg
+
+DB = _db_cfg()
 
 TEST_USER = "ITEST-NEWS-QUOTA"          # dedicated id; never a real user
 TEST_PLAN = "itest"                     # dedicated plan; torn down at the end

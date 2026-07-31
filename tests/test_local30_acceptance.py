@@ -51,11 +51,9 @@ FABRICATION_PATTERNS = [
 def clear_tour_cache():
     """Clear the tour_cache for this venue."""
     try:
+        from db_connection import get_database_url
         import psycopg2
-        conn = psycopg2.connect(os.environ.get(
-            'DATABASE_URL',
-            'postgresql://postgres:postgres@localhost:5432/audioura'
-        ))
+        conn = psycopg2.connect(get_database_url())
         with conn.cursor() as cur:
             cur.execute(
                 "DELETE FROM tour_cache WHERE location ILIKE %s",

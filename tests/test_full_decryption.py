@@ -13,13 +13,8 @@ from dh_service_simple import (
 )
 
 def get_db_connection():
-    return psycopg2.connect(
-        host=os.getenv('DB_HOST', 'localhost'),
-        database=os.getenv('DB_NAME', 'audiotours'),
-        user=os.getenv('DB_USER', 'admin'),
-        password=os.getenv('DB_PASSWORD', 'password123'),
-        port=os.getenv('DB_PORT', '5433')
-    )
+    from db_connection import get_connection
+    return get_connection()
 
 def test_decryption():
     """Test credential decryption with different key derivation methods"""

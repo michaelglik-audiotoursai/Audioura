@@ -47,7 +47,8 @@ OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 def clear_caches():
     """Delete tour_cache and venue_corpus for Q3330160."""
     import psycopg2
-    conn = psycopg2.connect(DATABASE_URL)
+    from db_connection import get_database_url
+    conn = psycopg2.connect(get_database_url())
     with conn.cursor() as cur:
         cur.execute("DELETE FROM tour_cache WHERE location ILIKE %s", ('%arts asiatiques%',))
         tc_deleted = cur.rowcount
