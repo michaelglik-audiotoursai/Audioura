@@ -232,7 +232,10 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                         tour_text = _qa_re.sub(r'  +', ' ', tour_text)
                         tour_text = _qa_re.sub(r'\n\n\n+', '\n\n', tour_text)
                     except ImportError:
-                        pass
+                        import logging as _svc_logging
+                        _svc_logging.getLogger("generate_tour_text_service").error(
+                            "[BLOCKER4c] MISSING: derepetition_guard (FORBIDDEN_PHRASES) — style correction DISABLED"
+                        )
                     # Loop continues — will re-run QA on corrected text
             
             if not _qa_passed:
@@ -293,6 +296,10 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                 except Exception as _pe:
                     print(f"[I-CON] Persistence error (non-fatal): {_pe}")
             except ImportError:
+                import logging as _svc_logging
+                _svc_logging.getLogger("generate_tour_text_service").error(
+                    "[I-CON] MISSING: icon_evaluator (evaluate_tour_icon, report_icon_gate) — I-CON evaluation DISABLED"
+                )
                 print("[I-CON] icon_evaluator not available — skipped")
             except Exception as _ie:
                 print(f"[I-CON] Evaluation error (non-fatal): {_ie}")
@@ -317,12 +324,29 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint."""
+    """Health check endpoint with code integrity info."""
+    try:
+        import manifest_check
+        _manifest_info = manifest_check.get_health_info()
+    except ImportError:
+        _manifest_info = {
+            "code_sha": "manifest_check_unavailable",
+            "build_time": "unknown",
+            "manifest_ok": False,
+            "drift_files": ["manifest_check.py not found in image"],
+        }
+
     return jsonify({
         "status": "healthy",
         "service": "tour_text_generator",
         "version": SERVICE_VERSION,
         "mode": os.getenv("STORIED_MODE", "false"),
+        "code_sha": _manifest_info.get("code_sha", "unknown"),
+        "build_time": _manifest_info.get("build_time", "unknown"),
+        "manifest_ok": _manifest_info.get("manifest_ok", False),
+        **({
+            "drift_files": _manifest_info["drift_files"]
+        } if not _manifest_info.get("manifest_ok", False) else {}),
     })
 
 @app.route('/generate', methods=['POST'])
