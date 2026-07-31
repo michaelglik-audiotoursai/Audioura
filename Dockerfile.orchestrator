@@ -5,6 +5,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY tour_orchestrator_service.py /app/
 COPY entitlements.py /app/
 COPY cost_ceiling_monitor.py /app/
+COPY wallet_api.py /app/
+COPY wallet_ledger.py /app/
+COPY pricing.py /app/
 COPY cost_meter.py /app/
 COPY cost_rates.py /app/
 EXPOSE 5002
