@@ -233,23 +233,29 @@ def test_exhibition_guard_describes_scope():
 
 
 # ────────────────────────────────────────────────────────────────────────────
-# 5. Thin-corpus honesty guard (prompt presence)
+# 5. Thin-corpus honesty rule — REMOVED (LOCAL-72 bounce)
 # ────────────────────────────────────────────────────────────────────────────
 
-def test_thin_corpus_guard_in_source():
-    """generate_tour_text.py contains the thin-corpus honesty rule."""
+def test_thin_corpus_rule_removed():
+    """The thin-corpus rule was removed — it was a thinning instruction, not
+    an anti-fabrication guard. Museum tour lost 5 facts when it was active.
+    The exhibition-vs-object rule (genuine anti-fabrication) is kept."""
     source = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                'generate_tour_text.py')).read()
-    assert "THIN-CORPUS HONESTY RULE" in source, "Missing thin-corpus guard"
-    assert "DO NOT INVENT details" in source, "Missing invention ban"
+    # The rule text must NOT be present as active code (it's in a comment block only)
+    assert "description_prompt += f\"\"\"\nTHIN-CORPUS HONESTY RULE" not in source, \
+        "Thin-corpus rule should have been removed — it is a thinning instruction"
+    # But the exhibition-vs-object rule IS still active
+    assert "EXHIBITION VS OBJECT RULE" in source, \
+        "Exhibition-vs-object rule must remain — it is a genuine anti-fabrication guard"
 
 
-def test_thin_corpus_guard_brevity_instruction():
-    """The thin-corpus guard instructs brevity over fabrication."""
+def test_thin_corpus_removal_comment_documents_reason():
+    """The removal is documented with the rationale in code."""
     source = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                'generate_tour_text.py')).read()
-    assert "120-word honest description beats a 300-word fabricated" in source, \
-        "Should instruct brevity over fabrication"
+    assert "Thin-corpus honesty rule REMOVED" in source, \
+        "Removal should be documented in code comment"
 
 
 # ────────────────────────────────────────────────────────────────────────────
