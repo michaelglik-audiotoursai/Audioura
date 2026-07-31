@@ -113,3 +113,48 @@ corpus ImportError first (LOCAL-63), then re-measure.**
 swallowed by `try/except`. Tours generate without the story pipeline, so the
 measured $0.043 excludes corpus mining — note `search: 0.0` in the
 breakdown. Setting a ×5 price against that number would misprice every tour.
+
+---
+
+## D8 — LOCAL-62 approved without the screenshots its task demanded
+
+**Decision: approved. Screenshot evidence deferred to a later task rather
+than bounced for.**
+
+The task required *"screenshots or rendered widget-test output"* so Michael
+could see the Wallet without running the app. LOCAL-62 supplied neither.
+
+Approved anyway because the substance is there and independently verified:
+9/9 wallet widget tests pass on a real `flutter test` run; `PaywallScreen`
+exists in `wallet_screen.dart`; Wallet is genuinely reachable from Settings
+(`about_screen.dart:344`). The two suite failures are pre-existing —
+`widget_test.dart`'s missing `MyApp`, and `services_compatibility_test.dart`,
+which fails identically at the baseline worktree.
+
+Bouncing a correct implementation over missing screenshots would cost a full
+round-trip for presentation. The test names already describe each state
+(Free / Pay-Per-Use / Unlimited / low-balance / paywall). Golden screenshots
+go in the backlog.
+
+## D9 — merges into `subscribed`, and `storied` keeps the docs
+
+**Decision: LOCAL-61 and LOCAL-62 merged into `subscribed`, which is now
+pushed to origin. Design and decision docs stay on `storied`.**
+
+Michael assumed Subscribed check-ins were landing in `subscribed`; they were
+not — the dispatcher hardcodes worktrees off `storied`, so `subscribed` was
+empty. Now corrected by merging by hand; **LOCAL-80** fixes the dispatcher so
+the base branch comes from the task file.
+
+Docs (`SUBSCRIBED_DESIGN.md`, `DECISIONS.md`, `BACKLOG.md`) deliberately live
+on `storied`: they are descriptive, useful to any session, and carry no
+feature risk. Only code is isolated on `subscribed`.
+
+## D10 — temp files untracked, not deleted
+
+**Decision: `git rm --cached` on `temp_*.py`, `test_suite_report_*.json`,
+`system_health_*.json`; gitignore patterns added. Files remain on disk.**
+
+LOCAL-61's commit swept up loose debug output from the repo root, violating
+the standing hygiene rule in `remind_mobile_ai.md`. Untracking is reversible
+and keeps the files; deleting them is not, so it was not done.
