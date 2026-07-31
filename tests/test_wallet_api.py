@@ -18,14 +18,27 @@ import psycopg2
 from decimal import Decimal
 from datetime import datetime, timezone
 
+# Ensure tests/ is on path for db_connection import
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from db_connection import get_database_url, get_connection, get_db_config
+
+# Set env defaults from shared helper BEFORE any service module imports
+# (service modules like wallet_ledger default to Docker-internal postgres-2:5432)
+_cfg = get_db_config()
+os.environ.setdefault("DB_HOST", _cfg["host"])
+os.environ.setdefault("DB_PORT", _cfg["port"])
+os.environ.setdefault("DB_NAME", _cfg["dbname"])
+os.environ.setdefault("DB_USER", _cfg["user"])
+os.environ.setdefault("DB_PASSWORD", _cfg["password"])
+
 # Service URL
 ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL", "http://localhost:5002")
-DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://admin:password123@localhost:5432/audiotours")
+DATABASE_URL = get_database_url()
 
 
 def get_db():
     """Get a database connection for test setup/teardown."""
-    return psycopg2.connect(DATABASE_URL)
+    return get_connection()
 
 
 def setup_test_user(user_id: str, tier: str = "free"):
