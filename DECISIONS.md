@@ -352,3 +352,50 @@ off as "the port thing again".
 
 LOCAL-77 requires a distinct message and exit code for an unreachable
 database, so the two can never again look alike.
+
+---
+
+## D20 — the $2/month fee must NOT be deducted from credits
+
+**Decision: the monthly fee is billed by Apple against the card. Credits pay
+for usage only. Record the fee in the transaction list for transparency, but
+it must not reduce the credit balance.**
+
+LOCAL-82's end-to-end run exposed the current behaviour:
+
+```
+step 2   PPU monthly fee debited ($2.00)   balance  -$2.00
+step 3   Top-up $10                        balance   $8.00
+```
+
+So a $10 top-up yields $8.00 of usable credit — while Apple has *also*
+charged $2.00 to the card for the auto-renewing subscription. The user pays
+**$12 and receives $8 of usage**. They are billed for the fee twice.
+
+Michael's spec lists them as separate things: *"$10 USD credits ... $2USD per
+month fee."* Credits are the usage wallet; the fee is a platform charge.
+Under IAP they are two distinct product types — an auto-renewable
+subscription and a consumable — and Apple collects both directly. Deducting
+the fee from credits invents a third charge that nobody authorised.
+
+**Consequences:**
+- `monthly_fee()` must record a movement that is visible in the Wallet
+  transaction list but does not change `balance_cents`, or must not touch the
+  wallet at all with the fee surfaced from subscription state instead.
+- A $10 top-up must leave a $10.00 balance.
+- LOCAL-82's E2E expectations change accordingly: step 2 leaves the balance
+  at $0.00, step 3 at $10.00.
+
+If Michael intends the fee to come out of credits, this is a one-line
+reversal — but it should be his explicit choice, not an artefact of the
+ledger treating every movement as a balance change.
+
+## D21 — merged LOCAL-82 despite it asserting the behaviour D20 changes
+
+**Decision: merge it. The test accurately describes what the code does today,
+and it is the artefact that found the charging gap.**
+
+Rewriting its expectations before the behaviour changes would be writing a
+test against code that does not exist. LOCAL-83 changes the behaviour and
+updates the expectations in the same commit, so the suite is never green
+against a state nobody intends.
