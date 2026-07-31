@@ -11,6 +11,7 @@ import 'dart:convert';
 import 'dart:io' show Platform, Directory;
 
 import 'debug_log_viewer_screen.dart';
+import 'wallet_screen.dart';
 import '../config/endpoints.dart';
 import '../services/error_handler_service.dart';
 
@@ -297,6 +298,60 @@ class _AboutScreenState extends State<AboutScreen> {
                       ),
                       const Text('Audio'),
                     ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Wallet — always visible per Michael's requirement
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.purple.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.purple.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.account_balance_wallet, size: 30, color: Colors.purple),
+                      SizedBox(width: 10),
+                      Text(
+                        'Wallet',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.purple,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'View your balance, plan, transactions, and manage top-ups.',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const WalletScreen()),
+                        );
+                      },
+                      icon: const Icon(Icons.account_balance_wallet_outlined),
+                      label: const Text('Open Wallet'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.purple,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
                   ),
                 ],
               ),
