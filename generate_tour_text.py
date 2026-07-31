@@ -5,7 +5,16 @@ import os
 import sys
 import json
 import time
+import logging
 import requests
+
+# Module-level logger for ImportError reporting (LOCAL-63: never swallow ImportError silently)
+_import_logger = logging.getLogger("generate_tour_text.imports")
+if not _import_logger.handlers:
+    _h = logging.StreamHandler(sys.stderr)
+    _h.setFormatter(logging.Formatter("[%(levelname)s] %(name)s: %(message)s"))
+    _import_logger.addHandler(_h)
+    _import_logger.setLevel(logging.DEBUG)
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from enhanced_tour_templates_fixed import get_enhanced_tour_template, validate_enhanced_poi_knowledge
 from poi_inclusion_exceptions import should_include_in_restaurant_tour, should_include_in_walking_tour
@@ -1016,6 +1025,7 @@ def _verify_works_v2(poi_list, venue_name):
             check_stop_disjointness,
         )
     except ImportError:
+        _import_logger.error("[D1v2] MISSING: story_miner (fetch_venue_narrative_corpus, match_candidate_to_canonical, check_stop_disjointness) — corpus mining DISABLED for this tour")
         print("  [D1v2] story_miner not available — verification cannot proceed")
         return None  # Caller handles clean-fail
 
@@ -1052,6 +1062,7 @@ def _verify_works_v2(poi_list, venue_name):
         else:
             print(f"  [D1v2] Venue resolver returned None — falling back to heuristic")
     except ImportError:
+        _import_logger.error("[D1v2] MISSING: venue_resolver (resolve_venue, fetch_venue_works, build_canonical_titles_from_works) — venue resolution DISABLED")
         print("  [D1v2] venue_resolver not available — using heuristic fallback")
     except Exception as e:
         print(f"  [D1v2] venue_resolver error: {e} — using heuristic fallback")
@@ -2343,6 +2354,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 _persona_tone = PERSONA_TONE_OVERRIDE.get(_persona_enum, "")
                 print(f"  [Storied] Unknown persona '{persona}' → defaulting to FIRST_TIME_VISITOR")
             except ImportError:
+                _import_logger.error("[Storied] MISSING: onboarding_preference (UserPersona, PERSONA_TONE_OVERRIDE) — persona customization DISABLED")
                 print(f"  [Storied] onboarding_preference not available — persona skipped")
                 _persona_enum = None
                 _persona_tone = ""
@@ -2404,6 +2416,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 else:
                     print(f"CACHE MISS: {location} / {tour_type} / {total_stops}")
             except ImportError:
+                _import_logger.error("[S20] MISSING: tour_cache_layer1 (get_cached_tour) — tour caching DISABLED")
                 print(f"  [S20] tour_cache_layer1 not available — cache skipped")
             except Exception as e:
                 print(f"  [S20] Cache check error: {e}")
@@ -4052,6 +4065,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             try:
                 from story_miner import _normalize
             except ImportError:
+                _import_logger.error("[D1v2] MISSING: story_miner._normalize — using inline fallback (corpus matching degraded)")
                 import unicodedata
                 def _normalize(text):
                     if not text: return ""
@@ -4471,6 +4485,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         except Exception as _db_err:
                             print(f"  [§3] DB update non-fatal: {_db_err}")
                 except ImportError:
+                    _import_logger.error("[§3] MISSING: story_element_extractor (extract_story_elements) — story element extraction DISABLED")
                     print(f"  [§3] story_element_extractor not available")
                 except Exception as _se_err:
                     print(f"  [§3] Story element extraction error: {_se_err}")
@@ -4516,6 +4531,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 print(f"  [LOCAL-37] Three-class retrieval: {len(_three_class_results)} stops processed, "
                       f"{sum(1 for v in _three_class_results.values() if v.get('category'))} with category")
             except ImportError as _tcr_err:
+                _import_logger.error("[LOCAL-37] MISSING: three_class_retrieval — three-class context DISABLED: %s", _tcr_err)
                 print(f"  [LOCAL-37] three_class_retrieval not available: {_tcr_err}")
             except Exception as _tcr_err:
                 print(f"  [LOCAL-37] Three-class retrieval error (non-fatal): {_tcr_err}")
@@ -4549,6 +4565,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 print(f"  [Storied] Fact sheet generation failed — descriptions will proceed without facts")
                 _storied_fact_sheets = []
         except ImportError as e:
+            _import_logger.error("[Storied] MISSING: spine/fact generation modules (spine_generator, fact_extractor) — spine and fact sheets DISABLED: %s", e)
             print(f"  [Storied] Import error (spine/fact modules not available): {e}")
         except Exception as e:
             print(f"  [Storied] Error generating spine/facts: {e}")
@@ -4563,6 +4580,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             _assigned_types = [p.get('story_type', '?') for p in poi_list]
             print(f"  [S25] Story types assigned: {_assigned_types}")
         except ImportError as e:
+            _import_logger.error("[S25] MISSING: story_type_assigner (assign_story_types) — story type assignment DISABLED: %s", e)
             print(f"  [S25] story_type_assigner not available: {e}")
         except Exception as e:
             print(f"  [S25] Error assigning story types: {e}")
@@ -4604,6 +4622,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 else:
                     print(f"  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)")
         except ImportError as e:
+            _import_logger.error("[LOCAL-37] MISSING: tour diversity module (apply_tour_diversity) — class diversity balancing DISABLED: %s", e)
             print(f"  [LOCAL-37] Tour diversity import failed: {e}")
         except Exception as e:
             print(f"  [LOCAL-37] Tour diversity error (non-fatal): {e}")
@@ -4871,6 +4890,7 @@ events tied to this specific stop. Do NOT invent specific names, dates, or incid
                         from derepetition_guard import FORBIDDEN_PHRASES as _GLOBAL_FORBIDDEN
                         _global_phrases = [p.pattern for p in _GLOBAL_FORBIDDEN]
                     except ImportError:
+                        _import_logger.error("[S24] MISSING: derepetition_guard (FORBIDDEN_PHRASES) — global phrase filtering DISABLED for stop descriptions")
                         _global_phrases = []
                     _all_forbidden = _type_forbidden + _global_phrases
                     if _all_forbidden:
@@ -5096,7 +5116,7 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                             f"'{_category_name} pieces were typically...', NEVER 'this {_category_name} was...'\n"
                         )
             except ImportError:
-                pass
+                _import_logger.error("[B6] MISSING: story element wiring modules — elements→generation per-status phrasing DISABLED for this stop")
             except Exception as _b6_err:
                 print(f"  [B6] Story element wiring error (stop {stop_num}): {_b6_err}")
 
@@ -6041,12 +6061,14 @@ Requirements:
                         if _rewrite_count > 0:
                             print(f"  [S29] {_rewrite_count} sentence(s) rewritten")
                     except ImportError:
+                        _import_logger.error("[S29] MISSING: derepetition_guard.rewrite_repeated_sentence — repetition rewriting DISABLED")
                         print(f"  [S29] rewrite_repeated_sentence not available — skipping rewrites")
                     except Exception as _rw_err:
                         print(f"  [S29] Rewrite error: {_rw_err}")
             else:
                 print(f"  [S27] No cross-stop repetition detected")
         except ImportError:
+            _import_logger.error("[S27] MISSING: derepetition_guard (detect_cross_stop_repetition) — cross-stop repetition check DISABLED")
             print(f"  [S27] derepetition_guard not available — repetition check skipped")
         except Exception as e:
             print(f"  [S27] Repetition check error: {e}")
@@ -6101,6 +6123,7 @@ Requirements:
         else:
             print(f"  [LOCAL-36] PRACTICAL FACTS GATE: PASSED ({len(_pf_result.verified_claims)} verified)")
     except ImportError:
+        _import_logger.error("[LOCAL-36] MISSING: practical_facts_gate — practical facts verification DISABLED")
         print("  [LOCAL-36] practical_facts_gate not available — skipped")
     except Exception as _pf_err:
         print(f"  [LOCAL-36] Practical facts gate error (non-fatal): {_pf_err}")
@@ -6127,7 +6150,7 @@ Requirements:
                 store_tour(location, tour_type, total_stops, complete_tour, _db_url, spine_json=_spine_json_str)
                 print(f"CACHE STORE: {location} / {tour_type} / {total_stops}")
             except ImportError:
-                pass
+                _import_logger.error("[S20] MISSING: tour_cache_layer1 (store_tour) — tour cache storage DISABLED")
             except Exception as e:
                 print(f"  [S20] Cache store error: {e}")
 
