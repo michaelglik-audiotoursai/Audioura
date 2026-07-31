@@ -1,0 +1,2586 @@
+Starting Modified Tour Text Generator Service...
+Tours directory: /app/tours
+ * Serving Flask app "generate_tour_text_service" (lazy loading)
+ * Environment: production
+   WARNING: This is a development server. Do not use it in a production deployment.
+   Use a production WSGI server instead.
+ * Debug mode: off
+
+======================================================================
+CALL #001 | 18:08:41.156 | GENERATOR_SERVICE_RECEIVED_REQUEST
+======================================================================
+  raw_request_body:
+    {
+        "location": "Musee Oceanographique de Monaco, Monaco",
+        "tour_type": "museum",
+        "total_stops": 8
+    }
+  location: Musee Oceanographique de Monaco, Monaco
+  tour_type: museum
+  total_stops_raw: 8
+  total_stops_resolved: 8
+
+
+======================================================================
+CALL #002 | 18:08:41.158 | GENERATOR_SERVICE_ASYNC_START
+======================================================================
+  job_id: b02b66e0-b4bd-491e-bc58-dd1e56c5d443
+  location: Musee Oceanographique de Monaco, Monaco
+  tour_type: museum
+  total_stops: 8
+  user_id: None
+
+
+======================================================================
+CALL #003 | 18:08:41.164 | CALLING_GENERATE_TOUR_TEXT_FUNCTION
+======================================================================
+  function: generate_tour_text
+  location: Musee Oceanographique de Monaco, Monaco
+  tour_type: museum
+  total_stops: 8
+  persona: None
+  log_file: /app/api_call_chain_20260731_180841.txt
+
+
+======================================================================
+CALL #004 | 18:08:41.168 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Musee Oceanographique de Monaco, Monaco
+  tour_type: museum
+  total_stops_parameter: 8
+  output_file: /tmp/tmpu8b9qd_7.txt
+
+
+======================================================================
+CALL #005 | 18:08:41.168 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Musee Oceanographique de Monaco, Monaco
+  total_stops_final: 8
+  source: parameter
+
+CACHE MISS: Musee Oceanographique de Monaco, Monaco / museum / 8
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix] tour_type='museum' suppressed for intent analysis (pre_category='walking'); using location only
+Intent analysis response: {
+    "poi_type": "museums",
+    "location": "Monaco",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Musee Oceanographique de Monaco",
+    "geographic_scope": null,
+    "scope_precision": null,
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museums
+   Location: Monaco
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: Musee Oceanographique de Monaco
+  [venue_name sanity] 'Musee Oceanographique de Monaco' OK
+  [S15] Forced tour_category=museum from venue_name='Musee Oceanographique de Monaco'
+
+Detected tour category: MUSEUM
+Using museum template for Musee Oceanographique de Monaco, Monaco - museum
+
+======================================================================
+CALL #006 | 18:08:42.956 | GENERATING_PROMPT
+======================================================================
+  location: Musee Oceanographique de Monaco, Monaco
+  user_request: Musee Oceanographique de Monaco, Monaco
+  total_stops: 8
+
+
+PHASE 3A: Fetching 8 candidate POI(s) for Musee Oceanographique de Monaco, Monaco...
+  [Museum constraint] Venue from intent='Musee Oceanographique de Monaco'
+  [venue_resolver] Resolved: 'Musee Oceanographique de Monaco' → Q851527 (Musée océanographique de Monaco)
+    URL: http://www.oceano.org/
+    Coords: 43.730833333333, 7.4252777777778
+    Language: en
+  [venue_resolver] SPARQL: 2 works found for Q851527
+  [Phase3A] Injected 2 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='', scope='')
+  [venue_resolver] Resolved: 'Musee Oceanographique de Monaco' → Q851527 (Musée océanographique de Monaco)
+    URL: http://www.oceano.org/
+    Coords: 43.730833333333, 7.4252777777778
+    Language: en
+  [venue_cache] MISS for Q851527
+  [venue_resolver] SPARQL: 2 works found for Q851527
+  [LOCAL-30] Deterministic selection: 2 documented works (0 catalogue, 2 SPARQL)
+  [LOCAL-30] Documented works (2) < total_stops (8) — will use documented as base, GPT fills remainder
+  [venue_resolver] Resolved: 'Musee Oceanographique de Monaco' → Q851527 (Musée océanographique de Monaco)
+    URL: http://www.oceano.org/
+    Coords: 43.730833333333, 7.4252777777778
+    Language: en
+  [venue_cache] MISS for Q851527
+  [venue_resolver] SPARQL: 2 works found for Q851527
+  [LOCAL-30] Deterministic selection: 2 documented works (0 catalogue, 2 SPARQL)
+  [LOCAL-30] Documented works (2) < total_stops (8) — will use documented as base, GPT fills remainder
+  [R4] Museum tour: asking for 16 candidates (2x for D1v2 filtering)
+
+======================================================================
+CALL #007 | 18:08:49.720 | PHASE_3A_REQUEST
+======================================================================
+  location: Musee Oceanographique de Monaco, Monaco
+  total_stops: 8
+  poi_type_hint: museums
+
+PHASE 3A API call cost: $0.0015 (740 tokens)
+
+======================================================================
+CALL #008 | 18:08:52.324 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 8
+  stop_count_in_prompt: True
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for Musee Oceanographique de Monaco, Monaco.
+List exactly 16 specific, real, well-known museums relevant to: Musee Oceanographique de Monaco, Monaco.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A SINGLE-VENUE MUSEUM TOUR (WORKS-FIRST):
+- List the 8 m
+  prompt_last_300_chars: this list):
+  MOM-INV-0021953; Statue of Albert I, Prince of Monaco at Oceanographic Museum, Monaco
+Each work should appear ONLY ONCE in your list — do NOT list the same work under multiple names.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "..."}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+{"name": "Statue of Albert I, Prince of Monaco", "address": "Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco"},
+{"name": "Whale Room Exhibit", "address": "Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco"},
+{"name": "Shark Lagoon", "address": "Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco"},
+{"name": "Turtle Island", "address": "Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco"},
+{"name": "Coral Reef Aquarium", "addres
+
+OK PHASE 3A parsed 8 candidate POI(s):
+   - Statue of Albert I, Prince of Monaco @ Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco
+   - Whale Room Exhibit @ Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco
+   - Shark Lagoon @ Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco
+   - Turtle Island @ Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco
+   - Coral Reef Aquarium @ Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco
+   - Seabird Aviary @ Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco
+   - Deep Sea Exploration Zone @ Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco
+   - Oceanographic Library @ Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco
+  [venue_resolver] Resolved: 'Musee Oceanographique de Monaco' → Q851527 (Musée océanographique de Monaco)
+    URL: http://www.oceano.org/
+    Coords: 43.730833333333, 7.4252777777778
+    Language: en
+  [D1v2] Venue resolved: Q851527 → URL=http://www.oceano.org/, lang=en
+  [venue_cache] MISS for Q851527
+  [venue_resolver] SPARQL: 2 works found for Q851527
+  [D1v2] SPARQL source: 2 canonical titles
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/linstitut-oceanographique-de-monaco-sengage-aux-cotes-des-semeurs-despoir/  (13911 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites/ (17214 chars)
+  [story_miner] Site page: https://www.oceano.org/contact/ (13640 chars)
+  [story_miner] Site page: https://www.oceano.org/espace-presse/ (30000 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/oceano-pour-tous-2025-2026-une-edition-placee-sous-le-signe-de-lengagement-et-de-louverture-sur-la-mediterranee/  (20278 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/monaco-blue-initiative-et-blue-economy-and-finance-forum-une-mobilisation-croissante-pour-faire-avancer-les-solutions-en-faveur-de-locean/  (20531 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/a-europa-park-le-musee-oceanographique-sensibilise-des-millions-de-visiteurs-a-la-protection-de-la-mediterranee/  (16369 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/suivi-microbiologique-de-leau-une-premiere-experimentation-en-eau-de-mer-au-musee-oceanographique-de-monaco/  (16592 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/blue-economy-and-finance-forum-2026/  (15503 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/monaco-blue-initiative-2026/  (17501 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/julia-marton-lefevre-nommee-a-la-presidence-du-conseil-dadministration-de-linstitut-oceanographique-de-monaco/  (15512 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/ceremonie-grandes-medailles-albert-ier-2024-2025/  (15466 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/la-journee-internationale-de-la-mediterranee-au-coeur-des-actions-de-linstitut/  (15204 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/reconnaissance-trois-nouveautes-a-decouvrir-au-musee-oceanographique-de-monaco/  (21544 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/quels-gestes-pour-proteger-la-mer-ecoutez-la-jeunesse-qui-sengage/  (30000 chars)
+  [story_miner] Site crawl: 16 pages fetched (budget: 15)
+  [story_miner] Sitelink EN: 'Oceanographic Museum of Monaco'
+  [story_miner] Wikipedia EN: 2876 chars (title: 'Oceanographic Museum of Monaco')
+  [T0a] Exhibit-name extraction: 2 from sections, 9 from quoted/bold/list
+  [T0a] Extracted 11 canonical titles, 0 cycle names
+  [story_miner] Corpus: 17 pages, 11 titles, 0 from Joconde
+  [D1v2] Canonical titles union: 11 site/wiki + 2 SPARQL = 13 total
+  [D1v2] Removed 1 substring titles (prefer longer forms)
+  [LOCAL-24] Classification: 12 works, 0 galleries, 0 excluded
+  [D1v2-LOCAL24] After filter: 12 works, 0 galleries, 0 excluded
+  [venue_resolver] Built 2 dynamic aliases from 2 works
+  [D1v2] Injected 2 dynamic aliases
+  [D1v2] Built bilingual map: 84 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+  [D1v2] VERIFIED 'Statue of Albert I, Prince of Monaco' → canonical: 'Statue of Albert I, Prince of Monaco at Oceanographic Museum, Monaco'
+  [D1v2] DROPPED 'Whale Room Exhibit' — no canonical title match
+  [D1v2] DROPPED 'Shark Lagoon' — no canonical title match
+  [D1v2] DROPPED 'Turtle Island' — no canonical title match
+  [D1v2] DROPPED 'Coral Reef Aquarium' — no canonical title match
+  [D1v2] DROPPED 'Seabird Aviary' — no canonical title match
+  [D1v2] DROPPED 'Deep Sea Exploration Zone' — no canonical title match
+  [D1v2] DROPPED 'Oceanographic Library' — no canonical title match
+  [D1v2] Exhibit museum detected: 2 SPARQL QIDs, 12 total titles (mostly from site/wiki sections)
+  [D1v2] 1/8 works verified — tier: exhibit_museum
+  [venue_cache] STORED Q851527 (tier=exhibit_museum, ttl=30d, expires=2026-08-30)
+  [D1] Tier: exhibit_museum (1 verified works)
+
+  [R4] Replenishment round 1/3: need 7 more, asking for 12
+    [LOCAL-22] Rejected corrupted name from R4: 'Pôles, des mondes fragiles'
+    [R4] VERIFIED 'Caulerpa taxifolia' → 'Caulerpa taxifolia'
+    [R4] VERIFIED 'Charlene Guillaumot' → 'Charlene Guillaumot'
+    [R4] VERIFIED 'Jean Jaubert' → 'Jean Jaubert'
+    [R4] VERIFIED 'MOM-INV-0021953' → 'MOM-INV-0021953'
+    [R4] VERIFIED 'Mission Polaire' → 'Mission Polaire'
+    [R4] VERIFIED 'Oceanographic research vessels inscribed on façade' → 'Oceanographic research vessels inscribed on façade'
+    [R4] VERIFIED 'Océano pour Tous' → 'Océano pour Tous'
+    [R4] VERIFIED 'Pièces jointes' → 'Pièces jointes'
+    [R4] VERIFIED 'Plaidoyer pour l’Antarctique' → 'Plaidoyer pour l’Antarctique'
+    [R4] Round 1: +7 verified, total now 8
+  [R4] Target reached: 8/8 stops
+  [LOCAL-16 GATE] All 8 stops are D1v2-verified ✓
+
+PHASE 4.5: Validating AI knowledge for Musee Oceanographique de Monaco, Monaco...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+
+PHASE 3B: Requesting structured details and walking directions for 8 stop(s)...
+
+======================================================================
+CALL #009 | 18:09:51.702 | PHASE_3B_REQUEST
+======================================================================
+  location: Musee Oceanographique de Monaco, Monaco
+  stop_count: 8
+
+PHASE 3B API call cost: $0.0021 (1040 tokens)
+! PHASE 3B introduced unknown names (ignored): ['Statue of Albert I, Prince of Monaco at Oceanographic Museum']
+! PHASE 3B dropped POI; re-appending: Statue of Albert I, Prince of Monaco at Oceanographic Museum, Monaco
+OK PHASE 3B: ordered 8 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 8 stops
+  [LOCAL-27] No visitor info page found for http://www.oceano.org/
+  [LOCAL-27] No visitor info sourced — Museum Information field OMITTED
+
+Coordinates fallback: requesting coords for 1 stop(s) missing them...
+   Coords fallback OK 'Statue of Albert I, Prince of Monaco at Oceanographic Museum, Monaco': 43.7308, 7.4260
+   Coords cluster detected: 7 stops share '43.7312, 7.4268', refetching...
+   Cluster refetch OK 'Charlene Guillaumot': 43.7309, 7.4266
+   Cluster refetch OK 'MOM-INV-0021953': 43.7309, 7.4266
+   Cluster refetch OK 'Caulerpa taxifolia': 43.7329, 7.4261
+   Cluster refetch OK 'Mission Polaire': 43.7304, 7.4274
+   Cluster refetch OK 'Jean Jaubert': 43.7306, 7.4266
+   Cluster refetch OK 'Oceanographic research vessels inscribed on façade': 43.7324, 7.4266
+   Cluster refetch OK 'Océano pour Tous': 43.7314, 7.4257
+Extracted first POI coordinates: (43.7329, 7.4261)
+  [D4] Museum single-coordinate: all stops set to (43.7329, 7.4261) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Caulerpa taxifolia
+   Address: Musee Oceanographique de Monaco
+   Coordinates: 43.7329, 7.4261
+   Directions: Walk straight ahead after entering the museum's main hall and take the first lef...
+2. Charlene Guillaumot
+   Address: Musee Oceanographique de Monaco
+   Coordinates: 43.7329, 7.4261
+   Directions: Continue down the corridor, passing the large aquarium on your right.
+3. Jean Jaubert
+   Address: Musee Oceanographique de Monaco
+   Coordinates: 43.7329, 7.4261
+   Directions: Turn right at the end of the corridor and proceed to the exhibit showcasing Jean...
+4. MOM-INV-0021953
+   Address: Musee Oceanographique de Monaco
+   Coordinates: 43.7329, 7.4261
+   Directions: Head towards the section displaying the artifact labeled MOM-INV-0021953.
+5. Mission Polaire
+   Address: Musee Oceanographique de Monaco
+   Coordinates: 43.7329, 7.4261
+   Directions: Continue straight and take the stairs to the upper level where the Mission Polai...
+6. Oceanographic research vessels inscribed on façade
+   Address: Musee Oceanographique de Monaco
+   Coordinates: 43.7329, 7.4261
+   Directions: Descend the stairs and head outside to view the oceanographic research vessels i...
+7. Océano pour Tous
+   Address: Musee Oceanographique de Monaco
+   Coordinates: 43.7329, 7.4261
+   Directions: Walk back inside the museum to the lower level and explore the Océano pour Tous ...
+8. Statue of Albert I, Prince of Monaco at Oceanographic Museum, Monaco
+   Address: Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco
+   Coordinates: 43.7329, 7.4261
+================================
+
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 5/17 corpus pages for 'Musee Oceanographique de Monaco'
+    page[0] score=10260 url=https://en.wikipedia.org/wiki/Oceanographic_Museum_of_Monaco
+    page[1] score=915 url=https://www.oceano.org/espace-presse/
+    page[2] score=890 url=http://www.oceano.org/
+  [§3-adapter] Raw elements: 4 from 1 pages
+  [§3-adapter] After corroboration scoring: 4 elements
+  [§3-adapter] Final: 4 ranked elements (top type: origin)
+  [§3-adapter] Persisted 4 elements → /tmp/tmpu8b9qd_7_story_elements.json
+  [§3] Updated venue_corpus.story_elements_json for Q851527 (4 elements)
+  [LOCAL-37] Three-class retrieval error (non-fatal): local variable 'name_lower' referenced before assignment
+  [§3] Story elements injected into spine prompt (4 elements, mode=found)
+SPINE_COST: category=museum venue=Musee Oceanographique de Monac tokens=2084 (in=1072 out=1012) cost=$0.0205 latency=10.1s
+  [Storied] Spine generated: 8 arc entries (mode=found)
+Starting Modified Tour Text Generator Service...
+Tours directory: /app/tours
+ * Serving Flask app "generate_tour_text_service" (lazy loading)
+ * Environment: production
+   WARNING: This is a development server. Do not use it in a production deployment.
+   Use a production WSGI server instead.
+ * Debug mode: off
+
+======================================================================
+CALL #001 | 18:11:49.409 | GENERATOR_SERVICE_RECEIVED_REQUEST
+======================================================================
+  raw_request_body:
+    {
+        "location": "Musee d Art Moderne et d Art Contemporain, Nice, France",
+        "tour_type": "museum",
+        "total_stops": 10,
+        "user_id": "local60-fresh-evidence"
+    }
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  tour_type: museum
+  total_stops_raw: 10
+  total_stops_resolved: 10
+
+
+======================================================================
+CALL #002 | 18:11:49.410 | GENERATOR_SERVICE_ASYNC_START
+======================================================================
+  job_id: f3131458-069f-4459-8390-240c0d577ae7
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  tour_type: museum
+  total_stops: 10
+  user_id: local60-fresh-evidence
+
+  [S46] No persona stored for user 'local60-fresh-evidence' — using default
+
+======================================================================
+CALL #003 | 18:11:49.427 | CALLING_GENERATE_TOUR_TEXT_FUNCTION
+======================================================================
+  function: generate_tour_text
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  tour_type: museum
+  total_stops: 10
+  persona: None
+  log_file: /app/api_call_chain_20260731_181149.txt
+
+
+======================================================================
+CALL #004 | 18:11:49.427 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  tour_type: museum
+  total_stops_parameter: 10
+  output_file: /tmp/tmpsjd7drnw.txt
+
+
+======================================================================
+CALL #005 | 18:11:49.427 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  total_stops_final: 10
+  source: parameter
+
+CACHE MISS: Musee d Art Moderne et d Art Contemporain, Nice, France / museum / 10
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix] tour_type='museum' suppressed for intent analysis (pre_category='walking'); using location only
+Intent analysis response: {
+    "poi_type": "museum exhibits",
+    "location": "Nice, France",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": true,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Musee d Art Moderne et d Art Contemporain",
+    "geographic_scope": null,
+    "scope_precision": null,
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museum exhibits
+   Location: Nice, France
+   Requirements: None
+   Business Hours Relevant: True
+   Accessibility Mentioned: False
+   Venue Name: Musee d Art Moderne et d Art Contemporain
+  [venue_name sanity] 'Musee d Art Moderne et d Art Contemporain' OK
+  [S15] Forced tour_category=museum from venue_name='Musee d Art Moderne et d Art Contemporain'
+
+Detected tour category: MUSEUM
+Using museum template for Musee d Art Moderne et d Art Contemporain, Nice, France - museum
+
+======================================================================
+CALL #006 | 18:11:51.205 | GENERATING_PROMPT
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  user_request: Musee d Art Moderne et d Art Contemporain, Nice, France
+  total_stops: 10
+
+
+PHASE 3A: Fetching 10 candidate POI(s) for Musee d Art Moderne et d Art Contemporain, Nice, France...
+  [Museum constraint] Venue from intent='Musee d Art Moderne et d Art Contemporain'
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [Phase3A] Injected 3 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='', scope='')
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [venue_cache] MISS for Q936859
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [LOCAL-30] Deterministic selection: 3 documented works (0 catalogue, 3 SPARQL)
+  [LOCAL-30] Documented works (3) < total_stops (10) — will use documented as base, GPT fills remainder
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [venue_cache] MISS for Q936859
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [LOCAL-30] Deterministic selection: 3 documented works (0 catalogue, 3 SPARQL)
+  [LOCAL-30] Documented works (3) < total_stops (10) — will use documented as base, GPT fills remainder
+  [R4] Museum tour: asking for 20 candidates (2x for D1v2 filtering)
+
+======================================================================
+CALL #007 | 18:12:00.267 | PHASE_3A_REQUEST
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  total_stops: 10
+  poi_type_hint: museum exhibits
+
+PHASE 3A API call cost: $0.0019 (944 tokens)
+
+======================================================================
+CALL #008 | 18:12:04.557 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 10
+  stop_count_in_prompt: True
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for Musee d Art Moderne et d Art Contemporain, Nice, France.
+List exactly 20 specific, real, well-known museum exhibits relevant to: Musee d Art Moderne et d Art Contemporain, Nice, France.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A SINGLE-VENUE M
+  prompt_last_300_chars: s list):
+  Richard Long ou la sculpture en marchant; She-Bam Pow POP Wizz; Tir, séance 26 juin 1961
+Each work should appear ONLY ONCE in your list — do NOT list the same work under multiple names.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "..."}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+{"name": "Richard Long ou la sculpture en marchant", "address": "Musee d'Art Moderne et d'Art Contemporain, 1 Place Yves Klein, 06000 Nice, France"},
+{"name": "She-Bam Pow POP Wizz", "address": "Musee d'Art Moderne et d'Art Contemporain, 1 Place Yves Klein, 06000 Nice, France"},
+{"name": "Tir, séance 26 juin 1961", "address": "Musee d'Art Moderne et d'Art Contemporain, 1 Place Yves Klein, 06000 Nice, France"},
+{"name": "The Creation of the World", "address": "Musee d'Art Moderne et d'Art Conte
+
+OK PHASE 3A parsed 10 candidate POI(s):
+   - Richard Long ou la sculpture en marchant @ Musee d'Art Moderne et d'Art Contemporain, 1 Place Yves Klein, 06000 Nice, France
+   - She-Bam Pow POP Wizz @ Musee d'Art Moderne et d'Art Contemporain, 1 Place Yves Klein, 06000 Nice, France
+   - Tir, séance 26 juin 1961 @ Musee d'Art Moderne et d'Art Contemporain, 1 Place Yves Klein, 06000 Nice, France
+   - The Creation of the World @ Musee d'Art Moderne et d'Art Contemporain, 1 Place Yves Klein, 06000 Nice, France
+   - Jerusalem Windows @ Musee d'Art Moderne et d'Art Contemporain, 1 Place Yves Klein, 06000 Nice, France
+   - Song of Songs @ Musee d'Art Moderne et d'Art Contemporain, 1 Place Yves Klein, 06000 Nice, France
+   - Concert Hall @ Musee d'Art Moderne et d'Art Contemporain, 1 Place Yves Klein, 06000 Nice, France
+   - The Persistence of Memory @ Musee d'Art Moderne et d'Art Contemporain, 1 Place Yves Klein, 06000 Nice, France
+   - Guernica @ Musee d'Art Moderne et d'Art Contemporain, 1 Place Yves Klein, 06000 Nice, France
+   - Starry Night @ Musee d'Art Moderne et d'Art Contemporain, 1 Place Yves Klein, 06000 Nice, France
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [D1v2] Venue resolved: Q936859 → URL=http://www.mamac-nice.org/, lang=fr
+  [venue_cache] MISS for Q936859
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [D1v2] SPARQL source: 3 canonical titles
+  [story_miner] Site page: https://www.mamac-nice.org/collection/navigart/ (4917 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/online-collection/ (3919 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/niki-de-saint-phalle/ (21393 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/niki-de-saint-phalle-room/ (18390 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/fr/collection/navigart/ (4917 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/yves-klein/ (23128 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/yves-klein-room/ (21039 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/nouveau-realisme-pop-art/ (15280 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/new-realism-pop-art/ (10472 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualites/categorie/collection/ (8849 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/actualites/categorie/collection/page/2/ (8798 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/actualites/categorie/collection/page/3/ (8549 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/actualites/categorie/collection/page/4/ (8081 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/collection/bernar-venet-ligne-indeterminee/ (9940 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/parcours/ (19551 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/oeuvres-in-situ/ (28945 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/le-mamac-hors-les-murs/mamac-pres-de-chez-vous-collection-depots-prets/ (10736 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/le-mamac-hors-les-murs/mamac-en-voyage-collection-depots-prets/ (10963 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/ (10007 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualite/mamac-en-voyage-collection-pret-museum-frieder-burda-baden-baden-allemagne/ (7850 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualite/mamac-en-voyage-collection-pret-alexander-calder-monumental/ (11928 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualite/mamac-en-voyage-collection-pret-musee-unterlinden-colmar/ (8201 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/exposition/ (10371 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/evenement/ (7045 chars)
+  [story_miner] Site crawl: 25 pages fetched (budget: 15)
+  [story_miner] Sitelink EN: 'Musée d'art moderne et d'art contemporain'
+  [story_miner] Sitelink FR: 'Musée d'Art moderne et d'Art contemporain de Nice'
+  [story_miner] Wikipedia EN: 3553 chars (title: 'Musée d'art moderne et d'art contemporain')
+  [story_miner] Wikipedia FR: 5607 chars
+  [story_miner] Joconde museo code: M0888 (from P539)
+  [story_miner] Joconde/POP: no results for M0888 (JS-rendered, expected)
+  [T0a] Exhibit-name extraction: 6 from sections, 3 from quoted/bold/list
+  [T0a] Final-pass nav filter removed 1: ['Horaires et tarifs']
+  [T0a] Extracted 14 canonical titles, 0 cycle names
+  [story_miner] Corpus: 27 pages, 14 titles, 0 from Joconde
+  [D1v2] Canonical titles union: 14 site/wiki + 3 SPARQL = 17 total
+  [D1v2] Removed 1 substring titles (prefer longer forms)
+  [LOCAL-24] Classification: 15 works, 0 galleries, 1 excluded
+    EXCLUDED: 'Nouveau Réalisme' — rule: url_path_nonwork (evenement)
+  [LOCAL-24] Near-duplicate collapse removed 1:
+    'Le Mur de Feu d’Yves Klein' → collapsed into 'Le Mur de Feu  d’Yves Klein'
+  [D1v2-LOCAL24] After filter: 14 works, 0 galleries, 1 excluded
+  [venue_resolver] Built 3 dynamic aliases from 3 works
+  [D1v2] Injected 3 dynamic aliases
+  [D1v2] Built bilingual map: 84 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+  [D1v2] VERIFIED 'Richard Long ou la sculpture en marchant' → canonical: 'Richard Long ou la sculpture en marchant'
+  [D1v2] VERIFIED 'She-Bam Pow POP Wizz' → canonical: 'She-Bam Pow POP Wizz'
+  [D1v2] VERIFIED 'Tir, séance 26 juin 1961' → canonical: 'Tir, séance 26 juin 1961'
+  [D1v2] DROPPED 'The Creation of the World' — no canonical title match
+  [D1v2] DROPPED 'Jerusalem Windows' — no canonical title match
+  [D1v2] DROPPED 'Song of Songs' — theme/book word, not a work title
+  [D1v2] DROPPED 'Concert Hall' — no canonical title match
+  [D1v2] DROPPED 'The Persistence of Memory' — no canonical title match
+  [D1v2] DROPPED 'Guernica' — no canonical title match
+  [D1v2] DROPPED 'Starry Night' — no canonical title match
+  [D1v2] Exhibit museum detected: 3 SPARQL QIDs, 14 total titles (mostly from site/wiki sections)
+  [D1v2] 3/10 works verified — tier: exhibit_museum
+  [venue_cache] STORED Q936859 (tier=exhibit_museum, ttl=30d, expires=2026-08-30)
+  [D1] Tier: exhibit_museum (3 verified works)
+
+  [R4] Replenishment round 1/3: need 7 more, asking for 12
+    [R4] VERIFIED 'Donations and deposits' → 'Donations and deposits'
+    [R4] VERIFIED 'Donations et dépôts' → 'Donations et dépôts'
+    [R4] VERIFIED 'Expositions temporaires' → 'Expositions temporaires'
+    [R4] VERIFIED 'La mariée sous l’arbre' → 'La mariée sous l’arbre'
+    [R4] VERIFIED 'Le Déjeuner sur l’herbe' → 'Le Déjeuner sur l’herbe'
+    [R4] VERIFIED 'Le Mur de Feu d’Yves Klein' → 'Le Mur de Feu  d’Yves Klein'
+    [R4] VERIFIED 'Le Village de grand-mère' → 'Le Village de grand-mère'
+    [R4] VERIFIED 'Les mouvements et les artistes' → 'Les mouvements et les artistes'
+    [R4] VERIFIED 'Nana noire upside down' → 'Nana noire upside down'
+    [R4] VERIFIED 'New Realism' → 'New Realism'
+    [R4] Round 1: +7 verified, total now 10
+  [R4] Target reached: 10/10 stops
+  [LOCAL-16 GATE] All 10 stops are D1v2-verified ✓
+
+PHASE 4.5: Validating AI knowledge for Musee d Art Moderne et d Art Contemporain, Nice, France...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+
+PHASE 3B: Requesting structured details and walking directions for 10 stop(s)...
+
+======================================================================
+CALL #009 | 18:12:46.021 | PHASE_3B_REQUEST
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  stop_count: 10
+
+PHASE 3B API call cost: $0.0026 (1303 tokens)
+OK PHASE 3B: ordered 10 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 10 stops
+  [LOCAL-27] Visitor info page found: http://www.mamac-nice.org/tarifs-et-horaires
+  [LOCAL-27] Extracted visitor info: Tarifs Visites commentées Boutique --> Découvrez les 11...
+  [LOCAL-33] Visitor info FAILED validity gate — omitting (raw: 'Tarifs Visites commentées Boutique --> Découvrez les 11')
+  [LOCAL-27] No visitor info sourced — Museum Information field OMITTED
+
+Coordinates fallback: requesting coords for 7 stop(s) missing them...
+   Coords fallback OK 'Expositions temporaires': 43.7034, 7.2794
+   Coords fallback OK 'Donations and deposits': 43.7039, 7.2794
+   Coords fallback OK 'Le Déjeuner sur l’herbe': 43.6987, 7.2792
+   Coords fallback OK 'Donations et dépôts': 43.6979, 7.2790
+   Coords fallback OK 'La mariée sous l’arbre': 43.6979, 7.2796
+   Coords fallback OK 'Le Village de grand-mère': 43.7003, 7.2795
+   Coords fallback OK 'Le Mur de Feu d’Yves Klein': 43.7035, 7.2797
+Extracted first POI coordinates: (43.7032, 7.2661)
+  [D4] Museum single-coordinate: all stops set to (43.7032, 7.2661) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Richard Long ou la sculpture en marchant
+   Address: Musee d'Art Moderne et d'Art Contemporain, 1 Place Yves Klein, 06000 Nice, France
+   Coordinates: 43.7032, 7.2661
+   Directions: Head southeast on Place Yves Klein toward Rue Verdi, the museum will be on your ...
+2. She-Bam Pow POP Wizz
+   Address: Musee d'Art Moderne et d'Art Contemporain, 1 Place Yves Klein, 06000 Nice, France
+   Coordinates: 43.7032, 7.2661
+   Directions: Continue straight on Place Yves Klein, the next exhibition is on your right.
+3. Tir, séance 26 juin 1961
+   Address: Musee d'Art Moderne et d'Art Contemporain, 1 Place Yves Klein, 06000 Nice, France
+   Coordinates: 43.7032, 7.2661
+   Directions: Walk ahead on Place Yves Klein, you'll see the exhibition on the right side.
+4. Donations and deposits
+   Address: Musee d Art Moderne et d Art Contemporain
+   Coordinates: 43.7032, 7.2661
+   Directions: Walk straight ahead to the museum's Donations and Deposits section.
+5. Donations et dépôts
+   Address: Musee d Art Moderne et d Art Contemporain
+   Coordinates: 43.7032, 7.2661
+   Directions: Continue straight to reach the Donations and Deposits area of the museum.
+6. Expositions temporaires
+   Address: Musee d Art Moderne et d Art Contemporain
+   Coordinates: 43.7032, 7.2661
+   Directions: Walk straight to explore the Temporary Exhibitions section.
+7. La mariée sous l’arbre
+   Address: Musee d Art Moderne et d Art Contemporain
+   Coordinates: 43.7032, 7.2661
+   Directions: Continue walking straight to view La mariée sous l’arbre exhibit.
+8. Le Déjeuner sur l’herbe
+   Address: Musee d Art Moderne et d Art Contemporain
+   Coordinates: 43.7032, 7.2661
+   Directions: Walk straight to reach the exhibit Le Déjeuner sur l’herbe.
+9. Le Mur de Feu d’Yves Klein
+   Address: Musee d Art Moderne et d Art Contemporain
+   Coordinates: 43.7032, 7.2661
+   Directions: Continue straight to find Le Mur de Feu d’Yves Klein exhibit.
+10. Le Village de grand-mère
+   Address: Musee d Art Moderne et d Art Contemporain
+   Coordinates: 43.7032, 7.2661
+   Directions: Walk straight to discover the exhibit Le Village de grand-mère.
+================================
+
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 5/27 corpus pages for 'Musee d Art Moderne et d Art Contemporain'
+    page[0] score=12405 url=https://fr.wikipedia.org/wiki/Musée_d'Art_moderne_et_d'Art_contemporain_de_Nice
+    page[1] score=10275 url=https://en.wikipedia.org/wiki/Musée_d'art_moderne_et_d'art_contemporain
+    page[2] score=6870 url=https://www.mamac-nice.org/collection/oeuvres-in-situ/
+  [§3-adapter] Raw elements: 40 from 5 pages
+  [§3-adapter] After corroboration scoring: 26 elements
+  [§3-adapter] Final: 26 ranked elements (top type: dedication)
+  [§3-adapter] Persisted 26 elements → /tmp/tmpsjd7drnw_story_elements.json
+  [§3] Updated venue_corpus.story_elements_json for Q936859 (26 elements)
+  [LOCAL-37] Three-class retrieval error (non-fatal): local variable 'name_lower' referenced before assignment
+  [§3] Story elements injected into spine prompt (26 elements, mode=found)
+SPINE_COST: category=museum venue=Musee d Art Moderne et d Art C tokens=2935 (in=1640 out=1295) cost=$0.0276 latency=12.8s
+  [Storied] Spine generated: 10 arc entries (mode=found)
+  [Storied] Fact sheets: 8/10 generated
+  [S25] Story types assigned: ['art', 'history', 'anecdote', 'art', 'history', 'art', 'history', 'anecdote', 'art', 'history']
+  [work_stories] MISS for richard long ou la sculpture en marchant
+  [work_stories] MISS for shebam pow pop wizz
+  [work_stories] MISS for tir seance 26 juin 1961
+  [work_stories] MISS for donations and deposits
+  [work_stories] MISS for donations et depots
+  [work_stories] MISS for expositions temporaires
+  [work_stories] MISS for la mariee sous larbre
+  [work_stories] MISS for le dejeuner sur lherbe
+  [work_stories] MISS for le mur de feu dyves klein
+  [work_stories] MISS for le village de grandmere
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+Generating description for Stop 1: Richard Long ou la sculpture en marchant by , ...
+Generating description for Stop 2: She-Bam Pow POP Wizz by , ...
+
+
+Generating description for Stop 3: Tir, séance 26 juin 1961 by , ...
+
+Generating description for Stop 4: Donations and deposits by , ...
+
+Generating description for Stop 5: Donations et dépôts by , ...
+Stop 1 API call cost: $0.0064 (3193 tokens)
+Stop 1 description word count: 81 words
+
+Generating description for Stop 6: Expositions temporaires by , ...
+Stop 5 API call cost: $0.0074 (3700 tokens)
+Stop 5 description word count: 236 words
+
+Generating description for Stop 7: La mariée sous l’arbre by , ...
+Stop 2 API call cost: $0.0064 (3213 tokens)
+Stop 2 description word count: 73 words
+
+Generating description for Stop 8: Le Déjeuner sur l’herbe by , ...
+Stop 3 API call cost: $0.0071 (3555 tokens)
+Stop 3 description word count: 267 words
+
+Generating description for Stop 9: Le Mur de Feu d’Yves Klein by , ...
+Stop 4 API call cost: $0.0075 (3734 tokens)
+Stop 4 description word count: 279 words
+
+Generating description for Stop 10: Le Village de grand-mère by , ...
+Stop 6 API call cost: $0.0073 (3644 tokens)
+Stop 6 description word count: 220 words
+Stop 7 API call cost: $0.0080 (3984 tokens)
+Stop 7 description word count: 276 words
+Stop 8 API call cost: $0.0078 (3917 tokens)
+Stop 8 description word count: 262 words
+Stop 9 API call cost: $0.0077 (3863 tokens)
+Stop 9 description word count: 246 words
+Stop 10 API call cost: $0.0078 (3917 tokens)
+Stop 10 description word count: 235 words
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Musee d Art Moderne et d Art Contemporain'...
+   Authority: 9 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 10 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (10 stops)
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 3 trailing question(s), removed 0 'broader context' instance(s)
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: 1 facts found {'architecture': 1}
+  [R2] Prolog saved for Stop 1 (137 words)
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Musee d Art Moderne et d Art Contemporain —...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 3: Next: Tir, séance 26 juin 1961....
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 4: Proceed to Donations and deposits....
+  DEBUG - POI 4 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 5: Continue to Donations et dépôts....
+  DEBUG - POI 5 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 6: Next: Expositions temporaires....
+  DEBUG - POI 6 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 7: Proceed to La mariée sous l’arbre....
+  DEBUG - POI 7 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 8: Continue to Le Déjeuner sur l’herbe....
+  DEBUG - POI 8 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 9: Next: Le Mur de Feu d’Yves Klein....
+  DEBUG - POI 9 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 10: Your final stop in Musee d Art Moderne et d Art Contemporain...
+  DEBUG - POI 10 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] PRACTICAL FACTS GATE: PASSED (0 verified)
+
+=== Word Count Statistics ===
+Stop 1: Richard Long ou la sculpture en marchant - 81 words
+Stop 2: She-Bam Pow POP Wizz - 73 words
+Stop 3: Tir, séance 26 juin 1961 - 267 words
+Stop 4: Donations and deposits - 279 words
+Stop 5: Donations et dépôts - 236 words
+Stop 6: Expositions temporaires - 220 words
+Stop 7: La mariée sous l’arbre - 276 words
+Stop 8: Le Déjeuner sur l’herbe - 262 words
+Stop 9: Le Mur de Feu d’Yves Klein - 246 words
+Stop 10: Le Village de grand-mère - 235 words
+===========================
+
+
+Total API cost: $0.0803 (40130 tokens)
+CACHE STORE: Musee d Art Moderne et d Art Contemporain, Nice, France / museum / 10
+
+Tour text generated successfully!
+Saved to: /tmp/tmpsjd7drnw.txt
+  [C5-5] Evidence persisted: /tmp/tmpsjd7drnw_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Musee d Art Moderne et d Art Contemporain, Nice, France - Museum Tour
+Tour-Category: museum
+
+Stop 1: Richard Long ou la sculpture en marchant
+
+Address: Musee d'Art Moderne et d'Art Contemporain, 1 Place Yves Klein, 06000 Nice, France
+
+Coordinates: 43.7032, 7.2661
+
+Orientation: Stand at the entrance of the Musee d'Art Moderne et d'Art Contemporain, facing towards the exhibit "Richard Long ou la sculpture en marchant." From this vantage point, the expansive nature o...
+
+[COST_METER] FRESH | tour_generate | $0.080260 | user=local60-fresh-evidence | job=f3131458-069f-4459-8390-240c0d577ae7
+[LOCAL-60] Cost metered: tour_generate | $0.080260 | cache_hit=False
+[BLOCKER4c] Loaded 26 story elements for G4 check
+  Rendered Stop headings (10):
+    Stop 1: Richard Long ou la sculpture en marchant
+    Stop 2: She-Bam Pow POP Wizz
+    Stop 3: Tir, séance 26 juin 1961
+    Stop 4: Donations and deposits
+    Stop 5: Donations et dépôts
+    Stop 6: Expositions temporaires
+    Stop 7: La mariée sous l’arbre
+    Stop 8: Le Déjeuner sur l’herbe
+    Stop 9: Le Mur de Feu d’Yves Klein
+    Stop 10: Le Village de grand-mère
+  FAIL: No forbidden phrases — 22 forbidden phrases found: ['vibrant colors and', 'vibrant colors and', 'intricate details']
+  PASS: No cross-stop repetition (>0.85)
+  PASS: Distinct opening sentences
+  PASS: No compass bearings (museum)
+  PASS: No standalone Introduction block (R2)
+  PASS: Final stop has substantial content
+  PASS: Word count per stop (200-500 middle, 150-800 first/last)
+  PASS: Total length reasonable (1000-8000 words)
+  PASS: D3(a) Stop-title sanity
+  PASS: D3(b) Coordinate scatter (museum <200m)
+  FAIL: D3(c) No boilerplate shingles (4-word in 3+ stops) — 1 repeated shingle(s): ['dialogue between past present']
+  FAIL: D3(c2) No unearned adjectives (explain or cut) [LOCAL-40] — 8 unearned adjective(s): ["Stop 1: 'mesmerizing' without evidence in: ...As you approach the exhibit, you encounter a mesmerizing installation of stones ...", "Stop 4: 'vibrant' without evidence in: ...As you immerse yourself in the vibrant hues and dynamic forms of these artworks,...", "Stop 5: 'vibrant' without evidence in: ...The ongoing legacy of these donations, including those possibly contributed by K..."]
+  PASS: D3(d) Grounding assertion (titles look like real entities)
+  PASS: D3(e) No duplicate stops (same work under different labels) (FACTUAL)
+  PASS: T6 No splice corruption (mid-token dots, stray Stop N refs)
+  PASS: R3 Orientation substance (no generic filler in museum)
+  PASS: Single-venue consistency (no other NAMED venues)
+  PASS: Attribution grounding (consistent with venue)
+  PASS: Venue coherence (stops reference correct venue)
+  PASS: G4 Prolog/epilog claims trace to story elements (FACTUAL)
+  [LOCAL-36] No practical claims in tour (OK — omission is safe)
+[BLOCKER4c] Style issues (round 1): 3 style failure(s) — correcting
+  Rendered Stop headings (10):
+    Stop 1: Richard Long ou la sculpture en marchant
+    Stop 2: She-Bam Pow POP Wizz
+    Stop 3: Tir, séance 26 juin 1961
+    Stop 4: Donations and deposits
+    Stop 5: Donations et dépôts
+    Stop 6: Expositions temporaires
+    Stop 7: La mariée sous l’arbre
+    Stop 8: Le Déjeuner sur l’herbe
+    Stop 9: Le Mur de Feu d’Yves Klein
+    Stop 10: Le Village de grand-mère
+  PASS: No forbidden phrases
+  PASS: No cross-stop repetition (>0.85)
+  PASS: Distinct opening sentences
+  PASS: No compass bearings (museum)
+  PASS: No standalone Introduction block (R2)
+  PASS: Final stop has substantial content
+  PASS: Word count per stop (200-500 middle, 150-800 first/last)
+  PASS: Total length reasonable (1000-8000 words)
+  PASS: D3(a) Stop-title sanity
+  PASS: D3(b) Coordinate scatter (museum <200m)
+  FAIL: D3(c) No boilerplate shingles (4-word in 3+ stops) — 1 repeated shingle(s): ['dialogue between past present']
+  FAIL: D3(c2) No unearned adjectives (explain or cut) [LOCAL-40] — 7 unearned adjective(s): ["Stop 1: 'mesmerizing' without evidence in: ...As you approach the exhibit, you encounter a mesmerizing installation of stones ...", "Stop 4: 'vibrant' without evidence in: ...As you the vibrant hues and dynamic forms of these artworks, consider the transf...", "Stop 5: 'vibrant' without evidence in: ...The ongoing legacy of these donations, including those possibly contributed by K..."]
+  PASS: D3(d) Grounding assertion (titles look like real entities)
+  PASS: D3(e) No duplicate stops (same work under different labels) (FACTUAL)
+  PASS: T6 No splice corruption (mid-token dots, stray Stop N refs)
+  PASS: R3 Orientation substance (no generic filler in museum)
+  PASS: Single-venue consistency (no other NAMED venues)
+  PASS: Attribution grounding (consistent with venue)
+  PASS: Venue coherence (stops reference correct venue)
+  PASS: G4 Prolog/epilog claims trace to story elements (FACTUAL)
+  [LOCAL-36] No practical claims in tour (OK — omission is safe)
+[BLOCKER4c] Style issues (round 2): 2 style failure(s) — correcting
+  Rendered Stop headings (10):
+    Stop 1: Richard Long ou la sculpture en marchant
+    Stop 2: She-Bam Pow POP Wizz
+    Stop 3: Tir, séance 26 juin 1961
+    Stop 4: Donations and deposits
+    Stop 5: Donations et dépôts
+    Stop 6: Expositions temporaires
+    Stop 7: La mariée sous l’arbre
+    Stop 8: Le Déjeuner sur l’herbe
+    Stop 9: Le Mur de Feu d’Yves Klein
+    Stop 10: Le Village de grand-mère
+  PASS: No forbidden phrases
+  PASS: No cross-stop repetition (>0.85)
+  PASS: Distinct opening sentences
+  PASS: No compass bearings (museum)
+  PASS: No standalone Introduction block (R2)
+  PASS: Final stop has substantial content
+  PASS: Word count per stop (200-500 middle, 150-800 first/last)
+  PASS: Total length reasonable (1000-8000 words)
+  PASS: D3(a) Stop-title sanity
+  PASS: D3(b) Coordinate scatter (museum <200m)
+  FAIL: D3(c) No boilerplate shingles (4-word in 3+ stops) — 1 repeated shingle(s): ['dialogue between past present']
+  FAIL: D3(c2) No unearned adjectives (explain or cut) [LOCAL-40] — 7 unearned adjective(s): ["Stop 1: 'mesmerizing' without evidence in: ...As you approach the exhibit, you encounter a mesmerizing installation of stones ...", "Stop 4: 'vibrant' without evidence in: ...As you the vibrant hues and dynamic forms of these artworks, consider the transf...", "Stop 5: 'vibrant' without evidence in: ...The ongoing legacy of these donations, including those possibly contributed by K..."]
+  PASS: D3(d) Grounding assertion (titles look like real entities)
+  PASS: D3(e) No duplicate stops (same work under different labels) (FACTUAL)
+  PASS: T6 No splice corruption (mid-token dots, stray Stop N refs)
+  PASS: R3 Orientation substance (no generic filler in museum)
+  PASS: Single-venue consistency (no other NAMED venues)
+  PASS: Attribution grounding (consistent with venue)
+  PASS: Venue coherence (stops reference correct venue)
+  PASS: G4 Prolog/epilog claims trace to story elements (FACTUAL)
+  [LOCAL-36] No practical claims in tour (OK — omission is safe)
+[BLOCKER4c] Style issues (round 3): 2 style failure(s) — correcting
+[BLOCKER4c] Delivered with 2 style issue(s) after 3 correction rounds
+  [I-CON] LLM error: Expecting ',' delimiter: line 6 column 112 (char 1291)
+[I-CON] ADVISORY FAIL — tour avg: 3.00, min stop: 3.00 | Issues: tour avg 3.00 < 3.5; stop 'Tir, séance 26 juin 1961' avg 0.00 < 3; stop 'Donations and deposits' avg 0.00 < 3; stop 'Donations et dépôts' avg 0.00 < 3; stop 'Expositions temporaires' avg 0.00 < 3; stop 'La mariée sous l’arbre' avg 0.00 < 3; stop 'Le Déjeuner sur l’herbe' avg 0.00 < 3; stop 'Le Mur de Feu d’Yves Klein' avg 0.00 < 3
+[I-CON] Persisted 10 stop metrics for job f3131458-069f-4459-8390-240c0d577ae7
+
+======================================================================
+CALL #010 | 18:16:30.765 | GENERATOR_SERVICE_RECEIVED_REQUEST
+======================================================================
+  raw_request_body:
+    {
+        "location": "Musee Picasso, Antibes, France",
+        "tour_type": "museum",
+        "total_stops": 8
+    }
+  location: Musee Picasso, Antibes, France
+  tour_type: museum
+  total_stops_raw: 8
+  total_stops_resolved: 8
+
+
+======================================================================
+CALL #011 | 18:16:30.766 | GENERATOR_SERVICE_ASYNC_START
+======================================================================
+  job_id: 090e852b-1e84-4934-9715-b32aa3afb2dc
+  location: Musee Picasso, Antibes, France
+  tour_type: museum
+  total_stops: 8
+  user_id: None
+
+
+======================================================================
+CALL #012 | 18:16:30.767 | CALLING_GENERATE_TOUR_TEXT_FUNCTION
+======================================================================
+  function: generate_tour_text
+  location: Musee Picasso, Antibes, France
+  tour_type: museum
+  total_stops: 8
+  persona: None
+  log_file: /app/api_call_chain_20260731_181149.txt
+
+
+======================================================================
+CALL #013 | 18:16:30.767 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Musee Picasso, Antibes, France
+  tour_type: museum
+  total_stops_parameter: 8
+  output_file: /tmp/tmpz7ijtlsy.txt
+
+
+======================================================================
+CALL #014 | 18:16:30.767 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Musee Picasso, Antibes, France
+  total_stops_final: 8
+  source: parameter
+
+CACHE MISS: Musee Picasso, Antibes, France / museum / 8
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix] tour_type='museum' suppressed for intent analysis (pre_category='walking'); using location only
+Intent analysis response: {
+    "poi_type": "museums",
+    "location": "Antibes, France",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": null,
+    "scope_precision": null,
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [INTENT] venue_name=null but request implies a venue (attempt 1/2) — retrying
+Intent analysis response: {
+    "poi_type": "museums",
+    "location": "Antibes, France",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": null,
+    "geographic_scope": "Musee Picasso",
+    "scope_precision": "BUILDING",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museums
+   Location: Antibes, France
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: None
+
+Detected tour category: MUSEUM
+Using museum template for Musee Picasso, Antibes, France - museum
+
+======================================================================
+CALL #015 | 18:16:33.687 | GENERATING_PROMPT
+======================================================================
+  location: Musee Picasso, Antibes, France
+  user_request: Musee Picasso, Antibes, France
+  total_stops: 8
+
+
+PHASE 3A: Fetching 8 candidate POI(s) for Musee Picasso, Antibes, France...
+  [Museum constraint] No venue_name from intent — single-venue constraint skipped
+  [BLOCKER4a] venue_name from location fallback: 'Musee Picasso'
+  [venue_resolver] City-qualified search hit: 'Musee Picasso (Antibes)' → 1 candidates
+    [venue_resolver] Artist inferred from name: 'Picasso'
+  [venue_resolver] Resolved: 'Musee Picasso' → Q1368360 (Picasso Museum)
+    URL: http://www.antibes-juanlespins.com/les-musees/picasso/
+    Coords: 43.580833, 7.128333
+    Language: fr
+    Artist: Picasso ()
+  [venue_resolver] SPARQL: 128 works found for Q1368360
+  [Phase3A] Injected 12 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='BUILDING', scope='Musee Picasso')
+  [venue_resolver] City-qualified search hit: 'Musee Picasso (Antibes)' → 1 candidates
+    [venue_resolver] Artist inferred from name: 'Picasso'
+  [venue_resolver] Resolved: 'Musee Picasso' → Q1368360 (Picasso Museum)
+    URL: http://www.antibes-juanlespins.com/les-musees/picasso/
+    Coords: 43.580833, 7.128333
+    Language: fr
+    Artist: Picasso ()
+  [venue_cache] MISS for Q1368360
+  [venue_resolver] SPARQL: 128 works found for Q1368360
+  [LOCAL-30] Deterministic selection: 41 documented works (0 catalogue, 41 SPARQL)
+  [LOCAL-30] DETERMINISTIC BYPASS: 16 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Satyre, faune et centaure au trident [sparql]
+     - La Chèvre [sparql]
+     - Les Clefs d'Antibes [sparql]
+     - Nu debout [sparql]
+     - Nature morte aux trois poissons, à la murène, au citron vert sur fond blanc [sparql]
+     - La Villa Chêne-Roc à Juan-les-Pins [sparql]
+     - Mère et enfants jouant [sparql]
+     - Le Concert [sparql]
+  [venue_resolver] City-qualified search hit: 'Musee Picasso (Antibes)' → 1 candidates
+
+======================================================================
+CALL #016 | 18:16:38.169 | GENERATOR_SERVICE_RECEIVED_REQUEST
+======================================================================
+  raw_request_body:
+    {
+        "location": "Musee d Art Moderne et d Art Contemporain, Nice, France",
+        "tour_type": "museum",
+        "total_stops": 10,
+        "user_id": "local60-fresh-evidence"
+    }
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  tour_type: museum
+  total_stops_raw: 10
+  total_stops_resolved: 10
+
+
+======================================================================
+CALL #017 | 18:16:38.170 | GENERATOR_SERVICE_ASYNC_START
+======================================================================
+  job_id: 14d1adc8-053e-4d3e-88fc-6178b1edb555
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  tour_type: museum
+  total_stops: 10
+  user_id: local60-fresh-evidence
+
+  [S46] No persona stored for user 'local60-fresh-evidence' — using default
+
+======================================================================
+CALL #018 | 18:16:38.177 | CALLING_GENERATE_TOUR_TEXT_FUNCTION
+======================================================================
+  function: generate_tour_text
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  tour_type: museum
+  total_stops: 10
+  persona: None
+  log_file: /app/api_call_chain_20260731_181149.txt
+
+
+======================================================================
+CALL #019 | 18:16:38.177 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  tour_type: museum
+  total_stops_parameter: 10
+  output_file: /tmp/tmpdr8_j4rv.txt
+
+
+======================================================================
+CALL #020 | 18:16:38.177 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  total_stops_final: 10
+  source: parameter
+
+CACHE HIT: Musee d Art Moderne et d Art Contemporain, Nice, France / museum / 10
+[COST_METER] CACHE_HIT | tour_cache_hit | $0.000000 | user=local60-fresh-evidence | job=14d1adc8-053e-4d3e-88fc-6178b1edb555
+[LOCAL-60] Cost metered: tour_cache_hit | $0.000000 | cache_hit=True
+[BLOCKER4c] No story_elements file at /tmp/tmpdr8_j4rv_story_elements.json — G4 will use fail-closed
+  Rendered Stop headings (10):
+    Stop 1: Richard Long ou la sculpture en marchant
+    Stop 2: She-Bam Pow POP Wizz
+    Stop 3: Tir, séance 26 juin 1961
+    Stop 4: Donations and deposits
+    Stop 5: Donations et dépôts
+    Stop 6: Expositions temporaires
+    Stop 7: La mariée sous l’arbre
+    Stop 8: Le Déjeuner sur l’herbe
+    Stop 9: Le Mur de Feu d’Yves Klein
+    Stop 10: Le Village de grand-mère
+  FAIL: No forbidden phrases — 22 forbidden phrases found: ['vibrant colors and', 'vibrant colors and', 'intricate details']
+  PASS: No cross-stop repetition (>0.85)
+  PASS: Distinct opening sentences
+  PASS: No compass bearings (museum)
+  PASS: No standalone Introduction block (R2)
+  PASS: Final stop has substantial content
+  PASS: Word count per stop (200-500 middle, 150-800 first/last)
+  PASS: Total length reasonable (1000-8000 words)
+  PASS: D3(a) Stop-title sanity
+  PASS: D3(b) Coordinate scatter (museum <200m)
+  FAIL: D3(c) No boilerplate shingles (4-word in 3+ stops) — 1 repeated shingle(s): ['dialogue between past present']
+  FAIL: D3(c2) No unearned adjectives (explain or cut) [LOCAL-40] — 8 unearned adjective(s): ["Stop 1: 'mesmerizing' without evidence in: ...As you approach the exhibit, you encounter a mesmerizing installation of stones ...", "Stop 4: 'vibrant' without evidence in: ...As you immerse yourself in the vibrant hues and dynamic forms of these artworks,...", "Stop 5: 'vibrant' without evidence in: ...The ongoing legacy of these donations, including those possibly contributed by K..."]
+  PASS: D3(d) Grounding assertion (titles look like real entities)
+  PASS: D3(e) No duplicate stops (same work under different labels) (FACTUAL)
+  PASS: T6 No splice corruption (mid-token dots, stray Stop N refs)
+  PASS: R3 Orientation substance (no generic filler in museum)
+  PASS: Single-venue consistency (no other NAMED venues)
+  PASS: Attribution grounding (consistent with venue)
+  PASS: Venue coherence (stops reference correct venue)
+  PASS: G4 Prolog/epilog claims trace to story elements (FACTUAL)
+  [LOCAL-36] No practical claims in tour (OK — omission is safe)
+[BLOCKER4c] Style issues (round 1): 3 style failure(s) — correcting
+  Rendered Stop headings (10):
+    Stop 1: Richard Long ou la sculpture en marchant
+    Stop 2: She-Bam Pow POP Wizz
+    Stop 3: Tir, séance 26 juin 1961
+    Stop 4: Donations and deposits
+    Stop 5: Donations et dépôts
+    Stop 6: Expositions temporaires
+    Stop 7: La mariée sous l’arbre
+    Stop 8: Le Déjeuner sur l’herbe
+    Stop 9: Le Mur de Feu d’Yves Klein
+    Stop 10: Le Village de grand-mère
+  PASS: No forbidden phrases
+  PASS: No cross-stop repetition (>0.85)
+  PASS: Distinct opening sentences
+  PASS: No compass bearings (museum)
+  PASS: No standalone Introduction block (R2)
+  PASS: Final stop has substantial content
+  PASS: Word count per stop (200-500 middle, 150-800 first/last)
+  PASS: Total length reasonable (1000-8000 words)
+  PASS: D3(a) Stop-title sanity
+  PASS: D3(b) Coordinate scatter (museum <200m)
+  FAIL: D3(c) No boilerplate shingles (4-word in 3+ stops) — 1 repeated shingle(s): ['dialogue between past present']
+  FAIL: D3(c2) No unearned adjectives (explain or cut) [LOCAL-40] — 7 unearned adjective(s): ["Stop 1: 'mesmerizing' without evidence in: ...As you approach the exhibit, you encounter a mesmerizing installation of stones ...", "Stop 4: 'vibrant' without evidence in: ...As you the vibrant hues and dynamic forms of these artworks, consider the transf...", "Stop 5: 'vibrant' without evidence in: ...The ongoing legacy of these donations, including those possibly contributed by K..."]
+  PASS: D3(d) Grounding assertion (titles look like real entities)
+  PASS: D3(e) No duplicate stops (same work under different labels) (FACTUAL)
+  PASS: T6 No splice corruption (mid-token dots, stray Stop N refs)
+  PASS: R3 Orientation substance (no generic filler in museum)
+  PASS: Single-venue consistency (no other NAMED venues)
+  PASS: Attribution grounding (consistent with venue)
+  PASS: Venue coherence (stops reference correct venue)
+  PASS: G4 Prolog/epilog claims trace to story elements (FACTUAL)
+  [LOCAL-36] No practical claims in tour (OK — omission is safe)
+[BLOCKER4c] Style issues (round 2): 2 style failure(s) — correcting
+  Rendered Stop headings (10):
+    Stop 1: Richard Long ou la sculpture en marchant
+    Stop 2: She-Bam Pow POP Wizz
+    Stop 3: Tir, séance 26 juin 1961
+    Stop 4: Donations and deposits
+    Stop 5: Donations et dépôts
+    Stop 6: Expositions temporaires
+    Stop 7: La mariée sous l’arbre
+    Stop 8: Le Déjeuner sur l’herbe
+    Stop 9: Le Mur de Feu d’Yves Klein
+    Stop 10: Le Village de grand-mère
+  PASS: No forbidden phrases
+  PASS: No cross-stop repetition (>0.85)
+  PASS: Distinct opening sentences
+  PASS: No compass bearings (museum)
+  PASS: No standalone Introduction block (R2)
+  PASS: Final stop has substantial content
+  PASS: Word count per stop (200-500 middle, 150-800 first/last)
+  PASS: Total length reasonable (1000-8000 words)
+  PASS: D3(a) Stop-title sanity
+  PASS: D3(b) Coordinate scatter (museum <200m)
+  FAIL: D3(c) No boilerplate shingles (4-word in 3+ stops) — 1 repeated shingle(s): ['dialogue between past present']
+  FAIL: D3(c2) No unearned adjectives (explain or cut) [LOCAL-40] — 7 unearned adjective(s): ["Stop 1: 'mesmerizing' without evidence in: ...As you approach the exhibit, you encounter a mesmerizing installation of stones ...", "Stop 4: 'vibrant' without evidence in: ...As you the vibrant hues and dynamic forms of these artworks, consider the transf...", "Stop 5: 'vibrant' without evidence in: ...The ongoing legacy of these donations, including those possibly contributed by K..."]
+  PASS: D3(d) Grounding assertion (titles look like real entities)
+  PASS: D3(e) No duplicate stops (same work under different labels) (FACTUAL)
+  PASS: T6 No splice corruption (mid-token dots, stray Stop N refs)
+  PASS: R3 Orientation substance (no generic filler in museum)
+  PASS: Single-venue consistency (no other NAMED venues)
+  PASS: Attribution grounding (consistent with venue)
+  PASS: Venue coherence (stops reference correct venue)
+  PASS: G4 Prolog/epilog claims trace to story elements (FACTUAL)
+  [LOCAL-36] No practical claims in tour (OK — omission is safe)
+[BLOCKER4c] Style issues (round 3): 2 style failure(s) — correcting
+[BLOCKER4c] Delivered with 2 style issue(s) after 3 correction rounds
+    [venue_resolver] Artist inferred from name: 'Picasso'
+  [venue_resolver] Resolved: 'Musee Picasso' → Q1368360 (Picasso Museum)
+    URL: http://www.antibes-juanlespins.com/les-musees/picasso/
+    Coords: 43.580833, 7.128333
+    Language: fr
+    Artist: Picasso ()
+  [venue_cache] MISS for Q1368360
+  [venue_resolver] SPARQL: 128 works found for Q1368360
+  [LOCAL-30] Deterministic selection: 41 documented works (0 catalogue, 41 SPARQL)
+  [LOCAL-30] DETERMINISTIC BYPASS: 16 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Satyre, faune et centaure au trident [sparql]
+     - La Chèvre [sparql]
+     - Les Clefs d'Antibes [sparql]
+     - Nu debout [sparql]
+     - Nature morte aux trois poissons, à la murène, au citron vert sur fond blanc [sparql]
+     - La Villa Chêne-Roc à Juan-les-Pins [sparql]
+     - Mère et enfants jouant [sparql]
+     - Le Concert [sparql]
+  [R4] Museum tour: asking for 16 candidates (2x for D1v2 filtering)
+
+PHASE 3A: SKIPPED (deterministic fill from 16 documented works)
+OK PHASE 3A parsed 16 candidate POI(s):
+   - Satyre, faune et centaure au trident
+   - La Chèvre
+   - Les Clefs d'Antibes
+   - Nu debout
+   - Nature morte aux trois poissons, à la murène, au citron vert sur fond blanc
+   - La Villa Chêne-Roc à Juan-les-Pins
+   - Mère et enfants jouant
+   - Le Concert
+   - Déesse de la mer
+   - Nomade
+   - Chemins de traverse 6 - Un nouvel accrochage des collections
+   - Picasso sans cliché - Photographies d'Edward Quinn
+   - Chemins de traverse 7 - Un nouvel accrochage des collections
+   - Les vacances de M. Pablo - Picasso à Antibes Juan-les-Pins, 1920-1946
+   - Chemins de traverse - Un nouvel accrochage des collections
+   - Germaine Richier, la Magicienne
+  [venue_resolver] City-qualified search hit: 'Musee Picasso (Antibes)' → 1 candidates
+    [venue_resolver] Artist inferred from name: 'Picasso'
+  [venue_resolver] Resolved: 'Musee Picasso' → Q1368360 (Picasso Museum)
+    URL: http://www.antibes-juanlespins.com/les-musees/picasso/
+    Coords: 43.580833, 7.128333
+    Language: fr
+    Artist: Picasso ()
+  [D1v2] Venue resolved: Q1368360 → URL=http://www.antibes-juanlespins.com/les-musees/picasso/, lang=fr
+  [venue_cache] MISS for Q1368360
+  [venue_resolver] SPARQL: 128 works found for Q1368360
+  [D1v2] SPARQL source: 51 canonical titles
+  [LOCAL-33] Deep-path URL detected — crawl scoped to: /les-musees/picasso*
+  [story_miner] Site crawl: 0 pages fetched (budget: 15)
+  [I-CON] LLM error: Expecting ',' delimiter: line 6 column 112 (char 1291)
+[I-CON] ADVISORY FAIL — tour avg: 3.00, min stop: 3.00 | Issues: tour avg 3.00 < 3.5; stop 'Tir, séance 26 juin 1961' avg 0.00 < 3; stop 'Donations and deposits' avg 0.00 < 3; stop 'Donations et dépôts' avg 0.00 < 3; stop 'Expositions temporaires' avg 0.00 < 3; stop 'La mariée sous l’arbre' avg 0.00 < 3; stop 'Le Déjeuner sur l’herbe' avg 0.00 < 3; stop 'Le Mur de Feu d’Yves Klein' avg 0.00 < 3
+[I-CON] Persisted 10 stop metrics for job 14d1adc8-053e-4d3e-88fc-6178b1edb555
+  [story_miner] Sitelink EN: 'Musée Picasso (Antibes)'
+  [story_miner] Sitelink FR: 'Musée Picasso (Antibes)'
+  [story_miner] Wikipedia EN: 1889 chars (title: 'Musée Picasso (Antibes)')
+  [story_miner] Wikipedia FR: 3866 chars
+  [story_miner] Joconde museo code: M0867 (from P539)
+  [story_miner] Joconde/POP: no results for M0867 (JS-rendered, expected)
+  [T0a] Exhibit-name extraction: 3 from sections, 1 from quoted/bold/list
+  [T0a] Extracted 3 canonical titles, 0 cycle names
+  [story_miner] Corpus: 2 pages, 3 titles, 0 from Joconde
+  [D1v2] Canonical titles union: 3 site/wiki + 51 SPARQL = 54 total
+  [LOCAL-24] Classification: 53 works, 0 galleries, 1 excluded
+    EXCLUDED: 'Le musée Picasso' — rule: museum_meta_phrase
+  [LOCAL-24] Cross-language dedup removed 4:
+    'La deessa de la mar' → alias of 'Déesse de la mer'
+    'Ulysses and the Sirens' → alias of 'Ulysse et les sirènes'
+    'Still-Life with a Watermelon' → alias of 'Nature morte à la pastèque'
+    'Sitting Nude on Green Ground' → alias of 'Nu assis sur fond vert'
+  [LOCAL-24] Near-duplicate collapse removed 1:
+    'Sea Goddess' → collapsed into 'Goddess of the sea'
+  [D1v2-LOCAL24] After filter: 48 works, 0 galleries, 1 excluded
+  [venue_resolver] Built 51 dynamic aliases from 128 works
+  [D1v2] Injected 51 dynamic aliases
+  [D1v2] Built bilingual map: 104 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+  [D1v2] VERIFIED 'Satyre, faune et centaure au trident' → canonical: 'Satyre, faune et centaure au trident'
+  [D1v2] VERIFIED 'La Chèvre' → canonical: 'La Chèvre'
+  [D1v2] VERIFIED 'Les Clefs d'Antibes' → canonical: 'Les Clefs d'Antibes'
+  [D1v2] VERIFIED 'Nu debout' → canonical: 'Nu debout'
+  [D1v2] VERIFIED 'Nature morte aux trois poissons, à la murène, au citron vert sur fond blanc' → canonical: 'Nature morte aux trois poissons, à la murène, au citron vert sur fond blanc'
+  [D1v2] VERIFIED 'La Villa Chêne-Roc à Juan-les-Pins' → canonical: 'La Villa Chêne-Roc à Juan-les-Pins'
+  [D1v2] VERIFIED 'Mère et enfants jouant' → canonical: 'Mère et enfants jouant'
+  [D1v2] VERIFIED 'Le Concert' → canonical: 'Le Concert'
+  [D1v2] VERIFIED 'Déesse de la mer' → canonical: 'Déesse de la mer'
+  [D1v2] VERIFIED 'Nomade' → canonical: 'Nomade'
+  [D1v2] VERIFIED 'Chemins de traverse 6 - Un nouvel accrochage des collections' → canonical: 'Chemins de traverse 6 - Un nouvel accrochage des collections'
+  [D1v2] VERIFIED 'Picasso sans cliché - Photographies d'Edward Quinn' → canonical: 'Picasso sans cliché - Photographies d'Edward Quinn'
+  [D1v2] VERIFIED 'Chemins de traverse 7 - Un nouvel accrochage des collections' → canonical: 'Chemins de traverse 7 - Un nouvel accrochage des collections'
+  [D1v2] VERIFIED 'Les vacances de M. Pablo - Picasso à Antibes Juan-les-Pins, 1920-1946' → canonical: 'Les vacances de M. Pablo - Picasso à Antibes Juan-les-Pins, 1920-1946'
+  [D1v2] VERIFIED 'Chemins de traverse - Un nouvel accrochage des collections' → canonical: 'Chemins de traverse - Un nouvel accrochage des collections'
+  [D1v2] VERIFIED 'Germaine Richier, la Magicienne' → canonical: 'Germaine Richier, la Magicienne'
+  [D1v2] 16/16 works verified — tier: rich
+  [venue_cache] STORED Q1368360 (tier=rich, ttl=30d, expires=2026-08-30)
+  [D1] Tier: rich (16 verified works)
+  [R4] Target reached: 16/8 stops
+  [LOCAL-16 GATE] All 16 stops are D1v2-verified ✓
+
+PHASE 4.5: Validating AI knowledge for Musee Picasso, Antibes, France...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+
+PHASE 3B: Requesting structured details and walking directions for 8 stop(s)...
+
+======================================================================
+CALL #021 | 18:16:46.798 | PHASE_3B_REQUEST
+======================================================================
+  location: Musee Picasso, Antibes, France
+  stop_count: 8
+
+PHASE 3B API call cost: $0.0021 (1030 tokens)
+OK PHASE 3B: ordered 8 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 8 stops
+  [LOCAL-33] Visitor info scoped to venue section (deep path)
+  [LOCAL-27] No visitor info page found for https://en.wikipedia.org/wiki/Musée_Picasso_(Antibes)
+  [LOCAL-27] No visitor info sourced — Museum Information field OMITTED
+   Coords cluster detected: 8 stops share '43.5808, 7.1267', refetching...
+   Cluster refetch OK 'Satyre, faune et centaure au trident': 43.5802, 7.1147
+   Cluster refetch OK 'Nature morte aux trois poissons, à la murène, au citron vert sur fond blanc': 43.5784, 7.1279
+   Cluster refetch OK 'Nu debout': 43.5839, 7.1095
+   Cluster refetch OK 'La Chèvre': 43.5804, 7.1139
+   Cluster refetch OK 'Les Clefs d'Antibes': 43.5797, 7.1169
+   Cluster refetch OK 'Le Concert': 43.5809, 7.1091
+   Cluster refetch OK 'La Villa Chêne-Roc à Juan-les-Pins': 43.5668, 7.1141
+   Cluster refetch OK 'Mère et enfants jouant': 43.5874, 7.1211
+Extracted first POI coordinates: (43.5802, 7.1147)
+  [D4] Museum single-coordinate: all stops set to (43.5802, 7.1147) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Satyre, faune et centaure au trident
+   Address: Chemin du Calvaire, 06600 Antibes, France
+   Coordinates: 43.5802, 7.1147
+   Directions: Head southwest on Chemin du Calvaire, the sculpture is on the right near the ent...
+2. La Chèvre
+   Address: Chemin du Calvaire, 06600 Antibes, France
+   Coordinates: 43.5802, 7.1147
+   Directions: Continue southwest on Chemin du Calvaire, the sculpture is on the left at the cr...
+3. Les Clefs d'Antibes
+   Address: Chemin du Calvaire, 06600 Antibes, France
+   Coordinates: 43.5802, 7.1147
+   Directions: Continue southwest on Chemin du Calvaire, the sculpture is on the right near the...
+4. Nu debout
+   Address: Chemin du Calvaire, 06600 Antibes, France
+   Coordinates: 43.5802, 7.1147
+   Directions: Continue southwest on Chemin du Calvaire, the sculpture is on the left just befo...
+5. Nature morte aux trois poissons, à la murène, au citron vert sur fond blanc
+   Address: Chemin du Calvaire, 06600 Antibes, France
+   Coordinates: 43.5802, 7.1147
+   Directions: Continue southwest on Chemin du Calvaire, the sculpture is on the right near the...
+6. La Villa Chêne-Roc à Juan-les-Pins
+   Address: Chemin du Calvaire, 06600 Antibes, France
+   Coordinates: 43.5802, 7.1147
+   Directions: Continue southwest on Chemin du Calvaire, the villa is on the left at the end of...
+7. Mère et enfants jouant
+   Address: Chemin du Calvaire, 06600 Antibes, France
+   Coordinates: 43.5802, 7.1147
+   Directions: Continue southwest on Chemin du Calvaire, the sculpture is on the right near the...
+8. Le Concert
+   Address: Chemin du Calvaire, 06600 Antibes, France
+   Coordinates: 43.5802, 7.1147
+   Directions: Continue southwest on Chemin du Calvaire, the sculpture is on the left just befo...
+================================
+
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 2/2 corpus pages for 'Musee Picasso'
+    page[0] score=12355 url=https://fr.wikipedia.org/wiki/Musée_Picasso_(Antibes)
+    page[1] score=10180 url=https://en.wikipedia.org/wiki/Musée_Picasso_(Antibes)
+  [§3-adapter] Raw elements: 19 from 2 pages
+
+======================================================================
+CALL #022 | 18:17:33.781 | GENERATOR_SERVICE_RECEIVED_REQUEST
+======================================================================
+  raw_request_body:
+    {
+        "location": "Musee d Art Moderne et d Art Contemporain, Nice, France",
+        "tour_type": "museum",
+        "total_stops": 10,
+        "user_id": "local60-fresh-evidence"
+    }
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  tour_type: museum
+  total_stops_raw: 10
+  total_stops_resolved: 10
+
+
+======================================================================
+CALL #023 | 18:17:33.781 | GENERATOR_SERVICE_ASYNC_START
+======================================================================
+  job_id: 482fc074-58a4-4b99-9455-0b8e1b3829f9
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  tour_type: museum
+  total_stops: 10
+  user_id: local60-fresh-evidence
+
+  [S46] No persona stored for user 'local60-fresh-evidence' — using default
+
+======================================================================
+CALL #024 | 18:17:33.785 | CALLING_GENERATE_TOUR_TEXT_FUNCTION
+======================================================================
+  function: generate_tour_text
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  tour_type: museum
+  total_stops: 10
+  persona: None
+  log_file: /app/api_call_chain_20260731_181149.txt
+
+
+======================================================================
+CALL #025 | 18:17:33.785 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  tour_type: museum
+  total_stops_parameter: 10
+  output_file: /tmp/tmpqsn2fnun.txt
+
+
+======================================================================
+CALL #026 | 18:17:33.785 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  total_stops_final: 10
+  source: parameter
+
+CACHE HIT: Musee d Art Moderne et d Art Contemporain, Nice, France / museum / 10
+[COST_METER] CACHE_HIT | tour_cache_hit | $0.000000 | user=local60-fresh-evidence | job=482fc074-58a4-4b99-9455-0b8e1b3829f9
+[LOCAL-60] Cost metered: tour_cache_hit | $0.000000 | cache_hit=True
+[BLOCKER4c] No story_elements file at /tmp/tmpqsn2fnun_story_elements.json — G4 will use fail-closed
+  Rendered Stop headings (10):
+    Stop 1: Richard Long ou la sculpture en marchant
+    Stop 2: She-Bam Pow POP Wizz
+    Stop 3: Tir, séance 26 juin 1961
+    Stop 4: Donations and deposits
+    Stop 5: Donations et dépôts
+    Stop 6: Expositions temporaires
+    Stop 7: La mariée sous l’arbre
+    Stop 8: Le Déjeuner sur l’herbe
+    Stop 9: Le Mur de Feu d’Yves Klein
+    Stop 10: Le Village de grand-mère
+  FAIL: No forbidden phrases — 22 forbidden phrases found: ['vibrant colors and', 'vibrant colors and', 'intricate details']
+  PASS: No cross-stop repetition (>0.85)
+  PASS: Distinct opening sentences
+  PASS: No compass bearings (museum)
+  PASS: No standalone Introduction block (R2)
+  PASS: Final stop has substantial content
+  PASS: Word count per stop (200-500 middle, 150-800 first/last)
+  PASS: Total length reasonable (1000-8000 words)
+  PASS: D3(a) Stop-title sanity
+  PASS: D3(b) Coordinate scatter (museum <200m)
+  FAIL: D3(c) No boilerplate shingles (4-word in 3+ stops) — 1 repeated shingle(s): ['dialogue between past present']
+  FAIL: D3(c2) No unearned adjectives (explain or cut) [LOCAL-40] — 8 unearned adjective(s): ["Stop 1: 'mesmerizing' without evidence in: ...As you approach the exhibit, you encounter a mesmerizing installation of stones ...", "Stop 4: 'vibrant' without evidence in: ...As you immerse yourself in the vibrant hues and dynamic forms of these artworks,...", "Stop 5: 'vibrant' without evidence in: ...The ongoing legacy of these donations, including those possibly contributed by K..."]
+  PASS: D3(d) Grounding assertion (titles look like real entities)
+  PASS: D3(e) No duplicate stops (same work under different labels) (FACTUAL)
+  PASS: T6 No splice corruption (mid-token dots, stray Stop N refs)
+  PASS: R3 Orientation substance (no generic filler in museum)
+  PASS: Single-venue consistency (no other NAMED venues)
+  PASS: Attribution grounding (consistent with venue)
+  PASS: Venue coherence (stops reference correct venue)
+  PASS: G4 Prolog/epilog claims trace to story elements (FACTUAL)
+  [LOCAL-36] No practical claims in tour (OK — omission is safe)
+[BLOCKER4c] Style issues (round 1): 3 style failure(s) — correcting
+  Rendered Stop headings (10):
+    Stop 1: Richard Long ou la sculpture en marchant
+    Stop 2: She-Bam Pow POP Wizz
+    Stop 3: Tir, séance 26 juin 1961
+    Stop 4: Donations and deposits
+    Stop 5: Donations et dépôts
+    Stop 6: Expositions temporaires
+    Stop 7: La mariée sous l’arbre
+    Stop 8: Le Déjeuner sur l’herbe
+    Stop 9: Le Mur de Feu d’Yves Klein
+    Stop 10: Le Village de grand-mère
+  PASS: No forbidden phrases
+  PASS: No cross-stop repetition (>0.85)
+  PASS: Distinct opening sentences
+  PASS: No compass bearings (museum)
+  PASS: No standalone Introduction block (R2)
+  PASS: Final stop has substantial content
+  PASS: Word count per stop (200-500 middle, 150-800 first/last)
+  PASS: Total length reasonable (1000-8000 words)
+  PASS: D3(a) Stop-title sanity
+  PASS: D3(b) Coordinate scatter (museum <200m)
+  FAIL: D3(c) No boilerplate shingles (4-word in 3+ stops) — 1 repeated shingle(s): ['dialogue between past present']
+  FAIL: D3(c2) No unearned adjectives (explain or cut) [LOCAL-40] — 7 unearned adjective(s): ["Stop 1: 'mesmerizing' without evidence in: ...As you approach the exhibit, you encounter a mesmerizing installation of stones ...", "Stop 4: 'vibrant' without evidence in: ...As you the vibrant hues and dynamic forms of these artworks, consider the transf...", "Stop 5: 'vibrant' without evidence in: ...The ongoing legacy of these donations, including those possibly contributed by K..."]
+  PASS: D3(d) Grounding assertion (titles look like real entities)
+  PASS: D3(e) No duplicate stops (same work under different labels) (FACTUAL)
+  PASS: T6 No splice corruption (mid-token dots, stray Stop N refs)
+  PASS: R3 Orientation substance (no generic filler in museum)
+  PASS: Single-venue consistency (no other NAMED venues)
+  PASS: Attribution grounding (consistent with venue)
+  PASS: Venue coherence (stops reference correct venue)
+  PASS: G4 Prolog/epilog claims trace to story elements (FACTUAL)
+  [LOCAL-36] No practical claims in tour (OK — omission is safe)
+[BLOCKER4c] Style issues (round 2): 2 style failure(s) — correcting
+  Rendered Stop headings (10):
+    Stop 1: Richard Long ou la sculpture en marchant
+    Stop 2: She-Bam Pow POP Wizz
+    Stop 3: Tir, séance 26 juin 1961
+    Stop 4: Donations and deposits
+    Stop 5: Donations et dépôts
+    Stop 6: Expositions temporaires
+    Stop 7: La mariée sous l’arbre
+    Stop 8: Le Déjeuner sur l’herbe
+    Stop 9: Le Mur de Feu d’Yves Klein
+    Stop 10: Le Village de grand-mère
+  PASS: No forbidden phrases
+  PASS: No cross-stop repetition (>0.85)
+  PASS: Distinct opening sentences
+  PASS: No compass bearings (museum)
+  PASS: No standalone Introduction block (R2)
+  PASS: Final stop has substantial content
+  PASS: Word count per stop (200-500 middle, 150-800 first/last)
+  PASS: Total length reasonable (1000-8000 words)
+  PASS: D3(a) Stop-title sanity
+  PASS: D3(b) Coordinate scatter (museum <200m)
+  FAIL: D3(c) No boilerplate shingles (4-word in 3+ stops) — 1 repeated shingle(s): ['dialogue between past present']
+  FAIL: D3(c2) No unearned adjectives (explain or cut) [LOCAL-40] — 7 unearned adjective(s): ["Stop 1: 'mesmerizing' without evidence in: ...As you approach the exhibit, you encounter a mesmerizing installation of stones ...", "Stop 4: 'vibrant' without evidence in: ...As you the vibrant hues and dynamic forms of these artworks, consider the transf...", "Stop 5: 'vibrant' without evidence in: ...The ongoing legacy of these donations, including those possibly contributed by K..."]
+  PASS: D3(d) Grounding assertion (titles look like real entities)
+  PASS: D3(e) No duplicate stops (same work under different labels) (FACTUAL)
+  PASS: T6 No splice corruption (mid-token dots, stray Stop N refs)
+  PASS: R3 Orientation substance (no generic filler in museum)
+  PASS: Single-venue consistency (no other NAMED venues)
+  PASS: Attribution grounding (consistent with venue)
+  PASS: Venue coherence (stops reference correct venue)
+  PASS: G4 Prolog/epilog claims trace to story elements (FACTUAL)
+  [LOCAL-36] No practical claims in tour (OK — omission is safe)
+[BLOCKER4c] Style issues (round 3): 2 style failure(s) — correcting
+[BLOCKER4c] Delivered with 2 style issue(s) after 3 correction rounds
+  [§3-adapter] After corroboration scoring: 16 elements
+  [§3-adapter] Final: 16 ranked elements (top type: dedication)
+  [§3-adapter] Persisted 16 elements → /tmp/tmpz7ijtlsy_story_elements.json
+  [§3] Updated venue_corpus.story_elements_json for Q1368360 (16 elements)
+  [LOCAL-37] Three-class retrieval error (non-fatal): local variable 'name_lower' referenced before assignment
+  [§3] Story elements injected into spine prompt (16 elements, mode=found)
+  [I-CON] LLM error: Expecting ',' delimiter: line 6 column 112 (char 1291)
+[I-CON] ADVISORY FAIL — tour avg: 3.00, min stop: 3.00 | Issues: tour avg 3.00 < 3.5; stop 'Tir, séance 26 juin 1961' avg 0.00 < 3; stop 'Donations and deposits' avg 0.00 < 3; stop 'Donations et dépôts' avg 0.00 < 3; stop 'Expositions temporaires' avg 0.00 < 3; stop 'La mariée sous l’arbre' avg 0.00 < 3; stop 'Le Déjeuner sur l’herbe' avg 0.00 < 3; stop 'Le Mur de Feu d’Yves Klein' avg 0.00 < 3
+[I-CON] Persisted 10 stop metrics for job 482fc074-58a4-4b99-9455-0b8e1b3829f9
+SPINE_COST: category=museum venue=Musee Picasso tokens=2546 (in=1493 out=1053) cost=$0.0233 latency=9.3s
+  [Storied] Spine generated: 8 arc entries (mode=found)
+  [Storied] Fact sheets: 8/8 generated
+  [S25] Story types assigned: ['art', 'history', 'anecdote', 'art', 'history', 'art', 'history', 'anecdote']
+  [work_stories] MISS for satyre faune et centaure au trident
+  [work_stories] MISS for la chevre
+  [work_stories] MISS for les clefs dantibes
+  [work_stories] MISS for nu debout
+  [work_stories] MISS for nature morte aux trois poissons a la mur
+  [work_stories] MISS for la villa cheneroc a juanlespins
+  [work_stories] MISS for mere et enfants jouant
+  [work_stories] MISS for le concert
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+Generating description for Stop 1: Satyre, faune et centaure au trident by , ...
+
+Generating description for Stop 2: La Chèvre by , ...
+
+Generating description for Stop 3: Les Clefs d'Antibes by , ...
+
+Generating description for Stop 4: Nu debout by , ...
+Generating description for Stop 5: Nature morte aux trois poissons, à la murène, au citron vert sur fond blanc by , ...
+
+Stop 2 API call cost: $0.0065 (3263 tokens)
+Stop 2 description word count: 214 words
+
+Generating description for Stop 6: La Villa Chêne-Roc à Juan-les-Pins by , ...
+Stop 5 API call cost: $0.0069 (3472 tokens)
+Stop 5 description word count: 237 words
+
+Generating description for Stop 7: Mère et enfants jouant by , ...
+Stop 3 API call cost: $0.0068 (3420 tokens)
+Stop 3 description word count: 204 words
+
+Generating description for Stop 8: Le Concert by , ...
+Stop 1 API call cost: $0.0066 (3304 tokens)
+Stop 1 description word count: 199 words
+Stop 4 API call cost: $0.0067 (3334 tokens)
+Stop 4 description word count: 233 words
+Stop 6 API call cost: $0.0068 (3422 tokens)
+Stop 6 description word count: 264 words
+Stop 8 API call cost: $0.0067 (3357 tokens)
+Stop 8 description word count: 262 words
+Stop 7 API call cost: $0.0067 (3360 tokens)
+Stop 7 description word count: 206 words
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Musee Picasso'...
+   Authority: 7 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 8 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (8 stops)
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 1 trailing question(s), removed 0 'broader context' instance(s)
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: no specific facts found in corpus
+  [R2] Prolog saved for Stop 1 (131 words)
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Musee Picasso — next is La Chèvre....
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 3: Next: Les Clefs d'Antibes....
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 4: Proceed to Nu debout....
+  DEBUG - POI 4 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 5: Continue to Nature morte aux trois poissons, à la murène, au...
+  DEBUG - POI 5 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 6: Next: La Villa Chêne-Roc à Juan-les-Pins....
+  DEBUG - POI 6 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 7: Proceed to Mère et enfants jouant....
+  DEBUG - POI 7 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 8: Your final stop in Musee Picasso: Le Concert....
+  DEBUG - POI 8 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] PRACTICAL FACTS GATE: PASSED (0 verified)
+
+=== Word Count Statistics ===
+Stop 1: Satyre, faune et centaure au trident - 199 words
+Stop 2: La Chèvre - 214 words
+Stop 3: Les Clefs d'Antibes - 204 words
+Stop 4: Nu debout - 233 words
+Stop 5: Nature morte aux trois poissons, à la murène, au citron vert sur fond blanc - 237 words
+Stop 6: La Villa Chêne-Roc à Juan-les-Pins - 264 words
+Stop 7: Mère et enfants jouant - 206 words
+Stop 8: Le Concert - 262 words
+===========================
+
+
+Total API cost: $0.0573 (28670 tokens)
+CACHE STORE: Musee Picasso, Antibes, France / museum / 8
+
+Tour text generated successfully!
+Saved to: /tmp/tmpz7ijtlsy.txt
+  [C5-5] Evidence persisted: /tmp/tmpz7ijtlsy_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Musee Picasso, Antibes, France - Museum Tour
+Tour-Category: museum
+
+Stop 1: Satyre, faune et centaure au trident
+
+Address: Chemin du Calvaire, 06600 Antibes, France
+
+Coordinates: 43.5802, 7.1147
+
+You are about to embark on a transformative journey through the interconnected chapters of Picasso's artistic evolution at the Château Grimaldi. In 1946, Pablo Picasso chose this historic haven to house a part of his legacy, a decision that continues to intrigue visitors ...
+
+[COST_METER] FRESH | tour_generate | $0.057340 | user=None | job=090e852b-1e84-4934-9715-b32aa3afb2dc
+[LOCAL-60] Cost metered: tour_generate | $0.057340 | cache_hit=False
+[BLOCKER4c] Loaded 16 story elements for G4 check
+  Rendered Stop headings (8):
+    Stop 1: Satyre, faune et centaure au trident
+    Stop 2: La Chèvre
+    Stop 3: Les Clefs d'Antibes
+    Stop 4: Nu debout
+    Stop 5: Nature morte aux trois poissons, à la murène, au citron vert sur fond blanc
+    Stop 6: La Villa Chêne-Roc à Juan-les-Pins
+    Stop 7: Mère et enfants jouant
+    Stop 8: Le Concert
+  FAIL: No forbidden phrases — 20 forbidden phrases found: ['vibrant colors of', 'vibrant colors and', 'deep connection to']
+  PASS: No cross-stop repetition (>0.85)
+  PASS: Distinct opening sentences
+  PASS: No compass bearings (museum)
+  PASS: No standalone Introduction block (R2)
+  PASS: Final stop has substantial content
+  PASS: Word count per stop (200-500 middle, 150-800 first/last)
+  PASS: Total length reasonable (1000-8000 words)
+  PASS: D3(a) Stop-title sanity
+  PASS: D3(b) Coordinate scatter (museum <200m)
+  FAIL: D3(c) No boilerplate shingles (4-word in 3+ stops) — 5 repeated shingle(s): ['satyre faune centaure trident', 'morte trois poissons murène', 'citron vert fond blanc']
+  FAIL: D3(c2) No unearned adjectives (explain or cut) [LOCAL-40] — 6 unearned adjective(s): ["Stop 3: 'vibrant' without evidence in: ...The central panel showcases a vibrant scene of Antibes, with its iconic lighthou...", "Stop 5: 'captivating' without evidence in: ... Nature morte aux trois poissons, à la murène, au citron vert sur fond blanc As ...", "Stop 6: 'vibrant' without evidence in: ...One striking aspect of this artwork is Picasso's unique use of color, particular..."]
+  PASS: D3(d) Grounding assertion (titles look like real entities)
+  PASS: D3(e) No duplicate stops (same work under different labels) (FACTUAL)
+  PASS: T6 No splice corruption (mid-token dots, stray Stop N refs)
+  PASS: R3 Orientation substance (no generic filler in museum)
+  PASS: Single-venue consistency (no other NAMED venues)
+  PASS: Attribution grounding (consistent with venue)
+  PASS: Venue coherence (stops reference correct venue)
+  PASS: G4 Prolog/epilog claims trace to story elements (FACTUAL)
+  [LOCAL-36] No practical claims in tour (OK — omission is safe)
+[BLOCKER4c] Style issues (round 1): 3 style failure(s) — correcting
+  Rendered Stop headings (8):
+    Stop 1: Satyre, faune et centaure au trident
+    Stop 2: La Chèvre
+    Stop 3: Les Clefs d'Antibes
+    Stop 4: Nu debout
+    Stop 5: Nature morte aux trois poissons, à la murène, au citron vert sur fond blanc
+    Stop 6: La Villa Chêne-Roc à Juan-les-Pins
+    Stop 7: Mère et enfants jouant
+    Stop 8: Le Concert
+  PASS: No forbidden phrases
+  PASS: No cross-stop repetition (>0.85)
+  PASS: Distinct opening sentences
+  PASS: No compass bearings (museum)
+  PASS: No standalone Introduction block (R2)
+  PASS: Final stop has substantial content
+  PASS: Word count per stop (200-500 middle, 150-800 first/last)
+  PASS: Total length reasonable (1000-8000 words)
+  PASS: D3(a) Stop-title sanity
+  PASS: D3(b) Coordinate scatter (museum <200m)
+  FAIL: D3(c) No boilerplate shingles (4-word in 3+ stops) — 5 repeated shingle(s): ['satyre faune centaure trident', 'morte trois poissons murène', 'citron vert fond blanc']
+  FAIL: D3(c2) No unearned adjectives (explain or cut) [LOCAL-40] — 4 unearned adjective(s): ["Stop 3: 'vibrant' without evidence in: ...The central panel showcases a vibrant scene of Antibes, with its iconic lighthou...", "Stop 5: 'captivating' without evidence in: ... Nature morte aux trois poissons, à la murène, au citron vert sur fond blanc As ...", "Stop 6: 'vibrant' without evidence in: ...One striking aspect of this artwork is Picasso's unique use of color, particular..."]
+  PASS: D3(d) Grounding assertion (titles look like real entities)
+  PASS: D3(e) No duplicate stops (same work under different labels) (FACTUAL)
+  PASS: T6 No splice corruption (mid-token dots, stray Stop N refs)
+  PASS: R3 Orientation substance (no generic filler in museum)
+  PASS: Single-venue consistency (no other NAMED venues)
+  PASS: Attribution grounding (consistent with venue)
+  PASS: Venue coherence (stops reference correct venue)
+  PASS: G4 Prolog/epilog claims trace to story elements (FACTUAL)
+  [LOCAL-36] No practical claims in tour (OK — omission is safe)
+[BLOCKER4c] Style issues (round 2): 2 style failure(s) — correcting
+  Rendered Stop headings (8):
+    Stop 1: Satyre, faune et centaure au trident
+    Stop 2: La Chèvre
+    Stop 3: Les Clefs d'Antibes
+    Stop 4: Nu debout
+    Stop 5: Nature morte aux trois poissons, à la murène, au citron vert sur fond blanc
+    Stop 6: La Villa Chêne-Roc à Juan-les-Pins
+    Stop 7: Mère et enfants jouant
+    Stop 8: Le Concert
+  PASS: No forbidden phrases
+  PASS: No cross-stop repetition (>0.85)
+  PASS: Distinct opening sentences
+  PASS: No compass bearings (museum)
+  PASS: No standalone Introduction block (R2)
+  PASS: Final stop has substantial content
+  PASS: Word count per stop (200-500 middle, 150-800 first/last)
+  PASS: Total length reasonable (1000-8000 words)
+  PASS: D3(a) Stop-title sanity
+  PASS: D3(b) Coordinate scatter (museum <200m)
+  FAIL: D3(c) No boilerplate shingles (4-word in 3+ stops) — 5 repeated shingle(s): ['satyre faune centaure trident', 'morte trois poissons murène', 'citron vert fond blanc']
+  FAIL: D3(c2) No unearned adjectives (explain or cut) [LOCAL-40] — 4 unearned adjective(s): ["Stop 3: 'vibrant' without evidence in: ...The central panel showcases a vibrant scene of Antibes, with its iconic lighthou...", "Stop 5: 'captivating' without evidence in: ... Nature morte aux trois poissons, à la murène, au citron vert sur fond blanc As ...", "Stop 6: 'vibrant' without evidence in: ...One striking aspect of this artwork is Picasso's unique use of color, particular..."]
+  PASS: D3(d) Grounding assertion (titles look like real entities)
+  PASS: D3(e) No duplicate stops (same work under different labels) (FACTUAL)
+  PASS: T6 No splice corruption (mid-token dots, stray Stop N refs)
+  PASS: R3 Orientation substance (no generic filler in museum)
+  PASS: Single-venue consistency (no other NAMED venues)
+  PASS: Attribution grounding (consistent with venue)
+  PASS: Venue coherence (stops reference correct venue)
+  PASS: G4 Prolog/epilog claims trace to story elements (FACTUAL)
+  [LOCAL-36] No practical claims in tour (OK — omission is safe)
+[BLOCKER4c] Style issues (round 3): 2 style failure(s) — correcting
+[BLOCKER4c] Delivered with 2 style issue(s) after 3 correction rounds
+[I-CON] ADVISORY FAIL — tour avg: 4.00, min stop: 4.00 | Issues: stop 'Satyre, faune et centaure au trident' avg 0.00 < 3; stop 'Les Clefs d'Antibes' avg 0.00 < 3; stop 'Nu debout' avg 0.00 < 3; stop 'Nature morte aux trois poissons, à la murène, au citron vert sur fond blanc' avg 0.00 < 3; stop 'La Villa Chêne-Roc à Juan-les-Pins' avg 0.00 < 3; stop 'Mère et enfants jouant' avg 0.00 < 3; stop 'Le Concert' avg 0.00 < 3
+[I-CON] Persisted 8 stop metrics for job 090e852b-1e84-4934-9715-b32aa3afb2dc
+
+======================================================================
+CALL #027 | 18:19:31.587 | GENERATOR_SERVICE_RECEIVED_REQUEST
+======================================================================
+  raw_request_body:
+    {
+        "location": "Musee Oceanographique de Monaco, Monaco",
+        "tour_type": "museum",
+        "total_stops": 8
+    }
+  location: Musee Oceanographique de Monaco, Monaco
+  tour_type: museum
+  total_stops_raw: 8
+  total_stops_resolved: 8
+
+
+======================================================================
+CALL #028 | 18:19:31.588 | GENERATOR_SERVICE_ASYNC_START
+======================================================================
+  job_id: a03b82c1-4216-4f5e-8a30-3dad77ca0457
+  location: Musee Oceanographique de Monaco, Monaco
+  tour_type: museum
+  total_stops: 8
+  user_id: None
+
+
+======================================================================
+CALL #029 | 18:19:31.591 | CALLING_GENERATE_TOUR_TEXT_FUNCTION
+======================================================================
+  function: generate_tour_text
+  location: Musee Oceanographique de Monaco, Monaco
+  tour_type: museum
+  total_stops: 8
+  persona: None
+  log_file: /app/api_call_chain_20260731_181149.txt
+
+
+======================================================================
+CALL #030 | 18:19:31.591 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Musee Oceanographique de Monaco, Monaco
+  tour_type: museum
+  total_stops_parameter: 8
+  output_file: /tmp/tmpjcwugw66.txt
+
+
+======================================================================
+CALL #031 | 18:19:31.591 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Musee Oceanographique de Monaco, Monaco
+  total_stops_final: 8
+  source: parameter
+
+CACHE MISS: Musee Oceanographique de Monaco, Monaco / museum / 8
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix] tour_type='museum' suppressed for intent analysis (pre_category='walking'); using location only
+
+======================================================================
+CALL #032 | 18:19:33.101 | GENERATOR_SERVICE_RECEIVED_REQUEST
+======================================================================
+  raw_request_body:
+    {
+        "location": "Musee d Art Moderne et d Art Contemporain, Nice, France",
+        "tour_type": "museum",
+        "total_stops": 10,
+        "user_id": "local60-fresh-evidence"
+    }
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  tour_type: museum
+  total_stops_raw: 10
+  total_stops_resolved: 10
+
+
+======================================================================
+CALL #033 | 18:19:33.101 | GENERATOR_SERVICE_ASYNC_START
+======================================================================
+  job_id: de4a99d9-3a8e-4033-940f-5093c882497c
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  tour_type: museum
+  total_stops: 10
+  user_id: local60-fresh-evidence
+
+  [S46] No persona stored for user 'local60-fresh-evidence' — using default
+
+======================================================================
+CALL #034 | 18:19:33.105 | CALLING_GENERATE_TOUR_TEXT_FUNCTION
+======================================================================
+  function: generate_tour_text
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  tour_type: museum
+  total_stops: 10
+  persona: None
+  log_file: /app/api_call_chain_20260731_181149.txt
+
+
+======================================================================
+CALL #035 | 18:19:33.105 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  tour_type: museum
+  total_stops_parameter: 10
+  output_file: /tmp/tmp2h4l20w6.txt
+
+
+======================================================================
+CALL #036 | 18:19:33.105 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  total_stops_final: 10
+  source: parameter
+
+CACHE HIT: Musee d Art Moderne et d Art Contemporain, Nice, France / museum / 10
+[COST_METER] CACHE_HIT | tour_cache_hit | $0.000000 | user=local60-fresh-evidence | job=de4a99d9-3a8e-4033-940f-5093c882497c
+[LOCAL-60] Cost metered: tour_cache_hit | $0.000000 | cache_hit=True
+[BLOCKER4c] No story_elements file at /tmp/tmp2h4l20w6_story_elements.json — G4 will use fail-closed
+  Rendered Stop headings (10):
+    Stop 1: Richard Long ou la sculpture en marchant
+    Stop 2: She-Bam Pow POP Wizz
+    Stop 3: Tir, séance 26 juin 1961
+    Stop 4: Donations and deposits
+    Stop 5: Donations et dépôts
+    Stop 6: Expositions temporaires
+    Stop 7: La mariée sous l’arbre
+    Stop 8: Le Déjeuner sur l’herbe
+    Stop 9: Le Mur de Feu d’Yves Klein
+    Stop 10: Le Village de grand-mère
+  FAIL: No forbidden phrases — 22 forbidden phrases found: ['vibrant colors and', 'vibrant colors and', 'intricate details']
+  PASS: No cross-stop repetition (>0.85)
+  PASS: Distinct opening sentences
+  PASS: No compass bearings (museum)
+  PASS: No standalone Introduction block (R2)
+  PASS: Final stop has substantial content
+  PASS: Word count per stop (200-500 middle, 150-800 first/last)
+  PASS: Total length reasonable (1000-8000 words)
+  PASS: D3(a) Stop-title sanity
+  PASS: D3(b) Coordinate scatter (museum <200m)
+  FAIL: D3(c) No boilerplate shingles (4-word in 3+ stops) — 1 repeated shingle(s): ['dialogue between past present']
+  FAIL: D3(c2) No unearned adjectives (explain or cut) [LOCAL-40] — 8 unearned adjective(s): ["Stop 1: 'mesmerizing' without evidence in: ...As you approach the exhibit, you encounter a mesmerizing installation of stones ...", "Stop 4: 'vibrant' without evidence in: ...As you immerse yourself in the vibrant hues and dynamic forms of these artworks,...", "Stop 5: 'vibrant' without evidence in: ...The ongoing legacy of these donations, including those possibly contributed by K..."]
+  PASS: D3(d) Grounding assertion (titles look like real entities)
+  PASS: D3(e) No duplicate stops (same work under different labels) (FACTUAL)
+  PASS: T6 No splice corruption (mid-token dots, stray Stop N refs)
+  PASS: R3 Orientation substance (no generic filler in museum)
+  PASS: Single-venue consistency (no other NAMED venues)
+  PASS: Attribution grounding (consistent with venue)
+  PASS: Venue coherence (stops reference correct venue)
+  PASS: G4 Prolog/epilog claims trace to story elements (FACTUAL)
+  [LOCAL-36] No practical claims in tour (OK — omission is safe)
+[BLOCKER4c] Style issues (round 1): 3 style failure(s) — correcting
+  Rendered Stop headings (10):
+    Stop 1: Richard Long ou la sculpture en marchant
+    Stop 2: She-Bam Pow POP Wizz
+    Stop 3: Tir, séance 26 juin 1961
+    Stop 4: Donations and deposits
+    Stop 5: Donations et dépôts
+    Stop 6: Expositions temporaires
+    Stop 7: La mariée sous l’arbre
+    Stop 8: Le Déjeuner sur l’herbe
+    Stop 9: Le Mur de Feu d’Yves Klein
+    Stop 10: Le Village de grand-mère
+  PASS: No forbidden phrases
+  PASS: No cross-stop repetition (>0.85)
+  PASS: Distinct opening sentences
+  PASS: No compass bearings (museum)
+  PASS: No standalone Introduction block (R2)
+  PASS: Final stop has substantial content
+  PASS: Word count per stop (200-500 middle, 150-800 first/last)
+  PASS: Total length reasonable (1000-8000 words)
+  PASS: D3(a) Stop-title sanity
+  PASS: D3(b) Coordinate scatter (museum <200m)
+  FAIL: D3(c) No boilerplate shingles (4-word in 3+ stops) — 1 repeated shingle(s): ['dialogue between past present']
+  FAIL: D3(c2) No unearned adjectives (explain or cut) [LOCAL-40] — 7 unearned adjective(s): ["Stop 1: 'mesmerizing' without evidence in: ...As you approach the exhibit, you encounter a mesmerizing installation of stones ...", "Stop 4: 'vibrant' without evidence in: ...As you the vibrant hues and dynamic forms of these artworks, consider the transf...", "Stop 5: 'vibrant' without evidence in: ...The ongoing legacy of these donations, including those possibly contributed by K..."]
+  PASS: D3(d) Grounding assertion (titles look like real entities)
+  PASS: D3(e) No duplicate stops (same work under different labels) (FACTUAL)
+  PASS: T6 No splice corruption (mid-token dots, stray Stop N refs)
+  PASS: R3 Orientation substance (no generic filler in museum)
+  PASS: Single-venue consistency (no other NAMED venues)
+  PASS: Attribution grounding (consistent with venue)
+  PASS: Venue coherence (stops reference correct venue)
+  PASS: G4 Prolog/epilog claims trace to story elements (FACTUAL)
+  [LOCAL-36] No practical claims in tour (OK — omission is safe)
+[BLOCKER4c] Style issues (round 2): 2 style failure(s) — correcting
+  Rendered Stop headings (10):
+    Stop 1: Richard Long ou la sculpture en marchant
+    Stop 2: She-Bam Pow POP Wizz
+    Stop 3: Tir, séance 26 juin 1961
+    Stop 4: Donations and deposits
+    Stop 5: Donations et dépôts
+    Stop 6: Expositions temporaires
+    Stop 7: La mariée sous l’arbre
+    Stop 8: Le Déjeuner sur l’herbe
+    Stop 9: Le Mur de Feu d’Yves Klein
+    Stop 10: Le Village de grand-mère
+  PASS: No forbidden phrases
+  PASS: No cross-stop repetition (>0.85)
+  PASS: Distinct opening sentences
+  PASS: No compass bearings (museum)
+  PASS: No standalone Introduction block (R2)
+  PASS: Final stop has substantial content
+  PASS: Word count per stop (200-500 middle, 150-800 first/last)
+  PASS: Total length reasonable (1000-8000 words)
+  PASS: D3(a) Stop-title sanity
+  PASS: D3(b) Coordinate scatter (museum <200m)
+  FAIL: D3(c) No boilerplate shingles (4-word in 3+ stops) — 1 repeated shingle(s): ['dialogue between past present']
+  FAIL: D3(c2) No unearned adjectives (explain or cut) [LOCAL-40] — 7 unearned adjective(s): ["Stop 1: 'mesmerizing' without evidence in: ...As you approach the exhibit, you encounter a mesmerizing installation of stones ...", "Stop 4: 'vibrant' without evidence in: ...As you the vibrant hues and dynamic forms of these artworks, consider the transf...", "Stop 5: 'vibrant' without evidence in: ...The ongoing legacy of these donations, including those possibly contributed by K..."]
+  PASS: D3(d) Grounding assertion (titles look like real entities)
+  PASS: D3(e) No duplicate stops (same work under different labels) (FACTUAL)
+  PASS: T6 No splice corruption (mid-token dots, stray Stop N refs)
+  PASS: R3 Orientation substance (no generic filler in museum)
+  PASS: Single-venue consistency (no other NAMED venues)
+  PASS: Attribution grounding (consistent with venue)
+  PASS: Venue coherence (stops reference correct venue)
+  PASS: G4 Prolog/epilog claims trace to story elements (FACTUAL)
+  [LOCAL-36] No practical claims in tour (OK — omission is safe)
+[BLOCKER4c] Style issues (round 3): 2 style failure(s) — correcting
+[BLOCKER4c] Delivered with 2 style issue(s) after 3 correction rounds
+Intent analysis response: {
+    "poi_type": "museums",
+    "location": "Monaco",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Musee Oceanographique de Monaco",
+    "geographic_scope": null,
+    "scope_precision": null,
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museums
+   Location: Monaco
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: Musee Oceanographique de Monaco
+  [venue_name sanity] 'Musee Oceanographique de Monaco' OK
+  [S15] Forced tour_category=museum from venue_name='Musee Oceanographique de Monaco'
+
+Detected tour category: MUSEUM
+Using museum template for Musee Oceanographique de Monaco, Monaco - museum
+
+======================================================================
+CALL #037 | 18:19:33.193 | GENERATING_PROMPT
+======================================================================
+  location: Musee Oceanographique de Monaco, Monaco
+  user_request: Musee Oceanographique de Monaco, Monaco
+  total_stops: 8
+
+
+PHASE 3A: Fetching 8 candidate POI(s) for Musee Oceanographique de Monaco, Monaco...
+  [Museum constraint] Venue from intent='Musee Oceanographique de Monaco'
+  [venue_resolver] Resolved: 'Musee Oceanographique de Monaco' → Q851527 (Musée océanographique de Monaco)
+    URL: http://www.oceano.org/
+    Coords: 43.730833333333, 7.4252777777778
+    Language: en
+  [venue_resolver] SPARQL: 2 works found for Q851527
+  [Phase3A] Injected 2 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='', scope='')
+  [venue_resolver] Resolved: 'Musee Oceanographique de Monaco' → Q851527 (Musée océanographique de Monaco)
+    URL: http://www.oceano.org/
+    Coords: 43.730833333333, 7.4252777777778
+    Language: en
+  [venue_cache] MISS for Q851527
+  [venue_resolver] SPARQL: 2 works found for Q851527
+  [LOCAL-30] Deterministic selection: 2 documented works (0 catalogue, 2 SPARQL)
+  [LOCAL-30] Documented works (2) < total_stops (8) — will use documented as base, GPT fills remainder
+  [venue_resolver] Resolved: 'Musee Oceanographique de Monaco' → Q851527 (Musée océanographique de Monaco)
+    URL: http://www.oceano.org/
+    Coords: 43.730833333333, 7.4252777777778
+    Language: en
+  [venue_cache] MISS for Q851527
+  [venue_resolver] SPARQL: 2 works found for Q851527
+  [LOCAL-30] Deterministic selection: 2 documented works (0 catalogue, 2 SPARQL)
+  [LOCAL-30] Documented works (2) < total_stops (8) — will use documented as base, GPT fills remainder
+  [R4] Museum tour: asking for 16 candidates (2x for D1v2 filtering)
+
+======================================================================
+CALL #038 | 18:19:39.696 | PHASE_3A_REQUEST
+======================================================================
+  location: Musee Oceanographique de Monaco, Monaco
+  total_stops: 8
+  poi_type_hint: museums
+
+  [I-CON] LLM error: Expecting ',' delimiter: line 6 column 112 (char 1291)
+[I-CON] ADVISORY FAIL — tour avg: 3.00, min stop: 3.00 | Issues: tour avg 3.00 < 3.5; stop 'Tir, séance 26 juin 1961' avg 0.00 < 3; stop 'Donations and deposits' avg 0.00 < 3; stop 'Donations et dépôts' avg 0.00 < 3; stop 'Expositions temporaires' avg 0.00 < 3; stop 'La mariée sous l’arbre' avg 0.00 < 3; stop 'Le Déjeuner sur l’herbe' avg 0.00 < 3; stop 'Le Mur de Feu d’Yves Klein' avg 0.00 < 3
+[I-CON] Persisted 10 stop metrics for job de4a99d9-3a8e-4033-940f-5093c882497c
+PHASE 3A API call cost: $0.0015 (737 tokens)
+
+======================================================================
+CALL #039 | 18:19:42.368 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 8
+  stop_count_in_prompt: True
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for Musee Oceanographique de Monaco, Monaco.
+List exactly 16 specific, real, well-known museums relevant to: Musee Oceanographique de Monaco, Monaco.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A SINGLE-VENUE MUSEUM TOUR (WORKS-FIRST):
+- List the 8 m
+  prompt_last_300_chars: this list):
+  MOM-INV-0021953; Statue of Albert I, Prince of Monaco at Oceanographic Museum, Monaco
+Each work should appear ONLY ONCE in your list — do NOT list the same work under multiple names.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "..."}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+{"name": "Statue of Albert I, Prince of Monaco", "address": "Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco"},
+{"name": "Whale Room", "address": "Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco"},
+{"name": "Shark Lagoon", "address": "Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco"},
+{"name": "Turtle Island", "address": "Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco"},
+{"name": "Coral Reef Aquarium", "address": "Mus
+
+OK PHASE 3A parsed 8 candidate POI(s):
+   - Statue of Albert I, Prince of Monaco @ Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco
+   - Whale Room @ Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco
+   - Shark Lagoon @ Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco
+   - Turtle Island @ Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco
+   - Coral Reef Aquarium @ Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco
+   - Mediterranean Garden @ Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco
+   - Seal Tank @ Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco
+   - Whale Skeleton @ Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco
+  [venue_resolver] Resolved: 'Musee Oceanographique de Monaco' → Q851527 (Musée océanographique de Monaco)
+    URL: http://www.oceano.org/
+    Coords: 43.730833333333, 7.4252777777778
+    Language: en
+  [D1v2] Venue resolved: Q851527 → URL=http://www.oceano.org/, lang=en
+  [venue_cache] MISS for Q851527
+  [venue_resolver] SPARQL: 2 works found for Q851527
+  [D1v2] SPARQL source: 2 canonical titles
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/linstitut-oceanographique-de-monaco-sengage-aux-cotes-des-semeurs-despoir/  (13911 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites/ (17214 chars)
+  [story_miner] Site page: https://www.oceano.org/contact/ (13640 chars)
+  [story_miner] Site page: https://www.oceano.org/espace-presse/ (30000 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/oceano-pour-tous-2025-2026-une-edition-placee-sous-le-signe-de-lengagement-et-de-louverture-sur-la-mediterranee/  (20278 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/monaco-blue-initiative-et-blue-economy-and-finance-forum-une-mobilisation-croissante-pour-faire-avancer-les-solutions-en-faveur-de-locean/  (20531 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/a-europa-park-le-musee-oceanographique-sensibilise-des-millions-de-visiteurs-a-la-protection-de-la-mediterranee/  (16369 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/suivi-microbiologique-de-leau-une-premiere-experimentation-en-eau-de-mer-au-musee-oceanographique-de-monaco/  (16592 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/blue-economy-and-finance-forum-2026/  (15503 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/monaco-blue-initiative-2026/  (17501 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/julia-marton-lefevre-nommee-a-la-presidence-du-conseil-dadministration-de-linstitut-oceanographique-de-monaco/  (15512 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/ceremonie-grandes-medailles-albert-ier-2024-2025/  (15466 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/la-journee-internationale-de-la-mediterranee-au-coeur-des-actions-de-linstitut/  (15204 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/reconnaissance-trois-nouveautes-a-decouvrir-au-musee-oceanographique-de-monaco/  (21544 chars)
+  [story_miner] Site page: https://www.oceano.org/actualites-institut/quels-gestes-pour-proteger-la-mer-ecoutez-la-jeunesse-qui-sengage/  (30000 chars)
+  [story_miner] Site crawl: 16 pages fetched (budget: 15)
+  [story_miner] Sitelink EN: 'Oceanographic Museum of Monaco'
+  [story_miner] Wikipedia EN: 2876 chars (title: 'Oceanographic Museum of Monaco')
+  [T0a] Exhibit-name extraction: 2 from sections, 9 from quoted/bold/list
+  [T0a] Extracted 11 canonical titles, 0 cycle names
+  [story_miner] Corpus: 17 pages, 11 titles, 0 from Joconde
+  [D1v2] Canonical titles union: 11 site/wiki + 2 SPARQL = 13 total
+  [D1v2] Removed 1 substring titles (prefer longer forms)
+  [LOCAL-24] Classification: 12 works, 0 galleries, 0 excluded
+  [D1v2-LOCAL24] After filter: 12 works, 0 galleries, 0 excluded
+  [venue_resolver] Built 2 dynamic aliases from 2 works
+  [D1v2] Injected 2 dynamic aliases
+  [D1v2] Built bilingual map: 84 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+  [D1v2] VERIFIED 'Statue of Albert I, Prince of Monaco' → canonical: 'Statue of Albert I, Prince of Monaco at Oceanographic Museum, Monaco'
+  [D1v2] DROPPED 'Whale Room' — no canonical title match
+  [D1v2] DROPPED 'Shark Lagoon' — no canonical title match
+  [D1v2] DROPPED 'Turtle Island' — no canonical title match
+  [D1v2] DROPPED 'Coral Reef Aquarium' — no canonical title match
+  [D1v2] DROPPED 'Mediterranean Garden' — no canonical title match
+  [D1v2] DROPPED 'Seal Tank' — no canonical title match
+  [D1v2] DROPPED 'Whale Skeleton' — no canonical title match
+  [D1v2] Exhibit museum detected: 2 SPARQL QIDs, 12 total titles (mostly from site/wiki sections)
+  [D1v2] 1/8 works verified — tier: exhibit_museum
+  [venue_cache] STORED Q851527 (tier=exhibit_museum, ttl=30d, expires=2026-08-30)
+  [D1] Tier: exhibit_museum (1 verified works)
+
+  [R4] Replenishment round 1/3: need 7 more, asking for 12
+    [LOCAL-22] Rejected corrupted name from R4: 'Pôles, des mondes fragiles'
+    [R4] VERIFIED 'Caulerpa taxifolia' → 'Caulerpa taxifolia'
+    [R4] VERIFIED 'Charlene Guillaumot' → 'Charlene Guillaumot'
+    [R4] VERIFIED 'Jean Jaubert' → 'Jean Jaubert'
+    [R4] VERIFIED 'MOM-INV-0021953' → 'MOM-INV-0021953'
+    [R4] VERIFIED 'Mission Polaire' → 'Mission Polaire'
+    [R4] VERIFIED 'Oceanographic research vessels inscribed on façade' → 'Oceanographic research vessels inscribed on façade'
+    [R4] VERIFIED 'Océano pour Tous' → 'Océano pour Tous'
+    [R4] VERIFIED 'Pièces jointes' → 'Pièces jointes'
+    [R4] VERIFIED 'Plaidoyer pour l’Antarctique' → 'Plaidoyer pour l’Antarctique'
+    [R4] Round 1: +7 verified, total now 8
+  [R4] Target reached: 8/8 stops
+  [LOCAL-16 GATE] All 8 stops are D1v2-verified ✓
+
+PHASE 4.5: Validating AI knowledge for Musee Oceanographique de Monaco, Monaco...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+
+PHASE 3B: Requesting structured details and walking directions for 8 stop(s)...
+
+======================================================================
+CALL #040 | 18:20:11.135 | PHASE_3B_REQUEST
+======================================================================
+  location: Musee Oceanographique de Monaco, Monaco
+  stop_count: 8
+
+PHASE 3B API call cost: $0.0022 (1080 tokens)
+! PHASE 3B introduced unknown names (ignored): ['Statue of Albert I, Prince of Monaco at Oceanographic Museum']
+! PHASE 3B dropped POI; re-appending: Statue of Albert I, Prince of Monaco at Oceanographic Museum, Monaco
+OK PHASE 3B: ordered 8 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 8 stops
+  [LOCAL-27] No visitor info page found for http://www.oceano.org/
+  [LOCAL-27] No visitor info sourced — Museum Information field OMITTED
+
+Coordinates fallback: requesting coords for 1 stop(s) missing them...
+   Coords fallback OK 'Statue of Albert I, Prince of Monaco at Oceanographic Museum, Monaco': 43.7314, 7.4272
+   Coords cluster detected: 7 stops share '43.731402, 7.426946', refetching...
+   Cluster refetch OK 'Mission Polaire': 43.7304, 7.4266
+   Cluster refetch OK 'Caulerpa taxifolia': 43.7311, 7.4266
+   Cluster refetch OK 'Charlene Guillaumot': 43.7306, 7.4266
+   Cluster refetch OK 'Jean Jaubert': 43.7309, 7.4261
+   Cluster refetch OK 'Oceanographic research vessels inscribed on façade': 43.7314, 7.4267
+   Cluster refetch OK 'Océano pour Tous': 43.7314, 7.4262
+   Cluster refetch OK 'MOM-INV-0021953': 43.7308, 7.4266
+Extracted first POI coordinates: (43.7311, 7.4266)
+  [D4] Museum single-coordinate: all stops set to (43.7311, 7.4266) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Caulerpa taxifolia
+   Address: Musee Oceanographique de Monaco
+   Coordinates: 43.7311, 7.4266
+   Directions: Walk past the statue and continue straight ahead, you will see Caulerpa taxifoli...
+2. Charlene Guillaumot
+   Address: Musee Oceanographique de Monaco
+   Coordinates: 43.7311, 7.4266
+   Directions: After viewing Caulerpa taxifolia, turn left and proceed until you find the displ...
+3. Jean Jaubert
+   Address: Musee Oceanographique de Monaco
+   Coordinates: 43.7311, 7.4266
+   Directions: Continue straight, then take a right turn to reach the section dedicated to Jean...
+4. MOM-INV-0021953
+   Address: Musee Oceanographique de Monaco
+   Coordinates: 43.7311, 7.4266
+   Directions: Walk ahead and turn left at the next corridor to find MOM-INV-0021953 on display...
+5. Mission Polaire
+   Address: Musee Oceanographique de Monaco
+   Coordinates: 43.7311, 7.4266
+   Directions: After MOM-INV-0021953, turn right and proceed straight to encounter the Mission ...
+6. Oceanographic research vessels inscribed on façade
+   Address: Musee Oceanographique de Monaco
+   Coordinates: 43.7311, 7.4266
+   Directions: Turn left from Mission Polaire and walk until you see the facade with inscriptio...
+7. Océano pour Tous
+   Address: Musee Oceanographique de Monaco
+   Coordinates: 43.7311, 7.4266
+   Directions: Finally, head straight from the inscriptions and you will reach the Océano pour ...
+8. Statue of Albert I, Prince of Monaco at Oceanographic Museum, Monaco
+   Address: Musee Oceanographique de Monaco, Avenue Saint-Martin, 98000 Monaco
+   Coordinates: 43.7311, 7.4266
+================================
+
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 5/17 corpus pages for 'Musee Oceanographique de Monaco'
+    page[0] score=10260 url=https://en.wikipedia.org/wiki/Oceanographic_Museum_of_Monaco
+    page[1] score=915 url=https://www.oceano.org/espace-presse/
+    page[2] score=890 url=http://www.oceano.org/
+  [§3-adapter] Raw elements: 9 from 2 pages
+  [§3-adapter] After corroboration scoring: 9 elements
+  [§3-adapter] Final: 9 ranked elements (top type: origin)
+  [§3-adapter] Persisted 9 elements → /tmp/tmpjcwugw66_story_elements.json
+  [§3] Updated venue_corpus.story_elements_json for Q851527 (9 elements)
+  [LOCAL-37] Three-class retrieval error (non-fatal): local variable 'name_lower' referenced before assignment
+  [§3] Story elements injected into spine prompt (9 elements, mode=found)
+SPINE_COST: category=museum venue=Musee Oceanographique de Monac tokens=2217 (in=1198 out=1019) cost=$0.0213 latency=13.8s
+  [Storied] Spine generated: 8 arc entries (mode=found)
+  [Storied] Fact sheets: 6/8 generated
+  [S25] Story types assigned: ['art', 'history', 'anecdote', 'art', 'history', 'art', 'history', 'anecdote']
+  [work_stories] MISS for caulerpa taxifolia
+  [work_stories] MISS for charlene guillaumot
+  [work_stories] MISS for jean jaubert
+  [work_stories] MISS for mominv0021953
+  [work_stories] MISS for mission polaire
+  [work_stories] MISS for oceanographic research vessels inscribed
+  [work_stories] MISS for oceano pour tous
+  [work_stories] MISS for statue of albert i prince of monaco at o
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+Generating description for Stop 1: Caulerpa taxifolia by , ...
+
+Generating description for Stop 2: Charlene Guillaumot by , ...
+
+Generating description for Stop 3: Jean Jaubert by , ...
+
+Generating description for Stop 4: MOM-INV-0021953 by , ...
+
+Generating description for Stop 5: Mission Polaire by , ...
+Stop 4 API call cost: $0.0063 (3154 tokens)
+Stop 4 description word count: 94 words
+
+Generating description for Stop 6: Oceanographic research vessels inscribed on façade by , ...
+Stop 2 API call cost: $0.0074 (3691 tokens)
+Stop 2 description word count: 204 words
+
+Generating description for Stop 7: Océano pour Tous by , ...
+Stop 5 API call cost: $0.0072 (3586 tokens)
+Stop 5 description word count: 231 words
+
+Generating description for Stop 8: Statue of Albert I, Prince of Monaco at Oceanographic Museum, Monaco by , ...
+Stop 1 API call cost: $0.0073 (3628 tokens)
+Stop 1 description word count: 251 words
+Stop 3 API call cost: $0.0078 (3912 tokens)
+Stop 3 description word count: 246 words
+Stop 8 API call cost: $0.0067 (3326 tokens)
+Stop 8 description word count: 84 words
+Stop 6 API call cost: $0.0073 (3654 tokens)
+Stop 6 description word count: 202 words
+Stop 7 API call cost: $0.0075 (3738 tokens)
+Stop 7 description word count: 203 words
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Musee Oceanographique de Monaco'...
+   Authority: 7 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 8 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (8 stops)
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 2 trailing question(s), removed 0 'broader context' instance(s)
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 1 preaching closer(s)
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: no specific facts found in corpus
+  [R2] Prolog saved for Stop 1 (114 words)
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Musee Oceanographique de Monaco — next is C...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 3: Next: Jean Jaubert....
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 4: Proceed to MOM-INV-0021953....
+  DEBUG - POI 4 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 5: Continue to Mission Polaire....
+  DEBUG - POI 5 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 6: Next: Oceanographic research vessels inscribed on façade....
+  DEBUG - POI 6 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 7: Proceed to Océano pour Tous....
+  DEBUG - POI 7 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 8: Your final stop in Musee Oceanographique de Monaco: Statue o...
+  DEBUG - POI 8 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: False
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] PRACTICAL FACTS GATE: PASSED (0 verified)
+
+=== Word Count Statistics ===
+Stop 1: Caulerpa taxifolia - 251 words
+Stop 2: Charlene Guillaumot - 204 words
+Stop 3: Jean Jaubert - 246 words
+Stop 4: MOM-INV-0021953 - 94 words
+Stop 5: Mission Polaire - 231 words
+Stop 6: Oceanographic research vessels inscribed on façade - 202 words
+Stop 7: Océano pour Tous - 203 words
+Stop 8: Statue of Albert I, Prince of Monaco at Oceanographic Museum, Monaco - 84 words
+===========================
+
+
+Total API cost: $0.0633 (31664 tokens)
+CACHE STORE: Musee Oceanographique de Monaco, Monaco / museum / 8
+
+Tour text generated successfully!
+Saved to: /tmp/tmpjcwugw66.txt
+  [C5-5] Evidence persisted: /tmp/tmpjcwugw66_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Musee Oceanographique de Monaco, Monaco - Museum Tour
+Tour-Category: museum
+
+Stop 1: Caulerpa taxifolia
+
+Address: Musee Oceanographique de Monaco
+
+Coordinates: 43.7311, 7.4266
+
+You are about to embark on a transformative journey through the interconnected chapters of the Oceanographic Museum, a testament to the enduring spirit of exploration and conservation that began with Prince Albert I. From the invasive journey of Caulerpa taxifolia, symbolizing the unforesee...
+
+[COST_METER] FRESH | tour_generate | $0.063328 | user=None | job=a03b82c1-4216-4f5e-8a30-3dad77ca0457
+[LOCAL-60] Cost metered: tour_generate | $0.063328 | cache_hit=False
+[BLOCKER4c] Loaded 9 story elements for G4 check
+  Rendered Stop headings (8):
+    Stop 1: Caulerpa taxifolia
+    Stop 2: Charlene Guillaumot
+    Stop 3: Jean Jaubert
+    Stop 4: MOM-INV-0021953
+    Stop 5: Mission Polaire
+    Stop 6: Oceanographic research vessels inscribed on façade
+    Stop 7: Océano pour Tous
+    Stop 8: Statue of Albert I, Prince of Monaco at Oceanographic Museum, Monaco
+  FAIL: No forbidden phrases — 14 forbidden phrases found: ['intricate details', 'intricate details', 'a testament to']
+  PASS: No cross-stop repetition (>0.85)
+  PASS: Distinct opening sentences
+  PASS: No compass bearings (museum)
+  PASS: No standalone Introduction block (R2)
+  PASS: Final stop has substantial content
+  PASS: Word count per stop (200-500 middle, 150-800 first/last)
+  PASS: Total length reasonable (1000-8000 words)
+  PASS: D3(a) Stop-title sanity
+  PASS: D3(b) Coordinate scatter (museum <200m)
+  PASS: D3(c) No boilerplate shingles (4-word in 3+ stops)
+  FAIL: D3(c2) No unearned adjectives (explain or cut) [LOCAL-40] — 3 unearned adjective(s): ["Stop 1: 'vibrant' without evidence in: ...The vibrant green hue of the seaweed, meticulously crafted from glass, shimmers ...", "Stop 2: 'stunning' without evidence in: ...The work consists of a series of stunning visual representations, each showcasin...", "Stop 3: 'vibrant' without evidence in: ...Immerse yourself in the vibrant marine life teeming within the basin, showcasing..."]
+  PASS: D3(d) Grounding assertion (titles look like real entities)
+  PASS: D3(e) No duplicate stops (same work under different labels) (FACTUAL)
+  PASS: T6 No splice corruption (mid-token dots, stray Stop N refs)
+  PASS: R3 Orientation substance (no generic filler in museum)
+  PASS: Single-venue consistency (no other NAMED venues)
+  PASS: Attribution grounding (consistent with venue)
+  PASS: Venue coherence (stops reference correct venue)
+  PASS: G4 Prolog/epilog claims trace to story elements (FACTUAL)
+  [LOCAL-36] No practical claims in tour (OK — omission is safe)
+[BLOCKER4c] Style issues (round 1): 2 style failure(s) — correcting
+  Rendered Stop headings (8):
+    Stop 1: Caulerpa taxifolia
+    Stop 2: Charlene Guillaumot
+    Stop 3: Jean Jaubert
+    Stop 4: MOM-INV-0021953
+    Stop 5: Mission Polaire
+    Stop 6: Oceanographic research vessels inscribed on façade
+    Stop 7: Océano pour Tous
+    Stop 8: Statue of Albert I, Prince of Monaco at Oceanographic Museum, Monaco
+  PASS: No forbidden phrases
+  PASS: No cross-stop repetition (>0.85)
+  PASS: Distinct opening sentences
+  PASS: No compass bearings (museum)
+  PASS: No standalone Introduction block (R2)
+  PASS: Final stop has substantial content
+  PASS: Word count per stop (200-500 middle, 150-800 first/last)
+  PASS: Total length reasonable (1000-8000 words)
+  PASS: D3(a) Stop-title sanity
+  PASS: D3(b) Coordinate scatter (museum <200m)
+  PASS: D3(c) No boilerplate shingles (4-word in 3+ stops)
+  FAIL: D3(c2) No unearned adjectives (explain or cut) [LOCAL-40] — 3 unearned adjective(s): ["Stop 1: 'vibrant' without evidence in: ...The vibrant green hue of the seaweed, meticulously crafted from glass, shimmers ...", "Stop 2: 'stunning' without evidence in: ...The work consists of a series of stunning visual representations, each showcasin...", "Stop 3: 'vibrant' without evidence in: ...the vibrant marine life teeming within the basin, showcasing the intricate balan..."]
+  PASS: D3(d) Grounding assertion (titles look like real entities)
+  PASS: D3(e) No duplicate stops (same work under different labels) (FACTUAL)
+  PASS: T6 No splice corruption (mid-token dots, stray Stop N refs)
+  PASS: R3 Orientation substance (no generic filler in museum)
+  PASS: Single-venue consistency (no other NAMED venues)
+  PASS: Attribution grounding (consistent with venue)
+  PASS: Venue coherence (stops reference correct venue)
+  PASS: G4 Prolog/epilog claims trace to story elements (FACTUAL)
+  [LOCAL-36] No practical claims in tour (OK — omission is safe)
+[BLOCKER4c] Style issues (round 2): 1 style failure(s) — correcting
+  Rendered Stop headings (8):
+    Stop 1: Caulerpa taxifolia
+    Stop 2: Charlene Guillaumot
+    Stop 3: Jean Jaubert
+    Stop 4: MOM-INV-0021953
+    Stop 5: Mission Polaire
+    Stop 6: Oceanographic research vessels inscribed on façade
+    Stop 7: Océano pour Tous
+    Stop 8: Statue of Albert I, Prince of Monaco at Oceanographic Museum, Monaco
+  PASS: No forbidden phrases
+  PASS: No cross-stop repetition (>0.85)
+  PASS: Distinct opening sentences
+  PASS: No compass bearings (museum)
+  PASS: No standalone Introduction block (R2)
+  PASS: Final stop has substantial content
+  PASS: Word count per stop (200-500 middle, 150-800 first/last)
+  PASS: Total length reasonable (1000-8000 words)
+  PASS: D3(a) Stop-title sanity
+  PASS: D3(b) Coordinate scatter (museum <200m)
+  PASS: D3(c) No boilerplate shingles (4-word in 3+ stops)
+  FAIL: D3(c2) No unearned adjectives (explain or cut) [LOCAL-40] — 3 unearned adjective(s): ["Stop 1: 'vibrant' without evidence in: ...The vibrant green hue of the seaweed, meticulously crafted from glass, shimmers ...", "Stop 2: 'stunning' without evidence in: ...The work consists of a series of stunning visual representations, each showcasin...", "Stop 3: 'vibrant' without evidence in: ...the vibrant marine life teeming within the basin, showcasing the intricate balan..."]
+  PASS: D3(d) Grounding assertion (titles look like real entities)
+  PASS: D3(e) No duplicate stops (same work under different labels) (FACTUAL)
+  PASS: T6 No splice corruption (mid-token dots, stray Stop N refs)
+  PASS: R3 Orientation substance (no generic filler in museum)
+  PASS: Single-venue consistency (no other NAMED venues)
+  PASS: Attribution grounding (consistent with venue)
+  PASS: Venue coherence (stops reference correct venue)
+  PASS: G4 Prolog/epilog claims trace to story elements (FACTUAL)
+  [LOCAL-36] No practical claims in tour (OK — omission is safe)
+[BLOCKER4c] Style issues (round 3): 1 style failure(s) — correcting
+[BLOCKER4c] Delivered with 1 style issue(s) after 3 correction rounds
+[I-CON] ADVISORY FAIL — tour avg: 5.00, min stop: 5.00 | Issues: stop 'Caulerpa taxifolia' avg 0.00 < 3; stop 'Charlene Guillaumot' avg 0.00 < 3; stop 'Jean Jaubert' avg 0.00 < 3; stop 'MOM-INV-0021953' avg 0.00 < 3; stop 'Mission Polaire' avg 0.00 < 3; stop 'Océano pour Tous' avg 0.00 < 3; stop 'Statue of Albert I, Prince of Monaco at Oceanographic Museum, Monaco' avg 0.00 < 3
+[I-CON] Persisted 8 stop metrics for job a03b82c1-4216-4f5e-8a30-3dad77ca0457
