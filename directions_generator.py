@@ -97,7 +97,8 @@ def generate_real_directions(
 
         # Cost logging
         tokens = result.get("usage", {}).get("total_tokens", 0)
-        cost = tokens / 1000 * 0.002
+        from cost_rates import llm_cost
+        cost = llm_cost(tokens)
         logger.info(f"Directions: {from_name} → {to_name} | {tokens} tokens | ${cost:.4f}")
 
         return text
@@ -180,7 +181,8 @@ def generate_walking_directions(
         result = response.json()
         text = result["choices"][0]["message"]["content"].strip()
         tokens = result.get("usage", {}).get("total_tokens", 0)
-        cost = tokens / 1000 * 0.002
+        from cost_rates import llm_cost
+        cost = llm_cost(tokens)
         logger.info(f"Walking directions: {from_name} → {to_name} | {tokens} tokens | ${cost:.4f}")
         return text
 

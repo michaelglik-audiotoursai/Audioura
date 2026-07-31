@@ -82,3 +82,4 @@ __pycache__/
 
 # LOCAL-fix: requirements files must reach the build context (*.txt above excluded them)
 !requirements*.txt
+!build_manifest.py

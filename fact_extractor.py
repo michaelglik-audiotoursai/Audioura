@@ -100,7 +100,8 @@ def generate_fact_sheet(
 
         # Cost logging
         tokens = result.get("usage", {}).get("total_tokens", 0)
-        cost = tokens / 1000 * 0.002
+        from cost_rates import llm_cost
+        cost = llm_cost(tokens)
         logger.info(f"Fact sheet: {poi_name} | {tokens} tokens | ${cost:.4f}")
 
         # Parse JSON (handle markdown fences)
