@@ -158,3 +158,107 @@ feature risk. Only code is isolated on `subscribed`.
 LOCAL-61's commit swept up loose debug output from the repo root, violating
 the standing hygiene rule in `remind_mobile_ai.md`. Untracking is reversible
 and keeps the files; deleting them is not, so it was not done.
+
+---
+
+## D11 — my bounce of LOCAL-60 over `search: 0.00` was wrong; withdrawn
+
+**Decision: `search: 0.00` is correct. Criterion withdrawn, LOCAL-60 approved.**
+
+I bounced LOCAL-60 partly demanding `search > 0` in the cost breakdown,
+assuming corpus mining costs money. It does not. `story_miner.py` has **no
+cost accounting at all** — it performs plain HTTP fetches of Wikipedia and
+museum websites, which are free. The `search` component comes from
+`work_story_searcher.py` (`total_queries * 0.001`, a paid API), and
+`generate_tour_text.py` imports only its *cache* helpers
+(`normalize_work_key`, `work_stories_get`), never the paid path.
+
+LOCAL-60 explained this correctly rather than fabricating a number. The rest
+of that bounce — the simulated ledger row — was justified and was fixed.
+
+Lesson for future bounces: verify that an acceptance criterion is
+*satisfiable* before demanding it. I invented a requirement from an
+assumption about how the code works, having just been burned by the opposite
+error.
+
+## D12 — commit `2f7e2fd` on `storied` is titled "x"
+
+**Decision: leave it, document it here. No history rewrite.**
+
+A shell fallback in my merge command (`-m "x"`) was intended to fail and
+instead succeeded, so the LOCAL-60 merge into `storied` carries a
+meaningless message. It is already pushed. Amending would require a
+force-push — an irreversible operation that needs Michael — over a cosmetic
+problem.
+
+For the record: **`2f7e2fd` is the merge of `kiro/local60-cost-metering`
+into `storied`** (per-operation cost metering).
+
+Side effect: LOCAL-60's code is now on both `storied` and `subscribed`
+rather than `subscribed` alone. `cost_meter.py` is general infrastructure —
+useful on the mainline and carrying no Subscribed product behaviour — so I
+am not reverting it. LOCAL-80 (dispatcher base-branch fix) remains the real
+fix for the isolation problem.
+
+## D13 — fixed LOCAL-63's build break myself instead of bouncing
+
+**Decision: applied the one-line `.dockerignore` fix directly.**
+
+`.dockerignore:13` `build_*.py` excluded `build_manifest.py`, so LOCAL-63's
+image could not build at all — exit code 2. A full bounce round-trip for one
+`!build_manifest.py` line would have cost ~10 minutes of queue time for a
+change I could verify immediately. Also passed `GIT_SHA` through
+docker-compose, without which the new health endpoint reported
+`code_sha: "unknown"` and the guard was pointless.
+
+Verified after: `manifest_ok: true`, container FRESH,
+`code_sha: 6ccad55f9ccc474c76a85d7b3f5eeb5b509e4749`.
+
+**Third `.dockerignore`-caused build failure this session.** LOCAL-64 now
+carries a task to check every Dockerfile `COPY` source against
+`.dockerignore` so this class of bug dies permanently.
+
+---
+
+## D14 — controls fail closed; instrumentation fails open
+
+**Decision: adopted as a standing rule, and written into every task file for
+a safety control from now on.**
+
+LOCAL-64 put cost-ceiling enforcement inside the same `try` as LOCAL-60's
+cost metering, whose handler prints *"Cost metering failed (non-fatal)"* and
+continues. So any exception in the ceiling check — dead DB, bad env value,
+import failure — silently skipped the abort and delivered the over-budget
+tour.
+
+This is the **fourth** instance of the same pattern in this project:
+
+1. The story engine sat dead for weeks behind a swallowed `ImportError`.
+2. Corpus mining silently degraded for two days behind another
+   (`extract_catalogue_works_from_pages`, stale container).
+3. `check_cost_ceiling` existed with tests and **zero production callers**.
+4. LOCAL-64's ceiling sharing an exception handler with instrumentation.
+
+**The rule:** metering, logging and analytics may fail open — losing a
+measurement is survivable. Anything that *decides whether an operation
+proceeds* — cost ceilings, entitlement checks, quota gates, payment
+verification — fails **closed**, logs at ERROR, and never shares an
+exception handler with instrumentation.
+
+A swallowed exception around a control is the control not existing.
+
+## D15 — the ceiling limits delivery, not spend
+
+**Decision: accept for now; record the limitation rather than let the
+submission overstate it.**
+
+LOCAL-64's check runs after generation completes, so when it fires the API
+spend has already happened. It prevents *delivering* an over-budget tour; it
+does not prevent the *cost*.
+
+That is probably what Michael needs — the ceiling is a tripwire against
+runaway spend, and at a measured $0.06 per tour we are two orders of
+magnitude below $1.30. But it should not be described as enforcing his
+ceiling without that caveat. An in-flight check (accumulated cost between
+stops, stopping early) is the real version, and is proposed as a follow-up
+rather than built now.

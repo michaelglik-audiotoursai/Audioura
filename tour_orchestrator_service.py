@@ -1174,8 +1174,17 @@ def call_coordinates_service(location):
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint."""
-    return jsonify({"status": "healthy", "service": "tour_orchestrator"})
+    """Health check endpoint with cost ceiling stats."""
+    try:
+        from cost_ceiling_monitor import get_ceiling_stats
+        _ceiling_stats = get_ceiling_stats()
+    except ImportError:
+        _ceiling_stats = {}
+    return jsonify({
+        "status": "healthy",
+        "service": "tour_orchestrator",
+        "cost_ceiling": _ceiling_stats,
+    })
 
 @app.route('/generate-complete-tour', methods=['POST'])
 def generate_complete_tour():

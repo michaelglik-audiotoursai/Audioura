@@ -142,6 +142,7 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
         
         # [LOCAL-60] Record operation cost immediately after generation (before QA gate)
         # This ensures cache hits are always metered even if QA subsequently rejects.
+        _our_cost = 0.0
         try:
             from cost_meter import record_operation
             from generate_tour_text import _LAST_GENERATION_COST
@@ -161,6 +162,41 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
             print(f"[LOCAL-60] Cost metered: {_op_type} | ${_our_cost:.6f} | cache_hit={_is_cache_hit}")
         except Exception as _meter_err:
             print(f"[LOCAL-60] Cost metering failed (non-fatal): {_meter_err}")
+
+        # [LOCAL-64] Enforce cost ceiling — SEPARATE try block, FAILS CLOSED.
+        # A safety control must not share an exception handler with instrumentation.
+        # If this check cannot run (DB down, import error, bad config), we abort
+        # delivery — a tour we cannot price is a tour we must not ship.
+        try:
+            from cost_ceiling_monitor import enforce_cost_ceiling
+            _ceiling_result = enforce_cost_ceiling(
+                total_cost=_our_cost,
+                job_id=job_id,
+                user_id=user_id,
+                tour_category=tour_type,
+            )
+            if _ceiling_result["abort"]:
+                # Hard limit exceeded — do NOT deliver this tour
+                ACTIVE_JOBS.update(job_id, status="error",
+                    error=_ceiling_result["message"],
+                    error_type="cost_hard_limit_exceeded")
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
+                return
+        except Exception as _ceiling_err:
+            # FAIL CLOSED: ceiling check itself failed — abort delivery.
+            import logging as _ceil_logging
+            _ceil_logging.getLogger("generate_tour_text_service").error(
+                f"[LOCAL-64] COST CEILING CHECK FAILED — aborting delivery (fail-closed): {_ceiling_err}"
+            )
+            print(f"[LOCAL-64] ERROR: Cost ceiling check failed — aborting delivery: {_ceiling_err}")
+            ACTIVE_JOBS.update(job_id, status="error",
+                error=f"Cost ceiling check unavailable ({type(_ceiling_err).__name__}: {_ceiling_err}). "
+                      f"Tour not delivered — fail-closed safety policy.",
+                error_type="cost_ceiling_check_failed")
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+            return
 
         # [BLOCKER4c] QA gate — corrections on structured data, never deliver on exit 1
         if os.getenv('STORIED_MODE', 'false').lower() == 'true' and tour_text:
@@ -358,6 +394,13 @@ def health_check():
             "drift_files": ["manifest_check.py not found in image"],
         }
 
+    # [LOCAL-64] Include cost ceiling stats for monitoring/alerting
+    try:
+        from cost_ceiling_monitor import get_ceiling_stats
+        _ceiling_stats = get_ceiling_stats()
+    except ImportError:
+        _ceiling_stats = {}
+
     return jsonify({
         "status": "healthy",
         "service": "tour_text_generator",
@@ -369,6 +412,7 @@ def health_check():
         **({
             "drift_files": _manifest_info["drift_files"]
         } if not _manifest_info.get("manifest_ok", False) else {}),
+        "cost_ceiling": _ceiling_stats,
     })
 
 @app.route('/generate', methods=['POST'])
