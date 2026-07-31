@@ -794,30 +794,37 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             lat = coordinates[0]
             lng = coordinates[1]
         
-        # Read original tour content from the text file for translation purposes
-        tour_content = None
-        if tour_file:
-            tour_file_path = os.path.join(TOURS_DIR, tour_file)
-            if os.path.exists(tour_file_path):
-                try:
-                    with open(tour_file_path, 'r', encoding='utf-8') as f:
-                        tour_content = f.read()
-                    print(f"Successfully read tour content: {len(tour_content)} characters")
-                    
-                    # Also add tour_content.txt to the ZIP file for redundancy
+        # Resolve tour_content: prefer HTTP response (already captured at line 612),
+        # fall back to reading from shared-volume file if HTTP didn't provide it.
+        # FIX (LOCAL-49): Previously this unconditionally reset tour_content = None,
+        # discarding the HTTP-received content and relying solely on a file read that
+        # fails when the text generator's file isn't visible to the orchestrator.
+        if not tour_content:
+            # HTTP response didn't include tour_content — try file read
+            if tour_file:
+                tour_file_path = os.path.join(TOURS_DIR, tour_file)
+                if os.path.exists(tour_file_path):
                     try:
-                        with zipfile.ZipFile(zip_path, 'a') as zipf:
-                            zipf.writestr('tour_content.txt', tour_content.encode('utf-8'))
-                        print(f"Added tour_content.txt to ZIP file")
-                    except Exception as zip_error:
-                        print(f"Warning: Could not add tour_content.txt to ZIP: {zip_error}")
-                        
-                except Exception as read_error:
-                    print(f"Warning: Could not read tour content from {tour_file_path}: {read_error}")
+                        with open(tour_file_path, 'r', encoding='utf-8') as f:
+                            tour_content = f.read()
+                        print(f"Successfully read tour content from file: {len(tour_content)} characters")
+                    except Exception as read_error:
+                        print(f"Warning: Could not read tour content from {tour_file_path}: {read_error}")
+                else:
+                    print(f"Warning: Tour file not found: {tour_file_path}")
             else:
-                print(f"Warning: Tour file not found: {tour_file_path}")
+                print(f"Warning: No tour file available for content extraction")
         else:
-            print(f"Warning: No tour file available for content extraction")
+            print(f"Using tour_content from HTTP response: {len(tour_content)} characters")
+        
+        # Add tour_content.txt to the ZIP file for redundancy (regardless of source)
+        if tour_content:
+            try:
+                with zipfile.ZipFile(zip_path, 'a') as zipf:
+                    zipf.writestr('tour_content.txt', tour_content.encode('utf-8'))
+                print(f"Added tour_content.txt to ZIP file")
+            except Exception as zip_error:
+                print(f"Warning: Could not add tour_content.txt to ZIP: {zip_error}")
         
         # Store in database with tour content
         store_success = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"))
