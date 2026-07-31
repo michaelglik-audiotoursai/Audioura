@@ -932,6 +932,11 @@ _LAST_POI_LIST = []
 # Module-level: populated after D1v2 verification with the computed tier
 _LAST_VERIFICATION_TIER = ""
 
+# [LOCAL-60] Module-level: populated after generation with cost breakdown
+# Allows the service layer to read the cost without changing the function signature.
+# Keys: total_cost, total_tokens, cache_hit, breakdown (dict with llm/tts/search)
+_LAST_GENERATION_COST = {"total_cost": 0.0, "total_tokens": 0, "cache_hit": False, "breakdown": {}}
+
 
 
 def _is_artist_human(artist_qid: str) -> bool:
@@ -2386,6 +2391,9 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     total_tokens = 0
     total_cost = 0
     
+    # [LOCAL-60] Declare global for cost exposure
+    global _LAST_GENERATION_COST
+
     # -------- [S20] Storied: check tour cache before generation --------
     _cache_hit = None
     if _storied_mode:
@@ -2396,6 +2404,13 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 _cache_hit = get_cached_tour(location, tour_type, total_stops, _db_url)
                 if _cache_hit:
                     print(f"CACHE HIT: {location} / {tour_type} / {total_stops}")
+                    # [LOCAL-60] Record cache hit cost = 0
+                    _LAST_GENERATION_COST = {
+                        "total_cost": 0.0,
+                        "total_tokens": 0,
+                        "cache_hit": True,
+                        "breakdown": {"llm": 0.0, "tts": 0.0, "search": 0.0},
+                    }
                     # Return cached tour immediately
                     if output_file:
                         with open(output_file, "w", encoding="utf-8") as _cf:
@@ -6164,6 +6179,18 @@ Requirements:
     # [B1b] Expose poi_list at module level for stop_metrics verified-flag mapping
     global _LAST_POI_LIST
     _LAST_POI_LIST = list(poi_list)
+
+    # [LOCAL-60] Expose generation cost at module level for cost metering
+    _LAST_GENERATION_COST = {
+        "total_cost": total_cost,
+        "total_tokens": total_tokens,
+        "cache_hit": False,
+        "breakdown": {
+            "llm": total_cost,  # Currently all tracked cost is LLM tokens
+            "tts": 0.0,         # TTS cost tracked separately at orchestrator level
+            "search": 0.0,      # Search cost tracked separately via work_story_searcher
+        },
+    }
 
     return complete_tour, output_file, first_poi_coordinates
 
