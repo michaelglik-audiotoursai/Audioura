@@ -133,7 +133,7 @@ The Mac Mini is now a full development environment. To continue working:
 | GitHub email | `michael.glik@gmail.com` |
 | Version | `2.2.0+1` |
 | Docker port | `localhost:5000` |
-| Postgres | `localhost:5432` (user: admin, pass: password123) |
+| Postgres | `localhost:5433` (user: admin, pass: password123) |
 | ClickUp list | `1000410000000733` (🟦 Services — Kiro) |
 
 ## TROUBLESHOOTING
@@ -146,7 +146,74 @@ The Mac Mini is now a full development environment. To continue working:
 ---
 
 # SESSION HANDOFF — Audioura review (read this first)
-## Last updated: 2026-07-29 evening (tour-quality loop root cause found)
+## Last updated: 2026-07-31 (autonomy rule + Subscribed kickoff)
+
+---
+
+# ⚠️ RULE ZERO — DO NOT STOP AND ASK. KEEP THE QUEUE MOVING.
+
+**Continuous development is Michael's single highest priority.** He has said
+so explicitly, and has corrected this behaviour twice. A session that idles
+waiting for approval is failing at the main job, even if every individual
+answer it gives is correct.
+
+**Ask only before an action that cannot be undone.** That set is far smaller
+than it feels:
+
+| Action | Undoable? | Ask first? |
+|---|---|---|
+| Edit/create task files, dispatch or re-dispatch Kiro | yes | **no** |
+| Review diffs, bounce work, write verdicts | yes | **no** |
+| Merge a reviewed branch into local `storied` | yes (`git reset`) | **no** |
+| Push a **feature branch** to origin | yes (delete remote branch) | **no** |
+| Push `storied` to origin | yes (`git revert`, or force-push if truly needed) | **no**, once field-test gate is met |
+| Generate tours within the cost ceiling | yes | **no** |
+| Modify the live DB **schema** (additive) | yes | **no**, but declare it |
+| `DELETE` rows / drop columns / overwrite files | **no** | **YES** |
+| `git push --force`, history rewrite | **no** | **YES** |
+| Anything outward-facing: publishing, sending, external services | **no** | **YES** |
+
+Michael's own words, 2026-07-31: *"when no serious risk that can not be
+undone: even git push can be undone!"*
+
+**If one action is gated, guard it and keep working on everything else.**
+The pattern that works: park the gated task file outside the dispatcher glob
+(`PARKED_kiro_task_LOCAL-NN.md`) and have it self-abort unless a sentinel
+file exists. Never let a single gate idle the whole queue.
+
+**Cost of getting this wrong, measured 2026-07-31:** four tasks sat finished
+but unreviewed for ~10 hours awaiting a "go-ahead". Re-dispatched, they took
+233–368 seconds each. Hours lost to protect against near-zero risk.
+
+**When a long unattended stretch is expected, self-schedule.** Use
+`ScheduleWakeup` (dynamic `/loop`) or `CronCreate` so the loop survives
+without Michael prompting it. If usage credits run out, schedule a wakeup
+far enough ahead that they have reset, and resume from the files on disk —
+never wait to be re-invoked by a human.
+
+### Corollaries learned the hard way
+
+- **`exit=0` from Kiro means nothing.** Verify by effect: commits exist
+  (`git rev-list --count storied..HEAD ≥ 1`), submission doc present, and
+  the behaviour actually changed. On 2026-07-31 all four tasks reported
+  success having committed nothing — because the task files omitted the
+  `## PROCESS` section. **Every task file must end with one.**
+- **"Regression" is a claim about two trees.** A failing test in the current
+  tree proves nothing. Keep a baseline worktree
+  (`git worktree add --detach ~/audioura-worktrees/prepush-baseline origin/storied`)
+  and compare. This caught a false BLOCKED verdict on a test that had been
+  failing for 188 commits.
+- **Read the code; do not pattern-match it.** Greps have twice produced
+  confidently wrong conclusions (a French-vs-English fact audit, and an
+  all-negative check that was searching the wrong function).
+- **Live-artifact gate** (Michael, 2026-07-27) still binds: no "COMPLETE"
+  without a real run. "Unproven, handing to LEAD" is always acceptable.
+- **Test artifacts must never reach the user-facing tour list.** LOCAL-49
+  left 7 test tours in the live DB, 2 of them visible in Michael's app.
+  Hide by nulling `lat`/`lng` (the `tours-near` query filters on those, not
+  on `draft`), and back up the values first.
+
+---
 
 ### FIRST ACTIONS ON A FRESH SESSION
 1. `git log --oneline -3` and `cat .continuous_dev/STATUS.md`.
