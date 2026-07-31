@@ -138,17 +138,23 @@ CACHE_HIT_COST_USD          = 0.00
 
 ---
 
-## Open items — Michael to confirm on return
+## Decisions — made by LEAD, recorded in `DECISIONS.md`
 
-Defaults chosen so work is not blocked. Flag them, do not treat as settled.
+These were previously listed as open questions for Michael. Per his ruling
+of 2026-07-31 they are decided; he overturns what he dislikes.
 
-1. **Does the $2/month fee also apply to Unlimited?**
-   Assumed **no** — $50 covers everything.
-2. **Zero balance on Pay-Per-Use?**
-   Assumed **hard stop** with a top-up reminder; no negative balance from
-   normal use (refund clawback may still push it negative).
-3. **Unlimited hits its cost stop — what does the user see?**
-   Assumed a clear message plus the option to switch to Pay-Per-Use for the
-   rest of the month. Silently failing would be worse than any of this.
-4. **Does the free plan survive?**
-   Assumed **yes**, untouched, as the pre-subscription default.
+1. **$2/month fee on Unlimited?** No — $50 covers everything. (D2)
+2. **Zero balance on Pay-Per-Use?** Hard stop plus a top-up reminder; no
+   negative balance from normal use. A refund clawback may still go
+   negative, and is recorded. (D3)
+3. **Unlimited hits its cost stop?** Clear message naming what happened,
+   plus an offer to switch to Pay-Per-Use for the rest of the month. Never
+   fail silently. (D4)
+4. **Does `free` survive?** Yes, unchanged. Every existing user is on it. (D5)
+5. **Mobile versioning.** Build numbers are globally monotonic across all
+   branches; next build is `2.3.0+20`. Today `storied` carries 2.2.0+**1**
+   while `services-migration` carries 2.1.1+**9** — a higher version string
+   with a lower build number, which app stores cannot order safely. (D1)
+6. **Pricing calibration is blocked**, not by a question but by a bug: the
+   corpus ImportError means measured cost excludes story mining
+   (`search: 0.0`). Fix LOCAL-63, then re-measure before setting prices. (D7)
