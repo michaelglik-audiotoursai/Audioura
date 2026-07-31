@@ -6,6 +6,17 @@ Limits live in the `plans` table (changeable via SQL, no redeploy).
 Users have a `plan` field (default 'free').
 Enforcement is server-side, keyed on user_id.
 
+For paid tiers (ppu, unlimited), the check transitions from quota-count logic
+to balance/cost-stop logic. This is done by extending check_tour_quota() and
+check_news_quota() to inspect the subscriptions table when plan != 'free'.
+Same call site, same user_id path — no duplication needed.
+
+The gate returns a STRUCTURED result the app can act on:
+    - allowed: bool
+    - reason: str (why denied, or 'ok')
+    - remedy: str or None (what the user can do)
+Plus additional fields per tier for backward compatibility.
+
 Usage:
     from entitlements import check_tour_quota, check_news_quota
 
@@ -21,8 +32,12 @@ Usage:
 """
 
 import os
+import logging
 import psycopg2
 from datetime import datetime, date
+from decimal import Decimal
+
+logger = logging.getLogger(__name__)
 
 
 def _get_conn():
@@ -114,6 +129,106 @@ def get_user_plan(user_id):
     }
 
 
+def _get_subscription_tier(user_id):
+    """Get the user's active subscription tier from the subscriptions table.
+    Returns tier string ('ppu' or 'unlimited') or None if no active subscription.
+    Raises on DB connection errors.
+    """
+    try:
+        conn = _get_conn()
+    except Exception as e:
+        print(f"[ENTITLEMENTS] DB CONNECTION ERROR getting subscription for {user_id}: {e}")
+        raise
+
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT tier FROM subscriptions
+            WHERE user_id = %s AND state IN ('active', 'billing_retry')
+            ORDER BY created_at DESC
+            LIMIT 1
+        """, (user_id,))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        return row[0] if row else None
+    except Exception as e:
+        print(f"[ENTITLEMENTS] Error querying subscription for {user_id}: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
+        raise
+
+
+def _check_ppu_balance(user_id):
+    """Check Pay-Per-Use wallet balance. Returns structured result.
+    Zero or negative balance → hard stop with low-balance reminder (D3).
+    """
+    from wallet_ledger import get_balance_cents, check_low_balance, CREDIT_TOPUP_USD
+
+    balance_cents = get_balance_cents(user_id)
+    
+    if balance_cents <= 0:
+        # Hard stop — zero balance means no service (D3)
+        balance_usd = Decimal(balance_cents) / Decimal(100)
+        return {
+            'allowed': False,
+            'reason': 'insufficient_balance',
+            'remedy': 'topup',
+            'error': 'insufficient_balance',
+            'plan': 'ppu',
+            'balance_usd': f"{balance_usd:.2f}",
+            'balance_cents': balance_cents,
+            'message': (
+                f"Your balance is ${balance_usd:.2f}. "
+                f"Top up ${CREDIT_TOPUP_USD:.2f} to continue generating audio tours and articles."
+            ),
+        }
+    
+    # Check low balance for reminder (non-blocking)
+    low_balance_msg = check_low_balance(user_id)
+    
+    return {
+        'allowed': True,
+        'reason': 'ok',
+        'remedy': None,
+        'plan': 'ppu',
+        'balance_cents': balance_cents,
+        'low_balance_reminder': low_balance_msg,
+    }
+
+
+def _check_unlimited_cost_stop(user_id):
+    """Check Unlimited tier cost stop. Returns structured result.
+    Breach → clear message + offer to switch to Pay-Per-Use (D4).
+    """
+    from wallet_ledger import check_unlimited_cost_stop, UNLIMITED_COST_STOP_USD
+
+    result = check_unlimited_cost_stop(user_id)
+    
+    if result['breached']:
+        return {
+            'allowed': False,
+            'reason': 'cost_stop_reached',
+            'remedy': 'switch_to_ppu',
+            'error': 'cost_stop_reached',
+            'plan': 'unlimited',
+            'current_cost_usd': str(result['current_cost_usd']),
+            'limit_usd': str(result['limit_usd']),
+            'message': result['message'],
+        }
+    
+    return {
+        'allowed': True,
+        'reason': 'ok',
+        'remedy': None,
+        'plan': 'unlimited',
+        'current_cost_usd': str(result['current_cost_usd']),
+        'limit_usd': str(result['limit_usd']),
+    }
+
+
 def get_tours_used_today(user_id):
     """Count tours generated today by this user. 
     Raises on DB connection errors (caller returns 503).
@@ -199,13 +314,38 @@ def get_news_used_period(user_id, period='week'):
 
 def check_tour_quota(user_id, requested_stops=10):
     """
-    Check if user can generate a tour. Returns dict with allowed/rejection info.
+    Check if user can generate a tour. Returns structured dict.
     
-    Returns:
-        {'allowed': True, 'clamped_stops': N} — proceed with (possibly clamped) stops
-        {'allowed': False, 'error': 'quota_exceeded', ...} — reject with 429 info
+    Dispatches by tier:
+      - free: quota-count logic (unchanged from pre-Subscribed)
+      - ppu: wallet balance check — zero balance → hard stop
+      - unlimited: month-to-date our-cost vs cost stop ($25)
+    
+    Returns structured result the app can act on:
+        allowed: bool
+        reason: str ('ok', 'quota_exceeded', 'insufficient_balance', 'cost_stop_reached')
+        remedy: str or None ('upgrade', 'topup', 'switch_to_ppu')
+    
+    Plus backward-compatible fields (clamped_stops, used, max, etc.)
+    
+    On internal error: DENY, not allow. Log at ERROR with a message distinguishing
+    "you are out of credit" from "we could not check your credit".
     """
     plan = get_user_plan(user_id)
+    plan_id = plan['plan_id']
+    
+    # For paid tiers, check subscription state and billing gate
+    if plan_id in ('ppu', 'unlimited'):
+        return _check_tour_quota_paid(user_id, requested_stops, plan)
+    
+    # Free tier: existing quota-count logic, unchanged
+    return _check_tour_quota_free(user_id, requested_stops, plan)
+
+
+def _check_tour_quota_free(user_id, requested_stops, plan):
+    """Free tier: existing quota-count behaviour. Every current user is on free.
+    Identical logic to pre-Subscribed — a regression here breaks everyone.
+    """
     used_today = get_tours_used_today(user_id)
     
     if used_today >= plan['tours_per_day']:
@@ -213,6 +353,8 @@ def check_tour_quota(user_id, requested_stops=10):
         tomorrow = (date.today() + timedelta(days=1)).strftime('%Y-%m-%dT00:00:00Z')
         return {
             'allowed': False,
+            'reason': 'quota_exceeded',
+            'remedy': 'upgrade',
             'error': 'quota_exceeded',
             'limit': 'tours_per_day',
             'plan': plan['plan_id'],
@@ -223,14 +365,12 @@ def check_tour_quota(user_id, requested_stops=10):
         }
     
     # Clamp stops to plan maximum
-    # NOTE: tour_max_minutes is not enforced directly — the POI clamp serves as its proxy.
-    # Tour duration is roughly proportional to stop count (2-5 min/stop), so clamping POI
-    # to tour_max_poi effectively caps duration. Direct time enforcement would require
-    # post-generation measurement + rejection, which wastes the compute cost.
     clamped_stops = min(requested_stops, plan['tour_max_poi'])
     
     return {
         'allowed': True,
+        'reason': 'ok',
+        'remedy': None,
         'clamped_stops': clamped_stops,
         'plan': plan['plan_id'],
         'used': used_today,
@@ -239,16 +379,130 @@ def check_tour_quota(user_id, requested_stops=10):
     }
 
 
+def _check_tour_quota_paid(user_id, requested_stops, plan):
+    """Paid tier (ppu or unlimited): billing-based gate.
+    The plans table has generous safety ceilings for paid tiers (tours_per_day=999),
+    so we skip quota-count and go straight to the billing check.
+    """
+    # Verify active subscription exists — fail closed if not
+    try:
+        tier = _get_subscription_tier(user_id)
+    except Exception as e:
+        logger.error(f"[ENTITLEMENTS] Subscription check error for {user_id}: {e}")
+        print(f"[ENTITLEMENTS] ERROR: Could not verify subscription for {user_id}: {e} — DENYING (fail-closed)")
+        return {
+            'allowed': False,
+            'reason': 'entitlement_check_error',
+            'remedy': None,
+            'error': 'entitlement_check_error',
+            'plan': plan['plan_id'],
+            'message': (
+                "We could not verify your subscription status. "
+                "This is a temporary issue on our end — please try again in a moment."
+            ),
+        }
+    
+    if not tier:
+        # User's plan says ppu/unlimited but no active subscription row.
+        # This is a data inconsistency — fail closed.
+        logger.error(
+            f"[ENTITLEMENTS] Plan={plan['plan_id']} but no active subscription row for {user_id}"
+        )
+        print(
+            f"[ENTITLEMENTS] ERROR: Plan/subscription mismatch for {user_id} "
+            f"(plan={plan['plan_id']}, no active subscription) — DENYING"
+        )
+        return {
+            'allowed': False,
+            'reason': 'subscription_inactive',
+            'remedy': 'resubscribe',
+            'error': 'subscription_inactive',
+            'plan': plan['plan_id'],
+            'message': (
+                "Your subscription is not active. "
+                "Please restore your subscription in Settings to continue."
+            ),
+        }
+    
+    # Dispatch to tier-specific billing check
+    try:
+        if tier == 'ppu':
+            result = _check_ppu_balance(user_id)
+        elif tier == 'unlimited':
+            result = _check_unlimited_cost_stop(user_id)
+        else:
+            # Unknown tier — fail closed
+            logger.error(f"[ENTITLEMENTS] Unknown subscription tier '{tier}' for {user_id}")
+            print(f"[ENTITLEMENTS] ERROR: Unknown tier '{tier}' for {user_id} — DENYING")
+            return {
+                'allowed': False,
+                'reason': 'entitlement_check_error',
+                'remedy': None,
+                'error': 'unknown_tier',
+                'plan': plan['plan_id'],
+                'message': "Could not determine your subscription type. Please contact support.",
+            }
+    except Exception as e:
+        # Billing check itself errored — DENY, not allow (fail closed)
+        logger.error(f"[ENTITLEMENTS] Billing check error for {user_id} (tier={tier}): {e}")
+        print(
+            f"[ENTITLEMENTS] ERROR: Billing check failed for {user_id} (tier={tier}): {e} — "
+            f"DENYING (fail-closed, this is NOT a credit issue)"
+        )
+        return {
+            'allowed': False,
+            'reason': 'entitlement_check_error',
+            'remedy': None,
+            'error': 'entitlement_check_error',
+            'plan': plan['plan_id'],
+            'message': (
+                "We could not verify your account balance. "
+                "This is a temporary issue on our end — please try again in a moment."
+            ),
+        }
+    
+    # If billing check passed, apply stop clamping and return
+    if result['allowed']:
+        clamped_stops = min(requested_stops, plan['tour_max_poi'])
+        result['clamped_stops'] = clamped_stops
+        # Paid tiers don't have meaningful used/max/remaining for quota
+        # but include them for API compatibility
+        result['used'] = 0
+        result['max'] = plan['tours_per_day']
+        result['remaining'] = plan['tours_per_day']
+    
+    return result
+
+
 def check_news_quota(user_id):
     """
-    Check if user can process a news article. Returns dict with allowed/rejection info.
+    Check if user can process a news article. Returns structured dict.
+    
+    Dispatches by tier:
+      - free: quota-count logic (unchanged)
+      - ppu: wallet balance check
+      - unlimited: month-to-date cost stop
     """
     plan = get_user_plan(user_id)
+    plan_id = plan['plan_id']
+    
+    # For paid tiers, check subscription state and billing gate
+    if plan_id in ('ppu', 'unlimited'):
+        return _check_news_quota_paid(user_id, plan)
+    
+    # Free tier: existing quota-count logic, unchanged
+    return _check_news_quota_free(user_id, plan)
+
+
+def _check_news_quota_free(user_id, plan):
+    """Free tier news quota: unchanged from pre-Subscribed."""
     used = get_news_used_period(user_id, plan['news_period'])
     
     if used >= plan['news_per_period']:
         return {
             'allowed': False,
+            'reason': 'quota_exceeded',
+            'remedy': 'upgrade',
             'error': 'quota_exceeded',
             'limit': 'news_per_period',
             'plan': plan['plan_id'],
@@ -261,12 +515,107 @@ def check_news_quota(user_id):
     
     return {
         'allowed': True,
+        'reason': 'ok',
+        'remedy': None,
         'plan': plan['plan_id'],
         'used': used,
         'max': plan['news_per_period'],
         'remaining': plan['news_per_period'] - used - 1,
         'news_max_minutes': plan['news_max_minutes']
     }
+
+
+def _check_news_quota_paid(user_id, plan):
+    """Paid tier news quota: same billing gate as tours.
+    News and tours are both covered by the same subscription (per design).
+    """
+    # Verify active subscription
+    try:
+        tier = _get_subscription_tier(user_id)
+    except Exception as e:
+        logger.error(f"[ENTITLEMENTS] Subscription check error for {user_id}: {e}")
+        print(f"[ENTITLEMENTS] ERROR: Could not verify subscription for {user_id}: {e} — DENYING (fail-closed)")
+        return {
+            'allowed': False,
+            'reason': 'entitlement_check_error',
+            'remedy': None,
+            'error': 'entitlement_check_error',
+            'plan': plan['plan_id'],
+            'news_max_minutes': plan['news_max_minutes'],
+            'message': (
+                "We could not verify your subscription status. "
+                "This is a temporary issue on our end — please try again in a moment."
+            ),
+        }
+    
+    if not tier:
+        logger.error(
+            f"[ENTITLEMENTS] Plan={plan['plan_id']} but no active subscription row for {user_id}"
+        )
+        print(
+            f"[ENTITLEMENTS] ERROR: Plan/subscription mismatch for {user_id} "
+            f"(plan={plan['plan_id']}, no active subscription) — DENYING"
+        )
+        return {
+            'allowed': False,
+            'reason': 'subscription_inactive',
+            'remedy': 'resubscribe',
+            'error': 'subscription_inactive',
+            'plan': plan['plan_id'],
+            'news_max_minutes': plan['news_max_minutes'],
+            'message': (
+                "Your subscription is not active. "
+                "Please restore your subscription in Settings to continue."
+            ),
+        }
+    
+    # Dispatch to tier-specific billing check
+    try:
+        if tier == 'ppu':
+            result = _check_ppu_balance(user_id)
+        elif tier == 'unlimited':
+            result = _check_unlimited_cost_stop(user_id)
+        else:
+            logger.error(f"[ENTITLEMENTS] Unknown subscription tier '{tier}' for {user_id}")
+            print(f"[ENTITLEMENTS] ERROR: Unknown tier '{tier}' for {user_id} — DENYING")
+            return {
+                'allowed': False,
+                'reason': 'entitlement_check_error',
+                'remedy': None,
+                'error': 'unknown_tier',
+                'plan': plan['plan_id'],
+                'news_max_minutes': plan['news_max_minutes'],
+                'message': "Could not determine your subscription type. Please contact support.",
+            }
+    except Exception as e:
+        logger.error(f"[ENTITLEMENTS] Billing check error for {user_id} (tier={tier}): {e}")
+        print(
+            f"[ENTITLEMENTS] ERROR: Billing check failed for {user_id} (tier={tier}): {e} — "
+            f"DENYING (fail-closed, this is NOT a credit issue)"
+        )
+        return {
+            'allowed': False,
+            'reason': 'entitlement_check_error',
+            'remedy': None,
+            'error': 'entitlement_check_error',
+            'plan': plan['plan_id'],
+            'news_max_minutes': plan['news_max_minutes'],
+            'message': (
+                "We could not verify your account balance. "
+                "This is a temporary issue on our end — please try again in a moment."
+            ),
+        }
+    
+    # Include news_max_minutes for compatibility
+    if result['allowed']:
+        result['news_max_minutes'] = plan['news_max_minutes']
+        result['used'] = 0
+        result['max'] = plan['news_per_period']
+        result['remaining'] = plan['news_per_period']
+    else:
+        result['news_max_minutes'] = plan['news_max_minutes']
+    
+    return result
 
 
 # ---------------------------------------------------------------------------
