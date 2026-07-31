@@ -2,7 +2,7 @@
 
 # LOCAL-73: News Article Cache
 
-**Commit:** `a69bc12` on `kiro/local73-news-cache`  
+**Commit:** `9d0dbfa` on `kiro/local73-news-cache`  
 **Depends on:** LOCAL-69 (merged into `subscribed` via `storied`)
 
 ---
