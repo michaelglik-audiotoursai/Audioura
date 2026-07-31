@@ -217,3 +217,48 @@ Verified after: `manifest_ok: true`, container FRESH,
 **Third `.dockerignore`-caused build failure this session.** LOCAL-64 now
 carries a task to check every Dockerfile `COPY` source against
 `.dockerignore` so this class of bug dies permanently.
+
+---
+
+## D14 — controls fail closed; instrumentation fails open
+
+**Decision: adopted as a standing rule, and written into every task file for
+a safety control from now on.**
+
+LOCAL-64 put cost-ceiling enforcement inside the same `try` as LOCAL-60's
+cost metering, whose handler prints *"Cost metering failed (non-fatal)"* and
+continues. So any exception in the ceiling check — dead DB, bad env value,
+import failure — silently skipped the abort and delivered the over-budget
+tour.
+
+This is the **fourth** instance of the same pattern in this project:
+
+1. The story engine sat dead for weeks behind a swallowed `ImportError`.
+2. Corpus mining silently degraded for two days behind another
+   (`extract_catalogue_works_from_pages`, stale container).
+3. `check_cost_ceiling` existed with tests and **zero production callers**.
+4. LOCAL-64's ceiling sharing an exception handler with instrumentation.
+
+**The rule:** metering, logging and analytics may fail open — losing a
+measurement is survivable. Anything that *decides whether an operation
+proceeds* — cost ceilings, entitlement checks, quota gates, payment
+verification — fails **closed**, logs at ERROR, and never shares an
+exception handler with instrumentation.
+
+A swallowed exception around a control is the control not existing.
+
+## D15 — the ceiling limits delivery, not spend
+
+**Decision: accept for now; record the limitation rather than let the
+submission overstate it.**
+
+LOCAL-64's check runs after generation completes, so when it fires the API
+spend has already happened. It prevents *delivering* an over-budget tour; it
+does not prevent the *cost*.
+
+That is probably what Michael needs — the ceiling is a tripwire against
+runaway spend, and at a measured $0.06 per tour we are two orders of
+magnitude below $1.30. But it should not be described as enforcing his
+ceiling without that caveat. An in-flight check (accumulated cost between
+stops, stopping early) is the real version, and is proposed as a follow-up
+rather than built now.
