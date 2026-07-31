@@ -54,3 +54,6 @@ key.properties
 !audio_tour_app/android/app/debug.keystore
 
 *.apk
+
+# iPhone app diagnostic logs pasted in for debugging (not source)
+.claude/log_iphone_*.txt

@@ -79,3 +79,6 @@ Temp/
 __pycache__/
 *.pyc
 .env
+
+# LOCAL-fix: requirements files must reach the build context (*.txt above excluded them)
+!requirements*.txt

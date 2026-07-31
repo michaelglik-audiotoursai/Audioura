@@ -3,6 +3,24 @@
 
 services:
   # Core Tour Services
+  tour-id-resolution:
+    build:
+      context: .
+      dockerfile: Dockerfile.tour-id-resolution
+    ports:
+      - "5025:5025"
+    environment:
+      - DB_HOST=postgres-2
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+    volumes:
+      - ./tours:/app/tours
+    restart: unless-stopped
+    depends_on:
+      - postgres-2
+
   tour-generator:
     build:
       context: .

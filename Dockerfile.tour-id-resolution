@@ -11,7 +11,7 @@ COPY requirements-tour-id-resolution.txt .
 RUN pip install --no-cache-dir -r requirements-tour-id-resolution.txt
 
 # Copy service file
-COPY tour_id_resolution_service.py .
+COPY deeplink_resolution_endpoint.py storied_version_constants.py tour_id_resolution_service.py tour_sharing.py ./
 
 # Create tours directory
 RUN mkdir -p /app/tours
