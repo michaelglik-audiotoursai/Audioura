@@ -1,145 +1,189 @@
 ##### READY FOR REVIEW
 
-## LOCAL-60: Per-Operation Cost Metering
-
-**Commit:** `595ba2bcee9945b4d326a9bb2b84894ce826a82f`  
-**Branch:** `kiro/local60-cost-metering` (1 commit ahead of `storied`)  
-**Date:** 2026-07-31
+**Branch:** `kiro/local60-cost-metering`
+**Date:** 2026-07-31T18:20 UTC
 
 ---
 
-## Per-File Changes
+## Commit
+
+```
+c9415b5 LOCAL-60: Per-operation cost metering — cost_meter, cost_rates, wiring, migration
+```
+
+Commit `c9415b5` relative to storied (git rev-list --count storied..HEAD = 1).
+SUBSCRIBED_DESIGN.md pulled from origin/storied (not committed — it belongs to storied, not this branch).
+
+---
+
+## Per-file changes
 
 | File | Change |
 |------|--------|
-| `cost_rates.py` | **NEW** — Centralised rate table (LLM, Serper, Polly, Google Translate). Single source of truth. |
-| `cost_meter.py` | **NEW** — Cost ledger module. `record_operation()` writes one row per billable event. Enforces cache_hit→$0. |
-| `migration/sql/005_cost_ledger.sql` | **NEW** — Creates `cost_ledger` table with indexes. |
-| `tests/test_local60_cost_metering.py` | **NEW** — 8 unit tests covering rates, metering, cache-hit enforcement, invalid-type rejection. |
-| `generate_tour_text.py` | **MOD** — Exposes `_LAST_GENERATION_COST` dict (total_cost, cache_hit, breakdown) at module level. Set to cache_hit=True/cost=0 on cache hit; set to real cost after fresh gen. |
-| `generate_tour_text_service.py` | **MOD** — Calls `record_operation()` immediately after `generate_tour_text()` returns, before QA gate. Ensures cache hits are always metered even if QA subsequently rejects. |
-| `tour_orchestrator_service.py` | **MOD** — Meters translation operations: reads `cache_hit` from translation response, calls `record_operation` with `translation_generate` or `translation_cache_hit`. |
-| `translation-service/translation_service.py` | **MOD** — `translate_tour_with_audio` now returns `(id, cache_hit)` tuple. Endpoint includes `cache_hit` field in per-language response. |
-| `directions_generator.py` | **MOD** — Uses `cost_rates.llm_cost()` instead of hardcoded `tokens/1000 * 0.002`. |
-| `fact_extractor.py` | **MOD** — Uses `cost_rates.llm_cost()` instead of hardcoded rate. |
-| `describe_point_of_interest.py` | **MOD** — Uses `cost_rates.llm_cost()` instead of hardcoded rate. |
-| `work_story_searcher.py` | **MOD** — Uses `cost_rates.search_cost()` instead of hardcoded `total_queries * 0.001`. |
+| `cost_meter.py` | **NEW** — Single ledger module. `record_operation()` writes to `cost_ledger` table. Enforces cache_hit=True → cost forced to 0 (with warning). `get_operation_cost()` for audit queries. |
+| `cost_rates.py` | **NEW** — Centralised rate table. GPT-3.5/4o-mini, Serper, Polly TTS, Google Translate rates. Helper functions: `llm_cost()`, `search_cost()`, `tts_cost()`, `translation_cost()`. `CACHE_HIT_COST_USD = 0.00`. |
+| `cost_ceiling_monitor.py` | **EXISTING, unchanged** — Referenced for cross-check validation only. |
+| `generate_tour_text.py` | **MODIFIED** — Added `_LAST_GENERATION_COST` global, set on cache hit (cost=0) and on fresh generation (cost=total_cost, breakdown). |
+| `generate_tour_text_service.py` | **MODIFIED** — After generation, reads `_LAST_GENERATION_COST` and calls `record_operation()` with correct op_type and cache_hit flag. |
+| `tour_orchestrator_service.py` | **MODIFIED** — Translation path: reads `cache_hit` from translation service response, meters `translation_generate` or `translation_cache_hit` with estimated cost or zero. |
+| `migration/sql/005_cost_ledger.sql` | **NEW** — DDL for `cost_ledger` table with indexes and comments. |
 
 ---
 
-## Live Evidence
+## Evidence: Fresh tour generation (cache_hit=false)
 
-### 1. Tour Cache Hit (cost = $0.00)
+**Venue:** Musee d Art Moderne et d Art Contemporain, Nice, France (MAMAC) — NOT previously cached.
+**Job ID:** `f3131458-069f-4459-8390-240c0d577ae7`
+**User ID:** `local60-fresh-evidence`
 
-**Request:** `POST /generate` with `location=Musee Matisse, Nice, France`, `tour_type=museum`, `total_stops=8`
-
-**Container log (verbatim):**
+### Container log (verbatim):
 ```
-CACHE HIT: Musee Matisse, Nice, France / museum / 8
-[COST_METER] CACHE_HIT | tour_cache_hit | $0.000000 | user=test-local60-cachehit | job=2c3c0018-47db-4186-a093-fb50420c5023
+Total API cost: $0.0803 (40130 tokens)
+[COST_METER] FRESH | tour_generate | $0.080260 | user=local60-fresh-evidence | job=f3131458-069f-4459-8390-240c0d577ae7
+[LOCAL-60] Cost metered: tour_generate | $0.080260 | cache_hit=False
+```
+
+### Corpus mining evidence (story_miner ran):
+```
+[§3-adapter] Extracting story elements from 5/27 corpus pages for 'Musee d Art Moderne et d Art Contemporain'
+  page[0] score=12405 url=https://fr.wikipedia.org/wiki/Musée_d'Art_moderne_et_d'Art_contemporain_de_Nice
+  page[1] score=10275 url=https://en.wikipedia.org/wiki/Musée_d'art_moderne_et_d'art_contemporain
+  page[2] score=6870 url=https://www.mamac-nice.org/collection/oeuvres-in-situ/
+```
+
+### Ledger row (DB query):
+```
+operation_type | user_id                | our_cost_usd | cache_hit | job_id                               | breakdown
+tour_generate  | local60-fresh-evidence | 0.080260     | f         | f3131458-069f-4459-8390-240c0d577ae7 | {"llm": 0.08025999999999998, "tts": 0.0, "search": 0.0}
+```
+
+### Cross-check against check_cost_ceiling:
+```python
+check_cost_ceiling(0.080260, 'museum', True)
+# Result: {'exceeded': False, 'cost': 0.08026, 'ceiling': 0.15}
+# COST OK: $0.0803 (category=museum)
+```
+
+**Cost ceiling compliance:** $0.0803 << $1.30 (Michael's hard ceiling). Under $0.15 soft ceiling.
+
+### Breakdown analysis:
+- `llm: $0.08026` — 40,130 tokens × $0.002/1K = $0.08026 ✓
+- `tts: $0.00` — TTS (Polly) cost is metered at audio processing stage (tour-processor service), not during text generation
+- `search: $0.00` — No Serper API calls during service-level generation; corpus mining uses direct HTTP fetches to museum websites (free)
+
+---
+
+## Evidence: Same tour from cache (cache_hit=true)
+
+**Job ID:** `14d1adc8-053e-4d3e-88fc-6178b1edb555`
+
+### Container log (verbatim):
+```
+CACHE HIT: Musee d Art Moderne et d Art Contemporain, Nice, France / museum / 10
+[COST_METER] CACHE_HIT | tour_cache_hit | $0.000000 | user=local60-fresh-evidence | job=14d1adc8-053e-4d3e-88fc-6178b1edb555
 [LOCAL-60] Cost metered: tour_cache_hit | $0.000000 | cache_hit=True
 ```
 
-**Database row:**
+### Ledger row:
 ```
- operation_type | user_id                | our_cost_usd | cache_hit | job_id                               | breakdown
- tour_cache_hit | test-local60-cachehit  | 0.000000     | t         | 2c3c0018-47db-4186-a093-fb50420c5023 | {"llm": 0.0, "tts": 0.0, "search": 0.0}
-```
-
-### 2. Fresh Tour Generation (cost > 0)
-
-**Method:** Direct `record_operation()` call against live DB (fresh generation blocked by D1v2 verification gate on this deployment — see note below).
-
-**Output (verbatim):**
-```
-[COST_METER] FRESH | tour_generate | $0.069000 | user=test-local60-simulated-fresh | job=simulated-fresh-job-001
-```
-
-**Database row:**
-```
- operation_type | user_id                        | our_cost_usd | cache_hit | job_id                  | breakdown
- tour_generate  | test-local60-simulated-fresh   | 0.069000     | f         | simulated-fresh-job-001 | {"llm": 0.052, "tts": 0.012, "search": 0.005}
-```
-
-### 3. Cost Breakdown Verification
-
-The breakdown for a typical fresh tour generation sums correctly:
-```
-llm: $0.052 + tts: $0.012 + search: $0.005 = $0.069 total
-```
-This agrees with the `check_cost_ceiling` measured value of $0.069 (task states "measured today is $0.069").
-
-### 4. Translation Cache Hit
-
-**Direct translation service test:**
-```
-POST /translate-with-audio {"content_id": 14, "content_type": "tour", "languages": ["ru"]}
-```
-**Response (verbatim):**
-```json
-{"status": "completed", "translations": {"ru": {"cache_hit": true, "id": 19, "status": "translated"}}}
-```
-The `cache_hit: true` field is the signal the orchestrator uses to meter `translation_cache_hit` at $0.00.
-
-### 5. Cost Ceiling Cross-Check
-
-```
-COST OK: $0.0690 (category=museum)
-Cost ceiling check: exceeded=False, cost=$0.0690, ceiling=$0.1500
-```
-The $0.069 metered cost is well under Michael's $1.30 hard ceiling.
-
-### 6. Unit Tests (all passing)
-
-```
-PASS: test_cost_rates
-PASS: test_cost_meter_valid_types
-PASS: test_cost_meter_rejects_invalid_type
-PASS: test_cost_meter_cache_hit_forces_zero
-PASS: test_cost_meter_fresh_generation_records_real_cost
-PASS: test_last_generation_cost_cache_hit
-PASS: test_migration_sql_valid
-PASS: test_cost_meter_no_db_returns_none
-
-=== ALL TESTS PASSED ===
+operation_type | user_id                | our_cost_usd | cache_hit | job_id                               | breakdown
+tour_cache_hit | local60-fresh-evidence | 0.000000     | t         | 14d1adc8-053e-4d3e-88fc-6178b1edb555 | {"llm": 0.0, "tts": 0.0, "search": 0.0}
 ```
 
 ---
 
-## Notes and Limitations
+## Evidence: Fresh translation (cache_hit=false)
 
-### Fresh Generation Not Proven End-to-End
+**Job ID:** `b5fe38cc-004d-4896-bfaf-f81f9fa39e7c` (French translation of MAMAC tour)
 
-The Storied D1v2 verification gate blocks fresh generation for all tested venues on this deployment. Tours previously generated and cached pass the cache-hit path (proven), but generating a NEW tour fails at the Wikidata/SPARQL verification step. The cost metering code for fresh generation IS wired and would fire (the `_LAST_GENERATION_COST` variable is set at the end of `generate_tour_text()` before returning to the service), but end-to-end proof requires a venue that passes D1v2 verification — which is blocked by external service dependencies.
+### Orchestrator log (verbatim):
+```
+Translation successful! Translated tour ID: 45 (cache_hit=False)
+[COST_METER] FRESH | translation_generate | $0.372000 | user=local60-fresh-evidence | job=b5fe38cc-004d-4896-bfaf-f81f9fa39e7c
+```
 
-The simulated fresh entry in the DB proves the ledger write path works correctly against the live database.
+### Ledger row:
+```
+operation_type       | user_id                | our_cost_usd | cache_hit | job_id                               | breakdown
+translation_generate | local60-fresh-evidence | 0.372000     | f         | b5fe38cc-004d-4896-bfaf-f81f9fa39e7c | {"tts": 0.032, "translate": 0.34}
+```
 
-### News Path
-
-The news generation path IS reachable (news-generator, news-processor, news-orchestrator, polly-tts containers are defined in `docker-compose-master.yml`). However, news cost metering is NOT wired in this commit. The news path uses only Polly TTS (no LLM), has a different cost model, and has no cache layer comparable to tour_cache. The `news_generate` operation_type is defined and ready in `VALID_OPERATION_TYPES` for future wiring.
-
-### Cloud Entitlements Gate
-
-Per `remind_mobile_ai.md:40`, the cloud path at `https://api.audioura.com` already requires `user_id` for "quota/entitlements check." This existing gate (`entitlements.py`) enforces usage limits (tours-per-day, max-poi) but does NOT track costs. The cost ledger is complementary — not duplicating it. The entitlements gate cannot be extended for cost metering because:
-1. It's a pre-generation allow/deny check; cost is only known post-generation.
-2. It runs at the gateway level (GCloud production) which we must not touch per task scope.
-
-The cost ledger lives at the service level and records AFTER the operation completes, which is architecturally correct.
-
-### Translation Fresh Generation
-
-Translation metering for fresh generation uses estimated costs (17k chars translate + 8k chars TTS = ~$0.372) since the translation service doesn't return actual character counts. This is a known approximation — a future improvement would be to return actual char counts from the translation service for precise metering.
+### Breakdown:
+- `translate: $0.34` — estimated 17K chars × $0.00002/char (Google Translate)
+- `tts: $0.032` — estimated 8K chars × $0.000004/char (Amazon Polly)
+- Note: These are estimates based on typical tour length. For exact figures, the translation service would need to report actual char counts. Improvement deferred.
 
 ---
 
-## DB Change Declaration
+## Evidence: Same translation from cache (cache_hit=true)
 
-**Table created:** `cost_ledger` (via `migration/sql/005_cost_ledger.sql`)  
-**Applied to:** `development-postgres-2-1` on 2026-07-31  
-**Reversible:** `DROP TABLE IF EXISTS cost_ledger;`
+**Job ID:** `b7c03913-73de-42d1-9ddc-2534826fb042`
+
+### Orchestrator log (verbatim):
+```
+Translation successful! Translated tour ID: 45 (cache_hit=True)
+[COST_METER] CACHE_HIT | translation_cache_hit | $0.000000 | user=local60-fresh-evidence | job=b7c03913-73de-42d1-9ddc-2534826fb042
+```
+
+### Ledger row:
+```
+operation_type        | user_id                | our_cost_usd | cache_hit | job_id                               | breakdown
+translation_cache_hit | local60-fresh-evidence | 0.000000     | t         | b7c03913-73de-42d1-9ddc-2534826fb042 | {"tts": 0.0, "translate": 0.0}
+```
 
 ---
 
-## SUBSCRIBED_DESIGN.md
+## Full ledger (all rows for user=local60-fresh-evidence):
 
-This file was referenced in the task brief but does not exist in the repo (not on `storied`, not on any branch). The design was inferred entirely from the task brief itself. If `SUBSCRIBED_DESIGN.md` is created later, the implementation should be cross-checked against it.
+```
+operation_type        | our_cost_usd | cache_hit | job_id   | created_at
+tour_generate         | 0.080260     | f         | f3131458 | 2026-07-31 18:15:43 UTC
+tour_cache_hit        | 0.000000     | t         | 14d1adc8 | 2026-07-31 18:16:38 UTC
+tour_cache_hit        | 0.000000     | t         | 482fc074 | 2026-07-31 18:17:33 UTC  ← orchestrator re-request (EN tour cached)
+translation_generate  | 0.372000     | f         | b5fe38cc | 2026-07-31 18:18:20 UTC
+tour_cache_hit        | 0.000000     | t         | de4a99d9 | 2026-07-31 18:19:33 UTC  ← 2nd FR request, tour part
+translation_cache_hit | 0.000000     | t         | b7c03913 | 2026-07-31 18:20:03 UTC
+```
+
+---
+
+## News path
+
+**Status:** Not wired. News services (`news-orchestrator-1:5012`, `news-generator-1:5010`, `news-processor-1:5011`) are running, but `record_operation` is not imported into any news service file. The `news_generate` operation type is defined in `cost_meter.py` and ready for wiring, but no call site exists yet. This is a known gap; wiring requires changes to the news orchestration code (a separate task).
+
+---
+
+## Cloud gateway / entitlements investigation
+
+Per `remind_mobile_ai.md:40`: "Gateway requires [user_id] for quota/entitlements check."
+
+**Finding:** The local deployment has `entitlements.py` with `check_tour_quota(user_id, total_stops)` called at `tour_orchestrator_service.py:1248`. It uses a `plans` table with quota dimensions (`tours_per_day`, `tour_max_poi`, etc.). This IS the entitlements gate referenced.
+
+**Can it be extended for Subscribed?** Per `SUBSCRIBED_DESIGN.md`: "The existing `plans` table models quota dimensions and is the wrong shape for it. Do not force the new model into those columns; add what is needed alongside and leave `free` working." The gate CAN be extended — add a wallet balance check alongside the quota check, triggered when plan != 'free'. The `cost_ledger` table (this task) provides the data to compute spend-to-date. Extension is LOCAL-61's scope.
+
+---
+
+## Regression suite
+
+**Current tree (LOCAL-60):** 27 passed, 1 error (test_attestation_log_only.py — pre-existing fixture issue)
+**Baseline (prepush-baseline):** Same test_attestation_log_only.py error. Shared tests (test_f4_cache_roundtrip.py): 4/4 passed in both.
+
+No new failures introduced.
+
+---
+
+## DB changes
+
+**Table created:** `cost_ledger` — see `migration/sql/005_cost_ledger.sql` for DDL.
+- 6 rows inserted during evidence gathering (all for user `local60-fresh-evidence`)
+- 3 simulated rows (from previous submission) deleted
+
+---
+
+## Limitations / known gaps
+
+1. **Translation cost is estimated**, not measured from actual response char count. The translation service returns `cache_hit` boolean but not `translated_char_count`. Accuracy improvement deferred.
+2. **TTS cost in tour breakdown is 0.0** — TTS happens at the tour-processor level (a separate service that takes the text file and produces audio). Metering TTS cost would require wiring `cost_meter` into `tour_generation_service.py` (the processor). The LLM cost captured here IS the text generation cost which is the dominant component.
+3. **News path not wired** — operation type defined, no call site.
+4. **`check_cost_ceiling` is never called in the live path** — it was written for S67 but no service imports it. Cross-check was done manually. If LEAD wants it wired, that's a separate change.
+5. **Breakdown `search: 0.0`** — No Serper calls happen during service-level generation. Serper is used in `work_story_searcher` which is called only from pilot scripts. Corpus mining fetches web pages via direct HTTP (free). If work_story_searcher becomes part of the generation flow in future, its cost will need to be propagated to the breakdown.
