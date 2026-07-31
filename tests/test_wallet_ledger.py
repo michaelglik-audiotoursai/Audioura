@@ -100,7 +100,7 @@ def test_ledger_and_derived_balance():
         assert stop is False
 
         # Step 4: Monthly fee $2.00
-        row4, bal4 = monthly_fee(user, "pay_per_use", _unique_key())
+        row4, bal4 = monthly_fee(user, "ppu", _unique_key())
         assert row4 is not None
         assert bal4 == 690, f"Expected 690¢, got {bal4}"
 
@@ -168,7 +168,7 @@ def test_rebuild_1000_movements():
                 operations.append(("charge", amt))
             else:
                 # Monthly fee
-                monthly_fee(user, "pay_per_use", _unique_key())
+                monthly_fee(user, "ppu", _unique_key())
                 operations.append(("fee", Decimal("2.00")))
 
         # Get cached balance

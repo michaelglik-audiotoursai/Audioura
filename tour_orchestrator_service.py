@@ -80,6 +80,14 @@ sys.stdout.reconfigure(line_buffering=True)
 
 app = Flask(__name__)
 
+# --- Wallet API Blueprint (LOCAL-68) ---
+try:
+    from wallet_api import wallet_bp
+    app.register_blueprint(wallet_bp)
+    print("[ORCHESTRATOR] Wallet API blueprint registered (LOCAL-68)")
+except ImportError as e:
+    print(f"[ORCHESTRATOR] Wallet API not available: {e}")
+
 # CORS headers for web platform support
 def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
@@ -98,6 +106,10 @@ def after_request(response):
 @app.route('/download/<job_id>', methods=['OPTIONS'])
 @app.route('/serve/<job_id>', methods=['OPTIONS'])
 @app.route('/jobs', methods=['OPTIONS'])
+@app.route('/wallet/<user_id>', methods=['OPTIONS'])
+@app.route('/wallet/<user_id>/transactions', methods=['OPTIONS'])
+@app.route('/wallet/<user_id>/topup', methods=['OPTIONS'])
+@app.route('/plans/available', methods=['OPTIONS'])
 def handle_options(*args, **kwargs):
     response = make_response()
     return add_cors_headers(response)
