@@ -57,3 +57,8 @@ key.properties
 
 # iPhone app diagnostic logs pasted in for debugging (not source)
 .claude/log_iphone_*.txt
+
+# Standing file-hygiene rule (remind_mobile_ai.md): no temp/debug output in the repo root
+temp_*.py
+test_suite_report_*.json
+system_health_*.json
