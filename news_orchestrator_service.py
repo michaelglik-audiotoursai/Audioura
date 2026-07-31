@@ -264,7 +264,71 @@ def generate_news():
             # Metering is instrumentation — fails open (D14 rule).
             logging.error(f"[LOCAL-69] News cost metering failed (non-fatal): {_meter_err}")
         # ── end metering ────────────────────────────────────────────────────
-        
+
+        # ── [LOCAL-83] Charge the user's wallet — SEPARATE try block, FAILS CLOSED.
+        # This is a billing control (D14): if charging fails, do NOT deliver.
+        # Do NOT share an exception handler with cost metering above.
+        # Idempotency: use article_id as the key — a retried generation charges once.
+        if secret_id and secret_id != 'anonymous' and not is_trusted_internal:
+            try:
+                from pricing import compute_user_charge as _compute_charge
+                from wallet_ledger import charge as _wallet_charge, record_unlimited_cost as _record_unlimited
+                from entitlements import _get_subscription_tier
+
+                _user_tier = _get_subscription_tier(secret_id)
+
+                # Reuse _total_cost from metering above (or default 0 if metering failed)
+                _news_cost = _total_cost if '_total_cost' in dir() else 0.0
+
+                _charge_result = _compute_charge(
+                    our_cost_usd=_news_cost,
+                    cache_hit=False,
+                    operation_type="news_generate",
+                    description=_description if '_description' in dir() else f"Article: {request_string[:200]}",
+                )
+
+                if _user_tier == 'ppu' and _charge_result['user_charge_cents'] > 0:
+                    _charge_idem_key = f"charge:{secret_id}:{article_id}"
+                    _row_id, _new_bal, _was_stopped = _wallet_charge(
+                        user_id=secret_id,
+                        charge_usd=_charge_result['user_charge_usd'],
+                        idempotency_key=_charge_idem_key,
+                        description=f"Article: {request_string[:200]} — ${_charge_result['user_charge_usd']:.2f}",
+                        job_id=article_id,
+                    )
+                    if _was_stopped:
+                        logging.error(
+                            f"[LOCAL-83] CHARGE BLOCKED (zero balance) for {secret_id} article={article_id}"
+                        )
+                        return jsonify({
+                            "error": "insufficient_balance",
+                            "message": "Insufficient balance to complete this article. Please top up your credits.",
+                        }), 402
+
+                    logging.info(
+                        f"[LOCAL-83] PPU charged: ${_charge_result['user_charge_usd']:.2f} | "
+                        f"balance={_new_bal}¢ | user={secret_id} | article={article_id}"
+                    )
+
+                elif _user_tier == 'unlimited':
+                    from decimal import Decimal as _Dec
+                    _record_unlimited(secret_id, _Dec(str(_news_cost)))
+                    logging.info(
+                        f"[LOCAL-83] Unlimited cost recorded: ${_news_cost:.6f} | user={secret_id} | article={article_id}"
+                    )
+
+                # free tier: no wallet action needed
+            except Exception as _charge_err:
+                # FAIL CLOSED (D14): charging failed — do NOT deliver unbilled article.
+                logging.error(
+                    f"[LOCAL-83] CHARGING FAILED — aborting news delivery (fail-closed): {_charge_err}"
+                )
+                return jsonify({
+                    "error": "billing_unavailable",
+                    "message": f"Billing unavailable ({type(_charge_err).__name__}). Article not delivered.",
+                }), 503
+        # ── end charging ────────────────────────────────────────────────────
+
         return jsonify({
             "status": "success",
             "article_id": article_id,

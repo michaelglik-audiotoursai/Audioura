@@ -446,7 +446,14 @@ def monthly_fee(
     tier: str,
     idempotency_key: str,
 ) -> Tuple[Optional[str], int]:
-    """Record monthly subscription fee debit.
+    """Record monthly subscription fee as a visible transaction in the Wallet.
+
+    Per D20: the fee is billed by Apple against the card (auto-renewable subscription).
+    It must NOT reduce the credit balance. We record a $0 movement so the fee appears
+    in the transaction list for transparency, but balance_cents is unchanged.
+
+    The user sees: "Monthly fee (Pay-Per-Use): $2.00 — billed by Apple"
+    The balance does not move.
 
     Args:
         tier: 'ppu' ($2) or 'unlimited' ($50)
@@ -454,20 +461,21 @@ def monthly_fee(
     if tier == "ppu":
         fee_usd = PPU_MONTHLY_FEE_USD
         movement = "monthly_fee"
-        desc = f"Monthly fee (Pay-Per-Use): ${fee_usd:.2f}"
+        desc = f"Monthly fee (Pay-Per-Use): ${fee_usd:.2f} — billed by Apple"
     elif tier == "unlimited":
         fee_usd = UNLIMITED_MONTHLY_FEE_USD
         movement = "monthly_fee_unlimited"
-        desc = f"Monthly fee (Unlimited): ${fee_usd:.2f}"
+        desc = f"Monthly fee (Unlimited): ${fee_usd:.2f} — billed by Apple"
     else:
         logger.error(f"[WALLET] Invalid tier for monthly_fee: {tier}")
         return None, get_balance_cents(user_id)
 
-    cents = _usd_to_cents(fee_usd)
+    # D20: Record with amount_cents=0 so balance is unchanged.
+    # The fee is visible in the transaction list but does not debit the wallet.
     return record_movement(
         user_id=user_id,
         movement_type=movement,
-        amount_cents=-cents,
+        amount_cents=0,
         idempotency_key=idempotency_key,
         description=desc,
     )
