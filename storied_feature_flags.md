@@ -13,7 +13,7 @@ All environment variables controlling Storied behavior. This document is the sin
 | `ATTESTATION_ENFORCED` | `false` | api-gateway | Legacy flag. Prefer `ATTESTATION_MODE`. When `true` + `ATTESTATION_MODE=enforce`: rejects missing/invalid tokens with 403. |
 | `BASE_URL` | `https://audioura.io` | tour-generator | Base URL for share links returned by `POST /tour/share`. |
 | `REFERRAL_BASE_URL` | `https://audioura.io` | tour-generator | Base URL for referral links returned by `POST /referral/create`. |
-| `DATABASE_URL` | `postgresql://admin:admin@localhost:5432/audiotours` | tour-generator | Postgres connection URL for persona store, tour cache, shared tours, referrals. |
+| `DATABASE_URL` | `postgresql://admin:admin@localhost:5433/audiotours` | tour-generator | Postgres connection URL for persona store, tour cache, shared tours, referrals. |
 | `OPENAI_API_KEY` | (required) | tour-generator | OpenAI API key for all generation calls. |
 | `GATEWAY_API_KEY` | (required) | api-gateway, tour-generator | Shared secret for API key authentication on cost-bearing endpoints. |
 | `PLAY_INTEGRITY_API_KEY` | (empty) | api-gateway | Google Cloud API key for Play Integrity verification. Only needed when `ATTESTATION_MODE=log_only` or `enforce`. |

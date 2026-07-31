@@ -48,10 +48,8 @@ def test_database_connectivity():
     print("\n=== DATABASE CONNECTIVITY ===")
     
     try:
-        conn = psycopg2.connect(
-            host='localhost', database='audiotours', user='admin', 
-            password='password123', port='5433'
-        )
+        from db_connection import get_connection
+        conn = get_connection()
         cursor = conn.cursor()
         
         # Test basic queries
@@ -122,12 +120,9 @@ def test_recent_articles():
     print("\n=== RECENT ARTICLE ANALYSIS ===")
     
     try:
-        conn = psycopg2.connect(
-            host='localhost', database='audiotours', user='admin', 
-            password='password123', port='5433'
-        )
+        from db_connection import get_connection
+        conn = get_connection()
         cursor = conn.cursor()
-        
         # Get recent finished articles
         cursor.execute("""
             SELECT article_id, request_string, status, 

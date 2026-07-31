@@ -11,10 +11,8 @@ from datetime import datetime
 def cleanup_nytimes_newsletter():
     """Clean up any existing NY Times newsletter records"""
     try:
-        conn = psycopg2.connect(
-            host='localhost', database='audiotours', user='admin', 
-            password='password123', port='5433'
-        )
+        from db_connection import get_connection
+        conn = get_connection()
         cursor = conn.cursor()
         
         # Clean up NY Times newsletters
@@ -122,13 +120,9 @@ def verify_nytimes_articles(newsletter_id):
     """Verify NY Times articles were created"""
     print("\n=== STEP 4: Database Verification ===")
     try:
-        conn = psycopg2.connect(
-            host='localhost', database='audiotours', user='admin', 
-            password='password123', port='5433'
-        )
+        from db_connection import get_connection
+        conn = get_connection()
         cursor = conn.cursor()
-        
-        # Get articles
         cursor.execute("""
             SELECT ar.article_id, ar.request_string, ar.status, 
                    LENGTH(ar.article_text) as content_length,

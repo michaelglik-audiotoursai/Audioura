@@ -13,26 +13,16 @@ import json
 import os
 import sys
 sys.path.insert(0, '.')
-
-# Ensure we can reach the DB
-os.environ.setdefault('DB_HOST', 'localhost')
-os.environ.setdefault('DB_PORT', '5433')
-os.environ.setdefault('DB_NAME', 'audiotours')
-os.environ.setdefault('DB_USER', 'admin')
-os.environ.setdefault('DB_PASSWORD', 'password123')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
 def get_db_connection():
     """Get connection to the local postgres."""
     try:
-        import psycopg2
-        return psycopg2.connect(
-            host=os.environ['DB_HOST'],
-            port=int(os.environ['DB_PORT']),
-            dbname=os.environ['DB_NAME'],
-            user=os.environ['DB_USER'],
-            password=os.environ['DB_PASSWORD'],
-        )
+        from db_connection import get_connection
+        return get_connection()
+    except SystemExit:
+        return None
     except Exception as e:
         print(f"DB connection failed: {e}")
         return None

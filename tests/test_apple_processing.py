@@ -16,13 +16,8 @@ TEST_USER_ID = "test_user_apple"
 # Test cleanup prevents storage growth by removing old test articles
 
 def get_db_connection():
-    return psycopg2.connect(
-        host=os.getenv('DB_HOST', 'localhost'),
-        database=os.getenv('DB_NAME', 'audiotours'),
-        user=os.getenv('DB_USER', 'admin'),
-        password=os.getenv('DB_PASSWORD', 'password123'),
-        port=os.getenv('DB_PORT', '5433')
-    )
+    from db_connection import get_connection
+    return get_connection()
 
 def cleanup_existing_articles():
     """Clean up test articles to maintain constant storage"""

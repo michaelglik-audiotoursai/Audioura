@@ -55,13 +55,10 @@ LOCAL_URL = os.getenv("TOUR_LOCAL_URL", "http://localhost:5008")  # set to your 
 API_KEY = os.getenv("GATEWAY_API_KEY", "")
 TOUR_PATH = os.getenv("TOUR_PATH", "/generate-complete-tour")     # confirm against gateway_routes.yaml if unsure
 
-DB = dict(
-    host=os.getenv("DB_HOST", "localhost"),
-    dbname=os.getenv("DB_NAME", "audiotours"),
-    user=os.getenv("DB_USER", "admin"),
-    password=os.getenv("DB_PASSWORD", "password123"),
-    port=os.getenv("DB_PORT", "5432"),
-)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from db_connection import get_db_config as _db_cfg
+
+DB = _db_cfg()
 
 TEST_USER = "ITEST-TOUR-QUOTA"     # dedicated id; never a real user
 TEST_PLAN = "itest_tour"           # dedicated plan; torn down at the end

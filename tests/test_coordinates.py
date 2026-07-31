@@ -117,15 +117,10 @@ def test_coordinates_in_db(location, lat, lng):
     """Test storing coordinates in the database."""
     try:
         import psycopg2
+        from db_connection import get_connection
         
         # Connect to the database
-        conn = psycopg2.connect(
-            host="localhost",
-            port=5433,  # Mapped from 5432 in Docker
-            database="audiotours",
-            user="admin",
-            password="password123"
-        )
+        conn = get_connection()
         
         # Create cursor
         cur = conn.cursor()

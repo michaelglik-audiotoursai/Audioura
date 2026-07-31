@@ -52,9 +52,9 @@ SERP_API_KEY=...
 STORIED_MODE=true
 GENERATION_TIER=plus
 
-# Database (local Docker Postgres)
-DATABASE_URL=postgresql://admin:password123@localhost:5432/audiotours
-VENUE_CACHE_DB_URL=postgresql://admin:password123@localhost:5432/audiotours
+# Database (local Docker Postgres — host port is 5433, see docker-compose-master.yml)
+DATABASE_URL=postgresql://admin:password123@localhost:5433/audiotours
+VENUE_CACHE_DB_URL=postgresql://admin:password123@localhost:5433/audiotours
 ```
 
 ## Step 4: Build and start Docker services

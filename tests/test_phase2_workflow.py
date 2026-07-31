@@ -99,13 +99,8 @@ def test_phase2_workflow():
         
         # Manually store credentials in database (simulating successful decryption)
         try:
-            conn = psycopg2.connect(
-                host=os.getenv('DB_HOST', 'localhost'),
-                database=os.getenv('DB_NAME', 'audiotours'),
-                user=os.getenv('DB_USER', 'admin'),
-                password=os.getenv('DB_PASSWORD', 'password123'),
-                port=os.getenv('DB_PORT', '5433')
-            )
+            from db_connection import get_connection
+            conn = get_connection()
             cursor = conn.cursor()
             
             # Store test credentials
@@ -163,13 +158,8 @@ def test_phase2_workflow():
             article_id = test_article['article_id']
             
             # Update article with simulated premium content
-            conn = psycopg2.connect(
-                host=os.getenv('DB_HOST', 'localhost'),
-                database=os.getenv('DB_NAME', 'audiotours'),
-                user=os.getenv('DB_USER', 'admin'),
-                password=os.getenv('DB_PASSWORD', 'password123'),
-                port=os.getenv('DB_PORT', '5433')
-            )
+            from db_connection import get_connection
+            conn = get_connection()
             cursor = conn.cursor()
             
             # Create a news_audios entry to simulate successful processing

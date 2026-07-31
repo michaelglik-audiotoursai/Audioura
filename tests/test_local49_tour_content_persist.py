@@ -11,6 +11,7 @@ This test hits the live orchestrator and database — requires services running.
 import json
 import os
 import re
+import sys
 import time
 
 import psycopg2
@@ -18,13 +19,13 @@ import pytest
 import requests
 
 ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL", "http://localhost:5002")
-DB_CONFIG = {
-    "host": os.environ.get("DB_HOST", "localhost"),
-    "database": os.environ.get("DB_NAME", "audiotours"),
-    "user": os.environ.get("DB_USER", "admin"),
-    "password": os.environ.get("DB_PASSWORD", "password123"),
-    "port": os.environ.get("DB_PORT", "5433"),
-}
+
+# Import shared DB config
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from db_connection import get_db_config
+DB_CONFIG = get_db_config()
+# Remap 'dbname' to 'database' for psycopg2.connect compatibility
+DB_CONFIG['database'] = DB_CONFIG.pop('dbname')
 
 # Timeout for tour generation (seconds)
 GENERATION_TIMEOUT = 180
