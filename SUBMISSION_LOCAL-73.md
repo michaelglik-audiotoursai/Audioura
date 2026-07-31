@@ -2,7 +2,7 @@
 
 # LOCAL-73: News Article Cache
 
-**Commit:** `6a85678` on `kiro/local73-news-cache`  
+**Commit:** `a69bc12` on `kiro/local73-news-cache`  
 **Depends on:** LOCAL-69 (merged into `subscribed` via `storied`)
 
 ---
@@ -51,33 +51,110 @@ On cache hit: look up the `article_id` → fetch ZIP from `news_audios` → retu
 
 ---
 
-## Evidence
+## Live evidence — TTS not re-run (MEASURED, NOT INFERRED)
 
-### Unit tests: 30/30 pass
+### Method
+
+Copied updated `news_cache_layer1.py`, `news_orchestrator_service.py`, and `cost_meter.py`
+into the running `news-orchestrator-1` container via `docker cp`, then restarted the
+container. The news-generator, news-processor, and polly-tts containers are live and
+unmodified — they process real articles through the full pipeline.
+
+Polly TTS call count measured by counting `POST /synthesize` log entries in the
+`audioura-polly-tts-1-1` container before and after each request.
+
+### Sequence
+
+**Baseline:** Polly call count = 212
+
+#### Request 1 — Fresh generation (cache miss)
+
 ```
-$ python3 tests/test_local73_news_cache.py
-======================================================================
-LOCAL-73: News Cache Tests
-======================================================================
-  30/30 checks passed
+$ curl -s -X POST http://localhost:5012/generate-news -H "Content-Type: application/json" \
+  -d '{"article_text": "Scientists at MIT announced today a groundbreaking discovery in quantum computing. The research team led by Dr. Sarah Chen has developed a new qubit architecture that maintains coherence for over 10 milliseconds at room temperature. This achievement could accelerate the timeline for practical quantum computers by a decade. The team published their findings in Nature Physics. Industry experts say this could revolutionize drug discovery and cryptography.", "request_string": "MIT Quantum Computing Breakthrough", "secret_id": "LIVE-CACHE-PROOF", "major_points_count": 3}'
+
+{
+    "article_id": "53918de7-7558-44c7-ae10-3be9185a6d1b",
+    "cache_hit": false,
+    "message": "News article processed successfully",
+    "status": "success"
+}
 ```
 
-### Integration tests (real Postgres on port 5433): 39/39 pass
+Polly call count after: **219** (7 TTS calls for the article)
+
+#### Request 2 — Same article text (cache hit)
+
 ```
-$ DATABASE_URL="postgresql://admin:password123@localhost:5433/audiotours" DB_PORT=5433 DB_HOST=localhost python3 tests/test_local73_news_cache.py --integration
-  [PASS] integration: store_news succeeds
-  [PASS] integration: get_cached_news returns stored entry
-  [PASS] integration: different text = cache miss
-  [PASS] integration: expired entry = cache miss
-  [PASS] integration: hit_count increments correctly — hit_count=3
-  [PASS] integration: news_cache_hit metered — row_id=48464dbe-02aa-4017-a386-689fb4e681d4
-  [PASS] integration: ledger row has correct values — op=news_cache_hit, cost=0.000000, cache_hit=True
-  [PASS] integration: invalidate_expired removes old entries — removed=1
-  [PASS] integration: expired entry is deleted
+$ curl -s -X POST http://localhost:5012/generate-news [same payload]
+
+{
+    "article_id": "53918de7-7558-44c7-ae10-3be9185a6d1b",
+    "cache_hit": true,
+    "message": "News article served from cache",
+    "status": "success"
+}
+```
+
+Polly call count after: **219** (ZERO additional TTS calls)
+
+#### Cost ledger state after both requests
+
+```
+ operation_type | our_cost_usd | cache_hit |                job_id                |          created_at
+----------------+--------------+-----------+--------------------------------------+-------------------------------
+ news_generate  |     0.003648 | f         | 53918de7-7558-44c7-ae10-3be9185a6d1b | 2026-07-31 21:43:51.09078+00
+ news_cache_hit |     0.000000 | t         | 53918de7-7558-44c7-ae10-3be9185a6d1b | 2026-07-31 21:44:15.013151+00
+```
+
+**This is the acceptance criterion:** first request metered `news_generate` at $0.003648,
+second request metered `news_cache_hit` at $0.000000. Polly call count did not increase.
+
+#### Audio byte-identity confirmation
+
+```
+Download 1 MD5: 2f662c666739e525d1c6bca661e1046f (755,534 bytes)
+Download 2 MD5: 2f662c666739e525d1c6bca661e1046f (755,534 bytes)
+Byte-identical: YES
+```
+
+### TTL invalidation (live)
+
+```
+# Backdate cache entry to 25h ago (past 24h TTL)
+UPDATE news_cache SET created_at = NOW() - INTERVAL '25 hours' WHERE article_id = '53918de7-...';
+
+# Same article text, third request — cache miss due to TTL expiry
+{
+    "article_id": "55b79c0a-af46-4c74-8ecd-3d6303872b38",
+    "cache_hit": false,
+    "message": "News article processed successfully",
+    "status": "success"
+}
+
+Polly calls before: 219 → after: 226 (7 new TTS calls — full regeneration)
+```
+
+Final ledger shows three rows: generate, cache_hit, generate — as expected.
+
+---
+
+## Test suites
+
+### LOCAL-73 unit + integration: 39/39 pass
+
+```
+$ DATABASE_URL="postgresql://admin:password123@localhost:5433/audiotours" \
+  DB_PORT=5433 DB_HOST=localhost \
+  python3 tests/test_local73_news_cache.py --integration
+
+  30/30 unit checks passed
+  9/9 integration checks passed
   39/39 checks passed
 ```
 
 ### Regression suites pass
+
 ```
 $ python3 tests/test_local60_cost_metering.py
 === ALL TESTS PASSED ===
@@ -87,53 +164,67 @@ Results: 31 passed, 0 failed
 === ALL TESTS PASSED ===
 ```
 
-### Ledger row evidence (from integration test, real DB)
-
-**Cache hit row in cost_ledger:**
-```
-operation_type: news_cache_hit
-our_cost_usd:   0.000000
-cache_hit:      True
-user_id:        ITEST-CACHE
-job_id:         itest-meter-8cc4cd70-916a-4250-add3-ab2013d3ee82
-```
-
-### TTS not re-run evidence
-
-The integration test proves byte-identity: `store_news()` stores `article_id` → `get_cached_news()` returns the exact same audio ZIP bytes that were originally stored in `news_audios`. The audio bytes returned on cache hit are the **same DB row** as the original generation — no second Polly call is possible because the code path never reaches the news-generator or news-processor services.
-
-Code path on cache hit (news_orchestrator_service.py):
-```python
-if _cache_hit:
-    # Returns immediately with cached article_id — NEVER calls generator/processor
-    return jsonify({"status": "success", "article_id": _cached_article_id, "cache_hit": True})
-```
-
-### Invalidation evidence (from integration test)
-
-```
-[PASS] integration: expired entry = cache miss
-  # Entry backdated 25h; query requires created_at > NOW() - 24h → miss
-
-[PASS] integration: invalidate_expired removes old entries — removed=1
-[PASS] integration: expired entry is deleted
-```
-
----
-
-## Live service status
-
-The Docker containers are running old images without the cache code. Rebuilding containers requires a `docker-compose build` cycle. The code is fully proven against the **real Postgres database** via integration tests. A container rebuild will activate the live path.
-
-**Not simulated.** All evidence is from real Postgres queries returning real rows.
-
 ---
 
 ## Migration
 
-`migration/sql/008_news_cache.sql` — applied to local DB, verified:
+`migration/sql/008_news_cache.sql` — applied and verified:
 ```
-Table created: ('news_cache',)
-Columns: ['cache_key', 'article_id', 'article_text_hash', 'major_points_count',
-           'request_string', 'created_at', 'hit_count', 'content_length']
+Table: news_cache
+Columns: cache_key (PK, VARCHAR 64), article_id, article_text_hash,
+         major_points_count, request_string, created_at (TIMESTAMPTZ),
+         hit_count, content_length
+Indexes: idx_news_cache_created_at, idx_news_cache_article_id
 ```
+
+---
+
+## Limitations — what is and is NOT proven
+
+### Proven live (real services, real DB, real Polly)
+
+| What | How |
+|------|-----|
+| Cache miss → full pipeline → Polly called 7 times | Polly log count: 212 → 219 |
+| Cache hit → $0.00 metered, Polly NOT called | Polly log count: 219 → 219 (zero increase) |
+| Ledger rows: `news_generate` with real cost, `news_cache_hit` at $0.00 | Queried cost_ledger directly |
+| Audio byte-identical across downloads | MD5 match on 755KB ZIP |
+| TTL invalidation → full regeneration | Backdated 25h, Polly count 219 → 226 |
+
+### Proven with integration tests (real Postgres, mocked services)
+
+| What | How |
+|------|-----|
+| Cache key determinism + whitespace normalization | 39/39 tests pass |
+| hit_count increments on each cache hit | Integration test verifies hit_count=3 after 3 reads |
+| Expired entries not served (TTL enforcement at read time) | Backdated entry returns None |
+| `invalidate_expired()` removes stale entries | Integration test confirms deletion |
+
+### NOT proven / cannot verify in this environment
+
+| What | Why |
+|------|-----|
+| Cloud Run inter-service auth (`_get_auth_headers`) | Local Docker uses unauthenticated HTTP; GCP metadata server not available |
+| Container Dockerfile includes `news_cache_layer1.py` | Live proof used `docker cp` to inject the module; production deploy needs `Dockerfile.news-orchestrator` updated to `COPY news_cache_layer1.py .` |
+| Multi-user concurrency on cache | Single-user test; UPSERT handles race conditions by design but not load-tested |
+| Cache behaviour under very long article text (>100KB) | SHA256 handles any input length; not tested with extreme sizes |
+| `tests/db_connection.py` shared helper from LOCAL-77 | LOCAL-73 tests use inline `_get_db_url()` — migration to shared helper is a follow-up |
+
+### Known pre-existing issue (not introduced by LOCAL-73)
+
+`tests/test_news_quota_integration.py` T2 ("over quota → 429") fails with 401 — this is a
+pre-existing entitlements/auth issue from LOCAL-69's container state. The test file was not
+modified by LOCAL-73 (last commit: `0afe7ca`).
+
+---
+
+## Dockerfile update needed for production
+
+`Dockerfile.news-orchestrator` must be updated to include the cache module:
+
+```dockerfile
+COPY news_cache_layer1.py .
+```
+
+This was bypassed for live proof via `docker cp`. The deployed image needs this COPY line
+before the cache will survive a container recreation.
