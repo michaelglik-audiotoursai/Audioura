@@ -8,6 +8,11 @@ services:
       - ./tours:/app/tours:ro
     environment:
       - PYTHONUNBUFFERED=1
+      - DB_HOST=postgres-2
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
     networks:
       - development_default
     restart: unless-stopped

@@ -145,7 +145,10 @@ def get_coordinates_direct(location):
 # === Tour storage ===
 
 def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None):
-    """Store the audio tour ZIP in the database."""
+    """Store the audio tour ZIP in the database.
+
+    LOCAL-50: Also persists zip_filename for deterministic resolution.
+    """
     try:
         import psycopg2
         conn = _get_db_conn()
@@ -154,6 +157,9 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         with open(zip_path, "rb") as f:
             zip_data = f.read()
         print(f"[STORE] Read {len(zip_data)} bytes from {zip_path}")
+
+        # Extract bare filename for zip_filename column
+        zip_filename = os.path.basename(zip_path)
 
         # Check if tour already exists
         cur.execute(
@@ -165,16 +171,18 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         if existing:
             cur.execute("""
                 UPDATE audio_tours
-                SET audio_tour=%s, number_requested=number_requested+1, lat=%s, lng=%s, tour_content=%s
+                SET audio_tour=%s, number_requested=number_requested+1, lat=%s, lng=%s,
+                    tour_content=%s, zip_filename=%s
                 WHERE id=%s
-            """, (psycopg2.Binary(zip_data), lat, lng, tour_content, existing[0]))
-            print(f"[STORE] Updated existing tour: {tour_name} (id={existing[0]})")
+            """, (psycopg2.Binary(zip_data), lat, lng, tour_content, zip_filename, existing[0]))
+            print(f"[STORE] Updated existing tour: {tour_name} (id={existing[0]}, zip={zip_filename})")
         else:
             cur.execute("""
-                INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng, tour_content, content_language)
-                VALUES (%s, %s, %s, 1, %s, %s, %s, 'en')
-            """, (tour_name, request_string, psycopg2.Binary(zip_data), lat, lng, tour_content))
-            print(f"[STORE] Inserted new tour: {tour_name}")
+                INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested,
+                    lat, lng, tour_content, content_language, zip_filename)
+                VALUES (%s, %s, %s, 1, %s, %s, %s, 'en', %s)
+            """, (tour_name, request_string, psycopg2.Binary(zip_data), lat, lng, tour_content, zip_filename))
+            print(f"[STORE] Inserted new tour: {tour_name} (zip={zip_filename})")
 
         conn.commit()
         cur.close()
