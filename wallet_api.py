@@ -69,7 +69,7 @@ def _get_plans_config() -> list:
             ],
         },
         {
-            "plan_id": "pay_per_use",
+            "plan_id": "ppu",
             "display_name": "Pay-Per-Use",
             "price_usd": float(ppu_fee),
             "period": "month",
@@ -200,7 +200,7 @@ def get_wallet(user_id: str):
 
     Response contract (field names are the API contract — do NOT rename):
     {
-        "plan": "free" | "pay_per_use" | "unlimited",
+        "plan": "free" | "ppu" | "unlimited",
         "balance_usd": float,
         "period_spend_usd": float,
         "period_start": ISO8601 string,
@@ -225,9 +225,9 @@ def get_wallet(user_id: str):
                 "limit_usd": float(cost_stop_info["limit_usd"]),
             }
 
-        # low_balance: only meaningful for pay_per_use
+        # low_balance: only meaningful for ppu
         low_balance = False
-        if tier == "pay_per_use":
+        if tier == "ppu":
             low_balance = check_low_balance(user_id) is not None
 
         response = {

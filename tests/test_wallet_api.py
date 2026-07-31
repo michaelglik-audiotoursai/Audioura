@@ -266,7 +266,7 @@ def test_wallet_free_user(results: TestResults):
 def test_wallet_ppu_user(results: TestResults):
     """Test GET /wallet for a pay-per-use user with balance."""
     user_id = f"test_ppu_{uuid.uuid4().hex[:8]}"
-    setup_test_user(user_id, tier="pay_per_use")
+    setup_test_user(user_id, tier="ppu")
     seed_topup(user_id, 1000)  # $10.00
     seed_charge(user_id, 35, "Tour: French Riviera biking")  # $0.35
 
@@ -277,7 +277,7 @@ def test_wallet_ppu_user(results: TestResults):
         return
 
     data = r.json()
-    results.record("ppu_user_plan", data["plan"] == "pay_per_use",
+    results.record("ppu_user_plan", data["plan"] == "ppu",
                    f"got plan={data.get('plan')}")
     results.record("ppu_user_balance", data["balance_usd"] == 9.65,
                    f"got balance={data.get('balance_usd')}")
@@ -292,7 +292,7 @@ def test_wallet_ppu_user(results: TestResults):
 def test_wallet_ppu_low_balance(results: TestResults):
     """Test low_balance flag triggers when balance < $2.00."""
     user_id = f"test_ppu_low_{uuid.uuid4().hex[:8]}"
-    setup_test_user(user_id, tier="pay_per_use")
+    setup_test_user(user_id, tier="ppu")
     seed_topup(user_id, 150)  # $1.50 (below $2 threshold)
 
     r = requests.get(f"{ORCHESTRATOR_URL}/wallet/{user_id}")
@@ -338,7 +338,7 @@ def test_wallet_unlimited_user(results: TestResults):
 def test_transactions(results: TestResults):
     """Test GET /wallet/<user_id>/transactions — contract compliance."""
     user_id = f"test_txn_{uuid.uuid4().hex[:8]}"
-    setup_test_user(user_id, tier="pay_per_use")
+    setup_test_user(user_id, tier="ppu")
     seed_topup(user_id, 1000)
     seed_charge(user_id, 35, "Tour: French Riviera biking", cache_hit=False)
     seed_charge(user_id, 0, "Downloaded — no charge", cache_hit=True)
@@ -397,13 +397,13 @@ def test_plans_available(results: TestResults):
     plan_ids = {p["plan_id"] for p in data}
     results.record("plans_has_free", "free" in plan_ids,
                    f"plan_ids={plan_ids}")
-    results.record("plans_has_ppu", "pay_per_use" in plan_ids,
+    results.record("plans_has_ppu", "ppu" in plan_ids,
                    f"plan_ids={plan_ids}")
     results.record("plans_has_unlimited", "unlimited" in plan_ids,
                    f"plan_ids={plan_ids}")
 
     # Verify prices come from config, not hardcoded (check they match env/default)
-    ppu = next((p for p in data if p["plan_id"] == "pay_per_use"), None)
+    ppu = next((p for p in data if p["plan_id"] == "ppu"), None)
     if ppu:
         results.record("plans_ppu_price", ppu["price_usd"] == 2.0,
                        f"got price={ppu.get('price_usd')}")
@@ -416,7 +416,7 @@ def test_plans_available(results: TestResults):
 def test_topup_success(results: TestResults):
     """Test POST /wallet/<user_id>/topup — success case."""
     user_id = f"test_topup_{uuid.uuid4().hex[:8]}"
-    setup_test_user(user_id, tier="pay_per_use")
+    setup_test_user(user_id, tier="ppu")
     seed_topup(user_id, 500)  # Start with $5.00
 
     product_id = f"purchase_{uuid.uuid4().hex[:12]}"
@@ -439,7 +439,7 @@ def test_topup_success(results: TestResults):
 def test_topup_idempotent(results: TestResults):
     """Test POST /wallet/<user_id>/topup — same product_id twice credits once."""
     user_id = f"test_idem_{uuid.uuid4().hex[:8]}"
-    setup_test_user(user_id, tier="pay_per_use")
+    setup_test_user(user_id, tier="ppu")
 
     product_id = f"idem_purchase_{uuid.uuid4().hex[:12]}"
 
@@ -486,7 +486,7 @@ def test_topup_missing_product_id(results: TestResults):
 def test_contract_field_names(results: TestResults):
     """Verify exact field names match the Flutter contract — the critical check."""
     user_id = f"test_contract_{uuid.uuid4().hex[:8]}"
-    setup_test_user(user_id, tier="pay_per_use")
+    setup_test_user(user_id, tier="ppu")
     seed_topup(user_id, 745)
     seed_charge(user_id, 35, "Tour: Nice old town")
 
@@ -520,6 +520,45 @@ def test_contract_field_names(results: TestResults):
                        plan_contract == set(plans[0].keys()),
                        f"extra={set(plans[0].keys()) - plan_contract}, "
                        f"missing={plan_contract - set(plans[0].keys())}")
+
+
+def test_plan_matches_users_table(results: TestResults):
+    """D16 guard: API 'plan' value must equal users.plan in the database.
+
+    This test asserts that the wallet_subscription.tier (which the API returns
+    as 'plan') uses the same vocabulary as plans.plan_id — the canonical FK target.
+    If this test fails, a vocabulary split has been re-introduced.
+    """
+    conn = get_db()
+    cur = conn.cursor()
+
+    # Ensure plans table has the canonical IDs
+    cur.execute("SELECT plan_id FROM plans ORDER BY plan_id")
+    db_plan_ids = {row[0] for row in cur.fetchall()}
+
+    # Test for each tier: set up wallet_subscription, call API, compare
+    for tier in ("free", "ppu", "unlimited"):
+        user_id = f"test_d16_{tier}_{uuid.uuid4().hex[:8]}"
+        setup_test_user(user_id, tier=tier)
+
+        r = requests.get(f"{ORCHESTRATOR_URL}/wallet/{user_id}")
+        if r.status_code == 200:
+            api_plan = r.json()["plan"]
+            # The API plan value must be a valid plans.plan_id
+            results.record(
+                f"d16_{tier}_plan_in_db",
+                api_plan in db_plan_ids,
+                f"API returned plan='{api_plan}' but valid plan_ids are {db_plan_ids}"
+            )
+            # The API plan must exactly match what we stored in wallet_subscription.tier
+            results.record(
+                f"d16_{tier}_plan_matches_tier",
+                api_plan == tier,
+                f"API returned plan='{api_plan}' but wallet_subscription.tier='{tier}'"
+            )
+
+    cur.close()
+    conn.close()
 
 
 # ============================================================
@@ -580,6 +619,10 @@ def main():
 
     print("--- CONTRACT FIELD NAMES ---")
     test_contract_field_names(results)
+    print()
+
+    print("--- D16: PLAN VOCABULARY GUARD ---")
+    test_plan_matches_users_table(results)
     print()
 
     # Summary

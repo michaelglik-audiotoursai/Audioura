@@ -1,46 +1,77 @@
 ##### READY FOR REVIEW
 
+# SUBMISSION_LOCAL-68 — Wallet API Endpoints
+
 **Branch:** `kiro/local68-wallet-api`
-**Commit:** `7792427`
-**Date:** 2026-07-31T15:30 EDT
+**Commit:** `8f95d78` (fix: rebase + D16 vocabulary reconciliation)
+**Parent:** `09c65fc` (original wallet API implementation)
+**Base:** `origin/subscribed` (includes LOCAL-67 entitlement gate)
 
 ---
 
-## Commit
+## Summary of changes
 
-```
-7792427 LOCAL-68: Wallet API endpoints — contract from LOCAL-62, backed by LOCAL-65/66
-```
+### Commit 1 (`09c65fc`): Wallet API endpoints
+- `wallet_api.py` — Flask Blueprint implementing the LOCAL-62 contract
+- `wallet_ledger.py` — Append-only ledger, idempotent writes, cost-stop
+- `pricing.py` — Cost × multiplier with Decimal + banker's rounding
+- `Dockerfile.orchestrator` — COPY lines for all modules
+- `tests/test_wallet_api.py` — 53-test live contract verification suite
+- `SUBMISSION_LOCAL-68.md` — this file
 
-`git rev-list --count storied..HEAD` = 14 (includes merge of `subscribed` with LOCAL-65/66).
+### Commit 2 (`8f95d78`): LEAD bounce fixes
+- **Dockerfile.orchestrator conflict** resolved: merged LOCAL-67's
+  `cost_ceiling_monitor.py` alongside LOCAL-68's wallet files.
+- **D16 vocabulary reconciliation**: `pay_per_use` → `ppu` in
+  `wallet_api.py` (4 occurrences), `wallet_ledger.py` (2 occurrences),
+  `tests/test_wallet_api.py` (9 occurrences).
+- **Guard test** `test_plan_matches_users_table` added: asserts the API's
+  `plan` value is a valid `plans.plan_id` for all three tiers.
+- **D16 recorded** in `DECISIONS.md`.
 
 ---
 
 ## Per-file changes
 
-| File | Change |
-|------|--------|
-| `wallet_api.py` | **NEW** — Flask Blueprint with 4 endpoints matching the LOCAL-62 contract exactly. Reads from wallet_ledger (LOCAL-66) and pricing (LOCAL-65). Plans from env config. |
-| `tour_orchestrator_service.py` | **MODIFIED** — Registers `wallet_bp` Blueprint, adds CORS OPTIONS for wallet routes. 10 lines added. |
-| `Dockerfile.orchestrator` | **MODIFIED** — COPY wallet_api.py, wallet_ledger.py, pricing.py, cost_meter.py, cost_rates.py into image. |
-| `tests/test_wallet_api.py` | **NEW** — 47-assertion integration test suite against live orchestrator + PostgreSQL. |
+| File | Lines | What |
+|------|-------|------|
+| `wallet_api.py` | 341 | Blueprint: GET /wallet, GET /transactions, GET /plans, POST /topup |
+| `wallet_ledger.py` | 601 | Ledger, balance, cost-stop, low-balance, idempotency |
+| `pricing.py` | 157 | Cost → charge computation (from LOCAL-65) |
+| `Dockerfile.orchestrator` | 14 | All COPY lines for LOCAL-67 + LOCAL-68 |
+| `tests/test_wallet_api.py` | ~530 | 53 live contract tests |
+| `DECISIONS.md` | +28 | D16 added |
+| `SUBMISSION_LOCAL-68.md` | this | — |
 
 ---
 
 ## Hosting decision
 
-**Wallet endpoints live on the tour orchestrator (port 5002)** because:
-1. The Flutter app already routes wallet calls to `Service.orchestrator` (5002) — see `wallet_service.dart:146-175`.
-2. The orchestrator is already in docker-compose, talks to PostgreSQL, and has CORS.
-3. No new service created (per requirement #6).
-4. user-api-2 (5003) was an alternative, but it has its own docker-compose, its own Dockerfile, and the Flutter app doesn't route wallet traffic there.
+**Hosted on the tour_orchestrator (port 5002)** because:
+1. The Flutter app already routes wallet calls to `Service.orchestrator`
+2. The orchestrator is in docker-compose and has DB access
+3. No new service created (per task requirement 6)
+4. `user-api-2` is an alternative but would require adding psycopg2 and
+   wallet dependencies to a service that currently handles only auth
 
 ---
 
-## Evidence: GET /wallet/<user_id> — free user
+## Live evidence
+
+### Test suite: 53/53 passed
 
 ```
-$ curl -s http://localhost:5002/wallet/demo_free | python3 -m json.tool
+============================================================
+LOCAL-68: Wallet API — Contract Test Suite
+============================================================
+Results: 53/53 passed, 0 failed
+ALL TESTS PASSED ✓
+============================================================
+```
+
+### GET /wallet — Free user
+
+```json
 {
     "balance_usd": 0.0,
     "cost_stop_progress": null,
@@ -52,35 +83,23 @@ $ curl -s http://localhost:5002/wallet/demo_free | python3 -m json.tool
 }
 ```
 
-✓ `cost_stop_progress: null` for free (requirement #3).
-✓ `low_balance: false` for free.
+### GET /wallet — PPU user ($9.65 balance, $0.35 spent)
 
----
-
-## Evidence: GET /wallet/<user_id> — pay_per_use user
-
-```
-$ curl -s http://localhost:5002/wallet/demo_ppu | python3 -m json.tool
+```json
 {
-    "balance_usd": 9.2,
+    "balance_usd": 9.65,
     "cost_stop_progress": null,
     "low_balance": false,
     "period_end": "2026-08-01T00:00:00+00:00",
-    "period_spend_usd": 0.8,
+    "period_spend_usd": 0.35,
     "period_start": "2026-07-01T00:00:00+00:00",
-    "plan": "pay_per_use"
+    "plan": "ppu"
 }
 ```
 
-✓ `cost_stop_progress: null` for ppu (requirement #3).
-✓ Balance reflects top-up minus charges.
+### GET /wallet — Unlimited user ($18.75 of $25.00 cost-stop used)
 
----
-
-## Evidence: GET /wallet/<user_id> — unlimited user
-
-```
-$ curl -s http://localhost:5002/wallet/demo_unlimited | python3 -m json.tool
+```json
 {
     "balance_usd": 0.0,
     "cost_stop_progress": {
@@ -95,131 +114,110 @@ $ curl -s http://localhost:5002/wallet/demo_unlimited | python3 -m json.tool
 }
 ```
 
-✓ `cost_stop_progress` populated with used_usd/limit_usd (requirement #3).
-✓ Limit is $25.00 = 0.5 × $50 (from config `UNLIMITED_COST_STOP_FRACTION`).
+### GET /wallet/transactions — cache-hit visible
 
----
-
-## Evidence: GET /wallet/<user_id>/transactions — cache hit visible
-
-```
-$ curl -s "http://localhost:5002/wallet/demo_ppu/transactions?limit=50" | python3 -m json.tool
+```json
 [
     {
         "cache_hit": false,
         "charged_usd": -10.0,
-        "created_at": "2026-07-31T19:20:13.206225+00:00",
+        "created_at": "2026-07-31T19:42:10.457993+00:00",
         "description": "Credit top-up: $10.00",
-        "id": "b6852825-63e5-440d-99fe-f5a1d3473556",
+        "id": "b8ce6c02-5526-44f8-a771-ebf8f2541dee",
         "operation_type": "topup"
     },
     {
         "cache_hit": false,
         "charged_usd": 0.35,
-        "created_at": "2026-07-31T19:20:13.206225+00:00",
+        "created_at": "2026-07-31T19:42:10.457993+00:00",
         "description": "Tour: French Riviera biking",
-        "id": "8cec65e4-0c5d-45e7-983e-1592355e5db1",
+        "id": "7d334928-f998-4990-a6d2-a351c7802adb",
         "operation_type": "charge"
     },
     {
         "cache_hit": true,
         "charged_usd": 0.0,
-        "created_at": "2026-07-31T19:20:13.206225+00:00",
-        "description": "Tour: Paris walking (cached)",
-        "id": "88711dc7-3b35-4544-90e3-5f059219ece4",
-        "operation_type": "charge"
-    },
-    {
-        "cache_hit": false,
-        "charged_usd": 0.45,
-        "created_at": "2026-07-31T19:20:13.206225+00:00",
-        "description": "Tour: Historic Boston walking",
-        "id": "a0cc72b5-b01e-48ab-8a62-fdc3127797fd",
+        "created_at": "2026-07-31T19:42:10.457993+00:00",
+        "description": "Tour: French Riviera biking (cached)",
+        "id": "63fe02b7-4750-49d6-9297-23b3f05e9375",
         "operation_type": "charge"
     }
 ]
 ```
 
-✓ `cache_hit: true` with `charged_usd: 0.0` visible (requirement #2).
-✓ `description` is human-readable: "Tour: French Riviera biking" (requirement #1).
-✓ Field names match contract exactly: id, created_at, operation_type, description, charged_usd, cache_hit.
+### GET /plans/available
 
----
-
-## Evidence: GET /plans/available
-
-```
-$ curl -s http://localhost:5002/plans/available | python3 -m json.tool
+```json
 [
-    {
-        "display_name": "Free",
-        "features": ["Browse pre-made tours", "Limited tour downloads"],
-        "period": "forever",
-        "plan_id": "free",
-        "price_usd": 0.0
-    },
-    {
-        "display_name": "Pay-Per-Use",
-        "features": ["Unlimited tour generation", "Unlimited news articles",
-                     "Pay only for what you use", "Credits never expire"],
-        "period": "month",
-        "plan_id": "pay_per_use",
-        "price_usd": 2.0
-    },
-    {
-        "display_name": "Unlimited",
-        "features": ["Unlimited tour generation", "Unlimited news articles",
-                     "No per-use charges", "Priority processing",
-                     "All future features included"],
-        "period": "month",
-        "plan_id": "unlimited",
-        "price_usd": 50.0
-    }
+    {"plan_id": "free", "display_name": "Free", "price_usd": 0.0, "period": "forever", "features": ["Browse pre-made tours", "Limited tour downloads"]},
+    {"plan_id": "ppu", "display_name": "Pay-Per-Use", "price_usd": 2.0, "period": "month", "features": ["Unlimited tour generation", "Unlimited news articles", "Pay only for what you use", "Credits never expire"]},
+    {"plan_id": "unlimited", "display_name": "Unlimited", "price_usd": 50.0, "period": "month", "features": ["Unlimited tour generation", "Unlimited news articles", "No per-use charges", "Priority processing", "All future features included"]}
 ]
 ```
 
-✓ Prices from config (PPU_MONTHLY_FEE_USD, UNLIMITED_MONTHLY_FEE_USD), not hardcoded (requirement #4).
-✓ Field names: plan_id, display_name, price_usd, period, features.
+### POST /topup — idempotency proven
+
+```
+First call:  {"status": "success", "new_balance_usd": 19.65}
+Second call: {"status": "success", "new_balance_usd": 19.65}
+```
+
+Same `product_id` ("idem_test_receipt_001") called twice → balance credited once.
+
+### D16 vocabulary guard — all assertions pass
+
+```
+  ✓ d16_free_plan_in_db
+  ✓ d16_free_plan_matches_tier
+  ✓ d16_ppu_plan_in_db
+  ✓ d16_ppu_plan_matches_tier
+  ✓ d16_unlimited_plan_in_db
+  ✓ d16_unlimited_plan_matches_tier
+```
+
+### Container verification — all modules import
+
+```
+entitlements.py imports OK       (LOCAL-67)
+cost_ceiling_monitor.py imports OK (LOCAL-67)
+wallet_api.py imports OK         (LOCAL-68)
+wallet_ledger.py imports OK      (LOCAL-66/68)
+pricing.py imports OK            (LOCAL-65/68)
+```
 
 ---
 
-## Evidence: POST /wallet/<user_id>/topup — idempotent
+## Contract compliance checklist
 
-```
-$ curl -s -X POST http://localhost:5002/wallet/demo_ppu/topup \
-    -H "Content-Type: application/json" \
-    -d '{"product_id": "receipt_idem_test_001"}'
-{"new_balance_usd": 19.2, "status": "success"}
-
-$ curl -s -X POST http://localhost:5002/wallet/demo_ppu/topup \
-    -H "Content-Type: application/json" \
-    -d '{"product_id": "receipt_idem_test_001"}'
-{"new_balance_usd": 19.2, "status": "success"}
-```
-
-✓ Same product_id twice → same balance (19.2, not 29.2). Credited once (requirement #5).
-✓ Idempotency mechanism: wallet_ledger's UNIQUE index on `idempotency_key` (LOCAL-66).
+| Requirement | Status |
+|-------------|--------|
+| Field names match LOCAL-62 mock exactly | ✓ Verified by contract_field_names test |
+| `description` human-readable | ✓ "Tour: French Riviera biking" |
+| Cache hits: `charged_usd: 0.00`, `cache_hit: true` | ✓ Proven in transactions |
+| `cost_stop_progress` null for free/ppu, populated for unlimited | ✓ All three tiers verified |
+| Prices from config, not hardcoded | ✓ `os.environ.get()` with defaults |
+| `/topup` idempotent | ✓ Same key credits once |
+| No new service created | ✓ Hosted on orchestrator (5002) |
+| `ppu` canonical (D16) | ✓ Guard test asserts API plan ∈ plans.plan_id |
 
 ---
 
-## Evidence: Regression
+## ⚠️ CONTRACT CHANGE from original mock
 
-```
-$ curl -s http://localhost:5002/health
-{"service": "tour_orchestrator", "status": "healthy"}
-
-$ curl -s http://localhost:5002/jobs
-{"jobs": []}
-
-Pricing tests (LOCAL-65):  30/30 passed
-Wallet ledger tests (LOCAL-66): 8/8 passed
-Wallet API tests (LOCAL-68): 47/47 passed
-```
-
-All existing orchestrator endpoints operational. No breaking changes.
+The LOCAL-62 Flutter mock used `"pay_per_use"` as the plan identifier.
+Per D16 (LEAD decision), the canonical value is now `"ppu"`. The Flutter
+`wallet_screen.dart` must be updated to check for `"ppu"` instead of
+`"pay_per_use"`. This is a deliberate, documented change — flagged here
+per the task instruction to "say so loudly."
 
 ---
 
 ## DB changes
 
-**None.** All tables used (`wallet_ledger`, `wallet_balance_cache`, `wallet_subscription`, `cost_ledger`) were created by LOCAL-66's migration (006_wallet_ledger.sql) and LOCAL-60's migration (005_cost_ledger.sql). The `_ensure_tables()` pattern in wallet_ledger.py creates them idempotently at runtime if migrations haven't run.
+No schema changes. The `wallet_ledger`, `wallet_balance_cache`, and
+`wallet_subscription` tables are created by `_ensure_tables()` on first use
+(idempotent CREATE IF NOT EXISTS). Migration
+`006_wallet_ledger.sql` is the production path.
+
+The `wallet_subscription.tier` column now stores `'ppu'` (not `'pay_per_use'`),
+consistent with `plans.plan_id` and `subscriptions.tier CHECK` constraint.

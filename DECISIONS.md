@@ -262,3 +262,31 @@ magnitude below $1.30. But it should not be described as enforcing his
 ceiling without that caveat. An in-flight check (accumulated cost between
 stops, stopping early) is the real version, and is proposed as a follow-up
 rather than built now.
+
+## D16 — `ppu` is the canonical tier identifier, not `pay_per_use`
+
+**Decision: `ppu` is the canonical identifier for the Pay-Per-Use tier
+everywhere in the system. `pay_per_use` must not appear as a machine
+identifier anywhere.**
+
+**The problem.** Two vocabularies emerged independently:
+- `ppu`: used by `plans.plan_id` (DB primary key), `users.plan` (FK target),
+  `entitlements.py` dispatch, `subscriptions.tier` constraint.
+- `pay_per_use`: used by `wallet_ledger.py` tier parameter and
+  `wallet_api.py` response and plan config.
+
+Each component was internally consistent so nothing failed until values
+crossed boundaries — an API response saying `pay_per_use` would never match
+a `users.plan` value of `ppu`, and a remedy of `switch_to_ppu` sits next to
+a plan called `pay_per_use`.
+
+**Rationale.** `ppu` is the `plans.plan_id` primary key and a foreign key
+target from `users.plan`. It is the hardest value to change (schema, data,
+constraints) and the system of record. All other code adapts to match it.
+
+The human-facing `display_name` stays "Pay-Per-Use" — only the machine
+identifier changes.
+
+**Guard:** `test_plan_matches_users_table` in `tests/test_wallet_api.py`
+asserts the API's `plan` value equals a valid `plans.plan_id` for every
+tier. This test fails if the vocabulary splits again.

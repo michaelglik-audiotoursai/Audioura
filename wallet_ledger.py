@@ -449,9 +449,9 @@ def monthly_fee(
     """Record monthly subscription fee debit.
 
     Args:
-        tier: 'pay_per_use' ($2) or 'unlimited' ($50)
+        tier: 'ppu' ($2) or 'unlimited' ($50)
     """
-    if tier == "pay_per_use":
+    if tier == "ppu":
         fee_usd = PPU_MONTHLY_FEE_USD
         movement = "monthly_fee"
         desc = f"Monthly fee (Pay-Per-Use): ${fee_usd:.2f}"
