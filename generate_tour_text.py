@@ -4792,6 +4792,32 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             except Exception as _tcr_err:
                 print(f"  [LOCAL-37] Three-class retrieval error (non-fatal): {_tcr_err}")
 
+            # [SQ-S6b] Theme thread discovery — cross-stop narrative threads
+            _thread_result = None
+            try:
+                from theme_thread_discoverer import discover_theme_threads
+                _thread_result = discover_theme_threads(
+                    story_elements=_story_elements,
+                    poi_names=_poi_names,
+                    venue_name=_venue_name,
+                    api_key=api_key,
+                )
+                if _thread_result:
+                    print(f"  [SQ-S6b] Thread discovery: mode={_thread_result.mode}, "
+                          f"threads={len(_thread_result.threads)}")
+                    if _thread_result.threads:
+                        for _t in _thread_result.threads:
+                            print(f"    → '{_t.name}': coverage={_t.coverage:.0%}, weight={_t.weight:.2f}, "
+                                  f"elements={_t.supporting_elements}")
+                    if output_file and _thread_result.mode == "threaded":
+                        _thread_path = output_file.replace('.txt', '_threads.json')
+                        with open(_thread_path, 'w', encoding='utf-8') as _tf:
+                            json.dump(_thread_result.to_dict(), _tf, indent=2, ensure_ascii=False)
+            except ImportError:
+                print(f"  [SQ-S6b] theme_thread_discoverer not available")
+            except Exception as _th_err:
+                print(f"  [SQ-S6b] Thread discovery error (non-fatal): {_th_err}")
+
             _storied_spine = generate_spine(
                 venue_name=_venue_name,
                 poi_list=_poi_names,
@@ -4799,6 +4825,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 api_key=api_key,
                 theme_name="",
                 story_elements=_story_elements if _story_elements else None,
+                thread_result=_thread_result,
             )
             if _storied_spine:
                 print(f"  [Storied] Spine generated: {len(_storied_spine.get('arc', []))} arc entries (mode={_storied_spine.get('story_mode', '?')})")
@@ -5201,6 +5228,21 @@ NARRATIVE SPINE CONTEXT (use to shape your description):
             if _cliffhanger:
                 spine_block += f"\n- End with a forward-looking hook: {_cliffhanger}"
             description_prompt += spine_block + "\n"
+
+        # [SQ-S6b] Thread context injection — cross-stop narrative threads
+        if _thread_result and _thread_result.mode == "threaded" and _thread_result.per_stop_thread_context:
+            _stop_thread_ctx = _thread_result.per_stop_thread_context[idx] if idx < len(_thread_result.per_stop_thread_context) else None
+            if _stop_thread_ctx and _stop_thread_ctx.get("threads_active"):
+                _thread_block = "\nTHEME THREAD CONTEXT (weave these cross-stop connections into your narrative):\n"
+                for _ta in _stop_thread_ctx["threads_active"]:
+                    _thread_block += f"- Thread \"{_ta['name']}\" (weight {_ta['weight']:.0%}): {'; '.join(_ta['element_summaries'][:2])}\n"
+                # Callbacks: specific cross-stop references
+                if _stop_thread_ctx.get("callbacks"):
+                    _thread_block += "CROSS-STOP CALLBACKS (reference these specific items from earlier stops BY NAME):\n"
+                    for _cb in _stop_thread_ctx["callbacks"][:2]:
+                        _from_name = poi_list[_cb['from_stop']]['name'] if _cb['from_stop'] < len(poi_list) else f"Stop {_cb['from_stop']+1}"
+                        _thread_block += f"  - From {_from_name}: {_cb['element_text'][:100]}\n"
+                description_prompt += _thread_block
 
         # [S10] Storied: inject fact sheet if provided
         # [BLOCKER 2] Only inject facts marked as verified/confident.
@@ -6028,7 +6070,21 @@ historical claims that lack sourcing."""
 
 Theme/connecting thread: {_connecting_thread}
 Tour hook: {_tour_hook}
-Chapter previews: {'; '.join(_chapter_previews)}{_identity_section}{_grounding_constraint}
+Chapter previews: {'; '.join(_chapter_previews)}{_identity_section}{_grounding_constraint}"""
+
+            # [SQ-S6b] Inject thread promise into prolog prompt
+            _thread_prolog_section = ""
+            if _thread_result and _thread_result.mode == "threaded" and _thread_result.prolog_promise:
+                _thread_prolog_section = f"""
+
+NARRATIVE THREAD (pose this as the tour's central promise — a question the visitor will answer by the end):
+{_thread_result.prolog_promise}
+The prolog should frame this thread as a mystery or journey of discovery.
+Secondary threads ({', '.join(t.name for t in _thread_result.threads[1:3])}) can be hinted at."""
+
+            _prolog_prompt += _thread_prolog_section
+
+            _prolog_prompt += """
 
 Requirements:
 - Write in second-person present tense ("You are about to embark...")
@@ -6258,6 +6314,10 @@ Requirements:
                 _mid = _poi_names[_mid_idx] if len(_poi_names) > 2 else None
                 
                 epilog = f"\n\n"
+                
+                # [SQ-S6b] Thread payoff in epilog — pay off the narrative promise
+                if _thread_result and _thread_result.mode == "threaded" and _thread_result.epilog_payoff:
+                    epilog += _thread_result.epilog_payoff + " "
                 
                 # Use ONLY documented story elements for closing facts (never GPT-generated spine text)
                 if _story_elements:
