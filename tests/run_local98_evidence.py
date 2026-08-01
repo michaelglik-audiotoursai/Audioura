@@ -42,6 +42,7 @@ def generate_and_wait():
         'tour_type': 'museum',
         'total_stops': 8,
         'user_id': 'test-mac-mini',
+        'is_test': True,  # LOCAL-103: mark HTTP-generated test tours
     }, timeout=30)
     resp.raise_for_status()
     job_id = resp.json().get('job_id')

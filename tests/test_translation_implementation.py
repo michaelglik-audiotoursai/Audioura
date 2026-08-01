@@ -18,7 +18,8 @@ def test_tour_generation_with_content():
         "tour_type": "walking",
         "total_stops": 3,
         "user_id": "test_translation_user",
-        "request_string": "Test tour for translation functionality"
+        "request_string": "Test tour for translation functionality",
+        "is_test": True,  # LOCAL-103: mark HTTP-generated test tours
     }
     
     print(f"Generating test tour: {tour_data}")

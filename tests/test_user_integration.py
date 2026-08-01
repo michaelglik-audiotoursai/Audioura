@@ -33,7 +33,8 @@ def test_user_integration():
         "tour_type": "walking",
         "total_stops": 5,
         "user_id": user_id,
-        "request_string": "Please generate a walking tour of Boston Common"
+        "request_string": "Please generate a walking tour of Boston Common",
+        "is_test": True,  # LOCAL-103: mark HTTP-generated test tours
     }
     
     response = requests.post(

@@ -330,7 +330,7 @@ def log_job_update(job_id, status, progress):
     else:
         print(f"WARNING: Attempted to update non-existent job: {job_id}")
 
-def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None, stops_count=None):
+def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None, stops_count=None, is_test=None):
     """Store the audio tour in the database with original tour content."""
     print(f"\n==== STORING AUDIO TOUR IN DATABASE: {datetime.now().isoformat()} ====")
     print(f"Tour name: {tour_name}")
@@ -506,7 +506,11 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         else:
             # Insert new tour
             print(f"Inserting new tour...")
-            _is_test_mode = os.getenv('TOUR_TEST_MODE', 'false').lower() == 'true'
+            # LOCAL-103: is_test from request param takes precedence; env var is fallback
+            if is_test is not None:
+                _is_test_mode = is_test
+            else:
+                _is_test_mode = os.getenv('TOUR_TEST_MODE', 'false').lower() == 'true'
             if has_audio_tour and has_lat and has_number_requested and has_tour_content:
                 cur.execute(
                     """
@@ -555,7 +559,7 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         print(f"Traceback: {traceback.format_exc()}")
         return False
 
-def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=None, request_string=None, language='en', persona=None):
+def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=None, request_string=None, language='en', persona=None, is_test=None):
     """Orchestrate the complete tour generation pipeline asynchronously."""
     print(f"\n==== ORCHESTRATE_TOUR_ASYNC STARTED: {datetime.now().isoformat()} ====")
     print(f"Parameters:")
@@ -863,7 +867,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                 print(f"Warning: Could not add tour_content.txt to ZIP: {zip_error}")
         
         # Store in database with tour content
-        store_success = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"))
+        store_success = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"), is_test=is_test)
         
         if store_success:
             print(f"Tour stored successfully with coordinates: lat={lat}, lng={lng}")
@@ -1240,6 +1244,19 @@ def generate_complete_tour():
     language = data.get('language', 'en')  # Default to English
     persona = sanitize_input(data.get('persona'))  # [S81] Direct-pass persona (optional)
     
+    # [LOCAL-103] Accept is_test from request — gated by server-side allow-flag
+    # Trust boundary: is_test is only honored when the server is already in test mode
+    # (TOUR_TEST_MODE=true) OR when explicitly opted in (TOUR_TEST_MODE_ALLOW_REQUEST=true).
+    # On a production deployment neither env var is set, so a malicious caller cannot
+    # mark tours as test to hide them from tours-near.
+    _is_test_raw = data.get('is_test')
+    _server_test_mode = os.getenv('TOUR_TEST_MODE', 'false').lower() == 'true'
+    _allow_request_flag = os.getenv('TOUR_TEST_MODE_ALLOW_REQUEST', 'false').lower() == 'true'
+    if _is_test_raw and (_server_test_mode or _allow_request_flag):
+        is_test_override = True
+    else:
+        is_test_override = None  # None means "use server env default"
+    
     # [S81] Resolve persona: stored-preference-wins (downstream tour-generator handles DB lookup)
     # Log the resolved persona on every /generate request
     print(f"PERSONA_RESOLVED: {persona or 'none'}")
@@ -1252,6 +1269,7 @@ def generate_complete_tour():
     print(f"  request_string: {request_string}")
     print(f"  language: {language}")
     print(f"  persona: {persona}")
+    print(f"  is_test: {is_test_override} (raw={_is_test_raw}, server_mode={_server_test_mode}, allow_request={_allow_request_flag})")
     
     # Validate language parameter
     supported_languages = ['en', 'ru', 'es', 'fr', 'de', 'zh', 'ko']
@@ -1343,6 +1361,7 @@ def generate_complete_tour():
         "request_string": request_string,
         "language": language,
         "persona": persona,  # [S81] Pass persona for downstream generation
+        "is_test": is_test_override,  # [LOCAL-103] Track test flag
         "created_at": datetime.now().isoformat()
     }
     
@@ -1372,7 +1391,7 @@ def generate_complete_tour():
             print(f"[CLOUD_TASKS] Enqueue failed, falling back to thread mode for job {job_id}")
             thread = threading.Thread(
                 target=orchestrate_tour_async,
-                args=(job_id, location, tour_type, total_stops, user_id, request_string, language, persona)
+                args=(job_id, location, tour_type, total_stops, user_id, request_string, language, persona, is_test_override)
             )
             thread.daemon = True
             thread.start()
@@ -1384,7 +1403,7 @@ def generate_complete_tour():
         sys.stdout.flush()
         thread = threading.Thread(
             target=orchestrate_tour_async,
-            args=(job_id, location, tour_type, total_stops, user_id, request_string, language, persona)
+            args=(job_id, location, tour_type, total_stops, user_id, request_string, language, persona, is_test_override)
         )
         thread.daemon = True
         thread.start()
