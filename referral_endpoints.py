@@ -42,7 +42,7 @@ def _require_api_key():
     return None
 
 
-def _get_referrer_user_id(code: str) -> str | None:
+def _get_referrer_user_id(code: str):
     """Look up the referrer_user_id for a code. Returns None if not found."""
     import psycopg2
     try:
