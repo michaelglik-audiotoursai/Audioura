@@ -425,3 +425,77 @@ def topup_wallet(user_id: str):
     except Exception as e:
         logger.error(f"[WALLET_API] POST /wallet/{user_id}/topup failed: {e}")
         return jsonify({"error": "Internal server error"}), 500
+
+
+# ---------------------------------------------------------------------------
+# POST /wallet/<user_id>/change-tier   {target_tier}
+# ---------------------------------------------------------------------------
+
+@wallet_bp.route("/wallet/<user_id>/change-tier", methods=["POST"])
+def change_tier_endpoint(user_id: str):
+    """Change the user's subscription tier.
+
+    This is the endpoint the app calls when the user taps "Switch to Pay-Per-Use"
+    (remedy=switch_to_ppu) or "Upgrade" (remedy=upgrade).
+
+    Request body:
+        {"target_tier": "ppu" | "unlimited" | "free"}
+
+    Response contract:
+        {
+            "success": bool,
+            "previous_tier": str,
+            "new_tier": str,
+            "message": str,
+            "balance_usd": float | null,
+            "details": {}
+        }
+
+    HTTP status codes:
+        200: success or no-op (already on tier)
+        400: invalid request (missing target_tier, invalid tier)
+        409: invalid transition (e.g., ppu → ppu)
+        500: internal error (partial failure, DB error)
+    """
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        target_tier = data.get("target_tier")
+
+        if not target_tier:
+            return jsonify({
+                "success": False,
+                "message": "target_tier is required. Must be 'free', 'ppu', or 'unlimited'.",
+            }), 400
+
+        from tier_change import change_tier, VALID_TIERS
+        if target_tier not in VALID_TIERS:
+            return jsonify({
+                "success": False,
+                "message": f"Invalid target_tier: '{target_tier}'. Must be one of: free, ppu, unlimited",
+            }), 400
+
+        # Use the FakePaymentProvider (production will inject RevenueCat)
+        from fake_payment_provider import FakePaymentProvider
+        provider = FakePaymentProvider()
+
+        result = change_tier(user_id, target_tier, provider=provider)
+
+        if result["success"]:
+            return jsonify(result), 200
+        else:
+            # Distinguish client errors from server errors
+            details = result.get("details", {})
+            if details.get("invalid_transition") or details.get("no_op"):
+                return jsonify(result), 409
+            elif details.get("partial_failure"):
+                return jsonify(result), 500
+            else:
+                return jsonify(result), 400
+
+    except Exception as e:
+        logger.error(f"[WALLET_API] POST /wallet/{user_id}/change-tier failed: {e}")
+        return jsonify({
+            "success": False,
+            "message": "Internal server error",
+            "details": {"error": str(e)},
+        }), 500
