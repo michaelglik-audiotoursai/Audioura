@@ -4301,16 +4301,69 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     _sourced_visitor_info = _fetch_visitor_info_from_site(_official_url_for_info, language="en")
                     _visitor_info_source_url = _official_url_for_info
                     _visitor_info_source_text = _fetch_visitor_info_raw_source(_official_url_for_info)
-            # [LOCAL-34] Fallback: extract visitor info from already-fetched corpus text.
-            # Some venues (e.g., Palais Lascaris on nice.fr) publish hours/tariffs on their
-            # main page rather than a separate child page. The combined_text already contains
-            # this data from the initial crawl.
+            # -------- [LOCAL-91] Corpus-text fallback with provenance --------
+            # Originally LOCAL-34/75 extracted visitor info from combined_text without
+            # provenance. LOCAL-91 rewires this: iterates story_miner's individual pages
+            # (each with URL + raw text) so practical_facts_gate can verify claims.
+            # Falls back to combined_text extraction (LOCAL-34 style) only when pages
+            # are unavailable, but in that case no provenance means the gate will still
+            # reject unverifiable claims — as designed.
+            if not _sourced_visitor_info and _story_corpus_result and _story_corpus_result.get('pages'):
+                try:
+                    from visitor_facts_extractor import extract_visitor_facts_from_text
+                    _corpus_pages = _story_corpus_result['pages']
+                    _best_corpus_facts = None
+                    _best_corpus_score = -1
+                    _best_corpus_page_url = ''
+                    _best_corpus_page_text = ''
+                    for _cp in _corpus_pages:
+                        _cp_text = _cp.get('text', '')
+                        _cp_url = _cp.get('url', '')
+                        if not _cp_text or len(_cp_text) < 100:
+                            continue
+                        # Detect language for extraction
+                        _cp_lower = _cp_text[:2000].lower()
+                        _fr_sig = sum(1 for w in ['fermé', 'horaires', 'tarifs', 'ouvert', 'gratuit', 'mardi']
+                                      if w in _cp_lower)
+                        _en_sig = sum(1 for w in ['closed', 'hours', 'admission', 'open', 'free', 'tuesday']
+                                      if w in _cp_lower)
+                        _cp_lang = "en" if _en_sig > _fr_sig else "fr"
+                        _cp_facts = extract_visitor_facts_from_text(_cp_text, _cp_lang)
+                        # Score: admission with price is critical
+                        _cp_score = 0
+                        _cp_score += min(len(_cp_facts.hours), 2) * 2
+                        if _cp_facts.admission:
+                            _cp_score += 3
+                            if re.search(r'€\d+|\d+\s*€', _cp_facts.admission):
+                                _cp_score += 2
+                        if _cp_facts.closed_days:
+                            _cp_score += 1
+                        if _cp_score > _best_corpus_score:
+                            _best_corpus_score = _cp_score
+                            _best_corpus_facts = _cp_facts
+                            _best_corpus_page_url = _cp_url
+                            _best_corpus_page_text = _cp_text
+                    # Use if we found anything substantive (at least closed day OR admission)
+                    if _best_corpus_facts and not _best_corpus_facts.is_empty():
+                        _formatted = _best_corpus_facts.format_en()
+                        if _formatted and len(_formatted) >= 10:
+                            _sourced_visitor_info = _formatted
+                            _visitor_info_source_url = _best_corpus_page_url
+                            _visitor_info_source_text = _best_corpus_page_text[:10000]
+                            print(f"  [LOCAL-91] Corpus fallback: visitor info extracted from {_best_corpus_page_url}")
+                            print(f"  [LOCAL-91] Corpus fallback Museum Information: {_formatted}")
+                except ImportError:
+                    print(f"  [LOCAL-91] visitor_facts_extractor not available for corpus fallback")
+                except Exception as _cf_err:
+                    print(f"  [LOCAL-91] Corpus fallback error (non-fatal): {_cf_err}")
+            # [LOCAL-34] Secondary fallback: combined_text (no provenance — gate will
+            # reject unverifiable claims, which is correct behavior)
             if not _sourced_visitor_info and _story_corpus_result and _story_corpus_result.get('combined_text'):
                 _sourced_visitor_info = _extract_visitor_info_from_corpus(
                     _story_corpus_result['combined_text'], language="en"
                 )
                 if _sourced_visitor_info:
-                    print(f"  [LOCAL-34] Visitor info extracted from corpus text (main page fallback)")
+                    print(f"  [LOCAL-34] Visitor info extracted from corpus text (main page fallback, no provenance)")
             if _sourced_visitor_info and poi_list:
                 poi_list[0]['operational_details'] = _sourced_visitor_info
                 print(f"  [LOCAL-39] Museum Information sourced from official site for stop 1")
