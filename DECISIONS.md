@@ -513,3 +513,58 @@ check which branch the container was built from before treating it as one.
 
 This reverses when `subscribed` merges into `storied`, which is Michael's
 call on return.
+
+---
+
+## D25 — I overstated SQ4b's callbacks to Michael
+
+**2026-08-01.** I merged LOCAL-95 reporting "8 callbacks, 6 of 8 stops (75%),
+spread 0" and told Michael this cleared the 50% threshold in his own
+arithmetic, implying a score of 75.6.
+
+**It was wrong.** LOCAL-95's counter flags a callback whenever **two words
+from an earlier stop's title appear anywhere** in a later stop:
+
+```
+title "Statue de Bouddha" -> tracked ['Statue', 'Bouddha']
+"the serene buddhist statue tradition and its bouddha imagery..."
+matches=2 -> counted as callback
+```
+
+Reading the text, LOCAL-96 found Run 1: **2**, Run 2: **none**, Run 3: **1**.
+
+The two excerpts I quoted were genuine — stop 3 does name stop 2's Buddha.
+I generalised from two real examples to a count produced by substring
+matching. That is the same error I have bounced others for (LOCAL-50's
+vacuous collision test, LOCAL-73's inferred Polly claim) and made myself
+twice before. The "spread 0" that I read as stability was the measurement
+being insensitive, not the system being consistent.
+
+**Rule:** a metric reported by a task is itself unverified until its
+*counting method* is read. Not just the number — the code that produced it.
+
+SQ4b still earns its merge; it does produce real callbacks. It does not
+produce them reliably, and the correlation bonus therefore cannot be assumed.
+
+## D26 — the "75 mandates the dominant story" premise is out of date
+
+`CLAUDE.md` records that 75 at N=8 is unreachable by per-stop quality alone,
+because the base cap is `(100/N)·(2C−N)` and the Asian museum had **C=6**
+canonical titles:
+
+```
+C=6, N=8  -> base cap  50.0
+C=8, N=8  -> base cap 100.0
+```
+
+Corpus expansion raised C to **8** — LOCAL-96 scored "all 8 documented
+œuvres commentées". So the base cap is now 100, and **75 is reachable from
+per-stop quality alone**, without the correlation bonus.
+
+This matters for what to build next. The old conclusion pointed at the
+dominant story as the only path; the current one points at per-stop
+substance — the catalogue already holds the dates and materials the five
+THIN stops omit. LOCAL-96's own analysis reaches the same place: 6 stops at
+ADEQUATE puts the base at ≥68.75 before any bonus.
+
+SQ4b remains worth having. It is no longer the gate's critical path.
