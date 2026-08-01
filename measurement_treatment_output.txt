@@ -1,0 +1,1908 @@
+/Users/micha/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+LOCAL-75 Measurement: arm=treatment, runs=3
+============================================================
+
+============================================================
+  Palais_treatment_run1: Palais Lascaris, Nice
+============================================================
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #001 | 01:36:55.304 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Palais Lascaris, Nice
+  tour_type: art and musical instruments
+  total_stops_parameter: 8
+  output_file: None
+
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #002 | 01:36:55.304 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Palais Lascaris, Nice
+  total_stops_final: 8
+  source: parameter
+
+  [S20] DATABASE_URL not set — cache skipped
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix] tour_type='art and musical instruments' suppressed for intent analysis (pre_category='walking'); using location only
+Intent analysis response: {
+    "poi_type": "specific type of locations requested (e.g., restaurants, shops, stores, museums, book locations, movie filming sites, etc.) — IMPORTANT: poi_type must always be a single string, never a JSON array. If multiple types are detected, combine them with 'or' — e.g. 'restaurants or museums'.",
+    "location": "geographic area",
+    "theme_type": "BOOK/MOVIE/PRODUCT/STANDARD - identify if this is a themed tour",
+    "theme_name": "name of book, movie, or specific product if applicable",
+    "requirements": "any specific criteria mentioned",
+    "business_hours_relevant": true/false,
+    "accessibility_mentioned": true/false,
+    "needs_research": true/false,
+    "venue_name": "The full official name of the institution ONLY when the ENTIRE tour is bounded by one specific building or campus (e.g. a single museum, historic house, gallery, or library). Use the institution's complete official name including suffixes like 'Museum', 'Gallery', 'Library' — never a shortened nickname (e.g. 'Museum of Fine Arts, Boston' not 'MFA'). Return null if the tour spans a city, district, neighborhood, multiple venues, or any open-ended area. If you are unsure whether the request names a specific bounded institution or just a region, return null.",
+    "geographic_scope": "The most specific bounded area the tour must stay within, in the user's own terms — a street or corridor, a square, a named district or quarter, a waterfront, a campus, a market, a cluster of blocks, or a single building. Copy the phrasing the request uses. If the request only names a whole city or town with no tighter anchor, return that city/town name. Never invent a tighter scope than the request states.",
+    "scope_precision": "One of exactly these four
+Intent analysis JSON parse error (attempt 1/2): Expecting ',' delimiter: line 7 column 36 (char 593)
+  Retrying intent analysis...
+Intent analysis response: {
+    "poi_type": "landmarks",
+    "location": "Nice",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Palais Lascaris",
+    "geographic_scope": "Palais Lascaris",
+    "scope_precision": "BUILDING",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: landmarks
+   Location: Nice
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: Palais Lascaris
+  [venue_name sanity] 'Palais Lascaris' OK
+  [S15] Forced tour_category=museum from venue_name='Palais Lascaris'
+
+Detected tour category: MUSEUM
+Using museum template for Palais Lascaris, Nice - art and musical instruments
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #003 | 01:37:00.699 | GENERATING_PROMPT
+======================================================================
+  location: Palais Lascaris, Nice
+  user_request: Palais Lascaris, Nice
+  total_stops: 8
+
+
+PHASE 3A: Fetching 8 candidate POI(s) for Palais Lascaris, Nice...
+  [Museum constraint] Venue from intent='Palais Lascaris'
+    [venue_resolver] Artist inferred from name: 'Palais Lascaris'
+  [venue_resolver] Resolved: 'Palais Lascaris' → Q34653010 (Palais Lascaris)
+    URL: https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais
+    Coords: 43.697694444444444, 7.27725
+    Language: fr
+    Artist: Palais Lascaris ()
+  [venue_resolver] SPARQL: 1 works found for Q34653010
+  [Phase3A] Injected 1 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='BUILDING', scope='Palais Lascaris')
+    [venue_resolver] Artist inferred from name: 'Palais Lascaris'
+  [venue_resolver] Resolved: 'Palais Lascaris' → Q34653010 (Palais Lascaris)
+    URL: https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais
+    Coords: 43.697694444444444, 7.27725
+    Language: fr
+    Artist: Palais Lascaris ()
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 1 works found for Q34653010
+  [LOCAL-30] Deterministic selection: 1 documented works (0 catalogue, 1 SPARQL)
+  [LOCAL-30] Documented works (1) < total_stops (8) — will use documented as base, GPT fills remainder
+    [venue_resolver] Artist inferred from name: 'Palais Lascaris'
+  [venue_resolver] Resolved: 'Palais Lascaris' → Q34653010 (Palais Lascaris)
+    URL: https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais
+    Coords: 43.697694444444444, 7.27725
+    Language: fr
+    Artist: Palais Lascaris ()
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 1 works found for Q34653010
+  [LOCAL-30] Deterministic selection: 1 documented works (0 catalogue, 1 SPARQL)
+  [LOCAL-30] Documented works (1) < total_stops (8) — will use documented as base, GPT fills remainder
+  [R4] Museum tour: asking for 16 candidates (2x for D1v2 filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #004 | 01:37:08.243 | PHASE_3A_REQUEST
+======================================================================
+  location: Palais Lascaris, Nice
+  total_stops: 8
+  poi_type_hint: landmarks
+
+PHASE 3A API call cost: $0.0014 (717 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #005 | 01:37:11.600 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 8
+  stop_count_in_prompt: True
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for Palais Lascaris, Nice.
+List exactly 16 specific, real, well-known landmarks relevant to: Palais Lascaris, Nice.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A SINGLE-VENUE MUSEUM TOUR (WORKS-FIRST):
+- List the 8 most famous, notable, or significan
+  prompt_last_300_chars:  to see.
+
+KNOWN WORKS AT THIS VENUE (use these as guidance — include some from this list):
+  Raquel
+Each work should appear ONLY ONCE in your list — do NOT list the same work under multiple names.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "..."}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+{"name": "Raquel", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
+{"name": "The Annunciation", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
+{"name": "Portrait of a Man", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
+{"name": "The Ecstasy of Saint Theresa", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
+{"name": "The Temptation of Saint Anthony", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
+{"nam
+
+OK PHASE 3A parsed 8 candidate POI(s):
+   - Raquel @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   - The Annunciation @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   - Portrait of a Man @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   - The Ecstasy of Saint Theresa @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   - The Temptation of Saint Anthony @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   - The Adoration of the Magi @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   - The Last Supper @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   - Judith Beheading Holofernes @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+    [venue_resolver] Artist inferred from name: 'Palais Lascaris'
+  [venue_resolver] Resolved: 'Palais Lascaris' → Q34653010 (Palais Lascaris)
+    URL: https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais
+    Coords: 43.697694444444444, 7.27725
+    Language: fr
+    Artist: Palais Lascaris ()
+  [D1v2] Venue resolved: Q34653010 → URL=https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais, lang=fr
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 1 works found for Q34653010
+  [D1v2] SPARQL source: 1 canonical titles
+  [LOCAL-33] Deep-path URL detected — crawl scoped to: /fr/culture/musees-et-galeries/palais-lascaris-le-palais*
+  [story_miner] Site crawl: 0 pages fetched (budget: 15)
+  [story_miner] Wikipedia EN: 6406 chars (title: 'Palais Lascaris')
+  [story_miner] Wikipedia FR: 9820 chars
+  [story_miner] Joconde museo code: M0887 (from P539)
+  [story_miner] Joconde/POP: no results for M0887 (JS-rendered, expected)
+  [T0a] Pattern 7 (maker attribution): 6 items
+  [T0a] Pattern 7b (sub-item attribution): 3 items
+  [T0a] Exhibit-name extraction: 4 from sections, 9 from quoted/bold/list
+  [T0a] Extracted 10 canonical titles, 0 cycle names
+  [story_miner] Corpus: 2 pages, 10 titles, 0 from Joconde
+  [D1v2] Canonical titles union: 10 site/wiki + 1 SPARQL = 11 total
+  [LOCAL-24] Classification: 10 works, 0 galleries, 1 excluded
+    EXCLUDED: 'Legs d'Antoine Gautier' — rule: wiki_section_heading
+  [D1v2-LOCAL24] After filter: 10 works, 0 galleries, 1 excluded
+  [venue_resolver] Built 1 dynamic aliases from 1 works
+  [D1v2] Injected 1 dynamic aliases
+  [D1v2] Built bilingual map: 84 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+  [D1v2] VERIFIED 'Raquel' → canonical: 'Raquel'
+  [D1v2] DROPPED 'The Annunciation' — no canonical title match
+  [D1v2] DROPPED 'Portrait of a Man' — no canonical title match
+  [D1v2] DROPPED 'The Ecstasy of Saint Theresa' — no canonical title match
+  [D1v2] DROPPED 'The Temptation of Saint Anthony' — no canonical title match
+  [D1v2] DROPPED 'The Adoration of the Magi' — no canonical title match
+  [D1v2] DROPPED 'The Last Supper' — no canonical title match
+  [D1v2] DROPPED 'Judith Beheading Holofernes' — no canonical title match
+  [D1v2] Exhibit museum detected: 1 SPARQL QIDs, 10 total titles (mostly from site/wiki sections)
+  [D1v2] 1/8 works verified — tier: exhibit_museum
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [D1] Tier: exhibit_museum (1 verified works)
+
+  [R4] Replenishment round 1/3: need 7 more, asking for 12
+    [R4] VERIFIED 'Basse de violon by Paolo Antonio Testore (Milan, 1696)' → 'Basse de violon by Paolo Antonio Testore (Milan, 1696)'
+    [R4] dropped 'Guitar'
+    [R4] VERIFIED 'Guitare baroque by Jean Christophle (Avignon, 1645)' → 'Guitare baroque by Jean Christophle (Avignon, 1645)'
+    [R4] dropped 'Harpe'
+    [R4] VERIFIED 'Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)' → 'Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)'
+    [R4] VERIFIED 'Violes d'amour by Joannes Florenus Guidanti (Bologne, 1717)' → 'Violes d'amour by Joannes Florenus Guidanti (Bologne, 1717)'
+    [R4] VERIFIED 'Violes gambe by William Turner (Londres, 1652)' → 'Violes gambe by William Turner (Londres, 1652)'
+    [R4] Round 1: +5 verified, total now 6
+
+  [R4] Replenishment round 2/3: need 2 more, asking for 7
+    [R4] dropped 'Madonna and Child with Saint John the Baptist'
+    [R4] dropped 'The Holy Family with Saint Catherine of Alexandria'
+    [R4] dropped 'Saint Sebastian'
+    [R4] dropped 'Venus and Cupid'
+    [R4] dropped 'The Assumption of the Virgin Mary'
+    [R4] dropped 'The Crucifixion'
+    [R4] dropped 'Saint George and the Dragon'
+    [R4] Round 2: +0 verified, total now 6
+
+  [R4] Replenishment round 3/3: need 2 more, asking for 7
+    [R4] Unparseable response — retrying
+  [R4] Replenishment exhausted: 6/8 stops (stop_count_warning)
+  [UNIFIED-FILL] tier=exhibit_museum: added 2 unverified fills (from 8 pre-D1v2 candidates, total now 8/8)
+  [LOCAL-16 GATE] D1v2-verified-only filter for museum tour
+    Removed 2 stop(s):
+      ✗ The Annunciation
+      ✗ Portrait of a Man
+    After: 6 verified stop(s)
+    [LOCAL-16 GATE] Accepting honest shortfall: 6/8 stops
+
+PHASE 4.5: Validating AI knowledge for Palais Lascaris, Nice...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+
+PHASE 3B: Requesting structured details and walking directions for 6 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #006 | 01:37:19.663 | PHASE_3B_REQUEST
+======================================================================
+  location: Palais Lascaris, Nice
+  stop_count: 6
+
+PHASE 3B API call cost: $0.0019 (945 tokens)
+OK PHASE 3B: ordered 6 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 6 stops
+  [LOCAL-35] Visitor info scoped to venue section (deep path: https://en.wikipedia.org/wiki/Palais_Lascaris)
+  [LOCAL-35] Visitor info page found (en): https://en.wikipedia.org/wiki/Palais_Lascaris
+  [LOCAL-35] Extracted from https://en.wikipedia.org/wiki/Palais_Lascaris: closed=[], hours=1, admission=''
+  [LOCAL-35] Formatted result too short — omitting
+  [LOCAL-39] No visitor info sourced — Museum Information field OMITTED
+   Coords cluster detected: 6 stops share '43.6966, 7.2765', refetching...
+   Cluster refetch OK 'Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)': 43.6978, 7.2797
+   Cluster refetch OK 'Violes d'amour by Joannes Florenus Guidanti (Bologne, 1717)': 43.6964, 7.2760
+   Cluster refetch OK 'Guitare baroque by Jean Christophle (Avignon, 1645)': 43.6966, 7.2760
+   Cluster refetch OK 'Raquel': 43.6971, 7.2741
+   Cluster refetch OK 'Basse de violon by Paolo Antonio Testore (Milan, 1696)': 43.6979, 7.2763
+   Cluster refetch OK 'Violes gambe by William Turner (Londres, 1652)': 43.6976, 7.2766
+Extracted first POI coordinates: (43.6971, 7.2741)
+  [D4] Museum single-coordinate: all stops set to (43.6971, 7.2741) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Raquel
+   Address: Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   Coordinates: 43.6971, 7.2741
+   Directions: Head northeast on Rue de la Poissonnerie, then turn right onto Rue Droite. You w...
+2. Basse de violon by Paolo Antonio Testore (Milan, 1696)
+   Address: Palais Lascaris
+   Coordinates: 43.6971, 7.2741
+   Directions: Walk straight ahead through the main entrance of Palais Lascaris.
+3. Guitare baroque by Jean Christophle (Avignon, 1645)
+   Address: Palais Lascaris
+   Coordinates: 43.6971, 7.2741
+   Directions: Turn left and continue walking through the hallway until you reach the room with...
+4. Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)
+   Address: Palais Lascaris
+   Coordinates: 43.6971, 7.2741
+   Directions: Turn right, then take the stairs to the upper floor where the Sacqueboute ténor ...
+5. Violes d'amour by Joannes Florenus Guidanti (Bologne, 1717)
+   Address: Palais Lascaris
+   Coordinates: 43.6971, 7.2741
+   Directions: Descend the stairs and head straight ahead to the room showcasing Violes d'amour...
+6. Violes gambe by William Turner (Londres, 1652)
+   Address: Palais Lascaris
+   Coordinates: 43.6971, 7.2741
+   Directions: Continue straight, passing the courtyard, to find the display of Violes gambe.
+================================
+
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 2/2 corpus pages for 'Palais Lascaris'
+    page[0] score=12770 url=https://fr.wikipedia.org/wiki/Palais_Lascaris
+    page[1] score=10430 url=https://en.wikipedia.org/wiki/Palais_Lascaris
+  [§3-adapter] Raw elements: 2 from 2 pages
+  [§3-adapter] After corroboration scoring: 1 elements
+  [§3-adapter] Final: 1 ranked elements (top type: origin)
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Three-class retrieval error (non-fatal): local variable 'name_lower' referenced before assignment
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=museum venue=Palais Lascaris tokens=1737 (in=793 out=944) cost=$0.0181 latency=7.4s
+  [Storied] Spine generated: 6 arc entries (mode=invented)
+  [Storied] Fact sheets: 6/6 generated
+  [S25] Story types assigned: ['art', 'history', 'anecdote', 'art', 'history', 'art']
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+Generating description for Stop 1: Raquel by , ...
+
+Generating description for Stop 2: Basse de violon by Paolo Antonio Testore (Milan, 1696) by , ...
+
+Generating description for Stop 3: Guitare baroque by Jean Christophle (Avignon, 1645) by , ...
+
+Generating description for Stop 4: Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581) by , ...
+
+Generating description for Stop 5: Violes d'amour by Joannes Florenus Guidanti (Bologne, 1717) by , ...
+Stop 4 API call cost: $0.0088 (4398 tokens)
+Stop 4 description word count: 278 words
+
+Generating description for Stop 6: Violes gambe by William Turner (Londres, 1652) by , ...
+Stop 3 API call cost: $0.0087 (4326 tokens)
+Stop 3 description word count: 242 words
+Stop 5 API call cost: $0.0086 (4282 tokens)
+Stop 5 description word count: 273 words
+Stop 1 API call cost: $0.0073 (3664 tokens)
+Stop 1 description word count: 222 words
+Stop 2 API call cost: $0.0087 (4365 tokens)
+Stop 2 description word count: 293 words
+Stop 6 API call cost: $0.0085 (4249 tokens)
+Stop 6 description word count: 274 words
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Palais Lascaris'...
+   Authority: 5 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 6 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (6 stops)
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 1 trailing question(s), removed 0 'broader context' instance(s)
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: 2 facts found {'architecture': 2}
+  [R2] Prolog saved for Stop 1 (151 words)
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Palais Lascaris — next is Basse de violon b...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 3: Next: Guitare baroque by Jean Christophle (Avignon, 1645)....
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 4: Proceed to Sacqueboute ténor by Anton Schnitzer (Nuremberg, ...
+  DEBUG - POI 4 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 5: Continue to Violes d'amour by Joannes Florenus Guidanti (Bol...
+  DEBUG - POI 5 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 6: Your final stop in Palais Lascaris: Violes gambe by William ...
+  DEBUG - POI 6 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] PRACTICAL FACTS GATE: PASSED (0 verified)
+
+=== Word Count Statistics ===
+Stop 1: Raquel - 222 words
+Stop 2: Basse de violon by Paolo Antonio Testore (Milan, 1696) - 293 words
+Stop 3: Guitare baroque by Jean Christophle (Avignon, 1645) - 242 words
+Stop 4: Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581) - 278 words
+Stop 5: Violes d'amour by Joannes Florenus Guidanti (Bologne, 1717) - 273 words
+Stop 6: Violes gambe by William Turner (Londres, 1652) - 274 words
+===========================
+
+
+Total API cost: $0.0578 (28925 tokens)
+
+Tour text generated successfully!
+Saved to: Palais_Lascaris__Nice_art_and_musical_instruments_tour_20260801_013759.txt
+  [C5-5] Evidence persisted: Palais_Lascaris__Nice_art_and_musical_instruments_tour_20260801_013759_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Palais Lascaris, Nice - Museum Tour
+Tour-Category: museum
+
+Stop 1: Raquel
+
+Address: Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+
+Coordinates: 43.6971, 7.2741
+
+Orientation: Stand in the center of the grand gallery at Palais Lascaris, surrounded by the opulent splendor of musical instruments from centuries past. From this vantage point, let your eyes be drawn to the ornate details adorning a particular harpsichord in the corner, beckoning you closer to uncove...
+
+
+  Stop Name                                          Words  Facts  W/F   
+  ---- --------------------------------------------- ------ ------ ------
+  1    Raquel                                        452    11     41.1  
+  2    Basse de violon by Paolo Antonio Testore (Mil 305    14     21.8  
+  3    Guitare baroque by Jean Christophle (Avignon, 255    14     18.2  
+  4    Sacqueboute ténor by Anton Schnitzer (Nurembe 292    17     17.2  
+  5    Violes d'amour by Joannes Florenus Guidanti ( 263    9      29.2  
+  6    Violes gambe by William Turner (Londres, 1652 322    11     29.3  
+  TOT                                                1889   76     24.9  
+  Elapsed: 64.4s | Cost: $0.0578
+
+============================================================
+  Palais_treatment_run2: Palais Lascaris, Nice
+============================================================
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #007 | 01:37:59.679 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Palais Lascaris, Nice
+  tour_type: art and musical instruments
+  total_stops_parameter: 8
+  output_file: None
+
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #008 | 01:37:59.679 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Palais Lascaris, Nice
+  total_stops_final: 8
+  source: parameter
+
+  [S20] DATABASE_URL not set — cache skipped
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix] tour_type='art and musical instruments' suppressed for intent analysis (pre_category='walking'); using location only
+Intent analysis response: {
+    "poi_type": "landmarks",
+    "location": "Nice",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Palais Lascaris",
+    "geographic_scope": "Palais Lascaris",
+    "scope_precision": "BUILDING",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: landmarks
+   Location: Nice
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: Palais Lascaris
+  [venue_name sanity] 'Palais Lascaris' OK
+  [S15] Forced tour_category=museum from venue_name='Palais Lascaris'
+
+Detected tour category: MUSEUM
+Using museum template for Palais Lascaris, Nice - art and musical instruments
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #009 | 01:38:01.124 | GENERATING_PROMPT
+======================================================================
+  location: Palais Lascaris, Nice
+  user_request: Palais Lascaris, Nice
+  total_stops: 8
+
+
+PHASE 3A: Fetching 8 candidate POI(s) for Palais Lascaris, Nice...
+  [Museum constraint] Venue from intent='Palais Lascaris'
+    [venue_resolver] Artist inferred from name: 'Palais Lascaris'
+  [venue_resolver] Resolved: 'Palais Lascaris' → Q34653010 (Palais Lascaris)
+    URL: https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais
+    Coords: 43.697694444444444, 7.27725
+    Language: fr
+    Artist: Palais Lascaris ()
+  [venue_resolver] SPARQL: 1 works found for Q34653010
+  [Phase3A] Injected 1 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='BUILDING', scope='Palais Lascaris')
+    [venue_resolver] Artist inferred from name: 'Palais Lascaris'
+  [venue_resolver] Resolved: 'Palais Lascaris' → Q34653010 (Palais Lascaris)
+    URL: https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais
+    Coords: 43.697694444444444, 7.27725
+    Language: fr
+    Artist: Palais Lascaris ()
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 1 works found for Q34653010
+  [LOCAL-30] Deterministic selection: 1 documented works (0 catalogue, 1 SPARQL)
+  [LOCAL-30] Documented works (1) < total_stops (8) — will use documented as base, GPT fills remainder
+    [venue_resolver] Artist inferred from name: 'Palais Lascaris'
+  [venue_resolver] Resolved: 'Palais Lascaris' → Q34653010 (Palais Lascaris)
+    URL: https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais
+    Coords: 43.697694444444444, 7.27725
+    Language: fr
+    Artist: Palais Lascaris ()
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 1 works found for Q34653010
+  [LOCAL-30] Deterministic selection: 1 documented works (0 catalogue, 1 SPARQL)
+  [LOCAL-30] Documented works (1) < total_stops (8) — will use documented as base, GPT fills remainder
+  [R4] Museum tour: asking for 16 candidates (2x for D1v2 filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #010 | 01:38:08.703 | PHASE_3A_REQUEST
+======================================================================
+  location: Palais Lascaris, Nice
+  total_stops: 8
+  poi_type_hint: landmarks
+
+PHASE 3A API call cost: $0.0014 (713 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #011 | 01:38:10.930 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 8
+  stop_count_in_prompt: True
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for Palais Lascaris, Nice.
+List exactly 16 specific, real, well-known landmarks relevant to: Palais Lascaris, Nice.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A SINGLE-VENUE MUSEUM TOUR (WORKS-FIRST):
+- List the 8 most famous, notable, or significan
+  prompt_last_300_chars:  to see.
+
+KNOWN WORKS AT THIS VENUE (use these as guidance — include some from this list):
+  Raquel
+Each work should appear ONLY ONCE in your list — do NOT list the same work under multiple names.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "..."}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+{"name": "Raquel", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
+{"name": "Saint Cecilia", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
+{"name": "Virgin and Child", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
+{"name": "The Penitent Magdalene", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
+{"name": "The Lascaris Room", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
+{"name": "The Lascaris Stairc
+
+OK PHASE 3A parsed 8 candidate POI(s):
+   - Raquel @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   - Saint Cecilia @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   - Virgin and Child @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   - The Penitent Magdalene @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   - The Lascaris Room @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   - The Lascaris Staircase @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   - The Lascaris Chapel @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   - The Lascaris Gallery @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+    [venue_resolver] Artist inferred from name: 'Palais Lascaris'
+  [venue_resolver] Resolved: 'Palais Lascaris' → Q34653010 (Palais Lascaris)
+    URL: https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais
+    Coords: 43.697694444444444, 7.27725
+    Language: fr
+    Artist: Palais Lascaris ()
+  [D1v2] Venue resolved: Q34653010 → URL=https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais, lang=fr
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 1 works found for Q34653010
+  [D1v2] SPARQL source: 1 canonical titles
+  [LOCAL-33] Deep-path URL detected — crawl scoped to: /fr/culture/musees-et-galeries/palais-lascaris-le-palais*
+  [story_miner] Site crawl: 0 pages fetched (budget: 15)
+  [story_miner] Wikipedia EN: 6406 chars (title: 'Palais Lascaris')
+  [story_miner] Wikipedia FR: 9820 chars
+  [story_miner] Joconde museo code: M0887 (from P539)
+  [story_miner] Joconde/POP: no results for M0887 (JS-rendered, expected)
+  [T0a] Pattern 7 (maker attribution): 6 items
+  [T0a] Pattern 7b (sub-item attribution): 3 items
+  [T0a] Exhibit-name extraction: 4 from sections, 9 from quoted/bold/list
+  [T0a] Extracted 10 canonical titles, 0 cycle names
+  [story_miner] Corpus: 2 pages, 10 titles, 0 from Joconde
+  [D1v2] Canonical titles union: 10 site/wiki + 1 SPARQL = 11 total
+  [LOCAL-24] Classification: 10 works, 0 galleries, 1 excluded
+    EXCLUDED: 'Legs d'Antoine Gautier' — rule: wiki_section_heading
+  [D1v2-LOCAL24] After filter: 10 works, 0 galleries, 1 excluded
+  [venue_resolver] Built 1 dynamic aliases from 1 works
+  [D1v2] Injected 1 dynamic aliases
+  [D1v2] Built bilingual map: 84 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+  [D1v2] VERIFIED 'Raquel' → canonical: 'Raquel'
+  [D1v2] DROPPED 'Saint Cecilia' — no canonical title match
+  [D1v2] DROPPED 'Virgin and Child' — no canonical title match
+  [D1v2] DROPPED 'The Penitent Magdalene' — no canonical title match
+  [D1v2] DROPPED 'The Lascaris Room' — no canonical title match
+  [D1v2] DROPPED 'The Lascaris Staircase' — no canonical title match
+  [D1v2] DROPPED 'The Lascaris Chapel' — no canonical title match
+  [D1v2] DROPPED 'The Lascaris Gallery' — no canonical title match
+  [D1v2] Exhibit museum detected: 1 SPARQL QIDs, 10 total titles (mostly from site/wiki sections)
+  [D1v2] 1/8 works verified — tier: exhibit_museum
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [D1] Tier: exhibit_museum (1 verified works)
+
+  [R4] Replenishment round 1/3: need 7 more, asking for 12
+    [R4] VERIFIED 'Basse de violon by Paolo Antonio Testore (Milan, 1696)' → 'Basse de violon by Paolo Antonio Testore (Milan, 1696)'
+    [R4] dropped 'Guitar'
+    [R4] VERIFIED 'Guitare baroque by Jean Christophle (Avignon, 1645)' → 'Guitare baroque by Jean Christophle (Avignon, 1645)'
+    [R4] dropped 'Harpe'
+    [R4] VERIFIED 'Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)' → 'Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)'
+    [R4] VERIFIED 'Violes d'amour by Joannes Florenus Guidanti (Bologne, 1717)' → 'Violes d'amour by Joannes Florenus Guidanti (Bologne, 1717)'
+    [R4] VERIFIED 'Violes gambe by William Turner (Londres, 1652)' → 'Violes gambe by William Turner (Londres, 1652)'
+    [R4] Round 1: +5 verified, total now 6
+
+  [R4] Replenishment round 2/3: need 2 more, asking for 7
+    [LOCAL-22] Rejected corrupted name from R4: 'St. Sebastian'
+    [R4] dropped 'Madonna and Child'
+    [R4] dropped 'The Annunciation'
+    [R4] dropped 'The Last Supper'
+    [R4] dropped 'Portrait of a Noblewoman'
+    [R4] dropped 'The Adoration of the Magi'
+    [R4] dropped 'The Coronation of the Virgin'
+    [R4] Round 2: +0 verified, total now 6
+
+  [R4] Replenishment round 3/3: need 2 more, asking for 7
+    [R4] dropped 'Harmonie du Soir'
+    [R4] dropped 'La Belle Ferronnière'
+    [R4] dropped 'La Joconde'
+    [R4] dropped 'Le Radeau de la Méduse'
+    [R4] dropped 'Les Noces de Cana'
+    [R4] dropped 'Mona Lisa'
+    [R4] dropped 'Nymphéas'
+    [R4] Round 3: +0 verified, total now 6
+  [R4] Replenishment exhausted: 6/8 stops (stop_count_warning)
+  [UNIFIED-FILL] tier=exhibit_museum: added 2 unverified fills (from 8 pre-D1v2 candidates, total now 8/8)
+  [LOCAL-16 GATE] D1v2-verified-only filter for museum tour
+    Removed 2 stop(s):
+      ✗ Saint Cecilia
+      ✗ Virgin and Child
+    After: 6 verified stop(s)
+    [LOCAL-16 GATE] Accepting honest shortfall: 6/8 stops
+
+PHASE 4.5: Validating AI knowledge for Palais Lascaris, Nice...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+
+PHASE 3B: Requesting structured details and walking directions for 6 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #012 | 01:38:19.953 | PHASE_3B_REQUEST
+======================================================================
+  location: Palais Lascaris, Nice
+  stop_count: 6
+
+PHASE 3B API call cost: $0.0019 (969 tokens)
+OK PHASE 3B: ordered 6 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 6 stops
+  [LOCAL-35] Visitor info scoped to venue section (deep path: https://en.wikipedia.org/wiki/Palais_Lascaris)
+  [LOCAL-35] Visitor info page found (en): https://en.wikipedia.org/wiki/Palais_Lascaris
+  [LOCAL-35] Extracted from https://en.wikipedia.org/wiki/Palais_Lascaris: closed=[], hours=1, admission=''
+  [LOCAL-35] Formatted result too short — omitting
+  [LOCAL-39] No visitor info sourced — Museum Information field OMITTED
+   Coords cluster detected: 6 stops share '43.6968, 7.2767', refetching...
+   Cluster refetch OK 'Violes d'amour by Joannes Florenus Guidanti (Bologne, 1717)': 43.6971, 7.2765
+   Cluster refetch OK 'Raquel': 43.6978, 7.2758
+   Cluster refetch OK 'Guitare baroque by Jean Christophle (Avignon, 1645)': 43.6967, 7.2760
+   Cluster refetch OK 'Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)': 43.6978, 7.2767
+   Cluster refetch OK 'Basse de violon by Paolo Antonio Testore (Milan, 1696)': 43.6974, 7.2760
+   Cluster refetch OK 'Violes gambe by William Turner (Londres, 1652)': 43.6976, 7.2797
+Extracted first POI coordinates: (43.6978, 7.2758)
+  [D4] Museum single-coordinate: all stops set to (43.6978, 7.2758) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Raquel
+   Address: Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   Coordinates: 43.6978, 7.2758
+   Directions: Head southwest on Rue de la Boucherie, then turn right onto Rue Droite. You'll r...
+2. Basse de violon by Paolo Antonio Testore (Milan, 1696)
+   Address: Palais Lascaris
+   Coordinates: 43.6978, 7.2758
+   Directions: Walk straight ahead through the entrance of Palais Lascaris to find the Basse de...
+3. Guitare baroque by Jean Christophle (Avignon, 1645)
+   Address: Palais Lascaris
+   Coordinates: 43.6978, 7.2758
+   Directions: From the Basse de violon exhibit, turn left and continue to the next room showca...
+4. Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)
+   Address: Palais Lascaris
+   Coordinates: 43.6978, 7.2758
+   Directions: Turn right upon exiting the Guitare baroque room and proceed to the display of S...
+5. Violes d'amour by Joannes Florenus Guidanti (Bologne, 1717)
+   Address: Palais Lascaris
+   Coordinates: 43.6978, 7.2758
+   Directions: Continue straight ahead from the Sacqueboute ténor area to reach the Violes d'am...
+6. Violes gambe by William Turner (Londres, 1652)
+   Address: Palais Lascaris
+   Coordinates: 43.6978, 7.2758
+   Directions: Lastly, proceed to the Violes gambe display by turning left and walking to the d...
+================================
+
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 2/2 corpus pages for 'Palais Lascaris'
+    page[0] score=12770 url=https://fr.wikipedia.org/wiki/Palais_Lascaris
+    page[1] score=10430 url=https://en.wikipedia.org/wiki/Palais_Lascaris
+  [§3-adapter] Raw elements: 2 from 2 pages
+  [§3-adapter] After corroboration scoring: 1 elements
+  [§3-adapter] Final: 1 ranked elements (top type: origin)
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Three-class retrieval error (non-fatal): local variable 'name_lower' referenced before assignment
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=museum venue=Palais Lascaris tokens=1756 (in=793 out=963) cost=$0.0184 latency=6.7s
+  [Storied] Spine generated: 6 arc entries (mode=invented)
+  [Storied] Fact sheets: 6/6 generated
+  [S25] Story types assigned: ['art', 'history', 'anecdote', 'art', 'history', 'art']
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+Generating description for Stop 1: Raquel by , ...
+
+Generating description for Stop 2: Basse de violon by Paolo Antonio Testore (Milan, 1696) by , ...
+
+Generating description for Stop 3: Guitare baroque by Jean Christophle (Avignon, 1645) by , ...
+
+Generating description for Stop 4: Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581) by , ...
+
+Generating description for Stop 5: Violes d'amour by Joannes Florenus Guidanti (Bologne, 1717) by , ...
+Stop 2 API call cost: $0.0087 (4341 tokens)
+Stop 2 description word count: 276 words
+
+Generating description for Stop 6: Violes gambe by William Turner (Londres, 1652) by , ...
+Stop 4 API call cost: $0.0088 (4387 tokens)
+Stop 4 description word count: 272 words
+Stop 3 API call cost: $0.0087 (4330 tokens)
+Stop 3 description word count: 229 words
+Stop 1 API call cost: $0.0074 (3702 tokens)
+Stop 1 description word count: 236 words
+Stop 5 API call cost: $0.0085 (4255 tokens)
+Stop 5 description word count: 265 words
+Stop 6 API call cost: $0.0085 (4249 tokens)
+Stop 6 description word count: 258 words
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Palais Lascaris'...
+   Authority: 5 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 6 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (6 stops)
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 1 trailing question(s), removed 0 'broader context' instance(s)
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 1 preaching closer(s)
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: 2 facts found {'architecture': 2}
+  [R2] Prolog saved for Stop 1 (152 words)
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Palais Lascaris — next is Basse de violon b...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 3: Next: Guitare baroque by Jean Christophle (Avignon, 1645)....
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 4: Proceed to Sacqueboute ténor by Anton Schnitzer (Nuremberg, ...
+  DEBUG - POI 4 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 5: Continue to Violes d'amour by Joannes Florenus Guidanti (Bol...
+  DEBUG - POI 5 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 6: Your final stop in Palais Lascaris: Violes gambe by William ...
+  DEBUG - POI 6 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] PRACTICAL FACTS GATE: PASSED (0 verified)
+
+=== Word Count Statistics ===
+Stop 1: Raquel - 236 words
+Stop 2: Basse de violon by Paolo Antonio Testore (Milan, 1696) - 276 words
+Stop 3: Guitare baroque by Jean Christophle (Avignon, 1645) - 229 words
+Stop 4: Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581) - 272 words
+Stop 5: Violes d'amour by Joannes Florenus Guidanti (Bologne, 1717) - 265 words
+Stop 6: Violes gambe by William Turner (Londres, 1652) - 258 words
+===========================
+
+
+Total API cost: $0.0580 (29000 tokens)
+
+Tour text generated successfully!
+Saved to: Palais_Lascaris__Nice_art_and_musical_instruments_tour_20260801_013852.txt
+  [C5-5] Evidence persisted: Palais_Lascaris__Nice_art_and_musical_instruments_tour_20260801_013852_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Palais Lascaris, Nice - Museum Tour
+Tour-Category: museum
+
+Stop 1: Raquel
+
+Address: Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+
+Coordinates: 43.6978, 7.2758
+
+Welcome to the Palais Lascaris, a tapestry woven with threads of history, culture, and music. As you step through its ancient doors, you begin a journey through the interconnected chapters of Europe's musical evolution. Raquel, the embodiment of this palace's metamorphosis from noble abode to musical ...
+
+
+  Stop Name                                          Words  Facts  W/F   
+  ---- --------------------------------------------- ------ ------ ------
+  1    Raquel                                        417    12     34.8  
+  2    Basse de violon by Paolo Antonio Testore (Mil 288    13     22.2  
+  3    Guitare baroque by Jean Christophle (Avignon, 278    13     21.4  
+  4    Sacqueboute ténor by Anton Schnitzer (Nurembe 286    11     26.0  
+  5    Violes d'amour by Joannes Florenus Guidanti ( 265    9      29.4  
+  6    Violes gambe by William Turner (Londres, 1652 306    13     23.5  
+  TOT                                                1840   71     25.9  
+  Elapsed: 53.2s | Cost: $0.0580
+
+============================================================
+  Palais_treatment_run3: Palais Lascaris, Nice
+============================================================
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #013 | 01:38:52.843 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Palais Lascaris, Nice
+  tour_type: art and musical instruments
+  total_stops_parameter: 8
+  output_file: None
+
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #014 | 01:38:52.843 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Palais Lascaris, Nice
+  total_stops_final: 8
+  source: parameter
+
+  [S20] DATABASE_URL not set — cache skipped
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix] tour_type='art and musical instruments' suppressed for intent analysis (pre_category='walking'); using location only
+Intent analysis response: {
+    "poi_type": "landmarks",
+    "location": "Nice",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": false,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Palais Lascaris",
+    "geographic_scope": "Palais Lascaris",
+    "scope_precision": "BUILDING",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: landmarks
+   Location: Nice
+   Requirements: None
+   Business Hours Relevant: False
+   Accessibility Mentioned: False
+   Venue Name: Palais Lascaris
+  [venue_name sanity] 'Palais Lascaris' OK
+  [S15] Forced tour_category=museum from venue_name='Palais Lascaris'
+
+Detected tour category: MUSEUM
+Using museum template for Palais Lascaris, Nice - art and musical instruments
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #015 | 01:38:54.376 | GENERATING_PROMPT
+======================================================================
+  location: Palais Lascaris, Nice
+  user_request: Palais Lascaris, Nice
+  total_stops: 8
+
+
+PHASE 3A: Fetching 8 candidate POI(s) for Palais Lascaris, Nice...
+  [Museum constraint] Venue from intent='Palais Lascaris'
+    [venue_resolver] Artist inferred from name: 'Palais Lascaris'
+  [venue_resolver] Resolved: 'Palais Lascaris' → Q34653010 (Palais Lascaris)
+    URL: https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais
+    Coords: 43.697694444444444, 7.27725
+    Language: fr
+    Artist: Palais Lascaris ()
+  [venue_resolver] SPARQL: 1 works found for Q34653010
+  [Phase3A] Injected 1 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='BUILDING', scope='Palais Lascaris')
+    [venue_resolver] Artist inferred from name: 'Palais Lascaris'
+  [venue_resolver] Resolved: 'Palais Lascaris' → Q34653010 (Palais Lascaris)
+    URL: https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais
+    Coords: 43.697694444444444, 7.27725
+    Language: fr
+    Artist: Palais Lascaris ()
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 1 works found for Q34653010
+  [LOCAL-30] Deterministic selection: 1 documented works (0 catalogue, 1 SPARQL)
+  [LOCAL-30] Documented works (1) < total_stops (8) — will use documented as base, GPT fills remainder
+    [venue_resolver] Artist inferred from name: 'Palais Lascaris'
+  [venue_resolver] Resolved: 'Palais Lascaris' → Q34653010 (Palais Lascaris)
+    URL: https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais
+    Coords: 43.697694444444444, 7.27725
+    Language: fr
+    Artist: Palais Lascaris ()
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 1 works found for Q34653010
+  [LOCAL-30] Deterministic selection: 1 documented works (0 catalogue, 1 SPARQL)
+  [LOCAL-30] Documented works (1) < total_stops (8) — will use documented as base, GPT fills remainder
+  [R4] Museum tour: asking for 16 candidates (2x for D1v2 filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #016 | 01:39:01.312 | PHASE_3A_REQUEST
+======================================================================
+  location: Palais Lascaris, Nice
+  total_stops: 8
+  poi_type_hint: landmarks
+
+PHASE 3A API call cost: $0.0014 (720 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #017 | 01:39:03.610 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 8
+  stop_count_in_prompt: True
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for Palais Lascaris, Nice.
+List exactly 16 specific, real, well-known landmarks relevant to: Palais Lascaris, Nice.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A SINGLE-VENUE MUSEUM TOUR (WORKS-FIRST):
+- List the 8 most famous, notable, or significan
+  prompt_last_300_chars:  to see.
+
+KNOWN WORKS AT THIS VENUE (use these as guidance — include some from this list):
+  Raquel
+Each work should appear ONLY ONCE in your list — do NOT list the same work under multiple names.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "..."}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+{"name": "Raquel", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
+{"name": "The Penitent Magdalene", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
+{"name": "The Education of the Virgin", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
+{"name": "The Immaculate Conception", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
+{"name": "The Annunciation", "address": "Palais Lascaris, 15 Rue Droite, 06300 Nice, France"},
+{"name"
+
+OK PHASE 3A parsed 8 candidate POI(s):
+   - Raquel @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   - The Penitent Magdalene @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   - The Education of the Virgin @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   - The Immaculate Conception @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   - The Annunciation @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   - The Adoration of the Shepherds @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   - The Adoration of the Magi @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   - The Assumption of the Virgin @ Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+    [venue_resolver] Artist inferred from name: 'Palais Lascaris'
+  [venue_resolver] Resolved: 'Palais Lascaris' → Q34653010 (Palais Lascaris)
+    URL: https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais
+    Coords: 43.697694444444444, 7.27725
+    Language: fr
+    Artist: Palais Lascaris ()
+  [D1v2] Venue resolved: Q34653010 → URL=https://www.nice.fr/fr/culture/musees-et-galeries/palais-lascaris-le-palais, lang=fr
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 1 works found for Q34653010
+  [D1v2] SPARQL source: 1 canonical titles
+  [LOCAL-33] Deep-path URL detected — crawl scoped to: /fr/culture/musees-et-galeries/palais-lascaris-le-palais*
+  [story_miner] Site crawl: 0 pages fetched (budget: 15)
+  [story_miner] Wikipedia EN: 6406 chars (title: 'Palais Lascaris')
+  [story_miner] Wikipedia FR: 9820 chars
+  [story_miner] Joconde museo code: M0887 (from P539)
+  [story_miner] Joconde/POP: no results for M0887 (JS-rendered, expected)
+  [T0a] Pattern 7 (maker attribution): 6 items
+  [T0a] Pattern 7b (sub-item attribution): 3 items
+  [T0a] Exhibit-name extraction: 4 from sections, 9 from quoted/bold/list
+  [T0a] Extracted 10 canonical titles, 0 cycle names
+  [story_miner] Corpus: 2 pages, 10 titles, 0 from Joconde
+  [D1v2] Canonical titles union: 10 site/wiki + 1 SPARQL = 11 total
+  [LOCAL-24] Classification: 10 works, 0 galleries, 1 excluded
+    EXCLUDED: 'Legs d'Antoine Gautier' — rule: wiki_section_heading
+  [D1v2-LOCAL24] After filter: 10 works, 0 galleries, 1 excluded
+  [venue_resolver] Built 1 dynamic aliases from 1 works
+  [D1v2] Injected 1 dynamic aliases
+  [D1v2] Built bilingual map: 84 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+  [D1v2] VERIFIED 'Raquel' → canonical: 'Raquel'
+  [D1v2] DROPPED 'The Penitent Magdalene' — no canonical title match
+  [D1v2] DROPPED 'The Education of the Virgin' — no canonical title match
+  [D1v2] DROPPED 'The Immaculate Conception' — no canonical title match
+  [D1v2] DROPPED 'The Annunciation' — no canonical title match
+  [D1v2] DROPPED 'The Adoration of the Shepherds' — no canonical title match
+  [D1v2] DROPPED 'The Adoration of the Magi' — no canonical title match
+  [D1v2] DROPPED 'The Assumption of the Virgin' — no canonical title match
+  [D1v2] Exhibit museum detected: 1 SPARQL QIDs, 10 total titles (mostly from site/wiki sections)
+  [D1v2] 1/8 works verified — tier: exhibit_museum
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [D1] Tier: exhibit_museum (1 verified works)
+
+  [R4] Replenishment round 1/3: need 7 more, asking for 12
+    [R4] VERIFIED 'Basse de violon by Paolo Antonio Testore (Milan, 1696)' → 'Basse de violon by Paolo Antonio Testore (Milan, 1696)'
+    [R4] dropped 'Guitar'
+    [R4] VERIFIED 'Guitare baroque by Giovanni Tesler (Ancona, 1618)' → 'Guitare baroque by Giovanni Tesler (Ancona, 1618)'
+    [R4] VERIFIED 'Guitare baroque by Jean Christophle (Avignon, 1645)' → 'Guitare baroque by Jean Christophle (Avignon, 1645)'
+    [R4] VERIFIED 'Guitare baroque by René Voboam (Paris, 1650)' → 'Guitare baroque by René Voboam (Paris, 1650)'
+    [R4] dropped 'Harpe'
+    [R4] VERIFIED 'Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)' → 'Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)'
+    [R4] VERIFIED 'Violes d'amour by Joannes Florenus Guidanti (Bologne, 1717)' → 'Violes d'amour by Joannes Florenus Guidanti (Bologne, 1717)'
+    [R4] VERIFIED 'Violes gambe by William Turner (Londres, 1652)' → 'Violes gambe by William Turner (Londres, 1652)'
+    [R4] Round 1: +7 verified, total now 8
+  [R4] Target reached: 8/8 stops
+  [LOCAL-16 GATE] All 8 stops are D1v2-verified ✓
+
+PHASE 4.5: Validating AI knowledge for Palais Lascaris, Nice...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+
+PHASE 3B: Requesting structured details and walking directions for 8 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #018 | 01:39:09.468 | PHASE_3B_REQUEST
+======================================================================
+  location: Palais Lascaris, Nice
+  stop_count: 8
+
+PHASE 3B API call cost: $0.0024 (1187 tokens)
+OK PHASE 3B: ordered 8 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 8 stops
+  [LOCAL-35] Visitor info scoped to venue section (deep path: https://en.wikipedia.org/wiki/Palais_Lascaris)
+  [LOCAL-35] Visitor info page found (en): https://en.wikipedia.org/wiki/Palais_Lascaris
+  [LOCAL-35] Extracted from https://en.wikipedia.org/wiki/Palais_Lascaris: closed=[], hours=1, admission=''
+  [LOCAL-35] Formatted result too short — omitting
+  [LOCAL-39] No visitor info sourced — Museum Information field OMITTED
+   Coords cluster detected: 8 stops share '43.6978, 7.2766', refetching...
+   Cluster refetch OK 'Raquel': 43.6971, 7.2753
+   Cluster refetch OK 'Guitare baroque by Giovanni Tesler (Ancona, 1618)': 43.6973, 7.2765
+   Cluster refetch OK 'Guitare baroque by René Voboam (Paris, 1650)': 43.6977, 7.2766
+   Cluster refetch OK 'Guitare baroque by Jean Christophle (Avignon, 1645)': 43.6965, 7.2796
+   Cluster refetch OK 'Basse de violon by Paolo Antonio Testore (Milan, 1696)': 43.6965, 7.2761
+   Cluster refetch OK 'Violes gambe by William Turner (Londres, 1652)': 43.6973, 7.2762
+   Cluster refetch OK 'Violes d'amour by Joannes Florenus Guidanti (Bologne, 1717)': 43.6961, 7.2765
+   Cluster refetch OK 'Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)': 43.6963, 7.2760
+Extracted first POI coordinates: (43.6971, 7.2753)
+  [D4] Museum single-coordinate: all stops set to (43.6971, 7.2753) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Raquel
+   Address: Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+   Coordinates: 43.6971, 7.2753
+   Directions: Head northeast on Rue Droite toward Rue de la Boucherie, then arrive at Palais L...
+2. Basse de violon by Paolo Antonio Testore (Milan, 1696)
+   Address: Palais Lascaris
+   Coordinates: 43.6971, 7.2753
+   Directions: Walk straight ahead through the entrance hall to reach the exhibit room showcasi...
+3. Guitare baroque by Giovanni Tesler (Ancona, 1618)
+   Address: Palais Lascaris
+   Coordinates: 43.6971, 7.2753
+   Directions: Turn left and proceed to the next room where the Guitare baroque by Giovanni Tes...
+4. Guitare baroque by Jean Christophle (Avignon, 1645)
+   Address: Palais Lascaris
+   Coordinates: 43.6971, 7.2753
+   Directions: Continue straight ahead and you will find the Guitare baroque by Jean Christophl...
+5. Guitare baroque by René Voboam (Paris, 1650)
+   Address: Palais Lascaris
+   Coordinates: 43.6971, 7.2753
+   Directions: Turn right and proceed to the section where the Guitare baroque by René Voboam i...
+6. Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)
+   Address: Palais Lascaris
+   Coordinates: 43.6971, 7.2753
+   Directions: Walk straight ahead and you will reach the area showcasing the Sacqueboute ténor...
+7. Violes d'amour by Joannes Florenus Guidanti (Bologne, 1717)
+   Address: Palais Lascaris
+   Coordinates: 43.6971, 7.2753
+   Directions: Turn left and proceed to the room where the Violes d'amour by Joannes Florenus G...
+8. Violes gambe by William Turner (Londres, 1652)
+   Address: Palais Lascaris
+   Coordinates: 43.6971, 7.2753
+   Directions: Continue straight ahead to the final section where you can admire the Violes gam...
+================================
+
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 2/2 corpus pages for 'Palais Lascaris'
+    page[0] score=12770 url=https://fr.wikipedia.org/wiki/Palais_Lascaris
+    page[1] score=10430 url=https://en.wikipedia.org/wiki/Palais_Lascaris
+  [§3-adapter] Raw elements: 2 from 2 pages
+  [§3-adapter] After corroboration scoring: 1 elements
+  [§3-adapter] Final: 1 ranked elements (top type: origin)
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Three-class retrieval error (non-fatal): local variable 'name_lower' referenced before assignment
+  [§3] No story elements available — spine will use invented arc (mode=invented)
+SPINE_COST: category=museum venue=Palais Lascaris tokens=1966 (in=861 out=1105) cost=$0.0209 latency=9.2s
+  [Storied] Spine generated: 8 arc entries (mode=invented)
+  [Storied] Fact sheets: 8/8 generated
+  [S25] Story types assigned: ['art', 'history', 'anecdote', 'art', 'history', 'art', 'history', 'anecdote']
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+Generating description for Stop 1: Raquel by , ...
+
+Generating description for Stop 2: Basse de violon by Paolo Antonio Testore (Milan, 1696) by , ...
+
+Generating description for Stop 3: Guitare baroque by Giovanni Tesler (Ancona, 1618) by , ...
+
+Generating description for Stop 4: Guitare baroque by Jean Christophle (Avignon, 1645) by , ...
+
+Generating description for Stop 5: Guitare baroque by René Voboam (Paris, 1650) by , ...
+Stop 2 API call cost: $0.0086 (4309 tokens)
+Stop 2 description word count: 267 words
+
+Generating description for Stop 6: Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581) by , ...
+Stop 3 API call cost: $0.0086 (4322 tokens)
+Stop 3 description word count: 274 words
+Stop 4 API call cost: $0.0087 (4371 tokens)
+Stop 4 description word count: 258 words
+
+Generating description for Stop 7: Violes d'amour by Joannes Florenus Guidanti (Bologne, 1717) by , ...
+
+Generating description for Stop 8: Violes gambe by William Turner (Londres, 1652) by , ...
+Stop 5 API call cost: $0.0087 (4328 tokens)
+Stop 5 description word count: 311 words
+Stop 1 API call cost: $0.0074 (3700 tokens)
+Stop 1 description word count: 253 words
+Stop 6 API call cost: $0.0088 (4400 tokens)
+Stop 6 description word count: 264 words
+Stop 8 API call cost: $0.0084 (4199 tokens)
+Stop 8 description word count: 258 words
+Stop 7 API call cost: $0.0085 (4240 tokens)
+Stop 7 description word count: 257 words
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Palais Lascaris'...
+   Authority: 7 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 8 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (8 stops)
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 1 preaching closer(s)
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: 2 facts found {'architecture': 2}
+  [R2] Prolog saved for Stop 1 (149 words)
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Palais Lascaris — next is Basse de violon b...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 3: Next: Guitare baroque by Giovanni Tesler (Ancona, 1618)....
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 4: Proceed to Guitare baroque by Jean Christophle (Avignon, 164...
+  DEBUG - POI 4 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 5: Continue to Guitare baroque by René Voboam (Paris, 1650)....
+  DEBUG - POI 5 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 6: Next: Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)...
+  DEBUG - POI 6 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 7: Proceed to Violes d'amour by Joannes Florenus Guidanti (Bolo...
+  DEBUG - POI 7 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 8: Your final stop in Palais Lascaris: Violes gambe by William ...
+  DEBUG - POI 8 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] PRACTICAL FACTS GATE: PASSED (0 verified)
+
+=== Word Count Statistics ===
+Stop 1: Raquel - 253 words
+Stop 2: Basse de violon by Paolo Antonio Testore (Milan, 1696) - 267 words
+Stop 3: Guitare baroque by Giovanni Tesler (Ancona, 1618) - 274 words
+Stop 4: Guitare baroque by Jean Christophle (Avignon, 1645) - 258 words
+Stop 5: Guitare baroque by René Voboam (Paris, 1650) - 311 words
+Stop 6: Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581) - 264 words
+Stop 7: Violes d'amour by Joannes Florenus Guidanti (Bologne, 1717) - 257 words
+Stop 8: Violes gambe by William Turner (Londres, 1652) - 258 words
+===========================
+
+
+Total API cost: $0.0740 (37009 tokens)
+
+Tour text generated successfully!
+Saved to: Palais_Lascaris__Nice_art_and_musical_instruments_tour_20260801_013949.txt
+  [C5-5] Evidence persisted: Palais_Lascaris__Nice_art_and_musical_instruments_tour_20260801_013949_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Palais Lascaris, Nice - Museum Tour
+Tour-Category: museum
+
+Stop 1: Raquel
+
+Address: Palais Lascaris, 15 Rue Droite, 06300 Nice, France
+
+Coordinates: 43.6971, 7.2753
+
+Orientation: Stand in the center of the opulent chamber at Palais Lascaris, surrounded by a mesmerizing array of art and musical instruments. Direct your gaze towards a particular corner where a rare treasure awaits your discovery.
+
+You stand at the threshold of Palais Lascaris, a living tome of music...
+
+
+  Stop Name                                          Words  Facts  W/F   
+  ---- --------------------------------------------- ------ ------ ------
+  1    Raquel                                        432    15     28.8  
+  2    Basse de violon by Paolo Antonio Testore (Mil 279    14     19.9  
+  3    Guitare baroque by Giovanni Tesler (Ancona, 1 287    9      31.9  
+  4    Guitare baroque by Jean Christophle (Avignon, 271    14     19.4  
+  5    Guitare baroque by René Voboam (Paris, 1650)  323    14     23.1  
+  6    Sacqueboute ténor by Anton Schnitzer (Nurembe 278    15     18.5  
+  7    Violes d'amour by Joannes Florenus Guidanti ( 274    10     27.4  
+  8    Violes gambe by William Turner (Londres, 1652 306    12     25.5  
+  TOT                                                2450   103    23.8  
+  Elapsed: 56.3s | Cost: $0.0740
+
+============================================================
+  Asian_treatment: Musée des Arts Asiatiques, Nice
+============================================================
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #019 | 01:39:49.198 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Musée des Arts Asiatiques, Nice
+  tour_type: art and culture
+  total_stops_parameter: 8
+  output_file: None
+
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #020 | 01:39:49.198 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Musée des Arts Asiatiques, Nice
+  total_stops_final: 8
+  source: parameter
+
+  [S20] DATABASE_URL not set — cache skipped
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix] tour_type='art and culture' suppressed for intent analysis (pre_category='walking'); using location only
+Intent analysis response: {
+    "poi_type": "museum exhibits",
+    "location": "Nice",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": true,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Musée des Arts Asiatiques",
+    "geographic_scope": "Musée des Arts Asiatiques",
+    "scope_precision": "BUILDING",
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museum exhibits
+   Location: Nice
+   Requirements: None
+   Business Hours Relevant: True
+   Accessibility Mentioned: False
+   Venue Name: Musée des Arts Asiatiques
+  [venue_name sanity] 'Musée des Arts Asiatiques' OK
+  [S15] Forced tour_category=museum from venue_name='Musée des Arts Asiatiques'
+
+Detected tour category: MUSEUM
+Using museum template for Musée des Arts Asiatiques, Nice - art and culture
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #021 | 01:39:50.424 | GENERATING_PROMPT
+======================================================================
+  location: Musée des Arts Asiatiques, Nice
+  user_request: Musée des Arts Asiatiques, Nice
+  total_stops: 8
+
+
+PHASE 3A: Fetching 8 candidate POI(s) for Musée des Arts Asiatiques, Nice...
+  [Museum constraint] Venue from intent='Musée des Arts Asiatiques'
+  [venue_resolver] Geo-disambiguated by distance: Q3330160 (Asian Arts Museum) — 5.6km from Nice
+    [venue_resolver] Artist link: P921 → Q48 (Asia)
+  [venue_resolver] Resolved: 'Musée des Arts Asiatiques' → Q3330160 (Asian Arts Museum)
+    URL: https://maa.departement06.fr/
+    Coords: 43.668055555555554, 7.216111111111111
+    Language: fr
+    Artist: Asia (Q48)
+  [venue_resolver] SPARQL: 6 works found for Q3330160
+  [Phase3A] Injected 6 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='BUILDING', scope='Musée des Arts Asiatiques')
+  [venue_resolver] Geo-disambiguated by distance: Q3330160 (Asian Arts Museum) — 5.6km from Nice
+    [venue_resolver] Artist link: P921 → Q48 (Asia)
+  [venue_resolver] Resolved: 'Musée des Arts Asiatiques' → Q3330160 (Asian Arts Museum)
+    URL: https://maa.departement06.fr/
+    Coords: 43.668055555555554, 7.216111111111111
+    Language: fr
+    Artist: Asia (Q48)
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 6 works found for Q3330160
+  [LOCAL-30] Deterministic selection: 6 documented works (0 catalogue, 6 SPARQL)
+  [LOCAL-30] Documented works (6) < total_stops (8) — will use documented as base, GPT fills remainder
+  [venue_resolver] Geo-disambiguated by distance: Q3330160 (Asian Arts Museum) — 5.6km from Nice
+    [venue_resolver] Artist link: P921 → Q48 (Asia)
+  [venue_resolver] Resolved: 'Musée des Arts Asiatiques' → Q3330160 (Asian Arts Museum)
+    URL: https://maa.departement06.fr/
+    Coords: 43.668055555555554, 7.216111111111111
+    Language: fr
+    Artist: Asia (Q48)
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 6 works found for Q3330160
+  [LOCAL-30] Deterministic selection: 6 documented works (0 catalogue, 6 SPARQL)
+  [LOCAL-30] Documented works (6) < total_stops (8) — will use documented as base, GPT fills remainder
+  [R4] Museum tour: asking for 16 candidates (2x for D1v2 filtering)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #022 | 01:40:01.471 | PHASE_3A_REQUEST
+======================================================================
+  location: Musée des Arts Asiatiques, Nice
+  total_stops: 8
+  poi_type_hint: museum exhibits
+
+PHASE 3A API call cost: $0.0017 (840 tokens)
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #023 | 01:40:04.186 | OPENAI_API_CALL
+======================================================================
+  total_stops_requested: 8
+  stop_count_in_prompt: True
+  http_status: 200
+  prompt_first_500_chars: You are a knowledgeable local guide for Musée des Arts Asiatiques, Nice.
+List exactly 16 specific, real, well-known museum exhibits relevant to: Musée des Arts Asiatiques, Nice.
+
+Requirements:
+- Use REAL, SPECIFIC names of actual establishments or landmarks.
+- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
+- Include a complete street address with ZIP code where applicable.
+
+CRITICAL CONSTRAINT — THIS IS A SINGLE-VENUE MUSEUM TOUR (WORKS-FIRST):
+- List the 8 most famo
+  prompt_last_300_chars: l; la geste de Bouddha; les paysages de l'âme; l’art en exil - Hàm Nghi, Prince d'Annam (1871-1944)
+Each work should appear ONLY ONCE in your list — do NOT list the same work under multiple names.
+
+
+Return ONLY a JSON array, no other text, no markdown fences:
+[{"name": "...", "address": "..."}, ...]
+  stops_found_in_response: 0
+  stop_markers_in_response:
+    []
+  response_first_500_chars: [
+{"name": "Voyage au pied du mont Fuji", "address": "Musée des Arts Asiatiques, 405 Prom. des Anglais, 06200 Nice, France"},
+{"name": "Disque", "address": "Musée des Arts Asiatiques, 405 Prom. des Anglais, 06200 Nice, France"},
+{"name": "Fauteuil", "address": "Musée des Arts Asiatiques, 405 Prom. des Anglais, 06200 Nice, France"},
+{"name": "La geste de Bouddha", "address": "Musée des Arts Asiatiques, 405 Prom. des Anglais, 06200 Nice, France"},
+{"name": "Les paysages de l'âme", "address": "Musé
+
+OK PHASE 3A parsed 8 candidate POI(s):
+   - Voyage au pied du mont Fuji @ Musée des Arts Asiatiques, 405 Prom. des Anglais, 06200 Nice, France
+   - Disque @ Musée des Arts Asiatiques, 405 Prom. des Anglais, 06200 Nice, France
+   - Fauteuil @ Musée des Arts Asiatiques, 405 Prom. des Anglais, 06200 Nice, France
+   - La geste de Bouddha @ Musée des Arts Asiatiques, 405 Prom. des Anglais, 06200 Nice, France
+   - Les paysages de l'âme @ Musée des Arts Asiatiques, 405 Prom. des Anglais, 06200 Nice, France
+   - L’art en exil - Hàm Nghi, Prince d'Annam (1871-1944) @ Musée des Arts Asiatiques, 405 Prom. des Anglais, 06200 Nice, France
+   - Song of Songs @ Musée des Arts Asiatiques, 405 Prom. des Anglais, 06200 Nice, France
+   - The Creation of the World @ Musée des Arts Asiatiques, 405 Prom. des Anglais, 06200 Nice, France
+  [venue_resolver] Geo-disambiguated by distance: Q3330160 (Asian Arts Museum) — 5.6km from Nice
+    [venue_resolver] Artist link: P921 → Q48 (Asia)
+  [venue_resolver] Resolved: 'Musée des Arts Asiatiques' → Q3330160 (Asian Arts Museum)
+    URL: https://maa.departement06.fr/
+    Coords: 43.668055555555554, 7.216111111111111
+    Language: fr
+    Artist: Asia (Q48)
+  [D1v2] Venue resolved: Q3330160 → URL=https://maa.departement06.fr/, lang=fr
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 6 works found for Q3330160
+  [D1v2] SPARQL source: 6 canonical titles
+  [story_miner] Site page: https://maa.departement06.fr/agenda/saltimbanques-au-japon (18165 chars)
+  [story_miner] Site page: https://maa.departement06.fr/les-oeuvres-commentees (30000 chars)
+  [story_miner] Site page: https://maa.departement06.fr/publications/dossier-pedagogique-de-lexposition-sanyu-la-ligne-loeuvre (15980 chars)
+  [story_miner] Site page: https://maa.departement06.fr/publications/sanyu-la-ligne-loeuvre (15844 chars)
+  [story_miner] Site page: https://maa.departement06.fr/publications?categories%5B192%5D=192 (16733 chars)
+  [story_miner] Site page: https://maa.departement06.fr/les-publications (18548 chars)
+  [story_miner] Site page: https://maa.departement06.fr/agenda/corps-corps (20562 chars)
+  [story_miner] Site page: https://maa.departement06.fr/visites-guidees (16327 chars)
+  [story_miner] Site page: https://maa.departement06.fr/tarifs-et-horaires (27309 chars)
+  [story_miner] Site page: https://maa.departement06.fr/visites-scolaires (22193 chars)
+  [story_miner] Site page: https://maa.departement06.fr/visiteurs-en-situation-de-handicap (17703 chars)
+  [story_miner] Site page: https://maa.departement06.fr/les-publications?keys=&categories%5B204%5D=204 (17324 chars)
+  [story_miner] Site page: https://maa.departement06.fr/acces-et-conditions-de-visite (19182 chars)
+  [story_miner] Site page: https://maa.departement06.fr/contacts (18639 chars)
+  [story_miner] Site page: https://maa.departement06.fr/newsletter (19514 chars)
+  [story_miner] Site crawl: 16 pages fetched (budget: 15)
+  [story_miner] Sitelink EN: 'Asian Art Museum (Nice)'
+  [story_miner] Sitelink FR: 'Musée départemental des arts asiatiques à Nice'
+  [story_miner] Wikipedia EN: 6454 chars (title: 'Asian Art Museum (Nice)')
+  [story_miner] Wikipedia FR: 9045 chars
+  [story_miner] Joconde museo code: M0889 (from P539)
+  [story_miner] Joconde/POP: no results for M0889 (JS-rendered, expected)
+  [T0a] Exhibit-name extraction: 10 from sections, 13 from quoted/bold/list
+  [T0a] Final-pass nav filter removed 2: ['Infos pratiques', 'Le musée en vidéo']
+  [T0a] Extracted 16 canonical titles, 0 cycle names
+  [LOCAL-28] Catalogue page detected: https://maa.departement06.fr/les-oeuvres-commentees
+  [LOCAL-28] Extracted 9 documented works from https://maa.departement06.fr/les-oeuvres-commentees
+  [LOCAL-28] Catalogue extraction: 9 documented works with metadata
+  [story_miner] Corpus: 18 pages, 25 titles, 0 from Joconde
+  [D1v2] Canonical titles union: 25 site/wiki + 6 SPARQL = 31 total
+  [LOCAL-34] Will enrich bare title at stop-naming: 'fauteuil' → 'fauteuil (Toile, 2024)'
+  [LOCAL-24] Classification: 17 works, 4 galleries, 10 excluded
+    EXCLUDED: 'Voyage en Asie' — rule: themed_program
+    EXCLUDED: 'Monstres et Cie' — rule: themed_program
+    EXCLUDED: 'En harmonie avec la nature' — rule: themed_program
+    EXCLUDED: 'The museum’s collections' — rule: wiki_section_heading
+    EXCLUDED: 'Monstres de poche' — rule: themed_program
+    EXCLUDED: 'Pour ne pas perdre la mémoire' — rule: themed_program
+    EXCLUDED: 'Promenade des Anglais' — rule: street_address
+    EXCLUDED: 'Monstre de poche' — rule: themed_program
+    EXCLUDED: 'Origin of the museum’s pieces' — rule: wiki_section_heading
+    EXCLUDED: 'Super-héros, super-pouvoirs' — rule: themed_program
+    GALLERY:  'Le Japon, pays du soleil levant'
+    GALLERY:  'Les quatre grands courants religieux d'Asie'
+    GALLERY:  'L’Asie du Sud-Est'
+    GALLERY:  'Rites et cérémonies en Asie'
+  [LOCAL-24] Cross-language dedup removed 1:
+    'Stag and hind symbolizing Buddha’s first sermon' → alias of 'Daim et Daine symbolisant le premier sermon de Bouddha'
+  [D1v2-LOCAL24] After filter: 16 works, 4 galleries, 10 excluded
+  [LOCAL-31] Dropping material 'acier, cuir, soie, laqué' for 'L’Armure d’Andô Naoyuki' — not found in entry's own description (likely cross-entry bleed)
+  [LOCAL-31] Dropping material 'schiste' for 'Statue de Bouddha' — not found in entry's own description (likely cross-entry bleed)
+  [LOCAL-31] Dropping period 'XIIe siècle' for 'La danse cosmique de Ganesh' — not found in entry's own description (likely cross-entry bleed)
+  [LOCAL-31] Dropping period '2002' for 'Kannon à mille bras' — not found in entry's own description (likely cross-entry bleed)
+  [LOCAL-31] Dropping material 'cuivre, cuir, cuir laqué, laqué' for 'Armure du Clan Hotta' — not found in entry's own description (likely cross-entry bleed)
+  [LOCAL-28] Pre-injected 9 catalogue works as verified POIs
+  [venue_resolver] Built 6 dynamic aliases from 6 works
+  [D1v2] Injected 6 dynamic aliases
+  [D1v2] Built bilingual map: 84 word pairs
+  [D1v2] artist-check skipped (no valid creator) — artist_qid=Q48 (Asia) is not a human
+  [D1v2] VERIFIED 'Voyage au pied du mont Fuji' → canonical: 'Hokusai – Voyage au pied du mont Fuji'
+  [D1v2] VERIFIED 'Disque' → canonical: 'disque'
+  [D1v2] VERIFIED 'Fauteuil' → canonical: 'fauteuil'
+  [D1v2] VERIFIED 'La geste de Bouddha' → canonical: 'la geste de Bouddha'
+  [D1v2] VERIFIED 'Les paysages de l'âme' → canonical: 'les paysages de l'âme'
+  [D1v2] VERIFIED 'L’art en exil - Hàm Nghi, Prince d'Annam (1871-1944)' → canonical: 'l’art en exil - Hàm Nghi, Prince d'Annam (1871-1944)'
+  [D1v2] DROPPED 'Song of Songs' — theme/book word, not a work title
+  [D1v2] DROPPED 'The Creation of the World' — no canonical title match
+  [D1v2] 15/8 works verified — tier: medium
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [D1] Tier: medium (15 verified works)
+  [R4] Target reached: 15/8 stops
+  [LOCAL-16 GATE] All 15 stops are D1v2-verified ✓
+
+PHASE 4.5: Validating AI knowledge for Musée des Arts Asiatiques, Nice...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+
+PHASE 3B: Requesting structured details and walking directions for 8 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260801_013655.txt'
+
+======================================================================
+CALL #024 | 01:40:30.422 | PHASE_3B_REQUEST
+======================================================================
+  location: Musée des Arts Asiatiques, Nice
+  stop_count: 8
+
+PHASE 3B API call cost: $0.0021 (1033 tokens)
+OK PHASE 3B: ordered 8 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 8 stops
+  [LOCAL-35] Visitor info page found (fr): https://maa.departement06.fr/tarifs-et-horaires
+  [LOCAL-35] Extracted from https://maa.departement06.fr/tarifs-et-horaires: closed=['Tuesday'], hours=2, admission='FREE'
+  [LOCAL-35] Final Museum Information: Closed on Tuesday. 10:00–17:00 (1 Sep–30 Jun); 10:00–18:00 (1 Jul–31 Aug). FREE
+  [LOCAL-39] Museum Information sourced from official site for stop 1
+   Coords cluster detected: 8 stops share '43.6787, 7.2271', refetching...
+   Cluster refetch OK 'Statue de Bouddha': 43.6788, 7.2261
+   Cluster refetch OK 'Kannon, le bodhisattva de la compassion': 43.6717, 7.2147
+   Cluster refetch OK 'La danse cosmique de Ganesh': 43.6716, 7.2145
+   Cluster refetch OK 'Ulysses Grant au Japon': 43.667867, 7.205496
+   Cluster refetch OK 'Robe de prêtre taoïste': 43.6699, 7.2187
+   Cluster refetch OK 'Masque du vieillard kojô': 43.6715, 7.2223
+   Cluster refetch OK 'Kannon à mille bras': 43.6783, 7.2187
+   Cluster refetch OK 'L’Armure d’Andô Naoyuki': 43.6794, 7.2181
+Extracted first POI coordinates: (43.6794, 7.2181)
+  [D4] Museum single-coordinate: all stops set to (43.6794, 7.2181) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. L’Armure d’Andô Naoyuki
+   Address: 405 Promenade des Anglais, 06200 Nice, France
+   Coordinates: 43.6794, 7.2181
+   Directions: Head southeast on Promenade des Anglais, the museum will be on your left with a ...
+2. Statue de Bouddha
+   Address: 405 Promenade des Anglais, 06200 Nice, France
+   Coordinates: 43.6794, 7.2181
+   Directions: Walk straight ahead towards the main entrance, passing by the stunning gardens s...
+3. La danse cosmique de Ganesh
+   Address: 405 Promenade des Anglais, 06200 Nice, France
+   Coordinates: 43.6794, 7.2181
+   Directions: Turn right after entering, follow the signs to the east wing where you'll find t...
+4. Kannon, le bodhisattva de la compassion
+   Address: 405 Promenade des Anglais, 06200 Nice, France
+   Coordinates: 43.6794, 7.2181
+   Directions: Continue straight, then take a left at the intersection, the statue is in the ce...
+5. Ulysses Grant au Japon
+   Address: 405 Promenade des Anglais, 06200 Nice, France
+   Coordinates: 43.6794, 7.2181
+   Directions: From the courtyard, head back towards the entrance, then turn right to reach the...
+6. Robe de prêtre taoïste
+   Address: 405 Promenade des Anglais, 06200 Nice, France
+   Coordinates: 43.6794, 7.2181
+   Directions: Take the stairs to the first floor, turn left and walk straight ahead to find th...
+7. Kannon à mille bras
+   Address: 405 Promenade des Anglais, 06200 Nice, France
+   Coordinates: 43.6794, 7.2181
+   Directions: Descend to the ground floor, turn right and continue straight to discover the aw...
+8. Masque du vieillard kojô
+   Address: 405 Promenade des Anglais, 06200 Nice, France
+   Coordinates: 43.6794, 7.2181
+   Directions: Exit the museum and take a moment to appreciate the intricate details of the bui...
+================================
+
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 5/18 corpus pages for 'Musée des Arts Asiatiques'
+    page[0] score=12735 url=https://fr.wikipedia.org/wiki/Musée_départemental_des_arts_asiatiques_à_Nice
+    page[1] score=10535 url=https://en.wikipedia.org/wiki/Asian_Art_Museum_(Nice)
+    page[2] score=2400 url=https://maa.departement06.fr/les-oeuvres-commentees
+  [§3-adapter] Raw elements: 19 from 2 pages
+  [§3-adapter] After corroboration scoring: 13 elements
+  [§3-adapter] Final: 13 ranked elements (top type: dedication)
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] L’Armure d’Andô Naoyuki: category='acier, cuir, soie, laqué milieu du XIXe siècle' has_context=False
+  [LOCAL-37] Statue de Bouddha: category='schiste 3500' has_context=False
+  [LOCAL-37] La danse cosmique de Ganesh: category='XIIe siècle' has_context=False
+  [LOCAL-37] Kannon, le bodhisattva de la c: category='bois seconde moitié du XIIe siècle' has_context=False
+  [LOCAL-37] Ulysses Grant au Japon: category='1879' has_context=True
+  [LOCAL-37] Robe de prêtre taoïste: category='soie, soie brodée Datée du XVIIIe siècle, cette robe est faite de s' has_context=False
+  [LOCAL-37] Kannon à mille bras: category='2002' has_context=True
+  [LOCAL-37] Masque du vieillard kojô: category='bois, bois laqué, laqué daté du XVIe siècle et représente les traits d’u' has_context=False
+  [LOCAL-37] Three-class retrieval: 8 stops processed, 8 with category
+  [§3] Story elements injected into spine prompt (13 elements, mode=found)
+SPINE_COST: category=museum venue=Musée des Arts Asiatiques tokens=2515 (in=1432 out=1083) cost=$0.0234 latency=6.9s
+  [Storied] Spine generated: 8 arc entries (mode=found)
+  [Storied] Fact sheets: 8/8 generated
+  [S25] Story types assigned: ['art', 'history', 'anecdote', 'art', 'history', 'art', 'history', 'anecdote']
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+Generating description for Stop 1: L’Armure d’Andô Naoyuki by , ...
+
+Generating description for Stop 2: Statue de Bouddha by , ...
+
+Generating description for Stop 3: La danse cosmique de Ganesh by , ...
+
+Generating description for Stop 4: Kannon, le bodhisattva de la compassion by , ...
+
+Generating description for Stop 5: Ulysses Grant au Japon by , ...
+Stop 3 API call cost: $0.0082 (4108 tokens)
+Stop 3 description word count: 173 words
+
+Generating description for Stop 6: Robe de prêtre taoïste by , ...
+Stop 5 API call cost: $0.0086 (4312 tokens)
+Stop 5 description word count: 277 words
+
+Generating description for Stop 7: Kannon à mille bras by , ...
+Stop 4 API call cost: $0.0085 (4254 tokens)
+  [LOCAL-31] Stop 4: catalogue material 'bois' missing from description.
+  [LOCAL-31] Stop 4: patched missing metadata into description.
+Stop 4 description word count: 246 words
+
+Generating description for Stop 8: Masque du vieillard kojô by , ...
+Stop 1 API call cost: $0.0083 (4170 tokens)
+Stop 1 description word count: 237 words
+Stop 2 API call cost: $0.0084 (4195 tokens)
+Stop 2 description word count: 307 words
+Stop 7 API call cost: $0.0082 (4102 tokens)
+Stop 7 description word count: 195 words
+Stop 6 API call cost: $0.0086 (4288 tokens)
+  [LOCAL-31] Stop 6: catalogue material 'soie, soie brodée' missing from description.
+  [LOCAL-31] Stop 6: patched missing metadata into description.
+Stop 6 description word count: 306 words
+Stop 8 API call cost: $0.0085 (4270 tokens)
+  [LOCAL-31] Stop 8: catalogue material 'bois, bois laqué, laqué' missing from description.
+  [LOCAL-31] Stop 8: patched missing metadata into description.
+Stop 8 description word count: 266 words
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Musée des Arts Asiatiques'...
+   Authority: 7 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 8 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (8 stops)
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 1 preaching closer(s)
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: 2 facts found {'architecture': 1, 'founding': 1}
+  [R2] Prolog saved for Stop 1 (126 words)
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Musée des Arts Asiatiques — next is Statue ...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 3: Next: La danse cosmique de Ganesh....
+  DEBUG - POI 3 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 4: Proceed to Kannon, le bodhisattva de la compassion....
+  DEBUG - POI 4 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 5: Continue to Ulysses Grant au Japon....
+  DEBUG - POI 5 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 6: Next: Robe de prêtre taoïste....
+  DEBUG - POI 6 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 7: Proceed to Kannon à mille bras....
+  DEBUG - POI 7 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [T4] Transition to Stop 8: Your final stop in Musée des Arts Asiatiques: Masque du viei...
+  DEBUG - POI 8 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 2
+    Verified: 2
+    Dropped: 0
+    AUDIT: closed_day | Closed on Tuesday | https://maa.departement06.fr/tarifs-et-horaires | VERIFIED
+    AUDIT: admission | FREE | https://maa.departement06.fr/tarifs-et-horaires | VERIFIED
+  [LOCAL-36] PRACTICAL FACTS GATE: PASSED (2 verified)
+
+=== Word Count Statistics ===
+Stop 1: L’Armure d’Andô Naoyuki - 237 words
+Stop 2: Statue de Bouddha - 307 words
+Stop 3: La danse cosmique de Ganesh - 173 words
+Stop 4: Kannon, le bodhisattva de la compassion - 246 words
+Stop 5: Ulysses Grant au Japon - 277 words
+Stop 6: Robe de prêtre taoïste - 306 words
+Stop 7: Kannon à mille bras - 195 words
+Stop 8: Masque du vieillard kojô - 266 words
+===========================
+
+
+Total API cost: $0.0726 (36287 tokens)
+
+Tour text generated successfully!
+Saved to: Musée_des_Arts_Asiatiques__Nice_art_and_culture_tour_20260801_014201.txt
+  [C5-5] Evidence persisted: Musée_des_Arts_Asiatiques__Nice_art_and_culture_tour_20260801_014201_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Musée des Arts Asiatiques, Nice - Museum Tour
+Tour-Category: museum
+
+Stop 1: L’Armure d’Andô Naoyuki
+
+Address: 405 Promenade des Anglais, 06200 Nice, France
+
+Coordinates: 43.6794, 7.2181
+
+Museum Information: Closed on Tuesday. 10:00–17:00 (1 Sep–30 Jun); 10:00–18:00 (1 Jul–31 Aug). FREE
+
+You are about to embark on a mesmerizing journey through the Musée des Arts Asiatiques, a testament to the dedication of Pierre-Yves Trémois and the visionary architecture of Kenz...
+
+
+  Stop Name                                          Words  Facts  W/F   
+  ---- --------------------------------------------- ------ ------ ------
+  1    L’Armure d’Andô Naoyuki                       401    10     40.1  
+  2    Statue de Bouddha                             322    3      107.3 
+  3    La danse cosmique de Ganesh                   264    1      264.0 
+  4    Kannon, le bodhisattva de la compassion       261    4      65.2  
+  5    Ulysses Grant au Japon                        291    6      48.5  
+  6    Robe de prêtre taoïste                        321    3      107.0 
+  7    Kannon à mille bras                           254    3      84.7  
+  8    Masque du vieillard kojô                      292    6      48.7  
+  TOT                                                2406   36     66.8  
+  Elapsed: 132.0s | Cost: $0.0726
+
+
+============================================================
+  SUMMARY: treatment (3 Palais runs)
+============================================================
+  Palais Lascaris:
+    Stops:  [6, 6, 8]
+    Facts:  mean=83.3, values=[76, 71, 103], spread=32
+    Words:  mean=2060, values=[1889, 1840, 2450], spread=610
+Traceback (most recent call last):
+  File "/Users/micha/audioura-worktrees/LOCAL-75/run_local75_measurement.py", line 242, in <module>
+    main()
+  File "/Users/micha/audioura-worktrees/LOCAL-75/run_local75_measurement.py", line 216, in main
+    print(f"    Cost:   mean=${mean_cost:.4f}, values=[${c:.4f} for c in costs_list]")
+NameError: name 'c' is not defined
