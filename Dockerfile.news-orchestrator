@@ -6,6 +6,10 @@ COPY requirements-news.txt .
 RUN pip install --no-cache-dir -r requirements-news.txt
 
 COPY news_orchestrator_service.py .
+COPY news_cache_layer1.py .
+COPY cost_meter.py .
+COPY cost_rates.py .
+COPY entitlements.py .
 
 EXPOSE 5012
 
