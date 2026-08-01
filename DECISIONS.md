@@ -482,19 +482,34 @@ at a live database. The guard should have existed before the first task ran.
 
 ---
 
-### D24 — Shared containers stay on `storied`; Subscribed gets its own compose
+## D24 — shared containers stay built from `storied`, not `subscribed`
 
-**Date:** 2026-08-01
-**Context:** Michael is away. His phone depends on the shared containers
-built from `storied`. Putting unreviewed feature code into that path with
-nobody present to report a break is unacceptable.
+**Decision: the compose-managed services keep running `storied`. Subscribed
+work builds its own containers under distinct names.**
 
-**Decision:** The compose-managed containers (`audioura-*`) stay built from
-`storied`. Subscribed tasks that need `wallet_api` (or any code only on the
-`subscribed` branch) bring up an isolated stack via
-`docker-compose-subscribed.yml` on non-conflicting ports (5100, 5102).
-This compose shares Postgres but never touches the shared containers.
+I rebuilt `tour-orchestrator` from `storied` while clearing stale images.
+That removed `wallet_api.py` — which lives only on `subscribed` — from the
+running service, so LOCAL-90's end-to-end step 10 failed with `wallet=404`.
+Environmental, and mine.
 
-**Consequence:** `GET /wallet/...` against the shared orchestrator (port 5002)
-returns 404 — that's environmental, not a defect. Tests must set
-`ORCHESTRATOR_URL=http://localhost:5102` to hit the subscribed orchestrator.
+The tempting fix is to deploy `subscribed` to the shared containers so the
+Subscribed E2E passes. **That is the wrong call while Michael is away
+field-testing.** The shared services are the path his phone uses. Deploying
+an unmerged feature branch to them means:
+
+- entitlement gating and charging become live on his real requests;
+- a defect in unreviewed Subscribed code breaks tour downloads, which is the
+  one thing that must keep working;
+- and I would be doing it with no one able to tell me it broke.
+
+`free`-tier behaviour is unchanged by design (LOCAL-67), so it would
+*probably* be fine. "Probably fine" is not a reason to put unreviewed code
+in the path of the user's only working feature.
+
+**Consequence:** any Subscribed test needing the wallet HTTP endpoints must
+build its own orchestrator, as LOCAL-84 did. A `wallet=404` against the
+shared orchestrator is expected and is not a task defect — reviewers should
+check which branch the container was built from before treating it as one.
+
+This reverses when `subscribed` merges into `storied`, which is Michael's
+call on return.

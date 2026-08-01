@@ -1190,6 +1190,41 @@ def _verify_works_v2(poi_list, venue_name):
     if not _cache_hit:
         print(f"  [D1v2] Canonical titles union: {len(site_wiki_titles)} site/wiki + {len(sparql_titles)} SPARQL = {len(canonical_titles)} total")
     
+    # [LOCAL-34] Track bare SPARQL titles that need enrichment at stop-naming time.
+    # When SPARQL returns a bare single-word title (e.g., "Raquel"), we keep it as-is
+    # for matching purposes, but build a richer display title from corpus context.
+    _bare_sparql_enrichments = {}  # bare_title → enriched_title
+    if sparql_titles and combined_text:
+        for _st in sparql_titles:
+            if len(_st.split()) <= 1 and len(_st) < 12:
+                # Bare word — search for context in corpus
+                _st_lower = _st.lower()
+                _st_pos = combined_text.lower().find(_st_lower)
+                if _st_pos >= 0:
+                    _ctx_start = max(0, _st_pos - 200)
+                    _ctx_end = min(len(combined_text), _st_pos + 200)
+                    _ctx = combined_text[_ctx_start:_ctx_end]
+                    _period_match = re.search(
+                        r'(?:fin\s+du\s+|d[eé]but\s+du\s+)?'
+                        r'([IVXLC]+e\s+si[eè]cle|\d{4})',
+                        _ctx, re.IGNORECASE
+                    )
+                    _material_match = re.search(
+                        r'(cuir\s+dor[eé]|portrait|peinture|sculpture|bronze|'
+                        r'panneau|bois|marbre|toile|huile|cuivre|ivoire|'
+                        r'gilded\s+leather|painted\s+leather|panel)',
+                        _ctx, re.IGNORECASE
+                    )
+                    _parts = []
+                    if _material_match:
+                        _parts.append(_material_match.group(1).strip())
+                    if _period_match:
+                        _parts.append(_period_match.group(0).strip())
+                    if _parts:
+                        _enriched = f"{_st} ({', '.join(_parts)})"
+                        _bare_sparql_enrichments[_st] = _enriched
+                        print(f"  [LOCAL-34] Will enrich bare title at stop-naming: '{_st}' → '{_enriched}'")
+    
     # Remove site-extracted titles that are substrings of longer SPARQL titles
     # (prevents truncated site extractions from polluting the canonical set)
     # Uses normalized comparison (accent-stripped, punctuation-stripped) for matching
@@ -1233,6 +1268,7 @@ def _verify_works_v2(poi_list, venue_name):
     if 'corpus_result' in dir() and corpus_result and isinstance(corpus_result, dict):
         corpus_result['filter_result'] = _filter_result
         corpus_result['canonical_titles'] = canonical_titles  # LOCAL-24: filtered set
+        corpus_result['bare_sparql_enrichments'] = _bare_sparql_enrichments  # LOCAL-34
     
     print(f"  [D1v2-LOCAL24] After filter: {len(canonical_titles)} works, "
           f"{len(_gallery_titles)} galleries, {len(_excluded_titles)} excluded")
@@ -1418,6 +1454,10 @@ def _verify_works_v2(poi_list, venue_name):
             # Ensure title starts with uppercase (Wikidata sometimes stores lowercase)
             if _best_title and _best_title[0].islower():
                 _best_title = _best_title[0].upper() + _best_title[1:]
+            # [LOCAL-34] Apply enrichment for bare SPARQL titles
+            if _best_title in _bare_sparql_enrichments:
+                _best_title = _bare_sparql_enrichments[_best_title]
+                print(f"  [LOCAL-34] Stop title enriched: '{canonical_title}' → '{_best_title}'")
             poi['name'] = _best_title
             verified_pois.append(poi)
             continue
@@ -2167,6 +2207,117 @@ def _fetch_visitor_info_from_site(base_site_url: str, language: str = "en") -> s
                 return ""
     
     return _raw_result
+
+
+def _extract_visitor_info_from_corpus(combined_text: str, language: str = "en") -> str:
+    """[LOCAL-34] Extract visitor info from already-fetched corpus text.
+    
+    Fallback for venues where hours/tariffs are on the main page rather than
+    a dedicated child page. Searches the combined_text for recognisable
+    closed-day, hours, and admission patterns.
+    
+    Returns a concise visitor info string (EN), or empty if none found.
+    """
+    if not combined_text or len(combined_text) < 200:
+        return ""
+    
+    _info_parts = []
+    _text = combined_text
+    
+    # 1. Closed-day detection (French source → translate to EN)
+    _closed_fr = re.search(
+        r'(?:Fermé|fermé)\s+(?:le\s+)?'
+        r'(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)',
+        _text
+    )
+    # Also handle reversed pattern: "Mardi: Fermé" (schedule-table format)
+    _closed_fr_rev = re.search(
+        r'(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\s*[:]\s*'
+        r'(?:Fermé|fermé)',
+        _text, re.IGNORECASE
+    )
+    _closed_en = re.search(
+        r'[Cc]losed\s+(?:on\s+)?'
+        r'(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)',
+        _text
+    )
+    _FR_TO_EN_DAYS = {
+        'lundi': 'Monday', 'mardi': 'Tuesday', 'mercredi': 'Wednesday',
+        'jeudi': 'Thursday', 'vendredi': 'Friday', 'samedi': 'Saturday',
+        'dimanche': 'Sunday',
+    }
+    if _closed_fr:
+        _day_fr = _closed_fr.group(1).lower()
+        _day_en = _FR_TO_EN_DAYS.get(_day_fr, _day_fr.capitalize())
+        _info_parts.append(f"Closed on {_day_en}")
+    elif _closed_fr_rev:
+        _day_fr = _closed_fr_rev.group(1).lower()
+        _day_en = _FR_TO_EN_DAYS.get(_day_fr, _day_fr.capitalize())
+        _info_parts.append(f"Closed on {_day_en}")
+    elif _closed_en:
+        _info_parts.append(f"Closed on {_closed_en.group(1)}")
+    
+    # 2. Opening hours — look for time ranges (French format: 10h00 - 18h00)
+    # Find ALL time ranges and pick the widest (main venue hours, not subsidiary)
+    _all_hours = re.findall(
+        r'(\d{1,2})[hH](\d{2})?\s*[-–àa]\s*(\d{1,2})[hH](\d{2})?',
+        _text
+    )
+    if _all_hours:
+        # Pick the time range with the widest span (hours)
+        _best_range = None
+        _best_span = 0
+        for _match in _all_hours:
+            _h1 = int(_match[0])
+            _h2 = int(_match[2])
+            _span = _h2 - _h1
+            if _span > _best_span:
+                _best_span = _span
+                _best_range = _match
+        if _best_range:
+            _h1 = _best_range[0]
+            _m1 = _best_range[1] or '00'
+            _h2 = _best_range[2]
+            _m2 = _best_range[3] or '00'
+            _open_str = f"{_h1}:{_m1}"
+            _close_str = f"{_h2}:{_m2}"
+            _info_parts.append(f"Open {_open_str} to {_close_str}")
+    
+    # 3. Admission / pricing
+    # Look for "gratuit" / free indicators
+    _free_match = re.search(
+        r'(?:gratuit|entr[eé]e\s+(?:libre|gratuite)|free\s+admission|admission\s+free)',
+        _text, re.IGNORECASE
+    )
+    # Look for specific pricing (€ amounts)
+    _price_match = re.search(
+        r'(\d+)\s*€', _text
+    )
+    if _free_match:
+        # Check if it's conditionally free (for specific groups) vs universally free
+        _free_context_start = max(0, _free_match.start() - 100)
+        _free_context = _text[_free_context_start:_free_match.end() + 50].lower()
+        if 'moins de 18' in _free_context or 'étudiant' in _free_context or 'enfant' in _free_context:
+            # Conditional free — report the paid price if available
+            if _price_match:
+                _info_parts.append(f"Admission {_price_match.group(1)}€ (free for under 18, students)")
+            else:
+                _info_parts.append("Free for under 18 and students")
+        else:
+            _info_parts.append("Free admission")
+    elif _price_match:
+        _info_parts.append(f"Admission {_price_match.group(1)}€")
+    
+    if not _info_parts:
+        return ""
+    
+    _result = '. '.join(_info_parts)
+    
+    # Validate using the standard gate
+    if not _is_valid_visitor_info(_result):
+        return ""
+    
+    return _result
 
 
 def _translate_visitor_info_to_language(raw_info: str, target_language: str) -> str:
@@ -3397,6 +3548,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     # Verify new candidates
                     if _story_corpus_result:
                         from story_miner import match_candidate_to_canonical
+                        _r4_enrichments = _story_corpus_result.get('bare_sparql_enrichments', {})
                         _r4_verified = []
                         for p in _r4_new_pois:
                             match = match_candidate_to_canonical(
@@ -3405,6 +3557,12 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                                 _story_corpus_result['combined_text']
                             )
                             if match:
+                                # [LOCAL-34] Rename POI to the canonical title (with enrichment)
+                                _r4_canonical = match[0]
+                                if _r4_canonical in _r4_enrichments:
+                                    _r4_canonical = _r4_enrichments[_r4_canonical]
+                                p = dict(p)  # Don't mutate original
+                                p['name'] = _r4_canonical
                                 _r4_verified.append(p)
                                 _d1_evidence_log[p['name']] = {
                                     "status": "VERIFIED",
@@ -4143,6 +4301,69 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     _sourced_visitor_info = _fetch_visitor_info_from_site(_official_url_for_info, language="en")
                     _visitor_info_source_url = _official_url_for_info
                     _visitor_info_source_text = _fetch_visitor_info_raw_source(_official_url_for_info)
+            # -------- [LOCAL-91] Corpus-text fallback with provenance --------
+            # Originally LOCAL-34/75 extracted visitor info from combined_text without
+            # provenance. LOCAL-91 rewires this: iterates story_miner's individual pages
+            # (each with URL + raw text) so practical_facts_gate can verify claims.
+            # Falls back to combined_text extraction (LOCAL-34 style) only when pages
+            # are unavailable, but in that case no provenance means the gate will still
+            # reject unverifiable claims — as designed.
+            if not _sourced_visitor_info and _story_corpus_result and _story_corpus_result.get('pages'):
+                try:
+                    from visitor_facts_extractor import extract_visitor_facts_from_text
+                    _corpus_pages = _story_corpus_result['pages']
+                    _best_corpus_facts = None
+                    _best_corpus_score = -1
+                    _best_corpus_page_url = ''
+                    _best_corpus_page_text = ''
+                    for _cp in _corpus_pages:
+                        _cp_text = _cp.get('text', '')
+                        _cp_url = _cp.get('url', '')
+                        if not _cp_text or len(_cp_text) < 100:
+                            continue
+                        # Detect language for extraction
+                        _cp_lower = _cp_text[:2000].lower()
+                        _fr_sig = sum(1 for w in ['fermé', 'horaires', 'tarifs', 'ouvert', 'gratuit', 'mardi']
+                                      if w in _cp_lower)
+                        _en_sig = sum(1 for w in ['closed', 'hours', 'admission', 'open', 'free', 'tuesday']
+                                      if w in _cp_lower)
+                        _cp_lang = "en" if _en_sig > _fr_sig else "fr"
+                        _cp_facts = extract_visitor_facts_from_text(_cp_text, _cp_lang)
+                        # Score: admission with price is critical
+                        _cp_score = 0
+                        _cp_score += min(len(_cp_facts.hours), 2) * 2
+                        if _cp_facts.admission:
+                            _cp_score += 3
+                            if re.search(r'€\d+|\d+\s*€', _cp_facts.admission):
+                                _cp_score += 2
+                        if _cp_facts.closed_days:
+                            _cp_score += 1
+                        if _cp_score > _best_corpus_score:
+                            _best_corpus_score = _cp_score
+                            _best_corpus_facts = _cp_facts
+                            _best_corpus_page_url = _cp_url
+                            _best_corpus_page_text = _cp_text
+                    # Use if we found anything substantive (at least closed day OR admission)
+                    if _best_corpus_facts and not _best_corpus_facts.is_empty():
+                        _formatted = _best_corpus_facts.format_en()
+                        if _formatted and len(_formatted) >= 10:
+                            _sourced_visitor_info = _formatted
+                            _visitor_info_source_url = _best_corpus_page_url
+                            _visitor_info_source_text = _best_corpus_page_text[:10000]
+                            print(f"  [LOCAL-91] Corpus fallback: visitor info extracted from {_best_corpus_page_url}")
+                            print(f"  [LOCAL-91] Corpus fallback Museum Information: {_formatted}")
+                except ImportError:
+                    print(f"  [LOCAL-91] visitor_facts_extractor not available for corpus fallback")
+                except Exception as _cf_err:
+                    print(f"  [LOCAL-91] Corpus fallback error (non-fatal): {_cf_err}")
+            # [LOCAL-34] Secondary fallback: combined_text (no provenance — gate will
+            # reject unverifiable claims, which is correct behavior)
+            if not _sourced_visitor_info and _story_corpus_result and _story_corpus_result.get('combined_text'):
+                _sourced_visitor_info = _extract_visitor_info_from_corpus(
+                    _story_corpus_result['combined_text'], language="en"
+                )
+                if _sourced_visitor_info:
+                    print(f"  [LOCAL-34] Visitor info extracted from corpus text (main page fallback, no provenance)")
             if _sourced_visitor_info and poi_list:
                 poi_list[0]['operational_details'] = _sourced_visitor_info
                 print(f"  [LOCAL-39] Museum Information sourced from official site for stop 1")

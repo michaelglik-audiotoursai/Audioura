@@ -383,22 +383,91 @@ def extract_canonical_titles(corpus: str, venue_name: str = "") -> Tuple[Set[str
             _maker = match.group(2).strip().rstrip(' ,.')
             _city = match.group(3).strip()
             _year = match.group(4)
-            # Skip if instrument type contains structural words
-            if any(w in _instr_type.lower() for w in ('dont', 'celle', 'celui', 'plus', 'célèbres', 'including')):
-                continue
+            # [LOCAL-34] If instrument type contains structural/superlative words
+            # (section headings like "Most famous guitars" or "les plus célèbres guitares"),
+            # strip the superlatives and extract just the instrument noun.
+            _superlative_words = ('dont', 'celle', 'celui', 'plus', 'célèbres',
+                                  'including', 'most', 'famous', 'celebrated',
+                                  'finest', 'greatest', 'important')
+            if any(w in _instr_type.lower() for w in _superlative_words):
+                # Try to salvage: extract just the last noun (the actual instrument)
+                _type_words = _instr_type.strip().split()
+                # Keep only the last 1-2 words that are NOT superlatives/articles
+                _NOISE = {'most', 'famous', 'celebrated', 'finest', 'greatest',
+                          'important', 'plus', 'célèbres', 'célèbre', 'principales',
+                          'dont', 'celle', 'celui', 'including', 'the', 'les', 'des',
+                          'extremely', 'rare', 'very', 'en', 'état', 'de', 'jeu'}
+                _clean_words = [w for w in _type_words if w.lower() not in _NOISE]
+                if _clean_words:
+                    _instr_type = ' '.join(_clean_words[-2:])  # Keep last 1-2 meaningful words
+                else:
+                    continue  # No salvageable instrument word at all
             # Dedup by maker+year
             _dedup_key = f"{_maker.lower()}_{_year}"
             if _dedup_key in _seen_makers:
                 continue
             _seen_makers.add(_dedup_key)
-            # Build a clean title
-            _clean_type = _instr_type.strip().capitalize()
+            # Build a clean title — singularize trailing 's' for single instruments
+            _clean_type = _instr_type.strip()
+            if _clean_type.endswith('s') and not _clean_type.endswith('ss'):
+                _clean_type = _clean_type[:-1]  # guitars → guitar
+            _clean_type = _clean_type.capitalize()
             _title = f"{_clean_type} by {_maker} ({_city}, {_year})"
             if len(_title) >= 15 and len(_maker) >= 4:
                 _exhibit_from_quoted.add(_title)
                 _maker_items_found += 1
     if _maker_items_found:
         print(f"  [T0a] Pattern 7 (maker attribution): {_maker_items_found} items")
+
+    # Pattern 7b (LOCAL-34): "one/that by [Maker] (City, Year)" — sub-items in lists
+    # e.g. "several baroque guitars, including one by Giovanni Tesler (Ancona, 1618)"
+    # These reference a previously-named instrument type in the same sentence/paragraph.
+    _sub_item_pattern = re.compile(
+        r'(?:including\s+)?(?:one|that|celle)\s+(?:by|de|d[\'\\u2019])\s*'
+        r'([A-ZÀ-Ü][A-Za-zà-ÿ\s\.\-]{3,40}?)'  # Maker name
+        r'\s*\(([A-ZÀ-Ü][a-zà-ÿ]+(?:\s+[a-zà-ÿ]+)?),?\s*'  # City
+        r'(?:c\.\s*|v\.\s*)?(\d{4})\s*\)',  # Year (with optional c./v. prefix)
+        re.MULTILINE
+    )
+    # Instrument type context: look for the nearest instrument category keyword
+    _INSTRUMENT_CATEGORIES = {
+        'guitar': 'Guitare baroque', 'guitars': 'Guitare baroque',
+        'guitare': 'Guitare baroque', 'guitares': 'Guitare baroque',
+        'violin': 'Violon', 'violon': 'Violon',
+        'viola': 'Viole', 'viole': 'Viole',
+        'harp': 'Harpe', 'harpe': 'Harpe',
+        'flute': 'Flûte', 'flûte': 'Flûte',
+        'recorder': 'Flûte à bec',
+        'clarinet': 'Clarinette', 'clarinette': 'Clarinette',
+        'oboe': 'Hautbois', 'hautbois': 'Hautbois',
+        'cello': 'Violoncelle', 'violoncelle': 'Violoncelle',
+        'piano': 'Piano', 'clavecin': 'Clavecin', 'harpsichord': 'Clavecin',
+    }
+    _maker_items_7b = 0
+    for match in _sub_item_pattern.finditer(corpus):
+        _maker = match.group(1).strip().rstrip(' ,.')
+        _city = match.group(2).strip()
+        _year = match.group(3)
+        _dedup_key = f"{_maker.lower()}_{_year}"
+        if _dedup_key in _seen_makers:
+            continue
+        _seen_makers.add(_dedup_key)
+        # Find instrument type from context (200 chars before match)
+        _ctx_start = max(0, match.start() - 200)
+        _context = corpus[_ctx_start:match.start()].lower()
+        _found_type = ''
+        for _kw, _cat in _INSTRUMENT_CATEGORIES.items():
+            if _kw in _context:
+                _found_type = _cat
+                break
+        if not _found_type:
+            _found_type = 'Instrument'  # generic fallback
+        _title = f"{_found_type} by {_maker} ({_city}, {_year})"
+        if len(_title) >= 15 and len(_maker) >= 4:
+            _exhibit_from_quoted.add(_title)
+            _maker_items_7b += 1
+    if _maker_items_7b:
+        print(f"  [T0a] Pattern 7b (sub-item attribution): {_maker_items_7b} items")
 
     # Combine exhibit names into canonical_titles
     _exhibit_names = _exhibit_from_sections | _exhibit_from_quoted
@@ -2416,6 +2485,12 @@ def match_candidate_to_canonical(
             if len(_candidate_words) <= 2:
                 if fwd_matches < len(_candidate_words):
                     continue  # Not all candidate words matched — skip
+            # [LOCAL-34] Single-word candidates must also achieve reasonable reverse coverage.
+            # Prevents "Raquel" from matching against "Jesabel, Etan, Efer, Asalel et Raquel"
+            # where the candidate is just one fragment of a multi-item enumeration.
+            if len(_candidate_words) == 1 and len(_canon_words) >= 3:
+                if rev_score < 0.34:
+                    continue  # Single word covers too little of the canonical title
             best_score = score
             best_match = canonical
 
