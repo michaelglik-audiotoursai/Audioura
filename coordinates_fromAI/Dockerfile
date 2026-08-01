@@ -17,6 +17,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application
 COPY app.py .
+COPY build_manifest.py .
+
+# Build-time manifest: record checksums of all Python sources + git SHA
+ARG GIT_SHA=unknown
+RUN echo "${GIT_SHA}" > /app/.git_sha
+RUN python build_manifest.py /app /app/.build_manifest.json
 
 # Expose port
 EXPOSE 5004
