@@ -685,19 +685,24 @@ def _parse_catalogue_from_html(url: str) -> List[Dict]:
     # [LOCAL-29] Split HTML into sections at h2 boundaries.
     # Each section is: <h2...>Title</h2> followed by body until next <h2>.
     # Using re.split gives clean, non-overlapping sections.
+    # [LOCAL-97] Also capture the pre-h2 content (figcaption/data-caption) which
+    # on many museum pages contains the structured metadata (period, material).
     _h2_split_pattern = re.compile(r'(<h2[^>]*>.*?</h2>)', re.DOTALL | re.IGNORECASE)
     parts = _h2_split_pattern.split(html)
     
     # parts alternates: [pre-content, h2-tag, body, h2-tag, body, ...]
-    # Pair each h2-tag (odd index) with the body that follows it (even index+1)
+    # Pair each h2-tag (odd index) with:
+    #   - pre_html: the content BEFORE this h2 (parts[i-1]) — contains figcaption/data-caption
+    #   - body_html: the content AFTER this h2 (parts[i+1]) — contains <p> description
     sections = []
     for i in range(len(parts)):
         if re.match(r'<h2[^>]*>', parts[i], re.IGNORECASE):
             heading_html = parts[i]
+            pre_html = parts[i - 1] if i > 0 else ''
             body_html = parts[i + 1] if (i + 1) < len(parts) else ''
-            sections.append((heading_html, body_html))
+            sections.append((heading_html, body_html, pre_html))
     
-    for heading_html, raw_body in sections:
+    for heading_html, raw_body, pre_html in sections:
         # Extract title from heading
         title_match = re.search(r'<h2[^>]*>\s*(.*?)\s*</h2>', heading_html, re.DOTALL | re.IGNORECASE)
         if not title_match:
@@ -731,24 +736,65 @@ def _parse_catalogue_from_html(url: str) -> List[Dict]:
         alt_texts = re.findall(r'alt="([^"]*)"', raw_body)
         caption_text = ' '.join(alt_texts)
         
+        # [LOCAL-97] Extract metadata from the pre-h2 content.
+        # On many museum pages, the structured metadata (period, material, inventory)
+        # appears in a <figcaption> or data-caption attribute BEFORE the <h2> heading.
+        # We extract this into a separate metadata string that gets priority for
+        # period/material extraction (it's the museum's own structured data).
+        _pre_metadata = ''
+        if pre_html:
+            # 1. Look for data-caption attributes in the pre-h2 content.
+            # Use the LAST one found (closest to the h2 = most likely to belong to this work).
+            # Match criterion: either contains part of title, OR is the final caption
+            # in the pre-section (structural proximity = semantic proximity).
+            _dc_matches = re.findall(r'data-caption="([^"]*)"', pre_html, re.IGNORECASE)
+            if _dc_matches:
+                # Try title-based match first
+                _title_lower = title.lower()
+                for _dc in reversed(_dc_matches):
+                    _dc_clean = _dc.replace('&#039;', "'").replace('&amp;', '&').replace('\\n', '\n')
+                    _dc_lower = _dc_clean.lower()
+                    if (_title_lower[:10] in _dc_lower or
+                        any(w in _dc_lower for w in _title_lower.split() if len(w) >= 5)):
+                        _pre_metadata = _dc_clean
+                        break
+                # If no title match, use the last data-caption (structural proximity)
+                if not _pre_metadata:
+                    _dc_clean = _dc_matches[-1].replace('&#039;', "'").replace('&amp;', '&').replace('\\n', '\n')
+                    _pre_metadata = _dc_clean
+            
+            # 2. If no data-caption, look for <figcaption>
+            if not _pre_metadata:
+                _fig_matches = re.findall(r'<figcaption[^>]*>(.*?)</figcaption>', pre_html, re.DOTALL | re.IGNORECASE)
+                if _fig_matches:
+                    # Use the last figcaption (closest to the h2)
+                    _fig_clean = re.sub(r'<[^>]+>', '', _fig_matches[-1]).strip()
+                    _pre_metadata = _fig_clean
+        
         # Combined text for metadata extraction (bounded to THIS section)
+        # [LOCAL-97] Priority: pre_metadata first (structured museum data), then alt/body
         full_text = caption_text + '\n' + body_text
+        metadata_text = _pre_metadata + '\n' + full_text if _pre_metadata else full_text
         
         if len(body_text) < 50:
             continue
         
         # Extract metadata (from THIS section's content only)
-        material = _extract_material(full_text)
-        period = _extract_period(title + ' ' + full_text)
-        origin = _extract_origin(title + ' ' + full_text)
+        # [LOCAL-97] Use metadata_text which prioritizes pre-h2 structured data
+        material = _extract_material(metadata_text)
+        period = _extract_period(title + ' ' + metadata_text)
+        origin = _extract_origin(title + ' ' + metadata_text)
         
         # Skip if this doesn't look like a work (no metadata and short text)
         if not material and not period and not origin and len(body_text) < 150:
             continue
         
         # Take first ~500 chars of body as description
-        description = body_text[:500].strip()
-        if len(body_text) > 500:
+        # [LOCAL-97] Prepend pre_metadata (structured catalogue data) so that
+        # LOCAL-31's validation can find period/material in the description text.
+        _desc_source = (_pre_metadata + '\n' + body_text) if _pre_metadata else body_text
+        description = _desc_source[:500].strip()
+        if len(_desc_source) > 500:
             last_period = description.rfind('.')
             if last_period > 200:
                 description = description[:last_period + 1]
@@ -935,10 +981,67 @@ def _extract_material(text: str) -> str:
 
 
 def _extract_period(text: str) -> str:
-    """Extract date/period mentions from text."""
-    match = _PERIOD_PATTERNS.search(text)
+    """Extract date/period mentions from text.
+    
+    [LOCAL-97] Priority-ordered extraction: prefer explicit century/half-century
+    mentions over plain year ranges (which may be artist lifespans, not artwork dates).
+    Also tightened to avoid capturing sentence fragments after "datée du..." patterns.
+    """
+    # Roman numeral pattern for centuries (must match full numeral, not partial)
+    # Uses word boundary (\b) to prevent "XVI" from matching as "VI"
+    _ROMAN = r'(?:X{0,3}(?:IX|IV|V?I{0,3}))'  # Matches I through XXXIX
+    
+    # Priority 1: Qualified century (half-century, début/fin/milieu)
+    _QUALIFIED_CENTURY = re.compile(
+        r'(?:seconde?\s+moiti[eé]\s+du\s+|premi[eè]re\s+moiti[eé]\s+du\s+|'
+        r'(?:d[eé]but|fin|milieu)\s+du\s+)\s*' + _ROMAN + r'e\s+si[eè]cle',
+        re.IGNORECASE
+    )
+    match = _QUALIFIED_CENTURY.search(text)
     if match:
         return match.group(0).strip()
+    
+    # Priority 2: Standalone Roman numeral century (with word boundary to prevent partial match)
+    _STANDALONE_CENTURY = re.compile(
+        r'(?<![A-Za-z])' + _ROMAN + r'e(?:\s*[-–]\s*' + _ROMAN + r'e)?\s+si[eè]cles?',
+        re.IGNORECASE
+    )
+    match = _STANDALONE_CENTURY.search(text)
+    if match:
+        return match.group(0).strip()
+    
+    # Priority 3: "vers YYYY" or standalone year on its own line (artwork creation date)
+    _STANDALONE_YEAR = re.compile(r'(?:^|\n)\s*(?:vers?\s+)?(\d{4})\s*(?:\n|$)', re.MULTILINE)
+    match = _STANDALONE_YEAR.search(text)
+    if match:
+        year = int(match.group(1))
+        if 1000 <= year <= 2025:
+            return match.group(0).strip()
+    
+    # Priority 4: "Ère/Époque X" pattern
+    _ERA_PATTERN = re.compile(
+        r'(?:[EÉ](?:poque|re)\s+(?:d[e\']?\s*)?)'
+        r'(?:Edo|Heian|Meiji|Kamakura|Muromachi|Nara|Momoyama)',
+        re.IGNORECASE
+    )
+    match = _ERA_PATTERN.search(text)
+    if match:
+        return match.group(0).strip()
+    
+    # Priority 5: Plain year NOT in parentheses and NOT part of a lifespan range
+    _PLAIN_YEAR = re.compile(r'(?<!\()(?<!\d[-–])\b(\d{4})\b(?!\s*[-–]\s*\d)(?!\))')
+    match = _PLAIN_YEAR.search(text)
+    if match:
+        year = int(match.group(1))
+        if 1000 <= year <= 2025:
+            return match.group(1)
+    
+    # Priority 6: Year range (may be artist lifespan — lowest priority)
+    _YEAR_RANGE = re.compile(r'\b(\d{4})\s*[-–]\s*(\d{4})\b')
+    match = _YEAR_RANGE.search(text)
+    if match:
+        return match.group(0).strip()
+    
     return ''
 
 

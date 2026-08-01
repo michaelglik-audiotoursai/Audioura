@@ -1432,13 +1432,17 @@ def _verify_works_v2(poi_list, venue_name):
                 _verified_qids.add(_matched_qid)
             
             print(f"  [D1v2] VERIFIED '{work_name}' → canonical: '{canonical_title}'")
-            evidence_log[work_name] = {
-                "status": "VERIFIED",
-                "canonical_title": canonical_title,
-                "snippet": snippet,
-                "method": "canonical_title_match",
-                "qid": _matched_qid,
-            }
+            # [LOCAL-97] Don't overwrite existing catalogue_work entries — they carry
+            # period/material metadata that the C5-1 binding block needs.
+            _existing_ev_for_title = evidence_log.get(work_name)
+            if not (_existing_ev_for_title and _existing_ev_for_title.get('method') == 'catalogue_work'):
+                evidence_log[work_name] = {
+                    "status": "VERIFIED",
+                    "canonical_title": canonical_title,
+                    "snippet": snippet,
+                    "method": "canonical_title_match",
+                    "qid": _matched_qid,
+                }
             # Use the EXACT canonical title as the stop name (prevents GPT truncation)
             # If the matched canonical is a substring of a longer SPARQL title, prefer the SPARQL form
             poi = dict(poi)  # Don't mutate the original
@@ -1530,7 +1534,11 @@ def _verify_works_v2(poi_list, venue_name):
         _vp_norm = _normalize_for_title_dedup(_vp.get('name', ''))
         if _vp_norm in _verified_normalized_titles:
             print(f"  [D1v2] TITLE-DEDUP dropped '{_vp.get('name', '')[:50]}' (normalized duplicate)")
-            evidence_log[_vp.get('name', '')] = {"status": "DROPPED", "reason": "normalized title duplicate"}
+            # [LOCAL-97] Do NOT overwrite existing catalogue_work entries in evidence_log.
+            # Catalogue entries carry period/material metadata that the C5-1 binding block needs.
+            _existing_ev = evidence_log.get(_vp.get('name', ''))
+            if not (_existing_ev and _existing_ev.get('method') == 'catalogue_work'):
+                evidence_log[_vp.get('name', '')] = {"status": "DROPPED", "reason": "normalized title duplicate"}
             continue
         _verified_normalized_titles.add(_vp_norm)
         _deduped_pois.append(_vp)
