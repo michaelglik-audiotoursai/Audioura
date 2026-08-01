@@ -1,0 +1,152 @@
+[
+  {
+    "passes": 6,
+    "distinct_facts": 38,
+    "stops": {
+      "1": {
+        "exempt": true,
+        "name": "L'Armure d'Andô Naoyuki"
+      },
+      "2": {
+        "name": "Statue de Bouddha",
+        "material": "✓ (schiste)",
+        "period": "—",
+        "passes": true
+      },
+      "3": {
+        "name": "La danse cosmique de Ganesh",
+        "material": "✓ (chlorite)",
+        "period": "✓ (Xe siècle)",
+        "passes": true
+      },
+      "4": {
+        "name": "Kannon, le bodhisattva de la compassion",
+        "material": "—",
+        "period": "✓ (XIIe siècle)",
+        "passes": true
+      },
+      "5": {
+        "name": "Ulysses Grant au Japon",
+        "material": "—",
+        "period": "✓ (1879)",
+        "passes": true
+      },
+      "6": {
+        "name": "Robe de prêtre taoïste",
+        "material": "✓ (soie)",
+        "period": "✓ (XVIIIe siècle)",
+        "passes": true
+      },
+      "7": {
+        "exempt": true,
+        "name": "Kannon à mille bras"
+      },
+      "8": {
+        "name": "Masque du vieillard kojô",
+        "material": "✓ (bois)",
+        "period": "✓ (XVIe siècle)",
+        "passes": true
+      }
+    }
+  },
+  {
+    "passes": 6,
+    "distinct_facts": 38,
+    "stops": {
+      "1": {
+        "exempt": true,
+        "name": "L'Armure d'Andô Naoyuki"
+      },
+      "2": {
+        "name": "Statue de Bouddha",
+        "material": "✓ (schiste)",
+        "period": "—",
+        "passes": true
+      },
+      "3": {
+        "name": "La danse cosmique de Ganesh",
+        "material": "✓ (chlorite)",
+        "period": "✓ (Xe siècle)",
+        "passes": true
+      },
+      "4": {
+        "name": "Kannon, le bodhisattva de la compassion",
+        "material": "—",
+        "period": "✓ (XIIe siècle)",
+        "passes": true
+      },
+      "5": {
+        "name": "Ulysses Grant au Japon",
+        "material": "—",
+        "period": "✓ (1879)",
+        "passes": true
+      },
+      "6": {
+        "name": "Robe de prêtre taoïste",
+        "material": "✓ (soie)",
+        "period": "✓ (XVIIIe siècle)",
+        "passes": true
+      },
+      "7": {
+        "exempt": true,
+        "name": "Kannon à mille bras"
+      },
+      "8": {
+        "name": "Masque du vieillard kojô",
+        "material": "✓ (bois)",
+        "period": "✓ (XVIe siècle)",
+        "passes": true
+      }
+    }
+  },
+  {
+    "passes": 6,
+    "distinct_facts": 38,
+    "stops": {
+      "1": {
+        "exempt": true,
+        "name": "L'Armure d'Andô Naoyuki"
+      },
+      "2": {
+        "name": "Statue de Bouddha",
+        "material": "✓ (schiste)",
+        "period": "—",
+        "passes": true
+      },
+      "3": {
+        "name": "La danse cosmique de Ganesh",
+        "material": "✓ (chlorite)",
+        "period": "✓ (Xe siècle)",
+        "passes": true
+      },
+      "4": {
+        "name": "Kannon, le bodhisattva de la compassion",
+        "material": "—",
+        "period": "✓ (XIIe siècle)",
+        "passes": true
+      },
+      "5": {
+        "name": "Ulysses Grant au Japon",
+        "material": "—",
+        "period": "✓ (1879)",
+        "passes": true
+      },
+      "6": {
+        "name": "Robe de prêtre taoïste",
+        "material": "✓ (soie)",
+        "period": "✓ (XVIIIe siècle)",
+        "passes": true
+      },
+      "7": {
+        "exempt": true,
+        "name": "Kannon à mille bras"
+      },
+      "8": {
+        "name": "Masque du vieillard kojô",
+        "material": "✓ (bois)",
+        "period": "✓ (XVIe siècle)",
+        "passes": true
+      }
+    }
+  }
+]
