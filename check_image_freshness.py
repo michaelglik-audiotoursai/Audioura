@@ -6,6 +6,12 @@ For every running audioura/development container, compare the Python source
 files inside the container against the host's working tree.  Print a table
 showing which containers are fresh and which have drifted.
 
+Three states:
+  FRESH   — manifest present and all files match, OR no manifest but direct
+            file comparison shows all files identical.
+  STALE   — manifest present and mismatched, OR direct comparison shows drift.
+  UNKNOWN — no manifest AND cannot determine file state (container unreachable, etc.)
+
 Usage:
     python check_image_freshness.py              # check all running containers
     python check_image_freshness.py --verbose    # show per-file diffs
@@ -27,6 +33,50 @@ CONTAINER_APP_DIR = "/app"
 
 # Host working tree root (override with --host-dir)
 DEFAULT_HOST_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Map of service names (as they appear in docker-compose) to their build
+# context subdirectory relative to the host root.  Services not listed here
+# use the root directory as their build context.
+SERVICE_BUILD_CONTEXT = {
+    "map-delivery": "map_delivery",
+    "user-api-2": "user-tracking",
+    "tour-update": "tour-update-service",
+    "coordinates-fromai": "coordinates_fromAI",
+    "voice-control": "voice_control",
+    "translation-service": "translation-service",
+}
+
+# Map of (service_key, container_filename) → host_filename for services that
+# rename files during COPY (e.g., `COPY treats_service.py app.py`).
+SERVICE_FILE_RENAMES = {
+    ("treats", "app.py"): "treats_service.py",
+    ("tour-processor", "build_mp3.py"): "build_mp3_simple.py",
+}
+
+
+def resolve_host_dir_for_container(container_name, base_host_dir):
+    """
+    Given a container name, determine the host directory that was used as the
+    build context.  Subdirectory services (map-delivery, user-api-2, etc.)
+    have their source in a subfolder; root-context services use the repo root.
+    """
+    for service_key, subdir in SERVICE_BUILD_CONTEXT.items():
+        if service_key in container_name:
+            candidate = os.path.join(base_host_dir, subdir)
+            if os.path.isdir(candidate):
+                return candidate
+    return base_host_dir
+
+
+def resolve_host_filename(container_name, container_filename):
+    """
+    Some services rename files during COPY (e.g., treats: COPY treats_service.py app.py).
+    Return the host-side filename for a given container filename.
+    """
+    for (service_key, cfile), host_file in SERVICE_FILE_RENAMES.items():
+        if service_key in container_name and cfile == container_filename:
+            return host_file
+    return container_filename
 
 
 def md5_file(path):
@@ -112,20 +162,30 @@ def list_container_py_files(container_name):
 def check_container(container_name, host_dir, verbose=False):
     """
     Compare a container's Python files against the host working tree.
-    Returns (status, details) where status is 'FRESH', 'STALE', or 'ERROR'.
+    Returns (status, details) where status is 'FRESH', 'STALE', or 'UNKNOWN'.
     """
     manifest = get_container_manifest(container_name)
+
+    # Resolve the correct host directory for this container
+    effective_host_dir = resolve_host_dir_for_container(container_name, host_dir)
 
     # Get list of .py files in container
     container_files = list_container_py_files(container_name)
     if not container_files:
-        return "ERROR", {"reason": "Could not list files in container"}
+        return "UNKNOWN", {"reason": "Could not list files in container",
+                           "manifest_present": manifest is not None,
+                           "code_sha": manifest.get("git_sha", "unknown") if manifest else "no_manifest",
+                           "build_time": manifest.get("build_time", "unknown") if manifest else "no_manifest",
+                           "host_dir": effective_host_dir}
 
     diffs = []
     checked = 0
+    files_compared = []
 
     for filename in container_files:
-        host_path = os.path.join(host_dir, filename)
+        # Resolve potential file renames (e.g., treats_service.py → app.py)
+        host_filename = resolve_host_filename(container_name, filename)
+        host_path = os.path.join(effective_host_dir, host_filename)
         if not os.path.exists(host_path):
             # File exists in container but not on host — might be fine (generated)
             continue
@@ -145,6 +205,7 @@ def check_container(container_name, host_dir, verbose=False):
             continue
 
         checked += 1
+        files_compared.append(filename)
         if host_md5 != container_md5:
             host_size = os.path.getsize(host_path)
             diffs.append({
@@ -160,11 +221,19 @@ def check_container(container_name, host_dir, verbose=False):
         "manifest_present": manifest is not None,
         "code_sha": manifest.get("git_sha", "unknown") if manifest else "no_manifest",
         "build_time": manifest.get("build_time", "unknown") if manifest else "no_manifest",
+        "host_dir": effective_host_dir,
+        "files_compared": files_compared,
     }
     if diffs:
         details["drifted_files"] = diffs
 
-    status = "FRESH" if len(diffs) == 0 else "STALE"
+    if checked == 0:
+        status = "UNKNOWN"
+    elif len(diffs) == 0:
+        status = "FRESH"
+    else:
+        status = "STALE"
+
     return status, details
 
 
@@ -224,7 +293,7 @@ def main():
 
     if args.json:
         print(json.dumps(results, indent=2))
-        sys.exit(0 if all(r["status"] == "FRESH" for r in results) else 1)
+        sys.exit(0 if all(r["status"] in ("FRESH", "UNKNOWN") for r in results) else 1)
 
     # Print table
     print(f"\n{'='*80}")
@@ -234,13 +303,27 @@ def main():
 
     any_stale = False
     for r in results:
-        status_icon = "✅" if r["status"] == "FRESH" else "❌" if r["status"] == "STALE" else "⚠️"
-        print(f"{status_icon} {r['container']:<40} {r['status']}")
+        if r["status"] == "FRESH":
+            status_icon = "✅"
+        elif r["status"] == "STALE":
+            status_icon = "❌"
+        elif r["status"] == "UNKNOWN":
+            status_icon = "⚠️"
+        else:
+            status_icon = "❓"
+
+        manifest_tag = ""
+        if not r.get("manifest_present", False) and r["status"] != "UNKNOWN":
+            manifest_tag = " (no manifest — compared live)"
+
+        print(f"{status_icon} {r['container']:<40} {r['status']}{manifest_tag}")
         print(f"   Image: {r['image']}")
         print(f"   Created: {r['created']}")
         print(f"   SHA: {r.get('code_sha', 'unknown')}")
         print(f"   Built: {r.get('build_time', 'unknown')}")
         print(f"   Files checked: {r.get('files_checked', 0)}, drifted: {r.get('files_drifted', 0)}")
+        if r.get("host_dir") and r["host_dir"] != args.host_dir:
+            print(f"   Source dir: {r['host_dir']}")
 
         if r["status"] == "STALE":
             any_stale = True
@@ -249,16 +332,36 @@ def main():
                     print(f"      ⚠ {df['file']}: host={df.get('host_md5', '?')[:8]}… "
                           f"container={df.get('container_md5', '?')[:8]}…"
                           f" (host size: {df.get('host_size', '?')})")
+
+        if r["status"] == "UNKNOWN" and r.get("reason"):
+            print(f"   Reason: {r['reason']}")
+
+        if args.verbose and r["status"] == "FRESH" and r.get("files_compared"):
+            print(f"   Verified: {', '.join(r['files_compared'][:5])}"
+                  + (f" (+{len(r['files_compared'])-5} more)" if len(r['files_compared']) > 5 else ""))
+
         print()
 
     print(f"{'='*80}")
+    summary_parts = []
+    fresh_count = sum(1 for r in results if r["status"] == "FRESH")
+    stale_count = sum(1 for r in results if r["status"] == "STALE")
+    unknown_count = sum(1 for r in results if r["status"] == "UNKNOWN")
+    if fresh_count:
+        summary_parts.append(f"✅ {fresh_count} FRESH")
+    if stale_count:
+        summary_parts.append(f"❌ {stale_count} STALE")
+    if unknown_count:
+        summary_parts.append(f"⚠️  {unknown_count} UNKNOWN")
+    print(f"Summary: {' | '.join(summary_parts)}")
+
     if any_stale:
-        print("⚠️  STALE CONTAINERS DETECTED — rebuild required:")
-        print("   docker-compose -f docker-compose-master.yml build <service>")
+        print("\n⚠️  STALE CONTAINERS DETECTED — rebuild required:")
+        print("   docker-compose -f docker-compose-master.yml build --build-arg GIT_SHA=$(git rev-parse HEAD) <service>")
         print("   docker-compose -f docker-compose-master.yml up -d <service>")
         sys.exit(1)
     else:
-        print("✅ All containers are fresh.")
+        print("\n✅ All containers are fresh (or UNKNOWN — no manifest to compare).")
         sys.exit(0)
 
 

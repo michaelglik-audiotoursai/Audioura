@@ -7,6 +7,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.tour-id-resolution
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     ports:
       - "5025:5025"
     environment:
@@ -55,6 +57,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.orchestrator
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     ports:
       - "5002:5002"
     environment:
@@ -81,6 +85,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.modernized
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     ports:
       - "5021:5021"
     volumes:
@@ -91,6 +97,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.polly-tts
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     ports:
       - "5018:5018"
     env_file:
@@ -101,6 +109,8 @@ services:
     build:
       context: ./translation-service
       dockerfile: Dockerfile
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     ports:
       - "5030:5030"
     environment:
@@ -117,6 +127,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.tour-processor
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     ports:
       - "5001:5001"
     volumes:
@@ -144,7 +156,10 @@ services:
 
   # Support Services
   user-api-2:
-    build: ./user-tracking
+    build:
+      context: ./user-tracking
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     ports:
       - "5003:5000"
     depends_on:
@@ -154,7 +169,10 @@ services:
     restart: unless-stopped
     
   tour-update:
-    build: ./tour-update-service
+    build:
+      context: ./tour-update-service
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     ports:
       - "5004:5001"
     depends_on:
@@ -164,7 +182,10 @@ services:
     restart: unless-stopped
 
   coordinates-fromai:
-    build: ./coordinates_fromAI
+    build:
+      context: ./coordinates_fromAI
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     ports:
       - "5006:5004"
     environment:
@@ -177,7 +198,10 @@ services:
       retries: 3
       
   map-delivery:
-    build: ./map_delivery
+    build:
+      context: ./map_delivery
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     ports:
       - "5005:5005"
     depends_on:
@@ -193,6 +217,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.treats
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     ports:
       - "5007:5006"
     depends_on:
@@ -202,7 +228,10 @@ services:
       - ./treats_service.py:/app/app.py
       
   voice-control:
-    build: ./voice_control
+    build:
+      context: ./voice_control
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     ports:
       - "5008:5008"
     restart: unless-stopped
@@ -217,6 +246,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.news-generator
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     container_name: news-generator-1
     ports:
       - "5010:5010"
@@ -234,6 +265,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.news-processor
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     container_name: news-processor-1
     ports:
       - "5011:5011"
@@ -251,6 +284,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.news-orchestrator
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     container_name: news-orchestrator-1
     ports:
       - "5012:5012"
@@ -269,6 +304,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.newsletter-link-extractor
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     container_name: newsletter-link-extractor-1
     ports:
       - "5014:5000"
@@ -280,6 +317,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.background-article-processor
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     container_name: background-article-processor-1
     ports:
       - "5015:5000"
@@ -294,6 +333,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.simple-news-search
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     container_name: simple-news-search-1
     ports:
       - "5016:5000"
