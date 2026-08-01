@@ -3,12 +3,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/endpoints.dart';
 
 /// Whether to use the mock wallet API instead of the real backend.
-/// Set to false when the backend is deployed and ready.
-const bool useMockWallet = true;
+/// Default is **false** (live API). Set to true for offline development.
+/// Toggle via SharedPreferences key 'use_mock_wallet' for runtime switching.
+const bool _defaultUseMockWallet = false;
 
 /// Wallet data model
 class WalletData {
-  final String plan; // 'free', 'pay_per_use', 'unlimited'
+  final String plan; // 'free', 'ppu', 'unlimited'
   final double balanceUsd;
   final double periodSpendUsd;
   final DateTime periodStart;
@@ -87,6 +88,13 @@ class WalletTransaction {
       cacheHit: json['cache_hit'] as bool,
     );
   }
+
+  /// Whether this transaction is a monthly subscription fee (billed by Apple,
+  /// not deducted from credits). See D20 in DECISIONS.md.
+  bool get isMonthlyFee => operationType == 'monthly_fee';
+
+  /// Whether this is a cache-hit download that cost nothing.
+  bool get isFreeDownload => cacheHit && chargedUsd == 0.0;
 }
 
 /// Available plan data model
@@ -131,8 +139,16 @@ class TopUpResult {
   }
 }
 
-/// Wallet service — fetches wallet data from the API or mock
+/// Wallet service — fetches wallet data from the API or mock.
+/// Defaults to live API. Use SharedPreferences key 'use_mock_wallet' = 'true'
+/// or the compile-time [_defaultUseMockWallet] constant for offline mode.
 class WalletService {
+  static Future<bool> _useMock() async {
+    if (_defaultUseMockWallet) return true;
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('use_mock_wallet') ?? false;
+  }
+
   static Future<String> _getUserId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('user_id') ?? 'unknown';
@@ -140,7 +156,7 @@ class WalletService {
 
   /// Get wallet data for the current user
   static Future<WalletData> getWallet() async {
-    if (useMockWallet) return _MockWalletBackend.getWallet();
+    if (await _useMock()) return _MockWalletBackend.getWallet();
 
     final userId = await _getUserId();
     final response = await Endpoints.get(
@@ -156,7 +172,7 @@ class WalletService {
 
   /// Get transaction history
   static Future<List<WalletTransaction>> getTransactions({int limit = 50}) async {
-    if (useMockWallet) return _MockWalletBackend.getTransactions(limit: limit);
+    if (await _useMock()) return _MockWalletBackend.getTransactions(limit: limit);
 
     final userId = await _getUserId();
     final response = await Endpoints.get(
@@ -173,7 +189,7 @@ class WalletService {
 
   /// Get available plans
   static Future<List<AvailablePlan>> getAvailablePlans() async {
-    if (useMockWallet) return _MockWalletBackend.getAvailablePlans();
+    if (await _useMock()) return _MockWalletBackend.getAvailablePlans();
 
     final response = await Endpoints.get(
       Service.orchestrator,
@@ -189,7 +205,7 @@ class WalletService {
 
   /// Top up balance (Pay-Per-Use)
   static Future<TopUpResult> topUp(String productId) async {
-    if (useMockWallet) return _MockWalletBackend.topUp(productId);
+    if (await _useMock()) return _MockWalletBackend.topUp(productId);
 
     final userId = await _getUserId();
     final response = await Endpoints.post(
@@ -205,11 +221,12 @@ class WalletService {
   }
 }
 
-/// Mock wallet backend for development/demo
+/// Mock wallet backend for development/demo.
+/// Uses 'ppu' as the canonical plan identifier per D16.
 class _MockWalletBackend {
-  // Switch between mock scenarios by changing this value
-  static String _mockPlan = 'pay_per_use'; // 'free', 'pay_per_use', 'unlimited'
+  static String _mockPlan = 'ppu'; // 'free', 'ppu', 'unlimited'
   static double _mockBalance = 7.45;
+  static bool _includeMontlyFee = true;
 
   static Future<WalletData> getWallet() async {
     await Future.delayed(const Duration(milliseconds: 300));
@@ -238,9 +255,9 @@ class _MockWalletBackend {
           costStopProgress: CostStopProgress(usedUsd: 18.75, limitUsd: 25.0),
           lowBalance: false,
         );
-      default: // pay_per_use
+      default: // ppu
         return WalletData(
-          plan: 'pay_per_use',
+          plan: 'ppu',
           balanceUsd: _mockBalance,
           periodSpendUsd: 2.55,
           periodStart: periodStart,
@@ -254,7 +271,7 @@ class _MockWalletBackend {
   static Future<List<WalletTransaction>> getTransactions({int limit = 50}) async {
     await Future.delayed(const Duration(milliseconds: 200));
     final now = DateTime.now();
-    return [
+    final transactions = <WalletTransaction>[
       WalletTransaction(
         id: 'txn_001',
         createdAt: now.subtract(const Duration(hours: 2)),
@@ -336,6 +353,20 @@ class _MockWalletBackend {
         cacheHit: true,
       ),
     ];
+
+    // Include a monthly fee row to demonstrate D20 rendering
+    if (_includeMontlyFee) {
+      transactions.add(WalletTransaction(
+        id: 'txn_011',
+        createdAt: now.subtract(const Duration(days: 30)),
+        operationType: 'monthly_fee',
+        description: 'Monthly subscription — billed by Apple',
+        chargedUsd: 0.00,
+        cacheHit: false,
+      ));
+    }
+
+    return transactions.take(limit).toList();
   }
 
   static Future<List<AvailablePlan>> getAvailablePlans() async {
@@ -352,7 +383,7 @@ class _MockWalletBackend {
         ],
       ),
       AvailablePlan(
-        planId: 'pay_per_use',
+        planId: 'ppu',
         displayName: 'Pay-Per-Use',
         priceUsd: 2.0,
         period: 'month',
@@ -394,11 +425,17 @@ class _MockWalletBackend {
   static void setMockBalance(double balance) {
     _mockBalance = balance;
   }
+
+  /// For testing: toggle monthly fee row inclusion
+  static void setIncludeMonthlyFee(bool include) {
+    _includeMontlyFee = include;
+  }
 }
 
-/// Test helpers for widget tests — only effective when useMockWallet = true
+/// Test helpers for widget tests — controls mock backend state.
+/// Effective only when mock mode is active.
 class WalletTestHelper {
-  /// Set mock plan for testing. One of: 'free', 'pay_per_use', 'unlimited'
+  /// Set mock plan for testing. One of: 'free', 'ppu', 'unlimited'
   static void setMockPlan(String plan) {
     _MockWalletBackend.setMockPlan(plan);
   }
@@ -408,9 +445,27 @@ class WalletTestHelper {
     _MockWalletBackend.setMockBalance(balance);
   }
 
+  /// Toggle monthly fee row in transaction list
+  static void setIncludeMonthlyFee(bool include) {
+    _MockWalletBackend.setIncludeMonthlyFee(include);
+  }
+
   /// Reset to defaults
   static void reset() {
-    _MockWalletBackend.setMockPlan('pay_per_use');
+    _MockWalletBackend.setMockPlan('ppu');
     _MockWalletBackend.setMockBalance(7.45);
+    _MockWalletBackend.setIncludeMonthlyFee(true);
+  }
+
+  /// Force mock mode for testing (sets SharedPreferences flag)
+  static Future<void> enableMockMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('use_mock_wallet', true);
+  }
+
+  /// Disable mock override (live mode unless compile-time default is mock)
+  static Future<void> disableMockMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('use_mock_wallet');
   }
 }
