@@ -18,7 +18,8 @@ def test_tracking_fix():
         "tour_type": "walking",
         "total_stops": 3,
         "user_id": user_id,
-        "request_string": "Test tour for tracking verification"
+        "request_string": "Test tour for tracking verification",
+        "is_test": True,  # LOCAL-103: mark HTTP-generated test tours
     }
     
     print(f"1. Starting tour for user: {user_id}")

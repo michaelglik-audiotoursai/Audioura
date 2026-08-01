@@ -1,0 +1,90 @@
+# Tests that require running Docker services, API keys, or network access.
+# Skip by default in the local test runner. Include with: run_tests.py --include-services
+#
+# Convention: tests that detect an unreachable service should exit 7
+# (same as tests/db_connection.py EXIT_DB_UNREACHABLE).
+#
+# Root-level (need API keys or unavailable services):
+test_attestation_log_only.py
+test_contained_regression.py
+test_local24_corpus_filter.py
+test_local24_live_regeneration.py
+test_local24_regression.py
+test_local27_truthfulness.py
+test_local_generate.py
+test_orchestrator_storied_wiring.py
+test_persona_weighted_tour.py
+test_referral_flow.py
+test_serp_key.py
+test_sharing_deep_link.py
+test_wiki_api.py
+test_wiki_context.py
+test_wiki_full.py
+#
+# tests/ directory — needs database (psycopg2 to live DB):
+tests/test_apple_processing.py
+tests/test_database_storage.py
+tests/test_full_decryption.py
+tests/test_local49_tour_content_persist.py
+tests/test_local88_tour_pollution.py
+tests/test_nytimes_newsletter.py
+tests/test_phase3_realistic.py
+tests/test_spotify_processing.py
+tests/test_system_health.py
+tests/test_zip_verification.py
+#
+# tests/ directory — needs Docker services (HTTP to localhost):
+tests/run_local31_acceptance.py
+tests/run_local98_evidence.py
+tests/test_all_newsletter_technologies.py
+tests/test_auth_simple.py
+tests/test_bostonglobe_only.py
+tests/test_complete_pipeline.py
+tests/test_connectivity.py
+tests/test_credential_submission.py
+tests/test_enhanced_auth.py
+tests/test_enhanced_mailchimp.py
+tests/test_enhanced_newsletters.py
+tests/test_exact_endpoint.py
+tests/test_existing_endpoints.py
+tests/test_guy_raz.py
+tests/test_guy_raz_binary_fix.py
+tests/test_iframe_auth.py
+tests/test_integrated_bg_auth.py
+tests/test_known_working_newsletter.py
+tests/test_local28_acceptance.py
+tests/test_local30_acceptance.py
+tests/test_logging.py
+tests/test_news_quota_integration.py
+tests/test_newsletter_cloud.py
+tests/test_newsletter_technologies.py
+tests/test_newsletter_utility.py
+tests/test_nytimes_undetected.py
+tests/test_openai_api.py
+tests/test_pdf_newsletter.py
+tests/test_phase2_boston_globe.py
+tests/test_phase2_simple.py
+tests/test_phase2_workflow.py
+tests/test_phase3_consolidation.py
+tests/test_quora_newsletter.py
+tests/test_quora_newsletter_full.py
+tests/test_security_fix.py
+tests/test_services_decryption.py
+tests/test_tour_editing.py
+tests/test_tour_quota_integration.py
+tests/test_translation_implementation.py
+tests/test_url_fix.py
+tests/test_url_redirect.py
+tests/test_user_integration.py
+tests/test_user_tracking_fix.py
+tests/test_user_tracking_simple.py
+#
+# tests/ directory — CLI utilities (not tests, moved to tools/):
+# tests/test_coordinates.py -> tools/
+# tests/test_coordinates_direct.py -> tools/
+# tests/test_coordinates_endpoint.py -> tools/
+# tests/test_coordinates_service.py -> tools/
+# tests/test_coordinates_service_v2.py -> tools/
+# tests/test_mapbox.py -> tools/
+# tests/test_tour_generation.py -> tools/
+# tests/test_zip_quality.py -> tools/

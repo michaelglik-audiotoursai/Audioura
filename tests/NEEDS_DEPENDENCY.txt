@@ -1,0 +1,68 @@
+# Tests that require pip packages not installed in the host environment.
+# These packages ARE declared in requirements*.txt — the tests are not dead,
+# they just need: pip install -r requirements-browser.txt (selenium, bs4, lxml)
+#                 pip install pycryptodome (Crypto)
+#                 pip install cryptography
+#
+# Skip by default in the local test runner.
+# Include with: run_tests.py --include-deps
+#
+# Convention: these tests exit with ModuleNotFoundError if the package is
+# missing. That is an ENVIRONMENT problem, not a test problem.
+#
+# Needs: beautifulsoup4 (bs4) — declared in requirements-browser.txt, requirements-newsletter.txt
+tests/test_apple_podcasts_extraction.py
+tests/test_binary_content_source.py
+tests/test_bostonglobe.py
+tests/test_content_extraction_only.py
+tests/test_content_selectors.py
+tests/test_different_guy_raz.py
+tests/test_encoding.py
+tests/test_encoding_fix.py
+tests/test_guy_raz_extraction_live.py
+tests/test_guy_raz_simple.py
+tests/test_html_text_extraction.py
+tests/test_improved_filtering.py
+tests/test_mailchimp.py
+tests/test_newsletter_urls.py
+tests/test_rapid7_date.py
+tests/test_russian_zip.py
+#
+# Needs: beautifulsoup4 (bs4) + project module that also needs bs4
+tests/test_apple_extraction_only.py
+tests/test_modular_functions.py
+#
+# Needs: selenium (via browser_automation import) — declared in requirements-browser.txt
+tests/test_spotify_expansion_fix.py
+#
+# Needs: selenium — declared in requirements-browser.txt
+tests/test_bg_auth_final.py
+tests/test_bg_subscription_url.py
+tests/test_blocked_url.py
+tests/test_boston_globe_auth.py
+tests/test_boston_globe_credentials.py
+tests/test_enhanced_spotify.py
+tests/test_flutter_web_demo.py
+tests/test_guy_raz_browser.py
+tests/test_nytimes_auth.py
+tests/test_real_articles.py
+tests/test_real_bg_url.py
+tests/test_real_spotify_urls.py
+tests/test_specific_article.py
+tests/test_spotify_text.py
+#
+# Needs: pycryptodome (Crypto) — declared in requirements.txt (pycryptodome)
+tests/test_32byte_truncation.py
+tests/test_dh_integration.py
+tests/test_key_variations.py
+tests/test_known_values.py
+tests/test_mobile_decryption.py
+#
+# Needs: cryptography — declared in requirements.txt
+tests/test_secure_compatibility.py
+#
+# Syntax requires Python 3.12+ (f-string backslash / unterminated string)
+# These will pass on the Docker container (Python 3.12) but not macOS system Python 3.9
+tests/test_boston_globe_auth_enhanced.py
+tests/test_multiple_spotify_urls.py
+tests/test_regex_behavior.py

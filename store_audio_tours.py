@@ -9,7 +9,7 @@ import zipfile
 import argparse
 from datetime import datetime
 
-def store_audio_tour(tour_name, request_string, zip_path, lat=None, lng=None):
+def store_audio_tour(tour_name, request_string, zip_path, lat=None, lng=None, is_test=None):
     """
     Store an audio tour in the database with coordinates and ZIP file
     
@@ -117,7 +117,11 @@ def store_audio_tour(tour_name, request_string, zip_path, lat=None, lng=None):
             print(f"Updated existing tour: {tour_name} (zip={zip_filename})")
         else:
             # Insert new tour
-            _is_test_mode = os.getenv('TOUR_TEST_MODE', 'false').lower() == 'true'
+            # LOCAL-103: is_test param takes precedence; env var is fallback
+            if is_test is not None:
+                _is_test_mode = is_test
+            else:
+                _is_test_mode = os.getenv('TOUR_TEST_MODE', 'false').lower() == 'true'
             if has_audio_tour and has_lat and has_number_requested:
                 cur.execute(
                     """

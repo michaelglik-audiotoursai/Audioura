@@ -1432,13 +1432,17 @@ def _verify_works_v2(poi_list, venue_name):
                 _verified_qids.add(_matched_qid)
             
             print(f"  [D1v2] VERIFIED '{work_name}' → canonical: '{canonical_title}'")
-            evidence_log[work_name] = {
-                "status": "VERIFIED",
-                "canonical_title": canonical_title,
-                "snippet": snippet,
-                "method": "canonical_title_match",
-                "qid": _matched_qid,
-            }
+            # [LOCAL-97] Don't overwrite existing catalogue_work entries — they carry
+            # period/material metadata that the C5-1 binding block needs.
+            _existing_ev_for_title = evidence_log.get(work_name)
+            if not (_existing_ev_for_title and _existing_ev_for_title.get('method') == 'catalogue_work'):
+                evidence_log[work_name] = {
+                    "status": "VERIFIED",
+                    "canonical_title": canonical_title,
+                    "snippet": snippet,
+                    "method": "canonical_title_match",
+                    "qid": _matched_qid,
+                }
             # Use the EXACT canonical title as the stop name (prevents GPT truncation)
             # If the matched canonical is a substring of a longer SPARQL title, prefer the SPARQL form
             poi = dict(poi)  # Don't mutate the original
@@ -1530,7 +1534,11 @@ def _verify_works_v2(poi_list, venue_name):
         _vp_norm = _normalize_for_title_dedup(_vp.get('name', ''))
         if _vp_norm in _verified_normalized_titles:
             print(f"  [D1v2] TITLE-DEDUP dropped '{_vp.get('name', '')[:50]}' (normalized duplicate)")
-            evidence_log[_vp.get('name', '')] = {"status": "DROPPED", "reason": "normalized title duplicate"}
+            # [LOCAL-97] Do NOT overwrite existing catalogue_work entries in evidence_log.
+            # Catalogue entries carry period/material metadata that the C5-1 binding block needs.
+            _existing_ev = evidence_log.get(_vp.get('name', ''))
+            if not (_existing_ev and _existing_ev.get('method') == 'catalogue_work'):
+                evidence_log[_vp.get('name', '')] = {"status": "DROPPED", "reason": "normalized title duplicate"}
             continue
         _verified_normalized_titles.add(_vp_norm)
         _deduped_pois.append(_vp)
@@ -5302,17 +5310,16 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                         _c51_grounded.extend(s[:200] for s in _sents[:3])
                         break
 
-            # [LOCAL-31] Build the hard-binding injection block.
+            # [LOCAL-31] [LOCAL-98] Build the hard-binding injection block.
             # Period and material are MANDATORY VERBATIM inclusions.
             # Origin is framed as catalogued geographic attribution, not cultural identity.
+            # LOCAL-98: The binding block is NO LONGER injected here in the middle of the prompt.
+            # It is instead appended as the FINAL instruction (after format/length) so it benefits
+            # from recency bias in GPT-3.5-turbo. The block is built here, stored in _binding_block,
+            # and appended later (search for "LOCAL-98 FINAL BINDING").
+            _binding_block = ""
             if _c51_period or _c51_material or _c51_origin or _c51_grounded:
-                _binding_block = "\n--- CATALOGUE RECORD FOR THIS SPECIFIC WORK (from the museum's own documentation) ---\n"
-                if _c51_period:
-                    _binding_block += f"DATE/PERIOD: {_c51_period}\n"
-                    _binding_block += f'  → You MUST state this date in the description. Say "{_c51_period}" or its English equivalent. Do NOT use any other century or date.\n'
-                if _c51_material:
-                    _binding_block += f"MATERIAL: {_c51_material}\n"
-                    _binding_block += f'  → You MUST mention "{_c51_material}" in the description. This is verified — do not substitute another material.\n'
+                _binding_block = "\n"
                 if _c51_origin:
                     _binding_block += f"CATALOGUED REGION: {_c51_origin}\n"
                     _binding_block += (
@@ -5324,15 +5331,10 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                     )
                 if _c51_grounded:
                     _binding_block += "ADDITIONAL CONTEXT:\n" + '. '.join(_c51_grounded) + "\n"
-                _binding_block += "--- END CATALOGUE RECORD ---\n"
-                _binding_block += (
-                    "HARD RULES:\n"
-                    "1. The DATE/PERIOD above is the ONLY correct date for this work. Any other century is WRONG.\n"
-                    "2. The MATERIAL above MUST appear in your description.\n"
-                    "3. Do NOT invent provenance, cultural identity, or geographic origin beyond what is stated above.\n"
-                    "4. If the catalogue gives no origin, you must not assert one.\n"
-                )
-                description_prompt += _binding_block
+                # [LOCAL-98] Inject origin/context as informational (not binding);
+                # the date/material FINAL BINDING goes at the end of the prompt.
+                if _binding_block.strip():
+                    description_prompt += _binding_block
         
         # [§4] Story element injection — per-work facts from story_elements
         # [LOCAL-29] Tightened matching: use [:10] prefix AND require >= 60% word overlap
@@ -5530,9 +5532,12 @@ NOTE: "The Biblical Message" (Message Biblique) is the name of the COMPLETE CYCL
         # When confirmed facts are fewer than 2 AND no corpus context was injected,
         # reduce description target and instruct GPT not to pad with generic prose.
         # [LOCAL-44] Length scales with substance: short stops stay short, rich stops may run longer.
+        # [LOCAL-98] Catalogue metadata (period/material) IS substance — a stop with these
+        # must never get the 120-word "be SHORT" instruction that competes with binding.
         _confirmed_count = len(fact_sheet.get('confirmed_facts', [])) if fact_sheet else 0
         _had_corpus = fact_sheet.get('had_corpus_context', False) if fact_sheet else False
-        _specificity_short = (_confirmed_count < 2 and not _had_corpus)
+        _has_catalogue_metadata = bool(_c51_period or _c51_material)
+        _specificity_short = (_confirmed_count < 2 and not _had_corpus and not _has_catalogue_metadata)
 
         if _specificity_short:
             _word_target = "120"
@@ -5572,6 +5577,57 @@ DO NOT include directions to the next stop - these will be added separately.
             description_prompt += f"""
 NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize aspects that would appeal to someone with this sensibility.
 """
+
+        # [LOCAL-98] FINAL BINDING — inject catalogue date/material requirements as the
+        # LAST instruction in the prompt. Rationale: GPT-3.5-turbo exhibits strong recency
+        # bias; instructions near the end of the user message are followed most reliably.
+        # Previously this block was buried among 10+ competing rules (brevity, banned phrases,
+        # exhibition checks) and the model paraphrased or dropped the required facts.
+        # The block now uses explicit English target strings and a "FINAL REQUIREMENT" header
+        # to maximise compliance.
+        if _c51_period or _c51_material:
+            _final_binding = "\n━━━ FINAL REQUIREMENT (non-negotiable — your description will be REJECTED if these are missing) ━━━\n"
+            if _c51_period:
+                # Build explicit English equivalent for the period
+                import re as _re98
+                _period_english = _c51_period  # default: use as-is
+                # Map common French period strings to English
+                _century_m = _re98.search(r'((?:X{0,3}(?:IX|IV|V?I{0,3})))e\s+si[eè]cle', _c51_period)
+                if _century_m:
+                    _rom = _century_m.group(1).upper()
+                    _rom_map = {'I':1,'II':2,'III':3,'IV':4,'V':5,'VI':6,'VII':7,'VIII':8,
+                                'IX':9,'X':10,'XI':11,'XII':12,'XIII':13,'XIV':14,'XV':15,
+                                'XVI':16,'XVII':17,'XVIII':18,'XIX':19,'XX':20}
+                    _arab = _rom_map.get(_rom, '')
+                    if _arab:
+                        _suffix = 'th'
+                        if _arab == 1: _suffix = 'st'
+                        elif _arab == 2: _suffix = 'nd'
+                        elif _arab == 3: _suffix = 'rd'
+                        _period_english = f"{_arab}{_suffix} century"
+                        # Preserve qualifiers like "2nde moitié du"
+                        if 'moitié' in _c51_period.lower():
+                            if '2nde moitié' in _c51_period.lower() or 'seconde moitié' in _c51_period.lower():
+                                _period_english = f"second half of the {_arab}{_suffix} century"
+                            elif '1ère moitié' in _c51_period.lower() or 'première moitié' in _c51_period.lower():
+                                _period_english = f"first half of the {_arab}{_suffix} century"
+                        elif 'début' in _c51_period.lower():
+                            _period_english = f"early {_arab}{_suffix} century"
+                        elif 'fin' in _c51_period.lower():
+                            _period_english = f"late {_arab}{_suffix} century"
+                elif _re98.match(r'^\d{4}$', _c51_period.strip()):
+                    _period_english = _c51_period.strip()  # raw year stays as-is
+
+                _final_binding += f'YOUR DESCRIPTION MUST CONTAIN THIS DATE: "{_period_english}"\n'
+                _final_binding += f'  Write the exact string "{_period_english}" somewhere in your text. Not "around that time", not a vague century — the literal string "{_period_english}".\n'
+            if _c51_material:
+                # [LOCAL-98] Use the primary (first) material for binding — multi-value
+                # strings like "bois, bois laqué, laqué" can't be embedded verbatim.
+                _primary_material = _c51_material.split(',')[0].strip()
+                _final_binding += f'YOUR DESCRIPTION MUST CONTAIN THIS MATERIAL: "{_primary_material}"\n'
+                _final_binding += f'  Write the word "{_primary_material}" somewhere in your text. Do not substitute a different material.\n'
+            _final_binding += "━━━ END FINAL REQUIREMENT ━━━\n"
+            description_prompt += _final_binding
 
         description_data = {
             "model": "gpt-3.5-turbo",
@@ -5626,19 +5682,19 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                             print(f"  [LOCAL-26] Stop {stop_num}: placeholder leak persists after {_max_retries+1} attempts, using fallback")
                             description = f"{poi_name} — an exhibit at this venue. Detailed information was not available at generation time."
 
-                    # [LOCAL-31] Post-generation metadata binding validation.
+                    # [LOCAL-31] [LOCAL-98] Post-generation metadata binding validation.
                     # If the catalogue record specified a period or material, verify
                     # they actually appear in the generated description. If not:
-                    # - Wrong period (adjacent entry's date) → retry with emphasis
-                    # - Missing material → patch it into the text
+                    # - LOCAL-98: RETRY first (up to retry budget), with binding reinforcement
+                    # - Fallback: patch missing material/period into the text
                     if _c51_period or _c51_material:
                         _desc_lower = description.lower()
                         # Check period: extract century number from catalogue period
                         _period_ok = True
                         if _c51_period:
-                            # Extract the core period identifier for checking
                             import re as _re31
                             _century_match = _re31.search(r'((?:I{1,3}|IV|VI{0,3}|IX|X{0,3}I{0,3}V?)e)\s+si[eè]cle', _c51_period)
+                            _year_match = _re31.match(r'^(\d{4})$', _c51_period.strip())
                             if _century_match:
                                 _expected_century = _century_match.group(1).lower()
                                 # Check if this century appears OR its Arabic equivalent
@@ -5658,6 +5714,19 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                                     if _arabic_century == '1': _ordinal_variants.extend(['1st century', '1st-century'])
                                     elif _arabic_century == '2': _ordinal_variants.extend(['2nd century', '2nd-century'])
                                     elif _arabic_century == '3': _ordinal_variants.extend(['3rd century', '3rd-century'])
+                                    # [LOCAL-98] Also accept qualified variants (second half of the Xth century)
+                                    _ordinal_variants.extend([
+                                        f"half of the {_arabic_century}th century",
+                                        f"half of the {_arabic_century}th-century",
+                                        f"early {_arabic_century}th century",
+                                        f"late {_arabic_century}th century",
+                                    ])
+                                    if _arabic_century == '1': _ordinal_variants.extend([
+                                        'half of the 1st century', 'early 1st century', 'late 1st century'])
+                                    elif _arabic_century == '2': _ordinal_variants.extend([
+                                        'half of the 2nd century', 'early 2nd century', 'late 2nd century'])
+                                    elif _arabic_century == '3': _ordinal_variants.extend([
+                                        'half of the 3rd century', 'early 3rd century', 'late 3rd century'])
                                 _period_found = (
                                     _expected_century in _desc_lower or
                                     _c51_period.lower() in _desc_lower or
@@ -5665,31 +5734,48 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                                 )
                                 if not _period_found:
                                     _period_ok = False
-                                    # Check if a WRONG century appears (cross-contamination)
-                                    _wrong_century = _re31.search(r'(\d{1,2})(?:st|nd|rd|th)[\s-]century', _desc_lower)
-                                    if _wrong_century and _wrong_century.group(1) != _arabic_century:
-                                        print(f"  [LOCAL-31] Stop {stop_num}: WRONG CENTURY detected "
-                                              f"(got {_wrong_century.group(1)}th, expected {_arabic_century}th). Retrying...")
-                                        if _attempt < _max_retries:
-                                            continue  # retry will re-emphasize the correct period
-                                    else:
-                                        print(f"  [LOCAL-31] Stop {stop_num}: catalogue period '{_c51_period}' missing from description.")
+                                    print(f"  [LOCAL-98] Stop {stop_num}: catalogue period '{_c51_period}' missing from description.")
+                                    if _attempt < _max_retries:
+                                        print(f"  [LOCAL-98] Stop {stop_num}: retrying (attempt {_attempt+1}) with binding enforcement...")
+                                        continue
+                            elif _year_match:
+                                # [LOCAL-98] Raw year case (e.g., "1879")
+                                _expected_year = _year_match.group(1)
+                                if _expected_year not in _desc_lower:
+                                    _period_ok = False
+                                    print(f"  [LOCAL-98] Stop {stop_num}: catalogue year '{_expected_year}' missing from description.")
+                                    if _attempt < _max_retries:
+                                        print(f"  [LOCAL-98] Stop {stop_num}: retrying (attempt {_attempt+1}) with binding enforcement...")
+                                        continue
+                            else:
+                                # [LOCAL-98] Other period formats — check literal presence
+                                if _c51_period.lower() not in _desc_lower:
+                                    _period_ok = False
+                                    print(f"  [LOCAL-98] Stop {stop_num}: catalogue period '{_c51_period}' missing from description.")
+                                    if _attempt < _max_retries:
+                                        print(f"  [LOCAL-98] Stop {stop_num}: retrying (attempt {_attempt+1}) with binding enforcement...")
+                                        continue
 
                         # Check material
                         _material_ok = True
                         if _c51_material:
-                            _mat_lower = _c51_material.lower()
-                            if _mat_lower not in _desc_lower:
+                            # [LOCAL-98] Check primary material (first in comma-separated list)
+                            _primary_mat = _c51_material.split(',')[0].strip().lower()
+                            if _primary_mat not in _desc_lower:
                                 _material_ok = False
-                                print(f"  [LOCAL-31] Stop {stop_num}: catalogue material '{_c51_material}' missing from description.")
+                                print(f"  [LOCAL-98] Stop {stop_num}: catalogue material '{_primary_mat}' missing from description.")
+                                if _attempt < _max_retries and _period_ok:
+                                    # Only retry for material if period was OK (avoid double-retry)
+                                    print(f"  [LOCAL-98] Stop {stop_num}: retrying (attempt {_attempt+1}) for material...")
+                                    continue
 
                         # [LOCAL-31] Patch missing material/period into the description
-                        # Rather than burning a full retry (expensive, may still fail),
-                        # insert a factual sentence at the start of the description body.
+                        # (last resort after retries exhausted)
                         if not _period_ok or not _material_ok:
                             _patch_parts = []
                             if not _material_ok and _c51_material:
-                                _patch_parts.append(f"crafted in {_c51_material}")
+                                _primary_mat_patch = _c51_material.split(',')[0].strip()
+                                _patch_parts.append(f"crafted in {_primary_mat_patch}")
                             if not _period_ok and _c51_period:
                                 _patch_parts.append(f"dating from the {_c51_period}")
                                 # Also fix any WRONG century that was detected in the text
