@@ -608,3 +608,53 @@ tour-quality work should exist too.
 
 **Consequence:** a tour-quality verification stack, mirroring LOCAL-92, so
 LEAD never has a reason to reach for `docker cp` again. Added to the queue.
+
+---
+
+## D29 — the gate is cleared. My contrary measurement was the broken one.
+
+LOCAL-100 scored five runs on the isolated stack: **mean 98.8, spread 20.6,
+worst run 87.8, gate ≥75 YES.** Base alone (81.25–87.50) clears 75 in every
+run; the bonuses are surplus.
+
+I doubted it. My own signal check over their same five files gave 6/5/4/3/5
+stops with date+material — mean 4.6/8 — which looked incompatible with "one
+THIN stop". So I read Run 4, the most divergent, stop by stop:
+
+```
+1  1850, 19th c.   silk, lacquer, steel      5  1879           polychrome, xylogravure, papier
+2  3rd century     —                         6  18th century   soie
+3  10th century    chlorite                  7  —              —   (no catalogue data)
+4  12th century    wood/bois                 8  16th century   wood, lacquer
+```
+
+Six stops with date **and** material, one date-only, one genuinely THIN.
+**Their classification is right; mine was wrong.** My proxy's material
+vocabulary was English-only and short — it missed chlorite, soie,
+xylogravure, bois and lacquer, which is most of what this museum is made of.
+
+That is the same failure as LOCAL-95's callback counter and as my own French
+-vs-English fact audit weeks ago: **a crude matcher reported confidently and
+was believed because it was mine.** Their base of 84.38 for that run is in
+fact more conservative than my reading supports.
+
+**Recorded: the 75 gate is cleared, on evidence I checked by reading.**
+
+Michael's field test is the next step, and that is his call, not mine.
+
+## D30 — how the gate was actually reached
+
+Worth recording because the earlier analysis pointed elsewhere. The gain
+from 72.3 to 98.8 came from per-stop substance, not from the dominant story:
+
+- **LOCAL-97** got catalogue material and period into the prompt — three
+  distinct extraction faults.
+- **LOCAL-98** got them to survive into the prose — the binding block was
+  buried 70% through the prompt behind 600+ words, and a `_specificity_short`
+  collision was still telling fact-bearing stops to "be SHORT".
+- **LOCAL-72/91** kept fact density from being thinned and made visitor facts
+  provenance-verified.
+
+SQ4b's callbacks contribute 0–20 points and appear in only 3 of 5 runs. They
+are gravy, exactly as D26 predicted once corpus expansion moved the base cap
+from 50 to 100.
