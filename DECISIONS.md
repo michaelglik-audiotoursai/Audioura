@@ -479,3 +479,22 @@ delete rows myself — hiding test tours by nulling coordinates, backing values
 up first, treating deletion as the one thing needing Michael. I applied that
 care to my own actions and never extended it to the agents I was dispatching
 at a live database. The guard should have existed before the first task ran.
+
+---
+
+### D24 — Shared containers stay on `storied`; Subscribed gets its own compose
+
+**Date:** 2026-08-01
+**Context:** Michael is away. His phone depends on the shared containers
+built from `storied`. Putting unreviewed feature code into that path with
+nobody present to report a break is unacceptable.
+
+**Decision:** The compose-managed containers (`audioura-*`) stay built from
+`storied`. Subscribed tasks that need `wallet_api` (or any code only on the
+`subscribed` branch) bring up an isolated stack via
+`docker-compose-subscribed.yml` on non-conflicting ports (5100, 5102).
+This compose shares Postgres but never touches the shared containers.
+
+**Consequence:** `GET /wallet/...` against the shared orchestrator (port 5002)
+returns 404 — that's environmental, not a defect. Tests must set
+`ORCHESTRATOR_URL=http://localhost:5102` to hit the subscribed orchestrator.
