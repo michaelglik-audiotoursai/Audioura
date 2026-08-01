@@ -236,6 +236,16 @@ unproven.
 writes a `*** ROW LOSS ***` line to `.continuous_dev/ALERTS.md` the moment
 the count falls. Check `ALERTS.md` at the start of every review tick.
 
+### Files tasks must NOT edit
+
+`DECISIONS.md` is LEAD's record and has now caused three merge conflicts by
+being edited on task branches (LOCAL-77, LOCAL-92, and again on the
+subscribed merge). Tasks record their reasoning in their own
+`SUBMISSION_LOCAL-NN.md`; LEAD transfers anything durable into `DECISIONS.md`.
+
+Same for `CLAUDE.md`, `BACKLOG.md`, and `.continuous_dev/STATUS.md`.
+Every task file should carry this in its PROCESS section.
+
 ### Corollaries learned the hard way
 
 - **`exit=0` from Kiro means nothing.** Verify by effect: commits exist
