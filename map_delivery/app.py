@@ -101,12 +101,14 @@ def get_tours_near_location(lat, lng):
         cur = conn.cursor()
         
         # Get only English/original tours for map display (no translations)
+        # Exclude test-generated tours (is_test flag set by test-mode generation)
         cur.execute("""
             SELECT id, tour_name, request_string, lat, lng, number_requested, content_language, original_tour_id
             FROM audio_tours 
             WHERE lat IS NOT NULL AND lng IS NOT NULL
             AND (content_language = 'en' OR content_language IS NULL)
             AND original_tour_id IS NULL
+            AND (is_test IS NOT TRUE)
         """)
         
         tours = cur.fetchall()
@@ -298,6 +300,7 @@ def search_tours():
             FROM audio_tours 
             WHERE (tour_name ILIKE %s OR request_string ILIKE %s)
             AND lat IS NOT NULL AND lng IS NOT NULL
+            AND (is_test IS NOT TRUE)
             ORDER BY number_requested DESC
             LIMIT 50
         """, (f'%{sql_pattern}%', f'%{sql_pattern}%'))
