@@ -117,6 +117,14 @@ try:
 except ImportError as e:
     print(f"[ORCHESTRATOR] Wallet API not available: {e}")
 
+# --- Swipe Preference Routes (LOCAL-107) ---
+try:
+    from swipe_preference_service import register_preference_routes
+    register_preference_routes(app)
+    print("[ORCHESTRATOR] Preference routes registered (LOCAL-107)")
+except ImportError as e:
+    print(f"[ORCHESTRATOR] Preference routes not available: {e}")
+
 # CORS headers for web platform support
 def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'

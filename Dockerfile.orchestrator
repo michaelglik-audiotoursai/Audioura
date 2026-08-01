@@ -3,6 +3,8 @@ WORKDIR /app
 COPY requirements_orchestrator.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 COPY tour_orchestrator_service.py /app/
+COPY swipe_preference_service.py /app/
+COPY tests/db_connection.py /app/tests/db_connection.py
 COPY entitlements.py /app/
 COPY cost_ceiling_monitor.py /app/
 COPY wallet_api.py /app/
