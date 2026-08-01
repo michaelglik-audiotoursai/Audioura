@@ -58,6 +58,10 @@ CORS(app)
 from sharing_endpoints import sharing_bp
 app.register_blueprint(sharing_bp)
 
+# Register persona blueprint (LOCAL-113: POST/GET /user/persona)
+from persona_endpoints import persona_bp
+app.register_blueprint(persona_bp)
+
 # Global variables
 TOURS_DIR = "/app/tours"
 ACTIVE_JOBS = get_job_store('tour-generator')
