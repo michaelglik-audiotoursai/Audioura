@@ -7,9 +7,36 @@ import sys
 import json
 import psycopg2
 from io import BytesIO
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file as _send_file
 from flask_cors import CORS
+import inspect as _inspect
 import math
+
+
+def _compat_send_file(path_or_file, **kwargs):
+    """Version-tolerant send_file wrapper.
+
+    Flask <2.0 uses ``attachment_filename``; Flask >=2.0 renamed it to
+    ``download_name``.  This helper accepts either and maps to whichever the
+    installed Flask supports, so the same code runs on both.
+    """
+    sig = _inspect.signature(_send_file)
+    params = sig.parameters
+
+    download_name = kwargs.pop("download_name", None)
+    attachment_filename = kwargs.pop("attachment_filename", None)
+    name = download_name or attachment_filename
+
+    if name:
+        if "download_name" in params:
+            kwargs["download_name"] = name
+        else:
+            kwargs["attachment_filename"] = name
+
+    return _send_file(path_or_file, **kwargs)
+
+
+send_file = _compat_send_file
 
 app = Flask(__name__)
 CORS(app)
