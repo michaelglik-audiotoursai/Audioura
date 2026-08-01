@@ -57,3 +57,7 @@ key.properties
 
 # iPhone app diagnostic logs pasted in for debugging (not source)
 .claude/log_iphone_*.txt
+
+# .continuous_dev/ is ignored above (session state), but the guard SCRIPTS are
+# code and must survive this machine — see !.continuous_dev/*.sh
+!.continuous_dev/*.sh
