@@ -8,8 +8,38 @@ import time
 import uuid
 import tempfile
 from datetime import datetime
-from flask import Flask, request, jsonify, send_file
+import flask
+from flask import Flask, request, jsonify, send_file as _send_file
 from flask_cors import CORS
+
+
+def _compat_send_file(path_or_file, **kwargs):
+    """Version-tolerant send_file wrapper.
+
+    Flask <2.0 uses ``attachment_filename``; Flask >=2.0 renamed it to
+    ``download_name``.  This helper accepts either and maps to whichever the
+    installed Flask supports, so the same code runs on both.
+    """
+    import inspect
+    sig = inspect.signature(_send_file)
+    params = sig.parameters
+
+    # Normalise: caller may pass either name
+    download_name = kwargs.pop("download_name", None)
+    attachment_filename = kwargs.pop("attachment_filename", None)
+    name = download_name or attachment_filename
+
+    if name:
+        if "download_name" in params:
+            kwargs["download_name"] = name
+        else:
+            kwargs["attachment_filename"] = name
+
+    return _send_file(path_or_file, **kwargs)
+
+
+# Override module-level name so all call sites use the compat wrapper
+send_file = _compat_send_file
 import threading
 import re
 
