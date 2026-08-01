@@ -2480,7 +2480,7 @@ def _check_type_prose_contradiction(poi_list: list) -> list:
     return warnings
 
 
-def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None):
+def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None):
     """
     Generate audio tour text using OpenAI API with geo coordinates.
     
@@ -2493,6 +2493,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                  When STORIED_MODE=true and persona is provided, biases story-type
                  assignment and injects persona tone into descriptions.
                  When STORIED_MODE=false or persona=None: no effect.
+        user_id: Optional user identifier. When provided and user has swipe
+                 preferences, biases stop ordering toward preferred content classes
+                 (LOCAL-104). Failure in preference lookup falls back gracefully to
+                 today's ordering — preference is a nicety, not a gate.
     
     Returns:
         tuple: (tour_text, output_file, coordinates)
@@ -4917,6 +4921,127 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             print(f"  [LOCAL-37] Tour diversity import failed: {e}")
         except Exception as e:
             print(f"  [LOCAL-37] Tour diversity error (non-fatal): {e}")
+
+    # -------- [LOCAL-104] Preference-biased stop ordering --------
+    # Apply swipe preferences to bias stop ordering AFTER all structural ordering
+    # (geographic route, Phase 3B details, story-type assignment, diversity balancing)
+    # but BEFORE text generation (Phase 5). This is a BIAS, not a filter:
+    # disliked classes appear less often, never zero. A THIN stop the user loves
+    # cannot promote above a RICH stop they dislike (quality ranks first).
+    # Failure here falls back to today's ordering — preference is a nicety, not a gate (D14).
+    _preference_bias_applied = False
+    if user_id and poi_list and len(poi_list) >= 2:
+        try:
+            import logging as _pref_logging
+            _pref_logger = _pref_logging.getLogger("generate_tour_text.preference_bias")
+            from swipe_preference_service import bias_stop_ordering, get_user_prefs
+
+            # Check if user has preferences (non-cold-start)
+            _user_prefs = get_user_prefs(user_id)
+            if _user_prefs is not None and _user_prefs.get("swipe_count", 0) > 0:
+                # Look up stop_metrics for these stops (prior generation data)
+                # Build stop dicts for bias_stop_ordering using stop_metrics from DB
+                import psycopg2 as _pref_pg
+                _pref_conn = _pref_pg.connect(
+                    host=os.environ.get("DB_HOST", "postgres-2"),
+                    port=os.environ.get("DB_PORT", "5432"),
+                    dbname=os.environ.get("DB_NAME", "audiotours"),
+                    user=os.environ.get("DB_USER", "admin"),
+                    password=os.environ.get("DB_PASSWORD", "password123"),
+                )
+                _pref_cur = _pref_conn.cursor()
+
+                # Query stop_metrics for matching stop titles
+                _poi_names_lower = [p.get('name', '').strip().lower() for p in poi_list]
+                _pref_cur.execute("""
+                    SELECT LOWER(TRIM(stop_title)), i_con, class_details, class_historic, class_social
+                    FROM stop_metrics
+                    WHERE LOWER(TRIM(stop_title)) = ANY(%s)
+                      AND i_con > 0
+                    ORDER BY created_at DESC
+                """, (_poi_names_lower,))
+                _metrics_rows = _pref_cur.fetchall()
+                _pref_cur.close()
+                _pref_conn.close()
+
+                # Build lookup: most recent metrics per stop title
+                _metrics_by_title = {}
+                for row in _metrics_rows:
+                    title_lower = row[0]
+                    if title_lower not in _metrics_by_title:  # first row is most recent (ORDER BY DESC)
+                        _metrics_by_title[title_lower] = {
+                            "i_con": float(row[1]),
+                            "class_details": float(row[2]),
+                            "class_historic": float(row[3]),
+                            "class_social": float(row[4]),
+                        }
+
+                # Count how many stops have prior metrics
+                _matched_count = sum(1 for n in _poi_names_lower if n in _metrics_by_title)
+                print(f"  [LOCAL-104] Preference bias: user '{user_id}' has {_user_prefs['swipe_count']} swipes, "
+                      f"{_matched_count}/{len(poi_list)} stops have prior metrics")
+
+                if _matched_count >= 2:
+                    # Build stop dicts for bias_stop_ordering
+                    _bias_stops = []
+                    for i, poi in enumerate(poi_list):
+                        _name_lower = poi.get('name', '').strip().lower()
+                        _metrics = _metrics_by_title.get(_name_lower)
+                        if _metrics:
+                            _bias_stops.append({
+                                "stop_index": i,
+                                "stop_title": poi.get('name', ''),
+                                "i_con": _metrics["i_con"],
+                                "class_details": _metrics["class_details"],
+                                "class_historic": _metrics["class_historic"],
+                                "class_social": _metrics["class_social"],
+                            })
+                        else:
+                            # No prior metrics: use neutral defaults (i_con=3.0, equal classes)
+                            # This ensures the stop participates in ordering without bias
+                            _bias_stops.append({
+                                "stop_index": i,
+                                "stop_title": poi.get('name', ''),
+                                "i_con": 3.0,
+                                "class_details": 0.333,
+                                "class_historic": 0.333,
+                                "class_social": 0.334,
+                            })
+
+                    # Apply preference bias (preference_weight=0.3 — quality 70%, preference 30%)
+                    _biased = bias_stop_ordering(_bias_stops, user_id=user_id, preference_weight=0.3)
+
+                    # Reorder poi_list to match biased ordering
+                    _biased_order = [s["stop_index"] for s in _biased]
+                    _original_order = list(range(len(poi_list)))
+                    if _biased_order != _original_order:
+                        poi_list = [poi_list[idx] for idx in _biased_order]
+                        # Re-number stops after reorder
+                        for i, poi in enumerate(poi_list):
+                            poi['stop_number'] = i + 1
+                        _preference_bias_applied = True
+                        # Log the reordering
+                        _rank_changes = [(s["stop_title"][:30], s["rank_change"]) for s in _biased if s["rank_change"] != 0]
+                        print(f"  [LOCAL-104] Preference bias APPLIED: {len(_rank_changes)} stops moved")
+                        for _title, _change in _rank_changes[:5]:
+                            _dir = "promoted" if _change > 0 else "demoted"
+                            print(f"    {_title}: {_dir} by {abs(_change)}")
+                        # Log preference vector and weights for transparency
+                        print(f"  [LOCAL-104] Preference vector: d={_user_prefs['pref_details']:.3f} "
+                              f"h={_user_prefs['pref_historic']:.3f} s={_user_prefs['pref_social']:.3f}")
+                        print(f"  [LOCAL-104] Weights: quality=0.70, preference=0.30")
+                    else:
+                        print(f"  [LOCAL-104] Preference bias: ordering unchanged (preferences don't alter ranking)")
+                else:
+                    print(f"  [LOCAL-104] Preference bias: skipped (only {_matched_count} stops have prior metrics, need ≥2)")
+            else:
+                print(f"  [LOCAL-104] Preference bias: skipped (user has no swipe history — cold start)")
+        except Exception as _pref_err:
+            # D14: preference is a nicety, not a gate. Failure falls back to today's ordering.
+            import logging as _pref_logging
+            _pref_logger = _pref_logging.getLogger("generate_tour_text.preference_bias")
+            _pref_logger.warning(f"[LOCAL-104] Preference bias lookup failed — continuing with unbiased order: {_pref_err}")
+            print(f"  [LOCAL-104] WARNING: Preference bias failed ({type(_pref_err).__name__}: {_pref_err}) — using today's ordering")
 
     # PHASE 5: Generate detailed descriptions for each POI (parallelized)
     print(f"\nPHASE 5: Generating detailed descriptions for each POI (parallel)...")

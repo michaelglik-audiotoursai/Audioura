@@ -146,8 +146,8 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
             "log_file": api_call_logger.get_log_path(),
         })
         
-        # Generate the tour text - PASS total_stops and persona parameters
-        tour_text, _, coordinates = generate_tour_text(location, tour_type, temp_path, total_stops, persona=_persona_value)
+        # Generate the tour text - PASS total_stops, persona, and user_id parameters
+        tour_text, _, coordinates = generate_tour_text(location, tour_type, temp_path, total_stops, persona=_persona_value, user_id=user_id)
         
         if tour_text is None:
             # Check for structured evidence from degradation ladder
