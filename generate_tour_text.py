@@ -4839,6 +4839,54 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 story_elements=_story_elements if _story_elements else None,
                 thread_result=_thread_result,
             )
+
+            # [LOCAL-111] Spine quality gate — score and retry on low quality.
+            # Design: D14 quality instrumentation — scoring failure logs WARNING
+            # and delivers the spine as-is. Never blocks a tour because a scorer errored.
+            _SPINE_QUALITY_THRESHOLD = 2  # Retry if score <= 1 (2+ criteria failed)
+            _SPINE_QUALITY_MAX_RETRIES = 1  # One retry only (cost ceiling headroom)
+            if _storied_spine:
+                try:
+                    from spine_quality_scorer import score_spine as _score_spine
+                    _sq_score, _sq_breakdown = _score_spine(_storied_spine, total_stops=len(_poi_names))
+                    print(f"  [LOCAL-111] Spine quality: {_sq_score}/4 | {_sq_breakdown}")
+
+                    _sq_retries = 0
+                    while _sq_score < _SPINE_QUALITY_THRESHOLD and _sq_retries < _SPINE_QUALITY_MAX_RETRIES:
+                        _sq_retries += 1
+                        print(f"  [LOCAL-111] Score {_sq_score}/4 < threshold {_SPINE_QUALITY_THRESHOLD} — retry {_sq_retries}/{_SPINE_QUALITY_MAX_RETRIES}")
+                        _retry_spine = generate_spine(
+                            venue_name=_venue_name,
+                            poi_list=_poi_names,
+                            tour_category=tour_category,
+                            api_key=api_key,
+                            theme_name="",
+                            story_elements=_story_elements if _story_elements else None,
+                            thread_result=_thread_result,
+                        )
+                        if _retry_spine:
+                            _retry_score, _retry_breakdown = _score_spine(_retry_spine, total_stops=len(_poi_names))
+                            print(f"  [LOCAL-111] Retry spine quality: {_retry_score}/4 | {_retry_breakdown}")
+                            if _retry_score > _sq_score:
+                                _storied_spine = _retry_spine
+                                _sq_score = _retry_score
+                                _sq_breakdown = _retry_breakdown
+                                print(f"  [LOCAL-111] Retry improved score: {_sq_score}/4 (accepted)")
+                            else:
+                                print(f"  [LOCAL-111] Retry did not improve ({_retry_score} <= {_sq_score}), keeping original")
+                        else:
+                            print(f"  [LOCAL-111] Retry generation failed — keeping original spine")
+
+                    if _sq_score < _SPINE_QUALITY_THRESHOLD:
+                        print(f"  [LOCAL-111] WARNING: Final spine score {_sq_score}/4 still below threshold {_SPINE_QUALITY_THRESHOLD} — delivering anyway")
+                except Exception as _sq_err:
+                    # D14: quality instrumentation must never block delivery
+                    import logging as _sq_logging
+                    _sq_logging.getLogger("generate_tour_text").warning(
+                        f"[LOCAL-111] Spine quality scoring failed — delivering spine unscored: {_sq_err}"
+                    )
+                    print(f"  [LOCAL-111] WARNING: Spine scoring failed ({type(_sq_err).__name__}: {_sq_err}) — delivering spine unscored")
+
             if _storied_spine:
                 print(f"  [Storied] Spine generated: {len(_storied_spine.get('arc', []))} arc entries (mode={_storied_spine.get('story_mode', '?')})")
             else:

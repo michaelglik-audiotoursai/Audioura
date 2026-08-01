@@ -54,6 +54,10 @@ SERVICE_VERSION = STORIED_SERVICE_VERSION
 app = Flask(__name__)
 CORS(app)
 
+# Register sharing blueprint (LOCAL-110: POST /tour/share + GET /tour/<id>)
+from sharing_endpoints import sharing_bp
+app.register_blueprint(sharing_bp)
+
 # Global variables
 TOURS_DIR = "/app/tours"
 ACTIVE_JOBS = get_job_store('tour-generator')

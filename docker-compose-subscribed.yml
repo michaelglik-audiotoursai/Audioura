@@ -29,7 +29,11 @@ services:
       context: .
       dockerfile: Dockerfile.orchestrator
       args:
+<<<<<<< HEAD
         GIT_SHA: subscribed-local92
+=======
+        GIT_SHA: subscribed-local110
+>>>>>>> storied
     container_name: subscribed-orchestrator
     ports:
       - "5102:5002"
@@ -63,7 +67,11 @@ services:
       context: .
       dockerfile: Dockerfile.generator
       args:
+<<<<<<< HEAD
         GIT_SHA: subscribed-local92
+=======
+        GIT_SHA: subscribed-local110
+>>>>>>> storied
     container_name: subscribed-generator
     ports:
       - "5100:5000"
@@ -76,6 +84,10 @@ services:
       - BASE_URL=http://localhost:5000
       - REFERRAL_BASE_URL=http://localhost:5000
       - DATABASE_URL=postgresql://admin:password123@postgres-2:5432/audiotours
+<<<<<<< HEAD
+=======
+      - GATEWAY_API_KEY=test-api-key
+>>>>>>> storied
       - PYTHONUNBUFFERED=1
       - VENUE_CACHE_TTL_DAYS=30
       - VENUE_CACHE_NEGATIVE_TTL_DAYS=5
