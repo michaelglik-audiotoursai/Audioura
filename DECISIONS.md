@@ -658,3 +658,37 @@ from 72.3 to 98.8 came from per-stop substance, not from the dominant story:
 SQ4b's callbacks contribute 0–20 points and appear in only 3 of 5 runs. They
 are gravy, exactly as D26 predicted once corpus expansion moved the base cap
 from 50 to 100.
+
+---
+
+## D31 — five instances of the same failure, and what actually catches it
+
+LOCAL-106 found `register_preference_routes(app)` defined and never called.
+LEAD verified: `POST /user/<id>/stop-feedback` returns 404, zero call sites.
+Every swipe from every user would have failed silently while LOCAL-105's
+offline queue retried ten times and discarded the signal.
+
+That is the **fifth** instance of one pattern:
+
+| What | How long it went unnoticed |
+|---|---|
+| story engine — zero production callers | weeks |
+| corpus mining — stale container, swallowed ImportError | two days |
+| `check_cost_ceiling` — tests, no invocation | unknown; found by a task |
+| Subscribed — nine correct components, no glue | until LOCAL-82 |
+| `register_preference_routes` — never called | until LOCAL-106 |
+
+**Every one was found by a test whose only job was crossing a seam.** None
+were found by component tests, code review, or reading a diff — including by
+me, and I reviewed all of these.
+
+The generalisation worth keeping: **in this codebase, the default failure is
+not broken code. It is correct code nobody calls.** Component tests confirm
+the code works, which is exactly why they cannot see it.
+
+So for any feature assembled from parts, write the integration test that
+crosses the seams **before** declaring it done, and treat "X exists and is
+callable" in a submission as a red flag rather than a status.
+
+`FEATURE_PLAYBOOK.md` §5 already says "guard the seams, not just the parts".
+This is the evidence for it, and the count is now five.
