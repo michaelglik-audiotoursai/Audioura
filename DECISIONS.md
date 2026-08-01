@@ -479,3 +479,37 @@ delete rows myself — hiding test tours by nulling coordinates, backing values
 up first, treating deletion as the one thing needing Michael. I applied that
 care to my own actions and never extended it to the agents I was dispatching
 at a live database. The guard should have existed before the first task ran.
+
+---
+
+## D24 — shared containers stay built from `storied`, not `subscribed`
+
+**Decision: the compose-managed services keep running `storied`. Subscribed
+work builds its own containers under distinct names.**
+
+I rebuilt `tour-orchestrator` from `storied` while clearing stale images.
+That removed `wallet_api.py` — which lives only on `subscribed` — from the
+running service, so LOCAL-90's end-to-end step 10 failed with `wallet=404`.
+Environmental, and mine.
+
+The tempting fix is to deploy `subscribed` to the shared containers so the
+Subscribed E2E passes. **That is the wrong call while Michael is away
+field-testing.** The shared services are the path his phone uses. Deploying
+an unmerged feature branch to them means:
+
+- entitlement gating and charging become live on his real requests;
+- a defect in unreviewed Subscribed code breaks tour downloads, which is the
+  one thing that must keep working;
+- and I would be doing it with no one able to tell me it broke.
+
+`free`-tier behaviour is unchanged by design (LOCAL-67), so it would
+*probably* be fine. "Probably fine" is not a reason to put unreviewed code
+in the path of the user's only working feature.
+
+**Consequence:** any Subscribed test needing the wallet HTTP endpoints must
+build its own orchestrator, as LOCAL-84 did. A `wallet=404` against the
+shared orchestrator is expected and is not a task defect — reviewers should
+check which branch the container was built from before treating it as one.
+
+This reverses when `subscribed` merges into `storied`, which is Michael's
+call on return.
