@@ -4,6 +4,13 @@ COPY requirements-modernized.txt .
 RUN pip install --no-cache-dir -r requirements-modernized.txt
 COPY tour_generation_modernized.py /app/
 COPY job_store.py /app/
+COPY build_manifest.py /app/
 RUN mkdir -p /app/tours
+
+# Build-time manifest: record checksums of all Python sources + git SHA
+ARG GIT_SHA=unknown
+RUN echo "${GIT_SHA}" > /app/.git_sha
+RUN python build_manifest.py /app /app/.build_manifest.json
+
 EXPOSE 5021
 CMD ["python", "tour_generation_modernized.py"]

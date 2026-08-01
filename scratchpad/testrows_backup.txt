@@ -1,0 +1,27 @@
+# Test Rows Coordinate Backup
+# Created: 2026-07-31 (LOCAL-88)
+#
+# These rows were identified as test-generated tours that leaked into
+# Michael's app via the tours-near endpoint. LEAD nulled their lat/lng
+# four separate times to hide them. LOCAL-88 replaces the NULL hack with
+# an is_test flag, allowing coordinates to be restored.
+#
+# Coordinate sources:
+#   - ids 39, 40, 54, 55: Nice-area venues (geocoded from request_string)
+#   - ids 41, 42, 43, 50, 51, 52, 53: LOCAL-49 regression tests
+#     (originally had Nice coords ~43.70/7.27 from test generation defaults)
+#   - id 49: Arnold Arboretum, Jamaica Plain, Boston MA
+#
+# Format: id | lat | lng | source
+39 | 43.7175 | 7.2815 | Fort du Mont Alban, Nice, France
+40 | 43.7200 | 7.2780 | Cathédrale Saint-Nicolas, Nice, France
+41 | 43.7009 | 7.2684 | LOCAL49 Regression Test (Nice test coords)
+42 | 43.7009 | 7.2684 | LOCAL49 Final Verification (Nice test coords)
+43 | 43.7009 | 7.2684 | LOCAL49 Regression Test (Nice test coords)
+49 | 42.2955 | -71.1250 | Arnold Arboretum, Jamaica Plain, Boston MA
+50 | 43.7009 | 7.2684 | LOCAL49 Regression Test (Nice test coords)
+51 | 43.7009 | 7.2684 | LOCAL49 Regression Test (Nice test coords)
+52 | 43.7009 | 7.2684 | LOCAL49 Regression Test (Nice test coords)
+53 | 43.7009 | 7.2684 | LOCAL49 Regression Test (Nice test coords)
+54 | 43.6881 | 7.2679 | Musée Matisse, Nice, France
+55 | 43.6782 | 7.2280 | Musée des Arts Asiatiques, Nice, France

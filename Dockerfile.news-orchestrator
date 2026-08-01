@@ -10,6 +10,12 @@ COPY news_cache_layer1.py .
 COPY cost_meter.py .
 COPY cost_rates.py .
 COPY entitlements.py .
+COPY build_manifest.py .
+
+# Build-time manifest: record checksums of all Python sources + git SHA
+ARG GIT_SHA=unknown
+RUN echo "${GIT_SHA}" > /app/.git_sha
+RUN python build_manifest.py /app /app/.build_manifest.json
 
 EXPOSE 5012
 

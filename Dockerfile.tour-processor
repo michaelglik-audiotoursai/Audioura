@@ -27,9 +27,15 @@ COPY build_mp3_simple.py ./build_mp3.py
 COPY build_web_page_fixed.py .
 COPY single_file_app_builder.py .
 COPY prepare_for_netlify.py .
+COPY build_manifest.py .
 
 # Create tours directory
 RUN mkdir -p /app/tours
+
+# Build-time manifest: record checksums of all Python sources + git SHA
+ARG GIT_SHA=unknown
+RUN echo "${GIT_SHA}" > /app/.git_sha
+RUN python build_manifest.py /app /app/.build_manifest.json
 
 # Expose port
 EXPOSE 5001

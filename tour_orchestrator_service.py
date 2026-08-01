@@ -518,34 +518,35 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         else:
             # Insert new tour
             print(f"Inserting new tour...")
+            _is_test_mode = os.getenv('TOUR_TEST_MODE', 'false').lower() == 'true'
             if has_audio_tour and has_lat and has_number_requested and has_tour_content:
                 cur.execute(
                     """
                     INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng,
-                        tour_content, content_language, storied_mode, stops_count, zip_filename)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        tour_content, content_language, storied_mode, stops_count, zip_filename, is_test)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, tour_content, 'en',
-                     os.getenv('STORIED_MODE', 'false').lower() == 'true', stops_count, zip_filename)
+                     os.getenv('STORIED_MODE', 'false').lower() == 'true', stops_count, zip_filename, _is_test_mode)
                 )
             elif has_audio_tour and has_lat and has_number_requested:
                 cur.execute(
                     """
-                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng, zip_filename)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng, zip_filename, is_test)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     """,
-                    (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, zip_filename)
+                    (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, zip_filename, _is_test_mode)
                 )
             else:
                 # Fallback if columns don't exist
                 cur.execute(
                     """
-                    INSERT INTO audio_tours (tour_name, request_string)
-                    VALUES (%s, %s)
+                    INSERT INTO audio_tours (tour_name, request_string, is_test)
+                    VALUES (%s, %s, %s)
                     """,
-                    (tour_name, request_string)
+                    (tour_name, request_string, _is_test_mode)
                 )
-            print(f"Inserted new tour: {tour_name} (zip={zip_filename})")
+            print(f"Inserted new tour: {tour_name} (zip={zip_filename}, is_test={_is_test_mode})")
         
         # Commit the transaction
         print(f"Committing transaction...")
