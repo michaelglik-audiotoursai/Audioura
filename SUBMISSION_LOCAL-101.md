@@ -1,19 +1,34 @@
 ##### READY FOR REVIEW
 
-# SUBMISSION_LOCAL-101: Swipe-to-Sway Stop Preferences
+# SUBMISSION_LOCAL-101: Swipe-to-Sway Stop Preferences (resubmission)
 
 **Task:** LOCAL-101 — Capture like/dislike per stop, derive per-user preference vector, bias stop ordering  
 **Branch:** `kiro/local101-swipe-to-sway`  
 **Author:** Mac Mini Kiro  
-**Date:** 2026-08-01  
+**Date:** 2026-08-01 (resubmission after bounce)  
 
 ---
 
 ## Commit
 
 ```
-git rev-list --count storied..HEAD: 1
+git rev-list --count storied..HEAD: 2
 ```
+
+## Bounce fix (2026-08-01)
+
+**Problem:** `tests/test_local101_swipe_prefs.py:49` asserted `audio_tours == 61` — a
+hard-coded absolute value that broke when the table grew to 79 through normal work.
+
+**Fix:** Replaced both assertions (pre-flight and post-flight) with the correct invariant:
+
+```python
+assert at_count_after == at_count_before, (
+    f"audio_tours changed: {at_count_before} -> {at_count_after}")
+```
+
+The test now asserts "this task destroyed nothing" (which is true at any table size)
+and reports both before/after counts as the task spec asked. No other changes needed.
 
 ## Files Changed
 
@@ -143,10 +158,13 @@ Full request/response shapes documented in the test output and in `swipe_prefere
 ### Constraints verified
 
 ```
-audio_tours row count BEFORE: 61
-audio_tours row count AFTER:  61
+audio_tours row count BEFORE: 79
+audio_tours row count AFTER:  79
+✓ audio_tours unchanged (79 → 79, no rows deleted or added)
 tours-near/43.7009358/7.2683912?radius=50 = [1, 12, 14, 17, 21, 24, 27, 28, 29]  ✓
 ```
+
+The assertion is now `at_count_after == at_count_before` — correct at any table size.
 
 ---
 
