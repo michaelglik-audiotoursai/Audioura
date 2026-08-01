@@ -29,11 +29,7 @@ services:
       context: .
       dockerfile: Dockerfile.orchestrator
       args:
-<<<<<<< HEAD
-        GIT_SHA: subscribed-local92
-=======
-        GIT_SHA: subscribed-local110
->>>>>>> storied
+        GIT_SHA: ${GIT_SHA:-subscribed}
     container_name: subscribed-orchestrator
     ports:
       - "5102:5002"
@@ -67,11 +63,7 @@ services:
       context: .
       dockerfile: Dockerfile.generator
       args:
-<<<<<<< HEAD
-        GIT_SHA: subscribed-local92
-=======
-        GIT_SHA: subscribed-local110
->>>>>>> storied
+        GIT_SHA: ${GIT_SHA:-subscribed}
     container_name: subscribed-generator
     ports:
       - "5100:5000"
