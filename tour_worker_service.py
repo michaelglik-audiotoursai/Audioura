@@ -177,12 +177,13 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
             """, (psycopg2.Binary(zip_data), lat, lng, tour_content, zip_filename, existing[0]))
             print(f"[STORE] Updated existing tour: {tour_name} (id={existing[0]}, zip={zip_filename})")
         else:
+            _is_test_mode = os.getenv('TOUR_TEST_MODE', 'false').lower() == 'true'
             cur.execute("""
                 INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested,
-                    lat, lng, tour_content, content_language, zip_filename)
-                VALUES (%s, %s, %s, 1, %s, %s, %s, 'en', %s)
-            """, (tour_name, request_string, psycopg2.Binary(zip_data), lat, lng, tour_content, zip_filename))
-            print(f"[STORE] Inserted new tour: {tour_name} (zip={zip_filename})")
+                    lat, lng, tour_content, content_language, zip_filename, is_test)
+                VALUES (%s, %s, %s, 1, %s, %s, %s, 'en', %s, %s)
+            """, (tour_name, request_string, psycopg2.Binary(zip_data), lat, lng, tour_content, zip_filename, _is_test_mode))
+            print(f"[STORE] Inserted new tour: {tour_name} (zip={zip_filename}, is_test={_is_test_mode})")
 
         conn.commit()
         cur.close()

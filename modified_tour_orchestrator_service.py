@@ -122,24 +122,25 @@ def store_audio_tour(tour_name, request_string, zip_path, lat=None, lng=None):
             print(f"Updated existing tour: {tour_name}")
         else:
             # Insert new tour
+            _is_test_mode = os.getenv('TOUR_TEST_MODE', 'false').lower() == 'true'
             if has_audio_tour and has_lat and has_number_requested:
                 cur.execute(
                     """
-                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng)
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng, is_test)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
                     """,
-                    (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng)
+                    (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, _is_test_mode)
                 )
             else:
                 # Fallback if columns don't exist
                 cur.execute(
                     """
-                    INSERT INTO audio_tours (tour_name, request_string)
-                    VALUES (%s, %s)
+                    INSERT INTO audio_tours (tour_name, request_string, is_test)
+                    VALUES (%s, %s, %s)
                     """,
-                    (tour_name, request_string)
+                    (tour_name, request_string, _is_test_mode)
                 )
-            print(f"Inserted new tour: {tour_name}")
+            print(f"Inserted new tour: {tour_name} (is_test={_is_test_mode})")
         
         # Commit the transaction
         conn.commit()
