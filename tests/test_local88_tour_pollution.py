@@ -66,12 +66,15 @@ def test_tours_near_returns_michaels_9():
 def test_test_mode_tour_flagged_and_excluded():
     """AC2: A tour generated in test mode exists, is flagged, and is NOT in tours-near."""
     print("\n=== TEST 2: Test-mode tour is flagged and excluded ===")
+    import time
     helper = TestTourHelper(auto_cleanup=False)
 
     # Create a test tour with Nice coordinates (would appear in Michael's list without the flag)
+    # Use timestamp to ensure unique name (unique constraint on tour_name)
+    ts = int(time.time())
     tour_id = helper.create_test_tour(
-        tour_name="LOCAL88 Acceptance Test Tour",
-        request_string="LOCAL88 Test, Nice, France",
+        tour_name=f"LOCAL88 Acceptance Test Tour {ts}",
+        request_string=f"LOCAL88 Test {ts}, Nice, France",
         lat=43.7009,
         lng=7.2684,
     )
@@ -102,17 +105,19 @@ def test_test_mode_tour_flagged_and_excluded():
 def test_helper_cleanup_selective():
     """AC3: Helper's cleanup removes only ids it created — prove by creating two, cleaning one."""
     print("\n=== TEST 3: Helper cleanup is selective ===")
+    import time
     helper = TestTourHelper(auto_cleanup=False)
+    ts = int(time.time())
 
     # Create two test tours
     id_a = helper.create_test_tour(
-        tour_name="LOCAL88 Selective Test A",
-        request_string="Selective Test A",
+        tour_name=f"LOCAL88 Selective Test A {ts}",
+        request_string=f"Selective Test A {ts}",
         lat=43.70, lng=7.27,
     )
     id_b = helper.create_test_tour(
-        tour_name="LOCAL88 Selective Test B",
-        request_string="Selective Test B",
+        tour_name=f"LOCAL88 Selective Test B {ts}",
+        request_string=f"Selective Test B {ts}",
         lat=43.71, lng=7.28,
     )
     print(f"  Created tour A: id={id_a}")
