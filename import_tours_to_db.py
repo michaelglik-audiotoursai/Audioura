@@ -130,12 +130,13 @@ def import_tour(conn, zip_path, api_key):
             zip_data = f.read()
         
         # Insert into database
+        _is_test_mode = os.getenv('TOUR_TEST_MODE', 'false').lower() == 'true'
         with conn.cursor() as cur:
             cur.execute("""
-                INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng, is_test)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
-            """, (tour_name, request_string, psycopg2.Binary(zip_data), 0, lat, lng))
+            """, (tour_name, request_string, psycopg2.Binary(zip_data), 0, lat, lng, _is_test_mode))
             
             tour_id = cur.fetchone()[0]
             conn.commit()

@@ -138,11 +138,13 @@ def get_tours_near_location(lat, lng):
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Get original tours
+        # Get original tours (exclude test tours and translations)
         cur.execute("""
             SELECT id, tour_name, request_string, lat, lng, number_requested
             FROM audio_tours 
             WHERE lat IS NOT NULL AND lng IS NOT NULL
+              AND (is_test IS NOT TRUE)
+              AND original_tour_id IS NULL
         """)
         
         tours = cur.fetchall()
@@ -377,6 +379,7 @@ def search_tours():
                 FROM audio_tours 
                 WHERE (LOWER(tour_name) LIKE LOWER(%s) OR LOWER(request_string) LIKE LOWER(%s))
                 AND lat IS NOT NULL AND lng IS NOT NULL
+                AND (is_test IS NOT TRUE)
             """, (f'%{query}%', f'%{query}%'))
             
             tours = cur.fetchall()

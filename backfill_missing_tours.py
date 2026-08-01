@@ -101,10 +101,11 @@ def backfill_missing_tours():
             
             # Insert into audio_tours table
             try:
+                _is_test_mode = os.getenv('TOUR_TEST_MODE', 'false').lower() == 'true'
                 cur.execute("""
-                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                """, (tour_name, request_string, psycopg2.Binary(zip_data), 1, 42.3278, -71.205))
+                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng, is_test)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (tour_name, request_string, psycopg2.Binary(zip_data), 1, 42.3278, -71.205, _is_test_mode))
                 
                 print(f"  ✅ Successfully indexed tour in audio_tours")
                 
