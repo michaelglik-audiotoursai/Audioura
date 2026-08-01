@@ -158,3 +158,48 @@ of 2026-07-31 they are decided; he overturns what he dislikes.
 6. **Pricing calibration is blocked**, not by a question but by a bug: the
    corpus ImportError means measured cost excludes story mining
    (`search: 0.0`). Fix LOCAL-63, then re-measure before setting prices. (D7)
+
+---
+
+## Isolated Deployment — `docker-compose-subscribed.yml` (LOCAL-92)
+
+### Why
+
+The shared containers (`audioura-*`) run from `storied` and do not include
+`wallet_api.py`. Any Subscribed task that needs `GET /wallet/...` must bring
+up its own orchestrator built from the `subscribed` branch.
+
+### What it does
+
+`docker-compose-subscribed.yml` stands up:
+
+| Service | Container Name | Host Port | Internal Port |
+|---------|---------------|-----------|---------------|
+| Orchestrator (with wallet_api) | `subscribed-orchestrator` | **5102** | 5002 |
+| Tour Generator (with cache) | `subscribed-generator` | **5100** | 5000 |
+
+Both join the existing `development_default` network and point at the
+master's `postgres-2` container — no second database.
+
+### Quick commands
+
+```bash
+# Bring up (from any worktree that has the file):
+docker compose -f docker-compose-subscribed.yml up -d --build
+
+# Run e2e tests against it:
+ORCHESTRATOR_URL=http://localhost:5102 python3 tests/test_local82_subscribed_e2e.py
+
+# Tear down (leaves nothing behind):
+docker compose -f docker-compose-subscribed.yml down
+```
+
+### Constraints
+
+- **Never collides** with the shared `audioura-*` containers (distinct names
+  and ports).
+- **Never modifies** `docker-compose-master.yml`.
+- **Shares Postgres** — billing tables are real. Test users are created/cleaned
+  per the helper in each test.
+- OPENAI_API_KEY and SERP_API_KEY must be exported in the shell (or the
+  generator won't generate new tours; cached lookups still work without them).
