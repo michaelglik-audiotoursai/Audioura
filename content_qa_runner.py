@@ -496,13 +496,60 @@ def run_qa(tour_text, tour_file="", story_elements=None, venue_context=None):
     else:
         check("Attribution grounding (consistent with venue)", True, "(not a museum tour)")
 
-    # 11. Venue coherence: stop descriptions should reference the correct venue
+    # 11. Venue coherence: stops must not drift to a DIFFERENT venue
+    # [LOCAL-85] Replaced substring-count heuristic with negative-drift detection.
+    # Old rule demanded ≥ len//3 stops contain venue[:15] — conflicted with the
+    # LOCAL-47 repetition cap (max 2 occurrences) and penalized natural prose
+    # ("the museum", "Matisse's work") that omits the full venue string.
+    # New rule: fail only when a MAJORITY of stops name a foreign venue,
+    # proving the tour has genuinely drifted away from its subject.
+    # Consistency with LOCAL-47 cap: this check requires ZERO mentions of
+    # the venue name — it only fires on positive evidence of drift (foreign
+    # venues present). The repetition cap permits up to 2 mentions.
+    # The two rules can never conflict: a tour that passes one cannot violate the other.
     if is_museum and _tour_venue:
-        _venue_mentions = sum(1 for stop in stops if _tour_venue.lower()[:15] in stop.lower())
-        _passed_11 = _venue_mentions >= len(stops) // 3
+        # Extract distinctive words from venue name (skip generic museum/gallery words)
+        _GENERIC_VENUE_WORDS = {'musée', 'musee', 'museum', 'gallery', 'galerie',
+                                'palais', 'villa', 'national', 'municipal', 'royal',
+                                'the', 'of', 'de', 'du', 'des', 'le', 'la', 'les'}
+        _venue_words = [w.lower() for w in re.split(r'[\s,]+', _tour_venue)
+                        if w.lower() not in _GENERIC_VENUE_WORDS and len(w) > 2]
+        
+        # Count stops that name a foreign venue (reuse check-9's pattern)
+        _drifted_stops = 0
+        for stop in stops:
+            # Extract content lines only (skip structural lines)
+            _content_only = '\n'.join(
+                line for line in stop.split('\n')
+                if line.strip() and not re.match(
+                    r'^(Address|Coordinates|Type/?Specialty|Specific Examples?|'
+                    r'Operational|Orientation|Museum Information|Directions|Sources|'
+                    r'Stop \d+|Please resume):', line.strip())
+            )
+            _foreign_refs = _NAMED_VENUE_PATTERN.findall(_content_only)
+            _has_foreign = False
+            for ref in _foreign_refs:
+                _ref_core = ' '.join(ref.split()[:2]).lower()
+                # Skip references that match the tour's own venue
+                if _tour_venue and (_tour_venue.lower()[:20] in ref.lower()
+                                    or ref.lower()[:20] in _tour_venue.lower()
+                                    or _ref_core in _tour_venue.lower()):
+                    continue
+                # Skip if ref contains any distinctive word from the venue
+                _ref_lower = ref.lower()
+                if any(vw in _ref_lower for vw in _venue_words):
+                    continue
+                _has_foreign = True
+                break
+            if _has_foreign:
+                _drifted_stops += 1
+        
+        # Fail if majority of stops have drifted to foreign venues
+        _drift_threshold = len(stops) // 2  # >50% must drift to fail
+        _passed_11 = _drifted_stops <= _drift_threshold
         check("Venue coherence (stops reference correct venue)",
               _passed_11,
-              f"{_venue_mentions}/{len(stops)} stops mention '{_tour_venue[:30]}'")
+              f"{_drifted_stops}/{len(stops)} stops reference a foreign venue (threshold: >{_drift_threshold})")
         if not _passed_11:
             FACTUAL_FAIL_COUNT += 1
     else:
