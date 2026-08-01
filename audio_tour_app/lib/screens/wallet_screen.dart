@@ -142,7 +142,7 @@ class _WalletScreenState extends State<WalletScreen> {
                       const SizedBox(height: 16),
                       _buildPlanCard(),
                       const SizedBox(height: 16),
-                      if (_wallet?.plan == 'pay_per_use') ...[
+                      if (_wallet?.plan == 'ppu') ...[
                         _buildTopUpButton(),
                         const SizedBox(height: 16),
                       ],
@@ -392,6 +392,35 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Widget _buildTransactionRow(WalletTransaction txn) {
+    // D20: Monthly fee is billed by Apple, not deducted from credits.
+    // Show it as informational (grey, $0.00) so it does not look like a charge.
+    if (txn.isMonthlyFee) {
+      return ListTile(
+        dense: true,
+        leading: Icon(
+          Icons.receipt_long_outlined,
+          color: Colors.grey.shade500,
+          size: 20,
+        ),
+        title: Text(
+          txn.description,
+          style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+        ),
+        subtitle: Text(
+          _formatDate(txn.createdAt),
+          style: const TextStyle(fontSize: 11),
+        ),
+        trailing: Text(
+          '\$0.00',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade500,
+          ),
+        ),
+      );
+    }
+
     final isCredit = txn.chargedUsd < 0;
     return ListTile(
       dense: true,
@@ -452,7 +481,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
   String _planDisplayName(String plan) {
     switch (plan) {
-      case 'pay_per_use':
+      case 'ppu':
         return 'Pay-Per-Use';
       case 'unlimited':
         return 'Unlimited';
@@ -463,7 +492,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
   IconData _planIcon(String plan) {
     switch (plan) {
-      case 'pay_per_use':
+      case 'ppu':
         return Icons.account_balance_wallet;
       case 'unlimited':
         return Icons.all_inclusive;
@@ -474,7 +503,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
   Color _planColor(String plan) {
     switch (plan) {
-      case 'pay_per_use':
+      case 'ppu':
         return Colors.green;
       case 'unlimited':
         return Colors.blue;
@@ -624,7 +653,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
   }
 
   Widget _buildPlanCard(AvailablePlan plan) {
-    final isHighlighted = plan.planId == 'pay_per_use';
+    final isHighlighted = plan.planId == 'ppu';
     return Card(
       elevation: isHighlighted ? 4 : 1,
       margin: const EdgeInsets.only(bottom: 12),

@@ -1,19 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:audio_tour_app_dev/screens/wallet_screen.dart';
 import 'package:audio_tour_app_dev/services/wallet_service.dart';
 
 /// Widget tests for Wallet UI screens against the mock backend.
 /// These test each visual state without requiring the real backend.
+///
+/// Tests run in mock mode by setting SharedPreferences 'use_mock_wallet'=true.
+/// The compile-time default is live, but tests override to mock.
 
 void main() {
-  setUp(() {
+  setUp(() async {
+    // Force mock mode for all widget tests
+    SharedPreferences.setMockInitialValues({'use_mock_wallet': true});
     WalletTestHelper.reset();
   });
 
   group('WalletScreen — Pay-Per-Use', () {
     testWidgets('shows balance and transactions', (tester) async {
-      WalletTestHelper.setMockPlan('pay_per_use');
+      WalletTestHelper.setMockPlan('ppu');
       WalletTestHelper.setMockBalance(7.45);
 
       await tester.pumpWidget(const MaterialApp(home: WalletScreen()));
@@ -41,7 +47,7 @@ void main() {
     });
 
     testWidgets('transactions show \$0.00 for cache hits', (tester) async {
-      WalletTestHelper.setMockPlan('pay_per_use');
+      WalletTestHelper.setMockPlan('ppu');
       await tester.pumpWidget(const MaterialApp(home: WalletScreen()));
       await tester.pumpAndSettle();
 
@@ -50,7 +56,7 @@ void main() {
     });
 
     testWidgets('top-up button shows confirmation dialog', (tester) async {
-      WalletTestHelper.setMockPlan('pay_per_use');
+      WalletTestHelper.setMockPlan('ppu');
       await tester.pumpWidget(const MaterialApp(home: WalletScreen()));
       await tester.pumpAndSettle();
 
@@ -66,7 +72,7 @@ void main() {
     });
 
     testWidgets('low balance shows warning', (tester) async {
-      WalletTestHelper.setMockPlan('pay_per_use');
+      WalletTestHelper.setMockPlan('ppu');
       WalletTestHelper.setMockBalance(1.50); // Below $2 threshold
 
       await tester.pumpWidget(const MaterialApp(home: WalletScreen()));
@@ -75,6 +81,20 @@ void main() {
       // Low balance warning should appear
       expect(
         find.textContaining('Low balance'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('monthly fee shows as informational, not a charge (D20)', (tester) async {
+      WalletTestHelper.setMockPlan('ppu');
+      WalletTestHelper.setIncludeMonthlyFee(true);
+
+      await tester.pumpWidget(const MaterialApp(home: WalletScreen()));
+      await tester.pumpAndSettle();
+
+      // Monthly fee row should say "billed by Apple", not look like a debit
+      expect(
+        find.text('Monthly subscription — billed by Apple'),
         findsOneWidget,
       );
     });
@@ -172,6 +192,35 @@ void main() {
         200.0,
       );
       expect(find.text('Restore Purchases'), findsOneWidget);
+    });
+  });
+
+  group('Transaction rendering edge cases', () {
+    testWidgets('cache-hit renders as \$0.00 with clear wording', (tester) async {
+      WalletTestHelper.setMockPlan('ppu');
+      await tester.pumpWidget(const MaterialApp(home: WalletScreen()));
+      await tester.pumpAndSettle();
+
+      // "Downloaded — no charge" is the API's description for cache hits
+      // It must display clearly that nothing was charged
+      expect(find.text('Downloaded — no charge'), findsWidgets);
+
+      // The amount column for these rows shows $0.00
+      // (verified by existence of multiple $0.00 entries)
+      expect(find.text('\$0.00'), findsWidgets);
+    });
+
+    testWidgets('monthly fee does not reduce displayed balance (D20)', (tester) async {
+      // The wallet balance should be $7.45 even with a monthly fee in history
+      WalletTestHelper.setMockPlan('ppu');
+      WalletTestHelper.setMockBalance(7.45);
+      WalletTestHelper.setIncludeMonthlyFee(true);
+
+      await tester.pumpWidget(const MaterialApp(home: WalletScreen()));
+      await tester.pumpAndSettle();
+
+      // Balance is not reduced by the monthly fee
+      expect(find.textContaining('\$7.45'), findsOneWidget);
     });
   });
 }
