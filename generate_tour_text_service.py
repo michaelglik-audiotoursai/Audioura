@@ -198,6 +198,70 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                 os.unlink(temp_path)
             return
 
+        # [LOCAL-83] Charge the user's wallet — SEPARATE try block, FAILS CLOSED.
+        # This is a billing control (D14): if charging fails, do NOT deliver.
+        # Do NOT share an exception handler with cost metering above.
+        # Idempotency: use job_id as the key — a retried generation charges once (LOCAL-66).
+        if user_id and _our_cost > 0:
+            try:
+                from pricing import compute_user_charge as _compute_charge
+                from wallet_ledger import charge as _wallet_charge, record_unlimited_cost as _record_unlimited
+                from entitlements import _get_subscription_tier
+
+                _user_tier = _get_subscription_tier(user_id)
+                _charge_result = _compute_charge(
+                    our_cost_usd=_our_cost,
+                    cache_hit=_is_cache_hit,
+                    operation_type=_op_type,
+                    description=f"Tour: {location[:200]}",
+                )
+
+                if _user_tier == 'ppu' and _charge_result['user_charge_cents'] > 0:
+                    _charge_idem_key = f"charge:{user_id}:{job_id}"
+                    _row_id, _new_bal, _was_stopped = _wallet_charge(
+                        user_id=user_id,
+                        charge_usd=_charge_result['user_charge_usd'],
+                        idempotency_key=_charge_idem_key,
+                        description=f"Tour: {location[:200]} — ${_charge_result['user_charge_usd']:.2f}",
+                        job_id=job_id,
+                    )
+                    if _was_stopped:
+                        # Balance insufficient — should not happen if entitlements passed,
+                        # but fail closed anyway.
+                        import logging as _charge_logging
+                        _charge_logging.getLogger("generate_tour_text_service").error(
+                            f"[LOCAL-83] CHARGE BLOCKED (zero balance) for {user_id} job={job_id}"
+                        )
+                        ACTIVE_JOBS.update(job_id, status="error",
+                            error="Insufficient balance to complete this tour. Please top up your credits.",
+                            error_type="charge_blocked_zero_balance")
+                        if os.path.exists(temp_path):
+                            os.unlink(temp_path)
+                        return
+                    print(f"[LOCAL-83] PPU charged: ${_charge_result['user_charge_usd']:.2f} | "
+                          f"balance={_new_bal}¢ | user={user_id} | job={job_id}")
+
+                elif _user_tier == 'unlimited':
+                    from decimal import Decimal as _Dec
+                    _record_unlimited(user_id, _Dec(str(_our_cost)))
+                    print(f"[LOCAL-83] Unlimited cost recorded: ${_our_cost:.6f} | user={user_id} | job={job_id}")
+
+                # free tier or cache hit ($0 charge): no wallet action needed
+            except Exception as _charge_err:
+                # FAIL CLOSED (D14): charging failed — do NOT deliver unbilled tour.
+                import logging as _charge_logging
+                _charge_logging.getLogger("generate_tour_text_service").error(
+                    f"[LOCAL-83] CHARGING FAILED — aborting delivery (fail-closed): {_charge_err}"
+                )
+                print(f"[LOCAL-83] ERROR: Charging failed — aborting delivery: {_charge_err}")
+                ACTIVE_JOBS.update(job_id, status="error",
+                    error=f"Billing unavailable ({type(_charge_err).__name__}: {_charge_err}). "
+                          f"Tour not delivered — fail-closed billing policy.",
+                    error_type="charge_failed")
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
+                return
+
         # [BLOCKER4c] QA gate — corrections on structured data, never deliver on exit 1
         if os.getenv('STORIED_MODE', 'false').lower() == 'true' and tour_text:
             import content_qa_runner

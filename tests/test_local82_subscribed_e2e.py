@@ -281,34 +281,29 @@ def step1_free_user_unchanged():
 
 
 def step2_subscribe_ppu():
-    """Step 2: Subscribe to `ppu` via the fake provider. Monthly fee debited."""
+    """Step 2: Subscribe to `ppu` via the fake provider. Monthly fee recorded (D20: no balance change)."""
     log("--- Step 2: Subscribe to PPU + monthly fee ---")
 
     # Switch to PPU tier
     switch_to_tier("ppu")
 
-    # Record monthly fee debit ($2.00)
+    # Record monthly fee — per D20, this is billed by Apple and does NOT debit the wallet.
     idem_key = f"monthly_fee:{TEST_USER_ID}:{uuid.uuid4().hex[:8]}"
     row_id, new_balance = wallet_ledger.monthly_fee(TEST_USER_ID, "ppu", idem_key)
 
-    # On PPU, the monthly fee is a debit. User starts with $0 balance, so it goes to -$2.00.
-    # But wait — the design says monthly_fee is an auto-renewable subscription fee,
-    # separate from the credit balance. Let's check what actually happens.
     actual_bal = get_balance_usd()
 
-    # The fee drives balance negative. This is expected behaviour for the fee —
-    # but the design says the fee is a subscription (Apple handles), not a wallet debit.
-    # For this test, we accept the implementation as-is: fee debited from wallet.
-    fee_expected = Decimal("-2.00")
+    # D20: fee does not reduce balance. User starts at $0, stays at $0.
+    fee_expected = Decimal("0.00")
 
     passed = (actual_bal == fee_expected)
-    record(2, "PPU monthly fee debited ($2.00)", None, 2.00, float(fee_expected), float(actual_bal), passed,
-           f"row_id={'ok' if row_id else 'NONE'}")
+    record(2, "PPU monthly fee recorded (D20: balance unchanged)", None, 0.00, float(fee_expected), float(actual_bal), passed,
+           f"row_id={'ok' if row_id else 'NONE'}, D20=fee billed by Apple, not from credits")
     return passed
 
 
 def step3_topup():
-    """Step 3: Top up $10. Balance = $10.00 - $2.00 fee = $8.00."""
+    """Step 3: Top up $10. Balance = $10.00 (D20: fee didn't debit, so full $10)."""
     log("--- Step 3: Top up $10 ---")
 
     idem_key = f"topup:{TEST_USER_ID}:{uuid.uuid4().hex[:8]}"
@@ -317,11 +312,11 @@ def step3_topup():
     )
 
     actual_bal = get_balance_usd()
-    # After -$2.00 fee + $10.00 topup = $8.00
-    expected = Decimal("8.00")
+    # D20: fee is $0 movement, so after $10 topup balance is $10.00
+    expected = Decimal("10.00")
 
     passed = (actual_bal == expected)
-    record(3, "Top-up $10, balance = $8.00", None, None, float(expected), float(actual_bal), passed,
+    record(3, "Top-up $10, balance = $10.00", None, None, float(expected), float(actual_bal), passed,
            f"new_balance_cents={new_balance_cents}")
 
     verify_balance_reconciles("step3")
@@ -785,36 +780,23 @@ def main():
 
     # Integration seam findings
     print("\n" + "=" * 70)
-    print("INTEGRATION SEAM FINDINGS")
+    print("INTEGRATION FINDINGS")
     print("=" * 70)
     print("""
-CRITICAL FINDING — Wallet charging is NOT wired into the generation pipeline:
+LOCAL-83 STATUS — Wallet charging IS NOW wired into the generation pipeline:
 
-  The production flow in tour_orchestrator_service.py and generate_tour_text_service.py:
+  The production flow in generate_tour_text_service.py and news_orchestrator_service.py:
     1. ✅ entitlements.check_tour_quota() gates access (pre-generation)
     2. ✅ cost_meter.record_operation() records our cost (post-generation)
-    3. ❌ pricing.compute_user_charge() is NEVER called post-generation
-    4. ❌ wallet_ledger.charge() is NEVER called post-generation
+    3. ✅ pricing.compute_user_charge() computes user charge (LOCAL-83)
+    4. ✅ wallet_ledger.charge() / record_unlimited_cost() debits wallet (LOCAL-83)
 
-  This means: a PPU user passes the entitlement check (has balance > 0),
-  generates a tour, the cost is metered to cost_ledger, but NO money is
-  ever deducted from their wallet. Their balance never decreases from use.
-
-  The same gap exists in news_orchestrator_service.py (line 215 meters cost
-  but never calls pricing or wallet_ledger).
-
-  This test exercises all components directly to prove they WORK individually
-  and CAN work together. But the orchestrator glue is missing.
-
-  Impact: PPU users can generate unlimited content without spending credits.
-  The entitlement gate only blocks at balance == 0, which never happens
-  because nothing debits the wallet.
-
-  Recommended fix: After cost_meter.record_operation() succeeds, add:
-    charge_info = pricing.compute_user_charge(our_cost, cache_hit, op_type)
-    if charge_info['user_charge_cents'] > 0:
-        wallet_ledger.charge(user_id, charge_info['user_charge_usd'], ...)
-    For unlimited tier: wallet_ledger.record_unlimited_cost(user_id, our_cost)
+  Additionally:
+    - D20 FIX: monthly_fee() no longer debits the wallet. Fee is visible
+      in transaction list but balance is unchanged (Apple bills it separately).
+    - Cache hits: $0.00 charge, balance unchanged (Michael's rule).
+    - Fail closed: charging failure aborts delivery, logs ERROR (D14).
+    - Idempotent: same job_id retried charges exactly once (LOCAL-66 mechanism).
 """)
 
     # Cleanup
