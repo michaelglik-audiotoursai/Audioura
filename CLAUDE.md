@@ -204,6 +204,38 @@ without Michael prompting it. If usage credits run out, schedule a wakeup
 far enough ahead that they have reset, and resume from the files on disk —
 never wait to be re-invoked by a human.
 
+### ⛔ THE LIVE DATABASE IS PRODUCTION DATA
+
+**2026-08-01: tour 29 — Michael's French Riviera biking tour, which he had
+downloaded and field-tested — plus its translations 34 and 35 were DELETED
+from `audio_tours` during autonomous operation.** Nothing detected it; LEAD
+noticed only because the Nice tour list dropped from 9 entries to 8 while
+checking something unrelated. Recovery worked only because the ZIP and
+source text happened to still be on disk. Nothing guaranteed that.
+
+The culprit was never identified. No task worktree contains a
+`DELETE FROM audio_tours`, and the only cascade on that table is
+`stop_metrics`. Test cleanup reaching real rows is the leading hypothesis,
+unproven.
+
+**Rules, binding on every task file from now on:**
+
+- **No task may `DELETE FROM audio_tours`.** To hide a test tour, set
+  `lat`/`lng` to NULL — `tours-near` filters on those, not on `draft` — and
+  back up the values first.
+- **Test cleanup must be scoped to rows the test created**, by an id or a
+  user id captured at creation. Never by name pattern, never by date range,
+  never "everything above id N".
+- **Any task touching the live DB must report a row count before and after**
+  for every table it writes. A drop is a bounce.
+- Tasks must **declare live-DB changes explicitly** in their submission —
+  this was already required and remains.
+
+**Guards now in place:** `.continuous_dev/backup_tours.sh` runs on every
+5-minute launchd tick, snapshots `audio_tours`, keeps the last 12, and
+writes a `*** ROW LOSS ***` line to `.continuous_dev/ALERTS.md` the moment
+the count falls. Check `ALERTS.md` at the start of every review tick.
+
 ### Corollaries learned the hard way
 
 - **`exit=0` from Kiro means nothing.** Verify by effect: commits exist

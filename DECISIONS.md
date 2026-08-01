@@ -442,3 +442,40 @@ rule-removed runs. So the rule is not earning its place as an
 anti-fabrication guard, which is what it was written as. It earns it as a
 fact-density stabiliser. Same code, different justification — and the
 justification should be corrected in the comment.
+
+---
+
+## D23 — data-loss incident: tour 29 deleted, restored, guards added
+
+**2026-08-01.** Tour 29 (French Riviera Biking Tour, 15 stops — the one
+Michael downloaded and field-tested) and its translations 34/35 were deleted
+from `audio_tours` during autonomous operation.
+
+**Detection was luck.** I noticed the Nice tour list had gone from 9 entries
+to 8 while verifying something unrelated. Nothing alerted.
+
+**Recovery was also luck.** The ZIP (`French Riviera Biking Tour_c6195a89.zip`,
+7.4 MB) and the source text were still on disk, so the row could be rebuilt
+byte-identically and re-verified end to end: listed near Nice, resolves to
+its own ZIP, downloads HTTP 200 at 7,408,370 bytes.
+
+**Cause: unidentified.** No task worktree contains `DELETE FROM audio_tours`.
+The only FK cascade is `stop_metrics`. That 29's two translations went with
+it suggests something deleting a tour and its derivatives together. Test
+cleanup reaching real rows is the leading hypothesis and remains unproven —
+recording it as open rather than closing it with a guess.
+
+**Decisions taken:**
+
+1. `audio_tours` is snapshotted on every 5-minute launchd tick, last 12 kept.
+2. A falling row count writes `*** ROW LOSS ***` to
+   `.continuous_dev/ALERTS.md`. Five minutes to detection instead of chance.
+3. `CLAUDE.md` now forbids any task from deleting from `audio_tours`, requires
+   cleanup scoped to ids the test created, and requires before/after row
+   counts from any task touching the live DB.
+
+**What this says about my own judgement.** I have consistently refused to
+delete rows myself — hiding test tours by nulling coordinates, backing values
+up first, treating deletion as the one thing needing Michael. I applied that
+care to my own actions and never extended it to the agents I was dispatching
+at a live database. The guard should have existed before the first task ran.
