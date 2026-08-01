@@ -5201,14 +5201,24 @@ If the title names a person, an event, or uses language like "hommage à", "expo
 Example: "Pierre Matisse, un marchand d'art à New York" is a biographical EXHIBITION about
 Henri Matisse's son — describe the exhibition's subject and scope, NOT brushstrokes.
 """
-            # [LOCAL-48] Thin-corpus honesty rule REMOVED (LOCAL-72 bounce).
-            # LEAD identified this as a thinning instruction ("be SHORT when knowledge
-            # is thin") wearing an honesty label. Museum tour lost 5 facts (36→31)
-            # when this rule was active — five times the 1-fact LLM noise observed
-            # between identical runs. Same treatment as the 80-word outdoor cap:
-            # content-removal instructions are not anti-fabrication guards.
-            # The exhibition-vs-object rule above IS a genuine anti-fabrication guard
-            # (it corrects what the model says, not how much it says) and is kept.
+            # [LOCAL-48] Thin-corpus honesty guard (Palais Lascaris fabrication fix)
+            # LOCAL-72 A/B test: rule PRESENT → mean 39.7 facts (stdev 2.1, min 38);
+            # rule REMOVED → mean 32.7 facts (stdev 7.0, min 26). The rule acts as a
+            # fact-density stabiliser, not a thinning instruction. Restored per LEAD.
+            # Note: 0 fabrications in 3 rule-removed runs — the rule does not earn its
+            # keep as an anti-fabrication guard; it earns it by pointing the model at
+            # the fact sheet, which stabilises output density.
+            description_prompt += f"""
+THIN-CORPUS HONESTY RULE (critical — prevents fabrication):
+If you do not have verified, specific information about this particular work's visual content,
+material, or history, DO NOT INVENT details. Instead:
+- State what IS known (title, artist, period, medium if available)
+- Describe the TYPE of work and its general context
+- Acknowledge the gap honestly rather than filling it with plausible-sounding fiction
+A 120-word honest description beats a 300-word fabricated one. When your knowledge is thin,
+be SHORT and FACTUAL. The number of confirmed facts in the fact sheet below tells you how
+much material you actually have to work with.
+"""
             # [D5] No artist bio repetition in descriptions
             description_prompt += """
 Do NOT repeat the artist's biographical background (birth year, nationality, school associations like 'École de Paris', artistic formats like 'stained glass and stage sets'). That information belongs in the tour introduction only. Here, focus EXCLUSIVELY on THIS SPECIFIC ARTWORK — what it depicts, its technique, its story, what to look for with your eyes.

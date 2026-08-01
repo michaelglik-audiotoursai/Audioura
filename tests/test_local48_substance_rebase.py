@@ -233,29 +233,29 @@ def test_exhibition_guard_describes_scope():
 
 
 # ────────────────────────────────────────────────────────────────────────────
-# 5. Thin-corpus honesty rule — REMOVED (LOCAL-72 bounce)
+# 5. Thin-corpus honesty rule — RESTORED (LOCAL-72 A/B test overturned bounce)
 # ────────────────────────────────────────────────────────────────────────────
 
-def test_thin_corpus_rule_removed():
-    """The thin-corpus rule was removed — it was a thinning instruction, not
-    an anti-fabrication guard. Museum tour lost 5 facts when it was active.
-    The exhibition-vs-object rule (genuine anti-fabrication) is kept."""
+def test_thin_corpus_guard_in_source():
+    """Thin-corpus honesty rule is present in generate_tour_text.py.
+    LOCAL-72 A/B test: rule present → mean 39.7 facts (stdev 2.1);
+    rule removed → mean 32.7 facts (stdev 7.0). The rule acts as a
+    fact-density stabiliser, not a thinning instruction. Restored per LEAD."""
     source = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                'generate_tour_text.py')).read()
-    # The rule text must NOT be present as active code (it's in a comment block only)
-    assert "description_prompt += f\"\"\"\nTHIN-CORPUS HONESTY RULE" not in source, \
-        "Thin-corpus rule should have been removed — it is a thinning instruction"
-    # But the exhibition-vs-object rule IS still active
-    assert "EXHIBITION VS OBJECT RULE" in source, \
-        "Exhibition-vs-object rule must remain — it is a genuine anti-fabrication guard"
+    assert "THIN-CORPUS HONESTY RULE" in source, "Missing thin-corpus guard"
+    assert "DO NOT INVENT details" in source, "Missing invention ban"
 
 
-def test_thin_corpus_removal_comment_documents_reason():
-    """The removal is documented with the rationale in code."""
+def test_thin_corpus_guard_brevity_instruction():
+    """The thin-corpus guard instructs brevity over fabrication and points
+    model at fact sheet (the stabilisation mechanism)."""
     source = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                'generate_tour_text.py')).read()
-    assert "Thin-corpus honesty rule REMOVED" in source, \
-        "Removal should be documented in code comment"
+    assert "120-word honest description beats a 300-word fabricated" in source, \
+        "Should instruct brevity over fabrication"
+    assert "confirmed facts in the fact sheet below" in source, \
+        "Should point model at fact sheet — this is why it stabilises density"
 
 
 # ────────────────────────────────────────────────────────────────────────────
