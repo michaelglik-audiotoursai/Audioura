@@ -399,3 +399,46 @@ Rewriting its expectations before the behaviour changes would be writing a
 test against code that does not exist. LOCAL-83 changes the behaviour and
 updates the expectations in the same commit, so the suite is never green
 against a state nobody intends.
+
+---
+
+## D22 — I was wrong about the thin-corpus rule; it stays
+
+**Decision: restore the thin-corpus honesty rule. Keep the 80-word cap
+removed. My bounce of LOCAL-72 was based on noise read as signal.**
+
+I bounced LOCAL-72 arguing that the museum tour's 36→31 fact drop was caused
+by a "thin-corpus honesty rule" telling the model to *"be SHORT and FACTUAL"*
+— the fifth instance of the thinning pattern. I required three runs per arm
+so the claim could be tested. It was, and it failed:
+
+```
+ARM A (rule REMOVED)   40, 26, 32   mean 32.7   stdev 7.0   min 26
+ARM B (rule PRESENT)   38, 39, 42   mean 39.7   stdev 2.1   min 38
+```
+
+Removing the rule **costs 7 facts on average and triples the variance**. The
+36→31 I built the bounce on was a single-run comparison against a
+distribution with stdev 7.0. It was noise. I made precisely the error I have
+bounced others for — LOCAL-50's vacuous collision test, LOCAL-73's inferred
+Polly claim — treating one measurement as a trend.
+
+Two lessons worth keeping:
+
+1. **Two rules can look identical and behave oppositely.** The 80-word cap
+   and the thin-corpus rule both read as length instructions. The cap
+   genuinely thinned (105 → 89 with it, 121 without). The rule enriches. No
+   amount of reading the prompt would have separated them; only measurement
+   did. The rule's second sentence — *"the number of confirmed facts in the
+   fact sheet below tells you how much material you have"* — points the
+   model at its source material, which is plausibly why.
+2. **The standing "any merge that cuts distinct facts is a bounce" rule needs
+   a noise floor.** Museum fact counts have a stdev around 7 at n=3. Any
+   claimed change smaller than that requires repeated runs before anyone —
+   me included — treats it as real.
+
+Also worth recording: no fabrications appeared in any of the three
+rule-removed runs. So the rule is not earning its place as an
+anti-fabrication guard, which is what it was written as. It earns it as a
+fact-density stabiliser. Same code, different justification — and the
+justification should be corrected in the comment.
