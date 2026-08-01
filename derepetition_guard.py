@@ -286,3 +286,87 @@ def rewrite_repeated_sentence(
     except Exception as e:
         _log.error(f"Rewrite error: {e}")
         return sentence
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# [LOCAL-47] Tour-title / location-name repetition cap
+# ──────────────────────────────────────────────────────────────────────────────
+
+def cap_location_repetition(tour_text: str, location_phrase: str, max_occurrences: int = 2) -> str:
+    """Remove excess occurrences of the tour location phrase from generated text.
+    
+    When GPT over-references the tour title/location (e.g., "French Riviera biking tour"
+    appears 6 times), this removes occurrences beyond max_occurrences while preserving
+    sentence structure.
+    
+    Strategy: keep the first `max_occurrences`, for subsequent ones:
+    - If the phrase is within a larger noun-phrase ("this French Riviera biking tour stop"),
+      remove just the location phrase leaving the rest intact.
+    - If it's a standalone clause ("on this French Riviera biking tour"), remove the
+      entire clause-fragment.
+    
+    Args:
+        tour_text: Full tour text.
+        location_phrase: The phrase to cap (e.g., "French Riviera biking tour").
+        max_occurrences: Maximum allowed occurrences (default 2).
+        
+    Returns:
+        Modified tour text with excess occurrences removed or replaced.
+    """
+    if not tour_text or not location_phrase or len(location_phrase) < 5:
+        return tour_text
+    
+    # Build case-insensitive pattern that captures surrounding context
+    escaped = re.escape(location_phrase)
+    # Match with optional surrounding articles/prepositions
+    pattern = re.compile(
+        r'(?:(?:this|the|our|your|a)\s+)?' + escaped + r'(?:\s+(?:stop|experience|adventure|journey))?',
+        re.IGNORECASE
+    )
+    
+    matches = list(pattern.finditer(tour_text))
+    if len(matches) <= max_occurrences:
+        return tour_text  # Within cap, nothing to do
+    
+    # Keep first N, replace rest
+    result = tour_text
+    # Process from end to preserve character offsets
+    for match in reversed(matches[max_occurrences:]):
+        start, end = match.start(), match.end()
+        matched_text = match.group(0)
+        
+        # Check if removing would leave a broken sentence
+        # Look for surrounding sentence context
+        before = result[max(0, start - 20):start].rstrip()
+        after = result[end:min(len(result), end + 20)].lstrip()
+        
+        # If preceded by "on/of/along/during" and followed by comma or period,
+        # remove the whole prepositional phrase fragment
+        if re.search(r'\b(on|of|along|during|in|across)\s*$', before):
+            # Find the preposition start
+            prep_match = re.search(r'\b(on|of|along|during|in|across)\s*$', before)
+            if prep_match:
+                prep_start = start - (len(before) - prep_match.start())
+                # Also consume trailing comma if present
+                if after.startswith(','):
+                    result = result[:prep_start] + result[end + 1:]
+                else:
+                    result = result[:prep_start] + result[end:]
+        else:
+            # Simple removal — just strip the location phrase, keep surrounding words
+            result = result[:start] + result[end:]
+        
+        # Clean up double spaces
+        result = re.sub(r'  +', ' ', result)
+        # Clean up orphaned punctuation from removals
+        result = re.sub(r'\s+,', ',', result)
+        result = re.sub(r',\s*,', ',', result)
+    
+    return result
+
+
+def count_phrase_occurrences(text: str, phrase: str) -> int:
+    """Count case-insensitive occurrences of a phrase in text."""
+    if not text or not phrase:
+        return 0
+    return len(re.findall(re.escape(phrase), text, re.IGNORECASE))
