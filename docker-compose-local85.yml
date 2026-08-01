@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  tour-generator-local85:
+    build:
+      context: .
+      dockerfile: Dockerfile.generator
+      args:
+        GIT_SHA: local85
+    container_name: local-85-tour-generator-1
+    ports:
+      - "5085:5000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SERP_API_KEY=${SERP_API_KEY}
+      - SERP_PROVIDER=serper
+      - STORIED_MODE=true
+      - ATTESTATION_MODE=log_only
+      - BASE_URL=http://localhost:5000
+      - REFERRAL_BASE_URL=http://localhost:5000
+      - DATABASE_URL=postgresql://admin:password123@postgres-2:5432/audiotours
+      - PYTHONUNBUFFERED=1
+      - VENUE_CACHE_TTL_DAYS=30
+      - VENUE_CACHE_NEGATIVE_TTL_DAYS=5
+      - REQUIRE_LISTING_VERIFICATION=false
+    volumes:
+      - ./tours:/app/tours
+    networks:
+      - development_default
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  development_default:
+    external: true
