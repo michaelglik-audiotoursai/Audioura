@@ -1,0 +1,96 @@
+# ============================================================================
+# docker-compose-subscribed.yml — Isolated Subscribed billing stack
+# ============================================================================
+#
+# PURPOSE:
+#   Stand up the orchestrator (with wallet_api) and tour-generator from the
+#   `subscribed` branch on NON-CONFLICTING ports. Shares Postgres with the
+#   master stack (billing tables are real and shared). Never collides with or
+#   replaces the shared `audioura-*` containers that Michael's phone relies on.
+#
+# BRING UP:
+#   docker compose -f docker-compose-subscribed.yml up -d --build
+#
+# TEAR DOWN:
+#   docker compose -f docker-compose-subscribed.yml down
+#
+# RUN TESTS AGAINST IT:
+#   ORCHESTRATOR_URL=http://localhost:5102 python3 tests/test_local82_subscribed_e2e.py
+#
+# PORT MAP (avoids all master ports 5000-5030, 5433):
+#   subscribed-orchestrator:  5102 (maps to container 5002)
+#   subscribed-generator:     5100 (maps to container 5000)
+#
+# ============================================================================
+
+services:
+  subscribed-orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.orchestrator
+      args:
+        GIT_SHA: subscribed-local110
+    container_name: subscribed-orchestrator
+    ports:
+      - "5102:5002"
+    environment:
+      - TOUR_GENERATOR_URL=http://subscribed-generator:5000
+      - MODERNIZED_URL=http://tour-generation-modernized-1:5021
+      - TRANSLATION_URL=http://translation-service:5030
+      - USER_API_URL=http://user-api-2:5000
+      - TOUR_UPDATE_URL=http://tour-update:5001
+      - DB_HOST=postgres-2
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./tours:/app/tours
+    networks:
+      - development_default
+    depends_on:
+      subscribed-generator:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5002/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  subscribed-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile.generator
+      args:
+        GIT_SHA: subscribed-local110
+    container_name: subscribed-generator
+    ports:
+      - "5100:5000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SERP_API_KEY=${SERP_API_KEY}
+      - SERP_PROVIDER=serper
+      - STORIED_MODE=true
+      - ATTESTATION_MODE=log_only
+      - BASE_URL=http://localhost:5000
+      - REFERRAL_BASE_URL=http://localhost:5000
+      - DATABASE_URL=postgresql://admin:password123@postgres-2:5432/audiotours
+      - GATEWAY_API_KEY=test-api-key
+      - PYTHONUNBUFFERED=1
+      - VENUE_CACHE_TTL_DAYS=30
+      - VENUE_CACHE_NEGATIVE_TTL_DAYS=5
+      - REQUIRE_LISTING_VERIFICATION=false
+    volumes:
+      - ./tours:/app/tours
+    networks:
+      - development_default
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  development_default:
+    external: true
