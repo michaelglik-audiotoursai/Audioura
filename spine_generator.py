@@ -60,6 +60,7 @@ def generate_spine(
     api_key: str,
     theme_name: str = "",
     story_elements: Optional[List[dict]] = None,
+    thread_result=None,
 ) -> Optional[dict]:
     """Generate a narrative spine for a tour.
 
@@ -71,6 +72,8 @@ def generate_spine(
         theme_name: For book tours, the source work/theme name.
         story_elements: Optional list of documented story elements from story_element_extractor.
                        When provided, the spine must build from these (story_mode: found).
+        thread_result: Optional ThreadDiscoveryResult from theme_thread_discoverer.
+                      When provided and mode == "threaded", spine uses discovered themes.
 
     Returns:
         Parsed spine dict with all 11 fields + optional grounded_on per arc entry.
@@ -114,6 +117,27 @@ REQUIREMENTS for story-grounded spine:
         print(f"  [§3] Story elements injected into spine prompt ({len(story_elements)} elements, mode=found)")
     else:
         print(f"  [§3] No story elements available — spine will use invented arc (mode=invented)")
+
+    # [SQ-S6b] Inject theme thread context when available
+    if thread_result and hasattr(thread_result, 'mode') and thread_result.mode == "threaded" and thread_result.threads:
+        _thread_injection = "\n\nDISCOVERED NARRATIVE THREADS (use these to shape the connecting_thread and arc):\n"
+        for _t in thread_result.threads:
+            _thread_injection += (
+                f"  THREAD: \"{_t.name}\" (weight={_t.weight:.2f}, covers stops {[s+1 for s in _t.stops_covered]})\n"
+                f"    Description: {_t.description[:200]}\n"
+                f"    Grounded on elements: {_t.grounded_on}\n\n"
+            )
+        _thread_injection += (
+            "THREAD INTEGRATION RULES:\n"
+            "- The connecting_thread MUST name the top-weighted discovered thread\n"
+            "- The tour_hook should pose the top thread as a promise or mystery\n"
+            "- Each arc stop at a thread-covered stop should advance that thread\n"
+            "- Use callbacks: reference a specific fact from an earlier stop's thread element\n"
+            "- The closing_revelation should pay off the top thread's arc\n"
+            "- Secondary threads add texture at their stops (mention but don't dominate)\n"
+        )
+        prompt += _thread_injection
+        print(f"  [SQ-S6b] Thread context injected into spine prompt ({len(thread_result.threads)} threads)")
 
     start = time.time()
 
