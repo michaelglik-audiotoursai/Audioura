@@ -58,6 +58,10 @@ CORS(app)
 from sharing_endpoints import sharing_bp
 app.register_blueprint(sharing_bp)
 
+# Register referral blueprint (LOCAL-114: POST /referral/create + POST /referral/redeem)
+from referral_endpoints import referral_bp
+app.register_blueprint(referral_bp)
+
 # Global variables
 TOURS_DIR = "/app/tours"
 ACTIVE_JOBS = get_job_store('tour-generator')
