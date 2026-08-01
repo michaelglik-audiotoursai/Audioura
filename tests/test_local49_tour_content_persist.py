@@ -69,6 +69,7 @@ def _generate_tour(location, tour_type="walking", total_stops=3):
             "tour_type": tour_type,
             "total_stops": total_stops,
             "user_id": "USER-TEST-REGRESSION-LOCAL49",
+            "is_test": True,  # LOCAL-103: mark HTTP-generated test tours
         },
         timeout=30,
     )

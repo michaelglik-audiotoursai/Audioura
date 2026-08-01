@@ -25,7 +25,8 @@ def test_user_tracking_integration():
         "tour_type": "museum",
         "total_stops": 3,
         "user_id": test_user_id,
-        "request_string": "I would like a test tour for integration testing"
+        "request_string": "I would like a test tour for integration testing",
+        "is_test": True,  # LOCAL-103: mark HTTP-generated test tours
     }
     
     try:
