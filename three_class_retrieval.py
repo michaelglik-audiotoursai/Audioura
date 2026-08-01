@@ -545,19 +545,23 @@ def retrieve_three_classes_for_stop(
     per_work_contexts: Dict = None,
     catalogue_works: List[Dict] = None,
     language: str = "en",
+    tour_category: str = "museum",
+    tour_location: str = "",
 ) -> Dict:
     """Run the complete three-class retrieval for one stop.
     
     1. Determine category from existing metadata.
     2. Generate class-targeted queries.
     3. Fetch category-level context (free path first).
-    4. Return structured result.
+    4. [LOCAL-47] For outdoor tours: fallback to region/corridor retrieval.
     
     Args:
         stop: Stop dict with name, artist, etc.
         per_work_contexts: From story_miner.
         catalogue_works: From story_miner.
         language: Venue language.
+        tour_category: 'museum', 'walking', etc.
+        tour_location: The full tour location string (for region fallback).
         
     Returns:
         Dict with:
@@ -565,6 +569,8 @@ def retrieve_three_classes_for_stop(
             class_queries: {class: [queries]}
             category_context: str — free-path category text (for Historical)
             class_elements: {class: [elements]} — any pre-extracted elements tagged by class
+            retrieval_facts: list — [LOCAL-47] extracted checkable facts
+            retrieval_tier: str — 'rich'/'medium'/'empty'
     """
     # Step 1: Determine category
     category = determine_category(stop, per_work_contexts, catalogue_works)
@@ -577,12 +583,264 @@ def retrieve_three_classes_for_stop(
     if category:
         category_context = fetch_category_context_free(category, language)
     
+    # [LOCAL-47] Step 4: For outdoor/walking/biking tours, run multi-level retrieval
+    retrieval_facts = []
+    retrieval_tier = "empty"
+    stop_name = stop.get("name", "") or stop.get("canonical_title", "")
+    
+    if tour_category != "museum":
+        retrieval_facts, retrieval_tier, extra_context = retrieve_outdoor_stop_facts(
+            stop_name, tour_location, language
+        )
+        # Merge extra historical context into category_context
+        if extra_context.get(CLASS_HISTORIC) and not category_context.get(CLASS_HISTORIC):
+            category_context[CLASS_HISTORIC] = extra_context[CLASS_HISTORIC]
+        if extra_context.get(CLASS_SOCIAL) and not category_context.get(CLASS_SOCIAL):
+            category_context[CLASS_SOCIAL] = extra_context[CLASS_SOCIAL]
+        if extra_context.get(CLASS_DETAILS) and not category_context.get(CLASS_DETAILS):
+            category_context[CLASS_DETAILS] = extra_context[CLASS_DETAILS]
+    
     return {
         "category": category,
         "class_queries": class_queries,
         "category_context": category_context,
         "is_category_level": bool(category),
+        "retrieval_facts": retrieval_facts,
+        "retrieval_tier": retrieval_tier,
     }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# [LOCAL-47] OUTDOOR STOP RETRIEVAL — multi-level fact acquisition
+# ──────────────────────────────────────────────────────────────────────────────
+# For walking/biking/outdoor tours where museum-style catalogue works don't exist.
+# Strategy:
+#   Level 1: Wikipedia article for the stop name itself
+#   Level 2: Wikipedia for nearby/parent landmark (e.g., "Cap Ferrat" for "Paloma Beach")
+#   Level 3: Wikipedia for the broader region/corridor
+# Extract checkable facts from whatever text comes back.
+
+def _extract_parent_location(stop_name: str, tour_location: str) -> List[str]:
+    """Extract fallback location names from a stop name and tour context.
+    
+    "Paloma Beach" in "French Riviera biking tour" →
+        ["Paloma Beach, Cap Ferrat", "Saint-Jean-Cap-Ferrat", "Cap Ferrat"]
+    "SJCF Coastal Path" → ["Saint-Jean-Cap-Ferrat coastal path", "Saint-Jean-Cap-Ferrat"]
+    "Massif de l'Esterel" → ["Esterel massif", "Massif de l'Esterel geology"]
+    """
+    fallbacks = []
+    
+    # Add the stop name + city/region from tour location
+    # Extract city/region hints from tour location
+    _region_parts = [p.strip() for p in tour_location.split(",") if p.strip()]
+    # Remove "tour", "biking", "walking" etc. from parts
+    _location_keywords = re.compile(
+        r'\b(tour|tours|biking|cycling|bike|walking|walk|self[- ]guided)\b', re.IGNORECASE
+    )
+    _clean_parts = [_location_keywords.sub('', p).strip() for p in _region_parts]
+    _clean_parts = [p for p in _clean_parts if p and len(p) > 2]
+    
+    # Try stop_name + region
+    if _clean_parts:
+        for part in _clean_parts:
+            if part.lower() not in stop_name.lower():
+                fallbacks.append(f"{stop_name}, {part}")
+    
+    # Try expanding abbreviations common in tour stops
+    _abbreviation_expansions = {
+        'sjcf': 'Saint-Jean-Cap-Ferrat',
+        'st.': 'Saint',
+        'mt.': 'Mont',
+        'ft.': 'Fort',
+    }
+    _name_lower = stop_name.lower()
+    for abbrev, expansion in _abbreviation_expansions.items():
+        if abbrev in _name_lower:
+            expanded = stop_name.lower().replace(abbrev, expansion)
+            fallbacks.append(expanded)
+    
+    # Extract known landmark qualifiers that suggest a broader entity
+    # "Port of Monaco" → also try "Monaco" 
+    # "Plage de la Garoupe" → also try "Cap d'Antibes"
+    _qualifier_patterns = [
+        (r"^(?:Port|Harbor|Harbour|Bay|Beach|Plage|Pointe|Cap)\s+(?:of|de|du|des|d['\u2019])\s*(.+)", r'\1'),
+        (r"^(?:La|Le|Les|L['\u2019])\s*(.+)", r'\1'),
+    ]
+    for pat, replacement in _qualifier_patterns:
+        m = re.match(pat, stop_name, re.IGNORECASE)
+        if m:
+            core = m.group(1).strip()
+            if core and len(core) > 3:
+                fallbacks.append(core)
+    
+    return fallbacks
+
+
+def _extract_facts_from_text(text: str, stop_name: str) -> List[str]:
+    """Extract checkable facts from Wikipedia text.
+    
+    A "checkable fact" is a sentence containing at least one of:
+    - A year or date (e.g., "1863", "2nd century BC", "medieval")
+    - A named person or organization
+    - A numeric measurement or statistic
+    - A specific event reference
+    
+    Returns list of fact strings, each a single sentence.
+    """
+    if not text or len(text) < 50:
+        return []
+    
+    facts = []
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    
+    # Patterns that indicate a checkable fact
+    _year_pattern = re.compile(r'\b\d{3,4}\b|\b\d{1,2}(?:st|nd|rd|th)\s+century\b|\bBC\b|\bAD\b|\bmedieval\b|\bancient\b', re.IGNORECASE)
+    _person_pattern = re.compile(r'\b[A-Z][a-z]+\s+(?:[A-Z][a-z]+|[IVXLCDM]+)\b')  # Capitalized names
+    _number_pattern = re.compile(r'\b\d+(?:\.\d+)?\s*(?:m|km|ft|metres?|meters?|miles?|hectares?|acres?|kg|tons?|tonnes?)\b', re.IGNORECASE)
+    _event_pattern = re.compile(r'\b(?:battle|war|revolution|treaty|founded|built|constructed|opened|destroyed|conquered|invasion)\b', re.IGNORECASE)
+    
+    for sent in sentences:
+        sent = sent.strip()
+        if len(sent) < 20 or len(sent) > 300:
+            continue
+        # Skip sentences that are pure description with no fact
+        if (_year_pattern.search(sent) or _person_pattern.search(sent) or
+                _number_pattern.search(sent) or _event_pattern.search(sent)):
+            facts.append(sent)
+    
+    # Deduplicate and limit
+    seen = set()
+    unique_facts = []
+    for f in facts:
+        f_norm = f.lower().strip()
+        if f_norm not in seen:
+            seen.add(f_norm)
+            unique_facts.append(f)
+    
+    return unique_facts[:8]  # Cap at 8 facts per stop
+
+
+def retrieve_outdoor_stop_facts(
+    stop_name: str,
+    tour_location: str,
+    language: str = "en",
+) -> Tuple[List[str], str, Dict[str, str]]:
+    """[LOCAL-47] Multi-level retrieval for outdoor/walking/biking tour stops.
+    
+    Strategy:
+      Level 1: Direct Wikipedia lookup for the stop name
+      Level 2: Wikipedia for parent location / nearby landmark
+      Level 3: Wikipedia for the broader corridor/region
+    
+    Args:
+        stop_name: Name of the stop (e.g., "Paloma Beach")
+        tour_location: Full tour location string (e.g., "French Riviera biking tour, France")
+        language: Language code
+        
+    Returns:
+        Tuple of:
+          - facts: list of checkable fact strings
+          - tier: 'rich' (4+), 'medium' (2-3), 'empty' (0-1)
+          - context: {class: text} for injection into description prompt
+    """
+    import urllib.request
+    import urllib.parse
+    import json as _json
+    import time as _time
+    
+    all_facts = []
+    context = {CLASS_DETAILS: "", CLASS_HISTORIC: "", CLASS_SOCIAL: ""}
+    
+    def _wiki_fetch(topic: str) -> str:
+        """Fetch Wikipedia extract for a topic."""
+        if not topic or not topic.strip():
+            return ""
+        wiki_hosts = [f"{language}.wikipedia.org"] if language != "en" else []
+        wiki_hosts.append("en.wikipedia.org")
+        
+        for wiki_host in wiki_hosts:
+            try:
+                _time.sleep(0.3)  # [LOCAL-72] Rate-limit guard for Wikipedia API
+                params = urllib.parse.urlencode({
+                    "action": "query",
+                    "prop": "extracts",
+                    "explaintext": "1",
+                    "titles": topic.strip(),
+                    "format": "json",
+                })
+                req = urllib.request.Request(
+                    f"https://{wiki_host}/w/api.php?{params}",
+                    headers={"User-Agent": "Audioura/2.2 (outdoor-retrieval; contact@audioura.com)"},
+                )
+                with urllib.request.urlopen(req, timeout=8) as resp:
+                    data = _json.loads(resp.read().decode())
+                    pages = data.get("query", {}).get("pages", {})
+                    for pid, pdata in pages.items():
+                        if pid == "-1" or pdata.get("missing"):
+                            continue
+                        extract = pdata.get("extract", "")
+                        if extract and len(extract) > 100:
+                            return extract
+            except Exception:
+                continue
+        return ""
+    
+    # Level 1: Direct lookup
+    text = _wiki_fetch(stop_name)
+    if text:
+        facts = _extract_facts_from_text(text, stop_name)
+        all_facts.extend(facts)
+        # Use first 800 chars as historical context
+        if len(text) > 200:
+            context[CLASS_HISTORIC] = text[:800]
+    
+    # Level 2: Parent location / nearby landmark (only if Level 1 was thin)
+    if len(all_facts) < 3:
+        fallbacks = _extract_parent_location(stop_name, tour_location)
+        for fb in fallbacks[:3]:  # Try up to 3 fallbacks
+            fb_text = _wiki_fetch(fb)
+            if fb_text and len(fb_text) > 200:
+                fb_facts = _extract_facts_from_text(fb_text, stop_name)
+                # Only add facts not already found
+                existing_lower = {f.lower() for f in all_facts}
+                for f in fb_facts:
+                    if f.lower() not in existing_lower:
+                        all_facts.append(f)
+                        existing_lower.add(f.lower())
+                # Supplement context
+                if not context[CLASS_HISTORIC] or len(context[CLASS_HISTORIC]) < 200:
+                    context[CLASS_HISTORIC] = fb_text[:800]
+                break  # Stop after first successful fallback
+    
+    # Level 3: Broader region (only if still thin)
+    if len(all_facts) < 2:
+        # Extract region name from tour_location
+        _region_keywords = re.compile(
+            r'\b(tour|tours|biking|cycling|bike|walking|walk|self[- ]guided)\b', re.IGNORECASE
+        )
+        region = _region_keywords.sub('', tour_location).strip().strip(',').strip()
+        if region and region.lower() != stop_name.lower():
+            region_text = _wiki_fetch(region)
+            if region_text and len(region_text) > 200:
+                region_facts = _extract_facts_from_text(region_text, stop_name)
+                existing_lower = {f.lower() for f in all_facts}
+                for f in region_facts[:3]:  # Max 3 from region level
+                    if f.lower() not in existing_lower:
+                        all_facts.append(f)
+                        existing_lower.add(f.lower())
+                if not context[CLASS_HISTORIC]:
+                    context[CLASS_HISTORIC] = region_text[:600]
+    
+    # Determine tier
+    n_facts = len(all_facts)
+    if n_facts >= 4:
+        tier = "rich"
+    elif n_facts >= 2:
+        tier = "medium"
+    else:
+        tier = "empty"
+    
+    return all_facts, tier, context
 
 
 def tag_elements_by_class(elements: List[Dict]) -> List[Dict]:
