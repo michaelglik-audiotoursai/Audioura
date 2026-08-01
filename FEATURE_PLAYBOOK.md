@@ -281,3 +281,56 @@ worktree persists, so the agent resumes on top of its own work.
 **Split features, not files.** Two machines working the same feature will
 merge-conflict continuously. One machine per feature, each with its own
 branch, merged to the mainline only after review.
+
+---
+
+## 11. Verification stacks — testing unmerged branches without docker cp
+
+D24 keeps the shared `audioura-*` containers built from `storied` because
+Michael's phone depends on them. That means there is no clean way to test an
+unmerged branch on the actual generation pipeline — unless you stand up an
+isolated stack.
+
+### The pattern
+
+Each domain that needs verification gets its own compose file:
+
+| Domain       | Compose file                      | Ports         |
+|--------------|-----------------------------------|---------------|
+| Tour quality | `docker-compose-tourquality.yml`  | 5200/5202/5221 |
+| Subscribed   | `docker-compose-subscribed.yml`   | (varies)      |
+
+All verification stacks:
+- Use the **shared Postgres** (`development-postgres-2-1`) and `tours/`
+  volume — no second database, same corpus.
+- Have **distinct container names** (e.g. `tourquality-*`) that never collide
+  with `audioura-*`.
+- Publish on **non-conflicting host ports** (5200+ range).
+- Set `TOUR_TEST_MODE=true` so any generated rows are flagged `is_test`.
+- Join `development_default` network to reach Postgres by service name.
+
+### Tour quality verification (LOCAL-99)
+
+```bash
+# One command — build, generate, score, tear down:
+./verify-tourquality.sh "Nice France walking" 8
+
+# Or manually:
+docker compose -f docker-compose-tourquality.yml build
+docker compose -f docker-compose-tourquality.yml up -d
+# ... hit localhost:5202/generate-complete-tour ...
+docker compose -f docker-compose-tourquality.yml down
+```
+
+The wrapper (`verify-tourquality.sh`) handles health-check polling, job
+status polling, scoring via `tour_rubric_scorer.py`, cost reporting, and
+automatic teardown.
+
+### Why not `docker cp`?
+
+`docker cp` into a shared container means the container's image no longer
+matches its running state. If it crashes and restarts, the branch code is
+gone. If someone else inspects the container, they see storied code but get
+branch behaviour. D28 records that LEAD did exactly this during LOCAL-98
+review and it was wrong. The verification stack exists so that shortcut is
+never needed again.
