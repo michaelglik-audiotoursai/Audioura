@@ -215,7 +215,7 @@ def _verify_closed_day(claim_lower: str, source_lower: str) -> bool:
     _other_lang = _day_map.get(day, '')
 
     # Check if source mentions this day + closed/fermé
-    _closure_indicators = ['ferm', 'closed', 'closure', 'relâche', 'repos']
+    _closure_indicators = ['ferm', 'closed', 'closure', 'relâche', 'repos', 'except']
     for indicator in _closure_indicators:
         if indicator in source_lower:
             # The source mentions closure — check if same day is referenced nearby
@@ -273,7 +273,33 @@ def _verify_admission(claim_lower: str, source_lower: str) -> bool:
     """
     # "Free" claims
     if re.search(r'\bfree\b|gratuit|libre', claim_lower):
-        return bool(re.search(r'gratuit|libre|free', source_lower))
+        # Source must say free/gratuit/libre...
+        _has_free = bool(re.search(r'gratuit|libre|free', source_lower))
+        if not _has_free:
+            return False
+        # ...BUT if the source also contains a specific GENERAL ENTRY price,
+        # an unconditional "free" claim is suspicious. The source likely has
+        # conditional free (e.g., "free for residents") alongside a paid entry.
+        # Only reject if the claim itself is PURELY "free" without a condition.
+        _claim_is_unconditional_free = bool(
+            re.search(r'^(?:free\s*(?:admission|entry)?|admission\s*free|gratuit|entr[eé]e\s*(?:gratuite|libre))$',
+                      claim_lower.strip())
+        )
+        if _claim_is_unconditional_free:
+            # Check if source contains a GENERAL ENTRY price (not guided tour/workshop prices).
+            # Indicators of general entry: "tarif normal/plein/unique", "entrée unique",
+            # "individual", "Musée X – €N", single ticket markers.
+            # We must NOT flag prices for workshops, guided tours, groups, etc.
+            _source_has_general_entry_price = bool(re.search(
+                r'(?:tarif\s+(?:normal|plein|unique)|entr[eé]e\s+unique|'
+                r'mus[eé]e\s+\w+\s*[-–:]\s*\d+\s*€|'
+                r'mus[eé]e\s+\w+\s*[-–:]\s*€\s*\d+|'
+                r'individual\w*\s+[-–:€\d])',
+                source_lower
+            ))
+            if _source_has_general_entry_price:
+                return False
+        return True
 
     # "Admission fee required" — vague, must be backed by a specific price
     if 'fee required' in claim_lower or 'charged' in claim_lower:
