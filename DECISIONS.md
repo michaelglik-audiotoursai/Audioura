@@ -802,3 +802,39 @@ cover the data?
 I have demanded this standard from every task all week while failing it four
 times. The reviewer's own instruments deserve the same scepticism as the
 submissions they review.
+
+---
+
+## D35 — static checks cannot prove a control is active
+
+Three attempts to guard the referral rate limiter, each defeated by a weaker
+evasion than the last:
+
+| Guard | Defeated by |
+|---|---|
+| `"_check_rate_limit" in source` | replacing every call site with `if False:` — the definition alone satisfied it |
+| AST walk for `Call` nodes in route handlers | `if False and _check_rate_limit(...)` — the node still exists, it just never runs |
+| (proposed) behavioural test | fire requests until 429 |
+
+The pattern: **each fix moved one level up the abstraction and kept the same
+blind spot.** Source inspection can tell you a control is *written*. It
+cannot tell you it is *reached*.
+
+The next evasion after AST would be `if maybe_check()`, or a call in dead
+code, or a decorator that no longer wraps anything. There is no static
+version of this that terminates.
+
+**Rule: a guard for a control must exercise the control.** Send the request,
+assert the status code. Source-level checks are acceptable as a cheap first
+line, never as the only evidence.
+
+This connects to §5b in `FEATURE_PLAYBOOK` (substring matching) and to D31
+(correct code nobody calls). All three are the same failure viewed from
+different angles: **the artefact exists, therefore the behaviour must
+happen.** It does not follow, and this codebase has now demonstrated that
+seven times.
+
+Where a behavioural test genuinely cannot run — services down, Docker
+builds hung — the correct output is an explicit skip naming what was not
+exercised. An honest skip beats a hollow pass, because a hollow pass is
+indistinguishable from real coverage six months later.
