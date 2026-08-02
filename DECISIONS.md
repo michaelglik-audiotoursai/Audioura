@@ -770,3 +770,35 @@ it replaced.
 
 Post-merge verification: all six services 200, download of tour 29 returns
 7,408,370 bytes, Michael's Nice list unchanged.
+
+---
+
+## D34 — four measurement errors of mine, all the same shape
+
+This week I reported four findings that were artefacts of how I measured,
+not facts about the system:
+
+| What I concluded | What was actually true |
+|---|---|
+| "5/8 stops carry date+material" — doubted a correct score | my materials vocabulary was English-only; it missed chlorite, soie, bois, xylogravure |
+| "news_search_service.py is a live entry point" — wrongly bounced LOCAL-117 | substring match; the container runs `simple_news_search_service.py` |
+| "compose parses OK" — printed over a real failure | `&&` fired on `head`'s exit status, not on compose |
+| "compose does not parse" — a false alarm on LOCAL-126 | ran from a worktree with no `.env`; the YAML was fine |
+
+Two produced wrong statements to Michael. One produced a wrongful bounce
+that cost a task a round-trip.
+
+The shape is identical every time: **a tool returned something, and I read
+the return as a finding without checking what the tool had actually
+measured.** It fails toward confidence, because a result feels like an
+answer.
+
+**The check before believing my own output:** what exactly did this command
+compare, and would it have produced this same output for a reason unrelated
+to my hypothesis? Specifically — is the match bounded, am I in the right
+directory, is the exit status the one I think it is, and does my vocabulary
+cover the data?
+
+I have demanded this standard from every task all week while failing it four
+times. The reviewer's own instruments deserve the same scepticism as the
+submissions they review.
