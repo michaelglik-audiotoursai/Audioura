@@ -34,12 +34,16 @@ Usage
 Env: DB_HOST DB_NAME DB_USER DB_PASSWORD DB_PORT  |  GATEWAY_API_KEY  |  TOUR_LOCAL_URL
 Confirm the route if needed: TOUR_PATH (default /generate-complete-tour)
 Requires: requests, psycopg2 (pip install requests psycopg2-binary)
+
+LOCAL-141: Migrated to TestTourFactory.adopt_and_ensure_flagged() — the flag
+is set structurally after HTTP creation, regardless of Docker env vars.
 """
 import os
 import sys
 import uuid
 import argparse
 import requests
+import time
 
 try:
     from dotenv import load_dotenv
@@ -57,6 +61,10 @@ TOUR_PATH = os.getenv("TOUR_PATH", "/generate-complete-tour")     # confirm agai
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from db_connection import get_db_config as _db_cfg
+from test_tour_factory import TestTourFactory
+
+# Factory instance — adopt tours created via HTTP so is_test=TRUE is structural
+_factory = TestTourFactory(auto_cleanup=True)
 
 DB = _db_cfg()
 
@@ -192,6 +200,47 @@ def t3_allow_and_single_count(base_url):
     added = after - before
     record("T3 single-count: exactly ONE orchestrator row added", added == 1,
            f"before={before} after={after} added={added} (2 = double-count regression)")
+
+    # LOCAL-141: Adopt the tour so is_test=TRUE is structural.
+    # T3 generates a real tour in audio_tours — find and adopt it.
+    try:
+        job_data = r.json()
+        job_id = job_data.get("job_id")
+        if job_id:
+            # Poll briefly for completion to get tour_id
+            deadline = time.time() + 60
+            while time.time() < deadline:
+                try:
+                    sr = requests.get(f"{base_url}/status/{job_id}", timeout=10)
+                    if sr.status_code == 200:
+                        sd = sr.json()
+                        tour_id = sd.get('final_tour_id')
+                        if tour_id:
+                            _factory.adopt_and_ensure_flagged(tour_id)
+                            print(f"  ✅ Tour {tour_id} adopted and flagged is_test=TRUE")
+                            break
+                        if sd.get('status') in ('completed', 'error', 'failed'):
+                            break
+                except Exception:
+                    pass
+                time.sleep(3)
+            else:
+                # Fallback: find by name
+                import psycopg2
+                conn = db_conn()
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT id FROM audio_tours WHERE tour_name ILIKE %s ORDER BY id DESC LIMIT 1",
+                    ('%test park Boston%',)
+                )
+                row = cur.fetchone()
+                cur.close()
+                conn.close()
+                if row:
+                    _factory.adopt_and_ensure_flagged(row[0])
+                    print(f"  ✅ Tour {row[0]} found by name and flagged is_test=TRUE")
+    except Exception as e:
+        print(f"  ⚠️ Could not adopt tour (will be caught by guard): {e}")
 
 
 def t4_db_down_503(base_url):
