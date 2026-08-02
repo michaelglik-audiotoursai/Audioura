@@ -80,7 +80,7 @@ appears in any Dockerfile CMD or docker-compose command.
 | `spine_quality_scorer.py` | `score_spine()` | **UNWIRED** | Scores spine quality (0–4) for retry logic. Zero importers. Spine generator produces output with no quality gate. |
 | `tour_hook_generator.py` | `generate_tour_hook_audio()` | **UNWIRED** | Expands spine `tour_hook` into spoken intro. Zero importers. Spine generates a hook field that nothing consumes for TTS. |
 | `custom_audio_service.py` | Full Flask service for user audio uploads | **DEAD** | No Dockerfile runs it. Self-contained `__main__` service never deployed. |
-| `news_search_service.py` | `NewsSearchService` class | **DEAD** | Zero importers. Docker uses `simple_news_search_service.py` instead. |
+| `news_search_service.py` | `NewsSearchService` class | **KEPT** (LOCAL-117 reclassification) | Zero Python importers, but LEAD identified potential entry-point risk — kept per directive. See limitation #7. |
 | `voice_control_service.py` | Voice command processing Flask service | **DEAD** | Zero importers. Docker uses `voice_control/app.py` instead. |
 | `coordinates_fromai_service.py` | Coordinates Flask service (port 5006) | **DEAD** | Zero importers. Docker uses `coordinates_fromAI/app.py`. |
 | `store_audio_tours.py` | `store_audio_tour()` standalone | **DEAD** | Function is defined inline in `tour_orchestrator_service.py:333`. This file is a dead duplicate. |
@@ -226,12 +226,13 @@ corpus mining for two days.
 | Category | UNWIRED | DEAD | INTENTIONAL | Total |
 |----------|---------|------|-------------|-------|
 | 1. register/init/setup | 1 | 4 | 5 | 10 |
-| 2. Orphan modules | 5 | 10 | — | 15 |
+| 2. Orphan modules | 5 | 9 | 1 KEPT | 15 |
 | 3. Dead public functions | 9 | 2 | — | 11 |
 | 4. Silent ImportError | 2 | 1 | 3 | 6 |
-| **Totals (deduplicated)** | **8** | **13** | **8** | — |
+| **Totals (deduplicated)** | **8** | **12** | **8** | — |
 
 *Deduplicated UNWIRED count removes items that appear in multiple categories.*
+*DEAD count reduced from 13→12: `news_search_service.py` reclassified as KEPT (LOCAL-117).*
 
 ### The 8 UNWIRED findings (features Michael thinks he has and does not)
 
@@ -275,6 +276,17 @@ corpus mining for two days.
    decorators at import time would not show up in an explicit call-site search.
    The codebase uses Flask Blueprints for this pattern, and I checked all
    Blueprint registrations explicitly.
+
+7. **Entry-point invocations outside the import graph** (added LOCAL-117) — a
+   module can be reachable via `Dockerfile` `CMD`/`ENTRYPOINT`, `docker-compose`
+   `command:`, a `launchd`/cron invocation, or by being run directly as a script
+   (`python some_module.py`). None of these appear in a Python import graph.
+   Static analysis that only walks `import` statements will correctly report zero
+   callers for such a module while it is in fact the live entry point of a running
+   container or scheduled job. **Mitigation:** before classifying any standalone
+   `.py` file as DEAD, grep all `Dockerfile*`, `docker-compose*.yml`, `*.sh`,
+   crontabs, and launchd plists for its filename. A module with zero Python
+   importers but named in a `CMD` or `command:` line is LIVE, not dead.
 
 ---
 
