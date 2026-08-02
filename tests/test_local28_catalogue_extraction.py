@@ -184,20 +184,22 @@ Datée de la première moitié du XIXe siècle, l'armure porte le mon de la fami
         works_by_title = {w['title']: w for w in works}
         
         # Masque du vieillard kojô should have XVIe siècle
-        if "Masque du vieillard kojô" in works_by_title:
-            mask = works_by_title["Masque du vieillard kojô"]
-            assert mask.get('period', ''), f"Mask should have a period, got empty"
+        assert "Masque du vieillard kojô" in works_by_title, \
+            f"Mask not extracted from fixture — titles: {list(works_by_title.keys())}"
+        mask = works_by_title["Masque du vieillard kojô"]
+        assert mask.get('period', ''), f"Mask should have a period, got empty"
     
     def test_extraction_captures_origin(self, maa_oeuvres_page):
         """Should extract geographic origin."""
         works = extract_catalogue_works_from_pages(maa_oeuvres_page)
         works_by_title = {w['title']: w for w in works}
         
-        # L'Armure d'Andô Naoyuki should have Japan origin
-        if "L'Armure d'Andô Naoyuki" in works_by_title:
-            armure = works_by_title["L'Armure d'Andô Naoyuki"]
-            assert 'japon' in armure.get('origin', '').lower(), \
-                f"Armure origin should contain 'Japon', got: {armure.get('origin')}"
+        # L\u2019Armure d\u2019Andô Naoyuki should have Japan origin
+        assert "L\u2019Armure d\u2019And\u00f4 Naoyuki" in works_by_title, \
+            f"Armure not extracted from fixture \u2014 titles: {list(works_by_title.keys())}"
+        armure = works_by_title["L\u2019Armure d\u2019And\u00f4 Naoyuki"]
+        assert 'japon' in armure.get('origin', '').lower(), \
+            f"Armure origin should contain 'Japon', got: {armure.get('origin')}"
     
     def test_non_catalogue_page_ignored(self):
         """Pages without catalogue URL pattern should be ignored."""
