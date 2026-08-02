@@ -870,3 +870,46 @@ system, and must never be reported as one.
 A negative result from a probe that did not apply is indistinguishable from
 a negative result about the code. Only the match count tells them apart, so
 always print it.
+
+---
+
+## D37 — An assertion that accepts its own failure mode is worse than none (2026-08-02)
+
+**Decision:** merge LOCAL-133 despite a hollow assertion inside it, and
+dispatch LOCAL-134 to hunt the shape across all of `tests/`.
+
+LOCAL-133 fixed the real problem — three guards that inspected source and
+so could not tell a registered blueprint from an unreachable one. All nine
+probes reproduce: baseline exit 0, comment-out exit 1, `if False:` exit 1,
+replacement count 1 every time. In each neutered run the AST assertion still
+PASSES and the behavioural one FAILS, which is D35 written as a diff.
+
+But one assertion inside the now-passing LOCAL-114 guard reads:
+
+```python
+route_exists = (resp2.status_code != 404
+                or b"referral" in resp2.data.lower()
+                or b"not found" in resp2.data.lower())
+```
+
+Flask's own 404 page says *"The requested URL was not found on the server."*
+The last disjunct matches it, so the check passes with the blueprint
+unregistered — it PASSES in both of LEAD's neutered runs. The guard survives
+only because a sibling assertion on `/referral/create` catches the
+regression.
+
+**The shape, stated generally:** a disjunct satisfied by the failure
+condition itself. This is a *third* failure mode, distinct from the two
+already recorded. D35 was a guard that inspects instead of exercises. D36
+was a probe that never applied. This is an assertion that exercises the
+right thing and then accepts any answer. All three report safety that was
+never checked, and none of them are visible in a green test run.
+
+**Why merge rather than bounce:** three blind guards is a worse state than
+one hollow assertion inside three working ones. The defect is recorded in
+the merge commit, not discovered later.
+
+**Rule going forward:** an assertion on a response body must name what
+success looks like, never what failure happens to also contain. Prefer
+asserting on `app.url_map` or a status code over substring-matching a page
+whose text you do not own.
