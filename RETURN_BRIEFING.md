@@ -78,7 +78,7 @@ fixed:
 
 Still unwired (lower severity): spine quality scorer (wired as a gate with
 threshold 2, max 1 retry — it never fires on real spines since all score
-≥3), tour hook generator (hook field in spine never becomes audio), cost
+≥3), tour hook generator — CORRECTED 2026-08-02: the hook DOES become audio. generate_tour_text.py:6091 feeds it to a prolog prompt and the result opens Stop 1. The module is superseded, not a missing feature (see TOUR_HOOK_ANALYSIS.md), cost
 reader (get_operation_cost is write-only), and two silent ImportError blocks
 on cost ceiling health checks.
 
@@ -227,3 +227,23 @@ it. (D26)
 | Data loss incident | D23 |
 | Callback overstatement | D25 |
 | Corpus expansion | D26 |
+
+---
+
+## Note on "the app" (added 2026-08-02)
+
+Several claims in the record say what "the mobile app" does. That is
+ambiguous here, because two branches carry different apps:
+
+- `storied` — no swipe UI, no share button, no referral or persona screens
+- `subscribed` — has the Wallet, paywall and swipe controls built this week
+
+An audit run from `storied` will correctly report "no swipe UI exists" while
+the same audit from `subscribed` reports the opposite. Both are true of
+their branch. When reading any claim about the app, check which branch it
+was made from.
+
+This bit twice: `UNWIRED_AUDIT.md` overstated severity partly by assuming an
+app caller existed, and the audit correcting it then understated the app by
+reading only `storied`.
+
