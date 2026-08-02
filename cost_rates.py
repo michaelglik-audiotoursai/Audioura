@@ -52,22 +52,55 @@ def tts_cost(char_count: int) -> float:
     return char_count * POLLY_COST_PER_CHAR
 
 
-def translation_cost(char_count: int) -> float:
+
+# [LOCAL-143] Deployed translation mode.
+# The running container determines how many translate_text calls happen per stop.
+# - TWO_PASS (2): old behaviour — each stop translated twice (full + nav-stripped).
+#   Deployed container built 2026-07-28; LOCAL-142 merged 2026-08-02 but NOT deployed.
+# - SINGLE_PASS (1): LOCAL-142 behaviour — each stop translated once, nav fields
+#   stripped positionally from the raw output. Fallback fires on line mismatch
+#   (logged as "[LOCAL-142] Positional strip fallback"), adding 1 extra call per
+#   affected stop. In the best case the multiplier is 1.0; worst case = 2.0.
+#
+# HOW DETERMINED: `docker exec audioura-translation-service-1 grep -c "LOCAL-142"
+# /app/translation_service.py` returns 0 → the container has no single-pass code.
+# See tests/test_local143_cost_model_matches_deploy.py for automated enforcement.
+DEPLOYED_TRANSLATION_PASSES = 2
+
+
+def translation_cost(char_count: int, passes: int = None) -> float:
     """Calculate full translation cost from source character count.
 
-    [LOCAL-135] Corrected to reflect actual service behavior:
-    The translation service translates each stop TWICE per language
-    (full text for .txt + nav-stripped text for Polly input), then
-    synthesizes audio via Polly on the translated TTS text.
+    [LOCAL-135] Corrected to reflect actual service behavior.
+    [LOCAL-143] Parameterized by pass count so the cost model follows the
+    code that actually ran, not a hardcoded assumption.
 
-    Effective rate: ~$32.58 per 1M source characters (measured over 5 tours).
-    Breakdown: 2x AWS Translate ($15/1M each pass) + Polly ($4/1M on ~95% of source).
+    Args:
+        char_count: Source text character count (English).
+        passes: Number of translate_text calls per stop.
+            2 = two-pass (full + nav-stripped). Default before LOCAL-142 deployed.
+            1 = single-pass (full only; nav stripped positionally from output).
+            None = use DEPLOYED_TRANSLATION_PASSES constant (matches running container).
+
+    Returns:
+        Total cost in USD (AWS Translate + Polly TTS).
     """
-    # Translate API: source text is sent twice (full + nav-stripped ≈ 95% of full)
-    translate_chars = char_count * 1.95  # full + ~95% for TTS-stripped
+    if passes is None:
+        passes = DEPLOYED_TRANSLATION_PASSES
+
+    if passes == 2:
+        # Two-pass: source text sent twice (full + nav-stripped ≈ 95% of full)
+        translate_chars = char_count * 1.95
+    elif passes == 1:
+        # Single-pass: source text sent once (full only)
+        translate_chars = char_count * 1.0
+    else:
+        raise ValueError(f"passes must be 1 or 2, got {passes}")
+
     translate_usd = translate_chars * AWS_TRANSLATE_COST_PER_CHAR
 
-    # Polly: runs on translated TTS text (nav-stripped source * ~1.06 expansion ratio)
+    # Polly: always runs on translated TTS text (nav-stripped source × 1.06 expansion)
+    # Polly cost is the same regardless of pass count — audio is always generated.
     polly_chars = char_count * 0.95 * 1.06  # 95% nav-stripped, 6% translation expansion
     polly_usd = polly_chars * POLLY_COST_PER_CHAR
 
