@@ -261,3 +261,35 @@ Two status documents exist and they cover different questions:
 
 If the two ever disagree, that split decides which one is right.
 
+---
+
+## Late findings (2026-08-02)
+
+Four things surfaced after the briefing was first written.
+
+**Tour-level quality cannot be measured.** `i_con` exists for 1002 stops,
+but nothing links a stop to its tour — `stop_metrics.tour_id` is NULL on
+every row, `job_status` is empty, and `audio_tours` has no job id. A task
+populated the aggregate columns via stop-title matching, which gave the
+Alpha and Bravo tours identical scores despite different text; it was
+bounced and correctly reverted everything to NULL. Ranking or filtering
+tours by quality is not possible until `stop_metrics.tour_id` is written at
+generation time.
+
+**Five containers have reported "unhealthy" for days and all five are
+fine.** The healthcheck runs `curl`, which is not installed in those images
+— failing streak 3,591 while the services served normally throughout. The
+compose file is fixed but **not applied**, because applying it recreates
+containers and that is your call.
+
+**Docker builds are hung and undiagnosed.** A three-line Alpine image times
+out at 180 seconds while running containers stay healthy. It killed four
+workers and quarantined two tasks, including the one sent to diagnose it —
+each attempt died at almost exactly an hour, so the builder does not fail,
+it hangs until something kills the caller. A Docker Desktop restart is the
+obvious remedy and I did not do it unattended.
+
+**Two tasks are parked awaiting you**, both blocked on that builder:
+verifying the swipe route reaches port 5002, and the Docker diagnosis
+itself.
+
