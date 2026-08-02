@@ -7,6 +7,87 @@
 
 ---
 
+## LOCAL-120 AMENDMENT — Severity Method Correction (2026-08-02)
+
+### Error rate
+
+Of the 6 deduplicated UNWIRED findings that drove task dispatch (excluding
+`get_operation_cost` and `silent ImportError` which made no mobile-breakage claim),
+**4 had incorrect severity justifications** — a 67% error rate on the judgement
+that actually drives work priority.
+
+The detection (zero importers / zero call sites) was correct in all 6 cases.
+The **impact inference** — "the mobile app hits this and gets 404" — was wrong
+in 4 of 6 because the audit never checked the Dart client.
+
+### Per-symbol correction table
+
+| # | Symbol | Original verdict | Original severity claim | Corrected verdict | Evidence for correction |
+|---|--------|-----------------|------------------------|-------------------|------------------------|
+| 1 | `persona_endpoints.py` | UNWIRED | "Mobile persona UI sends these requests to 404" | UNWIRED — severity overstated | Zero Dart files call POST/GET /user/persona. App stores persona locally via SharedPreferences as `narrative_tone` and passes inline with tour requests. Server endpoint is for future/external use. (LOCAL-113 §"What the Flutter App Actually Does") |
+| 2 | `tour_hook_generator.py` | UNWIRED | "hook never becomes audio" | DEAD (superseded) — not a missing feature | Hook IS consumed at `generate_tour_text.py:6091` → fed to prolog prompt → expanded to 80-190 words → injected into Stop 1 → TTS → audio. The module is a weaker predecessor. (TOUR_HOOK_ANALYSIS §2) |
+| 3 | `sharing_endpoints.py` (POST) | UNWIRED | "Share button in app is non-functional for creating new shares" | UNWIRED — severity overstated | Zero Dart files call POST /tour/share. No share button exists in the mobile app (grep `share\b`, `Icons.share`, `tour/share` = 0 hits in Dart). Server endpoint is for future use. Now wired (LOCAL-110). |
+| 4 | `referral_endpoints.py` | UNWIRED | "The mobile app has referral UI (LOCAL-52). All requests 404" | UNWIRED — severity overstated | Zero Dart files contain the word "referral". No referral UI exists in the mobile app. The task reference (LOCAL-52) may refer to a planned feature. Now wired (LOCAL-114). |
+| 5 | `register_preference_routes` | UNWIRED | "every swipe from every user returns 404. The mobile app sends these requests" | UNWIRED — severity overstated | Zero Dart files call `/user/<id>/stop-feedback` or `/user/<id>/preferences`. No swipe/like/dislike UI exists in the mobile app. Server endpoint is for future use. Now wired (LOCAL-112). |
+| 6 | `spine_quality_scorer` | UNWIRED | "no spine quality gate" | UNWIRED — severity correct | Severity claim was purely server-side ("A low-quality spine passes through unchecked"). No mobile UI claim was made. The absence of a quality gate IS the breakage — any spine, regardless of coherence, proceeds to full TTS. Now wired (LOCAL-111). |
+
+### Diagnosis: why the severity method failed
+
+**Root cause:** The audit inferred *user-visible impact* from *absence of server-side
+callers* without verifying the other end of the connection. In 4 of 6 cases it
+claimed "the mobile app sends X to 404" without reading any Dart file.
+
+**Pattern of the error:**
+1. Module has zero importers ✓ (correct detection)
+2. Module implements an HTTP endpoint that sounds user-facing ✓ (correct observation)
+3. Audit concludes: "Therefore the mobile app is calling this and getting 404" ✗ (unverified leap)
+
+**What would have caught it:**
+- For persona/sharing/referral/preferences: `grep -rn "persona\|referral\|tour/share\|stop-feedback" audio_tour_app/lib/` returns zero Dart hits.
+- For tour_hook: Reading `generate_tour_text.py:6091` shows `_tour_hook = _storied_spine.get("tour_hook", "")` — the field IS consumed, just not by the module the audit named.
+
+**The distinguishing question the audit failed to ask:** "If this is a missing
+feature, what user action triggers the failure, and can I observe that action
+in the client code?"
+
+### Severity checklist for future audits
+
+Before assigning severity above "server-side gap" to any UNWIRED finding, the
+auditor MUST complete all of the following:
+
+- [ ] **1. Identify the claimed caller.** Name the specific file and line that
+  would exercise the dead code. "The mobile app" is not specific enough.
+- [ ] **2. Verify the caller exists.** Grep the client codebase (Dart, JS,
+  etc.) for the URL path, endpoint name, or feature keyword. Record the grep
+  command and its output (including "0 results").
+- [ ] **3. Trace the data path, not just the module.** If the finding is "field
+  X is never consumed," grep for the field name across ALL files, not just the
+  module that was designed to consume it. Another code path may already handle it.
+- [ ] **4. Observe the breakage or state its absence.** If you claim "users see
+  404," show: (a) the Dart/client code that makes the HTTP call, (b) the URL it
+  calls, (c) the server route that should handle it. If you cannot show (a), the
+  severity is "server gap for future use," not "broken user-facing feature."
+- [ ] **5. Distinguish superseded from missing.** Before claiming a module's
+  function is "missing," search for the function's *purpose* (not its name) in
+  the codebase. If the same job is done by different code, the module is
+  superseded (DEAD), not missing (UNWIRED).
+
+**Rule:** A finding that fails check #2 (no caller exists in the client) CANNOT
+be classified as "broken user-facing feature." It may still be UNWIRED (server
+capability gap), but the severity framing must say "server readiness for future
+client use" — not "users experience failure."
+
+### Corrected UNWIRED count
+
+| Original claim | Corrected |
+|---|---|
+| 8 UNWIRED (6 "user-facing mobile breakage") | 6 UNWIRED still valid as detection; 1 reclassified to DEAD (tour_hook). Of the remaining 5 wired findings, only `spine_quality_scorer` had correct severity. The other 4 had overstated severity (claimed mobile breakage without evidence). |
+| 33% error rate on severity (task statement) | **67% error rate** on severity for the 6 findings that claimed specific user-facing impact (4 of 6 wrong). |
+
+---
+
+---
+
 ## Category 1: `register_*_routes` / `init_*` / `setup_*` Functions
 
 Every function matching these patterns in the repo, with call-site verification.
