@@ -1,128 +1,185 @@
 # Subscribed — Status Report for Michael
 
-**Written:** 2026-08-01, covering work from 2026-07-31 through 2026-08-01.
-**Context:** You left for a field test and asked for Subscribed to be built.
-Fifteen tasks landed. Here is where things stand.
+**Originally written:** 2026-08-01  
+**Refreshed:** 2026-08-02 (LOCAL-122)  
+**Purpose:** Single authoritative reference on Subscribed-tier billing, what
+is proven, what is stubbed, and what needs Michael.
 
 ---
 
-## 1. What works today
+## ⚠️ Two-document decision
 
-Each claim names its evidence.
+`RETURN_BRIEFING.md` (on `storied`) is the broader document — it covers tour
+quality, infrastructure, swipe personalization, unwired features, Docker state,
+and decisions. This document covers **Subscribed billing only** — the economic
+system, the payment stack, the wallet, and what makes billing go live.
 
-**Cost metering** — every tour, translation, and news article records its
-real API cost to a `cost_ledger` table. Proven by live generation and DB
-query.
+**Reasoning:** Folding this into `RETURN_BRIEFING.md` would bury billing
+specifics (the exact cost table, the tier-switch matrix, the Apple setup
+checklist) inside a 200-line general briefing. Michael needs both a high-level
+"what happened" document (the briefing) and a deep-dive into "how does billing
+work and what do I do to ship it" (this one). The briefing links here for
+detail; this one does not repeat what the briefing covers.
+
+If the two ever disagree, **this document governs on billing topics**; the
+briefing governs on everything else.
+
+---
+
+## 1. What works today (branch: `subscribed`)
+
+Each claim names its branch and evidence source.
+
+### Cost metering
+
+**Branch: `subscribed` (merged from `storied` via LOCAL-60)**
+
+Every tour, translation, and news article records its real API cost to a
+`cost_ledger` table.
 
 ```
-tour_generate          $0.0633 our cost  →  user $0.32   (×5 multiplier)
-translation_generate   $0.3720 our cost  →  user $1.86   (6× a tour's cost)
-news_generate          $0.0063–$0.0114 our cost
-cache hits             $0.00 always (forced at metering layer)
+tour_generate          $0.068 our cost  →  user $0.34   (×5 multiplier)
+                       ~~$0.063~~ [CORRECTED: LOCAL-100 measured mean $0.0682 over 5 runs]
+translation_generate   $0.372 our cost  →  user $1.86   (6× a tour's cost) [ESTIMATED — see §5]
+news_generate          $0.006–$0.011 our cost
+cache hits             $0.00 always
 ```
 
-**Pricing engine** — pure Decimal math, banker's rounding, no float drift.
-10,000-charge drift test: $0.00 cumulative error. Multiplier is runtime-
-configurable via `PRICING_MULTIPLIER` env var.
+### Pricing engine
 
-**Wallet ledger** — append-only, idempotent writes (duplicate key returns
-same row), integer-cents storage. Balance derived from SUM; 1000-row rebuild
-test matches cache exactly. Clawback drives balance negative without error.
+**Branch: `subscribed`**
 
-**Entitlement gate** — extends the existing `check_tour_quota()`. Free tier
-unchanged. PPU blocks at zero balance with topup reminder. Unlimited blocks
-at $25 our-cost with a switch-to-PPU offer. Errors fail closed (deny, never
-silently allow). 23 tests passing.
+Pure Decimal math, banker's rounding, no float drift. 10,000-charge drift
+test: $0.00 cumulative error. Multiplier is runtime-configurable via
+`PRICING_MULTIPLIER` env var.
 
-**Wallet API** — GET /wallet, GET /transactions, GET /plans, POST /topup.
-Lives on the orchestrator Blueprint. 53 contract tests passing. Idempotent
-top-up proven (same receipt key credits once).
+### Wallet ledger
 
-**Charging is wired** — a real HTTP tour-generation request through the
-orchestrator debits a real wallet. Proven end-to-end: POST /generate-
-complete-tour → $0.028 our cost → $0.14 charged → balance dropped from $5.00
-to $4.86 → GET /wallet confirmed. Cache hit: balance unchanged to the cent.
-Unlimited: `monthly_cost_spent_cents` incremented by our cost, no wallet
-charge.
+**Branch: `subscribed`**
 
-**Tier switching** — all six transitions work (free↔ppu↔unlimited). The
-critical loop closes: unlimited hits cost-stop → remedy says "switch to
-PPU" → user switches → tops up → generates successfully. 14 tests passing.
+Append-only, idempotent writes (duplicate key returns same row), integer-cents
+storage. Balance derived from SUM; 1000-row rebuild test matches cache exactly.
+Clawback drives balance negative without error.
 
-**Cost ceiling** — dual-threshold ($0.15 warn, $1.30 abort). Fails closed:
-if the ceiling check itself errors, delivery is aborted. Separate try/except
-from metering. Proven with monkeypatched failures.
+### Entitlement gate
 
-**News cache** — content-hash deduplication with 24h TTL. Second request for
-same article: Polly TTS call count 236 → 236 (zero additional calls), cost
-metered at $0.00, audio byte-identical (MD5 match).
+**Branch: `subscribed`**
 
-**RevenueCat provider** — implements the full PaymentProvider interface
-(purchase, restore, renewal, expiry, refund, billing-retry). Runs against
-real Postgres. Same 15-test shared suite passes on both fake and real
-providers. Webhook idempotency via event_id.
+Extends the existing `check_tour_quota()`. Free tier unchanged. PPU blocks at
+zero balance with topup reminder. Unlimited blocks at $25 our-cost with a
+switch-to-PPU offer. Errors fail closed (deny, never silently allow). 23 tests
+passing.
 
-**Flutter Wallet UI** — Settings → Wallet shows balance, transaction
-history, cost-stop progress (unlimited), low-balance banner, paywall with
-three plans. Wired to live API (not mock). D16 vocabulary reconciled
-(`ppu` everywhere). D20 monthly-fee renders as informational, not a charge.
-12 widget tests passing, `flutter analyze` zero errors on wallet files.
+### Wallet API
 
-**Isolated deployment** — `docker-compose-subscribed.yml` stands up the
-billing stack on ports 5102/5100, shares Postgres, never collides with your
-running containers. E2E passes 10/10 against it.
+**Branch: `subscribed`**
 
-**Stale-image detection** — `check_image_freshness.py` now correctly
-reports FRESH for all 15 healthy services (was falsely reporting STALE on
-12 of them). Three-state: FRESH / STALE / UNKNOWN.
+GET /wallet, GET /transactions, GET /plans, POST /topup. Lives on the
+orchestrator Blueprint. 53 contract tests passing. Idempotent top-up proven
+(same receipt key credits once).
 
-**Test tour pollution fixed** — `is_test` filter in `map_delivery/app.py`
-(the live file, not the dead root-level one). Your Nice list returns exactly
-[1, 12, 14, 17, 21, 24, 27, 28, 29].
+### Charging is wired
+
+**Branch: `subscribed`**
+
+A real HTTP tour-generation request through the orchestrator debits a real
+wallet. Proven end-to-end: POST /generate-complete-tour → $0.028 our cost →
+$0.14 charged → balance dropped from $5.00 to $4.86 → GET /wallet confirmed.
+Cache hit: balance unchanged. Unlimited: `monthly_cost_spent_cents`
+incremented by our cost, no wallet charge.
+
+### Tier switching
+
+**Branch: `subscribed`**
+
+All six transitions work (free↔ppu↔unlimited). The critical loop closes:
+unlimited hits cost-stop → remedy says "switch to PPU" → user switches → tops
+up → generates successfully. 14 tests passing.
+
+### RevenueCat provider
+
+**Branch: `subscribed`**
+
+Implements the full PaymentProvider interface (purchase, restore, renewal,
+expiry, refund, billing-retry). Runs against real Postgres. Same 15-test
+shared suite passes on both fake and real providers. Webhook idempotency via
+event_id.
+
+**`APPLE_SETUP.md` exists** (since LOCAL-93) with a step-by-step enrollment
+guide for App Store Connect products, RevenueCat project setup, sandbox
+testers, and the three env vars to flip.
+
+### Cost ceiling
+
+**Branch: `subscribed`**
+
+Dual-threshold ($0.15 warn, $1.30 abort). Fails closed: if the ceiling check
+itself errors, delivery is aborted. Proven with monkeypatched failures.
+
+**Limitation (unchanged from D15):** the check runs *after* generation
+completes, so it prevents *delivering* an over-budget tour but not the API
+*spend*. At $0.068/tour, this is two orders of magnitude below $1.30.
+
+### Flutter Wallet UI
+
+**Branch: `subscribed`**
+
+Settings → Wallet shows balance, transaction history, cost-stop progress
+(unlimited), low-balance banner, paywall with three plans. Wired to live API
+(not mock). 12 widget tests passing, `flutter analyze` zero errors on wallet
+files.
+
+**Cannot be verified on device from this Mac Mini.** Evidence: widget tests +
+flutter analyze only. No APK build possible (Docker builder hung — see §4).
+
+### Isolated deployment
+
+**Branch: `subscribed`**
+
+`docker-compose-subscribed.yml` stands up the billing stack on ports
+5102/5100, shares Postgres, never collides with shared (storied) containers.
 
 ---
 
 ## 2. What is NOT proven
 
-Be blunt:
-
 - **Real Apple IAP has never been called.** No App Store Connect products
   exist. No RevenueCat project exists. No sandbox tester has ever purchased
   anything. The RevenueCat provider runs against synthetic payloads only.
 
-- **The Flutter app has not been built on a device.** Cannot build APK on
-  the Mac Mini. All mobile evidence is `flutter analyze` + widget tests.
-  No screenshot from a real screen exists.
+- **The Flutter app has not been built on a device from this Mac.** Cannot
+  build APK (Docker builder hung). All mobile evidence is `flutter analyze` +
+  widget tests. No screenshot from a real screen exists.
 
 - **No real user has ever been charged.** The system runs against
-  `FakePaymentProvider` by default. Flipping to real requires your App
-  Store credentials.
+  `FakePaymentProvider` by default. Flipping to real requires App Store
+  credentials.
 
 - **RevenueCat webhook format is assumed, not verified.** The real webhook
   payload structure may differ from the documented examples used in tests.
 
-- **The charging wire was proven on a privately-rebuilt container**, not on
-  the shared deployment. The shared containers still run `storied` code
-  (by design — your phone uses them).
+- **The charging wire was proven on a privately-rebuilt container**, not on the
+  shared deployment. The shared containers still run `storied` code (by design
+  — Michael's phone uses them, per D24).
+
+- ~~**Tier-change via HTTP will 500.** `tier_change.py` is not COPY'd into the orchestrator Dockerfile yet.~~
+  **CORRECTED (LOCAL-90):** Tier switching works over HTTP. All six transitions
+  tested against the subscribed stack. The `Dockerfile.orchestrator` now
+  includes the tier-change module.
 
 - **Translation cost is estimated, not measured.** The translation service
-  returns `cache_hit` but not actual character counts. The $0.372 figure
-  is calculated from typical tour length, not from real API response data.
+  returns `cache_hit` but not actual character counts. The $0.372 figure is
+  calculated from typical tour length, not from real API response data.
 
 - **TTS cost in tour breakdown is $0.00.** TTS happens at the tour-processor
-  level; the cost metered at the generator level captures only the LLM spend
-  ($0.063). Full end-to-end tour cost including audio synthesis is higher
-  but not yet captured in a single ledger row.
+  level; the cost metered at the generator level captures only the LLM spend.
+  Full end-to-end tour cost including audio synthesis is higher but not yet
+  captured in a single ledger row.
 
-- **Apple grace period not modelled.** The fake provider does immediate
-  cutoff on cancellation. Real Apple subscriptions retain access until
-  period_end.
+- **Apple grace period not modelled.** The fake provider does immediate cutoff
+  on cancellation. Real Apple subscriptions retain access until period_end.
 
-- **Tier-change via HTTP will 500.** `tier_change.py` is not COPY'd into the
-  orchestrator Dockerfile yet. Tests exercise it via direct Python imports.
-
-- **Cloud Run deployment untested.** Everything runs on local Docker. The
-  cloud gateway integration (`_get_auth_headers`) has not been exercised.
+- **Cloud Run deployment untested.** Everything runs on local Docker.
 
 ---
 
@@ -130,129 +187,209 @@ Be blunt:
 
 See `APPLE_SETUP.md` for the full checklist. The short version:
 
-1. **Create three products in App Store Connect** — `com.audioura.ppu_monthly`
-   ($2/month), `com.audioura.unlimited_monthly` ($50/month),
-   `com.audioura.credit_topup_10` ($9.99 consumable). Apple reviews IAPs;
-   expect 24–48h.
+1. **Create three products in App Store Connect** —
+   `com.audioura.ppu_monthly` ($2/month),
+   `com.audioura.unlimited_monthly` ($50/month),
+   `com.audioura.credit_topup_10` ($9.99 consumable).
 
 2. **Set up a RevenueCat project** — add the iOS app, create the `premium`
    entitlement, configure the webhook URL and secret.
 
 3. **Create a sandbox tester** — throwaway Apple ID for testing without real
-   money. Sandbox subscriptions renew every 5 minutes.
+   money.
 
 4. **Set three env vars and rebuild** — `PAYMENT_PROVIDER=revenuecat`,
    `REVENUECAT_API_KEY`, `REVENUECAT_WEBHOOK_SECRET`.
 
-**Subscribed cannot ship until those products exist.** The code is ready
-and waiting. Estimated time: ~1 hour of your hands plus Apple's review
-queue.
+**Subscribed cannot ship until those products exist.** Estimated time: ~1 hour
+of your hands plus Apple's review queue.
 
 ---
 
-## 4. Decisions taken in your absence
+## 4. Current blockers
 
-You said to make our own judgement on reversible decisions. All of these are
-one-line or one-config reversals.
+### Docker builder hung
 
-| Decision | What | Why | To reverse |
-|----------|------|-----|------------|
-| D2 | No $2 fee on top of Unlimited ($50 covers all) | "$52 billed to a customer told $50" generates refund requests | Add $2 to Unlimited billing logic |
-| D3 | Hard stop at zero balance (no debt from normal use) | Letting users run up uncollectible debt through Apple | Change `charge()` to allow negative |
-| D4 | Cost-stop offers switch to PPU | Silent failure at $50/month feels broken | Remove the switch offer, show message only |
-| D5 | `free` tier survives unchanged | Every existing user is on it; changing silently alters behaviour | Remove the free tier handling |
-| D20 | Monthly fee NOT deducted from credits | Apple already collects the fee via subscription; deducting from credits is double-billing | Change `monthly_fee()` amount_cents from 0 to -200 |
-| LOCAL-90 | No proration credit on Unlimited→PPU switch | User already consumed up to $25 of our cost; crediting unused days rewards gaming | Add prorated credit calculation to `_sync_db_state_switch` |
-| LOCAL-93 | $9.99 charged for $10.00 credit (Apple rounds) | Apple pricing tiers round $10 to $9.99; we credit the full $10 internally | Change credit amount to $9.99 |
-| D1 | Mobile build numbers globally monotonic (next is 2.3.0+20) | Two branches had colliding build numbers; stores order by build number | Pick a different versioning scheme |
+A three-line Alpine image times out at 180 seconds. Running containers stay
+healthy; the problem is exclusively in the builder. Any task requiring a
+container rebuild is blocked. The subscribed-orchestrator and
+tourquality-* stacks were already built before the hang began and still run.
+
+**Impact on Subscribed:** No new container image can be built. If a code fix
+touches server Python and needs deployment, it cannot be deployed until the
+builder is fixed or the machine is cleaned.
+
+### Port map mismatch (app → server)
+
+**Branch: `subscribed` (Dart code)**
+
+The app's `Endpoints._localPorts[Service.orchestrator]` hardcodes **5002**
+(the shared/storied orchestrator). The subscribed-orchestrator with wallet +
+preference routes lives on **5102**. On Michael's phone talking to the Windows
+laptop (192.168.0.218:5002), preferences and wallet will 404 unless that
+orchestrator has the subscribed code merged in.
+
+**Fix options:**
+1. Merge `subscribed` into `storied` and rebuild the shared stack (Michael's
+   call — this is "go live")
+2. Change the port map in the Dart client to 5102 (breaks storied-only usage)
+3. Deploy `subscribed` code to the 5002 container (violates D24 while Michael
+   is away)
+
+Reported in SUBMISSION_LOCAL-109.
 
 ---
 
-## 5. The economics question
+## 5. The economics question (unchanged)
 
 A translation costs us $0.372 — roughly **6× the tour it translates**
-($0.063). At the ×5 multiplier that becomes $1.86 to the user versus $0.32
+($0.068). At the ×5 multiplier that becomes $1.86 to the user versus $0.34
 for the tour.
 
 A user who generates a tour and then translates it into 5 languages pays:
-$0.32 + (5 × $1.86) = **$9.62** — nearly the entire $10 top-up gone on one
+$0.34 + (5 × $1.86) = **$9.64** — nearly the entire $10 top-up gone on one
 tour in six languages.
 
-Nobody has decided whether this is right. Options:
+**Not decided.** Options:
+1. Accept it (reflects real cost)
+2. Cap translation charge (e.g., max 2× the tour charge)
+3. Lower the multiplier for translations only
 
-1. **Accept it** — it reflects real cost proportions (Google Translate +
-   full TTS resynthesis is genuinely expensive).
-2. **Cap translation charge** — e.g., max 2× the tour charge ($0.64 instead
-   of $1.86).
-3. **Lower the multiplier for translations only** — breaks the uniform-×5
-   simplicity.
-
-The measured translation cost ($0.372) is an estimate, not an exact figure.
-The translation service does not report actual character counts, so there is
-some uncertainty. But the 6:1 ratio is real.
+The measured translation cost ($0.372) is an *estimate* — the translation
+service does not report actual character counts. The 6:1 ratio is directionally
+real.
 
 ---
 
-## 6. Open risks
+## 6. Tour quality gate — cleared
 
-**Tour 29 deletion incident (D23).** During autonomous operation, tour 29
-(your French Riviera Biking Tour, the one on your phone) and its
-translations 34/35 were deleted from `audio_tours`. Detected by luck;
-restored from the ZIP on disk. Row count is back to 60.
+**Branch: `storied` (tour generation code lives here)**
 
-**Cause: never identified.** No task worktree contains `DELETE FROM
-audio_tours`. Leading hypothesis is test cleanup reaching real rows. Guards
-now in place: 5-minute row-count snapshot, alert on falling count,
-`CLAUDE.md` now forbids any task from deleting from `audio_tours`.
+Five independent runs on the isolated verification stack:
 
-**Michael's app path currently works** — tour 29 downloads at 7,408,370
-bytes. But whatever caused the deletion was never found, only mitigated.
+| Metric | Value |
+|--------|-------|
+| Mean score | 98.8 |
+| Worst run | 87.8 |
+| Gate threshold | 75 |
+| Spread | 20.6 |
+| Mean cost/tour | $0.0682 |
 
-**Other risks:**
+The base score alone (81.25–87.50) clears the gate in every run without needing
+callbacks. Evidence: SUBMISSION_LOCAL-100.
 
-- The charging wire was proven on a privately-rebuilt container that is not
-  the one your phone talks to. Merging `subscribed` into `storied` and
-  rebuilding is what makes billing live — and that is your call.
+**Michael's field test is the next step.** That is his call.
 
-- Three containers are genuinely STALE (running LOCAL-86 private images).
-  A full rebuild from compose would fix them but was avoided while you were
-  field-testing.
+---
 
-- The venue-coherence gate (LOCAL-85) was rewritten because it blocked
-  delivery of correct Matisse tours. The new logic is less aggressive —
-  it catches genuine drift but may miss edge cases where stops reference
-  venues with non-standard French naming patterns.
+## 7. Swipe personalization loop — closed end to end
+
+**Branch: `subscribed` (schema, service, wiring, Dart UI)**
+
+The full loop:
+1. User swipes like/dislike during playback → offline queue → POST /user/<id>/stop-feedback → 200
+2. Server updates user_class_prefs (Beta-count model)
+3. Next generation reads prefs → `bias_stop_ordering()` → different stop order
+4. Cold start = today's behavior exactly (quality-only)
+
+**Proven over HTTP** (SUBMISSION_LOCAL-107, LOCAL-109). Route registered on
+subscribed-orchestrator (port 5102).
+
+**Known gap:** The shared orchestrator (port 5002, `storied` branch) does NOT
+have the preference route. The Dart app targets 5002. Until `subscribed` merges
+into `storied` or the port map changes, swipes from a real device will silently
+fail against the shared stack.
+
+---
+
+## 8. Decisions with billing consequences
+
+Full list in `DECISIONS.md`. Billing-relevant subset:
+
+| # | Decision | Consequence |
+|---|----------|-------------|
+| D2 | $50 Unlimited has no $2 fee on top | Total is $50, not $52 |
+| D3 | Hard stop at zero balance | No negative from normal use; clawback can go negative |
+| D4 | Unlimited cost-stop → offer PPU switch | Not silent; shows message |
+| D5 | Free plan survives unchanged | No migration needed |
+| D16 | `ppu` is canonical tier ID | DB primary key |
+| D20 | Monthly fee NOT deducted from credits | $10 topup = $10.00 usable balance |
+| LOCAL-90 | No proration credit on Unlimited→PPU | Prevents gaming |
+| LOCAL-93 | $9.99 Apple price → $10.00 credit internally | Apple rounding absorbed |
+
+---
+
+## 9. Corrections from the original document
+
+These claims appeared in the 2026-08-01 version and are now known to be
+inaccurate or incomplete:
+
+| Original claim | Correction | Source |
+|----------------|------------|--------|
+| "tour_generate $0.0633 our cost" | Mean measured at $0.0682 over 5 runs | LOCAL-100 |
+| "Tier-change via HTTP will 500" | All six transitions work over HTTP after LOCAL-90 merged the module into the Dockerfile | SUBMISSION_LOCAL-90, D24 |
+| "Stale-image detection — correctly reports FRESH for all 15 healthy services" | Three containers are genuinely STALE (running LOCAL-86 private images). Detection works; the images it finds stale *are* stale. | Original §6 already noted this; phrasing corrected. |
+| Row count stated as 60 | Row count is now **88** (grew through test generations, all marked `is_test=true`) | SUBMISSION_LOCAL-103, LOCAL-104 |
+
+---
+
+## 10. What is proven, what is stubbed, what needs Michael
+
+### PROVEN (exercised with real data on real Postgres)
+
+- Cost metering (per-operation, per-job)
+- Wallet ledger (append-only, idempotent, SUM-derived balance)
+- Entitlement gate (all three tiers dispatch correctly)
+- Pricing engine (×5, Decimal, drift-free)
+- Tier switching (all 6 transitions)
+- Wallet API (4 endpoints, 53 contract tests)
+- Charging wire (HTTP request → wallet debit → balance change)
+- Cost ceiling (fail-closed, dual-threshold)
+- News cache (content-hash dedup, $0.00 on cache hit)
+- Swipe loop (gesture → preference → reordered tour, over HTTP)
+- Sharing (POST /tour/share → 200, round trip confirmed, free)
+- Tour quality gate (mean 98.8, worst 87.8, gate ≥75)
+
+### STUBBED (code exists, exercised against synthetic data only)
+
+- RevenueCat provider (synthetic webhook payloads, not real Apple receipts)
+- Wallet UI (widget tests only, no device build, no screenshot)
+- Apple grace period (immediate cutoff in fake provider)
+- Translation cost ($0.372 estimated, not measured from real API response)
+- TTS cost (not captured in cost_ledger; happens downstream)
+
+### NEEDS MICHAEL
+
+- App Store Connect products (3 IAPs) — see `APPLE_SETUP.md`
+- RevenueCat project setup
+- Sandbox tester creation
+- Decision: merge `subscribed` into `storied` (makes billing live)
+- Decision: translation pricing (accept 6:1 ratio or cap it)
+- Decision: fix Docker builder (cleanup images/swap) or work around it
+- Field test of tour quality on his own terms
 
 ---
 
 ## Reference table
 
-| Feature / Component | Task(s) |
-|---|---|
-| Cost metering (per-operation ledger) | LOCAL-60 |
-| Payment provider interface + fake | LOCAL-61 |
-| Wallet UI (Flutter) | LOCAL-62, LOCAL-87 |
-| Stale-image detection | LOCAL-63, LOCAL-89 |
-| Cost ceiling enforcement (fail-closed) | LOCAL-64 |
-| Pricing engine (×5, Decimal, bankers) | LOCAL-65 |
-| Wallet ledger (append-only, idempotent) | LOCAL-66 |
-| Entitlement gate (tier dispatch) | LOCAL-67 |
-| Wallet API endpoints | LOCAL-68 |
-| News cost metering | LOCAL-69 |
-| Corpus verification (post-rebuild) | LOCAL-71 |
-| Thin-corpus rule A/B test | LOCAL-72 |
-| News cache (content-hash dedup) | LOCAL-73 |
-| Visitor facts rebase | LOCAL-74, LOCAL-91 |
-| Palais Lascaris fact density | LOCAL-75 |
-| Test DB port fix (5432→5433) | LOCAL-77 |
-| Dispatcher base-branch fix | LOCAL-80 |
-| Subscribed test port fix | LOCAL-81 |
-| End-to-end integration test | LOCAL-82 |
-| Charging wire (billing actually works) | LOCAL-83 |
-| HTTP charging proof (real request debits wallet) | LOCAL-84 |
-| Venue-coherence gate fix | LOCAL-85 |
-| Flask send_file compatibility | LOCAL-86 |
-| Test tour pollution prevention | LOCAL-88 |
-| Tier switching (all 6 transitions) | LOCAL-90 |
-| Isolated deployment (docker-compose-subscribed.yml) | LOCAL-92 |
-| RevenueCat provider + APPLE_SETUP.md | LOCAL-93 |
+| Feature / Component | Task(s) | Branch |
+|---|---|---|
+| Cost metering | LOCAL-60 | storied + subscribed |
+| Payment provider interface + fake | LOCAL-61 | subscribed |
+| Wallet UI (Flutter) | LOCAL-62, LOCAL-87 | subscribed |
+| Stale-image detection | LOCAL-63, LOCAL-89 | storied |
+| Cost ceiling | LOCAL-64 | subscribed |
+| Pricing engine | LOCAL-65 | subscribed |
+| Wallet ledger | LOCAL-66 | subscribed |
+| Entitlement gate | LOCAL-67 | subscribed |
+| Wallet API | LOCAL-68 | subscribed |
+| News cost metering + cache | LOCAL-69, LOCAL-73 | storied |
+| Tier switching | LOCAL-90 | subscribed |
+| Isolated deployment | LOCAL-92 | subscribed |
+| RevenueCat provider + APPLE_SETUP | LOCAL-93 | subscribed |
+| Tour quality gate clearance | LOCAL-97, LOCAL-98, LOCAL-100 | storied |
+| Swipe preferences (backend) | LOCAL-101, LOCAL-104 | subscribed |
+| Swipe UI (Flutter) | LOCAL-105 | subscribed |
+| Swipe loop closed | LOCAL-106, LOCAL-107, LOCAL-109 | subscribed |
+| Sharing wired | LOCAL-110 | storied |
+| Spine quality gate | LOCAL-111 | storied |
