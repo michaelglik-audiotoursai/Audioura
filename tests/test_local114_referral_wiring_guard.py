@@ -141,6 +141,12 @@ print("=" * 70)
 SERVICE_URL = os.environ.get("SERVICE_URL", "http://localhost:5100")
 API_KEY = os.environ.get("GATEWAY_API_KEY", "test-api-key")
 
+# Use unique IDs per run to avoid collisions with duplicate-redemption guard (LOCAL-115)
+import time as _time
+_RUN_TS = str(int(_time.time()))
+_CREATOR_ID = f"guard_test_user_{_RUN_TS}"
+_REDEEMER_ID = f"guard_new_user_{_RUN_TS}"
+
 try:
     import requests
     REQUESTS_AVAILABLE = True
@@ -153,7 +159,7 @@ if REQUESTS_AVAILABLE:
         # Test: POST /referral/create should NOT return 404
         resp = requests.post(
             f"{SERVICE_URL}/referral/create",
-            json={"user_id": "guard_test_user"},
+            json={"user_id": _CREATOR_ID},
             headers={"X-API-Key": API_KEY, "Content-Type": "application/json"},
             timeout=10,
         )
@@ -173,7 +179,7 @@ if REQUESTS_AVAILABLE:
             # Test: POST /referral/redeem should NOT return 404
             resp2 = requests.post(
                 f"{SERVICE_URL}/referral/redeem",
-                json={"referral_code": code, "new_user_id": "guard_new_user"},
+                json={"referral_code": code, "new_user_id": _REDEEMER_ID},
                 headers={"X-API-Key": API_KEY, "Content-Type": "application/json"},
                 timeout=10,
             )
@@ -187,13 +193,13 @@ if REQUESTS_AVAILABLE:
                 check("Redeem response has redeemed=true", data2.get("redeemed") is True,
                       f"Got: {data2}")
                 check("Redeem response has referrer_user_id",
-                      data2.get("referrer_user_id") == "guard_test_user",
+                      data2.get("referrer_user_id") == _CREATOR_ID,
                       f"Got: {data2.get('referrer_user_id')}")
 
         # Test: Missing API key returns 401
         resp3 = requests.post(
             f"{SERVICE_URL}/referral/create",
-            json={"user_id": "guard_test_user"},
+            json={"user_id": _CREATOR_ID},
             headers={"Content-Type": "application/json"},
             timeout=10,
         )

@@ -1,0 +1,41 @@
+# ============================================================================
+# docker-compose-local115.yml — LOCAL-115: Referral abuse controls testing
+# ============================================================================
+# Uses cached local-114-subscribed-generator image with volume mounts to
+# overlay updated referral files. Docker Hub is unreachable for fresh builds.
+# ============================================================================
+
+services:
+  subscribed-generator:
+    image: local-114-subscribed-generator:latest
+    container_name: subscribed-generator
+    ports:
+      - "5100:5000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-placeholder}
+      - SERP_API_KEY=${SERP_API_KEY:-placeholder}
+      - SERP_PROVIDER=serper
+      - STORIED_MODE=true
+      - ATTESTATION_MODE=log_only
+      - BASE_URL=http://localhost:5000
+      - REFERRAL_BASE_URL=http://localhost:5000
+      - DATABASE_URL=postgresql://admin:password123@postgres-2:5432/audiotours
+      - GATEWAY_API_KEY=test-api-key
+      - PYTHONUNBUFFERED=1
+      - REFERRAL_RATE_LIMIT_MAX=10
+      - REFERRAL_RATE_LIMIT_WINDOW=60
+    volumes:
+      - ./tours:/app/tours
+      - ./referral_endpoints.py:/app/referral_endpoints.py:ro
+      - ./referral_engine.py:/app/referral_engine.py:ro
+    networks:
+      - development_default
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  development_default:
+    external: true
