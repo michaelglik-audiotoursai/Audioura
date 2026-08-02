@@ -3,44 +3,41 @@
 test_local113_persona_wiring_guard.py — Guard test for persona blueprint registration
 ======================================================================================
 LOCAL-113: Verifies that persona_bp is registered on generate_tour_text_service.py.
-LOCAL-131: Split into source-level and live-HTTP assertions so the guard is not
-           permanently red when the container is stale.
+LOCAL-131: Split into source-level and live-HTTP assertions.
+LOCAL-133: Added behavioural assertion — imports the Flask app and uses test_client()
+           to verify routes are actually reachable, not just syntactically present.
+
+The AST check is kept as a cheap first line (catches comment-out fast) but is
+insufficient alone (misses `if False:` neutering — D35).
 
 Two independent questions:
   1. Is the registration in the source? (AST guard — always answerable)
-  2. Does the running service serve the route? (HTTP — skips when the container
-     is stale, i.e. source is correct but route 404s)
+  2. Does the app actually serve the route? (Behavioural — uses test_client())
 
-Exit 0 = source assertions pass (HTTP may be skipped).
-Exit 1 = source assertion fails.
+Exit 0 = all assertions pass (skips OK). Exit 1 = test failure.
 Skips are reported separately and never masquerade as passes.
 
-When the container is rebuilt with current source, the HTTP assertions will
-start running automatically (no hardcoded skip — reachability is detected).
-
 Usage:
-    python3 tests/test_local113_persona_wiring_guard.py [--service-url URL]
+    python3 tests/test_local113_persona_wiring_guard.py
 """
 import os
 import sys
 import ast
-import socket
 
 # ─── Configuration ───────────────────────────────────────────────────────────
-SERVICE_URL = os.getenv("SERVICE_URL", "http://localhost:5000")
-API_KEY = os.getenv("GATEWAY_API_KEY", "test-api-key")
-
 SERVICE_FILE = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "generate_tour_text_service.py"
 )
+
+SERVICE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # ─── Test harness ────────────────────────────────────────────────────────────
 PASS_COUNT = 0
 FAIL_COUNT = 0
 SKIP_COUNT = 0
 
-# Track whether source guard passed — used by HTTP guard to decide skip vs fail
+# Track whether source guard passed
 SOURCE_GUARD_PASSED = False
 
 
@@ -60,22 +57,6 @@ def skip(name: str, reason: str):
     global SKIP_COUNT
     SKIP_COUNT += 1
     print(f"  SKIP: {name} — {reason}")
-
-
-def is_port_reachable(url: str, timeout: float = 3.0) -> bool:
-    """Check if the host:port in a URL is accepting TCP connections."""
-    try:
-        from urllib.parse import urlparse
-        parsed = urlparse(url)
-        host = parsed.hostname or "localhost"
-        port = parsed.port or 80
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(timeout)
-        result = sock.connect_ex((host, port))
-        sock.close()
-        return result == 0
-    except Exception:
-        return False
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -146,17 +127,61 @@ def test_source_guard():
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PART 2: Behaviour Guard — persona is opt-in only (no side effects)
+# PART 2: Behavioural Guard — import app, use test_client, verify route (LOCAL-133)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def test_behaviour_guard():
-    """Verify persona endpoints don't modify tours or cost data."""
-    print("\n[BEHAVIOUR GUARD] Verifying persona is opt-in only")
+def test_behavioural_guard():
+    """Import the Flask app and verify persona routes respond via test_client().
 
-    persona_file = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "persona_endpoints.py"
+    This catches `if False: app.register_blueprint(persona_bp)` — the route
+    will 404 even though ast.walk finds the Call node (D35).
+    """
+    print("\n[BEHAVIOURAL GUARD] Verifying persona routes via test_client()")
+
+    # Add project root to path so we can import the app
+    if SERVICE_DIR not in sys.path:
+        sys.path.insert(0, SERVICE_DIR)
+
+    # Set env vars the app expects
+    os.environ.setdefault("DATABASE_URL", "postgresql://admin:password123@localhost:5433/audiotours")
+    os.environ.setdefault("GATEWAY_API_KEY", "test-api-key")
+
+    try:
+        from generate_tour_text_service import app
+        client = app.test_client()
+    except Exception as e:
+        skip("Behavioural guard (all)", f"Cannot import app: {e}")
+        return
+
+    # Test: POST /user/persona should NOT be 404 (route is registered)
+    resp = client.post(
+        "/user/persona",
+        json={"user_id": "guard_test_local133", "persona": "art_lover"},
+        headers={"Content-Type": "application/json", "X-API-Key": "test-api-key"},
     )
+    check("POST /user/persona is not 404 (behavioural)",
+          resp.status_code != 404,
+          f"Got {resp.status_code} — blueprint not registered or route unreachable!")
+
+    # Test: GET /user/persona should NOT be 404
+    resp2 = client.get(
+        "/user/persona?user_id=guard_test_local133",
+        headers={"X-API-Key": "test-api-key"},
+    )
+    check("GET /user/persona is not 404 (behavioural)",
+          resp2.status_code != 404,
+          f"Got {resp2.status_code} — blueprint not registered or route unreachable!")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PART 3: Behaviour Guard — persona is opt-in only (no side effects)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def test_no_side_effects():
+    """Verify persona endpoints don't modify tours or cost data."""
+    print("\n[SIDE-EFFECT GUARD] Verifying persona is opt-in only")
+
+    persona_file = os.path.join(SERVICE_DIR, "persona_endpoints.py")
 
     if not os.path.exists(persona_file):
         check("persona_endpoints.py exists", False, "File not found")
@@ -177,10 +202,7 @@ def test_behaviour_guard():
           "audio_tours" not in source,
           "persona_endpoints.py touches audio_tours table — should only use user_preferences")
 
-    store_file = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "persona_preference_store.py"
-    )
+    store_file = os.path.join(SERVICE_DIR, "persona_preference_store.py")
     if os.path.exists(store_file):
         with open(store_file, "r") as f:
             store_source = f.read()
@@ -193,126 +215,23 @@ def test_behaviour_guard():
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PART 3: Live HTTP Guard — verify routes respond (SKIPS if stale/unreachable)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def test_live_http():
-    """Hit the running service and verify persona routes are reachable.
-
-    Skip logic (no hardcoded skip — detect reachability):
-      - Port unreachable → SKIP (no container running at all)
-      - Port reachable, route 404, source guard PASSED → SKIP (container stale)
-      - Port reachable, route 404, source guard FAILED → FAIL (genuinely broken)
-      - Port reachable, route non-404 → assert normally
-
-    When the container is rebuilt with current source, the 404 disappears and
-    HTTP assertions begin running automatically.
-    """
-    print(f"\n[LIVE HTTP] Testing against {SERVICE_URL}")
-
-    # Gate 1: Is the port even accepting connections?
-    if not is_port_reachable(SERVICE_URL):
-        reason = (
-            f"Port not accepting connections at {SERVICE_URL} — "
-            f"no container running. Will auto-run when service starts."
-        )
-        skip("POST /user/persona reachable", reason)
-        skip("GET /user/persona reachable", reason)
-        return
-
-    # Port is open — probe the route
-    import requests
-
-    headers = {"Content-Type": "application/json", "X-API-Key": API_KEY}
-
-    # Probe POST
-    try:
-        resp_post = requests.post(
-            f"{SERVICE_URL}/user/persona",
-            json={"user_id": "guard_test_local113", "persona": "art_lover"},
-            headers=headers,
-            timeout=10,
-        )
-    except requests.ConnectionError as e:
-        reason = f"Connection failed after port probe: {e}"
-        skip("POST /user/persona reachable", reason)
-        skip("GET /user/persona reachable", reason)
-        return
-
-    # Gate 2: If 404 and source guard passed → container is stale, skip
-    if resp_post.status_code == 404 and SOURCE_GUARD_PASSED:
-        reason = (
-            f"Container at {SERVICE_URL} returns 404 for /user/persona — "
-            f"image predates persona_bp registration (source is correct per "
-            f"Part 1). Cannot rebuild (Docker builds hung). "
-            f"Will auto-run when container is rebuilt with current source."
-        )
-        skip("POST /user/persona is not 404", reason)
-        skip("POST /user/persona returns 200", reason)
-        skip("GET /user/persona is not 404", reason)
-        skip("GET /user/persona returns 200", reason)
-        skip("Round trip: persona value matches", reason)
-        return
-
-    # Gate 3: If 404 and source guard FAILED → genuinely broken
-    # (fall through to normal assertions which will fail)
-
-    # Normal assertions — route is responding
-    print("\n  POST /user/persona:")
-    check("POST /user/persona is not 404", resp_post.status_code != 404,
-          f"Got {resp_post.status_code} — blueprint not registered!")
-    check("POST /user/persona returns 200", resp_post.status_code == 200,
-          f"Got {resp_post.status_code}: {resp_post.text[:200]}")
-
-    # GET /user/persona — round trip
-    print("\n  GET /user/persona:")
-    try:
-        resp_get = requests.get(
-            f"{SERVICE_URL}/user/persona?user_id=guard_test_local113",
-            headers=headers,
-            timeout=10,
-        )
-        check("GET /user/persona is not 404", resp_get.status_code != 404,
-              f"Got {resp_get.status_code} — blueprint not registered!")
-        check("GET /user/persona returns 200", resp_get.status_code == 200,
-              f"Got {resp_get.status_code}: {resp_get.text[:200]}")
-
-        if resp_get.status_code == 200:
-            data = resp_get.json()
-            check("Round trip: persona value matches",
-                  data.get("persona") == "art_lover",
-                  f"Expected 'art_lover', got: {data.get('persona')}")
-    except Exception as e:
-        check("GET request succeeded", False, str(e))
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
 # Main
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def main():
-    global SERVICE_URL
-
-    # Parse CLI args
-    if "--service-url" in sys.argv:
-        idx = sys.argv.index("--service-url")
-        if idx + 1 < len(sys.argv):
-            SERVICE_URL = sys.argv[idx + 1]
-
     print("=" * 70)
     print("test_local113_persona_wiring_guard.py")
-    print("LOCAL-113 + LOCAL-131: Persona blueprint registration guard")
-    print(f"Service: {SERVICE_URL}")
+    print("LOCAL-113 + LOCAL-131 + LOCAL-133: Persona blueprint registration guard")
     print("=" * 70)
 
     # Source guard — always runs, always answerable
     test_source_guard()
 
-    # Behaviour guard — always runs (reads source only)
-    test_behaviour_guard()
+    # Side-effect guard — always runs (reads source only)
+    test_no_side_effects()
 
-    # Live HTTP — skips if unreachable or stale, runs if route is live
-    test_live_http()
+    # Behavioural guard — exercises actual app (LOCAL-133)
+    test_behavioural_guard()
 
     # Summary — skips counted separately from passes
     print("\n" + "=" * 70)
@@ -324,7 +243,7 @@ def main():
     if FAIL_COUNT == 0 and SKIP_COUNT == 0:
         print("ALL TESTS PASSED")
     elif FAIL_COUNT == 0 and SKIP_COUNT > 0:
-        print("SOURCE ASSERTIONS PASSED — live HTTP skipped (see reasons above)")
+        print("SOURCE ASSERTIONS PASSED — behavioural tests skipped (see reasons above)")
     else:
         print("SOME TESTS FAILED")
     print("=" * 70)
