@@ -42,7 +42,11 @@ def test_cost_rates():
     assert llm_cost(5000) == 0.010
     assert search_cost(10) == 0.010
     assert tts_cost(1_000_000) == 4.00
-    assert translation_cost(1_000_000) == 20.00
+    # [LOCAL-135] translation_cost() now models the full translation service behavior:
+    # 2× AWS Translate passes ($15/1M each: full text + ~95% nav-stripped for TTS input)
+    # + Polly TTS ($4/1M on ~95% of source × 1.06 translation expansion ratio)
+    # = (1M × 1.95 × $15/1M) + (1M × 0.95 × 1.06 × $4/1M) = $29.25 + $4.028 = $33.278
+    assert translation_cost(1_000_000) == 29.25 + 1_000_000 * 0.95 * 1.06 * 4.00 / 1_000_000  # $33.278
 
     print("PASS: test_cost_rates")
 

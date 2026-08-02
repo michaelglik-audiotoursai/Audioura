@@ -40,7 +40,7 @@ Every tour, translation, and news article records its real API cost to a
 ```
 tour_generate          $0.068 our cost  →  user $0.34   (×5 multiplier)
                        ~~$0.063~~ [CORRECTED: LOCAL-100 measured mean $0.0682 over 5 runs]
-translation_generate   $0.372 our cost  →  user $1.86   (6× a tour's cost) [ESTIMATED — see §5]
+translation_generate   $0.532 our cost  →  user $2.66   (8× a tour's cost) [MEASURED: LOCAL-135, n=5]
 news_generate          $0.006–$0.011 our cost
 cache hits             $0.00 always
 ```
@@ -167,9 +167,15 @@ flutter analyze only. No APK build possible (Docker builder hung — see §4).
   tested against the subscribed stack. The `Dockerfile.orchestrator` now
   includes the tier-change module.
 
-- **Translation cost is estimated, not measured.** The translation service
+- ~~**Translation cost is estimated, not measured.** The translation service
   returns `cache_hit` but not actual character counts. The $0.372 figure is
-  calculated from typical tour length, not from real API response data.
+  calculated from typical tour length, not from real API response data.~~
+  **CORRECTED (LOCAL-135):** Translation cost measured at **$0.532** mean over
+  5 tours (n=5, stdev $0.050, range $0.475–$0.591). The old $0.372 estimate
+  was wrong for two reasons: (1) used Google Translate rate ($20/1M) but the
+  service uses AWS Translate ($15/1M); (2) did not account for the service
+  translating each stop twice (full text + TTS-stripped text). The double
+  translation dominates — lower per-char rate × 2 passes = higher total.
 
 - **TTS cost in tour breakdown is $0.00.** TTS happens at the tour-processor
   level; the cost metered at the generator level captures only the LLM spend.
@@ -240,14 +246,14 @@ Reported in SUBMISSION_LOCAL-109.
 
 ---
 
-## 5. The economics question (unchanged)
+## 5. The economics question (updated LOCAL-135)
 
-A translation costs us $0.372 — roughly **6× the tour it translates**
-($0.068). At the ×5 multiplier that becomes $1.86 to the user versus $0.34
+A translation costs us **$0.532** — roughly **8× the tour it translates**
+($0.068). At the ×5 multiplier that becomes **$2.66** to the user versus $0.34
 for the tour.
 
 A user who generates a tour and then translates it into 5 languages pays:
-$0.34 + (5 × $1.86) = **$9.64** — nearly the entire $10 top-up gone on one
+$0.34 + (5 × $2.66) = **$13.64** — exceeding the entire $10 top-up on one
 tour in six languages.
 
 **Not decided.** Options:
@@ -255,9 +261,12 @@ tour in six languages.
 2. Cap translation charge (e.g., max 2× the tour charge)
 3. Lower the multiplier for translations only
 
-The measured translation cost ($0.372) is an *estimate* — the translation
-service does not report actual character counts. The 6:1 ratio is directionally
-real.
+The measured translation cost ($0.532, n=5, stdev $0.050) is **higher** than
+the previous $0.372 estimate. The 8:1 ratio is measured, not estimated.
+
+**Root cause of the higher cost:** the translation service translates each
+stop twice per language (once for the text file, once nav-stripped for Polly
+TTS input). The old estimate assumed a single translation pass.
 
 ---
 
@@ -330,6 +339,7 @@ inaccurate or incomplete:
 | "Tier-change via HTTP will 500" | All six transitions work over HTTP after LOCAL-90 merged the module into the Dockerfile | SUBMISSION_LOCAL-90, D24 |
 | "Stale-image detection — correctly reports FRESH for all 15 healthy services" | Three containers are genuinely STALE (running LOCAL-86 private images). Detection works; the images it finds stale *are* stale. | Original §6 already noted this; phrasing corrected. |
 | Row count stated as 60 | Row count is now **88** (grew through test generations, all marked `is_test=true`) | SUBMISSION_LOCAL-103, LOCAL-104 |
+| "translation_generate $0.372 our cost" | Measured at **$0.532** mean (n=5, stdev $0.050). Old estimate used wrong API (Google $20/1M vs actual AWS $15/1M) and missed double-translation per stop. | LOCAL-135 |
 
 ---
 
@@ -355,7 +365,9 @@ inaccurate or incomplete:
 - RevenueCat provider (synthetic webhook payloads, not real Apple receipts)
 - Wallet UI (widget tests only, no device build, no screenshot)
 - Apple grace period (immediate cutoff in fake provider)
-- Translation cost ($0.372 estimated, not measured from real API response)
+- ~~Translation cost ($0.372 estimated, not measured from real API response)~~
+  **PROVEN (LOCAL-135):** measured $0.532 mean (n=5, stdev $0.050) from real
+  tour content in the database. Includes TTS.
 - TTS cost (not captured in cost_ledger; happens downstream)
 
 ### NEEDS MICHAEL
