@@ -967,19 +967,26 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                                         breakdown={"translate": 0.0, "tts": 0.0},
                                     )
                                 else:
-                                    # [LOCAL-135] translation_cost() is all-in: 2× AWS Translate
-                                    # passes + Polly TTS on translated text. No separate tts_cost().
-                                    from cost_rates import translation_cost
+                                    # [LOCAL-143] translation_cost() is all-in: AWS Translate
+                                    # passes + Polly TTS. Pass count comes from
+                                    # DEPLOYED_TRANSLATION_PASSES (inspected from running
+                                    # container — see test_local143). The cost model now
+                                    # tracks which code path the container actually runs.
+                                    from cost_rates import translation_cost, DEPLOYED_TRANSLATION_PASSES
                                     # Use actual tour character count (tour_content is in scope)
                                     _source_chars = len(tour_content) if tour_content else 16000
-                                    _total_translation_cost = translation_cost(_source_chars)
+                                    _total_translation_cost = translation_cost(_source_chars, passes=DEPLOYED_TRANSLATION_PASSES)
                                     record_operation(
                                         operation_type="translation_generate",
                                         our_cost_usd=_total_translation_cost,
                                         cache_hit=False,
                                         user_id=user_id,
                                         job_id=job_id,
-                                        breakdown={"translate_and_tts": _total_translation_cost, "source_chars": _source_chars},
+                                        breakdown={
+                                            "translate_and_tts": _total_translation_cost,
+                                            "source_chars": _source_chars,
+                                            "translation_passes": DEPLOYED_TRANSLATION_PASSES,
+                                        },
                                     )
                             except Exception as _meter_err:
                                 print(f"[LOCAL-60] Translation cost metering failed (non-fatal): {_meter_err}")

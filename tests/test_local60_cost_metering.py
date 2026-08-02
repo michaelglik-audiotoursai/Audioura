@@ -43,10 +43,17 @@ def test_cost_rates():
     assert search_cost(10) == 0.010
     assert tts_cost(1_000_000) == 4.00
     # [LOCAL-135] translation_cost() now models the full translation service behavior:
-    # 2× AWS Translate passes ($15/1M each: full text + ~95% nav-stripped for TTS input)
+    # [LOCAL-143] Parameterized by pass count. Default = DEPLOYED_TRANSLATION_PASSES (2).
+    # Two-pass: 2× AWS Translate ($15/1M each: full text + ~95% nav-stripped for TTS input)
     # + Polly TTS ($4/1M on ~95% of source × 1.06 translation expansion ratio)
     # = (1M × 1.95 × $15/1M) + (1M × 0.95 × 1.06 × $4/1M) = $29.25 + $4.028 = $33.278
     assert translation_cost(1_000_000) == 29.25 + 1_000_000 * 0.95 * 1.06 * 4.00 / 1_000_000  # $33.278
+    # [LOCAL-143] Single-pass (after LOCAL-142 deploys): 1× Translate + Polly
+    # = (1M × 1.0 × $15/1M) + (1M × 0.95 × 1.06 × $4/1M) = $15.00 + $4.028 = $19.028
+    assert translation_cost(1_000_000, passes=1) == 15.00 + 1_000_000 * 0.95 * 1.06 * 4.00 / 1_000_000  # $19.028
+    # Verify default uses DEPLOYED_TRANSLATION_PASSES
+    from cost_rates import DEPLOYED_TRANSLATION_PASSES
+    assert translation_cost(1_000_000) == translation_cost(1_000_000, passes=DEPLOYED_TRANSLATION_PASSES)
 
     print("PASS: test_cost_rates")
 
