@@ -913,3 +913,46 @@ the merge commit, not discovered later.
 success looks like, never what failure happens to also contain. Prefer
 asserting on `app.url_map` or a status code over substring-matching a page
 whose text you do not own.
+
+---
+
+## D38 — "Run the full test suite" is a live-database write (2026-08-02)
+
+**What happened:** LOCAL-137's task file, written by LEAD, required
+"full `tests/` suite exit codes before and after" as proof that editing
+assertions had not turned a real failure green. Reasonable in isolation.
+But several suites in `tests/` create tours in the live database, and one
+of them left **tour 132, "LOCAL49 Regression Test … Walking Tour"**, with
+`is_test = false` and real coordinates (47.6098, −122.3423). `tours-near`
+filters on `is_test`, so the row was **live and user-visible** at those
+coordinates. LEAD found it by chance while probing LOCAL-138 — a row count
+of 101 where 94 was expected.
+
+**Two failures, and the second is the important one.**
+
+1. A test suite created a user-visible artifact. Known class — LOCAL-49 and
+   LOCAL-88 have both done this before.
+2. **The guard could not have caught it.** `check_user_visible.sh` watched
+   one location, Nice, because the previous incident happened in Nice. Tour
+   132 was in Seattle. A guard scoped to where the last failure occurred
+   does not generalise to where the next one will.
+
+**Fixed:** `is_test` set true on 132 (an UPDATE, reversible — never a
+DELETE on `audio_tours`), verified gone from `tours-near`. The guard now
+also alarms on **any** row whose name matches a test marker while
+`is_test IS NOT TRUE`, anywhere on earth. Proven in both directions: silent
+when clean, fires when the condition is reintroduced.
+
+**Rules going forward:**
+
+- A task file that asks for a full-suite run is authorising live-database
+  writes. Say so in the file, require row counts before and after for
+  `audio_tours`, and prefer naming the specific suites that matter.
+- **Guard the invariant, not the incident.** "Nice returns these nine ids"
+  encodes one place. "No test-named row is unflagged" encodes the property
+  that actually matters. When writing a guard after an incident, ask what
+  the incident was an *instance of*.
+
+**Related:** the deletion prohibition already covers the opposite failure.
+Row loss and row visibility are different alarms and both are needed — the
+count went *up* here, so the row-loss alarm was correctly silent.
