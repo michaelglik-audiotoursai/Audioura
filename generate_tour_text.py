@@ -6166,37 +6166,130 @@ Requirements:
 - Do NOT end with a question
 - Return ONLY the paragraph, no quotes or labels"""
 
+            # [LOCAL-119] Prolog LLM call with retry for transient failures.
+            # Transient: timeout, connection error, HTTP 429/500/502/503/504.
+            # Non-transient (no retry): 400/401/403/404 — prompt or auth issue.
             import requests as _prolog_requests
-            _prolog_resp = _prolog_requests.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={
-                    "model": "gpt-3.5-turbo",
-                    "messages": [
-                        {"role": "system", "content": "You write immersive, literary audio tour introductions."},
-                        {"role": "user", "content": _prolog_prompt},
-                    ],
-                    "temperature": 0.8,
-                    "max_tokens": 380,
-                },
-                timeout=15,
-            )
-            if _prolog_resp.status_code == 200:
-                _prolog_text = _prolog_resp.json()["choices"][0]["message"]["content"].strip()
-                if _prolog_text.startswith('"') and _prolog_text.endswith('"'):
-                    _prolog_text = _prolog_text[1:-1].strip()
-                # [R2] Do NOT emit standalone Introduction block — save for Stop 1
-                _saved_prolog = _prolog_text
-                print(f"  [R2] Prolog saved for Stop 1 ({len(_prolog_text.split())} words)")
-            else:
-                # Fallback to simple hook
-                if _tour_hook:
+            _prolog_logger = logging.getLogger("generate_tour_text.prolog")
+            _PROLOG_TRANSIENT_CODES = {429, 500, 502, 503, 504}
+            _PROLOG_MAX_RETRIES = 1  # 1 retry = 2 attempts total
+            _prolog_attempt = 0
+            _prolog_success = False
+            _prolog_last_status = None
+
+            while _prolog_attempt <= _PROLOG_MAX_RETRIES:
+                try:
+                    _prolog_resp = _prolog_requests.post(
+                        "https://api.openai.com/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                        json={
+                            "model": "gpt-3.5-turbo",
+                            "messages": [
+                                {"role": "system", "content": "You write immersive, literary audio tour introductions."},
+                                {"role": "user", "content": _prolog_prompt},
+                            ],
+                            "temperature": 0.8,
+                            "max_tokens": 380,
+                        },
+                        timeout=15,
+                    )
+                    _prolog_last_status = _prolog_resp.status_code
+                    if _prolog_resp.status_code == 200:
+                        _prolog_text = _prolog_resp.json()["choices"][0]["message"]["content"].strip()
+                        if _prolog_text.startswith('"') and _prolog_text.endswith('"'):
+                            _prolog_text = _prolog_text[1:-1].strip()
+                        _saved_prolog = _prolog_text
+                        _prolog_success = True
+                        if _prolog_attempt > 0:
+                            print(f"  [R2] Prolog saved for Stop 1 ({len(_prolog_text.split())} words) [retry succeeded]")
+                        else:
+                            print(f"  [R2] Prolog saved for Stop 1 ({len(_prolog_text.split())} words)")
+                        break
+                    elif _prolog_resp.status_code in _PROLOG_TRANSIENT_CODES:
+                        # Transient — retry after backoff
+                        _prolog_attempt += 1
+                        if _prolog_attempt <= _PROLOG_MAX_RETRIES:
+                            _backoff = 2 ** _prolog_attempt  # 2s on first retry
+                            _prolog_logger.warning(
+                                f"[LOCAL-119] Prolog LLM transient failure (HTTP {_prolog_resp.status_code}), "
+                                f"retrying in {_backoff}s (attempt {_prolog_attempt + 1}/{_PROLOG_MAX_RETRIES + 1})"
+                            )
+                            time.sleep(_backoff)
+                        else:
+                            _prolog_logger.warning(
+                                f"[LOCAL-119] Prolog LLM transient failure (HTTP {_prolog_resp.status_code}), "
+                                f"retries exhausted — falling back"
+                            )
+                    else:
+                        # Non-transient (400/401/403/404) — do not retry, just fall back
+                        _prolog_logger.warning(
+                            f"[LOCAL-119] Prolog LLM non-transient failure (HTTP {_prolog_resp.status_code}), "
+                            f"no retry — falling back"
+                        )
+                        break
+                except (_prolog_requests.exceptions.Timeout, _prolog_requests.exceptions.ConnectionError) as _net_err:
+                    # Network-level transient failure — retry
+                    _prolog_attempt += 1
+                    if _prolog_attempt <= _PROLOG_MAX_RETRIES:
+                        _backoff = 2 ** _prolog_attempt
+                        _prolog_logger.warning(
+                            f"[LOCAL-119] Prolog LLM network error ({type(_net_err).__name__}), "
+                            f"retrying in {_backoff}s (attempt {_prolog_attempt + 1}/{_PROLOG_MAX_RETRIES + 1})"
+                        )
+                        time.sleep(_backoff)
+                    else:
+                        _prolog_logger.warning(
+                            f"[LOCAL-119] Prolog LLM network error ({type(_net_err).__name__}), "
+                            f"retries exhausted — falling back"
+                        )
+                except Exception as _parse_err:
+                    # Unexpected error (e.g. JSON parse failure on 200) — non-transient
+                    _prolog_logger.warning(
+                        f"[LOCAL-119] Prolog LLM unexpected error ({type(_parse_err).__name__}: {_parse_err}), "
+                        f"no retry — falling back"
+                    )
+                    break
+
+            # [LOCAL-119] Improved fallback: if prolog generation failed, use Stop 1's
+            # first POI description sentence (full prose) rather than the raw hook
+            # (which is a terse 11-25 word formulaic question).
+            if not _prolog_success:
+                # Try to get Stop 1's description as better fallback prose
+                _fallback_used = None
+                if poi_list and poi_list[0].get("description"):
+                    _stop1_desc = poi_list[0]["description"].strip()
+                    # Extract first two sentences (gives ~30-60 words of real prose)
+                    _sentences = re.split(r'(?<=[.!])\s+', _stop1_desc)
+                    if len(_sentences) >= 2:
+                        _fallback_prose = ' '.join(_sentences[:2])
+                        _saved_prolog = _fallback_prose
+                        _fallback_used = "stop1_prose"
+                    elif _sentences:
+                        _saved_prolog = _sentences[0]
+                        _fallback_used = "stop1_first_sentence"
+                # If Stop 1 description unavailable, fall back to raw hook (last resort)
+                if not _fallback_used and _tour_hook:
                     _saved_prolog = _tour_hook
-                    print(f"  [R2] Prolog fallback (hook) saved for Stop 1")
+                    _fallback_used = "raw_hook"
+
+                if _fallback_used:
+                    _prolog_logger.warning(
+                        f"[LOCAL-119] Prolog fallback active: using '{_fallback_used}' "
+                        f"({len(_saved_prolog.split())} words). Tour delivery continues."
+                    )
+                else:
+                    _prolog_logger.warning(
+                        "[LOCAL-119] Prolog generation failed and no fallback text available. "
+                        "Tour will open directly on Stop 1 content without prolog."
+                    )
         except Exception as e:
-            print(f"  [PROLOG] Error: {e}")
-            if _storied_spine.get("tour_hook"):
-                _saved_prolog = _storied_spine['tour_hook']
+            # [LOCAL-119] Outer safety net — prolog failure must NEVER block tour delivery.
+            # This catches any error not handled inside the retry loop (e.g. spine parsing).
+            _prolog_logger = logging.getLogger("generate_tour_text.prolog")
+            _prolog_logger.warning(
+                f"[LOCAL-119] Prolog block outer error ({type(e).__name__}: {e}). "
+                f"Tour delivery continues without prolog."
+            )
 
     # Add each POI with its description and directions
     for i, poi in enumerate(poi_list):
