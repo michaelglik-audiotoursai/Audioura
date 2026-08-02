@@ -172,6 +172,65 @@ Every serious failure in 45 tasks was at a seam:
 
 ---
 
+## 5b. Never match an identifier without a word boundary
+
+Four confident, wrong conclusions in one week came from substring matching:
+
+| Where | What matched wrongly |
+|---|---|
+| a callback counter | any two words of an earlier stop's title, appearing anywhere later |
+| a collision test | a pair of names that could not actually collide |
+| LEAD's materials check | English-only vocabulary; missed chlorite, soie, bois, xylogravure |
+| LEAD's entry-point check | `news_search_service.py` inside `simple_news_search_service.py` |
+
+The last one caused a wrongful bounce: a file was protected as a live
+container entry point when the container actually runs a *longer* filename
+containing that string.
+
+**Use `grep -w`, or `(^|[^a-z_])name([^a-z_]|$)`.** A bare substring search
+over identifiers is not evidence. It fails toward *false confidence* — it
+returns a hit, so it feels like a result, and the reviewer stops looking.
+
+The same applies to metrics built on matching. **A number is unverified
+until you have read the code that produced it**, not just the number. Two of
+the four above were reported as measurements and believed.
+
+## 5c. Static analysis cannot see an entry point
+
+An import graph will confidently tell you a module has zero callers when it
+is the `CMD` of a running container.
+
+A module can be reached by:
+- `Dockerfile` `CMD` / `ENTRYPOINT`
+- `docker-compose` `command:`
+- a launchd / cron / Task Scheduler job
+- being run directly as a script
+- string-based dispatch, `getattr`, Flask decorators, template references
+
+None appear in an import graph. Before deleting anything on "no importers",
+check every one of those, **per symbol**, and say so per symbol — a blanket
+"Docker does not use these" sentence is where the mistake hides.
+
+## 5d. The host is part of the system
+
+Continuous development assumes the machine keeps working. It may not.
+
+Observed in one week on a Mac Mini running Docker plus three concurrent
+agents:
+- swap at 91% (2783 MB of 3072 MB)
+- container builds failing with `DeadlineExceeded`, including a three-line
+  Alpine image timing out at 180 seconds
+- workers killed before writing a single log line
+
+**A task that dies with no log should be read as environmental until proven
+otherwise.** Re-dispatching it is how a resource problem becomes a resource
+spiral — each death leaked an orphaned agent process, and the liveness check
+faithfully fed the loop.
+
+So: reap orphans on a timer, cap retries and quarantine a task that keeps
+dying, and size concurrency to what the host sustains *including builds*.
+Three workers was one too many.
+
 ## 6. Protect production data before the first agent runs
 
 An agent deleted a real tour and its two translations during autonomous
