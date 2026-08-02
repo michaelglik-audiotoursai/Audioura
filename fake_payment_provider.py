@@ -38,6 +38,10 @@ CREDIT_LOW_BALANCE_USD = 2.00
 UNLIMITED_MONTHLY_FEE_USD = 50.00
 UNLIMITED_COST_STOP_FRACTION = 0.5
 CACHE_HIT_COST_USD = 0.00
+# Apple billing retry grace period — Apple retries for up to 16 days after
+# a failed renewal. Access continues during this window.
+# Source: Apple Developer docs "Billing retry" / "Billing Grace Period" (2024).
+BILLING_RETRY_GRACE_DAYS = 16
 
 
 @dataclass
@@ -69,9 +73,12 @@ class FakePaymentProvider(PaymentProvider):
     Scriptable: inject_webhook() lets tests simulate Apple server events.
     """
 
-    def __init__(self, now: Optional[datetime] = None):
+    def __init__(self, now: Optional[datetime] = None, billing_retry_grace_days: int = 16):
         self._users: Dict[str, UserSubscriptionRecord] = {}
         self._now = now or datetime.utcnow()
+        # Apple's billing retry grace period (default 16 days per Apple docs).
+        # During this window, access continues while Apple retries payment.
+        self._billing_retry_grace_days = billing_retry_grace_days
         # Restore index: maps provider_subscription_id -> user_id
         self._restore_index: Dict[str, str] = {}
 
@@ -105,8 +112,17 @@ class FakePaymentProvider(PaymentProvider):
 
         # Check if subscription has expired (time-based)
         if rec.tier != SubscriptionTier.FREE and rec.period_end:
-            if self._now >= rec.period_end and rec.state == SubscriptionState.ACTIVE:
-                rec.state = SubscriptionState.LAPSED
+            if self._now >= rec.period_end:
+                if rec.state in (SubscriptionState.ACTIVE, SubscriptionState.CANCELLED):
+                    # Active past period_end → lapsed
+                    # Cancelled past period_end → lapsed (grace period over)
+                    rec.state = SubscriptionState.LAPSED
+                elif rec.state == SubscriptionState.BILLING_RETRY:
+                    # Billing retry past grace window → lapsed
+                    grace_end = rec.period_end + timedelta(days=self._billing_retry_grace_days)
+                    if self._now >= grace_end:
+                        rec.state = SubscriptionState.LAPSED
+            # NOTE: CANCELLED before period_end keeps current state (access continues)
 
         cost_stop = None
         if rec.tier == SubscriptionTier.UNLIMITED:
