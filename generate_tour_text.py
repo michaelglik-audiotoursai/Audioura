@@ -6451,8 +6451,10 @@ Requirements:
                         _storied_directions = generate_walking_directions(poi_name, next_poi['name'], location, api_key)
                         if _storied_directions:
                             directions = _storied_directions
-                    except (ImportError, Exception):
-                        pass
+                    except ImportError as _dir_imp_err:
+                        _import_logger.error(f"[LOCAL-146] MISSING: directions_generator (generate_walking_directions) — walking directions DISABLED: {_dir_imp_err}")
+                    except Exception as _dir_err:
+                        _import_logger.error(f"[LOCAL-146] directions_generator.generate_walking_directions FAILED: {type(_dir_err).__name__}: {_dir_err}")
                 if directions and directions.strip():
                     _transition = directions.strip()
                 else:
