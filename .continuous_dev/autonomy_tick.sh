@@ -57,6 +57,12 @@ fi
 # test tours becoming visible, which happened 2026-08-01 with row count UP.
 "$CD/check_user_visible.sh"
 
+# --- Reap orphaned kiro processes; quarantine tasks that keep dying. ---
+# Added 2026-08-01: LOCAL-112/113 each died twice with no log, swap at 91%,
+# and every death leaked an orphaned kiro-cli. The liveness check kept
+# re-dispatching them into the same wall.
+"$CD/reap_orphans.sh"
+
 # --- Dispatch any unclaimed task files. ---
 # The dispatcher is idempotent: already-claimed files are skipped, and
 # MAX_CONCURRENT bounds the worker count. Safe to run every 5 minutes.

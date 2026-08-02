@@ -692,3 +692,38 @@ callable" in a submission as a red flag rather than a status.
 
 `FEATURE_PLAYBOOK.md` §5 already says "guard the seams, not just the parts".
 This is the evidence for it, and the count is now five.
+
+---
+
+## D32 — LOCAL-112's deaths were the machine, not the task
+
+LOCAL-112 died four times with **no log file written at any attempt** and
+was quarantined by the guard added this session. The task was a one-line
+Blueprint registration — nothing about it should be fragile.
+
+The cause is resource exhaustion on this Mac:
+
+```
+swap        2783 MB used of 3072 MB   (91%)
+docker      87 images, 5.86 GB
+build       DeadlineExceeded: context deadline exceeded
+```
+
+LEAD hit the same wall trying to verify the change: building the
+tourquality orchestrator timed out. Any task needing a container build is
+liable to die the same way, silently, before it can log.
+
+Three consequences:
+
+1. **The quarantine guard was right to fire**, and for a reason that has
+   nothing to do with the task's content. A task can be perfectly specified
+   and still be unrunnable on the host.
+2. **`worker_died` with no log should be read as environmental until proven
+   otherwise.** Re-dispatching such a task is what created the retry spiral.
+3. **LEAD applied the change by hand** and was explicit about the boundary:
+   the file parses and the registration is present; no live HTTP call was
+   made. That distinction is the whole point of the live-artifact gate, and
+   it applies to LEAD as much as to any task.
+
+Michael should know the Mac Mini is near its limit with Docker plus
+concurrent Kiro workers. `MAX_CONCURRENT=3` may be one too many for builds.
