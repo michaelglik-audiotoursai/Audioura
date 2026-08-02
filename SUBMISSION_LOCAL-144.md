@@ -4,138 +4,86 @@
 **Agent:** Mac Mini Kiro  
 **Branch:** kiro/local144-seam-audit  
 **Base:** storied  
-**Commit:** 455edf1
+**Commit:** 53a0244
 
 ---
 
-## Changes
+## Changes (round 2)
 
 | File | Change |
 |------|--------|
-| `UNREACHED_CODE_AUDIT.md` | +288 lines — full audit report |
+| `UNREACHED_CODE_AUDIT.md` | Revised — three categories, import-verified swallowed-exception table, corrected rankings |
 
 ---
 
-## Method
+## What changed from round 1
 
-Entry-point-rooted call graph traversal from all 19 services in `docker-compose-master.yml`, verified against running containers (`docker ps`). All four carriers searched:
+1. **Added Category B ("works today, fails silently tomorrow").** Practical facts QA gate and walking directions moved here with import evidence showing they currently work. They are not broken — their failure alarm is disconnected.
 
-1. **Module nobody imports:** `grep -rn "from <module>\|import <module>" *.py tests/*.py` for ~40 candidate modules
-2. **Function imported but never called:** Traced import chains from each entry point through transitive dependencies
-3. **Swallowed exceptions:** `grep` for `except.*pass` combined with context around `import` and `register` statements. Found 6 HIGH-risk, 3 MEDIUM-risk silent-pass patterns in production code.
-4. **Blueprint/handler defined but never registered:** `grep -rn "Blueprint(" *.py` + `grep -rn "register_blueprint" *.py`. All defined Blueprints are registered. No orphan handlers found.
+2. **Re-ranked by real user impact.** Category A (wired-wrong) is ranked by features that are dead RIGHT NOW:
+   - Rank 1: Tour editing (confirmed dead, app calls non-existent backend)
+   - Rank 2: Subscription credential pipeline (3 modules, zero deployment)
+   - Rank 3: Newsletter processor (old compose only)
+   - Rank 4: Translation ZIP validation (corrupt ZIPs silently pass — runtime, not import)
 
----
+3. **Full swallowed-exception table with import verification.** Every `except...: pass` around an import or registration, each tested with an actual `python3 -c "from X import Y"`. 11 locations tested. Results:
+   - 10 IMPORTS-OK (features currently work)
+   - 1 IMPORTS-FAIL (`browser_automation` — no selenium on host; irrelevant, module not reachable from any running service)
 
-## Key Findings
+4. **Fixed duplicated dead-code row** (`poi_inclusion_exceptions_raw.py` appeared twice).
 
-### All 6 D31 instances: FIXED
-Every prior known failure has production callers verified.
-
-### 10 new wired-wrong findings (ranked):
-1. **Tour editing** — entire feature not running (not in master compose, no container)
-2. **Practical facts QA gate** — silently disabled via `except ImportError: pass`
-3. **Walking directions** — `except (ImportError, Exception): pass` hides all failures
-4. **Voice NLP service** — Dockerfile exists, never deployed
-5. **Subscription credential pipeline** — 3 modules, zero deployment
-6. **GCP auth token** — bare `except: pass` hides auth failures
-7. **Tour hook generation** — zero imports anywhere
-8. **Translation ZIP validation** — corrupt ZIPs silently pass
-9. **Newsletter processor** — in old compose only, not in master
-10. **Error evidence/verification tier** — silently lost via except pass
-
-### 18+ genuinely dead modules (safe to delete)
-`*_raw.py` variants, multiple `tour_editing_phase2_*.py` copies, prototype servers.
+5. **Corrected voice_nlp_service and tour_hook_generator.** Both moved to dead code — their features are provided by other modules (`voice_control/app.py` and inline prolog generation respectively). Original report overstated impact.
 
 ---
 
 ## Evidence
 
-### Carrier 1 — Module nobody imports:
+### Import verification (ran on host)
 ```
-$ grep -rn "from tour_hook_generator\|import tour_hook_generator" *.py tests/*.py
-(zero results)
-
-$ grep -rn "from subscription_credentials_service\|import subscription_credentials_service" *.py tests/*.py
-(zero results)
-
-$ grep -rn "from voice_nlp_service\|import voice_nlp_service" *.py tests/*.py
-(zero results)
-```
-
-### Carrier 3 — Swallowed exception:
-```
-generate_tour_text.py:6449:
-    try:
-        from directions_generator import generate_walking_directions
-        ...
-    except (ImportError, Exception):
-        pass
-
-content_qa_runner.py:760:
-    try:
-        from practical_facts_gate import extract_practical_claims as _extract_pf
-        ...
-    except ImportError:
-        pass
-
-tour_generation_modernized.py:40:
-    try:
-        ...
-        resp = requests.get(f"http://metadata.google.internal/...")
-    except:
-        pass
+practical_facts_gate           IMPORTS OK   extract_practical_claims: True
+directions_generator           IMPORTS OK   generate_walking_directions: True
+content_qa_runner              IMPORTS OK
+generate_tour_text._LAST_CLEAN_FAIL_EVIDENCE  IMPORTS OK
+generate_tour_text._LAST_VERIFICATION_TIER    IMPORTS OK
+generate_tour_text._LAST_POI_LIST             IMPORTS OK
+cost_meter                     IMPORTS OK   record_operation: True
+sharing_endpoints              IMPORTS OK   sharing_bp: True
+referral_endpoints             IMPORTS OK   referral_bp: True
+persona_endpoints              IMPORTS OK   persona_bp: True
+deeplink_resolution_endpoint   IMPORTS OK   deeplink_bp: True
+swipe_preference_service       IMPORTS OK   register_preference_routes: True
+browser_automation             IMPORTS FAIL  ModuleNotFoundError: No module named 'selenium'
 ```
 
-### Carrier 4 — All Blueprints registered:
+### Tour editing NOT in master compose
 ```
-$ grep -rn "Blueprint(" *.py
-sharing_endpoints.py:23:sharing_bp = Blueprint('sharing', __name__)
-referral_endpoints.py:30:referral_bp = Blueprint('referral', __name__)
-persona_endpoints.py:20:persona_bp = Blueprint('persona', __name__)
-deeplink_resolution_endpoint.py:17:deeplink_bp = Blueprint('deeplink', __name__)
+$ grep -i "tour.edit\|5020\|5022" docker-compose-master.yml
+(no output — zero matches)
 
-$ grep -rn "register_blueprint" *.py
-generate_tour_text_service.py:59:app.register_blueprint(sharing_bp)
-generate_tour_text_service.py:63:app.register_blueprint(referral_bp)
-generate_tour_text_service.py:67:app.register_blueprint(persona_bp)
-tour_id_resolution_service.py:29:app.register_blueprint(deeplink_bp)
+$ grep -i "tour.edit\|5020\|5022" docker-compose.yml
+  tour-editing:
+    container_name: tour-editing-1
+      - "5020:5020"
+    command: python tour_editing_simple.py
+  tour-editing-phase2:
+    container_name: tour-editing-phase2-1
+      - "5022:5022"
+    command: python tour_editing_phase2.py
 ```
-All matched — no orphan Blueprints.
 
-### Docker ps (verifying what runs):
+### Mobile app calls port 5022
 ```
-$ docker ps --format "{{.Names}}" | sort
-audioura-coordinates-fromai-1
-audioura-map-delivery-1
-audioura-polly-tts-1-1
-audioura-tour-generation-modernized-1-1
-audioura-tour-generator-1
-audioura-tour-id-resolution-1
-audioura-tour-orchestrator-1
-audioura-tour-processor-1
-audioura-tour-update-1
-audioura-translation-service-1
-audioura-treats-1
-audioura-user-api-2-1
-audioura-voice-control-1
-background-article-processor-1
-development-postgres-2-1
-news-generator-1
-news-orchestrator-1
-news-processor-1
-newsletter-link-extractor-1
-simple-news-search-1
+audio_tour_app/lib/config/endpoints.dart:30:    Service.tourEditing: 5022,
+audio_tour_app/lib/screens/edit_stop_screen.dart:9:import '../services/tour_editing_service.dart';
+audio_tour_app/lib/screens/edit_tour_screen.dart:8:import '../services/tour_editing_service.dart';
 ```
-No tour-editing, newsletter-processor, or voice-nlp containers.
 
 ---
 
 ## Limitations
 
-1. Cloud Run deployments (`tour_worker_service.py`, `Dockerfile.cloudrun`) not auditable from Docker host
-2. Dynamic dispatch (`importlib`, `getattr`) not observed but cannot be ruled out
-3. Flutter/Dart mobile dead code not audited
-4. Conditional `try/except` imports classified as "wired-wrong" rather than strictly "unreachable" — they DO execute in the happy path
-5. Inter-service HTTP call targets not exhaustively validated (only tour-editing confirmed dead)
-6. The old `docker-compose.yml` defines services the master compose omits — if anyone runs the old compose, those services come alive
+- Imports tested on host Python 3.9, not inside containers. A module that loads on the host may fail in a container with different deps.
+- Cloud Run paths not audited.
+- Flutter/Dart dead code not audited beyond backend-calling confirmation.
+- "IMPORTS-OK" confirms the module loads — not that the code executes correctly at runtime.
+- Dynamic dispatch (`getattr`, `importlib`) would be invisible to this method.
