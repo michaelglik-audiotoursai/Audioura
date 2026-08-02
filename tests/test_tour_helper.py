@@ -7,6 +7,10 @@ flagged with is_test=TRUE and never appear in the user-facing tours-near
 endpoint. Cleanup removes ONLY the specific IDs created by this helper
 instance — never by name pattern, date range, or "everything above id N".
 
+LOCAL-139: This class is retained for backward compatibility. New code
+should use TestTourFactory from test_tour_factory.py instead, which has
+no is_test parameter at all (structural safety).
+
 Usage:
     from tests.test_tour_helper import TestTourHelper
 
