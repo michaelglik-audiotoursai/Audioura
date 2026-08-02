@@ -577,6 +577,40 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         print(f"Traceback: {traceback.format_exc()}")
         return False
 
+
+def link_stop_metrics_to_tour(tour_id, job_id):
+    """LOCAL-128: Set tour_id on stop_metrics rows that were written before the tour existed.
+
+    The evaluator in generate_tour_text_service writes stop_metrics with job_id
+    but cannot set tour_id (the tour row doesn't exist yet). After store_audio_tour
+    creates the tour row, this function backfills the link.
+
+    Returns the number of rows updated, or -1 on error.
+    """
+    import psycopg2
+    try:
+        conn = psycopg2.connect(
+            host=os.getenv('DB_HOST', 'postgres-2'),
+            database=os.getenv('DB_NAME', 'audiotours'),
+            user=os.getenv('DB_USER', 'admin'),
+            password=os.getenv('DB_PASSWORD', 'password123'),
+            port=os.getenv('DB_PORT', '5432')
+        )
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE stop_metrics SET tour_id = %s WHERE job_id = %s AND tour_id IS NULL",
+            (tour_id, job_id)
+        )
+        updated = cur.rowcount
+        conn.commit()
+        cur.close()
+        conn.close()
+        return updated
+    except Exception as e:
+        print(f"[LOCAL-128] link_stop_metrics_to_tour failed: {e}")
+        return -1
+
+
 def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=None, request_string=None, language='en', persona=None, is_test=None):
     """Orchestrate the complete tour generation pipeline asynchronously."""
     print(f"\n==== ORCHESTRATE_TOUR_ASYNC STARTED: {datetime.now().isoformat()} ====")
@@ -914,6 +948,20 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                 conn.close()
             except Exception as db_error:
                 print(f"Warning: Could not get tour ID from database: {db_error}")
+
+            # LOCAL-128: Link stop_metrics to this tour via tour_id.
+            # The text generator wrote stop_metrics with job_id = job_id_1
+            # but could not set tour_id (the tour didn't exist yet).
+            # Now that store_audio_tour has created the row, backfill it.
+            if english_tour_id and job_id_1:
+                _sm_updated = link_stop_metrics_to_tour(english_tour_id, job_id_1)
+                if _sm_updated > 0:
+                    print(f"[LOCAL-128] Linked {_sm_updated} stop_metrics rows to tour_id={english_tour_id} (job_id={job_id_1})")
+                elif _sm_updated == 0:
+                    print(f"[LOCAL-128] No stop_metrics rows found for job_id={job_id_1} (i-con may not have run)")
+                else:
+                    print(f"[LOCAL-128] stop_metrics tour_id update failed (non-fatal)")
+
             if language != 'en':
                 pass  # translation block below handles non-English
             
