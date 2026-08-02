@@ -92,6 +92,10 @@ class PaymentProviderTestSuite:
             self.test_webhook_idempotency,
             self.test_unknown_product,
             self.test_cache_hit_costs_zero,
+            # LOCAL-136: Apple grace period
+            self.test_cancelled_not_expired_has_access,
+            self.test_cancelled_past_period_end_lapsed,
+            self.test_billing_retry_retains_access,
         ]
 
         for test in tests:
@@ -348,6 +352,93 @@ class PaymentProviderTestSuite:
         ent_after = self.provider.get_entitlement(uid)
         assert ent_after.credit_balance_usd == ent_before.credit_balance_usd, \
             f"Cache hit changed balance: {ent_before.credit_balance_usd} → {ent_after.credit_balance_usd}"
+
+    # ─── LOCAL-136: Apple grace period tests ─────────────────────────────
+
+    def test_cancelled_not_expired_has_access(self):
+        """Cancelled user before period_end retains tier access (Apple grace)."""
+        uid = self._user_id()
+        self.provider.purchase_subscription(uid, "com.audioura.ppu_monthly")
+
+        # Cancel via webhook
+        if hasattr(self.provider, '_users'):
+            payload = {"event_type": "cancellation", "user_id": uid}
+        else:
+            payload = {
+                "event": {
+                    "id": f"evt_{uuid.uuid4().hex[:16]}",
+                    "type": "CANCELLATION",
+                    "app_user_id": uid,
+                    "product_id": "com.audioura.ppu_monthly",
+                }
+            }
+        self.provider.handle_webhook(payload)
+
+        # User is cancelled but period_end is 30 days in future → still has tier
+        ent = self.provider.get_entitlement(uid)
+        assert ent.tier == SubscriptionTier.PPU, \
+            f"Expected PPU tier retained, got {ent.tier}"
+        assert ent.state == SubscriptionState.CANCELLED, \
+            f"Expected CANCELLED state, got {ent.state}"
+        # Balance should still be accessible
+        assert ent.credit_balance_usd is not None, \
+            "PPU balance should be visible for cancelled-not-expired user"
+
+    def test_cancelled_past_period_end_lapsed(self):
+        """Cancelled user at/past period_end → LAPSED (no access)."""
+        uid = self._user_id()
+        self.provider.purchase_subscription(uid, "com.audioura.ppu_monthly")
+
+        # Cancel
+        if hasattr(self.provider, '_users'):
+            payload = {"event_type": "cancellation", "user_id": uid}
+            self.provider.handle_webhook(payload)
+            # Advance past period_end
+            ent = self.provider.get_entitlement(uid)
+            self.provider.set_time(ent.period_end)
+        else:
+            # For real provider, directly set state in DB with expired period_end
+            import psycopg2
+            from datetime import timezone
+            conn = psycopg2.connect(self.provider._db_url_override or "")
+            now = datetime.now(timezone.utc)
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE subscriptions SET state = 'cancelled',
+                        period_end = %s, updated_at = %s
+                    WHERE user_id = %s
+                """, (now - timedelta(seconds=1), now, uid))
+            conn.commit()
+            conn.close()
+
+        ent = self.provider.get_entitlement(uid)
+        assert ent.state == SubscriptionState.LAPSED, \
+            f"Expected LAPSED for cancelled-past-period_end, got {ent.state}"
+
+    def test_billing_retry_retains_access(self):
+        """Billing retry state retains access (Apple retries payment)."""
+        uid = self._user_id()
+        self.provider.purchase_subscription(uid, "com.audioura.ppu_monthly")
+
+        # Trigger billing retry
+        if hasattr(self.provider, '_users'):
+            payload = {"event_type": "billing_retry", "user_id": uid}
+        else:
+            payload = {
+                "event": {
+                    "id": f"evt_{uuid.uuid4().hex[:16]}",
+                    "type": "BILLING_ISSUE",
+                    "app_user_id": uid,
+                    "product_id": "com.audioura.ppu_monthly",
+                }
+            }
+        self.provider.handle_webhook(payload)
+
+        ent = self.provider.get_entitlement(uid)
+        assert ent.tier == SubscriptionTier.PPU, \
+            f"Expected PPU tier during billing retry, got {ent.tier}"
+        assert ent.state == SubscriptionState.BILLING_RETRY, \
+            f"Expected BILLING_RETRY state, got {ent.state}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

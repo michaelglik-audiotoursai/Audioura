@@ -165,10 +165,23 @@ class RevenueCatPaymentProvider(PaymentProvider):
                     period_end_aware = period_end.replace(tzinfo=timezone.utc)
                 else:
                     period_end_aware = period_end
-                if now_check > period_end_aware:
+                if now_check >= period_end_aware:
                     if state == SubscriptionState.ACTIVE:
                         state = SubscriptionState.LAPSED
                         self._update_state(user_id, state)
+                    elif state == SubscriptionState.CANCELLED:
+                        # Cancelled and period expired → lapsed (grace period over)
+                        state = SubscriptionState.LAPSED
+                        self._update_state(user_id, state)
+                    elif state == SubscriptionState.BILLING_RETRY:
+                        # Billing retry: Apple grants ~16 days past period_end
+                        grace_days = int(os.environ.get(
+                            "BILLING_RETRY_GRACE_DAYS", "16"))
+                        grace_end = period_end_aware + timedelta(days=grace_days)
+                        if now_check >= grace_end:
+                            state = SubscriptionState.LAPSED
+                            self._update_state(user_id, state)
+                # NOTE: CANCELLED before period_end → access continues (paid through period_end)
 
             cost_stop = None
             if tier == SubscriptionTier.UNLIMITED:

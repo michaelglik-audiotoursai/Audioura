@@ -130,9 +130,21 @@ def get_user_plan(user_id):
 
 
 def _get_subscription_tier(user_id):
-    """Get the user's active subscription tier from the subscriptions table.
-    Returns tier string ('ppu' or 'unlimited') or None if no active subscription.
-    Raises on DB connection errors.
+    """Get the user's subscription tier if they currently have access.
+
+    Access-granting states:
+      - 'active': normal paid subscription.
+      - 'billing_retry': payment failed but within Apple's grace window
+        (typically 16 days). Access continues while Apple retries.
+      - 'cancelled': user cancelled auto-renew but has paid through period_end.
+        Apple keeps the entitlement alive until period_end — cutting off early
+        takes money for service not delivered.
+
+    For 'cancelled', access is granted ONLY when period_end is still in the
+    future. At or past period_end the row is treated as expired (returns None).
+
+    Returns tier string ('ppu' or 'unlimited') or None if no current access.
+    Raises on DB connection errors (caller fails closed).
     """
     try:
         conn = _get_conn()
@@ -142,9 +154,23 @@ def _get_subscription_tier(user_id):
 
     try:
         cur = conn.cursor()
+        # First: check straightforward active/billing_retry states
         cur.execute("""
             SELECT tier FROM subscriptions
             WHERE user_id = %s AND state IN ('active', 'billing_retry')
+            ORDER BY created_at DESC
+            LIMIT 1
+        """, (user_id,))
+        row = cur.fetchone()
+        if row:
+            cur.close()
+            conn.close()
+            return row[0]
+
+        # Second: check cancelled-but-not-yet-expired (Apple grace period to period_end)
+        cur.execute("""
+            SELECT tier FROM subscriptions
+            WHERE user_id = %s AND state = 'cancelled' AND period_end > NOW()
             ORDER BY created_at DESC
             LIMIT 1
         """, (user_id,))
