@@ -247,3 +247,17 @@ This bit twice: `UNWIRED_AUDIT.md` overstated severity partly by assuming an
 app caller existed, and the audit correcting it then understated the app by
 reading only `storied`.
 
+---
+
+## Where to look for what (added 2026-08-02)
+
+Two status documents exist and they cover different questions:
+
+- **This briefing** — what happened, what is broken, what needs you. Governs
+  on everything except billing.
+- **`SUBSCRIBED_STATUS.md`** (on the `subscribed` branch) — how the billing
+  system works, the cost table, the tier-switch matrix, and the ship
+  checklist. **`SUBSCRIBED_STATUS.md` governs on billing topics.**
+
+If the two ever disagree, that split decides which one is right.
+
