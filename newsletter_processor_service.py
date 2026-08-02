@@ -35,6 +35,13 @@ NEWS_ORCHESTRATOR_URL = os.getenv('NEWS_ORCHESTRATOR_URL', 'http://news-orchestr
 # (gateway strips X-Internal-Service from client requests, so this can't be spoofed)
 INTERNAL_SERVICE_SECRET = os.getenv('INTERNAL_SERVICE_SECRET', '')
 
+# CREDENTIAL GATE (D14 — fail closed)
+# Credential endpoints (/key_exchange, /submit_credentials) are DISABLED unless
+# at-rest encryption is explicitly enabled. This prevents plaintext credential
+# storage. Set CREDENTIAL_ENCRYPTION_ENABLED=true only after KMS envelope
+# encryption (credential_encryption.py) is provisioned and verified.
+CREDENTIAL_ENDPOINTS_ENABLED = os.getenv('CREDENTIAL_ENCRYPTION_ENABLED', '').lower() == 'true'
+
 # OIDC token cache for authenticated inter-service calls on Cloud Run
 _oidc_token_cache = {}
 
@@ -2370,6 +2377,11 @@ def process_newsletter():
 @app.route('/key_exchange', methods=['POST'])
 def key_exchange():
     """DH key exchange Stage 2: receive client public key, compute shared secret, store AES key."""
+    if not CREDENTIAL_ENDPOINTS_ENABLED:
+        return jsonify({
+            "status": "error",
+            "message": "Credential endpoints are disabled. At-rest encryption is not configured."
+        }), 503
     try:
         data = request.get_json()
         device_id = data.get('device_id')
@@ -2425,6 +2437,11 @@ def key_exchange():
 @app.route('/submit_credentials', methods=['POST'])
 def submit_credentials():
     """Submit encrypted credentials using mobile public key for DH decryption"""
+    if not CREDENTIAL_ENDPOINTS_ENABLED:
+        return jsonify({
+            "status": "error",
+            "message": "Credential endpoints are disabled. At-rest encryption is not configured."
+        }), 503
     try:
         data = request.get_json()
         

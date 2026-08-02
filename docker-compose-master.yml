@@ -170,6 +170,9 @@ services:
       retries: 3
 
   # Newsletter Processor (browser-based article extraction, Spotify/Apple Podcasts, port 5017)
+  # NOTE: Credential endpoints (/key_exchange, /submit_credentials) are DISABLED by default.
+  # They require CREDENTIAL_ENCRYPTION_ENABLED=true, which must not be set until
+  # KMS at-rest encryption (credential_encryption.py) is provisioned. See D14.
   newsletter-processor:
     image: audioura-tour-generator:latest
     container_name: newsletter-processor-1
