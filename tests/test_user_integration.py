@@ -1,10 +1,22 @@
 #!/usr/bin/env python3
 """
 Test script for user tracking integration
+
+LOCAL-141: Migrated to TestTourFactory.adopt_and_ensure_flagged() — the flag
+is set structurally after HTTP creation, regardless of Docker env vars.
 """
+import os
+import sys
 import requests
 import json
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from test_tour_factory import TestTourFactory
+from db_connection import get_connection
+
+# Factory instance — adopt tours created via HTTP so is_test=TRUE is structural
+_factory = TestTourFactory(auto_cleanup=True)
 
 def test_user_integration():
     print("Testing User Tracking Integration")
@@ -57,6 +69,26 @@ def test_user_integration():
             status = status_response.json()
             print(f"   Status: {status['status']}")
             print(f"   Progress: {status['progress']}")
+            
+            # LOCAL-141: Adopt the tour if completed
+            tour_id = status.get('final_tour_id')
+            if tour_id:
+                _factory.adopt_and_ensure_flagged(tour_id)
+                print(f"   ✅ Tour {tour_id} adopted and flagged is_test=TRUE")
+            elif status['status'] == 'completed':
+                # Try to find by name
+                conn = get_connection()
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT id FROM audio_tours WHERE tour_name ILIKE %s ORDER BY id DESC LIMIT 1",
+                    ('%Boston Common%',)
+                )
+                row = cur.fetchone()
+                cur.close()
+                conn.close()
+                if row:
+                    _factory.adopt_and_ensure_flagged(row[0])
+                    print(f"   ✅ Tour {row[0]} found by name and flagged is_test=TRUE")
         
     else:
         print(f"   Error: {response.status_code} - {response.text}")

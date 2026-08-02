@@ -1,10 +1,22 @@
 #!/usr/bin/env python3
 """
 Test script to verify user tracking integration is working
+
+LOCAL-141: Migrated to TestTourFactory.adopt_and_ensure_flagged() — the flag
+is set structurally after HTTP creation, regardless of Docker env vars.
 """
+import os
+import sys
 import requests
 import json
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from test_tour_factory import TestTourFactory
+from db_connection import get_connection
+
+# Factory instance — adopt tours created via HTTP so is_test=TRUE is structural
+_factory = TestTourFactory(auto_cleanup=True)
 
 API_BASE_URL = 'http://192.168.0.217:5002'
 USER_API_URL = 'http://192.168.0.217:5003'
@@ -57,6 +69,25 @@ def test_user_tracking_integration():
                     print(f"SUCCESS: User ID tracked: {status_data['user_id']}")
                 else:
                     print("WARNING: User ID not found in job status")
+                
+                # LOCAL-141: Adopt the tour if completed
+                tour_id = status_data.get('final_tour_id')
+                if tour_id:
+                    _factory.adopt_and_ensure_flagged(tour_id)
+                    print(f"SUCCESS: Tour {tour_id} adopted and flagged is_test=TRUE")
+                elif status_data['status'] == 'completed':
+                    conn = get_connection()
+                    cur = conn.cursor()
+                    cur.execute(
+                        "SELECT id FROM audio_tours WHERE tour_name ILIKE %s ORDER BY id DESC LIMIT 1",
+                        ('%Test Museum%',)
+                    )
+                    row = cur.fetchone()
+                    cur.close()
+                    conn.close()
+                    if row:
+                        _factory.adopt_and_ensure_flagged(row[0])
+                        print(f"SUCCESS: Tour {row[0]} found by name and flagged is_test=TRUE")
             else:
                 print(f"ERROR: Failed to get job status: {status_response.text}")
         else:

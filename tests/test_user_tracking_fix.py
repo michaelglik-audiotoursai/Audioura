@@ -1,9 +1,21 @@
 #!/usr/bin/env python3
 """
 Test the user tracking fix
+
+LOCAL-141: Migrated to TestTourFactory.adopt_and_ensure_flagged() — the flag
+is set structurally after HTTP creation, regardless of Docker env vars.
 """
+import os
+import sys
 import requests
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from test_tour_factory import TestTourFactory
+from db_connection import get_connection
+
+# Factory instance — adopt tours created via HTTP so is_test=TRUE is structural
+_factory = TestTourFactory(auto_cleanup=True)
 
 def test_tracking_fix():
     print("Testing User Tracking Fix")
@@ -36,6 +48,32 @@ def test_tracking_fix():
         # Wait a bit for processing
         print("2. Waiting for processing...")
         time.sleep(10)
+        
+        # LOCAL-141: Poll for tour_id and adopt it
+        try:
+            sr = requests.get(f'http://192.168.0.217:5002/status/{job_id}', timeout=10)
+            if sr.status_code == 200:
+                sd = sr.json()
+                tour_id = sd.get('final_tour_id')
+                if tour_id:
+                    _factory.adopt_and_ensure_flagged(tour_id)
+                    print(f"   ✅ Tour {tour_id} adopted and flagged is_test=TRUE")
+                elif sd.get('status') == 'completed':
+                    # Try to find by name
+                    conn = get_connection()
+                    cur = conn.cursor()
+                    cur.execute(
+                        "SELECT id FROM audio_tours WHERE tour_name ILIKE %s ORDER BY id DESC LIMIT 1",
+                        ('%Test Museum Boston%',)
+                    )
+                    row = cur.fetchone()
+                    cur.close()
+                    conn.close()
+                    if row:
+                        _factory.adopt_and_ensure_flagged(row[0])
+                        print(f"   ✅ Tour {row[0]} found by name and flagged is_test=TRUE")
+        except Exception as e:
+            print(f"   ⚠️ Could not adopt tour (will be caught by guard): {e}")
         
         # Check user data
         print("3. Checking user tracking...")

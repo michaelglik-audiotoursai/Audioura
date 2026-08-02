@@ -2,11 +2,23 @@
 """
 Test Tour Content Storage and Translation
 Verify that the enhanced system works correctly
+
+LOCAL-141: Migrated to TestTourFactory.adopt_and_ensure_flagged() — the flag
+is set structurally after HTTP creation, regardless of Docker env vars.
 """
 
 import requests
 import json
 import time
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from test_tour_factory import TestTourFactory
+from db_connection import get_connection
+
+# Factory instance — adopt tours created via HTTP so is_test=TRUE is structural
+_factory = TestTourFactory(auto_cleanup=True)
 
 def test_tour_generation_with_content():
     """Test that new tours store content properly"""
@@ -38,12 +50,45 @@ def test_tour_generation_with_content():
             job_id = job_data["job_id"]
             print(f"✅ Tour generation started: {job_id}")
             
-            # Wait for completion (simplified for testing)
+            # LOCAL-141: Poll for completion and adopt the tour
             print("⏳ Waiting for tour generation to complete...")
-            print("Note: This is a test of the enhanced system. In practice, you would:")
-            print("1. Poll the status endpoint until completion")
-            print("2. Verify the tour has stored content in the database")
-            print("3. Test translation functionality")
+            deadline = time.time() + 180
+            tour_id = None
+            while time.time() < deadline:
+                try:
+                    sr = requests.get(f"http://localhost:5002/status/{job_id}", timeout=10)
+                    if sr.status_code == 200:
+                        sd = sr.json()
+                        if sd.get('status') == 'completed':
+                            tour_id = sd.get('final_tour_id')
+                            break
+                        elif sd.get('status') in ('error', 'failed'):
+                            print(f"❌ Tour generation failed: {sd.get('error')}")
+                            return None
+                except Exception:
+                    pass
+                time.sleep(5)
+
+            if tour_id:
+                _factory.adopt_and_ensure_flagged(tour_id)
+                print(f"✅ Tour {tour_id} adopted and flagged is_test=TRUE")
+            else:
+                # If we couldn't get the tour_id, try to find it by name
+                conn = get_connection()
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT id FROM audio_tours WHERE tour_name ILIKE %s ORDER BY id DESC LIMIT 1",
+                    ('%Test Location for Translation%',)
+                )
+                row = cur.fetchone()
+                cur.close()
+                conn.close()
+                if row:
+                    tour_id = row[0]
+                    _factory.adopt_and_ensure_flagged(tour_id)
+                    print(f"✅ Tour {tour_id} found by name and flagged is_test=TRUE")
+                else:
+                    print("⚠️ Could not find tour to adopt — may not have completed")
             
             return job_id
         else:
