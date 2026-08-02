@@ -283,15 +283,33 @@ class TranslationService:
             logging.info(f"Split tour content into {len(tour_stops)} stops")
             
             # Translate each stop, then restore English metadata labels
+            # [LOCAL-142] Single-pass optimization: strip nav fields from the raw
+            # translation instead of translating a pre-stripped version separately.
+            # This eliminates N translate_text calls per tour (one per stop).
             translated_stops = []
-            tts_texts = []  # nav-stripped English text translated separately for audio
+            tts_texts = []
             for i, stop_text in enumerate(tour_stops):
                 try:
-                    translated_stop = self.translate_text(stop_text, target_language)
-                    translated_stop = self._restore_metadata_labels(stop_text, translated_stop, target_language)
+                    raw_translated = self.translate_text(stop_text, target_language)
+
+                    # [LOCAL-142] Try single-pass: strip nav fields positionally from
+                    # the raw translation (before _restore_metadata_labels modifies it).
+                    tts_text = self._strip_nav_fields_from_translated(stop_text, raw_translated)
+                    if tts_text is None:
+                        # Fallback: line counts diverged — use two-pass (costs one extra API call)
+                        logging.warning(
+                            f"[LOCAL-142] Positional strip fallback on stop {i+1}/{len(tour_stops)} "
+                            f"(en_lines={len(stop_text.split(chr(10)))}, "
+                            f"tr_lines={len(raw_translated.split(chr(10)))})"
+                        )
+                        tts_text = self.translate_text(
+                            self._strip_nav_fields_for_tts(stop_text), target_language
+                        )
+
+                    translated_stop = self._restore_metadata_labels(
+                        stop_text, raw_translated, target_language
+                    )
                     translated_stops.append(translated_stop)
-                    # Strip nav fields in English BEFORE translating for TTS
-                    tts_text = self.translate_text(self._strip_nav_fields_for_tts(stop_text), target_language)
                     tts_texts.append(tts_text)
                     logging.info(f"Translated stop {i+1}/{len(tour_stops)}")
                 except Exception as e:
@@ -1217,6 +1235,56 @@ Say 'What are my options' to hear this help again"""
                 continue
             skip_next_blank = False
             clean_lines.append(line)
+        return '\n'.join(clean_lines).strip()
+
+    def _strip_nav_fields_from_translated(self, original_text, translated_text):
+        """Strip nav fields from an already-translated stop using positional template.
+
+        [LOCAL-142] Eliminates the second translation pass by stripping nav fields from
+        the raw translation output rather than translating a pre-stripped English version.
+
+        Approach (positional template):
+          1. Split both English source and translated text into lines.
+          2. In the English source, identify which line indices hold nav fields
+             (and their trailing blank lines).
+          3. If the translated text has the same line count, drop those same indices.
+          4. If line counts diverge (translation merged/split lines), return None
+             to signal the caller to fall back to the two-pass approach.
+
+        Args:
+            original_text: English source text for the stop.
+            translated_text: Raw translation output (BEFORE _restore_metadata_labels).
+
+        Returns:
+            Stripped TTS text (str) on success, or None if fallback is needed.
+        """
+        en_lines = original_text.split('\n')
+        tr_lines = translated_text.split('\n')
+
+        if len(en_lines) != len(tr_lines):
+            return None  # Line count mismatch → caller must fall back
+
+        # Identify indices to drop: nav field lines and their trailing blank line
+        drop_indices = set()
+        skip_next_blank = False
+        for i, line in enumerate(en_lines):
+            stripped = line.strip()
+            is_nav = any(
+                re.match(rf'^{re.escape(prefix)}', stripped, re.IGNORECASE)
+                for prefix in self._NAV_FIELD_PREFIXES
+            )
+            if is_nav:
+                drop_indices.add(i)
+                skip_next_blank = True
+                continue
+            if skip_next_blank and stripped == '':
+                drop_indices.add(i)
+                skip_next_blank = False
+                continue
+            skip_next_blank = False
+
+        # Drop the same indices from the translated text
+        clean_lines = [tr_lines[i] for i in range(len(tr_lines)) if i not in drop_indices]
         return '\n'.join(clean_lines).strip()
 
     def _split_tour_content_into_stops(self, tour_content):
