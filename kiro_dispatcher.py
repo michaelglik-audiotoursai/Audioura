@@ -39,7 +39,11 @@ LOCK_FILE = WATCH_DIR / ".kiro_dispatcher.lock"
 SESSION_LOG_DIR = WATCH_DIR / "kiro_session_logs"
 TASK_FILE_RE = re.compile(r"^new_kiro_session_is_required_(.+)\.md$")
 MAX_RUNTIME_SECONDS = 60 * 60  # kill a runaway headless session after 1 hour
-MAX_CONCURRENT_KIRO_SESSIONS = 3
+# Reduced from 3 to 2 on 2026-08-01. Swap hit 91% (2783MB of 3072MB) with
+# Docker plus three workers; container builds began failing with
+# DeadlineExceeded and LOCAL-112 died four times, silently, before it could
+# write a log. Two workers plus Docker is what this Mac Mini sustains. See D32.
+MAX_CONCURRENT_KIRO_SESSIONS = 2
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
 STATUS_LINE_RE = re.compile(r"^-\s*(\w+)\s*\|\s*task=(\S+)")
 

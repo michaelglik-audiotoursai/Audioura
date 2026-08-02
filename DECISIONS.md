@@ -727,3 +727,46 @@ Three consequences:
 
 Michael should know the Mac Mini is near its limit with Docker plus
 concurrent Kiro workers. `MAX_CONCURRENT=3` may be one too many for builds.
+
+---
+
+## D33 — I bounced LOCAL-117 on a substring match. It was right the first time.
+
+I claimed `news_search_service.py` was the entry point of a running
+container and blocked its deletion. The container runs
+**`simple_news_search_service.py`** — a different, larger file. My check was:
+
+```
+grep -rl "news_search_service.py" Dockerfile* docker-compose*.yml
+```
+
+`news_search_service.py` is a substring of `simple_news_search_service.py`.
+It matched. I read the match as proof and wrote a bounce around it.
+
+Re-checked with word boundaries: no entry-point reference, no importers, no
+running container executes it. Genuinely dead.
+
+**This is the fourth substring failure this week**, and the second of mine:
+
+| Where | What matched wrongly |
+|---|---|
+| LOCAL-95 callback counter | any two title words appearing later |
+| LOCAL-50 collision test | a pair that could not collide |
+| LEAD's materials vocabulary | English-only; missed chlorite, soie, bois |
+| LEAD's entry-point check | a filename inside a longer filename |
+
+**Rule: never match an identifier without a boundary.** `grep -w`, or an
+explicit `(^|[^a-z_])name([^a-z_]|$)`. A bare substring search over names is
+not evidence, and it fails in the direction of false confidence — it finds
+something, so it feels like a result.
+
+The bounce still improved the work, which is worth noting honestly rather
+than claiming the error was harmless. The re-run verifies all fourteen
+symbols against Dockerfile `CMD`, docker-compose `command:` and shell
+scripts **per symbol** instead of one blanket sentence, and amends
+`UNWIRED_AUDIT.md` with the blind spot: a container CMD is not an import,
+and no import graph can see one. That table is more trustworthy than what
+it replaced.
+
+Post-merge verification: all six services 200, download of tour 29 returns
+7,408,370 bytes, Michael's Nice list unchanged.
