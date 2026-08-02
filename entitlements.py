@@ -37,6 +37,8 @@ import psycopg2
 from datetime import datetime, date
 from decimal import Decimal
 
+from payment_provider import BILLING_RETRY_GRACE_DAYS
+
 logger = logging.getLogger(__name__)
 
 
@@ -134,14 +136,16 @@ def _get_subscription_tier(user_id):
 
     Access-granting states:
       - 'active': normal paid subscription.
-      - 'billing_retry': payment failed but within Apple's grace window
-        (typically 16 days). Access continues while Apple retries.
+      - 'billing_retry': payment failed but within Apple's grace window.
+        Access continues for BILLING_RETRY_GRACE_DAYS past period_end.
+        Bounded in this query — does NOT depend on a webhook arriving to lapse.
       - 'cancelled': user cancelled auto-renew but has paid through period_end.
         Apple keeps the entitlement alive until period_end — cutting off early
         takes money for service not delivered.
 
-    For 'cancelled', access is granted ONLY when period_end is still in the
-    future. At or past period_end the row is treated as expired (returns None).
+    Boundaries (both EXCLUSIVE — at the boundary instant, access is DENIED):
+      - cancelled: period_end > NOW()
+      - billing_retry: period_end + grace > NOW()
 
     Returns tier string ('ppu' or 'unlimited') or None if no current access.
     Raises on DB connection errors (caller fails closed).
@@ -154,10 +158,10 @@ def _get_subscription_tier(user_id):
 
     try:
         cur = conn.cursor()
-        # First: check straightforward active/billing_retry states
+        # First: check active — unconditional access
         cur.execute("""
             SELECT tier FROM subscriptions
-            WHERE user_id = %s AND state IN ('active', 'billing_retry')
+            WHERE user_id = %s AND state = 'active'
             ORDER BY created_at DESC
             LIMIT 1
         """, (user_id,))
@@ -167,7 +171,24 @@ def _get_subscription_tier(user_id):
             conn.close()
             return row[0]
 
-        # Second: check cancelled-but-not-yet-expired (Apple grace period to period_end)
+        # Second: check billing_retry — bounded by period_end + grace window.
+        # The gate must not depend on a webhook having arrived to lapse the row.
+        # Boundary: period_end is EXCLUSIVE (matching cancelled behaviour).
+        # At exactly period_end + grace days, access is DENIED.
+        cur.execute("""
+            SELECT tier FROM subscriptions
+            WHERE user_id = %s AND state = 'billing_retry'
+              AND period_end + interval '%s days' > NOW()
+            ORDER BY created_at DESC
+            LIMIT 1
+        """, (user_id, BILLING_RETRY_GRACE_DAYS))
+        row = cur.fetchone()
+        if row:
+            cur.close()
+            conn.close()
+            return row[0]
+
+        # Third: check cancelled-but-not-yet-expired (Apple grace period to period_end)
         cur.execute("""
             SELECT tier FROM subscriptions
             WHERE user_id = %s AND state = 'cancelled' AND period_end > NOW()

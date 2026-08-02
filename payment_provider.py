@@ -18,11 +18,20 @@ Apple constraint (non-negotiable):
 Swapping in RevenueCat later must touch ONE file (the concrete implementation).
 """
 
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Optional, List
+
+
+# ─── Shared constants ────────────────────────────────────────────────────────
+# Apple billing retry grace period — Apple retries for up to 16 days after
+# a failed renewal. Access continues during this window.
+# Source: Apple Developer docs "Billing retry" / "Billing Grace Period" (2024).
+# This is THE single source of truth — providers and the gate both import it.
+BILLING_RETRY_GRACE_DAYS = int(os.environ.get("BILLING_RETRY_GRACE_DAYS", "16"))
 
 
 class SubscriptionTier(str, Enum):

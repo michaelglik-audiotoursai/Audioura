@@ -36,6 +36,7 @@ from payment_provider import (
     SubscriptionTier,
     SubscriptionState,
     WebhookEvent,
+    BILLING_RETRY_GRACE_DAYS,
 )
 
 logger = logging.getLogger(__name__)
@@ -175,8 +176,7 @@ class RevenueCatPaymentProvider(PaymentProvider):
                         self._update_state(user_id, state)
                     elif state == SubscriptionState.BILLING_RETRY:
                         # Billing retry: Apple grants ~16 days past period_end
-                        grace_days = int(os.environ.get(
-                            "BILLING_RETRY_GRACE_DAYS", "16"))
+                        grace_days = BILLING_RETRY_GRACE_DAYS
                         grace_end = period_end_aware + timedelta(days=grace_days)
                         if now_check >= grace_end:
                             state = SubscriptionState.LAPSED

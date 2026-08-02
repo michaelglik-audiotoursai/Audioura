@@ -27,6 +27,7 @@ from payment_provider import (
     SubscriptionTier,
     SubscriptionState,
     WebhookEvent,
+    BILLING_RETRY_GRACE_DAYS,
 )
 
 
@@ -38,10 +39,6 @@ CREDIT_LOW_BALANCE_USD = 2.00
 UNLIMITED_MONTHLY_FEE_USD = 50.00
 UNLIMITED_COST_STOP_FRACTION = 0.5
 CACHE_HIT_COST_USD = 0.00
-# Apple billing retry grace period — Apple retries for up to 16 days after
-# a failed renewal. Access continues during this window.
-# Source: Apple Developer docs "Billing retry" / "Billing Grace Period" (2024).
-BILLING_RETRY_GRACE_DAYS = 16
 
 
 @dataclass
