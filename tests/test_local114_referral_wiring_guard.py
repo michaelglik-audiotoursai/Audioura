@@ -180,23 +180,26 @@ def test_behavioural_guard():
           resp.status_code != 404,
           f"Got {resp.status_code} — blueprint not registered or route unreachable!")
 
-    # Test: POST /referral/redeem should NOT be 404
-    # (Will likely 404 with "code not found" from business logic, but the route itself exists)
-    resp2 = client.post(
-        "/referral/redeem",
-        json={"referral_code": "ZZZTST", "new_user_id": "guard_test_nobody"},
-        headers={"Content-Type": "application/json", "X-API-Key": "test-api-key"},
-    )
-    # Business-logic 404 (referral code not found) is fine — it means the route IS registered.
-    # A Flask-level unregistered route returns a generic HTML 404.
-    route_exists = (
-        resp2.status_code != 404
-        or b"referral" in resp2.data.lower()
-        or b"not found" in resp2.data.lower()
-    )
+    # Test: /referral/redeem route is registered in Flask's url_map.
+    # Previous assertion checked response body for "not found" — but Flask's own
+    # 404 page contains "not found", making the check tautological (LOCAL-134).
+    # Checking the url_map directly is unambiguous: if the adapter matches, the
+    # blueprint registered the route regardless of what business logic returns.
+    from werkzeug.routing import RequestRedirect
+    from werkzeug.exceptions import MethodNotAllowed, NotFound
+    adapter = app.url_map.bind("")
+    try:
+        adapter.match("/referral/redeem", method="POST")
+        redeem_route_registered = True
+    except (RequestRedirect, MethodNotAllowed):
+        # Redirect or wrong-method means the route exists (registered)
+        redeem_route_registered = True
+    except NotFound:
+        # Route genuinely absent from url_map
+        redeem_route_registered = False
     check("POST /referral/redeem route registered (behavioural)",
-          route_exists,
-          f"Got {resp2.status_code} with no referral-related body — route not registered!")
+          redeem_route_registered,
+          "Route /referral/redeem not found in app.url_map — blueprint not registered!")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
