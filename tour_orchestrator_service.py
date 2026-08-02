@@ -1181,48 +1181,6 @@ def get_coordinates_direct(location):
         print(f"Traceback: {traceback.format_exc()}")
         return (0, 0)  # Return 0,0 as fallback
 
-# Direct function to call coordinates-fromai service
-def call_coordinates_service(location):
-    # Get coordinates directly from the coordinates-fromai service
-    import requests
-    import urllib.parse
-    
-    print(f"\n==== DIRECT CALL TO COORDINATES-FROMAI SERVICE ====")
-    print(f"Time: {datetime.now().isoformat()}")
-    print(f"Location: {location}")
-    
-    try:
-        # URL-encode the location
-        encoded_location = urllib.parse.quote(location)
-        
-        # Make the request to the coordinates-fromai service
-        url = f"{COORDINATES_URL}/coordinates/{encoded_location}"
-        print(f"Requesting URL: {url}")
-        
-        _auth = _get_auth_headers(COORDINATES_URL); response = requests.get(url, headers=_auth, timeout=60)
-        
-        print(f"Response status code: {response.status_code}")
-        print(f"Response time: {datetime.now().isoformat()}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            print(f"Response data: {data}")
-            
-            if "coordinates" in data and len(data["coordinates"]) >= 2:
-                lat, lng = data["coordinates"]
-                print(f"Received coordinates: lat={lat}, lng={lng}")
-                return (lat, lng)
-            else:
-                print(f"Invalid response format: {data}")
-        else:
-            print(f"Error response: {response.text}")
-        
-        print(f"No coordinates found for {location}")
-        return None
-    except Exception as e:
-        print(f"Error getting coordinates from coordinates-fromai service: {e}")
-        print(f"Traceback: {traceback.format_exc()}")
-        return None
 
 @app.route('/health', methods=['GET'])
 def health_check():
