@@ -62,6 +62,10 @@ app.register_blueprint(sharing_bp)
 from referral_endpoints import referral_bp
 app.register_blueprint(referral_bp)
 
+# Register persona blueprint (LOCAL-113: POST/GET /user/persona)
+from persona_endpoints import persona_bp
+app.register_blueprint(persona_bp)
+
 # Global variables
 TOURS_DIR = "/app/tours"
 ACTIVE_JOBS = get_job_store('tour-generator')
