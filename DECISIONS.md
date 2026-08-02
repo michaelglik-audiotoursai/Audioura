@@ -1013,3 +1013,53 @@ Related: D35 (inspection is not exercise), D36 (a probe that never applied
 is not evidence), D37 (an assertion that accepts its own failure). This is
 the fourth member — **a result produced by the measurement rather than the
 code.**
+
+---
+
+## D40 — Two safe tasks combined into a live plaintext-credential endpoint (2026-08-02)
+
+**What happened.** In one tick LEAD dispatched LOCAL-147 (restore the
+newsletter processor, which the audit showed was deployed in the old compose
+only) and LOCAL-148 (assess the credential pipeline). Both did exactly what
+they were asked. LOCAL-147 restored `newsletter-processor-1` and verified it.
+LOCAL-148 then discovered that *that same service* hosts
+`/submit_credentials` and `/key_exchange`, and that the endpoint writes
+newspaper usernames and passwords into `user_subscription_credentials` as
+**plaintext** — `decrypted_username`, `decrypted_password`.
+
+LEAD verified on the running system:
+
+```
+POST /submit_credentials -> HTTP 400   (route live; 400 is validation, not 404)
+POST /key_exchange       -> HTTP 400
+columns: decrypted_username, decrypted_password   (no encrypted_* columns)
+rows: 0   (and 0 in dh_server_keys, dh_aes_keys, device_encryption_keys)
+```
+
+Container stopped and removed within the hour. Nothing was ever written, and
+nothing was lost — `/newsletters_v2` returned an empty list because no
+sources are registered, so the service was doing nothing for anyone.
+
+**Neither task was wrong.** Each was correct in isolation. The composition
+was unsafe, and the composition is LEAD's to own: the dispatch created a
+capability neither task was asked to reason about.
+
+**Rules going forward:**
+
+- **Before restoring any dormant service, enumerate what it serves.** "Add
+  it back to the compose file" is not a small change — it is turning on
+  every route in that file. LOCAL-147's task said "work out which service
+  the app talks to" and never asked what *else* the service exposes.
+- **A dormant service is an unreviewed service.** Code that has not run in
+  months has not been read in months. Treat restoring it as introducing new
+  code, because for review purposes it is.
+- **Credential and payment paths fail closed or stay off.** Encryption at
+  rest is a precondition for accepting a secret, not a follow-up ticket.
+
+**Do not encrypt-and-enable as a fix without Michael.** `credential_
+encryption.py` targets a Google Cloud KMS keyring that may not be
+provisioned, and whether Audioura should hold third-party newspaper
+passwords at all is his call, not an implementation detail.
+
+Related: D14 (controls fail closed), D31 (code nobody calls — this is the
+inverse: code everybody suddenly calls again).
