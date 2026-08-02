@@ -1,11 +1,30 @@
 ##### READY FOR REVIEW
 
-# LOCAL-130: Fix the referral abuse guard — permanently red and bypassable
+# LOCAL-130: Fix the referral abuse guard — exercises behaviour, not source
 
 **Branch:** `kiro/local130-fix-abuse-guard`  
+**Commit:** `77a816642cde81d1c49622e45aaeb9c8f2c478d7`  
 **Agent:** Mac Mini Kiro  
 **Date:** 2026-08-02  
-**Commit:** `e17bd99`
+
+---
+
+## Summary
+
+The guard was permanently red (hardcoded row count 88 vs actual 94) and blind
+to disabled controls (substring/AST checks pass when a call exists even behind
+`if False:`). Both defects are fixed:
+
+1. **Hardcoded row count → before/after invariant.** Never asserts an absolute
+   value; records count at start, asserts unchanged at end.
+2. **Source-level inspection → behavioural HTTP tests.** Spins up a host-side
+   Flask instance with the real `referral_endpoints.py` and `referral_engine.py`,
+   pointed at the live Postgres DB. Exercises each control via actual HTTP
+   requests and asserts the correct rejection status code.
+
+The AST checks are retained as a fast first-line defence but are no longer the
+only evidence. A disabled limiter (`if False and _check_rate_limit(...)`) will
+now fail on the HTTP assertion even if the AST still finds a `Call` node.
 
 ---
 
@@ -13,63 +32,36 @@
 
 | File | Lines | What |
 |------|-------|------|
-| `tests/test_local115_referral_abuse_controls_guard.py` | +131 / −49 | Rewrote guard: AST checks + row-count invariant |
+| `tests/test_local115_referral_abuse_controls_guard.py` | +233 −141 | Full rewrite: behavioural tests, dynamic row counts |
 
 ---
 
-## Defects fixed
+## Evidence
 
-### 1. Hardcoded row count (audio_tours == 88)
-
-The table has 94 rows. The test was permanently red regardless of whether
-controls work. Replaced with before/after invariant:
-
-```python
-cur.execute("SELECT COUNT(*) FROM audio_tours")
-audio_tours_before = cur.fetchone()[0]
-# ... test runs ...
-cur.execute("SELECT COUNT(*) FROM audio_tours")
-audio_tours_after = cur.fetchone()[0]
-check("audio_tours row count unchanged across test",
-      audio_tours_after == audio_tours_before,
-      f"audio_tours changed: {audio_tours_before} -> {audio_tours_after}")
-```
-
-### 2. Substring identifier check (`"_check_rate_limit" in source`)
-
-Passed even when all call sites replaced with `if False:`. Now uses AST walk
-to verify `_check_rate_limit()` is **called** inside `@route`-decorated
-functions:
-
-```python
-for node in ast.walk(ep_tree):
-    if isinstance(node, ast.FunctionDef) and node.decorator_list:
-        is_route = any(isinstance(d, ast.Call) and ... d.func.attr == "route" ...)
-        if is_route:
-            for child in ast.walk(node):
-                if (isinstance(child, ast.Call)
-                        and isinstance(child.func, ast.Name)
-                        and child.func.id == "_check_rate_limit"):
-                    rate_limit_calls_in_routes += 1
-```
-
----
-
-## Evidence: Guard exits 0 (baseline)
+### Guard exits 0 with all three controls in place
 
 ```
-PART 1: AST Guard — abuse controls present in referral_endpoints.py
+PART 1: AST Guard — abuse control code structurally present
   PASS: referral_endpoints.py exists
   PASS: referral_engine.py exists
-  PASS: Self-referral guard: equality check in AST (new_user_id == referrer_user_id)
-  PASS: Self-referral: returns 403 with 'self_referral' error
-  PASS: Rate limiter: _check_rate_limit() called in route handlers (AST)
-  PASS: Rate limiter: called in ≥2 route handlers (both create & redeem)
-  PASS: Rate limiter: returns 429 with 'rate_limit_exceeded'
-  PASS: Duplicate redemption: redeem_referral handles 'duplicate' → 409
-  PASS: Engine: catches UniqueViolation and returns 'duplicate'
-PART 2: Live HTTP Guard — abuse controls respond correctly
-  SKIP: Cannot connect to http://localhost:5100
+  PASS: Self-referral: equality check in AST
+  PASS: Rate limiter: _check_rate_limit() called in ≥2 routes
+  PASS: Duplicate redemption: 409 + 'already_redeemed' in redeem_referral
+  PASS: Engine: catches UniqueViolation → 'duplicate'
+
+PART 2: Behavioural Guard — exercise controls via live HTTP
+  PASS: Setup: create referral returns 200
+  PASS: Self-referral returns 403
+  PASS: Self-referral error is 'self_referral'
+  PASS: First redeem returns 200
+  PASS: Duplicate redeem returns 409 (not 500)
+  PASS: Duplicate error is 'already_redeemed'
+  PASS: Rate limit fires within 8 requests (limit=5)
+  PASS: Rate limit error is 'rate_limit_exceeded'
+  PASS: Rate limit includes retry_after_seconds
+  PASS: Legitimate redeem returns 200
+  PASS: Legitimate redeem has redeemed=true
+
 PART 3: Database Guard — UNIQUE constraint + row-count invariant
   PASS: UNIQUE constraint 'uq_referral_redemptions_code_user' exists
   PASS: Constraint covers (referral_code, new_user_id)
@@ -77,101 +69,118 @@ PART 3: Database Guard — UNIQUE constraint + row-count invariant
   INFO: stop_metrics row count = 1002
   PASS: audio_tours row count unchanged across test
   PASS: stop_metrics row count unchanged across test
-Results: 13 PASS, 0 FAIL
+
+Results: 21 PASS, 0 FAIL, 0 SKIP
 ALL ASSERTIONS PASSED — referral abuse controls are working
-EXIT CODE: 0
+EXIT=0
 ```
 
----
+### Break/Restore Cycle 1: Self-referral prevention
 
-## Evidence: Break/restore cycles (3 controls)
-
-### Cycle 1: Self-referral guard
-
-**Break:** `sed 's/if new_user_id == referrer_user_id:/if False:/'`
-
+**BREAK** — `if new_user_id == referrer_user_id:` → `if False:`
 ```
-  FAIL: Self-referral guard: equality check in AST (new_user_id == referrer_user_id)
-        — No live AST comparison of new_user_id == referrer_user_id found
-Results: 12 PASS, 1 FAIL
-EXIT CODE: 1
+  FAIL: Self-referral: equality check in AST — No live AST comparison of new_user_id == referrer_user_id found
+  FAIL: Self-referral returns 403 — Got 200: {"redeemed":true,"referrer_user_id":"guard_self_1785688650482"}
+Results: 18 PASS, 2 FAIL, 0 SKIP
+EXIT=1
 ```
 
-**Restore:** exit 0, 13 PASS.
-
-### Cycle 2: Rate limiter
-
-**Break:** `sed 's/if not _check_rate_limit(rate_key):/if False:/'`
-
+**RESTORE** — reverted:
 ```
-  FAIL: Rate limiter: _check_rate_limit() called in route handlers (AST)
-        — Found 0 calls — expected ≥1 in decorated routes
-  FAIL: Rate limiter: called in ≥2 route handlers (both create & redeem)
-        — Found 0 calls — expected ≥2 (both routes)
-Results: 11 PASS, 2 FAIL
-EXIT CODE: 1
+Results: 21 PASS, 0 FAIL, 0 SKIP
+ALL ASSERTIONS PASSED — referral abuse controls are working
+EXIT=0
 ```
 
-**Restore:** exit 0, 13 PASS.
+### Break/Restore Cycle 2: Duplicate redemption
 
-### Cycle 3: Duplicate redemption guard
-
-**Break:** `sed 's/except.*UniqueViolation.*/except Exception as _never_matches_dummy:/'`
-
+**BREAK** — `return "duplicate"` → `return "ok_fake"` in referral_engine.py
 ```
-  FAIL: Engine: catches UniqueViolation and returns 'duplicate'
-        — Expected except handler with UniqueViolation returning 'duplicate'
-Results: 12 PASS, 1 FAIL
-EXIT CODE: 1
+  FAIL: Engine: catches UniqueViolation → 'duplicate' — Expected except handler with UniqueViolation returning 'duplicate'
+  FAIL: Duplicate redeem returns 409 (not 500) — Got 200: {"redeemed":true,"referrer_user_id":"guard_dup_creator_1785688658432"}
+Results: 18 PASS, 2 FAIL, 0 SKIP
+EXIT=1
 ```
 
-**Restore:** exit 0, 13 PASS.
+**RESTORE** — reverted:
+```
+Results: 21 PASS, 0 FAIL, 0 SKIP
+EXIT=0
+```
 
----
+### Break/Restore Cycle 3: Rate limiting
 
-## Evidence: No hardcoded row counts
+**BREAK** — `if not _check_rate_limit(rate_key):` → `if False and not _check_rate_limit(rate_key):`
+```
+  FAIL: Rate limit fires within 8 requests (limit=5) — All requests returned 200 — rate limiting not active
+Results: 18 PASS, 1 FAIL, 0 SKIP
+EXIT=1
+```
+
+**RESTORE** — reverted:
+```
+Results: 21 PASS, 0 FAIL, 0 SKIP
+ALL ASSERTIONS PASSED — referral abuse controls are working
+EXIT=0
+```
+
+### No hardcoded row counts
 
 ```
 $ grep -n "== 88\|== 94\|== 1002" tests/test_local115_referral_abuse_controls_guard.py
-(none found)
+(no output — NONE FOUND)
 ```
 
----
-
-## Evidence: No substring identifier checks
+### No substring identifier checks
 
 ```
-$ grep -n 'in ep_source\|in eng_source' tests/test_local115_referral_abuse_controls_guard.py
-(none found)
+$ grep -n '"_check_rate_limit" in' tests/test_local115_referral_abuse_controls_guard.py
+(no output — NONE FOUND)
 ```
 
----
-
-## Evidence: Row counts
+### Row counts
 
 ```
 audio_tours row count = 94
 stop_metrics row count = 1002
 ```
 
+### git status --short
+
+```
+(clean — no output)
+```
+
 ---
 
-## Evidence: git status clean
+## Approach: Host-side Flask instead of Docker
 
-```
-$ git status --short
-(empty — working tree clean after commit)
-```
+Docker builds are hung (constraint: no Docker builds). The test starts a
+temporary Flask process on a random free port with:
+- `referral_endpoints.py` loaded directly (the file under test)
+- `referral_engine.py` as its dependency
+- Connected to the existing Postgres on localhost:5433
+- Rate limit set to 5 (lower than prod's 10) for faster test cycles
+
+The launcher script is ephemeral — created at test start, deleted at end,
+never committed. The test is self-contained: `python3 tests/test_local115_referral_abuse_controls_guard.py`.
 
 ---
 
 ## Limitations
 
-1. **Part 2 (Live HTTP) skipped.** The container at localhost:5100 is not
-   running and Docker builds are prohibited (builder hangs). The HTTP guard
-   exercises the controls end-to-end (403, 409, 429) but cannot be verified
-   without a container rebuild. LEAD verified these by hand when LOCAL-115
-   merged; the AST guard (Part 1) ensures the code paths remain live.
+1. **No container-level verification.** The Docker service on port 5100 is
+   unreachable (no matching containers, Docker builds hung). The test uses
+   a host-side Flask instance with the same code. If the containerized
+   service diverges from the source files (e.g., stale image), this test
+   would not catch that — but since Docker builds are blocked, the container
+   cannot be rebuilt anyway.
 
-2. **No container touches.** Per constraints, no Docker build, no container
-   restart, no `DELETE FROM` on any table.
+2. **Rate limit window interaction.** The test uses unique user IDs per run
+   (timestamped) to avoid cross-run rate limit state. If run twice within
+   60s with the same timestamp (impossible in practice due to ms precision),
+   the second run could see stale rate limit entries from the first.
+
+3. **Referral redemption table accumulates test data.** Each run creates 3-4
+   referral codes and 2 redemptions. These are isolated by unique timestamped
+   user IDs and do not affect other tests or production data.
