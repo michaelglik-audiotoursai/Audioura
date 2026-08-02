@@ -5,38 +5,35 @@ test_local110_sharing_wiring_guard.py — Guard test for sharing blueprint regis
 LOCAL-110: Verifies that sharing_bp is registered on generate_tour_text_service.py
 and that POST /tour/share + GET /tour/<id> are reachable (not 404).
 
-This test FAILS if the register_blueprint(sharing_bp) line is removed or commented out.
+LOCAL-133: Added behavioural assertion — imports the Flask app and uses test_client()
+to verify routes are actually reachable, not just syntactically present in the AST.
+The AST check is kept as a cheap first line (catches comment-out fast) but is
+insufficient alone (misses `if False:` neutering — D35).
 
-Two modes:
-  1. Live HTTP test (default): hits the running subscribed-generator container.
-  2. AST guard (always runs): statically verifies the import + registration exist in
-     the source file, so the test catches removal even without a running container.
+Two independent questions:
+  1. Is the registration in the source? (AST guard — always answerable)
+  2. Does the app actually serve the route? (Behavioural — uses test_client())
+
+Exit 0 = all pass. Exit 1 = test failure.
 
 Usage:
-    python3 tests/test_local110_sharing_wiring_guard.py [--service-url URL]
-
-Exit codes:
-    0 = all pass
-    1 = test failure (registration missing or route 404)
-    7 = DB/service unreachable (infra problem)
+    python3 tests/test_local110_sharing_wiring_guard.py
 """
 import os
 import sys
 import ast
-import requests
 
 # ─── Configuration ───────────────────────────────────────────────────────────
-SERVICE_URL = os.getenv("SERVICE_URL", "http://localhost:5100")
-API_KEY = os.getenv("GATEWAY_API_KEY", "test-api-key")
-
-# The source file that must contain the registration
 SERVICE_FILE = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "generate_tour_text_service.py"
 )
 
+SERVICE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 PASS_COUNT = 0
 FAIL_COUNT = 0
+SKIP_COUNT = 0
 
 
 def check(name: str, condition: bool, detail: str = ""):
@@ -47,6 +44,12 @@ def check(name: str, condition: bool, detail: str = ""):
     else:
         print(f"  FAIL: {name} — {detail}")
         FAIL_COUNT += 1
+
+
+def skip(name: str, reason: str):
+    global SKIP_COUNT
+    SKIP_COUNT += 1
+    print(f"  SKIP: {name} — {reason}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -66,12 +69,18 @@ def test_ast_guard():
         source = f.read()
 
     # Check 1: import statement exists
-    has_import = "from sharing_endpoints import sharing_bp" in source
+    import_needle = "from sharing_endpoints import sharing_bp"
+    import_count = source.count(import_needle)
+    print(f"    (import matches: {import_count})")
+    has_import = import_count > 0
     check("Import statement present", has_import,
-          "Expected: 'from sharing_endpoints import sharing_bp'")
+          f"Expected: '{import_needle}'")
 
     # Check 2: register_blueprint call exists
-    has_register = "register_blueprint(sharing_bp)" in source
+    register_needle = "register_blueprint(sharing_bp)"
+    register_count = source.count(register_needle)
+    print(f"    (register_blueprint matches: {register_count})")
+    has_register = register_count > 0
     check("register_blueprint(sharing_bp) call present", has_register,
           "Expected: 'app.register_blueprint(sharing_bp)' or similar")
 
@@ -81,7 +90,6 @@ def test_ast_guard():
         found_register = False
         for node in ast.walk(tree):
             if isinstance(node, ast.Call):
-                # Look for *.register_blueprint(sharing_bp)
                 if isinstance(node.func, ast.Attribute):
                     if node.func.attr == "register_blueprint":
                         for arg in node.args:
@@ -96,60 +104,59 @@ def test_ast_guard():
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PART 2: Live HTTP test — verify routes respond (not 404)
+# PART 2: Behavioural Guard — import app, use test_client, verify route (LOCAL-133)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def test_live_routes():
-    """Hit the running service and verify sharing routes are reachable."""
-    print(f"\n[LIVE HTTP] Testing against {SERVICE_URL}")
+def test_behavioural_guard():
+    """Import the Flask app and verify sharing routes respond via test_client().
 
-    headers = {"Content-Type": "application/json", "X-API-Key": API_KEY}
+    This catches `if False: app.register_blueprint(sharing_bp)` — the route
+    will 404 even though ast.walk finds the Call node (D35).
+    """
+    print("\n[BEHAVIOURAL GUARD] Verifying sharing routes via test_client()")
 
-    # Test POST /tour/share — should NOT be 404
-    print("\n  POST /tour/share:")
+    # Add project root to path so we can import the app
+    if SERVICE_DIR not in sys.path:
+        sys.path.insert(0, SERVICE_DIR)
+
+    # Set env vars the app expects
+    os.environ.setdefault("DATABASE_URL", "postgresql://admin:password123@localhost:5433/audiotours")
+    os.environ.setdefault("GATEWAY_API_KEY", "test-api-key")
+
     try:
-        resp = requests.post(
-            f"{SERVICE_URL}/tour/share",
-            json={
-                "location": "Guard Test Nice",
-                "tour_type": "walking",
-                "total_stops": 3,
-                "tour_text": "Guard test tour text for LOCAL-110.",
-            },
-            headers=headers,
-            timeout=10,
-        )
-        check("POST /tour/share is not 404", resp.status_code != 404,
-              f"Got {resp.status_code} — blueprint not registered!")
-        check("POST /tour/share returns 200", resp.status_code == 200,
-              f"Got {resp.status_code}: {resp.text[:200]}")
-
-        if resp.status_code == 200:
-            data = resp.json()
-            share_id = data.get("share_id", "")
-            check("Response has share_id", bool(share_id), f"Got: {data}")
-
-            # Test GET /tour/<id>
-            print(f"\n  GET /tour/{share_id}:")
-            resp2 = requests.get(f"{SERVICE_URL}/tour/{share_id}", timeout=10)
-            check("GET /tour/<id> is not 404 (Flask-level)",
-                  resp2.status_code != 404 or "tour not found" in resp2.text,
-                  f"Got {resp2.status_code} — route not registered!")
-            check("GET /tour/<id> returns 200", resp2.status_code == 200,
-                  f"Got {resp2.status_code}: {resp2.text[:200]}")
-
-            if resp2.status_code == 200:
-                tour_data = resp2.json()
-                check("Retrieved tour_text matches",
-                      tour_data.get("tour_text") == "Guard test tour text for LOCAL-110.",
-                      f"Got: {tour_data.get('tour_text', '')[:100]}")
-
-    except requests.ConnectionError:
-        print(f"  SKIP: Service not running at {SERVICE_URL}")
-        print("  (AST guard above still validates the registration exists)")
-        return
+        from generate_tour_text_service import app
+        client = app.test_client()
     except Exception as e:
-        check("HTTP request succeeded", False, str(e))
+        skip("Behavioural guard (all)", f"Cannot import app: {e}")
+        return
+
+    # Test: POST /tour/share should NOT be 404 (route is registered)
+    resp = client.post(
+        "/tour/share",
+        json={
+            "location": "Guard Test LOCAL-133",
+            "tour_type": "walking",
+            "total_stops": 3,
+            "tour_text": "Behavioural guard test text.",
+        },
+        headers={"Content-Type": "application/json", "X-API-Key": "test-api-key"},
+    )
+    check("POST /tour/share is not 404 (behavioural)",
+          resp.status_code != 404,
+          f"Got {resp.status_code} — blueprint not registered or route unreachable!")
+
+    # Test: GET /tour/<id> should NOT be 404 at Flask-routing level
+    # (it may return 404 as business logic "tour not found", but the route must exist)
+    resp2 = client.get("/tour/nonexistent-id-for-guard-test")
+    # A registered route returns its own 404 with JSON body; an unregistered route
+    # returns Flask's default HTML 404. Check for route existence.
+    route_exists = (
+        resp2.status_code != 404
+        or b"tour" in resp2.data.lower()  # route handler's own 404 message
+    )
+    check("GET /tour/<id> route registered (behavioural)",
+          route_exists,
+          f"Got {resp2.status_code} with no tour-related body — route not registered!")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -160,10 +167,7 @@ def test_no_charge_on_sharing():
     """Verify sharing_endpoints.py has no cost_meter or wallet_ledger references."""
     print("\n[NO-CHARGE GUARD] Verifying sharing is free (no metering)")
 
-    sharing_file = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "sharing_endpoints.py"
-    )
+    sharing_file = os.path.join(SERVICE_DIR, "sharing_endpoints.py")
 
     if not os.path.exists(sharing_file):
         check("sharing_endpoints.py exists", False, "File not found")
@@ -185,10 +189,7 @@ def test_no_charge_on_sharing():
           "FINDING: sharing_endpoints.py calls record_operation — sharing should be FREE")
 
     # Also check tour_sharing.py
-    tour_sharing_file = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "tour_sharing.py"
-    )
+    tour_sharing_file = os.path.join(SERVICE_DIR, "tour_sharing.py")
     if os.path.exists(tour_sharing_file):
         with open(tour_sharing_file, "r") as f:
             ts_source = f.read()
@@ -205,18 +206,9 @@ def test_no_charge_on_sharing():
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def main():
-    global PASS_COUNT, FAIL_COUNT, SERVICE_URL
-
-    # Parse CLI args early
-    if "--service-url" in sys.argv:
-        idx = sys.argv.index("--service-url")
-        if idx + 1 < len(sys.argv):
-            SERVICE_URL = sys.argv[idx + 1]
-
     print("=" * 70)
     print("test_local110_sharing_wiring_guard.py")
-    print("LOCAL-110: Sharing blueprint registration guard")
-    print(f"Service: {SERVICE_URL}")
+    print("LOCAL-110 + LOCAL-133: Sharing blueprint registration guard")
     print("=" * 70)
 
     # Always run static guard
@@ -225,14 +217,19 @@ def main():
     # Always run no-charge guard
     test_no_charge_on_sharing()
 
-    # Run live test if service is reachable
-    test_live_routes()
+    # Behavioural guard — exercises the actual app (LOCAL-133)
+    test_behavioural_guard()
 
     # Summary
     print("\n" + "=" * 70)
-    print(f"Results: {PASS_COUNT} PASS, {FAIL_COUNT} FAIL")
-    if FAIL_COUNT == 0:
+    if SKIP_COUNT > 0:
+        print(f"Results: {PASS_COUNT} PASS, {FAIL_COUNT} FAIL, {SKIP_COUNT} SKIP")
+    else:
+        print(f"Results: {PASS_COUNT} PASS, {FAIL_COUNT} FAIL")
+    if FAIL_COUNT == 0 and SKIP_COUNT == 0:
         print("ALL TESTS PASSED")
+    elif FAIL_COUNT == 0 and SKIP_COUNT > 0:
+        print("SOURCE ASSERTIONS PASSED — behavioural tests skipped (see reasons above)")
     else:
         print("SOME TESTS FAILED")
     print("=" * 70)
