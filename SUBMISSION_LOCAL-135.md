@@ -158,11 +158,98 @@ and published rate tables.
 
 ---
 
+## 9. Round 2 Fixes (bounced defects)
+
+### Defect 1 — Test assertion updated
+
+`tests/test_local60_cost_metering.py:45` now asserts:
+```python
+assert translation_cost(1_000_000) == 29.25 + 1_000_000 * 0.95 * 1.06 * 4.00 / 1_000_000  # $33.278
+```
+
+Comment explains the formula: 2× AWS Translate + Polly on nav-stripped text.
+Old assertion was `== 20.00` (translate-only at old Google rate).
+
+**Test results — both trees:**
+```
+BASE (subscribed):  tests/test_local60_cost_metering.py  exit 0
+HEAD (this branch): tests/test_local60_cost_metering.py  exit 0
+```
+
+Full suite (both trees):
+```
+BASE (subscribed):
+  PASS: tests/test_local60_cost_metering.py (exit 0)
+  PASS: tests/test_local64_cost_ceiling.py (exit 0)
+  PASS: tests/test_local69_news_metering.py (exit 0)
+  PASS: tests/test_local83_charging_wire.py (exit 0)
+
+HEAD (feature branch):
+  PASS: tests/test_local60_cost_metering.py (exit 0)
+  PASS: tests/test_local64_cost_ceiling.py (exit 0)
+  PASS: tests/test_local69_news_metering.py (exit 0)
+  PASS: tests/test_local83_charging_wire.py (exit 0)
+```
+
+No regressions introduced.
+
+### Defect 2 — TTS counted exactly once
+
+**Decision:** `translation_cost()` is all-in (translate + TTS). The caller
+stops adding `tts_cost()` separately.
+
+**Rationale:** TTS is intrinsic to the translation service's operation — it
+always synthesizes audio for translated stops inside `translate_tour_with_audio()`.
+The caller cannot opt out. Making `translation_cost()` all-in means the
+function matches the service's actual behavior.
+
+**Before (double-count):**
+```python
+from cost_rates import translation_cost, tts_cost
+_est_translate = translation_cost(17000)   # now includes Polly
+_est_tts = tts_cost(8000)                  # Polly again
+_total_translation_cost = _est_translate + _est_tts  # WRONG: $0.5977
+```
+
+**After (single-count):**
+```python
+from cost_rates import translation_cost
+_source_chars = len(tour_content) if tour_content else 16000
+_total_translation_cost = translation_cost(_source_chars)  # all-in
+```
+
+**Proof Polly appears once — Tour 14 (17,765 source chars):**
+```
+translation_cost(17765):
+  AWS Translate: 17765 × 1.95 = 34,642 chars × $0.000015 = $0.5196
+  Polly TTS:     17765 × 0.95 × 1.06 = 17,889 chars × $0.000004 = $0.0716
+  Total booked: $0.5912
+```
+No other line adds Polly. `tts_cost` is not imported.
+
+### Defect 3 — Actual char count passed through
+
+The orchestrator now passes `len(tour_content)` instead of hardcoded 17000:
+```python
+_source_chars = len(tour_content) if tour_content else 16000
+_total_translation_cost = translation_cost(_source_chars)
+```
+
+`tour_content` is in scope: it's assigned at line ~862 (from HTTP response or
+file read) and used through the translation block at line ~972. The `if`
+guard (fallback 16000) covers the defensive case where `tour_content` is None,
+but in practice it's always populated by this point — the translation block
+only runs if `english_tour_id` is set, which requires a successful DB store,
+which requires `tour_content`.
+
+---
+
 ## Commit
 
 ```
-234b7e8 LOCAL-135: measure translation cost — corrected from $0.372 to $0.532
+5df0ff2 LOCAL-135: measure translation cost — corrected from $0.372 to $0.532
+5a0b693 LOCAL-135 round 2: fix TTS double-count, test assertion, use real char count
 ```
 
-`git rev-list --count subscribed..HEAD` = 1  
+`git rev-list --count subscribed..HEAD` = 2  
 `git status --short` = clean
