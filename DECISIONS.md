@@ -956,3 +956,60 @@ when clean, fires when the condition is reintroduced.
 **Related:** the deletion prohibition already covers the opposite failure.
 Row loss and row visibility are different alarms and both are needed — the
 count went *up* here, so the row-loss alarm was correctly silent.
+
+---
+
+## D39 — Two ways to report a failure that is not happening (2026-08-02)
+
+Both surfaced in the same tick, from opposite directions.
+
+### The task's error: "fragile" reported as "broken"
+
+LOCAL-144's audit ranked two findings as HIGH IMPACT, saying the
+practical-facts QA gate and walking directions were "silently disabled",
+on the strength of reading `except (ImportError, Exception): pass` around
+their imports. LEAD ran the imports:
+
+```
+practical_facts_gate     IMPORTS OK
+directions_generator     IMPORTS OK
+content_qa_runner        IMPORTS OK
+```
+
+They work. Tours are getting QA checks and directions right now. A
+swallowed `ImportError` is evidence that a failure *would* be invisible,
+never that one *has* occurred. The real finding — that the day
+`directions_generator` acquires a bug, directions vanish with no log line —
+is worth reporting, but it is a **latent** defect and belongs in a
+different rank than a feature that is dead today. Bounced for
+reclassification, because the ranking is what Michael reads to decide.
+
+Its Rank 1 was excellent and is kept: tour editing is absent from
+`docker-compose-master.yml`, nothing listens on 5020/5022, and the app
+really does call it — `endpoints.dart:30` maps `Service.tourEditing: 5022`
+with two screens importing the service. Michael has edit screens that
+cannot work.
+
+### LEAD's error: a probe that manufactured its own failure
+
+Reviewing LOCAL-143, both cost suites failed reproducibly. The module
+imported `DEPLOYED_TRANSLATION_PASSES` as 1 while the file on disk read 2 —
+confirmed by grep, by `inspect.getsource`, and by `exec`-ing the source,
+which returned the correct 2 and $33.278. No `.pyc`, no `__pycache__`, git
+tree clean, and a byte-identical copy in another directory imported
+correctly. Rewriting the file in place cleared it and all six suites
+passed.
+
+The cause was LEAD's own break-probe rewriting that path several times in
+quick succession, leaving a stale read. **A wrongful bounce was one step
+away.**
+
+**Rules:** before reporting a failure, prove the failing thing is the thing
+under review. Copy the file elsewhere and run it; if it passes there, the
+defect is in the environment. And after a break-probe that rewrites a file,
+rewrite it once more before trusting any subsequent run.
+
+Related: D35 (inspection is not exercise), D36 (a probe that never applied
+is not evidence), D37 (an assertion that accepts its own failure). This is
+the fourth member — **a result produced by the measurement rather than the
+code.**
