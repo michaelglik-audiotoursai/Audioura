@@ -10,10 +10,13 @@ import threading
 import requests
 import traceback
 import re
+import logging
 from datetime import datetime
 import flask
 from flask import Flask, request, jsonify, send_file as _send_file, make_response
 import inspect as _inspect
+
+_orch_logger = logging.getLogger("tour_orchestrator_service")
 
 
 def _compat_send_file(path_or_file, **kwargs):
@@ -1236,7 +1239,8 @@ def health_check():
     try:
         from cost_ceiling_monitor import get_ceiling_stats
         _ceiling_stats = get_ceiling_stats()
-    except ImportError:
+    except ImportError as _ceil_err:
+        _orch_logger.error(f"[LOCAL-146] MISSING: cost_ceiling_monitor (get_ceiling_stats) — ceiling stats unavailable in health endpoint: {_ceil_err}")
         _ceiling_stats = {}
     return jsonify({
         "status": "healthy",
