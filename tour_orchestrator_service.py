@@ -109,6 +109,24 @@ sys.stdout.reconfigure(line_buffering=True)
 
 app = Flask(__name__)
 
+# --- Swipe Preference Routes (LOCAL-107 / LOCAL-112) ---
+# The Dart client posts to /user/<id>/stop-feedback on this service (port
+# 5002). Without this registration every swipe 404s and LOCAL-105's offline
+# queue retries ten times and discards it.
+#
+# Failure is logged at ERROR, not printed. A swallowed ImportError is how
+# corpus mining silently degraded for two days (see CLAUDE.md, D31).
+try:
+    from swipe_preference_service import register_preference_routes
+    register_preference_routes(app)
+    print("[ORCHESTRATOR] Preference routes registered (LOCAL-112)")
+except ImportError as _pref_err:
+    import logging as _pref_logging
+    _pref_logging.getLogger("tour_orchestrator_service").error(
+        f"[LOCAL-112] Preference routes NOT registered — every swipe will 404: {_pref_err}"
+    )
+    print(f"[ORCHESTRATOR] ERROR: preference routes unavailable: {_pref_err}")
+
 # CORS headers for web platform support
 def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
