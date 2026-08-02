@@ -838,3 +838,35 @@ Where a behavioural test genuinely cannot run — services down, Docker
 builds hung — the correct output is an explicit skip naming what was not
 exercised. An honest skip beats a hollow pass, because a hollow pass is
 indistinguishable from real coverage six months later.
+
+---
+
+## D36 — I skipped my own verification discipline four times in two ticks
+
+Checking LOCAL-130's guard, I ran four break-probes that silently matched
+nothing:
+
+```
+if _check_rate_limit(        -> 0 matches (the code says `if not _check_rate_limit(`)
+regex for self-referral      -> NOT FOUND
+```
+
+Each printed "PASS — misses it", which reads as a finding and meant only
+that my `sed` had done nothing. I nearly recorded the guard as broken twice.
+
+The fix was one command: `grep -n "_check_rate_limit" referral_endpoints.py`
+shows the real shape in a second. Reading two lines before writing the probe
+would have prevented all four.
+
+This is the same root as D33 and D34 — **acting on an assumed shape rather
+than a confirmed one**. What makes it worth its own entry is where it
+happened: not in building something, but in the act of verifying someone
+else's work. The reviewer's instrument was the unchecked thing.
+
+**Rule: before a break-probe, print the lines you intend to break.** If the
+replacement count is zero, the probe failed — that is not a result about the
+system, and must never be reported as one.
+
+A negative result from a probe that did not apply is indistinguishable from
+a negative result about the code. Only the match count tells them apart, so
+always print it.
