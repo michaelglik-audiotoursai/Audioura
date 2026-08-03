@@ -169,32 +169,6 @@ services:
       timeout: 10s
       retries: 3
 
-  # Newsletter Processor (browser-based article extraction, Spotify/Apple Podcasts, port 5017)
-  # NOTE: Credential endpoints (/key_exchange, /submit_credentials) are DISABLED by default.
-  # They require CREDENTIAL_ENCRYPTION_ENABLED=true, which must not be set until
-  # KMS at-rest encryption (credential_encryption.py) is provisioned. See D14.
-  newsletter-processor:
-    image: audioura-tour-generator:latest
-    container_name: newsletter-processor-1
-    command: sh -c "pip install beautifulsoup4 --quiet && python newsletter_processor_service.py"
-    ports:
-      - "5017:5017"
-    environment:
-      - DB_HOST=postgres-2
-      - DB_NAME=audiotours
-      - DB_USER=admin
-      - DB_PASSWORD=password123
-      - DB_PORT=5432
-      - NEWS_ORCHESTRATOR_URL=http://news-orchestrator-1:5012
-    restart: unless-stopped
-    depends_on:
-      - postgres-2
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5017/health')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
   # Database
   postgres-2:
     image: postgres:15-alpine

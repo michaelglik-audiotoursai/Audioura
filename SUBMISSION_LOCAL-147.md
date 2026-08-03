@@ -1,47 +1,77 @@
 ##### READY FOR REVIEW
 
-## LOCAL-147 — Newsletter Processor: Fail-Closed Credential Gate (Round 2)
+## LOCAL-147 — Newsletter Processor: Option A (No Compose Entry)
 
 ### Commit
 
 ```
-3469e2f LOCAL-147: fail-closed gate on credential endpoints (D14)
-bc0f395 LOCAL-147: restore newsletter processor service (no build)
+git log --oneline storied..HEAD
 ```
+
+### Summary
+
+Round 3 resolution: **Option A — do not add `newsletter-processor` to
+`docker-compose-master.yml`.**
+
+The service's credential gate (added in round 2) lives in the source file,
+but the image (`audioura-tour-generator:latest`) contains the **ungated**
+version with plaintext credential storage. The builder is hung, so no new
+image can be built. A `docker compose up -d` with no arguments would run
+the image's copy — which has no gate — exposing `/submit_credentials` and
+`/key_exchange` with plaintext storage, exactly the round-2 scenario.
+
+**Why Option A over B or C:**
+
+- **Option B** (volume mount) works but introduces import fragility: if the
+  mounted source references modules not in the image, the service crashes
+  at startup. Verified it works today but is fragile across updates.
+- **Option C** (no port publish) still runs the ungated code inside the
+  network — weaker containment.
+- **Option A** is simplest and correct: the service does nothing for anyone
+  (`/newsletters_v2` returns empty; no sources registered). No cost to
+  leaving it out until the image is rebuilt with the gate baked in. The
+  compose entry can be added in one line the day the builder is fixed.
+
+The source gate is retained so it will be baked into the next image build.
 
 ### Per-File Changes
 
 | File | Lines | What |
 |------|-------|------|
-| `newsletter_processor_service.py` | +17 | Add `CREDENTIAL_ENDPOINTS_ENABLED` env-var gate; guard `/key_exchange` and `/submit_credentials` with 503 refusal |
-| `docker-compose-master.yml` | +3 | Security comment documenting that credential endpoints are disabled by default |
-
-### What Was Done
-
-Round 1 restored the newsletter processor service to `docker-compose-master.yml`
-using the LOCAL-145 pattern (reuse `audioura-tour-generator:latest` image, no build).
-
-Round 2 adds a fail-closed gate (D14) on the two credential endpoints that were
-found to store passwords in plaintext (`decrypted_username`, `decrypted_password`
-columns, no KMS encryption active). The gate:
-
-- Reads `CREDENTIAL_ENCRYPTION_ENABLED` env var at startup
-- Defaults to **disabled** (empty string ≠ `"true"`)
-- Returns HTTP 503 with explicit message when disabled
-- Does NOT affect `/health`, `/newsletters_v2`, `/process_newsletter`, or any
-  other newsletter processing endpoint
-- The compose entry does NOT set this env var → endpoints are gated by default
-  even if someone runs `docker compose up -d`
+| `docker-compose-master.yml` | -26 | Remove `newsletter-processor` service entry (cannot deploy ungated image) |
+| `newsletter_processor_service.py` | (unchanged this commit; +17 from round 2) | Gate retained in source for next image build |
+| `SUBMISSION_LOCAL-147.md` | rewritten | Updated for round 3 |
 
 ### Verbatim Evidence
 
-**Health (service starts and serves with flag off):**
+**No compose file can start the service:**
+```
+$ grep -c "newsletter-processor" docker-compose-master.yml
+0
+```
+
+**The source gate is in place (ready for next image build):**
+```
+$ grep -c "CREDENTIAL_ENDPOINTS_ENABLED" newsletter_processor_service.py
+3
+```
+
+**Proof the gate works in the deployed context (volume-mounted source):**
+
+Container started with `newsletter_processor_service.py` mounted read-only:
+```
+$ docker exec newsletter-processor-test-147 grep -c "CREDENTIAL_ENDPOINTS_ENABLED" /app/newsletter_processor_service.py
+3
+```
+
+Health works:
 ```
 $ curl -s http://localhost:5017/health
 {"service":"newsletter_processor","status":"healthy"}
+HTTP 200
 ```
 
-**Credential endpoints refuse (503, not 400/404):**
+Credential endpoints refuse (503):
 ```
 $ curl -s -w "\nHTTP %{http_code}\n" -X POST http://localhost:5017/key_exchange -H "Content-Type: application/json" -d '{}'
 {"message":"Credential endpoints are disabled. At-rest encryption is not configured.","status":"error"}
@@ -52,27 +82,27 @@ $ curl -s -w "\nHTTP %{http_code}\n" -X POST http://localhost:5017/submit_creden
 HTTP 503
 ```
 
-**Newsletter processing unaffected:**
+Newsletter processing unaffected:
 ```
-$ curl -s -w "\nHTTP %{http_code}\n" http://localhost:5017/newsletters_v2
+$ curl -s http://localhost:5017/newsletters_v2
 {"newsletters":[],"status":"success"}
 HTTP 200
 ```
 
-**Container stopped and removed after verification:**
+**Container stopped, removed, and gone:**
 ```
-$ docker stop newsletter-processor-1 && docker rm newsletter-processor-1
-newsletter-processor-1
-newsletter-processor-1
+$ docker stop newsletter-processor-test-147 && docker rm newsletter-processor-test-147
+newsletter-processor-test-147
+newsletter-processor-test-147
 
 $ docker ps --format "{{.Names}}" | grep newsletter-processor
 (no output — container is gone)
 ```
 
-**Existing containers untouched (diff before/after: no changes):**
+**Existing containers untouched:**
 ```
-$ diff /tmp/containers_before.txt /tmp/containers_after.txt
-(no output — identical)
+$ diff /tmp/containers_before_147r3.txt /tmp/containers_after_147r3.txt
+(no output — identical, 21 containers unchanged)
 ```
 
 ### Row Counts
@@ -86,28 +116,24 @@ $ diff /tmp/containers_before.txt /tmp/containers_after.txt
 ### Rollback
 
 ```bash
-# Revert the code change (returns to round-1 state with no gate):
-git revert 3469e2f --no-edit
-
-# Or revert both commits entirely:
-git revert 3469e2f bc0f395 --no-edit
+# To restore the compose entry (only safe after image is rebuilt with gate):
+git revert <this-commit> --no-edit
 ```
 
-The container is already stopped and removed. No runtime rollback needed.
+No runtime rollback needed — no container is running.
 
 ### Limitations
 
-1. **Runtime pip install**: The compose entry does `pip install beautifulsoup4`
-   at every start, so the container needs PyPI to boot. This is the same
-   fragility noted in LOCAL-145. The image already has the module's other
-   dependencies but not beautifulsoup4.
+1. **Service is not deployed.** Newsletter processing (browser-based article
+   extraction, Spotify/Apple Podcasts, `content_expander.py`) remains
+   unreachable until the image is rebuilt with the gated source. This is
+   acceptable because `/newsletters_v2` returns empty — no sources are
+   registered, so the service was doing nothing for anyone.
 
-2. **Encryption not implemented**: The gate blocks the endpoints but does not
-   implement at-rest encryption. `credential_encryption.py` and
-   `migrate_credentials_encrypt.py` exist but require a Google Cloud KMS
-   keyring that may not be provisioned. That is Michael's decision.
+2. **Builder hung.** The compose entry cannot be re-added until a fresh
+   image is built containing the gate. The source change (round 2) ensures
+   the gate will be present in the next build automatically.
 
-3. **Container left stopped**: Per round-2 instructions, the service is not
-   running. To start it: `docker compose -f docker-compose-master.yml up -d newsletter-processor`.
-   Credential endpoints will remain gated unless `CREDENTIAL_ENCRYPTION_ENABLED=true`
-   is added to the environment block.
+3. **One-line restoration.** When the builder is fixed and the image is
+   rebuilt, adding the service back requires only re-inserting the compose
+   entry (available in git history, commit bc0f395).
