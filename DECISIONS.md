@@ -1105,3 +1105,48 @@ Stated verbatim by Michael:
 **Open, and NOT decided by this directive:** what the app *shows* a user in
 debt — whether generation is blocked at −$2.00 with an explanation, or the
 button simply refuses. LEAD is not inventing that; it needs Michael.
+
+---
+
+## D42 — Three ways source and image drift apart (2026-08-03)
+
+The news outage completes a set. Every one of these shipped code that was
+correct and did not run, and each failed differently:
+
+| # | Case | Source | Image | Symptom |
+|---|---|---|---|---|
+| 1 | LOCAL-147 | gate present | gate absent | control written, unreachable |
+| 2 | LOCAL-151 | fix absent | fix present | works now, vanishes on rebuild |
+| 3 | news-orchestrator | Dockerfile correct | image stale | 503 on every request |
+
+**Case 3 is the new one, and the most deceptive.** Nothing was wrong with
+the code *or* the Dockerfile. `Dockerfile.news-orchestrator` line 9 copies
+`entitlements.py` and always did. The deployed image was simply built before
+that line was added, so `from entitlements import check_news_quota` raised
+`ModuleNotFoundError`, the quota check failed closed — correctly — and every
+news request returned 503.
+
+Reading the repository could never have found it. The Dockerfile is right.
+Only the *running artifact* was wrong, and it took `docker exec ls /app`
+to see it, which was impossible for six hours while the Docker CLI was
+wedged.
+
+**The hypothesis was wrong in a plausible way.** LOCAL-165 proposed that
+`entitlements.py` failed importing `payment_provider`. Reasonable — that
+import exists on `subscribed`. Reality: `entitlements.py` was not in the
+image at all. Being unable to inspect the container is what made a plausible
+story survive as long as it did.
+
+**Rules:**
+
+- **Ask what the running artifact contains, not what the repo says.**
+  `docker exec <c> ls /app` and importing each module inside the container
+  are ten-second checks that would have found all three cases.
+- **Treat a wedged operator tool as a blocker on diagnosis, not an
+  inconvenience.** Six hours of "the containers are serving, so it can
+  wait" hid a total outage of one feature.
+- **A correct Dockerfile is not a deployed Dockerfile.** Rebuild before
+  concluding anything about what is running.
+
+Related: D31 (code nobody calls), D35 (inspection is not exercise),
+D38 (guard the invariant, not the mechanism).
