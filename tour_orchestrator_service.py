@@ -352,13 +352,26 @@ def log_job_update(job_id, status, progress):
         print(f"WARNING: Attempted to update non-existent job: {job_id}")
 
 def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None, stops_count=None, is_test=None):
-    """Store the audio tour in the database with original tour content."""
+    """Store the audio tour in the database with original tour content.
+
+    Returns:
+        dict with keys:
+            success (bool): True if stored or already existed.
+            existing_tour_id (int|None): If the tour already exists, its ID.
+            action (str): 'inserted', 'already_exists', or 'error'.
+            error (str|None): Error message on failure.
+    """
     print(f"\n==== STORING AUDIO TOUR IN DATABASE: {datetime.now().isoformat()} ====")
     print(f"Tour name: {tour_name}")
     print(f"Request string: {request_string}")
     print(f"ZIP path: {zip_path}")
     print(f"Coordinates: lat={lat}, lng={lng}")
     print(f"Tour content length: {len(tour_content) if tour_content else 0} characters")
+
+    def _result(success, action, existing_tour_id=None, error=None):
+        """Build a result dict that also supports bool() for backward compat."""
+        return {"success": success, "action": action,
+                "existing_tour_id": existing_tour_id, "error": error}
     
     try:
         import psycopg2
@@ -470,14 +483,33 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         has_tour_content = cur.fetchone() is not None
         print(f"tour_content column exists: {has_tour_content}")
         
-        # Check if tour already exists
-        print(f"Checking if tour already exists...")
+        # [LOCAL-156] Check if tour already exists using the SAME logic as the unique index:
+        # lower(tour_name) WHERE original_tour_id IS NULL.
+        # Previously this checked (tour_name, request_string) with case-sensitive match,
+        # which diverged from the partial unique index uq_audio_tours_original_name.
+        print(f"Checking if tour already exists (case-insensitive, matching unique index)...")
         cur.execute(
-            "SELECT id FROM audio_tours WHERE tour_name = %s AND request_string = %s",
-            (tour_name, request_string)
+            "SELECT id FROM audio_tours WHERE lower(tour_name) = lower(%s) AND original_tour_id IS NULL",
+            (tour_name,)
         )
         existing_tour = cur.fetchone()
-        print(f"Existing tour: {existing_tour}")
+        print(f"Existing tour (unique-index-aware check): {existing_tour}")
+
+        # [LOCAL-156] If an original tour with this name already exists, reuse it.
+        # Increment number_requested and return the existing ID.
+        if existing_tour:
+            existing_id = existing_tour[0]
+            print(f"[LOCAL-156] Tour already exists (id={existing_id}). "
+                  f"Incrementing number_requested; no new row needed.")
+            cur.execute(
+                "UPDATE audio_tours SET number_requested = number_requested + 1 WHERE id = %s",
+                (existing_id,)
+            )
+            conn.commit()
+            cur.close()
+            conn.close()
+            print(f"==== AUDIO TOUR ALREADY EXISTS — REUSING id={existing_id} ====")
+            return _result(success=True, action="already_exists", existing_tour_id=existing_id)
         
         # Read the ZIP file as binary data
         print(f"Reading ZIP file: {zip_path}")
@@ -490,76 +522,41 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         # LOCAL-50: persist zip_filename for deterministic resolution
         zip_filename = os.path.basename(zip_path)
 
-        if existing_tour:
-            # Update existing tour
-            print(f"Updating existing tour...")
-            if has_audio_tour and has_lat and has_number_requested and has_tour_content:
-                cur.execute(
-                    """
-                    UPDATE audio_tours 
-                    SET audio_tour = %s, number_requested = number_requested + 1, lat = %s, lng = %s,
-                        tour_content = %s, stops_count = %s, zip_filename = %s
-                    WHERE id = %s
-                    """,
-                    (psycopg2.Binary(zip_data), lat, lng, tour_content, stops_count, zip_filename, existing_tour[0])
-                )
-            elif has_audio_tour and has_lat and has_number_requested:
-                cur.execute(
-                    """
-                    UPDATE audio_tours 
-                    SET audio_tour = %s, number_requested = number_requested + 1, lat = %s, lng = %s,
-                        stops_count = %s, zip_filename = %s
-                    WHERE id = %s
-                    """,
-                    (psycopg2.Binary(zip_data), lat, lng, stops_count, zip_filename, existing_tour[0])
-                )
-            else:
-                # Fallback if columns don't exist
-                cur.execute(
-                    """
-                    UPDATE audio_tours 
-                    SET tour_name = %s, request_string = %s
-                    WHERE id = %s
-                    """,
-                    (tour_name, request_string, existing_tour[0])
-                )
-            print(f"Updated existing tour: {tour_name} (zip={zip_filename})")
+        # Insert new tour (existing_tour case already returned above)
+        print(f"Inserting new tour...")
+        # LOCAL-103: is_test from request param takes precedence; env var is fallback
+        if is_test is not None:
+            _is_test_mode = is_test
         else:
-            # Insert new tour
-            print(f"Inserting new tour...")
-            # LOCAL-103: is_test from request param takes precedence; env var is fallback
-            if is_test is not None:
-                _is_test_mode = is_test
-            else:
-                _is_test_mode = os.getenv('TOUR_TEST_MODE', 'false').lower() == 'true'
-            if has_audio_tour and has_lat and has_number_requested and has_tour_content:
-                cur.execute(
-                    """
-                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng,
-                        tour_content, content_language, storied_mode, stops_count, zip_filename, is_test)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """,
-                    (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, tour_content, 'en',
-                     os.getenv('STORIED_MODE', 'false').lower() == 'true', stops_count, zip_filename, _is_test_mode)
-                )
-            elif has_audio_tour and has_lat and has_number_requested:
-                cur.execute(
-                    """
-                    INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng, zip_filename, is_test)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    """,
-                    (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, zip_filename, _is_test_mode)
-                )
-            else:
-                # Fallback if columns don't exist
-                cur.execute(
-                    """
-                    INSERT INTO audio_tours (tour_name, request_string, is_test)
-                    VALUES (%s, %s, %s)
-                    """,
-                    (tour_name, request_string, _is_test_mode)
-                )
-            print(f"Inserted new tour: {tour_name} (zip={zip_filename}, is_test={_is_test_mode})")
+            _is_test_mode = os.getenv('TOUR_TEST_MODE', 'false').lower() == 'true'
+        if has_audio_tour and has_lat and has_number_requested and has_tour_content:
+            cur.execute(
+                """
+                INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng,
+                    tour_content, content_language, storied_mode, stops_count, zip_filename, is_test)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, tour_content, 'en',
+                 os.getenv('STORIED_MODE', 'false').lower() == 'true', stops_count, zip_filename, _is_test_mode)
+            )
+        elif has_audio_tour and has_lat and has_number_requested:
+            cur.execute(
+                """
+                INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng, zip_filename, is_test)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, zip_filename, _is_test_mode)
+            )
+        else:
+            # Fallback if columns don't exist
+            cur.execute(
+                """
+                INSERT INTO audio_tours (tour_name, request_string, is_test)
+                VALUES (%s, %s, %s)
+                """,
+                (tour_name, request_string, _is_test_mode)
+            )
+        print(f"Inserted new tour: {tour_name} (zip={zip_filename}, is_test={_is_test_mode})")
         
         # Commit the transaction
         print(f"Committing transaction...")
@@ -573,12 +570,12 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         print(f"Database connection closed")
         
         print(f"==== AUDIO TOUR STORED SUCCESSFULLY ====")
-        return True
+        return _result(success=True, action="inserted")
         
     except Exception as e:
         print(f"ERROR storing audio tour: {e}")
         print(f"Traceback: {traceback.format_exc()}")
-        return False
+        return _result(success=False, action="error", error=str(e))
 
 
 def link_stop_metrics_to_tour(tour_id, job_id):
@@ -922,9 +919,34 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                 print(f"Warning: Could not add tour_content.txt to ZIP: {zip_error}")
         
         # Store in database with tour content
-        store_success = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"), is_test=is_test)
+        store_result = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"), is_test=is_test)
         
-        if store_success:
+        # [LOCAL-156] store_audio_tour now returns a dict:
+        #   {"success": bool, "action": str, "existing_tour_id": int|None, "error": str|None}
+        store_success = store_result["success"] if isinstance(store_result, dict) else store_result
+        store_action = store_result.get("action", "unknown") if isinstance(store_result, dict) else ("inserted" if store_result else "error")
+        store_existing_id = store_result.get("existing_tour_id") if isinstance(store_result, dict) else None
+        store_error = store_result.get("error") if isinstance(store_result, dict) else None
+        
+        if not store_success:
+            # [LOCAL-156] FAIL CLOSED: storage failed — do NOT report completed.
+            # No wallet on storied, so no compensating credit — just fail the job.
+            print(f"[LOCAL-156] STORAGE FAILED: {store_error}")
+            print(f"[LOCAL-156] Job {job_id} will NOT report completed — billing must not diverge from delivery (D14).")
+            
+            ACTIVE_JOBS[job_id]["status"] = "error"
+            ACTIVE_JOBS[job_id]["error"] = (
+                f"Tour storage failed: {store_error}. "
+            )
+            ACTIVE_JOBS[job_id]["error_type"] = "store_failed"
+            print(f"Keeping extraction directory due to database storage failure: {extract_path}")
+            return  # Do NOT fall through to "completed"
+        
+        # Tour stored (or already existed). Determine the english_tour_id.
+        if store_action == "already_exists" and store_existing_id:
+            english_tour_id = store_existing_id
+            print(f"[LOCAL-156] Reusing existing tour id={english_tour_id} (no new storage needed)")
+        else:
             print(f"Tour stored successfully with coordinates: lat={lat}, lng={lng}")
             
             # Get the tour ID from database (always needed for final_tour_id)
@@ -940,8 +962,8 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                 )
                 cur = conn.cursor()
                 cur.execute(
-                    "SELECT id FROM audio_tours WHERE tour_name = %s AND request_string = %s ORDER BY id DESC LIMIT 1",
-                    (tour_name, request_string or location)
+                    "SELECT id FROM audio_tours WHERE lower(tour_name) = lower(%s) AND original_tour_id IS NULL ORDER BY id DESC LIMIT 1",
+                    (tour_name,)
                 )
                 result = cur.fetchone()
                 if result:
@@ -951,140 +973,137 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                 conn.close()
             except Exception as db_error:
                 print(f"Warning: Could not get tour ID from database: {db_error}")
+        
+        # LOCAL-128: Link stop_metrics to this tour via tour_id.
+        # The text generator wrote stop_metrics with job_id = job_id_1
+        # but could not set tour_id (the tour didn't exist yet).
+        # Now that store_audio_tour has created the row, backfill it.
+        if english_tour_id and job_id_1:
+            _sm_updated = link_stop_metrics_to_tour(english_tour_id, job_id_1)
+            if _sm_updated > 0:
+                print(f"[LOCAL-128] Linked {_sm_updated} stop_metrics rows to tour_id={english_tour_id} (job_id={job_id_1})")
+            elif _sm_updated == 0:
+                print(f"[LOCAL-128] No stop_metrics rows found for job_id={job_id_1} (i-con may not have run)")
+            else:
+                print(f"[LOCAL-128] stop_metrics tour_id update failed (non-fatal)")
 
-            # LOCAL-128: Link stop_metrics to this tour via tour_id.
-            # The text generator wrote stop_metrics with job_id = job_id_1
-            # but could not set tour_id (the tour didn't exist yet).
-            # Now that store_audio_tour has created the row, backfill it.
-            if english_tour_id and job_id_1:
-                _sm_updated = link_stop_metrics_to_tour(english_tour_id, job_id_1)
-                if _sm_updated > 0:
-                    print(f"[LOCAL-128] Linked {_sm_updated} stop_metrics rows to tour_id={english_tour_id} (job_id={job_id_1})")
-                elif _sm_updated == 0:
-                    print(f"[LOCAL-128] No stop_metrics rows found for job_id={job_id_1} (i-con may not have run)")
-                else:
-                    print(f"[LOCAL-128] stop_metrics tour_id update failed (non-fatal)")
-
-            if language != 'en':
-                pass  # translation block below handles non-English
-            
-            # If non-English language requested, translate the tour
-            if language != 'en' and english_tour_id:
-                print(f"\n==== TRANSLATING TOUR TO {language.upper()} ====")
-                try:
-                    translation_data = {
-                        "content_id": english_tour_id,
-                        "content_type": "tour",
-                        "languages": [language]
-                    }
+        if language != 'en':
+            pass  # translation block below handles non-English
+        
+        # If non-English language requested, translate the tour
+        if language != 'en' and english_tour_id:
+            print(f"\n==== TRANSLATING TOUR TO {language.upper()} ====")
+            try:
+                translation_data = {
+                    "content_id": english_tour_id,
+                    "content_type": "tour",
+                    "languages": [language]
+                }
+                
+                print(f"Calling translation service with data: {translation_data}")
+                translation_response = _authenticated_request("POST", f"{TRANSLATION_URL}/translate-with-audio",
+                    headers={"Content-Type": "application/json"},
+                    json=translation_data,
+                    timeout=120
+                )
+                
+                if translation_response.status_code == 200:
+                    translation_result = translation_response.json()
+                    # [LOCAL-60] Extract translated_tour_ids for backward compat
+                    _translations = translation_result.get('translations', {})
+                    _lang_result = _translations.get(language, {})
+                    translated_tour_id = _lang_result.get('id')
+                    _translation_cache_hit = _lang_result.get('cache_hit', False)
                     
-                    print(f"Calling translation service with data: {translation_data}")
-                    translation_response = _authenticated_request("POST", f"{TRANSLATION_URL}/translate-with-audio",
-                        headers={"Content-Type": "application/json"},
-                        json=translation_data,
-                        timeout=120
-                    )
+                    # Backward compat: older response format
+                    if not translated_tour_id:
+                        translated_tour_id = translation_result.get('translated_tour_ids', {}).get(language)
                     
-                    if translation_response.status_code == 200:
-                        translation_result = translation_response.json()
-                        # [LOCAL-60] Extract translated_tour_ids for backward compat
-                        _translations = translation_result.get('translations', {})
-                        _lang_result = _translations.get(language, {})
-                        translated_tour_id = _lang_result.get('id')
-                        _translation_cache_hit = _lang_result.get('cache_hit', False)
+                    if translated_tour_id:
+                        print(f"Translation successful! Translated tour ID: {translated_tour_id} (cache_hit={_translation_cache_hit})")
+                        ACTIVE_JOBS[job_id]["translated_tour_id"] = translated_tour_id
+                        ACTIVE_JOBS[job_id]["final_tour_id"] = translated_tour_id
                         
-                        # Backward compat: older response format
-                        if not translated_tour_id:
-                            translated_tour_id = translation_result.get('translated_tour_ids', {}).get(language)
-                        
-                        if translated_tour_id:
-                            print(f"Translation successful! Translated tour ID: {translated_tour_id} (cache_hit={_translation_cache_hit})")
-                            ACTIVE_JOBS[job_id]["translated_tour_id"] = translated_tour_id
-                            ACTIVE_JOBS[job_id]["final_tour_id"] = translated_tour_id
-                            
-                            # [LOCAL-60] Meter translation cost
-                            try:
-                                from cost_meter import record_operation
-                                from cost_rates import CACHE_HIT_COST_USD
-                                if _translation_cache_hit:
-                                    record_operation(
-                                        operation_type="translation_cache_hit",
-                                        our_cost_usd=CACHE_HIT_COST_USD,
-                                        cache_hit=True,
-                                        user_id=user_id,
-                                        job_id=job_id,
-                                        breakdown={"translate": 0.0, "tts": 0.0},
-                                    )
-                                else:
-                                    # Estimate translation cost (Google Translate + Polly TTS)
-                                    # Typical tour: ~17k chars translate + ~8k chars TTS
-                                    from cost_rates import translation_cost, tts_cost
-                                    _est_translate = translation_cost(17000)
-                                    _est_tts = tts_cost(8000)
-                                    _total_translation_cost = _est_translate + _est_tts
-                                    record_operation(
-                                        operation_type="translation_generate",
-                                        our_cost_usd=_total_translation_cost,
-                                        cache_hit=False,
-                                        user_id=user_id,
-                                        job_id=job_id,
-                                        breakdown={"translate": _est_translate, "tts": _est_tts},
-                                    )
-                            except Exception as _meter_err:
-                                print(f"[LOCAL-60] Translation cost metering failed (non-fatal): {_meter_err}")
-                        else:
-                            print(f"Warning: Translation completed but no tour ID returned")
-                            ACTIVE_JOBS[job_id]["final_tour_id"] = english_tour_id
+                        # [LOCAL-60] Meter translation cost
+                        try:
+                            from cost_meter import record_operation
+                            from cost_rates import CACHE_HIT_COST_USD
+                            if _translation_cache_hit:
+                                record_operation(
+                                    operation_type="translation_cache_hit",
+                                    our_cost_usd=CACHE_HIT_COST_USD,
+                                    cache_hit=True,
+                                    user_id=user_id,
+                                    job_id=job_id,
+                                    breakdown={"translate": 0.0, "tts": 0.0},
+                                )
+                            else:
+                                # Estimate translation cost (Google Translate + Polly TTS)
+                                # Typical tour: ~17k chars translate + ~8k chars TTS
+                                from cost_rates import translation_cost, tts_cost
+                                _est_translate = translation_cost(17000)
+                                _est_tts = tts_cost(8000)
+                                _total_translation_cost = _est_translate + _est_tts
+                                record_operation(
+                                    operation_type="translation_generate",
+                                    our_cost_usd=_total_translation_cost,
+                                    cache_hit=False,
+                                    user_id=user_id,
+                                    job_id=job_id,
+                                    breakdown={"translate": _est_translate, "tts": _est_tts},
+                                )
+                        except Exception as _meter_err:
+                            print(f"[LOCAL-60] Translation cost metering failed (non-fatal): {_meter_err}")
                     else:
-                        print(f"Translation failed: {translation_response.status_code} - {translation_response.text}")
+                        print(f"Warning: Translation completed but no tour ID returned")
                         ACTIVE_JOBS[job_id]["final_tour_id"] = english_tour_id
-                        
-                except Exception as translation_error:
-                    print(f"Translation error: {translation_error}")
+                else:
+                    print(f"Translation failed: {translation_response.status_code} - {translation_response.text}")
                     ACTIVE_JOBS[job_id]["final_tour_id"] = english_tour_id
-            else:
-                ACTIVE_JOBS[job_id]["final_tour_id"] = english_tour_id or "unknown"
-            
-            # Update tour_requests status to completed
-            if user_id and 'tour_id' in ACTIVE_JOBS[job_id]:
-                tour_id = ACTIVE_JOBS[job_id]['tour_id']
-                print(f"Updating tour_requests status for tour_id: {tour_id}")
-                try:
-                    update_data = {
-                        'tour_id': tour_id,
-                        'status': 'completed',
-                        'finished_at': datetime.now().isoformat()
-                    }
-                    update_response = _authenticated_request("POST", f"{TOUR_UPDATE_URL}/update",
-                        headers={"Content-Type": "application/json"},
-                        json=update_data,
-                        timeout=10
-                    )
-                    if update_response.status_code == 200:
-                        print(f"Successfully updated tour_requests status for {tour_id}")
-                    else:
-                        print(f"Failed to update tour_requests status: {update_response.text}")
-                except Exception as update_error:
-                    print(f"Error updating tour_requests status: {update_error}")
-            else:
-                print(f"No tour_id available for tour_requests update (user_id: {user_id})")
-            
-            # Clean up extraction directory after successful database storage
-            # ZIP file is now the primary storage, directory is no longer needed
-            if os.path.exists(extract_path):
-                try:
-                    print(f"Cleaning up extraction directory: {extract_path}")
-                    shutil.rmtree(extract_path)
-                    print(f"Successfully cleaned up directory: {extract_dir}")
-                    print(f"Storage optimization: Directory removed, ZIP file remains as primary storage")
-                except Exception as cleanup_error:
-                    print(f"Warning: Could not clean up extraction directory: {cleanup_error}")
-                    print(f"Directory will remain: {extract_path}")
-            else:
-                print(f"Extraction directory not found for cleanup: {extract_path}")
+                    
+            except Exception as translation_error:
+                print(f"Translation error: {translation_error}")
+                ACTIVE_JOBS[job_id]["final_tour_id"] = english_tour_id
         else:
-            print("Failed to store tour in database")
-            print(f"Keeping extraction directory due to database storage failure: {extract_path}")
+            ACTIVE_JOBS[job_id]["final_tour_id"] = english_tour_id or "unknown"
+        
+        # Update tour_requests status to completed
+        if user_id and 'tour_id' in ACTIVE_JOBS[job_id]:
+            tour_id = ACTIVE_JOBS[job_id]['tour_id']
+            print(f"Updating tour_requests status for tour_id: {tour_id}")
+            try:
+                update_data = {
+                    'tour_id': tour_id,
+                    'status': 'completed',
+                    'finished_at': datetime.now().isoformat()
+                }
+                update_response = _authenticated_request("POST", f"{TOUR_UPDATE_URL}/update",
+                    headers={"Content-Type": "application/json"},
+                    json=update_data,
+                    timeout=10
+                )
+                if update_response.status_code == 200:
+                    print(f"Successfully updated tour_requests status for {tour_id}")
+                else:
+                    print(f"Failed to update tour_requests status: {update_response.text}")
+            except Exception as update_error:
+                print(f"Error updating tour_requests status: {update_error}")
+        else:
+            print(f"No tour_id available for tour_requests update (user_id: {user_id})")
+        
+        # Clean up extraction directory after successful database storage
+        # ZIP file is now the primary storage, directory is no longer needed
+        if os.path.exists(extract_path):
+            try:
+                print(f"Cleaning up extraction directory: {extract_path}")
+                shutil.rmtree(extract_path)
+                print(f"Successfully cleaned up directory: {extract_dir}")
+                print(f"Storage optimization: Directory removed, ZIP file remains as primary storage")
+            except Exception as cleanup_error:
+                print(f"Warning: Could not clean up extraction directory: {cleanup_error}")
+                print(f"Directory will remain: {extract_path}")
+        else:
+            print(f"Extraction directory not found for cleanup: {extract_path}")
         
         # [S82] Auto-call POST /tour/share after successful generation (Storied mode only)
         storied_mode = os.getenv('STORIED_MODE', 'false').lower() == 'true'
