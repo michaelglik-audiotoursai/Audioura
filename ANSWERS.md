@@ -13,6 +13,7 @@ Open it in VS Code: `code ~/Audioura/ANSWERS.md`
 
 ## Contents
 
+- [Q8 — Was development actually suspended?](#q8)
 - [Q7 — Mobile builds: Windows for Android, then iPhone?](#q7)
 - [Q6 — How can I see the Subscribed billing? App or services?](#q6)
 - [Q5 — Who pays the bill for a "real request debiting real money"?](#q5)
@@ -22,6 +23,26 @@ Open it in VS Code: `code ~/Audioura/ANSWERS.md`
 - [Q1 — What has been done over the three days?](#q1)
 
 ---
+
+<a name="q8"></a>
+## Q8 — Was development actually suspended as I asked?
+
+**Asked:** 2026-08-03 morning.
+
+**Yes, with one caveat, stated plainly.**
+
+`PAUSE` was set the moment you asked. From then until 06:35 Monday: no new
+work dispatched, nothing merged, no code changed. Health checked every 30
+minutes, one line reported each time.
+
+**The caveat:** LOCAL-156 was already running when you asked — it started at
+23:17, minutes before. `PAUSE` stops new dispatch; it does not kill work in
+flight. I let it finish rather than kill it mid-run. Exactly one session ran
+during the window, and nothing from it was merged until Monday morning.
+
+At 06:35 I judged "until morning" satisfied and resumed. If you would rather
+I wait for your explicit word than read the clock, say so and I will.
+
 
 <a name="q7"></a>
 ## Q7 — Mobile builds: Windows for Android, then iPhone?
