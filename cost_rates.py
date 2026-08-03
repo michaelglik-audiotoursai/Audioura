@@ -56,16 +56,16 @@ def tts_cost(char_count: int) -> float:
 # [LOCAL-143] Deployed translation mode.
 # The running container determines how many translate_text calls happen per stop.
 # - TWO_PASS (2): old behaviour — each stop translated twice (full + nav-stripped).
-#   Deployed container built 2026-07-28; LOCAL-142 merged 2026-08-02 but NOT deployed.
 # - SINGLE_PASS (1): LOCAL-142 behaviour — each stop translated once, nav fields
 #   stripped positionally from the raw output. Fallback fires on line mismatch
 #   (logged as "[LOCAL-142] Positional strip fallback"), adding 1 extra call per
 #   affected stop. In the best case the multiplier is 1.0; worst case = 2.0.
 #
-# HOW DETERMINED: `docker exec audioura-translation-service-1 grep -c "LOCAL-142"
-# /app/translation_service.py` returns 0 → the container has no single-pass code.
+# HOW DETERMINED: `docker exec translation-service-1 grep -c "LOCAL-142"
+# /app/translation_service.py` returns 4 → single-pass code is deployed.
+# Deployed 2026-08-03 (LOCAL-162). Container rebuilt with LOCAL-142 source.
 # See tests/test_local143_cost_model_matches_deploy.py for automated enforcement.
-DEPLOYED_TRANSLATION_PASSES = 2
+DEPLOYED_TRANSLATION_PASSES = 1
 
 
 def translation_cost(char_count: int, passes: int = None) -> float:
