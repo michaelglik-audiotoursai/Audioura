@@ -231,9 +231,15 @@ builder is fixed or the machine is cleaned.
 
 The app's `Endpoints._localPorts[Service.orchestrator]` hardcodes **5002**
 (the shared/storied orchestrator). The subscribed-orchestrator with wallet +
-preference routes lives on **5102**. On Michael's phone talking to the Mac Mini
-(192.168.0.218:5002), preferences and wallet 404 because that orchestrator does
-not have the subscribed code.
+preference routes lives on **5102**. Whichever machine the phone points at,
+preferences and wallet 404 on :5002 because that orchestrator does not have
+the subscribed code.
+
+**Machine addresses, corrected by LEAD 2026-08-02.** This Mac Mini is
+**192.168.0.136** (`ipconfig getifaddr en0`). `192.168.0.218` does not
+respond to ping from here and is not this machine; CLAUDE.md's `192.168.0.137`
+is also stale. Do not trust a hardcoded IP in these documents without
+re-checking — the addresses are DHCP and have moved at least twice.
 
 **Tested 2026-08-02 (LOCAL-152).** Previously inferred; now verified by HTTP.
 
