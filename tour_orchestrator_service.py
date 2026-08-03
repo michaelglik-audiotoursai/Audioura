@@ -109,21 +109,41 @@ sys.stdout.reconfigure(line_buffering=True)
 
 app = Flask(__name__)
 
-# --- Wallet API Blueprint (LOCAL-68) ---
+# --- Wallet API Blueprint (LOCAL-68 / LOCAL-154) ---
+# The Dart client calls GET /wallet/<id>, GET /wallet/<id>/transactions,
+# GET /plans/available, POST /wallet/<id>/topup on this service (port 5002).
+# Without this registration all wallet screens show "connection error" and
+# the topup flow silently fails.
+#
+# Failure is logged at ERROR, not printed. A swallowed ImportError is how
+# corpus mining silently degraded for two days (see D31).
 try:
     from wallet_api import wallet_bp
     app.register_blueprint(wallet_bp)
     print("[ORCHESTRATOR] Wallet API blueprint registered (LOCAL-68)")
-except ImportError as e:
-    print(f"[ORCHESTRATOR] Wallet API not available: {e}")
+except ImportError as _wallet_err:
+    import logging as _wallet_logging
+    _wallet_logging.getLogger("tour_orchestrator_service").error(
+        f"[LOCAL-154] Wallet API NOT registered — wallet screens will fail: {_wallet_err}"
+    )
+    print(f"[ORCHESTRATOR] ERROR: wallet API unavailable: {_wallet_err}")
 
-# --- Swipe Preference Routes (LOCAL-107) ---
+# --- Swipe Preference Routes (LOCAL-107 / LOCAL-154) ---
+# The Dart client posts to /user/<id>/stop-feedback on this service (port
+# 5002). Without this registration every swipe 404s and LOCAL-105's offline
+# queue retries ten times and discards it.
+#
+# Failure is logged at ERROR, not printed (D31, LOCAL-146).
 try:
     from swipe_preference_service import register_preference_routes
     register_preference_routes(app)
     print("[ORCHESTRATOR] Preference routes registered (LOCAL-107)")
-except ImportError as e:
-    print(f"[ORCHESTRATOR] Preference routes not available: {e}")
+except ImportError as _pref_err:
+    import logging as _pref_logging
+    _pref_logging.getLogger("tour_orchestrator_service").error(
+        f"[LOCAL-154] Preference routes NOT registered — every swipe will 404: {_pref_err}"
+    )
+    print(f"[ORCHESTRATOR] ERROR: preference routes unavailable: {_pref_err}")
 
 # CORS headers for web platform support
 def add_cors_headers(response):
