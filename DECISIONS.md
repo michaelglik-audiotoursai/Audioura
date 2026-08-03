@@ -1331,3 +1331,48 @@ The design space, none of it chosen by LEAD:
    is what Michael's requirement rules out.
 
 (1) and (2) both constrain the product. LEAD will not choose between them.
+
+---
+
+## D47 — Michael's answers, 2026-08-03 (Q&A-3)
+
+### 1. Bring LOCAL-156 to `storied` — **approved**
+
+> "Bring it to Storied"
+
+Authorises putting the charge-vs-delivery fix on the branch the shared stack
+builds from, and rebuilding `audioura-tour-orchestrator-1` — the container
+his phone uses. This is the fix for tours reporting `completed` while never
+entering the catalogue, confirmed live on port 5002.
+
+Note this is a **~170-line change on the main tour path**, and D24's rule
+that shared containers stay on `storied` is what makes bringing it there the
+correct move rather than a shortcut.
+
+### 2. News billing: **same ×5**
+
+> "The same ×5: people will be reading way more everyday articles than going
+> on tours so the revenue will come."
+
+So an article at $0.006–$0.011 our cost charges $0.03–$0.055. His reasoning
+is volume, not margin per item. No special-casing for articles.
+
+### 3. Tour reuse **also charges**
+
+> "Yes, users should be charged for translation. But again, to unsubscribed,
+> they should enjoy whatever free plan we allow."
+
+This closes the item D45 left explicitly unresolved. LOCAL-156 currently
+**refunds** when a requested tour already exists; that refund must go. The
+"why should only the first user pay" logic now applies to tours as well as
+translations.
+
+The caveat matters and is already how the gate behaves: **free-tier users
+are not charged at all**, so this changes nothing for them. Charging on
+reuse applies to PPU. Verify that rather than assume it.
+
+### 4. Debt display: keep the `$`
+
+> "My mistake: I did not mean to drop $USD sign."
+
+`formatUsd()` as shipped in LOCAL-161 is correct — `-$1.23`. No change.
