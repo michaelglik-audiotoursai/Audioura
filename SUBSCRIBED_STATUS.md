@@ -162,10 +162,25 @@ flutter analyze only. No APK build possible (Docker builder hung — see §4).
   shared deployment. The shared containers still run `storied` code (by design
   — Michael's phone uses them, per D24).
 
-- ~~**Tier-change via HTTP will 500.** `tier_change.py` is not COPY'd into the orchestrator Dockerfile yet.~~
-  **CORRECTED (LOCAL-90):** Tier switching works over HTTP. All six transitions
-  tested against the subscribed stack. The `Dockerfile.orchestrator` now
-  includes the tier-change module.
+- **Tier-change via HTTP.** The LOCAL-90 "CORRECTED" note that stood here was
+  **wrong**, and stood wrong for two days. It claimed `Dockerfile.orchestrator`
+  included the tier-change module. It did not — there was no `COPY` line for
+  it, and a freshly built image had zero copies of the file.
+
+  Found on 2026-08-02 by running it in front of Michael, not by reading it:
+  `POST /wallet/<id>/change-tier` → 500 `No module named 'tier_change'`.
+  Fixing that surfaced `payment_provider`, then `fake_payment_provider`, so
+  the transitive local-import closure was computed instead — 12 modules
+  required, 3 missing. All three now COPY'd (commit `0f11424`).
+
+  **Now genuinely working:** after rebuild, free → ppu succeeds and the wallet
+  reports `plan=ppu`. Only that one transition has been re-verified since the
+  fix; the "all six transitions" claim is **not** re-established and should be
+  treated as unproven until someone runs them against a current image.
+
+  Why it went undetected: the original claim was true of whatever container
+  existed on 2026-08-01 and false of the Dockerfile, so nothing that rebuilt
+  from source would ever have worked. Re-run claims against a fresh build.
 
 - ~~**Translation cost is estimated, not measured.** The translation service
   returns `cache_hit` but not actual character counts. The $0.372 figure is
