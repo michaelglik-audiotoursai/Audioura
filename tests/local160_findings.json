@@ -1,0 +1,261 @@
+{
+  "run_id": "7cb67df9",
+  "timestamp": "2026-08-03T09:38:03.034638",
+  "users": {
+    "free_zero": "test_ux160_free_zero_7cb67df9",
+    "free_positive": "test_ux160_free_pos_7cb67df9",
+    "ppu_healthy": "test_ux160_ppu_healthy_7cb67df9",
+    "ppu_low": "test_ux160_ppu_low_7cb67df9",
+    "ppu_zero": "test_ux160_ppu_zero_7cb67df9",
+    "unlimited_mid": "test_ux160_unlim_7cb67df9"
+  },
+  "findings": {
+    "free_zero": {
+      "wallet_data": {
+        "balance_usd": 0.0,
+        "cost_stop_progress": null,
+        "low_balance": false,
+        "period_end": "2026-09-01T00:00:00+00:00",
+        "period_spend_usd": 0.0,
+        "period_start": "2026-08-01T00:00:00+00:00",
+        "plan": "free"
+      },
+      "transactions": [],
+      "predicted_rendered": [
+        "Free Plan",
+        "Upgrade to generate unlimited tours and articles",
+        "View Plans",
+        "Free",
+        "Period: 8/1 \u2013 9/1",
+        "Change",
+        "Transaction History",
+        "No transactions yet",
+        "Wallet"
+      ],
+      "ledger_before": 0,
+      "ledger_after": 0
+    },
+    "free_positive": {
+      "wallet_data": {
+        "balance_usd": 10.0,
+        "cost_stop_progress": null,
+        "low_balance": false,
+        "period_end": "2026-09-01T00:00:00+00:00",
+        "period_spend_usd": 0.0,
+        "period_start": "2026-08-01T00:00:00+00:00",
+        "plan": "free"
+      },
+      "transactions": [
+        {
+          "cache_hit": false,
+          "charged_usd": -10.0,
+          "created_at": "2026-08-03T13:38:02.698900+00:00",
+          "description": "Credit top-up: $10.00",
+          "id": "9618d9cb-286d-4c4d-a50e-2f4537e47bef",
+          "operation_type": "topup"
+        }
+      ],
+      "predicted_rendered": [
+        "Free Plan",
+        "Upgrade to generate unlimited tours and articles",
+        "View Plans",
+        "Free",
+        "Period: 8/1 \u2013 9/1",
+        "Change",
+        "Transaction History",
+        "Credit top-up: $10.00",
+        "+$10.00",
+        "Wallet"
+      ],
+      "ledger_before": 0,
+      "ledger_after": 1,
+      "reachability_note": "Attempted via topup-on-free then change-tier round-trip"
+    },
+    "ppu_healthy": {
+      "wallet_data": {
+        "balance_usd": 10.0,
+        "cost_stop_progress": null,
+        "low_balance": false,
+        "period_end": "2026-09-02T13:38:02.748364+00:00",
+        "period_spend_usd": 0.0,
+        "period_start": "2026-08-03T13:38:02.748364+00:00",
+        "plan": "ppu"
+      },
+      "transactions": [
+        {
+          "cache_hit": false,
+          "charged_usd": -10.0,
+          "created_at": "2026-08-03T13:38:02.753853+00:00",
+          "description": "Credit top-up: $10.00",
+          "id": "5f4c1359-bd14-4b75-a7f7-0e637703e7d6",
+          "operation_type": "topup"
+        }
+      ],
+      "predicted_rendered": [
+        "Available Balance",
+        "$10.00",
+        "This period: $0.00",
+        "Pay-Per-Use",
+        "Period: 8/3 \u2013 9/2",
+        "Change",
+        "Top Up",
+        "Transaction History",
+        "Credit top-up: $10.00",
+        "+$10.00",
+        "Wallet"
+      ],
+      "ledger_before": 0,
+      "ledger_after": 1
+    },
+    "ppu_low": {
+      "wallet_data": {
+        "balance_usd": 1.5,
+        "cost_stop_progress": null,
+        "low_balance": true,
+        "period_end": "2026-09-02T13:38:02.787109+00:00",
+        "period_spend_usd": 8.5,
+        "period_start": "2026-08-03T13:38:02.787109+00:00",
+        "plan": "ppu"
+      },
+      "transactions": [
+        {
+          "cache_hit": false,
+          "charged_usd": 8.5,
+          "created_at": "2026-08-03T13:38:02.795134+00:00",
+          "description": "Simulated tour charges (test drain)",
+          "id": "58a7e171-7753-4963-91a6-b10cb3669f3f",
+          "operation_type": "charge"
+        },
+        {
+          "cache_hit": false,
+          "charged_usd": -10.0,
+          "created_at": "2026-08-03T13:38:02.791700+00:00",
+          "description": "Credit top-up: $10.00",
+          "id": "c91bda43-3108-4450-ba98-d9ccc57f8cb9",
+          "operation_type": "topup"
+        }
+      ],
+      "predicted_rendered": [
+        "Available Balance",
+        "$1.50",
+        "\u26a0\ufe0f Low balance \u2014 top up to continue generating",
+        "This period: $8.50",
+        "Pay-Per-Use",
+        "Period: 8/3 \u2013 9/2",
+        "Change",
+        "Top Up",
+        "Transaction History",
+        "Simulated tour charges (test drain)",
+        "\u2212$8.50",
+        "Credit top-up: $10.00",
+        "+$10.00",
+        "Wallet"
+      ],
+      "ledger_before": 0,
+      "ledger_after": 2,
+      "low_balance_threshold": "$2.00"
+    },
+    "ppu_zero": {
+      "wallet_data": {
+        "balance_usd": 0.0,
+        "cost_stop_progress": null,
+        "low_balance": true,
+        "period_end": "2026-09-02T13:38:02.829283+00:00",
+        "period_spend_usd": 10.0,
+        "period_start": "2026-08-03T13:38:02.829283+00:00",
+        "plan": "ppu"
+      },
+      "transactions": [
+        {
+          "cache_hit": false,
+          "charged_usd": 10.0,
+          "created_at": "2026-08-03T13:38:02.836741+00:00",
+          "description": "Simulated full drain (test)",
+          "id": "511b63f2-d320-4775-b668-a72cd029ce60",
+          "operation_type": "charge"
+        },
+        {
+          "cache_hit": false,
+          "charged_usd": -10.0,
+          "created_at": "2026-08-03T13:38:02.833549+00:00",
+          "description": "Credit top-up: $10.00",
+          "id": "edecbccb-3f5b-4fce-add4-c817a6bcf07f",
+          "operation_type": "topup"
+        }
+      ],
+      "predicted_rendered": [
+        "Available Balance",
+        "$0.00",
+        "\u26a0\ufe0f Low balance \u2014 top up to continue generating",
+        "This period: $10.00",
+        "Pay-Per-Use",
+        "Period: 8/3 \u2013 9/2",
+        "Change",
+        "Top Up",
+        "Transaction History",
+        "Simulated full drain (test)",
+        "\u2212$10.00",
+        "Credit top-up: $10.00",
+        "+$10.00",
+        "Wallet"
+      ],
+      "ledger_before": 0,
+      "ledger_after": 2
+    },
+    "ppu_negative": {
+      "wallet_data": {
+        "balance_usd": -0.5,
+        "cost_stop_progress": null,
+        "low_balance": true,
+        "period_end": "2026-09-02T13:38:02.829283+00:00",
+        "period_spend_usd": 10.5,
+        "period_start": "2026-08-03T13:38:02.829283+00:00",
+        "plan": "ppu"
+      },
+      "predicted_rendered": [
+        "Available Balance",
+        "$-0.50",
+        "\u26a0\ufe0f Low balance \u2014 top up to continue generating",
+        "This period: $10.50",
+        "Pay-Per-Use",
+        "Period: 8/3 \u2013 9/2",
+        "Change",
+        "Top Up",
+        "Transaction History",
+        "Simulated full drain (test)",
+        "\u2212$10.00",
+        "Credit top-up: $10.00",
+        "+$10.00",
+        "Wallet"
+      ]
+    },
+    "unlimited_mid": {
+      "wallet_data": {
+        "balance_usd": 0.0,
+        "cost_stop_progress": {
+          "limit_usd": 25.0,
+          "used_usd": 12.5
+        },
+        "low_balance": false,
+        "period_end": "2026-09-02T13:38:02.892370+00:00",
+        "period_spend_usd": 0.0,
+        "period_start": "2026-08-03T13:38:02.892370+00:00",
+        "plan": "unlimited"
+      },
+      "transactions": [],
+      "predicted_rendered": [
+        "Monthly Allowance",
+        "$12.50 / $25.00",
+        "50% used",
+        "Unlimited",
+        "Period: 8/3 \u2013 9/2",
+        "Change",
+        "Transaction History",
+        "No transactions yet",
+        "Wallet"
+      ],
+      "ledger_before": 0,
+      "ledger_after": 0
+    }
+  }
+}
