@@ -1719,6 +1719,74 @@ def promote_custom_tour(tour_id):
             conn.close()
 
 
+@app.route('/tour/<tour_id>/update-stop', methods=['POST'])
+def update_single_stop(tour_id):
+    """Shim: single-stop update delegated to bulk-save via internal request.
+
+    The app's edit_stop_screen calls this for individual stop text edits.
+    Translates the single-stop format into bulk-save format.
+    Returns synchronously (no job_id), so the app skips job polling.
+    """
+    data = request.json or {}
+    stop_number = data.get('stop_number')
+    new_text = data.get('new_text')
+
+    if not stop_number or not new_text:
+        return jsonify({
+            "status": "error",
+            "message": "stop_number and new_text are required",
+            "error_code": "VALIDATION_FAILED",
+            "recoverable": True,
+            "suggested_action": "Please provide stop_number and new_text fields"
+        }), 400
+
+    # Delegate to bulk-save using internal test client
+    import json as _json
+    bulk_payload = _json.dumps({
+        "stops": [{
+            "stop_number": stop_number,
+            "text": new_text,
+            "original_text": "",
+            "action": "modify",
+            "generate_audio_from_text": True,
+            "has_custom_audio": False,
+            "audio_source": "tts_generated"
+        }]
+    })
+
+    with app.test_client() as client:
+        resp = client.post(
+            f"/tour/{tour_id}/bulk-save",
+            data=bulk_payload,
+            content_type="application/json"
+        )
+
+    # Return the bulk-save response directly
+    return app.response_class(
+        response=resp.data,
+        status=resp.status_code,
+        mimetype="application/json"
+    )
+
+
+@app.route('/tour/<tour_id>/job-status/<job_id>', methods=['GET'])
+def get_job_status(tour_id, job_id):
+    """Shim: job status endpoint.
+
+    Phase2 bulk-save is synchronous - no background jobs exist.
+    The app only reaches this if update-stop returns a job_id (it does not).
+    Registered so the route returns structured JSON instead of generic 404.
+    Always returns 'completed' since all operations finish synchronously.
+    """
+    return jsonify({
+        "status": "completed",
+        "tour_id": tour_id,
+        "job_id": job_id,
+        "message": "Operation completed synchronously"
+    })
+
+
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint for Cloud Run liveness probe."""
