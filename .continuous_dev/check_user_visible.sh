@@ -38,3 +38,25 @@ if [ "$ACTUAL" != "$EXPECTED" ]; then
   echo "$MSG" >> "$ALERTS"
   echo "$MSG" >> "$LOG"
 fi
+
+# --- Unflagged test tours, anywhere on earth. ---
+#
+# WHY: the check above watches ONE location (Nice). On 2026-08-02 test suites
+# run during a task created tour 132, "LOCAL49 Regression Test ... Walking
+# Tour", with is_test=false and real Seattle coordinates. tours-near filters
+# on is_test, so it was live at 47.6098/-122.3423 — and the Nice check stayed
+# silent because it looks at Nice. A location-scoped guard cannot catch a
+# tour planted somewhere else.
+#
+# tours-near filters on is_test, so an is_test=false row named like a test
+# IS user-visible wherever it sits. Alarm on the flag, not on the place.
+UNFLAGGED=$(docker exec development-postgres-2-1 psql -U admin -d audiotours -t -A \
+  -c "SELECT string_agg(id::text, ',' ORDER BY id) FROM audio_tours
+      WHERE tour_name ~ '(LOCAL[0-9]+|Regression Test|Acceptance Test|Selective Test|NoFlag Test)'
+        AND is_test IS NOT TRUE;" 2>/dev/null)
+
+if [ -n "$UNFLAGGED" ]; then
+  MSG="$(date -u +%FT%TZ) | *** UNFLAGGED TEST TOURS VISIBLE: ids [$UNFLAGGED] — is_test is not true, tours-near will serve them ***"
+  echo "$MSG" >> "$ALERTS"
+  echo "$MSG" >> "$LOG"
+fi
