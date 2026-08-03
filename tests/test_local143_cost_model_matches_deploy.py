@@ -48,7 +48,7 @@ def detect_container_pass_mode():
     Returns:
         (int, str): (pass_count, evidence) or (None, reason) if undetectable.
     """
-    container_name = "audioura-translation-service-1"
+    container_name = "translation-service-1"
 
     # Check container is running
     try:
