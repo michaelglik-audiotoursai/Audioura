@@ -11,17 +11,14 @@ is used — it eliminates systematic bias over large transaction volumes and
 is the IEEE 754 default. A float balance would accumulate drift; Decimal
 with explicit quantize does not.
 
-Cache hits always charge $0.00 — non-negotiable per Michael's ruling.
+Tour/news cache hits charge $0.00 — per Michael's ruling.
+Translation cache hits charge the same as a fresh translation (D45):
+  Michael: "if user asks to retranslate, we return the translated text. But
+  as far as Wallet is concerned we should take the same amount."
 
 This module does NOT mutate balances, write to a wallet, or touch any
 ledger. It computes a price from a cost and returns it. LOCAL-66 owns the
 wallet.
-
-⚠️  FLAG FOR MICHAEL — Translation pricing:
-    At ×5, a fresh translation costs the user ~$1.86 vs ~$0.32 for the tour
-    it translates (roughly 6× more). This is mathematically correct given
-    the input costs, but Michael should confirm the user experience is
-    acceptable before launch.
 """
 
 import os
@@ -68,6 +65,7 @@ def compute_user_charge(
     cache_hit: bool,
     operation_type: str,
     description: Optional[str] = None,
+    fresh_cost_usd: "Decimal | float | str | None" = None,
 ) -> dict:
     """Compute the user-facing charge for a single metered operation.
 
@@ -80,6 +78,10 @@ def compute_user_charge(
         description: Optional human-readable label for the transaction list,
                      e.g. "Tour: French Riviera biking". If not provided,
                      a default is generated from operation_type.
+        fresh_cost_usd: For translation cache hits (D45): the cost of a fresh
+                        translation. The user is charged as if it were fresh,
+                        even though our_cost is $0.00. Required when
+                        operation_type == "translation_cache_hit".
 
     Returns:
         dict with:
@@ -104,13 +106,27 @@ def compute_user_charge(
     else:
         cost = Decimal(str(our_cost_usd))
 
-    # --- Cache hit: charge is ALWAYS $0.00 ---
-    if cache_hit:
+    multiplier = get_pricing_multiplier()
+
+    # --- Translation cache hit (D45): charge same as fresh translation ---
+    # Michael: "if user asks to retranslate, we return the translated text.
+    # But as far as Wallet is concerned we should take the same amount."
+    # our_cost stays $0.00 (that's our accounting truth), but the USER charge
+    # is computed from the fresh translation cost.
+    if cache_hit and operation_type == "translation_cache_hit" and fresh_cost_usd is not None:
+        if isinstance(fresh_cost_usd, float):
+            basis = Decimal(str(fresh_cost_usd))
+        elif isinstance(fresh_cost_usd, Decimal):
+            basis = fresh_cost_usd
+        else:
+            basis = Decimal(str(fresh_cost_usd))
+        raw_charge = basis * multiplier
+        charge = raw_charge.quantize(_CENT, rounding=ROUND_HALF_EVEN)
+    # --- Other cache hits: charge $0.00 (tours, news) ---
+    elif cache_hit:
         charge = Decimal("0.00")
-        multiplier = get_pricing_multiplier()  # report the active multiplier
     else:
-        multiplier = get_pricing_multiplier()
-        # Multiply first, round ONCE at the end.
+        # Fresh operation: charge = our_cost × multiplier
         raw_charge = cost * multiplier
         # Quantize to $0.01 using banker's rounding.
         charge = raw_charge.quantize(_CENT, rounding=ROUND_HALF_EVEN)
@@ -175,7 +191,7 @@ _OPERATION_LABELS = {
     "tour_generate": "Tour generation",
     "tour_cache_hit": "Tour (cached)",
     "translation_generate": "Translation",
-    "translation_cache_hit": "Translation (cached)",
+    "translation_cache_hit": "Translation (cached — same charge)",
     "news_generate": "News article",
     "photo_extension": "Photo tour extension",
 }
