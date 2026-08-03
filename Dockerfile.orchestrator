@@ -8,6 +8,9 @@ COPY tests/db_connection.py /app/tests/db_connection.py
 COPY entitlements.py /app/
 COPY cost_ceiling_monitor.py /app/
 COPY wallet_api.py /app/
+COPY tier_change.py /app/
+COPY payment_provider.py /app/
+COPY fake_payment_provider.py /app/
 COPY wallet_ledger.py /app/
 COPY pricing.py /app/
 COPY cost_meter.py /app/
