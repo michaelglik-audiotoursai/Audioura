@@ -16,6 +16,7 @@ the terminal scroll.**
 
 ## Contents
 
+- [Q9 — News generation is broken in production (LEAD-raised)](#q9)
 - [Q8 — Was development actually suspended?](#q8)
 - [Q7 — Mobile builds: Windows for Android, then iPhone?](#q7)
 - [Q6 — How can I see the Subscribed billing? App or services?](#q6)
@@ -26,6 +27,37 @@ the terminal scroll.**
 - [Q1 — What has been done over the three days?](#q1)
 
 ---
+
+<a name="q9"></a>
+## Q9 — [LEAD-raised] News article generation is broken in production
+
+**Found:** 2026-08-03, 12:10 EDT. **Needs Michael's decision.**
+
+**Every news article request returns HTTP 503.** Confirmed by direct probe:
+
+```
+POST /generate-news {"article_text":..., "secret_id":...}
+  -> {"allowed":false,"error":"quota_check_failed"}   HTTP 503
+```
+
+Users cannot generate articles at all. The billing code behind it is
+correct and proven — real cost metered at $0.008264, wallet debited, cache
+hits free, D41's floor enforced — but nothing reaches it.
+
+**The cause is unverified.** The hypothesis is a stale container image
+missing `payment_provider.py`, but LEAD could not confirm it: `docker exec`
+hangs because the Docker CLI is wedged. The shared containers run `storied`
+code while that import landed on `subscribed`, so the explanation may not
+hold as stated.
+
+**What LEAD needs from Michael:**
+
+1. **Is news generation used today?** If your app exposes it, this is a live
+   outage. If it is unreleased, it is merely undeployed.
+2. **The Docker Desktop restart.** The CLI has been wedged since 07:40. It
+   is now blocking diagnosis of this outage, not just the 44% translation
+   saving. A restart takes ~1 minute and briefly stops all 23 containers.
+
 
 <a name="q8"></a>
 ## Q8 — Was development actually suspended as I asked?
