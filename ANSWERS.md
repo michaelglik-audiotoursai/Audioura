@@ -16,6 +16,7 @@ the terminal scroll.**
 
 ## Contents
 
+- [Q10 — Tours silently vanish in production for existing venues (LEAD-raised)](#q10)
 - [Q9 — News generation is broken in production (LEAD-raised)](#q9)
 - [Q8 — Was development actually suspended?](#q8)
 - [Q7 — Mobile builds: Windows for Android, then iPhone?](#q7)
@@ -27,6 +28,47 @@ the terminal scroll.**
 - [Q1 — What has been done over the three days?](#q1)
 
 ---
+
+<a name="q10"></a>
+## Q10 — [LEAD-raised] Tours silently vanish in production for venues that already exist
+
+**Found:** 2026-08-03, 12:40 EDT. **Needs Michael's decision.**
+
+LEAD generated a tour against the **shared stack on 5002 — the one your
+phone uses**. Result:
+
+```
+job status        completed
+audio_tours row   NEVER CREATED   (107 before, 107 after)
+```
+
+The venue already had a tour (id=1, your real Palais Lascaris tour from
+2026-07-22), the insert hit a unique-name index, the exception was
+swallowed, and the job reported success anyway. **The user is told their
+tour is ready and it never appears in their library.**
+
+This is the same defect LOCAL-156 fixed on Saturday — but that fix lives on
+`subscribed`:
+
+```
+grep -c LOCAL-156 tour_orchestrator_service.py
+  storied      0      <- what the shared stack runs
+  subscribed  16      <- where the fix is
+```
+
+On the shared stack there is no wallet, so **no money is lost** — the harm
+is a user asking for a tour, being told it succeeded, and getting nothing.
+
+**What LEAD needs from Michael:** whether to bring the LOCAL-156 fix onto
+`storied` and rebuild the shared orchestrator. That touches the container
+your phone depends on, and it is blocked anyway while the Docker CLI is
+wedged. Two reasons this is your call, not LEAD's.
+
+**Cost note, disclosed:** this probe spent about **$0.017** of real
+OpenAI/AWS money generating a 2-stop tour on production. A cheaper probe
+would have sufficed; LEAD used a full generation where a lighter check
+would have answered the question.
+
 
 <a name="q9"></a>
 ## Q9 — [LEAD-raised] News article generation is broken in production
