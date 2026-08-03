@@ -18,6 +18,7 @@ Movement types:
     topup               — user purchased credits ($10.00 = 1000 cents)
     charge              — usage debit (our_cost × PRICING_MULTIPLIER)
     refund_clawback     — Apple refund reversal (negative, may go below 0)
+    service_credit      — compensating credit when delivery fails after charge (LOCAL-156)
     monthly_fee         — $2/month Pay-Per-Use subscription fee
     monthly_fee_unlimited — $50/month Unlimited subscription fee
 """
@@ -51,6 +52,7 @@ VALID_MOVEMENT_TYPES = frozenset([
     "topup",
     "charge",
     "refund_clawback",
+    "service_credit",
     "monthly_fee",
     "monthly_fee_unlimited",
 ])
