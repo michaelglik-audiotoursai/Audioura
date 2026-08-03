@@ -16,6 +16,7 @@ the terminal scroll.**
 
 ## Contents
 
+- [Q19 — Should the billing layer move to `storied`? (LEAD-raised)](#q19)
 - [Q18 — Translation pricing: what is $2.71 for, can it be cheaper?](#q18)
 - [Q17 — What is the credential pipeline, for whom, for what?](#q17)
 - [Q16 — Can I add field-experiment tasks? Is ClickUp working?](#q16)
@@ -36,6 +37,42 @@ the terminal scroll.**
 - [Q1 — What has been done over the three days?](#q1)
 
 ---
+
+<a name="q19"></a>
+## Q19 — [LEAD-raised] Should the billing layer move to `storied`?
+
+**Found:** 2026-08-03, 17:15 EDT. **Needs Michael's decision.**
+
+News billing is written, proven correct, and **cannot be deployed.**
+
+`Dockerfile.news-orchestrator` now copies the four billing modules it needs.
+But those modules exist only on `subscribed`:
+
+```
+wallet_ledger     storied NO    subscribed yes
+pricing           storied NO    subscribed yes
+payment_provider  storied NO    subscribed yes
+projected_costs   storied NO    subscribed yes
+```
+
+and `news-orchestrator-1` builds with `context: .` from `~/Audioura`, which
+is checked out on `storied`. A build from there fails outright — no such
+file. That is worse than today, where the image builds and merely cannot
+bill.
+
+**The decision:** bring the billing layer to `storied`?
+
+- **For:** it is the only way news billing (or wallet routes) can ever reach
+  the shared containers, since D24 keeps those on `storied`. You already
+  approved the same move for the LOCAL-156 fix.
+- **Against:** materially bigger than one bug fix. It puts unreleased
+  billing code on the branch your phone's containers build from. Until Apple
+  products exist nobody can pay anyway, so there is no revenue lost by
+  waiting.
+
+LEAD has parked it rather than decide: this is about what runs on your
+phone's stack, not a reversible implementation choice.
+
 
 <a name="q18"></a>
 ## Q18 — Translation pricing: what is the $2.71 for, and can it be cheaper?
