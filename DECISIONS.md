@@ -1712,3 +1712,47 @@ actual limit has been in the data:
 
 **When a text-quality metric refuses to move, look at what the generator was
 given, not at what it wrote.**
+
+---
+
+## D55 — LEAD designed a measurement that could not show an effect (2026-08-03)
+
+Round 3 of the stop-specificity loop reported "4.2% → 4.2%, no change" after
+building a `stop_corpus` table and attributing passages to it.
+
+**The number is void.** The v2 detector contains **zero references to
+`stop_corpus`** — because LEAD's own task file said *"Do not modify
+`tests/stop_anchor_detector_v2.py`"*. The new data could not reach the
+metric. An unchanged score was guaranteed before any work was done.
+
+The instinct was right: changing the metric and the data in the same round
+makes a result unreadable, and with a zero noise floor the ruler must hold
+still. The implementation was wrong: **freezing the ruler so it cannot see
+the new data is not the same as holding it steady.**
+
+The correct design, for round 4 and anything like it: keep the metric's
+*logic* fixed while letting it read the new source, or run both variants
+over the same set and report them side by side. What must not change is the
+rule; what must be allowed to change is the input.
+
+### The finding that survives
+
+```
+titles with no attributable passage: 47/67 = 70%
+```
+
+Even where attribution is mechanically possible, seven stops in ten have no
+page text mentioning them at all. The pages held are venue-level prose. So
+per-stop material can be recovered for roughly 30% of stops and no more —
+the rest is a **fetching** problem, not an attribution problem.
+
+### Where this sits in the pattern
+
+This is the fourth time the limit has been in the data rather than the text
+(D54 lists the first three). It is also the second time today a LEAD
+measurement produced a misleading result — D49 recorded asserting on a proxy
+instead of the user-visible outcome. Different error, same family: **the
+measurement was wrong in a way that looked like a finding.**
+
+Worth stating as a rule: *before believing a null result, check that the
+experiment was capable of producing a non-null one.*
