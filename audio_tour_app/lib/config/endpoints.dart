@@ -19,8 +19,13 @@ enum Service {
 }
 
 class Endpoints {
-  static const _localPorts = {
-    Service.orchestrator: 5002,
+  /// DEBUG ONLY — override orchestrator port via --dart-define=WALLET_DEBUG_PORT=5102
+  /// Points the app at the subscribed stack for wallet UI testing.
+  /// Has NO effect unless explicitly passed at build time.
+  static const _walletDebugPort = int.fromEnvironment('WALLET_DEBUG_PORT');
+
+  static final _localPorts = {
+    Service.orchestrator: _walletDebugPort > 0 ? _walletDebugPort : 5002,
     Service.userDb: 5003,
     Service.mapDelivery: 5005,
     Service.treats: 5007,
@@ -56,11 +61,19 @@ class Endpoints {
   /// NEVER hardcode the actual key in source.
   static const _builtInApiKey = String.fromEnvironment('GATEWAY_API_KEY');
 
+  /// DEBUG ONLY — override server IP via --dart-define=DEBUG_SERVER_IP=192.168.0.136
+  /// Forces local mode when set, regardless of SharedPreferences.
+  static const _debugServerIp = String.fromEnvironment('DEBUG_SERVER_IP');
+
   /// Returns the base URL for [s] based on current server_mode.
   /// Local:  http://<server_ip>:<port>
   /// Cloud (interim, bare per-service host):  <cloud_base_url>   (no prefix)
   /// Cloud (gateway, cloud_use_path_prefixes=true):  <cloud_base_url><path_prefix>
   static Future<String> base(Service s) async {
+    // DEBUG: if DEBUG_SERVER_IP is baked in, force local mode to that IP.
+    if (_debugServerIp.isNotEmpty) {
+      return 'http://$_debugServerIp:${_localPorts[s]}';
+    }
     final prefs = await SharedPreferences.getInstance();
     final mode = prefs.getString('server_mode') ?? 'cloud';
     if (mode == 'cloud') {
