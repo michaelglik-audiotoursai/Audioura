@@ -1,6 +1,15 @@
 import 'package:flutter/material.dart';
 import '../services/wallet_service.dart';
 
+/// Format a USD amount with conventional sign placement.
+/// Positive/zero: "$10.00", Negative: "-$0.50" (not "$-0.50").
+String formatUsd(double amount) {
+  if (amount < 0) {
+    return '-\$${(-amount).toStringAsFixed(2)}';
+  }
+  return '\$${amount.toStringAsFixed(2)}';
+}
+
 /// Wallet screen — accessible from Settings (About).
 /// Shows balance, plan, spend, transactions, and top-up.
 class WalletScreen extends StatefulWidget {
@@ -159,7 +168,7 @@ class _WalletScreenState extends State<WalletScreen> {
       return _buildCostStopCard(wallet);
     }
     if (wallet.plan == 'free') {
-      return _buildFreeCard();
+      return _buildFreeCard(wallet);
     }
     // Pay-Per-Use: show balance prominently
     return Card(
@@ -174,7 +183,7 @@ class _WalletScreenState extends State<WalletScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              '\$${wallet.balanceUsd.toStringAsFixed(2)}',
+              formatUsd(wallet.balanceUsd),
               style: TextStyle(
                 fontSize: 42,
                 fontWeight: FontWeight.bold,
@@ -273,7 +282,7 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget _buildFreeCard() {
+  Widget _buildFreeCard(WalletData wallet) {
     return Card(
       elevation: 2,
       child: Padding(
@@ -293,6 +302,24 @@ class _WalletScreenState extends State<WalletScreen> {
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey.shade600),
             ),
+            if (wallet.balanceUsd != 0.0) ...[
+              const SizedBox(height: 16),
+              const Text(
+                'Available Balance',
+                style: TextStyle(fontSize: 13, color: Colors.grey),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                formatUsd(wallet.balanceUsd),
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: wallet.balanceUsd < 0
+                      ? Colors.red
+                      : Colors.green.shade700,
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
