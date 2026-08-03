@@ -6,10 +6,10 @@ Two thresholds (both configurable via env vars):
   COST_TARGET (default $0.15)
       Design target. Exceeding → WARN. Tour still delivered.
 
-  COST_HARD_LIMIT (default $1.30)
-      Michael's standing instruction: "The maximum price for the individual
-      tour should be less than $1.30 otherwise, stop." Exceeding → ABORT.
-      Tour is NOT delivered. Error returned to caller.
+  COST_HARD_LIMIT (default $2.00)
+      Michael's directive (D45): "let's make the tour maximum from $1.30
+      to $2.00." Exceeding → ABORT. Tour is NOT delivered. Error returned
+      to caller.
 
 The function also:
   - Flags the cost_ledger row (ceiling_breach column)
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 # --- Configuration (env-var-tunable, no redeploy needed) ---
 COST_TARGET = float(os.environ.get("COST_TARGET_USD", "0.15"))
-COST_HARD_LIMIT = float(os.environ.get("COST_HARD_LIMIT_USD", "1.30"))
+COST_HARD_LIMIT = float(os.environ.get("COST_HARD_LIMIT_USD", "2.00"))
 
 # --- In-memory counters for /health exposure ---
 _lock = threading.Lock()
@@ -163,7 +163,7 @@ def enforce_cost_ceiling(
     result["message"] = (
         f"COST HARD LIMIT EXCEEDED: ${total_cost:.4f} > ${COST_HARD_LIMIT:.4f} — "
         f"ABORTING tour delivery (category={tour_category}, user={user_id}). "
-        f"Michael's standing instruction: stop at $1.30."
+        f"Michael's directive (D45): ceiling is ${COST_HARD_LIMIT:.2f}."
     )
     logger.error(f"[COST_CEILING] {result['message']}")
     print(f"[COST_CEILING] {result['message']}")

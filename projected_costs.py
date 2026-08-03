@@ -52,9 +52,10 @@ PROJECTED_COSTS = {
     # Photo extension: not yet measured; estimate similar to article.
     "photo_extension": Decimal("0.10"),
 
-    # Cache hits always $0.00 — no projection needed, but include for completeness.
+    # Cache hits: tours and news are $0.00, but translation cache hits (D45)
+    # charge the same as fresh. The pre-flight check must account for this.
     "tour_cache_hit": Decimal("0.00"),
-    "translation_cache_hit": Decimal("0.00"),
+    "translation_cache_hit": Decimal("2.70"),  # D45: retranslation charges same as fresh
     "news_cache_hit": Decimal("0.00"),
 }
 

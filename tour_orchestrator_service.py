@@ -1096,11 +1096,18 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                         ACTIVE_JOBS[job_id]["translated_tour_id"] = translated_tour_id
                         ACTIVE_JOBS[job_id]["final_tour_id"] = translated_tour_id
                         
-                        # [LOCAL-60] Meter translation cost
+                        # [LOCAL-60] Meter translation cost to cost_ledger
+                        # [LOCAL-169] Charge wallet for BOTH fresh and cached translations (D45)
                         try:
                             from cost_meter import record_operation
-                            from cost_rates import CACHE_HIT_COST_USD
+                            from cost_rates import CACHE_HIT_COST_USD, translation_cost, DEPLOYED_TRANSLATION_PASSES
+
+                            # Always compute fresh translation cost for charging
+                            _source_chars = len(tour_content) if tour_content else 16000
+                            _total_translation_cost = translation_cost(_source_chars, passes=DEPLOYED_TRANSLATION_PASSES)
+
                             if _translation_cache_hit:
+                                # cost_ledger: record TRUE cost ($0.00) — our accounting
                                 record_operation(
                                     operation_type="translation_cache_hit",
                                     our_cost_usd=CACHE_HIT_COST_USD,
@@ -1110,15 +1117,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                                     breakdown={"translate": 0.0, "tts": 0.0},
                                 )
                             else:
-                                # [LOCAL-143] translation_cost() is all-in: AWS Translate
-                                # passes + Polly TTS. Pass count comes from
-                                # DEPLOYED_TRANSLATION_PASSES (inspected from running
-                                # container — see test_local143). The cost model now
-                                # tracks which code path the container actually runs.
-                                from cost_rates import translation_cost, DEPLOYED_TRANSLATION_PASSES
-                                # Use actual tour character count (tour_content is in scope)
-                                _source_chars = len(tour_content) if tour_content else 16000
-                                _total_translation_cost = translation_cost(_source_chars, passes=DEPLOYED_TRANSLATION_PASSES)
+                                # cost_ledger: record real cost
                                 record_operation(
                                     operation_type="translation_generate",
                                     our_cost_usd=_total_translation_cost,
@@ -1133,6 +1132,49 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                                 )
                         except Exception as _meter_err:
                             print(f"[LOCAL-60] Translation cost metering failed (non-fatal): {_meter_err}")
+
+                        # [LOCAL-169] Charge the user's wallet (D45: cache hit charges same as fresh)
+                        # This is a billing control — separate try, FAILS CLOSED for fresh,
+                        # non-fatal for cache hits (translation already served).
+                        if user_id:
+                            try:
+                                from pricing import compute_user_charge as _compute_charge
+                                from wallet_ledger import charge as _wallet_charge, record_unlimited_cost as _record_unlimited
+                                from entitlements import _get_subscription_tier
+                                from cost_rates import translation_cost as _tc, DEPLOYED_TRANSLATION_PASSES as _dtp
+
+                                _user_tier = _get_subscription_tier(user_id)
+                                _source_chars_w = len(tour_content) if tour_content else 16000
+                                _fresh_cost = _tc(_source_chars_w, passes=_dtp)
+
+                                _op_type = "translation_cache_hit" if _translation_cache_hit else "translation_generate"
+                                _charge_result = _compute_charge(
+                                    our_cost_usd=CACHE_HIT_COST_USD if _translation_cache_hit else _fresh_cost,
+                                    cache_hit=_translation_cache_hit,
+                                    operation_type=_op_type,
+                                    description=f"Translation to {language}",
+                                    fresh_cost_usd=_fresh_cost if _translation_cache_hit else None,
+                                )
+
+                                if _user_tier == 'ppu' and _charge_result['user_charge_cents'] > 0:
+                                    _charge_idem_key = f"charge:{user_id}:{job_id}:translation"
+                                    _row_id, _new_bal, _was_stopped = _wallet_charge(
+                                        user_id=user_id,
+                                        charge_usd=_charge_result['user_charge_usd'],
+                                        idempotency_key=_charge_idem_key,
+                                        description=f"Translation to {language} — ${_charge_result['user_charge_usd']:.2f}",
+                                        job_id=job_id,
+                                    )
+                                    print(f"[LOCAL-169] PPU translation charged: ${_charge_result['user_charge_usd']:.2f} | "
+                                          f"cache_hit={_translation_cache_hit} | balance={_new_bal}¢ | user={user_id}")
+
+                                elif _user_tier == 'unlimited':
+                                    from decimal import Decimal as _Dec
+                                    _record_unlimited(user_id, _Dec(str(_fresh_cost)))
+                                    print(f"[LOCAL-169] Unlimited translation cost recorded: ${_fresh_cost:.6f} | user={user_id}")
+
+                            except Exception as _charge_err:
+                                print(f"[LOCAL-169] Translation wallet charge failed: {_charge_err}")
                     else:
                         print(f"Warning: Translation completed but no tour ID returned")
                         ACTIVE_JOBS[job_id]["final_tour_id"] = english_tour_id
