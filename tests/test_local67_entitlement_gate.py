@@ -294,22 +294,23 @@ def test_ppu_with_balance(test_users):
 
 
 def test_ppu_zero_balance(test_users):
-    """PPU user with $0 balance → hard stop with topup reminder (D3)."""
+    """PPU user with $0 balance → ALLOWED per LOCAL-163 overdraft rule (D41).
+    D3's zero-stop is superseded: balance $0.00 - projected $0.40 = -$0.40,
+    which is above the -$2.00 floor. Rule 1: finish what you started.
+    """
     from entitlements import check_tour_quota
     uid = test_users['ppu_zero_balance']
     result = check_tour_quota(uid, 10)
     
     assert_structured_result(result, "ppu_zero")
     
+    # LOCAL-163: zero balance is now ALLOWED (overdraft to about −$0.40)
     passed = (
-        result['allowed'] is False
-        and result['reason'] == 'insufficient_balance'
-        and result['remedy'] == 'topup'
+        result['allowed'] is True
+        and result['reason'] == 'ok'
         and result['plan'] == 'ppu'
-        and 'message' in result
-        and 'Top up' in result.get('message', '')
     )
-    record_result("ppu_zero_balance — hard stop with topup reminder", passed,
+    record_result("ppu_zero_balance — allowed per overdraft rule (D41)", passed,
                   json.dumps(result, default=str))
 
 
@@ -431,7 +432,7 @@ def test_billing_check_error_denies(test_users):
     
     # Monkey-patch _check_ppu_balance to raise
     original = entitlements._check_ppu_balance
-    def _exploding_balance(user_id):
+    def _exploding_balance(user_id, operation_type="tour_generate"):
         raise RuntimeError("Simulated wallet failure")
     
     entitlements._check_ppu_balance = _exploding_balance
@@ -488,15 +489,17 @@ def test_news_ppu_with_balance(test_users):
 
 
 def test_news_ppu_zero_balance(test_users):
-    """PPU user with zero balance → news denied with topup remedy."""
+    """PPU user with zero balance → news ALLOWED per LOCAL-163 overdraft rule (D41).
+    Balance $0.00 - projected $0.06 (news) = -$0.06, above the -$2.00 floor.
+    """
     from entitlements import check_news_quota
     uid = test_users['ppu_zero_balance']
     result = check_news_quota(uid)
     
+    # LOCAL-163: zero balance is now ALLOWED for news (overdraft to about −$0.06)
     passed = (
-        result['allowed'] is False
-        and result['reason'] == 'insufficient_balance'
-        and result['remedy'] == 'topup'
+        result['allowed'] is True
+        and result['reason'] == 'ok'
     )
     record_result("news_ppu_zero_balance", passed, json.dumps(result, default=str))
 

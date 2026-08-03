@@ -11,7 +11,10 @@ Design rules:
     4. A cache exists for read speed; it is rebuildable from the ledger.
     5. Refund clawbacks may drive balance negative. Record it; don't clamp.
     6. Every write carries a caller-supplied idempotency key (no double-credit).
-    7. Zero balance stops service (no debt from ordinary consumption).
+    7. LOCAL-163 overdraft rule (D41): balance may go negative to −$2.00 floor.
+       Pre-flight check in entitlements.py refuses operations that would breach
+       the floor. charge() records the debit unconditionally — "finish what you
+       started" (rule 1). Debt carries forward: top-up settles debt first.
     8. Unlimited tier has no balance; tracks our-cost against cost-stop instead.
 
 Movement types:
@@ -377,6 +380,19 @@ def charge(
 
     This function does NOT apply the ×5 multiplier. It takes the final charge amount.
 
+    LOCAL-163 overdraft rule (D41 — Michael's directive):
+      1. Finish what you started — if a task's real cost exceeds balance, deliver
+         it anyway and let balance go negative. Do not abandon work a user is
+         waiting on over a few cents.
+      2. The floor is −$2.00. The pre-flight check in entitlements.py refuses
+         operations that would breach this floor BEFORE work begins.
+      3. This charge() function no longer blocks at zero — the pre-flight check
+         is the enforcement point. charge() records the debit unconditionally.
+
+    The pre-flight check (entitlements._check_ppu_overdraft_floor) runs before
+    any work starts and uses projected costs. By the time charge() is called,
+    the work is already done and must be recorded regardless of balance.
+
     Args:
         user_id: User to charge.
         charge_usd: Amount to debit in USD (already includes markup).
@@ -386,29 +402,15 @@ def charge(
 
     Returns:
         (row_id, new_balance_cents, was_zero_stop_triggered)
+        was_zero_stop_triggered is now always False for PPU charges — the
+        pre-flight check in entitlements.py is the enforcement point.
     """
-    # Check balance before charge
-    current_balance = get_balance_cents(user_id)
     charge_cents = _usd_to_cents(charge_usd)
 
-    # Zero-balance stop: if balance is already 0 or less, block the charge
-    # Note: negative balance from clawback does NOT block — only zero from normal use
-    # Decision D3: zero balance = hard stop. No debt from ordinary consumption.
-    if current_balance <= 0:
-        logger.warning(
-            f"[WALLET] ZERO_STOP | user={user_id} | balance={current_balance}¢ | "
-            f"attempted_charge={charge_cents}¢ | BLOCKED"
-        )
-        return None, current_balance, True
-
-    # If this charge would go negative, also block (no debt from normal consumption)
-    if current_balance - charge_cents < 0:
-        logger.warning(
-            f"[WALLET] INSUFFICIENT_BALANCE | user={user_id} | balance={current_balance}¢ | "
-            f"attempted_charge={charge_cents}¢ | BLOCKED"
-        )
-        return None, current_balance, True
-
+    # LOCAL-163: No longer block at zero. The pre-flight overdraft floor check
+    # in entitlements.py refuses operations BEFORE work begins. By the time
+    # charge() is called, work is complete and must be recorded (rule 1:
+    # "finish what you started"). Balance may go negative down to the floor.
     row_id, new_balance = record_movement(
         user_id=user_id,
         movement_type="charge",
