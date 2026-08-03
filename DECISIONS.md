@@ -1235,3 +1235,99 @@ and $3.00 is the hard abort.
 
 **This is a development-testing ceiling and not a user-facing price.**
 Michael's $1.30 product ceiling is unchanged.
+
+---
+
+## D45 — Translation pricing and re-translation (Michael, 2026-08-03)
+
+### Tour ceiling raised: $1.30 → **$2.00**
+
+> "You significantly lowered your cost from $0.53 → 0.31 that should be good
+> enough, so let's make the tour maximum from $1.30 to $2.00."
+
+At $0.31 our cost, a translation at ×5 is $1.55 — now inside the ceiling.
+The cost-ceiling abort constant must move from 1.30 to 2.00.
+
+### Discarded-text optimisation: **dropped**
+
+> "Do not bother with Stopping translation of discarded text: very little to
+> gain and loose time."
+
+Agrees with the measurement — 559 chars/tour, $0.0084, 2.7%. Closed.
+
+### Cheaper provider: **only if ≥ ⅓ cheaper at similar quality**
+
+> "If we can find a cheaper provider than Amazon, let's discuss it, but it
+> has to be at least one third cheaper with the similar quality."
+
+A bar, not a task. Below $10/1M with comparable quality is worth raising.
+
+### Re-translation: serve the cache, **but charge the same**
+
+> "Please make sure we do not re-translate … if user asks to retranslate, we
+> return the translated text. But as far as Wallet is concerned we should
+> take the same amount in order not to confuse the user why sometimes he
+> pays and sometimes he does not and share the translation cost: why only
+> the first user is paying?"
+
+Two distinct reasons, both his: **price predictability** and **cost
+sharing**. Later, with real usage data, amortise — his worked example: a
+$1.00 translation expected to serve 10 users is $0.10/user × 5 = **$0.50**.
+
+Also: tours can be modified and a user may hold several variants; **each
+variant keeps its own translation.** Cache identity is tour-variant +
+language, not venue + language.
+
+### ⚠️ This reverses a rule already implemented — flagged, not silently resolved
+
+Michael previously said: *"it cost to us and to our clients nothing when/if
+they download a tour already pre-created or pre-translated."* LEAD built to
+that: `news_cache_hit` and translation cache hits cost **$0.00**, and
+LOCAL-156 **refunds** when a requested tour already exists.
+
+LEAD's reading, to be confirmed: the two statements address different acts.
+**Downloading** something already made is passive retrieval and stays free.
+**Requesting a translation** is an explicit service request and is charged
+whether or not we happen to hold the result.
+
+**Unresolved and NOT assumed:** whether the same logic applies to *tour*
+generation, where LOCAL-156 currently refunds on reuse. The "why should only
+the first user pay" argument applies identically, but Michael said it about
+translations, so LEAD is not extending it unasked.
+
+---
+
+## D46 — Credentials: keep, encrypted, with key material on the phone (Michael, 2026-08-03)
+
+> "We should keep the credentials in an encrypted way so user would not have
+> to enter the same credentials many times … The key or part of the key
+> should be kept on the individual phone so if our server is penetrated by
+> hackers, they would not be able to get the credentials."
+
+**Decision: keep the pipeline, do not delete it.** Requirements: encrypted at
+rest, and **split-key** — the server alone must not be able to decrypt.
+
+This supersedes the open question in `CREDENTIAL_PIPELINE_ASSESSMENT.md`.
+Current state remains: plaintext columns, 0 rows ever written, service
+unstartable. Nothing may be stored until the scheme exists.
+
+### ⚠️ The consequence Michael should decide, because it is not obvious
+
+If the decryption key lives only on the phone, **the server cannot fetch a
+paywalled article while the phone is asleep.** That is the whole purpose of
+holding the credential — background retrieval of subscriber-only content.
+
+The design space, none of it chosen by LEAD:
+
+1. **Phone-present only.** Strongest. Fetching happens while the user is in
+   the app; no background processing.
+2. **Split key, phone supplies its half per session.** Server holds one
+   half, phone sends the other when the user opens the app; the server may
+   fetch during that window and must discard the assembled key afterwards.
+   Weaker than (1) — a compromised server can capture the half in transit.
+3. **Server-side envelope encryption (KMS), no phone half.** Enables
+   background fetching, but a sufficiently compromised server *can* decrypt.
+   This is what `migrate_credentials_encrypt.py` was written for — and it
+   is what Michael's requirement rules out.
+
+(1) and (2) both constrain the product. LEAD will not choose between them.
