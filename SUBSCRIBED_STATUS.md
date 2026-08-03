@@ -225,17 +225,74 @@ tourquality-* stacks were already built before the hang began and still run.
 touches server Python and needs deployment, it cannot be deployed until the
 builder is fixed or the machine is cleaned.
 
-### Port map mismatch (app → server)
+### Port map mismatch (app → server) — TESTED (LOCAL-152)
 
 **Branch: `subscribed` (Dart code)**
 
 The app's `Endpoints._localPorts[Service.orchestrator]` hardcodes **5002**
 (the shared/storied orchestrator). The subscribed-orchestrator with wallet +
-preference routes lives on **5102**. On Michael's phone talking to the Windows
-laptop (192.168.0.218:5002), preferences and wallet will 404 unless that
-orchestrator has the subscribed code merged in.
+preference routes lives on **5102**. On Michael's phone talking to the Mac Mini
+(192.168.0.218:5002), preferences and wallet 404 because that orchestrator does
+not have the subscribed code.
 
-**Fix options:**
+**Tested 2026-08-02 (LOCAL-152).** Previously inferred; now verified by HTTP.
+
+#### Subscribed stack (port 5102): NOT RUNNING
+
+The `subscribed-orchestrator` and `subscribed-generator` containers are not up.
+`curl http://localhost:5102/health` → connection refused. The subscribed stack
+has no running containers.
+
+#### Shared stack (port 5002): wallet routes NOT registered
+
+| Route | Method | HTTP code | Body type | Verdict |
+|---|---|---|---|---|
+| `/wallet/<id>` | GET | 404 | Generic Flask HTML | **NOT REGISTERED** — route absent from image |
+| `/wallet/<id>/transactions` | GET | 404 | Generic Flask HTML | **NOT REGISTERED** |
+| `/plans/available` | GET | 404 | Generic Flask HTML | **NOT REGISTERED** |
+| `/wallet/<id>/topup` | POST | 404 | Generic Flask HTML | **NOT REGISTERED** |
+| `/user/<id>/stop-feedback` | POST | 404 | Generic Flask HTML | **NOT REGISTERED** |
+
+**Distinction applied (LOCAL-150 method):** All five return `<!DOCTYPE HTML
+...><title>404 Not Found</title>` — the Flask default for an unregistered URL.
+This is NOT a structured JSON 404 (which would mean the route exists but the
+resource is absent). These routes genuinely do not exist in the running image.
+
+**Root cause confirmed:** `wallet_api.py`, `wallet_ledger.py`, `pricing.py`,
+`swipe_preference_service.py`, and `tier_change.py` are absent from the
+container filesystem (`find /app -name "*.py"` shows only 5 files:
+`cost_ceiling_monitor.py`, `cost_meter.py`, `cost_rates.py`,
+`entitlements.py`, `tour_orchestrator_service.py`).
+
+**Flask url_map confirms** only 7 routes are registered on 5002:
+`DELETE /delete-account/<secret_id>`, `GET /download/<job_id>`,
+`POST /generate-complete-tour`, `GET /health`, `GET /jobs`,
+`GET /serve/<job_id>`, `GET /status/<job_id>`, `POST /tour-status`.
+
+#### The real finding
+
+**The app cannot reach the wallet at all today.** The subscribed stack is not
+running (connection refused on 5102), the shared stack doesn't have the code
+(generic 404 on 5002), and the app hardcodes port 5002. No code path exists
+that would allow the wallet screen to load data from a real backend today.
+
+The original note ("will 404") was correct — but understated the situation:
+it's not "would 404 if built from stale code" but rather "does 404 right now
+and has no fallback." The inference was right; the mechanism (image predates
+wallet code entirely, not stale image with wrong code) was slightly wrong.
+
+**`POST /topup` — UNVERIFIED for functional exercise.** Could not be safely
+tested because: (1) the route doesn't exist on either stack, so there is
+nothing to call; (2) even if it existed, any body with a valid `product_id`
+would credit a wallet (the endpoint is designed to succeed idempotently on
+any new product_id). The route's absence from `url_map` is definitive proof
+it is not registered — no HTTP exercise was possible or needed.
+
+#### Evidence: wallet_ledger unchanged
+
+Row count before: **163**. Row count after: **163**. No rows created or modified.
+
+**Fix options (unchanged):**
 1. Merge `subscribed` into `storied` and rebuild the shared stack (Michael's
    call — this is "go live")
 2. Change the port map in the Dart client to 5102 (breaks storied-only usage)
@@ -304,10 +361,11 @@ The full loop:
 **Proven over HTTP** (SUBMISSION_LOCAL-107, LOCAL-109). Route registered on
 subscribed-orchestrator (port 5102).
 
-**Known gap:** The shared orchestrator (port 5002, `storied` branch) does NOT
-have the preference route. The Dart app targets 5002. Until `subscribed` merges
-into `storied` or the port map changes, swipes from a real device will silently
-fail against the shared stack.
+**Known gap — CONFIRMED (LOCAL-152):** The shared orchestrator (port 5002,
+`storied` branch) does NOT have the preference route. Tested 2026-08-02:
+`POST /user/test-user-999/stop-feedback` → generic Flask HTML 404. The Dart
+app targets 5002. Swipes from a real device **do** silently fail against the
+shared stack. This is not an inference — it is measured.
 
 ---
 
