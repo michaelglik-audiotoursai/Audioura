@@ -270,9 +270,12 @@ cache was only 24.58 kB, so it was **wedged, not full**. If it recurs, try
 I skipped the Docker Desktop restart you also approved, because it was no
 longer needed and would have taken 21 containers down for nothing.
 
-**Note:** the Docker *management API* wedged separately on 2026-08-03 —
-`docker ps` times out while every container serves normally. Still
-outstanding; costs nothing to users but has hung one task.
+**Second incident, also resolved.** The Docker *management API* wedged
+separately on 2026-08-03 07:40 — `docker ps` timed out while every container
+served normally. It hid a total outage of news generation for six hours,
+because `docker exec` was the only way to see inside the container.
+**Michael authorised a Docker Desktop restart at 12:55; CLI responsive in 20
+seconds, all 23 containers recovered, nothing lost.**
 
 ---
 
@@ -294,9 +297,21 @@ $20/1M when the code calls AWS at $15/1M, and it assumed one pass. The
 service translates **every stop twice** — once for the text file, once
 nav-stripped for the audio.
 
-**44% is removable** (translate once, strip the nav lines from the
-translated text): $0.543 → $0.310, i.e. $2.71 → $1.55 at ×5. Written and
-proven; still above your $1.30 ceiling.
+**44% is removable, and as of 2026-08-03 13:30 it is DEPLOYED and
+measured in production**, not projected:
+
+```
+API calls   12  (2+N)   instead of 22  (2+2N)
+cost        $0.3433     instead of $0.6004      -42.8%
+fallbacks   none — every stop took the single-pass path
+```
+
+So a translation costs **$0.31, not $0.54** — **$1.55 rather than $2.71** at
+×5. **Still above your $1.30 ceiling**, so the pricing decision below stands;
+only the numbers improved.
+
+Verified inside the running container, not just built:
+`docker exec translation-service-1 grep -c LOCAL-142 …` → 4.
 
 Detail: `TRANSLATION_PRICING.md` on the `subscribed` branch.
 
