@@ -1150,3 +1150,48 @@ story survive as long as it did.
 
 Related: D31 (code nobody calls), D35 (inspection is not exercise),
 D38 (guard the invariant, not the mechanism).
+
+---
+
+## D43 — A rebuild that renames a container orphans it from compose (2026-08-03)
+
+LOCAL-162 deployed the single-pass translation change successfully, and the
+container came back as `translation-service-1` instead of
+`audioura-translation-service-1`. LEAD checked the obvious risk — whether
+anything addressed it by container name — found nothing did, since callers
+use `TRANSLATION_URL=http://translation-service:5030`, and accepted it as
+harmless.
+
+**It was not harmless.** The container was orphaned from the compose
+project. A dry run proved it:
+
+```
+docker compose -f docker-compose-master.yml up -d --dry-run translation-service
+  Container audioura-translation-service-1 Creating
+```
+
+Compose did not recognise the running container as its own, so the next
+ordinary `docker compose up -d` would have created a **second** translation
+service bound to the same port 5030. Whoever ran it — a task, a reboot
+script, Michael — would have hit a port collision on a service his phone
+uses, with no obvious cause.
+
+**Fixed** by removing the mis-named container and recreating it through
+compose from the same image. Single-pass code still present (4 references),
+health 200, and the dry run now reports `Running` rather than `Creating`.
+
+**The lesson is about the question asked.** "Does anything reference this
+container by name?" was the right question and got the right answer. The
+question that mattered was **"does compose still consider this container
+its own?"** — orphaning is invisible to service-to-service DNS and only
+appears the next time someone runs the tool that manages it.
+
+**Rule:** after any rebuild that changes a container's name, run
+`docker compose up -d --dry-run <service>` and require it to say `Running`.
+Anything else means the container is orphaned, however healthy it looks.
+
+**Related and still open:** `subscribed-orchestrator` and
+`subscribed-generator` belong to compose project `local-156` with working
+directory `/Users/micha/audioura-worktrees/LOCAL-156` — a task worktree that
+may be deleted. They are similarly orphaned from any stack Michael would
+manage from `~/Audioura`.
