@@ -1509,3 +1509,63 @@ grounding work already built, and fails safe: no corpus, no anchor, flagged.
 on it while, per Michael's field reading, containing prose that would pass
 unchanged for any other cape on the Riviera. This is the second signal that
 the rubric measures something other than what a listener values.
+
+---
+
+## D51 — Michael overturns two of LEAD's three calls on stop-specificity (2026-08-03)
+
+D50 recorded two calls LEAD made rather than deferring. Michael reversed
+both. Recording that plainly: the value of LEAD deciding is that he can
+overturn it, and he did.
+
+### 1. Not audit-first — a **validation-stage gate** ✗ LEAD's call overturned
+
+> "I would make it on the validation stage — definitely before the user sees
+> it — as we validate the content, we should also validate this as 'a fit'
+> paragraph or a detail."
+
+LEAD wanted prevalence measured before switching anything on. Michael wants
+it enforced at validation from the start, alongside the existing content
+checks. Prevalence still needs measuring — but as the gate's first half,
+not as a precondition for building it.
+
+And the reason he gives changes the objective:
+
+> "It was overwhelming opinion that people I tested the tours on wanted to
+> hear more about this stop, so increasing a size (reasonably) for the
+> purpose of providing more context is a good thing."
+
+**This is field data from real listeners**, and it points the opposite way
+to LEAD's instinct. LEAD optimised for *removing* weak prose; listeners want
+*more* substance about the stop. Longer is good when the added length is
+stop-specific.
+
+### 2. Not remove-by-default — **search first, remove last** ✗ LEAD's call overturned
+
+> "Fabrication is a very bad thing… We should always verify and if unknown
+> remove. On the other hand the default should be to find the reference even
+> if we would require a different search through trusted sources that would
+> cost us money and compliment the information making it connected to the
+> stop. If we start simply remove everything we will end up with very little
+> substance."
+
+So the order is: **corpus → targeted trusted-source search (paid) →
+remove only if genuinely unfindable.** LEAD had removal as the default and
+search as the exception; it is the reverse.
+
+The fabrication ban is unchanged and absolute — D50 stands on that. What
+changes is how hard we work before giving up.
+
+**Consequence LEAD must design around:** this puts a paid search on the
+failure path, so cost scales with how bad the prose is. Serper is ~$0.001 a
+query, so a tour with 30 flagged paragraphs is ~$0.03 — negligible against
+the $2.00 ceiling. But the budget must be bounded per tour rather than
+assumed cheap, and the count logged so the real rate is visible.
+
+### 3. Anchor-based detection ✓ LEAD's call confirmed
+
+> "The second one: making sure that each paragraph to contain at least one
+> fact tied to this stop in the corpus"
+
+Objective, reuses the grounding work, fails safe. No LLM opinion in the
+detector.
