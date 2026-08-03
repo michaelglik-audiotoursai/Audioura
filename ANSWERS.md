@@ -6,6 +6,9 @@ date, the question verbatim, and the short answer with a pointer to detail.
 
 Open it in VS Code: `code ~/Audioura/ANSWERS.md`
 
+**Every entry carries the time it was asked, so it can be located against
+the terminal scroll.**
+
 **Rule for LEAD:** when Michael asks a real question, the answer goes here
 *as well as* in chat, before the next status dump buries it.
 
@@ -27,7 +30,7 @@ Open it in VS Code: `code ~/Audioura/ANSWERS.md`
 <a name="q8"></a>
 ## Q8 — Was development actually suspended as I asked?
 
-**Asked:** 2026-08-03 morning.
+**Asked:** 2026-08-03, 09:25 EDT (Monday morning).
 
 **Yes, with one caveat, stated plainly.**
 
@@ -47,7 +50,7 @@ I wait for your explicit word than read the clock, say so and I will.
 <a name="q7"></a>
 ## Q7 — Mobile builds: Windows for Android, then iPhone?
 
-**Asked:** 2026-08-02 evening, repeated 2026-08-03 morning.
+**Asked:** 2026-08-02, 23:35 EDT — repeated 2026-08-03, 09:25 EDT.
 
 > Should I engage Flutter builds on Windows computer as I always did before
 > so I can build on Android, develop tasks for Mac Mini Kiro and then build
@@ -99,7 +102,7 @@ debugging session rather than a demo.
 <a name="q6"></a>
 ## Q6 — How can I see the Subscribed billing? App or services?
 
-**Asked:** 2026-08-02.
+**Asked:** 2026-08-02, 22:58 EDT.
 
 Services only at the time; **now also on screen** via desktop/Chrome.
 Demonstrated live: the three plans exactly as specified (Free, PPU $2,
@@ -113,7 +116,7 @@ Detail: `SUBSCRIBED_STATUS.md`.
 <a name="q5"></a>
 ## Q5 — Who pays the bill, and how much, and why?
 
-**Asked:** 2026-08-02. This corrected sloppy wording of mine.
+**Asked:** 2026-08-02, 23:12 EDT. This corrected sloppy wording of mine.
 
 Two different kinds of money, which I had wrongly collapsed into one:
 
@@ -133,7 +136,7 @@ pay you. Real payment still needs the App Store products created.
 <a name="q4"></a>
 ## Q4 — What is the builder that hung?
 
-**Asked:** 2026-08-02. **Resolved.**
+**Asked:** 2026-08-02, 22:30 EDT. **Resolved** 22:52 EDT.
 
 **BuildKit v0.31.2**, a separate daemon from the one running your
 containers — which is why builds were dead while 21 containers stayed
@@ -156,7 +159,7 @@ outstanding; costs nothing to users but has hung one task.
 <a name="q3"></a>
 ## Q3 — What does the $0.53 translation cost consist of?
 
-**Asked:** 2026-08-02.
+**Asked:** 2026-08-02, 22:22 EDT.
 
 Per tour into one language, mean 16,300 source characters:
 
@@ -182,7 +185,7 @@ Detail: `TRANSLATION_PRICING.md` on the `subscribed` branch.
 <a name="q2"></a>
 ## Q2 — Why am I suddenly getting permission requests from Kiro?
 
-**Asked:** 2026-08-02.
+**Asked:** 2026-08-02, 21:10 EDT.
 
 **They are macOS prompts, not Kiro's and not Claude Code's.** Neither
 `--trust-all-tools` nor `bypassPermissions` can suppress them — different
@@ -201,7 +204,7 @@ likely casualty is ClickUp MCP, which we already work around.
 <a name="q1"></a>
 ## Q1 — What has been done over the three days?
 
-**Asked:** 2026-08-02.
+**Asked:** 2026-08-02, 21:45 EDT.
 
 138 commits on `storied`, 104 on `subscribed`, 138 Kiro sessions, both
 branches fully pushed.
