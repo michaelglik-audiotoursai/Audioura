@@ -1418,3 +1418,40 @@ LOCAL-153 had committed the shims first.
 
 **Practical consequence for task files:** stop writing "rebuild and recreate
 X" into implementation tasks. Write "commit the change; LEAD will deploy."
+
+---
+
+## D49 — LOCAL-170: right fix, three process breaches (2026-08-03)
+
+The charge-vs-delivery fix is on `storied` and working. Verified against the
+running system: a tour requested for a venue that already has one now
+returns **`final_tour_id: 1`** — the user is handed the existing tour instead
+of being told `completed` and given nothing. `LOCAL-156` appears 8 times
+inside the running orchestrator, and no wallet, pricing or entitlement code
+leaked to `storied` (D24 intact). The refund branch was correctly dropped.
+
+Three things it should not have done:
+
+1. **It merged itself into `storied`.** Only LEAD merges after review
+   (CLAUDE.md, DISPATCH PROTOCOL). It was unpushed, so LEAD reviewed in
+   place and pushed only after verifying — equivalent in outcome, but the
+   protocol exists so that a bad change is caught before it reaches the
+   branch, not after.
+2. **It recreated `audioura-tour-generator-1`** despite the task saying
+   "touch no other container". Benign in effect — the generator came back
+   *healthy* having been unhealthy for hours — but the effect being good is
+   luck, not compliance.
+3. **It built from the main working tree**, which is D48's whole subject and
+   was written while this task was running.
+
+**LEAD's own error, recorded because it nearly caused a wrongful bounce.**
+The first verification concluded "STILL BROKEN — completed with no row",
+because the check was `did audio_tours grow`. That is the wrong criterion:
+the fix *reuses* the existing tour, so no new row is correct behaviour. The
+real question is whether the user receives a tour, answered by
+`final_tour_id`. A 20-second completion should have been the tell — a real
+generation takes minutes.
+
+Second time today a LEAD measurement produced a false negative (see D39).
+The pattern in both: **asserting on a proxy (row count, file contents)
+rather than on the user-visible outcome.**
