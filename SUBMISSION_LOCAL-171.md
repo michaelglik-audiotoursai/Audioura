@@ -3,139 +3,137 @@
 # LOCAL-171: Make news billing able to run
 
 **Branch:** `kiro/local171-news-billing-wiring`  
-**Commit:** `dade030`  
-**Commits ahead of subscribed:** 1
+**Commit:** `c6bd6e7`  
+**Commits ahead of subscribed:** 2  
+**Task:** Add missing `projected_costs.py` to `Dockerfile.news-orchestrator`
 
 ---
 
-## Problem
+## The problem
 
-The news-orchestrator container holds only 3 Python files:
+The news-orchestrator container cannot execute its billing code. The running
+container holds only 3 Python files:
 
 ```
 /app/build_manifest.py  /app/entitlements.py  /app/news_orchestrator_service.py
 ```
 
-The billing code in `news_orchestrator_service.py` imports `cost_meter`,
-`cost_rates`, `pricing`, `wallet_ledger`, and `entitlements` (which itself
-imports `payment_provider`). None of these resolve → articles are delivered
-unmetered and uncharged.
-
-LOCAL-165 proved the billing *code* is correct ($0.008264 metered, 4¢ charged,
-×5 multiplier, D41 floor honoured). The code is right; it simply cannot be
-reached because the modules are absent from the container.
+The Dockerfile (after round 1) had 9 modules COPY'd — but `projected_costs.py`
+was missing. That module is imported inside `entitlements._check_ppu_balance()`
+at function scope (not top-level), so the container starts cleanly but fails
+at runtime when the overdraft floor check fires.
 
 ---
 
-## Import closure analysis
+## Import closure (ast.walk — descends into function bodies)
 
-### Transitive import graph (local .py files only)
-
-```
-news_orchestrator_service.py
-├── entitlements.py
-│   └── payment_provider.py         ← BILLING_RETRY_GRACE_DAYS
-├── news_cache_layer1.py
-├── cost_meter.py
-│   └── cost_rates.py
-├── cost_rates.py
-├── pricing.py
-│   └── cost_rates.py
-├── wallet_ledger.py
-└── build_manifest.py               (build utility, not runtime)
+Command used:
+```python
+for node in ast.walk(tree):  # walks ALL nodes including inside functions
+    if isinstance(node, ast.ImportFrom): ...
 ```
 
-### Required vs Copied vs Missing
+### Result: 9 modules required
 
-| Module | Required | In Dockerfile (before) | In Container | Status |
-|--------|----------|----------------------|--------------|--------|
-| `news_orchestrator_service.py` | ✓ | ✓ | ✓ | OK |
-| `entitlements.py` | ✓ | ✓ | ✓ | OK |
-| `news_cache_layer1.py` | ✓ | ✓ | ✗ | Stale build |
-| `cost_meter.py` | ✓ | ✓ | ✗ | Stale build |
-| `cost_rates.py` | ✓ | ✓ | ✗ | Stale build |
-| `build_manifest.py` | ✓ | ✓ | ✓ | OK |
-| **`payment_provider.py`** | ✓ | **✗** | ✗ | **MISSING from Dockerfile** |
-| **`pricing.py`** | ✓ | **✗** | ✗ | **MISSING from Dockerfile** |
-| **`wallet_ledger.py`** | ✓ | **✗** | ✗ | **MISSING from Dockerfile** |
+| Module | In Dockerfile (before) | Status |
+|--------|----------------------|--------|
+| news_orchestrator_service | ✅ COPY'd | entrypoint |
+| news_cache_layer1 | ✅ COPY'd | OK |
+| cost_meter | ✅ COPY'd | OK |
+| cost_rates | ✅ COPY'd | OK |
+| entitlements | ✅ COPY'd | OK |
+| payment_provider | ✅ COPY'd | OK |
+| pricing | ✅ COPY'd | OK |
+| wallet_ledger | ✅ COPY'd | OK |
+| **projected_costs** | ❌ **MISSING** | **Added** |
 
-**Summary:**
-- 3 files missing from Dockerfile entirely (never added)
-- 3 additional files missing from container (Dockerfile correct but image stale)
-- After fix: Dockerfile copies all 9 required files; rebuild will produce a
-  working image
+Plus `build_manifest.py` (utility, not in import closure but needed for build step).
+
+### Import chain that was broken:
+
+```
+news_orchestrator_service.py (line ~98)
+  → from entitlements import check_news_quota
+
+entitlements.py → _check_news_quota_paid → _check_ppu_balance (line ~224)
+  → from projected_costs import would_breach_floor, get_projected_cost_cents, OVERDRAFT_FLOOR_CENTS
+    ^^^ FUNCTION-LEVEL IMPORT — invisible to top-level-only scan
+```
 
 ---
 
-## Fix applied
+## Fix
 
-Added 3 `COPY` lines to `Dockerfile.news-orchestrator`:
+One line added to `Dockerfile.news-orchestrator`:
 
 ```dockerfile
-COPY payment_provider.py .
-COPY pricing.py .
-COPY wallet_ledger.py .
+COPY projected_costs.py .
 ```
 
 ---
 
-## Evidence: billing path resolves host-side
+## Verification: billing path resolves within image module set
 
-### (1) Full import chain — all modules resolve
-
-```
-1. Importing entitlements...
-   OK: check_news_quota, get_user_plan, words_budget_for_minutes, _get_subscription_tier
-2. Importing news_cache_layer1...
-   OK: get_cached_news, store_news
-3. Importing cost_meter...
-   OK: record_operation
-4. Importing cost_rates...
-   OK: CACHE_HIT_COST_USD=0.0, POLLY_COST_PER_CHAR=4e-06
-5. Importing pricing...
-   OK: compute_user_charge
-6. Importing wallet_ledger...
-   OK: charge, record_unlimited_cost
-7. Importing payment_provider (transitive dep of entitlements)...
-   OK: BILLING_RETRY_GRACE_DAYS=16
-
-=== ALL IMPORTS RESOLVE — billing path is reachable ===
-```
-
-### (2) Charge path computation — end-to-end interoperation verified
+Every module in the image was scanned with `ast.walk` and every local import
+verified to be present in the image set:
 
 ```
-Simulated article: 3000 chars, 3 major points
-  TTS chars estimated: 5400
-  TTS cost: $0.021600
-  LLM cost: $0.000000
-  Total our cost: $0.021600
-  User charge (x5): $0.11 (11¢)
-  Multiplier: 5.0
+OK: cost_meter -> cost_rates
+OK: entitlements -> payment_provider
+OK: entitlements -> projected_costs
+OK: entitlements -> wallet_ledger
+OK: news_orchestrator_service -> cost_meter
+OK: news_orchestrator_service -> cost_rates
+OK: news_orchestrator_service -> entitlements
+OK: news_orchestrator_service -> news_cache_layer1
+OK: news_orchestrator_service -> pricing
+OK: news_orchestrator_service -> wallet_ledger
+OK: pricing -> cost_rates
 
-=== CHARGE PATH COMPUTATION VERIFIED ===
+✅ ALL local imports resolve within the image module set.
 ```
 
-The ×5 multiplier is unchanged (D47 confirmed).
-
-### (3) Container uptimes — unchanged (no rebuild)
+### Host-side import proof (billing path end-to-end):
 
 ```
-BEFORE & AFTER:
-news-orchestrator-1     Up 3 hours
-news-processor-1        Up 3 hours
-news-generator-1        Up 3 hours
-simple-news-search-1    Up 3 hours
-newsletter-link-extractor-1  Up 3 hours
+Test 1: from entitlements import check_news_quota              ✅ Resolved
+Test 2: from projected_costs import would_breach_floor, ...    ✅ Resolved (OVERDRAFT_FLOOR_CENTS = -200)
+Test 3: from wallet_ledger import charge, record_unlimited_cost ✅ Resolved
+Test 4: from pricing import compute_user_charge                ✅ Resolved
+Test 5: from cost_meter import record_operation                ✅ Resolved
+Test 6: End-to-end pricing: $0.008264 × 5 = $0.04 (4¢)       ✅ Correct
+Test 7: would_breach_floor(100¢, news_generate) = False        ✅
+        would_breach_floor(-195¢, news_generate) = True        ✅ D41 floor enforced
 ```
 
 ---
 
-## Deployment is pending LEAD
+## Docker container uptimes (unchanged — no rebuild/restart)
 
-Per D48: this task proposes the fix. LEAD deploys (rebuilds the container).
-No container was rebuilt, recreated, or restarted. The Dockerfile change takes
-effect only when `docker compose build news-orchestrator` is run.
+```
+news-orchestrator-1    Up 4 hours
+news-generator-1       Up 4 hours
+news-processor-1       Up 4 hours
+development-postgres-2-1  Up 4 hours
+```
+
+### Running container contents (read-only `docker exec ls`):
+
+```
+/app/build_manifest.py
+/app/entitlements.py
+/app/news_orchestrator_service.py
+```
+
+Confirms the stale image — only 3 files. The fix requires a rebuild to take effect.
+
+---
+
+## ⚠️ Deployment is pending LEAD
+
+Per D48: this task proposes the fix. LEAD deploys. The container must be
+rebuilt (`docker-compose build news-orchestrator`) to pick up the corrected
+Dockerfile with all 10 COPY lines.
 
 ---
 
@@ -143,24 +141,24 @@ effect only when `docker compose build news-orchestrator` is run.
 
 | File | Change |
 |------|--------|
-| `Dockerfile.news-orchestrator` | Added 3 COPY lines: `payment_provider.py`, `pricing.py`, `wallet_ledger.py` |
+| `Dockerfile.news-orchestrator` | Added `COPY projected_costs.py .` |
 | `SUBMISSION_LOCAL-171.md` | This file |
 
 ---
 
 ## Limitations
 
-1. **Not deployed** — the fix requires a container rebuild (D48: LEAD deploys).
-   Until rebuilt, articles continue to ship unmetered.
+1. **Container is stale** — the running image has only 3 of the 10 required
+   modules. A rebuild is needed for ANY billing code to execute, not just
+   `projected_costs`. This is a deployment gap, not a code gap.
 
-2. **Container also missing `news_cache_layer1.py` and `cost_rates.py`** — these
-   are in the Dockerfile (added in prior commits) but not in the running image
-   because it was built before those lines existed. The rebuild will pick them up
-   automatically. No Dockerfile change needed for those.
+2. **Host-side verification only** — imports were verified against the repo
+   (where all files exist), but the closure analysis confirms the Dockerfile
+   COPY set is complete. The negative (no missing module) was proven by
+   exhaustive ast.walk over all 10 modules.
 
-3. **No live HTTP test** — the running container cannot exercise the billing path
-   (modules missing). Host-side import verification confirms the code will work
-   once the image is rebuilt with all files present.
+3. **No live billing test** — per constraints, no article was generated. The
+   billing code was already proven correct in LOCAL-165.
 
 ---
 

@@ -13,6 +13,7 @@ COPY entitlements.py .
 COPY payment_provider.py .
 COPY pricing.py .
 COPY wallet_ledger.py .
+COPY projected_costs.py .
 COPY build_manifest.py .
 
 # Build-time manifest: record checksums of all Python sources + git SHA
