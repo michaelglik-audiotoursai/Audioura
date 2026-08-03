@@ -16,6 +16,7 @@ the terminal scroll.**
 
 ## Contents
 
+- [Q11 — News generation fixed; but its billing cannot run (RESOLVED/open)](#q11)
 - [Q10 — Tours silently vanish in production for existing venues (LEAD-raised)](#q10)
 - [Q9 — News generation is broken in production (LEAD-raised)](#q9)
 - [Q8 — Was development actually suspended?](#q8)
@@ -28,6 +29,51 @@ the terminal scroll.**
 - [Q1 — What has been done over the three days?](#q1)
 
 ---
+
+<a name="q11"></a>
+## Q11 — [RESOLVED by LEAD] News generation is working again
+
+**Fixed:** 2026-08-03, 13:05 EDT, after Michael authorised the Docker restart.
+
+**News article generation was returning HTTP 503 to every request. It now
+returns 200.**
+
+```
+before   {"allowed":false,"error":"quota_check_failed"}   HTTP 503
+after    {"article_id":"...","message":"News article processed successfully"}   HTTP 200
+```
+
+**The cause was not the published hypothesis.** LOCAL-165 proposed that
+`entitlements.py` failed to import `payment_provider`. With the CLI working,
+the truth was simpler: **`entitlements.py` was not in the image at all.**
+`Dockerfile.news-orchestrator` line 9 copies it — the deployed image was
+built before that line existed. The Dockerfile was already correct; only the
+image was stale. A rebuild took 4 seconds.
+
+Nothing else was touched: 23 containers before and after, `audio_tours` 107,
+`wallet_ledger` 217, credentials 0, Nice list unchanged.
+
+### But billing still cannot run there
+
+The rebuilt container holds exactly three Python files, and none of the
+billing modules:
+
+```
+cost_meter    MISSING      wallet_ledger  MISSING
+pricing       MISSING      cost_rates     MISSING
+```
+
+So the news billing code LOCAL-165 proved correct — cost metered, wallet
+debited, cache hits free, the −$2.00 floor honoured — **cannot execute in
+production.** A generated article is delivered and nothing is metered or
+charged. Confirmed: a real article generated with cost_ledger empty
+afterwards.
+
+That is D31 once more — correct code with no way to be reached — and it is
+a revenue hole rather than an outage. **This needs Michael's decision**,
+because article pricing (~$0.006–$0.011 our cost) may not warrant the ×5
+multiplier used for tours.
+
 
 <a name="q10"></a>
 ## Q10 — [LEAD-raised] Tours silently vanish in production for venues that already exist
