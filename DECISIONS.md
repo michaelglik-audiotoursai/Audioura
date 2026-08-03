@@ -1455,3 +1455,57 @@ generation takes minutes.
 Second time today a LEAD measurement produced a false negative (see D39).
 The pattern in both: **asserting on a proxy (row count, file contents)
 rather than on the user-visible outcome.**
+
+---
+
+## D50 — Stop-specificity: corpus-only substantiation (Michael + LEAD, 2026-08-03)
+
+ClickUp `wdvrdaxa7h`, "Making strong association with POI aka Stop".
+
+### Michael's problem statement, and his two tests
+
+**Interchangeable prose.** *"…experience the enduring power of nature,
+inspiring creativity… soaking up the atmosphere of this everyday paradise."*
+**His test:** if substituting the place name leaves the sentence true, the
+paragraph is redundant.
+
+**Name-dropping without a link.** *"…Imagine the scene that once captivated
+Scott Fitzgerald…"* **His test:** if a paragraph names a person, book or
+film, it must say how that thing relates to *this* Stop.
+
+### Michael's decision — substantiate from the corpus, never from memory
+
+> "Completely AGREE."
+
+Agreed to LEAD's proposal: when a paragraph fails the substantiation test,
+it may only be repaired using facts already in the corpus. If no grounded
+fact links the entity to the stop, **the paragraph is cut, not embellished.**
+
+This matters because the alternative is a fabrication engine. Asked to
+justify a Fitzgerald reference, a model will invent a justification.
+Rounds 1–4 of the tour-improvement loop were spent fighting exactly that,
+and the root cause was stops having no source material to write from.
+
+Cost, accepted: tours get shorter where the corpus is thin. That is the
+correct trade — a shorter true tour beats a longer invented one.
+
+### LEAD's two calls, made rather than deferred (overturn freely)
+
+**Audit before gate.** Nobody knows whether this affects 5% or 50% of
+paragraphs. A gate switched on blind could gut tours or do nothing. So:
+measure first, across existing tours, then decide whether a generation-time
+gate is safe. No change to generation until the prevalence is known.
+
+**Mechanise via corpus anchors, not model opinion.** Asking an LLM "could
+this describe somewhere else?" is cheap and subjective, and would make the
+detector as unreliable as the thing it detects. Instead require each
+paragraph to carry at least one **anchor** — a proper noun, date, artefact,
+or figure — that the corpus ties to *this* stop. Objective, reuses the
+grounding work already built, and fails safe: no corpus, no anchor, flagged.
+
+### Worth stating plainly
+
+**The existing rubric cannot see either failure mode.** A tour scored 98.8
+on it while, per Michael's field reading, containing prose that would pass
+unchanged for any other cape on the Riviera. This is the second signal that
+the rubric measures something other than what a listener values.
