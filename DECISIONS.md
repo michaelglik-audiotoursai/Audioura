@@ -1063,3 +1063,45 @@ passwords at all is his call, not an implementation detail.
 
 Related: D14 (controls fail closed), D31 (code nobody calls — this is the
 inverse: code everybody suddenly calls again).
+
+---
+
+## D41 — Michael's overdraft rule (2026-08-03, his directive, not LEAD's inference)
+
+Stated verbatim by Michael:
+
+> there should not be negative balance less than $2USD; 0 is okay and so
+> negative balance in case we could not complete the task for the value in
+> the wallet, then we should complete the task (tour or news article) and
+> reflect this in balance unless we need to overcharge more than $2USD —
+> then the task needs to be aborted. The negative balance should be taken
+> into account when user add money to their wallet meaning that if user had
+> -0.23 and adds $10USD the balance should become $9.77 USD not $10 USD.
+
+**The rule, as LEAD reads it:**
+
+1. **Finish what you started.** If a task's real cost exceeds the balance,
+   deliver it anyway and let the balance go negative. Do not abandon work a
+   user is waiting on over a few cents.
+2. **The floor is −$2.00.** A balance may not go below it. If completing a
+   task would take the user past −$2.00, **abort the task** rather than
+   deliver it.
+3. **Debt carries forward.** A top-up settles the debt first: −$0.23 plus
+   $10.00 becomes **$9.77**, never $10.00.
+
+**Consequences worth stating, because they are decisions in themselves:**
+
+- The floor must be checked **before** the spend, against a *projected*
+  cost, not after. Checking afterwards cannot abort anything — the money is
+  already gone. This is the same limitation D15 records for the cost
+  ceiling, which runs after generation completes.
+- A projected cost is an estimate, so the abort boundary is fuzzy by
+  whatever the estimate's error is. Measured tour cost is ~$0.068 and
+  translation ~$0.31–0.54, all far below $2.00, so the floor is generous
+  relative to the error — but the estimate must exist.
+- "Abort" needs to be user-visible and must not charge. A silent failure
+  after a charge is the LOCAL-156 bug in a new costume.
+
+**Open, and NOT decided by this directive:** what the app *shows* a user in
+debt — whether generation is blocked at −$2.00 with an explanation, or the
+button simply refuses. LEAD is not inventing that; it needs Michael.
