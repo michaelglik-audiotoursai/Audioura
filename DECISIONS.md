@@ -1622,3 +1622,38 @@ where a fix existed on one branch and the bug stayed live on the other.
 
 D24 is unaffected: it governs which code the shared *containers* run, not
 which branches receive a feature.
+
+---
+
+## D53 — Dual-branch landing: cherry-pick, do not merge (2026-08-03)
+
+D52 requires stop-specificity work on both `storied` and `subscribed`. The
+first attempt merged the feature branch into each. It worked on `storied`
+and **conflicted immediately on `subscribed`**, in
+`tour_orchestrator_service.py`.
+
+The cause is worth understanding rather than working around. The branches
+have diverged substantially — `subscribed` carries the billing layer,
+`storied` carries the LOCAL-156 port done separately. Merging a
+storied-based feature branch into `subscribed` does not bring just the
+feature; it drags **all of storied's history that subscribed lacks**,
+including a different resolution of the same fix.
+
+**Method, corrected: cherry-pick the feature commits onto the second
+branch.** It transfers the change and nothing else.
+
+Verified for LOCAL-174 — the detector is byte-identical on both:
+
+```
+git show storied:tests/stop_anchor_detector.py    | md5  f25cd679…
+git show subscribed:tests/stop_anchor_detector.py | md5  f25cd679…
+```
+
+Commit hashes differ, contents do not. D52's intent — one change, not two
+hand-applied variants that drift — is satisfied by identical content, which
+is the property that actually matters.
+
+**Standing rule:** land on `storied` by merge, then cherry-pick onto
+`subscribed`, then verify identical content with a hash before claiming
+both are done. Never resolve a conflict between the branches as part of a
+feature merge — that silently picks a winner between two divergent fixes.
