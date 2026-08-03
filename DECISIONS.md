@@ -1195,3 +1195,43 @@ Anything else means the container is orphaned, however healthy it looks.
 directory `/Users/micha/audioura-worktrees/LOCAL-156` — a task worktree that
 may be deleted. They are similarly orphaned from any stack Michael would
 manage from `~/Audioura`.
+
+---
+
+## D44 — Michael's answers, 2026-08-03 (his decisions, recorded verbatim)
+
+### PPU signup grant: **intended**
+
+> Q: $10 PPU signup grant on top of existing balance — intended?
+> A: Yes
+
+So a user topping up $10 and then switching to PPU legitimately holds $20.
+No change needed; this closes the question raised during the Saturday demo.
+
+### What a user in debt sees: **decided**
+
+> A: "-1.23 with a message: 'Please add money to your account: you have a
+> negative balance.'"
+
+The balance is shown as a plain negative number and paired with that
+message. This completes D41, which deliberately left the presentation open.
+
+Note the format: **-1.23**, not -$1.23 or $-1.23. LOCAL-161 shipped
+`formatUsd()` producing `-$1.23`. LEAD is treating Michael's "-1.23" as
+shorthand for the value rather than a typographic instruction, and keeping
+the currency symbol — flag it if he meant otherwise. This is the kind of
+detail worth confirming rather than silently choosing.
+
+### Testing cost ceiling: raised to $3.00, conditionally
+
+> Currently for our own testing during development we can raise the price to
+> be $3.00 but we have to be very careful with this.
+
+The per-item development ceiling moves from $1.30 to **$3.00**, with
+"be very careful" attached. LEAD reads that as: the ceiling exists to stop
+runaway spend, not to authorise routine $3 operations. Tasks should still
+refuse anything projecting over ~$0.50 unless the task file says otherwise,
+and $3.00 is the hard abort.
+
+**This is a development-testing ceiling and not a user-facing price.**
+Michael's $1.30 product ceiling is unchanged.
