@@ -1,37 +1,63 @@
 ##### READY FOR REVIEW
 
-## LOCAL-157: Build a debug APK with the wallet UI, pointed at the subscribed stack
+# LOCAL-157: Build a debug APK with the wallet UI, pointed at the subscribed stack
 
-**Commit:** `a215331`  
 **Branch:** `kiro/local157-wallet-debug-apk`  
-**Base:** `subscribed`
+**Commit:** `d1c05f1`  
+**Commits ahead of subscribed:** 3  
 
 ---
 
-## Per-File Changes
+## Summary
 
-| File | Change |
-|------|--------|
-| `audio_tour_app/lib/config/endpoints.dart` | Added `WALLET_DEBUG_PORT` and `DEBUG_SERVER_IP` dart-define overrides. When baked in at build time, forces local mode to specified IP and overrides orchestrator port. No effect without the flags. |
-| `audio_tour_app/android/settings.gradle.kts` | Upgraded AGP 8.7.0 → 8.10.1, Kotlin 1.8.10 → 2.1.20 |
-| `audio_tour_app/android/gradle/wrapper/gradle-wrapper.properties` | Upgraded Gradle 8.10.2 → 9.4.1 |
-| `audio_tour_app/android/gradle.properties` | Added `org.gradle.java.home` pointing to JDK 21 |
-| `audio_tour_app/android/app/build.gradle.kts` | Upgraded Java source/target compatibility 11 → 17 |
+Debug APK built with original toolchain versions (no bumps). JDK selection
+moved to `~/.gradle/gradle.properties` (machine-local, never committed).
+The `--dart-define` approach from round 1 is preserved unchanged.
 
 ---
 
-## Approach: Build-Time Flag (--dart-define)
+## Defect 1 — Fixed: Machine-specific absolute path removed
 
-Chose `--dart-define` over alternatives because:
-- **Explicit** — must pass `--dart-define=WALLET_DEBUG_PORT=5102` at build time; defaults to 5002 otherwise
-- **Reversible** — a normal `flutter build apk` (without the flags) produces an app pointing at port 5002
-- **Cannot leak** — release builds never include this flag unless someone deliberately adds it
-
-Build command used:
+`audio_tour_app/android/gradle.properties` no longer contains:
 ```
-flutter build apk --debug \
-  --dart-define=WALLET_DEBUG_PORT=5102 \
-  --dart-define=DEBUG_SERVER_IP=192.168.0.136
+org.gradle.java.home=/Users/micha/jdks/jdk-21.0.12+8/Contents/Home
+```
+
+This setting now lives in `~/.gradle/gradle.properties` (per-user, never
+committed):
+```
+# Machine-local JDK for Gradle (JDK 26 jlink incompatible with Android SDK modules)
+org.gradle.java.home=/Users/micha/jdks/jdk-21.0.12+8/Contents/Home
+# Extra heap for JetifyTransform on this machine
+org.gradle.jvmargs=-Xmx4G
+```
+
+**Proof — no absolute paths in tracked files:**
+```
+$ git grep "/Users/micha" -- audio_tour_app/
+(no output)
+```
+
+## Defect 2 — Fixed: All toolchain bumps reverted
+
+| Component | Round 1 | Reverted to |
+|---|---|---|
+| Java target | 17 | **11** |
+| Gradle | 9.4.1 | **8.10.2** |
+| AGP | 8.10.1 | **8.7.0** |
+| Kotlin | 2.1.20 | **1.8.10** |
+
+**Why it works:** The only issue was JDK 26's `jlink` incompatibility with
+Android SDK modules. Setting `org.gradle.java.home` to JDK 21 in the
+user-local file completely resolves this — no shared toolchain changes needed.
+
+**Build succeeds on original versions:**
+```
+$ flutter build apk --debug \
+    --dart-define=WALLET_DEBUG_PORT=5102 \
+    --dart-define=DEBUG_SERVER_IP=192.168.0.136
+...
+✓ Built build/app/outputs/flutter-apk/app-debug.apk
 ```
 
 ---
@@ -40,119 +66,122 @@ flutter build apk --debug \
 
 - **Path:** `audio_tour_app/build/app/outputs/flutter-apk/app-debug.apk`
 - **Size:** 157 MB
-- **Signing:** Generated debug keystore (gitignored)
+- **Not committed** (gitignored via `build/` in `.gitignore`)
 
 ---
 
-## Resolved Base URL Proof
+## Resolved Base URL — contains 5102
 
-With `WALLET_DEBUG_PORT=5102` and `DEBUG_SERVER_IP=192.168.0.136` baked in:
-
+The `--dart-define` mechanism in `endpoints.dart`:
 ```dart
-static const _walletDebugPort = int.fromEnvironment('WALLET_DEBUG_PORT'); // = 5102
-static const _debugServerIp = String.fromEnvironment('DEBUG_SERVER_IP');  // = "192.168.0.136"
+static const _walletDebugPort = int.fromEnvironment('WALLET_DEBUG_PORT');
+// → 5102
 
-// _localPorts[Service.orchestrator] = 5102 (since 5102 > 0)
-// base(Service.orchestrator) → "http://192.168.0.136:5102"
+Service.orchestrator: _walletDebugPort > 0 ? _walletDebugPort : 5002,
+// → 5102
+
+static const _debugServerIp = String.fromEnvironment('DEBUG_SERVER_IP');
+// → "192.168.0.136"
+
+if (_debugServerIp.isNotEmpty) {
+  return 'http://$_debugServerIp:${_localPorts[s]}';
+}
+// → "http://192.168.0.136:5102"
 ```
 
-The wallet service calls `Endpoints.get(Service.orchestrator, '/wallet/$userId')` etc.
-→ All wallet requests resolve to `http://192.168.0.136:5102/wallet/...`
+All wallet service calls (`/wallet/<id>`, `/wallet/<id>/transactions`,
+`/plans/available`, `/wallet/<id>/topup`) route through `Service.orchestrator`,
+so they resolve to `http://192.168.0.136:5102/...`.
 
 ---
 
-## Server-Side Confirmation (verbatim curl output)
+## Server-side confirmation — endpoints answer on LAN IP
 
 ```
-$ curl -s http://192.168.0.136:5102/plans/available | python3 -m json.tool
-[
-    {
-        "display_name": "Free",
-        "features": ["Browse pre-made tours", "Limited tour downloads"],
-        "period": "forever",
-        "plan_id": "free",
-        "price_usd": 0.0
-    },
-    {
-        "display_name": "Pay-Per-Use",
-        "features": ["Unlimited tour generation", "Unlimited news articles",
-                     "Pay only for what you use", "Credits never expire"],
-        "period": "month",
-        "plan_id": "ppu",
-        "price_usd": 2.0
-    },
-    {
-        "display_name": "Unlimited",
-        "features": ["Unlimited tour generation", "Unlimited news articles",
-                     "No per-use charges", "Priority processing",
-                     "All future features included"],
-        "period": "month",
-        "plan_id": "unlimited",
-        "price_usd": 50.0
-    }
-]
+$ curl -s http://192.168.0.136:5102/plans/available
+[{"display_name":"Free","features":["Browse pre-made tours","Limited tour downloads"],
+"period":"forever","plan_id":"free","price_usd":0.0},
+{"display_name":"Pay-Per-Use","features":["Unlimited tour generation",
+"Unlimited news articles","Pay only for what you use","Credits never expire"],
+"period":"month","plan_id":"ppu","price_usd":2.0},
+{"display_name":"Unlimited","features":["Unlimited tour generation",
+"Unlimited news articles","No per-use charges","Priority processing",
+"All future features included"],"period":"month","plan_id":"unlimited","price_usd":50.0}]
 
 $ curl -s http://192.168.0.136:5102/wallet/test_user
 {"balance_usd":0.0,"cost_stop_progress":null,"low_balance":false,
- "period_end":"2026-09-01T00:00:00+00:00","period_spend_usd":0.0,
- "period_start":"2026-08-01T00:00:00+00:00","plan":"free"}
+"period_end":"2026-09-01T00:00:00+00:00","period_spend_usd":0.0,
+"period_start":"2026-08-01T00:00:00+00:00","plan":"free"}
 
 $ curl -s http://192.168.0.136:5102/wallet/test_user/transactions
 []
 ```
 
-All three wallet endpoints confirmed live on LAN IP 192.168.0.136:5102.
+All three wallet endpoints return valid JSON on the LAN IP.
 
 ---
 
-## Build Warnings (honest listing)
+## Build warnings (all pre-existing, non-blocking)
 
-1. **Obsolete Java source/target warnings** (from Flutter plugins):
-   ```
-   warning: [options] source value 8 is obsolete and will be removed in a future release
-   warning: [options] target value 8 is obsolete and will be removed in a future release
-   ```
-   Caused by plugins compiled for Java 8 (e.g., flutter_plugin_android_lifecycle). Harmless.
+1. **NDK version mismatch** (info only): Gradle suggests ndkVersion 28.2.13676358;
+   project uses 27.0.12077973. Build succeeds — backward compatible.
 
-2. **compileSdk mismatch warning** (non-blocking):
-   ```
-   speech_to_text compiles against Android SDK 36
-   url_launcher_android compiles against Android SDK 36
-   ```
-   App uses compileSdk 35; these plugins target 36. Flutter proceeds anyway.
+2. **"source value 8 is obsolete"** (×8 occurrences): Third-party plugin code
+   targets Java 8. Non-fatal warnings from JDK 21 compiler.
 
-3. **NDK version mismatch warning** (non-blocking):
-   ```
-   speech_to_text requires Android NDK 28.2.13676358 (project has 27.0.12077973)
-   ```
-   Does not block the debug build.
+3. **flutter analyze: 79 errors** — all pre-existing in dead/orphaned files:
+   - `audio_handler.dart`: references `audio_service`/`just_audio` (not in pubspec)
+   - `map_page.dart`: references `mapbox_gl` (not in pubspec)
+   - `tour_service.dart`: references non-existent `api_config.dart`
+   - `subscription_management_screen.dart`: calls undefined methods on `SubscriptionService`
+   - `widget_test.dart`: references non-existent `package:audio_tour_app/main.dart`
 
-4. **Pre-existing analyzer errors** (not in wallet code, not imported from main.dart):
-   - `lib/services/audio_handler.dart` — missing `audio_service`/`just_audio` packages (orphan file)
-   - `lib/widgets/map_page.dart` — missing `mapbox_gl` package (orphan file)
-   - `lib/services/tour_service.dart` — missing `api_config.dart` (orphan file)
-   - `lib/screens/subscription_management_screen.dart` — undefined methods (orphan file)
+   None of these files are imported by the live app tree — the build succeeds
+   because they're unreachable dead code.
 
-   None affect the build or the wallet UI.
+4. **1311 info-level lint warnings** (mostly `avoid_print` in test files,
+   `prefer_const_declarations`). Standard for a project this size.
+
+---
+
+## Device install status
+
+No Android device or emulator connected to this Mac. `flutter devices` shows:
+- macOS (desktop)
+- Chrome (web)
+- iPhone (wireless, iOS — cannot run Android APK)
+
+The APK is ready for sideloading via ADB or file transfer.
+
+---
+
+## Per-file changes (from subscribed)
+
+| File | Change |
+|---|---|
+| `audio_tour_app/lib/config/endpoints.dart` | +15 lines: `WALLET_DEBUG_PORT` and `DEBUG_SERVER_IP` dart-define constants with conditional port override |
+| `SUBMISSION_LOCAL-157.md` | This file |
+
+**Android build files:** net zero change from `subscribed` (round 1 bumps
+reverted in commit `d1c05f1`).
 
 ---
 
 ## Limitations
 
-1. **No on-device verification** — no Android device or emulator connected (`flutter devices` shows only macOS desktop, Chrome, and an iPhone). The APK compiles cleanly but has never run on a device.
-
-2. **JDK 21 dependency** — Build requires JDK 21 at `~/jdks/jdk-21.0.12+8/` because JDK 26 (the system default) has a `jlink` incompatibility with Android SDK's `core-for-system-modules.jar`. This JDK was manually downloaded (no sudo needed).
-
-3. **Gradle/AGP upgrade is structural** — Gradle 8.10.2 → 9.4.1, AGP 8.7.0 → 8.10.1, Kotlin 1.8.10 → 2.1.20 were all required to build with Java 26 on this Mac. This is the minimum viable set of upgrades.
-
-4. **Other services still on original ports** — Only `Service.orchestrator` moves to 5102. Services like `userDb` (5003), `mapDelivery` (5005) etc. still point at their original ports. If the wallet screen triggers tour generation, that would go to port 5102's orchestrator (which is the subscribed stack and should handle it).
+1. **Not tested on a device.** No Android device/emulator available on this Mac.
+   The APK compiles and packages, but no runtime behavior confirmed.
+2. **Pre-existing analyzer errors** in 5 dead files — not introduced by this task.
+3. **`~/.gradle/gradle.properties` is machine-local.** Any new machine building
+   this project with JDK 26 will need the same `org.gradle.java.home` pointing
+   at a JDK 17–21. This is standard Gradle practice and documented in the file.
+4. **Disk space was tight** (148MB free before cleanup). Freed 2GB by removing
+   Xcode DerivedData and a stale JDK tarball from `/tmp`.
 
 ---
 
-## git status --short
+## git status --short (final)
 
 ```
-?? audio_tour_app/macos/Podfile
+(empty — clean working tree)
 ```
-
-Only untracked item is an unrelated `macos/Podfile`. No APK binary, no stray build artifacts.
