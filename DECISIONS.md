@@ -1657,3 +1657,58 @@ is the property that actually matters.
 `subscribed`, then verify identical content with a hash before claiming
 both are done. Never resolve a conflict between the branches as part of a
 feature merge — that silently picks a winner between two divergent fixes.
+
+---
+
+## D54 — The stop-specificity score is bounded by the schema, not the prose (2026-08-03)
+
+Round 2 hardened the anchor metric and the score collapsed:
+
+```
+                 v1      v2
+ANCHORED       19.7%    4.2%
+Palais Lascaris 38.9%    0.0%
+Chagall         70.0%    3.3%
+```
+
+Noise floor is **zero** — three identical runs, no LLM, no sampling. Any
+future movement is real.
+
+**LEAD checked why rather than accepting the number.** `venue_corpus` is
+keyed by `qid` / `venue_name`: **one row per venue, shared by every stop in
+it.** The hardened rule requires an anchor that distinguishes a stop from
+its siblings, and no such token can exist when the siblings share a single
+corpus row. The only per-stop signal in the schema is
+`canonical_titles_json` — which is precisely how MAMAC and Chagall retained
+any anchors at all, by artwork titles matching stop names.
+
+**So the metric is not harsh. It is correctly reporting that there is no
+per-stop source material.** Same ceiling the earlier improvement loop hit —
+"every stop logged: No RAG context — cannot generate fact sheet" — but
+measured rather than argued.
+
+### What this means for the loop Michael asked for
+
+He asked (D52) for validation to be "a score to go up in iterative rounds".
+**This score cannot go up by improving prose.** It is bounded by the data
+layer. Rewriting sentences, tuning prompts, or adding fill logic will move
+it by noise at best — and the noise floor is zero, so it will not move at
+all.
+
+Round 3 must therefore be **per-stop corpus**, not prose. Concretely: source
+material attached to a stop rather than to its venue, so that two stops in
+the same museum can be told apart by what is known about them.
+
+### The pattern, stated once more because it keeps recurring
+
+Three times now the visible symptom has been in the generated text and the
+actual limit has been in the data:
+
+1. Tour-improvement rounds 1–4 fought fabrication in the fill logic; the
+   ceiling was corpus size.
+2. `story_elements_json` was empty for all 16 venues; the engine had no
+   production caller.
+3. Stop-specificity scores 4.2%; the corpus has no per-stop granularity.
+
+**When a text-quality metric refuses to move, look at what the generator was
+given, not at what it wrote.**
