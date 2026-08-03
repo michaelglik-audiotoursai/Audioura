@@ -1,0 +1,285 @@
+==============================================================================
+STOP ANCHOR DETECTOR v2 — LOCAL-175 Hardened Report
+==============================================================================
+
+audio_tours row count: 108
+Tours analyzed: 7
+
+HARDENING CHANGES:
+  1. Sibling discrimination: token in >50% of sibling stops → not an anchor
+  2. Navigation classification: wayfinding → NAVIGATION (not scored)
+  3. Threshold justification: Michael's substitution test — if you can say
+     the same thing about another stop, it is not an anchor.
+
+------------------------------------------------------------------------------
+SANITY CHECK: Michael's examples from ClickUp wdvrdaxa7h
+------------------------------------------------------------------------------
+
+Example 1 (generic prose — expected NO_ANCHOR):
+  Text: "Cycling on the French Riviera, stop at Cap d'Antibes to experience the enduring power of nature, ins..."
+  RESULT: NO_ANCHOR
+  ✓ MATCHES Michael's judgment
+
+Example 2 (Fitzgerald name-drop — expected UNLINKED_ENTITY):
+  Text: "As you stand on Cap d'Antibes with Mediterranean sea stretching out before you Imagine the scene tha..."
+  RESULT: UNLINKED_ENTITY
+  Unlinked: [('person', 'Scott Fitzgerald')]
+  ✓ MATCHES Michael's judgment
+
+Example 3 (wayfinding — expected NAVIGATION, was ANCHORED in v1):
+  Text: "As you enter the Palais Lascaris, make your way to the Grand Salon on the first floor, where a masterpiece awaits."
+  RESULT: NAVIGATION
+  ✓ Correctly classified as NAVIGATION (was ANCHORED in v1)
+
+==============================================================================
+PREVALENCE REPORT — Per Tour (v1 → v2 comparison)
+==============================================================================
+
+──────────────────────────────────────────────────────────────────────────────
+Tour 1: Palais Lascaris, Nice, France - museum Tour
+  Corpus: YES (Palais Lascaris, Nice)
+  Stops: 3, Paragraphs: 18
+  NAVIGATION (excluded from %): 1
+  Content paragraphs (scored): 17
+                             v1  →        v2
+  ANCHORED:           38.9%  →    0.0%
+  NO_ANCHOR:          22.2%  →   41.2%
+  UNLINKED_ENTITY:    38.9%  →   58.8%
+    Stop: The Triumph of David                               A=0 NO=1 UL=5 NAV=1 (/7)
+    Stop: The Annunciation                                   A=0 NO=1 UL=3 NAV=0 (/4)
+    Stop: Raquel                                             A=0 NO=5 UL=2 NAV=0 (/7)
+
+──────────────────────────────────────────────────────────────────────────────
+Tour 29: French Riviera Biking Tour
+  Corpus: YES (French Riviera walking area)
+  Stops: 15, Paragraphs: 32
+  NAVIGATION (excluded from %): 1
+  Content paragraphs (scored): 31
+                             v1  →        v2
+  ANCHORED:            0.0%  →    0.0%
+  NO_ANCHOR:          34.4%  →   35.5%
+  UNLINKED_ENTITY:    65.6%  →   64.5%
+    Stop: Old Town of Antibes                                A=0 NO=0 UL=3 NAV=0 (/3)
+    Stop: Cap d'Antibes                                      A=0 NO=0 UL=2 NAV=0 (/2)
+    Stop: Port Vauban                                        A=0 NO=1 UL=1 NAV=0 (/2)
+    Stop: Marineland Antibes                                 A=0 NO=1 UL=1 NAV=0 (/2)
+    Stop: Paloma Beach                                       A=0 NO=0 UL=2 NAV=0 (/2)
+    Stop: Villa Ephrussi de Rothschild                       A=0 NO=1 UL=1 NAV=0 (/2)
+    Stop: Promenade Maurice Rouvier                          A=0 NO=1 UL=1 NAV=0 (/2)
+    Stop: Chapelle Saint-Pierre                              A=0 NO=1 UL=1 NAV=0 (/2)
+    Stop: Mont Boron                                         A=0 NO=1 UL=1 NAV=0 (/2)
+    Stop: Place Massena                                      A=0 NO=0 UL=2 NAV=0 (/2)
+    Stop: Parc Phœnix                                        A=0 NO=0 UL=2 NAV=0 (/2)
+    Stop: Cours Saleya Market                                A=0 NO=1 UL=1 NAV=0 (/2)
+    Stop: Musée Matisse                                      A=0 NO=1 UL=0 NAV=1 (/2)
+    Stop: Castle Hill of Nice                                A=0 NO=2 UL=0 NAV=0 (/2)
+    Stop: Eze Village                                        A=0 NO=1 UL=2 NAV=0 (/3)
+
+──────────────────────────────────────────────────────────────────────────────
+Tour 12: walking tour in Nice, france - walking Tour
+  Corpus: NO ()
+  Stops: 10, Paragraphs: 61
+  NAVIGATION (excluded from %): 1
+  Content paragraphs (scored): 60
+                             v1  →        v2
+  ANCHORED:            0.0%  →    0.0%
+  NO_ANCHOR:          37.7%  →   36.7%
+  UNLINKED_ENTITY:    62.3%  →   63.3%
+    Stop: Promenade des Anglais                              A=0 NO=3 UL=2 NAV=1 (/6)
+    Stop: Castle Hill (Colline du Château)                   A=0 NO=2 UL=3 NAV=0 (/5)
+    Stop: Albert 1st Gardens                                 A=0 NO=2 UL=3 NAV=0 (/5)
+    Stop: Nice Opera House                                   A=0 NO=3 UL=3 NAV=0 (/6)
+    Stop: Place Masséna                                      A=0 NO=3 UL=3 NAV=0 (/6)
+    Stop: Cours Saleya Market                                A=0 NO=2 UL=4 NAV=0 (/6)
+    Stop: Old Town (Vieux Nice)                              A=0 NO=2 UL=4 NAV=0 (/6)
+    Stop: Russian Orthodox Cathedral                         A=0 NO=2 UL=4 NAV=0 (/6)
+    Stop: Marc Chagall National Museum                       A=0 NO=0 UL=7 NAV=0 (/7)
+    Stop: Museum of Modern and Contemporary Art (MAMAC)      A=0 NO=3 UL=5 NAV=0 (/8)
+
+──────────────────────────────────────────────────────────────────────────────
+Tour 24: Musée Marc Chagall, Nice, France - museum Tour
+  Corpus: YES (Musee National Marc Chagall, Nice, France)
+  Stops: 6, Paragraphs: 30
+  NAVIGATION (excluded from %): 0
+  Content paragraphs (scored): 30
+                             v1  →        v2
+  ANCHORED:           70.0%  →    3.3%
+  NO_ANCHOR:          20.0%  →   53.3%
+  UNLINKED_ENTITY:    10.0%  →   43.3%
+    Stop: Abraham et les trois anges                         A=0 NO=3 UL=2 NAV=0 (/5)
+    Stop: L'Arche de Noé                                     A=1 NO=1 UL=2 NAV=0 (/4)
+    Stop: L'Exode                                            A=0 NO=2 UL=2 NAV=0 (/4)
+    Stop: La Bible : Abraham et Isaac en route               A=0 NO=1 UL=3 NAV=0 (/4)
+    Stop: Le Cirque bleu                                     A=0 NO=4 UL=0 NAV=0 (/4)
+    Stop: King David                                         A=0 NO=5 UL=4 NAV=0 (/9)
+
+──────────────────────────────────────────────────────────────────────────────
+Tour 14: Museum Of Naïve Art, Nice, France - museum Tour
+  Corpus: NO ()
+  Stops: 9, Paragraphs: 48
+  NAVIGATION (excluded from %): 3
+  Content paragraphs (scored): 45
+                             v1  →        v2
+  ANCHORED:            0.0%  →    0.0%
+  NO_ANCHOR:          60.4%  →   64.4%
+  UNLINKED_ENTITY:    39.6%  →   35.6%
+    Stop: The Flight into Egypt                              A=0 NO=4 UL=1 NAV=1 (/6)
+    Stop: The Wedding                                        A=0 NO=3 UL=2 NAV=0 (/5)
+    Stop: The Dream                                          A=0 NO=3 UL=1 NAV=0 (/4)
+    Stop: The Red Umbrella                                   A=0 NO=4 UL=0 NAV=0 (/4)
+    Stop: The Bathers                                        A=0 NO=3 UL=2 NAV=1 (/6)
+    Stop: The Carousel                                       A=0 NO=4 UL=1 NAV=0 (/5)
+    Stop: The Hot Day                                        A=0 NO=1 UL=3 NAV=0 (/4)
+    Stop: The Sleeping Gypsy                                 A=0 NO=2 UL=2 NAV=1 (/5)
+    Stop: On the hills - rainforest                          A=0 NO=5 UL=4 NAV=0 (/9)
+
+──────────────────────────────────────────────────────────────────────────────
+Tour 46: Boston Common, Boston MA - historical Tour
+  Corpus: YES (Boston Common walking area)
+  Stops: 5, Paragraphs: 12
+  NAVIGATION (excluded from %): 0
+  Content paragraphs (scored): 12
+                             v1  →        v2
+  ANCHORED:            0.0%  →    0.0%
+  NO_ANCHOR:          16.7%  →   25.0%
+  UNLINKED_ENTITY:    83.3%  →   75.0%
+    Stop: Frog Pond                                          A=0 NO=1 UL=2 NAV=0 (/3)
+    Stop: Soldiers and Sailors Monument                      A=0 NO=0 UL=2 NAV=0 (/2)
+    Stop: Parkman Bandstand                                  A=0 NO=1 UL=1 NAV=0 (/2)
+    Stop: Granary Burying Ground                             A=0 NO=1 UL=1 NAV=0 (/2)
+    Stop: Brewer Fountain                                    A=0 NO=0 UL=3 NAV=0 (/3)
+
+──────────────────────────────────────────────────────────────────────────────
+Tour 44: Musee d Art Moderne et d Art Contemporain, Nice, France - Museum Tour
+  Corpus: YES (Musee d Art Moderne et d Art Contemporain, Nice, France)
+  Stops: 10, Paragraphs: 17
+  NAVIGATION (excluded from %): 0
+  Content paragraphs (scored): 17
+                             v1  →        v2
+  ANCHORED:           88.2%  →   47.1%
+  NO_ANCHOR:           5.9%  →   23.5%
+  UNLINKED_ENTITY:     5.9%  →   29.4%
+    Stop: Richard Long ou la sculpture en marchant           A=1 NO=1 UL=1 NAV=0 (/3)
+    Stop: She-Bam Pow POP Wizz                               A=1 NO=0 UL=1 NAV=0 (/2)
+    Stop: Tir, séance 26 juin 1961                           A=1 NO=0 UL=0 NAV=0 (/1)
+    Stop: Donations and deposits                             A=0 NO=0 UL=1 NAV=0 (/1)
+    Stop: Donations et dépôts                                A=1 NO=0 UL=0 NAV=0 (/1)
+    Stop: Expositions temporaires                            A=0 NO=1 UL=0 NAV=0 (/1)
+    Stop: La mariée sous l’arbre                             A=1 NO=0 UL=0 NAV=0 (/1)
+    Stop: Le Déjeuner sur l’herbe                            A=0 NO=0 UL=1 NAV=0 (/1)
+    Stop: Le Mur de Feu d’Yves Klein                         A=1 NO=0 UL=0 NAV=0 (/1)
+    Stop: Le Village de grand-mère                           A=2 NO=2 UL=1 NAV=0 (/5)
+
+==============================================================================
+GRAND TOTALS — v1 vs v2
+==============================================================================
+  Total paragraphs: 218
+  NAVIGATION (excluded): 6 (2.8% of all)
+  Content paragraphs (scored): 212
+
+                             v1  →        v2
+  ANCHORED:           19.7%  →    4.2%
+  NO_ANCHOR:          34.9%  →   43.4%
+  UNLINKED_ENTITY:    45.4%  →   52.4%
+
+==============================================================================
+10 SAMPLED ANCHORED PARAGRAPHS (for human judgment)
+These passed the hardened test: sibling-discriminating anchors only.
+==============================================================================
+
+  [1] Tour: Musée Marc Chagall, Nice, France - museu
+      Stop: L'Arche de Noé
+      Anchor: ('person', "L'Arche de Noé, Marc Chagall's")
+      Text: "In the timeless work of L'Arche de Noé, Marc Chagall's interpretation of the biblical story of Noah's Ark comes to life with a vibrancy that transcend"
+
+  [2] Tour: Musee d Art Moderne et d Art Contemporai
+      Stop: Richard Long ou la sculpture e
+      Anchor: ('title', 'Richard Long ou la sculpture en marchant.')
+      Text: "Stand at the entrance of the Musee d'Art Moderne et d'Art Contemporain, facing towards the exhibit "Richard Long ou la sculpture en marchant." From th"
+
+  [3] Tour: Musee d Art Moderne et d Art Contemporai
+      Stop: She-Bam Pow POP Wizz
+      Anchor: ('title', 'She-Bam Pow POP Wizz.')
+      Text: "Stand in the center of the gallery to behold "She-Bam Pow POP Wizz." This kinetic installation by Niki de Saint Phalle and Jean Tinguely mesmerizes wi"
+
+  [4] Tour: Musee d Art Moderne et d Art Contemporai
+      Stop: Tir, séance 26 juin 1961
+      Anchor: ('person', "Saint Phalle's")
+      All anchors: [('person', "Saint Phalle's"), ('person', "Niki de Saint Phalle's")]
+      Text: "Niki de Saint Phalle's groundbreaking exhibit, Tir, séance 26 juin 1961, challenges conventional boundaries with its unconventional approach. What ini"
+
+  [5] Tour: Musee d Art Moderne et d Art Contemporai
+      Stop: Donations et dépôts
+      Anchor: ('person', 'Nouveau Réalisme')
+      Text: "In this dedicated space, you are surrounded by around twenty of Yves Klein's artworks, several of which have become integral parts of the museum's per"
+
+  [6] Tour: Musee d Art Moderne et d Art Contemporai
+      Stop: La mariée sous l’arbre
+      Anchor: ('person', "Niki de Saint Phalle's")
+      All anchors: [('person', "Niki de Saint Phalle's"), ('person', 'Saint Phalle'), ('stop_specific_mention', "Phalle's")]
+      Text: "The sculpture, "La mariée sous l’arbre," created between 1963 and 1964, stands as a testament to Niki de Saint Phalle's artistic vision. Crafted with "
+
+  [7] Tour: Musee d Art Moderne et d Art Contemporai
+      Stop: Le Mur de Feu d’Yves Klein
+      Anchor: ('title', 'Le Mur de Feu d’Yves Klein,')
+      Text: "As you gaze upon "Le Mur de Feu d’Yves Klein," you are immediately struck by its sheer power and energy. The artwork consists of a mesmerizing wall of"
+
+  [8] Tour: Musee d Art Moderne et d Art Contemporai
+      Stop: Le Village de grand-mère
+      Anchor: ('person', 'Arman')
+      Text: "As you stand in the heart of Musee d'Art Moderne et d'Art Contemporain, turn towards the corner to behold "Le Village de grand-mère" by Arman. Positio"
+
+  [9] Tour: Musee d Art Moderne et d Art Contemporai
+      Stop: Le Village de grand-mère
+      Anchor: ('stop_specific_mention', "Arman's")
+      All anchors: [('stop_specific_mention', "Arman's"), ('date', '1962'), ('title', 'Le Village de grand-mère,')]
+      Text: "Arman's "Le Village de grand-mère," created in 1962, presents a fascinating composition of suspended objects evoking a sense of nostalgia and memory. "
+
+==============================================================================
+SAMPLE NAVIGATION PARAGRAPHS (correctly excluded from scoring)
+==============================================================================
+
+  Tour: Palais Lascaris, Nice, France - museum T
+  Stop: The Triumph of David
+  Text: "As you enter the Palais Lascaris, make your way to the Grand Salon on the first floor, where a masterpiece awaits your admiration."
+
+  Tour: French Riviera Biking Tour
+  Stop: Musée Matisse
+  Text: "Step into the world of Henri Matisse, the revolutionary artist who redefined modern art. Discover his vibrant use of color and bold shapes in works li"
+
+  Tour: walking tour in Nice, france - walking T
+  Stop: Promenade des Anglais
+  Text: "Start at the main entrance of the Promenade, facing the sea. Walk straight ahead. As you approach the Promenade des Anglais in Nice, France, find a sp"
+
+  Tour: Museum Of Naïve Art, Nice, France - muse
+  Stop: The Flight into Egypt
+  Text: "As you approach The Museum of Naïve Art in Nice, France, make your way to the central hall on the second floor for a unique perspective on the exhibit"
+
+  Tour: Museum Of Naïve Art, Nice, France - muse
+  Stop: The Bathers
+  Text: "Navigate your journey through the Museum Of Naïve Art to discover the whimsical charm of The Carousel."
+
+==============================================================================
+NOISE FLOOR (D22)
+==============================================================================
+
+The detector is DETERMINISTIC: no random seed, no LLM calls,
+no sampling. Entity extraction uses regex + capitalization heuristics.
+Corpus lookup is a fixed database query.
+
+Three runs over the same tour set:
+  Run 1: ANCHORED=4.2%  NO_ANCHOR=43.4%  UNLINKED=52.4%  NAV=6
+  Run 2: ANCHORED=4.2%  NO_ANCHOR=43.4%  UNLINKED=52.4%  NAV=6
+  Run 3: ANCHORED=4.2%  NO_ANCHOR=43.4%  UNLINKED=52.4%  NAV=6
+
+  All three runs are IDENTICAL.
+  Noise floor: ZERO. The metric is fully deterministic.
+  Any future change in the score represents a real change in
+  either the metric logic or the underlying data.
+
+==============================================================================
+DATABASE VERIFICATION
+==============================================================================
+  audio_tours row count before: 108
+  audio_tours row count after: 108
+  Read-only: no INSERT, UPDATE, or DELETE executed
