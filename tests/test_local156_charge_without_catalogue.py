@@ -2,9 +2,18 @@
 """
 LOCAL-156: A user can be charged for a tour that never reaches their library.
 
-This test proves the bug (charge without delivery) and the fix (compensating
-credit + correct job status) by exercising the store_audio_tour function and
-the orchestrator's handling of duplicate tour names.
+This test proves the bug (charge without delivery) and the fix (correct job
+status on failure + charge retention on reuse).
+
+HISTORY:
+  - LOCAL-156 original: issued a service_credit refund on tour reuse.
+  - LOCAL-172 / D47: Michael confirmed tour reuse should CHARGE, same as
+    fresh generation. The refund is removed. Reasoning: price predictability
+    (user should not wonder why the same request sometimes costs nothing)
+    and cost sharing (first requester should not pay for everyone).
+
+The store_failed path (genuine DB error) still issues a service_credit —
+that is a delivery failure, not a reuse.
 
 Run:
     python3 tests/test_local156_charge_without_catalogue.py
@@ -48,6 +57,7 @@ def evidence(label, value):
 def main():
     print("=" * 70)
     print("LOCAL-156: Charge without catalogue entry — reproduction & fix proof")
+    print("  (Updated LOCAL-172 / D47: reuse charges, no refund)")
     print("=" * 70)
     print(f"Test user: {TEST_USER_ID}")
     print(f"Job ID:    {JOB_ID}")
@@ -196,9 +206,6 @@ def main():
         zf.writestr("tour_content.txt", "LOCAL-156 test tour content")
     tmp_zip.close()
 
-    # Set required env vars for store_audio_tour (it connects to localhost:5433 outside Docker)
-    # (Already set above for wallet_ledger)
-
     # Import and call store_audio_tour
     from tour_orchestrator_service import store_audio_tour
 
@@ -233,45 +240,21 @@ def main():
                f"got {type(store_result).__name__}: {store_result}")
     print()
 
-    # ─── Step 5: Simulate orchestrator handling — issue compensating credit ───
-    print("─── STEP 5: COMPENSATING CREDIT (as orchestrator now does) ───")
+    # ─── Step 5: Verify charge is RETAINED (D47 — no refund on reuse) ─────────
+    print("─── STEP 5: CHARGE RETAINED (D47 — tour reuse charges same as fresh) ───")
+    print("  D47 (Michael, 2026-08-03): 'Yes, users should be charged for translation.'")
+    print("  Applied to tours: same price-predictability and cost-sharing reasoning.")
+    print("  The service_credit refund from LOCAL-156 is REMOVED.")
+    print()
 
-    if isinstance(store_result, dict) and store_result.get("action") == "already_exists":
-        # The orchestrator issues a service_credit to reverse the charge
-        reuse_idem_key = f"service_credit:reuse:{TEST_USER_ID}:{JOB_ID}"
-
-        # Look up the original charge amount
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT amount_cents FROM wallet_ledger WHERE idempotency_key = %s",
-            (charge_idem_key,)
-        )
-        charge_row = cur.fetchone()
-        cur.close()
-
-        if charge_row and charge_row[0] < 0:
-            credit_cents = abs(charge_row[0])
-            credit_row_id, credit_bal = record_movement(
-                user_id=TEST_USER_ID,
-                movement_type="service_credit",
-                amount_cents=credit_cents,
-                idempotency_key=reuse_idem_key,
-                description=f"Refund: tour already exists — {COLLIDING_TOUR_NAME[:100]}",
-                reference_id=JOB_ID,
-            )
-            balance_final = get_balance_cents(TEST_USER_ID)
-            evidence("Service credit issued", f"+{credit_cents}¢")
-            evidence("Balance after credit", f"{balance_final}¢ (${balance_final/100:.2f})")
-            record("Compensating credit equals original charge",
-                   credit_cents == user_charge_cents,
-                   f"credit={credit_cents}¢, charge={user_charge_cents}¢")
-            record("Net balance unchanged (charge + credit = 0)",
-                   balance_final == balance_before,
-                   f"final={balance_final}¢, original={balance_before}¢")
-        else:
-            record("Charge found for reversal", False, "No charge row found")
-    else:
-        record("Compensating credit path reachable", False, "store_result not as expected")
+    balance_final = get_balance_cents(TEST_USER_ID)
+    evidence("Balance after reuse (no refund)", f"{balance_final}¢ (${balance_final/100:.2f})")
+    record("Charge retained — no service_credit issued (D47)",
+           balance_final == balance_after_charge,
+           f"balance={balance_final}¢, expected={balance_after_charge}¢ (charge kept)")
+    record("User paid same amount as fresh generation",
+           balance_before - balance_final == user_charge_cents,
+           f"total deducted={balance_before - balance_final}¢, expected={user_charge_cents}¢")
     print()
 
     # ─── Step 6: Verify no new row in audio_tours ─────────────────────────────
@@ -290,37 +273,37 @@ def main():
            audio_tours_after == audio_tours_before,
            f"before={audio_tours_before}, after={audio_tours_after}")
 
-    # Wallet should have 3 new rows: topup, charge, service_credit
-    expected_wallet_new = 3
-    record(f"Wallet has {expected_wallet_new} new rows (topup + charge + credit)",
+    # Wallet should have 2 new rows: topup + charge (no service_credit — D47)
+    expected_wallet_new = 2
+    record(f"Wallet has {expected_wallet_new} new rows (topup + charge, NO credit — D47)",
            wallet_ledger_after - wallet_ledger_before == expected_wallet_new,
            f"new rows={wallet_ledger_after - wallet_ledger_before}")
     cur.close()
     print()
 
     # ─── Step 7: Verify job status would NOT be "completed" on failure ────────
-    print("─── STEP 7: JOB STATUS CHECK (store_failed case) ───")
-    # Simulate what happens if store_audio_tour actually FAILS (not already_exists)
-    # For this we call with a different scenario — a genuine error
-    print("  (Testing the error path: if store truly fails, job must not be 'completed')")
-    print("  The fix ensures: store_success=False → return early with status='error'")
-    print("  Evidence: the code path 'if not store_success: ... return' exists")
+    print("─── STEP 7: JOB STATUS CHECK (store_failed case still credits) ───")
+    # The store_failed path (genuine DB error) STILL issues a service_credit.
+    # That is a delivery failure, not a reuse — D14 requires no charge without delivery.
+    print("  The store_failed path is UNCHANGED — service_credit still issued on genuine failure.")
+    print("  Only the 'already_exists' refund is removed (D47).")
 
-    # Read the source to confirm the error handling path exists
-    import inspect
-    # We'll grep the source for the critical path
     source_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                'tour_orchestrator_service.py')
     with open(source_file, 'r') as f:
         source = f.read()
 
     has_store_fail_guard = "if not store_success:" in source and "return  # Do NOT fall through" in source
-    has_service_credit_path = "service_credit" in source and "store_failed" in source
+    has_service_credit_on_failure = "service_credit:store_failed" in source
+    has_no_reuse_refund = "service_credit:reuse" not in source
     record("Orchestrator guards against store failure (does not fall through to 'completed')",
            has_store_fail_guard,
            "Code path: 'if not store_success: ... return'")
-    record("Service credit issued on store failure",
-           has_service_credit_path)
+    record("Service credit still issued on genuine store failure (D14)",
+           has_service_credit_on_failure)
+    record("No service_credit on reuse path (D47 — charge retained)",
+           has_no_reuse_refund,
+           "service_credit:reuse removed from source")
     print()
 
     # ─── Cleanup ──────────────────────────────────────────────────────────────
@@ -336,8 +319,7 @@ def main():
     print("=" * 70)
     passed = sum(1 for _, p, _ in results if p)
     failed = sum(1 for _, p, _ in results if not p)
-    print(f"  Passed: {passed}/{len(results)}")
-    print(f"  Failed: {failed}/{len(results)}")
+    print(f"  Results: {passed} passed, {failed} failed")
     print()
 
     if failed > 0:

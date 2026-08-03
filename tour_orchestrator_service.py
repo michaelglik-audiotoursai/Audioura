@@ -985,52 +985,17 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         # Tour stored (or already existed). Determine the english_tour_id.
         if store_action == "already_exists" and store_existing_id:
             english_tour_id = store_existing_id
-            print(f"[LOCAL-156] Reusing existing tour id={english_tour_id} (no new storage needed)")
-            
-            # [LOCAL-156] Issue compensating credit — tour already exists, user should not pay.
-            # Per Michael: "it cost us and our clients nothing when they download a tour
-            # already pre-created."
-            if user_id:
-                try:
-                    from wallet_ledger import record_movement
-                    from entitlements import _get_subscription_tier
-                    _reuse_tier = _get_subscription_tier(user_id)
-                    if _reuse_tier == 'ppu':
-                        _reuse_idem_key = f"service_credit:reuse:{user_id}:{job_id}"
-                        _charge_idem_key = f"charge:{user_id}:{job_id}"
-                        import psycopg2 as _pg2_reuse
-                        _reuse_conn = _pg2_reuse.connect(
-                            host=os.getenv('DB_HOST', 'postgres-2'),
-                            database=os.getenv('DB_NAME', 'audiotours'),
-                            user=os.getenv('DB_USER', 'admin'),
-                            password=os.getenv('DB_PASSWORD', 'password123'),
-                            port=os.getenv('DB_PORT', '5432')
-                        )
-                        _reuse_cur = _reuse_conn.cursor()
-                        _reuse_cur.execute(
-                            "SELECT amount_cents FROM wallet_ledger WHERE idempotency_key = %s",
-                            (_charge_idem_key,)
-                        )
-                        _charge_row = _reuse_cur.fetchone()
-                        _reuse_cur.close()
-                        _reuse_conn.close()
-                        
-                        if _charge_row and _charge_row[0] < 0:
-                            _credit_cents = abs(_charge_row[0])
-                            _row, _bal = record_movement(
-                                user_id=user_id,
-                                movement_type="service_credit",
-                                amount_cents=_credit_cents,
-                                idempotency_key=_reuse_idem_key,
-                                description=f"Refund: tour already exists — {tour_name[:100]}",
-                                reference_id=job_id,
-                            )
-                            print(f"[LOCAL-156] SERVICE_CREDIT (reuse): +{_credit_cents}¢ | "
-                                  f"balance={_bal}¢ | user={user_id} | job={job_id}")
-                        else:
-                            print(f"[LOCAL-156] No charge to reverse for reuse (job={job_id})")
-                except Exception as _reuse_err:
-                    print(f"[LOCAL-156] WARNING: Could not issue reuse credit: {_reuse_err}")
+            print(f"[LOCAL-172] Reusing existing tour id={english_tour_id} (no new storage needed)")
+            # [LOCAL-172 / D47] Tour reuse charges the same as a fresh generation.
+            # Michael's reasoning (same as D45 for translations):
+            #   1. Price predictability — user should not wonder why the same
+            #      request sometimes costs nothing.
+            #   2. Cost sharing — the first requester should not pay for everyone.
+            # The charge already happened upstream in generate_tour_text_service.py.
+            # Previously LOCAL-156 issued a service_credit refund here; D47 removes it.
+            # Free-tier users are never charged (entitlements gate + _our_cost check
+            # in generate_tour_text_service.py skip the charge block entirely).
+            print(f"[LOCAL-172] Charge retained for reuse (D47) | user={user_id} | job={job_id}")
         else:
             print(f"Tour stored successfully with coordinates: lat={lat}, lng={lng}")
             
