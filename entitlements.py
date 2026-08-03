@@ -208,34 +208,53 @@ def _get_subscription_tier(user_id):
         raise
 
 
-def _check_ppu_balance(user_id):
-    """Check Pay-Per-Use wallet balance. Returns structured result.
-    Zero or negative balance → hard stop with low-balance reminder (D3).
+def _check_ppu_balance(user_id, operation_type="tour_generate"):
+    """Check Pay-Per-Use wallet balance with overdraft floor enforcement.
+
+    LOCAL-163 (D41 — Michael's overdraft rule):
+      1. Finish what you started — allow balance to go negative.
+      2. Floor at −$2.00 — refuse if projected_cost would breach it.
+      3. Debt carries forward — top-up settles debt first (handled by
+         record_movement's arithmetic: −23 + 1000 = 977).
+
+    The pre-flight check uses projected costs (conservative upper bounds)
+    to determine whether to allow the operation BEFORE work begins.
     """
     from wallet_ledger import get_balance_cents, check_low_balance, CREDIT_TOPUP_USD
+    from projected_costs import (
+        would_breach_floor, get_projected_cost_cents, OVERDRAFT_FLOOR_CENTS
+    )
 
     balance_cents = get_balance_cents(user_id)
-    
-    if balance_cents <= 0:
-        # Hard stop — zero balance means no service (D3)
+
+    # Pre-flight overdraft floor check: if balance − projected_cost < −$2.00, refuse.
+    if would_breach_floor(balance_cents, operation_type):
+        projected = get_projected_cost_cents(operation_type)
         balance_usd = Decimal(balance_cents) / Decimal(100)
+        floor_usd = Decimal(OVERDRAFT_FLOOR_CENTS) / Decimal(100)
+        projected_after = Decimal(balance_cents - projected) / Decimal(100)
         return {
             'allowed': False,
-            'reason': 'insufficient_balance',
+            'reason': 'overdraft_floor_breach',
             'remedy': 'topup',
-            'error': 'insufficient_balance',
+            'error': 'overdraft_floor_breach',
             'plan': 'ppu',
             'balance_usd': f"{balance_usd:.2f}",
             'balance_cents': balance_cents,
+            'projected_cost_cents': projected,
+            'projected_balance_after_cents': balance_cents - projected,
+            'floor_cents': OVERDRAFT_FLOOR_CENTS,
             'message': (
                 f"Your balance is ${balance_usd:.2f}. "
-                f"Top up ${CREDIT_TOPUP_USD:.2f} to continue generating audio tours and articles."
+                f"This operation would take it to approximately ${projected_after:.2f}, "
+                f"which is below the ${floor_usd:.2f} limit. "
+                f"Top up ${CREDIT_TOPUP_USD:.2f} to continue."
             ),
         }
-    
+
     # Check low balance for reminder (non-blocking)
     low_balance_msg = check_low_balance(user_id)
-    
+
     return {
         'allowed': True,
         'reason': 'ok',
@@ -474,7 +493,7 @@ def _check_tour_quota_paid(user_id, requested_stops, plan):
     # Dispatch to tier-specific billing check
     try:
         if tier == 'ppu':
-            result = _check_ppu_balance(user_id)
+            result = _check_ppu_balance(user_id, operation_type="tour_generate")
         elif tier == 'unlimited':
             result = _check_unlimited_cost_stop(user_id)
         else:
@@ -619,7 +638,7 @@ def _check_news_quota_paid(user_id, plan):
     # Dispatch to tier-specific billing check
     try:
         if tier == 'ppu':
-            result = _check_ppu_balance(user_id)
+            result = _check_ppu_balance(user_id, operation_type="news_generate")
         elif tier == 'unlimited':
             result = _check_unlimited_cost_stop(user_id)
         else:
