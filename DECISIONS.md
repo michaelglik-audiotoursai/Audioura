@@ -1569,3 +1569,56 @@ assumed cheap, and the count logged so the real rate is visible.
 
 Objective, reuses the grounding work, fails safe. No LLM opinion in the
 detector.
+
+---
+
+## D52 — Stop-specificity becomes an iterative score, landing on BOTH branches (Michael, 2026-08-03)
+
+> "Please work on this task as a part of continuous development while I will
+> be out and use validation as a score to go up in iterative rounds. This
+> check in should go into both: Storied and Subscribed code branches."
+
+Three instructions.
+
+### 1. Continuous, not a one-off
+
+Stop-specificity is now the standing work item while Michael is away, in the
+same shape as the earlier tour-improvement loop: dispatch, review, merge,
+measure, dispatch the next round.
+
+### 2. The validation IS the score
+
+The anchor detector is not only a gate — it is the **metric the loop
+optimises**. Each round reports the same numbers so movement is visible:
+
+- % paragraphs `ANCHORED` (the score — this goes up)
+- % `NO_ANCHOR` and % `UNLINKED_ENTITY` (these go down)
+- measured over the same tour set every round, or the comparison is worthless
+
+**The lesson from the last loop applies directly.** Rounds 1–4 of the
+tour-improvement loop chased a score that turned out not to measure what
+mattered, and the real ceiling was in the data layer. So: fix the baseline
+tour set now, keep it fixed, and record the per-round numbers where they can
+be compared. A score that moves because the measurement changed is worse
+than no score.
+
+Note also D22's noise floor — rubric scores had a stdev of 9.2, needing
+Δ ≥ 10.6 at n=3 to mean anything. Establish the equivalent for this metric
+before celebrating an improvement.
+
+### 3. Both branches
+
+> "This check in should go into both: Storied and Subscribed code branches."
+
+Stop-specificity work lands on **`storied` and `subscribed`**. This is a
+change from the existing split, where a task targets one branch and D24
+keeps the shared stack on `storied`.
+
+**Method:** develop on `storied` (the shared production branch), merge there
+after review, then merge the same feature branch into `subscribed`. Both get
+the identical commit rather than two hand-applied variants that drift —
+divergence between the two is exactly what produced the LOCAL-156 situation,
+where a fix existed on one branch and the bug stayed live on the other.
+
+D24 is unaffected: it governs which code the shared *containers* run, not
+which branches receive a feature.
