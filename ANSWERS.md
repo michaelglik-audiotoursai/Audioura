@@ -16,6 +16,13 @@ the terminal scroll.**
 
 ## Contents
 
+- [Q18 — Translation pricing: what is $2.71 for, can it be cheaper?](#q18)
+- [Q17 — What is the credential pipeline, for whom, for what?](#q17)
+- [Q16 — Can I add field-experiment tasks? Is ClickUp working?](#q16)
+- [Q15 — What is the current Audioura version number?](#q15)
+- [Q14 — How do I see the wallet screen on the Mac Mini?](#q14)
+- [Q13 — How do I install on my iPhone? Ask you or Kiro?](#q13)
+- [Q12 — Where is the APK to copy to an Android phone?](#q12)
 - [Q11 — News generation fixed; but its billing cannot run (RESOLVED/open)](#q11)
 - [Q10 — Tours silently vanish in production for existing venues (LEAD-raised)](#q10)
 - [Q9 — News generation is broken in production (LEAD-raised)](#q9)
@@ -29,6 +36,166 @@ the terminal scroll.**
 - [Q1 — What has been done over the three days?](#q1)
 
 ---
+
+<a name="q18"></a>
+## Q18 — Translation pricing: what is the $2.71 for, and can it be cheaper?
+
+**Asked:** 2026-08-03, 14:20 EDT.
+
+**$2.71 is one tour translated into one language** — a complete tour of
+~16,300 characters and 8–10 stops rendered into e.g. Russian, audio
+included. Not per stop, not per user.
+
+**Already down to $1.55** as of 13:30 today (single-pass deployed):
+
+| | our cost | user pays at ×5 |
+|---|---|---|
+| Saturday | $0.543 | $2.71 |
+| **Now** | **$0.310** | **$1.55** |
+
+Remaining split: **AWS Translate $0.245 (79%)**, **Polly TTS $0.066 (21%)**.
+
+**Three ways lower, measured not guessed:**
+
+1. **Stop translating discarded text — real but small.**
+   `_restore_metadata_labels` throws away translated Address/Coordinates
+   lines and restores English, because the app parses them by exact English
+   match. Measured across 5 tours: **559 chars/tour, $0.0084, 2.7%** of the
+   bill.
+2. **Translate is 79% — the only big lever.** A cheaper provider than AWS's
+   $15/1M, or translating narration only and never structured fields. The
+   second changes what the user receives, so it is a product decision.
+3. **Best lever costs nothing: don't re-translate.** Cache hits are already
+   $0.00 and verified. Ten users wanting the same Russian tour cost $0.31
+   once. Economics improve with usage, not cheaper APIs.
+
+**On development cost** — today's verification runs cost about **$0.35**.
+The $3.00 development ceiling is recorded as a **hard abort, not a licence**
+(D44); tasks still refuse anything projecting over ~$0.50 unless their task
+file says otherwise. The $1.30 product ceiling is unchanged.
+
+---
+
+<a name="q17"></a>
+## Q17 — What is the credential pipeline, for whom, for what?
+
+**Asked:** 2026-08-03, 14:20 EDT. *(Previous phrasing was jargon — apologies.)*
+
+- **Whose credentials:** the user's own newspaper logins — Boston Globe and
+  similar.
+- **What for:** paywalled articles. A user pastes a subscriber-only link;
+  without their login we retrieve the paywall, not the text. With it we
+  fetch the real article and turn it into audio.
+- **Why it exists:** it is the distinguishing value of the **$50/month
+  Unlimited tier** — unrestricted content.
+- **State:** your app already ships the screens that collect these logins.
+  There is **no working server behind them**, and the server code that
+  exists stores passwords in **plaintext**. Nothing has ever been stored
+  (0 rows) and the service cannot start.
+
+**The decision:** should Audioura hold users' third-party newspaper
+passwords at all? Yes → real encryption before anything is stored. No →
+delete the code and remove those screens. It is a liability question more
+than a technical one.
+
+---
+
+<a name="q16"></a>
+## Q16 — Can I add tasks from my field experiments? Is ClickUp working?
+
+**Asked:** 2026-08-03, 09:25 EDT.
+
+**Yes, please.** Two routes, both fine:
+
+- **ClickUp** → 🔵 Claude — Review list. LEAD decomposes into Kiro tasks.
+- **Just say it in chat.** Faster; LEAD writes the task files directly.
+
+**ClickUp is working** — verified 2026-08-03 09:40 by querying the workspace:
+four spaces returned (Beta/MVP, Storied, Subscribed, New Architecture).
+
+Field findings are the most valuable input available. Tour quality has been
+steered the whole time by an **internal rubric no real listener has ever
+validated** — it moved 72.3 → 98.8 on that scale, and if your listeners
+disagree, the rubric is wrong.
+
+---
+
+<a name="q15"></a>
+## Q15 — What is the current Audioura version number?
+
+**Asked:** 2026-08-03, 09:25 EDT. **Answer changed since asking.**
+
+**`2.3.0+20`.**
+
+When asked it was `2.2.0+1` — **stale**, unchanged through all of this work,
+so builds could not be told apart on a device. Bumped per D1 (build numbers
+globally monotonic). Verified in the built binary, not just the source:
+
+```
+aapt2 dump badging → versionCode='20' versionName='2.3.0'
+```
+
+---
+
+<a name="q14"></a>
+## Q14 — How do I see the wallet screen on the Mac Mini?
+
+**Asked:** 2026-08-03, 09:25 EDT.
+
+```bash
+cd ~/Audioura && git checkout subscribed
+cd audio_tour_app
+flutter run -t lib/main_wallet_proof.dart -d chrome \
+  --dart-define=WALLET_DEBUG_PORT=5102 \
+  --dart-define=DEBUG_SERVER_IP=192.168.0.136
+```
+
+Opens the wallet in Chrome against the **live** subscribed stack — real
+balance, real top-ups, real charges. LEAD can run it for you instead.
+
+Already demonstrated this way: balance $0.00 → $10.00 after a real top-up,
+and $10.00 → $9.92 after generating a real tour.
+
+---
+
+<a name="q13"></a>
+## Q13 — How do I install on my iPhone once it is attached? Ask you or Kiro?
+
+**Asked:** 2026-08-03, 09:25 EDT.
+
+**Ask LEAD, not Kiro.** Kiro runs headless and cannot drive Xcode's signing
+UI or respond to a trust prompt on the phone.
+
+The flow: plug in and unlock the iPhone → LEAD runs `flutter devices` to
+confirm it is seen → `flutter run -d <device-id>` with the debug flags.
+Xcode needs a signing team selected once — that click is yours. Repeatable
+afterwards.
+
+**Caveat:** nothing has run on a phone yet. Expect the first install to be a
+debugging session rather than a demo.
+
+---
+
+<a name="q12"></a>
+## Q12 — Where is the APK to copy to an Android phone?
+
+**Asked:** 2026-08-03, 09:25 EDT.
+
+```
+/Users/micha/Desktop/audioura-wallet-debug-2.3.0+20.apk     158 MB
+```
+
+Built with the wallet flags, so it points at the live subscribed stack on
+port 5102.
+
+When first asked there was **no APK anywhere on disk** — the earlier one was
+built inside a task worktree's `build/` directory, which is not committed
+(correctly; a 158 MB binary does not belong in git) and had been cleaned.
+Rebuilt to the Desktop so it is findable.
+
+**Not verified on a device.** `flutter devices` here shows only macOS,
+Chrome and an iPhone — no Android target on this machine.
+
 
 <a name="q11"></a>
 ## Q11 — [RESOLVED by LEAD] News generation is working again
