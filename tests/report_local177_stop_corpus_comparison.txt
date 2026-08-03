@@ -1,0 +1,203 @@
+================================================================================
+LOCAL-177: STOP ANCHOR DETECTOR v2 — STOP_CORPUS COMPARISON
+================================================================================
+
+DESIGN: Classification rules UNCHANGED. Only the corpus lookup differs.
+  Mode A: venue_corpus only (the 4.2% baseline)
+  Mode B: stop_corpus first, venue_corpus fallback
+
+stop_corpus table: 20 rows
+Tours analyzed: 7
+API spend: $0.00 (read-only, no LLM)
+
+--------------------------------------------------------------------------------
+SANITY CHECK: Michael's examples (must be unchanged)
+--------------------------------------------------------------------------------
+  Example 1 (generic): NO_ANCHOR            PASS
+  Example 2 (Fitzgerald): UNLINKED_ENTITY  PASS
+  Example 3 (wayfinding): NAVIGATION       PASS
+
+================================================================================
+SIDE-BY-SIDE RESULTS
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+Tour 1: Palais Lascaris, Nice, France - museum Tour
+  Stops: 3, with stop_corpus: 0/3
+  Content paragraphs: 17 (A) / 17 (B)
+
+                                Mode A      Mode B     Delta
+  ANCHORED                        0.0%        0.0%     +0.0%
+  NO_ANCHOR                      41.2%       41.2%     +0.0%
+  UNLINKED_ENTITY                58.8%       58.8%     +0.0%
+  NAVIGATION                        1           1
+
+────────────────────────────────────────────────────────────────────────────────
+Tour 29: French Riviera Biking Tour
+  Stops: 15, with stop_corpus: 0/15
+  Content paragraphs: 31 (A) / 31 (B)
+
+                                Mode A      Mode B     Delta
+  ANCHORED                        0.0%        0.0%     +0.0%
+  NO_ANCHOR                      35.5%       35.5%     +0.0%
+  UNLINKED_ENTITY                64.5%       64.5%     +0.0%
+  NAVIGATION                        1           1
+
+────────────────────────────────────────────────────────────────────────────────
+Tour 12: walking tour in Nice, france - walking Tour
+  Stops: 10, with stop_corpus: 0/10
+  Content paragraphs: 60 (A) / 60 (B)
+
+                                Mode A      Mode B     Delta
+  ANCHORED                        0.0%        0.0%     +0.0%
+  NO_ANCHOR                      36.7%       36.7%     +0.0%
+  UNLINKED_ENTITY                63.3%       63.3%     +0.0%
+  NAVIGATION                        1           1
+
+────────────────────────────────────────────────────────────────────────────────
+Tour 24: Musée Marc Chagall, Nice, France - museum Tour
+  Stops: 6, with stop_corpus: 4/6
+  Attributed stops: ['Abraham et les trois anges', "L'Arche de Noé", 'La Bible : Abraham et Isaac en route', 'Le Cirque bleu']
+  Content paragraphs: 30 (A) / 30 (B)
+
+                                Mode A      Mode B     Delta
+  ANCHORED                        3.3%       10.0%     +6.7%
+  NO_ANCHOR                      53.3%       50.0%     -3.3%
+  UNLINKED_ENTITY                43.3%       40.0%     -3.3%
+  NAVIGATION                        0           0
+
+  Per-stop detail (stop_corpus stops only):
+    Abraham et les trois anges                    A:0/5 → B:0/5
+    L'Arche de Noé                                A:1/4 → B:1/4
+    La Bible : Abraham et Isaac en route          A:0/4 → B:1/4
+    Le Cirque bleu                                A:0/4 → B:1/4
+
+────────────────────────────────────────────────────────────────────────────────
+Tour 14: Museum Of Naïve Art, Nice, France - museum Tour
+  Stops: 9, with stop_corpus: 0/9
+  Content paragraphs: 45 (A) / 45 (B)
+
+                                Mode A      Mode B     Delta
+  ANCHORED                        0.0%        0.0%     +0.0%
+  NO_ANCHOR                      64.4%       64.4%     +0.0%
+  UNLINKED_ENTITY                35.6%       35.6%     +0.0%
+  NAVIGATION                        3           3
+
+────────────────────────────────────────────────────────────────────────────────
+Tour 46: Boston Common, Boston MA - historical Tour
+  Stops: 5, with stop_corpus: 0/5
+  Content paragraphs: 12 (A) / 12 (B)
+
+                                Mode A      Mode B     Delta
+  ANCHORED                        0.0%        0.0%     +0.0%
+  NO_ANCHOR                      25.0%       25.0%     +0.0%
+  UNLINKED_ENTITY                75.0%       75.0%     +0.0%
+  NAVIGATION                        0           0
+
+────────────────────────────────────────────────────────────────────────────────
+Tour 44: Musee d Art Moderne et d Art Contemporain, Nice, France - Museum Tour
+  Stops: 10, with stop_corpus: 10/10
+  Attributed stops: ['Richard Long ou la sculpture en marchant', 'She-Bam Pow POP Wizz', 'Tir, séance 26 juin 1961', 'Donations and deposits', 'Donations et dépôts']
+  Content paragraphs: 17 (A) / 17 (B)
+
+                                Mode A      Mode B     Delta
+  ANCHORED                       47.1%       64.7%    +17.6%
+  NO_ANCHOR                      23.5%       23.5%     +0.0%
+  UNLINKED_ENTITY                29.4%       11.8%    -17.6%
+  NAVIGATION                        0           0
+
+  Per-stop detail (stop_corpus stops only):
+    Richard Long ou la sculpture en marchant      A:1/3 → B:2/3
+    She-Bam Pow POP Wizz                          A:1/2 → B:1/2
+    Tir, séance 26 juin 1961                      A:1/1 → B:1/1
+    Donations and deposits                        A:0/1 → B:1/1
+    Donations et dépôts                           A:1/1 → B:1/1
+    Expositions temporaires                       A:0/1 → B:0/1
+    La mariée sous l’arbre                        A:1/1 → B:1/1
+    Le Déjeuner sur l’herbe                       A:0/1 → B:1/1
+    Le Mur de Feu d’Yves Klein                    A:1/1 → B:1/1
+    Le Village de grand-mère                      A:2/5 → B:2/5
+
+================================================================================
+CATEGORY BREAKDOWN
+================================================================================
+
+  MUSEUMS (have attributable pages):
+    Mode A (venue-only):      8.3% ANCHORED (9/109)
+    Mode B (stop_corpus first): 12.8% ANCHORED (14/109)
+    Delta: +4.6%
+
+  WALKING/BIKING (no attributable pages):
+    Mode A (venue-only):      0.0% ANCHORED (0/103)
+    Mode B (stop_corpus first): 0.0% ANCHORED (0/103)
+    Delta: +0.0%
+
+================================================================================
+GRAND TOTALS
+================================================================================
+  Total content paragraphs: 212 (A) / 212 (B)
+
+                                Mode A      Mode B     Delta
+  ANCHORED                        4.2%        6.6%     +2.4%
+  NO_ANCHOR                      43.4%       42.9%
+  UNLINKED_ENTITY                52.4%       50.5%
+
+================================================================================
+COVERAGE
+================================================================================
+  Total stops across 7 tours: 58
+  Stops with stop_corpus row: 14
+  Coverage: 24.1%
+  stop_corpus table total rows: 20
+
+================================================================================
+NOISE FLOOR — 3 runs, must be identical
+================================================================================
+  Run 1: A=4.2%  B=6.6%
+  Run 2: A=4.2%  B=6.6%
+  Run 3: A=4.2%  B=6.6%
+  All runs IDENTICAL. Noise floor: ZERO.
+
+================================================================================
+NEWLY ANCHORED PARAGRAPHS (in Mode B but not Mode A)
+================================================================================
+  Found 5 newly anchored paragraphs:
+
+  [1] Tour: Musée Marc Chagall, Nice, France - museu
+      Stop: La Bible : Abraham et Isaac en rout
+      Was: UNLINKED_ENTITY → Now: ANCHORED via ('person', 'Bible: Abraham')
+      Text: "As you contemplate the sacrifice and devotion portrayed in "La Bible: Abraham et Isaac en route," consider the sacrifice..."
+
+  [2] Tour: Musée Marc Chagall, Nice, France - museu
+      Stop: Le Cirque bleu
+      Was: NO_ANCHOR → Now: ANCHORED via ('date', '1950')
+      All anchors: [('date', '1950'), ('date', '1952')]
+      Text: "In the tranquil ambiance of the museum, Le Cirque bleu emerges as a jubilant symphony of colors and movement, painted by..."
+
+  [3] Tour: Musee d Art Moderne et d Art Contemporai
+      Stop: Richard Long ou la sculpture en mar
+      Was: UNLINKED_ENTITY → Now: ANCHORED via ('person', 'Niki de Saint Phalle')
+      All anchors: [('person', 'Niki de Saint Phalle'), ('person', 'Albert Chubac and Khalil Nahoul,')]
+      Text: "You are about to embark on a captivating journey through the Musee d Art Moderne et d Art Contemporain, a living book of..."
+
+  [4] Tour: Musee d Art Moderne et d Art Contemporai
+      Stop: Donations and deposits
+      Was: UNLINKED_ENTITY → Now: ANCHORED via ('person', 'Niki de Saint Phalle')
+      All anchors: [('person', 'Niki de Saint Phalle'), ('stop_specific_mention', "Phalle's"), ('stop_specific_mention', "Saint Phalle's")]
+      Text: "As you stand amidst the artistic treasures generously donated to the museum, your eyes are drawn to a captivating piece ..."
+
+  [5] Tour: Musee d Art Moderne et d Art Contemporai
+      Stop: Le Déjeuner sur l’herbe
+      Was: UNLINKED_ENTITY → Now: ANCHORED via ('person', 'Jacquet')
+      All anchors: [('person', 'Jacquet'), ('date', '2005')]
+      Text: "In this modern transposition titled "Détail du déjeuner sur l’herbe," created in 2005 and displayed on the museum's faca..."
+
+================================================================================
+SUMMARY
+================================================================================
+  Mode A baseline (venue_corpus only): 4.2% ANCHORED
+  Mode B (stop_corpus first):          6.6% ANCHORED
+  Delta: +2.4%
+  API spend: $0.00
+  Classification rules: UNCHANGED
+  Database writes: NONE (read-only)
