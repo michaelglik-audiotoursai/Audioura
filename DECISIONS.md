@@ -1376,3 +1376,45 @@ reuse applies to PPU. Verify that rather than assume it.
 > "My mistake: I did not mean to drop $USD sign."
 
 `formatUsd()` as shipped in LOCAL-161 is correct — `-$1.23`. No change.
+
+---
+
+## D48 — Tasks that deploy must not build from the main working tree (2026-08-03)
+
+Twice now a task has needed to rebuild a shared container, and both times it
+did so by editing `~/Audioura` — the main working tree — because
+`docker-compose-master.yml`'s build context is the repo root, not the task's
+worktree.
+
+- **LOCAL-162** left the single-pass translation change uncommitted on
+  `storied`. Production ran code that existed nowhere in git. LEAD only
+  noticed because `git checkout` refused to switch branches over the dirty
+  file, and committed it at `4f8fb0f`.
+- **LOCAL-170** is doing the same right now with the LOCAL-156 port. Its
+  change is correct and its task authorised the rebuild — but it has again
+  blocked LEAD from switching branches, this time stalling an unrelated
+  merge (LOCAL-169).
+
+Neither task did anything wrong by its own instructions. The **pattern** is
+wrong, and it produces two failure modes: production running uncommitted
+code, and LEAD's branch operations blocked by a task's work in progress.
+
+**Rule: tasks propose, LEAD deploys.**
+
+A task that changes code destined for a shared container should:
+
+1. Commit the change **on its own branch, in its own worktree**.
+2. Stop there, and say in its submission that deployment is pending.
+
+LEAD then merges, and only then rebuilds and recreates from a clean tree.
+This also puts every deployment behind a review rather than inside one,
+which matters because these containers serve Michael's phone.
+
+**Exception, stated so it is not invented later:** a task whose *entire*
+purpose is deployment verification — proving an image contains what it
+should, as LOCAL-168 did — may rebuild, provided the source is already
+committed on the branch it builds from. LOCAL-168 was safe precisely because
+LOCAL-153 had committed the shims first.
+
+**Practical consequence for task files:** stop writing "rebuild and recreate
+X" into implementation tasks. Write "commit the change; LEAD will deploy."
