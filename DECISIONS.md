@@ -3366,3 +3366,124 @@ was **not gitignored** — `git add .` would have committed it. LEAD diffed it
 against `.env` (all 9 variables present, only the key changed), installed it,
 securely deleted it, and extended `.gitignore` to `*.env`, `newEnv*` and
 `.env.bak.*`.
+
+---
+
+## D94 — Our two quality metrics pull in opposite directions, and neither alone is a quality measure (2026-08-04)
+
+LOCAL-212 finally got coverage-based stop selection to fire (Musée Matisse, 6
+COVERED candidates, selection dropped `Nu bleu IV=EMPTY` and
+`Pierre Matisse…=EMPTY` in favour of covered stops). The measured result looked
+like a failure:
+
+| arm | unsupported / paragraph |
+|---|---|
+| selection ON (covered stops) | 0.576 |
+| selection OFF (one EMPTY stop) | 0.364 |
+
+Selecting *better-sourced* stops produced *more* unsupported claims. The task
+explained it, and the explanation is the important part:
+
+> "Nu bleu IV has NO corpus so its EMPTY_RESTRICTED prompt produces vague,
+> claim-light text. **Lower unsupported rate on EMPTY stops is an artifact of
+> writing nothing checkable — not of writing more truthfully.**"
+
+**This is the third time the same trap has appeared.** D70: gpt-3.5-turbo
+scored better on grounding than gpt-4o-mini by being vaguer. Michael's own
+evaluation: "ancient streets that exude a timeless charm" is unfalsifiable and
+worthless. Now: an unsourced stop scores well on truthfulness because it says
+nothing that can be checked.
+
+**The conclusion, and it changes how the recount should work.** i-con rewards
+specificity. `claim_check` penalises unsourced specificity. **Each is gameable
+alone and they are only meaningful together:**
+
+| i-con | unsupported | reading |
+|---|---|---|
+| high | low | what we want |
+| high | high | confident invention — the Villefranche paragraph |
+| **low** | **low** | **vague filler that games the truth gate** |
+| low | high | broken |
+
+A gate on unsupported claims alone would push the system towards the third row,
+which is exactly the writing Michael scored 0/5 and 1/5. `EVALUATION_RECOUNT.md`
+must pair them: the truth gate applies **only to paragraphs that clear an i-con
+floor**, otherwise vagueness is the cheapest way to pass.
+
+**Also settled by LOCAL-212:** the 1-stop regression from its first attempt was
+**not** caused by coverage selection. The selection guard only fires when there
+is surplus, and it reorders rather than removes; the shortfall came from the
+D1v2 geo-check rejecting a candidate and Part C failing to replace it. v2
+delivered 2 of 2 stops in 10 of 12 runs, the other two being container
+timeouts. LEAD's bounce was right to demand the diagnosis and wrong to assume
+the cause.
+
+---
+
+## D95 — `CONTRADICTED` is not counted, and it fires on unrelated subjects (2026-08-04)
+
+Found by LEAD while verifying LOCAL-215:
+
+```
+>>> check_paragraph('The chapel was built in 1432.', …,
+...                 ['The museum opened on 21 June 1990 in Nice, France.'])
+verdict: CONTRADICTED
+unsupported_count: 0
+```
+
+Two faults in one probe.
+
+**It is not counted.** `unsupported_count` counts only `UNSUPPORTED`. The
+gravest verdict we issue — the corpus actively says otherwise — is invisible to
+the number a publishability gate would read. Michael has just decided
+unsupported claims should score a paragraph down (Q&A 5, option b), so this
+number is about to carry weight.
+
+**It is also wrong here.** The corpus says the *museum* opened in 1990; the
+sentence says a *chapel* was built in 1432. Different subjects, no conflict. A
+bare date mismatch is being read as contradiction — false alarms on the verdict
+most likely to be trusted.
+
+**LOCAL-218** dispatched: per-verdict counts, a same-subject requirement before
+`CONTRADICTED` may fire, and a corpus-wide measurement of how many current
+contradictions survive that test. Zero false SUPPORTED remains the hard
+constraint.
+
+**LOCAL-215 merged regardless** — its paraphrase pass is a genuine if modest
+gain (over-flag 21% → 17% on the original set, 10% on a fresh 20-claim Chagall
+holdout, zero false SUPPORTED on both). The task said plainly that it fixed 1
+of 6 and did not dress it up, which is the right instinct on a 49-claim
+evidence base.
+
+---
+
+## D96 — R9 ships: a sentence that fits any stop is deleted, not scored (2026-08-04)
+
+Michael scored two Riviera sentences **0/5 — "should be removed… can be placed
+in millions of stops"**, below his own floor of 1. LOCAL-216 turned that
+verdict into a rule.
+
+LEAD verified independently against his file rather than the task's own tests:
+
+```
+0/5 "As you continue your journey through this charming town…"     fires ✓
+0/5 "From Cap d'Antibes to Villefranche — spans more ground…"      fires ✓
+5/5 "Start biking southeast on the main road…"        (navigation)  silent ✓
+5/5 "The town's strategic location east of Nice…"     (sourced)     silent ✓
+5/5 "…depths reaching 320 feet…"                      (sourced)     silent ✓
+1/5 "Walking through the narrow streets may evoke…"   (style fault) silent ✓
+3/5 "In January 1888, Claude Monet visited…"                        silent ✓
+```
+
+Zero disagreements with his judgement, including the two cases that mattered
+most: **navigation scored 5/5 and has no proper noun or date**, so a naive rule
+would have deleted his best content; and a **style** failure must not be
+deleted, because it is rewritable.
+
+Corpus-wide: 4,623 sentences across 79 tours, **59 deleted (1.3%)**, 44
+paragraphs emptied. Well under the 15% ceiling at which LEAD would have stopped
+and handed it back to Michael. Behind `DISABLE_R9_DELETION=1`.
+
+The 44 emptied paragraphs are mostly single-sentence transitions and epilogs —
+the same shape as his paragraph 6. Deleting a paragraph that consisted entirely
+of filler is the intended outcome, not a side effect.
