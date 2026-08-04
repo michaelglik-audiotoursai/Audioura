@@ -52,11 +52,12 @@ PROJECTED_COSTS = {
     # Photo extension: not yet measured; estimate similar to article.
     "photo_extension": Decimal("0.10"),
 
-    # Cache hits: tours and news are $0.00, but translation cache hits (D45)
-    # charge the same as fresh. The pre-flight check must account for this.
-    "tour_cache_hit": Decimal("0.00"),
+    # Cache hits: LOCAL-200 extends D45 — all cache hits charge same as fresh.
+    # Pre-flight projection uses the same upper-bound as fresh generation
+    # because the charge is identical.
+    "tour_cache_hit": Decimal("0.40"),
     "translation_cache_hit": Decimal("2.70"),  # D45: retranslation charges same as fresh
-    "news_cache_hit": Decimal("0.00"),
+    "news_cache_hit": Decimal("0.06"),
 }
 
 # The overdraft floor: balance may not go below this after a projected spend.
