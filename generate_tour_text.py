@@ -5255,9 +5255,9 @@ NO DESCRIBING THE OBVIOUS:
 Start with an orientation section that explains how the visitor arrives at this stop and what they should look for.
 
 Then provide a detailed description. Include:
-- What makes this stop notable or interesting — with specific evidence, not adjectives
+- The specific evidence for why this place matters — a fact, a number, a named person, not adjectives
 - Historical or cultural context: name a date, a person, an event, a cause-and-effect
-- One concrete sensory detail that places the listener HERE (a sound, material, smell)
+- Ground the listener in the physical present — weave in a real sound, texture, or smell they can perceive right now at this spot
 - How this stop connects to the tour's theme — show the connection, don't just assert it
 
 EXPLAIN-WHAT-YOU-NAME RULE (critical):

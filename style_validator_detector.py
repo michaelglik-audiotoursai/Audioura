@@ -765,12 +765,121 @@ def check_r7_hallucinated_sensory(sentence: str) -> List[Dict]:
     return findings
 
 
+# ─── R8: Prompt leakage (LOCAL-213) ──────────────────────────────────────────
+# The model restates its own instructions as narration. The listener hears
+# the recipe instead of the dish. Error severity — this is never acceptable.
+#
+# The leakage has a distinctive syntactic fingerprint:
+#   "One concrete sensory detail that [verb] you..." — the prompt said
+#   "include one concrete sensory detail"; the model turned the instruction
+#   into a topic sentence.
+#
+# Other patterns: "What makes this stop notable is...", "A concrete sensory
+# detail that envelops you in the atmosphere of X is...", meta-references to
+# paragraphs, instructions, or tasks.
+#
+# MUST FIRE on (from real stored tours):
+#   "One concrete sensory detail that envelops you in the atmosphere of
+#    Cap d'Antibes is the sound of the waves crashing..."
+#   "One concrete sensory detail that immerses you in the experience is
+#    the rhythmic sound of fishmongers..."
+#   "A concrete sensory detail that envelops you in the atmosphere of the
+#    park is the sound of seagulls..."
+#   "What makes this stop notable is its connection to Picasso..."
+#   "What makes this stop notable is its strategic role during World War II..."
+#
+# MUST NOT FIRE on (legitimate narration):
+#   "The sound of waves carries up the cliff face."
+#   "The carving repays a closer look at one detail in particular."
+#   "What makes the chapel unusual is its octagonal floor plan."
+#   "One detail stands out: the iron bolt holes where chains once ran."
+#   "A sensory world opens when you step inside — incense, cool stone, silence."
+#
+# Design: match the SYNTACTIC FRAME of "One/A [qualifier] sensory detail
+# that [verb] you" or "What makes this stop [adjective] is" — these are
+# the model filling in a template sentence, not writing free prose.
+
+_R8_PATTERNS = [
+    # "One concrete sensory detail that [verb] you" — the canonical leak
+    r'\b(?:one|a)\s+(?:concrete\s+)?sensory\s+detail\s+that\s+\w+s?\s+(?:you|the\s+listener)',
+    # "A concrete/vivid sensory detail that envelops/immerses/places you"
+    r'\b(?:one|a)\s+(?:concrete|vivid|specific)?\s*sensory\s+detail\b',
+    # "What makes this stop notable/interesting/unique is" — prompt scaffold
+    r'\bwhat\s+makes\s+this\s+stop\s+(?:notable|interesting|unique|special|remarkable)\s+is\b',
+    # "envelops you in the atmosphere of" — exact prompt residue
+    r'\benvelops?\s+you\s+in\s+the\s+atmosphere\b',
+    # "places the listener" — prompt meta-language
+    r'\bplaces?\s+the\s+listener\b',
+    # "in this paragraph" — narration doesn't have paragraphs
+    r'\bin\s+this\s+paragraph\b',
+    # "as instructed" — model acknowledging its instructions
+    r'\bas\s+instructed\b',
+    # "your task" — model exposing task framing
+    r'\byour\s+task\b',
+    # "this description will" — model narrating its own output
+    r'\bthis\s+description\s+will\b',
+    # "Paragraph N:" — numbered paragraph header leaked
+    r'\bParagraph\s+\d+\s*:',
+    # "anchors the listener in time" — opening style instruction
+    r'\banchors?\s+the\s+listener\b',
+    # "a sound, material, smell" — the exact prompt triple
+    r'\ba\s+sound,?\s*(?:a\s+)?material,?\s*(?:a\s+)?smell\b',
+]
+
+_R8_COMPILED = [re.compile(p, re.IGNORECASE) for p in _R8_PATTERNS]
+
+# Negative set: patterns that look similar but are legitimate narration.
+# Used to suppress false positives.
+_R8_FALSE_POSITIVE_GUARDS = [
+    # "One detail [verb]" without "sensory" is fine: "One detail stands out"
+    re.compile(r'\bone\s+detail\s+(?:stands|catches|draws|repays|rewards)', re.IGNORECASE),
+    # "What makes the/this [noun other than 'stop']" is fine: "What makes the chapel unusual"
+    re.compile(r'\bwhat\s+makes\s+(?:the|this)\s+(?!stop\b)\w+', re.IGNORECASE),
+]
+
+
+def check_r8_prompt_leakage(sentence: str) -> List[Dict]:
+    """R8: Detect prompt scaffolding leaked into narration (LOCAL-213).
+
+    Fires when the model restates its instructions as a topic sentence.
+    The listener should never hear the recipe — only the dish.
+
+    Severity: ERROR — prompt leakage is never acceptable in narration.
+
+    Does NOT fire on:
+    - "One detail stands out" (no "sensory" qualifier)
+    - "What makes the chapel unusual" (not "this stop")
+    - Normal use of "detail", "sound", "atmosphere" in free prose
+    """
+    findings = []
+    stripped = sentence.strip()
+    if not stripped:
+        return findings
+
+    # Check false-positive guards first
+    for guard in _R8_FALSE_POSITIVE_GUARDS:
+        if guard.search(stripped):
+            return findings
+
+    for pat in _R8_COMPILED:
+        if pat.search(stripped):
+            findings.append({
+                'rule_id': 'R8_PROMPT_LEAKAGE',
+                'severity': 'error',
+                'sentence': stripped,
+                'suggestion': 'This sentence restates the prompt\'s instructions as narration. Remove the scaffolding frame and state the sensory fact directly (e.g., "Waves crash against the rocks" not "One concrete sensory detail is the sound of waves...").',
+            })
+            break  # One R8 finding per sentence
+
+    return findings
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # PARAGRAPH-LEVEL ANALYSIS
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def validate_paragraph(paragraph: str) -> Dict:
-    """Validate a single paragraph against R1–R4, R7.
+    """Validate a single paragraph against R1–R4, R7, R8.
 
     Returns:
         {
@@ -805,6 +914,7 @@ def validate_paragraph(paragraph: str) -> Dict:
         all_findings.extend(check_r3_suggestive_exploration(sentence))
         all_findings.extend(check_r4_prescribed_feeling(sentence))
         all_findings.extend(check_r7_hallucinated_sensory(sentence))
+        all_findings.extend(check_r8_prompt_leakage(sentence))
 
     rules_violated = set(f['rule_id'] for f in all_findings)
 
@@ -840,6 +950,7 @@ def analyze_tour_style(tour_id: int, conn) -> Dict:
         'R3_SUGGESTIVE_EXPLORATION': 0,
         'R4_PRESCRIBED_FEELING': 0,
         'R7_HALLUCINATED_SENSORY': 0,
+        'R8_PROMPT_LEAKAGE': 0,
         'navigation_paragraphs': 0,
         'clean_paragraphs': 0,
         'total_paragraphs': 0,
@@ -1006,6 +1117,7 @@ def run_report(tour_ids: List[int]) -> str:
         'R3_SUGGESTIVE_EXPLORATION': 0,
         'R4_PRESCRIBED_FEELING': 0,
         'R7_HALLUCINATED_SENSORY': 0,
+        'R8_PROMPT_LEAKAGE': 0,
         'navigation_paragraphs': 0,
         'clean_paragraphs': 0,
         'total_paragraphs': 0,
@@ -1047,6 +1159,7 @@ def run_report(tour_ids: List[int]) -> str:
         lines.append(f"    R3 (suggestive exploration): {t['R3_SUGGESTIVE_EXPLORATION']}")
         lines.append(f"    R4 (prescribed feeling):    {t['R4_PRESCRIBED_FEELING']}")
         lines.append(f"    R7 (hallucinated sensory):  {t['R7_HALLUCINATED_SENSORY']}")
+        lines.append(f"    R8 (prompt leakage):        {t['R8_PROMPT_LEAKAGE']}")
 
         # Accumulate grand totals
         for k in grand_totals:
@@ -1058,7 +1171,7 @@ def run_report(tour_ids: List[int]) -> str:
         # Show up to 3 examples per rule per tour
         examples_shown = {'R1_IMPERATIVE': 0, 'R2_QUESTION': 0,
                           'R3_SUGGESTIVE_EXPLORATION': 0, 'R4_PRESCRIBED_FEELING': 0,
-                          'R7_HALLUCINATED_SENSORY': 0}
+                          'R7_HALLUCINATED_SENSORY': 0, 'R8_PROMPT_LEAKAGE': 0}
         MAX_EXAMPLES = 2
 
         for stop in result['stops']:
@@ -1096,6 +1209,7 @@ def run_report(tour_ids: List[int]) -> str:
     lines.append(f"    R3 (suggestive exploration):  {gt['R3_SUGGESTIVE_EXPLORATION']}")
     lines.append(f"    R4 (prescribed feeling):     {gt['R4_PRESCRIBED_FEELING']}")
     lines.append(f"    R7 (hallucinated sensory):   {gt['R7_HALLUCINATED_SENSORY']}")
+    lines.append(f"    R8 (prompt leakage):         {gt['R8_PROMPT_LEAKAGE']}")
 
     # ── R5 note ──
     lines.append("\n" + "-" * 78)
