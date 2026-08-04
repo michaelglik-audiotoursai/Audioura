@@ -573,70 +573,6 @@ Examples:
     # If we get here without returning, all retries failed
     return None
 
-def validate_poi_knowledge(poi_list, intent, location, api_key):
-    """
-    Enhanced validation for specialized themes and generic POI detection.
-    Returns True if knowledge is sufficient, False if insufficient.
-    """
-    if not poi_list or len(poi_list) == 0:
-        return False, "No POIs were generated"
-    
-    # Enhanced generic patterns detection
-    generic_patterns = [
-        r'^(Store|Shop|Restaurant|Location|Exhibit|Building|Stop)\s+\d+$',
-        r'^(Unknown|Generic|Sample)\s+',
-        r'^[A-Za-z]+\s+\d+$',  # Single word + number pattern
-        r'^Walking Tour \d+$',  # Specific pattern from the issue
-        r'^Tour Stop \d+$',
-        r'^Point \d+$'
-    ]
-    
-    # Check for fictional content patterns (hallucinations)
-    fictional_patterns = [
-        r'sculpture titled "Tomorrow.*?Tomorrow.*?Tomorrow"',
-        r'Created by renowned artist\s*,',  # Missing artist name
-        r'stands the impressive.*?monumental work',
-        r'fusion of art, history, and culture'
-    ]
-    
-    generic_count = 0
-    fictional_count = 0
-    
-    for poi in poi_list:
-        poi_name = poi.get('name', '')
-        poi_description = poi.get('description', '')
-        
-        # Check for generic names
-        for pattern in generic_patterns:
-            if re.match(pattern, poi_name):
-                generic_count += 1
-                break
-        
-        # Check for fictional/hallucinated content
-        full_text = f"{poi_name} {poi_description}"
-        for pattern in fictional_patterns:
-            if re.search(pattern, full_text, re.IGNORECASE):
-                fictional_count += 1
-                break
-    
-    # Enhanced validation for themed tours
-    if intent and intent.get('theme_type') in ['BOOK', 'MOVIE']:
-        theme_name = intent.get('theme_name', '')
-        if generic_count > 0 or fictional_count > 0:
-            return False, f"Unable to generate authentic locations for '{theme_name}'. The AI is creating fictional content instead of real locations. Please try a different theme or provide more specific location details."
-    
-    # Standard validation for regular tours
-    if generic_count > len(poi_list) / 2:
-        poi_type = intent.get('poi_type', 'locations') if intent else 'locations'
-        if isinstance(poi_type, list):
-            poi_type = " or ".join(poi_type)
-        return False, f"Insufficient data available for {poi_type} in {location}. Please try a different location or POI type."
-    
-    if fictional_count > 0:
-        return False, f"AI generated fictional content instead of real locations. Please try a more specific request."
-    
-    return True, "Knowledge validation passed"
-
 def verify_poi_matches_type(poi_name, poi_type, api_key):
     """
     Verify each POI matches the requested type.
@@ -2480,7 +2416,7 @@ def _check_type_prose_contradiction(poi_list: list) -> list:
     return warnings
 
 
-def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None):
+def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None):
     """
     Generate audio tour text using OpenAI API with geo coordinates.
     
@@ -2493,10 +2429,6 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                  When STORIED_MODE=true and persona is provided, biases story-type
                  assignment and injects persona tone into descriptions.
                  When STORIED_MODE=false or persona=None: no effect.
-        user_id: Optional user identifier. When provided and user has swipe
-                 preferences, biases stop ordering toward preferred content classes
-                 (LOCAL-104). Failure in preference lookup falls back gracefully to
-                 today's ordering — preference is a nicety, not a gate.
     
     Returns:
         tuple: (tour_text, output_file, coordinates)
@@ -4692,12 +4624,34 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 "description": "",
             })
     
+    # [LOCAL-183] Helper: merge stop_corpus passages into per_work_contexts dict
+    # so that generate_fact_sheets_parallel picks them up via its title-match logic.
+    def _merge_stop_corpus_into_per_work(per_work_contexts: dict, stop_corpus_data: dict) -> dict:
+        """Merge stop_corpus passages into per_work_contexts.
+
+        per_work_contexts is {title: [sentences]}. For each stop that has
+        stop_corpus data, add its passages as sentences keyed by the stop name.
+        Existing entries are preserved (stop_corpus supplements, doesn't replace).
+        """
+        merged = dict(per_work_contexts) if per_work_contexts else {}
+        if not stop_corpus_data:
+            return merged
+        for stop_name, sc_data in stop_corpus_data.items():
+            if sc_data and sc_data.get('passages'):
+                existing = merged.get(stop_name, [])
+                # Add stop_corpus passages as sentences (truncated for safety)
+                new_sentences = [p[:500] for p in sc_data['passages']]
+                merged[stop_name] = existing + new_sentences
+        return merged
+
     # -------- [S11] Storied: generate spine + fact sheets when STORIED_MODE=true --------
     _storied_spine = None
     _storied_fact_sheets = None
     _saved_prolog = ""  # [R2] Prolog text to be folded into Stop 1 (no standalone Introduction block)
     _three_class_results = {}  # [LOCAL-37] poi_name → three-class retrieval result
     _diversity_adjusted_selections = {}  # [LOCAL-37] poi_name → diversity-adjusted element selection
+    _stop_corpus_data = {}  # [LOCAL-183] poi_name → {passages, sources} from stop_corpus table
+    _thread_result = None  # [LOCAL-186] Initialize before storied block so closure doesn't NameError
     if _storied_mode:
         print(f"\n[Storied] STORIED_MODE=true — generating spine + fact sheets...")
         try:
@@ -4892,6 +4846,54 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             else:
                 print(f"  [Storied] Spine generation failed — descriptions will proceed without spine")
 
+            # [LOCAL-183] Fetch per-stop corpus for generation grounding.
+            # This is the wire D31/D54/D57 identified as missing: stop_corpus
+            # was only read by the detector, never by the generator.
+            # Feature flag: set DISABLE_STOP_CORPUS=1 to suppress (for controlled A/B comparison).
+            _stop_corpus_disabled = os.environ.get('DISABLE_STOP_CORPUS', '').strip() == '1'
+            if _stop_corpus_disabled:
+                print(f"  [LOCAL-183] stop_corpus: DISABLED by DISABLE_STOP_CORPUS=1 env var")
+            if not _stop_corpus_disabled:
+                try:
+                    from stop_corpus_reader import get_stop_corpus_for_tour
+                    # Use venue_resolver's connection first; fall back to DATABASE_URL
+                    _sc_conn = None
+                    try:
+                        from venue_resolver import _get_db_connection as _get_sc_conn
+                        _sc_conn = _get_sc_conn()
+                    except Exception:
+                        pass
+                    if not _sc_conn:
+                        # Fallback: direct connection using DATABASE_URL or defaults
+                        try:
+                            import psycopg2
+                            _sc_db_url = os.environ.get(
+                                'DATABASE_URL',
+                                'postgresql://admin:password123@localhost:5433/audiotours'
+                            )
+                            _sc_conn = psycopg2.connect(_sc_db_url, connect_timeout=5)
+                        except Exception:
+                            pass
+                    if _sc_conn:
+                        _stop_corpus_data = get_stop_corpus_for_tour(
+                            venue_name=_venue_name,
+                            stop_names=_poi_names,
+                            conn=_sc_conn,
+                        )
+                        _sc_conn.close()
+                        _sc_with_data = sum(1 for v in _stop_corpus_data.values() if v is not None)
+                        _sc_total_passages = sum(
+                            len(v['passages']) for v in _stop_corpus_data.values() if v is not None
+                        )
+                        print(f"  [LOCAL-183] stop_corpus: {_sc_with_data}/{len(_poi_names)} stops have per-stop passages ({_sc_total_passages} total passages)")
+                    else:
+                        print(f"  [LOCAL-183] stop_corpus: DB connection unavailable — skipping")
+                except ImportError as _sc_err:
+                    _import_logger.error("[LOCAL-183] MISSING: stop_corpus_reader — per-stop corpus DISABLED: %s", _sc_err)
+                    print(f"  [LOCAL-183] stop_corpus_reader not available: {_sc_err}")
+                except Exception as _sc_err:
+                    print(f"  [LOCAL-183] stop_corpus fetch error (non-fatal): {_sc_err}")
+
             _storied_fact_sheets = generate_fact_sheets_parallel(
                 poi_list=_poi_names,
                 venue_name=_venue_name,
@@ -4899,7 +4901,12 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 api_key=api_key,
                 # [LOCAL-12 Fix A] Route already-fetched venue corpus into fact-sheet generation
                 venue_corpus=_d1_venue_corpus if _d1_venue_corpus else "",
-                per_work_contexts=_story_corpus_result.get('per_work_contexts', {}) if _story_corpus_result else {},
+                # [LOCAL-183] Merge stop_corpus passages into per_work_contexts so
+                # fact extraction benefits from per-stop sourced material.
+                per_work_contexts=_merge_stop_corpus_into_per_work(
+                    _story_corpus_result.get('per_work_contexts', {}) if _story_corpus_result else {},
+                    _stop_corpus_data,
+                ),
             )
             if _storied_fact_sheets:
                 _valid_sheets = sum(1 for fs in _storied_fact_sheets if fs is not None)
@@ -4969,127 +4976,6 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             print(f"  [LOCAL-37] Tour diversity import failed: {e}")
         except Exception as e:
             print(f"  [LOCAL-37] Tour diversity error (non-fatal): {e}")
-
-    # -------- [LOCAL-104] Preference-biased stop ordering --------
-    # Apply swipe preferences to bias stop ordering AFTER all structural ordering
-    # (geographic route, Phase 3B details, story-type assignment, diversity balancing)
-    # but BEFORE text generation (Phase 5). This is a BIAS, not a filter:
-    # disliked classes appear less often, never zero. A THIN stop the user loves
-    # cannot promote above a RICH stop they dislike (quality ranks first).
-    # Failure here falls back to today's ordering — preference is a nicety, not a gate (D14).
-    _preference_bias_applied = False
-    if user_id and poi_list and len(poi_list) >= 2:
-        try:
-            import logging as _pref_logging
-            _pref_logger = _pref_logging.getLogger("generate_tour_text.preference_bias")
-            from swipe_preference_service import bias_stop_ordering, get_user_prefs
-
-            # Check if user has preferences (non-cold-start)
-            _user_prefs = get_user_prefs(user_id)
-            if _user_prefs is not None and _user_prefs.get("swipe_count", 0) > 0:
-                # Look up stop_metrics for these stops (prior generation data)
-                # Build stop dicts for bias_stop_ordering using stop_metrics from DB
-                import psycopg2 as _pref_pg
-                _pref_conn = _pref_pg.connect(
-                    host=os.environ.get("DB_HOST", "postgres-2"),
-                    port=os.environ.get("DB_PORT", "5432"),
-                    dbname=os.environ.get("DB_NAME", "audiotours"),
-                    user=os.environ.get("DB_USER", "admin"),
-                    password=os.environ.get("DB_PASSWORD", "password123"),
-                )
-                _pref_cur = _pref_conn.cursor()
-
-                # Query stop_metrics for matching stop titles
-                _poi_names_lower = [p.get('name', '').strip().lower() for p in poi_list]
-                _pref_cur.execute("""
-                    SELECT LOWER(TRIM(stop_title)), i_con, class_details, class_historic, class_social
-                    FROM stop_metrics
-                    WHERE LOWER(TRIM(stop_title)) = ANY(%s)
-                      AND i_con > 0
-                    ORDER BY created_at DESC
-                """, (_poi_names_lower,))
-                _metrics_rows = _pref_cur.fetchall()
-                _pref_cur.close()
-                _pref_conn.close()
-
-                # Build lookup: most recent metrics per stop title
-                _metrics_by_title = {}
-                for row in _metrics_rows:
-                    title_lower = row[0]
-                    if title_lower not in _metrics_by_title:  # first row is most recent (ORDER BY DESC)
-                        _metrics_by_title[title_lower] = {
-                            "i_con": float(row[1]),
-                            "class_details": float(row[2]),
-                            "class_historic": float(row[3]),
-                            "class_social": float(row[4]),
-                        }
-
-                # Count how many stops have prior metrics
-                _matched_count = sum(1 for n in _poi_names_lower if n in _metrics_by_title)
-                print(f"  [LOCAL-104] Preference bias: user '{user_id}' has {_user_prefs['swipe_count']} swipes, "
-                      f"{_matched_count}/{len(poi_list)} stops have prior metrics")
-
-                if _matched_count >= 2:
-                    # Build stop dicts for bias_stop_ordering
-                    _bias_stops = []
-                    for i, poi in enumerate(poi_list):
-                        _name_lower = poi.get('name', '').strip().lower()
-                        _metrics = _metrics_by_title.get(_name_lower)
-                        if _metrics:
-                            _bias_stops.append({
-                                "stop_index": i,
-                                "stop_title": poi.get('name', ''),
-                                "i_con": _metrics["i_con"],
-                                "class_details": _metrics["class_details"],
-                                "class_historic": _metrics["class_historic"],
-                                "class_social": _metrics["class_social"],
-                            })
-                        else:
-                            # No prior metrics: use neutral defaults (i_con=3.0, equal classes)
-                            # This ensures the stop participates in ordering without bias
-                            _bias_stops.append({
-                                "stop_index": i,
-                                "stop_title": poi.get('name', ''),
-                                "i_con": 3.0,
-                                "class_details": 0.333,
-                                "class_historic": 0.333,
-                                "class_social": 0.334,
-                            })
-
-                    # Apply preference bias (preference_weight=0.3 — quality 70%, preference 30%)
-                    _biased = bias_stop_ordering(_bias_stops, user_id=user_id, preference_weight=0.3)
-
-                    # Reorder poi_list to match biased ordering
-                    _biased_order = [s["stop_index"] for s in _biased]
-                    _original_order = list(range(len(poi_list)))
-                    if _biased_order != _original_order:
-                        poi_list = [poi_list[idx] for idx in _biased_order]
-                        # Re-number stops after reorder
-                        for i, poi in enumerate(poi_list):
-                            poi['stop_number'] = i + 1
-                        _preference_bias_applied = True
-                        # Log the reordering
-                        _rank_changes = [(s["stop_title"][:30], s["rank_change"]) for s in _biased if s["rank_change"] != 0]
-                        print(f"  [LOCAL-104] Preference bias APPLIED: {len(_rank_changes)} stops moved")
-                        for _title, _change in _rank_changes[:5]:
-                            _dir = "promoted" if _change > 0 else "demoted"
-                            print(f"    {_title}: {_dir} by {abs(_change)}")
-                        # Log preference vector and weights for transparency
-                        print(f"  [LOCAL-104] Preference vector: d={_user_prefs['pref_details']:.3f} "
-                              f"h={_user_prefs['pref_historic']:.3f} s={_user_prefs['pref_social']:.3f}")
-                        print(f"  [LOCAL-104] Weights: quality=0.70, preference=0.30")
-                    else:
-                        print(f"  [LOCAL-104] Preference bias: ordering unchanged (preferences don't alter ranking)")
-                else:
-                    print(f"  [LOCAL-104] Preference bias: skipped (only {_matched_count} stops have prior metrics, need ≥2)")
-            else:
-                print(f"  [LOCAL-104] Preference bias: skipped (user has no swipe history — cold start)")
-        except Exception as _pref_err:
-            # D14: preference is a nicety, not a gate. Failure falls back to today's ordering.
-            import logging as _pref_logging
-            _pref_logger = _pref_logging.getLogger("generate_tour_text.preference_bias")
-            _pref_logger.warning(f"[LOCAL-104] Preference bias lookup failed — continuing with unbiased order: {_pref_err}")
-            print(f"  [LOCAL-104] WARNING: Preference bias failed ({type(_pref_err).__name__}: {_pref_err}) — using today's ordering")
 
     # PHASE 5: Generate detailed descriptions for each POI (parallelized)
     print(f"\nPHASE 5: Generating detailed descriptions for each POI (parallel)...")
@@ -5258,6 +5144,32 @@ NO CONDESCENSION:
 - NEVER write "To truly appreciate/understand [X], one must..." — just state the context.
 - NEVER write "It is worth noting that..." or "It is important to understand that..."
 """
+            # [LOCAL-186] Venue disambiguation — prevent entity conflation (D62).
+            # When a stop name is ambiguous (e.g., "Musée Picasso" exists in Paris AND
+            # Antibes), tell the model WHICH entity this stop refers to by using the
+            # tour location and stop address as disambiguators.
+            _disambig_city = ""
+            if poi.get('address'):
+                # Extract city from address (typically "..., City, Country" or "City, Postcode")
+                _addr_parts = [p.strip() for p in poi['address'].split(',')]
+                if len(_addr_parts) >= 2:
+                    _disambig_city = _addr_parts[-2] if len(_addr_parts) >= 3 else _addr_parts[0]
+            if not _disambig_city:
+                # Extract city from tour location
+                from three_class_retrieval import _extract_city_hints_from_tour_location
+                _city_hints = _extract_city_hints_from_tour_location(location)
+                if _city_hints:
+                    _disambig_city = _city_hints[0]
+            if _disambig_city:
+                description_prompt += f"""
+VENUE DISAMBIGUATION (D62 — critical, prevents entity conflation):
+This stop is "{poi_name}" located in/near {_disambig_city} on this tour of {location}.
+If multiple places share this name (e.g., museums in different cities), you are describing
+ONLY the one in {_disambig_city}. Do NOT use facts about a same-named institution in another
+city. If you are uncertain which facts apply to THIS specific location, omit them rather
+than risk conflation.
+"""
+
             # [LOCAL-47] Inject retrieved facts for outdoor stops
             if _outdoor_facts:
                 _facts_block = "\n".join(f"  - {f}" for f in _outdoor_facts[:5])
@@ -5269,6 +5181,12 @@ SUBSTANCE RULE: Your description MUST include at least 2 of the facts above. Eac
 must appear as a specific, checkable claim (with a date, a name, or a number). Do NOT
 paraphrase them into vague atmosphere. If you cannot find a way to include them naturally,
 state them directly.
+
+GROUNDING RULE (D50/D62 — critical): For specific historical claims (founding year, collection
+size, building name, architect, named events), use ONLY the retrieved facts above. Do NOT
+supplement with facts from your training data that are not in these passages — such facts may
+apply to a same-named entity in a different city. If the passages do not mention a founding
+year, collection size, or building name, do NOT supply one from memory.
 """
             # [LOCAL-72] 80-word cap REMOVED — it stripped facts in practice.
             # When retrieval is empty, we still allow full-length descriptions.
@@ -5744,6 +5662,20 @@ DO NOT include directions to the next stop - these will be added separately.
 """
         if _word_target_instruction:
             description_prompt += f"\nLENGTH CONSTRAINT: {_word_target_instruction}\n"
+
+        # [LOCAL-183] Inject per-stop corpus passages with provenance and grounding rule.
+        # This is the production wiring that D31/D54/D57 identified as missing:
+        # stop_corpus was only read by the detector, never fed to the generator.
+        if _stop_corpus_data and poi_name in _stop_corpus_data:
+            _sc_stop_data = _stop_corpus_data[poi_name]
+            if _sc_stop_data and _sc_stop_data.get('passages'):
+                try:
+                    from stop_corpus_reader import format_passages_for_prompt
+                    _sc_prompt_block = format_passages_for_prompt(_sc_stop_data, poi_name)
+                    if _sc_prompt_block:
+                        description_prompt += _sc_prompt_block
+                except ImportError:
+                    pass  # Module unavailable — non-fatal, already logged at fetch time
 
         # [S43] Storied: inject persona tone override into description prompt
         if _storied_mode and _persona_tone:
@@ -6355,37 +6287,130 @@ Requirements:
 - Do NOT end with a question
 - Return ONLY the paragraph, no quotes or labels"""
 
+            # [LOCAL-119] Prolog LLM call with retry for transient failures.
+            # Transient: timeout, connection error, HTTP 429/500/502/503/504.
+            # Non-transient (no retry): 400/401/403/404 — prompt or auth issue.
             import requests as _prolog_requests
-            _prolog_resp = _prolog_requests.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={
-                    "model": "gpt-3.5-turbo",
-                    "messages": [
-                        {"role": "system", "content": "You write immersive, literary audio tour introductions."},
-                        {"role": "user", "content": _prolog_prompt},
-                    ],
-                    "temperature": 0.8,
-                    "max_tokens": 380,
-                },
-                timeout=15,
-            )
-            if _prolog_resp.status_code == 200:
-                _prolog_text = _prolog_resp.json()["choices"][0]["message"]["content"].strip()
-                if _prolog_text.startswith('"') and _prolog_text.endswith('"'):
-                    _prolog_text = _prolog_text[1:-1].strip()
-                # [R2] Do NOT emit standalone Introduction block — save for Stop 1
-                _saved_prolog = _prolog_text
-                print(f"  [R2] Prolog saved for Stop 1 ({len(_prolog_text.split())} words)")
-            else:
-                # Fallback to simple hook
-                if _tour_hook:
+            _prolog_logger = logging.getLogger("generate_tour_text.prolog")
+            _PROLOG_TRANSIENT_CODES = {429, 500, 502, 503, 504}
+            _PROLOG_MAX_RETRIES = 1  # 1 retry = 2 attempts total
+            _prolog_attempt = 0
+            _prolog_success = False
+            _prolog_last_status = None
+
+            while _prolog_attempt <= _PROLOG_MAX_RETRIES:
+                try:
+                    _prolog_resp = _prolog_requests.post(
+                        "https://api.openai.com/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                        json={
+                            "model": "gpt-3.5-turbo",
+                            "messages": [
+                                {"role": "system", "content": "You write immersive, literary audio tour introductions."},
+                                {"role": "user", "content": _prolog_prompt},
+                            ],
+                            "temperature": 0.8,
+                            "max_tokens": 380,
+                        },
+                        timeout=15,
+                    )
+                    _prolog_last_status = _prolog_resp.status_code
+                    if _prolog_resp.status_code == 200:
+                        _prolog_text = _prolog_resp.json()["choices"][0]["message"]["content"].strip()
+                        if _prolog_text.startswith('"') and _prolog_text.endswith('"'):
+                            _prolog_text = _prolog_text[1:-1].strip()
+                        _saved_prolog = _prolog_text
+                        _prolog_success = True
+                        if _prolog_attempt > 0:
+                            print(f"  [R2] Prolog saved for Stop 1 ({len(_prolog_text.split())} words) [retry succeeded]")
+                        else:
+                            print(f"  [R2] Prolog saved for Stop 1 ({len(_prolog_text.split())} words)")
+                        break
+                    elif _prolog_resp.status_code in _PROLOG_TRANSIENT_CODES:
+                        # Transient — retry after backoff
+                        _prolog_attempt += 1
+                        if _prolog_attempt <= _PROLOG_MAX_RETRIES:
+                            _backoff = 2 ** _prolog_attempt  # 2s on first retry
+                            _prolog_logger.warning(
+                                f"[LOCAL-119] Prolog LLM transient failure (HTTP {_prolog_resp.status_code}), "
+                                f"retrying in {_backoff}s (attempt {_prolog_attempt + 1}/{_PROLOG_MAX_RETRIES + 1})"
+                            )
+                            time.sleep(_backoff)
+                        else:
+                            _prolog_logger.warning(
+                                f"[LOCAL-119] Prolog LLM transient failure (HTTP {_prolog_resp.status_code}), "
+                                f"retries exhausted — falling back"
+                            )
+                    else:
+                        # Non-transient (400/401/403/404) — do not retry, just fall back
+                        _prolog_logger.warning(
+                            f"[LOCAL-119] Prolog LLM non-transient failure (HTTP {_prolog_resp.status_code}), "
+                            f"no retry — falling back"
+                        )
+                        break
+                except (_prolog_requests.exceptions.Timeout, _prolog_requests.exceptions.ConnectionError) as _net_err:
+                    # Network-level transient failure — retry
+                    _prolog_attempt += 1
+                    if _prolog_attempt <= _PROLOG_MAX_RETRIES:
+                        _backoff = 2 ** _prolog_attempt
+                        _prolog_logger.warning(
+                            f"[LOCAL-119] Prolog LLM network error ({type(_net_err).__name__}), "
+                            f"retrying in {_backoff}s (attempt {_prolog_attempt + 1}/{_PROLOG_MAX_RETRIES + 1})"
+                        )
+                        time.sleep(_backoff)
+                    else:
+                        _prolog_logger.warning(
+                            f"[LOCAL-119] Prolog LLM network error ({type(_net_err).__name__}), "
+                            f"retries exhausted — falling back"
+                        )
+                except Exception as _parse_err:
+                    # Unexpected error (e.g. JSON parse failure on 200) — non-transient
+                    _prolog_logger.warning(
+                        f"[LOCAL-119] Prolog LLM unexpected error ({type(_parse_err).__name__}: {_parse_err}), "
+                        f"no retry — falling back"
+                    )
+                    break
+
+            # [LOCAL-119] Improved fallback: if prolog generation failed, use Stop 1's
+            # first POI description sentence (full prose) rather than the raw hook
+            # (which is a terse 11-25 word formulaic question).
+            if not _prolog_success:
+                # Try to get Stop 1's description as better fallback prose
+                _fallback_used = None
+                if poi_list and poi_list[0].get("description"):
+                    _stop1_desc = poi_list[0]["description"].strip()
+                    # Extract first two sentences (gives ~30-60 words of real prose)
+                    _sentences = re.split(r'(?<=[.!])\s+', _stop1_desc)
+                    if len(_sentences) >= 2:
+                        _fallback_prose = ' '.join(_sentences[:2])
+                        _saved_prolog = _fallback_prose
+                        _fallback_used = "stop1_prose"
+                    elif _sentences:
+                        _saved_prolog = _sentences[0]
+                        _fallback_used = "stop1_first_sentence"
+                # If Stop 1 description unavailable, fall back to raw hook (last resort)
+                if not _fallback_used and _tour_hook:
                     _saved_prolog = _tour_hook
-                    print(f"  [R2] Prolog fallback (hook) saved for Stop 1")
+                    _fallback_used = "raw_hook"
+
+                if _fallback_used:
+                    _prolog_logger.warning(
+                        f"[LOCAL-119] Prolog fallback active: using '{_fallback_used}' "
+                        f"({len(_saved_prolog.split())} words). Tour delivery continues."
+                    )
+                else:
+                    _prolog_logger.warning(
+                        "[LOCAL-119] Prolog generation failed and no fallback text available. "
+                        "Tour will open directly on Stop 1 content without prolog."
+                    )
         except Exception as e:
-            print(f"  [PROLOG] Error: {e}")
-            if _storied_spine.get("tour_hook"):
-                _saved_prolog = _storied_spine['tour_hook']
+            # [LOCAL-119] Outer safety net — prolog failure must NEVER block tour delivery.
+            # This catches any error not handled inside the retry loop (e.g. spine parsing).
+            _prolog_logger = logging.getLogger("generate_tour_text.prolog")
+            _prolog_logger.warning(
+                f"[LOCAL-119] Prolog block outer error ({type(e).__name__}: {e}). "
+                f"Tour delivery continues without prolog."
+            )
 
     # Add each POI with its description and directions
     for i, poi in enumerate(poi_list):
@@ -6547,8 +6572,10 @@ Requirements:
                         _storied_directions = generate_walking_directions(poi_name, next_poi['name'], location, api_key)
                         if _storied_directions:
                             directions = _storied_directions
-                    except (ImportError, Exception):
-                        pass
+                    except ImportError as _dir_imp_err:
+                        _import_logger.error(f"[LOCAL-146] MISSING: directions_generator (generate_walking_directions) — walking directions DISABLED: {_dir_imp_err}")
+                    except Exception as _dir_err:
+                        _import_logger.error(f"[LOCAL-146] directions_generator.generate_walking_directions FAILED: {type(_dir_err).__name__}: {_dir_err}")
                 if directions and directions.strip():
                     _transition = directions.strip()
                 else:
