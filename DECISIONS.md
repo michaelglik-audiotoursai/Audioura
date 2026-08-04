@@ -2690,3 +2690,83 @@ with the storied containers Michael's phone talks to. **The deploy itself
 stays with LEAD** (D48), and it will not happen while Michael is away and
 unable to field-test — a subscribed stack that starts charging wallets is not
 something to switch on unattended.
+
+---
+
+## D77 — Subscribed's copy of this file was frozen at D31. Every subscribed task has been reading a stale record (2026-08-04)
+
+LOCAL-204 reported, in its limitations, that `DECISIONS.md`,
+`CONTAINER_OWNERSHIP.md` and `DORMANT_SERVICES.md` "do not exist in this
+worktree." Checked:
+
+```
+storied    DECISIONS: 76 entries, last D76
+subscribed DECISIONS: 31 entries, last D31
+```
+
+The file exists on `subscribed`; it stops at **D31**. D53's dual-branch rule
+covers code, and LEAD only ever appends the record on `storied`. So every
+subscribed-based task since — LOCAL-193, 197, 200, 201, 204 — was told to read
+D41, D45, D48, D53, D58, D65, D68, D72, D76 and could see none of them. The
+three reference documents were absent outright.
+
+They produced correct work anyway, because the task files quoted the substance
+inline. That is luck, not design: the citations were decoration, and the one
+task that said so was the one that happened to go looking.
+
+**Fixed:** `DECISIONS.md` plus `CONTAINER_OWNERSHIP.md`, `DORMANT_SERVICES.md`,
+`APP_FEATURE_REACHABILITY.md` and `ANSWERS.md` copied to `subscribed` and
+pushed. LEAD's record now syncs to both branches, not just code.
+
+**The lesson is about citations generally.** Telling an agent to "read D74"
+does nothing unless D74 is reachable from its worktree. Either quote the
+substance or verify the file is on the base branch. LEAD had been doing the
+former by habit and assuming the latter.
+
+---
+
+## D78 — MAMAC's flagship stop has no source about the artwork. That is the whole story of the last five rounds (2026-08-04)
+
+LOCAL-203 tagged every corpus passage with a role — `about_subject`,
+`about_creator`, `about_venue` — and made coverage role-aware. Verified
+independently by LEAD against the live table:
+
+```
+51 COVERED · 7 CREATOR_ONLY · 2 VENUE_ONLY · 1 EMPTY   (of 61)
+```
+
+**Both MAMAC stops that a 2-stop tour selects are not covered:**
+
+| id | stop | verdict |
+|---|---|---|
+| 18 | Richard Long ou la sculpture en marchant | **CREATOR_ONLY** |
+| 19 | She-Bam Pow POP Wizz | **CREATOR_ONLY** |
+
+Id 18 read `COVERED` until now only because a venue signal appeared in a
+*different passage of the same set* — the D74 loophole, left open on the one
+stop every experiment since LOCAL-189 has generated. Asked to apply one rule
+to both id 18 and the instrument stops, the task did, and reported the
+unflattering answer. That is the right instinct and worth saying so.
+
+**What this explains.** LOCAL-189 (style rules don't work), LOCAL-192 (the
+model won't self-correct), LOCAL-194 (gpt-4o-mini looks worse on grounding),
+LOCAL-195 (nine unsupported claims, all true about the real Richard Long) —
+every one of those was measured on two stops for which we hold **no material
+about the objects being described**. The model was not failing to use the
+corpus. There was no corpus to use.
+
+**Consequences, decided:**
+
+1. **D67/D70's model comparison is void as a grounding test.** It measured
+   which model resists filling a vacuum. **LOCAL-205** re-runs it on Musée
+   Matisse, whose six stops are all COVERED. The default stays gpt-3.5-turbo
+   until that lands.
+2. **MAMAC is retired as the standard test venue** for anything about
+   grounding. It remains useful for exactly one thing: testing the
+   CREATOR_ONLY gate, which is **LOCAL-206**.
+3. The five restored stops (Naderman, Torres, Testore harps and instruments,
+   plus places) are now CREATOR_ONLY rather than EMPTY — honest, and they can
+   still yield a paragraph about the maker.
+
+**Schema note, declared as required:** LOCAL-203 added a `passage_roles`
+column to `stop_corpus`. Additive, no data moved; 61 rows before and after.
