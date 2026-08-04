@@ -4651,6 +4651,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     _three_class_results = {}  # [LOCAL-37] poi_name → three-class retrieval result
     _diversity_adjusted_selections = {}  # [LOCAL-37] poi_name → diversity-adjusted element selection
     _stop_corpus_data = {}  # [LOCAL-183] poi_name → {passages, sources} from stop_corpus table
+    _thread_result = None  # [LOCAL-186] Initialize before storied block so closure doesn't NameError
     if _storied_mode:
         print(f"\n[Storied] STORIED_MODE=true — generating spine + fact sheets...")
         try:
@@ -5143,6 +5144,32 @@ NO CONDESCENSION:
 - NEVER write "To truly appreciate/understand [X], one must..." — just state the context.
 - NEVER write "It is worth noting that..." or "It is important to understand that..."
 """
+            # [LOCAL-186] Venue disambiguation — prevent entity conflation (D62).
+            # When a stop name is ambiguous (e.g., "Musée Picasso" exists in Paris AND
+            # Antibes), tell the model WHICH entity this stop refers to by using the
+            # tour location and stop address as disambiguators.
+            _disambig_city = ""
+            if poi.get('address'):
+                # Extract city from address (typically "..., City, Country" or "City, Postcode")
+                _addr_parts = [p.strip() for p in poi['address'].split(',')]
+                if len(_addr_parts) >= 2:
+                    _disambig_city = _addr_parts[-2] if len(_addr_parts) >= 3 else _addr_parts[0]
+            if not _disambig_city:
+                # Extract city from tour location
+                from three_class_retrieval import _extract_city_hints_from_tour_location
+                _city_hints = _extract_city_hints_from_tour_location(location)
+                if _city_hints:
+                    _disambig_city = _city_hints[0]
+            if _disambig_city:
+                description_prompt += f"""
+VENUE DISAMBIGUATION (D62 — critical, prevents entity conflation):
+This stop is "{poi_name}" located in/near {_disambig_city} on this tour of {location}.
+If multiple places share this name (e.g., museums in different cities), you are describing
+ONLY the one in {_disambig_city}. Do NOT use facts about a same-named institution in another
+city. If you are uncertain which facts apply to THIS specific location, omit them rather
+than risk conflation.
+"""
+
             # [LOCAL-47] Inject retrieved facts for outdoor stops
             if _outdoor_facts:
                 _facts_block = "\n".join(f"  - {f}" for f in _outdoor_facts[:5])
@@ -5154,6 +5181,12 @@ SUBSTANCE RULE: Your description MUST include at least 2 of the facts above. Eac
 must appear as a specific, checkable claim (with a date, a name, or a number). Do NOT
 paraphrase them into vague atmosphere. If you cannot find a way to include them naturally,
 state them directly.
+
+GROUNDING RULE (D50/D62 — critical): For specific historical claims (founding year, collection
+size, building name, architect, named events), use ONLY the retrieved facts above. Do NOT
+supplement with facts from your training data that are not in these passages — such facts may
+apply to a same-named entity in a different city. If the passages do not mention a founding
+year, collection size, or building name, do NOT supply one from memory.
 """
             # [LOCAL-72] 80-word cap REMOVED — it stripped facts in practice.
             # When retrieval is empty, we still allow full-length descriptions.

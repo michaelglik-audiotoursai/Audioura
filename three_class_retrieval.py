@@ -720,6 +720,27 @@ def _extract_facts_from_text(text: str, stop_name: str) -> List[str]:
     return unique_facts[:8]  # Cap at 8 facts per stop
 
 
+def _extract_city_hints_from_tour_location(tour_location: str) -> List[str]:
+    """[LOCAL-186] Extract city/region hints from tour_location for disambiguation.
+
+    "French Riviera biking tour, France" → ["French Riviera", "France"]
+    "Antibes cycling tour" → ["Antibes"]
+    "Nice, France walking tour" → ["Nice", "France"]
+    """
+    _strip_keywords = re.compile(
+        r'\b(tour|tours|biking|cycling|bike|walking|walk|self[- ]guided|audio|guided)\b',
+        re.IGNORECASE,
+    )
+    parts = [p.strip() for p in tour_location.split(",") if p.strip()]
+    hints = []
+    for part in parts:
+        cleaned = _strip_keywords.sub('', part).strip()
+        cleaned = re.sub(r'\s{2,}', ' ', cleaned).strip()
+        if cleaned and len(cleaned) >= 3:
+            hints.append(cleaned)
+    return hints
+
+
 def retrieve_outdoor_stop_facts(
     stop_name: str,
     tour_location: str,
@@ -728,7 +749,9 @@ def retrieve_outdoor_stop_facts(
     """[LOCAL-47] Multi-level retrieval for outdoor/walking/biking tour stops.
     
     Strategy:
-      Level 1: Direct Wikipedia lookup for the stop name
+      [LOCAL-186] Level 0: Location-disambiguated Wikipedia lookup FIRST
+        (e.g., "Musée Picasso (Antibes)") to prevent entity conflation.
+      Level 1: Direct Wikipedia lookup for the stop name (fallback)
       Level 2: Wikipedia for parent location / nearby landmark
       Level 3: Wikipedia for the broader corridor/region
     
@@ -784,9 +807,94 @@ def retrieve_outdoor_stop_facts(
             except Exception:
                 continue
         return ""
+
+    def _wiki_search_fetch(query: str) -> str:
+        """[LOCAL-186] Search Wikipedia for a query and fetch the top result's extract.
+
+        Unlike _wiki_fetch (which does exact title lookup), this uses the search
+        API to find the best match, then fetches its extract. This handles
+        disambiguated articles (e.g., "Musée Picasso Antibes" → "Musée Picasso (Antibes)").
+        """
+        if not query or not query.strip():
+            return ""
+        wiki_hosts = [f"{language}.wikipedia.org"] if language != "en" else []
+        wiki_hosts.append("en.wikipedia.org")
+
+        for wiki_host in wiki_hosts:
+            try:
+                _time.sleep(0.3)
+                # Step 1: Search for the disambiguated query
+                search_params = urllib.parse.urlencode({
+                    "action": "query",
+                    "list": "search",
+                    "srsearch": query.strip(),
+                    "srlimit": "3",
+                    "format": "json",
+                })
+                req = urllib.request.Request(
+                    f"https://{wiki_host}/w/api.php?{search_params}",
+                    headers={"User-Agent": "Audioura/2.2 (outdoor-retrieval; contact@audioura.com)"},
+                )
+                with urllib.request.urlopen(req, timeout=8) as resp:
+                    data = _json.loads(resp.read().decode())
+                    search_results = data.get("query", {}).get("search", [])
+                    if not search_results:
+                        continue
+                    # Pick the first result whose title contains the stop name words
+                    best_title = search_results[0].get("title", "")
+                    if not best_title:
+                        continue
+
+                # Step 2: Fetch the extract for the found title
+                _time.sleep(0.3)
+                extract_params = urllib.parse.urlencode({
+                    "action": "query",
+                    "prop": "extracts",
+                    "explaintext": "1",
+                    "titles": best_title,
+                    "format": "json",
+                })
+                req2 = urllib.request.Request(
+                    f"https://{wiki_host}/w/api.php?{extract_params}",
+                    headers={"User-Agent": "Audioura/2.2 (outdoor-retrieval; contact@audioura.com)"},
+                )
+                with urllib.request.urlopen(req2, timeout=8) as resp2:
+                    data2 = _json.loads(resp2.read().decode())
+                    pages = data2.get("query", {}).get("pages", {})
+                    for pid, pdata in pages.items():
+                        if pid == "-1" or pdata.get("missing"):
+                            continue
+                        extract = pdata.get("extract", "")
+                        if extract and len(extract) > 100:
+                            return extract
+            except Exception:
+                continue
+        return ""
     
-    # Level 1: Direct lookup
-    text = _wiki_fetch(stop_name)
+    # [LOCAL-186] Level 0: Location-disambiguated lookup FIRST.
+    # This prevents entity conflation where a bare name (e.g., "Musée Picasso")
+    # resolves to a same-named entity in a different city (Paris vs. Antibes).
+    # Strategy: try "Stop Name (City)" and "Stop Name City" via Wikipedia search API.
+    _city_hints = _extract_city_hints_from_tour_location(tour_location)
+    _disambiguated_text = ""
+    if _city_hints:
+        for city_hint in _city_hints:
+            # Skip hints that are already part of the stop name
+            if city_hint.lower() in stop_name.lower():
+                continue
+            # Try Wikipedia search with disambiguated query
+            _disambig_query = f"{stop_name} {city_hint}"
+            _disambiguated_text = _wiki_search_fetch(_disambig_query)
+            if _disambiguated_text:
+                print(f"  [LOCAL-186] Disambiguated fetch hit: '{_disambig_query}' → {len(_disambiguated_text)} chars")
+                break
+
+    if _disambiguated_text:
+        text = _disambiguated_text
+    else:
+        # Level 1: Direct lookup (fallback if disambiguation found nothing)
+        text = _wiki_fetch(stop_name)
+
     if text:
         facts = _extract_facts_from_text(text, stop_name)
         all_facts.extend(facts)
