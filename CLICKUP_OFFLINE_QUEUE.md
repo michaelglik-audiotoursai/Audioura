@@ -3319,3 +3319,16 @@ git -C C:\path\to\Audioura ls-remote origin | Select-Object -First 2
 ### Context
 The Windows laptop has not pushed to origin since **30 June**
 (`services-migration`), so even the worst case interrupts nothing in progress.
+
+
+---
+
+## ✅ ALL THREE QUEUED TASKS POSTED — 2026-08-04, rate limit cleared
+
+| task | ClickUp |
+|---|---|
+| Windows-laptop token check (Michael asked for this one) | `wdvrdaxbkf` |
+| Accuracy disclaimer wording | `wdvrdaxbkh` |
+| Mac Mini plaintext token → Keychain | `wdvrdaxbkv` |
+
+Nothing left in this queue.
