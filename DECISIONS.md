@@ -3260,3 +3260,46 @@ quoted.
 **D85's conclusion still stands unmeasured.** Three rounds show category rules
 land and negative constraints do not; selection is the remaining hypothesis and
 it has not yet had a fair test.
+
+---
+
+## D91 — The venue cache was unreachable from the host, and four experiments ran without it (2026-08-04)
+
+`venue_resolver._get_db_connection()` rewrote `@localhost:` to `@postgres-2:`
+unconditionally, then swallowed the failure and returned `None`. Hand it a
+correct host-side URL and it broke it.
+
+Fixed (LOCAL-214): the rewrite and the container default now apply only when
+`/.dockerenv` is present. Verified by LEAD on both sides —
+
+```
+host, DATABASE_URL=…@localhost:5433  → connects, 16 venue_corpus rows readable
+host, no env set                     → "venue cache skipped", returns None
+host, unreachable URL                → loud ERROR, not a silent None
+container, no env                    → container default still connects
+container, DATABASE_URL=…@localhost  → rewrite still applied
+```
+
+The container test used `docker cp` of the fixed file to `/tmp` and imported it
+from there; the running image is untouched and still needs LEAD to deploy.
+
+**The consequence for the record.** LOCAL-189, 194, 195 and 198 "bypassed the
+S20 tour cache" by deleting `DATABASE_URL`. That worked — and it also disabled
+the *venue* cache, because the fallback pointed at `postgres-2`. Those four
+experiments re-mined every venue from SPARQL and the web on every run.
+
+The task argues the results still stand because the resolution *path* is
+identical and only latency and cost differ. **That is mostly right and not
+entirely.** A cached corpus is byte-identical between runs; a freshly mined one
+depends on what Wikipedia and SPARQL returned that minute. It adds a source of
+between-run variance those experiments did not account for, on top of
+generation stochasticity. It does not invalidate them — no measured outcome
+turns on cache-vs-fresh — but "identical" is stronger than the evidence.
+
+LOCAL-205 is unaffected: it ran inside the container, where the fallback
+resolves.
+
+**The general shape, again.** A silent `except` that returns `None` turned a
+configuration bug into "no cache configured", and no experiment noticed for
+weeks because both look the same from the outside. The fix now distinguishes
+*absent* from *broken*, which is the part worth keeping.
