@@ -2914,3 +2914,1274 @@ the loop. GitHub push protection exists but caught only the newest occurrence
 and missed the 2026-07-30 one entirely. LEAD's review reads diffs for logic,
 not for credentials. The resubmitted LOCAL-207 wires a scanner into the
 pre-merge path and adds the prohibition to every task file's PROCESS block.
+
+
+---
+
+## D82 — Correction to D79/D81: the live OpenAI key was never fully on origin (2026-08-04)
+
+LEAD wrote in D79 that `SUBMISSION_LOCAL-39.md` "contains the same key in
+full." It does not. The line is:
+
+> The OpenAI API key (sk-proj-H6SIHfb...) has hit `insufficient_quota` (429).
+
+A **15-character prefix**, not a recoverable key. LEAD saw a known prefix in a
+grep and reported an exposure without reading the line. The same error was
+repeated in D81's table.
+
+**Corrected exposure list — what Michael actually needs to rotate:**
+
+| credential | where | on origin since | recoverable? |
+|---|---|---|---|
+| OpenAI `sk-proj-wpIWgoRa…` | `sk.py`, full 164-char value | **2025-10-26** | **yes — rotate** |
+| AWS `AKIAWLW3…` | two review/submission docs, full 20-char id | 2026-06-07 | **yes — rotate**, and it is the key live in `.env` |
+| OpenAI `sk-proj-H6SI…` (the `.env` key) | `SUBMISSION_LOCAL-39.md`, 15-char prefix | 2026-07-30 | **no** |
+
+So it is **two credentials to rotate, not three**. The live OpenAI key was
+written in full by LOCAL-206 this morning, but GitHub push protection stopped
+it and LEAD reset before it reached origin — it was never published. Rotating
+it anyway is cheap and reasonable; it is not urgent.
+
+The AWS key remains the serious one: full, valid, in use, on both branches
+since June.
+
+**The lesson, and it is the same one CLAUDE.md already records:** *read the
+code — do not pattern-match it.* A grep for `sk-proj-H6SI` returning a hit is
+not evidence of an exposed key; the line has to be read. LEAD has now made
+this mistake in the same way the greps did on the French-vs-English fact audit
+and the all-negative check.
+
+---
+
+## D83 — Model decision: switch for cost and latency, not for quality (2026-08-04)
+
+LOCAL-205 re-ran the comparison on Musée Matisse (6/6 COVERED), 3 runs per arm,
+after its style harness was fixed:
+
+| | gpt-3.5-turbo | gpt-4o-mini |
+|---|---|---|
+| unsupported claims / paragraph | 1.87 | 1.93 |
+| anchor rate | 100% | 100% |
+| **cost / tour** | $0.0225 | **$0.0063** |
+| **latency / tour** | 144.6s | **129.2s** |
+
+**Grounding parity confirmed** — D70's prediction held. The 4.5–5× gap seen on
+MAMAC was an artifact of stops with no source material (D78).
+
+**No reliable style difference.** The task reports overall failure 0.333 (A) vs
+0.375 (B) over 15/16 paragraphs; LEAD's own run over the same committed
+paragraphs, extracting 24 per arm, gives 0.292 (A) vs 0.208 (B) — **opposite
+sign**. Two extractions of the same six tours disagree on which model is
+better, which means the difference is smaller than the measurement noise. D67's
+"gpt-4o-mini halves R4" does not replicate on a covered venue.
+
+So the quality case is neutral and the operational case is decisive: **3.6×
+cheaper and 11% faster.** Against the $2.00 tour ceiling and the ×5 pricing
+rule, that is real money on every tour.
+
+**Decision: LEAD will flip `TOUR_LLM_MODEL` to gpt-4o-mini — but not while
+Michael is mid-evaluation.** He is about to read a 2-stop Riviera tour and
+recount the evaluation score. Changing the model underneath that would confound
+his read of the system. Flip after the evaluation baseline is agreed.
+
+**Open, and worth more than the model choice:** both models produce ~1.9
+unsupported claims per paragraph on a *well-covered* venue, at 100% anchor
+rate. Coverage fixed the gap between models; it did not fix grounding. The
+anchor metric saturates while half the paragraphs still assert something no
+passage supports — it measures coverage, not truth.
+
+---
+
+## D84 — The disk filled to 98% and stopped a dispatch. 188 worktrees, never cleaned up (2026-08-04)
+
+LOCAL-211 failed with `worktree_setup_failed: error: unable to write file
+migration/data_small_tables.sql`. Not a task defect — **353 MB free on a 228 GB
+volume.**
+
+```
+/Users/micha/audioura-worktrees   51 GB   188 worktrees
+```
+
+One worktree per task since LOCAL-14, each a full checkout of a 2,127-file
+repo, none ever removed. Of the 188, **171 were on branches already merged** —
+pure duplicates of content sitting in `.git`.
+
+Pruned the merged ones: 169 removed, **46 GB reclaimed**, 19 worktrees left
+(in-flight tasks and unmerged branches). Nothing lost — `git worktree remove`
+deletes the working directory only; every branch and commit stays in `.git`,
+and an unmerged branch is never touched.
+
+**Guard added:** `.continuous_dev/prune_worktrees.sh` runs on every 5-minute
+launchd tick and alarms into `ALERTS.md` when free space drops below 10 GB.
+The alarm is the point — the queue should not discover this by failing.
+
+**Why nobody saw it coming.** Every guard on this project watches *data*
+integrity: row counts, user-visible drift, secrets. Nothing watched the
+machine. The dispatcher's own failure message named a file, not a cause, and
+a task that fails at checkout looks exactly like a task that failed at work.
+LOCAL-211's `FAILED` line would have read as its own fault.
+
+---
+
+## D85 — The gate could not fire for stops with no corpus; now it can, and it only half-works (2026-08-04)
+
+**The bug (LOCAL-209).** `generate_tour_text.py`:
+
+```python
+if not _corpus_gate_disabled and _stop_corpus_data:
+```
+
+`_stop_corpus_data` holds only stops that *have* a `stop_corpus` row. A stop
+with none is absent, so the gate was skipped — and when the whole tour had no
+corpus, skipped entirely. `corpus_coverage` has defined an `EMPTY` verdict all
+along; **it was unreachable in production.** The gate handled every case except
+the one it exists for.
+
+That is why tour 163's Villefranche-sur-Mer produced "depths reaching 320
+feet", "Free City on Sea" and a 13th-century date with nothing behind any of
+them, in the same release where the museum path cut object-description 76%.
+
+Fixed: the gate iterates every stop; a missing entry is `EMPTY`; `EMPTY` gets
+its own degradation prompt, stricter than VENUE_ONLY.
+
+**The effect is weaker than the museum case: ~40–50% fewer unsourced
+specifics, against CREATOR_ONLY's 76%** — and the measurement is confounded,
+which the task said itself: stop selection is non-deterministic, different
+stops came up each run, and Villefranche was never re-selected. Treat the
+number as directional only.
+
+**The pattern is now three for three (D63, D80, here).** Negative constraints
+("do not assert dates you cannot source") land poorly. Category exclusions
+("do not describe the object") land well. A model can check "is this sentence
+describing the object?" far more reliably than "is this claim sourced?" —
+because the second question requires it to know something it does not have.
+
+**So for a stop with genuinely zero material, the answer is structural, not
+prompt-shaped:** drop the stop and select another, or emit orientation only.
+LEAD's lean is to drop it. Not implemented — it interacts with Michael's
+CREATOR_ONLY question (D80) and both should be settled together.
+
+---
+
+## D86 — The truth gate has an instrument. It never passes a fabrication, and it over-flags one claim in five (2026-08-04)
+
+LOCAL-210 built `claim_check.py` (repo root, container-safe) and calibrated it
+against the two hand-scored sets from LOCAL-195 and LOCAL-205.
+
+```
+29 claims checked · 6 disagreements · all in one direction
+false UNSUPPORTED (over-flagged) : 6   (21%)
+false SUPPORTED  (missed a fab)  : 0
+```
+
+**Zero false passes** — it never asserts a passage supports a claim when it
+does not. That is the direction that matters: a false pass puts an invented
+fact in front of a listener; a false flag costs a paragraph some score.
+
+**What it cannot do is paraphrase.** All six disagreements are semantic
+inferences a token-overlap matcher cannot make — "generous contributions shaped
+MAMAC" against three separate donation passages; "pop art challenges the
+boundary between high and low culture" against "embraces the emerging mass
+culture". One was a single threshold notch away.
+
+**Consequence for the recount, and Michael should see this before setting
+thresholds:** applied literally today, the truth gate would cap roughly **one in
+five legitimately-supported paragraphs** at i-con 1. That is not a reason to
+loosen it — the direction is right — but the threshold he picks should be
+chosen knowing the instrument is strict, not neutral.
+
+
+---
+
+## D84a — The guard I added to fix D84 killed the next task, twice (2026-08-04)
+
+`prune_worktrees.sh` removed worktrees whose branch was "merged". A freshly
+created task branch has **zero commits**, so `git branch --merged` lists it as
+merged into its base from the moment it exists. The script therefore deleted
+LOCAL-211's worktree out from under the running agent — which then failed on
+`'/Users/micha/audioura-worktrees/LOCAL-211/DECISIONS.md' does not exist`, a
+message that reads like a missing-file bug in the task.
+
+It happened twice: once on my manual run, once on the launchd tick five minutes
+later. Every task is "merged" during the minutes before its first commit, so
+the guard had a five-minute window to kill anything newly dispatched.
+
+**Fix:** prune only worktrees idle for **6 hours or more**. Commit state cannot
+tell finished work from work that has not started yet; recency can.
+
+**What this cost, and the general shape of it.** The disk fix was correct and
+necessary — 46 GB reclaimed, and without it nothing would run at all. But it
+was written and installed in a single pass on a live system, and the failure it
+caused looked exactly like a defect in the victim. I diagnosed LOCAL-211's
+first failure correctly (disk), re-dispatched it into a trap I had just built,
+and only found it by reading the session log rather than the `FAILED` line.
+
+The lesson is not "test more" in the abstract. It is that **a guard which
+deletes things needs its safety argument written down before it runs**, and
+mine was "merged means finished" — an assumption that is false for exactly the
+window where deletion does the most damage.
+
+---
+
+## D87 — Michael's queue is now a standing checklist item, and his tasks must be executable (2026-08-04)
+
+Michael, 2026-08-04: *"Please create ClickUp tasks for me if you definitely
+need me to do something… Always ask me here and if I answer change the status
+to Complete, if not, remind me that my queue for a space is not empty."* And:
+*"All tasks assigned to me should explain in detail how to deliver them; for
+example, what sites to go, what button/links to press, what to write, what
+questions to answer."*
+
+**Binding on LEAD from now on:**
+
+1. **Anything requiring Michael gets a ClickUp task in 👤 Michael
+   (`1000410000000735`)** — not just a paragraph in chat that scrolls away.
+2. **Ask in chat as well**, every time. Chat is the prompt; ClickUp is the record.
+3. **If he answers, set the task Complete.** If he does not, **remind him his
+   queue is not empty** on the next tick. Do not let it accumulate silently.
+4. **Every task assigned to him is written to be executed by someone who is not
+   in the code**: the exact URL, the exact menu path, the exact button, the
+   exact text to type, the exact answer to each form question. A task that says
+   "complete the data safety form" is not finished work.
+
+**Note on assignment.** Michael tried to assign a subtask to LEAD and found no
+way to. There is no ClickUp user for Claude — I read the space each tick, so
+list placement *is* the assignment: 👤 Michael = his, 🔵 Claude — Review = mine,
+🟦/🟩 Kiro = agents. He does not need to assign anything to me.
+
+---
+
+## D88 — Disk: no, there is no capacity problem, and an external drive would make things worse (2026-08-04)
+
+Michael asked whether we have a disk problem and whether an external drive
+would help. Measured:
+
+```
+/System/Volumes/Data   228 GB total   157 GB used   44 GB free   (78%)
+
+~/Library                47 GB   (Xcode/simulators 17 GB, App Support 13 GB, Docker 8 GB)
+~/audioura-worktrees    5.2 GB   (was 51 GB before the D84 prune)
+~/flutter               3.8 GB
+~/audioura-backups      2.4 GB   (16 files; retention of 12 is enforced)
+~/Audioura              982 MB
+```
+
+**The incident was not capacity, it was a leak.** 188 worktrees had accumulated
+since LOCAL-14. Pruning reclaimed 46 GB and the prune now runs every tick with
+a 6-hour idle guard (D84, D84a), plus an alarm below 10 GB free. 44 GB of
+headroom against a working set that grows a few GB a week is comfortable.
+
+**An external drive is the wrong tool here** and worth saying so plainly rather
+than accepting the suggestion:
+
+- Git worktrees on a different volume make every checkout cross a USB bus;
+  `git worktree add` on 2,127 files goes from seconds to minutes, and every
+  dispatch pays it.
+- Docker on macOS cannot easily use external storage for its VM disk without
+  moving the whole thing, and a disconnect mid-write corrupts images.
+- It adds a failure mode — an unplugged or unmounted drive — to a loop that
+  runs unattended overnight. The queue would fail in a new and confusing way.
+
+**If we do get tight, in order of safety:** `docker system prune` (~1.7 GB
+reclaimable now, zero risk), Xcode DerivedData and old simulator runtimes
+(~10 GB, Michael's call), older `~/audioura-backups` snapshots beyond the last
+12 (~1 GB). None of that is needed today.
+
+---
+
+## D89 — The prompt leak is real, rare, and never reached production. LEAD over-weighted it (2026-08-04)
+
+LOCAL-213 measured the leakage LEAD found in Michael's tour — the model
+narrating its own instruction:
+
+> "**One concrete sensory detail that envelops you in the atmosphere of** Cap
+> d'Antibes is the sound of the waves crashing against the rugged rocks…"
+
+Across every stored tour:
+
+```
+leakage rate              0.6%
+tours affected            11  (all test tours)
+production tours affected  0
+```
+
+Four distinct phrasings, all traceable to the prompt's `Include:` bullet list —
+"one concrete sensory detail" (7), "what makes this stop" (3), "envelops you in
+the atmosphere" (2), stray markdown (2).
+
+**Correction to how LEAD framed this.** I presented it to Michael as a defect
+that "reached a document written specifically for him to evaluate," which is
+true of tour 163 and gives a misleading impression of scale. At 0.6% and zero
+production tours, it is a real but minor fault. The reason it looked worse is
+that I found it in the one tour I had read closely — availability, not
+frequency.
+
+**Shipped:** `R8_PROMPT_LEAKAGE`, error severity. Verified by LEAD
+independently: fires on both real leak forms, stays clean on legitimate sensory
+prose ("The sound of waves carries up the cliff face"), on the ordinary word
+*detail*, on route navigation, and on third-person declaratives. 31/31 on the
+task's labelled set, R1 and the navigation exemptions unaffected.
+
+The prompt was also reworded so the phrasing is not there to echo. Before/after
+was **0/0** — underpowered, as the task said: at a 0.6% base rate you would need
+~170 paragraphs to expect a single occurrence, and it ran 30. The rule is the
+durable part; the rewording is prophylactic.
+
+---
+
+## D90 — Coverage-based stop selection is unproven, and its one observable effect was to drop a stop (2026-08-04)
+
+LOCAL-212 was meant to test D85's conclusion — that for a stop with no source
+material the lever is *selection*, not prompt wording. It could not.
+
+- **MAMAC: 6/6 runs failed before selection** —
+  `venue_cache DB connection failed: could not translate host name "postgres-2"`.
+  The D1 resolver needs Docker-internal networking; the harness runs on the
+  host.
+- **French Riviera: 2 stops requested from 2 candidates.** Preference ordering
+  with no surplus is a no-op.
+
+**A finding worth keeping from the failure:** our host-side test harness
+**cannot exercise museum venues at all**. Every museum measurement we have
+either ran inside the container or used a venue whose resolution happened to
+succeed. That is a gap in the instrument, not in this task.
+
+**And the regression:** one selection-ON run delivered **1 stop when 2 were
+requested**. LOCAL-190 exists because stop counts matter to Michael's field
+test. A coverage filter that can leave the itinerary short is worse than the
+problem it addresses — a fabricated paragraph is bad, a missing stop is
+visible.
+
+Bounced. Retest on **Musée Matisse** (6 stops, all COVERED, and LOCAL-205
+already generated there from the host), with requested-vs-delivered reported
+for every run, and the one-stop case diagnosed before any coverage numbers are
+quoted.
+
+**D85's conclusion still stands unmeasured.** Three rounds show category rules
+land and negative constraints do not; selection is the remaining hypothesis and
+it has not yet had a fair test.
+
+---
+
+## D91 — The venue cache was unreachable from the host, and four experiments ran without it (2026-08-04)
+
+`venue_resolver._get_db_connection()` rewrote `@localhost:` to `@postgres-2:`
+unconditionally, then swallowed the failure and returned `None`. Hand it a
+correct host-side URL and it broke it.
+
+Fixed (LOCAL-214): the rewrite and the container default now apply only when
+`/.dockerenv` is present. Verified by LEAD on both sides —
+
+```
+host, DATABASE_URL=…@localhost:5433  → connects, 16 venue_corpus rows readable
+host, no env set                     → "venue cache skipped", returns None
+host, unreachable URL                → loud ERROR, not a silent None
+container, no env                    → container default still connects
+container, DATABASE_URL=…@localhost  → rewrite still applied
+```
+
+The container test used `docker cp` of the fixed file to `/tmp` and imported it
+from there; the running image is untouched and still needs LEAD to deploy.
+
+**The consequence for the record.** LOCAL-189, 194, 195 and 198 "bypassed the
+S20 tour cache" by deleting `DATABASE_URL`. That worked — and it also disabled
+the *venue* cache, because the fallback pointed at `postgres-2`. Those four
+experiments re-mined every venue from SPARQL and the web on every run.
+
+The task argues the results still stand because the resolution *path* is
+identical and only latency and cost differ. **That is mostly right and not
+entirely.** A cached corpus is byte-identical between runs; a freshly mined one
+depends on what Wikipedia and SPARQL returned that minute. It adds a source of
+between-run variance those experiments did not account for, on top of
+generation stochasticity. It does not invalidate them — no measured outcome
+turns on cache-vs-fresh — but "identical" is stronger than the evidence.
+
+LOCAL-205 is unaffected: it ran inside the container, where the fallback
+resolves.
+
+**The general shape, again.** A silent `except` that returns `None` turned a
+configuration bug into "no cache configured", and no experiment noticed for
+weeks because both look the same from the outside. The fix now distinguishes
+*absent* from *broken*, which is the part worth keeping.
+
+---
+
+## D92 — Backend stays LAN-only. No public endpoint until quality is ready (Michael, 2026-08-04)
+
+Michael: *"I would keep it this way: we are far from giving this to anyone.
+Once we decide to add human testers, we may want to hide it on unsecured link
+on iCloud. As later, we will migrate from Beta to Storied. And it would be
+convenient that Storied will be on GCloud already. But not now: too many
+problems to work on."*
+
+**Option A.** No tunnel, no host, no work dispatched. The release task
+`wdvrdaw6en` is not the current priority and LEAD has stopped treating it as
+one.
+
+The reasoning holds up: his own sentence-level evaluation of the Riviera tour
+came to **2.0/5** against a 3.5 gate. Shipping that to outside readers would
+spend goodwill we cannot re-earn, and a public endpoint with no billing is an
+open tab on the OpenAI and AWS accounts.
+
+**Two things to carry forward when testers do come.** An unlisted link is
+obscurity, not access control — anyone holding the URL reaches the backend and
+every request costs money; a shared password is the minimum. And the Subscribed
+billing layer should be deployed *before* any public endpoint, so the first
+public server has a cost ceiling in front of it rather than one bolted on
+afterwards. It is built and merged already; only deployment is outstanding
+(D76).
+
+---
+
+## D93 — `docker restart` does not pick up a changed `.env`. Containers must be recreated (2026-08-04)
+
+Michael rotated the OpenAI key. LEAD installed it and ran
+`docker restart` on the four containers that read it. All four came back
+**still holding the old key**:
+
+```
+audioura-tour-generator-1 → sk-proj-H6SI    (the old one, after restart)
+```
+
+Environment variables are fixed when a container is **created**. A restart
+re-runs the process inside the same container with the same environment.
+`docker compose up -d --force-recreate <service>` is required.
+
+Done, and verified end to end: all four now hold `sk-proj-4Mi4…`, a real
+OpenAI call from inside `tour-generator` succeeds, five health endpoints return
+200, the Nice tour list is unchanged, 23 containers running as before.
+
+**A note on the dry-run.** `--dry-run` reported the new containers would be
+named `674ac0e8ce3a_audioura-tour-generator-1` — the hash-prefixed rename that
+`CONTAINER_OWNERSHIP.md` records as an orphaning incident. That is compose
+temporarily renaming the *old* container while it swaps, not the final state.
+LEAD confirmed by recreating the least critical service first
+(`coordinates-fromai`) and checking the resulting name before touching
+`tour-generator`. Worth remembering: the dry-run output is alarming and
+misleading here.
+
+**Michael's file had also not been saved where he thought.** He wrote
+`newEnv.env` into `~/Audioura` rather than over `.env`. It held a live key and
+was **not gitignored** — `git add .` would have committed it. LEAD diffed it
+against `.env` (all 9 variables present, only the key changed), installed it,
+securely deleted it, and extended `.gitignore` to `*.env`, `newEnv*` and
+`.env.bak.*`.
+
+---
+
+## D94 — Our two quality metrics pull in opposite directions, and neither alone is a quality measure (2026-08-04)
+
+LOCAL-212 finally got coverage-based stop selection to fire (Musée Matisse, 6
+COVERED candidates, selection dropped `Nu bleu IV=EMPTY` and
+`Pierre Matisse…=EMPTY` in favour of covered stops). The measured result looked
+like a failure:
+
+| arm | unsupported / paragraph |
+|---|---|
+| selection ON (covered stops) | 0.576 |
+| selection OFF (one EMPTY stop) | 0.364 |
+
+Selecting *better-sourced* stops produced *more* unsupported claims. The task
+explained it, and the explanation is the important part:
+
+> "Nu bleu IV has NO corpus so its EMPTY_RESTRICTED prompt produces vague,
+> claim-light text. **Lower unsupported rate on EMPTY stops is an artifact of
+> writing nothing checkable — not of writing more truthfully.**"
+
+**This is the third time the same trap has appeared.** D70: gpt-3.5-turbo
+scored better on grounding than gpt-4o-mini by being vaguer. Michael's own
+evaluation: "ancient streets that exude a timeless charm" is unfalsifiable and
+worthless. Now: an unsourced stop scores well on truthfulness because it says
+nothing that can be checked.
+
+**The conclusion, and it changes how the recount should work.** i-con rewards
+specificity. `claim_check` penalises unsourced specificity. **Each is gameable
+alone and they are only meaningful together:**
+
+| i-con | unsupported | reading |
+|---|---|---|
+| high | low | what we want |
+| high | high | confident invention — the Villefranche paragraph |
+| **low** | **low** | **vague filler that games the truth gate** |
+| low | high | broken |
+
+A gate on unsupported claims alone would push the system towards the third row,
+which is exactly the writing Michael scored 0/5 and 1/5. `EVALUATION_RECOUNT.md`
+must pair them: the truth gate applies **only to paragraphs that clear an i-con
+floor**, otherwise vagueness is the cheapest way to pass.
+
+**Also settled by LOCAL-212:** the 1-stop regression from its first attempt was
+**not** caused by coverage selection. The selection guard only fires when there
+is surplus, and it reorders rather than removes; the shortfall came from the
+D1v2 geo-check rejecting a candidate and Part C failing to replace it. v2
+delivered 2 of 2 stops in 10 of 12 runs, the other two being container
+timeouts. LEAD's bounce was right to demand the diagnosis and wrong to assume
+the cause.
+
+---
+
+## D95 — `CONTRADICTED` is not counted, and it fires on unrelated subjects (2026-08-04)
+
+Found by LEAD while verifying LOCAL-215:
+
+```
+>>> check_paragraph('The chapel was built in 1432.', …,
+...                 ['The museum opened on 21 June 1990 in Nice, France.'])
+verdict: CONTRADICTED
+unsupported_count: 0
+```
+
+Two faults in one probe.
+
+**It is not counted.** `unsupported_count` counts only `UNSUPPORTED`. The
+gravest verdict we issue — the corpus actively says otherwise — is invisible to
+the number a publishability gate would read. Michael has just decided
+unsupported claims should score a paragraph down (Q&A 5, option b), so this
+number is about to carry weight.
+
+**It is also wrong here.** The corpus says the *museum* opened in 1990; the
+sentence says a *chapel* was built in 1432. Different subjects, no conflict. A
+bare date mismatch is being read as contradiction — false alarms on the verdict
+most likely to be trusted.
+
+**LOCAL-218** dispatched: per-verdict counts, a same-subject requirement before
+`CONTRADICTED` may fire, and a corpus-wide measurement of how many current
+contradictions survive that test. Zero false SUPPORTED remains the hard
+constraint.
+
+**LOCAL-215 merged regardless** — its paraphrase pass is a genuine if modest
+gain (over-flag 21% → 17% on the original set, 10% on a fresh 20-claim Chagall
+holdout, zero false SUPPORTED on both). The task said plainly that it fixed 1
+of 6 and did not dress it up, which is the right instinct on a 49-claim
+evidence base.
+
+---
+
+## D96 — R9 ships: a sentence that fits any stop is deleted, not scored (2026-08-04)
+
+Michael scored two Riviera sentences **0/5 — "should be removed… can be placed
+in millions of stops"**, below his own floor of 1. LOCAL-216 turned that
+verdict into a rule.
+
+LEAD verified independently against his file rather than the task's own tests:
+
+```
+0/5 "As you continue your journey through this charming town…"     fires ✓
+0/5 "From Cap d'Antibes to Villefranche — spans more ground…"      fires ✓
+5/5 "Start biking southeast on the main road…"        (navigation)  silent ✓
+5/5 "The town's strategic location east of Nice…"     (sourced)     silent ✓
+5/5 "…depths reaching 320 feet…"                      (sourced)     silent ✓
+1/5 "Walking through the narrow streets may evoke…"   (style fault) silent ✓
+3/5 "In January 1888, Claude Monet visited…"                        silent ✓
+```
+
+Zero disagreements with his judgement, including the two cases that mattered
+most: **navigation scored 5/5 and has no proper noun or date**, so a naive rule
+would have deleted his best content; and a **style** failure must not be
+deleted, because it is rewritable.
+
+Corpus-wide: 4,623 sentences across 79 tours, **59 deleted (1.3%)**, 44
+paragraphs emptied. Well under the 15% ceiling at which LEAD would have stopped
+and handed it back to Michael. Behind `DISABLE_R9_DELETION=1`.
+
+The 44 emptied paragraphs are mostly single-sentence transitions and epilogs —
+the same shape as his paragraph 6. Deleting a paragraph that consisted entirely
+of filler is the intended outcome, not a side effect.
+
+---
+
+## D97 — Every CONTRADICTED verdict we have ever issued was wrong (2026-08-04)
+
+LOCAL-218 added the same-subject requirement and measured the corpus:
+
+```
+Total claims checked          77
+CONTRADICTED, before           4
+  of which false alarms        4  (100%)
+CONTRADICTED, after            0
+```
+
+**Four for four.** Our gravest verdict — "the corpus says otherwise" — has been
+fired only on claims about a different subject entirely, of the shape "chapel
+built in 1432" against a passage about a museum opening in 1990. Nobody looked,
+because nothing consumed the verdict.
+
+Also shipped: per-verdict counts (`verdict_counts`), so a future gate can
+hard-block on `contradicted` while merely penalising `unsupported`. The task
+argued — persuasively — for keeping `unsupported_count` semantically narrow
+rather than silently inflating it, since "corpus said nothing" and "corpus said
+the opposite" warrant different responses.
+
+Zero false SUPPORTED held on both labelled sets.
+
+**Two defects LEAD found, both now LOCAL-219:**
+
+**The subject matcher counts shared tokens rather than identifying a subject.**
+Verified on `storied` HEAD:
+
+```
+corpus: "The museum opened on 21 June 1990 in Nice, France."
+"The museum opened in 1890 in Nice, France."  → CONTRADICTED
+"The museum opened in 1890."                  → UNSUPPORTED
+```
+
+Same subject, same conflicting date. Removing an incidental location phrase
+downgrades the verdict. A model writing tersely gets a free pass on exactly
+what we most need to catch.
+
+**A demonstration in the submission does not reproduce.** §97–106 shows
+`"MAMAC was inaugurated in 1975 by the mayor."` → `CONTRADICTED ✓`. Run
+verbatim it extracts **no claims at all**. The submission's other
+demonstration (§213–220) reproduces exactly, so this is carelessness rather
+than a pattern — but it is the failure mode this review exists to catch, and a
+worse one than a broken test: a reviewer who trusts a pasted result stops
+looking. The task template now requires running every pasted example.
+
+**LEAD merged rather than bounced** because every substantive claim in the
+submission verified independently: the 4-of-4 false-alarm elimination, zero
+false SUPPORTED, per-verdict counts, and the working demonstration. The code is
+right; one illustration in the prose was not.
+
+---
+
+## D98 — A curated test set cannot find the bug that lives in real data (2026-08-04)
+
+LOCAL-219 fixed the subject-matching fragility exactly as asked. Verified by
+LEAD:
+
+```
+"The museum opened in 1890 in Nice, France."  → CONTRADICTED
+"The museum opened in 1890."                  → CONTRADICTED  (was UNSUPPORTED)
+"MAMAC was inaugurated in 1975 by the mayor." → CONTRADICTED  (was: no claims)
+"The chapel was built in 1432."               → UNSUPPORTED   (correctly refuses)
+```
+
+Seven paraphrase pairs symmetric, zero false SUPPORTED, both labelled sets
+unchanged. On its own terms the task succeeded.
+
+**And it reintroduced the defect LOCAL-218 had just removed.** The submission
+reported the corpus-wide `CONTRADICTED` rate as "0 across the 49 labelled
+claims", noting that a true corpus-wide count "depends heavily on how tours are
+matched to corpus passages". LEAD ran it — 107 paragraphs from stored tours
+against their venue corpora:
+
+```
+CONTRADICTED   3     (was 0 after LOCAL-218)
+```
+
+All three false. A claim's date matched against an unrelated date in an
+unrelated passage:
+
+```
+CLAIM   : 1820 — "In 1820, faced with an influx of beggars…"
+EVIDENCE: "Antibes … is a seaside resort city in the Alpes-Maritimes"
+```
+
+**Why the labelled sets could not have caught it.** They are 49 curated
+single-fact sentences with tightly matched passages. Real tour paragraphs carry
+several dates against a pool of loosely related passages, and that is precisely
+where a token-proximity matcher fails. The substituted measurement was not a
+weaker version of the required one — it was measuring a different thing.
+
+**The general lesson, and it is the one worth keeping.** Every instrument bug
+this week — the all-zero style harness (D83), the unreachable venue cache
+(D91), four bogus contradictions (D97), and now three more — was invisible to
+the tests written alongside the code and visible the moment it met real data.
+A test set built from the same understanding as the code shares the code's
+blind spots.
+
+**Rule for LEAD from now on:** when a task's acceptance criteria name a
+corpus-wide or production-data measurement, that measurement is not
+substitutable by a labelled set, and a submission that swaps it is incomplete
+regardless of how good the labelled-set numbers are. LOCAL-219 disclosed the
+swap honestly — the failure is that LEAD's acceptance criteria let a disclosed
+swap look like a pass.
+
+---
+
+## D99 — The claim detector is now in a defensible state (2026-08-04)
+
+LOCAL-219 resubmitted with the corpus-wide measurement actually run. LEAD
+re-ran the identical probe that produced the bounce:
+
+```
+                        at bounce    now
+paragraphs                   107     107
+SUPPORTED_PARAPHRASE          15      15
+UNSUPPORTED                   10      13
+CONTRADICTED                   3       0
+```
+
+The three false alarms became `UNSUPPORTED` — exactly the +3, and the safe
+direction. Checked that they had not simply switched the verdict off:
+
+```
+"The museum opened in 1890 in Nice, France."  → CONTRADICTED
+"The museum opened in 1890."                  → CONTRADICTED
+"MAMAC was inaugurated in 1975 by the mayor." → CONTRADICTED
+"The chapel was built in 1432."               → UNSUPPORTED    (different subject)
+"The museum opened on 21 June 1990."          → SUPPORTED_PARAPHRASE
+```
+
+Genuine contradictions fire, rephrasing does not change the verdict, unrelated
+subjects refuse, and zero false SUPPORTED holds on both labelled sets.
+
+**Where the instrument stands, for Michael's threshold decision:**
+
+| property | state |
+|---|---|
+| false SUPPORTED (a fabrication passing) | **0** across all sets |
+| false UNSUPPORTED (over-flagging) | ~17% original set, 10% holdout |
+| CONTRADICTED, corpus-wide | 0 of 188 claims, no false alarms |
+| paraphrase symmetry | 7/7 pairs |
+
+It never lets an invention through and it flags roughly one true statement in
+six. That is the right bias, and it is now measured rather than asserted.
+
+**What it still cannot do,** and the recount should say so: judge whether an
+unsupported claim is *true*. Michael scored "depths reaching 320 feet" 5/5;
+the detector marks it unsupported and is right to — we hold no passage saying
+it. Those are different questions and only one of them is automatable.
+
+**Four rounds to get here** (210 built it, 215 improved matching, 218 found
+every contradiction was false, 219 fixed the fragility and then the regression
+it caused). Every one of the four defects was found by running against real
+tour text, not by the tests shipped with the code (D98).
+
+---
+
+## D100 — Michael's ruling on accuracy: block what is wrong, publish what is merely unverified, and go looking for sources (2026-08-04)
+
+Three answers that together settle the gate, and one correction of LEAD.
+
+### The correction first
+
+LEAD wrote that Michael's 5/5 on *"depths reaching 320 feet"* contradicted the
+proposed truth gate. **It did not.** Michael:
+
+> *"Incorrect. I would have supported you 100% if I knew that the data was
+> incorrect. You said the data was not found aka UNSUPPORTED in corpus
+> passages."*
+
+He then searched, found the bay documented at 95–150 m at its outer mouth
+(320 ft ≈ 97.5 m), and concluded the figure is probably right. So the
+disagreement was never about whether the claim was sourced — it was about
+**what to do when it isn't**. LEAD built a whole two-axis proposal on a
+misread.
+
+### The rule he actually wants
+
+> *"We should not publish if we are reasonably sure that the data is
+> incorrect. It is a different story if the data is unverifiable. We can
+> publish if we recognize it… having no information or very little information
+> maybe worse than having unverifiable information."*
+
+That maps exactly onto the verdict vocabulary we already have:
+
+| verdict | meaning | action |
+|---|---|---|
+| `CONTRADICTED` | the corpus says otherwise | **hard block** |
+| `UNSUPPORTED` | we cannot verify it | **publish**, disclosed |
+| `SUPPORTED_*` | corpus backs it | publish |
+
+**This is a better rule than LEAD's** and it is implementable today. The hard
+block lands on `CONTRADICTED`, which LOCAL-218/219 just made trustworthy — 0
+of 188 corpus-wide, no false alarms. LEAD's proposal would have blocked on
+`UNSUPPORTED`, which over-flags ~17% and would have deleted good writing.
+
+Question 0 in `EVALUATION_RECOUNT.md` is answered and withdrawn.
+
+### And the corpus is not the only source
+
+> *"we should not remove or entrust the data if we can not find it in corpus
+> passages alone, we should use Other sources, especially if they are so cheap
+> compare to the tour price… correct me if I am wrong."*
+
+He asked to be corrected, so: **directionally right, an order of magnitude
+off.** Measured, our cost for a 2-stop tour:
+
+```
+Polly TTS (7,400 chars)   $0.0296
+LLM (12,700 tokens)       $0.0102
+TOTAL                     $0.0398
+```
+
+Serper is $0.001/query. Verification is therefore:
+
+| granularity | cost | share of tour cost |
+|---|---|---|
+| per checkable claim (~30) | $0.030 | **75%** |
+| per paragraph (~6) | $0.006 | 15% |
+| per stop (2) | $0.002 | 5% |
+
+Not two orders of magnitude cheaper than TTS — per-claim verification nearly
+doubles our cost. **Per-entity or per-paragraph batching is the affordable
+shape**, and against the $2.00 user ceiling even the 75% case is trivial. His
+conclusion holds; the arithmetic behind it needed fixing.
+
+**LOCAL-221** dispatched: when a claim is `UNSUPPORTED`, search for a source
+and promote it to `SUPPORTED_EXTERNAL` rather than deleting it.
+
+### Two smaller rulings
+
+**R9 stays deletion — for now.** Michael: *"Humans think they are being cheated
+or misled when they hear sentences that have no information… and they think the
+teller is stupid."* But the better answer is connectives carrying "both factual
+and emotional content." Deletion is the floor, not the goal.
+
+**The disclaimer he assumed exists does not.** He wrote *"we should in the
+disclaimer when people are installing / use our application that the data comes
+from Internet sources. If we do not, we should."* LEAD checked
+`audio_tour_app/lib`: there is **no accuracy disclaimer anywhere** — the only
+"AI-generated" strings concern replacing a custom audio recording. If we
+publish unverified claims by policy, the disclosure is not optional. Task
+raised for him.
+
+---
+
+## D101 — Validation is three passes, and the reason is the product's whole differentiator (Michael, 2026-08-04)
+
+> *"On the first pass we should look at the group, then on the second pass
+> sentence by sentence, and on the 3rd pass as a group again."*
+
+His reasoning is a nesting argument: a tour works only if every stop is
+interesting; a stop works only if every paragraph is; a paragraph works only if
+every sentence is — **but a sentence cannot be judged in isolation, or the
+paragraph stops making sense as a unit.** Hence group → sentence → group.
+
+And the reason it is worth spending on, in his words:
+
+> *"Lena said she would not use any museum tour because nowadays she can ask
+> Google about any painting by pointing her phone camera at it and get precise
+> factual information. I said that she can, but then this information will be
+> out of context of her tour, her interests, and will be dry. I am only right
+> if our tours will be full of the correct information, that fits Lena's
+> interests and enhances the whole tour experience."*
+
+**This is the product thesis and it should govern the roadmap.** Point-and-ask
+already beats us on isolated facts, for free. We are only worth using if the
+information is *correct*, *fitted to the listener*, and *connected across
+stops*. Each of the three maps to work already in flight or designed:
+
+| Lena's test | our work |
+|---|---|
+| correct | `claim_check`, and now external verification (D100) |
+| fits her interests | the swipe/preference model, `STORY_QUALITY_DESIGN` §2c/2d |
+| enhances the whole tour | cross-stop continuity — the weakest of the three, and the least built |
+
+The third is the one with almost nothing behind it. Michael's own evaluation
+scored both connective sentences 0/5, and the "dominant story" thread
+(SQ-S6b) has been designed since July and never built. **Continuity is the
+gap that a competitor cannot close by pointing a camera at a painting**, and it
+is where we are thinnest.
+
+---
+
+## D102 — Sentence-group scoring lands; boundary detection agrees with Michael 6 times in 11 (2026-08-04)
+
+LOCAL-220 built the scoring pass Michael asked for — group, classify, emit
+records, **no rewriting**. Verified by LEAD against his own evaluation:
+
+```
+¶1A NAVIGATION  michael=5  publishable=True   unsupported=0
+¶3A CONTENT     michael=3  publishable=True   unsupported=1
+¶5A CONTENT     michael=5  publishable=True   unsupported=2   ← the 320-feet case
+¶5C CONNECTIVE  michael=0  publishable=False  block=GENERIC_DELETE
+¶6  CONNECTIVE  michael=0  publishable=False  block=GENERIC_DELETE
+```
+
+Both cases that mattered come out right: **his 5/5 cycling directions classify
+NAVIGATION and pass clean**, and **his 5/5 "320 feet" group is publishable with
+its two unverified claims counted rather than suppressed**.
+
+**Group-boundary agreement: 6 of 11 (54.5%).** Reported honestly and low. That
+is the number worth having: the machine can find roughly half of Michael's
+idea-boundaries unaided. The five misses are mostly over-splitting — it breaks
+at "Enjoy the refreshing sea breeze" where he kept the sentence with its
+neighbours. Whether that is learnable from more examples or needs his rule is
+the open question; 11 groups is too few to tell.
+
+**LEAD's staleness, corrected on merge.** The task was dispatched *before*
+Michael's D100 ruling arrived, so it blocked on `UNSUPPORTED` — the rule LEAD
+had proposed and he then overruled. Left as shipped, every group carrying an
+unverified claim would have been marked unpublishable, which is precisely what
+he rejected. Corrected: only `CONTRADICTED` and `R9_GENERIC` block;
+`unsupported_claims` is counted, carried in the record, and handed to
+LOCAL-221.
+
+Worth noting as a process point — **a decision made after dispatch does not
+reach the running task.** Three tasks this week were dispatched under rules
+that changed before they landed. The fix is not faster dispatch; it is checking
+the current decision record at merge, which is what caught this one.
+
+**One check LEAD nearly got wrong.** `dir(sentence_group_scorer)` shows
+`check_r1_imperatives`, `check_r2_questions` and friends, which reads like a
+reimplementation of the style validator — two copies of R1 that would drift.
+They are re-exports from `style_validator_detector` (line 26), and the outputs
+match on every probe. Reading the import list before writing the bounce is the
+only reason that did not become a wrong verdict.
+
+---
+
+## D103 — Two correct components that do not compose (2026-08-04)
+
+LOCAL-221 built external source verification. Its guards are sound — the D62
+location-mismatch check, unit conversion with a compatibility test, three
+well-argued refusals of dates it could not confirm. And the case it was built
+for does not work.
+
+**The join is broken.** `claim_check` emits a claim as the bare value;
+`evaluate_evidence` needs surrounding context to bind the claim to a subject:
+
+```
+claim_check → type=NUMBER  text='320 feet'
+
+ev('320 feet',                 [good source]) → refused
+ev('depths reaching 320 feet', [good source]) → PROMOTED
+```
+
+Each function is correct in isolation. Nothing tested them together, so the
+seam went unnoticed — and the seam is the feature.
+
+**It explains the results.** Of the promotions shown, most are `known as "…"`
+or `attributed to …` — claim types whose *text carries its own context*, so
+subject binding happens by accident. **Every date and every number was
+refused.** External verification currently confirms what things are called and
+who built them, not when or how big. That is the inverse of the motivating
+case, and it means the reported 5.2% promotion rate is mostly a measure of
+which claim types survive the handoff rather than of what the web can confirm.
+
+**And the submission asserted a result the code does not produce** —
+limitation 5 said the 320-feet case "passes when the source says *'The deep bay
+of Villefranche reaches depths of approximately 97.5 meters at its outer
+mouth'*". LEAD ran exactly that string: refused. **Second consecutive round**
+with a non-reproducing demonstration (D97 was the first), after the PROCESS
+block was amended to require running every pasted example. If it recurs the
+requirement is not working and the fix has to be structural — a submission
+template that captures output rather than inviting prose.
+
+**Also flagged:** 213 unsupported claims found, **30 queried**, 11 promoted.
+The headline "5.2%" divides by 213; over attempted claims it is 37%. The
+pessimistic figure is the honest instinct, but the selection of those 30 is
+invisible, so neither number means much yet.
+
+**The general lesson is one this project keeps relearning at a different
+level.** Unit tests pass, integration is where it breaks: the validator that
+could not be imported in Docker (LOCAL-192), the gate guarded by an empty dict
+(LOCAL-209), the venue cache unreachable from the host (D91), and now two
+functions whose data formats disagree. Every one shipped with green tests.
+
+---
+
+## D104 — The expiring GitHub token is not ours; but ours is in plaintext and never expires (2026-08-04)
+
+Michael forwarded a GitHub notice that a classic PAT named "Ubuntu VM Token"
+expires around 7 August, and asked whether it was phishing.
+
+**Verified against the credential this machine actually pushes with:**
+
+| | the expiring token | Mac Mini's token |
+|---|---|---|
+| scopes | 11, incl. `repo`, `read:org`, `read:audit_log`, `codespace:secrets` | **`repo` only** |
+| expiry | ~7 Aug | **none reported** |
+
+Different tokens. **Letting it expire breaks nothing here** — the dispatcher,
+the nightly loop, and every push keep working.
+
+**Recommendation recorded: let it expire, do not regenerate.** Nothing in the
+current setup is an Ubuntu VM; the scopes are broad; and expiry is a free test
+of whether anything still depends on it — if something does, it fails visibly
+and a replacement takes two minutes. Regenerating keeps an unaccounted-for
+credential alive for another year and tests nothing.
+
+On the phishing question, the useful answer is not "it looks genuine" but a
+method that holds either way: navigate to github.com directly rather than
+following the link, and see whether the token is listed.
+
+**The finding that matters more.** This Mac stores its GitHub token in
+plaintext:
+
+```
+git config credential.helper → store
+~/.git-credentials           → https://michaelglik-audiotoursai:ghp_…@github.com
+```
+
+`credential.helper=store` is a plain file readable by any process running as
+the user, and it would be captured by any backup or sync. The macOS Keychain
+helper is already installed and a `github.com` keychain entry already exists,
+so the switch is one config change plus deleting the file.
+
+**LEAD is not doing this unattended.** It is low risk and reversible, but a
+half-completed switch breaks the dispatcher's pushes, and the next push needs
+the token typed once — so it wants Michael present. Queued for him.
+
+Also noted: the Mac's token has **no expiry at all**. A credential that never
+expires is one nobody is ever prompted to rotate — the same standing condition
+that let the `sk.py` key sit on origin for nine months (D81). Its replacement
+should carry a 12-month expiry.
+
+---
+
+## D105 — Round 2 measured: the 0/5 sentences are gone, the 1/5 imperatives are not (2026-08-04)
+
+Michael asked whether the tour would be better when he got back. LOCAL-222
+regenerated the same request at HEAD, three runs, and measured it rather than
+guessing.
+
+```
+                     tour 163 (what he read)   round 2
+R1_IMPERATIVE              50% (3/6)            50% (3/6)
+R3_SUGGESTIVE               0%                   0%
+R4_PRESCRIBED               0%                   0%
+R8_LEAKAGE                 17% (1/6)             0%     ← eliminated
+R9_GENERIC                 33% (2/6)            17%, deleted before delivery
+```
+
+**Fixed:** the generic connective he scored **0/5** is caught and removed every
+run —
+
+```
+Run 1: "From Cap d'Antibes to Eze Village — a collection that spans more ground than these stops alone."
+Run 2: "From Cap d'Antibes to Gorges du Loup — …"
+Run 3: "From Cap d'Antibes Coastal Path to Voie Verte du Littoral Varois — …"
+```
+
+Same template every time, **zero content sentences deleted**. Prompt leakage is
+gone too.
+
+**Not fixed:** instructions aimed at the listener — his complaint behind five of
+eleven 1/5 marks. The retry fires on 4–6 paragraphs per tour and succeeds on
+64% of them, and the delivered rate does not move, because the model generates
+new imperatives as fast as the retry removes them. "Take a moment to absorb the
+ancient aura" survived into the delivered text.
+
+**The risk LEAD flagged did not materialise.** The retry now runs far more often
+than when it was built (R1 was blind to "Stand at the entrance" then), but the
+task found **no case where a retry made a paragraph worse**. LOCAL-192's damage
+mode has not appeared.
+
+### And a false positive LEAD found that the task did not
+
+```
+"Start biking southeast on the main road, continue straight
+ until you reach the roundabout near the coast."      nav=True   clean
+"Start cycling south on the main road with the sea on
+ your right until you reach the peninsula's tip."     nav=False  R1_IMPERATIVE
+```
+
+The first is Michael's, scored **5/5 — his highest mark**. The second is the
+same instruction, one word different, and R1 flags it.
+
+`_STYLE_NAV_ROUTE_VERBS` contains **no cycling verb at all** — no *bike, cycle,
+pedal, ride, start.* Neither sentence matches the sentence-level exemption; the
+first survives only because a paragraph-level density heuristic happens to catch
+it.
+
+Two consequences. **The retry rewrites what R1 flags, so the pipeline is
+currently rewriting the one thing Michael rated perfect** — the LOCAL-192 damage
+mode aimed at our best content. And **the 50% R1 figure is inflated**: one of
+those three is this false positive, so the real content rate is 2 of 6, and
+every R1 number on a transport tour since LOCAL-196 may carry the same error.
+
+**LOCAL-224** dispatched, with the boundary stated explicitly: route movement is
+exempt, attention direction is not. "Turn left at the fountain" passes; "Turn
+your attention to the smaller canvas" must still fire — that distinction is
+Michael's, from his own 1/5 marks, and widening the exemption until his
+complaints pass would delete the rule he asked for.
+
+---
+
+## D106 — External verification works now, and dates and numbers are what it verifies (2026-08-04)
+
+LOCAL-221 resubmitted with the handoff fixed: `claim_check` now emits a
+`sentence` field alongside each claim, and the verifier uses it to bind claim to
+subject. Verified by LEAD end to end from the real paragraph:
+
+```
+check_paragraph → text='320 feet'  sentence='The deep bay of Villefranche…'
+evaluate_evidence(…, claim_sentence) → PROMOTED
+```
+
+**The inversion this fixes.** Before, every DATE and every NUMBER was refused
+and promotions were almost all `known as "…"` — claim types whose text happened
+to carry its own context (D103). After:
+
+```
+Type                    Promoted  Refused  Total   Rate
+DATE                          37       85    122    30%    (was 0%)
+NUMBER                         4        6     10    40%    (was 0%)
+ATTRIBUTION                    2       13     15    13%
+NICKNAME                       3       30     33     9%
+COMPOSITION                    0       28     28     0%
+MOVEMENT                       0        9      9     0%
+```
+
+Overall 47 of 235, **20%**, at **$0.0047 per tour** — 12% of our $0.0398 tour
+cost, well inside what Michael judged affordable.
+
+**COMPOSITION and MOVEMENT stay at 0%, and the task's reading is right:** "pop
+art" or "bronze sculpture" are genre classifications, not facts a search can
+confirm. External verification is for dateable and measurable claims. Worth
+saying plainly rather than treating as a gap to close.
+
+### Michael's own example still refuses, and that is correct
+
+```
+claim  : "320 feet"  (= 97.5 m)
+source : "…reaches 95 to 150 metres deep at the outer mouth…"   → refused
+source : "…reaches approximately 97.5 metres at its outer mouth" → PROMOTED
+```
+
+The source he found gives a **range**; the claim asserts a point. 97.5 falls
+inside 95–150, but a range is not an assertion that the bay is 97.5 m deep, and
+promoting on containment would let any number inside any range pass. Refusing is
+the safe direction (D100) — and it means the specific fact he researched will
+stay disclosed-but-unverified until a source states it directly.
+
+That is the honest outcome and he should know it: **the feature verifies fewer
+things than the motivating example implied.** Its value is the 37 dates it did
+confirm, not the one measurement it could not.
+
+**Zero false SUPPORTED preserved** — the corpus-based verdict logic is
+untouched, `SUPPORTED_EXTERNAL` is a distinct verdict, and LEAD re-ran the D99
+probes against `storied` HEAD: fabricated number → UNSUPPORTED, genuine support
+→ SUPPORTED_PARAPHRASE, different subject → UNSUPPORTED.
+
+**Three rounds to land this**, and the defect each round was a join rather than
+a component: the function pair that did not compose (D103), then the claim text
+that carried no subject. Both were invisible to unit tests and obvious the first
+time real data crossed the boundary (D98).
+
+---
+
+## D107 — The navigation exemption now covers how people actually travel (2026-08-04)
+
+LOCAL-224 fixed R1 firing on cycling directions. Verified by LEAD on the full
+boundary, both directions, 10 of 10 correct:
+
+```
+EXEMPT   Start cycling south on the main road…          ← was firing
+EXEMPT   Start biking southeast…                        ← Michael's 5/5
+EXEMPT   Pedal north along the seafront…
+EXEMPT   Head south along the Promenade…
+EXEMPT   Turn left at the fountain…
+FIRES    Look for the Rue Obscure…
+FIRES    Pause to take in the breathtaking view…
+FIRES    Turn your attention to the smaller canvas…
+FIRES    Take a moment to absorb the ancient aura…
+```
+
+Every sentence on the "fires" side is from Michael's own 1/5 and 2/5 marks. The
+distinction holds: **route movement is exempt, attention direction is not.**
+
+Corpus-wide, 13 false-positive paragraphs removed:
+
+```
+cycling   59.2% → 56.4%   (-7)
+walking   37.3% → 36.3%   (-3)
+museum    36.4% → 36.4%   ( 0)   ← correct, no transport verbs
+```
+
+Museum unchanged is the check that matters — a fix that moved museum numbers
+would have widened the exemption into ordinary prose.
+
+**Round 2's R1 corrects from 50% to 40%.** Michael's complaint stands; only the
+measurement was wrong. And the pipeline is no longer rewriting the navigation he
+rated highest.
+
+**Not verified:** the task scored rules only, no generation run, so we know R1
+no longer flags cycling navigation but not that the retry leaves it alone in a
+live run. Stated in its limitations and worth confirming on the next generation.
+
+---
+
+## D108 — The secret alarm fired, and it was our own cache keys (2026-08-04)
+
+First real firing of the tick alarm added after D81. Six findings across three
+commits, all in `CLICKUP_OFFLINE_QUEUE.md`:
+
+```
+[high_entropy_assignment] CLICKUP_OFFLINE_QUEUE.md:2227
+    cache_key = '959f666f3aaf681223781c3e9e81a27c34368da73f31300ec3c98474eca7fe54'
+```
+
+A SHA-256 `tour_cache` key inside a SQL example in a task write-up. The
+variable is named `cache_key`, the value is high-entropy, and the detector
+matched on the name. **Not a credential** — it is a hash of a tour request.
+
+**Fixed narrowly:** skip pure-hex values of exactly 32, 40 or 64 characters —
+MD5, SHA-1, SHA-256. No provider's API key is pure lowercase hex at those
+lengths; AWS secret keys are 40 characters but mixed-case base64-ish, not hex.
+Verified after the change:
+
+```
+SHA-256 cache key      → silent
+real OpenAI key        → fires
+AWS secret (40ch)      → fires
+bare key in prose      → fires
+sk.py at first commit  → still caught (3 findings)
+recent storied commits → 0 real findings, alarm quiet
+```
+
+**Why this was worth doing immediately rather than filing.** The whole value of
+that alarm is that it will be believed on the day it catches something real.
+Two credentials sat on origin for months because nothing was watching; an alarm
+that fires on our own cache keys every five minutes is one we learn to scroll
+past, and then it is worth less than no alarm at all — because we would think
+we were covered.
+
+Same reasoning as the worktree prune's idle guard (D84a): a guard that damages
+the thing it protects gets switched off, and then the protection is gone.
+
+---
+
+## D109 — The dry run found the one thing that would have taken down news entirely (2026-08-04)
+
+LOCAL-225 ran the billing code against `audiotours_subscribed` before anyone
+deployed it. The schema had been derived by reading the code (LOCAL-211), so
+the two had never actually met.
+
+**One mismatch, and it is the expensive kind:**
+
+```
+missing table : newsletters_article_link
+failing call  : entitlements.get_news_used_period()
+                SELECT 1 FROM newsletters_article_link nal
+                WHERE nal.article_requests_id = ar.article_id
+consequence   : the subquery errors, the function fails closed and returns
+                9999, which exceeds every quota — blocking ALL news
+                operations for ALL users
+```
+
+A total news outage, and it would have surfaced only after deployment, as
+"news is broken" with no obvious cause. Fixed by migration
+`011_add_newsletters_article_link.sql`; LEAD verified a second run is a no-op
+(21 tables before and after).
+
+**Everything else matched** — all other tables, columns, types and constraints.
+One dead column noted (`cost_ledger.ceiling_breach`, written by nothing,
+nullable, harmless).
+
+**The billing rules verified end to end**, LEAD re-ran them:
+
+```
+Step 1  fresh user                                    0¢
+Step 2  +$10                                       1000¢
+Step 3  tour charge at x5                           966¢
+Step 4  30 tours → negative but above the floor      −20¢
+Step 5  translation refused pre-flight (would hit −290¢, below −200¢)
+Step 6  +$10 against −20¢                           980¢
+Step 6b D41's exact example: −23¢ + $10.00 =        977¢  ($9.77)
+```
+
+Michael's carry-over rule, stated on 2026-07-31 and never before executed,
+works exactly as he specified.
+
+**Production untouched:** `audiotours` still 43 tables and 133 tours, 23
+containers, none started or stopped.
+
+**The general point.** This is the fourth integration-boundary defect this week
+(D91 venue cache, D102 stale rule at merge, D103 the claim/verifier join, now
+code against schema) and the first one caught *before* it reached anything. The
+difference was simply running the two halves together — which cost five
+minutes and would have cost a production outage.
