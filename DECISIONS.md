@@ -2869,3 +2869,48 @@ product call rather than a technical one:
 LEAD's lean is (2) for tours with few stops — with only two stops, spending one
 on a pure biography is a poor trade — and (3) as the real answer. Recorded for
 Michael to overturn; not implemented while the option is cheap to change.
+
+---
+
+## D81 — ⚠️ Three live credentials have been on origin, one for nine months. All must be rotated. (2026-08-04)
+
+LOCAL-207's history audit, **verified independently by LEAD against `origin`**:
+
+| credential | file | on origin since | still live in `.env`? |
+|---|---|---|---|
+| OpenAI `sk-proj-wpIWgoRa…` | `sk.py` | **2025-10-26** (first commit) | no — a second, older key |
+| OpenAI `sk-proj-H6SI…` | `SUBMISSION_LOCAL-39.md` | 2026-07-30 | **yes** (D79) |
+| AWS `AKIAWLW3…` | `claude_review_secret_fixes_final_2026_06_07.md` (storied), `SUBMISSION_LOCAL-162.md` (subscribed) | 2026-06-07 | **yes** |
+
+`sk.py`'s docstring reads *"This module designed to keep openai private key
+hidden."* It held the key as a literal and was committed on day one. **Nothing
+imports it** — LEAD checked before touching it.
+
+**Done (reversible, no approval needed):** all three redacted at the tip on
+both branches and pushed. `sk.py` now reads `os.environ["OPENAI_API_KEY"]`.
+
+**Not done, and why:**
+- **Rotation** — outward-facing. Rotating AWS mid-flight breaks Polly for every
+  running container; rotating OpenAI breaks generation. Michael's call.
+- **History purge** — needs `git filter-repo` and a force-push over a shared
+  branch. Gated in CLAUDE.md, and pointless before rotation.
+
+**Order of operations for Michael:** rotate all three, update `.env`, restart
+containers, *then* decide about history. Once the keys are dead the history is
+a cosmetic problem, and that is much cheaper than rewriting a shared branch
+first.
+
+**Scope note.** The repository is private, so this is not open exposure. It is
+still nine months of a live key sitting in a file that any collaborator, any
+CI integration, any future clone, and any account compromise would reach. Treat
+all three as compromised.
+
+**LOCAL-207 was bounced** for committing 80% of the `sk.py` key (a 38-character
+unbroken run) as a test fixture — a leak inside the secret scanner. Nothing was
+pushed. The audit stands; the code does not.
+
+**The gap that let this run for nine months:** no secret scanning anywhere in
+the loop. GitHub push protection exists but caught only the newest occurrence
+and missed the 2026-07-30 one entirely. LEAD's review reads diffs for logic,
+not for credentials. The resubmitted LOCAL-207 wires a scanner into the
+pre-merge path and adds the prohibition to every task file's PROCESS block.
