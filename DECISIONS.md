@@ -2486,3 +2486,49 @@ the instrument has now been wrong twice (D55, D69).
 
 D67's relative conclusion survives (R4 fires correctly in both validators);
 its absolute failure rates were understated for both arms.
+
+---
+
+## D72 — Overdraft carry-over is already correct; cache-hit charging is not (2026-08-04, LEAD verification)
+
+Checked two of Michael's billing directives against the code on `subscribed`
+rather than against anyone's report.
+
+**D41 carry-over — correct, by construction.** Michael: *"if user had -0.23
+and adds $10USD the balance should become $9.77."* `get_balance_cents()` is
+`COALESCE(SUM(amount_cents), 0)` over `wallet_ledger` with no clamp, and
+`topup()` records a positive movement. A −23-cent balance plus a 1,000-cent
+top-up sums to 977. Nothing to build. Recording this so it is not
+re-implemented by a task that assumes it is missing.
+
+**Cache-hit charging — a real gap.** `pricing.py`:
+
+```python
+if cache_hit and operation_type == "translation_cache_hit" and fresh_cost_usd is not None:
+    ...charge as if fresh...
+elif cache_hit:
+    charge = Decimal("0.00")      # tours and news
+```
+
+Michael gave the rule for translation (*"we should take the same amount in
+order not to confuse the user"*) and his reason was **"why only the first
+user is paying?"** In Q&A-3 he extended it: tour reuse also charges. Only the
+translation branch was built. Today the first requester of a tour pays and
+everyone after rides free — the exact thing he objected to.
+
+**LOCAL-200** dispatched. The interesting part is not the branch, it is the
+basis: translation is handed a fresh cost by its caller, tours are not, so the
+charge has to come from `cost_ledger` — where **every row written before
+LOCAL-197 is priced at June-2023 rates and is ~2.5× too high** (D68). Charging
+×5 of an already-inflated figure would overcharge by an order of magnitude on
+older tours. The task must state its handling of pre-LOCAL-197 rows and of the
+117 tours that predate metering entirely.
+
+**One honest wrinkle to flag to Michael when he is back.** This is the single
+case where our cost is $0.00 and the charge is not, so "×5 of what it cost us"
+stops describing it. The Wallet list is his user-facing proof of the ×5 rule,
+and a cached tour priced like a fresh one will read as wrong to anyone who
+noticed it arrived instantly. The fix is honest labelling — the existing
+translation row already says *"(cached — same charge)"* — but the principle
+being applied is fairness between users, not cost recovery, and the wording
+should say that rather than imply a cost we did not incur.
