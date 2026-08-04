@@ -4246,3 +4246,52 @@ falsification case to the suite itself, so a schema break makes it fail.
 The structure — real routes, real database, no mocks, happy path plus unknown
 user plus malformed body — is good and worth keeping. It needs tightening, not
 rebuilding.
+
+---
+
+## D111 — The suite can now fail, and that is the only reason to believe it (2026-08-04)
+
+LOCAL-226 resubmitted. LEAD re-ran the same falsification that produced the
+bounce:
+
+```
+healthy                                        34 passed
+ALTER TABLE newsletters_article_link RENAME…    4 failed, 30 passed
+```
+
+Named among the failures:
+
+```
+test_news_quota_healthy_returns_exact_count
+test_falsification.py::test_missing_table_produces_9999_not_correct_count
+```
+
+The fix was one assertion per test — `used == 10`, not merely
+`allowed is False` — plus a falsification case carried **in the suite itself**,
+which restores the table even if it crashes. (It restored ahead of LEAD's own
+restore, leaving a `_tmp_broken` artifact from the manual rename; LEAD dropped
+it. 21 tables, production `audiotours` untouched at 133 tours, 23 containers.)
+
+**Tightening surfaced no new schema mismatches.** LOCAL-225's missing table
+remains the only one — so the "zero failures" claim was true after all. It just
+was not *evidence* until the suite could produce a non-zero.
+
+That distinction is the whole of this week's method and worth stating once
+plainly: **a passing test is a claim about the code; a test that fails when you
+break the code is evidence for it.** Four instrument failures (D83, D91, D97,
+D110) were all the first kind mistaken for the second.
+
+### Where the subscribed track now stands
+
+| | |
+|---|---|
+| billing arithmetic vs real schema | verified (D109) |
+| Michael's overdraft carry-over (−23¢ + $10 = $9.77) | verified |
+| Flask routes vs real schema | verified, with assertions that can fail |
+| the suite's ability to detect a broken schema | verified by breaking it |
+| **deployed** | **no — and still Michael's call** |
+
+Everything short of turning it on has now been done. The remaining unknowns are
+the ones only a running stack answers: container networking, image contents,
+and real Apple IAP. `Dockerfile`s and the `subscribed-204` compose project
+exist for that (D76); nothing starts without him.
