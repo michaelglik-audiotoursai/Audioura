@@ -2022,3 +2022,71 @@ R1–R4 have safe mechanical fixes: *"How does this serenity manifest?"* →
 *"…this serenity manifests…"* is grammar. R5 has none — supplying the
 "because" needs a grounded fact. Asking a model for it invites exactly the
 fabrication D50 forbids, so that branch goes through corpus-then-search.
+
+---
+
+## D61 — Read-evaluation tours: 2 stops (Michael, 2026-08-04)
+
+> "Next time let's do only 2 stops."
+
+Comparison tours generated for Michael to read paragraph-by-paragraph use
+**2 stops**, not 15. Faster for him to read closely, and ~$0.01 instead of
+~$0.10 per run — which matters because the A/B work needs several.
+
+Does not change the **measurement** baseline: the 7-tour set stays fixed at
+its existing stop counts, or round-to-round comparisons break (D52).
+
+---
+
+## D62 — The Picasso paragraph: three failures, one paragraph (2026-08-04)
+
+Michael's test subject reviewed tour 152 Stop 2. LEAD verified each claim
+and found the diagnosis was understated.
+
+### It is not hallucination — it is entity conflation
+
+Every fabricated "fact" is a **true fact about the Musée Picasso in Paris**,
+reported as if about Antibes:
+
+| In the tour | Reality |
+|---|---|
+| "Hôtel Salé, 17th-century mansion" | that is the Paris museum's building |
+| "over 5,000 pieces" | Paris ~5,000; Antibes ~245 |
+| "established in 1985" | Paris opened 1985; Antibes 1966 |
+| "1936 National Treasure" | did not happen |
+| "Place Mariejol, 06670 Vallauris" | Place Mariejol is Antibes 06600 |
+
+Same shape as the false Annunciation source (D56): **right words, wrong
+referent.** Twice now, so it is a pattern — matching on a name without
+checking the name resolves to the same thing.
+
+### Our own metric cannot see the paragraph
+
+It is classified **NAVIGATION** and therefore excluded from scoring.
+Confirmed: `is_navigation_paragraph()` returns True on all 1,445 characters,
+because it contains "Step into his world", "Transport yourself back",
+"Close your eyes".
+
+**This is LEAD's error.** LEAD argued for the navigation exemption in D60 to
+protect *"Head south on Promenade de la Croisette"* — correct — without
+considering that an essay could claim the same shelter by containing two
+imperatives. Wayfinding is short and directional; this is prose. LOCAL-185
+narrows it.
+
+### Accepted from the review
+
+- **Task 7, hallucinated sensory data**: "hear the echo of his brushstrokes",
+  "breathe in the faint scent of oil paint". Distinct from prescribed
+  feeling — it asserts a false fact about the world rather than instructing
+  the listener.
+- **Stop 1 is a tour description in a stop's clothes.** Structural, and not
+  visible from any metric we have.
+- **His compliant rewrite is the positive target** LEAD asked for — the
+  first example on record of what good looks like.
+
+### Framed differently to the reviewer
+
+Fact-checking is **not** a fifth lint rule. Style rules are deterministic and
+free; verifying "1966 not 1985" requires a source lookup per claim. That is
+the corpus path and the same machinery as the anchor work, so it belongs
+there rather than in the validator.
