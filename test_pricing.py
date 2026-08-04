@@ -82,7 +82,7 @@ class TestOperationTypes:
         )
         assert result["user_charge_usd"] == Decimal("0.00")
         assert result["user_charge_cents"] == 0
-        assert result["description"] == "Tour (cached)"
+        assert result["description"] == "Tour (cached — same charge)"
 
     def test_translation_cache_hit(self):
         result = compute_user_charge(
@@ -92,7 +92,7 @@ class TestOperationTypes:
         )
         assert result["user_charge_usd"] == Decimal("0.00")
         assert result["user_charge_cents"] == 0
-        assert result["description"] == "Translation (cached)"
+        assert result["description"] == "Translation (cached — same charge)"
 
     def test_news_generate(self):
         result = compute_user_charge(
