@@ -3487,3 +3487,57 @@ and handed it back to Michael. Behind `DISABLE_R9_DELETION=1`.
 The 44 emptied paragraphs are mostly single-sentence transitions and epilogs —
 the same shape as his paragraph 6. Deleting a paragraph that consisted entirely
 of filler is the intended outcome, not a side effect.
+
+---
+
+## D97 — Every CONTRADICTED verdict we have ever issued was wrong (2026-08-04)
+
+LOCAL-218 added the same-subject requirement and measured the corpus:
+
+```
+Total claims checked          77
+CONTRADICTED, before           4
+  of which false alarms        4  (100%)
+CONTRADICTED, after            0
+```
+
+**Four for four.** Our gravest verdict — "the corpus says otherwise" — has been
+fired only on claims about a different subject entirely, of the shape "chapel
+built in 1432" against a passage about a museum opening in 1990. Nobody looked,
+because nothing consumed the verdict.
+
+Also shipped: per-verdict counts (`verdict_counts`), so a future gate can
+hard-block on `contradicted` while merely penalising `unsupported`. The task
+argued — persuasively — for keeping `unsupported_count` semantically narrow
+rather than silently inflating it, since "corpus said nothing" and "corpus said
+the opposite" warrant different responses.
+
+Zero false SUPPORTED held on both labelled sets.
+
+**Two defects LEAD found, both now LOCAL-219:**
+
+**The subject matcher counts shared tokens rather than identifying a subject.**
+Verified on `storied` HEAD:
+
+```
+corpus: "The museum opened on 21 June 1990 in Nice, France."
+"The museum opened in 1890 in Nice, France."  → CONTRADICTED
+"The museum opened in 1890."                  → UNSUPPORTED
+```
+
+Same subject, same conflicting date. Removing an incidental location phrase
+downgrades the verdict. A model writing tersely gets a free pass on exactly
+what we most need to catch.
+
+**A demonstration in the submission does not reproduce.** §97–106 shows
+`"MAMAC was inaugurated in 1975 by the mayor."` → `CONTRADICTED ✓`. Run
+verbatim it extracts **no claims at all**. The submission's other
+demonstration (§213–220) reproduces exactly, so this is carelessness rather
+than a pattern — but it is the failure mode this review exists to catch, and a
+worse one than a broken test: a reviewer who trusts a pasted result stops
+looking. The task template now requires running every pasted example.
+
+**LEAD merged rather than bounced** because every substantive claim in the
+submission verified independently: the 4-of-4 false-alarm elimination, zero
+false SUPPORTED, per-verdict counts, and the working demonstration. The code is
+right; one illustration in the prose was not.
