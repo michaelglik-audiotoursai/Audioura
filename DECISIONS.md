@@ -2532,3 +2532,79 @@ noticed it arrived instantly. The fix is honest labelling — the existing
 translation row already says *"(cached — same charge)"* — but the principle
 being applied is fairness between users, not cost recovery, and the wording
 should say that rather than imply a cost we did not incur.
+
+---
+
+## D73 — Two concurrent tasks shared a live table and invalidated each other's measurements. That was LEAD's dispatch error (2026-08-04)
+
+LOCAL-198 (measure stop-corpus coverage, build a gate) and LOCAL-199 (acquire
+stop-subject corpus) ran at the same time, on purpose. The task files told
+them not to both edit `stop_corpus_reader.py` — **LEAD guarded the code and
+forgot the data.** LOCAL-199 wrote to `stop_corpus` for 37 minutes while
+LOCAL-198 was measuring it.
+
+The result is two coverage tables that disagree and neither can be trusted:
+
+| | LOCAL-198 says | LOCAL-199 "before" says | LEAD, clean run after both |
+|---|---|---|---|
+| MAMAC | 8 / 2 / 0 | 2 / 5 / 0 | 9 / 1 / 0 |
+| total (61 stops) | 54 / 6 / 1 | 26 / 31 / 1 | **55 / 5 / 1** |
+
+Only the last row is a measurement of a table that was holding still. Both
+submissions' before/after deltas should be disregarded; the code in both is
+fine.
+
+**The rule: worktree isolation is not isolation.** Git gives each task its own
+files. There is exactly one Postgres. Any two tasks that touch the same table
+are in the same room regardless of what branch they are on. From now on, a
+task that *writes* a shared table and a task that *measures* it do not get
+dispatched together — and any task that reads a table another task may be
+writing must say so in its limitations.
+
+**Correction to D70, in LEAD's own words.** I told Michael "two of ten stops
+have corpus about their own subject." That figure was wrong. It came from a
+quick probe of mine that counted raw substrings in a JSON dump and displayed
+only the first title word — I read `{'Déjeuner': 0, 'herbe': 3}` and recorded
+it as a miss when `herbe` was a hit. LOCAL-198's word-boundary matching was
+right and mine was not. The true pre-acquisition figure for MAMAC was closer
+to 8/10 covered, with the *two uncovered stops being exactly the two that a
+2-stop MAMAC tour selects* — which is why every experiment we ran on that
+venue saw fabrication. That is a sharper and more useful finding than the one
+I reported, and it survives the correction.
+
+---
+
+## D74 — The acquisition validator accepted Manet's painting as the source for a Jacquet work (2026-08-04)
+
+`stop_corpus` id 15, "Le Déjeuner sur l'herbe" at MAMAC. The stop is **Alain
+Jacquet's 1964 pop-art reinterpretation**, and part of it is a mural on the
+museum's own façade. LOCAL-199 attached three passages about **Édouard
+Manet's 1863 canvas at the Musée d'Orsay** — different artist, different
+century, different museum — stamped `validation: subject confirmed + venue
+signal present`.
+
+The validator was satisfied because the *title* matched and a venue signal
+appeared **somewhere in the passage set** — supplied by the correct Jacquet
+passages sitting alongside. So the check that exists to prevent co-occurrence
+reasoning was itself satisfied by co-occurrence. This is D56 and D62 again in
+a subtler form: right title, right venue, wrong work.
+
+The task disclosed it in its limitations and argued the Manet material "still
+provides relevant art-historical context." It does not. Grounding a stop in a
+different artwork is precisely what produces confident false narration, and
+the task file for LOCAL-199 said so: *"a wrong attribution is worse than an
+empty corpus."*
+
+**LEAD removed the three Manet passages from the live row** (backup first:
+`~/audioura-backups/stop_corpus_20260804T060556.json`; 61 rows before, 61
+after; the row keeps its three correct Jacquet passages and stays COVERED).
+
+**The rule the validator needs:** venue confirmation must come from *the same
+source* as the subject claim, not from the passage set as a whole. And for a
+work-level stop, matching the work's *title* is not enough — the source must
+be about that work, which for a reinterpretation means the artist matters.
+**LOCAL-202** dispatched.
+
+Also found: three enriched sources carry `tier: None` (a YouTube video and a
+departmental portal among them), so D51's trust hierarchy cannot be applied to
+them at all. Unlabelled is worse than tier 3.
