@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
-"""style_validator_detector.py — LOCAL-184: Detect instructions, questions,
-and prescribed feelings in tour text.
+"""style_validator_detector.py — LOCAL-184 + LOCAL-187: Detect instructions,
+questions, prescribed feelings, and hallucinated sensory data in tour text.
 
-Implements rules R1–R4 from ClickUp wdvrdaxaqj (Michael's field-test finding):
+Implements rules R1–R4, R7 from ClickUp wdvrdaxaqj (Michael's field-test):
 
   R1 — Imperatives aimed at the listener (sentence-initial base-form verb, no subject)
   R2 — Questions (? = error; interrogative opener without ? = warning)
-  R3 — Suggestive exploration language
+  R3 — Suggestive exploration language (generalized: as you + movement verb)
   R4 — Prescribed feeling (you feel, you sense, pressing down upon you…)
+  R7 — Hallucinated sensory data: asserts a sensation the listener cannot
+       actually be having (historical/absent sound, smell, taste). (D62)
 
-Navigation paragraphs are EXEMPT (reuses is_navigation_paragraph from
-stop_anchor_detector_v2 — D48 compliance: no duplication).
+Navigation exemption: the style validator uses a NARROWER navigation test
+than the anchor detector. Wayfinding moves the listener along a route
+("head south", "turn left", "continue past"); attention-directing ("look
+for the walls", "notice the facade") is NOT navigation for style purposes.
+LOCAL-187 fix: "look for" directs attention, not movement.
 
 R5 (every abstract claim must be grounded) maps to the existing anchor
 detector's ANCHORED / UNLINKED_ENTITY classification. Not reimplemented here.
@@ -23,7 +28,122 @@ from typing import Dict, List, Tuple
 
 sys.path.insert(0, 'tests')
 from db_connection import get_connection
-from stop_anchor_detector_v2 import is_navigation_paragraph, parse_tour_stops
+from stop_anchor_detector_v2 import parse_tour_stops
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STYLE-SPECIFIC NAVIGATION EXEMPTION (LOCAL-187)
+# ═══════════════════════════════════════════════════════════════════════════════
+# The anchor detector's is_navigation_paragraph() is TOO BROAD for style
+# purposes. It classifies "Look for the sturdy stone walls" as navigation
+# because "look for the" is in its pattern list. But that is attention-
+# directing, not route-movement.
+#
+# For the STYLE validator, navigation means: the sentence moves the listener's
+# BODY along a route. "Head south", "Turn left", "Continue past the fountain",
+# "Cross the street", "Enter the building" — these are navigation.
+#
+# NOT navigation for style purposes:
+# - "Look for the walls" — directs attention/observation
+# - "Notice the facade" — directs attention
+# - "Find the painting on the third floor" — could be nav or attention
+#
+# The distinction: ROUTE verbs (head, turn, walk, proceed, continue, cross,
+# follow, go, move, step, exit, enter, approach, navigate, pass) + spatial
+# context = navigation. ATTENTION verbs (look for, notice, observe, find,
+# see, spot) = NOT exempt from style rules.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Verbs that genuinely move the listener along a route
+_STYLE_NAV_ROUTE_VERBS = [
+    'head', 'turn', 'walk', 'proceed', 'continue', 'cross', 'follow',
+    'make your way', 'find your way', 'go', 'move', 'step', 'exit',
+    'enter', 'approach', 'navigate', 'pass',
+]
+
+# Directional / spatial words that confirm route context
+_STYLE_NAV_DIRECTIONAL = {
+    'left', 'right', 'straight', 'ahead', 'forward', 'north', 'south',
+    'east', 'west', 'towards', 'toward', 'along', 'past', 'down', 'up',
+    'through', 'across', 'around', 'back', 'onto', 'into',
+    'on', 'to', 'the', 'inside', 'outside',
+}
+
+# Patterns for style-specific navigation (route movement only)
+_STYLE_NAV_PATTERNS = [
+    # Route verbs + directional: "Head south", "Turn left", "Walk along"
+    r'\b(?:head|turn|walk|proceed|continue|go|move)\s+(?:left|right|straight|ahead|forward|towards?|north|south|east|west|along|past|down|up|around|across|back)\b',
+    # "Make/find your way to/toward"
+    r'\b(?:make|find)\s+your\s+way\b',
+    # "Cross the street/bridge/square"
+    r'\bcross\s+(?:the|this)\b',
+    # "Follow the path/road/signs"
+    r'\bfollow\s+(?:the|this)\b',
+    # "Continue on/past/along"
+    r'\bcontinue\s+(?:on|past|along|down|up|through|to)\b',
+    # "Enter/exit the building/museum"
+    r'\b(?:enter|exit)\s+(?:the|this)\b',
+    # "Head south on Promenade" — route verb + compass + named road
+    r'\b(?:head|turn|walk|proceed|continue)\s+(?:north|south|east|west)\s+(?:on|along|down|past)\b',
+    # "Step inside/through/into"
+    r'\bstep\s+(?:inside|through|into|out)\b',
+]
+
+_STYLE_NAV_COMPILED = [re.compile(p, re.IGNORECASE) for p in _STYLE_NAV_PATTERNS]
+
+
+def _is_style_navigation_paragraph(paragraph: str) -> bool:
+    """Determine if a paragraph is navigation FOR STYLE VALIDATION purposes.
+
+    NARROWER than is_navigation_paragraph() from the anchor detector.
+    Only exempts text that moves the listener's body along a route.
+    Does NOT exempt attention-directing ("Look for the walls").
+
+    Rules:
+    - Short (<150 chars) + 1+ route-movement pattern → navigation
+    - Short-to-medium (≤300 chars) + 2+ route-movement patterns → navigation
+    - >50% sentence density of route-movement patterns → navigation
+    """
+    nav_matches = sum(1 for pat in _STYLE_NAV_COMPILED if pat.search(paragraph))
+
+    if len(paragraph) < 150 and nav_matches >= 1:
+        return True
+
+    if nav_matches >= 2 and len(paragraph) <= 300:
+        return True
+
+    # Density gate
+    sentences = re.split(r'[.!?]+', paragraph)
+    sentences = [s.strip() for s in sentences if s.strip() and len(s.strip()) > 10]
+
+    if not sentences:
+        return False
+
+    nav_sentences = 0
+    for sent in sentences:
+        sent_matches = sum(1 for pat in _STYLE_NAV_COMPILED if pat.search(sent))
+        if sent_matches >= 1:
+            nav_sentences += 1
+
+    if len(sentences) >= 2 and nav_sentences / len(sentences) > 0.5:
+        return True
+
+    return False
+
+
+def _is_style_navigation_sentence(sentence: str) -> bool:
+    """Check if a single sentence is navigational for style purposes.
+
+    Only route-movement sentences are exempt. "Look for X" is NOT exempt.
+    """
+    lower = sentence.lower().strip()
+    for verb in _STYLE_NAV_ROUTE_VERBS:
+        if lower.startswith(verb):
+            rest = lower[len(verb):].strip()
+            first_word = rest.split()[0] if rest.split() else ''
+            if first_word in _STYLE_NAV_DIRECTIONAL:
+                return True
+    return False
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # RULE DEFINITIONS
@@ -34,16 +154,15 @@ from stop_anchor_detector_v2 import is_navigation_paragraph, parse_tour_stops
 # Must be imperative form: "Feel the weight" fires, "Visitors notice" does NOT.
 
 _R1_IMPERATIVE_VERBS = [
-    'pay attention to', 'look at', 'notice', 'feel', 'imagine',
+    'pay attention to', 'look at', 'look for', 'notice', 'feel', 'imagine',
     'explore', 'discover', 'consider', 'think about', 'observe',
     'picture', 'envision', 'contemplate', 'reflect on', 'ponder',
     'take a moment', 'take in', 'let yourself', 'allow yourself',
     'prepare to', 'prepare yourself',
 ]
 
-# These verbs are also navigation verbs — when followed by directional content
-# they should NOT fire R1. The nav exemption handles this at the paragraph level,
-# but we also need sentence-level awareness for mixed paragraphs.
+# These verbs are route-movement verbs — when followed by directional content
+# they should NOT fire R1.
 _NAV_VERBS_R1_EXEMPT = {
     'head', 'turn', 'walk', 'proceed', 'continue', 'cross', 'follow',
     'make your way', 'find your way', 'go', 'move', 'step', 'exit',
@@ -80,20 +199,11 @@ def _split_sentences(text: str) -> List[str]:
 
 
 def _is_navigation_sentence(sentence: str) -> bool:
-    """Check if a single sentence is navigational (for mixed-paragraph cases)."""
-    lower = sentence.lower().strip()
-    # Check if it starts with a nav verb + directional word
-    for verb in _NAV_VERBS_R1_EXEMPT:
-        if lower.startswith(verb):
-            rest = lower[len(verb):].strip()
-            # Check if followed by directional content
-            first_word = rest.split()[0] if rest.split() else ''
-            if first_word in _DIRECTIONAL_WORDS:
-                return True
-            # "Head south on Promenade..." — direction might be 2nd word
-            if first_word in ('on', 'to', 'the', 'down', 'up', 'along', 'past'):
-                return True
-    return False
+    """Check if a single sentence is navigational (for mixed-paragraph cases).
+
+    Uses route-movement verbs only. "Look for X" is NOT navigation.
+    """
+    return _is_style_navigation_sentence(sentence)
 
 
 def check_r1_imperatives(sentence: str) -> List[Dict]:
@@ -186,13 +296,21 @@ def check_r2_questions(sentence: str) -> List[Dict]:
 
 
 # ─── R3: Suggestive exploration ──────────────────────────────────────────────
+# LOCAL-187: Generalized to catch "as you [movement/discovery verb]" —
+# the same construction as "as you explore" but with synonyms. The rule
+# targets second-person + movement/discovery verb + implied invitation.
+
+_R3_MOVEMENT_DISCOVERY_VERBS = (
+    'explore|wander|stroll|meander|amble|roam|walk|venture|journey|travel|'
+    'discover|uncover|find|encounter|traverse|navigate|drift|ramble'
+)
 
 _R3_PATTERNS = [
-    # "as you explore, you will…"
-    r'\bas you explore\b',
-    # "if you explore, you would…"
-    r'\bif you explore\b',
-    # "you can uncover / discover / find"
+    # "as you explore/wander/stroll/meander…" (the core generalized pattern)
+    rf'\bas you (?:{_R3_MOVEMENT_DISCOVERY_VERBS})\b',
+    # "if you explore/wander…"
+    rf'\bif you (?:{_R3_MOVEMENT_DISCOVERY_VERBS})\b',
+    # "you can uncover / discover / find / explore / see / notice"
     r'\byou (?:can|could|will|would|may|might)\s+(?:uncover|discover|find|explore|see|notice|observe|detect|encounter)\b',
     # "explore further to…"
     r'\bexplore\s+further\b',
@@ -274,12 +392,91 @@ def check_r4_prescribed_feeling(sentence: str) -> List[Dict]:
     return findings
 
 
+# ─── R7: Hallucinated sensory data (D62, LOCAL-187) ─────────────────────────
+# Distinct from R4. R4 catches INSTRUCTIONS about feeling ("you feel X").
+# R7 catches FALSE CLAIMS about the world — asserting a sensory experience
+# the listener cannot actually be having because the source is historical
+# or absent.
+#
+# Examples that SHOULD fire:
+#   "let the faint sound of waves lapping against the shore fill your ears"
+#   "you can almost hear the echo of his brushstrokes"
+#   "breathe in the faint scent of oil paint that still lingers in the air"
+#
+# Examples that should NOT fire (real present-tense sensory facts):
+#   "The market smells of lavender and rotisserie chicken"
+#   "The sound of waves is audible from the terrace"
+#   "Salt air fills the promenade"
+#
+# The distinction: R7 targets sensory claims qualified by ABSENCE markers
+# (almost, faint, still lingers, echo of, whispers of) or attached to
+# something historical/impossible (his brushstrokes, centuries past,
+# oil paint from 1936). A plain statement of present fact is fine.
+#
+# SEVERITY: WARNING — because reliably separating absent from present
+# sensation is not 100% achievable with regex. An honest warning beats
+# a wrong error. (Per task spec guidance.)
+
+_R7_PATTERNS = [
+    # "hear/echo of" + historical/artistic subject
+    r'\b(?:you\s+can\s+)?(?:almost\s+)?hear\s+the\s+(?:echo|sound|whisper|murmur)\s+of\s+(?:his|her|their|the)\s+\w+',
+    # "let the [faint/soft] sound of X fill your ears"
+    r'\blet\s+the\s+(?:faint|soft|gentle|distant)?\s*(?:sound|noise|echo|whisper|murmur)\b.*\bfill\s+your\s+(?:ears|senses)\b',
+    # "breathe in the FAINT/LINGERING scent of" — requires absence marker
+    r'\bbreathe\s+in\s+the\s+(?:faint|lingering|subtle)\s+(?:scent|smell|fragrance|aroma|odor)\s+of\b',
+    # "scent of [historical material] that still lingers"
+    r'\b(?:scent|smell|fragrance)\s+of\s+(?:oil\s+paint|incense|gunpowder|spices|timber)\b.*\b(?:still|linger)',
+    # "the faint/lingering scent/smell of X" (absence-qualified descriptor)
+    r'\b(?:faint|lingering)\s+(?:scent|smell|fragrance|aroma)\s+of\b.*\b(?:still\s+)?linger',
+    # "[whispers/echoes] of history/the past"
+    r'\b(?:whispers?|echoes?)\s+of\s+(?:history|the\s+past|centuries|bygone|ancient|forgotten)\b',
+    # "passageways/walls/halls echo with the whispers of history"
+    r'\b(?:echo|resound|ring)\s+with\s+the\s+(?:whispers?|sounds?|echoes?|voices?)\s+of\s+(?:history|the\s+past|centuries|bygone)\b',
+    # "almost taste/smell/hear/feel" (impossibility marker)
+    r'\b(?:you\s+can\s+)?almost\s+(?:taste|smell|hear|feel)\b',
+    # "fill your ears/nose/senses" with something qualified as faint/distant
+    r'\b(?:faint|distant|soft|gentle)\s+(?:sound|noise|melody|music|fragrance|scent)\b.*\bfill\s+your\b',
+]
+
+_R7_COMPILED = [re.compile(p, re.IGNORECASE) for p in _R7_PATTERNS]
+
+
+def check_r7_hallucinated_sensory(sentence: str) -> List[Dict]:
+    """R7: Detect hallucinated/absent sensory claims (D62).
+
+    Fires on assertions of sensory experience the listener cannot actually
+    be having — historical sounds, absent smells, impossible perceptions.
+
+    Does NOT fire on present-tense factual sensory descriptions without
+    absence markers (e.g., "The market smells of lavender").
+
+    Severity: WARNING (not error) because regex cannot perfectly distinguish
+    absent from present sensation in all cases.
+    """
+    findings = []
+    stripped = sentence.strip()
+    if not stripped:
+        return findings
+
+    for pat in _R7_COMPILED:
+        if pat.search(stripped):
+            findings.append({
+                'rule_id': 'R7_HALLUCINATED_SENSORY',
+                'severity': 'warning',
+                'sentence': stripped,
+                'suggestion': 'This appears to assert a sensory experience the listener cannot actually have (historical/absent). Rewrite as factual description of what IS present, or remove.',
+            })
+            break  # One R7 finding per sentence
+
+    return findings
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # PARAGRAPH-LEVEL ANALYSIS
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def validate_paragraph(paragraph: str) -> Dict:
-    """Validate a single paragraph against R1–R4.
+    """Validate a single paragraph against R1–R4, R7.
 
     Returns:
         {
@@ -288,8 +485,9 @@ def validate_paragraph(paragraph: str) -> Dict:
             'rules_violated': set of rule_ids that fired,
         }
     """
-    # Navigation exemption — reuses is_navigation_paragraph from anchor detector
-    if is_navigation_paragraph(paragraph):
+    # Navigation exemption — uses STYLE-SPECIFIC test (narrower than anchor's)
+    # Only genuine route-movement is exempt; attention-directing is NOT.
+    if _is_style_navigation_paragraph(paragraph):
         return {
             'is_navigation': True,
             'findings': [],
@@ -305,13 +503,14 @@ def validate_paragraph(paragraph: str) -> Dict:
             continue
 
         # Navigation exemption at sentence level for mixed paragraphs
-        if _is_navigation_sentence(sentence):
+        if _is_style_navigation_sentence(sentence):
             continue
 
         all_findings.extend(check_r1_imperatives(sentence))
         all_findings.extend(check_r2_questions(sentence))
         all_findings.extend(check_r3_suggestive_exploration(sentence))
         all_findings.extend(check_r4_prescribed_feeling(sentence))
+        all_findings.extend(check_r7_hallucinated_sensory(sentence))
 
     rules_violated = set(f['rule_id'] for f in all_findings)
 
@@ -346,6 +545,7 @@ def analyze_tour_style(tour_id: int, conn) -> Dict:
         'R2_INTERROGATIVE_OPENER': 0,
         'R3_SUGGESTIVE_EXPLORATION': 0,
         'R4_PRESCRIBED_FEELING': 0,
+        'R7_HALLUCINATED_SENSORY': 0,
         'navigation_paragraphs': 0,
         'clean_paragraphs': 0,
         'total_paragraphs': 0,
@@ -392,7 +592,7 @@ def run_report(tour_ids: List[int]) -> str:
 
     lines = []
     lines.append("=" * 78)
-    lines.append("STYLE VALIDATOR — LOCAL-184: Instructions, Questions & Prescribed Feelings")
+    lines.append("STYLE VALIDATOR — LOCAL-184 + LOCAL-187: Instructions, Questions, Prescribed Feelings & Hallucinated Sensory")
     lines.append("=" * 78)
     lines.append(f"\nTours analyzed: {tour_ids}")
     lines.append("")
@@ -511,6 +711,7 @@ def run_report(tour_ids: List[int]) -> str:
         'R2_INTERROGATIVE_OPENER': 0,
         'R3_SUGGESTIVE_EXPLORATION': 0,
         'R4_PRESCRIBED_FEELING': 0,
+        'R7_HALLUCINATED_SENSORY': 0,
         'navigation_paragraphs': 0,
         'clean_paragraphs': 0,
         'total_paragraphs': 0,
@@ -551,6 +752,7 @@ def run_report(tour_ids: List[int]) -> str:
         lines.append(f"    R2 (interrog opener — warn):{t['R2_INTERROGATIVE_OPENER']}")
         lines.append(f"    R3 (suggestive exploration): {t['R3_SUGGESTIVE_EXPLORATION']}")
         lines.append(f"    R4 (prescribed feeling):    {t['R4_PRESCRIBED_FEELING']}")
+        lines.append(f"    R7 (hallucinated sensory):  {t['R7_HALLUCINATED_SENSORY']}")
 
         # Accumulate grand totals
         for k in grand_totals:
@@ -561,7 +763,8 @@ def run_report(tour_ids: List[int]) -> str:
 
         # Show up to 3 examples per rule per tour
         examples_shown = {'R1_IMPERATIVE': 0, 'R2_QUESTION': 0,
-                          'R3_SUGGESTIVE_EXPLORATION': 0, 'R4_PRESCRIBED_FEELING': 0}
+                          'R3_SUGGESTIVE_EXPLORATION': 0, 'R4_PRESCRIBED_FEELING': 0,
+                          'R7_HALLUCINATED_SENSORY': 0}
         MAX_EXAMPLES = 2
 
         for stop in result['stops']:
@@ -598,6 +801,7 @@ def run_report(tour_ids: List[int]) -> str:
     lines.append(f"    R2 (interrog opener — warn): {gt['R2_INTERROGATIVE_OPENER']}")
     lines.append(f"    R3 (suggestive exploration):  {gt['R3_SUGGESTIVE_EXPLORATION']}")
     lines.append(f"    R4 (prescribed feeling):     {gt['R4_PRESCRIBED_FEELING']}")
+    lines.append(f"    R7 (hallucinated sensory):   {gt['R7_HALLUCINATED_SENSORY']}")
 
     # ── R5 note ──
     lines.append("\n" + "-" * 78)
@@ -606,7 +810,7 @@ def run_report(tour_ids: List[int]) -> str:
     lines.append("  R5 maps to the existing stop_anchor_detector_v2.py")
     lines.append("  (ANCHORED / UNLINKED_ENTITY classification).")
     lines.append("  Not reimplemented here — that is the substance detector.")
-    lines.append("  This file is the FORM detector (R1–R4).")
+    lines.append("  This file is the FORM detector (R1–R4, R7).")
 
     # ── Database verification ──
     lines.append("\n" + "-" * 78)
@@ -623,7 +827,7 @@ def run_report(tour_ids: List[int]) -> str:
 
 
 if __name__ == '__main__':
-    # 7 baseline tours + tours 152 and 156
-    TOUR_IDS = [1, 29, 12, 24, 14, 46, 44, 152, 156]
+    # 7 baseline tours + tours 152, 156, and 162
+    TOUR_IDS = [1, 29, 12, 24, 14, 46, 44, 152, 156, 162]
     report = run_report(TOUR_IDS)
     print(report)
