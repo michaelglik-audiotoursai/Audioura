@@ -795,6 +795,51 @@ def _extract_relevant_chunk(
     return chunk
 
 
+def _extract_subject_nouns(sentence: str) -> List[str]:
+    """Extract the grammatical subject nouns from a sentence.
+
+    Strategy: the subject phrase is the text BEFORE the first main verb.
+    From that phrase, extract content nouns (strip determiners, prepositions).
+
+    Returns a list of lowercase subject-noun tokens, e.g.:
+        "The museum opened in 1890." → ['museum']
+        "MAMAC was inaugurated in 1975." → ['mamac']
+        "Place Massena dates from the mid-1800s." → ['place', 'massena']
+        "Henri Matisse lived in Nice." → ['henri', 'matisse']
+
+    If no verb is found, returns an EMPTY list — the subject is
+    indeterminate and callers should not assert a match on this basis.
+    (LOCAL-219 R2: returning the full sentence as subject caused false
+    matches via incidental function words like "also".)
+    """
+    # Verbs that typically mark the end of a subject phrase
+    _SUBJ_VERB_RE = re.compile(
+        r'\b(opened|built|created|founded|established|designed|constructed|'
+        r'inaugurated|completed|started|began|finished|dates|dated|'
+        r'was|were|is|are|has|had|have|lived|worked|moved|arrived|'
+        r'painted|sculpted|composed|donated|acquired|sits|stands|'
+        r'houses|contains|features|includes|offers|consists|'
+        r'emerged|became|remained|represents|depicts|shows)\b',
+        re.IGNORECASE
+    )
+    # Determiners and prepositions to strip from subject phrase
+    _SUBJ_STRIP = {
+        'the', 'a', 'an', 'this', 'that', 'these', 'those',
+        'of', 'in', 'on', 'at', 'to', 'for', 'by', 'with', 'from',
+    }
+    m = _SUBJ_VERB_RE.search(sentence)
+    if m:
+        subject_phrase = sentence[:m.start()].strip()
+    else:
+        # No verb found — cannot identify what the sentence is about.
+        # Return empty rather than the whole sentence (which would
+        # produce dozens of spurious tokens).
+        return []
+    # Tokenize and filter
+    tokens = _tokenize(subject_phrase)
+    return [t for t in tokens if t not in _SUBJ_STRIP and len(t) >= 3 and not t.isdigit()]
+
+
 def _check_contradiction(
     claim: Dict,
     passages: List[str],
@@ -804,11 +849,17 @@ def _check_contradiction(
     Only for DATE/NUMBER claims where we can check the specific value.
     Returns contradicting evidence or None.
 
-    SAME-SUBJECT REQUIREMENT (LOCAL-218): Two claims conflict only when they
-    are about the same entity or event. "The chapel was built in 1432" does
-    not conflict with "The museum opened in 1990" — different subjects. We
-    require that the claim and passage share subject-anchoring tokens: words
-    that identify WHAT is being dated/measured, not just generic context.
+    SAME-SUBJECT REQUIREMENT (LOCAL-218, refined LOCAL-219): Two claims
+    conflict only when they are about the same entity or event. The check
+    uses GRAMMATICAL SUBJECT extraction — identifying what the sentence is
+    *about* — rather than counting shared incidental tokens.
+
+    "The museum opened in 1890." and "The museum opened on 21 June 1990."
+    share the subject "museum" → contradiction fires regardless of whether
+    incidental tokens like "Nice" or "France" are present.
+
+    "The chapel was built in 1432." vs "The museum opened in 1990."
+    have different subjects (chapel ≠ museum) → no contradiction.
 
     If no subject match is found, the verdict is UNSUPPORTED, not
     CONTRADICTED — under-claiming is safer than crying wolf on our gravest
@@ -825,34 +876,17 @@ def _check_contradiction(
     if not numbers_in_claim:
         return None
 
-    # ─── Subject extraction ──────────────────────────────────────────────
-    # We need tokens that identify the ENTITY being dated/measured.
-    # Strategy: extract all non-numeric, non-stopword tokens from the
-    # SENTENCE (not just the claim text annotation), then require a
-    # meaningful overlap with the passage.
+    # ─── Subject extraction (LOCAL-219) ──────────────────────────────────
+    # Extract the grammatical subject from the claim sentence. This
+    # identifies WHAT is being dated/measured — "the museum", "MAMAC",
+    # "Place Massena" — independent of incidental context words.
+    claim_subject_nouns = _extract_subject_nouns(sentence)
 
-    # Very generic words that appear in most sentences but don't identify
-    # a subject. Kept deliberately tight — we'd rather let a borderline
-    # subject through than block a legitimate contradiction.
-    _subj_stopwords = {
-        'the', 'a', 'an', 'is', 'was', 'are', 'were', 'has', 'had', 'have',
-        'of', 'in', 'on', 'at', 'to', 'for', 'by', 'with', 'from', 'as',
-        'it', 'its', 'this', 'that', 'and', 'or', 'but', 'not', 'be', 'been',
-        'which', 'who', 'their', 'they', 'you', 'your', 'his', 'her', 'our',
-        'when', 'where', 'how', 'what', 'than', 'then', 'there', 'here',
-        'also', 'just', 'very', 'more', 'most', 'some', 'all', 'each',
-        'back', 'mid', 'early', 'late', 'first', 'last', 'new', 'old',
-        'context', 'about', 'around', 'during', 'after', 'before',
-        # Common verbs — these describe actions, not subjects
-        'opened', 'built', 'created', 'founded', 'established', 'designed',
-        'made', 'constructed', 'named', 'called', 'known', 'became',
-        'presented', 'located', 'situated', 'dates', 'dedicated',
-        'inaugurated', 'completed', 'started', 'began', 'finished',
-        'housed', 'contains', 'features', 'includes', 'offers',
-        'between', 'over', 'more', 'than', 'nearly', 'almost',
-    }
-
-    # Month names — these are capitalized but not entity-identifying
+    # Extract proper nouns from the SUBJECT PHRASE only (LOCAL-219 fix).
+    # Proper nouns in adverbial/prepositional phrases (like "Nice" in
+    # "built in 1432 in Nice") are incidental locations, NOT the subject.
+    # Only proper nouns that appear BEFORE the main verb identify what
+    # the sentence is about.
     _month_names = {
         'january', 'february', 'march', 'april', 'may', 'june',
         'july', 'august', 'september', 'october', 'november', 'december',
@@ -862,90 +896,276 @@ def _check_contradiction(
         'decembre',
     }
 
-    sentence_tokens = set(_tokenize(sentence))
-    # Subject tokens: non-stopword, non-numeric, non-month, length >= 4
-    claim_subject = {
-        t for t in sentence_tokens
-        if t not in _subj_stopwords and len(t) >= 4 and not t.isdigit()
-        and t not in _month_names
+    # Common proper noun prefixes/fragments that appear in many different
+    # place names and are too generic to identify a specific entity.
+    # "Saint-Tropez" and "Saint-Jean-Cap-Ferrat" both contain "Saint"
+    # but are completely different places. These must not drive subject match.
+    _proper_noun_generics = {
+        'saint', 'port', 'fort', 'mont', 'cap', 'pont', 'tour',
+        'villa', 'place', 'parc', 'rue', 'avenue', 'boulevard',
+        'grand', 'petit', 'vieux', 'nouveau', 'belle', 'beau',
+        'les', 'des', 'sur', 'sous',
+        'new', 'old', 'great', 'north', 'south', 'east', 'west',
+        'upper', 'lower', 'lake', 'bay', 'cape', 'point', 'hill',
     }
 
-    if not claim_subject:
-        return None
+    # Find the subject phrase boundary (before first main verb)
+    _SUBJ_BOUNDARY_RE = re.compile(
+        r'\b(opened|built|created|founded|established|designed|constructed|'
+        r'inaugurated|completed|started|began|finished|dates|dated|'
+        r'was|were|is|are|has|had|have|lived|worked|moved|arrived|'
+        r'painted|sculpted|composed|donated|acquired|sits|stands|'
+        r'houses|contains|features|includes|offers|consists|'
+        r'emerged|became|remained|represents|depicts|shows)\b',
+        re.IGNORECASE
+    )
+    verb_match = _SUBJ_BOUNDARY_RE.search(sentence)
+    subject_phrase_end = verb_match.start() if verb_match else len(sentence)
+    subject_phrase_text = sentence[:subject_phrase_end]
 
-    # Also extract proper nouns from the original sentence (stronger signal)
-    # Matches: Title Case words AND ALL-CAPS acronyms (MAMAC, UNESCO, etc.)
     proper_nouns = set()
-    for m in re.finditer(r'\b([A-Z][a-zÀ-ÿ]{2,}|[A-Z]{3,})\b', sentence):
+    for m in re.finditer(r'\b([A-Z][a-zÀ-ÿ]{2,}|[A-Z]{3,})\b', subject_phrase_text):
         word = m.group(1)
         # Skip sentence-initial capitalization ONLY for Title Case words.
         # ALL-CAPS words (acronyms) are proper nouns regardless of position.
         if m.start() == 0 and not word.isupper():
             continue
         wl = word.lower()
-        if wl not in _month_names:
+        if wl not in _month_names and wl not in _proper_noun_generics:
             proper_nouns.add(wl)
+
+    # If we have no subject nouns AND no proper nouns, cannot determine
+    # what the sentence is about → bail out safely.
+    if not claim_subject_nouns and not proper_nouns:
+        return None
 
     for passage in passages:
         passage_tokens_set = set(_tokenize(passage))
 
-        # ─── Same-subject check ──────────────────────────────────────────
-        # Count how many subject tokens from the claim appear in the passage.
-        # Require: (proper noun match) OR (≥50% of claim subjects overlap
-        # AND at least 2 overlapping subject tokens).
+        # ─── Same-subject check (LOCAL-219 rewrite) ──────────────────────
+        # Match the SUBJECT of the claim against the passage. Three paths:
         #
-        # This is strict enough to block "chapel" vs "museum" (they share
-        # no subject tokens) while allowing "The museum opened in 1890" vs
-        # "The museum opened on 21 June 1990" (they share "museum", "opened",
-        # and possibly "nice").
+        # Path 1: A proper noun from the claim appears in the passage.
+        #     "MAMAC was inaugurated in 1975" vs passage mentioning "MAMAC"
+        #
+        # Path 2: The grammatical subject noun(s) of the claim appear in
+        #     the passage. "The museum opened in 1890" matches a passage
+        #     containing "museum" because that IS the subject.
+        #     A single shared subject noun is sufficient — this is what
+        #     the sentence is *about*, not a coincidental overlap.
+        #
+        # Path 3 (legacy fallback): If subject extraction yields nothing
+        #     useful, fall back to requiring 2+ shared non-stopword tokens
+        #     covering 50%+ of claim content (the LOCAL-218 rule).
+        #
+        # Incidental tokens ("Nice", "France", "June") that appear in
+        # adverbial phrases do NOT appear in the subject phrase and thus
+        # cannot influence the decision. Their presence or absence is
+        # irrelevant — exactly the property we need.
 
         proper_overlap = proper_nouns & passage_tokens_set
-        subject_overlap = claim_subject & passage_tokens_set
 
-        # Subject match conditions (ANY of these):
-        # 1. At least one proper noun matches
-        # 2. At least 2 subject tokens overlap AND they cover ≥50% of claim subjects
         has_subject_match = False
+
+        # Path 1: proper noun match
         if proper_overlap:
             has_subject_match = True
-        elif len(subject_overlap) >= 2 and len(subject_overlap) / len(claim_subject) >= 0.5:
-            has_subject_match = True
+
+        # Path 2: grammatical subject noun match
+        if not has_subject_match and claim_subject_nouns:
+            # Extract subject nouns from the passage too
+            passage_subject_nouns = _extract_subject_nouns(passage)
+            # Check if any claim subject noun matches a passage subject noun.
+            #
+            # GUARD (LOCAL-219): Generic common nouns like "museum", "park",
+            # "building", "villa" are too weak to confirm same-subject across
+            # a multi-venue corpus. They identify a CLASS, not an instance.
+            # However, if the generic noun matches AND the predicate verb
+            # also matches (e.g., both say "museum opened"), that IS the
+            # same event — the subject + predicate combination narrows the
+            # reference sufficiently.
+            _GENERIC_SUBJECT_NOUNS = {
+                'museum', 'musee', 'park', 'building', 'villa', 'palace',
+                'palais', 'castle', 'chateau', 'church', 'chapel', 'cathedral',
+                'gallery', 'hall', 'house', 'maison', 'tower', 'fort',
+                'garden', 'square', 'plaza', 'place', 'bridge', 'port',
+                'harbor', 'beach', 'hotel', 'monument', 'statue', 'fountain',
+                'theatre', 'theater', 'cinema', 'school', 'university',
+                'library', 'market', 'station', 'temple', 'mosque',
+                'festival', 'exhibition', 'collection', 'centre', 'center',
+                'itself', 'first', 'ever',
+                # Place-name prefixes and spatial words (LOCAL-219 R2)
+                'saint', 'mont', 'cap', 'pont', 'bay', 'cape', 'isle',
+                'shores', 'nestled', 'located', 'situated',
+                'commune', 'town', 'city', 'village', 'region', 'area',
+                'coast', 'promenade', 'avenue', 'boulevard', 'rue',
+            }
+            claim_subj_set = set(claim_subject_nouns)
+            passage_subj_set = set(passage_subject_nouns)
+            subj_overlap = claim_subj_set & passage_subj_set
+            # Remove generic nouns from the overlap
+            specific_overlap = subj_overlap - _GENERIC_SUBJECT_NOUNS
+            if specific_overlap:
+                # At least one specific (non-generic) subject noun matches
+                has_subject_match = True
+            elif subj_overlap:
+                # Only generic nouns match. Check if the predicate verb
+                # also matches — "museum opened" in both is strong evidence
+                # of same-event, even though "museum" alone is weak.
+                _PREDICATE_VERBS_RE = re.compile(
+                    r'\b(opened|built|created|founded|established|designed|'
+                    r'constructed|inaugurated|completed|started|began|'
+                    r'finished|dated|dates|dedicated|moved|arrived|'
+                    r'lived|worked|painted|sculpted|donated|acquired|'
+                    r'commissioned|renovated|restored|demolished|closed|'
+                    r'reopened|expanded|converted|transformed)\b',
+                    re.IGNORECASE
+                )
+                claim_verbs = set(
+                    v.lower() for v in _PREDICATE_VERBS_RE.findall(sentence)
+                )
+                passage_verbs = set(
+                    v.lower() for v in _PREDICATE_VERBS_RE.findall(passage)
+                )
+                shared_verbs = claim_verbs & passage_verbs
+                if shared_verbs:
+                    # Same generic subject + same predicate verb = same event
+                    has_subject_match = True
+                elif len(subj_overlap) >= 2:
+                    # Multiple generic nouns overlap (rare but possible)
+                    has_subject_match = True
+
+        # Path 3: legacy fallback — whole-sentence token overlap
+        # Only used when subject extraction yields an empty set (rare).
+        if not has_subject_match and not claim_subject_nouns and not proper_nouns:
+            # This branch is unreachable (we bail early above) but kept
+            # for defensive completeness.
+            pass
 
         if not has_subject_match:
             continue
 
-        # ─── Number conflict check ───────────────────────────────────────
+        # ─── Number conflict check (LOCAL-219 R2) ────────────────────────
         # Same subject established — now check if numbers differ.
-        # CRITICAL: The passage must contain at least one 3+ digit number
-        # of its own. A passage that mentions the subject but has NO numbers
-        # is just silent on the date/quantity — that's UNSUPPORTED, not
-        # CONTRADICTED. A contradiction requires a competing value.
+        #
+        # THREE requirements for CONTRADICTED:
+        # 1. The passage must contain at least one 3+ digit number
+        #    (a passage silent on dates/quantities cannot contradict).
+        # 2. The claim's specific number must NOT appear in the passage
+        #    (if it does, the passage agrees — no contradiction).
+        # 3. The passage's competing number must appear IN PROXIMITY TO
+        #    tokens from the claim's predicate context. This ensures
+        #    the passage is asserting a date/value for the SAME event,
+        #    not just having a random number somewhere.
+        #
+        # Without (3), "lighthouse since 1827" gets CONTRADICTED by a
+        # passage saying "Cap Ferrat population 72,999" — same place,
+        # completely unrelated assertion. The number 72,999 has nothing
+        # to do with the lighthouse. Requirement (3) catches this: the
+        # passage number must appear near words like "lighthouse",
+        # "beacon", "sailors", "opened", etc. to confirm it's about
+        # the same predicate.
         passage_numbers = set(re.findall(r'\d+', passage))
         passage_significant_numbers = {n for n in passage_numbers if len(n) >= 3}
         if not passage_significant_numbers:
             continue  # No competing numbers → cannot contradict
 
+        # Extract predicate context tokens from the claim sentence.
+        # These are the meaningful words AROUND the number that tell us
+        # what the number is about (e.g., "opened", "inaugurated",
+        # "lighthouse", "beacon", "sailors").
+        _predicate_stopwords = {
+            'the', 'a', 'an', 'is', 'was', 'are', 'were', 'has', 'had',
+            'have', 'of', 'in', 'on', 'at', 'to', 'for', 'by', 'with',
+            'from', 'as', 'it', 'its', 'this', 'that', 'and', 'or', 'but',
+            'not', 'be', 'been', 'which', 'who', 'their', 'they', 'also',
+            'you', 'your', 'his', 'her', 'since', 'until', 'during',
+            'between', 'after', 'before', 'about', 'than', 'more', 'most',
+            'very', 'just', 'only', 'other', 'would', 'could', 'should',
+            'into', 'over', 'under', 'through', 'then', 'when', 'where',
+            'how', 'all', 'each', 'every', 'both', 'few', 'many', 'some',
+            'any', 'such', 'what', 'face', 'due', 'harsh',
+        }
+        # Also exclude common place names and generic nouns that appear
+        # incidentally in both claims and passages without indicating the
+        # same event/predicate.
+        _predicate_generic = {
+            'nice', 'france', 'paris', 'antibes', 'cannes', 'monaco',
+            'vence', 'saint', 'jean', 'paul', 'cap', 'ferrat', 'mont',
+            'place', 'became', 'world', 'first', 'city', 'town', 'village',
+            'area', 'region', 'coast', 'french', 'south', 'north',
+            'east', 'west', 'riviera', 'cote', 'azur', 'alpes',
+            'maritimes', 'mediterranean', 'european', 'international',
+            'national', 'local', 'modern', 'contemporary', 'ancient',
+            'nature', 'natural', 'historical', 'cultural', 'artistic',
+            # Time words (too generic — "four years" ≠ "later years")
+            'years', 'year', 'time', 'century', 'period', 'later',
+            'early', 'late', 'long', 'new', 'old',
+            # Generic verbs that appear in many contexts
+            'made', 'work', 'worked', 'make', 'became', 'stands',
+            'known', 'named', 'called', 'used', 'took',
+            # Common descriptive words
+            'great', 'famous', 'well', 'much', 'many', 'most',
+            'large', 'small', 'major', 'important', 'significant',
+            'along', 'around', 'within', 'near',
+            # Venue/building types (appear incidentally in many passages)
+            'museum', 'musee', 'gallery', 'palace', 'chateau',
+            'castle', 'church', 'cathedral', 'houses', 'building',
+            'collection', 'exhibition', 'exposition',
+        }
+        sentence_tokens = _tokenize(sentence)
+        predicate_context_tokens = set(
+            t for t in sentence_tokens
+            if len(t) >= 4
+            and t not in _predicate_stopwords
+            and t not in _predicate_generic
+            and not t.isdigit()
+        )
+        # Remove the subject tokens themselves — we already matched on those;
+        # what we need is evidence that the passage asserts a number about
+        # the same PREDICATE, not just the same subject.
+        predicate_context_tokens -= set(claim_subject_nouns)
+        predicate_context_tokens -= proper_nouns
+
         for cn in numbers_in_claim:
             if cn not in passage_numbers and len(cn) >= 3:
-                # The passage discusses the same subject AND contains a
-                # different significant number. This is a contradiction.
+                # The passage has a different number. But does it appear
+                # in the context of the same predicate/event?
+                #
+                # Check: does ANY passage number (3+ digits, not equal to
+                # claim number) appear within 120 chars of at least one
+                # predicate context token?
+                passage_norm = _normalize(passage)
+                found_proximate_conflict = False
                 best_chunk = None
-                for st in (proper_overlap or subject_overlap):
-                    idx = _normalize(passage).find(st)
-                    if idx >= 0:
-                        start = max(0, idx - 30)
-                        end = min(len(passage), idx + 120)
-                        best_chunk = passage[start:end].strip()
+
+                for pn in passage_significant_numbers:
+                    if pn == cn:
+                        continue  # This one agrees, not a conflict
+                    # Find positions of this number in the passage
+                    for num_match in re.finditer(r'\b' + re.escape(pn) + r'\b', passage_norm):
+                        num_pos = num_match.start()
+                        # Check if any predicate context token is nearby
+                        window_start = max(0, num_pos - 120)
+                        window_end = min(len(passage_norm), num_pos + len(pn) + 120)
+                        window = passage_norm[window_start:window_end]
+                        window_tokens = set(_tokenize(window))
+
+                        # Require at least 1 predicate context token nearby
+                        nearby_context = predicate_context_tokens & window_tokens
+                        if nearby_context:
+                            found_proximate_conflict = True
+                            # Extract evidence chunk around the number
+                            ev_start = max(0, num_pos - 30)
+                            ev_end = min(len(passage), num_pos + 120)
+                            best_chunk = passage[ev_start:ev_end].strip()
+                            break
+
+                    if found_proximate_conflict:
                         break
-                if best_chunk:
+
+                if found_proximate_conflict and best_chunk:
                     return best_chunk
-                # Fallback
-                for sw in subject_overlap:
-                    idx = _normalize(passage).find(sw)
-                    if idx >= 0:
-                        start = max(0, idx - 30)
-                        end = min(len(passage), idx + 120)
-                        return passage[start:end].strip()
 
     return None
 
@@ -1010,17 +1230,23 @@ def check_paragraph(
             seen_texts.add(key)
             unique_claims.append(c)
 
-    # Filter out claims that are just the stop title or venue name
+    # Filter out claims that are just the stop title or venue name.
+    # IMPORTANT (LOCAL-219): Compare against the CORE claim text only,
+    # not the parenthetical context annotation. The claim text often
+    # includes "(in context: ...)" which contains the full sentence and
+    # would spuriously match venue names that appear in the sentence.
     stop_norm = _normalize(stop_title)
     venue_norm = _normalize(venue_name)
     filtered_claims = []
     for c in unique_claims:
-        c_norm = _normalize(c['text'])
-        # Skip if it's just repeating the stop title
-        if c_norm in stop_norm or stop_norm in c_norm:
+        # Strip the "(in context: ...)" or "(context: ...)" annotation
+        core_text = c['text'].split(' (')[0].strip() if ' (' in c['text'] else c['text']
+        core_norm = _normalize(core_text)
+        # Skip if it's just repeating the stop title (guard against empty)
+        if stop_norm and (core_norm in stop_norm or stop_norm in core_norm):
             continue
-        # Skip if it's just repeating the venue name
-        if c_norm in venue_norm or venue_norm in c_norm:
+        # Skip if it's just repeating the venue name (guard against empty)
+        if venue_norm and (core_norm in venue_norm or venue_norm in core_norm):
             continue
         filtered_claims.append(c)
 
