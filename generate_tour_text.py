@@ -4624,12 +4624,33 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 "description": "",
             })
     
+    # [LOCAL-183] Helper: merge stop_corpus passages into per_work_contexts dict
+    # so that generate_fact_sheets_parallel picks them up via its title-match logic.
+    def _merge_stop_corpus_into_per_work(per_work_contexts: dict, stop_corpus_data: dict) -> dict:
+        """Merge stop_corpus passages into per_work_contexts.
+
+        per_work_contexts is {title: [sentences]}. For each stop that has
+        stop_corpus data, add its passages as sentences keyed by the stop name.
+        Existing entries are preserved (stop_corpus supplements, doesn't replace).
+        """
+        merged = dict(per_work_contexts) if per_work_contexts else {}
+        if not stop_corpus_data:
+            return merged
+        for stop_name, sc_data in stop_corpus_data.items():
+            if sc_data and sc_data.get('passages'):
+                existing = merged.get(stop_name, [])
+                # Add stop_corpus passages as sentences (truncated for safety)
+                new_sentences = [p[:500] for p in sc_data['passages']]
+                merged[stop_name] = existing + new_sentences
+        return merged
+
     # -------- [S11] Storied: generate spine + fact sheets when STORIED_MODE=true --------
     _storied_spine = None
     _storied_fact_sheets = None
     _saved_prolog = ""  # [R2] Prolog text to be folded into Stop 1 (no standalone Introduction block)
     _three_class_results = {}  # [LOCAL-37] poi_name → three-class retrieval result
     _diversity_adjusted_selections = {}  # [LOCAL-37] poi_name → diversity-adjusted element selection
+    _stop_corpus_data = {}  # [LOCAL-183] poi_name → {passages, sources} from stop_corpus table
     if _storied_mode:
         print(f"\n[Storied] STORIED_MODE=true — generating spine + fact sheets...")
         try:
@@ -4824,6 +4845,49 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             else:
                 print(f"  [Storied] Spine generation failed — descriptions will proceed without spine")
 
+            # [LOCAL-183] Fetch per-stop corpus for generation grounding.
+            # This is the wire D31/D54/D57 identified as missing: stop_corpus
+            # was only read by the detector, never by the generator.
+            try:
+                from stop_corpus_reader import get_stop_corpus_for_tour
+                # Use venue_resolver's connection first; fall back to DATABASE_URL
+                _sc_conn = None
+                try:
+                    from venue_resolver import _get_db_connection as _get_sc_conn
+                    _sc_conn = _get_sc_conn()
+                except Exception:
+                    pass
+                if not _sc_conn:
+                    # Fallback: direct connection using DATABASE_URL or defaults
+                    try:
+                        import psycopg2
+                        _sc_db_url = os.environ.get(
+                            'DATABASE_URL',
+                            'postgresql://admin:password123@localhost:5433/audiotours'
+                        )
+                        _sc_conn = psycopg2.connect(_sc_db_url, connect_timeout=5)
+                    except Exception:
+                        pass
+                if _sc_conn:
+                    _stop_corpus_data = get_stop_corpus_for_tour(
+                        venue_name=_venue_name,
+                        stop_names=_poi_names,
+                        conn=_sc_conn,
+                    )
+                    _sc_conn.close()
+                    _sc_with_data = sum(1 for v in _stop_corpus_data.values() if v is not None)
+                    _sc_total_passages = sum(
+                        len(v['passages']) for v in _stop_corpus_data.values() if v is not None
+                    )
+                    print(f"  [LOCAL-183] stop_corpus: {_sc_with_data}/{len(_poi_names)} stops have per-stop passages ({_sc_total_passages} total passages)")
+                else:
+                    print(f"  [LOCAL-183] stop_corpus: DB connection unavailable — skipping")
+            except ImportError as _sc_err:
+                _import_logger.error("[LOCAL-183] MISSING: stop_corpus_reader — per-stop corpus DISABLED: %s", _sc_err)
+                print(f"  [LOCAL-183] stop_corpus_reader not available: {_sc_err}")
+            except Exception as _sc_err:
+                print(f"  [LOCAL-183] stop_corpus fetch error (non-fatal): {_sc_err}")
+
             _storied_fact_sheets = generate_fact_sheets_parallel(
                 poi_list=_poi_names,
                 venue_name=_venue_name,
@@ -4831,7 +4895,12 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 api_key=api_key,
                 # [LOCAL-12 Fix A] Route already-fetched venue corpus into fact-sheet generation
                 venue_corpus=_d1_venue_corpus if _d1_venue_corpus else "",
-                per_work_contexts=_story_corpus_result.get('per_work_contexts', {}) if _story_corpus_result else {},
+                # [LOCAL-183] Merge stop_corpus passages into per_work_contexts so
+                # fact extraction benefits from per-stop sourced material.
+                per_work_contexts=_merge_stop_corpus_into_per_work(
+                    _story_corpus_result.get('per_work_contexts', {}) if _story_corpus_result else {},
+                    _stop_corpus_data,
+                ),
             )
             if _storied_fact_sheets:
                 _valid_sheets = sum(1 for fs in _storied_fact_sheets if fs is not None)
@@ -5555,6 +5624,20 @@ DO NOT include directions to the next stop - these will be added separately.
 """
         if _word_target_instruction:
             description_prompt += f"\nLENGTH CONSTRAINT: {_word_target_instruction}\n"
+
+        # [LOCAL-183] Inject per-stop corpus passages with provenance and grounding rule.
+        # This is the production wiring that D31/D54/D57 identified as missing:
+        # stop_corpus was only read by the detector, never fed to the generator.
+        if _stop_corpus_data and poi_name in _stop_corpus_data:
+            _sc_stop_data = _stop_corpus_data[poi_name]
+            if _sc_stop_data and _sc_stop_data.get('passages'):
+                try:
+                    from stop_corpus_reader import format_passages_for_prompt
+                    _sc_prompt_block = format_passages_for_prompt(_sc_stop_data, poi_name)
+                    if _sc_prompt_block:
+                        description_prompt += _sc_prompt_block
+                except ImportError:
+                    pass  # Module unavailable — non-fatal, already logged at fetch time
 
         # [S43] Storied: inject persona tone override into description prompt
         if _storied_mode and _persona_tone:
