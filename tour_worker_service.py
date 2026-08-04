@@ -144,10 +144,11 @@ def get_coordinates_direct(location):
 
 # === Tour storage ===
 
-def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None):
+def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None, stops_count=None):
     """Store the audio tour ZIP in the database.
 
     LOCAL-50: Also persists zip_filename for deterministic resolution.
+    LOCAL-190: Persist stops_count (was missing — root cause of zero-stop tours).
     """
     try:
         import psycopg2
@@ -172,18 +173,18 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
             cur.execute("""
                 UPDATE audio_tours
                 SET audio_tour=%s, number_requested=number_requested+1, lat=%s, lng=%s,
-                    tour_content=%s, zip_filename=%s
+                    tour_content=%s, zip_filename=%s, stops_count=%s
                 WHERE id=%s
-            """, (psycopg2.Binary(zip_data), lat, lng, tour_content, zip_filename, existing[0]))
-            print(f"[STORE] Updated existing tour: {tour_name} (id={existing[0]}, zip={zip_filename})")
+            """, (psycopg2.Binary(zip_data), lat, lng, tour_content, zip_filename, stops_count, existing[0]))
+            print(f"[STORE] Updated existing tour: {tour_name} (id={existing[0]}, zip={zip_filename}, stops_count={stops_count})")
         else:
             _is_test_mode = os.getenv('TOUR_TEST_MODE', 'false').lower() == 'true'
             cur.execute("""
                 INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested,
-                    lat, lng, tour_content, content_language, zip_filename, is_test)
-                VALUES (%s, %s, %s, 1, %s, %s, %s, 'en', %s, %s)
-            """, (tour_name, request_string, psycopg2.Binary(zip_data), lat, lng, tour_content, zip_filename, _is_test_mode))
-            print(f"[STORE] Inserted new tour: {tour_name} (zip={zip_filename}, is_test={_is_test_mode})")
+                    lat, lng, tour_content, content_language, zip_filename, is_test, stops_count)
+                VALUES (%s, %s, %s, 1, %s, %s, %s, 'en', %s, %s, %s)
+            """, (tour_name, request_string, psycopg2.Binary(zip_data), lat, lng, tour_content, zip_filename, _is_test_mode, stops_count))
+            print(f"[STORE] Inserted new tour: {tour_name} (zip={zip_filename}, is_test={_is_test_mode}, stops_count={stops_count})")
 
         conn.commit()
         cur.close()
@@ -366,7 +367,7 @@ def run_generation(job_id, location, tour_type, total_stops, user_id=None, reque
             except Exception:
                 pass
 
-        store_success = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content)
+        store_success = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=actual_stops)
         if not store_success:
             raise Exception("Failed to store tour in database")
 
