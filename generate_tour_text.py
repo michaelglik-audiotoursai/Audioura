@@ -4665,6 +4665,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     _diversity_adjusted_selections = {}  # [LOCAL-37] poi_name → diversity-adjusted element selection
     _stop_corpus_data = {}  # [LOCAL-183] poi_name → {passages, sources} from stop_corpus table
     _corpus_gate_shortened_stops = set()  # [LOCAL-198] Stops flagged for venue-only narration
+    _corpus_gate_empty_stops = set()  # [LOCAL-209] Stops with NO corpus at all (stricter than VENUE_ONLY)
     _corpus_gate_creator_only_stops = set()  # [LOCAL-203] Stops with only creator-role passages
     _corpus_gate_log = []  # [LOCAL-198] Per-stop gate decisions
     _thread_result = None  # [LOCAL-186] Initialize before storied block so closure doesn't NameError
@@ -4914,9 +4915,11 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             # When enabled (DISABLE_CORPUS_GATE != '1'), checks each stop's corpus
             # for actual subject coverage. Stops with only venue-level text get
             # flagged for shortened, venue-grounded narration.
+            # [LOCAL-209] Gate now iterates _poi_names unconditionally — a stop
+            # absent from _stop_corpus_data is EMPTY, not invisible.
             _corpus_gate_disabled = os.environ.get('DISABLE_CORPUS_GATE', '').strip() == '1'
             
-            if not _corpus_gate_disabled and _stop_corpus_data:
+            if not _corpus_gate_disabled:
                 try:
                     # LEAD fixup on merge: the canonical module is at the repo
                     # root. `tests/` is not in the tour-generator image, so an
@@ -4938,12 +4941,16 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                                 passage_roles=_passage_roles
                             )
                         else:
-                            _assessment = {'verdict': 'EMPTY', 'content_words': [], 'subject_match_words': []}
+                            # [LOCAL-209] No corpus row at all → EMPTY verdict.
+                            # Previously this was unreachable when _stop_corpus_data was empty.
+                            _assessment = {'verdict': 'EMPTY', 'content_words': extract_content_words(_poi_name, _venue_name), 'subject_match_words': []}
                         
                         if _assessment['verdict'] == 'COVERED':
                             _corpus_gate_log.append({
                                 'stop': _poi_name, 'verdict': 'COVERED', 'action': 'PASSED'
                             })
+                            print(f"  [CORPUS-GATE] stop='{_poi_name}' "
+                                  f"verdict=COVERED action=PASSED")
                         elif _assessment['verdict'] == 'CREATOR_ONLY':
                             # [LOCAL-203] CREATOR_ONLY: narration may discuss the maker
                             # but must not describe the object itself.
@@ -4953,8 +4960,16 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             })
                             print(f"  [CORPUS-GATE] stop='{_poi_name}' "
                                   f"verdict=CREATOR_ONLY action=CREATOR_RESTRICTED")
+                        elif _assessment['verdict'] == 'EMPTY':
+                            # [LOCAL-209] EMPTY: no corpus at all — stricter than VENUE_ONLY.
+                            _corpus_gate_empty_stops.add(_poi_name)
+                            _corpus_gate_log.append({
+                                'stop': _poi_name, 'verdict': 'EMPTY', 'action': 'EMPTY_RESTRICTED'
+                            })
+                            print(f"  [CORPUS-GATE] stop='{_poi_name}' "
+                                  f"verdict=EMPTY action=EMPTY_RESTRICTED")
                         else:
-                            # VENUE_ONLY or EMPTY — shorten narration
+                            # VENUE_ONLY — shorten narration
                             _corpus_gate_shortened_stops.add(_poi_name)
                             _action = 'SHORTENED'
                             _corpus_gate_log.append({
@@ -4965,8 +4980,9 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     
                     _passed = sum(1 for g in _corpus_gate_log if g['action'] == 'PASSED')
                     _creator_only = sum(1 for g in _corpus_gate_log if g['action'] == 'CREATOR_RESTRICTED')
+                    _empty = sum(1 for g in _corpus_gate_log if g['action'] == 'EMPTY_RESTRICTED')
                     _shortened = sum(1 for g in _corpus_gate_log if g['action'] == 'SHORTENED')
-                    print(f"  [LOCAL-198] Corpus gate: {_passed} PASSED, {_creator_only} CREATOR_ONLY, {_shortened} SHORTENED")
+                    print(f"  [LOCAL-198] Corpus gate: {_passed} PASSED, {_creator_only} CREATOR_ONLY, {_empty} EMPTY, {_shortened} SHORTENED")
                 except ImportError:
                     print(f"  [LOCAL-198] Corpus gate: module not importable — gate DISABLED")
                 except Exception as _gate_err:
@@ -5800,10 +5816,37 @@ DO NOT include directions to the next stop - these will be added separately.
         if _word_target_instruction:
             description_prompt += f"\nLENGTH CONSTRAINT: {_word_target_instruction}\n"
 
+        # [LOCAL-209] CORPUS GATE: EMPTY — no corpus exists for this stop at all.
+        # Stricter than VENUE_ONLY: there is no venue-level material either.
+        # The paragraph must not assert dates, measurements, nicknames, or attributions.
+        if hasattr(poi_name, '__hash__') and poi_name in _corpus_gate_empty_stops:
+            description_prompt += f"""
+CORPUS GATE: EMPTY (D50 enforcement — LOCAL-209):
+There is NO verified source material for "{poi_name}" — no stop-level corpus,
+no venue-level corpus, nothing. Every specific claim you might generate about
+this place comes from your training data and CANNOT be verified.
+
+YOU MUST NOT:
+- Assert any specific date, year, century, or historical period
+- State any measurement (depth, height, distance, area)
+- Attribute a nickname, title, or epithet to this place
+- Name specific people, architects, artists, or historical figures
+- Claim specific events happened here
+- Describe specific architectural features as fact
+
+YOU MAY ONLY:
+- Name the stop and its general geographic context (e.g. "a coastal town east of Nice")
+- Describe what is physically visible to a cyclist arriving now (sea, buildings, streets)
+- Provide wayfinding and orientation ("look to your left", "the harbor is ahead")
+- Use hedging language ("this area is known for…", "visitors often notice…")
+- Note the atmosphere and sensory experience (sounds, smells, light)
+
+Write 60-80 words maximum. This is an orientation-only placeholder. No factual claims.
+"""
         # [LOCAL-198] CORPUS GATE: SHORTENED narration for stops without subject coverage.
-        # When the gate detected this stop as VENUE_ONLY or EMPTY, override the prompt
+        # When the gate detected this stop as VENUE_ONLY, override the prompt
         # to request only venue-grounded content that does NOT describe the artwork.
-        if hasattr(poi_name, '__hash__') and poi_name in _corpus_gate_shortened_stops:
+        elif hasattr(poi_name, '__hash__') and poi_name in _corpus_gate_shortened_stops:
             description_prompt += f"""
 CRITICAL CORPUS GATE RESTRICTION (D50 enforcement — LOCAL-198):
 The corpus for this stop does NOT contain information about the specific artwork/exhibit
