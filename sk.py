@@ -1,9 +1,15 @@
 """
- This module designed to keep openai private key hidden
- """
-MY_SK = "sk-proj-wpIWgoRaafn2tOoL_UR1rR5rTSs7IxWJKC80vHbd58D002CwdbxFVAi80nXTL6fDM" \
- "ew5xVp6X4T3BlbkFJeir7CidGwCg10q-eJFLPcfftPh1gRD7Z3FihzePF8veB-otLuSAwTc3pu4rG" \
- "I8gucm1pRwNw8A"
-MY_SK_1 = "sk-proj-wpIWgoRaafn2tOoL_UR1rR5rTSs7IxWJKC80vHbd58D002CwdbxFVAi80nXTL\
-6fDMew5xVp6X4T3BlbkFJeir7CidGwCg10q-eJFLPcfftPh1gRD7Z3FihzePF8veB-otLuSAwTc3pu4r\
-GI8gucm1pRwNw8A"
+This module used to hold an OpenAI key as a literal — "designed to keep the
+openai private key hidden", which it did not. The full key was committed on
+2025-10-26 and has been on origin ever since. Nothing in the codebase imports
+this module.
+
+Redacted 2026-08-04 (see DECISIONS.md D81). The key value remains in git
+history; removing it there needs a force-push, which is Michael's call. The
+key itself must be rotated regardless — redacting the tip does not un-expose
+something that has been public in the repository for nine months.
+"""
+import os
+
+MY_SK = os.environ["OPENAI_API_KEY"]
+MY_SK_1 = MY_SK

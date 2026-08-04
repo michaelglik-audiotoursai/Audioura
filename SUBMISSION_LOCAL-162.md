@@ -189,7 +189,7 @@ docker compose build --no-cache translation-service
 docker stop translation-service-1 && docker rm translation-service-1
 docker run -d --name translation-service-1 --network development_default \
   -p 5030:5030 \
-  -e AWS_ACCESS_KEY_ID=AKIAWLW36SCEWGWIQ26O \
+  -e AWS_ACCESS_KEY_ID=AKIA[REDACTED-see-D81] \
   -e AWS_SECRET_ACCESS_KEY=<key> \
   -e AWS_DEFAULT_REGION=us-east-1 \
   audioura-translation-service:latest

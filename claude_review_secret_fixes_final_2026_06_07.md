@@ -22,7 +22,7 @@
 
 **Problem:** Polly TTS returned 500 for every synthesis request. All MP3 files were 16-byte placeholders.
 
-**Root cause:** Cloud Run logs showed `Invalid header value b'AWS4-HMAC-SHA256 Credential=AKIAWLW36SCEWGWIQ26O\r\n/20260607/...'` — the AWS access key had a trailing carriage-return + newline. This made the HTTP Authorization header invalid, so boto3 couldn't authenticate to AWS Polly.
+**Root cause:** Cloud Run logs showed `Invalid header value b'AWS4-HMAC-SHA256 Credential=AKIA[REDACTED-see-D81]\r\n/20260607/...'` — the AWS access key had a trailing carriage-return + newline. This made the HTTP Authorization header invalid, so boto3 couldn't authenticate to AWS Polly.
 
 **Fix:** Same pattern — extracted from working local container, stored with `[IO.File]::WriteAllText` (no newline). Redeployed `polly-tts` and `tour-modernized`.
 
