@@ -1915,3 +1915,58 @@ subscribed limit. LEAD will have them **proposed from measured cost data**
 rather than guessed, for Michael to set. Article cost is $0.006–$0.011 today,
 so the free limit is a product judgement about how much value to give away,
 not a cost constraint.
+
+---
+
+## D59 — The unique-name constraint is wrong, and Michael spotted it (2026-08-03)
+
+While LEAD was generating a comparison tour, Michael read the aside that an
+identical request "would just return tour 29" and said:
+
+> "that seems to be a bug because user can regenerate the tour and the
+> previous base tour should not be changed and yet the new tour should be
+> available for download."
+
+**He is right, and it is more than an edge case.**
+
+The constraint:
+
+```sql
+CREATE UNIQUE INDEX uq_audio_tours_original_name
+  ON audio_tours (lower(tour_name)) WHERE original_tour_id IS NULL;
+```
+
+One tour per name, **globally, across all users**. Consequences:
+
+- A user who **regenerates** their own tour gets the old one handed back.
+  Their new version is never created.
+- A second user requesting the same venue silently receives the first
+  user's tour, whatever they asked for.
+
+### It contradicts a decision he already made
+
+D45, on translations: *"people can modify tours and have multiple tour
+options and we should keep them all with their individual translations."*
+A schema permitting exactly one tour per name cannot hold multiple variants.
+
+### It also reframes LOCAL-156
+
+That fix stopped the silent failure — a job reporting `completed` while
+nothing reached the library — and replaced it with reuse. Reuse is correct
+for *"serve me a tour of X"*. It is wrong for *"generate me a new one"*.
+**The two intents were never distinguished**, and the constraint forced them
+together. LOCAL-156 made the symptom visible and left the cause.
+
+### The distinction to build to
+
+- **Download / request an existing tour** → serve what exists. Free, per
+  Michael's rule that pre-created content costs nothing to serve.
+- **Generate / regenerate** → always produce a new tour, charged (D47).
+  The previous tour is untouched and both remain downloadable.
+
+### Not fixed yet, deliberately
+
+Dropping or re-scoping a unique index on live production data is not an
+additive change, and `audio_tours` is the table that lost Michael's tour 29
+once already. It needs its own task with a backup and a stated rollback,
+not a quick `DROP INDEX`.
