@@ -60,7 +60,7 @@ paragraph.** i-con stays as Michael defined it; the unit it applies to changes.
 
 ## 3. Two places his judgement contradicts the scoring I proposed
 
-### 3a. The truth gate would delete his favourite sentence
+### 3a. ~~The truth gate would delete his favourite sentence~~ — LEAD misread this
 
 `EVALUATION_RECOUNT.md` §3a proposed: any unsupported factual claim caps the
 paragraph at 1.
@@ -91,10 +91,41 @@ That is exactly the danger: he cannot tell a sourced 320 from an invented one,
 and neither can a listener. But capping at 1 is the wrong response, because it
 punishes the shape of writing we are trying to get.
 
-**Revised proposal:** an unsupported claim does not cap the score. It **blocks
-publication of that sentence until it is either sourced or removed** — a
-separate axis from quality. A sentence can be excellent *and* unpublishable.
-Conflating the two produced a rule that argues against our best output.
+**LEAD was wrong to call this a contradiction.** Michael, 2026-08-04:
+
+> *"Incorrect. I would have supported you 100% if I knew that the data was
+> incorrect. You said the data was not found aka UNSUPPORTED in corpus
+> passages."*
+
+He then searched, found the bay documented at 95–150 m at its outer mouth
+(320 ft ≈ 97.5 m), and concluded the figure is probably right. The
+disagreement was never about whether the claim was sourced. It was about
+**what to do when it isn't** — and his answer is: go and find a source.
+
+**The rule he actually wants (D100):**
+
+| verdict | meaning | action |
+|---|---|---|
+| `CONTRADICTED` | we are reasonably sure it is wrong | **hard block** |
+| `UNSUPPORTED` | we cannot verify it | **publish**, disclosed, *after* trying an external source |
+| `SUPPORTED_*` | backed | publish |
+
+> *"We should not publish if we are reasonably sure that the data is incorrect.
+> It is a different story if the data is unverifiable… having no information or
+> very little information maybe worse than having unverifiable information."*
+
+This is better than LEAD's proposal and implementable today. The hard block
+lands on `CONTRADICTED`, which is now trustworthy — 0 of 188 corpus-wide with
+no false alarms (D99). LEAD's version blocked on `UNSUPPORTED`, which
+over-flags ~17% and would have deleted good writing.
+
+**And the corpus is not the only source.** LOCAL-221 searches for a source
+before accepting `UNSUPPORTED`, promoting to `SUPPORTED_EXTERNAL` with a
+quoted sentence and a trust tier. Cost, measured: our 2-stop tour costs
+$0.0398 (Polly $0.0296 + LLM $0.0102); Serper is $0.001/query, so per-claim
+verification is ~75% on top, per-paragraph 15%, per-stop 5%. Michael's
+instinct that verification is cheap relative to the tour holds; his "two orders
+of magnitude" did not, and per-entity batching is the affordable shape.
 
 ### 3b. He has a rule we do not: generic → delete, not score low
 
@@ -185,13 +216,50 @@ step.
 
 ---
 
-## 7. What I need from Michael
+## 7. Answered by Michael, 2026-08-04
 
-1. **Does the split at §3a match your intent?** Quality score and
-   publishability as two separate axes — a sentence can be excellent and still
-   blocked for being unsourced.
-2. **R9 (generic → delete):** is deletion always right, or are there
-   connectives you want kept for flow even when they say nothing?
-3. **Sentence groups:** you grouped 1–3 sentences by idea rather than scoring
-   each one. Should the system group the same way, or score every sentence
-   individually?
+**§3a — two axes?** Volume-dependent: block unsourced sentences when we have
+plenty of material, allow them when we do not. But *"in today's world we can
+and should check trustworthy sources to verify that sentence's facts."* So the
+answer is not a gate setting, it is LOCAL-221 — verify first, gate second.
+
+**R9 — always delete?** *"Humans think they are being cheated or misled when
+they hear sentences that have no information… and they think the teller is
+stupid."* So yes, delete — **but the target is connectives carrying "both
+factual and emotional content."** Deletion is the floor, not the goal. A
+connective that names something true about the two stops it joins is worth
+building; a generic one is worth nothing.
+
+**Sentence groups — group or individual?** **Both, three times.**
+
+> *"On the first pass we should look at the group, then on the second pass
+> sentence by sentence, and on the 3rd pass as a group again."*
+
+His reasoning nests: a tour works only if every stop is interesting; a stop
+only if every paragraph is; a paragraph only if every sentence is — **but a
+sentence judged alone destroys the paragraph as a unit of meaning.** Hence
+group → sentence → group.
+
+---
+
+## 8. The Lena test — what all of this is for
+
+> *"Lena said she would not use any museum tour because nowadays she can ask
+> Google about any painting by pointing her phone camera at it and get precise
+> factual information. I said that she can, but then this information will be
+> out of context of her tour, her interests, and will be dry. I am only right
+> if our tours will be full of the correct information, that fits Lena's
+> interests and enhances the whole tour experience."*
+
+Point-and-ask already beats us on isolated facts, for free. Three things make a
+tour worth using instead:
+
+| Lena's test | our work | state |
+|---|---|---|
+| **correct** | `claim_check` + external verification | built, improving |
+| **fits her interests** | swipe/preference model, `STORY_QUALITY_DESIGN` §2c/2d | designed, not built |
+| **enhances the whole tour** | cross-stop continuity, SQ-S6b "dominant story" | designed July, **never built** |
+
+The third is the thinnest and the least substitutable — a camera cannot give
+you continuity between stops. Michael's own evaluation scored both connective
+sentences **0/5**. That is the gap.
