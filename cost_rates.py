@@ -1,107 +1,146 @@
 """
 Centralised rate table for all billable API calls.
-====================================================
 All cost-per-unit rates live here. No other module should hardcode rates.
 When a model price changes, update ONE file.
-
 Rates are in USD.
+
+LOCAL-197: Per-model input/output rates, split-token llm_cost() signature.
+Sources and read-dates inline below.
 """
 
-# --- LLM (OpenAI) ---
-# GPT-3.5-turbo (used for tour text generation, directions, descriptions, fact extraction)
-GPT35_TURBO_COST_PER_1K_TOKENS = 0.002
+import logging
 
-# GPT-4o-mini (used in some newer paths — same rate applies for metering purposes)
-GPT4O_MINI_COST_PER_1K_TOKENS = 0.002
+_log = logging.getLogger(__name__)
+
+# ─── LLM (OpenAI) — per 1M tokens ────────────────────────────────────────────
+# Source: https://openai.com/index/gpt-4o-mini-advancing-cost-efficient-intelligence/
+# Read: 2026-08-04
+# gpt-4o-mini: $0.15/1M input, $0.60/1M output (published 2024-07-18)
+#
+# Source: https://cloudprice.net/models/openai-gpt-3-5-turbo
+# Read: 2026-08-04
+# gpt-3.5-turbo: $0.50/1M input, $1.50/1M output (last published rate)
+#
+# Note: gpt-3.5-turbo was delisted from OpenAI's active pricing page ~July 2026,
+# but remains available via API at the last published rate.
+
+LLM_RATES = {
+    # model-family -> {input_per_1m, output_per_1m}
+    "gpt-4o-mini": {
+        "input_per_1m": 0.15,
+        "output_per_1m": 0.60,
+    },
+    "gpt-3.5-turbo": {
+        "input_per_1m": 0.50,
+        "output_per_1m": 1.50,
+    },
+}
+
+# Legacy constants — DEPRECATED. Kept for any code that reads them directly.
+# These are the REAL blended rates (approx 30% output ratio), not the old 0.002.
+GPT35_TURBO_COST_PER_1K_TOKENS = 0.0008  # ~($0.50*0.7 + $1.50*0.3) / 1000
+GPT4O_MINI_COST_PER_1K_TOKENS = 0.000285  # ~($0.15*0.7 + $0.60*0.3) / 1000
 
 # --- Search (Serper) ---
-SERPER_COST_PER_QUERY = 0.001  # ~$1 per 1,000 queries
+SERPER_COST_PER_QUERY = 0.001
 
 # --- TTS ---
-# Amazon Polly
 POLLY_COST_PER_1M_CHARS = 4.00
 POLLY_COST_PER_CHAR = POLLY_COST_PER_1M_CHARS / 1_000_000  # $0.000004
 
-# AWS Translate (the translation service uses boto3 translate_text, not Google)
-# [LOCAL-135] Corrected: service uses AWS Translate at $15/1M, not Google at $20/1M.
+# AWS Translate
 AWS_TRANSLATE_COST_PER_1M_CHARS = 15.00
 AWS_TRANSLATE_COST_PER_CHAR = AWS_TRANSLATE_COST_PER_1M_CHARS / 1_000_000  # $0.000015
 
-# Legacy alias — kept for any code importing the old name
+# Legacy alias
 GOOGLE_TRANSLATE_COST_PER_1M_CHARS = AWS_TRANSLATE_COST_PER_1M_CHARS
 GOOGLE_TRANSLATE_COST_PER_CHAR = AWS_TRANSLATE_COST_PER_CHAR
 
-# --- Cache ---
-CACHE_HIT_COST_USD = 0.00  # A cache hit costs us nothing
+CACHE_HIT_COST_USD = 0.00
 
-# --- Helper ---
-def llm_cost(total_tokens: int, model: str = "gpt-3.5-turbo") -> float:
-    """Calculate LLM cost from token count."""
-    if "gpt-4o" in model:
-        return total_tokens / 1000 * GPT4O_MINI_COST_PER_1K_TOKENS
-    return total_tokens / 1000 * GPT35_TURBO_COST_PER_1K_TOKENS
+
+def _resolve_model_rates(model: str) -> dict:
+    """Resolve a model string to its rate dict. Unknown model = warn + most expensive."""
+    # Try exact match first
+    if model in LLM_RATES:
+        return LLM_RATES[model]
+
+    # Try substring match (e.g. "gpt-4o-mini-2024-07-18" contains "gpt-4o-mini")
+    for key in LLM_RATES:
+        if key in model:
+            return LLM_RATES[key]
+
+    # Unknown model: warn and use the MOST EXPENSIVE known rate to avoid overcharging users
+    _most_expensive = max(
+        LLM_RATES.values(),
+        key=lambda r: r["input_per_1m"] + r["output_per_1m"]
+    )
+    _log.warning(
+        f"[LOCAL-197] Unknown model '{model}' — pricing at most expensive known rate "
+        f"(input=${_most_expensive['input_per_1m']}/1M, output=${_most_expensive['output_per_1m']}/1M). "
+        f"Error direction: we absorb the difference, never overcharge."
+    )
+    return _most_expensive
+
+
+def llm_cost(
+    input_tokens: int = 0,
+    output_tokens: int = 0,
+    model: str = "gpt-3.5-turbo",
+    *,
+    total_tokens: int = None,
+) -> float:
+    """Compute LLM cost from token counts.
+
+    Preferred call: llm_cost(input_tokens=N, output_tokens=M, model="gpt-4o-mini")
+
+    Deprecated single-argument path (for callers that only have total_tokens):
+        llm_cost(total_tokens=N, model="gpt-4o-mini")
+    When total_tokens is used, we assume a 70/30 input/output split and log a
+    deprecation warning on first use.
+
+    Returns cost in USD.
+    """
+    rates = _resolve_model_rates(model)
+    input_rate = rates["input_per_1m"] / 1_000_000
+    output_rate = rates["output_per_1m"] / 1_000_000
+
+    if total_tokens is not None:
+        # Deprecated path: caller cannot supply split counts
+        if not hasattr(llm_cost, "_deprecated_warned"):
+            _log.warning(
+                "[LOCAL-197] llm_cost() called with total_tokens (deprecated). "
+                "Caller should supply input_tokens and output_tokens separately."
+            )
+            llm_cost._deprecated_warned = True
+        # Assume 70% input, 30% output (conservative — output is more expensive)
+        input_tokens = int(total_tokens * 0.7)
+        output_tokens = total_tokens - input_tokens
+
+    return (input_tokens * input_rate) + (output_tokens * output_rate)
 
 
 def search_cost(num_queries: int) -> float:
-    """Calculate search (Serper) cost from query count."""
     return num_queries * SERPER_COST_PER_QUERY
 
 
 def tts_cost(char_count: int) -> float:
-    """Calculate TTS (Polly) cost from character count."""
     return char_count * POLLY_COST_PER_CHAR
 
 
-
-# [LOCAL-143] Deployed translation mode.
-# The running container determines how many translate_text calls happen per stop.
-# - TWO_PASS (2): old behaviour — each stop translated twice (full + nav-stripped).
-# - SINGLE_PASS (1): LOCAL-142 behaviour — each stop translated once, nav fields
-#   stripped positionally from the raw output. Fallback fires on line mismatch
-#   (logged as "[LOCAL-142] Positional strip fallback"), adding 1 extra call per
-#   affected stop. In the best case the multiplier is 1.0; worst case = 2.0.
-#
-# HOW DETERMINED: `docker exec translation-service-1 grep -c "LOCAL-142"
-# /app/translation_service.py` returns 4 → single-pass code is deployed.
-# Deployed 2026-08-03 (LOCAL-162). Container rebuilt with LOCAL-142 source.
-# See tests/test_local143_cost_model_matches_deploy.py for automated enforcement.
 DEPLOYED_TRANSLATION_PASSES = 1
 
 
 def translation_cost(char_count: int, passes: int = None) -> float:
-    """Calculate full translation cost from source character count.
-
-    [LOCAL-135] Corrected to reflect actual service behavior.
-    [LOCAL-143] Parameterized by pass count so the cost model follows the
-    code that actually ran, not a hardcoded assumption.
-
-    Args:
-        char_count: Source text character count (English).
-        passes: Number of translate_text calls per stop.
-            2 = two-pass (full + nav-stripped). Default before LOCAL-142 deployed.
-            1 = single-pass (full only; nav stripped positionally from output).
-            None = use DEPLOYED_TRANSLATION_PASSES constant (matches running container).
-
-    Returns:
-        Total cost in USD (AWS Translate + Polly TTS).
-    """
     if passes is None:
         passes = DEPLOYED_TRANSLATION_PASSES
-
     if passes == 2:
-        # Two-pass: source text sent twice (full + nav-stripped ≈ 95% of full)
         translate_chars = char_count * 1.95
     elif passes == 1:
-        # Single-pass: source text sent once (full only)
         translate_chars = char_count * 1.0
     else:
         raise ValueError(f"passes must be 1 or 2, got {passes}")
-
     translate_usd = translate_chars * AWS_TRANSLATE_COST_PER_CHAR
-
-    # Polly: always runs on translated TTS text (nav-stripped source × 1.06 expansion)
-    # Polly cost is the same regardless of pass count — audio is always generated.
-    polly_chars = char_count * 0.95 * 1.06  # 95% nav-stripped, 6% translation expansion
+    polly_chars = char_count * 0.95 * 1.06
     polly_usd = polly_chars * POLLY_COST_PER_CHAR
-
     return translate_usd + polly_usd

@@ -24,6 +24,7 @@ def test_cost_rates():
     """Test that centralized rate table returns expected values."""
     from cost_rates import (
         GPT35_TURBO_COST_PER_1K_TOKENS,
+        GPT4O_MINI_COST_PER_1K_TOKENS,
         SERPER_COST_PER_QUERY,
         CACHE_HIT_COST_USD,
         llm_cost,
@@ -32,14 +33,18 @@ def test_cost_rates():
         translation_cost,
     )
 
-    # Basic rate checks
-    assert GPT35_TURBO_COST_PER_1K_TOKENS == 0.002
+    # Basic rate checks — LOCAL-197: updated to real rates
+    assert GPT35_TURBO_COST_PER_1K_TOKENS == 0.0008  # real blended rate
+    assert GPT4O_MINI_COST_PER_1K_TOKENS == 0.000285  # real blended rate
     assert SERPER_COST_PER_QUERY == 0.001
     assert CACHE_HIT_COST_USD == 0.00
 
-    # Function checks
-    assert llm_cost(1000) == 0.002
-    assert llm_cost(5000) == 0.010
+    # Function checks — LOCAL-197: llm_cost now uses split input/output rates
+    # total_tokens=1000 with gpt-3.5-turbo: 700 input × $0.50/1M + 300 output × $1.50/1M
+    expected_1k = (700 * 0.50 / 1_000_000) + (300 * 1.50 / 1_000_000)  # $0.0008
+    assert abs(llm_cost(total_tokens=1000) - expected_1k) < 1e-9
+    expected_5k = (3500 * 0.50 / 1_000_000) + (1500 * 1.50 / 1_000_000)  # $0.004
+    assert abs(llm_cost(total_tokens=5000) - expected_5k) < 1e-9
     assert search_cost(10) == 0.010
     assert tts_cost(1_000_000) == 4.00
     # [LOCAL-135] translation_cost() now models the full translation service behavior:

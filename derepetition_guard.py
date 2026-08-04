@@ -6,6 +6,7 @@ Use scan_for_repetition() to check generated text before committing it.
 """
 import re
 from typing import List
+from cost_rates import llm_cost as _llm_cost
 
 # 25+ forbidden/overused phrases compiled as case-insensitive regexes.
 # Each pattern matches the phrase (or close variants) wherever it appears.
@@ -279,7 +280,7 @@ def rewrite_repeated_sentence(
         result = response.json()
         rewritten = result["choices"][0]["message"]["content"].strip().strip('"')
         tokens = result.get("usage", {}).get("total_tokens", 0)
-        cost = tokens / 1000 * 0.002
+        cost = _llm_cost(total_tokens=tokens)
         _log.info(f"Rewrite: {stop_name}/{story_type} | {tokens} tokens | ${cost:.4f}")
         return rewritten
 

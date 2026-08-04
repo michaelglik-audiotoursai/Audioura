@@ -328,7 +328,7 @@ def generate_news():
             _llm_cost = 0.0
             if _title_words > 12:
                 # GPT-3.5-turbo, ~100 tokens prompt + ~60 tokens response
-                _llm_cost = llm_cost(160)  # 160 tokens × $0.002/1K = $0.00032
+                _llm_cost = llm_cost(total_tokens=160)  # deprecated path; ~160 total tokens
 
             _total_cost = _tts_cost + _llm_cost
             _breakdown = {"tts": round(_tts_cost, 6), "llm": round(_llm_cost, 6)}
