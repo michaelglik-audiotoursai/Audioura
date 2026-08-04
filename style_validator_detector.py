@@ -874,6 +874,401 @@ def check_r8_prompt_leakage(sentence: str) -> List[Dict]:
     return findings
 
 
+# ─── R9: Generic sentence detection (LOCAL-216, D89) ─────────────────────────
+# A sentence is GENERIC when it carries nothing that ties it to THIS stop:
+# no proper noun, no date, no number, no venue- or stop-specific referent —
+# only stance, atmosphere, or transition filler.
+#
+# Michael's verdict: "Should be removed! As it can be placed in millions of
+# stops: nothing related to this one." His action is DELETE, not score low.
+#
+# MUST FIRE on (0/5 in Michael's evaluation):
+#   "As you continue your journey through this charming town, consider how
+#    these hidden paths have shaped the stories of this place, leading you
+#    to uncover more of its intriguing history."
+#   "From Cap d'Antibes to Villefranche-sur-Mer — a collection that spans
+#    more ground than these stops alone."
+#
+# MUST NOT FIRE on (scored 1-5 by Michael — these are rewritable or good):
+#   Navigation (5/5): "Start biking southeast on the main road..."
+#   Sourced facts (5/5): "The town's strategic location east of Nice and
+#     southwest of Monaco has been pivotal in its history."
+#   Content with specifics (3/5): "In January 1888, the renowned artist
+#     Claude Monet visited..."
+#   Style failures (1/5): "listen to the gentle lapping of waves" —
+#     these are R1/R4 problems, NOT generic. They name specific things.
+#
+# DETECTION APPROACH:
+# A sentence is generic if ALL of these are true:
+#   1. No proper noun (capitalized word not at sentence start, or known places)
+#   2. No date (year, month, century reference)
+#   3. No number (measurement, distance, count)
+#   4. No place-specific referent (named landmark, street, geographic feature)
+#   5. Contains generic filler signals (journey, charming, hidden, stories,
+#      collection, spans, uncover, intriguing, timeless)
+#
+# The key insight: absence of specifics + presence of filler = generic.
+# NEITHER ALONE suffices. A short connective with no specifics but also no
+# filler is just terse — not generic.
+#
+# SEVERITY: 'delete' — a new severity distinct from 'error' and 'warning'.
+# The assembly step uses this to DROP the sentence rather than rewrite it.
+
+# ── Proper noun detection ────────────────────────────────────────────────────
+# A proper noun is a capitalized word that is NOT:
+# - The first word of the sentence (always capitalized)
+# - A common word that sometimes appears capitalized after certain punctuation
+# - Part of a generic phrase like "French Riviera" used only as a vague locator
+
+_R9_KNOWN_VAGUE_LOCATORS = {
+    # These name a region but don't tie to THIS stop specifically
+    # Only block R9 exemption when they're the ONLY proper noun and the
+    # sentence has no other specifics. Actually — if the sentence names
+    # a real place, even a region, it has some specificity. The 0/5 sentences
+    # that DO name places ("From Cap d'Antibes to Villefranche-sur-Mer") show
+    # that even proper nouns don't save a sentence if the PREDICATE is generic.
+    # So we check: does the sentence SAY something specific about the named
+    # thing, or just use it as a geographic label in a filler frame?
+}
+
+# Words that commonly start sentences capitalized but aren't proper nouns
+_R9_SENTENCE_STARTERS_NOT_PROPER = {
+    'the', 'a', 'an', 'this', 'that', 'these', 'those', 'as', 'from',
+    'in', 'on', 'at', 'by', 'for', 'with', 'it', 'its', 'if', 'when',
+    'while', 'here', 'there', 'each', 'every', 'some', 'many', 'one',
+}
+
+# ── Date/time detection ──────────────────────────────────────────────────────
+_R9_DATE_PATTERNS = [
+    r'\b\d{4}\b',                          # Year: 1888, 2023
+    r'\b\d{1,2}(?:st|nd|rd|th)\s+century\b',  # "13th century"
+    r'\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\b',
+    r'\b\d{1,2}\s+(?:january|february|march|april|may|june|july|august|september|october|november|december)\b',
+    r'\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b',
+]
+_R9_DATE_COMPILED = [re.compile(p, re.IGNORECASE) for p in _R9_DATE_PATTERNS]
+
+# ── Number/measurement detection ─────────────────────────────────────────────
+_R9_NUMBER_PATTERNS = [
+    r'\b\d+\.?\d*\s*(?:km|m|ft|feet|miles?|meters?|metres?|inches?|yards?)\b',
+    r'\b\d+\.?\d*\s*(?:kg|lb|tons?|tonnes?)\b',
+    r'\b\d+(?:,\d{3})*\b',                # Numbers with commas: 1,200
+    r'\b\d+\.?\d+\b',                      # Decimal numbers: 2.7
+    r'\b(?:320|130|2\.7)\b',               # Specific numbers from Michael's 5/5 text
+]
+_R9_NUMBER_COMPILED = [re.compile(p, re.IGNORECASE) for p in _R9_NUMBER_PATTERNS]
+
+# ── Generic filler signals ───────────────────────────────────────────────────
+# These phrases/words appear in sentences that could be placed in "millions
+# of stops." They signal stance/atmosphere/transition with no specifics.
+_R9_FILLER_PATTERNS = [
+    # Journey/continue patterns
+    r'\bcontinue\s+your\s+journey\b',
+    r'\bas\s+you\s+continue\s+your\b',
+    r'\bon\s+your\s+journey\b',
+    # "charming town/place/village" — generic descriptor
+    r'\b(?:charming|quaint|picturesque|enchanting|delightful)\s+(?:town|place|village|city|area|neighborhood|neighbourhood)\b',
+    # "hidden paths/stories/secrets/tales"
+    r'\bhidden\s+(?:paths?|stories?|secrets?|tales?|treasures?|gems?)\b',
+    # "stories of this place"
+    r'\bstories\s+of\s+this\s+place\b',
+    # "uncover/discover more" (without specific object)
+    r'\b(?:uncover|discover)\s+more\s+of\s+(?:its|the|this)\b',
+    # "intriguing history" (unspecified)
+    r'\bintriguing\s+(?:history|past|heritage|stories?)\b',
+    # "a collection that spans"
+    r'\ba\s+collection\s+that\s+spans\b',
+    # "more ground than these stops alone"
+    r'\bmore\s+(?:ground|territory|area)\s+than\s+(?:these|those)\s+stops?\b',
+    # "timeless charm/elegance/beauty"
+    r'\btimeless\s+(?:charm|elegance|beauty|allure|appeal)\b',
+    # "consider how" + vague object
+    r'\bconsider\s+how\s+(?:these|those|the)\b',
+    # "shaped the stories"
+    r'\bshaped\s+the\s+(?:stories?|history|narrative)\b',
+    # "leading you to"
+    r'\bleading\s+you\s+to\b',
+    # Generic closers: "every corner holds..."
+    r'\bevery\s+corner\s+holds?\b',
+    # "spans more ground"
+    r'\bspans?\s+more\s+ground\b',
+]
+_R9_FILLER_COMPILED = [re.compile(p, re.IGNORECASE) for p in _R9_FILLER_PATTERNS]
+
+
+def _has_proper_noun(sentence: str) -> bool:
+    """Check if sentence contains a proper noun that provides SUBSTANTIVE specificity.
+
+    A proper noun is a capitalized word that isn't the first word and isn't
+    a common word. Also detects multi-word proper nouns like "Cap d'Antibes".
+
+    CRITICAL NUANCE (D89): A proper noun only provides specificity if the
+    sentence SAYS something about that place. If the proper nouns are just
+    used as geographic labels in a generic frame ("From X to Y — [filler]"),
+    they don't save the sentence. We detect this by checking if the predicate
+    (the part after the place-name frame) has substance.
+    """
+    words = sentence.split()
+    if len(words) < 2:
+        return False
+
+    proper_nouns_found = []
+
+    # Skip the first word (always capitalized)
+    for i, word in enumerate(words[1:], start=1):
+        # Strip punctuation
+        clean = re.sub(r'[^a-zA-Z\'-]', '', word)
+        if not clean:
+            continue
+        # Check if capitalized
+        if clean[0].isupper() and len(clean) > 1:
+            # Not a common word that happens to be capitalized
+            if clean.lower() not in _R9_SENTENCE_STARTERS_NOT_PROPER:
+                proper_nouns_found.append(clean)
+
+    if not proper_nouns_found:
+        return False
+
+    # Check if the proper nouns are just in a "From X to Y" frame with generic predicate
+    lower = sentence.lower()
+    if re.match(r'^from\s+', lower) and ('\u2014' in sentence or '\u2013' in sentence or ' - ' in sentence):
+        # Split on em-dash/en-dash/spaced-hyphen to get the predicate
+        predicate = re.split(r'[\u2014\u2013]|\s-\s', sentence, maxsplit=1)
+        if len(predicate) > 1:
+            pred_text = predicate[1].strip()
+            # If the predicate has no specifics of its own and matches filler,
+            # the proper nouns are just labels
+            pred_has_specifics = False
+            for w in pred_text.split():
+                clean_w = re.sub(r'[^a-zA-Z0-9\'-]', '', w)
+                if not clean_w:
+                    continue
+                if len(clean_w) > 1 and clean_w[0].isupper() and clean_w.lower() not in _R9_SENTENCE_STARTERS_NOT_PROPER:
+                    pred_has_specifics = True
+                    break
+                if re.match(r'\d', clean_w):
+                    pred_has_specifics = True
+                    break
+            if not pred_has_specifics and _has_filler_signal(pred_text):
+                return False  # Proper nouns are just geographic labels in filler
+
+    return True
+
+
+def _has_date(sentence: str) -> bool:
+    """Check if sentence contains a date or time reference."""
+    for pat in _R9_DATE_COMPILED:
+        if pat.search(sentence):
+            return True
+    return False
+
+
+def _has_number(sentence: str) -> bool:
+    """Check if sentence contains a meaningful number/measurement."""
+    for pat in _R9_NUMBER_COMPILED:
+        if pat.search(sentence):
+            return True
+    return False
+
+
+def _has_filler_signal(sentence: str) -> bool:
+    """Check if sentence contains generic filler language.
+
+    CONSERVATIVE: requires a STRONG filler signal — distinctive patterns from
+    Michael's 0/5 verdicts. Weaker signals like "timeless elegance" alone are
+    NOT sufficient, because they can appear in sentences that are part of
+    groups scored 3/5 (where the group's substance comes from other sentences).
+
+    The 0/5 sentences share a structural trait: they are SELF-CONTAINED transition
+    or closer sentences that reference no specific content from any stop.
+    """
+    count = 0
+    for pat in _R9_FILLER_COMPILED:
+        if pat.search(sentence):
+            count += 1
+    # Require at least 2 filler signals to fire, OR one very strong signal
+    # that is distinctive of the "millions of stops" pattern
+    if count >= 2:
+        return True
+
+    # Single strong signals — patterns that are definitively generic closers/transitions
+    _STRONG_FILLER = [
+        r'\bcontinue\s+your\s+journey\b',
+        r'\bas\s+you\s+continue\s+your\b',
+        r'\ba\s+collection\s+that\s+spans\b',
+        r'\bmore\s+(?:ground|territory|area)\s+than\s+(?:these|those)\s+stops?\b',
+        r'\bspans?\s+more\s+ground\b',
+        r'\bleading\s+you\s+to\s+(?:uncover|discover)\b',
+        r'\bstories\s+of\s+this\s+place\b',
+    ]
+    for pat_str in _STRONG_FILLER:
+        if re.search(pat_str, sentence, re.IGNORECASE):
+            return True
+
+    return False
+
+
+def check_r9_generic(sentence: str) -> List[Dict]:
+    """R9: Detect generic sentences that carry no stop-specific content.
+
+    A sentence is generic when:
+    1. It has NO proper noun, date, or number (nothing tying it to this stop)
+    2. It HAS generic filler signals (stance/atmosphere/transition language)
+
+    BOTH conditions must be true. A terse factual sentence without specifics
+    but also without filler is NOT generic — it's just short.
+
+    Navigation is exempt (handled before this is called).
+
+    Severity: 'delete' — this sentence should be removed, not rewritten.
+    """
+    findings = []
+    stripped = sentence.strip()
+    if not stripped:
+        return findings
+
+    # Navigation exemption (already handled at caller level, but belt+suspenders)
+    if _is_style_navigation_sentence(stripped):
+        return findings
+
+    # Check for specifics: proper nouns, dates, numbers
+    has_specifics = (
+        _has_proper_noun(stripped) or
+        _has_date(stripped) or
+        _has_number(stripped)
+    )
+
+    if has_specifics:
+        return findings  # Has something tying it to a specific place/time
+
+    # Check for filler signals
+    if not _has_filler_signal(stripped):
+        return findings  # No filler detected — not clearly generic
+
+    # Both conditions met: no specifics + filler present → generic
+    findings.append({
+        'rule_id': 'R9_GENERIC',
+        'severity': 'delete',
+        'sentence': stripped,
+        'suggestion': 'This sentence carries nothing specific to this stop — it could be placed in millions of stops. Delete it.',
+    })
+
+    return findings
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# R9 DELETION LOGIC (assembly-time)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Dangling connective patterns — if a paragraph starts with one of these after
+# deletion of the preceding sentence, the connective should be stripped.
+_DANGLING_CONNECTIVE_PATTERNS = [
+    r'^(?:And|But|So|Yet|However|Moreover|Furthermore|Additionally|Also|Meanwhile|Nevertheless|Therefore|Thus|Hence)\s*,?\s*',
+    r'^(?:In addition|On top of that|What is more|As a result)\s*,?\s*',
+]
+_DANGLING_CONNECTIVE_COMPILED = [re.compile(p, re.IGNORECASE) for p in _DANGLING_CONNECTIVE_PATTERNS]
+
+
+def apply_r9_deletions(paragraph: str) -> str:
+    """Apply R9 deletions to a paragraph.
+
+    - Removes sentences flagged as R9_GENERIC
+    - Strips dangling connectives from the resulting first sentence
+    - Returns empty string if all sentences are deleted (caller handles)
+
+    Behind DISABLE_R9_DELETION=1 env var — caller checks this.
+    """
+    if not paragraph or not paragraph.strip():
+        return paragraph
+
+    sentences = _split_sentences(paragraph)
+    if not sentences:
+        return paragraph
+
+    kept = []
+    for sentence in sentences:
+        if len(sentence) < 10:
+            kept.append(sentence)
+            continue
+        # Navigation sentences are never deleted
+        if _is_style_navigation_sentence(sentence):
+            kept.append(sentence)
+            continue
+        findings = check_r9_generic(sentence)
+        if not findings:
+            kept.append(sentence)
+        # else: sentence is generic — drop it
+
+    if not kept:
+        return ''  # All sentences deleted — caller removes the paragraph
+
+    # Fix dangling connective on the new first sentence
+    result_text = ' '.join(kept)
+
+    # If the first remaining sentence starts with a dangling connective
+    # (because the sentence before it was deleted), strip the connective.
+    for pat in _DANGLING_CONNECTIVE_COMPILED:
+        new_text = pat.sub('', result_text, count=1)
+        if new_text != result_text:
+            # Re-capitalize the first letter
+            new_text = new_text.strip()
+            if new_text and new_text[0].islower():
+                new_text = new_text[0].upper() + new_text[1:]
+            result_text = new_text
+            break
+
+    return result_text.strip()
+
+
+def apply_r9_to_description(description: str) -> Tuple[str, int, int]:
+    """Apply R9 deletions to a full stop description (multiple paragraphs).
+
+    Returns:
+        (new_description, sentences_deleted, paragraphs_emptied)
+
+    Handles:
+    - Sentence-level deletion within paragraphs
+    - Empty paragraph removal (when all sentences in a paragraph are generic)
+    - Dangling connective cleanup
+
+    Behind DISABLE_R9_DELETION=1 — caller must check.
+    """
+    if not description or not description.strip():
+        return description, 0, 0
+
+    paragraphs = [p for p in description.split('\n\n') if p.strip()]
+    if not paragraphs:
+        return description, 0, 0
+
+    new_paragraphs = []
+    total_deleted = 0
+    paragraphs_emptied = 0
+
+    for para in paragraphs:
+        para = para.strip()
+        if len(para) <= 30:
+            # Short segments (assembly lines, spacing) pass through unchanged
+            new_paragraphs.append(para)
+            continue
+
+        # Count sentences before and after
+        sentences_before = _split_sentences(para)
+        result = apply_r9_deletions(para)
+
+        if not result:
+            # All sentences deleted — drop the paragraph
+            paragraphs_emptied += 1
+            total_deleted += len([s for s in sentences_before if len(s) >= 10])
+        else:
+            sentences_after = _split_sentences(result)
+            deleted_count = len([s for s in sentences_before if len(s) >= 10]) - len([s for s in sentences_after if len(s) >= 10])
+            total_deleted += max(0, deleted_count)
+            new_paragraphs.append(result)
+
+    new_description = '\n\n'.join(new_paragraphs)
+    return new_description, total_deleted, paragraphs_emptied
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # PARAGRAPH-LEVEL ANALYSIS
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -915,6 +1310,7 @@ def validate_paragraph(paragraph: str) -> Dict:
         all_findings.extend(check_r4_prescribed_feeling(sentence))
         all_findings.extend(check_r7_hallucinated_sensory(sentence))
         all_findings.extend(check_r8_prompt_leakage(sentence))
+        all_findings.extend(check_r9_generic(sentence))
 
     rules_violated = set(f['rule_id'] for f in all_findings)
 
@@ -951,6 +1347,7 @@ def analyze_tour_style(tour_id: int, conn) -> Dict:
         'R4_PRESCRIBED_FEELING': 0,
         'R7_HALLUCINATED_SENSORY': 0,
         'R8_PROMPT_LEAKAGE': 0,
+        'R9_GENERIC': 0,
         'navigation_paragraphs': 0,
         'clean_paragraphs': 0,
         'total_paragraphs': 0,
