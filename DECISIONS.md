@@ -3089,3 +3089,34 @@ thresholds:** applied literally today, the truth gate would cap roughly **one in
 five legitimately-supported paragraphs** at i-con 1. That is not a reason to
 loosen it — the direction is right — but the threshold he picks should be
 chosen knowing the instrument is strict, not neutral.
+
+
+---
+
+## D84a — The guard I added to fix D84 killed the next task, twice (2026-08-04)
+
+`prune_worktrees.sh` removed worktrees whose branch was "merged". A freshly
+created task branch has **zero commits**, so `git branch --merged` lists it as
+merged into its base from the moment it exists. The script therefore deleted
+LOCAL-211's worktree out from under the running agent — which then failed on
+`'/Users/micha/audioura-worktrees/LOCAL-211/DECISIONS.md' does not exist`, a
+message that reads like a missing-file bug in the task.
+
+It happened twice: once on my manual run, once on the launchd tick five minutes
+later. Every task is "merged" during the minutes before its first commit, so
+the guard had a five-minute window to kill anything newly dispatched.
+
+**Fix:** prune only worktrees idle for **6 hours or more**. Commit state cannot
+tell finished work from work that has not started yet; recency can.
+
+**What this cost, and the general shape of it.** The disk fix was correct and
+necessary — 46 GB reclaimed, and without it nothing would run at all. But it
+was written and installed in a single pass on a live system, and the failure it
+caused looked exactly like a defect in the victim. I diagnosed LOCAL-211's
+first failure correctly (disk), re-dispatched it into a trap I had just built,
+and only found it by reading the session log rather than the `FAILED` line.
+
+The lesson is not "test more" in the abstract. It is that **a guard which
+deletes things needs its safety argument written down before it runs**, and
+mine was "merged means finished" — an assumption that is false for exactly the
+window where deletion does the most damage.
