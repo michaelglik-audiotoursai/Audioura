@@ -2211,3 +2211,54 @@ subscribed-tier copy names the limit only.
 
 Reversible: both numbers are config, not code. He overturns what he
 dislikes.
+
+---
+
+## D66 — The entire tour pipeline runs on gpt-3.5-turbo, and nobody checked (2026-08-04)
+
+```
+$ grep -c '"model": "gpt-3.5-turbo"' generate_tour_text.py
+13
+$ grep -c 'gpt-4' generate_tour_text.py
+0
+```
+
+Thirteen hardcoded literals, no environment override, no newer model
+referenced anywhere in the file.
+
+Found while reviewing LOCAL-192, which concluded *"the model cannot reliably
+self-correct from rule feedback… this is not an LLM task"* and proposed
+regex-based deterministic rewriting as the next step. That conclusion is
+about **gpt-3.5-turbo**, a 2023 model — not about LLMs.
+
+**What this reframes.** Four rounds have fought the same faults: fabricated
+facts (R1–R4 corpus work), "you feel the weight of centuries" (LOCAL-188
+prompt rules), and self-correction failure (LOCAL-192 retry). Every one of
+them was measured against gpt-3.5-turbo output. The style rules did not fail;
+they failed *on this model*. Michael's listener complained about prose this
+model wrote.
+
+**Why it went unnoticed.** Every round asked "is the prompt right?" or "is
+the grounding right?" — reasonable questions that each presuppose the model
+is a fixed constraint. Nothing in the review protocol asks what the model is.
+The literal is thirteen lines deep in a 6,600-line file and reads as
+plumbing.
+
+**Decision:** do not build deterministic rewriting until the model is
+measured. LOCAL-192 bounced (it also had three real defects); **LOCAL-194**
+dispatched to make the model runtime-configurable (`TOUR_LLM_MODEL`,
+defaulting to today's value so nothing changes silently) and to A/B
+gpt-3.5-turbo against gpt-4o-mini on four metrics: style rules, anchor rate,
+cost, latency.
+
+**The default does not change on a task's say-so.** LEAD flips it after
+seeing the numbers, because it alters every tour Michael reads.
+
+**A cost note that must be verified, not assumed:** newer small models may be
+*cheaper* per token than gpt-3.5-turbo, not more expensive. If so this is a
+quality gain with no price to weigh against it. LOCAL-194 must measure spend
+per arm rather than reason about published rates.
+
+**The general lesson, worth more than the fix:** before the fifth round of
+tuning a system, check what the system is made of. Four rounds of prompt
+engineering never asked which model was reading the prompt.
