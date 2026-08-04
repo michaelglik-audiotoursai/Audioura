@@ -4025,6 +4025,104 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 print(f"   Part C attempt {attempts}: exception {e}")
                 continue
 
+        # ──── [LOCAL-212] COVERAGE-AWARE STOP SELECTION ────────────────────────
+        # When enabled (DISABLE_COVERAGE_SELECTION != '1'), reorder candidates
+        # so COVERED stops are preferred over CREATOR_ONLY, VENUE_ONLY, EMPTY.
+        # This is the structural fix: instead of prompting the model not to
+        # fabricate on stops with no material, select stops that HAVE material.
+        _coverage_selection_disabled = os.environ.get('DISABLE_COVERAGE_SELECTION', '').strip() == '1'
+
+        if not _coverage_selection_disabled and len(poi_list) > total_stops:
+            try:
+                from stop_corpus_reader import get_stop_corpus_for_tour
+                from corpus_coverage import assess_stop_coverage
+
+                # Determine venue name for corpus lookup
+                _cs_venue = (_museum_venue_name or location) if tour_category == 'museum' else location
+                _cs_stop_names = [p['name'] for p in poi_list]
+
+                # Get DB connection for corpus lookup
+                _cs_conn = None
+                try:
+                    # Try venue_resolver first (same pattern as the later corpus fetch)
+                    from venue_resolver import _get_db_connection as _cs_get_conn
+                    _cs_conn = _cs_get_conn()
+                except Exception:
+                    pass
+                if not _cs_conn:
+                    try:
+                        import psycopg2
+                        _cs_db_url = os.environ.get(
+                            'DATABASE_URL',
+                            'postgresql://admin:password123@localhost:5433/audiotours'
+                        )
+                        _cs_conn = psycopg2.connect(_cs_db_url, connect_timeout=5)
+                    except Exception:
+                        pass
+
+                if _cs_conn:
+                    _cs_corpus = get_stop_corpus_for_tour(
+                        venue_name=_cs_venue,
+                        stop_names=_cs_stop_names,
+                        conn=_cs_conn,
+                    )
+                    _cs_conn.close()
+
+                    # Assess coverage for each candidate
+                    _COVERAGE_PRIORITY = {'COVERED': 0, 'CREATOR_ONLY': 1, 'VENUE_ONLY': 2, 'EMPTY': 3}
+                    _cs_verdicts = {}  # stop_name → verdict string
+
+                    for _cs_name in _cs_stop_names:
+                        _cs_data = _cs_corpus.get(_cs_name)
+                        if _cs_data and _cs_data.get('passages'):
+                            _cs_roles = _cs_data.get('passage_roles')
+                            _cs_assessment = assess_stop_coverage(
+                                _cs_name, _cs_venue, _cs_data['passages'],
+                                passage_roles=_cs_roles
+                            )
+                        else:
+                            _cs_assessment = {'verdict': 'EMPTY'}
+                        _cs_verdicts[_cs_name] = _cs_assessment['verdict']
+
+                    # Stable sort: preserve original order within each tier
+                    poi_list.sort(key=lambda p: _COVERAGE_PRIORITY.get(
+                        _cs_verdicts.get(p['name'], 'EMPTY'), 3
+                    ))
+
+                    # Log the selection
+                    _cs_selected = poi_list[:total_stops]
+                    _cs_dropped = poi_list[total_stops:]
+                    _cs_selected_verdicts = [_cs_verdicts.get(p['name'], 'EMPTY') for p in _cs_selected]
+                    _cs_dropped_verdicts = [_cs_verdicts.get(p['name'], 'EMPTY') for p in _cs_dropped]
+
+                    # Count fallbacks
+                    _cs_covered_count = sum(1 for v in _cs_selected_verdicts if v == 'COVERED')
+                    _cs_fallback_count = total_stops - _cs_covered_count
+                    if _cs_fallback_count > 0:
+                        _cs_fallback_reasons = []
+                        for v in ('CREATOR_ONLY', 'VENUE_ONLY', 'EMPTY'):
+                            _cs_cnt = sum(1 for sv in _cs_selected_verdicts if sv == v)
+                            if _cs_cnt > 0:
+                                _cs_fallback_reasons.append(f"{_cs_cnt}×{v}")
+                        print(f"  [LOCAL-212] Coverage selection: {_cs_covered_count} COVERED, "
+                              f"fallback needed: {', '.join(_cs_fallback_reasons)} "
+                              f"(not enough covered candidates to fill {total_stops} stops)")
+                    else:
+                        print(f"  [LOCAL-212] Coverage selection: all {total_stops} stops COVERED")
+
+                    print(f"  [LOCAL-212] Selected: {[p['name'] + '=' + _cs_verdicts.get(p['name'], '?') for p in _cs_selected]}")
+                    if _cs_dropped:
+                        print(f"  [LOCAL-212] Dropped:  {[p['name'] + '=' + _cs_verdicts.get(p['name'], '?') for p in _cs_dropped]}")
+                else:
+                    print(f"  [LOCAL-212] Coverage selection: DB unavailable — falling back to position order")
+            except ImportError as _cs_err:
+                print(f"  [LOCAL-212] Coverage selection: import failed ({_cs_err}) — falling back to position order")
+            except Exception as _cs_err:
+                print(f"  [LOCAL-212] Coverage selection error (non-fatal): {_cs_err}")
+        elif _coverage_selection_disabled:
+            print(f"  [LOCAL-212] Coverage selection: DISABLED by DISABLE_COVERAGE_SELECTION=1")
+        # ──── END [LOCAL-212] COVERAGE-AWARE STOP SELECTION ───────────────────
+
         # Hard cap and final sanity
         if len(poi_list) > total_stops:
             poi_list = poi_list[:total_stops]
