@@ -83,8 +83,8 @@ _GENERIC_DESCRIPTORS = {
 
 # Patterns that indicate navigation/wayfinding content
 _NAVIGATION_PATTERNS = [
-    # Directional instructions
-    r'\b(?:turn|head|walk|proceed|continue|make your way|go|move)\s+(?:left|right|straight|ahead|forward|towards?|to|through|along|past|down|up|around|across|back)\b',
+    # Directional instructions (includes compass directions)
+    r'\b(?:turn|head|walk|proceed|continue|make your way|go|move)\s+(?:left|right|straight|ahead|forward|towards?|to|through|along|past|down|up|around|across|back|north|south|east|west|northwards?|southwards?|eastwards?|westwards?)\b',
     # Entry/exit instructions
     r'\b(?:as you enter|upon entering|when you arrive|step (?:inside|into|through)|enter the|exit the|leave the)\b',
     # Wayfinding imperatives
@@ -111,16 +111,27 @@ _NAV_VERB_PHRASES = {
 def is_navigation_paragraph(paragraph: str) -> bool:
     """Determine if a paragraph is primarily navigation/wayfinding.
     
+    LOCAL-185 narrowing: Wayfinding is SHORT and DIRECTIONAL. A long essay
+    that happens to contain two imperatives ("Step into…", "Just ahead…")
+    is prose with directions in it, not navigation. The previous rule
+    (2+ pattern matches → NAVIGATION regardless of length) let a 1,445-char
+    Musée Picasso paragraph — full of hallucinated facts — hide from scoring.
+    
     A paragraph is NAVIGATION if:
-    - It matches 2+ navigation patterns, OR
     - It's short (<150 chars) and matches 1+ navigation pattern, OR
-    - >50% of its content words are navigation verbs/phrases
+    - It's short-to-medium (≤300 chars) and matches 2+ patterns, OR
+    - >50% of its sentences contain navigation patterns (density gate,
+      any length — this is what real multi-sentence directions look like)
     
-    This catches "As you enter the Palais Lascaris, make your way to the
-    Grand Salon" — pure wayfinding regardless of what proper nouns it contains.
+    Thresholds justified from baseline measurement (7 tours + tour 152):
+      Genuine nav paragraphs: 102, 108, 130, 175, 333 chars
+        (the 333-char one has 75% nav-sentence density → passes density gate)
+      False positives caught: 594 chars (33% density), 1445 chars (20% density)
+    Length cap 300 chars:
+      All genuine ≤175 char nav passes via short rules.
+      The 333-char genuine case passes via >50% density (75%).
+      The 594 and 1445 char false positives fail: density <50%.
     """
-    text_lower = paragraph.lower()
-    
     # Count nav pattern matches
     nav_matches = sum(1 for pat in _NAVIGATION_COMPILED if pat.search(paragraph))
     
@@ -128,12 +139,14 @@ def is_navigation_paragraph(paragraph: str) -> bool:
     if len(paragraph) < 150 and nav_matches >= 1:
         return True
     
-    # Multiple nav patterns → NAVIGATION
-    if nav_matches >= 2:
+    # Short-to-medium paragraph with multiple nav patterns → NAVIGATION
+    # Beyond 300 chars, pattern count alone is insufficient — density required.
+    if nav_matches >= 2 and len(paragraph) <= 300:
         return True
     
-    # Check if the paragraph is predominantly instructional
-    # Split into sentences and check what fraction are navigational
+    # Density gate: check what fraction of sentences are navigational.
+    # This handles both (a) longer genuine directions (high density) and
+    # (b) rejects long prose that merely contains a couple of imperatives.
     sentences = re.split(r'[.!?]+', paragraph)
     sentences = [s.strip() for s in sentences if s.strip() and len(s.strip()) > 10]
     
