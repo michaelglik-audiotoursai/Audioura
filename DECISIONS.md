@@ -1857,3 +1857,61 @@ is missing, price the search before choosing deletion. Here it was cents.
 
 Noise floor zero throughout; the classification rule byte-identical across
 every round, verified at each merge. Total spend on the loop: **$0.041**.
+
+---
+
+## D58 — Users never see cost. They see limits. (Michael, 2026-08-03)
+
+Answer to Q19 — should the billing layer move to `storied`?
+
+> "If by billing layer, you mean subscription, then no. In Storied user
+> should not be aware of a cost. In fact without subscription in Subscribed
+> space user should not be presented with costs, just limitations; for
+> example, a large article should be truncated and the last line makes
+> people aware that article is truncated because of the cost. In
+> subscription space, the last line should also encourage people to
+> subscribe then this limit will be increased to xxx number of characters."
+
+### The decision
+
+**No.** The billing layer stays on `subscribed`. `storied` gets no wallet,
+no pricing, no entitlements.
+
+### The reframe, which is larger than the answer
+
+Cost is **never** user-facing. Not in Storied, and **not even in Subscribed
+for an unsubscribed user**. What a non-paying user meets is a **limit**, not
+a price:
+
+- A long article is **truncated**.
+- The final line says it was truncated.
+- In Subscribed space, that line also **invites subscription**, stating the
+  higher limit they would get.
+
+So the free experience degrades gracefully with an upsell, rather than
+refusing, charging, or showing a balance. Dollar figures belong to
+subscribers only — the wallet, the balance, the overdraft message from D44
+are all subscriber-facing surfaces.
+
+### What this resolves
+
+- **LOCAL-171 is correctly parked, permanently.** Its Dockerfile change adds
+  billing modules to the news image; that image builds from `storied`, which
+  must never carry them. It stays on `subscribed` and is not deployed to the
+  shared stack. The "blocker" recorded there is not a blocker — it is the
+  architecture working as intended.
+- News on the shared stack is therefore **free and limited**, never billed.
+  That is consistent, not a gap.
+
+### What it opens — and LEAD is not inventing these
+
+**Truncation does not exist.** Today the system charges or blocks; nothing
+degrades. This needs building: a character limit, the truncation notice, and
+the subscribe prompt in Subscribed space.
+
+**The numbers are unspecified.** Michael wrote "xxx number of characters" —
+explicitly a placeholder. Two figures are needed: the free limit and the
+subscribed limit. LEAD will have them **proposed from measured cost data**
+rather than guessed, for Michael to set. Article cost is $0.006–$0.011 today,
+so the free limit is a product judgement about how much value to give away,
+not a cost constraint.
