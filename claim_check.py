@@ -394,6 +394,262 @@ def extract_claims(text: str) -> List[Dict]:
     return all_claims
 
 
+# ─── Lightweight stemmer (no dependencies) ───────────────────────────────────
+
+# Suffix rules ordered longest-first. Each rule: (suffix, min_stem_len, replacement)
+_STEM_RULES: List[Tuple[str, int, str]] = [
+    ('ational', 4, 'ate'),
+    ('tional', 4, 'tion'),
+    ('encies', 4, 'ence'),
+    ('ancies', 4, 'ance'),
+    ('ement', 4, ''),
+    ('ments', 4, ''),
+    ('ness', 4, ''),
+    ('ment', 4, ''),
+    ('ting', 3, 't'),
+    ('ings', 3, ''),
+    ('ions', 3, ''),
+    ('tion', 3, 't'),
+    ('sion', 3, 's'),
+    ('ious', 3, ''),
+    ('eous', 3, ''),
+    ('ates', 3, 'ate'),
+    ('ated', 3, 'ate'),
+    ('izes', 3, 'ize'),
+    ('ized', 3, 'ize'),
+    ('ises', 3, 'ise'),
+    ('ised', 3, 'ise'),
+    ('ying', 3, 'y'),
+    ('ies', 3, 'y'),
+    ('ing', 3, ''),
+    ('ers', 3, ''),
+    ('ent', 3, ''),
+    ('ant', 3, ''),
+    ('ous', 3, ''),
+    ('ive', 3, ''),
+    ('ful', 3, ''),
+    ('ism', 3, ''),
+    ('ist', 3, ''),
+    ('als', 3, 'al'),
+    ('ed', 3, ''),
+    ('es', 3, ''),
+    ('ly', 3, ''),
+    ('er', 3, ''),
+    ('or', 3, ''),
+    ('al', 3, ''),
+    ('s', 3, ''),
+]
+
+# Irregulars: map inflected form → base
+_STEM_IRREGULARS: Dict[str, str] = {
+    'gave': 'give',
+    'given': 'give',
+    'gives': 'give',
+    'giving': 'give',
+    'made': 'make',
+    'took': 'take',
+    'taken': 'take',
+    'built': 'build',
+    'went': 'go',
+    'gone': 'go',
+    'brought': 'bring',
+    'thought': 'think',
+    'became': 'become',
+    'began': 'begin',
+    'begun': 'begin',
+    'knew': 'know',
+    'known': 'know',
+    'grew': 'grow',
+    'grown': 'grow',
+    'came': 'come',
+    'ran': 'run',
+    'saw': 'see',
+    'seen': 'see',
+    'held': 'hold',
+    'kept': 'keep',
+    'left': 'leave',
+    'led': 'lead',
+    'met': 'meet',
+    'paid': 'pay',
+    'said': 'say',
+    'sent': 'send',
+    'set': 'set',
+    'shown': 'show',
+    'stood': 'stand',
+    'wrote': 'write',
+    'written': 'write',
+}
+
+
+def _stem(word: str) -> str:
+    """Lightweight suffix-stripping stemmer. No external dependencies."""
+    if word in _STEM_IRREGULARS:
+        return _STEM_IRREGULARS[word]
+    for suffix, min_len, replacement in _STEM_RULES:
+        if word.endswith(suffix) and len(word) - len(suffix) >= min_len:
+            return word[:-len(suffix)] + replacement
+    return word
+
+
+# ─── Synonym groups for paraphrase detection ─────────────────────────────────
+
+# Each group is a frozenset of stems that should be treated as interchangeable
+# during matching. Curated conservatively — only tight semantic equivalences
+# where the domain meaning is genuinely the same. Broad groups risk false passes.
+_SYNONYM_GROUPS: List[frozenset] = [
+    # Giving / contributing (these are genuinely interchangeable in museum context)
+    frozenset(['donat', 'donate', 'contribut', 'give', 'offer', 'gift', 'bestow', 'endow', 'bequeath']),
+    # Popular / mass (in the 'popular culture' / 'mass culture' sense)
+    frozenset(['popular', 'mass']),
+    # Reference / allusion / borrowing (in art context)
+    frozenset(['referenc', 'allus', 'borrow', 'reinterpret', 'reground']),
+    # Relate / connect / associate
+    frozenset(['relat', 'connect', 'link', 'associat', 'belong']),
+]
+
+# Build a lookup: stem → set of all synonyms (their stems)
+_SYNONYM_LOOKUP: Dict[str, frozenset] = {}
+for _group in _SYNONYM_GROUPS:
+    for _word in _group:
+        _SYNONYM_LOOKUP[_word] = _group
+
+
+def _get_synonyms(stem: str) -> frozenset:
+    """Return the synonym group containing this stem, or empty frozenset."""
+    return _SYNONYM_LOOKUP.get(stem, frozenset())
+
+
+def _stems_match(stem_a: str, stem_b: str) -> bool:
+    """True if two stems match directly or via synonym groups."""
+    if stem_a == stem_b:
+        return True
+    # Check prefix overlap — only for handling stemmer imprecision
+    # (e.g., donat/donate, contribut/contribute). Requires 6+ chars
+    # and matching prefix of at least 6 to avoid false matches like
+    # collaborate/collage (both stem to 'colla*' but are unrelated).
+    if len(stem_a) >= 6 and len(stem_b) >= 6:
+        if stem_a.startswith(stem_b[:6]) or stem_b.startswith(stem_a[:6]):
+            return True
+    # Short stems (5 chars): require full equality or synonym
+    # This handles donat/donate specifically
+    if len(stem_a) >= 4 and len(stem_b) >= 4:
+        if stem_a == stem_b[:len(stem_a)] or stem_b == stem_a[:len(stem_b)]:
+            return True
+    # Check synonym groups
+    group = _SYNONYM_LOOKUP.get(stem_a)
+    if group and stem_b in group:
+        return True
+    # Check if stem_b's group contains stem_a
+    group_b = _SYNONYM_LOOKUP.get(stem_b)
+    if group_b and stem_a in group_b:
+        return True
+    return False
+
+
+# ─── Enhanced matching (paraphrase-aware) ────────────────────────────────────
+
+def _find_best_evidence_enhanced(
+    claim: Dict,
+    passages: List[str],
+    threshold: float = 0.60,
+) -> Tuple[Optional[str], float]:
+    """Second-pass matching using stems + synonyms for paraphrase detection.
+
+    Only called when basic token overlap fails. Uses:
+    1. Suffix-stripped stems for morphological variants (donated→donat)
+    2. Synonym groups for tight semantic equivalences (donate↔contribute↔give)
+    3. Co-occurrence requirement: matching stems must appear in the SAME window
+
+    Does NOT use multi-passage aggregation (too prone to false positives when
+    concept fragments appear in unrelated passages).
+    """
+    claim_text = claim['text']
+    core_text = claim_text.split(' (')[0].strip() if ' (' in claim_text else claim_text
+    claim_tokens = _tokenize(core_text)
+
+    # Same stopwords as basic matching
+    _match_stopwords = {
+        'the', 'a', 'an', 'is', 'was', 'are', 'were', 'has', 'had', 'have',
+        'of', 'in', 'on', 'at', 'to', 'for', 'by', 'with', 'from', 'as',
+        'it', 'its', 'this', 'that', 'and', 'or', 'but', 'not', 'be', 'been',
+        'which', 'who', 'their', 'they', 'you', 'your', 'his', 'her',
+        'museum', 'work', 'works', 'art', 'artist', 'piece', 'collection',
+    }
+    content_tokens = [
+        t for t in claim_tokens
+        if len(t) >= 3 and t not in _match_stopwords
+    ]
+
+    if not content_tokens:
+        return None, 0.0
+
+    # Stem the content tokens
+    claim_stems = [_stem(t) for t in content_tokens]
+
+    # Require minimum content: claims with fewer than 4 content tokens
+    # after stopword removal are too ambiguous for synonym matching.
+    # Short claims produce too many spurious matches in art museum corpora.
+    if len(claim_stems) < 4:
+        return None, 0.0
+
+    # Filter out very common stems that appear in most passages
+    _generic_stems = {
+        'use', 'make', 'take', 'get', 'set', 'put', 'run', 'see', 'come',
+        'know', 'think', 'look', 'want', 'tell', 'show', 'find', 'give',
+        'say', 'go', 'try', 'call', 'keep', 'let', 'begin', 'seem',
+        'help', 'turn', 'start', 'might', 'move', 'live', 'believ',
+        'hold', 'bring', 'happen', 'write', 'provid', 'sit', 'stand',
+        'los', 'pay', 'meet', 'play', 'lead', 'hav', 'includ',
+        'one', 'new', 'also', 'well', 'just', 'even', 'back',
+        'large', 'small', 'great', 'long', 'high', 'low', 'first',
+        'natur', 'material', 'place', 'time', 'year', 'part',
+        'paint', 'color', 'form', 'space', 'creat', 'world',
+    }
+    # Count non-generic stems — if fewer than 2 remain, bail out
+    specific_stems = [s for s in claim_stems if s not in _generic_stems]
+    if len(specific_stems) < 2:
+        return None, 0.0
+
+    best_score = 0.0
+    best_evidence = None
+
+    # Sliding window with stem+synonym matching
+    # Uses a larger window (300 chars) since paraphrases may be verbose
+    window_size = 300
+    step = 50
+
+    for passage in passages:
+        passage_norm = _normalize(passage)
+
+        for start_idx in range(0, max(1, len(passage_norm) - window_size + 1), step):
+            window = passage_norm[start_idx:start_idx + window_size]
+            window_tokens = _tokenize(window)
+            window_stems = set(_stem(t) for t in window_tokens)
+
+            # Count concept matches (direct stem + synonym only)
+            matched = 0
+            for cs in claim_stems:
+                # Direct stem match in window
+                if cs in window_stems:
+                    matched += 1
+                    continue
+                # Synonym match — window stem is a synonym of this claim stem?
+                for ws in window_stems:
+                    if _stems_match(cs, ws):
+                        matched += 1
+                        break
+
+            score = matched / len(claim_stems)
+            if score > best_score:
+                best_score = score
+                if score >= threshold:
+                    ev_start = max(0, start_idx)
+                    ev_end = min(len(passage), start_idx + window_size)
+                    best_evidence = passage[ev_start:ev_end].strip()
+
+    return best_evidence, best_score
+
+
 # ─── Verdict assignment ──────────────────────────────────────────────────────
 
 def _token_overlap_score(claim_tokens: List[str], passage_tokens: List[str]) -> float:
@@ -493,6 +749,24 @@ def _find_best_evidence(
                     ev_end = min(len(passage), start_idx + window_size)
                     best_evidence = passage[ev_start:ev_end].strip()
 
+        # Strategy 3b: Stem-aware sliding window.
+        # Catches morphological variants: "donations" vs "donated",
+        # "contributions" vs "contributed". Uses same threshold as
+        # Strategy 3 because stems are a tight match (same root word).
+        content_stems = [_stem(t) for t in content_tokens]
+        for start_idx in range(0, max(1, len(passage_norm) - window_size + 1), step):
+            window = passage_norm[start_idx:start_idx + window_size]
+            window_tokens = _tokenize(window)
+            window_stems = set(_stem(t) for t in window_tokens)
+            found = sum(1 for s in content_stems if s in window_stems)
+            score = found / len(content_stems)
+            if score > best_score:
+                best_score = score
+                if score >= threshold:
+                    ev_start = max(0, start_idx)
+                    ev_end = min(len(passage), start_idx + window_size)
+                    best_evidence = passage[ev_start:ev_end].strip()
+
     return best_evidence, best_score
 
 
@@ -569,6 +843,7 @@ def _check_contradiction(
 # Conservative: prefer UNSUPPORTED over false SUPPORTED
 PARAPHRASE_THRESHOLD = 0.55  # token overlap needed for SUPPORTED_PARAPHRASE
 ELSEWHERE_THRESHOLD = 0.55   # same threshold for SUPPORTED_ELSEWHERE
+ENHANCED_THRESHOLD = 0.70    # stem+synonym pass: higher bar (fuzzier match = stricter gate)
 
 
 # ─── Main entry point ────────────────────────────────────────────────────────
@@ -665,6 +940,26 @@ def check_paragraph(
                 evidence = contradiction
             else:
                 verdict = UNSUPPORTED
+
+        # ─── Enhanced pass: stem+synonym matching for UNSUPPORTED claims ──
+        # Only fires when basic matching failed. Can only PROMOTE a verdict
+        # from UNSUPPORTED to SUPPORTED_PARAPHRASE — never the reverse.
+        if verdict == UNSUPPORTED:
+            enh_evidence, enh_score = _find_best_evidence_enhanced(
+                claim, passages, threshold=ENHANCED_THRESHOLD
+            )
+            if enh_score >= ENHANCED_THRESHOLD and enh_evidence:
+                verdict = SUPPORTED_PARAPHRASE
+                evidence = enh_evidence
+                score = enh_score
+            elif other_stop_passages:
+                enh_evidence, enh_score = _find_best_evidence_enhanced(
+                    claim, other_stop_passages, threshold=ENHANCED_THRESHOLD
+                )
+                if enh_score >= ENHANCED_THRESHOLD and enh_evidence:
+                    verdict = SUPPORTED_ELSEWHERE
+                    evidence = enh_evidence
+                    score = enh_score
 
         results.append({
             'text': claim['text'],
