@@ -6070,8 +6070,9 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
         _style_retry_failures = 0
 
         # Import the validator (same one used in measurement — D55: do not modify it)
+        # [LOCAL-192 fix 1] Validator now lives at repo root (same directory as this file),
+        # so it is importable without sys.path manipulation — works inside Docker too.
         try:
-            sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests'))
             from style_validator_detector import validate_paragraph as _sv_validate_paragraph
         except ImportError:
             _sv_validate_paragraph = None
@@ -6088,15 +6089,26 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                 _stop_num = _si + 1
                 _poi_name = _poi.get('name', f'Stop {_stop_num}')
 
-                # Split description into paragraphs (same logic as the validator test)
-                _paragraphs = [p.strip() for p in _desc.split('\n\n') if p.strip() and len(p.strip()) > 30]
-                if not _paragraphs:
+                # Split description into paragraphs — keep ALL segments for reassembly,
+                # but only validate content paragraphs (>30 chars). Short segments
+                # (assembly lines, spacing) pass through unchanged.
+                # [LOCAL-192 fix 2] Previous code dropped ≤30-char paragraphs on reassembly.
+                _all_segments = [p for p in _desc.split('\n\n') if p.strip()]
+                if not _all_segments:
                     continue
 
                 _new_paragraphs = []
                 _stop_had_retry = False
+                _stop_retry_tokens = 0
+                _stop_retry_cost = 0.0
 
-                for _pi, _para in enumerate(_paragraphs):
+                for _pi, _seg in enumerate(_all_segments):
+                    _para = _seg.strip()
+                    # Short segments: keep as-is, do not validate
+                    if len(_para) <= 30:
+                        _new_paragraphs.append(_para)
+                        continue
+
                     _result = _sv_validate_paragraph(_para)
 
                     # Check for ERROR-severity findings only (R7 is warning → skip)
@@ -6162,6 +6174,8 @@ REWRITE RULES (all mandatory):
                             _retry_c = _retry_tok / 1000 * 0.002
                             _style_retry_tokens += _retry_tok
                             _style_retry_cost += _retry_c
+                            _stop_retry_tokens += _retry_tok
+                            _stop_retry_cost += _retry_c
 
                             # Strip any preamble the model might add
                             _retry_text = re.sub(r'^(?:Here (?:is|\'s) the rewrite[d paragraph]*[:\s]*|Rewritten paragraph[:\s]*)', '', _retry_text, flags=re.IGNORECASE).strip()
@@ -6204,8 +6218,10 @@ REWRITE RULES (all mandatory):
                 # Reassemble description if any paragraph was retried
                 if _stop_had_retry:
                     poi_list[_si]["description"] = '\n\n'.join(_new_paragraphs)
-                    total_tokens += _style_retry_tokens
-                    total_cost += _style_retry_cost
+                    # [LOCAL-192 fix 3] Add only THIS stop's retry cost, not the
+                    # cumulative total (previous code was quadratic double-counting).
+                    total_tokens += _stop_retry_tokens
+                    total_cost += _stop_retry_cost
 
             # Summary
             print(f"  [LOCAL-192] Style retry summary: {_style_retry_count} paragraphs retried, "
