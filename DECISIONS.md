@@ -4132,3 +4132,56 @@ we were covered.
 
 Same reasoning as the worktree prune's idle guard (D84a): a guard that damages
 the thing it protects gets switched off, and then the protection is gone.
+
+---
+
+## D109 — The dry run found the one thing that would have taken down news entirely (2026-08-04)
+
+LOCAL-225 ran the billing code against `audiotours_subscribed` before anyone
+deployed it. The schema had been derived by reading the code (LOCAL-211), so
+the two had never actually met.
+
+**One mismatch, and it is the expensive kind:**
+
+```
+missing table : newsletters_article_link
+failing call  : entitlements.get_news_used_period()
+                SELECT 1 FROM newsletters_article_link nal
+                WHERE nal.article_requests_id = ar.article_id
+consequence   : the subquery errors, the function fails closed and returns
+                9999, which exceeds every quota — blocking ALL news
+                operations for ALL users
+```
+
+A total news outage, and it would have surfaced only after deployment, as
+"news is broken" with no obvious cause. Fixed by migration
+`011_add_newsletters_article_link.sql`; LEAD verified a second run is a no-op
+(21 tables before and after).
+
+**Everything else matched** — all other tables, columns, types and constraints.
+One dead column noted (`cost_ledger.ceiling_breach`, written by nothing,
+nullable, harmless).
+
+**The billing rules verified end to end**, LEAD re-ran them:
+
+```
+Step 1  fresh user                                    0¢
+Step 2  +$10                                       1000¢
+Step 3  tour charge at x5                           966¢
+Step 4  30 tours → negative but above the floor      −20¢
+Step 5  translation refused pre-flight (would hit −290¢, below −200¢)
+Step 6  +$10 against −20¢                           980¢
+Step 6b D41's exact example: −23¢ + $10.00 =        977¢  ($9.77)
+```
+
+Michael's carry-over rule, stated on 2026-07-31 and never before executed,
+works exactly as he specified.
+
+**Production untouched:** `audiotours` still 43 tables and 133 tours, 23
+containers, none started or stopped.
+
+**The general point.** This is the fourth integration-boundary defect this week
+(D91 venue cache, D102 stale rule at merge, D103 the claim/verifier join, now
+code against schema) and the first one caught *before* it reached anything. The
+difference was simply running the two halves together — which cost five
+minutes and would have cost a production outage.
