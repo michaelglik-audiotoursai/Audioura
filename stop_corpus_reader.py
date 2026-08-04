@@ -58,7 +58,7 @@ def get_stop_corpus_for_tour(
     # Fetch all rows for this venue in one query
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute(
-        "SELECT stop_title, passages_json, source_pages FROM stop_corpus WHERE venue_name = %s",
+        "SELECT stop_title, passages_json, source_pages, passage_roles FROM stop_corpus WHERE venue_name = %s",
         (corpus_venue_name,)
     )
     corpus_rows = cur.fetchall()
@@ -98,9 +98,15 @@ def get_stop_corpus_for_tour(
                 if text:
                     passages.append(text)
 
+            # [LOCAL-203] Include passage_roles for role-aware coverage
+            roles_raw = matched.get('passage_roles')
+            if isinstance(roles_raw, str):
+                roles_raw = json.loads(roles_raw)
+
             result[stop_name] = {
                 'passages': passages,
                 'sources': sources_raw or [],
+                'passage_roles': roles_raw or [],
             } if passages else None
         else:
             result[stop_name] = None
@@ -201,24 +207,31 @@ def format_passages_for_prompt(
 
     Returns a ready-to-inject string with passages and source URLs,
     plus the grounding instruction (D50). Returns empty string if no data.
+
+    [LOCAL-203] When passage_roles are available, annotates each passage
+    with its role so the model knows what content it may use for what purpose.
     """
     if not stop_corpus_data or not stop_corpus_data.get('passages'):
         return ""
 
     passages = stop_corpus_data['passages']
     sources = stop_corpus_data.get('sources', [])
+    roles = stop_corpus_data.get('passage_roles', [])
 
     # Truncate passages to fit budget
     passage_block = []
+    passage_roles_for_prompt = []
     total_chars = 0
-    for p in passages:
+    for i, p in enumerate(passages):
         if total_chars + len(p) > max_chars:
             # Include partial if room
             remaining = max_chars - total_chars
             if remaining > 100:
                 passage_block.append(p[:remaining] + "…")
+                passage_roles_for_prompt.append(roles[i] if i < len(roles) else None)
             break
         passage_block.append(p)
+        passage_roles_for_prompt.append(roles[i] if i < len(roles) else None)
         total_chars += len(p)
 
     if not passage_block:
@@ -238,8 +251,14 @@ def format_passages_for_prompt(
     lines = [
         f"\nPER-STOP SOURCE MATERIAL for \"{stop_name}\" (from verified sources — use this as your primary factual basis):",
     ]
-    for i, p in enumerate(passage_block, 1):
-        lines.append(f"  Passage {i}: {p}")
+    for i, p in enumerate(passage_block, 0):
+        role_info = ""
+        if i < len(passage_roles_for_prompt) and passage_roles_for_prompt[i]:
+            r = passage_roles_for_prompt[i]
+            role_val = r.get('role') if isinstance(r, dict) else r
+            if role_val:
+                role_info = f" [ROLE: {role_val}]"
+        lines.append(f"  Passage {i+1}{role_info}: {p}")
 
     if source_urls:
         lines.append("  Sources:")
@@ -254,5 +273,27 @@ def format_passages_for_prompt(
         "but specific historical claims, dates, people, and events MUST come from the passages above. "
         "If a passage names a person or event, you may include it; if it does not, leave it out."
     )
+
+    # [LOCAL-203] Add role-specific guidance when roles are present
+    if roles:
+        has_creator = any(
+            (r.get('role') if isinstance(r, dict) else r) == 'about_creator'
+            for r in passage_roles_for_prompt if r
+        )
+        has_subject = any(
+            (r.get('role') if isinstance(r, dict) else r) == 'about_subject'
+            for r in passage_roles_for_prompt if r
+        )
+        if has_creator and not has_subject:
+            lines.append(
+                "ROLE NOTE: All passages above are about the CREATOR/MAKER. You may discuss "
+                "the maker's biography and significance, but do NOT describe the physical object "
+                "at this stop — no appearance, materials, dimensions, or condition claims."
+            )
+        elif has_creator and has_subject:
+            lines.append(
+                "ROLE NOTE: Passages marked [ROLE: about_creator] describe the maker; those marked "
+                "[ROLE: about_subject] describe the specific work. Use both appropriately."
+            )
 
     return "\n".join(lines) + "\n"
