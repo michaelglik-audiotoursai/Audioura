@@ -2090,3 +2090,81 @@ Fact-checking is **not** a fifth lint rule. Style rules are deterministic and
 free; verifying "1966 not 1985" requires a source lookup per claim. That is
 the corpus path and the same machinery as the anchor work, so it belongs
 there rather than in the validator.
+
+---
+
+## D63 — Prompt instruction alone does not fix the style faults (2026-08-04)
+
+LOCAL-189 ran the A/B Michael's listener complaint demanded, on MAMAC,
+3 runs per arm, 2 stops, 18 content paragraphs each, **same two stops in all
+six generations** — no itinerary confound.
+
+```
+rule                     baseline   constrained   delta
+R1 imperatives             0.00        0.06       +0.06  worse
+R3 suggestive exploration  0.22        0.11       -0.11  better
+R4 prescribed feeling      0.22        0.22        0.00  unchanged
+overall failure rate      27.8%       33.3%       +5.6pp
+```
+
+**R4 is the rule his listener actually complained about** — "feel the weight
+of centuries" — and it did not move at all despite being explicitly banned
+in the prompt, with a worked replacement supplied. The model still wrote
+"As you stand before…", "As you step into the realm of…", "You are about to
+embark on a journey through…".
+
+Read the size honestly: 18 paragraphs per arm, and the overall delta is one
+paragraph. Generation is stochastic — unlike the detector, whose noise floor
+is zero — so +5.6pp means little on its own. What means something is the
+**absence of the large fall the prompt demands**. R4 sitting at 0.22 in both
+arms after being forbidden is not noise; it is indifference.
+
+**Conclusion: telling the model not to do it is insufficient. The next
+design is validate-and-regenerate** — run the validator on generated text
+and re-ask for the failing paragraphs, rather than hoping a longer prompt
+lands.
+
+Two traps were caught on the way, and both would have produced a confident
+wrong answer:
+
+- **The S20 tour cache key does not include the A/B flag.** All six runs
+  would have returned identical cached text and every delta would have been
+  exactly 0.00 — a clean, meaningless null that looks like a finding.
+- **STORIED_MODE off gives ~80-word stops**, one paragraph each, with
+  nothing to measure.
+
+---
+
+## D64 — Stop 1 is a normal stop with the tour's prolog stapled on (2026-08-04)
+
+Michael, reading tour 152: *"The first stop is a tour description, not
+POI/Stop description… simply too large."*
+
+Confirmed and localised. A tour-level prolog of 80-190 words, from a
+separate LLM call, is injected into Stop 1's body at assembly time
+(`generate_tour_text.py:6594`), present in 9 of 10 tours sampled.
+
+```
+                     Stop 1    Stops 2..N   ratio
+paragraph count         4.2        3.1      1.37x
+character length      2,086      1,570      1.33x
+tour framing / para    0.79       0.61      1.28x
+```
+
+Remove the prolog and the size ratio falls to roughly parity — it is the
+sole inflating factor. Stop 1 is not written differently; it carries the
+introduction.
+
+His nuance decides what to do about it: he called NO_ANCHOR the **right**
+verdict for that paragraph, because scene-setting is legitimate provided the
+stop's own story follows. So this is good content in the wrong slot, not bad
+content.
+
+**Cost of separating it** is not in the generator — two lines there — but in
+the Flutter player needing a rendering path, and **117 existing tours** that
+carry the prolog inside Stop 1. That migration is Michael's call.
+
+**No metric we have could see this.** The anchor detector asks whether a
+paragraph is tied to its stop; the style validator asks whether it instructs
+the listener. Neither asks whether the text is about the *tour* rather than
+the stop it sits under. It took a listener to notice.
