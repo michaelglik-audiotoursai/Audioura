@@ -3919,3 +3919,72 @@ Also noted: the Mac's token has **no expiry at all**. A credential that never
 expires is one nobody is ever prompted to rotate — the same standing condition
 that let the `sk.py` key sit on origin for nine months (D81). Its replacement
 should carry a 12-month expiry.
+
+---
+
+## D105 — Round 2 measured: the 0/5 sentences are gone, the 1/5 imperatives are not (2026-08-04)
+
+Michael asked whether the tour would be better when he got back. LOCAL-222
+regenerated the same request at HEAD, three runs, and measured it rather than
+guessing.
+
+```
+                     tour 163 (what he read)   round 2
+R1_IMPERATIVE              50% (3/6)            50% (3/6)
+R3_SUGGESTIVE               0%                   0%
+R4_PRESCRIBED               0%                   0%
+R8_LEAKAGE                 17% (1/6)             0%     ← eliminated
+R9_GENERIC                 33% (2/6)            17%, deleted before delivery
+```
+
+**Fixed:** the generic connective he scored **0/5** is caught and removed every
+run —
+
+```
+Run 1: "From Cap d'Antibes to Eze Village — a collection that spans more ground than these stops alone."
+Run 2: "From Cap d'Antibes to Gorges du Loup — …"
+Run 3: "From Cap d'Antibes Coastal Path to Voie Verte du Littoral Varois — …"
+```
+
+Same template every time, **zero content sentences deleted**. Prompt leakage is
+gone too.
+
+**Not fixed:** instructions aimed at the listener — his complaint behind five of
+eleven 1/5 marks. The retry fires on 4–6 paragraphs per tour and succeeds on
+64% of them, and the delivered rate does not move, because the model generates
+new imperatives as fast as the retry removes them. "Take a moment to absorb the
+ancient aura" survived into the delivered text.
+
+**The risk LEAD flagged did not materialise.** The retry now runs far more often
+than when it was built (R1 was blind to "Stand at the entrance" then), but the
+task found **no case where a retry made a paragraph worse**. LOCAL-192's damage
+mode has not appeared.
+
+### And a false positive LEAD found that the task did not
+
+```
+"Start biking southeast on the main road, continue straight
+ until you reach the roundabout near the coast."      nav=True   clean
+"Start cycling south on the main road with the sea on
+ your right until you reach the peninsula's tip."     nav=False  R1_IMPERATIVE
+```
+
+The first is Michael's, scored **5/5 — his highest mark**. The second is the
+same instruction, one word different, and R1 flags it.
+
+`_STYLE_NAV_ROUTE_VERBS` contains **no cycling verb at all** — no *bike, cycle,
+pedal, ride, start.* Neither sentence matches the sentence-level exemption; the
+first survives only because a paragraph-level density heuristic happens to catch
+it.
+
+Two consequences. **The retry rewrites what R1 flags, so the pipeline is
+currently rewriting the one thing Michael rated perfect** — the LOCAL-192 damage
+mode aimed at our best content. And **the 50% R1 figure is inflated**: one of
+those three is this false positive, so the real content rate is 2 of 6, and
+every R1 number on a transport tour since LOCAL-196 may carry the same error.
+
+**LOCAL-224** dispatched, with the boundary stated explicitly: route movement is
+exempt, attention direction is not. "Turn left at the fountain" passes; "Turn
+your attention to the smaller canvas" must still fire — that distinction is
+Michael's, from his own 1/5 marks, and widening the exemption until his
+complaints pass would delete the rule he asked for.
