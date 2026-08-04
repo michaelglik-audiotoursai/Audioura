@@ -2378,3 +2378,111 @@ experiments should be treated as unmeasured, not as zero.
 **LOCAL-196** dispatched. The fix is not a longer verb list — that is the
 same mistake at a larger size. It needs sentence-initial base-form detection
 with an exemption list, i.e. the inverse of today's design.
+
+---
+
+## D70 — The anchor drop is real. Do not switch models. But the model was never the problem (2026-08-04)
+
+LOCAL-195 hand-checked every factual claim in every unanchored paragraph
+from both arms against the corpus. Result:
+
+| | gpt-3.5-turbo | gpt-4o-mini |
+|---|---|---|
+| unsupported claims | 2 | 9–10 |
+| unsupported per flagged paragraph | **0.33** | **1.5–1.7** |
+| contradicted by corpus | 0 | 0 |
+
+**The default stays at gpt-3.5-turbo.** D67's condition is not met.
+
+**But read what gpt-4o-mini actually wrote.** Its unsupported claims are
+things like: Richard Long arranges stones collected on his walks; his work
+sits in the 1960s–70s land art movement alongside Robert Smithson and Andy
+Goldsworthy. Every one of those is **true about the real artist** — and none
+of it is in our corpus. It is not hallucinating. It is writing from
+world knowledge because we gave it nothing to write from.
+
+gpt-3.5-turbo scored better by being vaguer: "a captivating sight that
+encapsulates the essence of movement and artistry" is unfalsifiable, so it
+cannot be marked unsupported. **We have been rewarding waffle.**
+
+### The finding underneath, which is the real one
+
+The corpus for that stop contains nothing about Richard Long. LEAD checked
+all ten MAMAC stops:
+
+```
+ 23 passages | Le Mur de Feu d'Yves Klein            | "Klein" x31
+ 22 passages | Tir, séance 26 juin 1961              | covered
+  3 passages | Le Déjeuner sur l'herbe               | subject x0
+  2 passages | She-Bam Pow POP Wizz                  | "Wizz" x0
+  2 passages | La mariée sous l'arbre                | subject x0
+  1 passage  | Richard Long ou la sculpture...       | "Richard" x0
+  ...
+```
+
+**Two of ten stops have corpus about their own subject.** The other eight get
+one to three passages of venue-level text — donations, opening dates — and
+are then asked for 200–400 words about a specific artwork. There is no
+outcome for that except invention; the model only chooses the *style* of
+invention. This is the 2026-07-29 finding ("zero per-stop source material")
+still standing after LOCAL-176 added `stop_corpus` — the table exists and is
+populated, but not with material about the stops.
+
+It also explains the anchor metric: at 33–48% "anchored", what is being
+matched is largely venue-level facts appearing in stop paragraphs.
+
+**D50 already prohibits this** — *"if no grounded fact links the entity to
+the stop, the paragraph is cut, not embellished."* Nothing enforces it. There
+is no check that a stop's corpus mentions the stop. **LOCAL-198** dispatched
+to measure coverage across all venues and build the gate.
+
+**Revisit the model afterwards.** The comparison was run on stops with no
+source material, which is close to the worst possible test of grounding — it
+measures which model resists filling a vacuum, not which writes better from
+evidence. Once coverage is real, re-run it. The prediction worth testing:
+with adequate corpus, gpt-4o-mini's advantage on style holds and its
+grounding disadvantage shrinks or inverts.
+
+### A methodological note
+
+The like-for-like is imperfect and the submission says so: the ANCHORED
+paragraph in each arm was left unchecked, and it was a different slot in each
+(Richard Long main content in A, She-Bam main content in B). So the 0.33
+vs 1.5 counts compare partly different material. The qualitative finding does
+not depend on the counts — six specific, checkable, corpus-absent claims in a
+single gpt-4o-mini paragraph is not a rounding artifact.
+
+---
+
+## D71 — R1 fixed: between 13% and 63% of paragraphs in real tours instruct the listener (2026-08-04)
+
+LOCAL-196 replaced the 22-phrase verb list with sentence-initial base-form
+detection plus a justified exemption list, and narrowed the navigation
+exemption to require directional content. Verified independently by LEAD: all
+six previously-missed imperatives now fire; route navigation, "Explorers
+arrived", "Visitors notice", "Walking tours began" and "Standing water
+collected" all stay clean.
+
+Corrected rates on stored tours:
+
+| tour | | R1 rate |
+|---|---|---|
+| 29 | **Michael's field-tested biking tour** | **0.56** |
+| 152 | the cycling tour generated for comparison | **0.63** |
+| 44 | MAMAC | 0.35 |
+| 1 | Palais Lascaris | 0.29 |
+| 14 | Museum of Naïve Art | 0.13 |
+
+Michael's listener said the narration tells them what to do. It does, in
+more than half of tour 29's paragraphs. That was previously reported as
+**zero**.
+
+**LOCAL-189, 192 and 194 cannot be re-scored**: none of them persisted their
+generated paragraphs, so the corrected R1 for those arms is an estimate from
+a same-venue proxy. **Process rule from now on: any A/B task must persist its
+generated paragraphs to disk and commit them.** An experiment whose output is
+discarded cannot be revisited when the instrument turns out to be wrong — and
+the instrument has now been wrong twice (D55, D69).
+
+D67's relative conclusion survives (R4 fires correctly in both validators);
+its absolute failure rates were understated for both arms.
