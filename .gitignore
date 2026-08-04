@@ -61,3 +61,10 @@ key.properties
 # .continuous_dev/ is ignored above (session state), but the guard SCRIPTS are
 # code and must survive this machine — see !.continuous_dev/*.sh
 !.continuous_dev/*.sh
+
+# LOCAL-217: any *env* file, not just .env — a live key was left in newEnv.env
+# on 2026-08-04 and git would have committed it.
+*.env
+!.env.example
+newEnv*
+.env.bak.*
