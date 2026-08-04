@@ -111,7 +111,7 @@ Total: 49 passed in 0.09s
 
 ## Blocking: API quota exhausted
 
-The OpenAI API key (sk-proj-H6SIHfb...) has hit `insufficient_quota` (429).
+The OpenAI API key ([REDACTED — live OpenAI key, removed 2026-08-04; see D79]...) has hit `insufficient_quota` (429).
 This prevents the full 3-venue × 3-run acceptance evidence for Asian Arts and
 Palais Lascaris. The code is ready; the constraint is billing, not correctness.
 
