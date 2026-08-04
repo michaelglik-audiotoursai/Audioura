@@ -193,7 +193,57 @@ def generate_news():
             except Exception as _meter_err:
                 # D14: instrumentation fails open
                 logging.warning(f"[NEWS_CACHE] Metering failed (non-fatal): {_meter_err}")
-            
+
+            # [LOCAL-201] Cache-hit charging (D45 extended): charge user same as fresh.
+            # Basis comes from the original cost_ledger row. None → $0.00 (safe).
+            # Idempotency key: charge:{user}:{article_id} — same as fresh path.
+            # Retry of the same request with same article_id is a no-op in wallet.
+            if secret_id and secret_id != 'anonymous' and not is_trusted_internal:
+                try:
+                    from cost_meter import lookup_fresh_cost_for_cache_hit as _lookup_basis
+                    from pricing import compute_user_charge as _compute_charge
+                    from wallet_ledger import charge as _wallet_charge
+                    from entitlements import _get_subscription_tier
+
+                    _fresh_basis = _lookup_basis(_cached_article_id, "news_cache_hit")
+                    _charge_result = _compute_charge(
+                        our_cost_usd=0.00,
+                        cache_hit=True,
+                        operation_type="news_cache_hit",
+                        fresh_cost_usd=_fresh_basis,
+                        description=f"Article: {request_string[:200] if 'request_string' in dir() else 'news'}",
+                    )
+
+                    _user_tier = _get_subscription_tier(secret_id)
+                    if _user_tier == 'ppu' and _charge_result['user_charge_cents'] > 0:
+                        _charge_idem_key = f"charge:{secret_id}:{_cached_article_id}"
+                        _row_id, _new_bal, _was_stopped = _wallet_charge(
+                            user_id=secret_id,
+                            charge_usd=_charge_result['user_charge_usd'],
+                            idempotency_key=_charge_idem_key,
+                            description=_charge_result['description'] + f" — ${_charge_result['user_charge_usd']:.2f}",
+                            job_id=_cached_article_id,
+                        )
+                        if _was_stopped:
+                            logging.error(
+                                f"[LOCAL-201] NEWS CACHE-HIT CHARGE BLOCKED (zero balance) for {secret_id} article={_cached_article_id}"
+                            )
+                            return jsonify({
+                                "error": "insufficient_balance",
+                                "message": "Insufficient balance. Please top up your credits.",
+                            }), 402
+                        logging.info(
+                            f"[LOCAL-201] News cache-hit charged: ${_charge_result['user_charge_usd']:.2f} | "
+                            f"basis=${_fresh_basis or 0:.4f} | balance={_new_bal}¢ | user={secret_id} | article={_cached_article_id}"
+                        )
+                    else:
+                        logging.info(
+                            f"[LOCAL-201] News cache-hit no charge: basis={_fresh_basis} | tier={_user_tier} | user={secret_id}"
+                        )
+                except Exception as _cache_charge_err:
+                    # Cache-hit charging fails OPEN — content already exists, not new work.
+                    logging.warning(f"[LOCAL-201] News cache-hit charging failed (non-fatal): {_cache_charge_err}")
+
             return jsonify({
                 "status": "success",
                 "article_id": _cached_article_id,
