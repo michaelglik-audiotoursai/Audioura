@@ -3303,3 +3303,66 @@ resolves.
 configuration bug into "no cache configured", and no experiment noticed for
 weeks because both look the same from the outside. The fix now distinguishes
 *absent* from *broken*, which is the part worth keeping.
+
+---
+
+## D92 — Backend stays LAN-only. No public endpoint until quality is ready (Michael, 2026-08-04)
+
+Michael: *"I would keep it this way: we are far from giving this to anyone.
+Once we decide to add human testers, we may want to hide it on unsecured link
+on iCloud. As later, we will migrate from Beta to Storied. And it would be
+convenient that Storied will be on GCloud already. But not now: too many
+problems to work on."*
+
+**Option A.** No tunnel, no host, no work dispatched. The release task
+`wdvrdaw6en` is not the current priority and LEAD has stopped treating it as
+one.
+
+The reasoning holds up: his own sentence-level evaluation of the Riviera tour
+came to **2.0/5** against a 3.5 gate. Shipping that to outside readers would
+spend goodwill we cannot re-earn, and a public endpoint with no billing is an
+open tab on the OpenAI and AWS accounts.
+
+**Two things to carry forward when testers do come.** An unlisted link is
+obscurity, not access control — anyone holding the URL reaches the backend and
+every request costs money; a shared password is the minimum. And the Subscribed
+billing layer should be deployed *before* any public endpoint, so the first
+public server has a cost ceiling in front of it rather than one bolted on
+afterwards. It is built and merged already; only deployment is outstanding
+(D76).
+
+---
+
+## D93 — `docker restart` does not pick up a changed `.env`. Containers must be recreated (2026-08-04)
+
+Michael rotated the OpenAI key. LEAD installed it and ran
+`docker restart` on the four containers that read it. All four came back
+**still holding the old key**:
+
+```
+audioura-tour-generator-1 → sk-proj-H6SI    (the old one, after restart)
+```
+
+Environment variables are fixed when a container is **created**. A restart
+re-runs the process inside the same container with the same environment.
+`docker compose up -d --force-recreate <service>` is required.
+
+Done, and verified end to end: all four now hold `sk-proj-4Mi4…`, a real
+OpenAI call from inside `tour-generator` succeeds, five health endpoints return
+200, the Nice tour list is unchanged, 23 containers running as before.
+
+**A note on the dry-run.** `--dry-run` reported the new containers would be
+named `674ac0e8ce3a_audioura-tour-generator-1` — the hash-prefixed rename that
+`CONTAINER_OWNERSHIP.md` records as an orphaning incident. That is compose
+temporarily renaming the *old* container while it swaps, not the final state.
+LEAD confirmed by recreating the least critical service first
+(`coordinates-fromai`) and checking the resulting name before touching
+`tour-generator`. Worth remembering: the dry-run output is alarming and
+misleading here.
+
+**Michael's file had also not been saved where he thought.** He wrote
+`newEnv.env` into `~/Audioura` rather than over `.env`. It held a live key and
+was **not gitignored** — `git add .` would have committed it. LEAD diffed it
+against `.env` (all 9 variables present, only the key changed), installed it,
+securely deleted it, and extended `.gitignore` to `*.env`, `newEnv*` and
+`.env.bak.*`.
