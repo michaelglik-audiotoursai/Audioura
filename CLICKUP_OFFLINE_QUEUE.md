@@ -3144,3 +3144,61 @@ Smaller: stop 3 describes a generic French armchair (Wikipedia's `fauteuil`
 article, not the museum's object); stop 6 attributes Buddhist iconography
 (urna, elongated earlobes) to a Hàm Nghi portrait. Both source
 contamination. Without the two big defects the same tour scores ~64.
+
+---
+
+## QUEUED 2026-08-04 — ClickUp rate-limited (131 min). Post to 👤 Michael (`1000410000000735`) when it clears.
+
+**Task name:** 📄 Approve the accuracy disclaimer wording — the app has none today
+**Priority:** high
+
+You wrote: *"we should in the disclaimer when people are installing / use our
+application that the data comes from Internet sources. **If we do not, we
+should.**"*
+
+**We do not.** I searched `audio_tour_app/lib` — there is no accuracy
+disclaimer anywhere. The only "AI-generated" strings concern replacing a custom
+audio recording.
+
+This matters more now, because your D100 ruling makes it policy: **we publish
+unverifiable claims deliberately**, on the reasoning that "having no
+information may be worse than having unverifiable information." Defensible —
+but only if we say so.
+
+### Pick or edit the wording
+
+Two places: the **About screen**, and a **one-time notice on first launch**.
+
+**Draft A — plain**
+> Audioura tours are generated from public internet sources, including
+> Wikipedia and museum websites. We check facts against those sources where we
+> can, but some details may be incomplete or wrong. Please don't rely on tour
+> content for anything important.
+
+**Draft B — confident (LEAD's recommendation)**
+> Every Audioura tour is written from public sources — Wikipedia, museum
+> catalogues, and the institutions' own websites. We verify what we can and
+> leave out what we believe is wrong. Some details will still be unverified.
+> If something sounds off, it may be.
+
+**Draft C — short, for the first-launch notice**
+> Tours are generated from public internet sources. Some details may be
+> unverified.
+
+**Why B:** it states what we actually do, including the part he decided — block
+what we believe is wrong, allow what we merely cannot confirm. A and C imply we
+do not check at all, which undersells the work and reads as boilerplate. "If
+something sounds off, it may be" invites the listener to act as a check on us,
+worth more than a legal shield.
+
+### Needed from Michael
+1. Which draft, or his edit.
+2. First-launch notice: yes or no? LEAD's view is yes — a disclaimer only in
+   About is one nobody reads, and this one is load-bearing.
+
+Then LEAD dispatches: About screen + first-launch notice + the same text in
+both store listings (which `wdvrdaw6em`/`wdvrdaw6en` need anyway).
+
+**Separate from** the privacy policy (`wdvrdaw6em`), which is about data
+handling and is required by both stores. This one is about content accuracy and
+is required by nobody — we do it because it is honest.
