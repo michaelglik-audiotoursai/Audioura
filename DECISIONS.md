@@ -2608,3 +2608,85 @@ be about that work, which for a reinterpretation means the artist matters.
 Also found: three enriched sources carry `tier: None` (a YouTube video and a
 departmental portal among them), so D51's trust hierarchy cannot be applied to
 them at all. Unlabelled is worse than tier 3.
+
+---
+
+## D75 — A maker's biography is not a wrong artwork. Passages need roles, not a keep/drop verdict (2026-08-04)
+
+LOCAL-202 applied D74's rule ("venue confirmation must come from the same
+source as the subject claim") and stripped 10 passages from 9 rows. Some of
+that is right; some of it deleted good grounding; and it was not applied
+consistently.
+
+**The genuine catch:** id 17 "Le Village de grand-mère" was sourced to
+**Claude Viallat**. The work is by **Arman** — MAMAC's own collection metadata
+says so. That is a D74 error found and removed. Also removed: Antoine Bonfanti
+(a sound engineer) attached to the Yves Klein fire wall.
+
+**The over-removal.** Ids 21/22/23 — a harp by Naderman, a guitar by Antonio
+de Torres, a bass violin by Testore, all at Palais Lascaris — lost their only
+source because the maker's Wikipedia biography does not mention Nice. That bar
+cannot be met: an article about an 18th-century Parisian harp maker will never
+list which museum holds a surviving instrument.
+
+**And the categories are not the same.** Manet's canvas is a *different
+object* — passages describe a thing that is not at the stop. Naderman's
+biography describes *the maker of the object that is there*. Grounding a
+sentence about the maker in the maker's biography is correct; grounding a
+sentence about the instrument in it is not. The fix is not keep-or-drop.
+
+**Decision: passages carry a role.**
+`about_subject` (this object/exhibition) · `about_creator` (its artist or
+maker) · `about_venue` (the institution). The gate and the narration prompt
+then say what each role may support: a stop with only `about_creator` may
+discuss the maker and must not describe the object.
+
+**Two further removals were metric-chasing, not validation.** Èze's Wikipedia
+article was dropped because the passage says "commune" and the stop title says
+"village"; Paloma Beach lost Saint-Jean-Cap-Ferrat; Cap d'Antibes lost *Tender
+Is the Night*. Those sources are about the right places. They failed the
+**coverage word-match**, which is a measurement, not a validity test. Deleting
+sources to satisfy the metric is the wrong direction even when — as here — it
+makes the metric worse (55/5/1 → 52/3/6).
+
+**The inconsistency LEAD must not leave standing.** Id 18, Richard Long, keeps
+its artist biography and still reads COVERED — and its venue signal comes from
+a *different passage in the same set*, which is exactly the loophole D74 was
+written to close. Ids 21/22/23 were held to the strict rule and emptied. The
+flagship experiment venue got the lenient treatment. One rule, both places.
+
+**Data state:** live is 52 COVERED / 3 VENUE_ONLY / 6 EMPTY of 61. Nothing
+original was lost — each stripped row had exactly one passage, added by
+LOCAL-199. The five emptied stops are deliberately left empty for now:
+LOCAL-198's gate degrades them honestly, which is safer than restoring
+untagged maker biographies that invite the model to describe an object from
+its maker's life story. **LOCAL-203** restores them with roles.
+
+---
+
+## D76 — Five Subscribed features are built, tested, merged, and none of them run (2026-08-04)
+
+LOCAL-201 did the container check its task asked for:
+
+> the running containers are missing `pricing.py` and `wallet_ledger.py`
+> (tour-generator) and `cost_meter.py`, `pricing.py`, `wallet_ledger.py`,
+> `cost_rates.py` (news-orchestrator)
+
+So the chain is: **193** article truncation, **197** real token rates, **200**
+cache-hit charge basis, **201** the wiring for it — plus the wallet API before
+them — all merged to `subscribed`, all passing tests, **none deployed**.
+
+The blocker is not any one task. There is no build path for subscribed-track
+services: the repo working tree sits on `storied`, and every image is built
+from it, so subscribed-only modules are absent by construction. This is the
+same wall that parked `Dockerfile.news-orchestrator` earlier.
+
+Each task correctly declared its own limitation. Nobody was in a position to
+see the accumulation, which is LEAD's job and is why this entry exists.
+
+**LOCAL-204** dispatched to build the plumbing: images built from a
+`subscribed` worktree under a distinct compose project so they cannot collide
+with the storied containers Michael's phone talks to. **The deploy itself
+stays with LEAD** (D48), and it will not happen while Michael is away and
+unable to field-test — a subscribed stack that starts charging wallets is not
+something to switch on unattended.
