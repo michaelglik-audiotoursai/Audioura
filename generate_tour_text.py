@@ -6399,6 +6399,43 @@ REWRITE RULES (all mandatory):
                   f"{_style_retry_successes} fixed/improved, {_style_retry_failures} kept original")
             print(f"  [LOCAL-192] Retry cost: ${_style_retry_cost:.4f} ({_style_retry_tokens} tokens)")
 
+    # -------- [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion --------
+    # D89: a sentence that fits any stop belongs to no stop — delete it.
+    # Behind DISABLE_R9_DELETION=1 flag. $0.00 — deterministic, no LLM call.
+    _r9_deletion_disabled = os.environ.get('DISABLE_R9_DELETION', '').strip() == '1'
+    if _r9_deletion_disabled:
+        print(f"\n  [LOCAL-216] R9 deletion DISABLED by DISABLE_R9_DELETION=1 env var")
+    else:
+        print(f"\n  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...")
+        try:
+            from style_validator_detector import apply_r9_to_description as _r9_apply
+        except ImportError:
+            _r9_apply = None
+            print(f"  [LOCAL-216] WARNING: apply_r9_to_description not importable — R9 skipped")
+
+        if _r9_apply:
+            _r9_total_deleted = 0
+            _r9_total_paras_emptied = 0
+            _r9_stops_affected = 0
+
+            for _si, _poi in enumerate(poi_list):
+                _desc = _poi.get('description', '')
+                if not _desc or _desc.startswith('['):
+                    continue
+
+                _new_desc, _deleted, _emptied = _r9_apply(_desc)
+                if _deleted > 0 or _emptied > 0:
+                    poi_list[_si]['description'] = _new_desc
+                    _r9_total_deleted += _deleted
+                    _r9_total_paras_emptied += _emptied
+                    _r9_stops_affected += 1
+                    print(f"  [LOCAL-216] Stop {_si+1} '{_poi.get('name', '')[:30]}': "
+                          f"{_deleted} sentence(s) deleted, {_emptied} paragraph(s) emptied")
+
+            print(f"  [LOCAL-216] R9 summary: {_r9_total_deleted} sentences deleted, "
+                  f"{_r9_total_paras_emptied} paragraphs emptied, "
+                  f"{_r9_stops_affected} stops affected")
+
     # -------- PHASE 5.5: post-description validation for museum tours --------
     # Fix 4 (Claude session 7): second validate_enhanced_poi_knowledge() call for ALL tour types.
     # At this point descriptions are populated — the fictional-content patterns now have text to match.
