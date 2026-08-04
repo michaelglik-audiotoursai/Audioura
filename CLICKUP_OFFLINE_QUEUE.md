@@ -3247,3 +3247,75 @@ break. Needs Michael present, with the token to hand for the one prompt.
 
 Also: the Mac's token has **no expiry**. Put a 12-month expiry on its
 replacement.
+
+---
+
+## QUEUED 2026-08-04 — ClickUp rate-limited (63 min). Post to 👤 Michael (`1000410000000735`). **Michael asked for this one explicitly.**
+
+**Task name:** 🔑 Check whether the Windows laptop uses the expiring GitHub token (before ~Aug 7)
+**Priority:** high · **Due:** 2026-08-06
+
+### Step 1 — "Last used" (any computer, 30 seconds)
+Do NOT use the email link. Type github.com → avatar → Settings → Developer
+settings → Personal access tokens → Tokens (classic) → find "Ubuntu VM Token"
+→ read **Last used**.
+
+| Last used | meaning |
+|---|---|
+| within the last week | something uses it → Step 3 |
+| a month or more ago | probably dormant → Step 3 to confirm |
+| Never used | nothing uses it → Step 4 |
+| token not listed at all | the email was phishing; stop |
+
+### Step 2 — Mac Mini already ruled out
+| | Ubuntu VM Token | Mac Mini |
+|---|---|---|
+| scopes | 11, incl. repo, read:org, read:packages | **repo only** |
+| expiry | ~7 Aug | none |
+
+### Step 3 — On the Windows laptop (PowerShell)
+
+3a. Is there a stored credential?
+```powershell
+cmdkey /list | Select-String github
+```
+Nothing → skip to Step 4.
+
+3b. Which scopes? (does not print the token)
+```powershell
+$c = "protocol=https`nhost=github.com`n" | git credential fill
+$tok = ($c | Select-String '^password=') -replace '^password=',''
+$r = Invoke-WebRequest -Uri https://api.github.com/user -Headers @{Authorization="token $tok"} -UseBasicParsing
+"scopes : " + $r.Headers['X-OAuth-Scopes']
+"expiry : " + $r.Headers['github-authentication-token-expiration']
+```
+
+3c. Read it:
+- long scope list (repo + read:org + read:packages + read:audit_log…) → **this IS the expiring token** → Step 5
+- just `repo`, blank expiry → different token → Step 4
+- auth error → credential already dead → Step 4
+
+### Step 4 — Nothing uses it: let it expire
+Broad scopes, unaccounted for, and expiry is a free test — if something
+forgotten uses it, it fails visibly and a replacement takes two minutes.
+Decisive option: delete it on that page.
+
+### Step 5 — The laptop uses it: regenerate
+1. Tokens (classic) → "Ubuntu VM Token" → **Regenerate token**
+2. **Expiration: 90 days** — not "No expiration"
+3. Trim scopes to `repo` if the laptop only pushes code
+4. Copy the new token (shown once)
+
+Then on the laptop:
+```powershell
+cmdkey /delete:LegacyGeneric:target=git:https://github.com
+git -C C:\path\to\Audioura fetch origin
+```
+Username `michaelglik-audiotoursai`, password = the **new token**. Confirm:
+```powershell
+git -C C:\path\to\Audioura ls-remote origin | Select-Object -First 2
+```
+
+### Context
+The Windows laptop has not pushed to origin since **30 June**
+(`services-migration`), so even the worst case interrupts nothing in progress.
