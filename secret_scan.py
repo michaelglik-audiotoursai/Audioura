@@ -296,6 +296,18 @@ def detect_high_entropy_secret(line: str, lineno: int, filepath: str) -> list:
         # Skip shell command substitutions
         if val.startswith("$(") or val.startswith("`"):
             continue
+        # Skip cryptographic digests. A pure-hex string of exactly MD5/SHA-1/
+        # SHA-256 length is a hash, not a credential — our tour_cache keys are
+        # SHA-256 of the request and appear in SQL examples in the docs. No
+        # provider's API key is pure lowercase hex at these lengths (AWS secret
+        # keys are 40 chars but mixed-case base64-ish, not hex).
+        #
+        # This matters more than the noise it removes: on 2026-08-04 the tick
+        # alarm fired six times on cache keys in CLICKUP_OFFLINE_QUEUE.md. An
+        # alarm that cries wolf is one we learn to skip past, and this one has
+        # to still be believed the day it catches something real.
+        if len(val) in (32, 40, 64) and all(c in "0123456789abcdefABCDEF" for c in val):
+            continue
         findings.append(Finding(
             file=filepath, line=lineno,
             detector="high_entropy_assignment",
