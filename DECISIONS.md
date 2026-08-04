@@ -4092,3 +4092,43 @@ rated highest.
 **Not verified:** the task scored rules only, no generation run, so we know R1
 no longer flags cycling navigation but not that the retry leaves it alone in a
 live run. Stated in its limitations and worth confirming on the next generation.
+
+---
+
+## D108 — The secret alarm fired, and it was our own cache keys (2026-08-04)
+
+First real firing of the tick alarm added after D81. Six findings across three
+commits, all in `CLICKUP_OFFLINE_QUEUE.md`:
+
+```
+[high_entropy_assignment] CLICKUP_OFFLINE_QUEUE.md:2227
+    cache_key = '959f666f3aaf681223781c3e9e81a27c34368da73f31300ec3c98474eca7fe54'
+```
+
+A SHA-256 `tour_cache` key inside a SQL example in a task write-up. The
+variable is named `cache_key`, the value is high-entropy, and the detector
+matched on the name. **Not a credential** — it is a hash of a tour request.
+
+**Fixed narrowly:** skip pure-hex values of exactly 32, 40 or 64 characters —
+MD5, SHA-1, SHA-256. No provider's API key is pure lowercase hex at those
+lengths; AWS secret keys are 40 characters but mixed-case base64-ish, not hex.
+Verified after the change:
+
+```
+SHA-256 cache key      → silent
+real OpenAI key        → fires
+AWS secret (40ch)      → fires
+bare key in prose      → fires
+sk.py at first commit  → still caught (3 findings)
+recent storied commits → 0 real findings, alarm quiet
+```
+
+**Why this was worth doing immediately rather than filing.** The whole value of
+that alarm is that it will be believed on the day it catches something real.
+Two credentials sat on origin for months because nothing was watching; an alarm
+that fires on our own cache keys every five minutes is one we learn to scroll
+past, and then it is worth less than no alarm at all — because we would think
+we were covered.
+
+Same reasoning as the worktree prune's idle guard (D84a): a guard that damages
+the thing it protects gets switched off, and then the protection is gone.
