@@ -158,8 +158,13 @@ def build_verification_queries(claims: List[Dict], stop_title: str,
         # Strip context annotation
         core_text = text.split(' (')[0].strip() if ' (' in text else text
         
-        # Identify subject: look for proper nouns or key entities
-        subject = _extract_subject(core_text, stop_title)
+        # LOCAL-221 fix: Use the source sentence for subject extraction when
+        # the claim text is bare (a number/date with no proper nouns).
+        # "320 feet" has no extractable subject, but "the deep bay provides
+        # secure anchorage, with depths reaching 320 feet" does.
+        sentence = claim.get('sentence', '')
+        subject_source = sentence if sentence else core_text
+        subject = _extract_subject(subject_source, stop_title)
         if subject not in subject_groups:
             subject_groups[subject] = []
         subject_groups[subject].append(i)
@@ -170,8 +175,19 @@ def build_verification_queries(claims: List[Dict], stop_title: str,
         facts = []
         for idx in indices:
             core = claims[idx]['text'].split(' (')[0].strip() if ' (' in claims[idx]['text'] else claims[idx]['text']
-            # Extract the predicate/fact part
-            facts.append(core)
+            # LOCAL-221: For bare numeric/date claims, extract key context words
+            # from the sentence to make the query meaningful.
+            sentence = claims[idx].get('sentence', '')
+            if sentence and not any(c.isupper() for c in core if c.isalpha()):
+                # Bare claim (no proper nouns) — extract meaningful context words
+                # that describe WHAT the number refers to
+                context_words = _extract_query_context(sentence, core)
+                if context_words:
+                    facts.append(f'{context_words} {core}')
+                else:
+                    facts.append(core)
+            else:
+                facts.append(core)
 
         # Build a targeted query
         # Use the most specific fact + location context
@@ -203,7 +219,16 @@ def build_verification_queries(claims: List[Dict], stop_title: str,
         if i in used_indices:
             continue
         core = claim['text'].split(' (')[0].strip() if ' (' in claim['text'] else claim['text']
-        query_text = f'{core} {stop_title} {city}'.strip()
+        # LOCAL-221: use sentence context for bare claims
+        sentence = claim.get('sentence', '')
+        if sentence and not any(c.isupper() for c in core if c.isalpha()):
+            context_words = _extract_query_context(sentence, core)
+            if context_words:
+                query_text = f'{context_words} {core} {stop_title} {city}'.strip()
+            else:
+                query_text = f'{core} {stop_title} {city}'.strip()
+        else:
+            query_text = f'{core} {stop_title} {city}'.strip()
         if len(query_text) > 200:
             query_text = query_text[:200]
         queries.append({
@@ -215,31 +240,114 @@ def build_verification_queries(claims: List[Dict], stop_title: str,
     return queries
 
 
+def _extract_query_context(sentence: str, claim_value: str) -> str:
+    """Extract meaningful context words from a sentence to build a search query.
+    
+    When the claim is bare (e.g. "320 feet"), we need words from the sentence
+    that describe WHAT the number refers to. For "the deep bay provides secure
+    anchorage, with depths reaching 320 feet", we want "bay depth anchorage".
+    
+    Returns a short string of 2-4 context keywords, or '' if nothing useful.
+    """
+    # Remove the claim value itself from the sentence
+    remaining = sentence.replace(claim_value, '').strip()
+    
+    # Tokenize and remove stop words
+    tokens = _tokenize(remaining)
+    stop_words = {
+        'the', 'a', 'an', 'is', 'was', 'are', 'were', 'has', 'had', 'have',
+        'this', 'that', 'its', 'with', 'from', 'for', 'and', 'but', 'not',
+        'you', 'your', 'can', 'will', 'would', 'could', 'should', 'may',
+        'might', 'into', 'onto', 'upon', 'over', 'under', 'between',
+        'through', 'about', 'here', 'there', 'where', 'when', 'which',
+        'what', 'who', 'how', 'been', 'being', 'also', 'very', 'just',
+        'than', 'then', 'more', 'most', 'some', 'each', 'every', 'both',
+        'such', 'only', 'still', 'even', 'well', 'back', 'much',
+        'these', 'those', 'other', 'many', 'like', 'make', 'made',
+        'providing', 'provides', 'reaching', 'reaches', 'offering',
+    }
+    meaningful = [t for t in tokens if t not in stop_words and len(t) > 2]
+    
+    # Take the most distinctive 3-4 words (prefer nouns — longer words)
+    # Sort by length descending as a proxy for specificity
+    meaningful.sort(key=lambda w: len(w), reverse=True)
+    
+    return ' '.join(meaningful[:4])
+
+
 def _extract_subject(claim_text: str, stop_title: str) -> str:
-    """Extract the primary subject from a claim for query grouping."""
+    """Extract the primary subject from a claim for query grouping.
+    
+    The subject is the entity the claim is ABOUT. For evidence matching,
+    the source must mention this subject — otherwise word overlap alone
+    is meaningless (D62).
+    
+    Priority:
+    1. If claim_text contains the stop title → stop_title
+    2. Multi-word proper noun phrase in the text (≥2 meaningful words)
+    3. Fallback: stop_title (forces source to mention the stop)
+    
+    Common false subjects (articles, generic adjectives) are explicitly excluded.
+    """
     # If the claim mentions the stop title, that's the subject
     if _normalize(stop_title) in _normalize(claim_text):
         return stop_title
 
-    # Look for proper noun phrases (capitalized words)
-    # Simple heuristic: first sequence of capitalized words
+    # Skip words that are NOT meaningful subjects
+    # French and English articles, prepositions, generic adjectives
+    skip_words = {
+        'The', 'A', 'An', 'In', 'At', 'On', 'By', 'It', 'Its', 'This', 'That',
+        'Le', 'La', 'Les', 'Un', 'Une', 'Des', 'Du', 'De', 'L',
+        'From', 'For', 'With', 'To', 'As', 'But', 'And', 'Or', 'If',
+        'French', 'English', 'Italian', 'Spanish', 'German', 'American',
+        'European', 'Mediterranean', 'National', 'Royal', 'Grand',
+        'Dans', 'Sur', 'Avec', 'Pour', 'Par', 'Et', 'Ou', 'Cette',
+        'Step', 'Stop', 'Here', 'There', 'Today', 'Now', 'Then',
+        # Months (often capitalized but not subjects)
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December',
+        'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+        'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+    }
+
+    # Look for proper noun phrases (capitalized multi-word sequences)
     words = claim_text.split()
     proper_nouns = []
     for w in words:
-        # Skip common sentence starters and articles
-        if w in ('The', 'A', 'An', 'In', 'At', 'On', 'By', 'It', 'Its', 'This', 'That'):
+        # Strip punctuation for matching
+        clean_w = w.strip("'\".,;:!?()[]{}«»")
+        if not clean_w:
+            continue
+        # Skip known non-subject words
+        if clean_w in skip_words:
             if proper_nouns:
                 break
             continue
-        if w and w[0].isupper() and not w.isupper():
-            proper_nouns.append(w)
+        # Skip single-letter words (L', D', etc.)
+        if len(clean_w) <= 1:
+            if proper_nouns:
+                break
+            continue
+        if clean_w and clean_w[0].isupper() and not clean_w.isupper():
+            proper_nouns.append(clean_w)
         elif proper_nouns:
             break
 
-    if proper_nouns:
-        return ' '.join(proper_nouns)
+    # Require at least 2 characters in the proper noun to be meaningful
+    # Single words like "French" or "Step" are too generic
+    if proper_nouns and len(' '.join(proper_nouns)) >= 4:
+        # Verify it's not just a generic nationality/adjective alone
+        subject = ' '.join(proper_nouns)
+        generic_lone = {'French', 'English', 'Italian', 'Spanish', 'European',
+                       'American', 'National', 'Royal', 'Modern', 'Ancient',
+                       'Grand', 'Ancien', 'Nouveau', 'Premier', 'Dernier'}
+        if subject not in generic_lone:
+            return subject
 
-    # Fallback: use the stop title as subject
+    # Fallback: use the stop title as subject.
+    # This is IMPORTANT for safety: it forces the source sentence to mention
+    # the stop, preventing false promotions from unrelated pages that happen
+    # to contain the same year/number.
     return stop_title
 
 
@@ -290,6 +398,9 @@ def _numbers_compatible(claim_nums: List[Tuple[float, str]],
     
     Handles unit conversions. Returns True only if a source number matches
     the claim's number within tolerance after conversion.
+    
+    Years (4-digit numbers without units) require EXACT match — a 15%
+    tolerance would make 1963 ≈ 1973 which is incorrect for dates.
     """
     if not claim_nums or not source_nums:
         return True  # No numbers to compare = not a numeric mismatch
@@ -300,24 +411,30 @@ def _numbers_compatible(claim_nums: List[Tuple[float, str]],
         if c_unit in _TO_METERS:
             c_meters = c_val * _TO_METERS[c_unit]
 
+        # Detect if this is a year (4-digit number without a unit)
+        is_year = (not c_unit and 1000 < c_val < 2100 and c_val == int(c_val))
+
         matched = False
         for s_val, s_unit in source_nums:
-            # Direct comparison (same unit or both unitless)
-            if c_unit == s_unit or (not c_unit and not s_unit):
-                if abs(c_val - s_val) / max(c_val, 1) <= tolerance:
+            # Year comparison: exact match only (LOCAL-221 fix)
+            if is_year and not s_unit and 1000 < s_val < 2100 and s_val == int(s_val):
+                if c_val == s_val:
                     matched = True
                     break
+                else:
+                    continue  # Different year — not compatible
+
+            # Direct comparison (same unit or both unitless, non-year)
+            if c_unit == s_unit or (not c_unit and not s_unit):
+                if not is_year:  # Guard: don't fall through for years
+                    if abs(c_val - s_val) / max(c_val, 1) <= tolerance:
+                        matched = True
+                        break
 
             # Cross-unit comparison via meters
             if c_meters is not None and s_unit in _TO_METERS:
                 s_meters = s_val * _TO_METERS[s_unit]
                 if abs(c_meters - s_meters) / max(c_meters, 1) <= tolerance:
-                    matched = True
-                    break
-
-            # Year comparison (exact match only)
-            if not c_unit and not s_unit and c_val > 1000 and s_val > 1000:
-                if c_val == s_val:
                     matched = True
                     break
 
@@ -329,13 +446,20 @@ def _numbers_compatible(claim_nums: List[Tuple[float, str]],
 
 
 def evaluate_evidence(claim_text: str, source_sentences: List[str],
-                      stop_title: str) -> Optional[Dict]:
+                      stop_title: str, claim_sentence: str = "") -> Optional[Dict]:
     """Evaluate whether any source sentence actually supports the claim.
     
     Rules (D62, D100):
     - The sentence must assert the same fact about the SAME subject.
     - Unit conversions must be verified, not assumed.
     - Mere word overlap is not support.
+    
+    Args:
+        claim_text: The extracted claim text (may be bare, e.g. '320 feet').
+        source_sentences: Candidate supporting sentences from external sources.
+        stop_title: The stop/POI name.
+        claim_sentence: The FULL source sentence the claim was extracted from.
+            Used to reconstruct subject binding when claim_text is bare.
     
     Returns: {sentence, score, reason} or None if no support found.
     """
@@ -344,8 +468,20 @@ def evaluate_evidence(claim_text: str, source_sentences: List[str],
     claim_tokens = set(_tokenize(claim_core))
     claim_numbers = _extract_numbers(claim_core)
 
-    # What subject is the claim about?
-    claim_subject = _extract_subject(claim_core, stop_title)
+    # LOCAL-221 fix: When the claim text is bare (a number or date without
+    # surrounding context), use the full sentence for subject binding and
+    # for token overlap. This is the integration defect the LEAD review found:
+    # claim_check emits NUMBER claims as e.g. '320 feet', but evaluate_evidence
+    # needs surrounding context to know WHAT is 320 feet deep/tall/long.
+    #
+    # Strategy: use claim_sentence for subject extraction and contextual token
+    # matching, but still require the specific claim value (the number) to
+    # appear in the source.
+    context_text = claim_sentence if claim_sentence else claim_core
+    context_tokens = set(_tokenize(context_text))
+
+    # What subject is the claim about? Use the sentence for better subject extraction.
+    claim_subject = _extract_subject(context_text, stop_title)
     claim_subject_norm = _normalize(claim_subject)
 
     best_match = None
@@ -403,13 +539,22 @@ def evaluate_evidence(claim_text: str, source_sentences: List[str],
                 continue
 
         # Rule 2: Token overlap — need substantial overlap beyond the subject
-        non_subject_claim_tokens = claim_tokens - set(_tokenize(claim_subject))
-        if non_subject_claim_tokens:
-            overlap = non_subject_claim_tokens & sent_tokens
-            overlap_ratio = len(overlap) / len(non_subject_claim_tokens)
+        # LOCAL-221 fix: When claim_text is bare (a number/date), use context_tokens
+        # from the full sentence to compute meaningful overlap. The bare claim
+        # "320 feet" has no context tokens; the sentence "the deep bay provides
+        # secure anchorage, with depths reaching 320 feet" has many.
+        subject_tokens = set(_tokenize(claim_subject))
+        
+        # Use context tokens (from sentence) when available and claim is bare
+        effective_claim_tokens = context_tokens if claim_sentence else claim_tokens
+        non_subject_tokens = effective_claim_tokens - subject_tokens
+        
+        if non_subject_tokens:
+            overlap = non_subject_tokens & sent_tokens
+            overlap_ratio = len(overlap) / len(non_subject_tokens)
         else:
-            overlap = claim_tokens & sent_tokens
-            overlap_ratio = len(overlap) / max(len(claim_tokens), 1)
+            overlap = effective_claim_tokens & sent_tokens
+            overlap_ratio = len(overlap) / max(len(effective_claim_tokens), 1)
 
         # Rule 3: If claim has numbers, source must have compatible numbers
         number_match_bonus = 0.0
@@ -498,30 +643,63 @@ def verify_unsupported_claims(
 
     # Filter out claims too short/generic to meaningfully verify externally.
     # A claim like "pop art" or "North and South" alone carries no verifiable fact.
-    # Claims must contain at least 4 meaningful tokens AND either:
-    # - A number/date (verifiable by comparison), or
-    # - A proper noun + predicate (a falsifiable assertion)
-    MIN_CLAIM_TOKENS = 4
+    # Claims must be verifiable externally. A claim is verifiable if:
+    # - It has a number/date (verifiable by comparison with sources), OR
+    # - It has a proper noun + predicate (a falsifiable assertion), OR
+    # - Its source SENTENCE provides enough context for a meaningful query.
+    #
+    # LOCAL-221 fix: bare claim text may be short ("21 juin 1990" = 3 tokens),
+    # but if the sentence carries the subject and predicate, the claim IS
+    # verifiable. The sentence is what we search with, not the bare text.
+    MIN_CLAIM_TOKENS = 3  # Reduced: "320 feet" is 2 tokens but verifiable with sentence
+    MIN_SENTENCE_TOKENS = 5  # The sentence must carry enough context
     verifiable_claims = []
     non_verifiable_indices = []
     for i, claim in enumerate(claims):
         core_text = claim['text'].split(' (')[0].strip() if ' (' in claim['text'] else claim['text']
         tokens = _tokenize(core_text)
-        # Must have at least MIN_CLAIM_TOKENS meaningful words
-        if len(tokens) < MIN_CLAIM_TOKENS:
-            non_verifiable_indices.append(i)
-            continue
-        # Must contain either a number/date or be a genuine predicate
+        sentence = claim.get('sentence', '')
+        sentence_tokens = _tokenize(sentence) if sentence else []
+        
+        # A claim is verifiable if it has a number/date (the thing we compare)
         has_number = any(c.isdigit() for c in core_text)
         has_predicate_signal = any(w in core_text.lower() for w in
                                     ('built', 'designed', 'founded', 'established',
                                      'created', 'opened', 'named', 'known as',
                                      'located', 'constructed', 'completed'))
-        # At least 5 tokens if no number/predicate (needs more context)
-        if not has_number and not has_predicate_signal and len(tokens) < 5:
+        
+        # With sentence context, even short claims like "1990" or "320 feet"
+        # are verifiable if the sentence names the subject.
+        if has_number and sentence and len(sentence_tokens) >= MIN_SENTENCE_TOKENS:
+            verifiable_claims.append((i, claim))
+            continue
+        
+        # Predicate claims with sentence context
+        if has_predicate_signal and sentence and len(sentence_tokens) >= MIN_SENTENCE_TOKENS:
+            verifiable_claims.append((i, claim))
+            continue
+        
+        # Claims with enough tokens on their own (e.g. "known as 'the Biblical Message series'")
+        if len(tokens) >= 4:
+            verifiable_claims.append((i, claim))
+            continue
+            
+        # Claims too short AND no sentence context — can't verify
+        if len(tokens) < MIN_CLAIM_TOKENS and not sentence:
             non_verifiable_indices.append(i)
             continue
-        verifiable_claims.append((i, claim))
+            
+        # Short claims without number/predicate and insufficient sentence
+        if not has_number and not has_predicate_signal and len(sentence_tokens) < MIN_SENTENCE_TOKENS:
+            non_verifiable_indices.append(i)
+            continue
+        
+        # Fallback: movement/composition claims are often short but identifiable
+        # in context — allow if sentence provides subject
+        if sentence and len(sentence_tokens) >= MIN_SENTENCE_TOKENS:
+            verifiable_claims.append((i, claim))
+        else:
+            non_verifiable_indices.append(i)
 
     # Build batched queries (only for verifiable claims)
     verifiable_claim_list = [c for _, c in verifiable_claims]
@@ -536,6 +714,7 @@ def verify_unsupported_claims(
     for i in non_verifiable_indices:
         results[i] = {
             'claim_text': claims[i]['text'],
+            'claim_type': claims[i].get('type', 'UNKNOWN'),
             'verdict': 'UNSUPPORTED',
             'url': None,
             'tier': None,
@@ -586,15 +765,20 @@ def verify_unsupported_claims(
 
             claim = verifiable_claim_list[vi]
             claim_text = claim['text']
+            # LOCAL-221 fix: carry the source sentence for subject binding
+            claim_sentence = claim.get('sentence', '')
+            claim_type = claim.get('type', 'UNKNOWN')
 
             # First: check snippets (free, no fetch needed)
             for url, tier, snippet in viable_results:
                 if snippet:
                     snippet_sentences = _split_sentences(snippet)
-                    evidence = evaluate_evidence(claim_text, snippet_sentences, stop_title)
+                    evidence = evaluate_evidence(claim_text, snippet_sentences,
+                                                stop_title, claim_sentence)
                     if evidence:
                         results[oi] = {
                             'claim_text': claim_text,
+                            'claim_type': claim_type,
                             'verdict': SUPPORTED_EXTERNAL,
                             'url': url,
                             'tier': tier,
@@ -620,19 +804,25 @@ def verify_unsupported_claims(
                 # Extract sentences from the page
                 page_sentences = _split_sentences(page_text)
                 # Limit to relevant sentences (contain at least one claim keyword)
-                claim_keywords = [w for w in _tokenize(claim_text) if len(w) > 3]
+                # LOCAL-221 fix: use sentence tokens for keyword extraction when
+                # claim_text is bare (e.g. "320 feet" → use sentence keywords
+                # like "depths", "bay", "villefranche" for page filtering)
+                keyword_source = claim_sentence if claim_sentence else claim_text
+                claim_keywords = [w for w in _tokenize(keyword_source) if len(w) > 3]
                 relevant_sentences = []
                 for s in page_sentences:
                     s_lower = s.lower()
-                    if any(kw in s_lower for kw in claim_keywords[:3]):
+                    if any(kw in s_lower for kw in claim_keywords[:5]):
                         relevant_sentences.append(s)
                     if len(relevant_sentences) >= 50:
                         break
 
-                evidence = evaluate_evidence(claim_text, relevant_sentences, stop_title)
+                evidence = evaluate_evidence(claim_text, relevant_sentences,
+                                            stop_title, claim_sentence)
                 if evidence:
                     results[oi] = {
                         'claim_text': claim_text,
+                        'claim_type': claim_type,
                         'verdict': SUPPORTED_EXTERNAL,
                         'url': url,
                         'tier': tier,
@@ -646,6 +836,7 @@ def verify_unsupported_claims(
         if results[i] is None:
             results[i] = {
                 'claim_text': claims[i]['text'],
+                'claim_type': claims[i].get('type', 'UNKNOWN'),
                 'verdict': 'UNSUPPORTED',  # Stays unsupported
                 'url': None,
                 'tier': None,

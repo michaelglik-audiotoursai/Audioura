@@ -1309,6 +1309,7 @@ def check_paragraph(
         results.append({
             'text': claim['text'],
             'type': claim['type'],
+            'sentence': claim.get('sentence', ''),
             'verdict': verdict,
             'evidence': evidence,
             'score': round(score, 3),
