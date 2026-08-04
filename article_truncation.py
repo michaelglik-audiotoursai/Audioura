@@ -71,14 +71,19 @@ def get_char_limit_for_tier(tier: str) -> int:
 
 # --- FREE TIER ---
 # Candidate A (shipping): direct, names what lifts it
+# D58, Michael's words: "the last line should also encourage people to
+# subscribe then this limit will be increased to xxx number of characters."
+# He asked for the NUMBER, not a vague "longer" — so the notice names both.
 _FREE_NOTICE_A = (
     "\n\nThis article has been shortened to {limit} characters. "
-    "Subscribe to read longer articles."
+    "Subscribe to read articles up to {sub_limit} characters."
 )
 # Candidate B (alternate): slightly softer
+# NOTE: an earlier draft of B said "Subscribers can access the full text."
+# That is false — subscribers get a higher limit, not an unlimited one. Fixed.
 _FREE_NOTICE_B = (
     "\n\nYou're reading a shortened version of this article ({limit} characters). "
-    "Subscribers can access the full text."
+    "Subscribers can read up to {sub_limit} characters."
 )
 
 # --- SUBSCRIBED TIER ---
@@ -99,7 +104,10 @@ def _get_notice(tier: str, limit: int) -> str:
     """
     if tier in ('ppu', 'unlimited'):
         return _SUBSCRIBED_NOTICE_A.format(limit=f"{limit:,}")
-    return _FREE_NOTICE_A.format(limit=f"{limit:,}")
+    return _FREE_NOTICE_A.format(
+        limit=f"{limit:,}",
+        sub_limit=f"{get_subscribed_char_limit():,}",
+    )
 
 
 # ---------------------------------------------------------------------------

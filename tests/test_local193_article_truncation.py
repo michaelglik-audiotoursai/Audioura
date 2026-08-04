@@ -350,14 +350,14 @@ class TestNoticeCompliance(unittest.TestCase):
     """T9: No dollar amount, no 'cost' wording in user-facing strings."""
 
     def test_free_notice_no_cost_no_dollar(self):
-        notice = _FREE_NOTICE_A.format(limit="5,000")
+        notice = _FREE_NOTICE_A.format(limit="5,000", sub_limit="15,000")
         self.assertNotIn('$', notice)
         self.assertNotIn('cost', notice.lower())
         self.assertNotIn('token', notice.lower())
         self.assertNotIn('save', notice.lower())
 
     def test_free_notice_b_no_cost_no_dollar(self):
-        notice = _FREE_NOTICE_B.format(limit="5,000")
+        notice = _FREE_NOTICE_B.format(limit="5,000", sub_limit="15,000")
         self.assertNotIn('$', notice)
         self.assertNotIn('cost', notice.lower())
         self.assertNotIn('token', notice.lower())
