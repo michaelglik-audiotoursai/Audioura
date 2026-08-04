@@ -1756,3 +1756,50 @@ measurement was wrong in a way that looked like a finding.**
 
 Worth stating as a rule: *before believing a null result, check that the
 experiment was capable of producing a non-null one.*
+
+---
+
+## D56 — We reproduced Michael's own bug inside the corpus (2026-08-03)
+
+Round 4b fetched per-work sources for Palais Lascaris and lifted it from
+0.0% to 29.4% ANCHORED for **$0.010**. The mechanism works. But LEAD read
+the two sources behind the two anchors that moved the score, and one is
+false:
+
+**The Annunciation** was anchored on a MAMAC exhibition PDF about a **2020
+contemporary artwork** by Barbara and Michael Leisgen. It contains the word
+"Annunciation" and mentions Palais Lascaris elsewhere on the page. It is not
+about the historic Annunciation at Palais Lascaris in any way.
+
+That is a **false anchor** — it carries a real URL, looks substantiated, and
+would license generation to write about a 17th-century fresco while citing a
+contemporary art catalogue.
+
+**The irony is exact.** Michael's ClickUp task `wdvrdaxa7h` asks us to
+reject paragraphs that name a thing without establishing its relationship to
+the stop. Our corpus builder accepted a *source* on precisely that basis:
+two strings appearing on the same page. **Keyword co-occurrence is not a
+relationship** — the rule we are enforcing on output, we failed to enforce
+on input.
+
+The other anchor, The Triumph of David, came from a leather restorer's
+portfolio (`2-crc.com`) and is genuinely on-topic — the firm restored the
+tapestry. Low authority, correct content. It should have been ranked below
+an institutional source, not treated as equivalent.
+
+**Rules:**
+
+- **A source must pass the same test we apply to a paragraph.** The work and
+  the venue must be *related within the passage*, not merely co-present on
+  the page.
+- **Domain authority is necessary and not sufficient.** `mamac-nice.org` is
+  a museum's own site — the wrong museum. Tier 1 status does not survive
+  being about something else.
+- **A falling score after fixing a false anchor is the correct outcome.**
+  If round 2 drops Palais Lascaris below 29.4%, that is the metric becoming
+  honest, not a regression.
+
+**Separate finding, also from this round:** `canonical_titles_json` for
+Palais Lascaris lists 10 musical instruments while the tour's actual stops
+are 3 frescoes. Fetching driven by canonical titles spends money enriching
+works nobody visits. Drive it from actual tour stops.
