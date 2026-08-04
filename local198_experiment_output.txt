@@ -1,0 +1,2281 @@
+/Users/micha/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+[LOCAL-197] llm_cost() called with total_tokens (deprecated). Caller should supply input_tokens and output_tokens separately.
+
+================================================================================
+PART 1: CORPUS COVERAGE MEASUREMENT
+================================================================================
+
+================================================================================
+STOP CORPUS COVERAGE REPORT — LOCAL-198
+================================================================================
+
+┌─ Boston Common, Boston MA (4 stops)
+│
+│  ✓  1 passages | COVERED     | Granary Burying Ground (matched: granary, burying, ground)
+│  ✓  1 passages | COVERED     | Parkman Bandstand (matched: parkman, bandstand)
+│  ✓  1 passages | COVERED     | Soldiers and Sailors Monument (matched: soldiers, sailors, monument)
+│  ✓  1 passages | COVERED     | Brewer Fountain (matched: brewer, fountain)
+│
+└─ Summary: 4 COVERED, 0 VENUE_ONLY, 0 EMPTY
+
+┌─ French Riviera walking area (15 stops)
+│
+│  ✓  2 passages | COVERED     | Cap d'Antibes (matched: antibes)
+│  ✓  1 passages | COVERED     | Chapelle Saint-Pierre (matched: chapelle, saint, pierre)
+│  ⚠  1 passages | VENUE_ONLY  | Eze Village (sought: village — NOT FOUND)
+│  ⚠  1 passages | VENUE_ONLY  | Paloma Beach (sought: paloma, beach — NOT FOUND)
+│  ✓  1 passages | COVERED     | Cours Saleya Market (matched: cours, saleya, market)
+│  ✓  1 passages | COVERED     | Musee Matisse (matched: matisse)
+│  ✓  1 passages | COVERED     | Castle Hill of Nice (matched: castle, hill)
+│  ⚠  1 passages | VENUE_ONLY  | Parc Phoenix (sought: phoenix — NOT FOUND)
+│  ✓  1 passages | COVERED     | Place Massena (matched: massena)
+│  ✓  1 passages | COVERED     | Old Town of Antibes (matched: antibes)
+│  ✓  1 passages | COVERED     | Port Vauban (matched: vauban)
+│  ✓  1 passages | COVERED     | Marineland Antibes (matched: marineland, antibes)
+│  ✓  1 passages | COVERED     | Villa Ephrussi de Rothschild (matched: ephrussi, rothschild)
+│  ✓  1 passages | COVERED     | Promenade Maurice Rouvier (matched: promenade, maurice, rouvier)
+│  ✓  1 passages | COVERED     | Mont Boron (matched: mont, boron)
+│
+└─ Summary: 12 COVERED, 3 VENUE_ONLY, 0 EMPTY
+
+┌─ Musee Matisse, Nice, France (6 stops)
+│
+│  ✓  5 passages | COVERED     | Nature morte aux grenades (matched: nature, morte, grenades)
+│  ✓  1 passages | COVERED     | Nymphe dans la forêt (matched: nymphe, foret)
+│  ✓  1 passages | COVERED     | Lectrice à la table jaune (matched: lectrice, table, jaune)
+│  ✓  1 passages | COVERED     | Odalisque au coffret rouge (matched: odalisque, coffret, rouge)
+│  ✓  1 passages | COVERED     | Papeete-Tahiti (matched: papeete, tahiti)
+│  ✓  1 passages | COVERED     | Tempête à Nice (matched: tempete)
+│
+└─ Summary: 6 COVERED, 0 VENUE_ONLY, 0 EMPTY
+
+┌─ Musee National Marc Chagall, Nice, France (4 stops)
+│
+│  ✓  2 passages | COVERED     | Abraham et les trois anges (matched: abraham)
+│  ⚠  2 passages | VENUE_ONLY  | L'Arche de Noé (sought: arche — NOT FOUND)
+│  ✓  2 passages | COVERED     | La Bible : Abraham et Isaac en route (matched: bible, abraham, isaac, route)
+│  ✓  2 passages | COVERED     | Le Cirque bleu (matched: cirque, bleu)
+│
+└─ Summary: 3 COVERED, 1 VENUE_ONLY, 0 EMPTY
+
+┌─ Musee d Art Moderne et d Art Contemporain, Nice, France (10 stops)
+│
+│  ✓ 23 passages | COVERED     | Le Mur de Feu d’Yves Klein (matched: yves, klein)
+│  ✓ 22 passages | COVERED     | Tir, séance 26 juin 1961 (matched: seance, juin)
+│  ✓  3 passages | COVERED     | Le Déjeuner sur l’herbe (matched: dejeuner, herbe)
+│  ⚠  2 passages | VENUE_ONLY  | She-Bam Pow POP Wizz (sought: wizz — NOT FOUND)
+│  ✓  2 passages | COVERED     | Expositions temporaires (matched: expositions, temporaires)
+│  ✓  2 passages | COVERED     | La mariée sous l’arbre (matched: mariee, sous, arbre)
+│  ✓  2 passages | COVERED     | Le Village de grand-mère (matched: village, grand, mere)
+│  ✓  1 passages | COVERED     | Donations et dépôts (matched: donations, depots)
+│  ⚠  1 passages | VENUE_ONLY  | Richard Long ou la sculpture en marchant (sought: richard, long, sculpture, marchant — NOT FOUND)
+│  ✓  1 passages | COVERED     | Donations and deposits (matched: donations, deposits)
+│
+└─ Summary: 8 COVERED, 2 VENUE_ONLY, 0 EMPTY
+
+┌─ Palais Lascaris, Nice (12 stops)
+│
+│  ✓  1 passages | COVERED     | The Triumph of David (matched: triumph, david)
+│  ✓  1 passages | COVERED     | Harpe by Naderman (Paris, 1780) (matched: naderman, paris)
+│  ✓  1 passages | COVERED     | Guitar by Antonio de Torres (Almeria, 1884) (matched: guitar, antonio, torres)
+│  ✓  1 passages | COVERED     | Basse de violon by Paolo Antonio Testore (Milan, 1696) (matched: paolo, antonio, testore, milan)
+│  ✓  1 passages | COVERED     | Guitare baroque by Giovanni Tesler (Ancona, 1618) (matched: baroque, giovanni, tesler, ancona)
+│  ✓  1 passages | COVERED     | Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581) (matched: sacqueboute, tenor, anton, schnitzer)
+│  ✓  1 passages | COVERED     | Guitare baroque by Jean Christophle (Avignon, 1645) (matched: jean, christophle, avignon)
+│  ✓  1 passages | COVERED     | Violes d'amour by Joannes Florenus Guidanti (Bologne, 1717) (matched: joannes, florenus, guidanti)
+│  ✓  1 passages | COVERED     | Guitare baroque by René Voboam (Paris, 1650) (matched: baroque, rene, voboam, paris)
+│  ✓  1 passages | COVERED     | Violes gambe by William Turner (Londres, 1652) (matched: william, turner)
+│  ✓  1 passages | COVERED     | Raquel (matched: raquel)
+│  ✗  0 passages | EMPTY       | The Annunciation (sought: annunciation — NOT FOUND)
+│
+└─ Summary: 11 COVERED, 0 VENUE_ONLY, 1 EMPTY
+
+┌─ walking tour in Nice, france (10 stops)
+│
+│  ✓  1 passages | COVERED     | Cours Saleya Market (matched: cours, saleya, market)
+│  ✓  1 passages | COVERED     | Old Town (Vieux Nice) (matched: vieux)
+│  ✓  1 passages | COVERED     | Marc Chagall National Museum (matched: chagall)
+│  ✓  1 passages | COVERED     | Nice Opera House (matched: opera)
+│  ✓  1 passages | COVERED     | Albert 1st Gardens (matched: albert, gardens)
+│  ✓  1 passages | COVERED     | Promenade des Anglais (matched: promenade, anglais)
+│  ✓  1 passages | COVERED     | Russian Orthodox Cathedral (matched: russian, orthodox, cathedral)
+│  ✓  1 passages | COVERED     | Museum of Modern and Contemporary Art (MAMAC) (matched: mamac)
+│  ✓  1 passages | COVERED     | Place Massena (matched: massena)
+│  ✓  1 passages | COVERED     | Castle Hill (Colline du Chateau) (matched: colline)
+│
+└─ Summary: 10 COVERED, 0 VENUE_ONLY, 0 EMPTY
+
+================================================================================
+OVERALL SUMMARY
+================================================================================
+  Total stops in corpus:  61
+  COVERED (writable):     54 (89%)
+  VENUE_ONLY (dangerous): 6 (10%)
+  EMPTY (impossible):     1 (2%)
+
+  ** Writable stops (the real ceiling on tour quality): 54/61 **
+
+
+Report saved to: /Users/micha/audioura-worktrees/LOCAL-198/tests/../local198_coverage_report.txt
+
+================================================================================
+PART 2: CORPUS GATE DEMONSTRATION
+================================================================================
+
+Applying gate to all 10 MAMAC stops:
+  Input: ['Le Mur de Feu d’Yves Klein', 'Tir, séance 26 juin 1961', 'Le Déjeuner sur l’herbe', 'She-Bam Pow POP Wizz', 'Expositions temporaires', 'La mariée sous l’arbre', 'Le Village de grand-mère', 'Donations et dépôts', 'Richard Long ou la sculpture en marchant', 'Donations and deposits']
+  [CORPUS-GATE] stop='She-Bam Pow POP Wizz' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='Richard Long ou la sculpture en marchant' verdict=VENUE_ONLY action=SHORTENED
+
+  Gate results:
+    COVERED     | PASSED     | Le Mur de Feu d’Yves Klein
+    COVERED     | PASSED     | Tir, séance 26 juin 1961
+    COVERED     | PASSED     | Le Déjeuner sur l’herbe
+    VENUE_ONLY  | SHORTENED  | She-Bam Pow POP Wizz
+    COVERED     | PASSED     | Expositions temporaires
+    COVERED     | PASSED     | La mariée sous l’arbre
+    COVERED     | PASSED     | Le Village de grand-mère
+    COVERED     | PASSED     | Donations et dépôts
+    VENUE_ONLY  | SHORTENED  | Richard Long ou la sculpture en marchant
+    COVERED     | PASSED     | Donations and deposits
+
+================================================================================
+PART 3: A/B EXPERIMENT — MAMAC, 2 stops, 3 runs per arm
+================================================================================
+
+────────────────────────────────────────
+ARM: GATE_OFF (gate_enabled=False)
+────────────────────────────────────────
+
+  Run 1/3...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #001 | 05:15:39.631 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  tour_type: museum
+  total_stops_parameter: 2
+  output_file: None
+
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #002 | 05:15:39.631 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  total_stops_final: 2
+  source: parameter
+
+  [S20] DATABASE_URL not set — cache skipped
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix] tour_type='museum' suppressed for intent analysis (pre_category='walking'); using location only
+Intent analysis response: {
+    "poi_type": "museums",
+    "location": "Nice, France",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": true,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Musee d Art Moderne et d Art Contemporain",
+    "geographic_scope": null,
+    "scope_precision": null,
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museums
+   Location: Nice, France
+   Requirements: None
+   Business Hours Relevant: True
+   Accessibility Mentioned: False
+   Venue Name: Musee d Art Moderne et d Art Contemporain
+  [venue_name sanity] 'Musee d Art Moderne et d Art Contemporain' OK
+  [S15] Forced tour_category=museum from venue_name='Musee d Art Moderne et d Art Contemporain'
+
+Detected tour category: MUSEUM
+Using museum template for Musee d Art Moderne et d Art Contemporain, Nice, France - museum
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #003 | 05:15:42.580 | GENERATING_PROMPT
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  user_request: Musee d Art Moderne et d Art Contemporain, Nice, France
+  total_stops: 2
+
+
+PHASE 3A: Fetching 2 candidate POI(s) for Musee d Art Moderne et d Art Contemporain, Nice, France...
+  [Museum constraint] Venue from intent='Musee d Art Moderne et d Art Contemporain'
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [Phase3A] Injected 3 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='', scope='')
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [LOCAL-30] Deterministic selection: 3 documented works (0 catalogue, 3 SPARQL)
+  [LOCAL-30] DETERMINISTIC BYPASS: 3 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Richard Long ou la sculpture en marchant [sparql]
+     - She-Bam Pow POP Wizz [sparql]
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [LOCAL-30] Deterministic selection: 3 documented works (0 catalogue, 3 SPARQL)
+  [LOCAL-30] DETERMINISTIC BYPASS: 3 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Richard Long ou la sculpture en marchant [sparql]
+     - She-Bam Pow POP Wizz [sparql]
+  [R4] Museum tour: asking for 4 candidates (2x for D1v2 filtering)
+
+PHASE 3A: SKIPPED (deterministic fill from 3 documented works)
+OK PHASE 3A parsed 3 candidate POI(s):
+   - Richard Long ou la sculpture en marchant
+   - She-Bam Pow POP Wizz
+   - Tir, séance 26 juin 1961
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [D1v2] Venue resolved: Q936859 → URL=http://www.mamac-nice.org/, lang=fr
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [D1v2] SPARQL source: 3 canonical titles
+  [story_miner] Site page: https://www.mamac-nice.org/collection/navigart/ (4917 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/online-collection/ (3919 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/niki-de-saint-phalle/ (21393 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/niki-de-saint-phalle-room/ (18390 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/fr/collection/navigart/ (4917 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/yves-klein/ (23128 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/yves-klein-room/ (21039 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/nouveau-realisme-pop-art/ (15280 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/new-realism-pop-art/ (10472 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualites/categorie/collection/ (8849 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/actualites/categorie/collection/page/2/ (8798 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/actualites/categorie/collection/page/3/ (8549 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/actualites/categorie/collection/page/4/ (8081 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/collection/bernar-venet-ligne-indeterminee/ (9940 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/parcours/ (19551 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/oeuvres-in-situ/ (28945 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/le-mamac-hors-les-murs/mamac-pres-de-chez-vous-collection-depots-prets/ (10736 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/le-mamac-hors-les-murs/mamac-en-voyage-collection-depots-prets/ (10963 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/ (10007 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualite/mamac-en-voyage-collection-pret-museum-frieder-burda-baden-baden-allemagne/ (7850 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualite/mamac-en-voyage-collection-pret-alexander-calder-monumental/ (11928 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualite/mamac-en-voyage-collection-pret-musee-unterlinden-colmar/ (8201 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/exposition/ (10371 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/evenement/ (7045 chars)
+  [story_miner] Site crawl: 25 pages fetched (budget: 15)
+  [story_miner] Sitelink EN: 'Musée d'art moderne et d'art contemporain'
+  [story_miner] Sitelink FR: 'Musée d'Art moderne et d'Art contemporain de Nice'
+  [story_miner] Wikipedia EN: 3553 chars (title: 'Musée d'art moderne et d'art contemporain')
+  [story_miner] Wikipedia FR: 5607 chars
+  [story_miner] Joconde museo code: M0888 (from P539)
+  [story_miner] Joconde/POP: no results for M0888 (JS-rendered, expected)
+  [T0a] Exhibit-name extraction: 6 from sections, 3 from quoted/bold/list
+  [T0a] Final-pass nav filter removed 1: ['Horaires et tarifs']
+  [T0a] Extracted 14 canonical titles, 0 cycle names
+  [story_miner] Corpus: 27 pages, 14 titles, 0 from Joconde
+  [D1v2] Canonical titles union: 14 site/wiki + 3 SPARQL = 17 total
+  [D1v2] Removed 1 substring titles (prefer longer forms)
+  [LOCAL-24] Classification: 15 works, 0 galleries, 1 excluded
+    EXCLUDED: 'Nouveau Réalisme' — rule: url_path_nonwork (evenement)
+  [LOCAL-24] Near-duplicate collapse removed 1:
+    'Le Mur de Feu d’Yves Klein' → collapsed into 'Le Mur de Feu  d’Yves Klein'
+  [D1v2-LOCAL24] After filter: 14 works, 0 galleries, 1 excluded
+  [venue_resolver] Built 3 dynamic aliases from 3 works
+  [D1v2] Injected 3 dynamic aliases
+  [D1v2] Built bilingual map: 84 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+  [D1v2] VERIFIED 'Richard Long ou la sculpture en marchant' → canonical: 'Richard Long ou la sculpture en marchant'
+  [D1v2] VERIFIED 'She-Bam Pow POP Wizz' → canonical: 'She-Bam Pow POP Wizz'
+  [D1v2] VERIFIED 'Tir, séance 26 juin 1961' → canonical: 'Tir, séance 26 juin 1961'
+  [D1v2] Exhibit museum detected: 3 SPARQL QIDs, 14 total titles (mostly from site/wiki sections)
+  [D1v2] 3/3 works verified — tier: exhibit_museum
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [D1] Tier: exhibit_museum (3 verified works)
+  [R4] Target reached: 3/2 stops
+  [LOCAL-16 GATE] All 3 stops are D1v2-verified ✓
+
+PHASE 4.5: Validating AI knowledge for Musee d Art Moderne et d Art Contemporain, Nice, France...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+
+PHASE 3B: Requesting structured details and walking directions for 2 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #004 | 05:16:26.636 | PHASE_3B_REQUEST
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  stop_count: 2
+
+PHASE 3B API call cost: $0.0004 (470 tokens)
+OK PHASE 3B: ordered 2 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 2 stops
+  [LOCAL-35] Visitor info page found (fr): http://www.mamac-nice.org/tarifs-et-horaires
+  [LOCAL-35] Visitor info page found (fr): http://www.mamac-nice.org/horaires-et-tarifs
+  [LOCAL-35] Extracted from http://www.mamac-nice.org/tarifs-et-horaires: closed=[], hours=1, admission=''
+  [LOCAL-35] Extracted from http://www.mamac-nice.org/horaires-et-tarifs: closed=[], hours=1, admission=''
+  [LOCAL-35] Formatted result too short — omitting
+  [LOCAL-91] Corpus fallback: visitor info extracted from https://www.mamac-nice.org/collection/yves-klein/
+  [LOCAL-91] Corpus fallback Museum Information: 1947–1948; 1947–1977
+  [LOCAL-39] Museum Information sourced from official site for stop 1
+   Coords cluster detected: 2 stops share '43.7038, 7.2692', refetching...
+   Cluster refetch OK 'She-Bam Pow POP Wizz': 43.6961, 7.2656
+   Cluster refetch OK 'Richard Long ou la sculpture en marchant': 43.6964, 7.2651
+Extracted first POI coordinates: (43.6964, 7.2651)
+  [D4] Museum single-coordinate: all stops set to (43.6964, 7.2651) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Richard Long ou la sculpture en marchant
+   Address: Place Yves Klein, 06364 Nice, France
+   Coordinates: 43.6964, 7.2651
+   Directions: Head southeast on Promenade des Arts, then turn right onto Place Yves Klein. You...
+2. She-Bam Pow POP Wizz
+   Address: Place Yves Klein, 06364 Nice, France
+   Coordinates: 43.6964, 7.2651
+   Directions: Continue straight on Place Yves Klein. The exhibition will be on your right, ins...
+================================
+
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 5/27 corpus pages for 'Musee d Art Moderne et d Art Contemporain'
+    page[0] score=12405 url=https://fr.wikipedia.org/wiki/Musée_d'Art_moderne_et_d'Art_contemporain_de_Nice
+    page[1] score=10275 url=https://en.wikipedia.org/wiki/Musée_d'art_moderne_et_d'art_contemporain
+    page[2] score=6870 url=https://www.mamac-nice.org/collection/oeuvres-in-situ/
+  [§3-adapter] Raw elements: 40 from 5 pages
+  [§3-adapter] After corroboration scoring: 27 elements
+  [§3-adapter] Final: 27 ranked elements (top type: dedication)
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Three-class retrieval error (non-fatal): local variable 'name_lower' referenced before assignment
+  [SQ-S6b] Elements per stop: s0=27, s1=27
+  [SQ-S6b] Entity clusters found: 61 (≥2 stops)
+    → 21th century (eras): 2 stops, 10 elements
+    → 20th century (eras): 2 stops, 7 elements
+    → yves klein (people): 2 stops, 4 elements
+    → saint phalle (people): 2 stops, 3 elements
+    → niki de saint phalle (people): 2 stops, 3 elements
+  [SQ-S6b] Theme naming: $0.0146, 1848 tokens
+  [SQ-S6b] LLM named 3 candidate themes
+  [SQ-S6b] Scored themes: 3
+    → 'Chronological Growth of Mamac's Collection': coverage=1.00, evidence=1.00, distinct=1.00, arc=0.70, TOTAL=0.940
+    → 'Evolution of Art Donations to Mamac': coverage=1.00, evidence=0.90, distinct=1.00, arc=0.70, TOTAL=0.915
+    → 'Influence of Yves Klein on Modern Art': coverage=1.00, evidence=0.60, distinct=1.00, arc=0.70, TOTAL=0.840
+  [SQ-S6b] Blended 3 threads: 'Chronological Growth of Mamac's Collection'=0.33, 'Evolution of Art Donations to Mamac'=0.33, 'Influence of Yves Klein on Modern Art'=0.33
+  [SQ-S6b] Thread discovery: mode=threaded, threads=3
+    → 'Chronological Growth of Mamac's Collection': coverage=100%, weight=0.33, elements=['se_004', 'se_001', 'se_003']
+    → 'Evolution of Art Donations to Mamac': coverage=100%, weight=0.33, elements=['se_001', 'se_002', 'se_003', 'se_005']
+    → 'Influence of Yves Klein on Modern Art': coverage=100%, weight=0.33, elements=['se_006', 'se_011', 'se_012']
+  [§3] Story elements injected into spine prompt (27 elements, mode=found)
+  [SQ-S6b] Thread context injected into spine prompt (3 threads)
+SPINE_COST: category=museum venue=Musee d Art Moderne et d Art C tokens=2328 (in=1905 out=423) cost=$0.0159 latency=4.5s
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 2 arc entries (mode=found)
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-183] stop_corpus: 2/2 stops have per-stop passages (3 total passages)
+  [LOCAL-198] Corpus gate: DISABLED by DISABLE_CORPUS_GATE=1
+  [Storied] Fact sheets: 2/2 generated
+  [S25] Story types assigned: ['art', 'history']
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+Generating description for Stop 1: Richard Long ou la sculpture en marchant by , ...
+
+Generating description for Stop 2: She-Bam Pow POP Wizz by , ...
+Stop 2 API call cost: $0.0038 (4719 tokens)
+Stop 2 description word count: 265 words
+Stop 1 API call cost: $0.0039 (4819 tokens)
+Stop 1 description word count: 319 words
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry FIXED (R4_PRESCRIBED_FEELING)
+  [LOCAL-192] Stop 1 para 5: retry FIXED (R3_SUGGESTIVE_EXPLORATION)
+  [LOCAL-192] Stop 1 para 6: retry FIXED (R1_IMPERATIVE, R2_QUESTION)
+  [LOCAL-192] Stop 2 para 5: retry FAILED — keeping original (R2_QUESTION, R4_PRESCRIBED_FEELING)
+  [LOCAL-192] Style retry summary: 4 paragraphs retried, 3 fixed/improved, 1 kept original
+  [LOCAL-192] Retry cost: $0.0013 (1567 tokens)
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Musee d Art Moderne et d Art Contemporain'...
+   Authority: 1 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 2 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (2 stops)
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 1 trailing question(s), removed 0 'broader context' instance(s)
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: 1 facts found {'architecture': 1}
+  [R2] Prolog saved for Stop 1 (114 words)
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Musee d Art Moderne et d Art Contemporain —...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] PRACTICAL FACTS GATE: PASSED (0 verified)
+
+=== Word Count Statistics ===
+Stop 1: Richard Long ou la sculpture en marchant - 319 words
+Stop 2: She-Bam Pow POP Wizz - 265 words
+===========================
+
+
+Total API cost: $0.0094 (11744 tokens)
+
+Tour text generated successfully!
+Saved to: Musee_d_Art_Moderne_et_d_Art_Contemporain__Nice__France_museum_tour_20260804_051859.txt
+  [C5-5] Evidence persisted: Musee_d_Art_Moderne_et_d_Art_Contemporain__Nice__France_museum_tour_20260804_051859_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Musee d Art Moderne et d Art Contemporain, Nice, France - Museum Tour
+Tour-Category: museum
+
+Stop 1: Richard Long ou la sculpture en marchant
+
+Address: Place Yves Klein, 06364 Nice, France
+
+Coordinates: 43.6964, 7.2651
+
+Museum Information: 1947–1948; 1947–1977
+
+Orientation: Position yourself at the center of the gallery to fully appreciate the immersive experience of "Richard Long ou la sculpture en marchant" at Musee d Art Moderne et d Art Contemporain in Nice, F...
+
+    Stops: ['Stop 1: Richard Long ou la sculpture en ', 'Stop 2: She-Bam Pow POP Wizz']
+
+  Run 2/3...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #005 | 05:19:00.069 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  tour_type: museum
+  total_stops_parameter: 2
+  output_file: None
+
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #006 | 05:19:00.069 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  total_stops_final: 2
+  source: parameter
+
+  [S20] DATABASE_URL not set — cache skipped
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix] tour_type='museum' suppressed for intent analysis (pre_category='walking'); using location only
+Intent analysis response: {
+    "poi_type": "museums",
+    "location": "Nice, France",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": true,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Musee d Art Moderne et d Art Contemporain",
+    "geographic_scope": null,
+    "scope_precision": null,
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museums
+   Location: Nice, France
+   Requirements: None
+   Business Hours Relevant: True
+   Accessibility Mentioned: False
+   Venue Name: Musee d Art Moderne et d Art Contemporain
+  [venue_name sanity] 'Musee d Art Moderne et d Art Contemporain' OK
+  [S15] Forced tour_category=museum from venue_name='Musee d Art Moderne et d Art Contemporain'
+
+Detected tour category: MUSEUM
+Using museum template for Musee d Art Moderne et d Art Contemporain, Nice, France - museum
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #007 | 05:19:01.416 | GENERATING_PROMPT
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  user_request: Musee d Art Moderne et d Art Contemporain, Nice, France
+  total_stops: 2
+
+
+PHASE 3A: Fetching 2 candidate POI(s) for Musee d Art Moderne et d Art Contemporain, Nice, France...
+  [Museum constraint] Venue from intent='Musee d Art Moderne et d Art Contemporain'
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [Phase3A] Injected 3 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='', scope='')
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [LOCAL-30] Deterministic selection: 3 documented works (0 catalogue, 3 SPARQL)
+  [LOCAL-30] DETERMINISTIC BYPASS: 3 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Richard Long ou la sculpture en marchant [sparql]
+     - She-Bam Pow POP Wizz [sparql]
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [LOCAL-30] Deterministic selection: 3 documented works (0 catalogue, 3 SPARQL)
+  [LOCAL-30] DETERMINISTIC BYPASS: 3 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Richard Long ou la sculpture en marchant [sparql]
+     - She-Bam Pow POP Wizz [sparql]
+  [R4] Museum tour: asking for 4 candidates (2x for D1v2 filtering)
+
+PHASE 3A: SKIPPED (deterministic fill from 3 documented works)
+OK PHASE 3A parsed 3 candidate POI(s):
+   - Richard Long ou la sculpture en marchant
+   - She-Bam Pow POP Wizz
+   - Tir, séance 26 juin 1961
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [D1v2] Venue resolved: Q936859 → URL=http://www.mamac-nice.org/, lang=fr
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [D1v2] SPARQL source: 3 canonical titles
+  [story_miner] Site page: https://www.mamac-nice.org/collection/navigart/ (4917 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/online-collection/ (3919 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/niki-de-saint-phalle/ (21393 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/niki-de-saint-phalle-room/ (18390 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/fr/collection/navigart/ (4917 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/yves-klein/ (23128 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/yves-klein-room/ (21039 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/nouveau-realisme-pop-art/ (15280 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/new-realism-pop-art/ (10472 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualites/categorie/collection/ (8849 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/actualites/categorie/collection/page/2/ (8798 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/actualites/categorie/collection/page/3/ (8549 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/actualites/categorie/collection/page/4/ (8081 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/collection/bernar-venet-ligne-indeterminee/ (9940 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/parcours/ (19551 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/oeuvres-in-situ/ (28945 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/le-mamac-hors-les-murs/mamac-pres-de-chez-vous-collection-depots-prets/ (10736 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/le-mamac-hors-les-murs/mamac-en-voyage-collection-depots-prets/ (10963 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/ (10007 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualite/mamac-en-voyage-collection-pret-museum-frieder-burda-baden-baden-allemagne/ (7850 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualite/mamac-en-voyage-collection-pret-alexander-calder-monumental/ (11928 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualite/mamac-en-voyage-collection-pret-musee-unterlinden-colmar/ (8201 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/exposition/ (10371 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/evenement/ (7045 chars)
+  [story_miner] Site crawl: 25 pages fetched (budget: 15)
+  [story_miner] Sitelink EN: 'Musée d'art moderne et d'art contemporain'
+  [story_miner] Sitelink FR: 'Musée d'Art moderne et d'Art contemporain de Nice'
+  [story_miner] Wikipedia EN: 3553 chars (title: 'Musée d'art moderne et d'art contemporain')
+  [story_miner] Wikipedia FR: 5607 chars
+  [story_miner] Joconde museo code: M0888 (from P539)
+  [story_miner] Joconde/POP: no results for M0888 (JS-rendered, expected)
+  [T0a] Exhibit-name extraction: 6 from sections, 3 from quoted/bold/list
+  [T0a] Final-pass nav filter removed 1: ['Horaires et tarifs']
+  [T0a] Extracted 14 canonical titles, 0 cycle names
+  [story_miner] Corpus: 27 pages, 14 titles, 0 from Joconde
+  [D1v2] Canonical titles union: 14 site/wiki + 3 SPARQL = 17 total
+  [D1v2] Removed 1 substring titles (prefer longer forms)
+  [LOCAL-24] Classification: 15 works, 0 galleries, 1 excluded
+    EXCLUDED: 'Nouveau Réalisme' — rule: url_path_nonwork (evenement)
+  [LOCAL-24] Near-duplicate collapse removed 1:
+    'Le Mur de Feu d’Yves Klein' → collapsed into 'Le Mur de Feu  d’Yves Klein'
+  [D1v2-LOCAL24] After filter: 14 works, 0 galleries, 1 excluded
+  [venue_resolver] Built 3 dynamic aliases from 3 works
+  [D1v2] Injected 3 dynamic aliases
+  [D1v2] Built bilingual map: 84 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+  [D1v2] VERIFIED 'Richard Long ou la sculpture en marchant' → canonical: 'Richard Long ou la sculpture en marchant'
+  [D1v2] VERIFIED 'She-Bam Pow POP Wizz' → canonical: 'She-Bam Pow POP Wizz'
+  [D1v2] VERIFIED 'Tir, séance 26 juin 1961' → canonical: 'Tir, séance 26 juin 1961'
+  [D1v2] Exhibit museum detected: 3 SPARQL QIDs, 14 total titles (mostly from site/wiki sections)
+  [D1v2] 3/3 works verified — tier: exhibit_museum
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [D1] Tier: exhibit_museum (3 verified works)
+  [R4] Target reached: 3/2 stops
+  [LOCAL-16 GATE] All 3 stops are D1v2-verified ✓
+
+PHASE 4.5: Validating AI knowledge for Musee d Art Moderne et d Art Contemporain, Nice, France...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+
+PHASE 3B: Requesting structured details and walking directions for 2 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #008 | 05:19:32.581 | PHASE_3B_REQUEST
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  stop_count: 2
+
+PHASE 3B API call cost: $0.0004 (457 tokens)
+OK PHASE 3B: ordered 2 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 2 stops
+  [LOCAL-35] Visitor info page found (fr): http://www.mamac-nice.org/tarifs-et-horaires
+  [LOCAL-35] Visitor info page found (fr): http://www.mamac-nice.org/horaires-et-tarifs
+  [LOCAL-35] Extracted from http://www.mamac-nice.org/tarifs-et-horaires: closed=[], hours=1, admission=''
+  [LOCAL-35] Extracted from http://www.mamac-nice.org/horaires-et-tarifs: closed=[], hours=1, admission=''
+  [LOCAL-35] Formatted result too short — omitting
+  [LOCAL-91] Corpus fallback: visitor info extracted from https://www.mamac-nice.org/collection/yves-klein/
+  [LOCAL-91] Corpus fallback Museum Information: 1947–1948; 1947–1977
+  [LOCAL-39] Museum Information sourced from official site for stop 1
+   Coords cluster detected: 2 stops share '43.7033, 7.2698', refetching...
+   Cluster refetch OK 'Richard Long ou la sculpture en marchant': 43.6967, 7.2659
+   Cluster refetch OK 'She-Bam Pow POP Wizz': 43.6962, 7.2656
+Extracted first POI coordinates: (43.6967, 7.2659)
+  [D4] Museum single-coordinate: all stops set to (43.6967, 7.2659) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Richard Long ou la sculpture en marchant
+   Address: Place Yves Klein, 06000 Nice, France
+   Coordinates: 43.6967, 7.2659
+   Directions: Head southwest on Place Yves Klein, the museum will be on your left.
+2. She-Bam Pow POP Wizz
+   Address: Place Yves Klein, 06000 Nice, France
+   Coordinates: 43.6967, 7.2659
+   Directions: Continue straight on Place Yves Klein, the entrance to the exhibition will be on...
+================================
+
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 5/27 corpus pages for 'Musee d Art Moderne et d Art Contemporain'
+    page[0] score=12405 url=https://fr.wikipedia.org/wiki/Musée_d'Art_moderne_et_d'Art_contemporain_de_Nice
+    page[1] score=10275 url=https://en.wikipedia.org/wiki/Musée_d'art_moderne_et_d'art_contemporain
+    page[2] score=6870 url=https://www.mamac-nice.org/collection/oeuvres-in-situ/
+  [§3-adapter] Raw elements: 42 from 5 pages
+  [§3-adapter] After corroboration scoring: 33 elements
+  [§3-adapter] Final: 33 ranked elements (top type: dedication)
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Three-class retrieval error (non-fatal): local variable 'name_lower' referenced before assignment
+  [SQ-S6b] Elements per stop: s0=33, s1=33
+  [SQ-S6b] Entity clusters found: 69 (≥2 stops)
+    → 21th century (eras): 2 stops, 11 elements
+    → 20th century (eras): 2 stops, 9 elements
+    → yves klein (people): 2 stops, 7 elements
+    → saint phalle (people): 2 stops, 3 elements
+    → niki de saint phalle (people): 2 stops, 3 elements
+  [SQ-S6b] Theme naming: $0.0180, 2078 tokens
+  [SQ-S6b] LLM named 5 candidate themes
+  [SQ-S6b] Theme 'Legacy of Niki de Saint Phalle' rejected: insufficient valid grounding (1 elements)
+  [SQ-S6b] Theme 'Contributions of Albert Chubac' rejected: insufficient valid grounding (1 elements)
+  [SQ-S6b] Scored themes: 3
+    → 'Evolution of the Museum's Collection': coverage=1.00, evidence=0.87, distinct=0.80, arc=0.70, TOTAL=0.867
+    → 'Impact of 21st Century Donations': coverage=1.00, evidence=0.87, distinct=0.80, arc=0.70, TOTAL=0.867
+    → 'Yves Klein's Artistic Influence': coverage=1.00, evidence=0.60, distinct=1.00, arc=0.70, TOTAL=0.840
+  [SQ-S6b] Blended 3 threads: 'Evolution of the Museum's Collection'=0.33, 'Impact of 21st Century Donations'=0.33, 'Yves Klein's Artistic Influence'=0.33
+  [SQ-S6b] Thread discovery: mode=threaded, threads=3
+    → 'Evolution of the Museum's Collection': coverage=100%, weight=0.33, elements=['se_001', 'se_002', 'se_004']
+    → 'Impact of 21st Century Donations': coverage=100%, weight=0.33, elements=['se_001', 'se_002', 'se_004']
+    → 'Yves Klein's Artistic Influence': coverage=100%, weight=0.33, elements=['se_005', 'se_006']
+  [§3] Story elements injected into spine prompt (33 elements, mode=found)
+  [SQ-S6b] Thread context injected into spine prompt (3 threads)
+SPINE_COST: category=museum venue=Musee d Art Moderne et d Art C tokens=2267 (in=1891 out=376) cost=$0.0151 latency=5.1s
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 2 arc entries (mode=found)
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-183] stop_corpus: 2/2 stops have per-stop passages (3 total passages)
+  [LOCAL-198] Corpus gate: DISABLED by DISABLE_CORPUS_GATE=1
+  [Storied] Fact sheets: 2/2 generated
+  [S25] Story types assigned: ['art', 'history']
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+Generating description for Stop 1: Richard Long ou la sculpture en marchant by , ...
+
+Generating description for Stop 2: She-Bam Pow POP Wizz by , ...
+Stop 2 API call cost: $0.0037 (4635 tokens)
+Stop 2 description word count: 203 words
+Stop 1 API call cost: $0.0038 (4787 tokens)
+Stop 1 description word count: 299 words
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 4: retry FIXED (R3_SUGGESTIVE_EXPLORATION)
+  [LOCAL-192] Stop 2 para 1: retry FIXED (R4_PRESCRIBED_FEELING)
+  [LOCAL-192] Stop 2 para 2: retry FIXED (R3_SUGGESTIVE_EXPLORATION)
+  [LOCAL-192] Stop 2 para 4: retry FIXED (R2_QUESTION)
+  [LOCAL-192] Style retry summary: 4 paragraphs retried, 4 fixed/improved, 0 kept original
+  [LOCAL-192] Retry cost: $0.0012 (1499 tokens)
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Musee d Art Moderne et d Art Contemporain'...
+   Authority: 1 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 2 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (2 stops)
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 1 preaching closer(s)
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: 1 facts found {'architecture': 1}
+  [R2] Prolog saved for Stop 1 (118 words)
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Musee d Art Moderne et d Art Contemporain —...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] PRACTICAL FACTS GATE: PASSED (0 verified)
+
+=== Word Count Statistics ===
+Stop 1: Richard Long ou la sculpture en marchant - 299 words
+Stop 2: She-Bam Pow POP Wizz - 203 words
+===========================
+
+
+Total API cost: $0.0092 (11547 tokens)
+
+Tour text generated successfully!
+Saved to: Musee_d_Art_Moderne_et_d_Art_Contemporain__Nice__France_museum_tour_20260804_052159.txt
+  [C5-5] Evidence persisted: Musee_d_Art_Moderne_et_d_Art_Contemporain__Nice__France_museum_tour_20260804_052159_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Musee d Art Moderne et d Art Contemporain, Nice, France - Museum Tour
+Tour-Category: museum
+
+Stop 1: Richard Long ou la sculpture en marchant
+
+Address: Place Yves Klein, 06000 Nice, France
+
+Coordinates: 43.6967, 7.2659
+
+Museum Information: 1947–1948; 1947–1977
+
+Orientation: Stand at the entrance of the exhibit "Richard Long ou la sculpture en marchant" at Musee d Art Moderne et d Art Contemporain in Nice, France. Position yourself to the right of the entrance door...
+
+    Stops: ['Stop 1: Richard Long ou la sculpture en ', 'Stop 2: She-Bam Pow POP Wizz']
+
+  Run 3/3...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #009 | 05:22:00.961 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  tour_type: museum
+  total_stops_parameter: 2
+  output_file: None
+
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #010 | 05:22:00.961 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  total_stops_final: 2
+  source: parameter
+
+  [S20] DATABASE_URL not set — cache skipped
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix] tour_type='museum' suppressed for intent analysis (pre_category='walking'); using location only
+Intent analysis response: {
+    "poi_type": "museums",
+    "location": "Nice, France",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": true,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Musee d Art Moderne et d Art Contemporain",
+    "geographic_scope": null,
+    "scope_precision": null,
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museums
+   Location: Nice, France
+   Requirements: None
+   Business Hours Relevant: True
+   Accessibility Mentioned: False
+   Venue Name: Musee d Art Moderne et d Art Contemporain
+  [venue_name sanity] 'Musee d Art Moderne et d Art Contemporain' OK
+  [S15] Forced tour_category=museum from venue_name='Musee d Art Moderne et d Art Contemporain'
+
+Detected tour category: MUSEUM
+Using museum template for Musee d Art Moderne et d Art Contemporain, Nice, France - museum
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #011 | 05:22:02.332 | GENERATING_PROMPT
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  user_request: Musee d Art Moderne et d Art Contemporain, Nice, France
+  total_stops: 2
+
+
+PHASE 3A: Fetching 2 candidate POI(s) for Musee d Art Moderne et d Art Contemporain, Nice, France...
+  [Museum constraint] Venue from intent='Musee d Art Moderne et d Art Contemporain'
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [Phase3A] Injected 3 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='', scope='')
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [LOCAL-30] Deterministic selection: 3 documented works (0 catalogue, 3 SPARQL)
+  [LOCAL-30] DETERMINISTIC BYPASS: 3 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Richard Long ou la sculpture en marchant [sparql]
+     - She-Bam Pow POP Wizz [sparql]
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [LOCAL-30] Deterministic selection: 3 documented works (0 catalogue, 3 SPARQL)
+  [LOCAL-30] DETERMINISTIC BYPASS: 3 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Richard Long ou la sculpture en marchant [sparql]
+     - She-Bam Pow POP Wizz [sparql]
+  [R4] Museum tour: asking for 4 candidates (2x for D1v2 filtering)
+
+PHASE 3A: SKIPPED (deterministic fill from 3 documented works)
+OK PHASE 3A parsed 3 candidate POI(s):
+   - Richard Long ou la sculpture en marchant
+   - She-Bam Pow POP Wizz
+   - Tir, séance 26 juin 1961
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [D1v2] Venue resolved: Q936859 → URL=http://www.mamac-nice.org/, lang=fr
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [D1v2] SPARQL source: 3 canonical titles
+  [story_miner] Site page: https://www.mamac-nice.org/collection/navigart/ (4917 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/online-collection/ (3919 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/niki-de-saint-phalle/ (21393 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/niki-de-saint-phalle-room/ (18390 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/fr/collection/navigart/ (4917 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/yves-klein/ (23128 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/yves-klein-room/ (21039 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/nouveau-realisme-pop-art/ (15280 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/new-realism-pop-art/ (10472 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualites/categorie/collection/ (8849 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/actualites/categorie/collection/page/2/ (8798 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/actualites/categorie/collection/page/3/ (8549 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/actualites/categorie/collection/page/4/ (8081 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/collection/bernar-venet-ligne-indeterminee/ (9940 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/parcours/ (19551 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/oeuvres-in-situ/ (28945 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/le-mamac-hors-les-murs/mamac-pres-de-chez-vous-collection-depots-prets/ (10736 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/le-mamac-hors-les-murs/mamac-en-voyage-collection-depots-prets/ (10963 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/ (10007 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualite/mamac-en-voyage-collection-pret-museum-frieder-burda-baden-baden-allemagne/ (7850 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualite/mamac-en-voyage-collection-pret-alexander-calder-monumental/ (11928 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualite/mamac-en-voyage-collection-pret-musee-unterlinden-colmar/ (8201 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/exposition/ (10371 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/evenement/ (7045 chars)
+  [story_miner] Site crawl: 25 pages fetched (budget: 15)
+  [story_miner] Sitelink EN: 'Musée d'art moderne et d'art contemporain'
+  [story_miner] Sitelink FR: 'Musée d'Art moderne et d'Art contemporain de Nice'
+  [story_miner] Wikipedia EN: 3553 chars (title: 'Musée d'art moderne et d'art contemporain')
+  [story_miner] Wikipedia FR: 5607 chars
+  [story_miner] Joconde museo code: M0888 (from P539)
+  [story_miner] Joconde/POP: no results for M0888 (JS-rendered, expected)
+  [T0a] Exhibit-name extraction: 6 from sections, 3 from quoted/bold/list
+  [T0a] Final-pass nav filter removed 1: ['Horaires et tarifs']
+  [T0a] Extracted 14 canonical titles, 0 cycle names
+  [story_miner] Corpus: 27 pages, 14 titles, 0 from Joconde
+  [D1v2] Canonical titles union: 14 site/wiki + 3 SPARQL = 17 total
+  [D1v2] Removed 1 substring titles (prefer longer forms)
+  [LOCAL-24] Classification: 15 works, 0 galleries, 1 excluded
+    EXCLUDED: 'Nouveau Réalisme' — rule: url_path_nonwork (evenement)
+  [LOCAL-24] Near-duplicate collapse removed 1:
+    'Le Mur de Feu d’Yves Klein' → collapsed into 'Le Mur de Feu  d’Yves Klein'
+  [D1v2-LOCAL24] After filter: 14 works, 0 galleries, 1 excluded
+  [venue_resolver] Built 3 dynamic aliases from 3 works
+  [D1v2] Injected 3 dynamic aliases
+  [D1v2] Built bilingual map: 84 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+  [D1v2] VERIFIED 'Richard Long ou la sculpture en marchant' → canonical: 'Richard Long ou la sculpture en marchant'
+  [D1v2] VERIFIED 'She-Bam Pow POP Wizz' → canonical: 'She-Bam Pow POP Wizz'
+  [D1v2] VERIFIED 'Tir, séance 26 juin 1961' → canonical: 'Tir, séance 26 juin 1961'
+  [D1v2] Exhibit museum detected: 3 SPARQL QIDs, 14 total titles (mostly from site/wiki sections)
+  [D1v2] 3/3 works verified — tier: exhibit_museum
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [D1] Tier: exhibit_museum (3 verified works)
+  [R4] Target reached: 3/2 stops
+  [LOCAL-16 GATE] All 3 stops are D1v2-verified ✓
+
+PHASE 4.5: Validating AI knowledge for Musee d Art Moderne et d Art Contemporain, Nice, France...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+
+PHASE 3B: Requesting structured details and walking directions for 2 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #012 | 05:22:32.674 | PHASE_3B_REQUEST
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  stop_count: 2
+
+PHASE 3B API call cost: $0.0004 (466 tokens)
+OK PHASE 3B: ordered 2 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 2 stops
+  [LOCAL-35] Visitor info page found (fr): http://www.mamac-nice.org/tarifs-et-horaires
+  [LOCAL-35] Visitor info page found (fr): http://www.mamac-nice.org/horaires-et-tarifs
+  [LOCAL-35] Extracted from http://www.mamac-nice.org/tarifs-et-horaires: closed=[], hours=1, admission=''
+  [LOCAL-35] Extracted from http://www.mamac-nice.org/horaires-et-tarifs: closed=[], hours=1, admission=''
+  [LOCAL-35] Formatted result too short — omitting
+  [LOCAL-91] Corpus fallback: visitor info extracted from https://www.mamac-nice.org/collection/yves-klein/
+  [LOCAL-91] Corpus fallback Museum Information: 1947–1948; 1947–1977
+  [LOCAL-39] Museum Information sourced from official site for stop 1
+   Coords cluster detected: 2 stops share '43.7104, 7.2657', refetching...
+   Cluster refetch OK 'She-Bam Pow POP Wizz': 43.6962, 7.2651
+   Cluster refetch OK 'Richard Long ou la sculpture en marchant': 43.6963, 7.2651
+Extracted first POI coordinates: (43.6963, 7.2651)
+  [D4] Museum single-coordinate: all stops set to (43.6963, 7.2651) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Richard Long ou la sculpture en marchant
+   Address: Place Yves Klein, 06364 Nice, France
+   Coordinates: 43.6963, 7.2651
+   Directions: Head northeast on Promenade des Arts, the museum will be on your right with a st...
+2. She-Bam Pow POP Wizz
+   Address: Place Yves Klein, 06364 Nice, France
+   Coordinates: 43.6963, 7.2651
+   Directions: Continue straight on Place Yves Klein, the exhibition entrance will be on your l...
+================================
+
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 5/27 corpus pages for 'Musee d Art Moderne et d Art Contemporain'
+    page[0] score=12405 url=https://fr.wikipedia.org/wiki/Musée_d'Art_moderne_et_d'Art_contemporain_de_Nice
+    page[1] score=10275 url=https://en.wikipedia.org/wiki/Musée_d'art_moderne_et_d'art_contemporain
+    page[2] score=6870 url=https://www.mamac-nice.org/collection/oeuvres-in-situ/
+  [§3-adapter] Raw elements: 37 from 5 pages
+  [§3-adapter] After corroboration scoring: 29 elements
+  [§3-adapter] Final: 29 ranked elements (top type: dedication)
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Three-class retrieval error (non-fatal): local variable 'name_lower' referenced before assignment
+  [SQ-S6b] Elements per stop: s0=29, s1=29
+  [SQ-S6b] Entity clusters found: 57 (≥2 stops)
+    → 21th century (eras): 2 stops, 11 elements
+    → 20th century (eras): 2 stops, 7 elements
+    → 1990 (dates): 2 stops, 4 elements
+    → yves klein (people): 2 stops, 4 elements
+    → saint phalle (people): 2 stops, 3 elements
+  [SQ-S6b] Theme naming: $0.0143, 1843 tokens
+  [SQ-S6b] LLM named 3 candidate themes
+  [SQ-S6b] Scored themes: 3
+    → 'Impact of Early 21st Century Donations': coverage=1.00, evidence=1.00, distinct=1.00, arc=0.70, TOTAL=0.940
+    → 'Legacy of Niki de Saint Phalle': coverage=1.00, evidence=0.90, distinct=1.00, arc=0.70, TOTAL=0.915
+    → 'Evolution of Modern Art at MAMAC': coverage=1.00, evidence=0.80, distinct=0.80, arc=0.70, TOTAL=0.850
+  [SQ-S6b] Blended 3 threads: 'Impact of Early 21st Century Donations'=0.33, 'Legacy of Niki de Saint Phalle'=0.33, 'Evolution of Modern Art at MAMAC'=0.33
+  [SQ-S6b] Thread discovery: mode=threaded, threads=3
+    → 'Impact of Early 21st Century Donations': coverage=100%, weight=0.33, elements=['se_001', 'se_003']
+    → 'Legacy of Niki de Saint Phalle': coverage=100%, weight=0.33, elements=['se_001', 'se_002', 'se_003', 'se_005']
+    → 'Evolution of Modern Art at MAMAC': coverage=100%, weight=0.33, elements=['se_004', 'se_006']
+  [§3] Story elements injected into spine prompt (29 elements, mode=found)
+  [SQ-S6b] Thread context injected into spine prompt (3 threads)
+SPINE_COST: category=museum venue=Musee d Art Moderne et d Art C tokens=2309 (in=1905 out=404) cost=$0.0156 latency=4.4s
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 2 arc entries (mode=found)
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-183] stop_corpus: 2/2 stops have per-stop passages (3 total passages)
+  [LOCAL-198] Corpus gate: DISABLED by DISABLE_CORPUS_GATE=1
+  [Storied] Fact sheets: 2/2 generated
+  [S25] Story types assigned: ['art', 'history']
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+Generating description for Stop 1: Richard Long ou la sculpture en marchant by , ...
+
+Generating description for Stop 2: She-Bam Pow POP Wizz by , ...
+Stop 2 API call cost: $0.0038 (4703 tokens)
+Stop 2 description word count: 233 words
+Stop 1 API call cost: $0.0039 (4821 tokens)
+Stop 1 description word count: 296 words
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry FIXED (R1_IMPERATIVE, R4_PRESCRIBED_FEELING)
+  [LOCAL-192] Stop 1 para 4: retry FIXED (R3_SUGGESTIVE_EXPLORATION)
+  [LOCAL-192] Stop 1 para 5: retry FIXED (R1_IMPERATIVE)
+  [LOCAL-192] Stop 2 para 3: retry FIXED (R3_SUGGESTIVE_EXPLORATION)
+  [LOCAL-192] Style retry summary: 4 paragraphs retried, 4 fixed/improved, 0 kept original
+  [LOCAL-192] Retry cost: $0.0013 (1611 tokens)
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Musee d Art Moderne et d Art Contemporain'...
+   Authority: 1 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 2 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (2 stops)
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: 1 facts found {'architecture': 1}
+  [R2] Prolog saved for Stop 1 (144 words)
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Musee d Art Moderne et d Art Contemporain —...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] PRACTICAL FACTS GATE: PASSED (0 verified)
+
+=== Word Count Statistics ===
+Stop 1: Richard Long ou la sculpture en marchant - 296 words
+Stop 2: She-Bam Pow POP Wizz - 233 words
+===========================
+
+
+Total API cost: $0.0094 (11770 tokens)
+
+Tour text generated successfully!
+Saved to: Musee_d_Art_Moderne_et_d_Art_Contemporain__Nice__France_museum_tour_20260804_052506.txt
+  [C5-5] Evidence persisted: Musee_d_Art_Moderne_et_d_Art_Contemporain__Nice__France_museum_tour_20260804_052506_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Musee d Art Moderne et d Art Contemporain, Nice, France - Museum Tour
+Tour-Category: museum
+
+Stop 1: Richard Long ou la sculpture en marchant
+
+Address: Place Yves Klein, 06364 Nice, France
+
+Coordinates: 43.6963, 7.2651
+
+Museum Information: 1947–1948; 1947–1977
+
+Orientation: Position yourself at the entrance of the exhibit "Richard Long ou la sculpture en marchant" at Musee d'Art Moderne et d'Art Contemporain in Nice, France. Stand slightly to the left to gain a fu...
+
+    Stops: ['Stop 1: Richard Long ou la sculpture en ', 'Stop 2: She-Bam Pow POP Wizz']
+
+────────────────────────────────────────
+ARM: GATE_ON (gate_enabled=True)
+────────────────────────────────────────
+
+  Run 1/3...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #013 | 05:25:07.572 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  tour_type: museum
+  total_stops_parameter: 2
+  output_file: None
+
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #014 | 05:25:07.572 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  total_stops_final: 2
+  source: parameter
+
+  [S20] DATABASE_URL not set — cache skipped
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix] tour_type='museum' suppressed for intent analysis (pre_category='walking'); using location only
+Intent analysis response: {
+    "poi_type": "museums",
+    "location": "Nice, France",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": true,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Musee d Art Moderne et d Art Contemporain",
+    "geographic_scope": null,
+    "scope_precision": null,
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museums
+   Location: Nice, France
+   Requirements: None
+   Business Hours Relevant: True
+   Accessibility Mentioned: False
+   Venue Name: Musee d Art Moderne et d Art Contemporain
+  [venue_name sanity] 'Musee d Art Moderne et d Art Contemporain' OK
+  [S15] Forced tour_category=museum from venue_name='Musee d Art Moderne et d Art Contemporain'
+
+Detected tour category: MUSEUM
+Using museum template for Musee d Art Moderne et d Art Contemporain, Nice, France - museum
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #015 | 05:25:09.259 | GENERATING_PROMPT
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  user_request: Musee d Art Moderne et d Art Contemporain, Nice, France
+  total_stops: 2
+
+
+PHASE 3A: Fetching 2 candidate POI(s) for Musee d Art Moderne et d Art Contemporain, Nice, France...
+  [Museum constraint] Venue from intent='Musee d Art Moderne et d Art Contemporain'
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [Phase3A] Injected 3 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='', scope='')
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [LOCAL-30] Deterministic selection: 3 documented works (0 catalogue, 3 SPARQL)
+  [LOCAL-30] DETERMINISTIC BYPASS: 3 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Richard Long ou la sculpture en marchant [sparql]
+     - She-Bam Pow POP Wizz [sparql]
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [LOCAL-30] Deterministic selection: 3 documented works (0 catalogue, 3 SPARQL)
+  [LOCAL-30] DETERMINISTIC BYPASS: 3 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Richard Long ou la sculpture en marchant [sparql]
+     - She-Bam Pow POP Wizz [sparql]
+  [R4] Museum tour: asking for 4 candidates (2x for D1v2 filtering)
+
+PHASE 3A: SKIPPED (deterministic fill from 3 documented works)
+OK PHASE 3A parsed 3 candidate POI(s):
+   - Richard Long ou la sculpture en marchant
+   - She-Bam Pow POP Wizz
+   - Tir, séance 26 juin 1961
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [D1v2] Venue resolved: Q936859 → URL=http://www.mamac-nice.org/, lang=fr
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [D1v2] SPARQL source: 3 canonical titles
+  [story_miner] Site page: https://www.mamac-nice.org/collection/navigart/ (4917 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/online-collection/ (3919 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/niki-de-saint-phalle/ (21393 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/niki-de-saint-phalle-room/ (18390 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/fr/collection/navigart/ (4917 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/yves-klein/ (23128 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/yves-klein-room/ (21039 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/nouveau-realisme-pop-art/ (15280 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/new-realism-pop-art/ (10472 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualites/categorie/collection/ (8849 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/actualites/categorie/collection/page/2/ (8798 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/actualites/categorie/collection/page/3/ (8549 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/actualites/categorie/collection/page/4/ (8081 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/collection/bernar-venet-ligne-indeterminee/ (9940 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/parcours/ (19551 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/oeuvres-in-situ/ (28945 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/le-mamac-hors-les-murs/mamac-pres-de-chez-vous-collection-depots-prets/ (10736 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/le-mamac-hors-les-murs/mamac-en-voyage-collection-depots-prets/ (10963 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/ (10007 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualite/mamac-en-voyage-collection-pret-museum-frieder-burda-baden-baden-allemagne/ (7850 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualite/mamac-en-voyage-collection-pret-alexander-calder-monumental/ (11928 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualite/mamac-en-voyage-collection-pret-musee-unterlinden-colmar/ (8201 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/exposition/ (10371 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/evenement/ (7045 chars)
+  [story_miner] Site crawl: 25 pages fetched (budget: 15)
+  [story_miner] Sitelink EN: 'Musée d'art moderne et d'art contemporain'
+  [story_miner] Sitelink FR: 'Musée d'Art moderne et d'Art contemporain de Nice'
+  [story_miner] Wikipedia EN: 3553 chars (title: 'Musée d'art moderne et d'art contemporain')
+  [story_miner] Joconde museo code: M0888 (from P539)
+  [story_miner] Joconde/POP: no results for M0888 (JS-rendered, expected)
+  [T0a] Exhibit-name extraction: 1 from sections, 3 from quoted/bold/list
+  [T0a] Extracted 11 canonical titles, 0 cycle names
+  [story_miner] Corpus: 26 pages, 11 titles, 0 from Joconde
+  [D1v2] Canonical titles union: 11 site/wiki + 3 SPARQL = 14 total
+  [D1v2] Removed 1 substring titles (prefer longer forms)
+  [LOCAL-24] Classification: 12 works, 0 galleries, 1 excluded
+    EXCLUDED: 'Nouveau Réalisme' — rule: url_path_nonwork (evenement)
+  [LOCAL-24] Near-duplicate collapse removed 1:
+    'Le Mur de Feu d’Yves Klein' → collapsed into 'Le Mur de Feu  d’Yves Klein'
+  [D1v2-LOCAL24] After filter: 11 works, 0 galleries, 1 excluded
+  [venue_resolver] Built 3 dynamic aliases from 3 works
+  [D1v2] Injected 3 dynamic aliases
+  [D1v2] Built bilingual map: 84 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+SPARQL error: 429
+  [D1v2] VERIFIED 'Richard Long ou la sculpture en marchant' → canonical: 'Richard Long ou la sculpture en marchant'
+  [D1v2] VERIFIED 'She-Bam Pow POP Wizz' → canonical: 'She-Bam Pow POP Wizz'
+  [D1v2] VERIFIED 'Tir, séance 26 juin 1961' → canonical: 'Tir, séance 26 juin 1961'
+  [D1v2] Exhibit museum detected: 3 SPARQL QIDs, 11 total titles (mostly from site/wiki sections)
+  [D1v2] 3/3 works verified — tier: exhibit_museum
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [D1] Tier: exhibit_museum (3 verified works)
+  [R4] Target reached: 3/2 stops
+  [LOCAL-16 GATE] All 3 stops are D1v2-verified ✓
+
+PHASE 4.5: Validating AI knowledge for Musee d Art Moderne et d Art Contemporain, Nice, France...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+
+PHASE 3B: Requesting structured details and walking directions for 2 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #016 | 05:25:41.685 | PHASE_3B_REQUEST
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  stop_count: 2
+
+PHASE 3B API call cost: $0.0004 (526 tokens)
+OK PHASE 3B: ordered 2 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 2 stops
+  [LOCAL-35] Visitor info page found (fr): http://www.mamac-nice.org/tarifs-et-horaires
+  [LOCAL-35] Visitor info page found (fr): http://www.mamac-nice.org/horaires-et-tarifs
+  [LOCAL-35] Extracted from http://www.mamac-nice.org/tarifs-et-horaires: closed=[], hours=1, admission=''
+  [LOCAL-35] Extracted from http://www.mamac-nice.org/horaires-et-tarifs: closed=[], hours=1, admission=''
+  [LOCAL-35] Formatted result too short — omitting
+  [LOCAL-91] Corpus fallback: visitor info extracted from https://www.mamac-nice.org/collection/yves-klein/
+  [LOCAL-91] Corpus fallback Museum Information: 1947–1948; 1947–1977
+  [LOCAL-39] Museum Information sourced from official site for stop 1
+   Coords cluster detected: 2 stops share '43.7033, 7.2694', refetching...
+   Cluster refetch OK 'Richard Long ou la sculpture en marchant': 43.6965, 7.2656
+   Cluster refetch OK 'She-Bam Pow POP Wizz': 43.7081, 7.2653
+Extracted first POI coordinates: (43.6965, 7.2656)
+  [D4] Museum single-coordinate: all stops set to (43.6965, 7.2656) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Richard Long ou la sculpture en marchant
+   Address: Place Yves Klein, 06364 Nice Cedex 4, France
+   Coordinates: 43.6965, 7.2656
+   Directions: Head southwest on Rue de la Charité, turn left onto Rue de la Loge, continue str...
+2. She-Bam Pow POP Wizz
+   Address: Place Yves Klein, 06364 Nice Cedex 4, France
+   Coordinates: 43.6965, 7.2656
+   Directions: Head southwest on Rue de la Charité, turn left onto Rue de la Loge, continue str...
+================================
+
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 5/26 corpus pages for 'Musee d Art Moderne et d Art Contemporain'
+    page[0] score=10275 url=https://en.wikipedia.org/wiki/Musée_d'art_moderne_et_d'art_contemporain
+    page[1] score=6870 url=https://www.mamac-nice.org/collection/oeuvres-in-situ/
+    page[2] score=6355 url=https://www.mamac-nice.org/collection/yves-klein/
+  [§3-adapter] Raw elements: 34 from 5 pages
+  [§3-adapter] After corroboration scoring: 29 elements
+  [§3-adapter] Final: 29 ranked elements (top type: dedication)
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Three-class retrieval error (non-fatal): local variable 'name_lower' referenced before assignment
+  [SQ-S6b] Elements per stop: s0=29, s1=29
+  [SQ-S6b] Entity clusters found: 48 (≥2 stops)
+    → 21th century (eras): 2 stops, 9 elements
+    → 20th century (eras): 2 stops, 7 elements
+    → yves klein (people): 2 stops, 5 elements
+    → saint phalle (people): 2 stops, 4 elements
+    → niki de saint phalle (people): 2 stops, 4 elements
+  [SQ-S6b] Theme naming: $0.0134, 1804 tokens
+  [SQ-S6b] LLM named 3 candidate themes
+  [SQ-S6b] Scored themes: 3
+    → 'Artistic Donations Shaping MAMAC's Collection': coverage=1.00, evidence=0.73, distinct=1.00, arc=0.70, TOTAL=0.873
+    → 'The Influence of Yves Klein on Modern Art': coverage=1.00, evidence=0.60, distinct=1.00, arc=0.70, TOTAL=0.840
+    → 'Cultural Legacy of Albert Chubac': coverage=1.00, evidence=0.60, distinct=1.00, arc=0.70, TOTAL=0.840
+  [SQ-S6b] Blended 3 threads: 'Artistic Donations Shaping MAMAC's Collection'=0.33, 'The Influence of Yves Klein on Modern Art'=0.33, 'Cultural Legacy of Albert Chubac'=0.33
+  [SQ-S6b] Thread discovery: mode=threaded, threads=3
+    → 'Artistic Donations Shaping MAMAC's Collection': coverage=100%, weight=0.33, elements=['se_001', 'se_002', 'se_003']
+    → 'The Influence of Yves Klein on Modern Art': coverage=100%, weight=0.33, elements=['se_004', 'se_007']
+    → 'Cultural Legacy of Albert Chubac': coverage=100%, weight=0.33, elements=['se_002', 'se_005']
+  [§3] Story elements injected into spine prompt (29 elements, mode=found)
+  [SQ-S6b] Thread context injected into spine prompt (3 threads)
+SPINE_COST: category=museum venue=Musee d Art Moderne et d Art C tokens=2268 (in=1855 out=413) cost=$0.0155 latency=5.0s
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 2 arc entries (mode=found)
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-183] stop_corpus: 2/2 stops have per-stop passages (3 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Richard Long ou la sculpture en marchant' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='She-Bam Pow POP Wizz' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 2 SHORTENED
+  [Storied] Fact sheets: 2/2 generated
+  [S25] Story types assigned: ['art', 'history']
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+Generating description for Stop 1: Richard Long ou la sculpture en marchant by , ...
+
+Generating description for Stop 2: She-Bam Pow POP Wizz by , ...
+Stop 2 API call cost: $0.0038 (4780 tokens)
+Stop 2 description word count: 187 words
+Stop 1 API call cost: $0.0040 (4963 tokens)
+Stop 1 description word count: 294 words
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 4: retry FAILED — keeping original (R4_PRESCRIBED_FEELING)
+  [LOCAL-192] Stop 1 para 5: retry IMPROVED (2→1 errors)
+  [LOCAL-192] Style retry summary: 2 paragraphs retried, 1 fixed/improved, 1 kept original
+  [LOCAL-192] Retry cost: $0.0006 (788 tokens)
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Musee d Art Moderne et d Art Contemporain'...
+   Authority: 1 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 2 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (2 stops)
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 1 preaching closer(s)
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: 1 facts found {'architecture': 1}
+  [R2] Prolog saved for Stop 1 (128 words)
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Musee d Art Moderne et d Art Contemporain —...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] PRACTICAL FACTS GATE: PASSED (0 verified)
+
+=== Word Count Statistics ===
+Stop 1: Richard Long ou la sculpture en marchant - 294 words
+Stop 2: She-Bam Pow POP Wizz - 187 words
+===========================
+
+
+Total API cost: $0.0090 (11234 tokens)
+
+Tour text generated successfully!
+Saved to: Musee_d_Art_Moderne_et_d_Art_Contemporain__Nice__France_museum_tour_20260804_052755.txt
+  [C5-5] Evidence persisted: Musee_d_Art_Moderne_et_d_Art_Contemporain__Nice__France_museum_tour_20260804_052755_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Musee d Art Moderne et d Art Contemporain, Nice, France - Museum Tour
+Tour-Category: museum
+
+Stop 1: Richard Long ou la sculpture en marchant
+
+Address: Place Yves Klein, 06364 Nice Cedex 4, France
+
+Coordinates: 43.6965, 7.2656
+
+Museum Information: 1947–1948; 1947–1977
+
+Orientation: Position yourself at the entrance of the Musee d'Art Moderne et d'Art Contemporain in Nice, France, facing the central gallery space where Richard Long ou la sculpture en marchant is pr...
+
+    Stops: ['Stop 1: Richard Long ou la sculpture en ', 'Stop 2: She-Bam Pow POP Wizz']
+
+  Run 2/3...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #017 | 05:27:56.330 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  tour_type: museum
+  total_stops_parameter: 2
+  output_file: None
+
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #018 | 05:27:56.330 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  total_stops_final: 2
+  source: parameter
+
+  [S20] DATABASE_URL not set — cache skipped
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix] tour_type='museum' suppressed for intent analysis (pre_category='walking'); using location only
+Intent analysis response: {
+    "poi_type": "museums",
+    "location": "Nice, France",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": true,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Musee d Art Moderne et d Art Contemporain",
+    "geographic_scope": null,
+    "scope_precision": null,
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museums
+   Location: Nice, France
+   Requirements: None
+   Business Hours Relevant: True
+   Accessibility Mentioned: False
+   Venue Name: Musee d Art Moderne et d Art Contemporain
+  [venue_name sanity] 'Musee d Art Moderne et d Art Contemporain' OK
+  [S15] Forced tour_category=museum from venue_name='Musee d Art Moderne et d Art Contemporain'
+
+Detected tour category: MUSEUM
+Using museum template for Musee d Art Moderne et d Art Contemporain, Nice, France - museum
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #019 | 05:27:57.655 | GENERATING_PROMPT
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  user_request: Musee d Art Moderne et d Art Contemporain, Nice, France
+  total_stops: 2
+
+
+PHASE 3A: Fetching 2 candidate POI(s) for Musee d Art Moderne et d Art Contemporain, Nice, France...
+  [Museum constraint] Venue from intent='Musee d Art Moderne et d Art Contemporain'
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [S17] no scope_constraint (precision='', scope='')
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [LOCAL-30] Deterministic selection: 3 documented works (0 catalogue, 3 SPARQL)
+  [LOCAL-30] DETERMINISTIC BYPASS: 3 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Richard Long ou la sculpture en marchant [sparql]
+     - She-Bam Pow POP Wizz [sparql]
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [LOCAL-30] Deterministic selection: 3 documented works (0 catalogue, 3 SPARQL)
+  [LOCAL-30] DETERMINISTIC BYPASS: 3 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Richard Long ou la sculpture en marchant [sparql]
+     - She-Bam Pow POP Wizz [sparql]
+  [R4] Museum tour: asking for 4 candidates (2x for D1v2 filtering)
+
+PHASE 3A: SKIPPED (deterministic fill from 3 documented works)
+OK PHASE 3A parsed 3 candidate POI(s):
+   - Richard Long ou la sculpture en marchant
+   - She-Bam Pow POP Wizz
+   - Tir, séance 26 juin 1961
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [D1v2] Venue resolved: Q936859 → URL=http://www.mamac-nice.org/, lang=fr
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [D1v2] SPARQL source: 3 canonical titles
+  [story_miner] Site page: https://www.mamac-nice.org/collection/navigart/ (4917 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/online-collection/ (3919 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/niki-de-saint-phalle/ (21393 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/niki-de-saint-phalle-room/ (18390 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/fr/collection/navigart/ (4917 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/yves-klein/ (23128 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/yves-klein-room/ (21039 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/nouveau-realisme-pop-art/ (15280 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/new-realism-pop-art/ (10472 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualites/categorie/collection/ (8849 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/actualites/categorie/collection/page/2/ (8798 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/actualites/categorie/collection/page/3/ (8549 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/actualites/categorie/collection/page/4/ (8081 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/collection/bernar-venet-ligne-indeterminee/ (9940 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/parcours/ (19551 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/oeuvres-in-situ/ (28945 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/le-mamac-hors-les-murs/mamac-pres-de-chez-vous-collection-depots-prets/ (10736 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/le-mamac-hors-les-murs/mamac-en-voyage-collection-depots-prets/ (10963 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/ (10007 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualite/mamac-en-voyage-collection-pret-museum-frieder-burda-baden-baden-allemagne/ (7850 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualite/mamac-en-voyage-collection-pret-alexander-calder-monumental/ (11928 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualite/mamac-en-voyage-collection-pret-musee-unterlinden-colmar/ (8201 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/exposition/ (10371 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/evenement/ (7045 chars)
+  [story_miner] Site crawl: 25 pages fetched (budget: 15)
+  [story_miner] Sitelink EN: 'Musée d'art moderne et d'art contemporain'
+  [story_miner] Sitelink FR: 'Musée d'Art moderne et d'Art contemporain de Nice'
+  [story_miner] Wikipedia EN: 3553 chars (title: 'Musée d'art moderne et d'art contemporain')
+  [story_miner] Joconde museo code: M0888 (from P539)
+  [story_miner] Joconde/POP: no results for M0888 (JS-rendered, expected)
+  [T0a] Exhibit-name extraction: 1 from sections, 3 from quoted/bold/list
+  [T0a] Extracted 11 canonical titles, 0 cycle names
+  [story_miner] Corpus: 26 pages, 11 titles, 0 from Joconde
+  [D1v2] Canonical titles union: 11 site/wiki + 3 SPARQL = 14 total
+  [D1v2] Removed 1 substring titles (prefer longer forms)
+  [LOCAL-24] Classification: 12 works, 0 galleries, 1 excluded
+    EXCLUDED: 'Nouveau Réalisme' — rule: url_path_nonwork (evenement)
+  [LOCAL-24] Near-duplicate collapse removed 1:
+    'Le Mur de Feu d’Yves Klein' → collapsed into 'Le Mur de Feu  d’Yves Klein'
+  [D1v2-LOCAL24] After filter: 11 works, 0 galleries, 1 excluded
+  [venue_resolver] Built 3 dynamic aliases from 3 works
+  [D1v2] Injected 3 dynamic aliases
+  [D1v2] Built bilingual map: 84 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+  [D1v2] VERIFIED 'Richard Long ou la sculpture en marchant' → canonical: 'Richard Long ou la sculpture en marchant'
+  [D1v2] VERIFIED 'She-Bam Pow POP Wizz' → canonical: 'She-Bam Pow POP Wizz'
+  [D1v2] VERIFIED 'Tir, séance 26 juin 1961' → canonical: 'Tir, séance 26 juin 1961'
+  [D1v2] Exhibit museum detected: 3 SPARQL QIDs, 11 total titles (mostly from site/wiki sections)
+  [D1v2] 3/3 works verified — tier: exhibit_museum
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [D1] Tier: exhibit_museum (3 verified works)
+  [R4] Target reached: 3/2 stops
+  [LOCAL-16 GATE] All 3 stops are D1v2-verified ✓
+
+PHASE 4.5: Validating AI knowledge for Musee d Art Moderne et d Art Contemporain, Nice, France...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+
+PHASE 3B: Requesting structured details and walking directions for 2 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #020 | 05:28:35.891 | PHASE_3B_REQUEST
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  stop_count: 2
+
+PHASE 3B API call cost: $0.0004 (473 tokens)
+OK PHASE 3B: ordered 2 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 2 stops
+  [LOCAL-35] Visitor info page found (fr): http://www.mamac-nice.org/tarifs-et-horaires
+  [LOCAL-35] Visitor info page found (fr): http://www.mamac-nice.org/horaires-et-tarifs
+  [LOCAL-35] Extracted from http://www.mamac-nice.org/tarifs-et-horaires: closed=[], hours=1, admission=''
+  [LOCAL-35] Extracted from http://www.mamac-nice.org/horaires-et-tarifs: closed=[], hours=1, admission=''
+  [LOCAL-35] Formatted result too short — omitting
+  [LOCAL-91] Corpus fallback: visitor info extracted from https://www.mamac-nice.org/collection/yves-klein/
+  [LOCAL-91] Corpus fallback Museum Information: 1947–1948; 1947–1977
+  [LOCAL-39] Museum Information sourced from official site for stop 1
+   Coords cluster detected: 2 stops share '43.7036, 7.2696', refetching...
+   Cluster refetch OK 'She-Bam Pow POP Wizz': 43.7036, 7.2661
+   Cluster refetch OK 'Richard Long ou la sculpture en marchant': 43.7037, 7.2691
+Extracted first POI coordinates: (43.7037, 7.2691)
+  [D4] Museum single-coordinate: all stops set to (43.7037, 7.2691) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Richard Long ou la sculpture en marchant
+   Address: Place Yves Klein, 06364 Nice Cedex 4, France
+   Coordinates: 43.7037, 7.2691
+   Directions: Head southeast on Promenade des Arts, the museum will be on your left with a str...
+2. She-Bam Pow POP Wizz
+   Address: Place Yves Klein, 06364 Nice Cedex 4, France
+   Coordinates: 43.7037, 7.2691
+   Directions: Continue southeast on Promenade des Arts, the next exhibition is on the right wi...
+================================
+
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 5/26 corpus pages for 'Musee d Art Moderne et d Art Contemporain'
+    page[0] score=10275 url=https://en.wikipedia.org/wiki/Musée_d'art_moderne_et_d'art_contemporain
+    page[1] score=6870 url=https://www.mamac-nice.org/collection/oeuvres-in-situ/
+    page[2] score=6355 url=https://www.mamac-nice.org/collection/yves-klein/
+  [§3-adapter] Raw elements: 32 from 5 pages
+  [§3-adapter] After corroboration scoring: 25 elements
+  [§3-adapter] Final: 25 ranked elements (top type: dedication)
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Three-class retrieval error (non-fatal): local variable 'name_lower' referenced before assignment
+  [SQ-S6b] Elements per stop: s0=25, s1=25
+  [SQ-S6b] Entity clusters found: 47 (≥2 stops)
+    → 21th century (eras): 2 stops, 9 elements
+    → 20th century (eras): 2 stops, 5 elements
+    → yves klein (people): 2 stops, 4 elements
+    → saint phalle (people): 2 stops, 3 elements
+    → niki de saint phalle (people): 2 stops, 3 elements
+  [SQ-S6b] Theme naming: $0.0119, 1652 tokens
+  [SQ-S6b] LLM named 3 candidate themes
+  [SQ-S6b] Theme 'The Influence of Yves Klein' rejected: insufficient valid grounding (1 elements)
+  [SQ-S6b] Theme 'The Role of 21st Century Restorations' rejected: insufficient valid grounding (1 elements)
+  [SQ-S6b] Scored themes: 1
+    → 'Donations Shaping the Museum's Collection': coverage=1.00, evidence=0.70, distinct=1.00, arc=0.70, TOTAL=0.865
+  [SQ-S6b] Blended 1 threads: 'Donations Shaping the Museum's Collection'=1.00
+  [SQ-S6b] Thread discovery: mode=threaded, threads=1
+    → 'Donations Shaping the Museum's Collection': coverage=100%, weight=1.00, elements=['se_001', 'se_002', 'se_003', 'se_006']
+  [§3] Story elements injected into spine prompt (25 elements, mode=found)
+  [SQ-S6b] Thread context injected into spine prompt (1 threads)
+SPINE_COST: category=museum venue=Musee d Art Moderne et d Art C tokens=2010 (in=1600 out=410) cost=$0.0141 latency=5.2s
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 2 arc entries (mode=found)
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-183] stop_corpus: 2/2 stops have per-stop passages (3 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Richard Long ou la sculpture en marchant' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='She-Bam Pow POP Wizz' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 2 SHORTENED
+  [Storied] Fact sheets: 2/2 generated
+  [S25] Story types assigned: ['art', 'history']
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+Generating description for Stop 1: Richard Long ou la sculpture en marchant by , ...
+
+Generating description for Stop 2: She-Bam Pow POP Wizz by , ...
+Stop 2 API call cost: $0.0037 (4578 tokens)
+Stop 2 description word count: 132 words
+Stop 1 API call cost: $0.0038 (4803 tokens)
+Stop 1 description word count: 286 words
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry FIXED (R4_PRESCRIBED_FEELING)
+  [LOCAL-192] Stop 1 para 4: retry FAILED — keeping original (R4_PRESCRIBED_FEELING)
+  [LOCAL-192] Stop 2 para 2: retry FIXED (R3_SUGGESTIVE_EXPLORATION)
+  [LOCAL-192] Style retry summary: 3 paragraphs retried, 2 fixed/improved, 1 kept original
+  [LOCAL-192] Retry cost: $0.0010 (1190 tokens)
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Musee d Art Moderne et d Art Contemporain'...
+   Authority: 1 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 2 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (2 stops)
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: 1 facts found {'architecture': 1}
+  [R2] Prolog saved for Stop 1 (105 words)
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Musee d Art Moderne et d Art Contemporain —...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] PRACTICAL FACTS GATE: PASSED (0 verified)
+
+=== Word Count Statistics ===
+Stop 1: Richard Long ou la sculpture en marchant - 286 words
+Stop 2: She-Bam Pow POP Wizz - 132 words
+===========================
+
+
+Total API cost: $0.0090 (11221 tokens)
+
+Tour text generated successfully!
+Saved to: Musee_d_Art_Moderne_et_d_Art_Contemporain__Nice__France_museum_tour_20260804_053049.txt
+  [C5-5] Evidence persisted: Musee_d_Art_Moderne_et_d_Art_Contemporain__Nice__France_museum_tour_20260804_053049_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Musee d Art Moderne et d Art Contemporain, Nice, France - Museum Tour
+Tour-Category: museum
+
+Stop 1: Richard Long ou la sculpture en marchant
+
+Address: Place Yves Klein, 06364 Nice Cedex 4, France
+
+Coordinates: 43.7037, 7.2691
+
+Museum Information: 1947–1948; 1947–1977
+
+Orientation: For a captivating view of "Richard Long ou la sculpture en marchant," position yourself at the entrance of the exhibition hall at Musee d'Art Moderne et d'Art Contemporain in Nice, Fran...
+
+    Stops: ['Stop 1: Richard Long ou la sculpture en ', 'Stop 2: She-Bam Pow POP Wizz']
+
+  Run 3/3...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #021 | 05:30:50.310 | GENERATE_TOUR_TEXT_FUNCTION_ENTRY
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  tour_type: museum
+  total_stops_parameter: 2
+  output_file: None
+
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #022 | 05:30:50.310 | TOTAL_STOPS_FINALIZED
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  total_stops_final: 2
+  source: parameter
+
+  [S20] DATABASE_URL not set — cache skipped
+
+PHASE 1: Analyzing tour intent with AI...
+  [Bug2Fix] tour_type='museum' suppressed for intent analysis (pre_category='walking'); using location only
+Intent analysis response: {
+    "poi_type": "museums",
+    "location": "Nice, France",
+    "theme_type": "STANDARD",
+    "theme_name": null,
+    "requirements": null,
+    "business_hours_relevant": true,
+    "accessibility_mentioned": false,
+    "needs_research": false,
+    "venue_name": "Musee d Art Moderne et d Art Contemporain",
+    "geographic_scope": null,
+    "scope_precision": null,
+    "transport_mode": "on_foot",
+    "country_scope": null
+}
+  [TRANSPORT] mode=on_foot, country_scope=None (keyword=on_foot, intent=on_foot)
+✅ Intent Analysis Results:
+   POI Type: museums
+   Location: Nice, France
+   Requirements: None
+   Business Hours Relevant: True
+   Accessibility Mentioned: False
+   Venue Name: Musee d Art Moderne et d Art Contemporain
+  [venue_name sanity] 'Musee d Art Moderne et d Art Contemporain' OK
+  [S15] Forced tour_category=museum from venue_name='Musee d Art Moderne et d Art Contemporain'
+
+Detected tour category: MUSEUM
+Using museum template for Musee d Art Moderne et d Art Contemporain, Nice, France - museum
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #023 | 05:30:52.047 | GENERATING_PROMPT
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  user_request: Musee d Art Moderne et d Art Contemporain, Nice, France
+  total_stops: 2
+
+
+PHASE 3A: Fetching 2 candidate POI(s) for Musee d Art Moderne et d Art Contemporain, Nice, France...
+  [Museum constraint] Venue from intent='Musee d Art Moderne et d Art Contemporain'
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [Phase3A] Injected 3 canonical title hints from Wikidata (QID-deduped)
+  [S17] no scope_constraint (precision='', scope='')
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [LOCAL-30] Deterministic selection: 3 documented works (0 catalogue, 3 SPARQL)
+  [LOCAL-30] DETERMINISTIC BYPASS: 3 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Richard Long ou la sculpture en marchant [sparql]
+     - She-Bam Pow POP Wizz [sparql]
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [LOCAL-30] Deterministic selection: 3 documented works (0 catalogue, 3 SPARQL)
+  [LOCAL-30] DETERMINISTIC BYPASS: 3 documented works → Phase 3A SKIPPED
+   Stops proposed (deterministic, no GPT):
+     - Richard Long ou la sculpture en marchant [sparql]
+     - She-Bam Pow POP Wizz [sparql]
+  [R4] Museum tour: asking for 4 candidates (2x for D1v2 filtering)
+
+PHASE 3A: SKIPPED (deterministic fill from 3 documented works)
+OK PHASE 3A parsed 3 candidate POI(s):
+   - Richard Long ou la sculpture en marchant
+   - She-Bam Pow POP Wizz
+   - Tir, séance 26 juin 1961
+  [venue_resolver] DISAMBIGUATION PAGE detected: Q3329536 (musée d'Art moderne et contemporain) — skipping
+  [venue_resolver] Geo-disambiguated by distance: Q936859 (musée d'art moderne et d'art contemporain de Nice) — 0.8km from Nice
+  [venue_resolver] Resolved: 'Musee d Art Moderne et d Art Contemporain' → Q936859 (musée d'art moderne et d'art contemporain de Nice)
+    URL: http://www.mamac-nice.org/
+    Coords: 43.701298, 7.278453
+    Language: fr
+  [D1v2] Venue resolved: Q936859 → URL=http://www.mamac-nice.org/, lang=fr
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [venue_resolver] SPARQL: 3 works found for Q936859
+  [D1v2] SPARQL source: 3 canonical titles
+  [story_miner] Site page: https://www.mamac-nice.org/collection/navigart/ (4917 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/online-collection/ (3919 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/niki-de-saint-phalle/ (21393 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/niki-de-saint-phalle-room/ (18390 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/fr/collection/navigart/ (4917 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/yves-klein/ (23128 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/yves-klein-room/ (21039 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/nouveau-realisme-pop-art/ (15280 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/en/the-collection/new-realism-pop-art/ (10472 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualites/categorie/collection/ (8849 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/actualites/categorie/collection/page/2/ (8798 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/actualites/categorie/collection/page/3/ (8549 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/actualites/categorie/collection/page/4/ (8081 chars)
+  [story_miner] Sub-page: https://www.mamac-nice.org/collection/bernar-venet-ligne-indeterminee/ (9940 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/parcours/ (19551 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/oeuvres-in-situ/ (28945 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/le-mamac-hors-les-murs/mamac-pres-de-chez-vous-collection-depots-prets/ (10736 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/le-mamac-hors-les-murs/mamac-en-voyage-collection-depots-prets/ (10963 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/collection/ (10007 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualite/mamac-en-voyage-collection-pret-museum-frieder-burda-baden-baden-allemagne/ (7850 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualite/mamac-en-voyage-collection-pret-alexander-calder-monumental/ (11928 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/actualite/mamac-en-voyage-collection-pret-musee-unterlinden-colmar/ (8201 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/exposition/ (10371 chars)
+  [story_miner] Site page: https://www.mamac-nice.org/evenement/ (7045 chars)
+  [story_miner] Site crawl: 25 pages fetched (budget: 15)
+  [story_miner] Sitelink EN: 'Musée d'art moderne et d'art contemporain'
+  [story_miner] Sitelink FR: 'Musée d'Art moderne et d'Art contemporain de Nice'
+  [story_miner] Wikipedia EN: 3553 chars (title: 'Musée d'art moderne et d'art contemporain')
+  [story_miner] Joconde museo code: M0888 (from P539)
+  [story_miner] Joconde/POP: no results for M0888 (JS-rendered, expected)
+  [T0a] Exhibit-name extraction: 1 from sections, 3 from quoted/bold/list
+  [T0a] Extracted 11 canonical titles, 0 cycle names
+  [story_miner] Corpus: 26 pages, 11 titles, 0 from Joconde
+  [D1v2] Canonical titles union: 11 site/wiki + 3 SPARQL = 14 total
+  [D1v2] Removed 1 substring titles (prefer longer forms)
+  [LOCAL-24] Classification: 12 works, 0 galleries, 1 excluded
+    EXCLUDED: 'Nouveau Réalisme' — rule: url_path_nonwork (evenement)
+  [LOCAL-24] Near-duplicate collapse removed 1:
+    'Le Mur de Feu d’Yves Klein' → collapsed into 'Le Mur de Feu  d’Yves Klein'
+  [D1v2-LOCAL24] After filter: 11 works, 0 galleries, 1 excluded
+  [venue_resolver] Built 3 dynamic aliases from 3 works
+  [D1v2] Injected 3 dynamic aliases
+  [D1v2] Built bilingual map: 84 word pairs
+  [D1v2] artist-check skipped (no valid creator) — no artist_qid on entity
+  [D1v2] VERIFIED 'Richard Long ou la sculpture en marchant' → canonical: 'Richard Long ou la sculpture en marchant'
+  [D1v2] VERIFIED 'She-Bam Pow POP Wizz' → canonical: 'She-Bam Pow POP Wizz'
+  [D1v2] VERIFIED 'Tir, séance 26 juin 1961' → canonical: 'Tir, séance 26 juin 1961'
+  [D1v2] Exhibit museum detected: 3 SPARQL QIDs, 11 total titles (mostly from site/wiki sections)
+  [D1v2] 3/3 works verified — tier: exhibit_museum
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [D1] Tier: exhibit_museum (3 verified works)
+  [R4] Target reached: 3/2 stops
+  [LOCAL-16 GATE] All 3 stops are D1v2-verified ✓
+
+PHASE 4.5: Validating AI knowledge for Musee d Art Moderne et d Art Contemporain, Nice, France...
+OK Knowledge validation passed: Knowledge validation passed
+
+PHASE 4: skipped (tour_category='museum', no type-verification required)
+
+PHASE 3B: Requesting structured details and walking directions for 2 stop(s)...
+[api_call_logger] Failed to write log: [Errno 2] No such file or directory: '/app/api_call_chain_20260804_051539.txt'
+
+======================================================================
+CALL #024 | 05:31:46.630 | PHASE_3B_REQUEST
+======================================================================
+  location: Musee d Art Moderne et d Art Contemporain, Nice, France
+  stop_count: 2
+
+PHASE 3B API call cost: $0.0004 (464 tokens)
+OK PHASE 3B: ordered 2 stop(s) with structured details and directions
+  [LOCAL-27] Corpus-sourced metadata applied to 2 stops
+  [LOCAL-35] Visitor info page found (fr): http://www.mamac-nice.org/tarifs-et-horaires
+  [LOCAL-35] Visitor info page found (fr): http://www.mamac-nice.org/horaires-et-tarifs
+  [LOCAL-35] Extracted from http://www.mamac-nice.org/tarifs-et-horaires: closed=[], hours=1, admission=''
+  [LOCAL-35] Extracted from http://www.mamac-nice.org/horaires-et-tarifs: closed=[], hours=1, admission=''
+  [LOCAL-35] Formatted result too short — omitting
+  [LOCAL-91] Corpus fallback: visitor info extracted from https://www.mamac-nice.org/collection/yves-klein/
+  [LOCAL-91] Corpus fallback Museum Information: 1947–1948; 1947–1977
+  [LOCAL-39] Museum Information sourced from official site for stop 1
+   Coords cluster detected: 2 stops share '43.6964, 7.2654', refetching...
+   Cluster refetch OK 'Richard Long ou la sculpture en marchant': 43.7035, 7.2687
+   Cluster refetch OK 'She-Bam Pow POP Wizz': 43.7035, 7.2666
+Extracted first POI coordinates: (43.7035, 7.2687)
+  [D4] Museum single-coordinate: all stops set to (43.7035, 7.2687) (source: model (fallback))
+
+=== Extracted POI Information ===
+1. Richard Long ou la sculpture en marchant
+   Address: Place Yves Klein, 06364 Nice Cedex 4, France
+   Coordinates: 43.7035, 7.2687
+   Directions: Head northeast on Place Yves Klein. The museum will be on your left.
+2. She-Bam Pow POP Wizz
+   Address: Place Yves Klein, 06364 Nice Cedex 4, France
+   Coordinates: 43.7035, 7.2687
+   Directions: Continue straight on Place Yves Klein. You will see the exhibition entrance on t...
+================================
+
+
+[Storied] STORIED_MODE=true — generating spine + fact sheets...
+  [§3-adapter] Extracting story elements from 5/26 corpus pages for 'Musee d Art Moderne et d Art Contemporain'
+    page[0] score=10275 url=https://en.wikipedia.org/wiki/Musée_d'art_moderne_et_d'art_contemporain
+    page[1] score=6870 url=https://www.mamac-nice.org/collection/oeuvres-in-situ/
+    page[2] score=6355 url=https://www.mamac-nice.org/collection/yves-klein/
+  [§3-adapter] Raw elements: 34 from 5 pages
+  [§3-adapter] After corroboration scoring: 28 elements
+  [§3-adapter] Final: 28 ranked elements (top type: dedication)
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Three-class retrieval error (non-fatal): local variable 'name_lower' referenced before assignment
+  [SQ-S6b] Elements per stop: s0=28, s1=28
+  [SQ-S6b] Entity clusters found: 52 (≥2 stops)
+    → 21th century (eras): 2 stops, 7 elements
+    → 20th century (eras): 2 stops, 6 elements
+    → yves klein (people): 2 stops, 5 elements
+    → albert chubac (people): 2 stops, 3 elements
+    → 1961 (dates): 2 stops, 3 elements
+  [SQ-S6b] Theme naming: $0.0150, 1883 tokens
+  [SQ-S6b] LLM named 4 candidate themes
+  [SQ-S6b] Scored themes: 4
+    → 'Legacy of Niki de Saint Phalle': coverage=1.00, evidence=0.80, distinct=1.00, arc=0.70, TOTAL=0.890
+    → 'Chronological Evolution of the Collection': coverage=1.00, evidence=0.87, distinct=0.80, arc=0.70, TOTAL=0.867
+    → 'Artistic Contributions to the Museum': coverage=1.00, evidence=0.80, distinct=0.80, arc=0.70, TOTAL=0.850
+    → 'Influence of Yves Klein': coverage=1.00, evidence=0.60, distinct=0.80, arc=0.70, TOTAL=0.800
+  [SQ-S6b] Blended 3 threads: 'Legacy of Niki de Saint Phalle'=0.33, 'Chronological Evolution of the Collection'=0.33, 'Artistic Contributions to the Museum'=0.33
+  [SQ-S6b] Thread discovery: mode=threaded, threads=3
+    → 'Legacy of Niki de Saint Phalle': coverage=100%, weight=0.33, elements=['se_001', 'se_018']
+    → 'Chronological Evolution of the Collection': coverage=100%, weight=0.33, elements=['se_001', 'se_002', 'se_003']
+    → 'Artistic Contributions to the Museum': coverage=100%, weight=0.33, elements=['se_002', 'se_003']
+  [§3] Story elements injected into spine prompt (28 elements, mode=found)
+  [SQ-S6b] Thread context injected into spine prompt (3 threads)
+SPINE_COST: category=museum venue=Musee d Art Moderne et d Art C tokens=2184 (in=1784 out=400) cost=$0.0149 latency=5.0s
+  [LOCAL-111] Spine quality: 3/4 | {'climax_position': False, 'unique_emotional_beats': True, 'valid_callbacks': True, 'closing_revelation_length': True}
+  [Storied] Spine generated: 2 arc entries (mode=found)
+  [venue_cache] DB connection failed: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-183] stop_corpus: 2/2 stops have per-stop passages (3 total passages)
+  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...
+  [CORPUS-GATE] stop='Richard Long ou la sculpture en marchant' verdict=VENUE_ONLY action=SHORTENED
+  [CORPUS-GATE] stop='She-Bam Pow POP Wizz' verdict=VENUE_ONLY action=SHORTENED
+  [LOCAL-198] Corpus gate: 0 PASSED, 2 SHORTENED
+  [Storied] Fact sheets: 2/2 generated
+  [S25] Story types assigned: ['art', 'history']
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [work_stories] Read error: could not translate host name "postgres-2" to address: nodename nor servname provided, or not known
+
+  [LOCAL-37] Tour diversity: no swaps needed (naturally balanced)
+  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)
+
+PHASE 5: Generating detailed descriptions for each POI (parallel)...
+
+Generating description for Stop 1: Richard Long ou la sculpture en marchant by , ...
+
+Generating description for Stop 2: She-Bam Pow POP Wizz by , ...
+Stop 2 API call cost: $0.0038 (4710 tokens)
+Stop 2 description word count: 156 words
+Stop 1 API call cost: $0.0039 (4889 tokens)
+Stop 1 description word count: 222 words
+
+  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...
+  [LOCAL-192] Stop 1 para 1: retry FIXED (R3_SUGGESTIVE_EXPLORATION)
+  [LOCAL-192] Stop 2 para 2: retry FIXED (R3_SUGGESTIVE_EXPLORATION)
+  [LOCAL-192] Style retry summary: 2 paragraphs retried, 2 fixed/improved, 0 kept original
+  [LOCAL-192] Retry cost: $0.0007 (906 tokens)
+
+PHASE 5.5a: Post-description knowledge validation (all tour types)...
+OK Post-description validation passed: Knowledge validation passed
+
+PHASE 5.5b: Validating descriptions are inside 'Musee d Art Moderne et d Art Contemporain'...
+   Authority: 1 D1v2-verified (kept unconditionally), 0 unverified (will check)
+   Pre-filter: 0 clean, 0 suspect (will call OpenAI for suspect only)
+OK PHASE 5.5b: 2 stop(s) passed venue description validation
+OK PHASE 5.7: Dangling-reference scrub complete (2 stops)
+
+PHASE 5.8: Type/prose contradiction check (LOCAL-27)...
+  [LOCAL-27] No type/prose contradictions detected
+
+PHASE 5.9: Audio-native cleanup (LOCAL-41)...
+  [LOCAL-41] Stripped 0 trailing question(s), removed 0 'broader context' instance(s)
+
+PHASE 5.10: Anti-preaching cleanup (LOCAL-44)...
+  [LOCAL-44] Stripped 0 preaching closer(s)
+
+PHASE 6: Assembling the complete tour...
+  [LOCAL-11] Venue-identity mining: 1 facts found {'architecture': 1}
+  [R2] Prolog saved for Stop 1 (133 words)
+  DEBUG - POI 1 content includes:
+    Specific Examples: False
+    Operational Details: True
+    Walking Directions: True
+  [T4] Transition to Stop 2: Continue through Musee d Art Moderne et d Art Contemporain —...
+  DEBUG - POI 2 content includes:
+    Specific Examples: False
+    Operational Details: False
+    Walking Directions: True
+  [EPILOG] Journey epilog added to last stop
+  [S27] No cross-stop repetition detected
+
+  [LOCAL-36] Practical Facts Gate:
+    Claims found: 0
+    Verified: 0
+    Dropped: 0
+    AUDIT: NO_CLAIMS | (none) | (none) | PASS — no practical claims to verify
+  [LOCAL-36] PRACTICAL FACTS GATE: PASSED (0 verified)
+
+=== Word Count Statistics ===
+Stop 1: Richard Long ou la sculpture en marchant - 222 words
+Stop 2: She-Bam Pow POP Wizz - 156 words
+===========================
+
+
+Total API cost: $0.0089 (11146 tokens)
+
+Tour text generated successfully!
+Saved to: Musee_d_Art_Moderne_et_d_Art_Contemporain__Nice__France_museum_tour_20260804_053347.txt
+  [C5-5] Evidence persisted: Musee_d_Art_Moderne_et_d_Art_Contemporain__Nice__France_museum_tour_20260804_053347_evidence.json
+
+Preview of the generated tour:
+
+Step-by-Step Audio Guided Tour: Musee d Art Moderne et d Art Contemporain, Nice, France - Museum Tour
+Tour-Category: museum
+
+Stop 1: Richard Long ou la sculpture en marchant
+
+Address: Place Yves Klein, 06364 Nice Cedex 4, France
+
+Coordinates: 43.7035, 7.2687
+
+Museum Information: 1947–1948; 1947–1977
+
+Orientation: Stand in the center of the Musee d'Art Moderne et d'Art Contemporain in Nice, France, and let your gaze wander towards the exhibit "Richard Long ou la sculpture en marchant." From this ...
+
+    Stops: ['Stop 1: Richard Long ou la sculpture en ', 'Stop 2: She-Bam Pow POP Wizz']
+
+Paragraphs persisted to: /Users/micha/audioura-worktrees/LOCAL-198/tests/../local198_experiment_paragraphs.json
+
+  Anchor analysis would go here (detector integration)
+
+================================================================================
+SAFETY CHECKS
+================================================================================
+  audio_tours rows: 117
+  Nice list: [1, 12, 14, 17, 21, 24, 27, 28, 29, 152]
+
+✓ All safety checks passed
