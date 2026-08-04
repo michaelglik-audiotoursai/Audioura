@@ -3186,3 +3186,77 @@ than accepting the suggestion:
 reclaimable now, zero risk), Xcode DerivedData and old simulator runtimes
 (~10 GB, Michael's call), older `~/audioura-backups` snapshots beyond the last
 12 (~1 GB). None of that is needed today.
+
+---
+
+## D89 — The prompt leak is real, rare, and never reached production. LEAD over-weighted it (2026-08-04)
+
+LOCAL-213 measured the leakage LEAD found in Michael's tour — the model
+narrating its own instruction:
+
+> "**One concrete sensory detail that envelops you in the atmosphere of** Cap
+> d'Antibes is the sound of the waves crashing against the rugged rocks…"
+
+Across every stored tour:
+
+```
+leakage rate              0.6%
+tours affected            11  (all test tours)
+production tours affected  0
+```
+
+Four distinct phrasings, all traceable to the prompt's `Include:` bullet list —
+"one concrete sensory detail" (7), "what makes this stop" (3), "envelops you in
+the atmosphere" (2), stray markdown (2).
+
+**Correction to how LEAD framed this.** I presented it to Michael as a defect
+that "reached a document written specifically for him to evaluate," which is
+true of tour 163 and gives a misleading impression of scale. At 0.6% and zero
+production tours, it is a real but minor fault. The reason it looked worse is
+that I found it in the one tour I had read closely — availability, not
+frequency.
+
+**Shipped:** `R8_PROMPT_LEAKAGE`, error severity. Verified by LEAD
+independently: fires on both real leak forms, stays clean on legitimate sensory
+prose ("The sound of waves carries up the cliff face"), on the ordinary word
+*detail*, on route navigation, and on third-person declaratives. 31/31 on the
+task's labelled set, R1 and the navigation exemptions unaffected.
+
+The prompt was also reworded so the phrasing is not there to echo. Before/after
+was **0/0** — underpowered, as the task said: at a 0.6% base rate you would need
+~170 paragraphs to expect a single occurrence, and it ran 30. The rule is the
+durable part; the rewording is prophylactic.
+
+---
+
+## D90 — Coverage-based stop selection is unproven, and its one observable effect was to drop a stop (2026-08-04)
+
+LOCAL-212 was meant to test D85's conclusion — that for a stop with no source
+material the lever is *selection*, not prompt wording. It could not.
+
+- **MAMAC: 6/6 runs failed before selection** —
+  `venue_cache DB connection failed: could not translate host name "postgres-2"`.
+  The D1 resolver needs Docker-internal networking; the harness runs on the
+  host.
+- **French Riviera: 2 stops requested from 2 candidates.** Preference ordering
+  with no surplus is a no-op.
+
+**A finding worth keeping from the failure:** our host-side test harness
+**cannot exercise museum venues at all**. Every museum measurement we have
+either ran inside the container or used a venue whose resolution happened to
+succeed. That is a gap in the instrument, not in this task.
+
+**And the regression:** one selection-ON run delivered **1 stop when 2 were
+requested**. LOCAL-190 exists because stop counts matter to Michael's field
+test. A coverage filter that can leave the itinerary short is worse than the
+problem it addresses — a fabricated paragraph is bad, a missing stop is
+visible.
+
+Bounced. Retest on **Musée Matisse** (6 stops, all COVERED, and LOCAL-205
+already generated there from the host), with requested-vs-delivered reported
+for every run, and the one-stop case diagnosed before any coverage numbers are
+quoted.
+
+**D85's conclusion still stands unmeasured.** Three rounds show category rules
+land and negative constraints do not; selection is the remaining hypothesis and
+it has not yet had a fair test.
