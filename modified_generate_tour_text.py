@@ -8,6 +8,7 @@ import time
 import requests
 from datetime import datetime
 import re
+from cost_rates import llm_cost as _llm_cost
 
 def detect_tour_type(location, tour_type):
     """
@@ -207,7 +208,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None):
             # Track tokens and cost
             tokens_used = info_result["usage"]["total_tokens"]
             total_tokens += tokens_used
-            call_cost = tokens_used / 1000 * 0.002  # $0.002 per 1K tokens for GPT-3.5-turbo
+            call_cost = _llm_cost(total_tokens=tokens_used)  # LOCAL-197: uses real per-model rates
             total_cost += call_cost
             
             print(f"API call cost: ${call_cost:.4f} ({tokens_used} tokens)")
@@ -387,7 +388,7 @@ ONLY provide the coordinates, nothing else."""
                         # Track tokens and cost
                         tokens_used = coords_result["usage"]["total_tokens"]
                         total_tokens += tokens_used
-                        call_cost = tokens_used / 1000 * 0.002
+                        call_cost = _llm_cost(total_tokens=tokens_used)
                         total_cost += call_cost
                         
                         print(f"API call cost: ${call_cost:.4f} ({tokens_used} tokens)")
@@ -515,7 +516,7 @@ DO NOT include directions to the next stop - these will be added separately.
                 # Track tokens and cost
                 tokens_used = description_result["usage"]["total_tokens"]
                 total_tokens += tokens_used
-                call_cost = tokens_used / 1000 * 0.002  # $0.002 per 1K tokens for GPT-3.5-turbo
+                call_cost = _llm_cost(total_tokens=tokens_used)  # LOCAL-197: uses real per-model rates
                 total_cost += call_cost
                 
                 print(f"API call cost: ${call_cost:.4f} ({tokens_used} tokens)")

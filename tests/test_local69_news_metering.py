@@ -149,11 +149,13 @@ def test_news_cost_calculation_with_llm():
 
     tts_chars = min(article_text_chars, 5000) + 1200 + major_points * 400
     _tts_cost = tts_cost(tts_chars)
-    _llm_cost = llm_cost(160)  # ~160 tokens for short title
+    _llm_cost = llm_cost(total_tokens=160)  # ~160 tokens for short title
 
     total = _tts_cost + _llm_cost
     assert _llm_cost > 0, "LLM cost should be non-zero for long titles"
-    assert _llm_cost == 0.00032, f"LLM cost wrong: {_llm_cost}"
+    # LOCAL-197: with real rates, 160 tokens at gpt-3.5-turbo:
+    # 112 input × $0.50/1M + 48 output × $1.50/1M = $0.000128
+    assert abs(_llm_cost - 0.000128) < 0.00001, f"LLM cost wrong: {_llm_cost}"
     assert total > _tts_cost, "Total should exceed TTS-only cost"
 
     print("PASS: test_news_cost_calculation_with_llm")
@@ -167,30 +169,30 @@ def test_news_cost_model_arithmetic():
       1200 chars (summary+help overhead) = $0.0048
       3 topics × 400 chars = $0.0048
     Total TTS = $0.0296
-    LLM (if triggered): 160 tokens × $0.002/1K = $0.00032
+    LLM (if triggered): 160 tokens → $0.000128 (LOCAL-197 real rates)
     Grand total ≈ $0.030 (without LLM) or $0.030 (with LLM, negligible)
     """
     from cost_rates import POLLY_COST_PER_CHAR, GPT35_TURBO_COST_PER_1K_TOKENS
 
     # Verify rates haven't changed
     assert POLLY_COST_PER_CHAR == 0.000004
-    assert GPT35_TURBO_COST_PER_1K_TOKENS == 0.002
+    assert GPT35_TURBO_COST_PER_1K_TOKENS == 0.0008  # LOCAL-197: real blended rate
 
     # Full article scenario (5000 char cap)
     tts_chars = 5000 + 1200 + 3 * 400  # = 7400
     tts_cost_calculated = tts_chars * POLLY_COST_PER_CHAR
     assert abs(tts_cost_calculated - 0.0296) < 0.0001
 
-    # LLM cost
+    # LLM cost (using blended rate for simple check)
     llm_tokens = 160
     llm_cost_calculated = llm_tokens / 1000 * GPT35_TURBO_COST_PER_1K_TOKENS
-    assert abs(llm_cost_calculated - 0.00032) < 0.00001
+    assert abs(llm_cost_calculated - 0.000128) < 0.00001
 
     # Total
     total = tts_cost_calculated + llm_cost_calculated
-    assert abs(total - 0.02992) < 0.0001
+    assert abs(total - 0.029728) < 0.0001
 
-    # Sanity: news article cost is much less than tour cost ($0.069)
+    # Sanity: news article cost is much less than tour cost
     assert total < 0.069, f"News should be cheaper than a tour: ${total}"
 
     print("PASS: test_news_cost_model_arithmetic")

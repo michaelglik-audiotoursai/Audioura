@@ -6,6 +6,7 @@ compelling introduction paragraph in second-person present tense.
 """
 import logging
 import requests
+from cost_rates import llm_cost as _llm_cost
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,7 @@ Return ONLY the paragraph, no quotes or commentary."""
         # Log cost
         usage = result.get("usage", {})
         tokens = usage.get("total_tokens", 0)
-        cost = tokens / 1000 * 0.002
+        cost = _llm_cost(total_tokens=tokens)
         logger.info(f"Tour hook: {tokens} tokens, ${cost:.4f}")
 
         return text

@@ -447,7 +447,7 @@ def step6_news_article_charged():
     from cost_rates import tts_cost, llm_cost
     tts_chars = 3000 + 1200  # article cap + overhead
     tts_cost_val = tts_cost(tts_chars)
-    llm_cost_val = llm_cost(160)  # title shortening
+    llm_cost_val = llm_cost(total_tokens=160)  # title shortening
     our_cost = Decimal(str(round(tts_cost_val + llm_cost_val, 6)))
 
     cost_meter.record_operation(
