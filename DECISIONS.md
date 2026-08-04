@@ -3647,3 +3647,130 @@ it. Those are different questions and only one of them is automatable.
 every contradiction was false, 219 fixed the fragility and then the regression
 it caused). Every one of the four defects was found by running against real
 tour text, not by the tests shipped with the code (D98).
+
+---
+
+## D100 — Michael's ruling on accuracy: block what is wrong, publish what is merely unverified, and go looking for sources (2026-08-04)
+
+Three answers that together settle the gate, and one correction of LEAD.
+
+### The correction first
+
+LEAD wrote that Michael's 5/5 on *"depths reaching 320 feet"* contradicted the
+proposed truth gate. **It did not.** Michael:
+
+> *"Incorrect. I would have supported you 100% if I knew that the data was
+> incorrect. You said the data was not found aka UNSUPPORTED in corpus
+> passages."*
+
+He then searched, found the bay documented at 95–150 m at its outer mouth
+(320 ft ≈ 97.5 m), and concluded the figure is probably right. So the
+disagreement was never about whether the claim was sourced — it was about
+**what to do when it isn't**. LEAD built a whole two-axis proposal on a
+misread.
+
+### The rule he actually wants
+
+> *"We should not publish if we are reasonably sure that the data is
+> incorrect. It is a different story if the data is unverifiable. We can
+> publish if we recognize it… having no information or very little information
+> maybe worse than having unverifiable information."*
+
+That maps exactly onto the verdict vocabulary we already have:
+
+| verdict | meaning | action |
+|---|---|---|
+| `CONTRADICTED` | the corpus says otherwise | **hard block** |
+| `UNSUPPORTED` | we cannot verify it | **publish**, disclosed |
+| `SUPPORTED_*` | corpus backs it | publish |
+
+**This is a better rule than LEAD's** and it is implementable today. The hard
+block lands on `CONTRADICTED`, which LOCAL-218/219 just made trustworthy — 0
+of 188 corpus-wide, no false alarms. LEAD's proposal would have blocked on
+`UNSUPPORTED`, which over-flags ~17% and would have deleted good writing.
+
+Question 0 in `EVALUATION_RECOUNT.md` is answered and withdrawn.
+
+### And the corpus is not the only source
+
+> *"we should not remove or entrust the data if we can not find it in corpus
+> passages alone, we should use Other sources, especially if they are so cheap
+> compare to the tour price… correct me if I am wrong."*
+
+He asked to be corrected, so: **directionally right, an order of magnitude
+off.** Measured, our cost for a 2-stop tour:
+
+```
+Polly TTS (7,400 chars)   $0.0296
+LLM (12,700 tokens)       $0.0102
+TOTAL                     $0.0398
+```
+
+Serper is $0.001/query. Verification is therefore:
+
+| granularity | cost | share of tour cost |
+|---|---|---|
+| per checkable claim (~30) | $0.030 | **75%** |
+| per paragraph (~6) | $0.006 | 15% |
+| per stop (2) | $0.002 | 5% |
+
+Not two orders of magnitude cheaper than TTS — per-claim verification nearly
+doubles our cost. **Per-entity or per-paragraph batching is the affordable
+shape**, and against the $2.00 user ceiling even the 75% case is trivial. His
+conclusion holds; the arithmetic behind it needed fixing.
+
+**LOCAL-221** dispatched: when a claim is `UNSUPPORTED`, search for a source
+and promote it to `SUPPORTED_EXTERNAL` rather than deleting it.
+
+### Two smaller rulings
+
+**R9 stays deletion — for now.** Michael: *"Humans think they are being cheated
+or misled when they hear sentences that have no information… and they think the
+teller is stupid."* But the better answer is connectives carrying "both factual
+and emotional content." Deletion is the floor, not the goal.
+
+**The disclaimer he assumed exists does not.** He wrote *"we should in the
+disclaimer when people are installing / use our application that the data comes
+from Internet sources. If we do not, we should."* LEAD checked
+`audio_tour_app/lib`: there is **no accuracy disclaimer anywhere** — the only
+"AI-generated" strings concern replacing a custom audio recording. If we
+publish unverified claims by policy, the disclosure is not optional. Task
+raised for him.
+
+---
+
+## D101 — Validation is three passes, and the reason is the product's whole differentiator (Michael, 2026-08-04)
+
+> *"On the first pass we should look at the group, then on the second pass
+> sentence by sentence, and on the 3rd pass as a group again."*
+
+His reasoning is a nesting argument: a tour works only if every stop is
+interesting; a stop works only if every paragraph is; a paragraph works only if
+every sentence is — **but a sentence cannot be judged in isolation, or the
+paragraph stops making sense as a unit.** Hence group → sentence → group.
+
+And the reason it is worth spending on, in his words:
+
+> *"Lena said she would not use any museum tour because nowadays she can ask
+> Google about any painting by pointing her phone camera at it and get precise
+> factual information. I said that she can, but then this information will be
+> out of context of her tour, her interests, and will be dry. I am only right
+> if our tours will be full of the correct information, that fits Lena's
+> interests and enhances the whole tour experience."*
+
+**This is the product thesis and it should govern the roadmap.** Point-and-ask
+already beats us on isolated facts, for free. We are only worth using if the
+information is *correct*, *fitted to the listener*, and *connected across
+stops*. Each of the three maps to work already in flight or designed:
+
+| Lena's test | our work |
+|---|---|
+| correct | `claim_check`, and now external verification (D100) |
+| fits her interests | the swipe/preference model, `STORY_QUALITY_DESIGN` §2c/2d |
+| enhances the whole tour | cross-stop continuity — the weakest of the three, and the least built |
+
+The third is the one with almost nothing behind it. Michael's own evaluation
+scored both connective sentences 0/5, and the "dominant story" thread
+(SQ-S6b) has been designed since July and never built. **Continuity is the
+gap that a competitor cannot close by pointing a camera at a painting**, and it
+is where we are thinnest.
