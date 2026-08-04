@@ -2262,3 +2262,119 @@ per arm rather than reason about published rates.
 **The general lesson, worth more than the fix:** before the fifth round of
 tuning a system, check what the system is made of. Four rounds of prompt
 engineering never asked which model was reading the prompt.
+
+---
+
+## D67 — gpt-4o-mini halves the style failure rate and costs less; the default does NOT flip yet (2026-08-04)
+
+LOCAL-194, MAMAC, 2 stops, 3 runs per arm, 21 paragraphs each, same stops in
+all six runs:
+
+| | gpt-3.5-turbo | gpt-4o-mini |
+|---|---|---|
+| overall paragraph failure | 28.6% | **14.3%** |
+| R4 prescribed feeling | 5/21 | **1/21** |
+| R3 suggestive | 2/21 | 4/21 |
+| **anchor rate (grounding)** | **47.6%** | **33.3%** |
+| latency / tour | 161s | 191s |
+
+R4 is the fault Michael's listener named. Three rounds could not move it:
+LOCAL-188 put the rule in the prompt (no change), LOCAL-192 retried failing
+paragraphs (≈50% self-correction on R4). Changing the model moved it from 5
+to 1.
+
+**Cost.** LOCAL-194 reports 7.2× cheaper. That number is inflated by our own
+stale rate constant (see D68); against real published rates the ratio is
+closer to 3×. **The direction holds — the better model is also the cheaper
+one** — but the magnitude in that submission should not be quoted.
+
+**Significance.** 6/21 vs 3/21 is p=0.27 on Fisher's exact. The task said so
+itself, unprompted, which is the right instinct. The sign is consistent
+across all three runs but this is not yet a statistically established result.
+
+**Why the default stays at gpt-3.5-turbo for now.** The anchor rate — the
+corpus-grounding metric, our whole defense against fabrication — dropped 14
+points. The task's hypothesis is that gpt-4o-mini paraphrases rather than
+echoing corpus phrasing, so a token-matching detector sees fewer anchors
+while the claims stay just as grounded. That is plausible and matches the
+sample paragraphs. It is not verified.
+
+Fabrication is the fault Michael cares most about (D50, the Picasso
+paragraph). Flipping the default is reversible — it is one environment
+variable — but "reversible" is not "harmless" when the cost of being wrong
+is Michael reading an invented fact. **LOCAL-195** resolves the question by
+hand-checking whether NO_ANCHOR paragraphs from gpt-4o-mini are actually
+unsupported, or merely paraphrased. LEAD flips the default the moment that
+comes back clean.
+
+Merged regardless: `TOUR_LLM_MODEL` is now runtime config at all 14 call
+sites (13 from LOCAL-194 plus LOCAL-192's retry call, which LEAD wired up
+during the merge — a rewriter on the old model would silently confound every
+future model A/B).
+
+---
+
+## D68 — Our cost model prices gpt-4o-mini at 7× its real rate, and gpt-3.5-turbo at 2.5× (2026-08-04)
+
+```python
+# cost_rates.py, both storied and subscribed
+GPT35_TURBO_COST_PER_1K_TOKENS = 0.002
+GPT4O_MINI_COST_PER_1K_TOKENS  = 0.002      # ← identical
+```
+
+$0.002/1K is gpt-3.5-turbo's **June 2023** price. The current published
+rates are roughly $0.50/1M in and $1.50/1M out for gpt-3.5-turbo (≈$0.0008/1K
+blended) and $0.15/1M in, $0.60/1M out for gpt-4o-mini (≈$0.000285/1K).
+`generate_tour_text.py` additionally hardcodes `tokens / 1000 * 0.002` at
+eight or more sites, bypassing `cost_rates.py` entirely.
+
+**Why this matters beyond tidiness.** Subscribed charges the user **×5 of our
+measured cost** (Michael's rule), and D41's overdraft arithmetic runs on the
+same number. Overstating our cost overcharges a real person. On gpt-4o-mini
+the overstatement would be ~7×.
+
+**And it hides the win.** Switching to gpt-4o-mini would cut real LLM spend,
+but because both constants are 0.002 our own accounting would report *no
+saving at all* — and any future model comparison run through `llm_cost()`
+would come back exactly flat, a clean null that looks like a measurement.
+
+LLM is a minority of tour cost (Polly TTS dominates), so this is a
+correctness bug rather than a crisis. **LOCAL-197** dispatched: per-model
+input/output rates, one code path, and the hardcoded literals routed through
+it.
+
+---
+
+## D69 — R1 cannot see the most common imperative in our tours (2026-08-04)
+
+`_R1_IMPERATIVE_VERBS` is a closed list of 22 phrases. English imperatives
+are open-class. Checked against the validator:
+
+```
+MISSED | Stand at the entrance of the gallery and let the scale...
+MISSED | Immerse yourself in the atmosphere of the gallery...
+MISSED | Position yourself near the far wall...
+MISSED | Pause here before continuing...
+MISSED | Listen to the quiet of the room...
+MISSED | Turn your attention to the smaller canvas...
+```
+
+"Stand …" is the *standard opener* for stop narration in this pipeline —
+both sample paragraphs in LOCAL-194, one per arm, begin with it, and both
+score zero violations. So **R1 = 0.000 across every arm of LOCAL-188, 189,
+192 and 194 is an artifact**, not a finding. We have been reporting a rule as
+clean while it was blind to the dominant instance of the thing it detects.
+
+"Turn your attention to" is worse than an omission: `turn` sits in
+`_NAV_VERBS_R1_EXEMPT`, so directing the listener's attention is being
+excused as route navigation. That is the same shape as the navigation
+exemption that laundered the Picasso paragraph in D60 — an exemption written
+for one legitimate case, quietly covering an illegitimate one.
+
+**This does not disturb D67.** The model finding rests on R4 and the overall
+rate, both of which fire correctly. It does mean the R1 column of four
+experiments should be treated as unmeasured, not as zero.
+
+**LOCAL-196** dispatched. The fix is not a longer verb list — that is the
+same mistake at a larger size. It needs sentence-initial base-form detection
+with an exemption list, i.e. the inverse of today's design.
