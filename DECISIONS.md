@@ -4185,3 +4185,113 @@ containers, none started or stopped.
 code against schema) and the first one caught *before* it reached anything. The
 difference was simply running the two halves together — which cost five
 minutes and would have cost a production outage.
+
+---
+
+## D110 — 27 passing tests, database broken. A test that cannot fail is counted as coverage (2026-08-04)
+
+LOCAL-226 built the service-layer dry run: 27 tests, real Flask test client,
+real database, **no mocks**. It reported zero route failures and zero schema
+mismatches.
+
+LEAD applied D55 — *before believing a null result, check the experiment could
+have produced a non-null one* — by removing the exact table LOCAL-225 had just
+identified as critical:
+
+```
+$ ALTER TABLE newsletters_article_link RENAME TO _tmp_broken
+$ pytest tests/service_layer_dry_run/ -q
+27 passed
+```
+
+**Every test passed with the database broken.** (Table restored immediately;
+21 tables, production `audiotours` untouched at 133 tours.)
+
+### Why, and it is worth understanding rather than just patching
+
+```python
+assert result["allowed"] is False
+assert result["reason"] == "quota_exceeded"
+```
+
+With the table missing, `get_news_used_period()` fails closed and returns
+**9999**, which exceeds any limit — so `allowed=False` and
+`reason="quota_exceeded"`. **The broken state produces exactly the assertion
+the test checks for.** The test cannot distinguish "this user is at their
+quota" from "the database is broken and everyone is refused."
+
+The test even prints the distinguishing value without asserting it:
+`used` is 10 when healthy and 9999 when broken. One assertion apart.
+
+### The pattern, now unmistakable
+
+Every instrument failure this week was **a test that passed for the wrong
+reason**:
+
+| | what passed | what it actually measured |
+|---|---|---|
+| D83 | style A/B, all cells 0.000 | a `.get()` default |
+| D91 | venue cache "not configured" | an unreachable host, swallowed |
+| D97 | 4 CONTRADICTED verdicts | nothing consumed them, so nobody looked |
+| D110 | 27 service tests | a fail-closed path that mimics the success case |
+
+**A test that cannot fail is worse than no test, because it is counted as
+coverage.** The cheap defence is the one LEAD used here and should use
+routinely: break the thing on purpose and confirm the suite goes red.
+
+**Required of the resubmission:** assert the *value* (`used == 10`), not the
+verdict; audit every test for "what else could make this pass?"; and add a
+falsification case to the suite itself, so a schema break makes it fail.
+
+The structure — real routes, real database, no mocks, happy path plus unknown
+user plus malformed body — is good and worth keeping. It needs tightening, not
+rebuilding.
+
+---
+
+## D111 — The suite can now fail, and that is the only reason to believe it (2026-08-04)
+
+LOCAL-226 resubmitted. LEAD re-ran the same falsification that produced the
+bounce:
+
+```
+healthy                                        34 passed
+ALTER TABLE newsletters_article_link RENAME…    4 failed, 30 passed
+```
+
+Named among the failures:
+
+```
+test_news_quota_healthy_returns_exact_count
+test_falsification.py::test_missing_table_produces_9999_not_correct_count
+```
+
+The fix was one assertion per test — `used == 10`, not merely
+`allowed is False` — plus a falsification case carried **in the suite itself**,
+which restores the table even if it crashes. (It restored ahead of LEAD's own
+restore, leaving a `_tmp_broken` artifact from the manual rename; LEAD dropped
+it. 21 tables, production `audiotours` untouched at 133 tours, 23 containers.)
+
+**Tightening surfaced no new schema mismatches.** LOCAL-225's missing table
+remains the only one — so the "zero failures" claim was true after all. It just
+was not *evidence* until the suite could produce a non-zero.
+
+That distinction is the whole of this week's method and worth stating once
+plainly: **a passing test is a claim about the code; a test that fails when you
+break the code is evidence for it.** Four instrument failures (D83, D91, D97,
+D110) were all the first kind mistaken for the second.
+
+### Where the subscribed track now stands
+
+| | |
+|---|---|
+| billing arithmetic vs real schema | verified (D109) |
+| Michael's overdraft carry-over (−23¢ + $10 = $9.77) | verified |
+| Flask routes vs real schema | verified, with assertions that can fail |
+| the suite's ability to detect a broken schema | verified by breaking it |
+| **deployed** | **no — and still Michael's call** |
+
+Everything short of turning it on has now been done. The remaining unknowns are
+the ones only a running stack answers: container networking, image contents,
+and real Apple IAP. `Dockerfile`s and the `subscribed-204` compose project
+exist for that (D76); nothing starts without him.
