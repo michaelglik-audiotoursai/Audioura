@@ -4977,6 +4977,62 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         except Exception as e:
             print(f"  [LOCAL-37] Tour diversity error (non-fatal): {e}")
 
+    # [LOCAL-188] Feature flag: set DISABLE_STYLE_CONSTRAINTS=1 to suppress the
+    # declarative-prose style rules from the narration prompt (for controlled A/B comparison).
+    _style_constraints_disabled = os.environ.get('DISABLE_STYLE_CONSTRAINTS', '').strip() == '1'
+    if _style_constraints_disabled:
+        print(f"  [LOCAL-188] Style constraints DISABLED by DISABLE_STYLE_CONSTRAINTS=1 env var")
+    else:
+        print(f"  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)")
+
+    _STYLE_CONSTRAINT_BLOCK_MUSEUM = """
+DECLARATIVE PROSE — STYLE RULES (LOCAL-188, critical):
+All narration must be declarative. These rules are enforced by automated validation.
+- NO SECOND-PERSON IMPERATIVES: Never open a sentence with a base-form verb aimed at the
+  listener. "Feel the weight", "Notice the facade", "Imagine the scene", "Explore further",
+  "Discover the connection", "Consider the contrast" — ALL BANNED.
+  Write declarative statements instead: "The weight of centuries is visible in..." not
+  "Feel the weight of centuries."
+- NO QUESTIONS: Never use a question mark. Never pose a rhetorical question.
+  "How does this manifest?" → "This manifests in..."
+- NO "AS YOU WANDER/EXPLORE/STROLL": Never use "as you" + a movement or discovery verb.
+  "As you explore the gallery" / "As you wander through" / "If you look closely" — BANNED.
+  State what IS, not what happens when the listener moves.
+- NO PRESCRIBED FEELINGS: Never tell the listener what they feel, sense, or experience.
+  "You feel the solemnity" / "You sense the history" / "You find yourself moved" — BANNED.
+  Describe the OBJECT or PLACE, not the listener's inner state.
+- NO HALLUCINATED SENSORY CLAIMS: Never assert a sensation the listener cannot actually be
+  having. "You can almost hear the echo of his brushstrokes" / "Breathe in the faint scent
+  of oil paint that still lingers" — BANNED. Historical sounds are silent. Absent smells
+  are absent. Only describe sensory facts that are TRUE RIGHT NOW at this location.
+These rules apply to the NARRATION paragraphs only. Navigation/orientation directions
+("Head south", "Turn left", "Continue past") are exempt — imperative form is correct there.
+"""
+
+    _STYLE_CONSTRAINT_BLOCK_OUTDOOR = """
+DECLARATIVE PROSE — STYLE RULES (LOCAL-188, critical):
+All narration must be declarative. These rules are enforced by automated validation.
+- NO SECOND-PERSON IMPERATIVES: Never open a sentence with a base-form verb aimed at the
+  listener. "Feel the weight", "Notice the facade", "Imagine the scene", "Explore further",
+  "Discover the connection", "Consider the contrast" — ALL BANNED.
+  Write declarative statements instead: "The weight of centuries is visible in..." not
+  "Feel the weight of centuries."
+- NO QUESTIONS: Never use a question mark. Never pose a rhetorical question.
+  "How does this manifest?" → "This manifests in..."
+- NO "AS YOU WANDER/EXPLORE/STROLL": Never use "as you" + a movement or discovery verb.
+  "As you explore the area" / "As you wander through" / "If you look closely" — BANNED.
+  State what IS, not what happens when the listener moves.
+- NO PRESCRIBED FEELINGS: Never tell the listener what they feel, sense, or experience.
+  "You feel the solemnity" / "You sense the history" / "You find yourself moved" — BANNED.
+  Describe the OBJECT or PLACE, not the listener's inner state.
+- NO HALLUCINATED SENSORY CLAIMS: Never assert a sensation the listener cannot actually be
+  having. "You can almost hear the echo of his brushstrokes" / "Breathe in the faint scent
+  of oil paint that still lingers" — BANNED. Historical sounds are silent. Absent smells
+  are absent. Only describe sensory facts that are TRUE RIGHT NOW at this location.
+These rules apply to the NARRATION paragraphs only. Navigation/orientation directions
+("Head south", "Turn left", "Continue past") are exempt — imperative form is correct there.
+"""
+
     # PHASE 5: Generate detailed descriptions for each POI (parallelized)
     print(f"\nPHASE 5: Generating detailed descriptions for each POI (parallel)...")
 
@@ -5071,7 +5127,7 @@ NO PREACHING — NEVER INSTRUCT THE LISTENER (critical):
   "Let this be a reminder..." / "Carry this with you as..."
 - The listener is an adult. Do NOT tell them what they "should" feel or do.
 - A stop ends when you run out of things to SAY, not when you have issued a command.
-
+{_STYLE_CONSTRAINT_BLOCK_MUSEUM if not _style_constraints_disabled else ""}
 NO CONDESCENSION:
 - NEVER write "To truly appreciate/understand [X], one must..." — this presupposes
   ignorance. Instead, JUST STATE the context: "During samurai culture in 19th century
@@ -5139,7 +5195,7 @@ NO PREACHING — NEVER INSTRUCT THE LISTENER (critical):
   "Imagine..." / "Let this be a reminder..." / "Carry this with you as..."
 - The listener is an adult. Do NOT tell them what they "should" feel or do.
 - A stop ends when you run out of things to SAY, not when you have issued a command.
-
+{_STYLE_CONSTRAINT_BLOCK_OUTDOOR if not _style_constraints_disabled else ""}
 NO CONDESCENSION:
 - NEVER write "To truly appreciate/understand [X], one must..." — just state the context.
 - NEVER write "It is worth noting that..." or "It is important to understand that..."
