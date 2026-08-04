@@ -1,0 +1,97 @@
+{
+  "models": {
+    "A": "gpt-3.5-turbo",
+    "B": "gpt-4o-mini"
+  },
+  "runs_per_arm": 3,
+  "venue": "Mus\u00e9e Matisse, Nice, France",
+  "timestamp": "2026-08-04 08:01:49",
+  "arm_A_results": [
+    {
+      "arm": "A",
+      "run": 1,
+      "model": "gpt-3.5-turbo",
+      "elapsed_seconds": 131.4,
+      "cost_info": {
+        "total_cost": 0.0,
+        "total_tokens": 0,
+        "cache_hit": false,
+        "breakdown": {}
+      },
+      "tour_text_length": 5451,
+      "success": true
+    },
+    {
+      "arm": "A",
+      "run": 2,
+      "model": "gpt-3.5-turbo",
+      "elapsed_seconds": 144.5,
+      "cost_info": {
+        "total_cost": 0.0,
+        "total_tokens": 0,
+        "cache_hit": false,
+        "breakdown": {}
+      },
+      "tour_text_length": 5241,
+      "success": true
+    },
+    {
+      "arm": "A",
+      "run": 3,
+      "model": "gpt-3.5-turbo",
+      "elapsed_seconds": 127.8,
+      "cost_info": {
+        "total_cost": 0.0,
+        "total_tokens": 0,
+        "cache_hit": false,
+        "breakdown": {}
+      },
+      "tour_text_length": 4768,
+      "success": true
+    }
+  ],
+  "arm_B_results": [
+    {
+      "arm": "B",
+      "run": 1,
+      "model": "gpt-4o-mini",
+      "elapsed_seconds": 129.6,
+      "cost_info": {
+        "total_cost": 0.0,
+        "total_tokens": 0,
+        "cache_hit": false,
+        "breakdown": {}
+      },
+      "tour_text_length": 4799,
+      "success": true
+    },
+    {
+      "arm": "B",
+      "run": 2,
+      "model": "gpt-4o-mini",
+      "elapsed_seconds": 130.4,
+      "cost_info": {
+        "total_cost": 0.0,
+        "total_tokens": 0,
+        "cache_hit": false,
+        "breakdown": {}
+      },
+      "tour_text_length": 5250,
+      "success": true
+    },
+    {
+      "arm": "B",
+      "run": 3,
+      "model": "gpt-4o-mini",
+      "elapsed_seconds": 139.9,
+      "cost_info": {
+        "total_cost": 0.0,
+        "total_tokens": 0,
+        "cache_hit": false,
+        "breakdown": {}
+      },
+      "tour_text_length": 4819,
+      "success": true
+    }
+  ]
+}
