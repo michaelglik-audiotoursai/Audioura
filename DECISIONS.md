@@ -2914,3 +2914,78 @@ the loop. GitHub push protection exists but caught only the newest occurrence
 and missed the 2026-07-30 one entirely. LEAD's review reads diffs for logic,
 not for credentials. The resubmitted LOCAL-207 wires a scanner into the
 pre-merge path and adds the prohibition to every task file's PROCESS block.
+
+
+---
+
+## D82 — Correction to D79/D81: the live OpenAI key was never fully on origin (2026-08-04)
+
+LEAD wrote in D79 that `SUBMISSION_LOCAL-39.md` "contains the same key in
+full." It does not. The line is:
+
+> The OpenAI API key (sk-proj-H6SIHfb...) has hit `insufficient_quota` (429).
+
+A **15-character prefix**, not a recoverable key. LEAD saw a known prefix in a
+grep and reported an exposure without reading the line. The same error was
+repeated in D81's table.
+
+**Corrected exposure list — what Michael actually needs to rotate:**
+
+| credential | where | on origin since | recoverable? |
+|---|---|---|---|
+| OpenAI `sk-proj-wpIWgoRa…` | `sk.py`, full 164-char value | **2025-10-26** | **yes — rotate** |
+| AWS `AKIAWLW3…` | two review/submission docs, full 20-char id | 2026-06-07 | **yes — rotate**, and it is the key live in `.env` |
+| OpenAI `sk-proj-H6SI…` (the `.env` key) | `SUBMISSION_LOCAL-39.md`, 15-char prefix | 2026-07-30 | **no** |
+
+So it is **two credentials to rotate, not three**. The live OpenAI key was
+written in full by LOCAL-206 this morning, but GitHub push protection stopped
+it and LEAD reset before it reached origin — it was never published. Rotating
+it anyway is cheap and reasonable; it is not urgent.
+
+The AWS key remains the serious one: full, valid, in use, on both branches
+since June.
+
+**The lesson, and it is the same one CLAUDE.md already records:** *read the
+code — do not pattern-match it.* A grep for `sk-proj-H6SI` returning a hit is
+not evidence of an exposed key; the line has to be read. LEAD has now made
+this mistake in the same way the greps did on the French-vs-English fact audit
+and the all-negative check.
+
+---
+
+## D83 — Model decision: switch for cost and latency, not for quality (2026-08-04)
+
+LOCAL-205 re-ran the comparison on Musée Matisse (6/6 COVERED), 3 runs per arm,
+after its style harness was fixed:
+
+| | gpt-3.5-turbo | gpt-4o-mini |
+|---|---|---|
+| unsupported claims / paragraph | 1.87 | 1.93 |
+| anchor rate | 100% | 100% |
+| **cost / tour** | $0.0225 | **$0.0063** |
+| **latency / tour** | 144.6s | **129.2s** |
+
+**Grounding parity confirmed** — D70's prediction held. The 4.5–5× gap seen on
+MAMAC was an artifact of stops with no source material (D78).
+
+**No reliable style difference.** The task reports overall failure 0.333 (A) vs
+0.375 (B) over 15/16 paragraphs; LEAD's own run over the same committed
+paragraphs, extracting 24 per arm, gives 0.292 (A) vs 0.208 (B) — **opposite
+sign**. Two extractions of the same six tours disagree on which model is
+better, which means the difference is smaller than the measurement noise. D67's
+"gpt-4o-mini halves R4" does not replicate on a covered venue.
+
+So the quality case is neutral and the operational case is decisive: **3.6×
+cheaper and 11% faster.** Against the $2.00 tour ceiling and the ×5 pricing
+rule, that is real money on every tour.
+
+**Decision: LEAD will flip `TOUR_LLM_MODEL` to gpt-4o-mini — but not while
+Michael is mid-evaluation.** He is about to read a 2-stop Riviera tour and
+recount the evaluation score. Changing the model underneath that would confound
+his read of the system. Flip after the evaluation baseline is agreed.
+
+**Open, and worth more than the model choice:** both models produce ~1.9
+unsupported claims per paragraph on a *well-covered* venue, at 100% anchor
+rate. Coverage fixed the gap between models; it did not fix grounding. The
+anchor metric saturates while half the paragraphs still assert something no
+passage supports — it measures coverage, not truth.
