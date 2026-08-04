@@ -16,7 +16,7 @@ the terminal scroll.**
 
 ## Contents
 
-- [Q19 — Should the billing layer move to `storied`? (LEAD-raised)](#q19)
+- [Q19 — Should the billing layer move to `storied`? **Answered: No**](#q19)
 - [Q18 — Translation pricing: what is $2.71 for, can it be cheaper?](#q18)
 - [Q17 — What is the credential pipeline, for whom, for what?](#q17)
 - [Q16 — Can I add field-experiment tasks? Is ClickUp working?](#q16)
