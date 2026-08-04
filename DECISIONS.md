@@ -3120,3 +3120,69 @@ The lesson is not "test more" in the abstract. It is that **a guard which
 deletes things needs its safety argument written down before it runs**, and
 mine was "merged means finished" — an assumption that is false for exactly the
 window where deletion does the most damage.
+
+---
+
+## D87 — Michael's queue is now a standing checklist item, and his tasks must be executable (2026-08-04)
+
+Michael, 2026-08-04: *"Please create ClickUp tasks for me if you definitely
+need me to do something… Always ask me here and if I answer change the status
+to Complete, if not, remind me that my queue for a space is not empty."* And:
+*"All tasks assigned to me should explain in detail how to deliver them; for
+example, what sites to go, what button/links to press, what to write, what
+questions to answer."*
+
+**Binding on LEAD from now on:**
+
+1. **Anything requiring Michael gets a ClickUp task in 👤 Michael
+   (`1000410000000735`)** — not just a paragraph in chat that scrolls away.
+2. **Ask in chat as well**, every time. Chat is the prompt; ClickUp is the record.
+3. **If he answers, set the task Complete.** If he does not, **remind him his
+   queue is not empty** on the next tick. Do not let it accumulate silently.
+4. **Every task assigned to him is written to be executed by someone who is not
+   in the code**: the exact URL, the exact menu path, the exact button, the
+   exact text to type, the exact answer to each form question. A task that says
+   "complete the data safety form" is not finished work.
+
+**Note on assignment.** Michael tried to assign a subtask to LEAD and found no
+way to. There is no ClickUp user for Claude — I read the space each tick, so
+list placement *is* the assignment: 👤 Michael = his, 🔵 Claude — Review = mine,
+🟦/🟩 Kiro = agents. He does not need to assign anything to me.
+
+---
+
+## D88 — Disk: no, there is no capacity problem, and an external drive would make things worse (2026-08-04)
+
+Michael asked whether we have a disk problem and whether an external drive
+would help. Measured:
+
+```
+/System/Volumes/Data   228 GB total   157 GB used   44 GB free   (78%)
+
+~/Library                47 GB   (Xcode/simulators 17 GB, App Support 13 GB, Docker 8 GB)
+~/audioura-worktrees    5.2 GB   (was 51 GB before the D84 prune)
+~/flutter               3.8 GB
+~/audioura-backups      2.4 GB   (16 files; retention of 12 is enforced)
+~/Audioura              982 MB
+```
+
+**The incident was not capacity, it was a leak.** 188 worktrees had accumulated
+since LOCAL-14. Pruning reclaimed 46 GB and the prune now runs every tick with
+a 6-hour idle guard (D84, D84a), plus an alarm below 10 GB free. 44 GB of
+headroom against a working set that grows a few GB a week is comfortable.
+
+**An external drive is the wrong tool here** and worth saying so plainly rather
+than accepting the suggestion:
+
+- Git worktrees on a different volume make every checkout cross a USB bus;
+  `git worktree add` on 2,127 files goes from seconds to minutes, and every
+  dispatch pays it.
+- Docker on macOS cannot easily use external storage for its VM disk without
+  moving the whole thing, and a disconnect mid-write corrupts images.
+- It adds a failure mode — an unplugged or unmounted drive — to a loop that
+  runs unattended overnight. The queue would fail in a new and confusing way.
+
+**If we do get tight, in order of safety:** `docker system prune` (~1.7 GB
+reclaimable now, zero risk), Xcode DerivedData and old simulator runtimes
+(~10 GB, Michael's call), older `~/audioura-backups` snapshots beyond the last
+12 (~1 GB). None of that is needed today.
