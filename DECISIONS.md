@@ -2770,3 +2770,102 @@ corpus. There was no corpus to use.
 
 **Schema note, declared as required:** LOCAL-203 added a `passage_roles`
 column to `stop_corpus`. Additive, no data moved; 61 rows before and after.
+
+---
+
+## D79 — ⚠️ Michael's live OpenAI key is in the repository and on origin. He must rotate it. (2026-08-04)
+
+GitHub push protection rejected a push this morning:
+
+```
+—— OpenAI API Key ——
+  commit d56b4fc  path tests/test_creator_only_gate_LOCAL206.py:25
+```
+
+LOCAL-206 had written the key as a hardcoded fallback:
+
+```python
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY") or "sk-proj-H6SI…"
+```
+
+It is **the same key as `~/Audioura/.env`** — live, in use by every running
+service.
+
+**It was already on origin.** `SUBMISSION_LOCAL-39.md`, committed **2026-07-30**
+(`4f25c8d`), contains the same key in full and has been pushed since. Push
+protection did not stop that one; it caught the new occurrence only.
+
+**What LEAD did (all reversible):**
+1. `git reset --hard origin/storied` — dropped the local merge so the secret
+   never reached origin from this session. Only two unpushed commits existed;
+   both were mine from minutes earlier.
+2. Amended the LOCAL-206 commit to `os.environ["OPENAI_API_KEY"]` with no
+   fallback, re-merged, pushed clean.
+3. Redacted the key from `SUBMISSION_LOCAL-39.md` at the tip and pushed.
+
+**What LEAD did NOT do, and why:**
+- **No key rotation.** It is outward-facing and would break every running
+  container mid-flight, with Michael away and unable to confirm. His call.
+- **No history purge.** The key remains in history at `4f25c8d` and in the
+  amended-away object until git gc. Removing it means a force-push and a
+  rewritten shared branch — explicitly gated in CLAUDE.md.
+
+**What Michael needs to do, in order:**
+1. **Rotate the key at platform.openai.com.** Assume it is compromised: it sat
+   in a pushed file for five days. The repo is private, which lowers the
+   exposure but does not close it.
+2. Put the new key in `.env` and rebuild/restart the containers.
+3. Decide whether to purge history (`git filter-repo`, force-push, and every
+   clone re-cloned) or accept it now that the key is dead. **Rotating first
+   makes the history question cosmetic** — that is the cheaper order.
+
+**The process gap:** nothing checks task output for secrets before merge. Task
+files say "no hardcoded credentials" nowhere, and LEAD's review reads diffs for
+logic, not for keys. **LOCAL-207** adds a pre-merge secret scan and puts the
+prohibition in the PROCESS block every task file carries. GitHub caught this
+one; it did not catch the one from 2026-07-30.
+
+---
+
+## D80 — The CREATOR_ONLY gate works, and it is the first prompt instruction on this pipeline that did (2026-08-04)
+
+LOCAL-206, MAMAC, both CREATOR_ONLY stops, 3 runs each arm:
+
+| | OBJECT sentences per paragraph |
+|---|---|
+| gate off | 0.42 |
+| **gate on** | **0.10** |
+
+76% reduction. Richard Long: zero leaks in 15 paragraphs. She-Bam Pow POP
+Wizz: 3 leaks in 15, all soft — colour and shape adjectives attached to the
+exhibition rather than fabricated material claims. Every leak quoted verbatim
+in the submission.
+
+This breaks the D63 pattern. LOCAL-188's style rules did not move R4;
+LOCAL-192's retry managed ~50% on it. The difference is plausibly that "do not
+describe the object" names a concrete category the model can check itself
+against, where "do not prescribe what the listener feels" is a register
+judgement. Worth remembering when writing the next constraint.
+
+**The honest problem the task raised, unprompted, and Michael should decide.**
+Gated Richard Long narration reads:
+
+> "Sir Richard Long, born in 1945, is renowned as one of the leading British
+> land artists… challenging traditional notions of sculpture by integrating it
+> into performance and conceptual art."
+
+Accurate, corpus-grounded, and it never acknowledges that the listener is
+standing in front of something. The task called it "a biography segment that
+could play at any point in the museum or nowhere." That is right.
+
+So a CREATOR_ONLY stop is honest but disembodied. Three options, and this is a
+product call rather than a technical one:
+
+1. **Keep it** — a 90-second artist biography is a valid museum-audio format,
+   but the narration should say so rather than pretending to describe.
+2. **Drop the stop** from the itinerary and pick a COVERED one.
+3. **Fix the corpus** for that stop so it can be described properly.
+
+LEAD's lean is (2) for tours with few stops — with only two stops, spending one
+on a pure biography is a poor trade — and (3) as the real answer. Recorded for
+Michael to overturn; not implemented while the option is cheap to change.
