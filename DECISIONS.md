@@ -1803,3 +1803,57 @@ an institutional source, not treated as equivalent.
 Palais Lascaris lists 10 musical instruments while the tour's actual stops
 are 3 frescoes. Fetching driven by canonical titles spends money enriching
 works nobody visits. Drive it from actual tour stops.
+
+---
+
+## D57 — Michael's "search before removing" was right, measured (2026-08-03)
+
+Round 5 of the stop-specificity loop, on tour 29 — the French Riviera
+Biking Tour he took into the field and had listeners evaluate, and the
+source of both examples in his ClickUp task.
+
+```
+tour 29            0.0%  ->  32.3% ANCHORED
+baseline overall   4.2%  ->  13.2%
+spend              $0.025
+sources            15/15 stops — 13 tier 1, 2 tier 3, none unsourced
+```
+
+### The Fitzgerald result settles the design argument
+
+His flagged paragraph — *"As you stand on Cap d'Antibes … the scene that
+once captivated Scott Fitzgerald"* — was `UNLINKED_ENTITY`. Wikipedia
+confirms *Tender Is the Night* is set on the French Riviera (tier 1), the
+corpus now holds that link, and the paragraph classifies **ANCHORED**.
+
+**A paragraph he identified as defective became legitimate by finding the
+missing substantiation, not by deleting the sentence.**
+
+LEAD proposed remove-by-default with search as the exception. Michael
+reversed it (D51):
+
+> "the default should be to find the reference even if we would require a
+> different search through trusted sources that would cost us money…
+> If we start simply remove everything we will end up with very little
+> substance."
+
+He was right, and the evidence is now on the record: 2.5 cents converted a
+"defect" into substantiated content. His field data pointed the same way —
+listeners wanted *more* about each stop, and LEAD was optimising to remove.
+
+**Rule:** when a quality gate can either delete content or go and find what
+is missing, price the search before choosing deletion. Here it was cents.
+
+### Where the loop stands
+
+| Round | Change | ANCHORED |
+|---|---|---|
+| 1 | detector + baseline | 19.7% |
+| 2 | metric hardened | 4.2% |
+| 3 | per-stop corpus — void (D55) | 4.2% |
+| 4a | detector reads per-stop corpus | 6.6% |
+| 4b | per-work fetch, Palais Lascaris | 0→23.5% that venue |
+| 5 | per-place fetch, Riviera | **13.2% overall** |
+
+Noise floor zero throughout; the classification rule byte-identical across
+every round, verified at each merge. Total spend on the loop: **$0.041**.
