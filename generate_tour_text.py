@@ -4664,6 +4664,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     _three_class_results = {}  # [LOCAL-37] poi_name → three-class retrieval result
     _diversity_adjusted_selections = {}  # [LOCAL-37] poi_name → diversity-adjusted element selection
     _stop_corpus_data = {}  # [LOCAL-183] poi_name → {passages, sources} from stop_corpus table
+    _corpus_gate_shortened_stops = set()  # [LOCAL-198] Stops flagged for venue-only narration
+    _corpus_gate_log = []  # [LOCAL-198] Per-stop gate decisions
     _thread_result = None  # [LOCAL-186] Initialize before storied block so closure doesn't NameError
     if _storied_mode:
         print(f"\n[Storied] STORIED_MODE=true — generating spine + fact sheets...")
@@ -4906,6 +4908,52 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     print(f"  [LOCAL-183] stop_corpus_reader not available: {_sc_err}")
                 except Exception as _sc_err:
                     print(f"  [LOCAL-183] stop_corpus fetch error (non-fatal): {_sc_err}")
+
+            # ──── [LOCAL-198] CORPUS COVERAGE GATE ────────────────────────────────
+            # When enabled (DISABLE_CORPUS_GATE != '1'), checks each stop's corpus
+            # for actual subject coverage. Stops with only venue-level text get
+            # flagged for shortened, venue-grounded narration.
+            _corpus_gate_disabled = os.environ.get('DISABLE_CORPUS_GATE', '').strip() == '1'
+            
+            if not _corpus_gate_disabled and _stop_corpus_data:
+                try:
+                    from tests.test_local198_corpus_coverage_gate import (
+                        assess_stop_coverage, extract_content_words, _extract_passage_texts
+                    )
+                    print(f"  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...")
+                    
+                    for _poi_name in _poi_names:
+                        _sc_data = _stop_corpus_data.get(_poi_name)
+                        if _sc_data and _sc_data.get('passages'):
+                            _passages_text = _sc_data['passages']
+                            _assessment = assess_stop_coverage(_poi_name, _venue_name, _passages_text)
+                        else:
+                            _assessment = {'verdict': 'EMPTY', 'content_words': [], 'subject_match_words': []}
+                        
+                        if _assessment['verdict'] == 'COVERED':
+                            _corpus_gate_log.append({
+                                'stop': _poi_name, 'verdict': 'COVERED', 'action': 'PASSED'
+                            })
+                        else:
+                            # VENUE_ONLY or EMPTY — shorten narration
+                            _corpus_gate_shortened_stops.add(_poi_name)
+                            _action = 'SHORTENED'
+                            _corpus_gate_log.append({
+                                'stop': _poi_name, 'verdict': _assessment['verdict'], 'action': _action
+                            })
+                            print(f"  [CORPUS-GATE] stop='{_poi_name}' "
+                                  f"verdict={_assessment['verdict']} action={_action}")
+                    
+                    _passed = sum(1 for g in _corpus_gate_log if g['action'] == 'PASSED')
+                    _shortened = sum(1 for g in _corpus_gate_log if g['action'] == 'SHORTENED')
+                    print(f"  [LOCAL-198] Corpus gate: {_passed} PASSED, {_shortened} SHORTENED")
+                except ImportError:
+                    print(f"  [LOCAL-198] Corpus gate: module not importable — gate DISABLED")
+                except Exception as _gate_err:
+                    print(f"  [LOCAL-198] Corpus gate error (non-fatal): {_gate_err}")
+            elif _corpus_gate_disabled:
+                print(f"  [LOCAL-198] Corpus gate: DISABLED by DISABLE_CORPUS_GATE=1")
+            # ──── END [LOCAL-198] CORPUS COVERAGE GATE ────────────────────────────
 
             _storied_fact_sheets = generate_fact_sheets_parallel(
                 poi_list=_poi_names,
@@ -5731,6 +5779,30 @@ DO NOT include directions to the next stop - these will be added separately.
 """
         if _word_target_instruction:
             description_prompt += f"\nLENGTH CONSTRAINT: {_word_target_instruction}\n"
+
+        # [LOCAL-198] CORPUS GATE: SHORTENED narration for stops without subject coverage.
+        # When the gate detected this stop as VENUE_ONLY or EMPTY, override the prompt
+        # to request only venue-grounded content that does NOT describe the artwork.
+        if hasattr(poi_name, '__hash__') and poi_name in _corpus_gate_shortened_stops:
+            description_prompt += f"""
+CRITICAL CORPUS GATE RESTRICTION (D50 enforcement — LOCAL-198):
+The corpus for this stop does NOT contain information about the specific artwork/exhibit
+"{poi_name}". The available text is about the venue generally.
+
+YOU MUST NOT:
+- Describe the artwork's appearance, materials, technique, or composition
+- Name the artist's practice, style, or art-historical movement
+- Claim anything about what the visitor will see at this specific stop
+- Invent details about the work from your training data
+
+YOU MAY ONLY:
+- Note the stop's name and its location within the venue
+- Share venue-level facts that ARE in the corpus (opening date, general collection scope)
+- Describe the physical surroundings and wayfinding
+- Acknowledge that detailed information about this specific work is limited
+
+Write 80-100 words maximum. This is a venue-grounded placeholder, not a full stop narration.
+"""
 
         # [LOCAL-183] Inject per-stop corpus passages with provenance and grounding rule.
         # This is the production wiring that D31/D54/D57 identified as missing:
