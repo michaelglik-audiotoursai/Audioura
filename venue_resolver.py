@@ -902,25 +902,61 @@ CORPUS_VERSION = 4  # LOCAL-24: Work-vs-nonwork filter added; invalidate stale c
 
 
 # TODO(S94): remove in-code password fallback; prod must use DATABASE_URL/DB_PASSWORD env only
+def _is_inside_container():
+    """Return True if running inside a Docker container (/.dockerenv present)."""
+    return os.path.exists('/.dockerenv')
+
+
 def _get_db_connection():
-    """Get a Postgres connection for venue_corpus cache. Returns None if unavailable."""
+    """Get a Postgres connection for venue_corpus cache.
+
+    Returns None if no DB is configured (normal on host without DATABASE_URL).
+    Raises on misconfiguration (env var set but connection fails) — caller
+    should not silently degrade when the user intended a cache.
+    """
     try:
         import psycopg2
-        # Use VENUE_CACHE_DB_URL first, fall back to DATABASE_URL, then container default
-        db_url = os.environ.get('VENUE_CACHE_DB_URL',
-                 os.environ.get('DATABASE_URL', 'postgresql://admin:password123@postgres-2:5432/audiotours'))
-        # Fix localhost references for container-to-container communication
+    except ImportError:
+        print("  [venue_cache] psycopg2 not installed — venue cache unavailable")
+        return None
+
+    # Use VENUE_CACHE_DB_URL first, fall back to DATABASE_URL, then container default
+    db_url = os.environ.get('VENUE_CACHE_DB_URL',
+             os.environ.get('DATABASE_URL'))
+
+    _url_from_env = db_url is not None
+
+    if db_url is None:
+        if _is_inside_container():
+            # Container default: postgres-2 is on the Docker network
+            db_url = 'postgresql://admin:password123@postgres-2:5432/audiotours'
+        else:
+            # Host with no DB env: venue cache simply not configured — this is fine
+            print("  [venue_cache] No DATABASE_URL set (host mode) — venue cache skipped")
+            return None
+
+    # Rewrite localhost → postgres-2 ONLY inside a container (LOCAL-214)
+    if _is_inside_container():
         if '@localhost:' in db_url:
             db_url = db_url.replace('@localhost:', '@postgres-2:')
         # Fix auth mismatch: tour-generator uses admin:admin but postgres-2 expects password123
         if 'admin:admin@' in db_url and 'postgres-2' in db_url:
             db_url = db_url.replace('admin:admin@', 'admin:password123@')
+
+    try:
         conn = psycopg2.connect(db_url, connect_timeout=5)
         # Auto-create venue_corpus table if not exists (idempotent)
         _ensure_table(conn)
         return conn
     except Exception as e:
-        print(f"  [venue_cache] DB connection failed: {e}")
+        if _url_from_env:
+            # User explicitly configured a DB URL but it doesn't work — this is a defect
+            print(f"  [venue_cache] ERROR: DB connection FAILED (misconfiguration): {e}")
+            print(f"  [venue_cache]   URL source: {'VENUE_CACHE_DB_URL' if os.environ.get('VENUE_CACHE_DB_URL') else 'DATABASE_URL'}")
+            print(f"  [venue_cache]   This is a bug — the configured database is unreachable.")
+        else:
+            # Container default failed — also a defect (container should always reach postgres-2)
+            print(f"  [venue_cache] ERROR: container default DB unreachable: {e}")
         return None
 
 
