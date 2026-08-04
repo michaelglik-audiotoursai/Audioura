@@ -56,25 +56,73 @@ from stop_anchor_detector_v2 import parse_tour_stops
 # see, spot) = NOT exempt from style rules.
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Verbs that genuinely move the listener along a route
-_STYLE_NAV_ROUTE_VERBS = [
-    'head', 'turn', 'walk', 'proceed', 'continue', 'cross', 'follow',
-    'make your way', 'find your way', 'go', 'move', 'step', 'exit',
-    'enter', 'approach', 'navigate', 'pass',
+# ── TRANSPORT-MODE ROUTE VERBS ──────────────────────────────────────────────
+# Derived from the transport modes the pipeline actually generates
+# (generate_tour_text.py: _TRANSPORT_MODE_KEYWORDS → on_foot, bike, animal,
+# vehicle, country_scale). Each mode has verbs describing route movement in
+# that mode. A new transport mode added there should get verbs here — this
+# is the SINGLE place to update.
+#
+# WHY THIS DOES NOT REINTRODUCE D69's PROBLEM:
+# D69 said closed DETECTION lists miss the next verb. R1's design is inverted
+# — it detects ANY sentence-initial base-form verb, then subtracts exemptions.
+# These transport verbs are EXEMPTION entries, not detection entries. Each one
+# still requires a directional word after it (verb + directional = route
+# movement). "Cycle" alone won't exempt; "Cycle south on the main road" will.
+# The exemption set is structurally bounded: finite transport modes × finite
+# verbs per mode, each gated by directional context.
+_TRANSPORT_MODE_ROUTE_VERBS = {
+    # on_foot (default/walking tours)
+    'on_foot': ['walk', 'step', 'hike', 'stroll'],
+    # bike mode (generate_tour_text.py: bike|biking|cycling)
+    'bike': ['cycle', 'bike', 'pedal', 'ride'],
+    # animal mode (camel, horse, dogsled, etc.)
+    'animal': ['ride', 'trot', 'gallop'],
+    # vehicle mode (car, jeep, motorcycle, scooter, etc.)
+    'vehicle': ['drive', 'ride', 'cruise'],
+    # country_scale (road trip, safari, cross-country)
+    'country_scale': ['drive', 'cruise', 'ride'],
+}
+
+# Verbs that genuinely move the listener along a route.
+# Core verbs (mode-independent) + all transport-mode verbs merged.
+_STYLE_NAV_ROUTE_VERBS_CORE = [
+    'head', 'turn', 'proceed', 'continue', 'cross', 'follow',
+    'make your way', 'find your way', 'go', 'move', 'exit',
+    'enter', 'approach', 'navigate', 'pass', 'start', 'set off',
 ]
+# Merge core + all transport mode verbs (deduplicated, order preserved)
+_STYLE_NAV_ROUTE_VERBS = list(dict.fromkeys(
+    _STYLE_NAV_ROUTE_VERBS_CORE +
+    [v for verbs in _TRANSPORT_MODE_ROUTE_VERBS.values() for v in verbs]
+))
 
 # Directional / spatial words that confirm route context
 _STYLE_NAV_DIRECTIONAL = {
     'left', 'right', 'straight', 'ahead', 'forward', 'north', 'south',
-    'east', 'west', 'towards', 'toward', 'along', 'past', 'down', 'up',
+    'east', 'west', 'northeast', 'northwest', 'southeast', 'southwest',
+    'towards', 'toward', 'along', 'past', 'down', 'up',
     'through', 'across', 'around', 'back', 'onto', 'into',
     'on', 'to', 'the', 'inside', 'outside',
 }
 
 # Patterns for style-specific navigation (route movement only)
+# RECONCILIATION (LOCAL-224): The paragraph-level patterns now use the same
+# verb set as _STYLE_NAV_ROUTE_VERBS so both heuristics agree. The sentence-
+# level check (_is_style_navigation_sentence) is AUTHORITATIVE — it is precise
+# (verb + directional = route). The paragraph-level check is a fallback density
+# heuristic for mixed paragraphs where no single sentence qualifies but the
+# overall paragraph is clearly navigational (e.g. "Continue straight until the
+# roundabout, then look for parking."). When they disagree, sentence-level wins
+# at the sentence grain, paragraph-level only exempts the WHOLE paragraph.
+
+# Build the verb alternation from the canonical verb list (single-word only)
+_NAV_SINGLE_WORD_VERBS = [v for v in _STYLE_NAV_ROUTE_VERBS if ' ' not in v]
+_NAV_VERB_ALT = '|'.join(sorted(_NAV_SINGLE_WORD_VERBS, key=len, reverse=True))
+
 _STYLE_NAV_PATTERNS = [
-    # Route verbs + directional: "Head south", "Turn left", "Walk along"
-    r'\b(?:head|turn|walk|proceed|continue|go|move)\s+(?:left|right|straight|ahead|forward|towards?|north|south|east|west|along|past|down|up|around|across|back)\b',
+    # Route verbs + directional: "Head south", "Cycle along", "Ride north"
+    r'\b(?:' + _NAV_VERB_ALT + r')\s+(?:left|right|straight|ahead|forward|towards?|north|south|east|west|along|past|down|up|around|across|back)\b',
     # "Make/find your way to/toward"
     r'\b(?:make|find)\s+your\s+way\b',
     # "Cross the street/bridge/square"
@@ -85,10 +133,12 @@ _STYLE_NAV_PATTERNS = [
     r'\bcontinue\s+(?:on|past|along|down|up|through|to)\b',
     # "Enter/exit the building/museum"
     r'\b(?:enter|exit)\s+(?:the|this)\b',
-    # "Head south on Promenade" — route verb + compass + named road
-    r'\b(?:head|turn|walk|proceed|continue)\s+(?:north|south|east|west)\s+(?:on|along|down|past)\b',
+    # Route verb + compass + named road: "Cycle south on the main road"
+    r'\b(?:' + _NAV_VERB_ALT + r')\s+(?:north|south|east|west|northeast|northwest|southeast|southwest)\s+(?:on|along|down|past)\b',
     # "Step inside/through/into"
     r'\bstep\s+(?:inside|through|into|out)\b',
+    # "Start cycling/biking/riding + directional" — composite verb phrase
+    r'\bstart\s+(?:cycling|biking|riding|driving|walking|hiking)\s+(?:north|south|east|west|northeast|northwest|southeast|southwest|along|towards?|down|up|through|across)\b',
 ]
 
 _STYLE_NAV_COMPILED = [re.compile(p, re.IGNORECASE) for p in _STYLE_NAV_PATTERNS]
@@ -137,14 +187,52 @@ def _is_style_navigation_sentence(sentence: str) -> bool:
     """Check if a single sentence is navigational for style purposes.
 
     Only route-movement sentences are exempt. "Look for X" is NOT exempt.
+
+    LOCAL-224: Also handles composite verb phrases where a route verb is followed
+    by a transport gerund before the directional word:
+      "Start cycling south…" → start + cycling + south → navigation
+      "Start biking southeast…" → start + biking + southeast → navigation
+    The gerund must be a known transport-movement word; "Start looking south"
+    does NOT exempt (looking is attention, not transport).
     """
     lower = sentence.lower().strip()
+
+    # Transport gerunds that indicate route movement (not attention)
+    _TRANSPORT_GERUNDS = {
+        'cycling', 'biking', 'riding', 'driving', 'walking', 'hiking',
+        'pedaling', 'pedalling', 'cruising', 'trotting', 'galloping',
+        'strolling',
+    }
+
+    # Verbs too general-purpose to be confirmed by weak directional words
+    # like 'the', 'on', 'to'. These need either a strong directional (compass,
+    # left/right, along, etc.) or a transport gerund + directional.
+    _NEEDS_STRONG_DIRECTIONAL = {'start', 'set'}
+    _STRONG_DIRECTIONAL = _STYLE_NAV_DIRECTIONAL - {'the', 'on', 'to'}
+
     for verb in _STYLE_NAV_ROUTE_VERBS:
         if lower.startswith(verb):
             rest = lower[len(verb):].strip()
-            first_word = rest.split()[0] if rest.split() else ''
-            if first_word in _STYLE_NAV_DIRECTIONAL:
+            words = rest.split()
+            if not words:
+                continue
+            first_word = words[0]
+
+            # Pick directional set based on verb generality
+            verb_base = verb.split()[0]  # 'set off' → 'set', 'make your way' → 'make'
+            directional_set = (_STRONG_DIRECTIONAL
+                               if verb_base in _NEEDS_STRONG_DIRECTIONAL
+                               else _STYLE_NAV_DIRECTIONAL)
+
+            # Direct match: verb + directional → navigation
+            if first_word in directional_set:
                 return True
+            # Composite match: verb + transport gerund + directional → navigation
+            # e.g. "Start cycling south", "Set off riding north"
+            if first_word in _TRANSPORT_GERUNDS and len(words) >= 2:
+                second_word = words[1]
+                if second_word in _STYLE_NAV_DIRECTIONAL:
+                    return True
     return False
 
 
@@ -195,17 +283,16 @@ _R1_MULTI_WORD_VERBS = [
 # ── Route-movement verbs — exempt ONLY when followed by directional content ─
 # LOCAL-196 FIX: The old design exempted these unconditionally. "Turn your
 # attention" is NOT navigation. Now require directional words after the verb.
-_NAV_VERBS_R1 = {
-    'head', 'walk', 'proceed', 'continue', 'cross', 'follow',
-    'go', 'move', 'step', 'exit', 'enter', 'approach', 'navigate', 'pass',
-    'turn',  # only exempt with directional content
-}
+# LOCAL-224: Derived from _STYLE_NAV_ROUTE_VERBS (transport-mode-aware) —
+# single source of truth for which verbs count as route movement.
+_NAV_VERBS_R1 = set(v for v in _STYLE_NAV_ROUTE_VERBS if ' ' not in v)
 
 # Directional / spatial words that confirm navigation context
 _DIRECTIONAL_WORDS = {
     'left', 'right', 'straight', 'ahead', 'forward', 'north', 'south',
     'east', 'west', 'towards', 'toward', 'along', 'past', 'down', 'up',
     'through', 'across', 'around', 'back', 'onto', 'into',
+    'northeast', 'northwest', 'southeast', 'southwest',
 }
 
 # ── NON-VERB GATE: words that start sentences but are NOT imperative verbs ──
