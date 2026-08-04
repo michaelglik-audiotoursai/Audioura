@@ -3541,3 +3541,58 @@ looking. The task template now requires running every pasted example.
 submission verified independently: the 4-of-4 false-alarm elimination, zero
 false SUPPORTED, per-verdict counts, and the working demonstration. The code is
 right; one illustration in the prose was not.
+
+---
+
+## D98 — A curated test set cannot find the bug that lives in real data (2026-08-04)
+
+LOCAL-219 fixed the subject-matching fragility exactly as asked. Verified by
+LEAD:
+
+```
+"The museum opened in 1890 in Nice, France."  → CONTRADICTED
+"The museum opened in 1890."                  → CONTRADICTED  (was UNSUPPORTED)
+"MAMAC was inaugurated in 1975 by the mayor." → CONTRADICTED  (was: no claims)
+"The chapel was built in 1432."               → UNSUPPORTED   (correctly refuses)
+```
+
+Seven paraphrase pairs symmetric, zero false SUPPORTED, both labelled sets
+unchanged. On its own terms the task succeeded.
+
+**And it reintroduced the defect LOCAL-218 had just removed.** The submission
+reported the corpus-wide `CONTRADICTED` rate as "0 across the 49 labelled
+claims", noting that a true corpus-wide count "depends heavily on how tours are
+matched to corpus passages". LEAD ran it — 107 paragraphs from stored tours
+against their venue corpora:
+
+```
+CONTRADICTED   3     (was 0 after LOCAL-218)
+```
+
+All three false. A claim's date matched against an unrelated date in an
+unrelated passage:
+
+```
+CLAIM   : 1820 — "In 1820, faced with an influx of beggars…"
+EVIDENCE: "Antibes … is a seaside resort city in the Alpes-Maritimes"
+```
+
+**Why the labelled sets could not have caught it.** They are 49 curated
+single-fact sentences with tightly matched passages. Real tour paragraphs carry
+several dates against a pool of loosely related passages, and that is precisely
+where a token-proximity matcher fails. The substituted measurement was not a
+weaker version of the required one — it was measuring a different thing.
+
+**The general lesson, and it is the one worth keeping.** Every instrument bug
+this week — the all-zero style harness (D83), the unreachable venue cache
+(D91), four bogus contradictions (D97), and now three more — was invisible to
+the tests written alongside the code and visible the moment it met real data.
+A test set built from the same understanding as the code shares the code's
+blind spots.
+
+**Rule for LEAD from now on:** when a task's acceptance criteria name a
+corpus-wide or production-data measurement, that measurement is not
+substitutable by a labelled set, and a submission that swaps it is incomplete
+regardless of how good the labelled-set numbers are. LOCAL-219 disclosed the
+swap honestly — the failure is that LEAD's acceptance criteria let a disclosed
+swap look like a pass.
