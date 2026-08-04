@@ -49,14 +49,47 @@ is why five rounds of "improvement" moved i-con without improving the tour.
 I am not proposing to rescale i-con. Your matrix works and is calibrated
 against 13 hand-scored paragraphs. The additions sit around it.
 
-### 3a. Truth gate (blocking, per paragraph)
+### 3a. Truth gate — REVISED twice since first written
 
-Any paragraph containing an **UNSUPPORTED factual claim** — a date, name,
-material, measurement, or attribution with no corpus passage behind it — is
-**capped at 1**, whatever its information density.
+**First version (superseded):** cap any paragraph with an unsupported claim at 1.
 
-Rationale: an unsupported specific is worse than no specific. It is the failure
-your listener cannot detect and we can.
+**Why that was wrong (D94).** You scored "depths reaching 320 feet" **5/5**;
+`claim_check` marks it unsupported and is right to — we hold no passage saying
+it. The rule would have scored your favourite sentence a 1.
+
+**Why a naive fix is also wrong (D94).** Selecting better-sourced stops
+*raised* the unsupported rate (0.576 vs 0.364), because a stop with no corpus
+gets a restricted prompt, writes vaguely, and vague text has nothing to fail
+on. A truth gate alone rewards saying nothing:
+
+| i-con | unsupported | reading |
+|---|---|---|
+| high | low | what we want |
+| high | high | confident invention |
+| **low** | **low** | **vague filler that games the gate** |
+
+**Current proposal — two axes, not one number.**
+
+- **Quality** stays i-con, your matrix, unchanged.
+- **Publishability** is separate: a sentence may be excellent *and* blocked.
+- The truth gate applies **only to sentences that clear an i-con floor**.
+  Below the floor the sentence is failing on quality already, and penalising
+  it again for having nothing to source would reward vagueness.
+- `CONTRADICTED` — the corpus says otherwise — is a hard block at any i-con.
+  It is now measured at 0 of 188 corpus-wide with no false alarms (D99).
+
+**What the instrument can and cannot do** (D99):
+
+| | |
+|---|---|
+| false SUPPORTED (an invention passing) | **0** across all sets |
+| false UNSUPPORTED (over-flagging) | ~17% original, 10% holdout |
+| judging whether an unsourced claim is *true* | **cannot** — that is your 320 feet |
+
+So at your chosen setting — **(b) score it down now** — roughly one true
+sentence in six will be marked down unfairly. That is the price of never
+letting an invention through, and it is the right trade while the corpus is
+thin.
 
 ### 3b. Style gate (blocking, per paragraph)
 
@@ -133,6 +166,11 @@ version did not. Different code path; that is a bug, not a tuning problem.
 ---
 
 ## 6. What I need from you
+
+0. **Does the two-axis split match your intent?** Quality score and
+   publishability kept separate, and the truth gate applied only above an
+   i-con floor — so that writing nothing cannot be the cheapest way to pass.
+   This is the one that changes the shape of everything else.
 
 1. **The two caps** (1 for unsupported, 3 for style) — right levels?
 2. **The coverage multiplier** — 0.7 / 0.4, or should a VENUE_ONLY stop simply
