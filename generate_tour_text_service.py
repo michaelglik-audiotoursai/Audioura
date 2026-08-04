@@ -236,7 +236,60 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
         # This is a billing control (D14): if charging fails, do NOT deliver.
         # Do NOT share an exception handler with cost metering above.
         # Idempotency: use job_id as the key — a retried generation charges once (LOCAL-66).
-        if user_id and _our_cost > 0:
+        #
+        # [LOCAL-201] Cache-hit charging (D45 extended): even when our_cost is $0.00,
+        # cache hits charge the user the same as the original fresh generation.
+        # The basis comes from the original cost_ledger row via lookup_fresh_cost_for_cache_hit.
+        # If no basis exists (pre-metering tours, sanity ceiling), charge is $0.00.
+        if user_id and _is_cache_hit and _our_cost <= 0:
+            try:
+                from cost_meter import lookup_fresh_cost_for_cache_hit as _lookup_basis
+                from pricing import compute_user_charge as _compute_charge
+                from wallet_ledger import charge as _wallet_charge
+                from entitlements import _get_subscription_tier
+
+                _fresh_basis = _lookup_basis(job_id, _op_type)
+                _charge_result = _compute_charge(
+                    our_cost_usd=_our_cost,
+                    cache_hit=True,
+                    operation_type=_op_type,
+                    fresh_cost_usd=_fresh_basis,
+                    description=f"Tour: {location[:200]}",
+                )
+
+                _user_tier = _get_subscription_tier(user_id)
+                if _user_tier == 'ppu' and _charge_result['user_charge_cents'] > 0:
+                    _charge_idem_key = f"charge:{user_id}:{job_id}"
+                    _row_id, _new_bal, _was_stopped = _wallet_charge(
+                        user_id=user_id,
+                        charge_usd=_charge_result['user_charge_usd'],
+                        idempotency_key=_charge_idem_key,
+                        description=_charge_result['description'] + f" — ${_charge_result['user_charge_usd']:.2f}",
+                        job_id=job_id,
+                    )
+                    if _was_stopped:
+                        import logging as _charge_logging
+                        _charge_logging.getLogger("generate_tour_text_service").error(
+                            f"[LOCAL-201] CACHE-HIT CHARGE BLOCKED (zero balance) for {user_id} job={job_id}"
+                        )
+                        ACTIVE_JOBS.update(job_id, status="error",
+                            error="Insufficient balance to complete this tour. Please top up your credits.",
+                            error_type="charge_blocked_zero_balance")
+                        if os.path.exists(temp_path):
+                            os.unlink(temp_path)
+                        return
+                    print(f"[LOCAL-201] Cache-hit charged: ${_charge_result['user_charge_usd']:.2f} | "
+                          f"basis=${_fresh_basis or 0:.4f} | balance={_new_bal}¢ | user={user_id} | job={job_id}")
+                else:
+                    # No basis found, or free/unlimited tier, or $0 charge: no wallet action
+                    print(f"[LOCAL-201] Cache-hit no charge: basis={_fresh_basis} | tier={_user_tier} | user={user_id} | job={job_id}")
+
+            except Exception as _cache_charge_err:
+                # Cache-hit charging fails OPEN — the tour is free content, not new work.
+                # D14 fail-closed applies to fresh generation (unbilled work), not cache reuse.
+                print(f"[LOCAL-201] Cache-hit charging failed (non-fatal): {_cache_charge_err}")
+
+        elif user_id and _our_cost > 0:
             try:
                 from pricing import compute_user_charge as _compute_charge
                 from wallet_ledger import charge as _wallet_charge, record_unlimited_cost as _record_unlimited
