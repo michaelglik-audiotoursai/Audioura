@@ -119,7 +119,9 @@ def check_r1_imperatives(sentence: str) -> List[Dict]:
     lower = stripped.lower()
 
     for verb in _R1_IMPERATIVE_VERBS:
-        if lower.startswith(verb):
+        # Word-boundary match: "explore" must not match "Explorers" or "Explored"
+        # Use re.match with \b at the end of the verb phrase to enforce this.
+        if re.match(rf'{re.escape(verb)}\b', lower):
             # Verify it's imperative (no subject before verb)
             # If the sentence starts directly with the verb, it's imperative
             # "Feel the weight" → imperative
@@ -454,6 +456,29 @@ def run_report(tour_ids: List[int]) -> str:
     lines.append(f"  is_navigation: {result_nav2['is_navigation']}")
     lines.append(f"  findings: {len(result_nav2['findings'])}")
     lines.append(f"  Does NOT fire: {'✓' if nav_ok2 else '✗'}")
+
+    # ── R1 word-boundary regression test ────────────────────────────────────
+    lines.append("\n" + "-" * 78)
+    lines.append("R1 WORD-BOUNDARY REGRESSION (must NOT fire — nouns derived from verbs)")
+    lines.append("-" * 78)
+
+    r1_false_positives = [
+        "Observers considered the design scandalous in 1887.",
+        "Discoveries were made beneath the chapel floor in 1932.",
+        "Explorers landed here in 1388 and named the cape.",
+    ]
+
+    r1_regression_pass = True
+    for sent in r1_false_positives:
+        result_r1 = validate_paragraph(sent)
+        r1_errors = [f for f in result_r1['findings'] if f['rule_id'] == 'R1_IMPERATIVE']
+        ok = len(r1_errors) == 0
+        if not ok:
+            r1_regression_pass = False
+        lines.append(f"\n  Text: \"{sent}\"")
+        lines.append(f"  R1 fires: {len(r1_errors)} {'✓ (correctly not flagged)' if ok else '✗ FALSE POSITIVE'}")
+
+    lines.append(f"\n  R1 word-boundary regression: {'ALL PASS ✓' if r1_regression_pass else 'FAILURES DETECTED ✗'}")
 
     # ── Declarative exemption test (R2 warning vs error) ─────────────────────
     lines.append("\n" + "-" * 78)
