@@ -194,13 +194,13 @@ _KNOWN_SUBJECTS = {
         ],
     },
     ('Le Village de grand-mère', 'mamac'): {
-        'artist': None,
+        'artist': 'Arman',
         'artwork_title': 'Le Village de grand-mère',
         'subject_type': 'artwork',
         'search_terms': [
-            ('Viallat "Village de grand-mère"', 'fr'),
-            ('Claude Viallat artist', 'en'),
-            ('Supports/Surfaces art movement', 'en'),
+            ('Arman artist', 'en'),
+            ('Arman artiste', 'fr'),
+            ('Arman "Village de grand-mère"', 'fr'),
         ],
     },
     ('Le Mur de Feu d\'Yves Klein', 'mamac'): {
@@ -509,6 +509,13 @@ def _validate_article_for_stop(
     D62 rule: keyword co-occurrence is not a relationship. The article must
     be about the subject, and there must be a venue-confirming signal.
 
+    D74 rules (LOCAL-202):
+    1. Venue confirmation must come from THIS source, not co-occurrence with
+       other sources in the passage set.
+    2. For a work-level stop, title match is not identification — the artist
+       must match what the venue holds. Titles are reused and reinterpreted.
+    3. Every source must be tiered (handled at storage time, not here).
+
     Returns dict with valid: bool, reason: str, confidence: str
     """
     text_norm = normalize(article_text[:5000])  # First 5000 chars
@@ -573,7 +580,7 @@ def _validate_article_for_stop(
     if not subject_confirmed:
         return {'valid': False, 'reason': 'subject not confirmed in article'}
 
-    # --- Check 2: Venue-confirming signal ---
+    # --- Check 2: Venue-confirming signal (D74: from THIS source) ---
     # The article must mention something that ties it to THIS venue/location.
     # This prevents "Richard Long" the cricketer from being used for the sculptor.
     venue_confirmed = False
@@ -604,7 +611,28 @@ def _validate_article_for_stop(
     if not venue_confirmed:
         return {'valid': False, 'reason': f"no venue-confirming signal (tried: {venue_signals[:3]}...)"}
 
-    # --- Check 3: Negative signals (wrong entity) ---
+    # --- Check 3: Work-level identity (D74 rule 2) ---
+    # For work-level stops at multi-artist venues, verify the article is about
+    # the CORRECT artist for this work, not a different artist with the same title.
+    if subject.get('artwork_title') and subject.get('artist'):
+        # The known subject table provides the correct artist. If the article
+        # is NOT about that artist, it's a wrong-entity match (the Manet bug).
+        artist_norm = normalize(subject['artist'])
+        artist_surname = artist_norm.split()[-1] if artist_norm.split() else ''
+
+        if artist_surname:
+            # Check if this article is about OUR artist
+            article_title_norm = normalize(article_title)
+            article_is_about_our_artist = (
+                artist_surname in article_title_norm or
+                artist_surname in normalize(article_text[:300])
+            )
+            if not article_is_about_our_artist:
+                return {'valid': False,
+                        'reason': f"work-level identity check: article '{article_title}' "
+                                  f"is not about {subject['artist']}"}
+
+    # --- Check 4: Negative signals (wrong entity) ---
     # Check for disambiguation: is this about a different entity with the same name?
     if subject.get('artist'):
         # Check if this is about a sports figure, politician, etc.
@@ -617,7 +645,7 @@ def _validate_article_for_stop(
 
     return {
         'valid': True,
-        'reason': 'subject confirmed + venue signal present',
+        'reason': 'subject confirmed + venue signal present (per-source)',
         'confidence': 'high' if subject_confirmed and venue_confirmed else 'medium',
     }
 
