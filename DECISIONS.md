@@ -3988,3 +3988,107 @@ exempt, attention direction is not. "Turn left at the fountain" passes; "Turn
 your attention to the smaller canvas" must still fire — that distinction is
 Michael's, from his own 1/5 marks, and widening the exemption until his
 complaints pass would delete the rule he asked for.
+
+---
+
+## D106 — External verification works now, and dates and numbers are what it verifies (2026-08-04)
+
+LOCAL-221 resubmitted with the handoff fixed: `claim_check` now emits a
+`sentence` field alongside each claim, and the verifier uses it to bind claim to
+subject. Verified by LEAD end to end from the real paragraph:
+
+```
+check_paragraph → text='320 feet'  sentence='The deep bay of Villefranche…'
+evaluate_evidence(…, claim_sentence) → PROMOTED
+```
+
+**The inversion this fixes.** Before, every DATE and every NUMBER was refused
+and promotions were almost all `known as "…"` — claim types whose text happened
+to carry its own context (D103). After:
+
+```
+Type                    Promoted  Refused  Total   Rate
+DATE                          37       85    122    30%    (was 0%)
+NUMBER                         4        6     10    40%    (was 0%)
+ATTRIBUTION                    2       13     15    13%
+NICKNAME                       3       30     33     9%
+COMPOSITION                    0       28     28     0%
+MOVEMENT                       0        9      9     0%
+```
+
+Overall 47 of 235, **20%**, at **$0.0047 per tour** — 12% of our $0.0398 tour
+cost, well inside what Michael judged affordable.
+
+**COMPOSITION and MOVEMENT stay at 0%, and the task's reading is right:** "pop
+art" or "bronze sculpture" are genre classifications, not facts a search can
+confirm. External verification is for dateable and measurable claims. Worth
+saying plainly rather than treating as a gap to close.
+
+### Michael's own example still refuses, and that is correct
+
+```
+claim  : "320 feet"  (= 97.5 m)
+source : "…reaches 95 to 150 metres deep at the outer mouth…"   → refused
+source : "…reaches approximately 97.5 metres at its outer mouth" → PROMOTED
+```
+
+The source he found gives a **range**; the claim asserts a point. 97.5 falls
+inside 95–150, but a range is not an assertion that the bay is 97.5 m deep, and
+promoting on containment would let any number inside any range pass. Refusing is
+the safe direction (D100) — and it means the specific fact he researched will
+stay disclosed-but-unverified until a source states it directly.
+
+That is the honest outcome and he should know it: **the feature verifies fewer
+things than the motivating example implied.** Its value is the 37 dates it did
+confirm, not the one measurement it could not.
+
+**Zero false SUPPORTED preserved** — the corpus-based verdict logic is
+untouched, `SUPPORTED_EXTERNAL` is a distinct verdict, and LEAD re-ran the D99
+probes against `storied` HEAD: fabricated number → UNSUPPORTED, genuine support
+→ SUPPORTED_PARAPHRASE, different subject → UNSUPPORTED.
+
+**Three rounds to land this**, and the defect each round was a join rather than
+a component: the function pair that did not compose (D103), then the claim text
+that carried no subject. Both were invisible to unit tests and obvious the first
+time real data crossed the boundary (D98).
+
+---
+
+## D107 — The navigation exemption now covers how people actually travel (2026-08-04)
+
+LOCAL-224 fixed R1 firing on cycling directions. Verified by LEAD on the full
+boundary, both directions, 10 of 10 correct:
+
+```
+EXEMPT   Start cycling south on the main road…          ← was firing
+EXEMPT   Start biking southeast…                        ← Michael's 5/5
+EXEMPT   Pedal north along the seafront…
+EXEMPT   Head south along the Promenade…
+EXEMPT   Turn left at the fountain…
+FIRES    Look for the Rue Obscure…
+FIRES    Pause to take in the breathtaking view…
+FIRES    Turn your attention to the smaller canvas…
+FIRES    Take a moment to absorb the ancient aura…
+```
+
+Every sentence on the "fires" side is from Michael's own 1/5 and 2/5 marks. The
+distinction holds: **route movement is exempt, attention direction is not.**
+
+Corpus-wide, 13 false-positive paragraphs removed:
+
+```
+cycling   59.2% → 56.4%   (-7)
+walking   37.3% → 36.3%   (-3)
+museum    36.4% → 36.4%   ( 0)   ← correct, no transport verbs
+```
+
+Museum unchanged is the check that matters — a fix that moved museum numbers
+would have widened the exemption into ordinary prose.
+
+**Round 2's R1 corrects from 50% to 40%.** Michael's complaint stands; only the
+measurement was wrong. And the pipeline is no longer rewriting the navigation he
+rated highest.
+
+**Not verified:** the task scored rules only, no generation run, so we know R1
+no longer flags cycling navigation but not that the retry leaves it alone in a
+live run. Stated in its limitations and worth confirming on the next generation.
