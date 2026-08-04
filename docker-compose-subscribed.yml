@@ -3,44 +3,92 @@
 # ============================================================================
 #
 # PURPOSE:
-#   Stand up the orchestrator (with wallet_api) and tour-generator from the
-#   `subscribed` branch on NON-CONFLICTING ports. Shares Postgres with the
-#   master stack (billing tables are real and shared). Never collides with or
-#   replaces the shared `audioura-*` containers that Michael's phone relies on.
+#   Build and run the subscribed-track services (tour-generator, orchestrator,
+#   news-orchestrator) from the `subscribed` worktree. These images contain
+#   pricing.py, wallet_ledger.py, cost_meter.py, cost_rates.py — modules that
+#   are absent from the storied branch by construction.
 #
-# BRING UP:
-#   docker compose -f docker-compose-subscribed.yml up -d --build
+# PROJECT NAME:
+#   Always invoke with: docker compose -p subscribed-204 -f docker-compose-subscribed.yml ...
+#   This ensures containers are never adopted by or confused with the storied
+#   `audioura` project, the legacy `local-156` subscribed stack, or any other
+#   compose stack.
+#
+# BUILD ONLY (safe — no port conflicts):
+#   docker compose -p subscribed-204 -f docker-compose-subscribed.yml build
+#
+# BRING UP (only when LEAD approves deploy):
+#   docker compose -p subscribed-204 -f docker-compose-subscribed.yml up -d
 #
 # TEAR DOWN:
-#   docker compose -f docker-compose-subscribed.yml down
+#   docker compose -p subscribed-204 -f docker-compose-subscribed.yml down
 #
-# RUN TESTS AGAINST IT:
-#   ORCHESTRATOR_URL=http://localhost:5102 python3 tests/test_local82_subscribed_e2e.py
+# PORT MAP (offset +200 from storied to avoid all master ports AND local-156 subscribed):
+#   subscribed-generator-204:         5200 → container 5000
+#   subscribed-orchestrator-204:      5202 → container 5002
+#   subscribed-news-orchestrator-204: 5212 → container 5012
 #
-# PORT MAP (avoids all master ports 5000-5030, 5433):
-#   subscribed-orchestrator:  5102 (maps to container 5002)
-#   subscribed-generator:     5100 (maps to container 5000)
+# DATABASE:
+#   audiotours_subscribed — separate from storied's `audiotours`.
+#   The shared postgres-2 instance hosts both; tables are isolated by DB name.
+#
+# NETWORK:
+#   Joins development_default (external) so services can reach postgres-2
+#   and other shared infra without port conflicts.
 #
 # ============================================================================
 
 services:
+  subscribed-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile.generator
+      args:
+        GIT_SHA: ${GIT_SHA:-subscribed}
+    container_name: subscribed-generator-204
+    ports:
+      - "5200:5000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SERP_API_KEY=${SERP_API_KEY}
+      - SERP_PROVIDER=serper
+      - STORIED_MODE=false
+      - ATTESTATION_MODE=log_only
+      - BASE_URL=http://localhost:5000
+      - REFERRAL_BASE_URL=http://localhost:5000
+      - DATABASE_URL=postgresql://admin:password123@postgres-2:5432/audiotours_subscribed
+      - GATEWAY_API_KEY=${GATEWAY_API_KEY:-test-api-key}
+      - PYTHONUNBUFFERED=1
+      - VENUE_CACHE_TTL_DAYS=30
+      - VENUE_CACHE_NEGATIVE_TTL_DAYS=5
+      - REQUIRE_LISTING_VERIFICATION=false
+    volumes:
+      - ./tours:/app/tours
+    networks:
+      - development_default
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   subscribed-orchestrator:
     build:
       context: .
       dockerfile: Dockerfile.orchestrator
       args:
         GIT_SHA: ${GIT_SHA:-subscribed}
-    container_name: subscribed-orchestrator
+    container_name: subscribed-orchestrator-204
     ports:
-      - "5102:5002"
+      - "5202:5002"
     environment:
-      - TOUR_GENERATOR_URL=http://subscribed-generator:5000
+      - TOUR_GENERATOR_URL=http://subscribed-generator-204:5000
       - MODERNIZED_URL=http://tour-generation-modernized-1:5021
       - TRANSLATION_URL=http://translation-service:5030
       - USER_API_URL=http://user-api-2:5000
       - TOUR_UPDATE_URL=http://tour-update:5001
       - DB_HOST=postgres-2
-      - DB_NAME=audiotours
+      - DB_NAME=audiotours_subscribed
       - DB_USER=admin
       - DB_PASSWORD=password123
       - DB_PORT=5432
@@ -58,35 +106,26 @@ services:
       timeout: 5s
       retries: 5
 
-  subscribed-generator:
+  subscribed-news-orchestrator:
     build:
       context: .
-      dockerfile: Dockerfile.generator
+      dockerfile: Dockerfile.news-orchestrator
       args:
         GIT_SHA: ${GIT_SHA:-subscribed}
-    container_name: subscribed-generator
+    container_name: subscribed-news-orchestrator-204
     ports:
-      - "5100:5000"
+      - "5212:5012"
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - SERP_API_KEY=${SERP_API_KEY}
-      - SERP_PROVIDER=serper
-      - STORIED_MODE=true
-      - ATTESTATION_MODE=log_only
-      - BASE_URL=http://localhost:5000
-      - REFERRAL_BASE_URL=http://localhost:5000
-      - DATABASE_URL=postgresql://admin:password123@postgres-2:5432/audiotours
-      - GATEWAY_API_KEY=test-api-key
+      - DB_HOST=postgres-2
+      - DB_NAME=audiotours_subscribed
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
       - PYTHONUNBUFFERED=1
-      - VENUE_CACHE_TTL_DAYS=30
-      - VENUE_CACHE_NEGATIVE_TTL_DAYS=5
-      - REQUIRE_LISTING_VERIFICATION=false
-    volumes:
-      - ./tours:/app/tours
     networks:
       - development_default
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5012/health')"]
       interval: 10s
       timeout: 5s
       retries: 5
