@@ -4295,3 +4295,50 @@ Everything short of turning it on has now been done. The remaining unknowns are
 the ones only a running stack answers: container networking, image contents,
 and real Apple IAP. `Dockerfile`s and the `subscribed-204` compose project
 exist for that (D76); nothing starts without him.
+
+---
+
+## D112 — All 16 detectors notice being broken. LEAD pointed the test at the wrong layer (2026-08-04)
+
+LOCAL-227 wrote falsification tests for every detector — R1, R3, R4, R7, R8,
+R9, the integration path, `claim_check`, `corpus_coverage`, the anchor
+detector, `secret_scan`. **All 16 distinguish healthy from broken.** LEAD
+verified independently: neutralise `check_r4_prescribed_feeling` and
+`validate_paragraph` goes from `['R4_PRESCRIBED_FEELING']` to `[]`, restored
+cleanly after.
+
+Good work, honestly reported. And the conclusion — "the list of instruments
+that do not notice is empty" — is not the reassurance it appears to be,
+**because not one of this week's failures was in a detector.**
+
+| failure | where it actually lived |
+|---|---|
+| D83 | `local205_analyze.py` reading `.get('violations')` — a key the validator never returns |
+| D91 | `venue_resolver._get_db_connection` — an `except` returning `None` for both "not configured" and "unreachable" |
+| D97 | nothing consumed `CONTRADICTED`, so four false verdicts went unseen |
+| D103 | `claim_check` and `evaluate_evidence` — two correct functions whose formats disagreed |
+| D110 | a test asserting `allowed is False`, which the broken fail-closed path also produces |
+
+**The detectors were never the problem. The glue was.** Every one of those is a
+consumer, a connection helper, a key contract, or an assertion — the code
+*around* the instruments.
+
+**This is LEAD's error, not the task's.** The task file named the detectors
+explicitly and the agent tested exactly what it was asked to. Having spent the
+week finding that instruments report clean results they cannot produce dirtily,
+LEAD then wrote a task that measured the layer which had never failed and would
+have accepted "0 of 16" as a clean bill of health for the fleet.
+
+The same mistake in a new costume: **checking the thing that is easy to check
+rather than the thing that broke.**
+
+**LOCAL-228** dispatched at the right layer — key-name contracts between
+producers and consumers, swallowed exceptions that conflate failure with
+absence, detector outputs nothing reads, and cross-component format agreement
+on real data. Same method, same instruction to report rather than fix.
+
+**Keeping LOCAL-227 regardless.** Sixteen falsification tests that did not
+exist this morning are worth having, and they are the reference implementation
+of the pattern. It answers a narrower question than it appears to: *the
+detectors are sound*, which is true and worth knowing — just not the question
+that mattered.
