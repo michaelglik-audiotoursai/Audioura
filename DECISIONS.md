@@ -3596,3 +3596,54 @@ substitutable by a labelled set, and a submission that swaps it is incomplete
 regardless of how good the labelled-set numbers are. LOCAL-219 disclosed the
 swap honestly — the failure is that LEAD's acceptance criteria let a disclosed
 swap look like a pass.
+
+---
+
+## D99 — The claim detector is now in a defensible state (2026-08-04)
+
+LOCAL-219 resubmitted with the corpus-wide measurement actually run. LEAD
+re-ran the identical probe that produced the bounce:
+
+```
+                        at bounce    now
+paragraphs                   107     107
+SUPPORTED_PARAPHRASE          15      15
+UNSUPPORTED                   10      13
+CONTRADICTED                   3       0
+```
+
+The three false alarms became `UNSUPPORTED` — exactly the +3, and the safe
+direction. Checked that they had not simply switched the verdict off:
+
+```
+"The museum opened in 1890 in Nice, France."  → CONTRADICTED
+"The museum opened in 1890."                  → CONTRADICTED
+"MAMAC was inaugurated in 1975 by the mayor." → CONTRADICTED
+"The chapel was built in 1432."               → UNSUPPORTED    (different subject)
+"The museum opened on 21 June 1990."          → SUPPORTED_PARAPHRASE
+```
+
+Genuine contradictions fire, rephrasing does not change the verdict, unrelated
+subjects refuse, and zero false SUPPORTED holds on both labelled sets.
+
+**Where the instrument stands, for Michael's threshold decision:**
+
+| property | state |
+|---|---|
+| false SUPPORTED (a fabrication passing) | **0** across all sets |
+| false UNSUPPORTED (over-flagging) | ~17% original set, 10% holdout |
+| CONTRADICTED, corpus-wide | 0 of 188 claims, no false alarms |
+| paraphrase symmetry | 7/7 pairs |
+
+It never lets an invention through and it flags roughly one true statement in
+six. That is the right bias, and it is now measured rather than asserted.
+
+**What it still cannot do,** and the recount should say so: judge whether an
+unsupported claim is *true*. Michael scored "depths reaching 320 feet" 5/5;
+the detector marks it unsupported and is right to — we hold no passage saying
+it. Those are different questions and only one of them is automatable.
+
+**Four rounds to get here** (210 built it, 215 improved matching, 218 found
+every contradiction was false, 219 fixed the fragility and then the regression
+it caused). Every one of the four defects was found by running against real
+tour text, not by the tests shipped with the code (D98).
