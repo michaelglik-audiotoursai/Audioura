@@ -9,6 +9,7 @@ import time
 import requests
 from datetime import datetime
 import re
+from cost_rates import llm_cost as _llm_cost
 
 # Add current directory to Python path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -89,7 +90,7 @@ DO NOT include directions to the next stop - these will be added separately.
                 result = response.json()
                 description_text = result["choices"][0]["message"]["content"]
                 tokens_used = result["usage"]["total_tokens"]
-                cost = tokens_used / 1000 * 0.002
+                cost = _llm_cost(total_tokens=tokens_used)
                 
                 # Parse orientation and description
                 parts = description_text.split("Orientation:", 1)
@@ -222,7 +223,7 @@ Keep the directions concise but clear (2-3 sentences maximum)."""
             result = response.json()
             directions = result["choices"][0]["message"]["content"].strip()
             tokens_used = result["usage"]["total_tokens"]
-            cost = tokens_used / 1000 * 0.002
+            cost = _llm_cost(total_tokens=tokens_used)
             return directions, cost, tokens_used
         else:
             return f"Continue to '{poi_to['name']}'.", 0, 0

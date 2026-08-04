@@ -2,6 +2,19 @@
 Modified version of generate_tour_text.py that includes geo coordinates for the first stop
 """
 import os
+from cost_rates import llm_cost as _llm_cost
+
+
+def _tour_llm_cost(tokens: int) -> float:
+    """Cost of a call at the model actually in use.
+
+    LOCAL-197 moved rates into cost_rates.py; LOCAL-194 made the model runtime
+    config. Both matter here: pricing a gpt-4o-mini call at gpt-3.5-turbo rates
+    overstates our cost ~7x, and Subscribed charges the user 5x that number.
+    """
+    return _llm_cost(total_tokens=tokens,
+                     model=os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"))
+
 import sys
 import json
 import time
@@ -3234,8 +3247,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             info_text = info_result["choices"][0]["message"]["content"]
             tokens_used = info_result["usage"]["total_tokens"]
             total_tokens += tokens_used
-            total_cost += tokens_used / 1000 * 0.002
-            print(f"PHASE 3A API call cost: ${tokens_used / 1000 * 0.002:.4f} ({tokens_used} tokens)")
+            total_cost += _tour_llm_cost(tokens_used)
+            print(f"PHASE 3A API call cost: ${_tour_llm_cost(tokens_used):.4f} ({tokens_used} tokens)")
 
             api_call_logger.log_openai_call(phase_3a_prompt, total_stops, info_text, info_response.status_code)
 
@@ -3462,7 +3475,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     _r4_text = _r4_result["choices"][0]["message"]["content"]
                     tokens_used = _r4_result["usage"]["total_tokens"]
                     total_tokens += tokens_used
-                    total_cost += tokens_used / 1000 * 0.002
+                    total_cost += _tour_llm_cost(tokens_used)
                     
                     _r4_candidates = _parse_json_array_loose(_r4_text)
                     if not _r4_candidates:
@@ -3939,7 +3952,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 rep_text = rep_result["choices"][0]["message"]["content"]
                 tokens_used = rep_result["usage"]["total_tokens"]
                 total_tokens += tokens_used
-                total_cost += tokens_used / 1000 * 0.002
+                total_cost += _tour_llm_cost(tokens_used)
 
                 new_candidates = _parse_json_array_loose(rep_text)
                 if not new_candidates or not isinstance(new_candidates, list):
@@ -4095,8 +4108,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 b_text = b_result["choices"][0]["message"]["content"]
                 tokens_used = b_result["usage"]["total_tokens"]
                 total_tokens += tokens_used
-                total_cost += tokens_used / 1000 * 0.002
-                print(f"PHASE 3B API call cost: ${tokens_used / 1000 * 0.002:.4f} ({tokens_used} tokens)")
+                total_cost += _tour_llm_cost(tokens_used)
+                print(f"PHASE 3B API call cost: ${_tour_llm_cost(tokens_used):.4f} ({tokens_used} tokens)")
                 parsed = _parse_json_array_loose(b_text)
                 if not parsed or not isinstance(parsed, list):
                     print(f"! PHASE 3B unparseable response; keeping current order")
@@ -4356,7 +4369,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     if coords:
                         poi['coordinates'] = coords
                         total_tokens += tokens_used
-                        total_cost += tokens_used / 1000 * 0.002
+                        total_cost += _tour_llm_cost(tokens_used)
                         print(f"   Coords fallback OK '{poi['name']}': {coords}")
                     else:
                         print(f"   Coords fallback FAILED '{poi['name']}' — no map pin for this stop")
@@ -4381,7 +4394,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             if coords:
                                 poi['coordinates'] = coords
                                 total_tokens += tokens_used
-                                total_cost += tokens_used / 1000 * 0.002
+                                total_cost += _tour_llm_cost(tokens_used)
                                 print(f"   Cluster refetch OK '{poi['name']}': {coords}")
                             else:
                                 print(f"   Cluster refetch FAILED '{poi['name']}' -- no map pin")
@@ -4465,7 +4478,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             if rep_resp.status_code == 200:
                                 rep_tokens = rep_resp.json()["usage"]["total_tokens"]
                                 total_tokens += rep_tokens
-                                total_cost += rep_tokens / 1000 * 0.002
+                                total_cost += _tour_llm_cost(rep_tokens)
                                 new_candidates = _parse_json_array_loose(rep_resp.json()["choices"][0]["message"]["content"])
                                 if new_candidates and isinstance(new_candidates, list):
                                     new_stops = []
@@ -4493,7 +4506,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                                 if coords_r:
                                     poi_r['coordinates'] = coords_r
                                     total_tokens += tok_r
-                                    total_cost += tok_r / 1000 * 0.002
+                                    total_cost += _tour_llm_cost(tok_r)
                                     print(f"   GEO-CHECK coords OK '{poi_r['name']}': {coords_r}")
                                 else:
                                     print(f"   GEO-CHECK coords FAILED '{poi_r['name']}'")
@@ -5815,7 +5828,7 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                     description_text = description_result["choices"][0]["message"]["content"]
 
                     tokens_used = description_result["usage"]["total_tokens"]
-                    call_cost = tokens_used / 1000 * 0.002
+                    call_cost = _tour_llm_cost(tokens_used)
                     print(f"Stop {stop_num} API call cost: ${call_cost:.4f} ({tokens_used} tokens)")
 
                     parts = description_text.split("Orientation:", 1)
@@ -6174,7 +6187,7 @@ REWRITE RULES (all mandatory):
                             _retry_result = _retry_resp.json()
                             _retry_text = _retry_result["choices"][0]["message"]["content"].strip()
                             _retry_tok = _retry_result["usage"]["total_tokens"]
-                            _retry_c = _retry_tok / 1000 * 0.002
+                            _retry_c = _tour_llm_cost(_retry_tok)
                             _style_retry_tokens += _retry_tok
                             _style_retry_cost += _retry_c
                             _stop_retry_tokens += _retry_tok
