@@ -311,10 +311,15 @@ def run_calibration():
         # Check known disagreements
         # 1. "depths reaching 320 feet" — Michael 5/5, claim_check marks unsupported
         if mg['para'] == 5 and mg['label'] == 'A':
-            if not record['publishable'] and 'UNSUPPORTED_CLAIM' in record['block_reasons']:
+            # D100 (Michael): UNSUPPORTED does not block — only CONTRADICTED does.
+            # The two-axis shape is still what we assert, but the axes now read:
+            # excellent quality, publishable, and carrying unverified claims that
+            # must be disclosed and sent to external verification (LOCAL-221).
+            if record['publishable'] and record.get('unsupported_claims', 0) > 0:
                 known_disagreement_320ft = True
-                print(f"  │ ★ KNOWN DISAGREEMENT: Excellent quality (Michael 5/5), blocked for")
-                print(f"  │   unsupported '320 feet'. Two-axis shape: quality ≠ publishability.")
+                print(f"  │ ★ TWO-AXIS CASE: Michael 5/5, publishable, but "
+                      f"{record['unsupported_claims']} unverified claim(s)")
+                print(f"  │   ('320 feet'). Disclosed, not blocked — D100.")
 
         # 2. Cycling directions — pure imperatives, classified NAVIGATION, clean
         if mg['para'] == 1 and mg['label'] == 'A':
@@ -341,6 +346,10 @@ def run_calibration():
             ],
             'publishable': record['publishable'],
             'block_reasons': record['block_reasons'],
+            # D100: unverified claims are disclosed and sent to external
+            # verification (LOCAL-221), not blocked. Carried in the record so a
+            # downstream consumer can act on them.
+            'unsupported_claims': record.get('unsupported_claims', 0),
         })
 
     # ─── Part 3: Known disagreements check ───────────────────────────────

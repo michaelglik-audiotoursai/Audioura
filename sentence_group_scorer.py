@@ -370,20 +370,34 @@ def score_group(
 
     # ─── PUBLISHABLE / BLOCKED flag ─────────────────────────────────────
     # Two axes (D94): quality is separate from publishability.
+    #
+    # D100 (Michael, 2026-08-04) sets what blocks. LEAD dispatched this task
+    # before his answer arrived, so the original rule here blocked on
+    # UNSUPPORTED — corrected on merge.
+    #
+    #   "We should not publish if we are reasonably sure that the data is
+    #    incorrect. It is a different story if the data is unverifiable...
+    #    having no information or very little information maybe worse than
+    #    having unverifiable information."
+    #
     # Blocked if:
-    #   1. Any CONTRADICTED claim (hard block, D99)
-    #   2. Any UNSUPPORTED claim (block until sourced or removed)
-    #   3. R9_GENERIC fires (sentence should be deleted, not published)
+    #   1. Any CONTRADICTED claim — we believe it is wrong (hard block)
+    #   2. R9_GENERIC — the sentence says nothing and is deleted, not published
+    #
+    # UNSUPPORTED does NOT block. It is disclosed instead (the app disclaimer),
+    # and LOCAL-221 first tries to promote it via an external source. Blocking
+    # on it would delete good writing: the detector over-flags ~17% (D99), and
+    # Michael scored an UNSUPPORTED sentence 5/5.
     block_reasons = []
 
     if claim_result['verdict_counts'].get('contradicted', 0) > 0:
         block_reasons.append('CONTRADICTED_CLAIM')
 
-    if claim_result['verdict_counts'].get('unsupported', 0) > 0:
-        block_reasons.append('UNSUPPORTED_CLAIM')
-
     if 'R9_GENERIC' in rules_violated:
         block_reasons.append('GENERIC_DELETE')
+
+    # Reported, not blocking — drives the disclosure and LOCAL-221's lookup.
+    unsupported_n = claim_result['verdict_counts'].get('unsupported', 0)
 
     publishable = len(block_reasons) == 0
 
@@ -398,6 +412,7 @@ def score_group(
             'verdict_counts': claim_result['verdict_counts'],
         },
         'publishable': publishable,
+        'unsupported_claims': unsupported_n,   # disclosed, not blocking (D100)
         'block_reasons': block_reasons,
     }
 
