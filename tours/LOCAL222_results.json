@@ -1,0 +1,395 @@
+[
+  {
+    "run": 1,
+    "tour_id": 180,
+    "elapsed": 49.22348380088806,
+    "cost": 0.0093855,
+    "words": 819,
+    "stops": [
+      {
+        "title": "Cap d'Antibes",
+        "paragraphs": [
+          {
+            "text": "Start cycling south on the main road with the sea on your right until you reach the peninsula's tip with a lighthouse visible in the distance. As you arrive at Cap d'Antibes, the tranquil sounds of waves lapping against the rugged coastline greet you. The shimmering waters and the gentle sea breeze create a serene atmosphere, inviting you to explore the beauty of this stunning peninsula.",
+            "rules_violated": [
+              "R1_IMPERATIVE"
+            ],
+            "findings": [
+              {
+                "rule_id": "R1_IMPERATIVE",
+                "severity": "error",
+                "sentence": "Start cycling south on the main road with the sea on your right until you reach the peninsula's tip with a lighthouse visible in the distance.",
+                "suggestion": "Rewrite as declarative statement. Remove the imperative \"start\" and state the fact directly."
+              }
+            ],
+            "r9_deleted": [],
+            "sentence_count": 3
+          },
+          {
+            "text": "You are about to embark on a journey through the French Riviera, where the sun-kissed shores of Cap d'Antibes and the medieval charm of Eze Village converge to paint a vivid tapestry of natural beauty, artistic inspiration, and historical intrigue. Here, the serene coastline has nurtured the creativity of renowned artists like Picasso, while the cobblestone streets of Eze whisper tales of bygone eras. As you wind through the picturesque landscapes, you'll uncover the timeless allure that has beckoned both artists and aristocrats to these idyllic shores, each stop offering a new chapter in the riveting story of this enchanting region.",
+            "rules_violated": [],
+            "findings": [],
+            "r9_deleted": [],
+            "sentence_count": 3
+          },
+          {
+            "text": "Cap d'Antibes, situated on the French Riviera, holds a special place in the region's history and culture. This cape, along with Cap Ferrat to the northeast, forms a significant feature of the landscape, housing prestigious establishments like the H\u00f4tel du Cap-Eden-Roc and Grand-H\u00f4tel du Cap-Ferrat. These iconic hotels are renowned for their exclusivity and luxury, attracting visitors from around the world. In the literary world, Cap d'Antibes has inspired notable works, including F. Scott Fitzgerald's novel \"Tender Is the Night.\" This masterpiece captures the essence of the French Riviera during the Jazz Age, depicting the poignant tale of Dick Diver and his wife, Nicole, against the backdrop of this enchanting coastal setting. The breathtaking sentier Littoral is a scenic coastal path nearly 3.5 kilometers long. It begins at plage de la Garoupe and culminates at Cap d'Antibes near Villa Eilenroc. The trail offers stunning views of the coastline, allowing visitors to appreciate the natural beauty of the surroundings. At Cap d'Antibes, the tranquil vistas and vibrant atmosphere have inspired artists like Picasso, infusing their work with the essence of this coastal paradise. Cycling along the shimmering waters, you are not just exploring a physical landscape but also delving into a rich tapestry of history and culture that defines the French Riviera. The mystical allure of Eze Village beckons you forward, promising more wonders and discoveries along your journey.",
+            "rules_violated": [
+              "R1_IMPERATIVE"
+            ],
+            "findings": [
+              {
+                "rule_id": "R1_IMPERATIVE",
+                "severity": "error",
+                "sentence": "Cap d'Antibes, situated on the French Riviera, holds a special place in the region's history and culture.",
+                "suggestion": "Rewrite as declarative statement. Remove the imperative \"cap\" and state the fact directly."
+              }
+            ],
+            "r9_deleted": [],
+            "sentence_count": 11
+          }
+        ]
+      },
+      {
+        "title": "Eze Village",
+        "paragraphs": [
+          {
+            "text": "Position yourself at the entrance of Eze Village, a medieval gem perched on a rocky outcrop overlooking the azure waters of the French Riviera. Take a moment to absorb the ancient aura emanating from the cobblestone streets and weathered stone buildings that have stood witness to centuries of history.",
+            "rules_violated": [
+              "R1_IMPERATIVE"
+            ],
+            "findings": [
+              {
+                "rule_id": "R1_IMPERATIVE",
+                "severity": "error",
+                "sentence": "Position yourself at the entrance of Eze Village, a medieval gem perched on a rocky outcrop overlooking the azure waters of the French Riviera.",
+                "suggestion": "Rewrite as declarative statement. Remove the imperative \"position\" and state the fact directly."
+              },
+              {
+                "rule_id": "R1_IMPERATIVE",
+                "severity": "error",
+                "sentence": "Take a moment to absorb the ancient aura emanating from the cobblestone streets and weathered stone buildings that have stood witness to centuries of history.",
+                "suggestion": "Rewrite as declarative statement. Remove the imperative \"take a moment\" and state the fact directly."
+              }
+            ],
+            "r9_deleted": [],
+            "sentence_count": 2
+          },
+          {
+            "text": "In 200 BC, the area surrounding \u00c8ze saw its first inhabitants settle near Mount Bastide. The Antonine Itinerary mentions the bay of \u00c8ze as Avisionis portus, highlighting its maritime significance in antiquity. The timeless allure of Eze Village resides in its ability to transport visitors back through the annals of time. The aged stone walls exude a palpable sense of antiquity, each crack and crevice holding a story. The gentle rustle of the Mediterranean breeze mingles with the distant chime of church bells, creating a harmonious symphony of past and present. Wandering through the narrow alleyways, you'll encounter artisanal workshops where local craftsmen keep age-old traditions alive, infusing modernity with a touch of history. As you pause to admire the intricate ironwork adorning centuries-old doors, the connection between past and present becomes tangible, a thread weaving through the fabric of time. This stop on the French Riviera cycling tour offers a profound glimpse into the enduring spirit of a village steeped in history. The medieval charm of Eze Village serves as a bridge between ancient civilizations and contemporary life, inviting you to ponder the enduring legacy of those who once walked these very streets. At the apex of Jardin Exotique, you can gaze out over the panoramic vista of the Riviera. The hillsides hold a multitude of tales from a bygone era. As you cycle onward, remember Eze Village, a testament to the enduring allure of the French Riviera's rich historical tapestry.",
+            "rules_violated": [],
+            "findings": [],
+            "r9_deleted": [],
+            "sentence_count": 12
+          },
+          {
+            "text": "From Cap d'Antibes to Eze Village \u2014 a collection that spans more ground than these stops alone.",
+            "rules_violated": [
+              "R9_GENERIC"
+            ],
+            "findings": [
+              {
+                "rule_id": "R9_GENERIC",
+                "severity": "delete",
+                "sentence": "From Cap d'Antibes to Eze Village \u2014 a collection that spans more ground than these stops alone.",
+                "suggestion": "This sentence carries nothing specific to this stop \u2014 it could be placed in millions of stops. Delete it."
+              }
+            ],
+            "r9_deleted": [
+              "From Cap d'Antibes to Eze Village \u2014 a collection that spans more ground than these stops alone."
+            ],
+            "sentence_count": 1
+          }
+        ]
+      }
+    ],
+    "output_file": "/Users/micha/audioura-worktrees/LOCAL-222/tours/LOCAL222_riviera_run1.txt"
+  },
+  {
+    "run": 2,
+    "tour_id": 181,
+    "elapsed": 50.93703007698059,
+    "cost": 0.008871,
+    "words": 790,
+    "stops": [
+      {
+        "title": "Cap d'Antibes",
+        "paragraphs": [
+          {
+            "text": "Start cycling southwest on Avenue de la Garoupe towards Cap d'Antibes. Enjoy the sea breeze as you pass by stunning villas. As you arrive at Cap d'Antibes on your French Riviera cycling tour, take a moment to soak in the salty breeze coming off the Mediterranean Sea. The rhythmic lapping of waves against the rocky shore sets the backdrop for your exploration of this historic cape.",
+            "rules_violated": [
+              "R1_IMPERATIVE"
+            ],
+            "findings": [
+              {
+                "rule_id": "R1_IMPERATIVE",
+                "severity": "error",
+                "sentence": "Start cycling southwest on Avenue de la Garoupe towards Cap d'Antibes.",
+                "suggestion": "Rewrite as declarative statement. Remove the imperative \"start\" and state the fact directly."
+              },
+              {
+                "rule_id": "R1_IMPERATIVE",
+                "severity": "error",
+                "sentence": "Enjoy the sea breeze as you pass by stunning villas.",
+                "suggestion": "Rewrite as declarative statement. Remove the imperative \"enjoy\" and state the fact directly."
+              }
+            ],
+            "r9_deleted": [],
+            "sentence_count": 4
+          },
+          {
+            "text": "You are about to embark on a journey through the French Riviera, where the opulence of the past intertwines with the raw beauty of nature, revealing a landscape steeped in history and intrigue. As you traverse the scenic routes, you'll uncover the hidden stories beneath the glamorous surface of this famed coastline and rugged gorges. Each stop along the way offers a chapter in this captivating tale: from the secluded pathways of Cap d'Antibes, where artists and writers sought inspiration amidst tranquil surroundings, to the ancient trails of Gorges du Loup, once trodden by merchants and explorers, showcasing the untamed spirit of the region juxtaposed with its refined allure. Get ready to peel back the layers of this storied region, where every turn reveals a new facet of the French Riviera's rich tapestry.",
+            "rules_violated": [
+              "R1_IMPERATIVE",
+              "R3_SUGGESTIVE_EXPLORATION"
+            ],
+            "findings": [
+              {
+                "rule_id": "R3_SUGGESTIVE_EXPLORATION",
+                "severity": "error",
+                "sentence": "As you traverse the scenic routes, you'll uncover the hidden stories beneath the glamorous surface of this famed coastline and rugged gorges.",
+                "suggestion": "Replace with a direct declarative statement about the POI. Remove \"you\" + exploration verb."
+              },
+              {
+                "rule_id": "R1_IMPERATIVE",
+                "severity": "error",
+                "sentence": "Get ready to peel back the layers of this storied region, where every turn reveals a new facet of the French Riviera's rich tapestry.",
+                "suggestion": "Rewrite as declarative statement. Remove the imperative \"get\" and state the fact directly."
+              }
+            ],
+            "r9_deleted": [],
+            "sentence_count": 4
+          },
+          {
+            "text": "Cap d'Antibes, along with its counterpart Cap Ferrat, stands as a sentinel of elegance on the French Riviera. Named for the town of Antibes, this cape boasts the prestigious H\u00f4tel du Cap-Eden-Roc, a sanctuary for the world's elite seeking respite by the sea. The grandeur of this exclusive enclave is palpable, with each step revealing a new layer of opulence and history. In the 1930s, the American author F. Scott Fitzgerald found inspiration in the tranquil beauty of Cap d'Antibes for his novel \"Tender Is the Night.\" The captivating tale of love, ambition, and despair unfolds against the backdrop of this picturesque coastline, where echoes of the Jazz Age still linger in the sea breeze. The sentier Littoral is a scenic coastal path that stretches nearly 3.5 kilometers from plage de la Garoupe to Cap d'Antibes, offering breathtaking views of the azure waters and lush greenery. Locally known as the sentier Tire-poil, this trail guides you through a tapestry of natural wonders, leading you to the very heart of this iconic cape. Cap d'Antibes, with its storied past and timeless allure, embodies the hidden pathways where artists and writers sought solace and inspiration away from the bustling cities. As you pedal forward, the landscape shifts dramatically, promising tales of natural wonder just ahead, inviting you to uncover the mysteries and beauty of this enchanting coastal gem. Your exploration of Cap d'Antibes reveals hidden stories within the folds of this historic cape, enhancing your journey along the French Riviera.",
+            "rules_violated": [
+              "R1_IMPERATIVE"
+            ],
+            "findings": [
+              {
+                "rule_id": "R1_IMPERATIVE",
+                "severity": "error",
+                "sentence": "Cap d'Antibes, along with its counterpart Cap Ferrat, stands as a sentinel of elegance on the French Riviera.",
+                "suggestion": "Rewrite as declarative statement. Remove the imperative \"cap\" and state the fact directly."
+              },
+              {
+                "rule_id": "R1_IMPERATIVE",
+                "severity": "error",
+                "sentence": "Cap d'Antibes, with its storied past and timeless allure, embodies the hidden pathways where artists and writers sought solace and inspiration away from the bustling cities.",
+                "suggestion": "Rewrite as declarative statement. Remove the imperative \"cap\" and state the fact directly."
+              }
+            ],
+            "r9_deleted": [],
+            "sentence_count": 10
+          }
+        ]
+      },
+      {
+        "title": "Gorges du Loup",
+        "paragraphs": [
+          {
+            "text": "As you approach the Gorges du Loup, situated in the captivating Alpes-Maritimes region of France, you will be surrounded by the rugged beauty of the French Riviera. Look for the untamed Loup river winding through the dramatic limestone cliffs, creating a breathtaking natural spectacle that has captivated travelers for centuries.",
+            "rules_violated": [
+              "R1_IMPERATIVE"
+            ],
+            "findings": [
+              {
+                "rule_id": "R1_IMPERATIVE",
+                "severity": "error",
+                "sentence": "Look for the untamed Loup river winding through the dramatic limestone cliffs, creating a breathtaking natural spectacle that has captivated travelers for centuries.",
+                "suggestion": "Rewrite as declarative statement. Remove the imperative \"look for\" and state the fact directly."
+              }
+            ],
+            "r9_deleted": [],
+            "sentence_count": 2
+          },
+          {
+            "text": "Cycling through the ancient trails of Gorges du Loup, you are immersed in the essence of a bygone era. This historical passageway once echoed with the footsteps of merchants and explorers, traversing the rocky terrain with determination and awe. The sheer cliffs tower above you, bearing witness to the passage of time and the resilience of nature. The cool mist rising from the river below carries the whispers of centuries past, inviting introspection and reverence for the untamed spirit of this region. The wild beauty of the Gorges du Loup contrasts with the refined allure of the Riviera, defining this landscape. The rugged terrain and ancient trails reflect a time long gone, while the sophistication of the French Riviera beckons from the horizon, a testament to the enduring allure of this coastal paradise. The convergence of these two worlds offers a glimpse into the harmonious coexistence of nature and civilization in this fascinating region.",
+            "rules_violated": [
+              "R7_HALLUCINATED_SENSORY"
+            ],
+            "findings": [
+              {
+                "rule_id": "R7_HALLUCINATED_SENSORY",
+                "severity": "warning",
+                "sentence": "The cool mist rising from the river below carries the whispers of centuries past, inviting introspection and reverence for the untamed spirit of this region.",
+                "suggestion": "This appears to assert a sensory experience the listener cannot actually have (historical/absent). Rewrite as factual description of what IS present, or remove."
+              }
+            ],
+            "r9_deleted": [],
+            "sentence_count": 7
+          },
+          {
+            "text": "From Cap d'Antibes to Gorges du Loup \u2014 a collection that spans more ground than these stops alone.",
+            "rules_violated": [
+              "R9_GENERIC"
+            ],
+            "findings": [
+              {
+                "rule_id": "R9_GENERIC",
+                "severity": "delete",
+                "sentence": "From Cap d'Antibes to Gorges du Loup \u2014 a collection that spans more ground than these stops alone.",
+                "suggestion": "This sentence carries nothing specific to this stop \u2014 it could be placed in millions of stops. Delete it."
+              }
+            ],
+            "r9_deleted": [
+              "From Cap d'Antibes to Gorges du Loup \u2014 a collection that spans more ground than these stops alone."
+            ],
+            "sentence_count": 1
+          }
+        ]
+      }
+    ],
+    "output_file": "/Users/micha/audioura-worktrees/LOCAL-222/tours/LOCAL222_riviera_run2.txt"
+  },
+  {
+    "run": 3,
+    "tour_id": 182,
+    "elapsed": 45.13247585296631,
+    "cost": 0.0085125,
+    "words": 713,
+    "stops": [
+      {
+        "title": "Cap d'Antibes Coastal Path",
+        "paragraphs": [
+          {
+            "text": "Start at the main parking lot near the entrance of the coastal path and head south along the marked trail towards the sea. Enjoy the sea breeze as you cycle along the path. As you stand at the starting point of the Cap d'Antibes Coastal Path, the shimmering Mediterranean Sea stretches out before you, inviting you to embark on a journey along the stunning coastline. The gentle sound of waves lapping against the shore sets the tranquil tone for your exploration of this historic and picturesque location.",
+            "rules_violated": [
+              "R1_IMPERATIVE"
+            ],
+            "findings": [
+              {
+                "rule_id": "R1_IMPERATIVE",
+                "severity": "error",
+                "sentence": "Start at the main parking lot near the entrance of the coastal path and head south along the marked trail towards the sea.",
+                "suggestion": "Rewrite as declarative statement. Remove the imperative \"start\" and state the fact directly."
+              },
+              {
+                "rule_id": "R1_IMPERATIVE",
+                "severity": "error",
+                "sentence": "Enjoy the sea breeze as you cycle along the path.",
+                "suggestion": "Rewrite as declarative statement. Remove the imperative \"enjoy\" and state the fact directly."
+              }
+            ],
+            "r9_deleted": [],
+            "sentence_count": 4
+          },
+          {
+            "text": "You are about to embark on a journey through the French Riviera, where the breathtaking vistas belie a storied past of piracy and artistic inspiration. As you traverse from the Cap d'Antibes Coastal Path to the Voie Verte du Littoral Varois, each step unravels a chapter of transformation\u2014from the footprints of fishermen and smugglers to echoes of creativity, conflict, and change. Feel the breeze once felt by Claude Monet as he painted these very cliffs, and touch the ancient stones of the old railway line, a symbol of wartime resilience turned peaceful cycling path. The secrets of this sun-kissed paradise are waiting to be unveiled beneath its radiant exterior, revealing a tapestry of history waiting to be explored.",
+            "rules_violated": [
+              "R1_IMPERATIVE",
+              "R3_SUGGESTIVE_EXPLORATION"
+            ],
+            "findings": [
+              {
+                "rule_id": "R3_SUGGESTIVE_EXPLORATION",
+                "severity": "error",
+                "sentence": "As you traverse from the Cap d'Antibes Coastal Path to the Voie Verte du Littoral Varois, each step unravels a chapter of transformation\u2014from the footprints of fishermen and smugglers to echoes of creativity, conflict, and change.",
+                "suggestion": "Replace with a direct declarative statement about the POI. Remove \"you\" + exploration verb."
+              },
+              {
+                "rule_id": "R1_IMPERATIVE",
+                "severity": "error",
+                "sentence": "Feel the breeze once felt by Claude Monet as he painted these very cliffs, and touch the ancient stones of the old railway line, a symbol of wartime resilience turned peaceful cycling path.",
+                "suggestion": "Rewrite as declarative statement. Remove the imperative \"feel\" and state the fact directly."
+              }
+            ],
+            "r9_deleted": [],
+            "sentence_count": 4
+          },
+          {
+            "text": "The Cap d'Antibes Coastal Path, also known as the sentier Littoral or sentier Tire-poil, stretches almost 3.5 kilometers from plage de la Garoupe to the rugged cliffs of Cap d'Antibes, near Villa Eilenroc. The path showcases stunning views of azure waters and dramatic cliffs that have long inspired artists and writers. Ponder the connection to F. Scott Fitzgerald's novel \"Tender Is the Night,\" set on the French Riviera during the Jazz Age. Reflect on the parallels between the protagonist's descent and the author's own struggles, adding a layer of literary history to this idyllic coastal setting. The warm Mediterranean breeze carries whispers of history intertwined with the natural beauty of the surroundings. The lush greenery, the scent of salt in the air, and the distant calls of seagulls create a sensory tapestry that immerses visitors in the essence of the French Riviera. This coastal path offers a serene escape into nature and serves as a living link to the cultural heritage of Antibes. The region's rich history is showcased through landmarks like the H\u00f4tel du Cap-Eden-Roc and the Grand-H\u00f4tel du Cap-Ferrat, renowned for their exclusivity and elegance. As you round the next bend, imagine the echoes of the past guiding you towards another hidden gem along the coast, where history and nature converge in perfect harmony.",
+            "rules_violated": [
+              "R1_IMPERATIVE",
+              "R7_HALLUCINATED_SENSORY"
+            ],
+            "findings": [
+              {
+                "rule_id": "R1_IMPERATIVE",
+                "severity": "error",
+                "sentence": "Ponder the connection to F.",
+                "suggestion": "Rewrite as declarative statement. Remove the imperative \"ponder\" and state the fact directly."
+              },
+              {
+                "rule_id": "R1_IMPERATIVE",
+                "severity": "error",
+                "sentence": "Reflect on the parallels between the protagonist's descent and the author's own struggles, adding a layer of literary history to this idyllic coastal setting.",
+                "suggestion": "Rewrite as declarative statement. Remove the imperative \"reflect on\" and state the fact directly."
+              },
+              {
+                "rule_id": "R7_HALLUCINATED_SENSORY",
+                "severity": "warning",
+                "sentence": "The warm Mediterranean breeze carries whispers of history intertwined with the natural beauty of the surroundings.",
+                "suggestion": "This appears to assert a sensory experience the listener cannot actually have (historical/absent). Rewrite as factual description of what IS present, or remove."
+              },
+              {
+                "rule_id": "R7_HALLUCINATED_SENSORY",
+                "severity": "warning",
+                "sentence": "As you round the next bend, imagine the echoes of the past guiding you towards another hidden gem along the coast, where history and nature converge in perfect harmony.",
+                "suggestion": "This appears to assert a sensory experience the listener cannot actually have (historical/absent). Rewrite as factual description of what IS present, or remove."
+              }
+            ],
+            "r9_deleted": [],
+            "sentence_count": 10
+          }
+        ]
+      },
+      {
+        "title": "Voie Verte du Littoral Varois",
+        "paragraphs": [
+          {
+            "text": "As you pause along the Voie Verte du Littoral Varois, imagine the echoes of history whispering through the coastal breeze. Cyclists rest by the tranquil shores of Sainte-Maxime, soaking in the serene beauty of the French Riviera. To your left, the shimmering Mediterranean Sea dances under the sun's gentle caress, while the quaint streets of the town beckon with their timeless charm.",
+            "rules_violated": [
+              "R7_HALLUCINATED_SENSORY"
+            ],
+            "findings": [
+              {
+                "rule_id": "R7_HALLUCINATED_SENSORY",
+                "severity": "warning",
+                "sentence": "As you pause along the Voie Verte du Littoral Varois, imagine the echoes of history whispering through the coastal breeze.",
+                "suggestion": "This appears to assert a sensory experience the listener cannot actually have (historical/absent). Rewrite as factual description of what IS present, or remove."
+              }
+            ],
+            "r9_deleted": [],
+            "sentence_count": 3
+          },
+          {
+            "text": "Feel the ancient stones beneath your feet on this converted railway line, a testament to wartime resilience repurposed for peaceful pursuits. This cycling path unveils the strategic importance of the Riviera during World War II, a quiet reminder of the region's turbulent past. The blend of nature's tranquility and historical significance creates a profound sense of awe, bridging the gap between past sacrifices and present serenity. Just ahead lies a convergence of history and modernity, awaiting your exploration.",
+            "rules_violated": [
+              "R1_IMPERATIVE"
+            ],
+            "findings": [
+              {
+                "rule_id": "R1_IMPERATIVE",
+                "severity": "error",
+                "sentence": "Feel the ancient stones beneath your feet on this converted railway line, a testament to wartime resilience repurposed for peaceful pursuits.",
+                "suggestion": "Rewrite as declarative statement. Remove the imperative \"feel\" and state the fact directly."
+              }
+            ],
+            "r9_deleted": [],
+            "sentence_count": 4
+          },
+          {
+            "text": "From Cap d'Antibes Coastal Path to Voie Verte du Littoral Varois \u2014 a collection that spans more ground than these stops alone.",
+            "rules_violated": [
+              "R9_GENERIC"
+            ],
+            "findings": [
+              {
+                "rule_id": "R9_GENERIC",
+                "severity": "delete",
+                "sentence": "From Cap d'Antibes Coastal Path to Voie Verte du Littoral Varois \u2014 a collection that spans more ground than these stops alone.",
+                "suggestion": "This sentence carries nothing specific to this stop \u2014 it could be placed in millions of stops. Delete it."
+              }
+            ],
+            "r9_deleted": [
+              "From Cap d'Antibes Coastal Path to Voie Verte du Littoral Varois \u2014 a collection that spans more ground than these stops alone."
+            ],
+            "sentence_count": 1
+          }
+        ]
+      }
+    ],
+    "output_file": "/Users/micha/audioura-worktrees/LOCAL-222/tours/LOCAL222_riviera_run3.txt"
+  }
+]
