@@ -63,6 +63,11 @@ fi
 # re-dispatching them into the same wall.
 "$CD/reap_orphans.sh"
 
+# --- Reclaim disk: drop worktrees whose branch is already merged. ---
+# Added 2026-08-04 after 188 accumulated worktrees filled the disk to 98% and
+# a dispatch failed mid-checkout. Nothing is lost; unmerged branches are kept.
+"$CD/prune_worktrees.sh"
+
 # --- Dispatch any unclaimed task files. ---
 # The dispatcher is idempotent: already-claimed files are skipped, and
 # MAX_CONCURRENT bounds the worker count. Safe to run every 5 minutes.
