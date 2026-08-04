@@ -1,0 +1,348 @@
+==============================================================================
+STYLE VALIDATOR — LOCAL-184: Instructions, Questions & Prescribed Feelings
+==============================================================================
+
+Tours analyzed: [1, 29, 12, 24, 14, 46, 44, 152, 156]
+
+------------------------------------------------------------------------------
+CANONICAL TEST: Michael's Buddha paragraph from ClickUp wdvrdaxaqj
+------------------------------------------------------------------------------
+
+  Text: "As you stand in the presence of the 'Statue de Bouddha', feel the weight of centuries pressing down upon you, a reminder of the enduring quest for inner peace and spiritual enlightenment that transcends cultural boundaries. How does this serenity manifest itself in the different representations of divinity and wisdom throughout the museum's diverse exhibits? Explore further and uncover the interconnectedness of human spirituality across time and space."
+
+  Rules violated: ['R1_IMPERATIVE', 'R2_QUESTION', 'R3_SUGGESTIVE_EXPLORATION', 'R4_PRESCRIBED_FEELING']
+  Total findings: 4
+
+    [R4_PRESCRIBED_FEELING] severity=error
+      sentence: "As you stand in the presence of the 'Statue de Bouddha', feel the weight of centuries pressing down upon you, a reminder"
+      suggestion: Rewrite as objective description. Remove "you" + feeling verb; describe what IS, not what the listener should feel.
+
+    [R2_QUESTION] severity=error
+      sentence: "How does this serenity manifest itself in the different representations of divinity and wisdom throughout the museum's d"
+      suggestion: Convert to a declarative statement about the POI.
+
+    [R1_IMPERATIVE] severity=error
+      sentence: "Explore further and uncover the interconnectedness of human spirituality across time and space."
+      suggestion: Rewrite as declarative statement. Remove the imperative "explore" and state the fact directly.
+
+    [R3_SUGGESTIVE_EXPLORATION] severity=error
+      sentence: "Explore further and uncover the interconnectedness of human spirituality across time and space."
+      suggestion: Replace with a direct declarative statement about the POI. Remove "you" + exploration verb.
+
+  Acceptance: R1 fires = True ✓
+  Acceptance: R2 fires = True ✓
+  Acceptance: R4 fires = True ✓
+
+------------------------------------------------------------------------------
+NAVIGATION EXEMPTION TEST
+------------------------------------------------------------------------------
+
+  Text: "Head south on Promenade de la Croisette"
+  is_navigation: False
+  findings: 0
+  Does NOT fire: ✓
+
+  Text: "Head south on Promenade de la Croisette and continue past the Palais des Festivals until you reach the old port."
+  is_navigation: True
+  findings: 0
+  Does NOT fire: ✓
+
+------------------------------------------------------------------------------
+R1 WORD-BOUNDARY REGRESSION (must NOT fire — nouns derived from verbs)
+------------------------------------------------------------------------------
+
+  Text: "Observers considered the design scandalous in 1887."
+  R1 fires: 0 ✓ (correctly not flagged)
+
+  Text: "Discoveries were made beneath the chapel floor in 1932."
+  R1 fires: 0 ✓ (correctly not flagged)
+
+  Text: "Explorers landed here in 1388 and named the cape."
+  R1 fires: 0 ✓ (correctly not flagged)
+
+  R1 word-boundary regression: ALL PASS ✓
+
+------------------------------------------------------------------------------
+DECLARATIVE EXEMPTION TEST (R2 — should NOT fire as errors)
+------------------------------------------------------------------------------
+
+  Text: "What began as a fishing village became the busiest yacht harbour in Europe."
+  Errors: 0 ✓ (zero errors)
+  Warnings: 1 (expected — interrogative opener, non-blocking)
+
+  Text: "When the museum opened in 1963, Chagall attended in person."
+  Errors: 0 ✓ (zero errors)
+  Warnings: 1 (expected — interrogative opener, non-blocking)
+
+  Text: "Where the two rivers meet, the ramparts still stand."
+  Errors: 0 ✓ (zero errors)
+  Warnings: 1 (expected — interrogative opener, non-blocking)
+
+==============================================================================
+PER-TOUR RESULTS
+==============================================================================
+
+──────────────────────────────────────────────────────────────────────────────
+Tour 1: Palais Lascaris, Nice, France - museum Tour
+  Stops: 3, Paragraphs: 18
+  Navigation (exempt): 1
+  Content paragraphs: 17
+  Clean (no violations): 15
+  Failing (1+ violation): 2
+  Failure rate: 11.8%
+
+  Per-rule counts (sentences, not paragraphs):
+    R1 (imperatives):           3
+    R2 (questions — error):     1
+    R2 (interrog opener — warn):0
+    R3 (suggestive exploration): 0
+    R4 (prescribed feeling):    2
+    Example [R1_IMPERATIVE] @ The Triumph of David:
+      "Explore the intricate details of the Annunciation, depicting destiny shaped by higher powers."
+    Example [R1_IMPERATIVE] @ The Triumph of David:
+      "Discover the strength of Raquel, a lesser-known biblical figure whose portrayal challenges traditional narratives of pow"
+    Example [R4_PRESCRIBED_FEELING] @ The Triumph of David:
+      "Prepare to immerse yourself in the rich tapestry of Baroque art at its most thought-provoking and enigmatic."
+    Example [R4_PRESCRIBED_FEELING] @ The Annunciation:
+      "Immerse yourself in the intricate details of this transcendent artwork, letting the weight of centuries wash over you as"
+    Example [R2_QUESTION] @ The Annunciation:
+      "How does this divine-human relationship evolve in the next art piece?"
+
+──────────────────────────────────────────────────────────────────────────────
+Tour 29: French Riviera Biking Tour
+  Stops: 15, Paragraphs: 32
+  Navigation (exempt): 1
+  Content paragraphs: 31
+  Clean (no violations): 23
+  Failing (1+ violation): 8
+  Failure rate: 25.8%
+
+  Per-rule counts (sentences, not paragraphs):
+    R1 (imperatives):           6
+    R2 (questions — error):     0
+    R2 (interrog opener — warn):0
+    R3 (suggestive exploration): 2
+    R4 (prescribed feeling):    3
+    Example [R3_SUGGESTIVE_EXPLORATION] @ Old Town of Antibes:
+      "As you cycle through this landscape of luxurious villas and ancient fortifications, you will uncover the secrets that wh"
+    Example [R4_PRESCRIBED_FEELING] @ Old Town of Antibes:
+      "Immerse yourself in the vibrant charm of Antibes' Old Town, where worn cobblestone streets whisper tales of centuries pa"
+    Example [R1_IMPERATIVE] @ Old Town of Antibes:
+      "Discover the Musée Picasso, housed in the Château Grimaldi, a fortress-turned-art haven."
+    Example [R1_IMPERATIVE] @ Cap d'Antibes:
+      "Feel the same breeze that stirred his creative spirit as he wandered these shores, forever imprinting this landscape on "
+    Example [R4_PRESCRIBED_FEELING] @ Cours Saleya Market:
+      "Amidst the lively atmosphere, immerse yourself in the historical richness of this market, dating back to the 19th centur"
+    Example [R3_SUGGESTIVE_EXPLORATION] @ Eze Village:
+      "As you explore, take note of the intricate details adorning the doorways and windows, showcasing the craftsmanship of ar"
+
+──────────────────────────────────────────────────────────────────────────────
+Tour 12: walking tour in Nice, france - walking Tour
+  Stops: 10, Paragraphs: 61
+  Navigation (exempt): 1
+  Content paragraphs: 60
+  Clean (no violations): 48
+  Failing (1+ violation): 12
+  Failure rate: 20.0%
+
+  Per-rule counts (sentences, not paragraphs):
+    R1 (imperatives):           4
+    R2 (questions — error):     0
+    R2 (interrog opener — warn):0
+    R3 (suggestive exploration): 4
+    R4 (prescribed feeling):    6
+    Example [R1_IMPERATIVE] @ Promenade des Anglais:
+      "Discover how the azure sea meets the elegant walkway, originally funded by English aristocrats."
+    Example [R1_IMPERATIVE] @ Promenade des Anglais:
+      "Explore the hill, once home to a medieval fortress, now lush gardens revealing Nice's strategic past."
+    Example [R4_PRESCRIBED_FEELING] @ Promenade des Anglais:
+      "Walking along the promenade, you are enveloped in a sensory experience that engages all your senses."
+    Example [R3_SUGGESTIVE_EXPLORATION] @ Castle Hill (Colline du Châtea:
+      "As you explore the gardens and pathways, let the whispers of history guide your steps."
+    Example [R3_SUGGESTIVE_EXPLORATION] @ Albert 1st Gardens:
+      "As you continue your journey, let the elegance of these gardens linger in your mind, a verdant memory to carry with you "
+    Example [R4_PRESCRIBED_FEELING] @ Nice Opera House:
+      "Immerse yourself in the echoes of history that linger in the air, feel the energy of past audiences reverberate through "
+
+──────────────────────────────────────────────────────────────────────────────
+Tour 24: Musée Marc Chagall, Nice, France - museum Tour
+  Stops: 6, Paragraphs: 30
+  Navigation (exempt): 0
+  Content paragraphs: 30
+  Clean (no violations): 28
+  Failing (1+ violation): 2
+  Failure rate: 6.7%
+
+  Per-rule counts (sentences, not paragraphs):
+    R1 (imperatives):           1
+    R2 (questions — error):     1
+    R2 (interrog opener — warn):0
+    R3 (suggestive exploration): 0
+    R4 (prescribed feeling):    1
+    Example [R4_PRESCRIBED_FEELING] @ L'Exode:
+      "As you gaze upon L'Exode, let Chagall's portrayal of exile and the enduring spirit of a displaced people wash over you."
+    Example [R1_IMPERATIVE] @ L'Exode:
+      "Consider how this journey continues in his other works, such as L'Arche de Noé, and ponder the timeless themes of faith,"
+    Example [R2_QUESTION] @ Le Cirque bleu:
+      "Can the joy of performance captured in this painting truly encapsulate Chagall's vision for his museum?"
+
+──────────────────────────────────────────────────────────────────────────────
+Tour 14: Museum Of Naïve Art, Nice, France - museum Tour
+  Stops: 9, Paragraphs: 48
+  Navigation (exempt): 3
+  Content paragraphs: 45
+  Clean (no violations): 38
+  Failing (1+ violation): 7
+  Failure rate: 15.6%
+
+  Per-rule counts (sentences, not paragraphs):
+    R1 (imperatives):           1
+    R2 (questions — error):     2
+    R2 (interrog opener — warn):0
+    R3 (suggestive exploration): 1
+    R4 (prescribed feeling):    3
+    Example [R4_PRESCRIBED_FEELING] @ The Flight into Egypt:
+      "Get ready to immerse yourself in the vibrant colors, exaggerated expressions, and poignant contrasts that bring the huma"
+    Example [R2_QUESTION] @ The Flight into Egypt:
+      "What other stories and moments could be brought to life through the lens of naïve art?"
+    Example [R1_IMPERATIVE] @ The Wedding:
+      "Consider how this joyful depiction contrasts with other emotions portrayed in art and reflect on the universal theme of "
+    Example [R4_PRESCRIBED_FEELING] @ The Dream:
+      "As you immerse yourself in this dreamlike tableau, consider how it fits into the broader context of the museum's collect"
+    Example [R3_SUGGESTIVE_EXPLORATION] @ The Dream:
+      "Leaving this exhibit, you may find yourself pondering the delicate balance between fantasy and reality, and what dreams "
+    Example [R2_QUESTION] @ The Sleeping Gypsy:
+      "What final truth lies hidden in the rainforest that surrounds them?"
+
+──────────────────────────────────────────────────────────────────────────────
+Tour 46: Boston Common, Boston MA - historical Tour
+  Stops: 5, Paragraphs: 12
+  Navigation (exempt): 0
+  Content paragraphs: 12
+  Clean (no violations): 12
+  Failing (1+ violation): 0
+  Failure rate: 0.0%
+
+  Per-rule counts (sentences, not paragraphs):
+    R1 (imperatives):           0
+    R2 (questions — error):     0
+    R2 (interrog opener — warn):0
+    R3 (suggestive exploration): 0
+    R4 (prescribed feeling):    0
+
+──────────────────────────────────────────────────────────────────────────────
+Tour 44: Musee d Art Moderne et d Art Contemporain, Nice, France - Museum Tour
+  Stops: 10, Paragraphs: 17
+  Navigation (exempt): 0
+  Content paragraphs: 17
+  Clean (no violations): 9
+  Failing (1+ violation): 8
+  Failure rate: 47.1%
+
+  Per-rule counts (sentences, not paragraphs):
+    R1 (imperatives):           2
+    R2 (questions — error):     2
+    R2 (interrog opener — warn):2
+    R3 (suggestive exploration): 2
+    R4 (prescribed feeling):    2
+    Example [R3_SUGGESTIVE_EXPLORATION] @ Richard Long ou la sculpture e:
+      "Each chapter of this narrative unfolds as you explore Richard Long's sculptural movements, the explosive energy of pop a"
+    Example [R4_PRESCRIBED_FEELING] @ Donations and deposits:
+      "As you immerse yourself in the vibrant hues and dynamic forms of these artworks, consider the transformative power of ar"
+    Example [R4_PRESCRIBED_FEELING] @ Donations et dépôts:
+      "In this dedicated space, you are surrounded by around twenty of Yves Klein's artworks, several of which have become inte"
+    Example [R3_SUGGESTIVE_EXPLORATION] @ Expositions temporaires:
+      "As you explore the exhibit further, consider how this piece challenges the status quo and paves the way for new modes of"
+    Example [R2_QUESTION] @ Expositions temporaires:
+      "What can we expect from future temporary exhibitions here?"
+    Example [R1_IMPERATIVE] @ La mariée sous l’arbre:
+      "Reflect on the intricate details that adorn the sculpture, each telling a unique story of creation and rebirth."
+    Example [R2_QUESTION] @ Le Mur de Feu d’Yves Klein:
+      "What lasting impact has Yves Klein left on the museum and the art world?"
+    Example [R1_IMPERATIVE] @ Le Mur de Feu d’Yves Klein:
+      "Explore the fiery depths of his masterpiece and discover the enduring legacy of one of the most innovative artists of th"
+
+──────────────────────────────────────────────────────────────────────────────
+Tour 152: French Riviera cycling tour, France - Cycling Tour
+  Stops: 15, Paragraphs: 32
+  Navigation (exempt): 1
+  Content paragraphs: 31
+  Clean (no violations): 22
+  Failing (1+ violation): 9
+  Failure rate: 29.0%
+
+  Per-rule counts (sentences, not paragraphs):
+    R1 (imperatives):           6
+    R2 (questions — error):     0
+    R2 (interrog opener — warn):0
+    R3 (suggestive exploration): 4
+    R4 (prescribed feeling):    2
+    Example [R3_SUGGESTIVE_EXPLORATION] @ Saint-Paul-de-Vence:
+      "As you explore the winding alleys and sunlit squares, imagine the artistic conversations that once echoed through these "
+    Example [R4_PRESCRIBED_FEELING] @ Villefranche-sur-Mer:
+      "Immerse yourself in the captivating allure of Villefranche-sur-Mer, where time seems to stand still amidst the azure wat"
+    Example [R1_IMPERATIVE] @ Villefranche-sur-Mer:
+      "Picture the bay stretching out before you, offering safe anchorage for ships while harboring tales of pirates and navies"
+    Example [R3_SUGGESTIVE_EXPLORATION] @ Eze Village:
+      "As you explore Eze, listen for the distant chime of church bells echoing through the narrow streets, mingling with the s"
+    Example [R1_IMPERATIVE] @ Cap Ferrat:
+      "Imagine the opulent gatherings and elegant soirées that took place within its walls, echoing with the laughter of the ar"
+    Example [R4_PRESCRIBED_FEELING] @ Port Grimaud:
+      "Immerse yourself in the sensory delights of this seaside gem as the sound of boats gently gliding through the canals min"
+
+──────────────────────────────────────────────────────────────────────────────
+Tour 156: French Riviera Cycling Tour [LOCAL-183 test]
+  Stops: 15, Paragraphs: 32
+  Navigation (exempt): 1
+  Content paragraphs: 31
+  Clean (no violations): 19
+  Failing (1+ violation): 12
+  Failure rate: 38.7%
+
+  Per-rule counts (sentences, not paragraphs):
+    R1 (imperatives):           1
+    R2 (questions — error):     0
+    R2 (interrog opener — warn):0
+    R3 (suggestive exploration): 9
+    R4 (prescribed feeling):    6
+    Example [R4_PRESCRIBED_FEELING] @ Old Town Antibes:
+      "The narrow passageways echo with the whispers of history, inviting you to immerse yourself in the daily rhythms that def"
+    Example [R3_SUGGESTIVE_EXPLORATION] @ Fort Carré d'Antibes:
+      "As you explore the fortress, the sound of seagulls overhead mingles with the faint echoes of past military commands, tra"
+    Example [R3_SUGGESTIVE_EXPLORATION] @ Cap Ferrat:
+      "As you explore Cap Ferrat, listen for the gentle lapping of the waves against the rocky shore, a soothing symphony that "
+    Example [R4_PRESCRIBED_FEELING] @ Eze Village:
+      "The medieval streets and centuries-old perfumery highlight the region's artistic and cultural significance, inviting you"
+    Example [R1_IMPERATIVE] @ La Croisette:
+      "Picture this: as you walk, the Mediterranean Sea glistens on one side while luxury boutiques and grand hotels line the o"
+
+==============================================================================
+GRAND TOTALS
+==============================================================================
+  Total paragraphs: 282
+  Navigation (exempt): 8
+  Content paragraphs: 274
+  Clean: 214
+  Failing (1+ violation): 60
+  Overall failure rate: 21.9%
+
+  Sentence-level counts:
+    R1 (imperatives):            24
+    R2 (questions — error):      6
+    R2 (interrog opener — warn): 2
+    R3 (suggestive exploration):  22
+    R4 (prescribed feeling):     25
+
+------------------------------------------------------------------------------
+NOTE ON R5 (POI-specific grounding)
+------------------------------------------------------------------------------
+  R5 maps to the existing stop_anchor_detector_v2.py
+  (ANCHORED / UNLINKED_ENTITY classification).
+  Not reimplemented here — that is the substance detector.
+  This file is the FORM detector (R1–R4).
+
+------------------------------------------------------------------------------
+DATABASE VERIFICATION
+------------------------------------------------------------------------------
+  audio_tours row count: 114
+  Read-only: no INSERT, UPDATE, or DELETE executed
