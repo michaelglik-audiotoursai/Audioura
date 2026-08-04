@@ -6052,6 +6052,166 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
             total_tokens += tokens_used
             total_cost += call_cost
     
+    # -------- [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry --------
+    # D63: prompt instruction alone does not fix style faults. Validate generated
+    # text and re-ask for paragraphs that violate error-severity rules (R1–R4).
+    # R7 is warning-only (D62) — does NOT trigger retry.
+    # One retry per paragraph max. If retry also fails, keep the better of two.
+    # Behind DISABLE_STYLE_RETRY=1 flag for A/B measurement.
+    _style_retry_disabled = os.environ.get('DISABLE_STYLE_RETRY', '').strip() == '1'
+    if _style_retry_disabled:
+        print(f"\n  [LOCAL-192] Style retry DISABLED by DISABLE_STYLE_RETRY=1 env var")
+    else:
+        print(f"\n  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...")
+        _style_retry_count = 0
+        _style_retry_tokens = 0
+        _style_retry_cost = 0.0
+        _style_retry_successes = 0
+        _style_retry_failures = 0
+
+        # Import the validator (same one used in measurement — D55: do not modify it)
+        try:
+            sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests'))
+            from style_validator_detector import validate_paragraph as _sv_validate_paragraph
+        except ImportError:
+            _sv_validate_paragraph = None
+            print(f"  [LOCAL-192] WARNING: style_validator_detector not importable — retry skipped")
+
+        if _sv_validate_paragraph:
+            _ERROR_SEVERITIES = {'error'}  # Only error-severity triggers retry (not 'warning')
+
+            for _si, _poi in enumerate(poi_list):
+                _desc = _poi.get('description', '')
+                if not _desc or _desc.startswith('['):
+                    continue  # Skip failed/placeholder descriptions
+
+                _stop_num = _si + 1
+                _poi_name = _poi.get('name', f'Stop {_stop_num}')
+
+                # Split description into paragraphs (same logic as the validator test)
+                _paragraphs = [p.strip() for p in _desc.split('\n\n') if p.strip() and len(p.strip()) > 30]
+                if not _paragraphs:
+                    continue
+
+                _new_paragraphs = []
+                _stop_had_retry = False
+
+                for _pi, _para in enumerate(_paragraphs):
+                    _result = _sv_validate_paragraph(_para)
+
+                    # Check for ERROR-severity findings only (R7 is warning → skip)
+                    _error_findings = [f for f in _result.get('findings', [])
+                                       if f.get('severity') in _ERROR_SEVERITIES]
+
+                    if not _error_findings or _result.get('is_navigation'):
+                        _new_paragraphs.append(_para)
+                        continue
+
+                    # ── This paragraph has error-severity violations → retry ──
+                    _style_retry_count += 1
+                    _stop_had_retry = True
+
+                    # Build the retry prompt: tell the model exactly which rule it broke
+                    # and quote the offending sentence. Fabrication guard (D50): only
+                    # rewrite using what's already in the paragraph.
+                    _violated_rules = set(f['rule_id'] for f in _error_findings)
+                    _offending_sentences = [f['sentence'][:150] for f in _error_findings[:3]]
+
+                    _retry_prompt = f"""Rewrite the following paragraph to fix style violations.
+
+PARAGRAPH TO REWRITE:
+\"\"\"{_para}\"\"\"
+
+VIOLATIONS FOUND:
+"""
+                    for _ef in _error_findings[:3]:
+                        _retry_prompt += f"- Rule {_ef['rule_id']}: {_ef['suggestion']}\n"
+                        _retry_prompt += f"  Offending sentence: \"{_ef['sentence'][:150]}\"\n"
+
+                    _retry_prompt += f"""
+REWRITE RULES (all mandatory):
+1. Fix the violations listed above — remove prescribed feelings, imperatives, suggestive exploration, or questions as indicated.
+2. DO NOT ADD ANY NEW FACTS, claims, dates, names, or information not already present in the paragraph above. Rewrite using ONLY what is already stated. Adding facts risks fabrication.
+3. Keep the same approximate length (±20%).
+4. Keep the same subject matter and narrative flow.
+5. Write declarative prose only — state what IS, not what the listener should feel or do.
+6. Return ONLY the rewritten paragraph text. No explanations, no headers, no "Here is the rewrite:".
+"""
+
+                    _retry_data = {
+                        "model": "gpt-3.5-turbo",
+                        "messages": [
+                            {"role": "system", "content": "You are a copy editor fixing style violations in audio tour narration. You rewrite only — never add new information."},
+                            {"role": "user", "content": _retry_prompt}
+                        ],
+                        "temperature": 0.3,  # Lower temp for more faithful rewrite
+                        "max_tokens": 500
+                    }
+
+                    try:
+                        _retry_resp = requests.post(
+                            "https://api.openai.com/v1/chat/completions",
+                            headers=headers,
+                            data=json.dumps(_retry_data)
+                        )
+
+                        if _retry_resp.status_code == 200:
+                            _retry_result = _retry_resp.json()
+                            _retry_text = _retry_result["choices"][0]["message"]["content"].strip()
+                            _retry_tok = _retry_result["usage"]["total_tokens"]
+                            _retry_c = _retry_tok / 1000 * 0.002
+                            _style_retry_tokens += _retry_tok
+                            _style_retry_cost += _retry_c
+
+                            # Strip any preamble the model might add
+                            _retry_text = re.sub(r'^(?:Here (?:is|\'s) the rewrite[d paragraph]*[:\s]*|Rewritten paragraph[:\s]*)', '', _retry_text, flags=re.IGNORECASE).strip()
+                            # Strip wrapping quotes if present
+                            if _retry_text.startswith('"""') and _retry_text.endswith('"""'):
+                                _retry_text = _retry_text[3:-3].strip()
+                            elif _retry_text.startswith('"') and _retry_text.endswith('"'):
+                                _retry_text = _retry_text[1:-1].strip()
+
+                            # Validate the retry
+                            _retry_validation = _sv_validate_paragraph(_retry_text)
+                            _retry_errors = [f for f in _retry_validation.get('findings', [])
+                                             if f.get('severity') in _ERROR_SEVERITIES]
+
+                            if not _retry_errors:
+                                # Retry is clean — use it
+                                _new_paragraphs.append(_retry_text)
+                                _style_retry_successes += 1
+                                print(f"  [LOCAL-192] Stop {_stop_num} para {_pi+1}: retry FIXED ({', '.join(_violated_rules)})")
+                            else:
+                                # Retry also has errors — keep whichever has fewer
+                                if len(_retry_errors) < len(_error_findings):
+                                    _new_paragraphs.append(_retry_text)
+                                    _style_retry_successes += 1  # partial improvement
+                                    print(f"  [LOCAL-192] Stop {_stop_num} para {_pi+1}: retry IMPROVED ({len(_error_findings)}→{len(_retry_errors)} errors)")
+                                else:
+                                    _new_paragraphs.append(_para)  # keep original
+                                    _style_retry_failures += 1
+                                    print(f"  [LOCAL-192] Stop {_stop_num} para {_pi+1}: retry FAILED — keeping original ({', '.join(_violated_rules)})")
+                        else:
+                            # API error — keep original
+                            _new_paragraphs.append(_para)
+                            _style_retry_failures += 1
+                            print(f"  [LOCAL-192] Stop {_stop_num} para {_pi+1}: retry API error {_retry_resp.status_code} — keeping original")
+                    except Exception as _retry_err:
+                        _new_paragraphs.append(_para)
+                        _style_retry_failures += 1
+                        print(f"  [LOCAL-192] Stop {_stop_num} para {_pi+1}: retry exception — keeping original: {_retry_err}")
+
+                # Reassemble description if any paragraph was retried
+                if _stop_had_retry:
+                    poi_list[_si]["description"] = '\n\n'.join(_new_paragraphs)
+                    total_tokens += _style_retry_tokens
+                    total_cost += _style_retry_cost
+
+            # Summary
+            print(f"  [LOCAL-192] Style retry summary: {_style_retry_count} paragraphs retried, "
+                  f"{_style_retry_successes} fixed/improved, {_style_retry_failures} kept original")
+            print(f"  [LOCAL-192] Retry cost: ${_style_retry_cost:.4f} ({_style_retry_tokens} tokens)")
+
     # -------- PHASE 5.5: post-description validation for museum tours --------
     # Fix 4 (Claude session 7): second validate_enhanced_poi_knowledge() call for ALL tour types.
     # At this point descriptions are populated — the fictional-content patterns now have text to match.
