@@ -153,31 +153,234 @@ def _is_style_navigation_sentence(sentence: str) -> bool:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # ─── R1: Imperatives aimed at the listener ──────────────────────────────────
-# Sentence-initial base-form verb with no subject.
-# Must be imperative form: "Feel the weight" fires, "Visitors notice" does NOT.
+# LOCAL-196: INVERTED DESIGN — detect sentence-initial base-form verb with no
+# subject (the grammatical form of an imperative), then subtract exemptions.
+#
+# Why inverted: English imperatives are OPEN-CLASS. A closed verb list (the old
+# design, 22 entries) will always miss the next verb. Exemptions are closed —
+# you can enumerate the small set of non-verb words that legitimately start
+# English sentences.
+#
+# TECHNIQUE: Morphological heuristics (no POS tagger dependency).
+#   1. Extract the first word (or multi-word phrase for known patterns).
+#   2. Reject if it matches a NON-VERB gate (determiners, pronouns, prepositions,
+#      conjunctions, known nouns/adjectives that commonly start sentences).
+#   3. Reject if the word has non-base-form morphology (-ed, -ing, -s/-es with
+#      exceptions for verbs that naturally end in -s like "pass").
+#   4. Reject if the word is capitalized AND the next word is also lowercase
+#      (heuristic: "Visitors notice…" — capitalized noun + verb).
+#   5. What remains is a sentence-initial base-form verb = imperative.
+#
+# FAILURE MODES:
+#   - False positives on rare nouns not in the exemption set that happen to
+#     look like verb base forms. Mitigated by the large exemption set.
+#   - False negatives on imperative multi-word phrases not in _R1_MULTI_WORD_VERBS.
+#     Mitigated by catching the first word alone in most cases.
+#   - Words ending in -ss (pass, cross) need explicit handling since the -s
+#     filter would incorrectly reject them.
 
-_R1_IMPERATIVE_VERBS = [
-    'pay attention to', 'look at', 'look for', 'notice', 'feel', 'imagine',
-    'explore', 'discover', 'consider', 'think about', 'observe',
-    'picture', 'envision', 'contemplate', 'reflect on', 'ponder',
-    'take a moment', 'take in', 'let yourself', 'allow yourself',
+# ── Multi-word imperative phrases (detected before single-word analysis) ────
+_R1_MULTI_WORD_VERBS = [
+    'pay attention to', 'look at', 'look for', 'look up', 'look around',
+    'think about', 'think of',
+    'take a moment', 'take in', 'take note',
+    'let yourself', 'let the', 'let this',
+    'allow yourself', 'allow the',
     'prepare to', 'prepare yourself',
+    'make your way', 'find your way',
+    'reflect on', 'reflect upon',
+    'keep in mind', 'bear in mind',
 ]
 
-# These verbs are route-movement verbs — when followed by directional content
-# they should NOT fire R1.
-_NAV_VERBS_R1_EXEMPT = {
-    'head', 'turn', 'walk', 'proceed', 'continue', 'cross', 'follow',
-    'make your way', 'find your way', 'go', 'move', 'step', 'exit',
-    'enter', 'approach', 'navigate', 'pass',
+# ── Route-movement verbs — exempt ONLY when followed by directional content ─
+# LOCAL-196 FIX: The old design exempted these unconditionally. "Turn your
+# attention" is NOT navigation. Now require directional words after the verb.
+_NAV_VERBS_R1 = {
+    'head', 'walk', 'proceed', 'continue', 'cross', 'follow',
+    'go', 'move', 'step', 'exit', 'enter', 'approach', 'navigate', 'pass',
+    'turn',  # only exempt with directional content
 }
 
-# Directional / spatial words that indicate navigation context
+# Directional / spatial words that confirm navigation context
 _DIRECTIONAL_WORDS = {
     'left', 'right', 'straight', 'ahead', 'forward', 'north', 'south',
     'east', 'west', 'towards', 'toward', 'along', 'past', 'down', 'up',
     'through', 'across', 'around', 'back', 'onto', 'into',
 }
+
+# ── NON-VERB GATE: words that start sentences but are NOT imperative verbs ──
+# This is the EXEMPTION list — the thing that needs enumerating.
+_R1_NON_VERB_STARTERS = {
+    # Determiners / articles
+    'the', 'a', 'an', 'this', 'that', 'these', 'those', 'each', 'every',
+    'some', 'any', 'all', 'both', 'few', 'many', 'much', 'most', 'no',
+    'several', 'such', 'either', 'neither',
+    # Pronouns
+    'i', 'you', 'he', 'she', 'it', 'we', 'they', 'one', 'who', 'what',
+    'which', 'whom', 'whose', 'there', 'here', 'everyone', 'someone',
+    'anyone', 'nobody', 'nothing', 'something', 'everything', 'whoever',
+    'its', 'his', 'her', 'their', 'our', 'my', 'your',
+    # Prepositions starting adverbial phrases
+    'in', 'on', 'at', 'by', 'for', 'with', 'from', 'to', 'of', 'about',
+    'after', 'before', 'during', 'between', 'among', 'through', 'above',
+    'below', 'under', 'over', 'behind', 'beside', 'beyond', 'within',
+    'without', 'throughout', 'beneath', 'upon', 'against', 'along',
+    'inside', 'outside', 'despite', 'unlike', 'near', 'across',
+    'amidst', 'amid', 'amongst', 'atop', 'versus',
+    # Conjunctions / connectors
+    'and', 'but', 'or', 'nor', 'so', 'yet', 'although', 'because',
+    'since', 'while', 'whereas', 'unless', 'until', 'though', 'however',
+    'moreover', 'furthermore', 'meanwhile', 'nevertheless', 'otherwise',
+    'therefore', 'thus', 'hence', 'accordingly', 'consequently',
+    'additionally', 'alternatively', 'conversely', 'similarly',
+    # Interrogatives (handled by R2, not R1)
+    'how', 'why', 'where', 'when', 'whether',
+    # Adverbs that commonly start sentences
+    'today', 'now', 'then', 'once', 'soon', 'already', 'still', 'just',
+    'also', 'only', 'even', 'never', 'always', 'often', 'perhaps',
+    'certainly', 'clearly', 'obviously', 'apparently', 'unfortunately',
+    'remarkably', 'interestingly', 'historically', 'originally',
+    'eventually', 'finally', 'initially', 'subsequently', 'recently',
+    'formerly', 'previously', 'currently', 'notably', 'importantly',
+    'significantly', 'essentially', 'fundamentally', 'traditionally',
+    'typically', 'generally', 'specifically', 'particularly', 'especially',
+    # Time words
+    'yesterday', 'tomorrow', 'later', 'earlier', 'annually', 'daily',
+    # Common sentence-initial nouns/adjectives that look like verbs
+    # (This is the set that prevents false positives on derived forms)
+    'visitors', 'explorers', 'travelers', 'travellers', 'observers',
+    'pilgrims', 'tourists', 'locals', 'residents', 'architects',
+    'artists', 'builders', 'craftsmen', 'designers', 'engineers',
+    'historians', 'merchants', 'monks', 'painters', 'scholars',
+    'sculptors', 'settlers', 'soldiers', 'traders', 'workers',
+    'walking', 'running', 'swimming', 'cycling', 'hiking',
+    'located', 'built', 'designed', 'constructed', 'established',
+    'founded', 'created', 'completed', 'opened', 'dedicated',
+    'commissioned', 'renovated', 'restored', 'demolished', 'abandoned',
+    'surrounded', 'situated', 'nestled', 'perched', 'overlooking',
+    # Adjectives
+    'ancient', 'modern', 'old', 'new', 'great', 'small', 'large',
+    'beautiful', 'stunning', 'impressive', 'magnificent', 'grand',
+    'famous', 'renowned', 'notable', 'prominent', 'significant',
+    'original', 'unique', 'distinctive', 'remarkable', 'extraordinary',
+    'local', 'national', 'international', 'royal', 'imperial',
+    'medieval', 'gothic', 'baroque', 'classical', 'contemporary',
+    'bold', 'bright', 'dark', 'tall', 'vast', 'wide', 'long', 'deep',
+    'rich', 'rare', 'fine', 'pure', 'plain', 'stark', 'sheer',
+    # Nouns commonly starting tour sentences
+    'construction', 'renovation', 'restoration', 'completion',
+    'establishment', 'foundation', 'discovery', 'exploration',
+    'art', 'architecture', 'history', 'culture', 'music', 'nature',
+    'stone', 'marble', 'glass', 'iron', 'bronze', 'gold', 'silver',
+    'water', 'light', 'color', 'colour', 'space', 'time',
+    'people', 'men', 'women', 'children', 'families', 'generations',
+    'years', 'centuries', 'decades', 'days',
+    # Number words
+    'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+    'hundred', 'thousand', 'million',
+    # Proper-noun-like starters (will also be caught by capitalization heuristic)
+    'french', 'italian', 'spanish', 'english', 'german', 'roman',
+    'greek', 'european', 'mediterranean', 'african', 'asian',
+}
+
+# ── Words that end in -s/-es but ARE valid base-form verbs ──────────────────
+# (Not 3rd-person singular — they genuinely end in -ss, -us, etc.)
+_BASE_FORM_DESPITE_S = {
+    'pass', 'cross', 'toss', 'miss', 'kiss', 'press', 'stress', 'address',
+    'assess', 'access', 'process', 'express', 'focus', 'plus', 'bus',
+    'witness', 'harness', 'bypass',
+}
+
+# ── Words ending in nominalization suffixes that ARE valid verbs ─────────────
+# These would otherwise be rejected by the suffix filter.
+_VERB_DESPITE_SUFFIX = {
+    'position', 'mention', 'question', 'station', 'fashion', 'function',
+    'motion', 'section', 'auction', 'portion', 'ration', 'sanction',
+    'petition', 'commission', 'condition', 'audition', 'transition',
+    'imagine', 'determine', 'examine', 'combine', 'decline', 'define',
+    'discipline', 'undermine', 'outline', 'confine',
+    'marvel', 'travel', 'channel', 'model', 'level', 'label',
+    'total', 'signal', 'rival', 'spiral',
+    'experience', 'reference', 'sentence', 'silence', 'balance', 'influence',
+    'note', 'practice', 'notice', 'place', 'trace', 'embrace', 'face',
+    'surface', 'replace', 'advance',
+    'involve', 'resolve', 'dissolve', 'evolve',
+    'sample', 'tremble', 'tumble', 'stumble', 'fumble', 'humble',
+    'savor', 'savour', 'favour', 'favor', 'honour', 'honor',
+}
+
+# ── Suffixes that indicate NON-base-form (past, progressive, 3rd person) ────
+_NON_BASE_SUFFIXES = re.compile(
+    r'(?:'
+    r'ed$|'          # past tense / past participle
+    r'ing$|'         # present participle / gerund
+    r'tion$|'        # nominalization (construction, restoration)
+    r'ment$|'        # nominalization (establishment, movement)
+    r'ness$|'        # nominalization (darkness, awareness)
+    r'ity$|'         # nominalization (acity, university)
+    r'ance$|ence$|'  # nominalization (distance, presence)
+    r'ism$|'         # nominalization (modernism)
+    r'ist$|'         # agent noun (artist, tourist)
+    r'ous$|'         # adjective (famous, gorgeous)
+    r'ful$|'         # adjective (beautiful, powerful)
+    r'ive$|'         # adjective (impressive, massive)
+    r'ble$|'         # adjective (remarkable, notable)
+    r'al$|'          # adjective (original, medieval)
+    r'ial$|'         # adjective (imperial, commercial)
+    r'ical$|'        # adjective (historical, classical)
+    r'ary$|'         # adjective (ordinary, legendary)
+    r'ly$'           # adverb (recently, remarkably)
+    r')',
+    re.IGNORECASE
+)
+
+# ── Words ending in -s that are likely 3rd-person (NOT base form) ───────────
+def _looks_like_third_person_s(word: str) -> bool:
+    """Heuristic: word ends in -s/-es and is likely 3rd-person singular.
+
+    Returns True for "stands", "remains", "features" etc.
+    Returns False for "pass", "cross" (genuine base forms ending in -ss).
+    """
+    lower = word.lower()
+    if lower in _BASE_FORM_DESPITE_S:
+        return False
+    # Words ending in -ss are base forms (pass, cross, toss)
+    if lower.endswith('ss'):
+        return False
+    # Words ending in -s (but not -ss) after a consonant or vowel+consonant
+    # are likely 3rd person: "stands", "remains", "features", "rises"
+    if lower.endswith('s') and len(lower) > 3:
+        return True
+    return False
+
+
+def _is_likely_noun_subject(sentence: str) -> bool:
+    """Heuristic: Does the sentence start with a noun phrase (subject)?
+
+    Catches: "Visitors notice…", "The building stands…", "Walking tours began…"
+    Pattern: Capitalized word followed by a lowercase verb-like word.
+
+    Key insight: In English, a capitalized word at sentence start followed by
+    a lowercase word is almost always Noun + Verb (declarative), not an
+    imperative. Imperatives start with the verb directly.
+
+    But we must NOT reject single-word-start sentences like "Stand at the entrance"
+    — "Stand" is capitalized only because it's sentence-initial.
+    """
+    words = sentence.split()
+    if len(words) < 2:
+        return False
+
+    first = words[0]
+    # If the first word ends in -s/-ers/-ors/-ants/-ents — likely a plural noun
+    lower_first = first.lower()
+    if re.match(r'.*(?:ers|ors|ants|ents|ists|ians|ites|ives|ures)$', lower_first):
+        return True
+    # "Discoveries", "Observations" etc — nominalized plurals
+    if re.match(r'.*(?:tions|ments|nesses|ities|ances|ences|isms)$', lower_first):
+        return True
+
+    return False
 
 
 def _split_sentences(text: str) -> List[str]:
@@ -212,40 +415,128 @@ def _is_navigation_sentence(sentence: str) -> bool:
 def check_r1_imperatives(sentence: str) -> List[Dict]:
     """R1: Detect sentence-initial imperatives aimed at the listener.
 
+    LOCAL-196 INVERTED DESIGN: Detects ANY sentence-initial base-form verb
+    with no subject, then subtracts exemptions. Imperatives are open-class;
+    the exemption list is the closed, enumerable part.
+
     Fires when:
-    - Sentence starts with a base-form verb from the list
+    - Sentence starts with a base-form verb (morphological heuristic)
     - No explicit subject before the verb (imperative form)
+    - Not a navigation sentence (route verb + directional content)
 
     Does NOT fire when:
-    - Third person: "Visitors notice the asymmetry"
-    - Navigation: "Head south on Promenade de la Croisette"
+    - Starts with a known non-verb (determiner, pronoun, preposition, etc.)
+    - Word has non-base-form morphology (-ed, -ing, -tion, -ness, etc.)
+    - Likely 3rd person (-s ending): "Visitors notice the asymmetry"
+    - Navigation: "Head south", "Turn left at the fountain"
+    - Starts with a plural/agent noun: "Explorers arrived in 1890"
     """
     findings = []
     stripped = sentence.strip()
     if not stripped:
         return findings
 
-    # Navigation exemption at sentence level
+    # Navigation exemption at sentence level (existing check)
     if _is_navigation_sentence(stripped):
         return findings
 
     lower = stripped.lower()
+    words = lower.split()
+    if not words:
+        return findings
 
-    for verb in _R1_IMPERATIVE_VERBS:
-        # Word-boundary match: "explore" must not match "Explorers" or "Explored"
-        # Use re.match with \b at the end of the verb phrase to enforce this.
-        if re.match(rf'{re.escape(verb)}\b', lower):
-            # Verify it's imperative (no subject before verb)
-            # If the sentence starts directly with the verb, it's imperative
-            # "Feel the weight" → imperative
-            # "You feel the weight" → R4 (not R1)
-            findings.append({
-                'rule_id': 'R1_IMPERATIVE',
-                'severity': 'error',
-                'sentence': stripped,
-                'suggestion': f'Rewrite as declarative statement. Remove the imperative "{verb}" and state the fact directly.',
-            })
-            break  # Only one R1 finding per sentence
+    # ── Step 1: Check multi-word imperative phrases first ──
+    matched_verb = None
+    for phrase in _R1_MULTI_WORD_VERBS:
+        if re.match(rf'{re.escape(phrase)}\b', lower):
+            matched_verb = phrase
+            break
+
+    if not matched_verb:
+        # ── Step 2: Single-word analysis ──
+        first_word = words[0]
+
+        # Strip leading punctuation (quotes, em-dash)
+        first_word = re.sub(r'^["\'\u201c\u201d\u2018\u2019\u2014\u2013—–-]+', '', first_word)
+        if not first_word:
+            return findings
+
+        # Gate A: Known non-verb starters
+        if first_word in _R1_NON_VERB_STARTERS:
+            return findings
+
+        # Gate B: Non-base-form morphology (but allow known verb exceptions)
+        if first_word not in _VERB_DESPITE_SUFFIX and _NON_BASE_SUFFIXES.search(first_word):
+            return findings
+
+        # Gate C: Third-person -s (but not -ss base forms like "pass", "cross")
+        if _looks_like_third_person_s(first_word):
+            return findings
+
+        # Gate D: Likely noun subject (plural agent nouns, nominalizations)
+        if _is_likely_noun_subject(stripped):
+            return findings
+
+        # Gate D2: Proper noun heuristic — if the word after the first is
+        # a possessive ('s), a proper noun (capitalized), a comma, or a
+        # preposition introducing an appositive, the first word is likely a
+        # proper noun subject, not an imperative verb.
+        if len(words) > 1:
+            second_word = stripped.split()[1] if len(stripped.split()) > 1 else ''
+            # Possessive: "Klein's", "Niki's", "Saint Phalle's"
+            if second_word.endswith("'s") or second_word.endswith("\u2019s"):
+                return findings
+            # Comma after first word: "Klein, a pioneer..." (appositive)
+            first_token = stripped.split()[0]
+            if first_token.endswith(','):
+                return findings
+            # Second word is capitalized (proper noun continuation): "Saint Phalle"
+            # But only if it's NOT a quoted/titled work (those start with quotes)
+            if len(second_word) > 1 and second_word[0].isupper() and not stripped.startswith('"'):
+                return findings
+            # Foreign name particles: "Niki de Saint Phalle", "Ludwig van Beethoven"
+            _NAME_PARTICLES = {'de', 'von', 'van', 'di', 'del', 'la', 'le', 'les',
+                               'des', 'du', 'da', 'das', 'den', 'der', 'het', 'el'}
+            if second_word.lower() in _NAME_PARTICLES:
+                return findings
+
+        # Gate D3: Quoted content at sentence start (artwork titles, etc.)
+        if stripped.startswith('"') or stripped.startswith('\u201c') or stripped.startswith("'"):
+            return findings
+
+        # Gate E: Navigation verbs — exempt ONLY with directional content
+        if first_word in _NAV_VERBS_R1:
+            # Check if followed by directional word
+            rest_words = words[1:] if len(words) > 1 else []
+            # Look at the first meaningful word after the verb
+            for w in rest_words[:3]:  # Check first 3 words after verb
+                clean_w = re.sub(r'[^a-z]', '', w)
+                if clean_w in _DIRECTIONAL_WORDS:
+                    return findings  # Genuine navigation — exempt
+            # NOT followed by directional content → this IS an imperative
+            # e.g., "Turn your attention to…" — fires R1
+            matched_verb = first_word
+
+        # Gate F: Very short words (1-2 chars) are unlikely imperatives
+        if len(first_word) <= 2:
+            return findings
+
+        # Gate G: Words starting with a capital in the original that could be
+        # proper nouns — but ALL sentence-initial words are capitalized, so
+        # we can't use this as a gate. Instead we rely on gates A-E.
+
+        # If we passed all gates, this is a candidate imperative
+        if not matched_verb:
+            matched_verb = first_word
+
+    # Final confirmation: we have a matched verb
+    if matched_verb:
+        findings.append({
+            'rule_id': 'R1_IMPERATIVE',
+            'severity': 'error',
+            'sentence': stripped,
+            'suggestion': f'Rewrite as declarative statement. Remove the imperative "{matched_verb}" and state the fact directly.',
+        })
 
     return findings
 
