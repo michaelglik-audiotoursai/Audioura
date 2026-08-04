@@ -1970,3 +1970,55 @@ Dropping or re-scoping a unique index on live production data is not an
 additive change, and `audio_tours` is the table that lost Michael's tour 29
 once already. It needs its own task with a backup and a stated rollback,
 not a quick `DROP INDEX`.
+
+---
+
+## D60 — Style validator: agreed scope (Michael, 2026-08-03)
+
+ClickUp `wdvrdaxaqj`, from Michael's field-test listener: tour narration
+should carry no instructions, questions, or prescribed feelings. His
+example, all three faults in one paragraph:
+
+> "As you stand in the presence of the Statue de Bouddha, **feel the weight
+> of centuries pressing down upon you**… **How does this serenity manifest
+> itself…?** **Explore further and uncover** the interconnectedness of human
+> spirituality across time and space."
+
+LEAD proposed three refinements to his specification. Michael:
+*"I agree on all your points."* They are now binding on LOCAL-184.
+
+### 1. Navigation is exempt — this one matters most
+
+A cycling tour must say *"Head south on Promenade de la Croisette."* That is
+a second-person imperative and it is **correct**; tour 152 opens with it.
+Rule R1 as originally specified fails every direction we give.
+
+The validator reuses `is_navigation_paragraph` from the anchor detector
+rather than defining wayfinding twice — two definitions would drift, and the
+consequence of drift here is a tour that cannot tell the rider where to go.
+
+### 2. `?` is the hard rule; interrogative openers are only a warning
+
+The proposed regex `^(How|What|Why|Where|When|Who|Is|Are|Does)` matches
+ordinary declaratives:
+
+- "**What** began as a fishing village became the busiest yacht harbour…"
+- "**When** the museum opened in 1963, Chagall attended in person."
+
+Likewise R1 must require imperative *form*, not a prefix match — *"Visitors
+notice the asymmetry"* is fine.
+
+### 3. His Task 5 is the anchor detector, already built
+
+*"Every abstract claim must be grounded with because + a specific attribute
+of THIS POI"* is the same requirement as ClickUp `wdvrdaxa7h`, implemented
+as `ANCHORED` / `NO_ANCHOR` / `UNLINKED_ENTITY`. One validator, two rule
+families — **form** (R1–R4, deterministic, no cost) and **substance** (the
+anchor gate). Not two systems that can disagree.
+
+### And no rewriting in the same pass
+
+R1–R4 have safe mechanical fixes: *"How does this serenity manifest?"* →
+*"…this serenity manifests…"* is grammar. R5 has none — supplying the
+"because" needs a grounded fact. Asking a model for it invites exactly the
+fabrication D50 forbids, so that branch goes through corpus-then-search.
