@@ -68,3 +68,20 @@ fi
 # MAX_CONCURRENT bounds the worker count. Safe to run every 5 minutes.
 /usr/bin/python3 "$REPO/kiro_dispatcher.py" >> "$LOG" 2>&1
 echo "$(date -u +%FT%TZ) | tick complete (unpushed=$UNPUSHED)" >> "$LOG"
+
+# --- Secret scan of the pushed tip (LOCAL-207 / D81). ---
+# Two live credentials sat on origin for months because nothing looked. This
+# scans the last 20 commits each tick and alarms; it does not block.
+if [ -f "$REPO/secret_scan.py" ]; then
+  /usr/bin/python3 "$REPO/secret_scan.py" --range "origin/storied~20..origin/storied" >/tmp/secret_tick.out 2>&1
+  # The scanner's own docs and tests carry invented fixtures by design; a
+  # standing alarm on them would train us to ignore this line. Filter them out
+  # and alarm only on what is left.
+  REAL=$(grep -E "^\s+\[" /tmp/secret_tick.out \
+         | grep -v "SUBMISSION_LOCAL-207.md" \
+         | grep -v "tests/test_secret_scan.py" \
+         | grep -v "secret_scan.py" | wc -l | tr -d " ")
+  if [ "$REAL" != "0" ]; then
+    echo "$(date -u +%FT%TZ) | *** SECRET DETECTED in recent storied commits ($REAL finding/s) — see /tmp/secret_tick.out ***" >> "$CD/ALERTS.md"
+  fi
+fi
