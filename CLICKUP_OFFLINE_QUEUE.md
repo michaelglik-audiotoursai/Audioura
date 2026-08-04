@@ -3202,3 +3202,48 @@ both store listings (which `wdvrdaw6em`/`wdvrdaw6en` need anyway).
 **Separate from** the privacy policy (`wdvrdaw6em`), which is about data
 handling and is required by both stores. This one is about content accuracy and
 is required by nobody — we do it because it is honest.
+
+---
+
+## QUEUED 2026-08-04 — ClickUp still rate-limited (77 min). Post to 👤 Michael (`1000410000000735`).
+
+**Task name:** 🔑 GitHub PAT expiring ~Aug 7 — it is NOT the one this Mac uses. Let it expire.
+**Priority:** normal
+
+### Is it phishing?
+Form is right (`noreply@github.com`, real URL pattern) but form is what phishing
+copies. Verify the way that works regardless: **do not click the link** — type
+`github.com`, avatar → Settings → Developer settings → Personal access tokens →
+Tokens (classic). If "Ubuntu VM Token" is there expiring ~7 Aug, it was real.
+
+### It is not this machine's token — verified
+| | expiring token (email) | Mac Mini's token |
+|---|---|---|
+| scopes | 11, incl. repo, read:org, read:audit_log, codespace:secrets | **repo only** |
+| expiry | ~7 Aug | **none set** |
+
+Different tokens. Letting it expire breaks nothing here.
+
+### Recommendation: let it expire, do not regenerate
+1. Nothing here uses it; there is no Ubuntu VM in the current setup.
+2. Broad scopes — `repo` is full read/write to every repository.
+3. **Expiry is a free test.** If something forgotten uses it, that breaks
+   visibly ~7 Aug and a new token takes two minutes. Regenerating keeps an
+   unaccounted-for credential alive another year and tests nothing.
+
+Decisive option: delete it on that page now.
+
+### Separate finding: this Mac stores its token in plaintext
+```
+git config credential.helper → store
+~/.git-credentials           → https://user:ghp_xxxx@github.com
+```
+Keychain helper is already installed and a github.com keychain entry exists.
+Fix is `git config --global credential.helper osxkeychain` then
+`rm ~/.git-credentials`; next push prompts once.
+
+**LEAD will not do this unattended** — if it half-fails the dispatcher's pushes
+break. Needs Michael present, with the token to hand for the one prompt.
+
+Also: the Mac's token has **no expiry**. Put a 12-month expiry on its
+replacement.
