@@ -4665,6 +4665,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     _diversity_adjusted_selections = {}  # [LOCAL-37] poi_name → diversity-adjusted element selection
     _stop_corpus_data = {}  # [LOCAL-183] poi_name → {passages, sources} from stop_corpus table
     _corpus_gate_shortened_stops = set()  # [LOCAL-198] Stops flagged for venue-only narration
+    _corpus_gate_creator_only_stops = set()  # [LOCAL-203] Stops with only creator-role passages
     _corpus_gate_log = []  # [LOCAL-198] Per-stop gate decisions
     _thread_result = None  # [LOCAL-186] Initialize before storied block so closure doesn't NameError
     if _storied_mode:
@@ -4930,7 +4931,12 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         _sc_data = _stop_corpus_data.get(_poi_name)
                         if _sc_data and _sc_data.get('passages'):
                             _passages_text = _sc_data['passages']
-                            _assessment = assess_stop_coverage(_poi_name, _venue_name, _passages_text)
+                            # [LOCAL-203] Pass passage_roles for role-aware verdicts
+                            _passage_roles = _sc_data.get('passage_roles')
+                            _assessment = assess_stop_coverage(
+                                _poi_name, _venue_name, _passages_text,
+                                passage_roles=_passage_roles
+                            )
                         else:
                             _assessment = {'verdict': 'EMPTY', 'content_words': [], 'subject_match_words': []}
                         
@@ -4938,6 +4944,15 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             _corpus_gate_log.append({
                                 'stop': _poi_name, 'verdict': 'COVERED', 'action': 'PASSED'
                             })
+                        elif _assessment['verdict'] == 'CREATOR_ONLY':
+                            # [LOCAL-203] CREATOR_ONLY: narration may discuss the maker
+                            # but must not describe the object itself.
+                            _corpus_gate_creator_only_stops.add(_poi_name)
+                            _corpus_gate_log.append({
+                                'stop': _poi_name, 'verdict': 'CREATOR_ONLY', 'action': 'CREATOR_RESTRICTED'
+                            })
+                            print(f"  [CORPUS-GATE] stop='{_poi_name}' "
+                                  f"verdict=CREATOR_ONLY action=CREATOR_RESTRICTED")
                         else:
                             # VENUE_ONLY or EMPTY — shorten narration
                             _corpus_gate_shortened_stops.add(_poi_name)
@@ -4949,8 +4964,9 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                                   f"verdict={_assessment['verdict']} action={_action}")
                     
                     _passed = sum(1 for g in _corpus_gate_log if g['action'] == 'PASSED')
+                    _creator_only = sum(1 for g in _corpus_gate_log if g['action'] == 'CREATOR_RESTRICTED')
                     _shortened = sum(1 for g in _corpus_gate_log if g['action'] == 'SHORTENED')
-                    print(f"  [LOCAL-198] Corpus gate: {_passed} PASSED, {_shortened} SHORTENED")
+                    print(f"  [LOCAL-198] Corpus gate: {_passed} PASSED, {_creator_only} CREATOR_ONLY, {_shortened} SHORTENED")
                 except ImportError:
                     print(f"  [LOCAL-198] Corpus gate: module not importable — gate DISABLED")
                 except Exception as _gate_err:
@@ -5806,6 +5822,26 @@ YOU MAY ONLY:
 - Acknowledge that detailed information about this specific work is limited
 
 Write 80-100 words maximum. This is a venue-grounded placeholder, not a full stop narration.
+"""
+        # [LOCAL-203] CORPUS GATE: CREATOR_ONLY — may discuss the maker, must not describe the object.
+        elif hasattr(poi_name, '__hash__') and poi_name in _corpus_gate_creator_only_stops:
+            description_prompt += f"""
+CORPUS GATE: CREATOR_ONLY (D75 enforcement — LOCAL-203):
+The corpus for this stop contains information about the MAKER/ARTIST of "{poi_name}",
+but does NOT contain verified information about the specific object/artwork itself.
+
+YOU MAY:
+- Discuss the artist's or maker's biography, career, and significance
+- Mention their techniques, style, and historical context — IF stated in the passages
+- Note that this maker created the work at this stop
+
+YOU MUST NOT:
+- Describe the object's appearance, dimensions, materials, or condition
+- Claim what the visitor will see at this specific stop
+- Invent details about the physical work from your training data
+- State facts about the object that are not in the provided passages
+
+Ground all claims about the maker in the passages provided. Do not describe the object.
 """
 
         # [LOCAL-183] Inject per-stop corpus passages with provenance and grounding rule.

@@ -76,8 +76,17 @@ def assess_stop_coverage(
     stop_title: str,
     venue_name: str,
     passages: List[str],
+    passage_roles: Optional[List[Dict]] = None,
 ) -> Dict:
     """Assess whether a stop's corpus actually covers its subject.
+
+    Args:
+        stop_title: The stop/POI title.
+        venue_name: The venue name.
+        passages: List of passage text strings.
+        passage_roles: Optional list of role dicts (parallel to passages).
+            Each dict has 'role': 'about_subject'|'about_creator'|'about_venue'|None.
+            When provided, enables role-aware verdicts (LOCAL-203).
 
     Returns:
         {
@@ -86,7 +95,10 @@ def assess_stop_coverage(
             'subject_in_passages': bool,
             'subject_match_words': list of which content words matched,
             'venue_only_count': int (passages mentioning venue but not stop),
-            'verdict': 'COVERED' | 'VENUE_ONLY' | 'EMPTY',
+            'verdict': 'COVERED' | 'CREATOR_ONLY' | 'VENUE_ONLY' | 'EMPTY',
+            'has_subject_role': bool (True if any passage is about_subject),
+            'has_creator_role': bool (True if any passage is about_creator),
+            'has_venue_role': bool (True if any passage is about_venue),
         }
     """
     if not passages:
@@ -98,6 +110,9 @@ def assess_stop_coverage(
             'subject_match_words': [],
             'venue_only_count': 0,
             'verdict': 'EMPTY',
+            'has_subject_role': False,
+            'has_creator_role': False,
+            'has_venue_role': False,
         }
 
     content_words = extract_content_words(stop_title, venue_name)
@@ -125,19 +140,50 @@ def assess_stop_coverage(
         if p_has_venue and not p_has_stop:
             venue_only_count += 1
 
-    # Verdict
-    if subject_in_passages:
-        verdict = 'COVERED'
-    elif len(passages) > 0:
-        verdict = 'VENUE_ONLY'
-    else:
-        verdict = 'EMPTY'
+    # --- Role-aware verdict (LOCAL-203) ---
+    has_subject_role = False
+    has_creator_role = False
+    has_venue_role = False
 
-    # Special case: if no content words could be extracted (title is all short words
-    # or all venue words), we can't determine coverage → mark as VENUE_ONLY
-    # because we can't confirm the passages are about this specific stop.
-    if not content_words and passages:
-        verdict = 'VENUE_ONLY'
+    if passage_roles:
+        for r in passage_roles:
+            if isinstance(r, dict):
+                role = r.get('role')
+            else:
+                role = r
+            if role == 'about_subject':
+                has_subject_role = True
+            elif role == 'about_creator':
+                has_creator_role = True
+            elif role == 'about_venue':
+                has_venue_role = True
+
+    # Determine verdict
+    if passage_roles:
+        # Role-aware path (LOCAL-203): verdict is based on what roles are present
+        if has_subject_role:
+            verdict = 'COVERED'
+        elif has_creator_role:
+            verdict = 'CREATOR_ONLY'
+        elif has_venue_role:
+            verdict = 'VENUE_ONLY'
+        else:
+            # Has passages but none with a valid role — treat as VENUE_ONLY
+            verdict = 'VENUE_ONLY' if passages else 'EMPTY'
+    else:
+        # Legacy path (no roles available): original word-match logic
+        if subject_in_passages:
+            verdict = 'COVERED'
+        elif len(passages) > 0:
+            verdict = 'VENUE_ONLY'
+        else:
+            verdict = 'EMPTY'
+
+        # Special case: if no content words could be extracted (title is all short words
+        # or all venue words), we can't determine coverage → mark as VENUE_ONLY
+        # because we can't confirm the passages are about this specific stop.
+        if not content_words and passages:
+            verdict = 'VENUE_ONLY'
 
     return {
         'passage_count': len(passages),
@@ -146,6 +192,9 @@ def assess_stop_coverage(
         'subject_match_words': matched_words,
         'venue_only_count': venue_only_count,
         'verdict': verdict,
+        'has_subject_role': has_subject_role,
+        'has_creator_role': has_creator_role,
+        'has_venue_role': has_venue_role,
     }
 
 
