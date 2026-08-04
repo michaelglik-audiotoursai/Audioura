@@ -803,37 +803,149 @@ def _check_contradiction(
 
     Only for DATE/NUMBER claims where we can check the specific value.
     Returns contradicting evidence or None.
+
+    SAME-SUBJECT REQUIREMENT (LOCAL-218): Two claims conflict only when they
+    are about the same entity or event. "The chapel was built in 1432" does
+    not conflict with "The museum opened in 1990" — different subjects. We
+    require that the claim and passage share subject-anchoring tokens: words
+    that identify WHAT is being dated/measured, not just generic context.
+
+    If no subject match is found, the verdict is UNSUPPORTED, not
+    CONTRADICTED — under-claiming is safer than crying wolf on our gravest
+    verdict.
     """
     if claim['type'] not in ('DATE', 'NUMBER'):
         return None
 
     claim_text = claim['text']
+    # Extract the sentence context (more reliable for subject extraction)
+    sentence = claim.get('sentence', claim_text)
+
     numbers_in_claim = re.findall(r'\d+', claim_text)
     if not numbers_in_claim:
         return None
 
-    # Get non-numeric context words from the claim
-    context_words = [t for t in _tokenize(claim_text) if not t.isdigit()]
-    if not context_words:
+    # ─── Subject extraction ──────────────────────────────────────────────
+    # We need tokens that identify the ENTITY being dated/measured.
+    # Strategy: extract all non-numeric, non-stopword tokens from the
+    # SENTENCE (not just the claim text annotation), then require a
+    # meaningful overlap with the passage.
+
+    # Very generic words that appear in most sentences but don't identify
+    # a subject. Kept deliberately tight — we'd rather let a borderline
+    # subject through than block a legitimate contradiction.
+    _subj_stopwords = {
+        'the', 'a', 'an', 'is', 'was', 'are', 'were', 'has', 'had', 'have',
+        'of', 'in', 'on', 'at', 'to', 'for', 'by', 'with', 'from', 'as',
+        'it', 'its', 'this', 'that', 'and', 'or', 'but', 'not', 'be', 'been',
+        'which', 'who', 'their', 'they', 'you', 'your', 'his', 'her', 'our',
+        'when', 'where', 'how', 'what', 'than', 'then', 'there', 'here',
+        'also', 'just', 'very', 'more', 'most', 'some', 'all', 'each',
+        'back', 'mid', 'early', 'late', 'first', 'last', 'new', 'old',
+        'context', 'about', 'around', 'during', 'after', 'before',
+        # Common verbs — these describe actions, not subjects
+        'opened', 'built', 'created', 'founded', 'established', 'designed',
+        'made', 'constructed', 'named', 'called', 'known', 'became',
+        'presented', 'located', 'situated', 'dates', 'dedicated',
+        'inaugurated', 'completed', 'started', 'began', 'finished',
+        'housed', 'contains', 'features', 'includes', 'offers',
+        'between', 'over', 'more', 'than', 'nearly', 'almost',
+    }
+
+    # Month names — these are capitalized but not entity-identifying
+    _month_names = {
+        'january', 'february', 'march', 'april', 'may', 'june',
+        'july', 'august', 'september', 'october', 'november', 'december',
+        'jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug', 'sep', 'oct',
+        'nov', 'dec', 'janvier', 'fevrier', 'mars', 'avril', 'mai',
+        'juin', 'juillet', 'aout', 'septembre', 'octobre', 'novembre',
+        'decembre',
+    }
+
+    sentence_tokens = set(_tokenize(sentence))
+    # Subject tokens: non-stopword, non-numeric, non-month, length >= 4
+    claim_subject = {
+        t for t in sentence_tokens
+        if t not in _subj_stopwords and len(t) >= 4 and not t.isdigit()
+        and t not in _month_names
+    }
+
+    if not claim_subject:
         return None
 
+    # Also extract proper nouns from the original sentence (stronger signal)
+    # Matches: Title Case words AND ALL-CAPS acronyms (MAMAC, UNESCO, etc.)
+    proper_nouns = set()
+    for m in re.finditer(r'\b([A-Z][a-zÀ-ÿ]{2,}|[A-Z]{3,})\b', sentence):
+        word = m.group(1)
+        # Skip sentence-initial capitalization ONLY for Title Case words.
+        # ALL-CAPS words (acronyms) are proper nouns regardless of position.
+        if m.start() == 0 and not word.isupper():
+            continue
+        wl = word.lower()
+        if wl not in _month_names:
+            proper_nouns.add(wl)
+
     for passage in passages:
-        passage_tokens = _tokenize(passage)
-        # Check if passage discusses the same topic but with different numbers
-        context_overlap = sum(1 for w in context_words if w in passage_tokens)
-        if context_overlap >= max(1, len(context_words) * 0.4):
-            # Same topic — check if numbers differ
-            passage_numbers = re.findall(r'\d+', passage)
-            for cn in numbers_in_claim:
-                if cn not in passage_numbers and len(cn) >= 3:
-                    # The passage discusses the same thing but has different numbers
-                    # Find the relevant chunk
-                    for cw in context_words:
-                        idx = _normalize(passage).find(cw)
-                        if idx >= 0:
-                            start = max(0, idx - 30)
-                            end = min(len(passage), idx + 100)
-                            return passage[start:end].strip()
+        passage_tokens_set = set(_tokenize(passage))
+
+        # ─── Same-subject check ──────────────────────────────────────────
+        # Count how many subject tokens from the claim appear in the passage.
+        # Require: (proper noun match) OR (≥50% of claim subjects overlap
+        # AND at least 2 overlapping subject tokens).
+        #
+        # This is strict enough to block "chapel" vs "museum" (they share
+        # no subject tokens) while allowing "The museum opened in 1890" vs
+        # "The museum opened on 21 June 1990" (they share "museum", "opened",
+        # and possibly "nice").
+
+        proper_overlap = proper_nouns & passage_tokens_set
+        subject_overlap = claim_subject & passage_tokens_set
+
+        # Subject match conditions (ANY of these):
+        # 1. At least one proper noun matches
+        # 2. At least 2 subject tokens overlap AND they cover ≥50% of claim subjects
+        has_subject_match = False
+        if proper_overlap:
+            has_subject_match = True
+        elif len(subject_overlap) >= 2 and len(subject_overlap) / len(claim_subject) >= 0.5:
+            has_subject_match = True
+
+        if not has_subject_match:
+            continue
+
+        # ─── Number conflict check ───────────────────────────────────────
+        # Same subject established — now check if numbers differ.
+        # CRITICAL: The passage must contain at least one 3+ digit number
+        # of its own. A passage that mentions the subject but has NO numbers
+        # is just silent on the date/quantity — that's UNSUPPORTED, not
+        # CONTRADICTED. A contradiction requires a competing value.
+        passage_numbers = set(re.findall(r'\d+', passage))
+        passage_significant_numbers = {n for n in passage_numbers if len(n) >= 3}
+        if not passage_significant_numbers:
+            continue  # No competing numbers → cannot contradict
+
+        for cn in numbers_in_claim:
+            if cn not in passage_numbers and len(cn) >= 3:
+                # The passage discusses the same subject AND contains a
+                # different significant number. This is a contradiction.
+                best_chunk = None
+                for st in (proper_overlap or subject_overlap):
+                    idx = _normalize(passage).find(st)
+                    if idx >= 0:
+                        start = max(0, idx - 30)
+                        end = min(len(passage), idx + 120)
+                        best_chunk = passage[start:end].strip()
+                        break
+                if best_chunk:
+                    return best_chunk
+                # Fallback
+                for sw in subject_overlap:
+                    idx = _normalize(passage).find(sw)
+                    if idx >= 0:
+                        start = max(0, idx - 30)
+                        end = min(len(passage), idx + 120)
+                        return passage[start:end].strip()
 
     return None
 
@@ -876,7 +988,14 @@ def check_paragraph(
                     'score': float,     # Match confidence (0-1)
                 }
             ],
-            'unsupported_count': int,
+            'unsupported_count': int,       # Count of UNSUPPORTED only (backward compat)
+            'verdict_counts': {             # Per-verdict breakdown (LOCAL-218)
+                'supported': int,
+                'supported_elsewhere': int,
+                'unsupported': int,
+                'contradicted': int,
+                'not_checkable': int,
+            },
         }
     """
     # Extract claims
@@ -969,11 +1088,42 @@ def check_paragraph(
             'score': round(score, 3),
         })
 
-    unsupported_count = sum(
-        1 for r in results if r['verdict'] == UNSUPPORTED
-    )
+    # ─── Per-verdict counts (LOCAL-218) ─────────────────────────────────────
+    verdict_counts = {
+        'supported': sum(1 for r in results if r['verdict'] == SUPPORTED_PARAPHRASE),
+        'supported_elsewhere': sum(1 for r in results if r['verdict'] == SUPPORTED_ELSEWHERE),
+        'unsupported': sum(1 for r in results if r['verdict'] == UNSUPPORTED),
+        'contradicted': sum(1 for r in results if r['verdict'] == CONTRADICTED),
+        'not_checkable': sum(1 for r in results if r['verdict'] == NOT_CHECKABLE),
+    }
+
+    # unsupported_count: kept for backward compatibility with existing callers.
+    # Includes ONLY UNSUPPORTED, not CONTRADICTED. Rationale:
+    #
+    # CONTRADICTED is a distinct, graver signal — the corpus actively says
+    # otherwise. Callers that use unsupported_count as a "how many claims
+    # lack support" number should NOT silently absorb contradictions into
+    # that count, because:
+    # 1. The gate response to CONTRADICTED should be different (block, not
+    #    just penalize). A single contradiction in a paragraph about a
+    #    museum's founding date is a factual error, not a vague unsupported
+    #    opinion.
+    # 2. Existing callers (run_local212_*.py, local205_claims.py) use
+    #    unsupported_count to measure "how many claims we couldn't verify".
+    #    CONTRADICTED is not "couldn't verify" — it's "verified wrong".
+    #    Mixing them hides the severity.
+    # 3. Per-verdict counts (verdict_counts dict) are now available. Callers
+    #    that need CONTRADICTED visibility should check verdict_counts[
+    #    'contradicted'] directly, or iterate claims for verdict ==
+    #    CONTRADICTED when they need the evidence.
+    #
+    # Callers should be updated to check verdict_counts['contradicted'] > 0
+    # as a hard-block condition. This is a separate, stronger gate than the
+    # unsupported penalty.
+    unsupported_count = verdict_counts['unsupported']
 
     return {
         'claims': results,
         'unsupported_count': unsupported_count,
+        'verdict_counts': verdict_counts,
     }
