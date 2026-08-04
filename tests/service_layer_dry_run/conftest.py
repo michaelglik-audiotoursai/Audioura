@@ -132,7 +132,6 @@ def ppu_user_id():
 @pytest.fixture(scope="session")
 def wallet_client():
     """Flask test client for the tour_orchestrator (which hosts wallet_api)."""
-    # We import and build a minimal Flask app that registers wallet_bp
     from flask import Flask
     from wallet_api import wallet_bp
     app = Flask(__name__)
@@ -145,7 +144,6 @@ def wallet_client():
 @pytest.fixture(scope="session")
 def news_orchestrator_client():
     """Flask test client for the news_orchestrator_service."""
-    # Import the Flask app directly — it's defined at module level
     from news_orchestrator_service import app
     app.config["TESTING"] = True
     with app.test_client() as client:
