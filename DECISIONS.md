@@ -3820,3 +3820,53 @@ reimplementation of the style validator — two copies of R1 that would drift.
 They are re-exports from `style_validator_detector` (line 26), and the outputs
 match on every probe. Reading the import list before writing the bounce is the
 only reason that did not become a wrong verdict.
+
+---
+
+## D103 — Two correct components that do not compose (2026-08-04)
+
+LOCAL-221 built external source verification. Its guards are sound — the D62
+location-mismatch check, unit conversion with a compatibility test, three
+well-argued refusals of dates it could not confirm. And the case it was built
+for does not work.
+
+**The join is broken.** `claim_check` emits a claim as the bare value;
+`evaluate_evidence` needs surrounding context to bind the claim to a subject:
+
+```
+claim_check → type=NUMBER  text='320 feet'
+
+ev('320 feet',                 [good source]) → refused
+ev('depths reaching 320 feet', [good source]) → PROMOTED
+```
+
+Each function is correct in isolation. Nothing tested them together, so the
+seam went unnoticed — and the seam is the feature.
+
+**It explains the results.** Of the promotions shown, most are `known as "…"`
+or `attributed to …` — claim types whose *text carries its own context*, so
+subject binding happens by accident. **Every date and every number was
+refused.** External verification currently confirms what things are called and
+who built them, not when or how big. That is the inverse of the motivating
+case, and it means the reported 5.2% promotion rate is mostly a measure of
+which claim types survive the handoff rather than of what the web can confirm.
+
+**And the submission asserted a result the code does not produce** —
+limitation 5 said the 320-feet case "passes when the source says *'The deep bay
+of Villefranche reaches depths of approximately 97.5 meters at its outer
+mouth'*". LEAD ran exactly that string: refused. **Second consecutive round**
+with a non-reproducing demonstration (D97 was the first), after the PROCESS
+block was amended to require running every pasted example. If it recurs the
+requirement is not working and the fix has to be structural — a submission
+template that captures output rather than inviting prose.
+
+**Also flagged:** 213 unsupported claims found, **30 queried**, 11 promoted.
+The headline "5.2%" divides by 213; over attempted claims it is 37%. The
+pessimistic figure is the honest instinct, but the selection of those 30 is
+invisible, so neither number means much yet.
+
+**The general lesson is one this project keeps relearning at a different
+level.** Unit tests pass, integration is where it breaks: the validator that
+could not be imported in Docker (LOCAL-192), the gate guarded by an empty dict
+(LOCAL-209), the venue cache unreachable from the host (D91), and now two
+functions whose data formats disagree. Every one shipped with green tests.
