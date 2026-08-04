@@ -184,3 +184,55 @@ version did not. Different code path; that is a bug, not a tuning problem.
    two reconciled into one number, or kept as separate gates? My lean: keep
    them separate. i-con measures the writing; the 75 target measures the
    corpus and structure. Collapsing them would hide which one is failing.
+
+---
+
+## 7. Scoring shape: a profile, not a number (Michael asked, 2026-08-04)
+
+> *"Maybe we should adjust our score on a paragraph basis or at least include
+> this into our general scoring, what do you think?"*
+
+**Yes — but the fix is not swapping one scalar for another.** Your own data is
+the argument. Paragraph 5 scored 5, 1, 0 and averages to **2.0**, hiding both
+our best sentence and our worst. A paragraph number hides sentences exactly the
+way a tour number hides paragraphs.
+
+So score at every level and **gate on the minimum, not the mean**:
+
+```
+sentence group → paragraph → stop → tour
+```
+
+| figure | what it tells us | why it matters |
+|---|---|---|
+| tour **mean** | overall quality | the headline, and the least actionable |
+| stop **minimum** | the weakest stop | one bad stop is what a listener remembers |
+| paragraph **minimum** | the weakest paragraph in that stop | your ¶5 problem |
+| **worst sentence** | the single worst thing we say | your two 0/5s |
+
+Your 2.0 mean and your verdict "far from acceptable" agree — but the mean alone
+does not say *where* to work. The minima do.
+
+**And the gate should sit on the minima.** A tour with one fabricated sentence
+is not 95% fine; it is a tour with a fabricated sentence in it. That is your own
+standard, stated on 2026-08-04:
+
+> *"Our competition needs to find one poor judgement or incorrect data in our
+> tours to destroy our credibility."*
+
+This is also the three-pass structure (D101) applied to scoring — group, then
+sentence, then group — for the same reason: a level judged alone loses the
+level below it.
+
+### Still needed from Michael
+
+Not the structure — the floors:
+
+1. **Minimum stop score** for a stop to be shippable.
+2. **Worst-sentence score** that blocks a release outright.
+3. Whether the **tour mean of 3.5** stands, now that it sits alongside minima
+   rather than alone.
+
+My suggestion, to argue with rather than adopt: mean ≥ 3.5, **no stop below
+3.0**, **no sentence at 0** — the last being the R9 rule, which already deletes
+rather than scores.
