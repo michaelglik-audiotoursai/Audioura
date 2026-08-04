@@ -17,7 +17,11 @@ LOG="$HOME/audioura-backups/backup.log"
 
 # Michael's real tours near Nice. Update deliberately when he gains or
 # retires one — never to silence an alarm.
-EXPECTED="1,12,14,17,21,24,27,28,29"
+# 152 added 2026-08-04: the French Riviera cycling tour Michael asked LEAD to
+# generate so he could compare it paragraph-by-paragraph with his field-tested
+# tour 29. Real generation, real coords, is_test=false — a deliberate gain,
+# not a leaked test artifact.
+EXPECTED="1,12,14,17,21,24,27,28,29,152"
 
 ACTUAL=$(curl -s -m 20 "http://localhost:5005/tours-near/43.7009358/7.2683912?radius=50" 2>/dev/null \
   | /usr/bin/python3 -c "

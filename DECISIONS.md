@@ -2168,3 +2168,46 @@ carry the prolog inside Stop 1. That migration is Michael's call.
 paragraph is tied to its stop; the style validator asks whether it instructs
 the listener. Neither asks whether the text is about the *tour* rather than
 the stop it sits under. It took a listener to notice.
+
+---
+
+## D65 — Truncation limits: Row B (5,000 free / 15,000 subscribed), decided by LEAD (2026-08-04)
+
+`TRUNCATION_LIMITS.md` (on `subscribed`) was written to let Michael pick a
+row. He has been away for a day and the news tier cannot ship without a
+number, so per his 2026-07-31 ruling — *"do not make any strategy to be
+mine: make your own judgement"* — LEAD picks **Row B: 5,000 chars free,
+15,000 chars subscribed.**
+
+**Why B and not A or C.** The deciding fact is in the cost table LEAD
+already produced: `clean_text_for_polly()` caps each TTS segment at 5,000
+characters, so *article text beyond 5,000 chars is already generated and
+then silently discarded before Polly*. Cost flattens at ~$0.030/article
+from 5,000 chars upward.
+
+That reframes the whole choice. A free-tier limit of 5,000 is not a new
+restriction — it is **making an existing silent truncation honest**. A free
+user pasting a 12,000-char article today gets audio for roughly the first
+5,000 and no explanation. Row B tells them.
+
+- **Row A (3,000)** would be a genuine new restriction below the existing
+  cap, and would fire the upsell on 40–60% of real articles. Aggressive
+  enough to read as a paywall on a product nobody is paying for yet.
+- **Row C (8,000/25,000)** invents a boundary that matches nothing in the
+  pipeline, and pushes worst-case translation cost to $0.375/article.
+- **Row B** lands on a boundary the code already enforces, keeps a
+  translated subscribed article at $0.225 worst case, and truncates
+  15–30% of real articles.
+
+**Not a cost decision above 5,000.** Say this plainly in any user-facing
+copy review: the subscribed limit of 15,000 is about reading experience and
+translation spend, not TTS — we do not pay more for TTS at 15,000 than at
+5,000. Anyone arguing the subscribed tier "costs us 3x" is wrong.
+
+**Michael's constraint on the wording (D58) binds:** the user must not be
+shown a cost. "Truncated because of the cost" is his phrasing of the
+*reason*, not the copy. Free-tier copy names the limit and what lifts it;
+subscribed-tier copy names the limit only.
+
+Reversible: both numbers are config, not code. He overturns what he
+dislikes.
