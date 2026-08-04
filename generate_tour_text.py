@@ -6150,8 +6150,11 @@ REWRITE RULES (all mandatory):
 6. Return ONLY the rewritten paragraph text. No explanations, no headers, no "Here is the rewrite:".
 """
 
+                    # LEAD, merging LOCAL-192 into LOCAL-194: the rewriter must be
+                    # the same model as the writer, or a model A/B silently compares
+                    # new-model prose against old-model repairs.
                     _retry_data = {
-                        "model": "gpt-3.5-turbo",
+                        "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
                         "messages": [
                             {"role": "system", "content": "You are a copy editor fixing style violations in audio tour narration. You rewrite only — never add new information."},
                             {"role": "user", "content": _retry_prompt}
