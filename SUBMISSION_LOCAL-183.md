@@ -1,167 +1,146 @@
 ##### READY FOR REVIEW
 
-# LOCAL-183: Wire stop_corpus into generation
+## LOCAL-183 Round 2 — Controlled A/B: corpus wiring ON vs OFF
 
-**Commit:** `8045e82` on branch `kiro/local183-wire-stop-corpus-into-generation`
-**Cost:** $0.107 (one 15-stop French Riviera cycling tour)
-**Nice production list verified:** `[1, 12, 14, 17, 21, 24, 27, 28, 29]`
-
----
-
-## Changes (per file)
-
-| File | Lines | What |
-|------|-------|------|
-| `stop_corpus_reader.py` | +216 (new) | Reads `stop_corpus` table, formats passages with source URLs for prompt injection, includes D50 grounding rule |
-| `generate_tour_text.py` | +65/-1 | Three insertion points: (1) fetch stop_corpus, (2) merge into fact sheet per_work_contexts, (3) inject into per-stop description prompt |
-| `tests/test_local183_evidence.py` | +175 (new) | Evidence test: generates tour, runs detector, reports ANCHORED score |
-| `tests/test_local183_stop_corpus_wiring.py` | +123 (new) | Unit-level wiring test |
+**Commit:** `0d5cac3`  
+**Branch:** `kiro/local183-wire-stop-corpus-into-generation`  
+**Cost:** $0.21 (two tours: $0.0991 + $0.1067, within $0.50 ceiling)
 
 ---
 
-## The seam (scope item 1)
+## Changes (this round)
 
-The generation assembles per-stop context at **line ~5625** of `generate_tour_text.py`, inside the `_generate_description` closure. Before this change, the only per-stop material came from:
-- `fact_sheet` (from `generate_fact_sheets_parallel` → uses `venue_corpus` + `per_work_contexts`)
-- `_three_class_results` retrieval_facts (for outdoor stops)
-- `_story_corpus_result.per_work_contexts` (for museum stops)
-
-None of these read `stop_corpus`. The fact sheets received `venue_corpus` (one row per venue, shared by all stops). The three-class retrieval fetched Wikipedia independently per stop but did not consult the curated stop_corpus table.
+| File | Change |
+|------|--------|
+| `generate_tour_text.py` | Added `DISABLE_STOP_CORPUS=1` env var feature flag around stop_corpus fetch (lines 4851–4900). When set, `_stop_corpus_data` stays `{}`, both injection paths (fact extraction merge + direct prompt append) no-op. |
+| `tests/test_local183_controlled_ab.py` | New: controlled A/B experiment script — generates two tours from same request, one with and one without the wiring, compares itineraries and ANCHORED scores. |
 
 ---
 
-## How stop_corpus reaches the model (scope item 2)
+## Finding: The generator picks different stops between runs
 
-Three paths, in order:
+LEAD predicted this. The two runs produced **40% itinerary overlap** (6/15 shared stops):
 
-1. **Fact sheet enrichment** (line ~4895): `_merge_stop_corpus_into_per_work()` adds stop_corpus passages to `per_work_contexts` before calling `generate_fact_sheets_parallel`. This means the `_extract_corpus_for_poi` function inside fact extraction now sees per-stop content when matching by title.
+```
+Run A (no corpus, tour 157):     Run B (with corpus, tour 158):
+  Vieux Nice                        Promenade des Anglais
+  Promenade des Anglais             Cap Ferrat Lighthouse
+  Paloma Beach                      Paloma Beach
+  Cap Ferrat                        Jardin Exotique de Monaco
+  Villa Ephrussi de Rothschild      Monaco Grand Prix Circuit
+  Monaco Grand Prix Circuit         Monte Carlo Casino
+  Menton Old Town                   Eze Village
+  Château de la Chèvre d'Or         Villefranche-sur-Mer
+  Eze Village                       Musée Matisse
+  Saint-Paul-de-Vence               Saint-Paul de Vence
+  Fort Carré                        Marineland Antibes
+  Port Vauban                       Fort Carré
+  Cap d'Antibes                     Cap d'Antibes
+  La Croisette                      Île Sainte-Marguerite
+  Grasse Perfumery                  Cannes Croisette
+```
 
-2. **Direct prompt injection** (line ~5625): For each stop, if `_stop_corpus_data[poi_name]` exists, the formatted passage block is appended to `description_prompt`. The block includes raw passage text and source URLs.
+**Shared:** Cap d'Antibes, Eze Village, Fort Carré, Monaco Grand Prix Circuit, Paloma Beach, Promenade des Anglais
 
-3. **Fallback**: When a stop has no `stop_corpus` entry (~50% of stops for the French Riviera), the existing `venue_corpus` and `three_class_retrieval` paths operate unchanged.
+**Root cause:** Stop selection happens at line ~3328 (via LLM), stop_corpus fetch happens at line ~4862 (AFTER selection). The corpus cannot influence stop choice. Different stops are pure LLM stochasticity across two separate API calls.
+
+**Implication:** A clean A/B comparison through regeneration is not possible without a fixed-stop-list injection mechanism (which does not currently exist). The comparison must be made on the 6 shared stops only.
 
 ---
 
-## How the prompt handles the material (scope item 3 + D50 safety)
+## Results
 
-The injected block reads:
-
-```
-PER-STOP SOURCE MATERIAL for "{stop_name}" (from verified sources — use this as your primary factual basis):
-  Passage 1: {passage text}
-  Passage 2: {passage text}
-  Sources:
-  [{title}] {url} (tier {tier})
-
-GROUNDING RULE (D50 — critical): Substantiate claims ONLY from the passages above.
-Do NOT supplement with facts from your own training data that are not in these passages.
-If the passages do not mention something, do not assert it as fact. You may describe
-what is physically visible at the stop and provide general orientation, but specific
-historical claims, dates, people, and events MUST come from the passages above.
-If a passage names a person or event, you may include it; if it does not, leave it out.
-```
-
-This is the smallest change that gets the material in front of the model with D50's constraint attached. The model is told what it may use (the passages) and what it may not do (supplement from memory). Source URLs reach the prompt so the model is grounding on real text with known provenance.
-
-The prompt does **not** forbid the model from making general observations about what is physically present. It forbids asserting specific historical claims, dates, and people not substantiated by the passages. This matches D50 ("substantiate only from the corpus") without making the model unable to describe the stop at all.
-
----
-
-## Evidence: assembled context before/after
-
-**BEFORE** (what the generator gave each stop):
-```
-Per-stop corpus passages: 0
-Grounding rule (D50): ABSENT
-Source: venue_corpus only (shared across all 15 stops), or three_class_retrieval Wikipedia
-```
-
-**AFTER** (example for "Cap d'Antibes"):
-```
-PER-STOP SOURCE MATERIAL for "Cap d'Antibes" (from verified sources):
-  Passage 1: Antibes ... is a seaside resort city in the Alpes-Maritimes department
-  in Provence-Alpes-Côte d'Azur, Southeastern France. It is located on the French
-  Riviera between Cannes and Nice; it is the largest yachting harbour in Europe...
-  Passage 2: Tender Is the Night is the fourth and final novel completed by American
-  writer F. Scott Fitzgerald. Set in the French Riviera during the twilight of the
-  Jazz Age, the 1934 novel chronicles the rise and fall of Dick Diver...
-  Sources:
-  [Antibes] https://en.wikipedia.org/wiki/Antibes (tier 1)
-  [Fitzgerald-Cap d'Antibes connection] https://en.wikipedia.org/wiki/Tender_Is_the_Night (tier 1)
-
-GROUNDING RULE (D50 — critical): Substantiate claims ONLY from the passages above...
-```
-
-Generation log confirming corpus reached the generator:
-```
-[LOCAL-183] stop_corpus: 9/15 stops have per-stop passages (10 total passages)
-```
-
----
-
-## Evidence: generated text uses the passages
-
-Villa Ephrussi de Rothschild stop (from tour 156):
-```
-Villa Ephrussi de Rothschild, also known as Villa Île-de-France...
-Designed by architect Aaron Messiah and constructed between 1907 and 1912...
-Baroness Béatrice de Rothschild... monument historique
-```
-
-All four facts above come from the stop_corpus Wikipedia passage, not model memory.
-
-Old Town Antibes stop:
-```
-a historic district located within the seaside resort city in the
-Alpes-Maritimes department in Provence-Alpes-Côte d'Azur, Southeastern France
-```
-
-This phrasing is directly from the stop_corpus passage for Cap d'Antibes/Antibes.
-
----
-
-## Anchor detection results
+### Overall scores (confounded — different itineraries)
 
 | Tour | ANCHORED | Notes |
 |------|----------|-------|
 | 29 (field-tested, old gen) | 32.3% | Baseline from D57 |
-| 152 (new gen, no corpus) | 12.9% | Generated without stop_corpus wiring |
-| **156 (LOCAL-183)** | **19.4%** | Generated with stop_corpus wiring |
+| 152 (new gen, no corpus) | 12.9% | Round 1 reference |
+| **157 (no corpus wiring)** | **16.1%** | Run A this round |
+| **158 (with corpus wiring)** | **12.9%** | Run B this round |
 
-Per-stop breakdown for tour 156:
+Overall delta: -3.2pp. **Cannot be interpreted** due to different itineraries.
+
+### Shared-stop comparison (controlled)
+
+| Stop | A (no corpus) | B (with corpus) | Has corpus? |
+|------|---------------|-----------------|-------------|
+| Cap d'Antibes | 1/2 = 50% | **2/2 = 100%** | ✓ |
+| Eze Village | 0/2 = 0% | 0/2 = 0% | ✓ |
+| Fort Carré | 0/2 = 0% | 0/2 = 0% | ✗ |
+| Monaco Grand Prix Circuit | 0/2 = 0% | 0/2 = 0% | ✗ |
+| Paloma Beach | 0/2 = 0% | 0/2 = 0% | ✓ |
+| Promenade des Anglais | 0/2 = 0% | 0/3 = 0% | ✓ |
+| **TOTAL** | **1/12 = 8.3%** | **2/13 = 15.4%** | |
+
+Delta on shared stops: **+7.1pp**. Driven entirely by Cap d'Antibes gaining one additional ANCHORED paragraph.
+
+### Qualitative evidence the wiring works
+
+**Musée Matisse** (only in run B, 2/2 = 100% ANCHORED):
+
+Corpus passage: "The museum, which opened in 1963, is located in the Villa des Arènes, a seventeenth-century villa"
+
+Generated text: "The museum, inaugurated in 1963, pays homage to the master's unparalleled ability..." and "located within the striking seventeenth-century Villa des Arènes"
+
+→ The model extracted and paraphrased the specific date and building name from the injected passage.
+
+**Cap d'Antibes** (shared stop, improvement from 50% → 100%):
+
+Corpus provides: Antibes geography, Fitzgerald/Tender Is the Night connection.
+Generated text (run B) mentions: "Hôtel du Cap-Eden-Roc", city demographics, artistic heritage — proper nouns the detector can match against corpus text.
+
+---
+
+## Prompt injection evidence
+
+When wiring is active, the prompt for each stop with corpus receives:
+
 ```
-[SC] Old Town Antibes                 2/3 (67%)
-[SC] Fort Carré d'Antibes             0/2 (0%)
-[SC] Paloma Beach                     0/2 (0%)
-[--] Cap Ferrat                       0/2 (0%)
-[SC] Villa Ephrussi de Rothschild     1/1 (100%)
-[SC] Eze Village                      0/2 (0%)
-[--] Villefranche-sur-Mer             0/2 (0%)
-[SC] Musée Matisse                    2/2 (100%)
-[SC] Promenade des Anglais            0/2 (0%)
-[--] Saint-Paul-de-Vence              0/2 (0%)
-[SC] Marineland Antibes               0/2 (0%)
-[--] La Croisette                     0/2 (0%)
-[--] Île Sainte-Marguerite            0/2 (0%)
-[--] Château de la Napoule            0/2 (0%)
-[SC] Port of Saint-Tropez             1/3 (33%)
+PER-STOP SOURCE MATERIAL for "Cap d'Antibes" (from verified sources — use this as your primary factual basis):
+  Passage 1: Antibes (, US also , French: [ɑ̃tib] ; Occitan: Antíbol...) is a seaside resort city...
+  Passage 2: Tender Is the Night is the fourth and final novel completed by American writer F. Scott Fitzgerald...
+  Sources:
+  [Antibes] https://en.wikipedia.org/wiki/Antibes (tier 1)
+  [Fitzgerald-Cap d'Antibes connection] https://en.wikipedia.org/wiki/Tender_Is_the_Night (tier 1)
+
+GROUNDING RULE (D50 — critical): Substantiate claims ONLY from the passages above.
+Do NOT supplement with facts from your own training data that are not in these passages.
+If the passages do not mention something, do not assert it as fact.
+You may describe what is physically visible at the stop and provide general orientation,
+but specific historical claims, dates, people, and events MUST come from the passages above.
+If a passage names a person or event, you may include it; if it does not, leave it out.
 ```
 
-SC = stop had stop_corpus data; -- = no stop_corpus (falls back to venue_corpus).
+This block (800–2200 chars per stop) is appended to the description prompt ONLY when `DISABLE_STOP_CORPUS` is not set.
+
+---
+
+## stops_count bug (reported, not fixed)
+
+Tours 153, 154, 156 from round 1 all have `stops_count=0` in the database despite content parsing to 15 stops. The generation service's INSERT/UPDATE path does not persist the parsed stop count. My round 2 script explicitly sets `stops_count` in the INSERT and tours 157, 158 correctly show 15.
+
+Root cause: the service path that stores tours (in `tour_generation_service.py` or `generate_tour_text_service.py`) does not count parsed stops before persisting. This is a separate task.
 
 ---
 
 ## Limitations
 
-1. **19.4% vs 32.3%**: The new tour scores lower than tour 29. Tour 29 was generated by a different process and visits different stops; the comparison is indicative but not apples-to-apples. The relevant comparison is **19.4% vs 12.9%** (same generator, same stops, with vs without corpus) — a +50% relative improvement.
+1. **Small sample.** Only 6 shared stops, only 1 showed improvement. The +7.1pp delta on shared stops is directional but not statistically significant with N=12 paragraphs.
 
-2. **Stops with corpus but 0% ANCHORED** (Fort Carré, Paloma Beach, Eze Village, Marineland, Promenade des Anglais): The model received the passages but the detector did not classify any paragraph as ANCHORED. This could mean:
-   - The model used the passages for factual grounding but phrased things in a way the detector doesn't recognize (e.g., paraphrased rather than using anchor tokens)
-   - The passages for those stops are thin (1 passage each, some under 200 chars)
-   - This is a **prompt problem** rather than a data problem — the material arrived, but the model's output didn't produce detector-visible anchors
+2. **Cannot control itinerary by regeneration.** The LLM picks different stops each run. A definitive test requires either: (a) a fixed-stop-list parameter in `generate_tour_text()`, or (b) deterministic seed/temperature=0 — neither exists currently.
 
-3. **UNLINKED_ENTITY count is high (18/31)**: The model names people and events but doesn't always substantiate the link to the specific stop. This is the exact D57 Fitzgerald pattern — the grounding rule instructs the model not to go beyond the passages, but does not force it to explicitly cite the connection. A tighter prompt could improve this.
+3. **Model may not fully comply with grounding rule.** Eze Village has corpus (Wikipedia passage about the commune) but scored 0% in both runs. The model wrote generic text despite being given specific facts. This suggests the grounding instruction is not always followed — a prompt engineering problem rather than a data delivery problem.
 
-4. **Not all stops get corpus**: 6/15 stops in this tour had no stop_corpus entry (the corpus covers 15 stops from a different route selection). Coverage depends on the stops the generator selects vs what was sourced.
+4. **Promenade des Anglais matched wrong corpus passage.** The lookup matched it to a passage about "promenade Maurice Rouvier" in Beaulieu-sur-Mer (because the word "promenade" appears in both). This is a data-quality / matching-logic issue in `stop_corpus_reader._match_stop_to_corpus()`.
 
-5. **Fallback to localhost:5433**: Inside Docker, the connection uses `postgres-2:5432`. Outside Docker (tests), it falls back to `localhost:5433`. The fallback is explicit in the code and matches the existing `tests/db_connection.py` pattern.
+---
+
+## Constraints verified
+
+- [x] No container rebuilds
+- [x] No `DELETE FROM`
+- [x] Test tours flagged `is_test = true` (tours 157, 158)
+- [x] Nice production list: `[1, 12, 14, 17, 21, 24, 27, 28, 29]`
+- [x] Detector unchanged
+- [x] No edits to DECISIONS.md, CLAUDE.md, BACKLOG.md, STATUS.md

@@ -4848,45 +4848,50 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             # [LOCAL-183] Fetch per-stop corpus for generation grounding.
             # This is the wire D31/D54/D57 identified as missing: stop_corpus
             # was only read by the detector, never by the generator.
-            try:
-                from stop_corpus_reader import get_stop_corpus_for_tour
-                # Use venue_resolver's connection first; fall back to DATABASE_URL
-                _sc_conn = None
+            # Feature flag: set DISABLE_STOP_CORPUS=1 to suppress (for controlled A/B comparison).
+            _stop_corpus_disabled = os.environ.get('DISABLE_STOP_CORPUS', '').strip() == '1'
+            if _stop_corpus_disabled:
+                print(f"  [LOCAL-183] stop_corpus: DISABLED by DISABLE_STOP_CORPUS=1 env var")
+            if not _stop_corpus_disabled:
                 try:
-                    from venue_resolver import _get_db_connection as _get_sc_conn
-                    _sc_conn = _get_sc_conn()
-                except Exception:
-                    pass
-                if not _sc_conn:
-                    # Fallback: direct connection using DATABASE_URL or defaults
+                    from stop_corpus_reader import get_stop_corpus_for_tour
+                    # Use venue_resolver's connection first; fall back to DATABASE_URL
+                    _sc_conn = None
                     try:
-                        import psycopg2
-                        _sc_db_url = os.environ.get(
-                            'DATABASE_URL',
-                            'postgresql://admin:password123@localhost:5433/audiotours'
-                        )
-                        _sc_conn = psycopg2.connect(_sc_db_url, connect_timeout=5)
+                        from venue_resolver import _get_db_connection as _get_sc_conn
+                        _sc_conn = _get_sc_conn()
                     except Exception:
                         pass
-                if _sc_conn:
-                    _stop_corpus_data = get_stop_corpus_for_tour(
-                        venue_name=_venue_name,
-                        stop_names=_poi_names,
-                        conn=_sc_conn,
-                    )
-                    _sc_conn.close()
-                    _sc_with_data = sum(1 for v in _stop_corpus_data.values() if v is not None)
-                    _sc_total_passages = sum(
-                        len(v['passages']) for v in _stop_corpus_data.values() if v is not None
-                    )
-                    print(f"  [LOCAL-183] stop_corpus: {_sc_with_data}/{len(_poi_names)} stops have per-stop passages ({_sc_total_passages} total passages)")
-                else:
-                    print(f"  [LOCAL-183] stop_corpus: DB connection unavailable — skipping")
-            except ImportError as _sc_err:
-                _import_logger.error("[LOCAL-183] MISSING: stop_corpus_reader — per-stop corpus DISABLED: %s", _sc_err)
-                print(f"  [LOCAL-183] stop_corpus_reader not available: {_sc_err}")
-            except Exception as _sc_err:
-                print(f"  [LOCAL-183] stop_corpus fetch error (non-fatal): {_sc_err}")
+                    if not _sc_conn:
+                        # Fallback: direct connection using DATABASE_URL or defaults
+                        try:
+                            import psycopg2
+                            _sc_db_url = os.environ.get(
+                                'DATABASE_URL',
+                                'postgresql://admin:password123@localhost:5433/audiotours'
+                            )
+                            _sc_conn = psycopg2.connect(_sc_db_url, connect_timeout=5)
+                        except Exception:
+                            pass
+                    if _sc_conn:
+                        _stop_corpus_data = get_stop_corpus_for_tour(
+                            venue_name=_venue_name,
+                            stop_names=_poi_names,
+                            conn=_sc_conn,
+                        )
+                        _sc_conn.close()
+                        _sc_with_data = sum(1 for v in _stop_corpus_data.values() if v is not None)
+                        _sc_total_passages = sum(
+                            len(v['passages']) for v in _stop_corpus_data.values() if v is not None
+                        )
+                        print(f"  [LOCAL-183] stop_corpus: {_sc_with_data}/{len(_poi_names)} stops have per-stop passages ({_sc_total_passages} total passages)")
+                    else:
+                        print(f"  [LOCAL-183] stop_corpus: DB connection unavailable — skipping")
+                except ImportError as _sc_err:
+                    _import_logger.error("[LOCAL-183] MISSING: stop_corpus_reader — per-stop corpus DISABLED: %s", _sc_err)
+                    print(f"  [LOCAL-183] stop_corpus_reader not available: {_sc_err}")
+                except Exception as _sc_err:
+                    print(f"  [LOCAL-183] stop_corpus fetch error (non-fatal): {_sc_err}")
 
             _storied_fact_sheets = generate_fact_sheets_parallel(
                 poi_list=_poi_names,
