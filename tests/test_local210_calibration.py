@@ -257,6 +257,17 @@ def run_local195_calibration(conn):
             else:
                 detector_verdict = 'UNSUPPORTED'
 
+            # Enhanced pass: try stem+synonym matching on failures
+            # (mirrors the logic in check_paragraph)
+            if detector_verdict == 'UNSUPPORTED':
+                enh_evidence, enh_score = claim_check._find_best_evidence_enhanced(
+                    claim, passages, threshold=claim_check.ENHANCED_THRESHOLD
+                )
+                if enh_score >= claim_check.ENHANCED_THRESHOLD and enh_evidence:
+                    detector_verdict = 'SUPPORTED_PARAPHRASE'
+                    evidence = enh_evidence
+                    score = enh_score
+
             # Compare
             hand_is_supported = hand_verdict.startswith('SUPPORTED')
             det_is_supported = detector_verdict.startswith('SUPPORTED')
