@@ -2989,3 +2989,103 @@ unsupported claims per paragraph on a *well-covered* venue, at 100% anchor
 rate. Coverage fixed the gap between models; it did not fix grounding. The
 anchor metric saturates while half the paragraphs still assert something no
 passage supports — it measures coverage, not truth.
+
+---
+
+## D84 — The disk filled to 98% and stopped a dispatch. 188 worktrees, never cleaned up (2026-08-04)
+
+LOCAL-211 failed with `worktree_setup_failed: error: unable to write file
+migration/data_small_tables.sql`. Not a task defect — **353 MB free on a 228 GB
+volume.**
+
+```
+/Users/micha/audioura-worktrees   51 GB   188 worktrees
+```
+
+One worktree per task since LOCAL-14, each a full checkout of a 2,127-file
+repo, none ever removed. Of the 188, **171 were on branches already merged** —
+pure duplicates of content sitting in `.git`.
+
+Pruned the merged ones: 169 removed, **46 GB reclaimed**, 19 worktrees left
+(in-flight tasks and unmerged branches). Nothing lost — `git worktree remove`
+deletes the working directory only; every branch and commit stays in `.git`,
+and an unmerged branch is never touched.
+
+**Guard added:** `.continuous_dev/prune_worktrees.sh` runs on every 5-minute
+launchd tick and alarms into `ALERTS.md` when free space drops below 10 GB.
+The alarm is the point — the queue should not discover this by failing.
+
+**Why nobody saw it coming.** Every guard on this project watches *data*
+integrity: row counts, user-visible drift, secrets. Nothing watched the
+machine. The dispatcher's own failure message named a file, not a cause, and
+a task that fails at checkout looks exactly like a task that failed at work.
+LOCAL-211's `FAILED` line would have read as its own fault.
+
+---
+
+## D85 — The gate could not fire for stops with no corpus; now it can, and it only half-works (2026-08-04)
+
+**The bug (LOCAL-209).** `generate_tour_text.py`:
+
+```python
+if not _corpus_gate_disabled and _stop_corpus_data:
+```
+
+`_stop_corpus_data` holds only stops that *have* a `stop_corpus` row. A stop
+with none is absent, so the gate was skipped — and when the whole tour had no
+corpus, skipped entirely. `corpus_coverage` has defined an `EMPTY` verdict all
+along; **it was unreachable in production.** The gate handled every case except
+the one it exists for.
+
+That is why tour 163's Villefranche-sur-Mer produced "depths reaching 320
+feet", "Free City on Sea" and a 13th-century date with nothing behind any of
+them, in the same release where the museum path cut object-description 76%.
+
+Fixed: the gate iterates every stop; a missing entry is `EMPTY`; `EMPTY` gets
+its own degradation prompt, stricter than VENUE_ONLY.
+
+**The effect is weaker than the museum case: ~40–50% fewer unsourced
+specifics, against CREATOR_ONLY's 76%** — and the measurement is confounded,
+which the task said itself: stop selection is non-deterministic, different
+stops came up each run, and Villefranche was never re-selected. Treat the
+number as directional only.
+
+**The pattern is now three for three (D63, D80, here).** Negative constraints
+("do not assert dates you cannot source") land poorly. Category exclusions
+("do not describe the object") land well. A model can check "is this sentence
+describing the object?" far more reliably than "is this claim sourced?" —
+because the second question requires it to know something it does not have.
+
+**So for a stop with genuinely zero material, the answer is structural, not
+prompt-shaped:** drop the stop and select another, or emit orientation only.
+LEAD's lean is to drop it. Not implemented — it interacts with Michael's
+CREATOR_ONLY question (D80) and both should be settled together.
+
+---
+
+## D86 — The truth gate has an instrument. It never passes a fabrication, and it over-flags one claim in five (2026-08-04)
+
+LOCAL-210 built `claim_check.py` (repo root, container-safe) and calibrated it
+against the two hand-scored sets from LOCAL-195 and LOCAL-205.
+
+```
+29 claims checked · 6 disagreements · all in one direction
+false UNSUPPORTED (over-flagged) : 6   (21%)
+false SUPPORTED  (missed a fab)  : 0
+```
+
+**Zero false passes** — it never asserts a passage supports a claim when it
+does not. That is the direction that matters: a false pass puts an invented
+fact in front of a listener; a false flag costs a paragraph some score.
+
+**What it cannot do is paraphrase.** All six disagreements are semantic
+inferences a token-overlap matcher cannot make — "generous contributions shaped
+MAMAC" against three separate donation passages; "pop art challenges the
+boundary between high and low culture" against "embraces the emerging mass
+culture". One was a single threshold notch away.
+
+**Consequence for the recount, and Michael should see this before setting
+thresholds:** applied literally today, the truth gate would cap roughly **one in
+five legitimately-supported paragraphs** at i-con 1. That is not a reason to
+loosen it — the direction is right — but the threshold he picks should be
+chosen knowing the instrument is strict, not neutral.
