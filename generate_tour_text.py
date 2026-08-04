@@ -4917,7 +4917,11 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             
             if not _corpus_gate_disabled and _stop_corpus_data:
                 try:
-                    from tests.test_local198_corpus_coverage_gate import (
+                    # LEAD fixup on merge: the canonical module is at the repo
+                    # root. `tests/` is not in the tour-generator image, so an
+                    # import from there fails in Docker and the gate silently
+                    # never runs — the LOCAL-192 defect, two rounds later.
+                    from corpus_coverage import (
                         assess_stop_coverage, extract_content_words, _extract_passage_texts
                     )
                     print(f"  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...")
