@@ -3774,3 +3774,49 @@ scored both connective sentences 0/5, and the "dominant story" thread
 (SQ-S6b) has been designed since July and never built. **Continuity is the
 gap that a competitor cannot close by pointing a camera at a painting**, and it
 is where we are thinnest.
+
+---
+
+## D102 — Sentence-group scoring lands; boundary detection agrees with Michael 6 times in 11 (2026-08-04)
+
+LOCAL-220 built the scoring pass Michael asked for — group, classify, emit
+records, **no rewriting**. Verified by LEAD against his own evaluation:
+
+```
+¶1A NAVIGATION  michael=5  publishable=True   unsupported=0
+¶3A CONTENT     michael=3  publishable=True   unsupported=1
+¶5A CONTENT     michael=5  publishable=True   unsupported=2   ← the 320-feet case
+¶5C CONNECTIVE  michael=0  publishable=False  block=GENERIC_DELETE
+¶6  CONNECTIVE  michael=0  publishable=False  block=GENERIC_DELETE
+```
+
+Both cases that mattered come out right: **his 5/5 cycling directions classify
+NAVIGATION and pass clean**, and **his 5/5 "320 feet" group is publishable with
+its two unverified claims counted rather than suppressed**.
+
+**Group-boundary agreement: 6 of 11 (54.5%).** Reported honestly and low. That
+is the number worth having: the machine can find roughly half of Michael's
+idea-boundaries unaided. The five misses are mostly over-splitting — it breaks
+at "Enjoy the refreshing sea breeze" where he kept the sentence with its
+neighbours. Whether that is learnable from more examples or needs his rule is
+the open question; 11 groups is too few to tell.
+
+**LEAD's staleness, corrected on merge.** The task was dispatched *before*
+Michael's D100 ruling arrived, so it blocked on `UNSUPPORTED` — the rule LEAD
+had proposed and he then overruled. Left as shipped, every group carrying an
+unverified claim would have been marked unpublishable, which is precisely what
+he rejected. Corrected: only `CONTRADICTED` and `R9_GENERIC` block;
+`unsupported_claims` is counted, carried in the record, and handed to
+LOCAL-221.
+
+Worth noting as a process point — **a decision made after dispatch does not
+reach the running task.** Three tasks this week were dispatched under rules
+that changed before they landed. The fix is not faster dispatch; it is checking
+the current decision record at merge, which is what caught this one.
+
+**One check LEAD nearly got wrong.** `dir(sentence_group_scorer)` shows
+`check_r1_imperatives`, `check_r2_questions` and friends, which reads like a
+reimplementation of the style validator — two copies of R1 that would drift.
+They are re-exports from `style_validator_detector` (line 26), and the outputs
+match on every probe. Reading the import list before writing the bounce is the
+only reason that did not become a wrong verdict.
