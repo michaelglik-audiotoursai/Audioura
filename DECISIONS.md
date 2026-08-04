@@ -3870,3 +3870,52 @@ level.** Unit tests pass, integration is where it breaks: the validator that
 could not be imported in Docker (LOCAL-192), the gate guarded by an empty dict
 (LOCAL-209), the venue cache unreachable from the host (D91), and now two
 functions whose data formats disagree. Every one shipped with green tests.
+
+---
+
+## D104 — The expiring GitHub token is not ours; but ours is in plaintext and never expires (2026-08-04)
+
+Michael forwarded a GitHub notice that a classic PAT named "Ubuntu VM Token"
+expires around 7 August, and asked whether it was phishing.
+
+**Verified against the credential this machine actually pushes with:**
+
+| | the expiring token | Mac Mini's token |
+|---|---|---|
+| scopes | 11, incl. `repo`, `read:org`, `read:audit_log`, `codespace:secrets` | **`repo` only** |
+| expiry | ~7 Aug | **none reported** |
+
+Different tokens. **Letting it expire breaks nothing here** — the dispatcher,
+the nightly loop, and every push keep working.
+
+**Recommendation recorded: let it expire, do not regenerate.** Nothing in the
+current setup is an Ubuntu VM; the scopes are broad; and expiry is a free test
+of whether anything still depends on it — if something does, it fails visibly
+and a replacement takes two minutes. Regenerating keeps an unaccounted-for
+credential alive for another year and tests nothing.
+
+On the phishing question, the useful answer is not "it looks genuine" but a
+method that holds either way: navigate to github.com directly rather than
+following the link, and see whether the token is listed.
+
+**The finding that matters more.** This Mac stores its GitHub token in
+plaintext:
+
+```
+git config credential.helper → store
+~/.git-credentials           → https://michaelglik-audiotoursai:ghp_…@github.com
+```
+
+`credential.helper=store` is a plain file readable by any process running as
+the user, and it would be captured by any backup or sync. The macOS Keychain
+helper is already installed and a `github.com` keychain entry already exists,
+so the switch is one config change plus deleting the file.
+
+**LEAD is not doing this unattended.** It is low risk and reversible, but a
+half-completed switch breaks the dispatcher's pushes, and the next push needs
+the token typed once — so it wants Michael present. Queued for him.
+
+Also noted: the Mac's token has **no expiry at all**. A credential that never
+expires is one nobody is ever prompted to rotate — the same standing condition
+that let the `sk.py` key sit on origin for nine months (D81). Its replacement
+should carry a 12-month expiry.
