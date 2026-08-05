@@ -1851,13 +1851,115 @@ def _sentence_has_concrete_payload(sentence: str) -> bool:
 # One sentence forward is the minimum; we look 2 forward for robustness.
 _R10_LOOKAHEAD = 2
 
+# ── Topic-aware delivery matching (LOCAL-235 R2 bounce fix) ──────────────────
+# LEAD's key finding: "Delivery has to be about the thing promised, not merely
+# nearby. A date about Mount Bastide does not pay a promise about stone walls."
+#
+# A concrete payload only counts as delivery if it shares topic overlap with
+# the promise sentence. We extract content words from both and require at least
+# one shared non-trivial word (excluding stopwords, abstract fillers, and
+# place-only terms that appear in BOTH sentences as geographic context).
+
+_R10_STOPWORDS = frozenset({
+    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'by', 'for',
+    'with', 'to', 'of', 'from', 'is', 'are', 'was', 'were', 'be', 'been',
+    'being', 'has', 'have', 'had', 'do', 'does', 'did', 'will', 'would',
+    'could', 'should', 'may', 'might', 'shall', 'can', 'not', 'no', 'nor',
+    'so', 'yet', 'both', 'each', 'every', 'all', 'any', 'few', 'more',
+    'most', 'other', 'some', 'such', 'than', 'too', 'very', 'just', 'also',
+    'still', 'about', 'above', 'after', 'before', 'below', 'between',
+    'during', 'into', 'through', 'under', 'until', 'upon', 'within',
+    'without', 'against', 'along', 'among', 'around', 'that', 'this',
+    'these', 'those', 'which', 'what', 'where', 'when', 'who', 'whom',
+    'whose', 'how', 'here', 'there', 'then', 'now', 'its', 'it', 'you',
+    'your', 'we', 'our', 'they', 'their', 'them', 'us', 'me', 'my', 'he',
+    'she', 'his', 'her', 'him', 'as', 'if', 'while', 'once', 'since',
+    'only', 'even', 'much', 'many', 'well', 'back', 'over', 'out', 'up',
+    'down', 'off', 'away', 'again', 'further', 'one', 'two', 'three',
+})
+
+# Abstract filler words that are common in promise sentences and don't
+# constitute topic-grounding when shared with a delivery sentence
+_R10_ABSTRACT_FILLERS = frozenset({
+    'history', 'story', 'stories', 'tale', 'tales', 'past', 'present',
+    'time', 'era', 'centuries', 'legacy', 'heritage', 'culture', 'allure',
+    'charm', 'beauty', 'spirit', 'essence', 'atmosphere', 'journey',
+    'experience', 'connection', 'testament', 'witness', 'chapter',
+    'secret', 'secrets', 'tapestry', 'symphony', 'bridge', 'thread',
+    'fabric', 'ancient', 'timeless', 'enduring', 'bygone', 'rich',
+    'profound', 'palpable', 'harmonious', 'medieval', 'historic',
+    'historical', 'region', 'area', 'place', 'spot', 'site', 'location',
+    'visitors', 'travellers', 'travelers', 'explore', 'exploring',
+    'discover', 'discovering', 'landscape', 'surroundings', 'world',
+})
+
+
+def _extract_content_words(sentence: str) -> set:
+    """Extract meaningful content words from a sentence for topic matching.
+
+    Returns lowercased words that are neither stopwords nor abstract fillers,
+    after stripping punctuation. These are the words that ground a sentence
+    to a specific topic.
+    """
+    # Tokenize: split on whitespace, strip punctuation
+    raw_words = re.findall(r"[a-zA-Z\u00C0-\u024F'-]+", sentence.lower())
+    content = set()
+    for w in raw_words:
+        w_clean = w.strip("'-")
+        if len(w_clean) < 3:
+            continue
+        if w_clean in _R10_STOPWORDS:
+            continue
+        if w_clean in _R10_ABSTRACT_FILLERS:
+            continue
+        content.add(w_clean)
+    return content
+
+
+def _delivery_matches_promise(promise_sent: str, delivery_sent: str) -> bool:
+    """Check if a concrete delivery sentence is topically relevant to a promise.
+
+    Returns True if the delivery shares at least one content word with the
+    promise sentence (after excluding stopwords and abstract fillers), OR if
+    the delivery sentence self-evidently concerns the same entity (e.g. same
+    geographic anchor within 1 sentence of the promise).
+
+    The key insight from LEAD's bounce: "In 200 BC, the area surrounding Èze
+    saw its first inhabitants settle near Mount Bastide" does NOT deliver
+    "each crack and crevice holding a story" — there's no shared subject.
+    But "These walls were built in 1388 when the village was fortified" DOES
+    deliver it because "walls" appears in both.
+    """
+    promise_words = _extract_content_words(promise_sent)
+    delivery_words = _extract_content_words(delivery_sent)
+
+    # Find overlap
+    shared = promise_words & delivery_words
+    if shared:
+        return True
+
+    # Stemming fallback: check if any word in delivery is a prefix/suffix of
+    # a promise word (handles "wall"/"walls", "village"/"villages", etc.)
+    for pw in promise_words:
+        for dw in delivery_words:
+            # Shared root of 4+ chars
+            if len(pw) >= 4 and len(dw) >= 4:
+                if pw.startswith(dw[:4]) or dw.startswith(pw[:4]):
+                    return True
+
+    return False
+
 
 def check_r10_unfulfilled_promise(sentences: List[str], index: int) -> Optional[Dict]:
     """R10: Detect an unfulfilled promise at sentence[index].
 
     A sentence PROMISES something (names a story, tale, history, legacy, etc.)
     and neither it nor the next _R10_LOOKAHEAD sentences DELIVER a concrete
-    payload (date, named person/event, documented fact).
+    payload (date, named person/event, documented fact) ABOUT THE SAME SUBJECT.
+
+    CRITICAL (LOCAL-235 R2 bounce): Delivery must be topically related to the
+    promise. A date about Mount Bastide does NOT deliver a promise about stone
+    walls. The delivery sentence must share content words with the promise.
 
     Args:
         sentences: All sentences in the paragraph (or paragraph + next paragraph)
@@ -1883,21 +1985,27 @@ def check_r10_unfulfilled_promise(sentences: List[str], index: int) -> Optional[
     if _sentence_has_concrete_payload(stripped):
         return None
 
-    # Look forward: do any of the next _R10_LOOKAHEAD sentences deliver?
+    # Look forward: do any of the next _R10_LOOKAHEAD sentences deliver
+    # ON THE SAME TOPIC?
     for offset in range(1, _R10_LOOKAHEAD + 1):
         next_idx = index + offset
         if next_idx >= len(sentences):
             break
         next_sent = sentences[next_idx].strip()
-        if next_sent and _sentence_has_concrete_payload(next_sent):
-            return None  # Delivery found — promise is fulfilled
+        if not next_sent:
+            continue
+        if _sentence_has_concrete_payload(next_sent):
+            # NEW: Check topic overlap — delivery must be about the same subject
+            if _delivery_matches_promise(stripped, next_sent):
+                return None  # Delivery found on-topic — promise is fulfilled
 
-    # Also look backward 1 sentence — if the PREVIOUS sentence delivered,
-    # this sentence may be a legitimate continuation/summary
+    # Also look backward 1 sentence — if the PREVIOUS sentence delivered
+    # ON THE SAME TOPIC, this sentence may be a legitimate continuation/summary
     if index > 0:
         prev_sent = sentences[index - 1].strip()
         if prev_sent and _sentence_has_concrete_payload(prev_sent):
-            return None  # Previous sentence delivered — this is continuation
+            if _delivery_matches_promise(stripped, prev_sent):
+                return None  # Previous sentence delivered on-topic
 
     # Unfulfilled promise
     return {
@@ -1906,8 +2014,8 @@ def check_r10_unfulfilled_promise(sentences: List[str], index: int) -> Optional[
         'sentence': stripped,
         'suggestion': (
             'This sentence names a subject (story, tale, history, legacy) '
-            'without delivering a concrete payload (date, name, fact) in itself '
-            f'or the next {_R10_LOOKAHEAD} sentences. '
+            'without delivering a concrete, on-topic payload (date, name, fact) '
+            f'in itself or the next {_R10_LOOKAHEAD} sentences. '
             'Either follow up with specifics or delete the sentence.'
         ),
         'lookahead': _R10_LOOKAHEAD,
