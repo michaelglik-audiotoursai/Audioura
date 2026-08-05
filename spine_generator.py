@@ -3,6 +3,9 @@ Spine Generator — produces narrative spine JSON from a tour template + GPT-4o.
 ===============================================================================
 Loads the correct template by tour_category, substitutes variables, calls OpenAI,
 and returns a parsed spine dict. Logs cost + latency.
+
+LOCAL-278: Registers spine cost with cost_rates.llm_cost() (split tokens) and
+cost_meter.record_operation(). Exposes LAST_SPINE_COST for pipeline integration.
 """
 import json
 import logging
@@ -11,6 +14,8 @@ import time
 from typing import Optional, List
 
 import requests
+
+from cost_rates import llm_cost as _llm_cost
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +28,16 @@ _TEMPLATE_MAP = {
     "book": "spine_book.txt",
 }
 
-# GPT-4o pricing (per 1K tokens) — for cost logging
-_INPUT_COST_PER_1K = 0.005
-_OUTPUT_COST_PER_1K = 0.015
+# [LOCAL-278] Module-level cost state — set after each generate_spine() call.
+# Callers can read this to incorporate spine cost into pipeline totals.
+LAST_SPINE_COST = {
+    "cost_usd": 0.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "total_tokens": 0,
+    "model": "",
+    "latency_s": 0.0,
+}
 
 
 def _load_template(tour_category: str) -> str:
@@ -61,6 +73,8 @@ def generate_spine(
     theme_name: str = "",
     story_elements: Optional[List[dict]] = None,
     thread_result=None,
+    model: Optional[str] = None,
+    job_id: Optional[str] = None,
 ) -> Optional[dict]:
     """Generate a narrative spine for a tour.
 
@@ -74,11 +88,15 @@ def generate_spine(
                        When provided, the spine must build from these (story_mode: found).
         thread_result: Optional ThreadDiscoveryResult from theme_thread_discoverer.
                       When provided and mode == "threaded", spine uses discovered themes.
+        model: OpenAI model to use. Defaults to SPINE_MODEL env var or "gpt-4o".
+        job_id: Optional job correlation ID for cost_meter recording.
 
     Returns:
         Parsed spine dict with all 11 fields + optional grounded_on per arc entry.
         Logs cost and latency to stdout/logger.
     """
+    # [LOCAL-278] Model selection: parameter > env var > default
+    _model = model or os.environ.get("SPINE_MODEL", "gpt-4o")
     template = _load_template(tour_category)
 
     # Substitute variables
@@ -149,7 +167,7 @@ REQUIREMENTS for story-grounded spine:
                 "Content-Type": "application/json",
             },
             json={
-                "model": "gpt-4o",
+                "model": _model,
                 "messages": [
                     {
                         "role": "system",
@@ -172,24 +190,48 @@ REQUIREMENTS for story-grounded spine:
         result = response.json()
         text = result["choices"][0]["message"]["content"].strip()
 
-        # Cost calculation
+        # Cost calculation — [LOCAL-278] use cost_rates.llm_cost() with split tokens
         usage = result.get("usage", {})
         input_tokens = usage.get("prompt_tokens", 0)
         output_tokens = usage.get("completion_tokens", 0)
         total_tokens = usage.get("total_tokens", 0)
-        cost = (input_tokens / 1000 * _INPUT_COST_PER_1K) + (
-            output_tokens / 1000 * _OUTPUT_COST_PER_1K
-        )
+        cost = _llm_cost(input_tokens=input_tokens, output_tokens=output_tokens, model=_model)
+
+        # [LOCAL-278] Update module-level state for pipeline integration
+        LAST_SPINE_COST.update({
+            "cost_usd": cost,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": total_tokens,
+            "model": _model,
+            "latency_s": elapsed,
+        })
 
         print(
             f"SPINE_COST: category={tour_category} venue={venue_name[:30]} "
+            f"model={_model} "
             f"tokens={total_tokens} (in={input_tokens} out={output_tokens}) "
             f"cost=${cost:.4f} latency={elapsed:.1f}s"
         )
         logger.info(
             f"Spine generated: {tour_category}/{venue_name[:30]} | "
-            f"${cost:.4f} | {elapsed:.1f}s | {total_tokens} tokens"
+            f"model={_model} | ${cost:.4f} | {elapsed:.1f}s | {total_tokens} tokens"
         )
+
+        # [LOCAL-278] Register with cost_meter (billing ledger)
+        try:
+            from cost_meter import record_operation
+            record_operation(
+                operation_type="spine_generate",
+                our_cost_usd=cost,
+                cache_hit=False,
+                job_id=job_id,
+                breakdown={"llm": cost, "model": _model, "input_tokens": input_tokens, "output_tokens": output_tokens},
+            )
+        except Exception as _meter_err:
+            # Metering failure must never block spine delivery
+            logger.warning(f"[LOCAL-278] Spine cost metering failed (non-fatal): {_meter_err}")
+            print(f"  [LOCAL-278] Spine cost metering failed (non-fatal): {_meter_err}")
 
         # Parse JSON (handle markdown fences if model includes them despite instructions)
         import re
