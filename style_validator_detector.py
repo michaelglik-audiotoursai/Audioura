@@ -1110,6 +1110,19 @@ _R7_PATTERNS = [
     # Fabricated seaside ambiance — cannot be sourced from documents.
     # Does NOT fire on "waves crash against the seawall" (bare factual observation).
     r'\b(?:gentle|soft|rhythmic)\s+(?:lapping|lapping|crashing|splashing)\s+of\s+(?:waves|water)\b.*\b(?:provide|create|offer|lend|add|give)\b',
+    # LOCAL-256: "gentle/salty/fresh [WORD]* breeze/wind carries/brings the scent/smell"
+    # The round 12 pattern "gentle sea breeze carries the scent" has an intervening
+    # word between the sensory adjective and the carrier noun. Catches multi-sensory
+    # fabrication where the narrator invents a scent + sound + breeze scene.
+    # Requires BOTH a sensory carrier verb AND "mingling/sounds/waves" later in the
+    # sentence to confirm it's an invented multi-sensory ambiance, not a bare
+    # factual observation.
+    r'\b(?:salty|gentle|soft|warm|cool|sweet|fresh)\s+\w*\s*(?:breeze|wind|air)\s+(?:carries|brings|fills|wafts)\s+(?:the\s+)?(?:scent|smell|fragrance|aroma)\b.*\b(?:mingling|sounds?\s+of|waves?\s+lapping|seagulls?)\b',
+    # LOCAL-256: "the scent/smell/fragrance of X mingles/mixes/blends with the
+    # fragrance/scent/aroma of Y" — dual-sensory fabrication without "breathe in".
+    # The narrator invents TWO scent sources combined. Does NOT fire on a single
+    # factual scent ("The scent of lavender fills the garden" — one source, factual).
+    r'\b(?:the\s+)?(?:scent|smell|fragrance|aroma)\s+of\s+.+?\b(?:mingles?|mixes?|blends?|intertwines?|combines?)\s+with\s+(?:the\s+)?(?:scent|smell|fragrance|aroma)\b',
 ]
 
 _R7_COMPILED = [re.compile(p, re.IGNORECASE) for p in _R7_PATTERNS]
@@ -1194,22 +1207,24 @@ _R1_REWRITE_RULES = [
      lambda m: f"From {m.group(1).strip().rstrip(',')}, you can admire {m.group(2).strip()}"
     ),
 
-    # "Take in / Admire / Observe the X" → "The X is visible" / "You can admire the X"
+    # "Take in / Admire / Observe the X [that VERB ...]" → supply a predicate
+    # LOCAL-256: The old rule just produced "The X" which is a fragment.
+    # Now: if the captured tail contains a relative clause ("that ..." / "which ..."),
+    # hoist the relative verb to main-clause position. Otherwise supply "is visible".
     (re.compile(
         r'^(?:Take in|Admire|Observe|Appreciate|Enjoy|Behold|Absorb|Notice|See)\s+'
         r'(?:the\s+)?(.+)$',
         re.IGNORECASE | re.DOTALL),
-     lambda m: f"The {m.group(1).strip()}" if m.group(1).strip()[0:1].islower()
-     else f"{m.group(1).strip()}"
+     '_take_in_handler'  # LOCAL-256: delegate to handler that ensures a finite verb
     ),
 
-    # "Look for the X" → "The X stands..." / "X is here"
+    # "Look for the X" → supply a predicate to avoid fragments
+    # LOCAL-256: "Look for the Fondation Maeght, founded in 1964..." → must remain a sentence.
     (re.compile(
         r'^(?:Look for|Look at|Look upon|Seek out|Search for|Find)\s+'
         r'(?:the\s+)?(.+)$',
         re.IGNORECASE | re.DOTALL),
-     lambda m: f"The {m.group(1).strip()}" if not re.match(r'^[A-Z]', m.group(1).strip())
-     else f"The {m.group(1).strip()}"
+     '_look_for_handler'  # LOCAL-256: delegate to handler that ensures a finite verb
     ),
 
     # "Take a moment to X" → delete if X is pure feeling; rewrite otherwise
@@ -1313,6 +1328,105 @@ _FEELING_TERMS = re.compile(
 )
 
 
+def _take_in_handler(m):
+    """Handle 'Take in / Admire / Observe the X' — LOCAL-256 fragment fix.
+
+    The old rule just produced "The X" which is a bare noun phrase (fragment).
+    Now: detect whether the captured tail already contains a finite verb
+    (via relative clause "that stretches" or "which stands"). If so, promote
+    it to the main verb. Otherwise supply "stretches out before you" or
+    "is visible before you" depending on context.
+    """
+    tail = m.group(1).strip()
+    if not tail:
+        return None
+
+    # Case 1: tail contains "that VERB" relative clause → hoist verb to main
+    # "panoramic view that stretches out before you, with ..."
+    # → "The panoramic view stretches out before you, with ..."
+    rel_match = re.match(
+        r'^(.+?)\s+that\s+((?:stretch|extend|spread|open|unfold|sweep|reach|rise|tower|stand|lie|sit|overlook|face)\w*\s+.+)$',
+        tail, re.IGNORECASE | re.DOTALL
+    )
+    if rel_match:
+        subject = rel_match.group(1).strip().rstrip(',')
+        predicate = rel_match.group(2).strip()
+        # Ensure subject has "The" prefix — don't capitalize internal words
+        if not re.match(r'^(?:the|a|an|this|that)\b', subject, re.IGNORECASE):
+            subject = f"The {subject}"
+        elif subject[0].islower():
+            subject = subject[0].upper() + subject[1:]
+        return f"{subject} {predicate}"
+
+    # Case 2: tail contains "which VERB" → same treatment
+    rel_match2 = re.match(
+        r'^(.+?),?\s+which\s+((?:stretch|extend|spread|open|unfold|sweep|reach|rise|tower|stand|lie|sit|overlook|face)\w*\s+.+)$',
+        tail, re.IGNORECASE | re.DOTALL
+    )
+    if rel_match2:
+        subject = rel_match2.group(1).strip().rstrip(',')
+        predicate = rel_match2.group(2).strip()
+        if subject and subject[0].islower():
+            subject = subject[0].upper() + subject[1:]
+        if not re.match(r'^(?:the|a|an|this|that)\b', subject, re.IGNORECASE):
+            subject = f"The {subject}"
+        return f"{subject} {predicate}"
+
+    # Case 3: no relative clause — supply a predicate
+    # "the breathtaking views of the azure waters" → "The breathtaking views of the azure waters stretch out before you."
+    if tail and tail[0].islower():
+        tail = tail[0].upper() + tail[1:]
+    if not re.match(r'^(?:The|A|An|This|That)\b', tail):
+        tail = f"The {tail}"
+    # Rstrip period so we can add our predicate
+    tail_clean = tail.rstrip('.')
+    return f"{tail_clean} stretches out before you."
+
+
+def _look_for_handler(m):
+    """Handle 'Look for / Search for the X' — LOCAL-256 fragment fix.
+
+    The old rule just produced "The X" which has no verb. Now: detect whether
+    the tail contains a participle that can be hoisted ("X, founded in Y")
+    or supply a copula ("X was founded in Y" / "X stands here").
+    """
+    tail = m.group(1).strip()
+    if not tail:
+        return None
+
+    # Case 1: "X, PARTICIPLE ..." (past participle as reduced relative)
+    # "Fondation Maeght, founded in 1964 by Marguerite and Aimé Maeght."
+    # → "The Fondation Maeght was founded in 1964 by Marguerite and Aimé Maeght."
+    participle_match = re.match(
+        r'^(.+?),\s+(founded|built|created|established|constructed|designed|'
+        r'opened|completed|erected|dedicated|commissioned|painted|sculpted|'
+        r'carved|written|composed|named|known|located|situated|dating|placed)\b(.*)$',
+        tail, re.IGNORECASE | re.DOTALL
+    )
+    if participle_match:
+        subject = participle_match.group(1).strip()
+        participle = participle_match.group(2)
+        rest = participle_match.group(3).strip()
+        # Ensure "The" prefix
+        if not re.match(r'^(?:the|a|an)\b', subject, re.IGNORECASE):
+            subject = f"The {subject}"
+        # Choose auxiliary: "dating" gets "is", others get "was"
+        aux = "is" if participle.lower() in ('dating', 'known', 'located', 'situated') else "was"
+        result = f"{subject} {aux} {participle}{' ' + rest if rest else ''}"
+        # Ensure ends with period
+        if not result.rstrip().endswith('.'):
+            result = result.rstrip() + '.'
+        return result
+
+    # Case 2: tail has no participle — supply "stands here" / "can be found here"
+    if tail and tail[0].islower():
+        tail = tail[0].upper() + tail[1:]
+    if not re.match(r'^(?:The|A|An)\b', tail):
+        tail = f"The {tail}"
+    tail_clean = tail.rstrip('.')
+    return f"{tail_clean} can be found here."
+
+
 def _take_a_moment_handler(m):
     """Handle 'Take a moment to X' — delete if pure feeling, rewrite otherwise."""
     rest = m.group(1).strip()
@@ -1321,7 +1435,7 @@ def _take_a_moment_handler(m):
         return None  # Signal deletion
     # Otherwise, the sentence has some content — rewrite as statement
     # "Take a moment to admire the Fondation Maeght, founded in 1964..."
-    # → "The Fondation Maeght, founded in 1964..."
+    # → "The Fondation Maeght was founded in 1964..."
     # Strip the imperative prefix verb
     content_match = re.match(
         r'(?:admire|observe|notice|examine|study|inspect|appreciate|explore|discover|look at)\s+(.+)',
@@ -1329,7 +1443,26 @@ def _take_a_moment_handler(m):
     )
     if content_match:
         extracted = content_match.group(1).strip()
-        # Capitalize if needed
+        # LOCAL-256: Check for participle pattern (same as _look_for_handler)
+        # "the Fondation Maeght, founded in 1964 by ..." → supply copula
+        participle_match = re.match(
+            r'^(?:the\s+)?(.+?),\s+(founded|built|created|established|constructed|designed|'
+            r'opened|completed|erected|dedicated|commissioned|painted|sculpted|'
+            r'carved|written|composed|named|known|located|situated|dating|placed)\b(.*)$',
+            extracted, re.IGNORECASE | re.DOTALL
+        )
+        if participle_match:
+            subject = participle_match.group(1).strip()
+            participle = participle_match.group(2)
+            p_rest = participle_match.group(3).strip()
+            if not re.match(r'^(?:the|a|an)\b', subject, re.IGNORECASE):
+                subject = f"The {subject}"
+            aux = "is" if participle.lower() in ('dating', 'known', 'located', 'situated') else "was"
+            result = f"{subject} {aux} {participle}{' ' + p_rest if p_rest else ''}"
+            if not result.rstrip().endswith('.'):
+                result = result.rstrip() + '.'
+            return result
+        # No participle — add "The" prefix if needed
         if extracted and extracted[0].islower():
             # Add "The" if it doesn't already start with a determiner
             if not re.match(r'^(?:the|a|an|this|that|these|those)\b', extracted, re.IGNORECASE):
@@ -1368,6 +1501,128 @@ def _is_pure_instruction(sentence: str) -> bool:
     return False
 
 
+# ── LOCAL-256: Finite-verb checker ───────────────────────────────────────────
+# A sentence without a finite main verb is a fragment. Every R1 rewrite must
+# pass this check; if it fails, the original sentence is kept (an imperative
+# is better than a fragment).
+#
+# Heuristic: A sentence has a finite verb if it contains a word that is
+# (a) a common English finite form (is, was, are, were, has, had, stands, etc.)
+# OR (b) a verb-like word (ends -s, -ed, -es) that is NOT inside a relative
+# clause modifier ("that stretches") — wait, relative clause verbs ARE finite,
+# but they don't make the main clause complete. The key insight:
+#
+# "The X that stretches before you" → "stretches" is finite but it's in the
+# relative clause, not the main clause. The main clause is "The X" — no verb.
+#
+# Strategy: strip relative clauses (that/which + ...) and participial phrases
+# (, founded in ..., , perched high ...) then check if ANYTHING remains that
+# looks like a finite verb.
+
+_FINITE_VERB_FORMS = re.compile(
+    r'\b(?:is|are|was|were|has|have|had|does|do|did|can|could|will|would|'
+    r'shall|should|may|might|must|stands|stretches|extends|spreads|opens|'
+    r'unfolds|sweeps|reaches|rises|towers|lies|sits|overlooks|faces|'
+    r'remains|holds|carries|contains|features|offers|provides|marks|'
+    r'dates|runs|winds|leads|connects|separates|dominates|reveals|'
+    r'houses|displays|showcases|preserves|reflects|represents|serves)\b',
+    re.IGNORECASE
+)
+
+# Patterns for subordinate/relative clauses and participial phrases
+_RELATIVE_CLAUSE = re.compile(r'\bthat\s+\w+|\bwhich\s+\w+', re.IGNORECASE)
+_PARTICIPIAL_PHRASE = re.compile(
+    r',\s*(?:founded|built|created|established|constructed|designed|opened|'
+    r'completed|erected|dedicated|commissioned|painted|sculpted|carved|'
+    r'written|composed|named|known|located|situated|dating|placed|'
+    r'perched|nestled|surrounded|overlooking|facing|rising|towering|'
+    r'stretching|extending|winding)\b[^,]*', re.IGNORECASE
+)
+
+
+def _has_finite_main_verb(sentence: str) -> bool:
+    """Check if a sentence has a finite verb in the main clause.
+
+    LOCAL-256: Used to reject rewrites that produce fragments.
+    Returns True if the sentence appears to have a complete main clause.
+
+    Design: conservative — returns True (allow) in ambiguous cases. The
+    purpose is to catch the SPECIFIC fragment patterns our R1 rewrite rules
+    can produce:
+      "The X, founded in Y." (noun + participial — no main verb)
+      "The X that stretches..." (noun + relative clause — no main verb)
+    Anything that doesn't match these fragment shapes passes.
+    """
+    stripped = sentence.strip().rstrip('.')
+    if not stripped:
+        return False
+
+    # Strip relative clauses and participial phrases to isolate main clause
+    main_clause = _RELATIVE_CLAUSE.sub('', stripped)
+    main_clause = _PARTICIPIAL_PHRASE.sub('', main_clause)
+    main_clause = main_clause.strip().rstrip(',').strip()
+
+    # If after stripping, nothing substantial remains (just a noun phrase),
+    # it's a fragment. "The Fondation Maeght" after stripping ", founded in..."
+    # But "The Fondation Maeght was founded in 1964" → "The Fondation Maeght was founded in 1964" (not stripped)
+
+    # Check for finite verb forms in what remains
+    if _FINITE_VERB_FORMS.search(main_clause):
+        return True
+
+    # "you can" pattern (modal + infinitive)
+    if re.search(r'\byou\s+can\b', main_clause, re.IGNORECASE):
+        return True
+
+    # "From X, ..." patterns with a verb after the comma
+    from_match = re.match(r'^From\s+.+?,\s*(.+)$', main_clause, re.IGNORECASE)
+    if from_match:
+        rest = from_match.group(1)
+        if _FINITE_VERB_FORMS.search(rest) or re.search(r'\byou\s+can\b', rest, re.IGNORECASE):
+            return True
+
+    # Heuristic: any word ending in -ed/-es/-s after an article/determiner
+    # Catches "the village buzzed", "the foundation embodies", "beckons with"
+    if re.search(r'\b[a-z]+(?:ed|es|ons|ens)\b', main_clause):
+        return True
+
+    # Check for verbs ending in -s (3rd person present): "beckons", "holds"
+    # But exclude words that are commonly nouns ending in -s: "views", "streets", "walls"
+    _COMMON_NOUN_S = {'views', 'streets', 'walls', 'trees', 'arts', 'works',
+                      'examples', 'gardens', 'galleries', 'paths', 'stones',
+                      'waters', 'waves', 'sounds', 'scents', 'facts', 'years',
+                      'words', 'names', 'steps', 'stops', 'tours', 'times'}
+    words = main_clause.split()
+    for w in words:
+        wl = w.lower().rstrip('.,;:!?')
+        if wl.endswith('s') and len(wl) > 3 and wl not in _COMMON_NOUN_S:
+            # Check if preceded by a noun phrase (likely verb position)
+            idx = main_clause.lower().find(wl)
+            if idx > 0:
+                before = main_clause[:idx].strip()
+                # If what's before looks like a subject (ends with a capitalized word or pronoun)
+                if before and (before[-1] not in '.,;:' and
+                    (re.search(r'[A-Z][a-z]+$', before) or
+                     re.search(r'\b(?:it|he|she|they|we|one|this|that|which)\s*$', before, re.IGNORECASE))):
+                    return True
+
+    # "In YEAR/decade" pattern — virtually always has a verb
+    if re.search(r'^In\s+(?:the\s+)?\d{3,4}s?\b', main_clause):
+        return True
+
+    # If the main clause is very short (< 5 words) after stripping, likely a fragment
+    words_remaining = [w for w in main_clause.split() if len(w) > 2]
+    if len(words_remaining) <= 4:
+        return False
+
+    # If main clause has > 8 meaningful words, assume it has a verb somewhere
+    # (our rewrite fragments are typically short noun phrases)
+    if len(words_remaining) > 8:
+        return True
+
+    return False
+
+
 def rewrite_r1_sentence_deterministic(sentence: str) -> str:
     """Attempt deterministic rewrite of an R1-flagged sentence.
 
@@ -1396,6 +1651,16 @@ def rewrite_r1_sentence_deterministic(sentence: str) -> str:
                 return result
             elif handler == '_let_yourself_handler':
                 result = _let_yourself_handler(m)
+                if result is None:
+                    return None
+                return result
+            elif handler == '_take_in_handler':
+                result = _take_in_handler(m)
+                if result is None:
+                    return None
+                return result
+            elif handler == '_look_for_handler':
+                result = _look_for_handler(m)
                 if result is None:
                     return None
                 return result
@@ -1575,7 +1840,11 @@ def apply_r1_rewrites(paragraph: str, api_key: str = None, model: str = None) ->
                     kept.append(sentence)
                     continue
                 else:
-                    # LLM rewrite accepted
+                    # LLM rewrite accepted — LOCAL-256: verify finite verb
+                    if not _has_finite_main_verb(llm_result):
+                        # LLM produced a fragment — keep original
+                        kept.append(sentence)
+                        continue
                     kept.append(llm_result)
                     rewritten_count += 1
                     continue
@@ -1584,7 +1853,12 @@ def apply_r1_rewrites(paragraph: str, api_key: str = None, model: str = None) ->
                 kept.append(sentence)
                 continue
         else:
-            # Deterministic rewrite succeeded
+            # Deterministic rewrite succeeded — LOCAL-256: verify finite verb
+            if not _has_finite_main_verb(result):
+                # Rewrite produced a fragment — keep original (D156: an imperative
+                # is better than a fragment)
+                kept.append(sentence)
+                continue
             kept.append(result)
             rewritten_count += 1
             continue
