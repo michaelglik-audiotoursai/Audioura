@@ -82,10 +82,20 @@ if [ -f "$REPO/secret_scan.py" ]; then
   # The scanner's own docs and tests carry invented fixtures by design; a
   # standing alarm on them would train us to ignore this line. Filter them out
   # and alarm only on what is left.
+  # Drop findings LEAD has reviewed and cleared. Entries are pinned to a
+  # specific commit:path:line — never a filename or a directory — so a real key
+  # added to the same file tomorrow still fires. See secret_scan_cleared.txt.
+  CLEARED="$CD/secret_scan_cleared.txt"
   REAL=$(grep -E "^\s+\[" /tmp/secret_tick.out \
          | grep -v "SUBMISSION_LOCAL-207.md" \
          | grep -v "tests/test_secret_scan.py" \
-         | grep -v "secret_scan.py" | wc -l | tr -d " ")
+         | grep -v "secret_scan.py" \
+         | while read -r line; do
+             KEY=$(echo "$line" | sed -E 's/.*\] ([0-9a-f]+) [0-9-]+ ([^ ]+):([0-9]+).*/\1:\2:\3/')
+             SHORT=$(echo "$KEY" | cut -c1-7)
+             REST=$(echo "$KEY" | cut -d: -f2-)
+             grep -qs "^${SHORT}:${REST}[[:space:]]" "$CLEARED" || echo "$line"
+           done | wc -l | tr -d " ")
   if [ "$REAL" != "0" ]; then
     echo "$(date -u +%FT%TZ) | *** SECRET DETECTED in recent storied commits ($REAL finding/s) — see /tmp/secret_tick.out ***" >> "$CD/ALERTS.md"
   fi
