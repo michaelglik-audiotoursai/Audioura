@@ -4662,3 +4662,62 @@ One candidate LEAD flagged: the paragraph filter. LEAD used `len > 60`; if the
 task used something else, that alone could explain 18 vs 24 — and would mean
 the §1 rates are computed over a different denominator than stated. Which
 would matter, because those rates are the part worth keeping.
+
+---
+
+## D121 — R1 cannot see an imperative that follows a subordinate clause, and that is our house style (2026-08-04)
+
+LOCAL-231 resubmitted with the mechanism found: its original calibration
+aligned the machine's **18** sentence groups 1:1 against Michael's **11** marks,
+so rows 9 and 10 held the wrong text entirely. Corrected to a many-to-one
+mapping, and **R9 fires on both of his 0/5 sentences** — machine groups 16 and
+17, exactly as LOCAL-216 and LOCAL-222 showed.
+
+The honest calibration is now **5 agree · 2 partial · 4 disagree**, and three
+of the four disagreements share one cause. Verified by LEAD:
+
+```
+R1 fires   "Pause to take in the breathtaking view of the harbor."
+CLEAN      "As you arrive at Villefranche, pause to take in the breathtaking view…"
+
+R1 fires   "Take in the sight of the Garoupe lighthouse."
+CLEAN      "As you stand at the highest point, take in the sight of the Garoupe lighthouse."
+```
+
+**Put a subordinate clause in front of an imperative and R1 goes silent.**
+
+Not an accident: D69 built R1 as *sentence-initial base-form verb with no
+subject*, and that was right then. But the pipeline's house style is
+`"As you arrive at X, <imperative>…"` — so most of our imperatives sit precisely
+where R1 cannot see them. Michael scored two such groups 1/5 and 2/5 and said
+so directly: *"Do not give people instructions such as pause to take…"*
+
+**So the true R1 rate is higher than the 27.9% of 2,854 groups in D119.** The
+dominant defect in the product is worse than the number that made it look
+dominant.
+
+### And the navigation exemption is sentence-wide when it should be clause-wide
+
+```
+nav=True, CLEAN   "Pedal along the coastline."
+nav=True, CLEAN   "Pedal along the coastline, envisioning the hidden coves and
+                   immersing yourself in the beauty."
+```
+
+The first is route movement, correctly exempt. The second is route movement
+*plus* pure suggestion, and the exemption covers the lot. Michael scored it
+2/5: *"imperative Pedal, suggestive envisioning, and immersing yourself… way
+too many without substance."*
+
+LOCAL-224 fixed the exemption's *coverage* (it had no cycling verbs) and left
+its *scope* wrong. **LOCAL-233** dispatched for both, with his own marks as the
+boundary in each direction — his cycling directions scored 5/5 and breaking
+those would be worse than the gap.
+
+### Why this calibration was worth doing
+
+Every previous measurement of R1 was self-consistent and wrong in the same
+direction, because the instrument and the analysis shared an assumption about
+where imperatives live. **Only comparing against a human's marks exposed it.**
+Eleven hand-scored groups have now found more than four rounds of automated
+measurement did.
