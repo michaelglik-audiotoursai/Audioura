@@ -4812,3 +4812,81 @@ confident, sourced-looking, false narration.
 
 **Safe to run during Michael's read** — it changes `stop_corpus` data, which
 affects tours generated later. The file he is reading is static.
+
+---
+
+## D124 — Michael's second review: one rule, stated seven times, and we catch almost none of it (2026-08-05)
+
+`Review_on_RIVIERA_2STOP_ROUND2.txt`. Scores: **1, 3, 2, 2, 2 → mean 2.0.**
+Identical to round 1. From his side, nothing improved.
+
+### The rule
+
+> *"Either tell us the story or get rid of the sentence!"*
+> *"If the tour names a subject matter, it should follow up; otherwise, get rid
+> of the sentence."*
+> *"no reason to name something and then not to follow up"*
+> *"where are the tales??"*
+
+Seven repetitions across five paragraphs. **Name a subject, deliver it, or
+delete the sentence.**
+
+### The measurement that matters
+
+LEAD ran every detector over his eight quoted complaints. **Six are invisible:**
+
+```
+CLEAN  "each crack and crevice holding a story"
+CLEAN  "The hillsides hold a multitude of tales from a bygone era."
+CLEAN  "serves as a bridge between ancient civilizations and contemporary life"
+CLEAN  "creating a harmonious symphony of past and present"
+CLEAN  "delving into a rich tapestry of history and culture"
+CLEAN  "create a serene atmosphere, inviting you to explore"
+R1     "Position yourself…" / "Take a moment to absorb…"
+R1     "As you cycle onward, remember Eze Village…"
+```
+
+Only the literal imperatives fire. This is the **largest single gap** between
+our instruments and his judgement, and it is distinct from R9: these sentences
+are stop-specific, they simply promise and do not pay.
+
+**LOCAL-235** dispatched as `R10_UNFULFILLED_PROMISE`, action DELETE — his
+instruction is "get rid of the sentence", not "rewrite it".
+
+### What he confirmed works
+
+> *"absolutely agree! After [is] immeasurably better than before."*
+> *"In my opinion R3_SUGGESTIVE_EXPLORATION actually worked."*
+
+The style fixes land. **They are necessary and not sufficient** — his verdict on
+the cleaned sentence: *"it does not bring any information… What does Listener
+suppose to gain from this sentence?"* Removing the instruction leaves a
+well-formed sentence with nothing in it. That is D123 again: the corpus is the
+ceiling.
+
+### Paragraph 3 is the continuity problem, in his words
+
+> *"senseless combination of words and facts with no interconnectedness between
+> them. So there are facts and stories but because of the lack of
+> interconnectedness they make listener confused instead of informed."*
+
+That is **SQ-S6b** — theme threads, specified 2026-07-07, never built. LEAD had
+parked LOCAL-223 during his read; **unparked and dispatched.** His P3 complaint
+is the exact symptom the spec was written for, and the Lena test (D101) says it
+is the one thing a phone camera cannot replicate.
+
+### And a prolog specification, which he wrote out for us
+
+He gives the tour description four required parts, with worked examples:
+
+1. tour name including transportation
+2. **directions and physicality** — route, terrain, elevation
+3. **the purpose** — the intrigue, why anyone takes this tour
+4. connection forward to the stops
+
+Our current prolog does none of 2–4. His own example is concrete where ours is
+atmospheric: *"a biking route along the coastline from Nice to Antibes… mostly
+flat, with short elevated sections on the capes themselves."*
+
+Not yet dispatched — R10 and theme threads first, because a better-structured
+prolog full of unfulfilled promises is still a bad prolog.
