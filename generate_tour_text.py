@@ -8061,6 +8061,39 @@ Requirements:
         # Clean up resulting empty lines
         complete_tour = re.sub(r'\n\s*\n\s*\n', '\n\n', complete_tour)
 
+    # -------- [LOCAL-260] PHASE post-assembly: Prolog structure validation --------
+    # Michael's four-part prolog specification: the opening must have (in order):
+    #   1. Tour name + transportation mode
+    #   2. Directions and physicality expectation
+    #   3. Purpose / intrigue with sourced facts
+    #   4. Forward connection to stops (naming actual stop content)
+    # This is a REPORT-ONLY check — it never deletes or rewrites.
+    # Deterministic and free (no LLM calls).
+    if _saved_prolog:
+        try:
+            from prolog_structure_validator import validate_prolog_structure
+            _prolog_stop_names = [p.get('name', '') for p in poi_list] if poi_list else []
+            _prolog_meta = {
+                'transport_mode': transport_mode if 'transport_mode' in dir() else 'on_foot',
+                'tour_name': location if location else '',
+                'stop_names': _prolog_stop_names,
+            }
+            _prolog_violations = validate_prolog_structure(_saved_prolog, _prolog_meta)
+            _prolog_errors = [v for v in _prolog_violations if v['severity'] == 'error']
+            if _prolog_violations:
+                print(f"\n  [LOCAL-260] PROLOG STRUCTURE VALIDATION: "
+                      f"{len(_prolog_errors)} error(s), "
+                      f"{len(_prolog_violations) - len(_prolog_errors)} warning(s)")
+                for _pv in _prolog_violations:
+                    print(f"    [{_pv['severity'].upper()}] Part {_pv['part']}: "
+                          f"{_pv['code']} — {_pv['message']}")
+            else:
+                print(f"\n  [LOCAL-260] PROLOG STRUCTURE VALIDATION: ✓ all four parts present and conforming")
+        except ImportError as _e:
+            print(f"\n  [LOCAL-260] Prolog structure validation SKIPPED (import: {_e})")
+        except Exception as _e:
+            print(f"\n  [LOCAL-260] Prolog structure validation error (non-fatal): {_e}")
+
     # Print word count statistics
     print("\n=== Word Count Statistics ===")
     for poi in poi_list:
