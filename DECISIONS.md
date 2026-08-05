@@ -7512,3 +7512,66 @@ The fix is specified as: every item names its stop *and* the fact
 (*"the fortress prison on Île Sainte-Marguerite"*), never emit a truncated span,
 and filter candidates through `check_r1_imperatives` before ranking — the same
 discipline part 4 already applies.
+
+## D190 — The museum overview is restored, and the three-category check is now a rule (2026-08-05)
+
+LOCAL-282 merged (`2307e64`). LEAD's regression from this afternoon is fixed:
+R3 now gates only the orientation *text*, while the prefix carrying the tour
+overview and "Your first stop is X" is emitted regardless.
+
+LEAD verified all three categories rather than trusting the submission's table:
+
+```
+museum 5-stop   overview present, "Orientation:" leads, and exactly ONE
+                Orientation line across five stops — R3 still correctly
+                dropping the weak per-stop orientations
+biking 2-stop   overview present, "Your first stop is" present, unregressed
+restaurant      still aborting at the gate (LOCAL-281's scope)
+```
+
+**The three-category check is the durable part.** Its absence is what caused the
+bug: LEAD verified the original change three times, all on cycling tours, which
+always emit an orientation. It is now in the acceptance criteria rather than in
+LEAD's intentions.
+
+The `"L a geste de Bouddha"` broken space was investigated and **not found** in
+any source, corpus row or canonical title — so it is introduced downstream of the
+data. Reported unresolved rather than guessed at, which is the right answer and
+worth noting as the standard.
+
+## D191 — Restaurant tours generate again; the selector still does not produce restaurants (2026-08-05)
+
+LOCAL-281 merged (`1580936`). The `dining` venue kind exists and the fatal abort
+is gone: **0/3 verified → 2/3 delivered**.
+
+All six boundary rows checked by LEAD:
+
+```
+Le Chantecler, Nice      VERIFIED    Hotel Negresco, Wikipedia
+La Petite Maison, Nice   VERIFIED    Didier Casnati, Wikipedia
+L'Univers, Nice          unverified  real, but no tier-1 trace
+fabricated restaurant    rejected
+Le Chantecler, LYON      rejected    proximity check works
+fabricated museum stop   rejected    D127 strictness preserved
+```
+
+**The L'Univers miss is a genuine false negative and was reported rather than
+hidden.** Christian Plumail's restaurant is real and confirmed on Gayot and
+elsewhere, but absent from Wikipedia and Wikidata. The right answer is that the
+gate cannot verify what its sources do not contain — a false negative beats a
+weakened gate, and the fix is better sources, not a lower bar.
+
+**But the delivered tour is not a restaurant tour.** Stop 1 is the **Musée
+Matisse**; the opening reads *"a walking journey through ."* with an empty venue
+name; and the route says *"from Musée Matisse to Musée Matisse"*.
+
+The cause is visible in the prompt construction: museum tours get
+`_museum_venue_constraint`, biking tours get transport constraints, and
+**restaurant tours appear to get neither** — so the model returns whatever is
+notable in Nice, which is museums. Dispatched as LOCAL-285.
+
+Two general points fall out. The gate and the selector are independent failures
+and fixing one exposes the other — the abort was hiding the selection bug
+entirely. And **`"through ."` reaching text bound for text-to-speech** means no
+guard catches an empty span; LOCAL-285 adds one at the post-assembly gate where
+LOCAL-251's placeholder check already lives.
