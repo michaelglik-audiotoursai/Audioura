@@ -7681,3 +7681,33 @@ symptom precisely and both fixes addressed the symptom. Neither task file said
 "stop cutting, start composing" until now. LEAD specified outputs to avoid
 rather than the method to use, and got two rounds of increasingly careful
 cutting.
+
+## D195 — What could be verified without the API, and what could not (2026-08-05)
+
+LOCAL-285 merged (`db109f9`) during the credit outage. The distinction between
+what was proven and what was assumed is the point of this entry.
+
+**Verified without generation:**
+
+- the restaurant constraint is gated on `tour_category == 'restaurant'`, so it
+  cannot touch museum or biking selection — read from the diff;
+- the empty-venue gate sits at post-assembly beside LOCAL-251's placeholder
+  check. LEAD ran its regex against **eight real Riviera tours: zero false
+  positives**, and confirmed it fires on the text it was built for —
+  *"a walking journey through ."* is repaired rather than spoken;
+- the self-route guard is conditioned on `len(poi_list) > 1`;
+- 17 unit tests pass.
+
+**Not verified:** that a restaurant tour now selects restaurants. That needs a
+generation. The change is contained to the restaurant branch and restaurant
+tours are already broken, so merging unproven costs nothing — but it is unproven
+and is recorded as such in the PAUSE file's resume checklist.
+
+**The general point.** An outage forces the distinction between *inspecting a
+change* and *observing its effect*, which is the same distinction this project
+has repeatedly got wrong in the other direction — green tests over dead code
+(D-series), residual counts over broken prose (D161), a structural argument in
+place of a regression test (D193). Today it was possible to verify two of three
+claims by other means and say plainly that the third was not. That is the
+correct shape of a submission under constraint, and it is worth having on the
+record as the standard rather than as an excuse.
