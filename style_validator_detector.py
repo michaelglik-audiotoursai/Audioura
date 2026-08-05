@@ -1060,6 +1060,16 @@ _R7_PATTERNS = [
     r'\b(?:you\s+can\s+)?almost\s+(?:taste|smell|hear|feel)\b',
     # "fill your ears/nose/senses" with something qualified as faint/distant
     r'\b(?:faint|distant|soft|gentle)\s+(?:sound|noise|melody|music|fragrance|scent)\b.*\bfill\s+your\b',
+    # LOCAL-247: Fabricated multi-sensory scene + abstract emotional result.
+    # Pattern: "the [sensory] + [sensory verb] ... creates/evokes a [feeling] ambiance/atmosphere"
+    # Michael's 1/5: "guessing what one would feel: very annoying to humans"
+    # Fires when: sentence has a sensory carrier (breeze, scent, sound, waves)
+    # AND attributes an abstract emotional quality (ambiance, serenity, atmosphere)
+    # via a causation verb (creates, evokes, produces, offers, provides).
+    # Does NOT fire on factual sensory ("The market smells of lavender") — no abstract result.
+    r'\b(?:the\s+)?(?:salty|gentle|soft|warm|cool|sweet|fresh)\s+(?:breeze|wind|air|scent|aroma|fragrance)\s+(?:carries|brings|fills|wafts)\b.*\b(?:ambiance|ambience|atmosphere|serenity|tranquility|tranquillity|calm|peace)\b',
+    # Sound + abstract emotional causation: "the sound of X creates a [feeling]"
+    r'\bthe\s+sound\s+of\s+.*\b(?:creates?|produces?|evokes?|offers?|provides?|conjures?)\s+(?:a\s+)?(?:soothing|calming|serene|peaceful|tranquil|harmonious|magical|enchanting)\s+(?:ambiance|ambience|atmosphere|backdrop|setting|mood)\b',
 ]
 
 _R7_COMPILED = [re.compile(p, re.IGNORECASE) for p in _R7_PATTERNS]
@@ -1154,6 +1164,13 @@ _R8_PATTERNS = [
     r'\banchors?\s+the\s+listener\b',
     # "a sound, material, smell" — the exact prompt triple
     r'\ba\s+sound,?\s*(?:a\s+)?material,?\s*(?:a\s+)?smell\b',
+    # LOCAL-247: "this stop aligns with the tour's theme" — model restating
+    # its structural purpose instead of narrating content
+    r'\bthis\s+stop\s+aligns\s+with\b',
+    # "aligns with the tour's/overall theme" — same family
+    r'\baligns?\s+with\s+the\s+(?:tour|overall|main)\b.*\btheme\b',
+    # "the tour's theme of [gerund]" — model announcing purpose
+    r"\bthe\s+tour's\s+theme\s+of\b",
 ]
 
 _R8_COMPILED = [re.compile(p, re.IGNORECASE) for p in _R8_PATTERNS]
@@ -1322,6 +1339,10 @@ _R9_FILLER_PATTERNS = [
     r'\bevery\s+corner\s+holds?\b',
     # "spans more ground"
     r'\bspans?\s+more\s+ground\b',
+    # LOCAL-247: "inspired countless/many [X] over the years/centuries"
+    r'\binspired\s+(?:countless|many|numerous|innumerable)\s+\w+\s+over\s+the\s+(?:years|centuries|decades|generations)\b',
+    # LOCAL-247: "stunning/breathtaking [landscape/scenery] that has inspired"
+    r'\b(?:stunning|breathtaking|beautiful|magnificent)\s+(?:coastal\s+)?(?:landscape|scenery|view|vista|panorama)\s+that\s+has\b',
 ]
 _R9_FILLER_COMPILED = [re.compile(p, re.IGNORECASE) for p in _R9_FILLER_PATTERNS]
 
@@ -1337,6 +1358,12 @@ def _has_proper_noun(sentence: str) -> bool:
     used as geographic labels in a generic frame ("From X to Y — [filler]"),
     they don't save the sentence. We detect this by checking if the predicate
     (the part after the place-name frame) has substance.
+
+    LOCAL-247: Extended beyond "From X to Y" to catch the broader pattern:
+    place names as subject with entirely generic predicate. E.g.:
+    "The Cap d'Antibes, along with Cap Ferrat, forms a stunning coastal
+    landscape that has inspired countless creatives over the years."
+    The proper nouns are geographic labels; the predicate delivers nothing.
     """
     words = sentence.split()
     if len(words) < 2:
@@ -1381,6 +1408,80 @@ def _has_proper_noun(sentence: str) -> bool:
                     break
             if not pred_has_specifics and _has_filler_signal(pred_text):
                 return False  # Proper nouns are just geographic labels in filler
+
+    # LOCAL-247: Generalized D89 check — if ALL proper nouns in the sentence
+    # are place-name-like, and the verb/predicate portion is generic filler,
+    # then the proper nouns don't provide substantive specificity.
+    # Pattern: "[Place], along with [Place], [generic verb phrase]"
+    #
+    # Strategy: check if all proper nouns are geographic, then check if
+    # the predicate is pure filler with no factual content.
+    _geo_prefixes = {'cap', 'mont', 'monte', 'jardin', 'château', 'chateau',
+                     'lac', 'île', 'ile', 'fort', 'villa', 'hôtel', 'hotel',
+                     'col', 'val', 'port', 'pointe', 'baie', 'pic',
+                     'rue', 'place', 'avenue', 'boulevard', 'piazza',
+                     'via', 'corso', 'calle', 'plage', 'sentier', 'chemin'}
+    _geo_proper_set = {'riviera', 'mediterranean', 'adriatic', 'atlantic',
+                       'pacific', 'alps', 'pyrenees', 'sahara', 'amazon',
+                       'danube', 'rhine', 'seine', 'loire', 'nile'}
+    _nationality_set = {'french', 'italian', 'spanish', 'german', 'english',
+                        'british', 'greek', 'roman', 'turkish', 'portuguese',
+                        'dutch', 'belgian', 'swiss', 'austrian', 'russian',
+                        'chinese', 'japanese', 'indian', 'african', 'european',
+                        'asian', 'american', 'northern', 'southern', 'eastern',
+                        'western'}
+    # Check if at least one proper noun is a geographic prefix — if so,
+    # unknown adjacent proper nouns are likely place-name components
+    has_geo_prefix = any(pn.lower() in _geo_prefixes for pn in proper_nouns_found)
+
+    all_place_like = True
+    for pn in proper_nouns_found:
+        pn_lower = pn.lower()
+        pn_stem = _normalize_for_place_check(pn)
+        if pn_lower in _PLACE_WORDS or pn_stem in _PLACE_WORDS:
+            continue
+        if pn_lower in _geo_proper_set:
+            continue
+        if pn_lower in _nationality_set:
+            continue
+        if pn_lower in _geo_prefixes:
+            continue
+        # Unknown word — is it a place-name component (like "Ferrat" in "Cap Ferrat")?
+        # If there's a geographic prefix among the other proper nouns, treat
+        # unknown adjacent capitalized words as part of a place name.
+        if has_geo_prefix:
+            continue
+        # No geographic prefix sibling — this could be a person name
+        all_place_like = False
+        break
+
+    if all_place_like and proper_nouns_found:
+        # All proper nouns are geographic. Check if the sentence has
+        # any non-geographic factual content (dates, numbers, specific events)
+        has_date = _has_date(sentence)
+        has_number = _has_number(sentence)
+        if not has_date and not has_number:
+            # Check if the predicate portion has generic filler patterns
+            _generic_predicate_patterns = [
+                # "inspired countless/many X over the years"
+                r'\binspired\s+(?:countless|many|numerous|innumerable)\b',
+                # "forms/creates a stunning/beautiful/gorgeous [landscape/scene]"
+                r'\bforms?\s+(?:a\s+)?(?:stunning|beautiful|gorgeous|breathtaking|magnificent|spectacular)\b',
+                # "has attracted/drawn [visitors/tourists/artists] for [decades/centuries]"
+                r'\b(?:attracted|drawn|lured|beckoned)\s+(?:visitors?|tourists?|artists?|creatives?|travelers?|travellers?)\b.*\b(?:for|over)\s+(?:decades|centuries|years|generations)\b',
+                # "has inspired countless creatives over the years"
+                r'\binspired\s+.*\bover\s+the\s+(?:years|centuries|decades|generations)\b',
+                # "showcases the region's [abstract quality]"
+                r'\bshowcases?\s+the\s+(?:region|area|coast|city|town)\'?s?\s+(?:unspoiled\s+)?(?:beauty|charm|elegance|history|heritage|culture)\b',
+                # "that has inspired [anyone] over the years/centuries"
+                r'\bthat\s+has\s+inspired\b.*\bover\s+the\s+(?:years|centuries|decades|generations)\b',
+            ]
+            for pat in _generic_predicate_patterns:
+                if re.search(pat, sentence, re.IGNORECASE):
+                    return False  # Place-name labels + generic predicate = no specificity
+            # Also check standard filler signal
+            if _has_filler_signal(sentence):
+                return False
 
     return True
 
@@ -1750,16 +1851,98 @@ def _sentence_has_promise(sentence: str) -> bool:
     return False
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# UNIFIED PLACE VOCABULARY (LOCAL-247)
+# ═══════════════════════════════════════════════════════════════════════════════
+# One set consulted by BOTH _is_place_name AND _sentence_has_concrete_payload.
+# Prior to LOCAL-247, _place_suffixes and _place_only_words disagreed:
+#   - 'path' was in _place_only_words but not _place_suffixes
+#   - 'coastal' (adjective of 'coast') was unrecognized
+# This caused "Coastal Path" to be classified as a person name.
+
+_PLACE_WORDS = {
+    # Infrastructure / routes
+    'village', 'town', 'city', 'park', 'garden', 'bay', 'beach',
+    'coast', 'cape', 'peninsula', 'island', 'mountain', 'hill',
+    'street', 'road', 'path', 'trail', 'square', 'plaza', 'port',
+    'bridge', 'palace', 'castle', 'church', 'chapel', 'cathedral',
+    'museum', 'hotel', 'tower', 'gate', 'pass', 'lighthouse',
+    'fort', 'fortress', 'citadel', 'abbey', 'monastery', 'priory',
+    'basilica', 'shrine', 'temple', 'harbour', 'harbor', 'pier',
+    'wharf', 'quay', 'dam', 'reservoir', 'falls', 'gorge', 'canyon',
+    # Additional route/path words (the gap that caused this bug)
+    'walk', 'way', 'lane', 'passage', 'route', 'promenade',
+    'esplanade', 'terrace', 'corniche', 'lookout', 'viewpoint',
+    # Foreign route words likely in tour stop names
+    'sentier', 'chemin', 'allée', 'corso', 'passeggiata',
+    # Landscape features
+    'cliff', 'cove', 'inlet', 'headland', 'point', 'bluff',
+    'ridge', 'valley', 'peak', 'summit', 'plateau',
+    # From _place_only_words that were missing from _place_suffixes
+    'riviera', 'mediterranean', 'french', 'european', 'italian',
+}
+
+# Adjective-to-stem mapping: resolves adjective forms to their base place word.
+# "Coastal Path" → stem('coastal')='coast' → 'coast' ∈ _PLACE_WORDS → place name.
+_ADJECTIVE_TO_PLACE_STEM = {
+    'coastal': 'coast',
+    'mountainous': 'mountain',
+    'alpine': 'mountain',
+    'oceanic': 'ocean',
+    'maritime': 'port',
+    'riverside': 'river',
+    'lakeside': 'lake',
+    'hillside': 'hill',
+    'seaside': 'beach',
+    'cliffside': 'cliff',
+    'hilltop': 'hill',
+    'clifftop': 'cliff',
+    'woodland': 'forest',
+    'forested': 'forest',
+    'volcanic': 'volcano',
+    'glacial': 'glacier',
+    'peninsular': 'peninsula',
+    'insular': 'island',
+    'suburban': 'town',
+    'urban': 'city',
+    'rural': 'village',
+    'tropical': 'island',
+    'panoramic': 'viewpoint',
+    'scenic': 'route',
+}
+
+# French/Italian/Spanish/Dutch/German lowercase particles that appear inside
+# multi-word place names and must NOT break a capitalized-word run.
+# "Cap d'Antibes", "Hôtel du Cap-Eden-Roc", "Villa della Rotonda",
+# "Ludwig van Beethoven" (also persons — that's fine, we keep the run intact
+# and let _is_place_name decide afterwards).
+_NAME_PARTICLES = {
+    "d'", "l'", "de", "du", "des", "la", "le", "les",
+    "di", "del", "della", "delle", "dei", "degli", "dall'", "dall",
+    "van", "von", "den", "der", "het", "ten", "ter",
+    "el", "al", "bin", "ibn",
+}
+
+
+def _normalize_for_place_check(word: str) -> str:
+    """Resolve a word to its place-vocabulary stem if it's an adjective form."""
+    lower = word.lower()
+    return _ADJECTIVE_TO_PLACE_STEM.get(lower, lower)
+
+
 def _is_place_name(cap_words: List[str], place_suffixes: set) -> bool:
     """Determine if a sequence of capitalized words is likely a place name.
 
     Place names: "Eze Village", "Cap d'Antibes", "Jardin Exotique",
-    "Mont Bastide", "Eden-Roc", "French Riviera"
+    "Mont Bastide", "Eden-Roc", "French Riviera", "Coastal Path"
     Person names: "F. Scott Fitzgerald", "Claude Monet", "Saracen raiders"
 
-    Heuristic: if the last word (lowercased) is a place-type suffix, or if
-    the sequence is exactly 2 words and one of them is a known geographic term,
-    treat it as a place name rather than a person name.
+    Heuristic: if the last word (lowercased or adjective-resolved) is a
+    place-type word, or if the sequence matches geographic patterns, treat
+    it as a place name rather than a person name.
+
+    LOCAL-247: uses _PLACE_WORDS (unified vocabulary) and resolves adjective
+    forms via _ADJECTIVE_TO_PLACE_STEM.
     """
     if not cap_words:
         return False
@@ -1767,9 +1950,17 @@ def _is_place_name(cap_words: List[str], place_suffixes: set) -> bool:
     last_clean = re.sub(r"'s$", '', cap_words[-1]).lower()
     first_clean = re.sub(r"'s$", '', cap_words[0]).lower()
 
-    # If last word is a place suffix (Village, Park, Garden, etc.)
-    if last_clean in place_suffixes:
+    # Resolve adjective forms
+    last_stem = _normalize_for_place_check(cap_words[-1])
+    first_stem = _normalize_for_place_check(cap_words[0])
+
+    # If last word (or its stem) is a place word
+    if last_clean in _PLACE_WORDS or last_stem in _PLACE_WORDS:
         return True
+    # If first word (or its stem) is a place word
+    if first_clean in _PLACE_WORDS or first_stem in _PLACE_WORDS:
+        return True
+
     # Known geographic proper nouns (regions, seas, etc.)
     _geo_proper = {'riviera', 'mediterranean', 'adriatic', 'atlantic',
                    'pacific', 'alps', 'pyrenees', 'sahara', 'amazon',
@@ -1791,6 +1982,12 @@ def _is_place_name(cap_words: List[str], place_suffixes: set) -> bool:
                        'asian', 'american', 'northern', 'southern', 'eastern',
                        'western'}:
         return True
+    # Check any word in the sequence (or its stem) against _PLACE_WORDS
+    for w in cap_words:
+        w_lower = re.sub(r"'s$", '', w).lower()
+        w_stem = _normalize_for_place_check(w)
+        if w_lower in _PLACE_WORDS or w_stem in _PLACE_WORDS:
+            return True
     # Exactly 2 words where one is a known geographic modifier
     if len(cap_words) == 2:
         all_lower = {re.sub(r"'s$", '', w).lower() for w in cap_words}
@@ -1836,52 +2033,68 @@ def _sentence_has_concrete_payload(sentence: str) -> bool:
 
     # 4. Has a named person (two+ consecutive capitalized words that aren't
     #    a place name — "F. Scott Fitzgerald", "Claude Monet", "Mount Bastide")
+    #
+    # LOCAL-247 fixes:
+    #   a) French/Italian/Spanish particles (d', de, du, van, von, etc.) do NOT
+    #      break a capitalized run. "Cap d'Antibes Coastal Path" is one name.
+    #   b) Uses _PLACE_WORDS (unified vocabulary) instead of separate sets.
+    #   c) Adjective forms resolved via _normalize_for_place_check.
     words = sentence.split()
     consecutive_caps = 0
     consecutive_cap_words = []
-    _place_only_words = {
-        'village', 'town', 'city', 'park', 'garden', 'bay', 'beach',
-        'coast', 'cape', 'peninsula', 'island', 'mountain', 'hill',
-        'street', 'road', 'path', 'trail', 'square', 'plaza', 'port',
-        'riviera', 'mediterranean', 'french', 'european', 'italian',
+    _skip_words = {
+        'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'by',
+        'for', 'to', 'of', 'is', 'was', 'are', 'were', 'has', 'had',
+        'its', 'their', 'this', 'that', 'these', 'those',
     }
-    # Known place-name patterns (multi-word place names that aren't person names)
-    _place_suffixes = {'village', 'town', 'city', 'park', 'garden', 'bay',
-                       'beach', 'coast', 'cape', 'island', 'hill', 'mountain',
-                       'street', 'road', 'trail', 'square', 'port', 'bridge',
-                       'palace', 'castle', 'church', 'chapel', 'cathedral',
-                       'museum', 'hotel', 'tower', 'gate', 'pass',
-                       'lighthouse', 'fort', 'fortress', 'citadel', 'abbey',
-                       'monastery', 'priory', 'basilica', 'shrine', 'temple',
-                       'harbour', 'harbor', 'pier', 'wharf', 'quay',
-                       'dam', 'reservoir', 'falls', 'gorge', 'canyon'}
     for i, word in enumerate(words):
         if i == 0:
             consecutive_caps = 0
             consecutive_cap_words = []
             continue
-        clean = re.sub(r'[^a-zA-Z\'-]', '', word)
+        clean = re.sub(r'[^a-zA-Z\u00C0-\u024F\'-]', '', word)
         if not clean:
             # Check accumulated caps before resetting
-            if consecutive_caps >= 2 and not _is_place_name(consecutive_cap_words, _place_suffixes):
+            if consecutive_caps >= 2 and not _is_place_name(consecutive_cap_words, _PLACE_WORDS):
                 return True
             consecutive_caps = 0
             consecutive_cap_words = []
             continue
-        if clean[0].isupper() and len(clean) > 1 and clean.lower() not in {
-            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'by',
-            'for', 'to', 'of', 'is', 'was', 'are', 'were', 'has', 'had',
-            'its', 'their', 'this', 'that', 'these', 'those',
-        }:
-            consecutive_caps += 1
-            consecutive_cap_words.append(clean)
-        else:
-            if consecutive_caps >= 2 and not _is_place_name(consecutive_cap_words, _place_suffixes):
-                return True
-            consecutive_caps = 0
-            consecutive_cap_words = []
+
+        # LOCAL-247: Lowercase particles are transparent — they don't break
+        # the capitalized run. "Cap d'Antibes" stays together.
+        clean_lower = clean.lower()
+        # Check if this word is a name particle (d', de, du, van, von, etc.)
+        is_particle = False
+        if clean_lower in _NAME_PARTICLES:
+            is_particle = True
+        elif "'" in clean:
+            # Handle "d'Antibes" as a single token: split on apostrophe,
+            # check if prefix is a particle, and if suffix is capitalized
+            parts = clean.split("'", 1)
+            if len(parts) == 2 and (parts[0].lower() + "'") in _NAME_PARTICLES:
+                # The suffix after the particle (e.g., "Antibes") is the cap word
+                suffix = parts[1]
+                if suffix and suffix[0].isupper() and len(suffix) > 1:
+                    consecutive_caps += 1
+                    consecutive_cap_words.append(suffix)
+                is_particle = True  # Don't process further
+
+        if is_particle and "'" not in clean:
+            # Pure particle word like "de", "van" — skip without breaking run
+            continue
+
+        if not is_particle:
+            if clean[0].isupper() and len(clean) > 1 and clean_lower not in _skip_words:
+                consecutive_caps += 1
+                consecutive_cap_words.append(clean)
+            else:
+                if consecutive_caps >= 2 and not _is_place_name(consecutive_cap_words, _PLACE_WORDS):
+                    return True
+                consecutive_caps = 0
+                consecutive_cap_words = []
     # Final check
-    if consecutive_caps >= 2 and not _is_place_name(consecutive_cap_words, _place_suffixes):
+    if consecutive_caps >= 2 and not _is_place_name(consecutive_cap_words, _PLACE_WORDS):
         return True
 
     # 5. Named entity that's clearly a DOCUMENT, WORK, or PERSON
@@ -1895,7 +2108,7 @@ def _sentence_has_concrete_payload(sentence: str) -> bool:
             if not clean or len(clean) <= 2:
                 continue
             if clean[0].isupper() and clean.lower() not in _R9_SENTENCE_STARTERS_NOT_PROPER:
-                if clean.lower() not in _place_only_words:
+                if clean.lower() not in _PLACE_WORDS:
                     return True
 
     # 6. Has a specific numeric fact (number of 3+ digits suggests a year,
