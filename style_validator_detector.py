@@ -1354,13 +1354,17 @@ def _as_you_arrive_handler(m):
             '', tail, flags=re.IGNORECASE
         )
         if inner and inner != tail:
-            # Capitalize and add determiner if needed
-            if inner[0].islower() and not re.match(r'^(?:the|a|an|this|that)\b', inner, re.IGNORECASE):
-                inner = f"The {inner}"
-            elif inner[0].islower():
-                inner = inner[0].upper() + inner[1:]
-            # Supply a verb: "surrounds [location]" or "defines [location]"
+            # LOCAL-274: The result will appear after "From X, " so it must
+            # start lowercase (unless it's a proper noun).  We lowercase the
+            # first character to avoid "From X, The lush greenery..." which
+            # the well-formedness check rightly rejects.
             inner_clean = inner.rstrip('.')
+            # Ensure it starts with "the/a/an" lowercased for mid-sentence use
+            if re.match(r'^(?:The|A|An)\b', inner_clean):
+                inner_clean = inner_clean[0].lower() + inner_clean[1:]
+            elif inner_clean[0].isupper() and not re.match(r'^[A-Z][a-z]+\s+[A-Z]', inner_clean):
+                # Not a proper noun — lowercase it
+                inner_clean = inner_clean[0].lower() + inner_clean[1:]
             return f"From {location}, {inner_clean} is visible."
         else:
             # Can't parse — fall back to simple declarative
@@ -1445,10 +1449,13 @@ def _take_in_handler(m):
     # Case 3: no relative clause — supply a predicate
     # "the breathtaking views of the azure waters" → "The breathtaking views of the azure waters stretch out before you."
     # LOCAL-271: AVOID doubling if the tail already contains "stretching/stretches out before you"
-    if tail and tail[0].islower():
-        tail = tail[0].upper() + tail[1:]
-    if not re.match(r'^(?:The|A|An|This|That)\b', tail):
+    # LOCAL-274: Don't capitalize interior words — "vibrant" stays lowercase after "The"
+    if not re.match(r'^(?:the|a|an|this|that)\b', tail, re.IGNORECASE):
+        # No determiner — prepend "The" (tail stays as-is, lowercase is correct)
         tail = f"The {tail}"
+    elif tail and tail[0].islower():
+        # Has determiner but lowercase — capitalize the first letter for sentence start
+        tail = tail[0].upper() + tail[1:]
     # Rstrip period so we can add our predicate
     tail_clean = tail.rstrip('.')
     # LOCAL-271: Check if tail already contains a "stretch/extend/spread out before you" phrase
@@ -1508,10 +1515,13 @@ def _look_for_handler(m):
         return result
 
     # Case 2: tail has no participle — supply "stands here" / "can be found here"
-    if tail and tail[0].islower():
-        tail = tail[0].upper() + tail[1:]
-    if not re.match(r'^(?:The|A|An)\b', tail):
+    # LOCAL-274: Don't capitalize the first letter of tail if we're going to
+    # prepend "The" — that creates "The Winding path" (wrong mid-sentence cap).
+    if not re.match(r'^(?:the|a|an)\b', tail, re.IGNORECASE):
         tail = f"The {tail}"
+    elif tail and tail[0].islower():
+        # Already has "the/a/an" — just capitalize the first letter for sentence start
+        tail = tail[0].upper() + tail[1:]
     tail_clean = tail.rstrip('.')
     return f"{tail_clean} can be found here."
 
@@ -2065,12 +2075,14 @@ EXAMPLES:
 
 
 def _r1_rewrite_wellformed(original: str, rewritten: str) -> bool:
-    """LOCAL-271: Post-rewrite well-formedness check.
+    """LOCAL-271/LOCAL-274: Post-rewrite well-formedness check.
 
     After any R1 rewrite, verify the result is a well-formed sentence:
     1. Has a finite main verb (no fragments)
     2. No repeated clause (doubled "stretches out before you")
-    3. Correct capitalisation (no mid-sentence capitals from splicing)
+    3. Correct capitalisation:
+       a. Sentence must start with a capital letter.
+       b. No capitalised word mid-sentence unless it is a proper noun.
     4. No reflexive nonsense ("you can admire yourself standing at")
 
     Returns True if well-formed, False if the rewrite should be rejected
@@ -2098,54 +2110,90 @@ def _r1_rewrite_wellformed(original: str, rewritten: str) -> bool:
                 return False  # Doubled clause detected
             seen_ngrams.add(ngram)
 
-    # Check 3: mid-sentence capitals
+    # Check 3a (LOCAL-274): sentence-initial capital
+    # "breathe in the salty sea air..." fails — must start with uppercase.
+    first_alpha = next((c for c in stripped if c.isalpha()), None)
+    if first_alpha and first_alpha.islower():
+        return False
+
+    # Check 3b: mid-sentence capitals
     # After the first word, a capitalized word should only appear if it's:
-    # - After a period/colon
-    # - A proper noun (heuristic: multiple consecutive caps, or known patterns)
+    # - After a period/colon/semicolon
+    # - A proper noun (multi-cap sequence, known proper adj, place name)
     # - "I" (pronoun)
-    # Detect: "The Vibrant mix" / "The Panoramic views" — adjective wrongly capitalised
-    # Strategy: find words after the first that are capitalized but followed by
-    # a lowercase word (adjective+noun pattern where adj shouldn't be capped)
+    # LOCAL-274: Expanded to catch determiners like "The" after a comma,
+    # not just adjectives. "From Cap d'Antibes, The lush greenery…" fails.
+    #
+    # Strategy: a word that is capitalised after a comma (not sentence-start)
+    # is wrong unless it is plausibly a proper noun. Common words that should
+    # NEVER be capitalised mid-sentence are checked explicitly.
+    _NEVER_MID_CAP = {
+        # Determiners / articles
+        'the', 'a', 'an', 'this', 'that', 'these', 'those', 'some', 'any',
+        'each', 'every', 'no', 'my', 'your', 'his', 'her', 'its', 'our', 'their',
+        # Common adjectives (from prior LOCAL-271 list)
+        'vibrant', 'panoramic', 'breathtaking', 'stunning', 'beautiful',
+        'magnificent', 'ancient', 'historic', 'medieval', 'narrow', 'charming',
+        'picturesque', 'scenic', 'dramatic', 'remarkable', 'spectacular',
+        'lush', 'verdant', 'azure', 'golden', 'pristine', 'serene', 'tranquil',
+        'bustling', 'quaint', 'gentle', 'rugged', 'steep', 'winding', 'cobbled',
+        'ornate', 'elegant', 'grand', 'imposing', 'vast', 'sprawling', 'towering',
+        'tiny', 'sleepy',
+        # Prepositions / conjunctions / adverbs that could appear mid-sentence
+        'and', 'but', 'or', 'so', 'yet', 'for', 'nor', 'with', 'from', 'into',
+        'here', 'there', 'where', 'while', 'when', 'as', 'if', 'then',
+        # Pronouns (other than I)
+        'you', 'he', 'she', 'it', 'we', 'they',
+    }
+    # Proper adjectives that ARE legitimately capitalised mid-sentence
+    _PROPER_ADJS = {'french', 'british', 'italian', 'spanish', 'german',
+                    'roman', 'greek', 'byzantine', 'moorish', 'ottoman',
+                    'mediterranean', 'atlantic', 'pacific', 'european',
+                    'american', 'african', 'asian', 'christian', 'jewish',
+                    'muslim', 'buddhist', 'hindu', 'victorian', 'baroque',
+                    'gothic', 'renaissance', 'neoclassical', 'art'}
+
     _sent_words = stripped.split()
     if len(_sent_words) > 2:
-        for i in range(1, len(_sent_words) - 1):
+        for i in range(1, len(_sent_words)):
             w = _sent_words[i]
             # Skip if preceded by sentence-ending punctuation
             prev = _sent_words[i - 1]
             if prev.endswith(('.', '!', '?', ':')):
                 continue
-            # Skip proper noun indicators: word is part of a multi-cap sequence
-            # or is a known French/geographic particle
             clean_w = re.sub(r'[^a-zA-Z\u00C0-\u024F]', '', w)
             if not clean_w or len(clean_w) <= 1:
                 continue
             if clean_w[0].isupper() and clean_w[1:].islower():
-                # Potentially wrongly capitalised — but could be proper noun
-                # Check: is the next word lowercase? If so, this looks like
-                # a wrongly-capped adjective ("The Panoramic views")
-                next_w = re.sub(r'[^a-zA-Z\u00C0-\u024F]', '', _sent_words[i + 1])
-                if next_w and next_w[0].islower():
-                    # Check this isn't a known proper-noun-before-common pattern
-                    # e.g. "French riviera" (proper adj + noun) — actually "French" is legit
-                    _PROPER_ADJS = {'french', 'british', 'italian', 'spanish', 'german',
-                                    'roman', 'greek', 'byzantine', 'moorish', 'ottoman',
-                                    'mediterranean', 'atlantic', 'pacific', 'european',
-                                    'american', 'african', 'asian', 'christian', 'jewish',
-                                    'muslim', 'buddhist', 'hindu', 'victorian', 'baroque',
-                                    'gothic', 'renaissance', 'neoclassical', 'art'}
-                    if clean_w.lower() not in _PROPER_ADJS:
-                        # Is it a common adjective that should NOT be capitalised?
-                        _COMMON_ADJS = {'vibrant', 'panoramic', 'breathtaking', 'stunning',
-                                        'beautiful', 'magnificent', 'ancient', 'historic',
-                                        'medieval', 'narrow', 'charming', 'picturesque',
-                                        'scenic', 'dramatic', 'remarkable', 'spectacular',
-                                        'lush', 'verdant', 'azure', 'golden', 'pristine',
-                                        'serene', 'tranquil', 'bustling', 'quaint',
-                                        'gentle', 'rugged', 'steep', 'winding', 'cobbled',
-                                        'ornate', 'elegant', 'grand', 'imposing', 'vast',
-                                        'sprawling', 'towering', 'tiny', 'sleepy'}
-                        if clean_w.lower() in _COMMON_ADJS:
-                            return False  # Mid-sentence capital on common adjective
+                # Word is Title-Case mid-sentence — check if it's allowed
+                lower_w = clean_w.lower()
+                # Immediately fail if it's in the never-mid-cap list
+                if lower_w in _NEVER_MID_CAP:
+                    return False
+                # Proper adjectives are OK
+                if lower_w in _PROPER_ADJS:
+                    continue
+                # Check if this is part of a multi-word proper noun sequence:
+                # If the NEXT word is also capitalised, both are likely a proper noun
+                if i < len(_sent_words) - 1:
+                    next_clean = re.sub(r'[^a-zA-Z\u00C0-\u024F]', '', _sent_words[i + 1])
+                    if next_clean and next_clean[0].isupper():
+                        continue  # Part of multi-word proper noun (e.g. "Cap d'Antibes")
+                # If the PREVIOUS word (non-punctuation) was also capitalised,
+                # we're in a multi-word proper noun sequence
+                if i > 1:
+                    prev_clean = re.sub(r'[^a-zA-Z\u00C0-\u024F]', '', _sent_words[i - 1])
+                    if prev_clean and prev_clean[0].isupper() and prev_clean[1:].islower():
+                        continue  # Continuation of proper noun sequence
+                # Single capitalised word followed by lowercase — suspect
+                if i < len(_sent_words) - 1:
+                    next_clean = re.sub(r'[^a-zA-Z\u00C0-\u024F]', '', _sent_words[i + 1])
+                    if next_clean and next_clean[0].islower():
+                        # This looks like a wrongly-capitalised common word
+                        # But only flag if it's a common English word, not a name
+                        # Heuristic: if it's short and common, flag it
+                        if lower_w in _NEVER_MID_CAP:
+                            return False  # Already checked above, but belt-and-suspenders
 
     # Check 4: reflexive nonsense — "you can admire yourself"
     if re.search(r'\byou can admire yourself\b', stripped, re.IGNORECASE):
