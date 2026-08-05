@@ -7711,3 +7711,56 @@ place of a regression test (D193). Today it was possible to verify two of three
 claims by other means and say plainly that the third was not. That is the
 correct shape of a submission under constraint, and it is worth having on the
 record as the standard rather than as an excuse.
+
+## D196 — The rubric ranks the rejected tour above the praised one (2026-08-05)
+
+Blocked on credits, LEAD did the part-2 work that needs no API: **ran
+`tour_rubric_scorer.py`** — which D-earlier established has essentially never
+been run — against today's tours. Classification is manual, so LEAD applied the
+rubric's *own* fact test mechanically (≥3 verifiable facts → RICH).
+
+```
+  tour                             stops   base  struct   corr  ident   TOTAL
+  round 15 (this morning)              2  100.0     0.0   25.0    0.0   125.0
+  round 26 (Michael: "excellent")      2  100.0     0.0    0.0    0.0   100.0
+  8-stop after corpus work             8  100.0     0.0   12.5    2.0   114.5
+  museum 5-stop                        5   60.0     0.0   10.0    1.2    71.2
+```
+
+**Round 15 scores 125 and round 26 scores 100.** Round 15 is the tour whose
+paragraph Michael would have scored 1/5 — the one that prompted a day of work.
+Round 26 is the one he called *"excellent"*, with stop 2 *"wonderful!!!"*. The
+rubric ranks the rejected tour **25 points above** the praised one.
+
+**The mechanism.** Round 15's entire margin is the cross-stop correlation bonus,
+and LEAD traced what earned it:
+
+> "This route will take you from the opulent Cap d'Antibes to the ancient **Eze
+> Village**, spanning approximately 28 kilometres…"
+
+That is **part 2 of Michael's four-part opening stating its route endpoints**.
+The rubric saw stop 2's name inside stop 1's text and counted it as narrative
+interconnection. An itinerary is not a callback.
+
+**Three consequences.**
+
+1. The +50% correlation bonus is the largest lever in the rubric and the reason
+   it can exceed 100. It is being triggered by a sentence whose job is to say
+   where the route goes. It is a measurement artifact.
+2. **This morning's arithmetic was built on that artifact.** LEAD wrote that 75
+   at N=8 "cannot be reached by per-stop quality alone — it needs callbacks
+   between stops." That conclusion rests on the bonus meaning something. It does
+   not.
+3. The museum tour scores **71.2**, just under Michael's 75 gate — on a metric
+   that has just been shown to rank a bad tour above a good one. The gate number
+   is not currently measuring what he thinks it measures.
+
+**What this settles for part 2.** The rubric's problem is not only that stop
+selection makes it unstable (D170/D183/D192). It is that **its strongest term
+rewards a structural coincidence**. Fixing the instability without removing the
+bonus would produce a stable wrong answer.
+
+Recommendation to put to Michael: score facts-per-sentence normalised against
+available corpus, drop the correlation bonus until a real callback can be
+distinguished from an itinerary mention, and stop treating 100 as a ceiling that
+bonuses may exceed. Not to be dispatched without his decision.
