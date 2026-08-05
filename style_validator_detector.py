@@ -1680,12 +1680,73 @@ _R10_PROMISE_PATTERNS = [
 ]
 _R10_PROMISE_COMPILED = [re.compile(p, re.IGNORECASE) for p in _R10_PROMISE_PATTERNS]
 
+# ─── Structural promise detection (LOCAL-240) ────────────────────────────────
+# Widens R10 from a phrase list to the SHAPE: a narrative-promising noun
+# governed by a verb of possession or concealment.  "Villages hold forgotten
+# tales" promises; "the villages were fortified in 1388" states.
+#
+# A sentence triggers if it contains BOTH:
+#   1. A promise noun — a word that inherently promises narrative content
+#   2. A promise verb — a verb of possession, concealment, or revelation
+#      (NOT a verb of statement like "mentions", "was built", "settled")
+#
+# This is ADDITIVE to the regex patterns above — either path fires the promise.
+
+_R10_STRUCTURAL_PROMISE_NOUNS = frozenset({
+    'tale', 'tales', 'story', 'stories', 'secret', 'secrets',
+    'chapter', 'chapters', 'legacy', 'legacies', 'roots',
+    'tapestry', 'whispers', 'whisper', 'essence',
+    'juxtaposition', 'symphony',
+})
+
+_R10_STRUCTURAL_PROMISE_VERBS = re.compile(
+    r'\b(?:'
+    r'hold[s]?|holding|'
+    r'mask[s]?|masking|masked|'
+    r'conceal[s]?|concealing|concealed|'
+    r'carry|carries|carrying|carried|'
+    r'whisper[s]?|whispering|whispered|'
+    r'reveal[s]?|revealing|revealed|'
+    r'stand[s]?\s+sentinel|'
+    r'unravel[s]?|unraveling|unravelled|'
+    r'shape[s]?|shaping|shaped|'
+    r'discover(?!ed\s+(?:in|by|that|when))|'  # "discover X" promises; "discovered in 1870" states
+    r'hide[s]?|hiding|hidden|'
+    r'guard[s]?|guarding|guarded|'
+    r'unveil[s]?|unveiling|unveiled|'
+    r'beckon[s]?|beckoning|beckoned|'
+    r'woven|weav(?:e[s]?|ing)'
+    r')\b',
+    re.IGNORECASE,
+)
+
+
+def _sentence_has_structural_promise(sentence: str) -> bool:
+    """Check if sentence has the SHAPE of a promise: noun + verb.
+
+    LOCAL-240: catches "villages hold a tapestry", "masks the secrets",
+    "forgotten tales that shape its identity" — shapes that the regex list
+    misses because it only matched fixed phrases.
+    """
+    # Tokenize to check for promise nouns
+    words = set(re.findall(r'[a-z]+', sentence.lower()))
+    if not (words & _R10_STRUCTURAL_PROMISE_NOUNS):
+        return False
+    # Check for promise verb
+    if not _R10_STRUCTURAL_PROMISE_VERBS.search(sentence):
+        return False
+    return True
+
 
 def _sentence_has_promise(sentence: str) -> bool:
-    """Check if a sentence contains a promise-trigger phrase."""
+    """Check if a sentence contains a promise-trigger phrase or shape."""
+    # Path 1: original regex patterns (exact phrases)
     for pat in _R10_PROMISE_COMPILED:
         if pat.search(sentence):
             return True
+    # Path 2: structural detection (LOCAL-240) — noun + verb shape
+    if _sentence_has_structural_promise(sentence):
+        return True
     return False
 
 
@@ -1789,7 +1850,11 @@ def _sentence_has_concrete_payload(sentence: str) -> bool:
                        'beach', 'coast', 'cape', 'island', 'hill', 'mountain',
                        'street', 'road', 'trail', 'square', 'port', 'bridge',
                        'palace', 'castle', 'church', 'chapel', 'cathedral',
-                       'museum', 'hotel', 'tower', 'gate', 'pass'}
+                       'museum', 'hotel', 'tower', 'gate', 'pass',
+                       'lighthouse', 'fort', 'fortress', 'citadel', 'abbey',
+                       'monastery', 'priory', 'basilica', 'shrine', 'temple',
+                       'harbour', 'harbor', 'pier', 'wharf', 'quay',
+                       'dam', 'reservoir', 'falls', 'gorge', 'canyon'}
     for i, word in enumerate(words):
         if i == 0:
             consecutive_caps = 0
