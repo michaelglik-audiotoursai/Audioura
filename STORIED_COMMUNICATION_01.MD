@@ -512,3 +512,41 @@ stop's corpus depth, and several runs rather than one when judging a change.
 That is a part 2 proposal, not something to bolt on now.
 
 ---
+
+## 2026-08-05 12:42 — Michael
+
+> is it becoming longer to generate? May I ask you to track the timing in
+> additin to the price?
+
+## 2026-08-05 12:42 — LEAD
+
+**No — generation is flat.**
+
+| run | pipeline | spine call | true cost | words |
+|---|---|---|---|---|
+| round 10 | 42.7s | 8.2s | $0.0206* | 679 |
+| round 15 | 43.7s | 5.3s | $0.0206 | 708 |
+| round 16 | — | — | $0.0184 | 652 |
+| round 17L | 41.1s | 7.7s | $0.0187 | 388 |
+| round 17M | 43.5s | 6.9s | $0.0202 | 718 |
+
+41–44 seconds, no trend. Spine latency wobbles 5.3–8.2s on network and model
+variance. Everything added today is deterministic, so it costs neither money
+nor measurable time.
+
+**Timing is now tracked alongside cost as standing practice** — pipeline
+seconds, spine latency, and escalation latency once LOCAL-263 adds one.
+
+**The number to watch is escalation.** Your AI-verification path is the first
+thing that can make generation genuinely slower, because it puts a model
+round-trip inside the loop. One call per stop on an 8-stop tour is 8 sequential
+calls; at 2–5s each that is 15–40s on top of a 43s run. Measured figure to
+follow when round 18 lands.
+
+**A distinction worth keeping separate:** the *development* round-trip is
+getting longer — LOCAL-263 is 18 minutes in, earlier tasks ran 8–40 minutes.
+That is the Kiro agent reading code, writing changes, running boundary tests and
+regenerating. It has nothing to do with tour generation speed, and the two will
+be reported separately so neither is read as the other.
+
+---
