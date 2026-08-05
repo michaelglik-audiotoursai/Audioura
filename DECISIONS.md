@@ -4396,3 +4396,73 @@ Every failure this week lived where two correct things meet: a key name, an
 exception boundary, an unread output, a format. **Components are tested;
 seams are assumed.** LOCAL-227 proved all 16 detectors are sound and told us
 nothing about the system, because the system's failures are all seams.
+
+---
+
+## D114 — Michael's hard block is now in the product (2026-08-04)
+
+LOCAL-229 wired the `CONTRADICTED` block into `generate_tour_text.py`. Verified
+by LEAD against `storied` HEAD:
+
+```
+corpus : "The museum was founded in 1963 by the city council…"
+text   : "The museum was founded in 1842 by local merchants…"   → contradicted 1
+text   : "The museum was founded in 1963 by the city council."   → contradicted 0
+```
+
+Blocking is at the **sentence group**, not the paragraph (D102) — a paragraph
+with one contradicted group and one clean group loses only the first. Behind
+`DISABLE_CONTRADICTED_BLOCK=1`, and a tour with no contradictions passes
+through byte-identical, which is what protects Michael's read.
+
+Imports are from the repo root, no `sys.path` manipulation — container-safe,
+the mistake that shipped three times before.
+
+So D100 — *"we should not publish if we are reasonably sure that the data is
+incorrect"* — is enforced in the product for the first time, one day after he
+said it.
+
+**Expected firing rate: zero**, and that is correct. `CONTRADICTED` is 0 of 188
+corpus-wide (D99). This is a safety net for when the corpus grows, not a filter,
+and the task was told explicitly not to tune the detector to make it fire.
+
+### A near-miss worth recording
+
+LEAD's first probe of the task's constructed contradiction returned
+`UNSUPPORTED`, not `CONTRADICTED` — apparently contradicting the submission.
+Running *their exact fixture* rather than an approximation of it reproduced
+`CONTRADICTED` cleanly. The difference was a shorter corpus passage in LEAD's
+version, which changed subject matching (D97/D105 established that sensitivity).
+
+Second time this week that re-running the task's own example, rather than a
+paraphrase of it, prevented a wrong bounce. **When a probe disagrees with a
+submission, reproduce the submission's exact case before concluding anything.**
+
+---
+
+## D115 — The secret alarm fired on our own falsification fixture; fixed at source, not by filtering (2026-08-04)
+
+Three findings in `tests/test_local227_falsification.py:809` — the synthetic
+key that test plants *by design*, because LEAD asked it to prove the scanner
+fires. Longest common run with a real key: **8 characters**, the `sk-proj-`
+prefix.
+
+**The obvious fix was the wrong one.** Adding the filename to the tick's filter
+list would have blinded the guard to a real key hidden in that file — which is
+exactly how LOCAL-206 leaked, in a test file, caught only by GitHub's push
+protection.
+
+Fixed at source instead: the fixture is now **generated at runtime** from a
+seeded RNG, so no key-shaped literal exists in the repository at all. The
+alarm's filter stays narrow and the noise is gone.
+
+```
+key-shaped literals in the file : 0
+falsification tests             : 16 passed
+recent-commit scan              : 0 real findings
+```
+
+Second false alarm in two days (D108 was our own SHA-256 cache keys), and the
+same principle applied both times: **fix what makes the alarm wrong, never
+teach the alarm to look away.** An alarm with exceptions accumulates them until
+it means nothing.
