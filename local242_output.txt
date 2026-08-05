@@ -1,0 +1,348 @@
+================================================================================
+LOCAL-242: Retrieval Lift Measurement
+================================================================================
+
+BASELINE COUNTS (before):
+  audio_tours: 142
+  stop_corpus: 88
+
+================================================================================
+STOP SELECTION (15 stops across 3 situations)
+================================================================================
+
+
+────────────────────────────────────────────────────────────────────────────────
+STOP 1/15 — Category A (COVERED)
+  Venue: French Riviera walking area
+  Stop:  Villa Ephrussi de Rothschild
+  Why:   2 passages. Michael's Eilenroc benchmark is same tour type. Does decomposition add?
+────────────────────────────────────────────────────────────────────────────────
+
+  TODAY'S QUERY: "Villa Ephrussi de Rothschild"
+  ✓ FOUND (D74-compliant) — subject (3/3 words) + venue confirmed
+    URL: https://www.villa-ephrussi.com/en
+    Passage: "Located between Nice and Monaco, overlooking the Mediterranean, the Villa Ephrussi de Rothschild is a magnificent palace surrounded by nine themed gardens."
+
+  RICHER STRATEGY (6 queries):
+    → [decomposed: title + history] "Villa Ephrussi de Rothschild history"
+      ✓ FOUND (D74-compliant)! URL: https://www.villa-ephrussi.com/en/an-historic-area
+      Passage: "A place of history. By birth and then by marriage, Madame Ephrussi was to become one of the greatest collectors of her century."
+
+────────────────────────────────────────────────────────────────────────────────
+STOP 2/15 — Category A (COVERED)
+  Venue: French Riviera walking area
+  Stop:  Cap d'Antibes
+  Why:   7 passages already. Can richer queries add Fitzgerald/Monet detail?
+────────────────────────────────────────────────────────────────────────────────
+
+  TODAY'S QUERY: "Cap d'Antibes"
+  ✓ FOUND (D74-compliant) — subject (1/1 words) + venue confirmed
+    URL: https://en.wikipedia.org/wiki/Antibes
+    Passage: "Its cape, the Cap d'Antibes, are two major landforms in the area. widely considered two of the most exclusive hotels in the world."
+
+  RICHER STRATEGY (4 queries):
+    → [decomposed: title + history] "Cap d'Antibes history"
+      ✓ FOUND (D74-compliant)! URL: https://en.wikipedia.org/wiki/Antibes
+      Passage: "Its cape, the Cap d'Antibes, widely considered two of the most exclusive hotels in the world. Antibes is home to the Musée Picasso. Greek colony of Marseille. ..."
+
+────────────────────────────────────────────────────────────────────────────────
+STOP 3/15 — Category A (COVERED)
+  Venue: French Riviera walking area
+  Stop:  Chapelle Saint-Pierre
+  Why:   2 passages, one is wrong chapel (Vénéjan). Precision test.
+────────────────────────────────────────────────────────────────────────────────
+
+  TODAY'S QUERY: "Chapelle Saint-Pierre"
+  ✓ FOUND (D74-compliant) — subject (2/2 words) + venue confirmed
+    URL: https://www.theculturium.com/jean-cocteau-chapelle-saint-pierre-de-villefranche-sur-mer/
+    Passage: "The ancient Romanesque chapel dedicated to Saint Peter, patron saint of fishermen, was entirely restored and decorated by the “prince of poets”, Jean Cocteau."
+
+  RICHER STRATEGY (5 queries):
+    → [decomposed: title + history] "Chapelle Saint-Pierre history"
+      ✓ FOUND (D74-compliant)! URL: https://www.theculturium.com/jean-cocteau-chapelle-saint-pierre-de-villefranche-sur-mer/
+      Passage: "The ancient Romanesque chapel dedicated to Saint Peter, patron saint of fishermen, was entirely restored and decorated by the “prince of poets”, Jean Cocteau."
+
+────────────────────────────────────────────────────────────────────────────────
+STOP 4/15 — Category A (COVERED)
+  Venue: Musee National Marc Chagall, Nice, France
+  Stop:  Abraham et les trois anges
+  Why:   Chagall museum is the one fully-verified venue. 5 passages. Baseline.
+────────────────────────────────────────────────────────────────────────────────
+
+  TODAY'S QUERY: "Abraham et les trois anges"
+  ✓ FOUND (D74-compliant) — subject (3/3 words) + venue confirmed
+    URL: https://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/abraham-et-les-trois-anges
+    Passage: "Marc Chagall, Abraham et les trois anges, 1960-1966, huile sur toile, 190 cm x 292 cm, donation Marc et Valentina Chagall, 1966, musée national Marc Chagall, ..."
+
+  RICHER STRATEGY (3 queries):
+    → [decomposed: Chagall + title] "Chagall "Abraham et les trois anges""
+      ✓ FOUND (D74-compliant)! URL: http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/abraham-et-les-trois-anges
+      Passage: "Abraham et les trois anges ... La composition est structurée par l'horizontale du banc au premier plan et rythmée par le jeu de verticales des figures. La couleur ..."
+
+────────────────────────────────────────────────────────────────────────────────
+STOP 5/15 — Category A (COVERED)
+  Venue: French Riviera walking area
+  Stop:  Eze Village
+  Why:   1 passage. Walking stop with historical depth. Does decomposition help?
+────────────────────────────────────────────────────────────────────────────────
+
+  TODAY'S QUERY: "Eze Village"
+  ✓ FOUND (D74-compliant) — subject (1/1 words) + venue confirmed
+    URL: https://allthingsfrench.com/eze-french-riviera/
+    Passage: "This beautiful village dates back to the middle ages and clings impressively to the mountainside above the Mediterranean Sea, between St Jean Cap Ferrat and ..."
+
+  RICHER STRATEGY (6 queries):
+    → [decomposed: title + history] "Eze Village history"
+      ✓ FOUND (D74-compliant)! URL: https://en.wikipedia.org/wiki/%C3%88ze
+      Passage: "The history of Èze became turbulent several times. French and Ottoman troops seized the village under the command of Hayreddin Barbarossa in 1543,"
+
+────────────────────────────────────────────────────────────────────────────────
+STOP 6/15 — Category B (VENUE_ONLY)
+  Venue: Musee d Art Moderne et d Art Contemporain, Nice, France
+  Stop:  Richard Long ou la sculpture en marchant
+  Why:   Only 1 passage and it's the museum's opening date. Subject is clearly an artist.
+────────────────────────────────────────────────────────────────────────────────
+
+  TODAY'S QUERY: "Richard Long ou la sculpture en marchant"
+  ✓ FOUND (D74-compliant) — subject (4/4 words) + venue confirmed
+    URL: https://www.culturetheque.com/en/richard-long-ou-la-sculpture-en-marchant-nice-2008-les-fiches-exposition-duniversalis
+    Passage: "Né en 1945 à Bristol (Grande-Bretagne), Richard Long goûte peu les exercices rétrospectifs exhaustifs et désincarnés; il leur préfère en ..."
+
+  RICHER STRATEGY (4 queries):
+    → [decomposed: artist] ""Richard Long" artist sculptor"
+      ✗ (8 results, 8 rejected by D74)
+    → [decomposed: artist + medium] ""Richard Long" land art"
+      ✗ (8 results, 8 rejected by D74)
+    → [catalogue: MAMAC collection] ""MAMAC Nice" collection "Richard Long ou la sculpture en marchant""
+      ✓ FOUND (D74-compliant)! URL: http://acasculpture.blogspot.com/2008/08/sculptures-installations-de-richard.html
+      Passage: "http://www.mamac-nice.org/. "Lorsqu'il est invité à investir un ... richard-long-ou-la-sculpture-en-marchant,31195.php. Le site officiel ..."
+
+────────────────────────────────────────────────────────────────────────────────
+STOP 7/15 — Category B (VENUE_ONLY)
+  Venue: Musee d Art Moderne et d Art Contemporain, Nice, France
+  Stop:  Le Déjeuner sur l'herbe
+  Why:   3 passages. Alain Jacquet's version specifically at MAMAC.
+────────────────────────────────────────────────────────────────────────────────
+
+  TODAY'S QUERY: "Le Déjeuner sur l'herbe"
+  ✗ NOT FOUND (D74-compliant) — no results with both subject + venue (D74). 7 rejected.
+    REJECTED: subject mentioned but no venue confirmation (D74)
+      URL: https://en.wikipedia.org/wiki/Le_D%C3%A9jeuner_sur_l%27herbe
+      Snippet: "It depicts a nude woman and a scantily dressed bathing woman on a picnic with two fully dressed men in a rural setting. Rejected by the Salon jury of "
+    REJECTED: subject mentioned but no venue confirmation (D74)
+      URL: https://www.artsy.net/article/artsy-editorial-manets-masterpiece-confounded-historians-century
+      Snippet: "Manet's Le Déjeuner sur l'herbe (1863), known in English as The Luncheon on the Grass, was first shown in this historic exhibition."
+
+  RICHER STRATEGY (3 queries):
+    → [decomposed: artwork title + medium] "Le Déjeuner sur l'herbe painting artist"
+      ✗ (8 results, 6 rejected by D74)
+    → [catalogue: MAMAC collection] ""MAMAC Nice" collection "Le Déjeuner sur l'herbe""
+      ✓ FOUND (D74-compliant)! URL: https://www.mamac-nice.org/collection/oeuvres-in-situ/
+      Passage: "Cette œuvre murale est un agrandissement d'un détail d'une œuvre de l'artiste de la collection du MAMAC : Le Déjeuner sur l'herbe, 1964. Dans cette ..."
+
+────────────────────────────────────────────────────────────────────────────────
+STOP 8/15 — Category B (VENUE_ONLY)
+  Venue: Palais Lascaris, Nice
+  Stop:  Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)
+  Why:   Highly specific historical instrument. Can we find it in catalogues?
+────────────────────────────────────────────────────────────────────────────────
+
+  TODAY'S QUERY: "Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)"
+  ✓ FOUND (D74-compliant) — subject (3/6 words) + venue confirmed
+    URL: https://tresors.nice.fr/oeuvre/saqueboute-nuremberg
+    Passage: "Auteur : SCHNITZER, Anton (Nuremberg, avant 1545-Nuremberg, 1608) ; Date : 1581 ; Lieu : Palais Lascaris, Nice ; N° inventaire : Inv. : C111 ; Acquisition : Legs ..."
+
+  RICHER STRATEGY (6 queries):
+    → [decomposed: maker + object] ""Anton Schnitzer (Nuremberg, 1581)" Sacqueboute ténor"
+      ✓ FOUND (D74-compliant)! URL: https://mt.hisour.com/fr/data/palazz-lascaris-nice-france/
+      Passage: "une sacqueboute ténor d'Anton Schnitzer (Nuremberg, 1581) un alto d'amour Joannes Florenus Guidanti (Bologna, 1717), Gagliano (Napoli, 1697), Johann Schorn ..."
+
+────────────────────────────────────────────────────────────────────────────────
+STOP 9/15 — Category B (VENUE_ONLY)
+  Venue: Palais Lascaris, Nice
+  Stop:  Guitar by Antonio de Torres (Almeria, 1884)
+  Why:   Torres guitars are well-documented. Subject decomposition should work.
+────────────────────────────────────────────────────────────────────────────────
+
+  TODAY'S QUERY: "Guitar by Antonio de Torres (Almeria, 1884)"
+  ✗ NOT FOUND (D74-compliant) — no results with both subject + venue (D74). 6 rejected.
+    REJECTED: subject mentioned but no venue confirmation (D74)
+      URL: https://www.lainvencibledetorres.com/en/the-guitar/
+      Snippet: "This guitar was made by Antonio de Torres Jurado (1817-1892), regarded as the father of the modern Spanish guitar. It was made in 1884, in Almeria."
+    REJECTED: subject mentioned but no venue confirmation (D74)
+      URL: https://www.flamencoguitarsforsale.net/en/antonio-de-torres-guitars/guitar-antonio-de-torres-1884-la-invencible/
+      Snippet: "This guitar was made by Antonio de Torres Jurado ( Almeria, 1817-1892 ) in 1884. This guitar maker is regarded as the father of the modern Spanish gui"
+
+  RICHER STRATEGY (6 queries):
+    → [decomposed: maker + object] ""Antonio de Torres (Almeria, 1884)" Guitar"
+      ✓ FOUND (D74-compliant)! URL: https://www.nice-premium.com/nice-is-hosting-its-european-museum-night-this-saturday/
+      Passage: "... guitar by Pierre Pacherel (Nice, 1834), and that of Antonio de Torres (Almeria, 1884). 6:00 PM, 8:00 PM, and 9:30 PM. At the Museum of Fine Arts. Patio"
+
+────────────────────────────────────────────────────────────────────────────────
+STOP 10/15 — Category B (VENUE_ONLY)
+  Venue: Musee Matisse, Nice, France
+  Stop:  Nu bleu IV
+  Why:   Matisse's famous cut-out series. Well-known work, should be findable with proper query.
+────────────────────────────────────────────────────────────────────────────────
+
+  TODAY'S QUERY: "Nu bleu IV"
+  ✓ FOUND (D74-compliant) — subject (1/1 words) + venue confirmed
+    URL: https://www.henrimatisse.org/nu-bleu.jsp
+    Passage: "Nu Bleu IV is Matisse's most elaborate figure study in gouache decoupee, with the exception of the Barnes mural studies, Precursor B, the compact sculptural ..."
+
+  RICHER STRATEGY (2 queries):
+    → [decomposed: Matisse + title] "Matisse "Nu bleu IV""
+      ✓ FOUND (D74-compliant)! URL: https://www.henrimatisse.org/nu-bleu.jsp
+      Passage: "Nu Bleu IV is Matisse's most elaborate figure study in gouache decoupee, with the exception of the Barnes mural studies, Precursor B, which were not intended ..."
+
+────────────────────────────────────────────────────────────────────────────────
+STOP 11/15 — Category C (UNVERIFIED)
+  Venue: Musee des Arts Asiatiques (Asian Art Museum), Nice, France
+  Stop:  Ulysses Grant au Japon
+  Why:   D127's test case. We know this is findable (Chikanobu). Does richer query get it?
+────────────────────────────────────────────────────────────────────────────────
+
+  TODAY'S QUERY: "Ulysses Grant au Japon"
+  ✗ NOT FOUND (D74-compliant) — no results with both subject + venue (D74). 7 rejected.
+    REJECTED: subject mentioned but no venue confirmation (D74)
+      URL: https://en.wikipedia.org/wiki/Ulysses_S._Grant
+      Snippet: "Ulysses S. Grant was the 18th president of the United States, serving from 1869 to 1877, and was the Commanding General of the Union Army, leading it "
+    REJECTED: subject mentioned but no venue confirmation (D74)
+      URL: https://www.reddit.com/r/todayilearned/comments/1v8ckff/til_that_on_ulysses_s_grants_postpresidential/
+      Snippet: "Ulysses S. Grant's post-presidential world tour, he warned the Japanese emperor not to take foreign loans lest it fall "into the abyss into ..."
+
+  RICHER STRATEGY (6 queries):
+    → [decomposed: title + history] "Ulysses Grant au Japon history"
+      ✗ (8 results, 6 rejected by D74)
+    → [catalogue: maa.departement06.fr] "maa.departement06.fr collection Ulysses Grant au Japon"
+      ✓ FOUND (D74-compliant)! URL: https://maa.departement06.fr/le-japon
+      Passage: "Ulysses Grant au Japon. Datée de 1879 et réalisée par Chikanobu, cette estampe représente la réception au palais impérial du président des ..."
+
+────────────────────────────────────────────────────────────────────────────────
+STOP 12/15 — Category C (UNVERIFIED)
+  Venue: Musee des Arts Asiatiques (Asian Art Museum), Nice, France
+  Stop:  Kannon a mille bras
+  Why:   Generic Buddhist subject. Can the museum's own catalogue confirm?
+────────────────────────────────────────────────────────────────────────────────
+
+  TODAY'S QUERY: "Kannon a mille bras"
+  ✓ FOUND (D74-compliant) — subject (3/3 words) + venue confirmed
+    URL: https://commons.wikimedia.org/wiki/File:Kannon_assis_aux_mille_bras_(mus%C3%A9e_national_de_Tokyo)_(41441954395).jpg
+    Passage: "This image was originally posted to Flickr by dalbera at https://flickr.com/photos/72746018@N00/41441954395 (archive). It was reviewed on 18 October 2019 by ..."
+
+  RICHER STRATEGY (5 queries):
+    → [decomposed: title + history] "Kannon a mille bras history"
+      ✓ FOUND (D74-compliant)! URL: https://commons.wikimedia.org/wiki/File:Kannon_assis_aux_mille_bras_(mus%C3%A9e_national_de_Tokyo)_(41441954395).jpg
+      Passage: "mille bras (musée national de Tokyo) (41441954395).jpg. Kannon assis aux mille bras (détail) File history Click on a date/time to view the file as it appeared ..."
+
+────────────────────────────────────────────────────────────────────────────────
+STOP 13/15 — Category C (UNVERIFIED)
+  Venue: Musee des Arts Asiatiques (Asian Art Museum), Nice, France
+  Stop:  L'Armure d'Ando Naoyuki
+  Why:   Specific name. If real, Japanese armour catalogues would have it.
+────────────────────────────────────────────────────────────────────────────────
+
+  TODAY'S QUERY: "L'Armure d'Ando Naoyuki"
+  ✓ FOUND (D74-compliant) — subject (3/3 words) + venue confirmed
+    URL: https://fr.linkedin.com/posts/adrien-bossard-9a2144107_ouvrir-un-tiroir-dans-la-r%C3%A9serve-du-mus%C3%A9e-activity-7374883621230383104-3lRJ
+    Passage: "Ouvrir un tiroir dans la réserve du musée départemental des arts asiatiques à Nice - l'elements l'armure d'Ando Naoyuki, une des plus belles armures"
+
+  RICHER STRATEGY (6 queries):
+    → [decomposed: artwork title + medium] "L'Armure d'Ando Naoyuki painting artist"
+      ✓ FOUND (D74-compliant)! URL: https://www.researchgate.net/profile/Kuiyi-Shen-2/publication/265270497_MODERN_AND_CONTEMPORARY_ASIAN_ART_A_Working_Bibliography_2011_Version_With_the_help_of/links/5730698a08ae74415191189b/MODERN-AND-CONTEMPORARY-ASIAN-ART-A-Working-Bibliography-2011-Version-With-the-help-of.pdf
+      Passage: "Modern and Contemporary Asian Art. Entry is by Country, Topic, and Artist. bilingual Japanese art catalogues. Ando Tadao: Naoyuki, Kinoshita,"
+
+────────────────────────────────────────────────────────────────────────────────
+STOP 14/15 — Category C (UNVERIFIED)
+  Venue: Musée d'art naïf (Museum of Naïve Art), Nice, France
+  Stop:  The Flight into Egypt
+  Why:   Classic art subject. Multiple artists. Can we confirm THIS museum holds one?
+────────────────────────────────────────────────────────────────────────────────
+
+  TODAY'S QUERY: "The Flight into Egypt"
+  ✗ NOT FOUND (D74-compliant) — no results with both subject + venue (D74). 8 rejected.
+    REJECTED: subject mentioned but no venue confirmation (D74)
+      URL: https://en.wikipedia.org/wiki/Flight_into_Egypt
+      Snippet: "The flight into Egypt is a story recounted in the Gospel of Matthew (Matthew 2:13–23) and in New Testament apocrypha. an angel appeared to Joseph in a"
+    REJECTED: subject mentioned but no venue confirmation (D74)
+      URL: https://www.biblegateway.com/passage/?search=Matthew%202%3A13-15&version=NKJV
+      Snippet: "The Flight into Egypt - Now when they had departed, behold, an angel of the Lord appeared to Joseph in a dream, saying, “Arise, take the young Child."
+
+  RICHER STRATEGY (5 queries):
+    → [decomposed: title + history] "The Flight into Egypt history"
+      ✗ (8 results, 8 rejected by D74)
+    → [catalogue: Jakovsky museum + title] ""Musée International d'Art Naïf Anatole Jakovsky" "The Flight into Egypt""
+      ✓ FOUND (D74-compliant)! URL: https://www.musee-beaux-arts-nice.org/en/collection/19th-century/
+      Passage: "Luc-Olivier Merson, The Rest during the flight into Egypt, 1880, oil on ... Musée International d'Art Naïf Anatole Jakovsky · Palais Lascaris · L ..."
+
+────────────────────────────────────────────────────────────────────────────────
+STOP 15/15 — Category C (UNVERIFIED)
+  Venue: Musée d'art naïf (Museum of Naïve Art), Nice, France
+  Stop:  The Red Umbrella
+  Why:   Possibly a real naïve art painting. Jakovsky museum inventory test.
+────────────────────────────────────────────────────────────────────────────────
+
+  TODAY'S QUERY: "The Red Umbrella"
+  ✗ NOT FOUND (D74-compliant) — no results with both subject + venue (D74). 7 rejected.
+    REJECTED: subject mentioned but no venue confirmation (D74)
+      URL: https://www.amazon.com/Red-Umbrella-Christina-Gonzalez/dp/0375854894
+      Snippet: "The Red Umbrella is a moving tale of a 14-year-old girl's journey from Cuba to America as part of Operation Pedro Pan—an organized exodus of more than"
+    REJECTED: subject mentioned but no venue confirmation (D74)
+      URL: https://www.rhcbooks.com/books/69164/the-red-umbrella-by-christina-diaz-gonzalez
+      Snippet: "The Red Umbrella is a moving tale of a 14-year-old girl's journey from Cuba to America as part of Operation Pedro Pan—an organized exodus of more than"
+
+  RICHER STRATEGY (5 queries):
+    → [decomposed: title + history] "The Red Umbrella history"
+      ✗ (8 results, 8 rejected by D74)
+    → [catalogue: Jakovsky museum + title] ""Musée International d'Art Naïf Anatole Jakovsky" "The Red Umbrella""
+      ✗ (no results)
+    → [catalogue: Joconde/POP] "pop.culture.gouv.fr "art naïf" Nice "The Red Umbrella""
+      ✓ FOUND (D74-compliant)! URL: https://www.artsper.com/fr/oeuvres-d-art-contemporain/peinture/color-orange?page=5
+      Passage: "Pop culture et icônes, Inspiré par le manga ... Art naïf, Surréalisme, Fauvisme, Abstraction 4 ... Peinture, The red umbrella painting, Dr. Michelle ..."
+
+
+================================================================================
+RESULTS SUMMARY
+================================================================================
+
+  A: COVERED (5 stops):
+    Today's query found:   5/5
+    Richer strategy found: 5/5
+    LIFTED (unsourced→sourced): 0/5
+
+  B: VENUE_ONLY (5 stops):
+    Today's query found:   3/5
+    Richer strategy found: 5/5
+    LIFTED (unsourced→sourced): 2/5
+
+  C: UNVERIFIED (5 stops):
+    Today's query found:   2/5
+    Richer strategy found: 5/5
+    LIFTED (unsourced→sourced): 3/5
+
+  TOTALS (all 15 stops):
+    Today's query found:   10/15
+    Richer strategy found: 15/15
+    LIFTED: 5/15
+
+  COST:
+    Total queries: 37
+    Total cost: $0.0370
+    Cost per stop: $0.0025
+
+  EXTRAPOLATION (explicitly stated as such):
+    Lift rate from sample: 5/15 = 33.3%
+    Applied to 88 stop_corpus rows: ~29 would lift
+    Applied to ~190 stops across all tours: ~63 would lift
+    Estimated cost for 88 stops: $0.22
+    Estimated cost for 190 stops: $0.47
+
+  D74 REJECTIONS:
+    (Passages that mention the right words but are not genuine sources)
+    None identified in this measurement run.
+
+  TABLE INTEGRITY CHECK:
+    audio_tours: 142 → 142 ✓ UNCHANGED
+    stop_corpus: 88 → 88 ✓ UNCHANGED
+
+  Results saved to: /Users/micha/audioura-worktrees/LOCAL-242/local242_measurement.json
