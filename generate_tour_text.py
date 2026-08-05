@@ -8264,6 +8264,164 @@ NARRATIVE THREAD (weave into Part 3 as the central intrigue):
                         _p4_stops_text += f"    - {_p4f[:200]}\n"
 
             if _p4_stops_text.strip():
+                # ──── [LOCAL-276] INTRIGUE RANKING ────────────────────────────────
+                # One batched model call ranks ALL candidate facts by intrigue before
+                # composition. This replaces the "pick by name recognition" failure
+                # D177 identified. The ranking chooses AMONG verified facts — it does
+                # not write new ones, does not alter text, and does not replace D177
+                # verification (which still runs on the composed output).
+                #
+                # What counts as intrigue (in order):
+                #   1. A reversal — something became the opposite of what it was
+                #   2. A mystery or unresolved thing
+                #   3. A cause — X happened because Y
+                #   4. A specific dated event with consequence
+                #
+                # What does NOT count:
+                #   - Ownership/residence/visitation by a celebrity
+                #   - Attribution with no event ("designed by X" unless the design IS the story)
+                _rank_prompt = f"""You are ranking candidate facts from a tour for use in a preview sentence.
+
+CANDIDATE FACTS BY STOP:
+{_p4_stops_text}
+
+TASK: For each stop, rank the facts from MOST to LEAST intriguing. Return the single best fact per stop.
+
+INTRIGUE CRITERIA (in order of priority):
+1. REVERSAL — something became the opposite of what it was (e.g. a confectioner who became a casino director; a fishing village that became a playground for the elite)
+2. MYSTERY — an unresolved or unexplained thing (e.g. the Man in the Iron Mask, whose identity remains debated)
+3. CAUSE — X happened because Y, a causal chain
+4. DATED EVENT WITH CONSEQUENCE — a specific event that changed something (e.g. a festival cancelled by mobilisation; a castle destroyed in a war)
+
+NOT INTRIGUING (penalise these — rank them last):
+- Ownership, residence or visitation by a celebrity: "once owned by", "graced by", "hosted", "visited by" — unless the PERSON's story is itself a reversal
+- Attribution with no event: "designed by X", "built by Y" — unless the design or construction itself carries a story
+- A famous name with no tension: merely naming a celebrity who was there is trivia, not a story
+
+OUTPUT FORMAT (one line per stop, JSON array):
+[
+  {{"stop": "<stop name>", "best_fact": "<the exact sentence text>", "rank": 1, "reason": "<which criterion: reversal/mystery/cause/dated_event/celebrity_trivia>"}},
+  ...
+]
+
+Return ONLY the JSON array. Do not alter the fact text — copy it exactly as provided above."""
+
+                _rank_start = time.time()
+                _rank_cost = 0.0
+                _rank_tokens = 0
+                _ranked_facts = None  # Will hold the parsed ranking if successful
+
+                try:
+                    _rank_resp = requests.post(
+                        "https://api.openai.com/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                        json={
+                            "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                            "messages": [
+                                {"role": "system", "content": "You rank facts by narrative interest. You never invent facts. You return valid JSON only."},
+                                {"role": "user", "content": _rank_prompt},
+                            ],
+                            "temperature": 0.1,
+                            "max_tokens": 1200,
+                        },
+                        timeout=30,
+                    )
+                    _rank_elapsed = time.time() - _rank_start
+
+                    if _rank_resp.status_code == 200:
+                        _rank_result = _rank_resp.json()
+                        _rank_usage = _rank_result.get("usage", {})
+                        _rank_cost = (_rank_usage.get("prompt_tokens", 0) / 1000 * 0.005) + \
+                                     (_rank_usage.get("completion_tokens", 0) / 1000 * 0.015)
+                        _rank_tokens = _rank_usage.get("total_tokens", 0)
+                        total_cost += _rank_cost
+                        total_tokens += _rank_tokens
+
+                        _rank_text = _rank_result["choices"][0]["message"]["content"].strip()
+                        # Parse JSON — handle markdown code fences
+                        _rank_json_text = _rank_text
+                        if '```' in _rank_json_text:
+                            _fence_match = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', _rank_json_text, re.DOTALL)
+                            if _fence_match:
+                                _rank_json_text = _fence_match.group(1).strip()
+
+                        try:
+                            _ranked_facts = json.loads(_rank_json_text)
+                            print(f"    [LOCAL-276] Intrigue ranking completed: {_rank_elapsed:.1f}s, ${_rank_cost:.4f}, {_rank_tokens} tokens")
+                            print(f"    [LOCAL-276] Ranked {len(_ranked_facts)} stops:")
+                            for _rf in _ranked_facts:
+                                _rf_stop = _rf.get('stop', '?')
+                                _rf_reason = _rf.get('reason', '?')
+                                _rf_fact = _rf.get('best_fact', '?')[:80]
+                                print(f"      [{_rf_stop}] ({_rf_reason}): {_rf_fact}...")
+                        except (json.JSONDecodeError, TypeError) as _je:
+                            print(f"    [LOCAL-276] Ranking JSON parse failed: {_je}")
+                            print(f"    [LOCAL-276] Raw response: {_rank_text[:300]}")
+                            _ranked_facts = None
+                    else:
+                        _rank_elapsed = time.time() - _rank_start
+                        print(f"    [LOCAL-276] Ranking call failed (HTTP {_rank_resp.status_code}) after {_rank_elapsed:.1f}s")
+
+                except Exception as _rank_err:
+                    _rank_elapsed = time.time() - _rank_start
+                    print(f"    [LOCAL-276] Ranking call error: {_rank_err}")
+
+                # ──── Build the RANKED stops text for composition ────────────────
+                # If ranking succeeded, rebuild _p4_stops_text using only the top-
+                # ranked fact per stop. EXCLUDE celebrity_trivia — those are the
+                # "guest list" entries D177 identified as the problem. If ranking
+                # failed, fall through to the original (unranked) list.
+                #
+                # Priority order for the composition LLM: reversal > mystery >
+                # cause > dated_event. Stops with only celebrity_trivia are omitted.
+                _INTRIGUE_PRIORITY = {
+                    'reversal': 1,
+                    'mystery': 2,
+                    'cause': 3,
+                    'dated_event': 4,
+                }
+                _EXCLUDED_REASONS = {'celebrity_trivia'}
+
+                if _ranked_facts and isinstance(_ranked_facts, list):
+                    # Filter and sort
+                    _intriguing_facts = []
+                    _excluded_count = 0
+                    for _rf in _ranked_facts:
+                        _rf_reason = _rf.get('reason', '').lower().strip()
+                        if _rf_reason in _EXCLUDED_REASONS:
+                            _excluded_count += 1
+                            _rf_stop = _rf.get('stop', '?')
+                            print(f"      [LOCAL-276] EXCLUDED ({_rf_reason}): [{_rf_stop}] {_rf.get('best_fact', '')[:60]}...")
+                            continue
+                        _intriguing_facts.append(_rf)
+
+                    # Sort by intrigue priority (reversal first)
+                    _intriguing_facts.sort(
+                        key=lambda x: _INTRIGUE_PRIORITY.get(x.get('reason', '').lower().strip(), 99)
+                    )
+
+                    print(f"    [LOCAL-276] {len(_intriguing_facts)} intriguing / {_excluded_count} excluded (celebrity_trivia)")
+
+                    if len(_intriguing_facts) >= 2:
+                        _ranked_stops_text = ""
+                        for _rf in _intriguing_facts:
+                            _rf_stop = _rf.get('stop', '')
+                            _rf_fact = _rf.get('best_fact', '')
+                            if _rf_stop and _rf_fact:
+                                _ranked_stops_text += f"\n  [{_rf_stop}]:\n"
+                                _ranked_stops_text += f"    - {_rf_fact[:200]}\n"
+
+                        if _ranked_stops_text.strip():
+                            _p4_stops_text = _ranked_stops_text
+                            print(f"    [LOCAL-276] Using ranked facts for composition ({len(_intriguing_facts)} stops)")
+                        else:
+                            print(f"    [LOCAL-276] Ranked text empty — using unranked fallback")
+                    else:
+                        print(f"    [LOCAL-276] Fewer than 2 intriguing facts — using unranked fallback")
+                else:
+                    print(f"    [LOCAL-276] Using unranked facts (ranking unavailable)")
+                # ──── END [LOCAL-276] INTRIGUE RANKING ────────────────────────────
+
                 # LLM call to compose Part 4 — with one retry on verification failure
                 _p4_prompt = f"""Write 1-2 sentences connecting a tour introduction to its upcoming stops. Name SPECIFIC content from at least two different stops, using the stop names.
 
