@@ -51,3 +51,61 @@ over text that was visibly broken. Reading the tour as prose is now a standing
 step, not a fallback.
 
 ---
+
+## 2026-08-05 11:16 — Michael
+
+> I am looking at the fitst paragraph for the full text at
+> tours/LOCAL253_riviera_2stop_round10.txt. Is it the text that went through all
+> our validation stage or it is the raw return from OpenAI.API?
+
+## 2026-08-05 11:16 — LEAD
+
+**Validated, not raw — but validated by the pipeline as it stood at 09:29, and
+it was missing the two stages that matter most for that paragraph.**
+
+Round 10 was generated at 09:29. What ran on it:
+
+| stage | ran? |
+|---|---|
+| stop-existence gate (ENFORCE) | yes |
+| style retry (PHASE 5.1) | yes |
+| R9 generic deletion (5.15) | yes |
+| prolog gating (5.9), orientation gating (5.95) | yes |
+| CONTRADICTED block, coverage selection | yes |
+| R10 unfulfilled-promise deletion | yes, but by the run harness, not in-pipeline |
+| subject routine | **disabled in that run** |
+| **R7 invented-sensory deletion** | **did not exist yet** — merged 10:05 |
+| **R1 imperative rewrite** | **did not exist yet** — merged 10:40 |
+
+So the sentence you are almost certainly looking at —
+
+> "Take a moment to breathe in the salty sea air and listen to the gentle
+> lapping of the waves against the shore."
+
+— is exactly the class you scored **1/5**, and nothing in that run was capable
+of removing it. R7 could see it and had no deletion path; R1 could see the
+imperative and had no rewrite path. Both landed later the same morning.
+
+**The uncomfortable part: I re-ran that paragraph through today's pipeline and
+it still comes out wrong.**
+
+- R7 is *still silent* on the salty-air sentence. LOCAL-256 taught R7 the
+  orientation patterns it was shown, and this one is shielded by the leading
+  imperative.
+- The new R1 rewrite makes two of the three sentences worse, not better:
+  - "As you arrive at Cap d'Antibes, find yourself amidst the lush greenery…"
+    → "From Cap d'Antibes, **you can admire yourself amidst** the lush greenery…"
+    (nonsense)
+  - "Take a moment to breathe in the salty sea air…"
+    → "**breathe in the salty sea air**…" (lowercase, still an imperative,
+    worse than the original)
+
+That is a new defect, found by your question. The rewrite was verified against
+eight boundary rows and it handles those correctly; these two shapes were not
+among them. Recording it and folding it into the R1 work now in flight.
+
+**Short answer:** validated, by an older pipeline, and the specific thing
+annoying you in that paragraph is the thing that had no fix at the time — and
+still does not have a working one.
+
+---
