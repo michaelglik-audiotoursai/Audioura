@@ -5514,3 +5514,64 @@ consecutive round where a summary line overstated the result and the underlying
 work was sound — the pattern is not dishonesty, it is that the agent measures
 what it changed and not what shipped. The acceptance criteria for LOCAL-244 now
 say: *check the delivered text yourself.*
+
+---
+
+## D137 — The prolog is finally gated; the stop-existence gate has never stopped anything (2026-08-05)
+
+### What worked
+
+LOCAL-244 ran the existing gates over the prolog before injection. Verified by
+LEAD on the delivered text:
+
+```
+P1  51w  R1        P2 115w  R1   ← prolog, gated for the first time
+P3 145w  clean     P4  52w  R1
+P5 108w  R1        P6  17w  clean
+total 488 · residual R10: 0
+```
+
+**Zero residual R10 across the whole tour**, including the prolog — which no
+gate had ever seen before today, on any tour. D136's finding closed.
+
+### What did not
+
+Its own table:
+
+```
+stops selected     Cap d'Antibes, Corniche d'Or
+-> Corniche d'Or   UNVERIFIED - NO_CORPUS
+```
+
+Corniche d'Or got **two paragraphs, 160 words**. The gate computed the correct
+verdict and did nothing with it: LOG_ONLY is still the default from LOCAL-236,
+and no run has ever switched it. The summary listed the gate under "gates
+active", which is true and misleading in the same breath.
+
+**So the gate built to stop us narrating places we cannot source has never
+stopped anything.** LEAD has put a warning at the top of the document Michael
+reads at 09:00 — *"Stop 2 is UNVERIFIED and was narrated anyway… treat those
+paragraphs the way you treated the Chikanobu print"* — and that warning should
+not have been necessary. **LOCAL-245** makes the mode explicit, logged at
+startup, and real.
+
+### Where the night leaves the tour
+
+```
+round 2                  819 words   no R10
+R10 on old text          191         deletion only
+end-to-end, R10 post     393
+end-to-end, R10 in-pipe  505
+prolog gated             488         zero residual R10
+```
+
+**R1 still fires on four of six paragraphs.** That is Michael's original
+complaint and it is unresolved after all of it. R1 is caught, measured at 36.2%
+corpus-wide, and the style retry cannot reliably remove it — three rounds have
+said negative constraints do not land on this model.
+
+The one thing that has visibly improved is what we can *prove* about a tour:
+which stops are real, which sentences promise without delivering, which claims
+have sources. The writing itself has not improved, because the material has
+not — 25 of 29 tours have no venue corpus, and richer retrieval reaches perhaps
+a quarter of the gap (D135).
