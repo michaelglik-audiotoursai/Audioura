@@ -4342,3 +4342,57 @@ exist this morning are worth having, and they are the reference implementation
 of the pattern. It answers a narrower question than it appears to: *the
 detectors are sound*, which is true and worth knowing — just not the question
 that mattered.
+
+---
+
+## D113 — Ten glue points cannot detect their own breakage, and one of them is Michael's hard block (2026-08-04)
+
+LOCAL-228, dispatched at the layer LEAD should have aimed at first (D112),
+found **10 glue points that do not notice being broken** — and 5 where the
+contract holds.
+
+| # | kind | glue point | what the caller sees when it breaks |
+|---|---|---|---|
+| 1–2 | key name | `local205_analyze.py` reads `'violations'` / `'rule'`; producer returns `'findings'` / `'rule_id'` | always `[]` — **this is D83** |
+| 3–6 | swallowed | `venue_resolver` `_get_instance_of`, `_get_coordinates`, `_geocode_city`, `_search_entities` | `None`, `(0.0, 0.0)`, `[]` — identical to a legitimate "not found" |
+| 7 | swallowed | coverage selection's DB connect in `generate_tour_text` | connection stays `None`, **selection silently skipped** |
+| 8 | unconsumed | **`CONTRADICTED` in production** | tours with contradicted claims ship unchanged |
+| 9 | unconsumed | `SUPPORTED_PARAPHRASE`, `SUPPORTED_ELSEWHERE`, `SUPPORTED_EXTERNAL`, `NO_ANCHOR`, `UNLINKED_ENTITY` | nothing reads any of them |
+| 10 | format | `claim_check` → `evaluate_evidence` | **this is D103**, still the shape of it |
+
+Two of the ten are failures we already found the hard way, which is the check
+that the method works: it reproduces known bugs from first principles.
+
+### #8 is the serious one, and LEAD verified it independently
+
+```
+$ grep -c "sentence_group_scorer" generate_tour_text.py
+0
+```
+
+Michael ruled on 2026-08-04: *"We should not publish if we are reasonably sure
+that the data is incorrect."* That became D100, and it **is** implemented — in
+`sentence_group_scorer.py`. Its only consumer is an analysis script.
+
+**So his hard block exists in a document and a test harness, and not in the
+product.** A tour containing a claim our own corpus contradicts ships today.
+
+This is the D76 pattern — built, correct, inert — but for a rule he stated
+explicitly and expects to be in force. **LOCAL-229** dispatched to wire it in,
+with the instruction that a zero firing rate is the expected and correct
+outcome (0 of 188 corpus-wide, D99): it is a safety net, not a filter, and
+tuning the detector to make it fire is out of scope.
+
+### #3–#6: sentinel values that mean two different things
+
+`venue_resolver` returns `(0.0, 0.0)` when geocoding fails — indistinguishable
+from a venue with no coordinates, and a real point in the Gulf of Guinea. LEAD
+checked the live table: **no tour currently sits at 0,0**, so this has not bitten
+us. It is one network blip from doing so, and `tours-near` filters on lat/lng.
+
+### The pattern, stated once
+
+Every failure this week lived where two correct things meet: a key name, an
+exception boundary, an unread output, a format. **Components are tested;
+seams are assumed.** LOCAL-227 proved all 16 detectors are sound and told us
+nothing about the system, because the system's failures are all seams.
