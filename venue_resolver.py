@@ -86,6 +86,54 @@ class VenueEntity:
     works: List[Dict] = field(default_factory=list)  # [{qid, label_en, label_local}]
 
 
+def _normalise_venue_name(venue_string: str) -> List[str]:
+    """Generate lookup variants from a venue string with parentheticals/qualifiers.
+
+    LOCAL-258: A parenthetical gloss (English name, alternate name, disambiguator)
+    must not defeat lookup. Returns a list of search strings to try in order:
+      1. Full string as-is (may work if Wikidata indexes the full form)
+      2. Pre-parenthetical head (e.g. "Musee des Arts Asiatiques")
+      3. Parenthetical content alone (e.g. "Asian Art Museum")
+
+    Trailing place qualifiers (", Nice, France") are stripped consistently —
+    they are handled as a city hint, not part of the venue search key.
+    """
+    # Strip trailing comma-separated place qualifiers (city, country)
+    # These arrive as city hints via the caller; keeping them in the search
+    # string confuses Wikidata.
+    _stripped = re.sub(r',\s*[^,()]+$', '', venue_string).strip()
+    # If that removed something that looks like country, try once more for city
+    if _stripped != venue_string:
+        _stripped = re.sub(r',\s*[^,()]+$', '', _stripped).strip()
+
+    variants = []
+
+    # Check for parenthetical content
+    paren_match = re.match(r'^(.+?)\s*\((.+?)\)\s*$', _stripped)
+    if paren_match:
+        head = paren_match.group(1).strip()
+        paren_content = paren_match.group(2).strip()
+        # 1. Full string (might match a Wikidata alias)
+        variants.append(_stripped)
+        # 2. Pre-parenthetical head (most likely the official/local name)
+        if head:
+            variants.append(head)
+        # 3. Parenthetical content (often the English name)
+        if paren_content and paren_content != head:
+            variants.append(paren_content)
+    else:
+        variants.append(_stripped)
+
+    # Deduplicate while preserving order
+    seen = set()
+    deduped = []
+    for v in variants:
+        if v and v not in seen:
+            seen.add(v)
+            deduped.append(v)
+    return deduped
+
+
 def resolve_venue(venue_string: str, city: str = "") -> Optional[VenueEntity]:
     """Resolve a venue string to a Wikidata entity.
     
@@ -96,44 +144,77 @@ def resolve_venue(venue_string: str, city: str = "") -> Optional[VenueEntity]:
     Returns:
         VenueEntity with structured data, or None if unresolvable.
     """
+    # LOCAL-258: Extract city from trailing comma-separated segments if not provided.
+    # E.g. "Musee des Arts Asiatiques (Asian Art Museum), Nice, France" → city="Nice"
+    if not city and "," in venue_string:
+        _parts = [p.strip() for p in venue_string.split(",")]
+        if len(_parts) >= 2:
+            # Heuristic: second segment is likely the city; skip country-looking words
+            _COUNTRY_WORDS = {'france', 'italy', 'usa', 'uk', 'spain', 'germany',
+                              'netherlands', 'belgium', 'switzerland', 'japan', 'china'}
+            for _seg in _parts[1:]:
+                if _seg.lower() not in _COUNTRY_WORDS and len(_seg) > 1:
+                    city = _seg
+                    break
+
+    # LOCAL-258: Normalise venue name — strip parentheticals and trailing qualifiers,
+    # then try each variant in order until we get candidates.
+    _name_variants = _normalise_venue_name(venue_string)
+    print(f"  [venue_resolver] Name variants: {_name_variants}")
+
     # Step 1: Search Wikidata for candidates — city-qualified FIRST, then bare
     # Wikipedia naming conventions: "X in City", "X (City)", "X, City"
     candidates = []
-    
-    if city:
-        # Try city-qualified queries first (Wikipedia disambiguation conventions)
-        for _qual_query in [
-            f"{venue_string} in {city}",
-            f"{venue_string} ({city})",
-            f"{venue_string} {city}",
-        ]:
-            candidates = _search_entities(_qual_query)
-            if candidates:
-                print(f"  [venue_resolver] City-qualified search hit: '{_qual_query}' → {len(candidates)} candidates")
-                break
-    
+
+    # Try each normalised variant with the full search cascade
+    for _variant in _name_variants:
+        if city:
+            # Try city-qualified queries first (Wikipedia disambiguation conventions)
+            for _qual_query in [
+                f"{_variant} in {city}",
+                f"{_variant} ({city})",
+                f"{_variant} {city}",
+            ]:
+                candidates = _search_entities(_qual_query)
+                if candidates:
+                    print(f"  [venue_resolver] City-qualified search hit: '{_qual_query}' → {len(candidates)} candidates")
+                    break
+
+        if not candidates:
+            candidates = _search_entities(_variant)
+
+        if candidates:
+            break  # Found candidates with this variant
+
     if not candidates:
-        candidates = _search_entities(venue_string)
-    
-    if not candidates:
-        # Try with city appended (different from above — just simple append)
-        candidates = _search_entities(f"{venue_string} {city}")
+        # Fallback: try with city appended to each variant
+        for _variant in _name_variants:
+            if city:
+                candidates = _search_entities(f"{_variant} {city}")
+                if candidates:
+                    break
     
     if not candidates:
         # Try shorter variants: strip common prefixes/honorifics
-        _shorter = re.sub(r'(?i)^(mus[ée]+e?\s*(national|nationale|municipal|municipale|d[eu]\s*)?)', 'Musée ', venue_string).strip()
-        if _shorter != venue_string:
-            candidates = _search_entities(_shorter)
+        for _variant in _name_variants:
+            _shorter = re.sub(r'(?i)^(mus[ée]+e?\s*(national|nationale|municipal|municipale|d[eu]\s*)?)', 'Musée ', _variant).strip()
+            if _shorter != _variant:
+                candidates = _search_entities(_shorter)
+                if candidates:
+                    break
     
     if not candidates:
         # Try just the distinctive name words (e.g. "Marc Chagall" from "Musée national Marc Chagall")
-        _words = venue_string.split()
-        _distinctive = [w for w in _words if w.lower() not in
-                       ('musée', 'musee', 'museum', 'national', 'nationale', 'gallery',
-                        'galleria', 'the', 'of', 'de', 'du', 'des', 'le', 'la', 'les')]
-        if _distinctive:
-            _short_query = f"musée {' '.join(_distinctive)}"
-            candidates = _search_entities(_short_query)
+        for _variant in _name_variants:
+            _words = _variant.split()
+            _distinctive = [w for w in _words if w.lower() not in
+                           ('musée', 'musee', 'museum', 'national', 'nationale', 'gallery',
+                            'galleria', 'the', 'of', 'de', 'du', 'des', 'le', 'la', 'les')]
+            if _distinctive:
+                _short_query = f"musée {' '.join(_distinctive)}"
+                candidates = _search_entities(_short_query)
+                if candidates:
+                    break
     
     if not candidates:
         print(f"  [venue_resolver] No Wikidata candidates for '{venue_string}'")
