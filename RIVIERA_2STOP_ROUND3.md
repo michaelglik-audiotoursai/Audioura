@@ -4,23 +4,34 @@
 
 > Total words: **724** (round 2 was 819).
 
-> ## ⚠️ Read this first — LEAD's note, 2026-08-05 04:40
+> ## ⚠️ Read this first — LEAD, verified at merge 2026-08-05 05:05
 >
-> **LOCAL-245 fix applied.** The stop-existence gate now enforces: unverified
-> stops are dropped before narration. Both stops below are VERIFIED against
-> venue_corpus. The mode (`STOP_EXISTENCE_GATE_MODE=enforce`) is logged at
-> startup — a run can no longer claim enforcing while behaving otherwise.
+> **Both stops are verified this time.** Cap d'Antibes and Eze Village are real
+> places we hold sources for, and the existence gate now actually drops
+> unverified candidates instead of logging and continuing. Last night's version
+> narrated Corniche d'Or — a place we have no source for — while reporting the
+> gate as active.
 >
-> Previous state: LOCAL-244 ran the gate in LOG_ONLY mode, computed the
-> correct verdict (Corniche d'Or = UNVERIFIED, NO_CORPUS), and narrated it
-> anyway. The bug was structural: the gate existed but was never wired to
-> drop stops during generation.
+> **What LEAD measured in the text below**, not what the run reported:
 >
-> **R1 still fires on paragraphs.** That is your original complaint, unresolved.
+> ```
+> P1  58w  R1            P2  66w  R1            P3 179w  R1
+> P4  72w  R10           P5 207w  clean         P6  17w  clean
+> ```
 >
-> Word counts across the night: round 2 **819** → R10 on old text **191** →
-> end-to-end **393** → R10 in-pipeline **505** → prolog gated **488** →
-> this (enforce) **724**.
+> - **One unfulfilled promise survives**, in the first paragraph of Eze Village:
+>   *"take a moment to absorb the whispers of centuries that echo through it."*
+>   That is an Orientation paragraph — generated separately, like the prolog was,
+>   and injected after the gates. Same class of gap as the prolog, one layer over.
+> - **R1 fires on three of six paragraphs.** Your original complaint. Down from
+>   four of six, still there.
+> - Paragraph 5 is the one worth reading: 200 BC, Mount Bastide, the Antonine
+>   Itinerary. Sourced, specific, no promises. That is what the corpus produces
+>   when it has something.
+>
+> Word counts overnight: round 2 **819** → your rule on old text **191** →
+> end-to-end **393** → R10 in-pipeline **505** → prolog gated **488** → this
+> **599**. The variance is generation noise, not the rules loosening.
 
 
 ## Summary Table
