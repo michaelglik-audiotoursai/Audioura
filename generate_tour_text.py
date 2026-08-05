@@ -8801,7 +8801,13 @@ RULES:
             ))
             if _has_substance and _clean_orientation != "Position yourself to best view this artwork.":
                 poi_content += f"{_orientation_prefix}{_clean_orientation}\n\n"
-            # else: skip orientation entirely — go straight to description
+            elif i == 0 and _saved_prolog:
+                # [LOCAL-282] R3 drops the weak orientation text, but the tour overview
+                # (prolog) lives in _orientation_prefix and MUST survive. Emit the prefix
+                # without the orientation text. The "Orientation:" label stays because
+                # TTS and translation key on that word (D172).
+                poi_content += f"{_orientation_prefix.rstrip()}\n\n"
+            # else: non-stop-1 weak orientation — skip entirely (no overview at stake)
         else:
             poi_content += f"{_orientation_prefix}{_clean_orientation}\n\n"
         
