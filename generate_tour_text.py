@@ -7778,23 +7778,28 @@ NARRATIVE THREAD (weave into Part 3 as the central intrigue):
         
         # Add orientation section
         _orientation_prefix = "Orientation: "
+        _entrance_directive = ""
         if i == 0:
             # For the first POI, include directions from the entrance
             # [C5-3] Museum tours: skip fabricated entrance directions entirely
             if tour_category != 'museum' or not _museum_venue_name:
                 entrance_directions = poi.get("directions", "")
                 if entrance_directions:
-                    _orientation_prefix += entrance_directions + " "
+                    # [LOCAL-264] held back so the general description can go first,
+                    # inside the Orientation section
+                    _entrance_directive = entrance_directions + " "
         
-        # [LOCAL-264] Michael, 2026-08-05: the tour's general description must come
-        # BEFORE the orientation directive, not after it. His words: "it follows the
-        # direction of orientation. Logically it should proceed it. The word
-        # Orientation is important, so let's keep it, but then start with the General
-        # description of the tour and place the directive of where to go after."
-        # So for Stop 1 the order is: general description, then "Orientation: <where
-        # to go>", then the stop's own description.
+        # [LOCAL-264] Michael, 2026-08-05. Two corrections, in order:
+        #   1. the tour's general description must precede the where-to-go directive;
+        #   2. but BOTH sit INSIDE the Orientation section — the literal word
+        #      "Orientation:" has to come first, because "the verbalization and
+        #      translation depend on that word to start."
+        # So Stop 1 reads:
+        #   Orientation: <general description of the tour> <where to go>
+        # and the prolog is never emitted as a separate block above the label.
         if i == 0 and _saved_prolog:
-            poi_content += f"{_saved_prolog}\n\n"
+            _orientation_prefix += _saved_prolog.strip() + " "
+        _orientation_prefix += _entrance_directive
 
         # Add the orientation text — [R3] only if substantive (museum tours)
         # Strip any leading "Orientation:" from the LLM text to avoid duplication
