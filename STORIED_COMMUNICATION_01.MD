@@ -710,3 +710,35 @@ Still wrong in it: "you can admire yourself standing on a rocky outcrop" — the
 R1 bug, because LOCAL-271 has not landed yet.
 
 ---
+
+## 2026-08-05 15:02 — Michael
+
+> Or, I forgot, we should also mention that the listener can always visit Treat
+> Page to see if there is a real saving on his way in the local stores and
+> restaurants. Just one sentence or a part of the previous about restaurant
+> tour...
+
+## 2026-08-05 15:02 — LEAD
+
+**Verified it exists before writing it into the task** — the same check the news
+offer is held to, and this one passed:
+
+```
+treats_screen.dart          calls /treats-near/{lat}/{lng}
+endpoints.dart              Service.treats -> port 5007
+docker-compose-master.yml   treats service, Dockerfile.treats
+```
+
+So the offer is honest. Better, it is **location-aware**: `/treats-near/` takes
+coordinates and the final stop's coordinates are already in the tour, so it can
+be anchored there rather than offered generically.
+
+Folded into the restaurant sentence rather than added as a fourth, per your
+"just one sentence or a part of the previous". The three-sentence cap holds.
+
+One wording point I have written into the task: **do not claim savings exist.**
+The page shows *whether* there are any. Your own phrasing — "see if there is a
+real saving" — is exactly right; promising savings we have not checked would be
+the same error as promising a museum that is not there.
+
+---
