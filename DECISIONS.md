@@ -5322,3 +5322,63 @@ stops verified. It is a real improvement on round 2 in one respect only — the
 stops are now provably real places we have sourced — and it still reads the way
 he objected to. That is the honest position to hand him at 09:00, and it points
 at the corpus, which is where D123, D131 and D132 all end up.
+
+---
+
+## D134 — Apply Michael's rule strictly and the tour collapses to 191 words (2026-08-05)
+
+LOCAL-240 widened R10 from a phrase list to a structural test — a narrative
+noun governed by a verb of possession or concealment. LEAD verified the full
+boundary on `storied` HEAD:
+
+```
+FIRES   "villages hold a tapestry woven with… whispers of medieval roots"
+FIRES   "forgotten tales that shape its identity"
+FIRES   "stand sentinel against opulent villas"
+FIRES   "masks the secrets of its past… each chapter"
+
+CLEAN   "In 200 BC, the area surrounding Èze saw its first inhabitants…"
+CLEAN   "The Antonine Itinerary mentions the bay of Èze as Avisionis portus."
+CLEAN   "F. Scott Fitzgerald based the opening hotel of his 1934 novel…"
+CLEAN   "…the Hôtel du Cap-Eden-Roc, built here in 1870…"
+CLEAN   "Start cycling south on the main road…"          (his 5/5)
+```
+
+Tour 180 goes 11 → 12 hits; nothing regressed.
+
+### The result is the finding
+
+Applied to the round-3 text, R10 deletes **8 sentences**, and the tour becomes:
+
+```
+P1   5 words     P2  56     P3 107
+P4   8 words     P5   7     P6   8
+total 191 words       (round 2 was 819)
+```
+
+**Four of six paragraphs reduced to a single line.** That is Michael's own rule
+— *"either tell us the story or get rid of the sentence"* — applied without
+flinching, and it is the clearest picture yet of what D123 means: 77% of the
+tour was promises with nothing behind them.
+
+The deletions read as a list of everything he objected to: *"forgotten tales
+that shape its identity"*, *"a window into the enduring charm"*, *"whispers of
+medieval roots"*, *"the crisp sea air carries whispers of history"*.
+
+### One thing that document is not
+
+Its own summary says *"tour 195 — same generation, R10 re-applied"*, cost
+**$0.00**. It shows what R10 removes from prose written *before* R10 existed —
+not what the pipeline produces with every gate in the loop. The interactions
+that matter (the style retry rewrites, R10 then deletes the rewrite, the corpus
+gate shapes what gets written at all) only appear in a real run.
+
+**LOCAL-241** dispatched to generate end-to-end and carry both results side by
+side, with a hard 08:00 stop and instructions to restore the current document
+untouched if the run fails. Michael has a tour at 09:00 either way.
+
+**The honest headline for him:** the validation now works, and what it reveals
+is that there is almost nothing to validate. Every thread this week — the
+89.5%-corrected-to-26% unverified stops, the 18% expansion rate, the 25 of 29
+tours with no venue corpus, and now 191 words from 819 — converges on the same
+sentence: **the corpus is the product, and we do not have one.**
