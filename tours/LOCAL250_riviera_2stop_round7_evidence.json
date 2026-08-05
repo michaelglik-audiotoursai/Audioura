@@ -1,0 +1,107 @@
+{
+  "expansion_log": [
+    {
+      "stop": "Cap d'Antibes",
+      "sentence_before": "You are about to embark on a journey through the luxurious Cap d'Antibes, a seaside paradise steeped in opulence and intrigue.",
+      "subject_nouns": [
+        "intrigue",
+        "opulence"
+      ],
+      "corpus_passage": null,
+      "sentence_after": null,
+      "outcome": "DELETED_NO_CORPUS",
+      "cost": 0.0
+    },
+    {
+      "stop": "Cap d'Antibes",
+      "sentence_before": "As you pedal through this glittering peninsula, you will uncover the hidden stories that lie beneath the fa\u00e7ade of sun-drenched villas and azure beaches.",
+      "subject_nouns": [
+        "stories"
+      ],
+      "corpus_passage": "For France lovers, Fitzgerald's Tender is the Night (1934) is the truest portrait of 'the Roaring Twenties', and was inspired by his racy ...",
+      "sentence_after": "As you pedal through this glittering peninsula, remember that for France lovers, Fitzgerald's Tender is the Night, published in 1934, offers a vivid glimpse into 'the Roaring Twenties'.",
+      "outcome": "EXPANDED",
+      "cost": 6.165e-05
+    },
+    {
+      "stop": "Cap d'Antibes",
+      "sentence_before": "Each landmark along the way reveals a different chapter in the history of this captivating enclave, from clandestine wartime operations to the creative inspirations of famous artists and writers who once roamed its shores.",
+      "subject_nouns": [
+        "chapter"
+      ],
+      "corpus_passage": null,
+      "sentence_after": null,
+      "outcome": "DELETED_NO_CORPUS",
+      "cost": 0.0
+    },
+    {
+      "stop": "Cap d'Antibes",
+      "sentence_before": "The past whispers through the sea breeze, reminding you that behind the glamour of today, lies a tapestry woven with secrets and tales waiting to be discovered.",
+      "subject_nouns": [
+        "secrets",
+        "tales",
+        "tapestry",
+        "whispers"
+      ],
+      "corpus_passage": "For France lovers, Fitzgerald's Tender is the Night (1934) is the truest portrait of 'the Roaring Twenties', and was inspired by his racy ...",
+      "sentence_after": "For France lovers, a visit to Cap d'Antibes evokes the essence of Fitzgerald's Tender is the Night, the quintessential portrait of 'the Roaring Twenties' published in 1934.",
+      "outcome": "EXPANDED",
+      "cost": 6.165e-05
+    },
+    {
+      "stop": "Cap d'Antibes",
+      "sentence_before": "Welcome to a world where every stop is a new chapter, each unveiling a different facet of Cap d'Antibes' rich and storied past.",
+      "subject_nouns": [
+        "chapter",
+        "facet"
+      ],
+      "corpus_passage": null,
+      "sentence_after": null,
+      "outcome": "DELETED_NO_CORPUS",
+      "cost": 0.0
+    },
+    {
+      "stop": "Cap d'Antibes",
+      "sentence_before": "The blend of tradition, innovation, and natural beauty here reflects the essence of the French Riviera, a region where past and present harmoniously coexist.",
+      "subject_nouns": [
+        "essence"
+      ],
+      "corpus_passage": null,
+      "sentence_after": null,
+      "outcome": "DELETED_NO_CORPUS",
+      "cost": 0.0
+    },
+    {
+      "stop": "Cap d'Antibes",
+      "sentence_before": "End your visit with a sense of curiosity, eager to uncover more tales of art, espionage, and luxury along the glittering coastline that stretches before you.",
+      "subject_nouns": [
+        "tales"
+      ],
+      "corpus_passage": "For France lovers, Fitzgerald's Tender is the Night (1934) is the truest portrait of 'the Roaring Twenties', and was inspired by his racy ...",
+      "sentence_after": "End your visit by reflecting on how Fitzgerald's Tender is the Night, inspired by his experiences on the French Riviera, captures the essence of 'the Roaring Twenties'.",
+      "outcome": "EXPANDED",
+      "cost": 5.85e-05
+    }
+  ],
+  "gen_cost": {
+    "total_cost": 0.0,
+    "total_tokens": 0,
+    "cache_hit": false,
+    "breakdown": {}
+  },
+  "expansion_cost": 0.00018179999999999997,
+  "total_cost": 0.0052818000000000006,
+  "expanded_count": 3,
+  "deleted_count": 4,
+  "words_before": 452,
+  "words_after": 355,
+  "stops": [
+    "Cap d'Antibes"
+  ],
+  "residuals": {
+    "R7": 0,
+    "R8": 0,
+    "R9": 0,
+    "R10": 0
+  }
+}
