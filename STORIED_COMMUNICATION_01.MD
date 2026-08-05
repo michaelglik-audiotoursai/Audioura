@@ -199,3 +199,60 @@ When LOCAL-259 lands and passes review I will generate the tour, write it to
 measured cost alongside the $0.0206 baseline.
 
 ---
+
+## 2026-08-05 11:42 — LEAD (unprompted: a correction you should see)
+
+**D127 was wrong, and it was my error to keep building on it.**
+
+While checking whether LOCAL-258 had smuggled fabricated stops past the
+existence gate, I fetched the museum's own commented-works page,
+`maa.departement06.fr/les-oeuvres-commentees`. **All eight disputed works are
+on it**, including:
+
+> **Ulysses Grant au Japon** — *"cette estampe représente la réception au
+> palais impérial du président des États-Unis"*
+
+That is, near enough word for word, the sentence our tour produced and that we
+jointly concluded was invented. **The generator was reproducing the museum's own
+catalogue.**
+
+Your original search was reasonable and I adopted its conclusion wholesale. The
+mistake was mine: I treated "a general web search does not show it" as proof of
+absence, for eight days, with the museum's own site one fetch away.
+
+**What it cost.** I instructed LOCAL-254 to treat those stops as fabrications
+and it stripped their corpus to zero — legitimate works, deliberately emptied,
+on my instruction. Three task files carried the false premise. A decision entry
+recorded a prohibition breach that never happened. I am restoring the corpus.
+
+**What survives.** One narrower question: your search indicated the Chikanobu
+triptych shows the Ueno Park festival of 25 August 1879, not the Imperial
+Palace reception. The museum's catalogue says imperial palace. So either it is a
+different print, or the museum's own description is wrong. That is a question
+about a source we trust, not about our generator — and under your D100 rule it
+is the *unverifiable* case, not the *known-incorrect* case. Worth a look when
+you have a moment; it does not justify blocking the stop.
+
+### Meanwhile: your gate venue is unblocked
+
+LOCAL-258 fixed the parenthetical. All three spellings of the Asian Arts name
+now resolve to Q3330160, and Palais Lascaris, Matisse, Chagall and MAMAC still
+resolve — no regression. Downstream:
+
+| | before | after |
+|---|---|---|
+| canonical titles from story_miner | 0 | **16** |
+| stops passing the existence gate | **0 of 8** | **8 of 8** |
+| 8-stop tour generated | no | 6 of 8 stops, 1,935 words |
+| cost | — | **$0.0572** |
+
+The 16 titles come from the museum's own page plus Wikidata — none
+hand-registered, which was my stated rejection criterion. Two stops still
+produce no description for want of per-work source material; that is the next
+constraint at this venue, and it is corpus, not gate.
+
+**Cost note, as promised:** the 8-stop tour at $0.0572 tracks the 2-stop
+$0.0206 almost exactly — fixed spine and selection costs plus roughly $0.005
+per stop of narration.
+
+---
