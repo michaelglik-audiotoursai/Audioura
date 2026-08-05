@@ -6971,3 +6971,73 @@ That belongs in part 3 of his agenda. A tour with typed sections — description
 orientation, directive, narration — would make all three moves free. Dispatched
 LOCAL-265 for the immediate extractor fix; the structural question is his to
 decide.
+
+## D173 — D127 is closed by an inventory number (2026-08-05)
+
+LOCAL-262 merged (`014ce0f`). The three stops LEAD ordered stripped are restored
+with per-object, URL-bearing passages — 6, 5 and 5 — and the other five moved
+from venue boilerplate to object-level material.
+
+LEAD fetched `maa.departement06.fr/les-oeuvres-commentees` and compared verbatim.
+Every element matches, including two that end the argument: **inventory number
+2015.6.A.1** and donor **"Don Herrli"**. No model invents an accession number.
+The museum holds the print, it is catalogued, and the tour sentence we spent a
+week treating as fabricated was a faithful reading of the museum's own
+description.
+
+Total cost of that error: three task files built on a false premise, a
+prohibition breach recorded in D157 that never occurred, and genuine corpus
+deleted on LEAD's instruction. All from treating "a general web search does not
+show it" as proof of absence. D162's rule stands and is now proven twice.
+
+## D174 — Part 4 is written before the stories exist (2026-08-05)
+
+Michael: *"Why the general tour description does nto include a preview of the
+stories found later in the stops?"*
+
+LEAD traced the call order:
+
+```
+PHASE 3A  pick stops
+PHASE 3B  resolve details
+SPINE     <- writes the tour description INCLUDING part 4
+Stop 1..N <- the stories are written HERE, afterwards
+```
+
+**The spine composes "in the stops ahead you will encounter…" before a single
+stop narration exists.** It guesses from canonical titles and corpus fragments.
+
+| round | part 4 |
+|---|---|
+| 16 | present, good — Monet's 1888 paintings, the 1706 fortifications |
+| 19 | partial |
+| 20 (8 stops) | **absent entirely** |
+
+Same code each time. **Round 16 — the one Michael called "almost perfect" — was
+luck.** Every judgement made today comparing round 16 to later rounds was partly
+comparing two draws of a coin.
+
+Dispatched LOCAL-270: part 4 leaves the spine prompt and is composed after
+narration, from the delivered and gated text, with every named entity verified
+present in the stop it is attributed to. That makes it structurally impossible
+to promise what the tour does not contain — the rule LOCAL-259 stated in prose
+and this enforces by construction.
+
+**The general shape, again.** This is the third ordering defect today: the
+prolog validator read the wrong paragraph because LEAD moved the prolog; the
+claim gate ran on a tour generated before the reorder; and now part 4 previews
+content generated after it. Each is the same class — **stages that depend on
+each other's output, wired in an order nobody drew.** That belongs in part 3 of
+Michael's agenda alongside D172.
+
+## D175 — The prolog extractor no longer cares where the prolog is (2026-08-05)
+
+LOCAL-265 merged (`5c03f51`). Verified against three real artifacts spanning
+every layout the prolog has occupied today — after the Orientation line, inside
+it, and inside it with stop naming. It finds the description in all three, stops
+before the where-to-go directive, and the boundary set holds: round 16 → 0
+violations, round 15's opening → 4, keyword-stuffed → 3.
+
+The prolog moved four times in three hours and this is the first version that
+does not break. D168 recorded the lesson after the first breakage; it took a
+second to act on it.
