@@ -5634,3 +5634,58 @@ gates are sound; the assembly path routes around them.
 
 Word counts overnight: 819 → 191 → 393 → 505 → 488 → **599**. Generation
 variance, not the rules loosening.
+
+---
+
+## D139 — Eight injection points enumerated; R9's transition sentence came back (2026-08-05)
+
+LOCAL-246 did the enumeration LEAD asked for rather than fixing the one case
+LEAD spotted:
+
+```
+Orientation (per-stop)        LLM      GATED (new)
+Prolog                        LLM      gated (LOCAL-244)
+Directions/transitions, museum   template   not gated — f"Next: {name}."
+Directions/transitions, walking  LLM        not gated — navigation-exempt
+Epilog                        template   not gated
+Operational details           extracted  not gated — hours, prices
+Sources line                  metadata   not gated
+Tour title / category         metadata   not gated
+```
+
+Orientation went 99 words in, 99 out — nothing deleted, because this
+generation's orientation was genuinely navigational and the D107 exemption
+covers it. That is the right outcome, not a no-op.
+
+And it reported its own limit honestly: *"delve into its storied past"* is **not**
+caught, because neither "storied" (adjective) nor "past" (noun) is in R10's
+promise-noun set, and D55 forbade modifying the detector. Naming the miss and
+its cause is better than a widened rule nobody reviewed.
+
+### Bounced, for a regression its own summary could not see
+
+Line 101 of the delivered text:
+
+> *"From Cap d'Antibes to Villefranche-sur-Mer — a collection that spans more
+> ground than these stops alone."*
+
+**R9 fires on it.** This is the exact sentence Michael scored **0/5** —
+*"can be placed in millions of stops"* — that R9 has deleted reliably since
+LOCAL-216, in all three runs of round 2. It is back in the output.
+
+The residual analysis measured R10 and R1 and **not R9**, so the regression was
+invisible in the report. The likely cause is in the task's own table: the
+epilog/transition path is "deterministic templates — not gated", and that is
+where this sentence comes from. A template that emits a sentence R9 deletes is
+either a template to remove or a path to gate.
+
+**The lesson generalises past this task.** Every round we have added a rule and
+then measured only that rule. R9 was working; nobody checked it still was.
+Residual analysis has to cover **every rule**, not the one the round is about —
+otherwise each fix buys a silent regression somewhere behind it.
+
+Also bounced on format: round 4 emitted a raw text block instead of round 3's
+numbered, annotated paragraphs. Michael needs to be able to say "paragraph 4"
+and have us both know what he means.
+
+`RIVIERA_2STOP_ROUND3.md` is untouched and remains what he reads this morning.
