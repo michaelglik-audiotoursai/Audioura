@@ -29,6 +29,7 @@ from style_validator_detector import (
     _is_style_navigation_sentence,
     _extract_content_words,
     _delivery_matches_promise,
+    _sentence_has_structural_promise,
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -556,3 +557,89 @@ def test_extract_content_words_from_concrete():
 if __name__ == '__main__':
     import pytest
     pytest.main([__file__, '-v'])
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LOCAL-240: Round 3 labelled set — widened structural detection
+# ═══════════════════════════════════════════════════════════════════════════════
+
+ROUND3_PARAGRAPH_3 = (
+    "You are about to embark on a journey through the French Riviera, where "
+    "the sun-drenched coasts and ancient villages hold a tapestry woven with "
+    "the glamour of modern allure and whispers of medieval roots. Cycling "
+    "through winding paths, you'll discover a blend of architectural marvels "
+    "and forgotten tales that shape its identity. The ancient fortifications "
+    "of the Garoupe Lighthouse stand sentinel against opulent villas, "
+    "revealing a juxtaposition of past and present. Discover how the idyllic "
+    "beauty of the French Riviera masks the secrets of its past as you "
+    "unravel its intricate story through each chapter of this enchanting "
+    "journey."
+)
+
+# ── MUST FIRE: Round 3 unfulfilled promises ──────────────────────────────────
+ROUND3_MUST_FIRE_FRAGMENTS = [
+    "villages hold a tapestry woven with",
+    "forgotten tales that shape its identity",
+    "masks the secrets of its past",
+    "its intricate story through each chapter",
+    "stand sentinel against opulent villas, revealing a juxtaposition of past and present",
+]
+
+# ── MUST NOT FIRE: Michael's rewrite prose ───────────────────────────────────
+ROUND3_MUST_NOT_FIRE = [
+    "In 200 BC, the area surrounding Èze saw its first inhabitants settle near Mount Bastide.",
+    "The Antonine Itinerary mentions the bay of Èze as Avisionis portus.",
+    "F. Scott Fitzgerald based the opening hotel of his 1934 novel on Eden-Roc.",
+    "…the Hôtel du Cap-Eden-Roc, built here in 1870, at the southern tip.",
+    "Start cycling south on the main road…",
+]
+
+
+def test_r10_round3_all_five_promises_fire():
+    """LOCAL-240: All five promise fragments from Round 3 Para 3 must fire."""
+    sentences = _split_sentences(ROUND3_PARAGRAPH_3)
+
+    fired_sentences = []
+    for i in range(len(sentences)):
+        finding = check_r10_unfulfilled_promise(sentences, i)
+        if finding:
+            fired_sentences.append(finding['sentence'])
+
+    for frag in ROUND3_MUST_FIRE_FRAGMENTS:
+        found = any(frag in s for s in fired_sentences)
+        assert found, f"R10 must fire on round-3 fragment: '{frag[:60]}'"
+
+
+def test_r10_round3_rewrite_prose_stays_clean():
+    """LOCAL-240: Michael's rewrite prose must NOT fire R10."""
+    for sent in ROUND3_MUST_NOT_FIRE:
+        context = ["The atmosphere here is remarkable.", sent, "The air carries memories."]
+        finding = check_r10_unfulfilled_promise(context, 1)
+        assert finding is None, f"R10 must NOT fire on rewrite: '{sent[:60]}'"
+
+
+def test_r10_structural_detection_is_additive():
+    """LOCAL-240: structural detection adds new catches without breaking existing."""
+    from style_validator_detector import _sentence_has_structural_promise
+
+    # These should trigger structural detection (noun + verb of possession/concealment)
+    structural_triggers = [
+        "ancient villages hold a tapestry woven with the glamour of modern allure",
+        "forgotten tales that shape its identity",
+        "masks the secrets of its past",
+        "stand sentinel against opulent villas, revealing a juxtaposition of past and present",
+    ]
+    for s in structural_triggers:
+        assert _sentence_has_structural_promise(s), \
+            f"Structural detection should trigger on: '{s[:60]}'"
+
+    # These should NOT trigger structural detection (no promise noun or no promise verb)
+    structural_safe = [
+        "In 200 BC, the area surrounding Èze saw its first inhabitants settle near Mount Bastide.",
+        "The Antonine Itinerary mentions the bay of Èze as Avisionis portus.",
+        "Start cycling south on the main road with the sea on your right.",
+        "The Hôtel du Cap-Eden-Roc was built here in 1870.",
+    ]
+    for s in structural_safe:
+        assert not _sentence_has_structural_promise(s), \
+            f"Structural detection should NOT trigger on: '{s[:60]}'"
