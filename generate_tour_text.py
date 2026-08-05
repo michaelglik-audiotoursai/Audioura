@@ -7667,20 +7667,28 @@ Requirements:
                     ]
                     _transition = _interior_templates[(i - 1) % len(_interior_templates)]
             else:
-                # Walking tours: use generated directions if available
+                # Outdoor tours: use generated directions if available
                 directions = next_poi.get("directions", "")
                 if _storied_mode:
                     try:
                         from directions_generator import generate_walking_directions
-                        _storied_directions = generate_walking_directions(poi_name, next_poi['name'], location, api_key)
+                        _storied_directions = generate_walking_directions(poi_name, next_poi['name'], location, api_key, transport_mode=transport_mode)
                         if _storied_directions:
                             directions = _storied_directions
                     except ImportError as _dir_imp_err:
-                        _import_logger.error(f"[LOCAL-146] MISSING: directions_generator (generate_walking_directions) — walking directions DISABLED: {_dir_imp_err}")
+                        _import_logger.error(f"[LOCAL-146] MISSING: directions_generator (generate_walking_directions) — directions DISABLED: {_dir_imp_err}")
                     except Exception as _dir_err:
                         _import_logger.error(f"[LOCAL-146] directions_generator.generate_walking_directions FAILED: {type(_dir_err).__name__}: {_dir_err}")
                 if directions and directions.strip():
-                    _transition = directions.strip()
+                    # [LOCAL-253] Validate pre-existing directions (from POI data) against mode
+                    from directions_generator import validate_directions_mode
+                    _dir_violations = validate_directions_mode(directions.strip(), transport_mode)
+                    if _dir_violations:
+                        for _dv in _dir_violations:
+                            print(f"  ❌ [LOCAL-253] PRE-EXISTING DIRECTIONS REJECTED: {_dv}")
+                        _transition = f"Continue to {next_poi['name']}."
+                    else:
+                        _transition = directions.strip()
                 else:
                     _transition = f"Continue to {next_poi['name']}."
             
