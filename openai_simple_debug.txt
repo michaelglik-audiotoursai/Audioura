@@ -1,26 +1,35 @@
 === EXACT PROMPT SENT TO OPENAI (PHASE 3A) ===
-You are a knowledgeable local guide for Harry Potter filming locations, London.
-List exactly 8 specific, real, well-known filming locations relevant to: Harry Potter filming locations, London.
+You are a knowledgeable local guide for French Riviera cycling tour, France.
+List exactly 2 specific, real, well-known French Riviera relevant to: French Riviera cycling tour, France.
 
 Requirements:
 - Use REAL, SPECIFIC names of actual establishments or landmarks.
 - NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
 - Include a complete street address with ZIP code where applicable.
 
+CRITICAL CONSTRAINT — THIS IS A BIKING TOUR:
+Stops should be reachable via bike paths, roads, or trails suitable for cycling — avoid stops requiring highway travel or building interiors inaccessible by bike.
+
+GEOGRAPHIC SCOPE — ALL stops MUST be located within: French Riviera.
+- Do NOT include well-known landmarks elsewhere in the city just because they are famous — if it is outside French Riviera, it does not belong.
+
+BIKING-TOUR ROUTE — this is a cycling/biking tour:
+- Stops should form a coherent route that a cyclist can follow in sequence.
+- Adjacent stops may be up to 5–10 km apart (a comfortable cycling leg).
+- Total route length should stay under 120 km.
+- Prefer scenic roads, coastal paths, or designated cycling routes.
+- Stops should be accessible by bicycle (not inside buildings or pedestrian-only zones).
+
 
 Return ONLY a JSON array, no other text, no markdown fences:
 [{"name": "...", "address": "..."}, ...]
 
 === OPENAI RESPONSE ===
-[{"name": "Platform 9 3/4 at King's Cross Station", "address": "Euston Rd, Kings Cross, London N1 9AL"},
-{"name": "Leadenhall Market", "address": "Gracechurch St, Langbourn, London EC3V 1LT"},
-{"name": "Millennium Bridge", "address": "Thames Embankment, London SE1 9JE"},
-{"name": "Reptile House at London Zoo", "address": "Outer Cir, London NW1 4RY"},
-{"name": "Australia House", "address": "Strand, London WC2B 4LA"},
-{"name": "Claremont Square", "address": "Claremont Square, London N1"},
-{"name": "Piccadilly Circus", "address": "London W1D 7ET"},
-{"name": "Leavesden Studios", "address": "Warner Dr, Leavesden, Watford WD25 7LP"}]
+[
+    {"name": "Promenade des Anglais", "address": "Prom. des Anglais, 06000 Nice, France"},
+    {"name": "Cap d'Antibes", "address": "Cap d'Antibes, 06160 Antibes, France"}
+]
 
 === ANALYSIS ===
-Requested stops: 8
-See full chain log: /app/api_call_chain_20260714_135532.txt
+Requested stops: 2
+See full chain log: /app/api_call_chain_20260805_091705.txt
