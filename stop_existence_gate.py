@@ -342,6 +342,72 @@ def _check_stop_corpus(
         return False, ""
 
 
+def _classify_venue_kind(venue_name: str, db_conn) -> Tuple[str, str]:
+    """Classify a venue as 'institution' or 'geographic_area'.
+
+    LOCAL-239: An institution (museum, palace, named building) and a geographic
+    area (walking route, region, coastal path) need different confirmation logic.
+
+    Classification signal: venue_corpus.sparql_works_json presence.
+      - Institution: has sparql_works_json (a list of held works from Wikidata)
+      - Geographic area: no sparql_works_json (canonical_titles are POIs/sections)
+
+    Returns:
+        (kind: 'institution' | 'geographic_area' | 'unknown', evidence: str)
+    """
+    try:
+        rows = _find_venue_corpus_rows(venue_name, db_conn)
+        if not rows:
+            return 'unknown', 'no venue_corpus row found'
+
+        # Check if ANY matched row has sparql_works_json
+        for vc_name, ct_json, sw_json in rows:
+            if sw_json:
+                return 'institution', f'sparql_works_json present at {vc_name!r}'
+
+        # No sparql — geographic area
+        vc_name = rows[0][0]
+        return 'geographic_area', f'no sparql_works_json at {vc_name!r}'
+    except Exception as e:
+        logger.warning(f"[EXISTENCE-GATE] venue kind classification failed: {e}")
+        return 'unknown', f'classification error: {e}'
+
+
+def _check_stop_corpus_geographic(
+    stop_title: str, venue_name: str, db_conn
+) -> Tuple[bool, str]:
+    """Check stop_corpus for a geographic area — relaxed confirmation.
+
+    LOCAL-239: For geographic areas, the stop does NOT need to mention the
+    venue name in its passage. A stop_corpus row matching the stop title under
+    this venue, with at least one passage, is sufficient evidence that it is a
+    real place in the region.
+
+    This is fundamentally different from institutions: a museum stop must prove
+    the object is AT that museum (same-source rule, D74). But Eze Village's
+    Wikipedia article will never say "French Riviera walking area" — it just
+    needs to be a real place that is geographically within the Riviera.
+    """
+    try:
+        rows = _find_stop_corpus_rows(venue_name, db_conn)
+
+        for sc_venue, sc_stop, passages_json, source_pages in rows:
+            # Check if this stop_corpus row matches our stop title
+            if not _title_match(stop_title, sc_stop):
+                continue
+
+            # For geographic areas: having a passage at all is sufficient
+            if passages_json:
+                passages = passages_json if isinstance(passages_json, list) else []
+                if passages:
+                    return True, f"stop_corpus(geographic): {sc_stop!r} at {sc_venue!r} ({len(passages)} passages)"
+
+        return False, ""
+    except Exception as e:
+        logger.warning(f"[EXISTENCE-GATE] stop_corpus geographic check failed: {e}")
+        return False, ""
+
+
 def verify_stop_existence(
     stop_title: str,
     venue_name: str,
@@ -349,24 +415,34 @@ def verify_stop_existence(
 ) -> Dict:
     """Verify whether a stop actually exists at the claimed venue.
 
+    LOCAL-239: Uses venue kind to determine verification strictness:
+      - institution: source must tie the object to THAT institution (D74, D127)
+      - geographic_area: stop must be a real place in the region (relaxed)
+
     Returns:
         {
             'stop_title': str,
             'venue_name': str,
+            'venue_kind': 'institution' | 'geographic_area' | 'unknown',
             'verified': bool,
             'evidence': str (what confirmed it, or '' if unverified),
-            'source': 'venue_corpus' | 'stop_corpus' | '' (where evidence came from),
+            'source': 'venue_corpus' | 'stop_corpus' | 'stop_corpus_geographic' | '',
         }
     """
+    # Classify venue kind first
+    venue_kind, kind_evidence = _classify_venue_kind(venue_name, db_conn)
+
     result = {
         'stop_title': stop_title,
         'venue_name': venue_name,
+        'venue_kind': venue_kind,
         'verified': False,
         'evidence': '',
         'source': '',
     }
 
     # Check 1: venue_corpus (canonical titles, SPARQL works)
+    # This works for BOTH kinds — a canonical title match is always valid
     verified, evidence = _check_venue_corpus(stop_title, venue_name, db_conn)
     if verified:
         result['verified'] = True
@@ -374,13 +450,26 @@ def verify_stop_existence(
         result['source'] = 'venue_corpus'
         return result
 
-    # Check 2: stop_corpus (same-source passage naming stop + venue)
-    verified, evidence = _check_stop_corpus(stop_title, venue_name, db_conn)
-    if verified:
-        result['verified'] = True
-        result['evidence'] = evidence
-        result['source'] = 'stop_corpus'
-        return result
+    # Check 2: stop_corpus — logic depends on venue kind
+    if venue_kind == 'geographic_area':
+        # Relaxed: stop_corpus row with passages is sufficient (no same-source
+        # venue mention required). A real place doesn't need to name our
+        # internal label "French Riviera walking area" in its Wikipedia article.
+        verified, evidence = _check_stop_corpus_geographic(stop_title, venue_name, db_conn)
+        if verified:
+            result['verified'] = True
+            result['evidence'] = evidence
+            result['source'] = 'stop_corpus_geographic'
+            return result
+    else:
+        # Institution or unknown: strict same-source rule (D74, D127).
+        # The passage must mention BOTH the stop and the venue.
+        verified, evidence = _check_stop_corpus(stop_title, venue_name, db_conn)
+        if verified:
+            result['verified'] = True
+            result['evidence'] = evidence
+            result['source'] = 'stop_corpus'
+            return result
 
     # Check 3: venue catalogue page — not implemented yet
     # (would require fetching venue's official collection page and checking)
