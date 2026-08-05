@@ -548,6 +548,8 @@ def detect_duplicate_tour_descriptions(
     (names multiple stops, or opens with tour-scope language). Two such passages
     in one tour produce DUPLICATE_TOUR_DESCRIPTION.
     
+    Checks both body paragraphs AND inside Orientation fields (round 17M format).
+    
     Returns list of violation dicts (empty if exactly one or zero found).
     """
     if not full_tour_content:
@@ -559,19 +561,19 @@ def detect_duplicate_tour_descriptions(
     tour_level_passages = []
     
     for section in stop_sections:
-        # Extract body paragraphs (skip structured fields)
-        # Remove lines that are structured fields
         lines = section.split('\n')
         body_lines = []
         in_body = False
+        orient_text = ""
         for line in lines:
             # Structured fields start with known labels
             if re.match(r'^(?:Stop\s+\d+:|Address:|Coordinates:|Type/Specialty:|'
-                       r'Specific Examples:|Orientation:|Directions:)', line):
-                if line.startswith('Orientation:'):
-                    # The Orientation is a structured field; skip it
-                    in_body = False
-                    continue
+                       r'Specific Examples:|Directions:)', line):
+                in_body = False
+                continue
+            if line.startswith('Orientation:'):
+                # Extract Orientation content — may contain embedded prolog
+                orient_text = line[len('Orientation:'):].strip()
                 in_body = False
                 continue
             # After all structured fields, body text begins with a blank line
@@ -581,18 +583,21 @@ def detect_duplicate_tour_descriptions(
             if in_body:
                 body_lines.append(line)
         
-        body_text = '\n'.join(body_lines).strip()
-        if not body_text:
-            continue
-        
-        # Split into paragraphs
-        paragraphs = [p.strip() for p in body_text.split('\n\n') if p.strip()]
-        
-        for para in paragraphs:
-            if _is_tour_level_description(para, stop_names):
-                # Record it with a short excerpt for the error message
-                excerpt = para[:100] + ('...' if len(para) > 100 else '')
+        # Check Orientation for embedded tour-level span (round 17M)
+        if orient_text:
+            span = _extract_tour_level_span(orient_text, stop_names)
+            if span:
+                excerpt = span[:100] + ('...' if len(span) > 100 else '')
                 tour_level_passages.append(excerpt)
+        
+        # Check body paragraphs
+        body_text = '\n'.join(body_lines).strip()
+        if body_text:
+            paragraphs = [p.strip() for p in body_text.split('\n\n') if p.strip()]
+            for para in paragraphs:
+                if _is_tour_level_description(para, stop_names):
+                    excerpt = para[:100] + ('...' if len(para) > 100 else '')
+                    tour_level_passages.append(excerpt)
     
     if len(tour_level_passages) > 1:
         return [{
@@ -614,9 +619,12 @@ def _is_tour_level_description(paragraph: str, stop_names: List[str]) -> bool:
     tour as a whole) rather than a stop-specific one.
     
     A tour-level description:
-    - Names multiple stops, OR
     - Opens with tour-scope language (journey, tour, route, embark), OR
-    - Addresses the full tour arc rather than one location
+    - Contains forward-looking language about stops ahead, OR
+    - Names multiple stops AND has tour-scope framing
+    
+    Merely mentioning another stop in passing ("as you cycle onward towards X")
+    does NOT make a paragraph tour-level — it must address the tour AS A WHOLE.
     
     This is the STRUCTURAL detection Michael asked for: "detect it structurally,
     not by position."
@@ -626,7 +634,39 @@ def _is_tour_level_description(paragraph: str, stop_names: List[str]) -> bool:
     
     p_lower = paragraph.lower()
     
-    # Check 1: Names 2+ stops from the tour
+    # Check 1: Tour-scope opening language (strongest signal)
+    tour_scope_re = re.compile(
+        r'^(?:you are about to|on this .{0,30}(?:tour|journey|route|trip)|'
+        r'this (?:tour|route|journey|ride|trip|cycling|biking|walking|driving)|'
+        r'embark on|welcome to this|'
+        r'this is a .{0,20}(?:tour|route|journey|trip))',
+        re.IGNORECASE
+    )
+    if tour_scope_re.match(paragraph.strip()):
+        return True
+    
+    # Check 2: Contains forward-looking language about stops ahead
+    forward_re = re.compile(
+        r'\b(?:in the stops? ahead|stops? (?:of|on) this tour|'
+        r'each stop (?:unveils?|reveals?|offers?|brings?)|'
+        r'you will (?:encounter|explore|discover|visit).{10,}(?:and|,))',
+        re.IGNORECASE
+    )
+    if forward_re.search(paragraph):
+        return True
+    
+    # Check 3: Transport mode + tour context in opening sentence
+    transport_tour_re = re.compile(
+        r'\b(?:cycling|biking|walking|driving|hiking|sailing)\s+'
+        r'(?:tour|journey|route|trip|adventure)\b',
+        re.IGNORECASE
+    )
+    if transport_tour_re.search(paragraph):
+        return True
+    
+    # Check 4: Names 2+ stops BUT only if combined with tour-framing language.
+    # Merely mentioning the next stop ("cycle onward towards Eze Village") while
+    # describing the current stop does NOT make a paragraph tour-level.
     stops_referenced = 0
     for name in stop_names:
         if name.lower() in p_lower:
@@ -639,36 +679,16 @@ def _is_tour_level_description(paragraph: str, stop_names: List[str]) -> bool:
                     stops_referenced += 1
                     break
     if stops_referenced >= 2:
-        return True
-    
-    # Check 2: Tour-scope opening language
-    tour_scope_re = re.compile(
-        r'^(?:you are about to|on this .{0,30}(?:tour|journey|route|trip)|'
-        r'this (?:tour|route|journey|ride|trip|cycling|biking|walking|driving)|'
-        r'embark on|welcome to this|'
-        r'this is a .{0,20}(?:tour|route|journey|trip))',
-        re.IGNORECASE
-    )
-    if tour_scope_re.match(paragraph.strip()):
-        return True
-    
-    # Check 3: Contains forward-looking language about stops ahead
-    forward_re = re.compile(
-        r'\b(?:in the stops? ahead|stops? (?:of|on) this tour|'
-        r'you will (?:encounter|explore|discover|visit).{10,}(?:and|,))',
-        re.IGNORECASE
-    )
-    if forward_re.search(paragraph):
-        return True
-    
-    # Check 4: Transport mode + tour context in opening sentence
-    transport_tour_re = re.compile(
-        r'\b(?:cycling|biking|walking|driving|hiking|sailing)\s+'
-        r'(?:tour|journey|route|trip|adventure)\b',
-        re.IGNORECASE
-    )
-    if transport_tour_re.search(paragraph):
-        return True
+        # Must ALSO have tour-framing language — not just a passing mention
+        tour_framing_re = re.compile(
+            r'\b(?:this tour|this route|the tour|the route|'
+            r'tour takes you|route takes you|route will|'
+            r'stops? ahead|between .{3,30} and|'
+            r'from .{3,40} to .{3,40}(?:spanning|covering|along))',
+            re.IGNORECASE
+        )
+        if tour_framing_re.search(paragraph):
+            return True
     
     return False
 
@@ -681,8 +701,16 @@ def extract_prolog_from_tour_content(tour_content: str) -> str:
     we look for the passage that names multiple stops, or opens with tour-scope
     language, regardless of where it sits in the text.
     
-    LOCAL-259 places the prolog AFTER the Orientation (not inside it).
-    Older tours may have it elsewhere. This function handles both.
+    Three known layouts (the layout may move again — this handles all structurally):
+      - Round 16:  Orientation: <stop orientation>\n\n<prolog paragraph>\n\n<body>
+      - Round 17L: <prolog paragraph>\n\nOrientation: <stop orientation>
+      - Round 17M: Orientation: <prolog> <directive> <stop orientation>  (all one line)
+    
+    The extractor does NOT rely on position. It checks the Orientation field's
+    own content first (it may embed the prolog), then body paragraphs. Within
+    a multi-sentence Orientation, it finds the contiguous tour-level span by
+    sentence-level structural detection and excludes trailing directives and
+    stop-specific text.
     """
     if not tour_content:
         return ""
@@ -697,55 +725,254 @@ def extract_prolog_from_tour_content(tour_content: str) -> str:
     
     s1_text = stop1_match.group(0)
     
-    # Get the Orientation field text (to exclude it from prolog candidates)
-    orient_text = ""
-    orient_match = re.search(r'Orientation:\s*(.+?)(?=\n\n)', s1_text, re.DOTALL)
+    # ─── Strategy 1: Check inside the Orientation field ───────────────────
+    # Round 17M embeds the prolog inside Orientation. The Orientation line may
+    # contain: <prolog sentences> <directive sentence> <stop orientation sentences>
+    # We need to extract just the prolog span.
+    orient_match = re.search(r'Orientation:\s*(.+?)(?=\n\n|\n(?=Directions:)|\Z)', s1_text, re.DOTALL)
     if orient_match:
         orient_text = orient_match.group(1).strip()
+        prolog_from_orient = _extract_tour_level_span(orient_text, stop_names)
+        if prolog_from_orient:
+            return prolog_from_orient
     
-    # Get all body paragraphs between structured fields and Directions
-    # These are the candidates for the prolog
-    body_start = re.search(
-        r'Orientation:.*?\n\n',
-        s1_text, re.DOTALL
-    )
+    # ─── Strategy 2: Check body paragraphs (round 16 / 17L layouts) ──────
+    # Body paragraphs sit after the structured fields (Orientation:\n\n...)
+    body_start = re.search(r'Orientation:.*?\n\n', s1_text, re.DOTALL)
     if not body_start:
         # Try after Specific Examples
         body_start = re.search(r'Specific Examples:.*?\n\n', s1_text, re.DOTALL)
     
-    if not body_start:
-        return ""
+    if body_start:
+        body_text = s1_text[body_start.end():].strip()
+        
+        # Truncate at Directions: field
+        directions_match = re.search(r'\nDirections:', body_text)
+        if directions_match:
+            body_text = body_text[:directions_match.start()].strip()
+        
+        # Split into paragraphs
+        paragraphs = [p.strip() for p in body_text.split('\n\n') if p.strip()]
+        
+        # Find the paragraph(s) that are tour-level descriptions
+        prolog_parts = []
+        for para in paragraphs:
+            if _is_tour_level_description(para, stop_names):
+                prolog_parts.append(para)
+        
+        if prolog_parts:
+            return '\n\n'.join(prolog_parts)
     
-    body_text = s1_text[body_start.end():].strip()
-    
-    # Truncate at Directions: field
-    directions_match = re.search(r'\nDirections:', body_text)
-    if directions_match:
-        body_text = body_text[:directions_match.start()].strip()
-    
-    # Split into paragraphs
-    paragraphs = [p.strip() for p in body_text.split('\n\n') if p.strip()]
-    
-    if not paragraphs:
-        # Check if Orientation itself is a tour-level description (older format)
-        if orient_text and _is_tour_level_description(orient_text, stop_names):
-            return orient_text
-        return ""
-    
-    # Find the paragraph(s) that are tour-level descriptions
-    prolog_parts = []
-    for para in paragraphs:
-        if _is_tour_level_description(para, stop_names):
-            prolog_parts.append(para)
-    
-    if prolog_parts:
-        return '\n\n'.join(prolog_parts)
-    
-    # Fallback: check the Orientation text itself (pre-LOCAL-259 format)
-    if orient_text and _is_tour_level_description(orient_text, stop_names):
-        return orient_text
+    # ─── Strategy 3: Check BEFORE Orientation (round 17L layout) ─────────
+    # The prolog may sit above the Orientation line
+    orient_line_match = re.search(r'^Orientation:', s1_text, re.MULTILINE)
+    if orient_line_match:
+        # Get text between last structured field before Orientation and Orientation itself
+        pre_orient = s1_text[:orient_line_match.start()].strip()
+        # Find last structured field before this
+        last_field = None
+        for m in re.finditer(
+            r'^(?:Address:|Coordinates:|Type/Specialty:|Specific Examples:).*$',
+            pre_orient, re.MULTILINE
+        ):
+            last_field = m
+        if last_field:
+            between = pre_orient[last_field.end():].strip()
+            paragraphs = [p.strip() for p in between.split('\n\n') if p.strip()]
+            for para in paragraphs:
+                if _is_tour_level_description(para, stop_names):
+                    return para
     
     return ""
+
+
+def _extract_tour_level_span(orient_text: str, stop_names: List[str]) -> str:
+    """Extract the tour-level description span from within an Orientation field.
+    
+    The Orientation field in round 17M format contains:
+      <tour-level sentences> <where-to-go directive> <stop orientation sentences>
+    
+    This function finds the contiguous run of prolog sentences from the start,
+    stopping at the first directive sentence (imperative movement command) or
+    the first stop-orientation sentence (physical positioning/what you see).
+    
+    The prolog portion may contain sentences that serve different parts of the
+    four-part structure (Part 1: tour naming, Part 2: route, Part 3: sourced facts,
+    Part 4: forward connection). Not every sentence needs independent tour-scope
+    language — what matters is that the run starts with tour-scope language and
+    continues until a clear non-prolog boundary.
+    
+    Returns the tour-level span, or "" if the Orientation does not contain one.
+    """
+    if not orient_text:
+        return ""
+    
+    sentences = _split_into_sentences(orient_text)
+    if not sentences:
+        return ""
+    
+    # First sentence must be tour-level for the Orientation to contain an embedded prolog
+    if not _is_sentence_tour_level(sentences[0], stop_names):
+        return ""
+    
+    # Find the boundary: the first directive sentence marks the end of the prolog.
+    # Everything before the first directive (that comes after the tour-level opening)
+    # is part of the prolog.
+    prolog_end = len(sentences)  # default: entire text is prolog
+    for i in range(1, len(sentences)):
+        if _is_directive_sentence(sentences[i]):
+            prolog_end = i
+            break
+        # A stop-orientation sentence (physical positioning, sensory description
+        # with no tour-level or factual content) after a gap in tour-level signals
+        # also ends the prolog — but only if we've already passed some content.
+        if _is_stop_orientation_sentence(sentences[i]):
+            prolog_end = i
+            break
+    
+    if prolog_end == 0:
+        return ""
+    
+    return ' '.join(sentences[:prolog_end])
+
+
+def _is_stop_orientation_sentence(sentence: str) -> bool:
+    """Detect a stop-orientation sentence — one that tells the listener what they
+    see from their physical position, with no factual/historical content.
+    
+    Stop orientation sentences are sensory/spatial descriptions:
+    - "Sparkling blue Mediterranean Sea is the gentle sea breeze..."
+    - "Villa Ephrussi de Rothschild rises elegantly above you..."
+    - "The ancient stone walls surround you on all sides."
+    
+    They do NOT contain: years, historical events, named-person actions, 
+    tour-scope language, or forward-looking language about stops ahead.
+    """
+    s_lower = sentence.lower()
+    
+    # If it has tour-level signals, it's NOT a stop orientation
+    if re.search(r'\b(?:this tour|this route|tour takes|stops? ahead|each stop|'
+                 r'you will (?:explore|discover|visit)|embark)\b', s_lower):
+        return False
+    
+    # If it has sourced facts (year, named person action, documented event), it's not stop-orientation
+    if _YEAR_RE.search(sentence):
+        return False
+    if _NAMED_PERSON_ACTION_RE.search(sentence):
+        return False
+    if _DOCUMENTED_EVENT_RE.search(sentence):
+        return False
+    
+    # Positional/sensory language suggests stop orientation
+    positional = re.search(
+        r'\b(?:above you|before you|around you|beside you|behind you|'
+        r'rises?|towers?|stretches?|surrounds?|overlooks?|faces?|'
+        r'you can see|in front of you|to your (?:left|right))\b',
+        s_lower
+    )
+    sensory = re.search(
+        r'\b(?:sparkling|gentle|breeze|scent|sound|rustling|carrying|'
+        r'azure|golden|warm|cool|fragrant)\b',
+        s_lower
+    )
+    
+    return bool(positional or sensory)
+
+
+def _is_sentence_tour_level(sentence: str, stop_names: List[str]) -> bool:
+    """Detect whether a single sentence is tour-level.
+    
+    A sentence is tour-level if it:
+    - Opens with or contains tour-scope language (this tour, embark, journey)
+    - References multiple stops in a tour-framing context
+    - Contains forward-looking language about stops ahead
+    - Names the transport mode with tour context
+    
+    Unlike _is_tour_level_description (which operates on paragraphs), this
+    works at sentence granularity for span extraction within Orientation lines.
+    """
+    if not sentence or len(sentence.strip()) < 20:
+        return False
+    
+    s_lower = sentence.lower()
+    
+    # Tour-scope opening
+    if re.match(
+        r'(?:you are about to|on this .{0,30}(?:tour|journey|route|trip)|'
+        r'this (?:tour|route|journey|ride|trip|cycling|biking|walking|driving)|'
+        r'embark on|welcome to this|'
+        r'this is a .{0,20}(?:tour|route|journey|trip))',
+        s_lower.strip()
+    ):
+        return True
+    
+    # Forward-looking about stops
+    if re.search(
+        r'\b(?:in the stops? ahead|each stop (?:unveils?|reveals?|offers?)|'
+        r'stops? (?:of|on) this tour|'
+        r'you will (?:encounter|explore|discover|visit))',
+        s_lower
+    ):
+        return True
+    
+    # References route between stops (from X to Y)
+    if re.search(r'\b(?:from .{3,30} to .{3,30}(?:spanning|covering|along))', s_lower):
+        return True
+    
+    # Transport mode + tour context
+    if re.search(
+        r'\b(?:cycling|biking|walking|driving|hiking|sailing)\s+'
+        r'(?:tour|journey|route|trip|adventure)\b',
+        s_lower
+    ):
+        return True
+    
+    # Names 2+ stops with connective language (from X to Y, X and Y)
+    stops_found = []
+    for name in stop_names:
+        if name.lower() in s_lower:
+            stops_found.append(name)
+        else:
+            parts = re.split(r'[\s,\'-]+', name)
+            for part in parts:
+                if len(part) > 4 and part.lower() in s_lower:
+                    stops_found.append(name)
+                    break
+    if len(stops_found) >= 2:
+        # Must have connective language, not just passing mention
+        if re.search(r'\b(?:from|between|to|and|each|both)\b', s_lower):
+            return True
+    
+    return False
+
+
+def _is_directive_sentence(sentence: str) -> bool:
+    """Detect if a sentence is a where-to-go directive (not tour-level content).
+    
+    Directive sentences tell the listener where to physically go or position:
+    - "Start biking south on the main road"
+    - "Head north along the coastal path"
+    - "Position yourself facing the monument"
+    """
+    s_lower = sentence.lower().strip()
+    
+    # Imperative movement verbs at the start
+    if re.match(
+        r'(?:start|head|walk|bike|cycle|drive|ride|proceed|continue|turn|'
+        r'follow|go|position|face|look|stand|enter|exit|cross|take)\s',
+        s_lower
+    ):
+        return True
+    
+    # Directional language (compass or relative)
+    if re.search(
+        r'\b(?:north|south|east|west|northeast|northwest|southeast|southwest|'
+        r'left|right|straight ahead|along the|on the .{0,20}(?:road|path|trail|street))\b',
+        s_lower
+    ) and not re.search(r'\b(?:tour|journey|route takes|stops? ahead)\b', s_lower):
+        return True
+    
+    return False
 
 
 def extract_stop_names_from_tour_content(tour_content: str) -> List[str]:
