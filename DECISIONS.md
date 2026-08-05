@@ -6574,3 +6574,93 @@ cape, not a village with cobbled streets. Round 9 had the identical failure and
 LEAD wrongly withdrew it as a prolog preview (D152) — **this one is not in the
 prolog**, so that withdrawal should not be read as clearing the class. All
 three dispatched as LOCAL-257.
+
+## D162 — CORRECTION to D127: the museum does hold "Ulysses Grant au Japon" (2026-08-05)
+
+**D127 is wrong on its central claim, and LEAD built a week of work on top of
+it.**
+
+D127 concluded that the Musée des Arts Asiatiques does not hold the Chikanobu
+print of Ulysses Grant, that the documented holders are the MFA Boston and the
+Met, and that the tour's sentence was therefore invented. Michael reached that
+conclusion with a public search and LEAD adopted it wholesale.
+
+LEAD fetched the museum's own commented-works page today —
+`maa.departement06.fr/les-oeuvres-commentees` — while checking whether
+LOCAL-258 had laundered fabrications past the existence gate. **All eight of
+the disputed works are on it**, including:
+
+> **Ulysses Grant au Japon** — *"cette estampe représente la réception au
+> palais impérial du président des États-Unis"*
+
+That is, near enough verbatim, the sentence our tour produced and D127 called a
+fabrication: *"The print vividly depicts the reception at the imperial palace
+of the President of the United States, Ulysses Grant."* **The generator was
+reproducing the museum's own catalogue description.**
+
+Also on the page and previously suspect: `Kannon à mille bras`,
+`Kannon, le bodhisattva de la compassion`, `Statue de Bouddha`,
+`L'Armure d'Andô Naoyuki`, `Robe de prêtre taoïste`,
+`La danse cosmique de Ganesh`, `Masque du vieillard kojô`.
+
+### What this cost
+
+- **LOCAL-254 was instructed to treat those stops as fabrications** and it
+  stripped their corpus to zero. Legitimate works, deliberately emptied, on
+  LEAD's instruction. That needs restoring.
+- **Three task files carried the false premise** (LOCAL-252, 254, 258), each
+  warning against "laundering" stops that were never invented.
+- D157 called it "the prohibited thing happened". It did not happen.
+
+### What survives from D127
+
+One narrower question, unresolved and worth separating. Michael's search
+indicated the Chikanobu triptych depicts the **Ueno Park** entertainment of 25
+August 1879, not the Imperial Palace reception of 4 July. The museum's own
+catalogue says imperial palace. So either the museum is describing a different
+print, or the museum's own description is wrong.
+
+That is a real question about **a source we trust**, not about our generator.
+Under Michael's D100 rule it is the unverifiable case, not the
+known-incorrect case: we are faithfully reporting a primary source. It does not
+justify blocking the stop.
+
+### The lesson, and it is uncomfortable
+
+LEAD verified the *absence* of a fact by not finding it, and treated that as
+proof. The museum's own website was one fetch away for eight days. Every
+"suspected fabrication" ruling since has inherited that error, and the guards
+built to prevent laundering were guarding against something that was not
+happening — while the real risk, stripping genuine content, went unexamined
+because it looked like caution.
+
+**Rule:** before calling a venue claim fabricated, fetch the venue's own site.
+Absence of evidence from a general web search is not evidence of absence, and a
+museum's catalogue is the primary source for what a museum holds.
+
+## D163 — The gate venue is unblocked (2026-08-05)
+
+LOCAL-258 merged (`0629868`). `venue_resolver` now normalises the parenthetical
+gloss, and LEAD verified independently:
+
+```
+Musee des Arts Asiatiques (Asian Art Museum), Nice, France  -> Q3330160
+Musée des Arts Asiatiques, Nice                             -> Q3330160
+Musee des Arts Asiatiques  + city hint Nice                 -> Q3330160
+Palais Lascaris  Q34653010 | Matisse Q1563354 | Chagall Q3329265 | MAMAC Q936859
+```
+
+No regression on the four venues that already worked. Downstream, `story_miner`
+returns **16 canonical titles** where it returned 0, and the existence gate goes
+**0 of 8 → 8 of 8**. A first 8-stop Asian Arts tour generated: 6 of 8 stops with
+descriptions, 1,935 words, **$0.0572**.
+
+Provenance checked rather than accepted: the 16 titles come from the museum's
+own commented-works page and Wikidata SPARQL P195/P276, none hand-registered —
+which was LEAD's stated rejection criterion. Verifying our own stop titles
+against a list we wrote would have been circular; verifying them against the
+museum's catalogue is exactly right.
+
+Two stops still produced no description (`La danse cosmique de Ganesh`,
+one other) for want of per-work context. That is the next constraint at this
+venue, and it is a corpus problem, not a gate problem.
