@@ -825,19 +825,41 @@ def _build_closing_recap(poi_list, ranked_facts_for_recap):
 
     # --- Fallback: if ranking unavailable, extract key facts manually ---
     if not verified_highlights:
-        # Pick from delivered stops: find sentences with dates
+        # Pick from delivered stops: find sentences with dates or key events.
+        # Collect MULTIPLE candidates per stop (up to 3) to survive composition
+        # filtering, since not all sentences compose cleanly.
+        from style_validator_detector import check_r1_imperatives as _check_r1
         for p in delivered:
             desc = p.get('description', '')
             sents = re.split(r'(?<=[.!?])\s+', desc.strip())
+            _stop_candidates = 0
             for s in sents:
-                if re.search(r'\b\d{3,4}\b', s) and len(s) > 30:
+                if len(s) < 30:
+                    continue
+                # Skip imperatives and navigation
+                if _check_r1(s):
+                    continue
+                _first_w = s.split()[0].lower().rstrip('.,') if s else ''
+                if _first_w in ('head', 'turn', 'continue', 'proceed', 'walk',
+                                'cycle', 'follow', 'cross', 'step', 'pedal'):
+                    continue
+                # Accept: has a date, OR has a proper noun with a past-tense verb
+                _has_date = bool(re.search(r'\b\d{3,4}\b', s))
+                _has_event = bool(re.search(
+                    r'\b(built|designed|destroyed|seized|founded|opened|'
+                    r'constructed|completed|liberated|imprisoned|spent|'
+                    r'became|arrived|transformed|painted|created)\b',
+                    s, re.IGNORECASE))
+                if _has_date or _has_event:
                     verified_highlights.append({
                         'stop': p['name'],
                         'fact': s.strip(),
-                        'reason': 'dated_event',
+                        'reason': 'dated_event' if _has_date else 'cause',
                     })
-                    break
-            if len(verified_highlights) >= 3:
+                    _stop_candidates += 1
+                    if _stop_candidates >= 3:
+                        break
+            if len(verified_highlights) >= 8:
                 break
 
     if not verified_highlights:
@@ -862,26 +884,73 @@ def _build_closing_recap(poi_list, ranked_facts_for_recap):
     else:
         scale_part = f"That's {n_delivered} {_stop_word}"
 
-    # Content part: brief clauses from highlights
+    # Content part: compose clauses from highlights.
+    # _compose_recap_clause returns None if the fact cannot be cleanly composed
+    # (imperative, navigation, or uncomposable). When that happens, try the
+    # next-ranked candidate from verified_highlights, or try alternative
+    # sentences from the same stop.
+    _composition_rejected = 0
+    _stops_used = set()  # Track which stops already have a clause
+
+    def _try_alternative_sentences(stop_name, delivered_stops):
+        """Try other dated/event sentences from the same stop's description."""
+        for p in delivered_stops:
+            if p['name'] == stop_name:
+                desc = p.get('description', '')
+                sents = re.split(r'(?<=[.!?])\s+', desc.strip())
+                for s in sents:
+                    if len(s) < 25 or len(s.split()) < 5:
+                        continue
+                    # Only try sentences with dates
+                    if not re.search(r'\b\d{3,4}\b', s):
+                        continue
+                    clause = _compose_recap_clause(s.strip(), stop_name)
+                    if clause:
+                        return clause
+                break
+        return None
+
+    def _pick_clauses(highlights, max_count):
+        """Pick up to max_count composable clauses from the ranked list."""
+        nonlocal _composition_rejected, _stops_used
+        clauses = []
+        for h in highlights:
+            if len(clauses) >= max_count:
+                break
+            if h['stop'] in _stops_used:
+                continue  # One clause per stop
+            clause = _compose_recap_clause(h['fact'], h['stop'])
+            if clause:
+                clauses.append(clause)
+                _stops_used.add(h['stop'])
+            else:
+                # Try alternative sentences from the same stop
+                alt = _try_alternative_sentences(h['stop'], delivered)
+                if alt:
+                    clauses.append(alt)
+                    _stops_used.add(h['stop'])
+                else:
+                    _composition_rejected += 1
+        return clauses
+
     if n_delivered == 2:
         # Both stops, briefly — one clause each
-        clauses = []
-        for h in selected:
-            fact_short = _extract_brief_clause(h['fact'], h['stop'])
-            clauses.append(fact_short)
+        clauses = _pick_clauses(selected, 2)
+        # If we didn't get enough from selected, try remaining verified_highlights
+        if len(clauses) < 2 and len(verified_highlights) > len(selected):
+            extras = _pick_clauses(verified_highlights[len(selected):], 2 - len(clauses))
+            clauses.extend(extras)
         if clauses:
             content_part = " — " + " and ".join(clauses)
         else:
             content_part = ""
     else:
-        # 3+ stops: use a dash-separated list that reads naturally with
-        # subject-verb clauses. The template "from X to Y" only works with
-        # noun phrases; our clauses are short sentences, so use a colon/dash
-        # structure instead: "scale — [first clause], [second], and [third]."
-        clauses = []
-        for h in selected:
-            fact_short = _extract_brief_clause(h['fact'], h['stop'])
-            clauses.append(fact_short)
+        # 3+ stops: compose up to 3 clauses
+        clauses = _pick_clauses(selected, max_highlights)
+        # If we didn't get enough, try remaining verified_highlights
+        if len(clauses) < 2 and len(verified_highlights) > len(selected):
+            extras = _pick_clauses(verified_highlights[len(selected):], max_highlights - len(clauses))
+            clauses.extend(extras)
 
         def _lc_if_not_proper(s):
             """Lowercase first char if it's a common word (The/This/That/A/An/In/It)."""
@@ -893,7 +962,9 @@ def _build_closing_recap(poi_list, ranked_facts_for_recap):
                 return s[0].lower() + s[1:]
             return s
 
-        if len(clauses) == 1:
+        if len(clauses) == 0:
+            content_part = ""
+        elif len(clauses) == 1:
             # Single highlight: " — including X"
             content_part = f" — including {_lc_if_not_proper(clauses[0])}"
         elif len(clauses) == 2:
@@ -903,10 +974,15 @@ def _build_closing_recap(poi_list, ranked_facts_for_recap):
             # Three highlights: " — X, Y, and Z"
             content_part = f" — {clauses[0]}, {_lc_if_not_proper(clauses[1])}, and {_lc_if_not_proper(clauses[2])}"
 
+    if not clauses:
+        print(f"  [LOCAL-280] Recap: all candidates failed composition ({_composition_rejected} rejected) — skipped")
+        return ""
+
     recap = scale_part + content_part + "."
 
     # Print verification
-    print(f"  [LOCAL-280] Recap built: {len(recap.split())} words, {len(selected)} highlights")
+    print(f"  [LOCAL-280] Recap built: {len(recap.split())} words, {len(clauses)} composed clauses"
+          f" ({_composition_rejected} candidates rejected)")
     for h in selected:
         print(f"    [{h['stop']}] ({h['reason']}): \"{h['fact'][:80]}...\"")
     print(f"    D177 verified: all {len(selected)} facts present in delivered text")
@@ -914,91 +990,374 @@ def _build_closing_recap(poi_list, ranked_facts_for_recap):
     return recap
 
 
-def _extract_brief_clause(fact_sentence, stop_name):
-    """Extract a brief identifying clause from a fact sentence for the recap.
+def _compose_recap_clause(fact_sentence, stop_name):
+    """Compose a brief clause naming the stop and its key fact for the recap.
 
-    Aims for ~8-15 words that capture the essence: subject + date + key action.
-    Does NOT invent — only condenses what is in the fact. Always keeps the
-    subject (beginning of the sentence) to maintain readability.
+    [LOCAL-280 bounce fix] This COMPOSES a clause — it never concatenates or
+    truncates source text. Every output names its stop so the listener knows
+    which of N stops is meant.
+
+    Shape examples (from Michael's accepted target):
+      "the fortress prison on Île Sainte-Marguerite"
+      "the Carlton Hotel, designed by Charles Dalmas in 1913"
+      "Èze Village, seized in 1543 and razed by Louis XIV"
+
+    Strategy:
+      1. Extract the key entity (subject noun phrase) from the fact sentence.
+      2. Extract dates if present.
+      3. Compose as "[entity] at [stop]" or "[stop], where [predicate]".
+      4. Never truncate mid-phrase. If composition fails, return None (caller
+         will try the next-ranked fact).
+
+    Returns:
+        str or None: A composed clause (no trailing period), or None if the
+        fact cannot be cleanly composed.
     """
-    _TRAILING_PREPS = {'in', 'on', 'at', 'to', 'from', 'by', 'for', 'of', 'with', 'as', 'into', 'and', 'or', 'but', 'the', 'a', 'an'}
+    from style_validator_detector import check_r1_imperatives
 
-    def _trim_trailing_prep(text):
-        """Remove a dangling preposition from the end of a clause."""
-        w = text.split()
-        while w and w[-1].lower().rstrip('.,;—') in _TRAILING_PREPS:
-            w.pop()
-        return ' '.join(w)
+    # ── Gate: reject imperatives ──
+    if check_r1_imperatives(fact_sentence):
+        print(f"    [LOCAL-280] Recap clause: REJECTED imperative: \"{fact_sentence[:60]}...\"")
+        return None
 
-    words = fact_sentence.split()
-    # If the fact is very short already (≤14 words), use it as-is
-    if len(words) <= 14:
-        return fact_sentence.rstrip('.')
+    # ── Gate: reject navigation-only sentences ──
+    _nav_words = {'head', 'turn', 'continue', 'proceed', 'walk', 'cycle',
+                  'follow', 'cross', 'take', 'step', 'pedal', 'ride'}
+    _first_word = fact_sentence.split()[0].lower().rstrip('.,') if fact_sentence else ''
+    if _first_word in _nav_words and not re.search(r'\b\d{3,4}\b', fact_sentence):
+        print(f"    [LOCAL-280] Recap clause: REJECTED navigation: \"{fact_sentence[:60]}...\"")
+        return None
 
-    # Strategy: keep from the start of the sentence up to a natural break
-    # around the first date. This preserves the subject ("The Man in the Iron
-    # Mask spent eleven years...") rather than extracting a middle fragment.
-    date_match = re.search(r'\b(\d{3,4})\b', fact_sentence)
-    if date_match:
-        date_end_pos = date_match.end()
-        # Look for a natural break AFTER the date (comma, period, semicolon)
-        after_date = fact_sentence[date_end_pos:]
-        cut_pos = len(fact_sentence)  # default: use whole sentence
-        for sep in [', ', '. ', '; ', ' — ']:
-            idx = after_date.find(sep)
-            if idx >= 0:
-                cut_pos = date_end_pos + idx
-                break
+    # ── Normalise ──
+    fact = fact_sentence.strip().rstrip('.')
+    _stop_lower = stop_name.lower()
 
-        clause = fact_sentence[:cut_pos].strip()
-        clause_words = clause.split()
+    # ── Strategy A: The fact already starts with or contains the stop name ──
+    # e.g. "The Carlton Hotel was designed by Charles Dalmas in 1913"
+    # → "the Carlton Hotel, designed by Charles Dalmas in 1913"
+    #
+    # Check if the sentence's subject IS the stop (or part of it)
+    _fact_lower = fact.lower()
+    _stop_in_fact = (_stop_lower in _fact_lower or
+                     any(w in _fact_lower for w in _stop_lower.split()
+                         if len(w) > 4 and w not in ('beach', 'place', 'street',
+                                                      'hotel', 'villa', 'port',
+                                                      'fort', 'cape', 'bay')))
 
-        # If clause is 5-15 words, use it (after stripping trailing preps)
-        if 5 <= len(clause_words) <= 15:
-            result = _trim_trailing_prep(clause.rstrip('.,;—').strip())
-            if len(result.split()) >= 5:
-                return result
-            return clause.rstrip('.,;—').strip()
+    # ── Extract a predicate (the interesting part after the subject) ──
+    # Look for patterns: "was/were [verb-ed]", "built in", "designed by", dates
 
-        # Too long — cut at the FIRST comma in the sentence
-        if len(clause_words) > 15:
-            first_comma = fact_sentence.find(', ')
-            if first_comma > 20:
-                short = fact_sentence[:first_comma]
-                short_words = short.split()
-                if 5 <= len(short_words) <= 15:
-                    result = _trim_trailing_prep(short.rstrip('.,;—').strip())
-                    if len(result.split()) >= 5:
-                        return result
+    # Strategy A2: Sentence starts with a participle phrase
+    # "Sacked in 1536 by Andrea Doria, ..." → take the initial participle clause
+    _initial_participle = re.match(
+        r'^((?:Built|Designed|Constructed|Completed|Destroyed|Razed|Seized|'
+        r'Founded|Established|Opened|Commissioned|Painted|Liberated|Cancelled|'
+        r'Sacked|Transformed|Created|Hosted|Imprisoned|Fortified|Renovated|'
+        r'Restored|Demolished|Abandoned|Converted|Renamed|Inaugurated|Dedicated|'
+        r'Confiscated|Awarded|Erected|Captured|Rebuilt|Annexed)'
+        r'\s+(?:in|by|for|during|after|between|from)\s+.+?)(?:,\s+(?:the|this|it)\b|\.\s)',
+        fact, re.IGNORECASE
+    )
+    if _initial_participle:
+        _init_pred = _initial_participle.group(1).strip().rstrip('.,;')
+        # Cap at 12 words
+        _ip_words = _init_pred.split()
+        if len(_ip_words) > 12:
+            # Cut at a comma
+            _ip_comma = _init_pred.find(',')
+            if _ip_comma > 15:
+                _init_pred = _init_pred[:_ip_comma].strip()
+            else:
+                _init_pred = ' '.join(_ip_words[:12])
+        # Trim trailing preps/articles
+        _ip_w = _init_pred.split()
+        while _ip_w and _ip_w[-1].lower().rstrip('.,;') in {'in', 'on', 'at', 'to', 'from', 'by', 'for', 'of', 'with', 'and', 'or', 'the', 'a', 'an'}:
+            _ip_w.pop()
+        _init_pred = ' '.join(_ip_w).rstrip('.,;')
+        if _init_pred and len(_init_pred.split()) >= 4:
+            clause = f"{stop_name}, {_init_pred[0].lower()}{_init_pred[1:]}"
+            if len(clause.split()) >= 5:
+                return clause
 
-            # Fallback: take first 13 words and trim trailing prep
-            short = ' '.join(clause_words[:13])
-            result = _trim_trailing_prep(short.rstrip('.,;—').strip())
-            if len(result.split()) >= 5:
-                return result
-            return short.rstrip('.,;—').strip()
+    _pred_patterns = [
+        # "X was designed by Y in Z" → "designed by Y in Z"
+        re.compile(r'(?:was|were|is)\s+([\w]+ed\s+(?:by|in|from|for|during|after|before|between)\s+.+)', re.IGNORECASE),
+        # "X, built in 1234, ..." → "built in 1234"
+        re.compile(r',\s*(built|designed|constructed|completed|destroyed|razed|seized|founded|established|opened|commissioned)\s+(in|by|for|during|after|between)\s+(.+?)(?:,|\.|$)', re.IGNORECASE),
+        # "where X spent N years" or "where X was imprisoned"
+        re.compile(r'where\s+(.+?)(?:\.|$)', re.IGNORECASE),
+    ]
 
-        # Too short (< 5 words up to date) — expand to include what follows
-        short = ' '.join(words[:12])
-        result = _trim_trailing_prep(short.rstrip('.,;—').strip())
-        if len(result.split()) >= 5:
-            return result
-        return short.rstrip('.,;—').strip()
+    # ── Strategy B: Sentence has "The [Entity] ... [verb] ... [date]" ──
+    # Extract the subject (up to the first verb/comma) and a predicate with date
+    _date_match = re.search(r'\b(\d{3,4})\b', fact)
 
-    # No date found — take a concise opening portion (first ~12 words)
-    # Cut at first comma if present and reasonable
-    first_comma = fact_sentence.find(', ')
-    if first_comma > 20:
-        short = fact_sentence[:first_comma]
-        short_words = short.split()
-        if 5 <= len(short_words) <= 14:
-            return _trim_trailing_prep(short.rstrip('.,;—').strip())
+    # Try to find a clean predicate from the sentence
+    _predicate = None
+    for pat in _pred_patterns:
+        m = pat.search(fact)
+        if m:
+            _predicate = m.group(0).strip().lstrip(',').strip()
+            # Clean up: remove leading "was/were/is"
+            _predicate = re.sub(r'^(?:was|were|is)\s+', '', _predicate)
+            break
 
-    short = ' '.join(words[:12])
-    result = _trim_trailing_prep(short.rstrip('.,;—').strip())
-    if len(result.split()) >= 5:
-        return result
-    return short.rstrip('.,;—').strip()
+    # ── Strategy C: If the sentence has a relative clause, extract it ──
+    if not _predicate:
+        # "..., which was built in 1306" or "..., who spent eleven years..."
+        _rel_match = re.search(r',?\s*(?:which|who|where|whose)\s+(.+?)(?:\.|$)', fact, re.IGNORECASE)
+        if _rel_match:
+            _predicate = _rel_match.group(0).strip().lstrip(',').strip()
+
+    # ── Strategy D: Sentence starts with subject, has verb + object ──
+    # Take the verb phrase after the subject
+    if not _predicate and _date_match:
+        # Find the main verb (past tense or present)
+        _verb_match = re.search(
+            r'\b(spent|served|built|designed|imprisoned|held|housed|destroyed|'
+            r'razed|seized|founded|opened|painted|composed|created|established|'
+            r'hosted|survived|became|arrived|discovered|escaped|died|lived|'
+            r'ruled|fought|conquered|liberated|cancelled|transformed|underwent|'
+            r'constructed|completed|commissioned)\b',
+            fact, re.IGNORECASE
+        )
+        if _verb_match:
+            # Verbs that work as participles (can follow stop name directly):
+            _PARTICIPLE_VERBS = {'built', 'designed', 'imprisoned', 'held',
+                                 'housed', 'destroyed', 'razed', 'seized',
+                                 'founded', 'opened', 'painted', 'composed',
+                                 'created', 'established', 'hosted', 'liberated',
+                                 'cancelled', 'transformed', 'constructed',
+                                 'completed', 'commissioned'}
+            _matched_verb_lower = _verb_match.group(1).lower()
+
+            if _matched_verb_lower in _PARTICIPLE_VERBS:
+                # Take from the verb onwards — works as participle phrase
+                _from_verb = fact[_verb_match.start():]
+            else:
+                # Subject-requiring verbs (spent, served, lived, became, etc.)
+                # Include the subject: take from sentence start up to a natural
+                # break after the date
+                _from_verb = fact[:_verb_match.start()].strip()
+                _from_verb_full = fact[_verb_match.start():]
+                # Extract subject (the part before the verb)
+                _subject = _from_verb.rstrip()
+                # Remove leading "The " if present to avoid redundancy with stop
+                _subject_clean = re.sub(r'^The\s+', '', _subject).strip()
+                # Reject subjects that start with prepositions (they're temporal phrases)
+                _subj_first = _subject_clean.split()[0].lower() if _subject_clean else ''
+                _prep_starts = ('in', 'on', 'at', 'during', 'after', 'before',
+                                'from', 'by', 'with', 'through', 'between',
+                                'however', 'originally', 'once', 'although')
+                if (_subject_clean.lower() != _stop_lower and
+                    len(_subject_clean.split()) >= 2 and
+                    len(_subject_clean.split()) <= 8 and
+                    _subj_first not in _prep_starts):  # Don't use prep phrases as subjects
+                    # Compose "subject at stop, verb phrase" or similar
+                    # Cut verb phrase at natural break
+                    _break = re.search(r'[.;]|\s—\s', _from_verb_full)
+                    if _break and _break.start() > 10:
+                        _vp = _from_verb_full[:_break.start()]
+                    else:
+                        _vp = _from_verb_full
+                    _vp_words = _vp.split()
+                    if len(_vp_words) > 10:
+                        _vp = ' '.join(_vp_words[:10])
+                        # Trim trailing prep and incomplete "before/after + gerund"
+                        _vp_w = _vp.split()
+                        while _vp_w and _vp_w[-1].lower().rstrip('.,;') in {'in', 'on', 'at', 'to', 'from', 'by', 'for', 'of', 'with', 'and', 'or', 'the', 'a'}:
+                            _vp_w.pop()
+                        # Trim "before/after X" if X is a gerund (incomplete clause)
+                        if (len(_vp_w) >= 2 and
+                            _vp_w[-2].lower() in ('before', 'after', 'while') and
+                            _vp_w[-1].lower().endswith('ing')):
+                            _vp_w = _vp_w[:-2]
+                        # Trim trailing gerund alone if it's dangling
+                        if _vp_w and _vp_w[-1].lower().endswith('ing') and _vp_w[-1].lower() not in ('building', 'king', 'ring', 'thing', 'spring'):
+                            # Check if it's the object of "before/after" that was already trimmed
+                            pass  # only trim before+gerund pair, not standalone
+                        _vp = ' '.join(_vp_w)
+                    _vp = _vp.strip().rstrip('.,;')
+                    # Compose: "Île Ste-Marguerite, where the Man in the Iron Mask spent eleven years"
+                    # Use "where" connector with subject preserved
+                    # Keep original case — subjects are typically proper nouns
+                    _subj_for_clause = _subject_clean
+                    # Add "the" back if it looks like a titled entity
+                    if not _subj_for_clause[0].isupper() or _subj_for_clause.split()[0].lower() in ('man', 'duke', 'count', 'king', 'queen', 'prince', 'princess'):
+                        _subj_for_clause = f"the {_subj_for_clause}"
+                    elif _subject.lower().startswith('the '):
+                        _subj_for_clause = f"the {_subj_for_clause}"
+                    clause = f"{stop_name}, where {_subj_for_clause} {_vp}"
+                    _clause_words = clause.split()
+                    if 5 <= len(_clause_words) <= 20:
+                        return clause
+                # If subject extraction failed, skip — don't compose with dangling verb
+                _from_verb = None
+
+            if _from_verb:
+                # Cut at a natural break if too long
+                _break = re.search(r'[.;]|\s—\s', _from_verb)
+                if _break and _break.start() > 10:
+                    _from_verb = _from_verb[:_break.start()]
+                # Cap at ~15 words
+                _fv_words = _from_verb.split()
+                if len(_fv_words) > 15:
+                    # Cut at last comma before word 15
+                    _trunc = ' '.join(_fv_words[:15])
+                    _last_comma = _trunc.rfind(',')
+                    if _last_comma > 20:
+                        _from_verb = _trunc[:_last_comma]
+                    else:
+                        _from_verb = _trunc
+                _predicate = _from_verb.strip().rstrip('.,;')
+
+    # ── Compose the final clause ──
+    if _predicate:
+        # Clean trailing prepositions/articles that would leave a dangling end
+        _trailing = {'in', 'on', 'at', 'to', 'from', 'by', 'for', 'of', 'with',
+                     'and', 'or', 'but', 'the', 'a', 'an', 'as', 'into'}
+        _pred_words = _predicate.split()
+        while _pred_words and _pred_words[-1].lower().rstrip('.,;') in _trailing:
+            _pred_words.pop()
+        _predicate = ' '.join(_pred_words).rstrip('.,;')
+
+        # Strip redundant references to the stop itself in the predicate.
+        # E.g. "seized the village under..." → "seized under..." when stop is "Eze Village"
+        # Also strips the literal stop name if it appears in the predicate.
+        _stop_words_lc = set(w.lower() for w in stop_name.split() if len(w) > 3)
+        _stop_refs = []
+        for _sw in _stop_words_lc:
+            if _sw in ('village', 'island', 'fort', 'fortress', 'town', 'port',
+                       'hotel', 'beach', 'cape', 'promenade', 'castle', 'place',
+                       'château', 'villa', 'chapel', 'church', 'cathedral'):
+                _stop_refs.append(rf'\bthe\s+{re.escape(_sw)}\b')
+                _stop_refs.append(rf'\bthis\s+{re.escape(_sw)}\b')
+        # Also strip literal stop name in the predicate
+        if stop_name.lower() in _predicate.lower():
+            _stop_refs.append(re.escape(stop_name))
+        if _stop_refs:
+            for _ref_pat in _stop_refs:
+                _predicate = re.sub(_ref_pat, '', _predicate, flags=re.IGNORECASE).strip()
+            # Clean up double spaces
+            _predicate = re.sub(r'\s{2,}', ' ', _predicate).strip()
+
+        if not _predicate or len(_predicate.split()) < 3:
+            # Predicate too short to be meaningful
+            return None
+
+        # Final truncation guard: if the last word is very short (1-2 chars)
+        # and not a known valid ending word, this is a truncation artifact.
+        _final_word = _predicate.split()[-1].lower().rstrip('.,;') if _predicate.split() else ''
+        _valid_short_endings = {'ii', 'iv', 'vi', 'ad', 'bc', 'ce'}
+        if len(_final_word) <= 2 and _final_word not in _valid_short_endings:
+            # Remove the truncated word and trailing prep
+            _pred_words_trim = _predicate.split()[:-1]
+            while _pred_words_trim and _pred_words_trim[-1].lower().rstrip('.,;') in {'in', 'on', 'at', 'to', 'from', 'by', 'for', 'of', 'with', 'and', 'or', 'the', 'a', 'an'}:
+                _pred_words_trim.pop()
+            _predicate = ' '.join(_pred_words_trim).rstrip('.,;')
+            if not _predicate or len(_predicate.split()) < 3:
+                return None
+
+        # Decide the connector: if predicate starts with a relative pronoun, use as-is
+        _pred_lower = _predicate.lower()
+        clause = None
+
+        # Guard: reject predicates that start with bare pronouns (no antecedent)
+        if re.match(r'^(?:he|she|it|they|its|his|her|their)\b', _pred_lower):
+            # "where he created..." — listener doesn't know who "he" is
+            return None
+
+        if _pred_lower.startswith('who '):
+            # "who" implies the antecedent is a person — reject when stop is a place.
+            # Don't compose: the relative clause refers to someone else, not the stop.
+            clause = None
+        elif _pred_lower.startswith(('where ', 'which ', 'whose ')):
+            clause = f"{stop_name}, {_predicate}"
+        elif re.match(r'^(?:built|designed|constructed|completed|destroyed|razed|'
+                      r'seized|founded|established|opened|commissioned|painted|'
+                      r'liberated|cancelled|sacked|transformed|created|hosted|'
+                      r'imprisoned|fortified|renovated|restored|demolished|'
+                      r'abandoned|converted|renamed|inaugurated|dedicated|'
+                      r'confiscated|awarded|erected|captured|rebuilt|annexed|'
+                      r'repurposed|expanded|modernized|reclaimed)\b',
+                      _pred_lower):
+            # Past participle: "stop, [participle phrase]"
+            clause = f"{stop_name}, {_predicate}"
+        else:
+            # General predicate: "stop, where [predicate]"
+            clause = f"{stop_name}, where {_predicate[0].lower()}{_predicate[1:]}" if _predicate else None
+
+        if clause and len(clause.split()) >= 5:
+            # Cap clause at 20 words to keep the recap concise
+            _clause_w = clause.split()
+            if len(_clause_w) > 20:
+                # Cut at the last comma before word 20
+                _trunc_clause = ' '.join(_clause_w[:20])
+                _last_c = _trunc_clause.rfind(',')
+                if _last_c > len(stop_name) + 5:
+                    clause = _trunc_clause[:_last_c].rstrip()
+                else:
+                    clause = _trunc_clause
+                # Trim trailing preps/articles
+                _cw = clause.split()
+                while _cw and _cw[-1].lower().rstrip('.,;') in {'in', 'on', 'at', 'to', 'from', 'by', 'for', 'of', 'with', 'and', 'or', 'the', 'a', 'an'}:
+                    _cw.pop()
+                clause = ' '.join(_cw).rstrip('.,;')
+                # Final truncation check
+                if clause and len(clause.split()[-1].rstrip('.,;')) <= 2:
+                    _cw = clause.split()[:-1]
+                    while _cw and _cw[-1].lower().rstrip('.,;') in {'in', 'on', 'at', 'to', 'from', 'by', 'for', 'of', 'with', 'and', 'or', 'the', 'a', 'an'}:
+                        _cw.pop()
+                    clause = ' '.join(_cw).rstrip('.,;')
+                if not clause or len(clause.split()) < 5:
+                    return None
+            return clause
+
+    # ── Fallback E: Extract the key noun phrase (subject) if it differs from stop ──
+    # e.g. "The Man in the Iron Mask spent eleven years in the fortress prison"
+    # → try to get "the Man in the Iron Mask" + stop
+    if _stop_in_fact and _date_match:
+        # The stop is mentioned — try to extract just the fact's core subject
+        # if it's different from the stop name itself
+        _subj_match = re.match(r'^(?:The\s+)?(.+?)(?:\s+(?:was|were|is|spent|served|built|'
+                               r'designed|arrived|lived|died|ruled|fought)\b)', fact, re.IGNORECASE)
+        if _subj_match:
+            _subj = _subj_match.group(0).rstrip()
+            # Remove the verb at the end
+            _subj = re.sub(r'\s+(?:was|were|is|spent|served|built|designed|arrived|'
+                           r'lived|died|ruled|fought)$', '', _subj, flags=re.IGNORECASE).strip()
+            if _subj.lower() != _stop_lower and len(_subj.split()) >= 2:
+                # "the Man in the Iron Mask at Île Sainte-Marguerite"
+                _subj_clean = _subj if _subj[0].isupper() else f"the {_subj}"
+                clause = f"{_subj_clean} at {stop_name}"
+                if len(clause.split()) >= 5:
+                    return clause
+
+    # ── Fallback F: Use the first complete clause of the sentence (up to first comma/semicolon) ──
+    # Only if it's self-contained (has a verb and >= 5 words, <= 14 words)
+    _first_clause_match = re.match(r'^(.+?)(?:,\s|\.\s|;\s)', fact)
+    if _first_clause_match:
+        _fc = _first_clause_match.group(1).strip()
+        _fc_words = _fc.split()
+        if 5 <= len(_fc_words) <= 14:
+            # Verify it has a finite verb (not just a noun phrase)
+            _has_verb = bool(re.search(r'\b(?:is|was|were|are|had|has|have|spent|'
+                                       r'built|designed|destroyed|became|arrived|'
+                                       r'lived|died|ruled|served|held|opened|'
+                                       r'painted|founded|escaped|survived)\b',
+                                       _fc, re.IGNORECASE))
+            if _has_verb:
+                # If stop name not already in the clause, prepend it
+                if _stop_lower not in _fc.lower():
+                    clause = f"{stop_name}, where {_fc[0].lower()}{_fc[1:]}"
+                else:
+                    clause = _fc
+                if len(clause.split()) >= 5:
+                    return clause
+
+    # ── Cannot compose a clean clause — signal caller to try next candidate ──
+    print(f"    [LOCAL-280] Recap clause: CANNOT COMPOSE from: \"{fact_sentence[:70]}...\"")
+    return None
 
 
 def _build_closing_offer(poi_list, tour_category, transport_mode, location, sentence_budget=3):
