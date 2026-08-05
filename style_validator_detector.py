@@ -194,6 +194,9 @@ def _is_style_navigation_sentence(sentence: str) -> bool:
       "Start biking southeast…" → start + biking + southeast → navigation
     The gerund must be a known transport-movement word; "Start looking south"
     does NOT exempt (looking is attention, not transport).
+
+    LOCAL-255: Also handles "Start your ride/journey/trip at X and pedal..."
+    where the transport mode is explicit as a noun after "your".
     """
     lower = sentence.lower().strip()
 
@@ -202,6 +205,13 @@ def _is_style_navigation_sentence(sentence: str) -> bool:
         'cycling', 'biking', 'riding', 'driving', 'walking', 'hiking',
         'pedaling', 'pedalling', 'cruising', 'trotting', 'galloping',
         'strolling',
+    }
+
+    # Transport nouns after "your" that indicate navigation intent:
+    # "Start your ride at...", "Begin your journey from..."
+    _TRANSPORT_NOUNS = {
+        'ride', 'journey', 'trip', 'route', 'tour', 'trek', 'hike',
+        'walk', 'cycle', 'bike',
     }
 
     # Verbs too general-purpose to be confirmed by weak directional words
@@ -233,6 +243,22 @@ def _is_style_navigation_sentence(sentence: str) -> bool:
                 second_word = words[1]
                 if second_word in _STYLE_NAV_DIRECTIONAL:
                     return True
+            # LOCAL-255: Possessive match: verb + "your" + transport noun → navigation
+            # e.g. "Start your ride at Cap d'Antibes and pedal east"
+            if first_word == 'your' and len(words) >= 2:
+                second_word = words[1]
+                if second_word in _TRANSPORT_NOUNS:
+                    # Confirm there's a transport verb later in the sentence
+                    # (pedal, cycle, ride, walk, etc.) OR a directional word
+                    rest_of_sentence = ' '.join(words[2:])
+                    has_transport_verb = bool(re.search(
+                        r'\b(?:pedal|cycle|bike|ride|walk|hike|drive|cruise)\b',
+                        rest_of_sentence
+                    ))
+                    has_directional = any(d in rest_of_sentence.split()
+                                         for d in _STRONG_DIRECTIONAL)
+                    if has_transport_verb or has_directional:
+                        return True
     return False
 
 
@@ -1117,6 +1143,508 @@ def check_r7_hallucinated_sensory(sentence: str) -> List[Dict]:
             break  # One R7 finding per sentence
 
     return findings
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# R1 REWRITE LOGIC (assembly-time) — LOCAL-255
+# ═══════════════════════════════════════════════════════════════════════════════
+# Michael (Round 2, twice 2/5): "provides instructions; I thought we should have
+# overcome that error by now." R1 fires at 36.2% of paragraphs corpus-wide.
+#
+# At this rate, DELETION would gut every tour. R1 needs a REWRITE path:
+# - The instruction becomes a statement; the content survives intact.
+# - Only pure instructions with no content ("Take a moment to absorb the
+#   atmosphere.") are deleted.
+#
+# Michael's endorsed transformation (Round 2, "Fixes / Pair 1"):
+#   BEFORE: "Position yourself at the entrance of Eze Village, a medieval gem..."
+#   AFTER:  "Eze Village is a medieval gem..."
+#   Verdict: "absolutely agree! After immeasurably better than before."
+#
+# Navigation is exempt (D107): "Start cycling south on the main road..." survives.
+#
+# Behind DISABLE_R1_REWRITE=1 env var — caller checks this.
+
+# ── Deterministic rewrite rules ─────────────────────────────────────────────
+# The common imperative shapes are few and regular. These handle the majority.
+# An LLM pass is permitted for the residue (ceiling $0.60 per task), but it may
+# only RESTATE the sentence — it must not add a fact. If a deterministic rule
+# and the model disagree, prefer the deterministic one.
+
+_R1_REWRITE_RULES = [
+    # "Position yourself at X, a Y" → "X is a Y"
+    # Handles "at the entrance of X", "at the edge of X", "at X" etc.
+    (re.compile(
+        r'^(?:Position yourself|Place yourself|Station yourself|Stand)\s+'
+        r'(?:at|near|by|beside|before|in front of)\s+'
+        r'(?:the\s+)?(?:(?:entrance|edge|top|foot|base|center|centre|heart|start|beginning|end)\s+(?:of|to)\s+)?'
+        r'(?:the\s+)?(.+?),\s+(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     lambda m: f"{m.group(1).strip().rstrip(',')} is {m.group(2).strip()}"
+    ),
+
+    # "As you arrive at X, take in / observe / admire the Y" → "From X, the Y..."
+    # or "At X, the Y..." or "From this vantage point, you can admire the Y..."
+    (re.compile(
+        r'^As you (?:arrive|approach|reach|come)\s+'
+        r'(?:at|to|near)?\s*(.+?),\s*'
+        r'(?:take in|observe|admire|notice|see|behold|absorb|enjoy|appreciate|discover|find)\s+'
+        r'(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     lambda m: f"From {m.group(1).strip().rstrip(',')}, you can admire {m.group(2).strip()}"
+    ),
+
+    # "Take in / Admire / Observe the X" → "The X is visible" / "You can admire the X"
+    (re.compile(
+        r'^(?:Take in|Admire|Observe|Appreciate|Enjoy|Behold|Absorb|Notice|See)\s+'
+        r'(?:the\s+)?(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     lambda m: f"The {m.group(1).strip()}" if m.group(1).strip()[0:1].islower()
+     else f"{m.group(1).strip()}"
+    ),
+
+    # "Look for the X" → "The X stands..." / "X is here"
+    (re.compile(
+        r'^(?:Look for|Look at|Look upon|Seek out|Search for|Find)\s+'
+        r'(?:the\s+)?(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     lambda m: f"The {m.group(1).strip()}" if not re.match(r'^[A-Z]', m.group(1).strip())
+     else f"The {m.group(1).strip()}"
+    ),
+
+    # "Take a moment to X" → delete if X is pure feeling; rewrite otherwise
+    # Pure feeling: "absorb the atmosphere", "enjoy the view", "reflect"
+    (re.compile(
+        r'^Take a moment to\s+(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     '_take_a_moment_handler'  # Special handler below
+    ),
+
+    # "Let yourself X" / "Allow yourself to X" → remove or rewrite
+    (re.compile(
+        r'^(?:Let yourself|Allow yourself to|Let the)\s+(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     '_let_yourself_handler'
+    ),
+
+    # "Prepare to X" / "Get ready to X" → remove (pure instruction)
+    (re.compile(
+        r'^(?:Prepare to|Prepare yourself|Get ready to)\s+(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     None  # Always delete
+    ),
+
+    # "Find your way to X" / "Make your way to X" → navigation-like but not
+    # truly navigational unless followed by directional content
+    (re.compile(
+        r'^(?:Find your way|Make your way)\s+(?:to|towards|toward)\s+(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     lambda m: f"{m.group(1).strip()}" if ',' in m.group(1) else None
+    ),
+
+    # Mid-sentence: "As you X, pause/take in/notice/observe/admire Y"
+    # → "From this vantage point, Y"
+    (re.compile(
+        r'^(?:As you|While you|When you)\s+.+?,\s*'
+        r'(?:pause to |stop to )?'
+        r'(?:take in|observe|admire|notice|absorb|appreciate|enjoy|discover|look at|look for)\s+'
+        r'(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     lambda m: f"From this vantage point, you can admire {m.group(1).strip()}"
+    ),
+
+    # "Imagine X" → "X ..." (just state it)
+    (re.compile(
+        r'^(?:Imagine|Picture|Envision|Visualize|Visualise)\s+(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     lambda m: m.group(1).strip() if len(m.group(1).strip()) > 20 else None
+    ),
+
+    # "Consider X" → "X ..." (just state it) — only if it has content
+    (re.compile(
+        r'^Consider\s+(?:the\s+)?(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     lambda m: f"The {m.group(1).strip()}" if len(m.group(1).strip()) > 20
+     else None
+    ),
+
+    # "Immerse yourself in X" → "X surrounds you" / just state X
+    (re.compile(
+        r'^(?:Immerse yourself|Lose yourself|Plunge yourself)\s+'
+        r'(?:in|into)\s+(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     lambda m: m.group(1).strip() if len(m.group(1).strip()) > 20 else None
+    ),
+
+    # "Listen to/for X" → "The sound of X..." / "X can be heard"
+    (re.compile(
+        r'^Listen\s+(?:to|for)\s+(?:the\s+)?(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     lambda m: f"The sound of {m.group(1).strip()}" if 'sound' not in m.group(1).lower()
+     else f"The {m.group(1).strip()}"
+    ),
+
+    # "Keep in mind X" / "Bear in mind X" → "X ..."
+    (re.compile(
+        r'^(?:Keep in mind|Bear in mind|Remember)\s+(?:that\s+)?(.+)$',
+        re.IGNORECASE | re.DOTALL),
+     lambda m: m.group(1).strip()
+    ),
+]
+
+# ── Pure-instruction patterns (deletion, not rewrite) ────────────────────────
+# These sentences contain NO factual content. They only instruct or prescribe.
+_R1_PURE_INSTRUCTION_PATTERNS = [
+    re.compile(r'^Take a moment to (?:absorb|soak in|enjoy|savor|savour|relish|appreciate|reflect on|breathe in|feel|embrace)\s+(?:the )?(?:atmosphere|ambiance|ambience|view|scenery|beauty|moment|surroundings|experience|serenity|tranquility|magic|charm|energy|vibe|spirit)\s*\.?$', re.IGNORECASE),
+    re.compile(r'^(?:Enjoy|Savor|Savour|Relish|Embrace|Absorb|Soak in)\s+(?:the )?(?:view|scenery|atmosphere|moment|beauty|experience|surroundings|sights?|sounds?)\s*\.?$', re.IGNORECASE),
+    re.compile(r'^(?:Pause|Stop|Wait)\s+(?:here\s+)?(?:to\s+)?(?:for a moment|and\s+)?(?:absorb|enjoy|take in|appreciate|soak in|reflect)\s*\.?$', re.IGNORECASE),
+    re.compile(r'^(?:Take|Spare|Give yourself) a (?:moment|minute|second|breath)\s*\.?$', re.IGNORECASE),
+    re.compile(r'^(?:Breathe|Inhale|Exhale)\s+(?:in|out|deeply)\s*\.?$', re.IGNORECASE),
+    re.compile(r'^(?:Let|Allow)\s+(?:yourself|the\s+(?:atmosphere|moment|view|scenery))\s+(?:sink in|wash over you|envelop you|surround you)\s*\.?$', re.IGNORECASE),
+]
+
+# ── Feeling/experience terms that signal a "take a moment" is contentless ────
+_FEELING_TERMS = re.compile(
+    r'\b(?:absorb|soak\s+in|enjoy|savor|savour|relish|appreciate|embrace|'
+    r'reflect\s+on|breathe\s+in|feel|experience|immerse|lose\s+yourself)\b'
+    r'.*\b(?:atmosphere|ambiance|ambience|view|scenery|beauty|moment|'
+    r'surroundings|serenity|tranquility|magic|charm|energy|spirit|vibe)\b',
+    re.IGNORECASE
+)
+
+
+def _take_a_moment_handler(m):
+    """Handle 'Take a moment to X' — delete if pure feeling, rewrite otherwise."""
+    rest = m.group(1).strip()
+    # If the rest is purely about feeling/absorbing with no factual content, delete
+    if _FEELING_TERMS.search(rest):
+        return None  # Signal deletion
+    # Otherwise, the sentence has some content — rewrite as statement
+    # "Take a moment to admire the Fondation Maeght, founded in 1964..."
+    # → "The Fondation Maeght, founded in 1964..."
+    # Strip the imperative prefix verb
+    content_match = re.match(
+        r'(?:admire|observe|notice|examine|study|inspect|appreciate|explore|discover|look at)\s+(.+)',
+        rest, re.IGNORECASE | re.DOTALL
+    )
+    if content_match:
+        extracted = content_match.group(1).strip()
+        # Capitalize if needed
+        if extracted and extracted[0].islower():
+            # Add "The" if it doesn't already start with a determiner
+            if not re.match(r'^(?:the|a|an|this|that|these|those)\b', extracted, re.IGNORECASE):
+                return f"The {extracted}"
+        return extracted
+    # Fallback: just state it directly
+    return rest
+
+
+def _let_yourself_handler(m):
+    """Handle 'Let yourself X' — delete if pure feeling."""
+    rest = m.group(1).strip()
+    if _FEELING_TERMS.search(rest):
+        return None
+    # "Let yourself be transported by the story of X" → "The story of X..."
+    content_match = re.match(
+        r'(?:be\s+(?:transported|carried|moved|inspired|guided)\s+by\s+)(.+)',
+        rest, re.IGNORECASE | re.DOTALL
+    )
+    if content_match:
+        return content_match.group(1).strip()
+    return None  # Can't rewrite safely — delete
+
+
+def _is_pure_instruction(sentence: str) -> bool:
+    """Check if a sentence is a pure instruction with no factual content."""
+    stripped = sentence.strip().rstrip('.')
+    for pattern in _R1_PURE_INSTRUCTION_PATTERNS:
+        if pattern.match(stripped):
+            return True
+    # Additional heuristic: very short imperative with no proper nouns, dates, or numbers
+    if len(stripped.split()) <= 8:
+        has_content = bool(re.search(r'\d{3,4}|[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+', stripped))
+        if not has_content and not re.search(r'(?:founded|built|created|established|opened|dating|century)', stripped, re.IGNORECASE):
+            return True
+    return False
+
+
+def rewrite_r1_sentence_deterministic(sentence: str) -> str:
+    """Attempt deterministic rewrite of an R1-flagged sentence.
+
+    Returns:
+        - The rewritten sentence (if a deterministic rule matched)
+        - None if the sentence should be DELETED (pure instruction, no content)
+        - The sentinel string '__LLM_NEEDED__' if no deterministic rule matched
+          and an LLM pass is needed for this residue.
+    """
+    stripped = sentence.strip()
+
+    # Step 1: Is this a pure instruction? → Delete
+    if _is_pure_instruction(stripped):
+        return None
+
+    # Step 2: Try deterministic rewrite rules in order
+    for pattern, handler in _R1_REWRITE_RULES:
+        m = pattern.match(stripped)
+        if m:
+            if handler is None:
+                return None  # Rule says delete
+            elif handler == '_take_a_moment_handler':
+                result = _take_a_moment_handler(m)
+                if result is None:
+                    return None  # Delete
+                return result
+            elif handler == '_let_yourself_handler':
+                result = _let_yourself_handler(m)
+                if result is None:
+                    return None
+                return result
+            elif callable(handler):
+                result = handler(m)
+                if result is None:
+                    return None  # Handler says delete
+                # Ensure it ends with a period if the original did
+                result = result.strip()
+                if stripped.endswith('.') and not result.endswith('.'):
+                    result += '.'
+                # Capitalize first letter
+                if result and result[0].islower():
+                    result = result[0].upper() + result[1:]
+                return result
+
+    # Step 3: No deterministic rule matched — signal LLM needed
+    return '__LLM_NEEDED__'
+
+
+def rewrite_r1_sentence_llm(sentence: str, api_key: str, model: str = None) -> str:
+    """Rewrite an R1 sentence using an LLM call.
+
+    The LLM may only RESTATE the sentence — it must not add a fact.
+    Returns the rewritten sentence, or None if deletion is the outcome.
+    """
+    import requests as _req
+
+    if not model:
+        model = os.environ.get('TOUR_LLM_MODEL', 'gpt-4o-mini')
+
+    prompt = f"""Rewrite this sentence to remove the imperative/instruction while preserving ALL factual content.
+
+SENTENCE: "{sentence}"
+
+RULES:
+1. Convert the imperative (command to the listener) into a declarative statement.
+2. DO NOT add any facts, dates, names, or information not in the original.
+3. DO NOT delete any facts, dates, names, or quoted content from the original.
+4. The rewritten sentence must contain every proper noun and every number from the original.
+5. If the sentence is purely an instruction with no factual content (e.g., "Take a moment to absorb the atmosphere."), respond with exactly: DELETE
+6. Return ONLY the rewritten sentence. No explanation, no quotes around it.
+
+EXAMPLES:
+- "Position yourself at the entrance of Eze Village, a medieval gem perched high above the French Riviera." → "Eze Village is a medieval gem perched high above the French Riviera."
+- "Take in the stunning views of the azure Mediterranean Sea." → "The stunning views of the azure Mediterranean Sea stretch out from here."
+- "Look for the Fondation Maeght, founded in 1964 by Marguerite and Aimé Maeght." → "The Fondation Maeght, founded in 1964 by Marguerite and Aimé Maeght, stands here."
+- "As you arrive, take in the breathtaking views of the azure waters." → "From this vantage point, the breathtaking views of the azure waters are visible."
+- "Take a moment to absorb the atmosphere." → DELETE
+- "Enjoy the view." → DELETE
+"""
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+    data = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": "You are a copy editor. You rewrite imperative sentences as declarative statements. You never add information."},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.2,
+        "max_tokens": 200,
+    }
+
+    try:
+        resp = _req.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers=headers,
+            data=json.dumps(data),
+            timeout=30,
+        )
+        if resp.status_code == 200:
+            result = resp.json()
+            text = result["choices"][0]["message"]["content"].strip()
+            tokens_used = result["usage"]["total_tokens"]
+
+            # Check for DELETE signal
+            if text.upper().strip() == 'DELETE':
+                return None, tokens_used
+
+            # Strip quotes if wrapped
+            if text.startswith('"') and text.endswith('"'):
+                text = text[1:-1].strip()
+            if text.startswith('\u201c') and text.endswith('\u201d'):
+                text = text[1:-1].strip()
+
+            # Content preservation check: every proper noun and number in the
+            # original must appear in the rewrite.
+            orig_proper_nouns = set(re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', sentence))
+            orig_numbers = set(re.findall(r'\b\d{3,4}\b', sentence))
+            new_proper_nouns = set(re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', text))
+            new_numbers = set(re.findall(r'\b\d{3,4}\b', text))
+
+            # If proper nouns or numbers were dropped, reject the LLM rewrite
+            # and fall back to keeping the original (better imperative than lost content)
+            lost_nouns = orig_proper_nouns - new_proper_nouns
+            lost_numbers = orig_numbers - new_numbers
+            # Filter out very common words that happen to be capitalized
+            _common_caps = {'The', 'This', 'That', 'Here', 'From', 'You', 'As', 'In', 'At', 'On'}
+            lost_nouns -= _common_caps
+
+            if lost_nouns or lost_numbers:
+                # Content loss — reject LLM rewrite, keep original
+                return '__KEEP_ORIGINAL__', tokens_used
+
+            return text, tokens_used
+        else:
+            return '__KEEP_ORIGINAL__', 0
+    except Exception:
+        return '__KEEP_ORIGINAL__', 0
+
+
+def apply_r1_rewrites(paragraph: str, api_key: str = None, model: str = None) -> tuple:
+    """Apply R1 rewrites to a paragraph.
+
+    Rewrites imperative sentences to declarative form. Deletes only pure
+    instructions with no factual content.
+
+    Args:
+        paragraph: The paragraph text
+        api_key: OpenAI API key for LLM fallback (optional)
+        model: LLM model name (optional, defaults to TOUR_LLM_MODEL or gpt-4o-mini)
+
+    Returns:
+        (new_paragraph, sentences_rewritten, sentences_deleted, llm_tokens_used)
+
+    Behind DISABLE_R1_REWRITE=1 — caller must check.
+    """
+    if not paragraph or not paragraph.strip():
+        return paragraph, 0, 0, 0
+
+    sentences = _split_sentences(paragraph)
+    if not sentences:
+        return paragraph, 0, 0, 0
+
+    kept = []
+    rewritten_count = 0
+    deleted_count = 0
+    llm_tokens = 0
+
+    for sentence in sentences:
+        if len(sentence) < 10:
+            kept.append(sentence)
+            continue
+
+        # Navigation sentences are never touched (D107)
+        if _is_style_navigation_sentence(sentence):
+            kept.append(sentence)
+            continue
+
+        # Check if this sentence fires R1
+        findings = check_r1_imperatives(sentence)
+        if not findings:
+            kept.append(sentence)
+            continue
+
+        # This sentence is R1-flagged → attempt rewrite
+        result = rewrite_r1_sentence_deterministic(sentence)
+
+        if result is None:
+            # Pure instruction → delete
+            deleted_count += 1
+            continue
+        elif result == '__LLM_NEEDED__':
+            # No deterministic rule matched → try LLM if key available
+            if api_key:
+                llm_result, tokens = rewrite_r1_sentence_llm(sentence, api_key, model)
+                llm_tokens += tokens
+                if llm_result is None:
+                    # LLM says delete
+                    deleted_count += 1
+                    continue
+                elif llm_result == '__KEEP_ORIGINAL__':
+                    # LLM failed or dropped content → keep original
+                    kept.append(sentence)
+                    continue
+                else:
+                    # LLM rewrite accepted
+                    kept.append(llm_result)
+                    rewritten_count += 1
+                    continue
+            else:
+                # No API key — keep original (safe fallback)
+                kept.append(sentence)
+                continue
+        else:
+            # Deterministic rewrite succeeded
+            kept.append(result)
+            rewritten_count += 1
+            continue
+
+    if not kept:
+        return '', rewritten_count, deleted_count, llm_tokens
+
+    # Reassemble
+    result_text = ' '.join(kept)
+
+    # Fix dangling connective on the new first sentence
+    for pat in _DANGLING_CONNECTIVE_COMPILED:
+        new_text = pat.sub('', result_text, count=1)
+        if new_text != result_text:
+            new_text = new_text.strip()
+            if new_text and new_text[0].islower():
+                new_text = new_text[0].upper() + new_text[1:]
+            result_text = new_text
+            break
+
+    return result_text.strip(), rewritten_count, deleted_count, llm_tokens
+
+
+def apply_r1_to_description(description: str, api_key: str = None, model: str = None) -> tuple:
+    """Apply R1 rewrites to a full stop description (multiple paragraphs).
+
+    Returns:
+        (new_description, sentences_rewritten, sentences_deleted, llm_tokens_used)
+
+    Behind DISABLE_R1_REWRITE=1 — caller must check.
+    """
+    if not description or not description.strip():
+        return description, 0, 0, 0
+
+    paragraphs = [p for p in description.split('\n\n') if p.strip()]
+    if not paragraphs:
+        return description, 0, 0, 0
+
+    new_paragraphs = []
+    total_rewritten = 0
+    total_deleted = 0
+    total_llm_tokens = 0
+
+    for para in paragraphs:
+        para = para.strip()
+        if len(para) <= 30:
+            new_paragraphs.append(para)
+            continue
+
+        result, rewritten, deleted, llm_tok = apply_r1_rewrites(para, api_key, model)
+        total_rewritten += rewritten
+        total_deleted += deleted
+        total_llm_tokens += llm_tok
+
+        if result:
+            new_paragraphs.append(result)
+        # else: entire paragraph was deleted (all sentences were pure instructions)
+
+    new_description = '\n\n'.join(new_paragraphs)
+    return new_description, total_rewritten, total_deleted, total_llm_tokens
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
