@@ -4953,3 +4953,97 @@ Cheap mistake, but worth recording because the parking mechanism now has two
 states that must be changed together, and only one of them is visible in a
 directory listing. The instruction lives in the file; the dispatcher reads the
 name. **If a task is ever parked again, the unpark must edit both.**
+
+---
+
+## D127 — Michael's Chikanobu search: I was wrong about the web, and the sentence is worse than unsourced (2026-08-05)
+
+LEAD claimed the public web was the ceiling for the Asian Arts Museum's stops.
+Michael pushed back, asked for a real sentence from OpenAI output, and searched
+it. `Chikanobu_painting_search.txt`.
+
+The sentence, from tour 21:
+
+> *"In the year 1879, Chikanobu masterfully crafted a xylogravure on papier…
+> The print vividly depicts the reception at the imperial palace of the
+> President of the United States, Ulysses Grant…"*
+
+| claim | verdict from public sources |
+|---|---|
+| Chikanobu, 1879 | **true** |
+| reception at the Imperial Palace | **false** — Ueno Park, 25 Aug; the palace audience was 4 July, a different event |
+| held by the Nice museum | **no evidence** — MFA Boston and the Met hold it |
+
+**LEAD's claim was wrong.** One search resolved artist, date, real title, actual
+event and true holders. What LOCAL-234 established is that *our title-match
+query strategy* fails — not that the information is unavailable. That is a
+retrieval gap and it is ours.
+
+### What the search led to, which is worse
+
+```
+venue_corpus rows for "Musée des Arts Asiatiques":  0   (of 16 venues)
+tour 21 created                          2026-07-29
+its stop_corpus rows created             2026-08-05   ← yesterday, LOCAL-234
+```
+
+At generation time the pipeline had **no venue corpus and no stop corpus for
+this museum**. So the stop titles were invented by the model — "Ulysses Grant
+au Japon", "Kannon à mille bras", "Masque du vieillard kojo" are
+plausible-sounding Asian-art object names.
+
+And LOCAL-234 then took those invented titles as ground truth and attached the
+museum's Wikipedia page to each.
+
+**We built corpus for fabricated stops.** Every mechanism downstream — coverage
+verdicts, passage roles, the gate, the contradiction block — treats the stop
+list as given. **Nothing checks that a stop exists.**
+
+That is upstream of everything built this week. A perfect sentence about an
+object the museum does not hold is still false.
+
+Michael's conclusion — *"this work has nothing to do with Nice museum and
+should be excluded entirely as false"* — is right, and the reason is broader
+than the sentence.
+
+---
+
+## D128 — R10's labelled set was built to pass, and fires on none of Michael's real paragraphs (2026-08-05)
+
+LOCAL-235 implemented R10 with the right shape and a clean statement of its
+distinction from R9:
+
+> *"R9 checks absence of specifics plus presence of filler; R10 checks presence
+> of promise plus absence of delivery."*
+
+17/17 tests pass. LEAD ran the **real paragraph Michael complained about**:
+
+```
+"In 200 BC, the area surrounding Èze saw its first inhabitants settle near
+ Mount Bastide. … The aged stone walls exude a palpable sense of antiquity,
+ each crack and crevice holding a story. …"
+
+R10 findings: []
+```
+
+Nothing fires. Nor on the M8 paragraph the submission reports as newly caught.
+
+**Why:** the labelled set places each sentence between two invented
+abstractions — *"The atmosphere here is truly remarkable."* — so nothing
+delivers and R10 fires. In the real paragraph, "In 200 BC… Mount Bastide" is a
+concrete payload in the window, and the delivery check accepts **any** payload
+nearby as satisfying **every** promise around it.
+
+But a settlement date does not deliver a promise about stone walls. That is
+Michael's entire point: *"no reason to name something and then not to follow
+up."*
+
+**The week's signature failure at one more level.** The sentences were real; the
+*context* was synthetic, and that was enough to invert the result. D98 said a
+curated set cannot find what lives in real data; D110 said a test that cannot
+fail is counted as coverage. This is both — a set constructed to pass.
+
+Bounced with three requirements: build the labelled set from the real
+paragraphs verbatim; match delivery to the promised subject rather than
+proximity; and add a falsification case — append a sentence that genuinely
+delivers, assert R10 stops firing.
