@@ -720,12 +720,14 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12):
 
 
 def _build_closing_offer(poi_list, tour_category, transport_mode, location):
-    """[LOCAL-273] Build a ≤3 sentence closing offer from verified data.
+    """[LOCAL-273/275] Build a ≤3 sentence closing offer from verified data.
 
-    Two parts (Michael's spec):
-      Part 1: A similar tour (same category) near the last stop — existence-verified.
-      Part 2: An adjacent Audioura capability anchored to the last stop
-              (museum tour if one exists nearby + news articles).
+    Three sentences (Michael's spec, LOCAL-275 addendum):
+      Sentence 1: A similar tour (same category) near the last stop — existence-verified.
+      Sentence 2: Restaurant tour (verified in audio_tours) OR museum fallback,
+                  with Treat Page mention folded in. Never claims savings exist —
+                  only that the page shows *whether* there are any.
+      Sentence 3: News articles capability.
 
     Returns: str (the closing text, may be empty if nothing verifies).
     Falls back to a one-sentence factual summary if neither part can be built.
@@ -904,65 +906,112 @@ def _build_closing_offer(poi_list, tour_category, transport_mode, location):
     except Exception as e:
         print(f"  [LOCAL-273] Part 1 error: {e}")
 
-    # ─── Part 2: Adjacent capability ────────────────────────────────────
+    # ─── Part 2: Restaurant tour (or museum fallback) + Treat Page ─────
+    # [LOCAL-275] Michael's spec: "a recommendation restaurant tour, or visit a
+    # museum (if there is one)" — restaurant preferred, museum fallback.
+    # Treat Page folded in: "the Treat Page shows whether there are real savings
+    # at local shops and restaurants around here."
     try:
         _co_cur = _co_conn.cursor()
-        # For non-museum tours: offer a museum tour if one exists nearby
-        if tour_category != 'museum':
-            _co_cur.execute("""
-                SELECT venue_name, qid FROM venue_corpus
-                WHERE (LOWER(venue_name) LIKE '%musee%' OR LOWER(venue_name) LIKE '%museum%')
-            """)
-            _nearby_museums = []
-            # Museums don't have geo-coordinates in canonical_titles.
-            # Use location keywords from venue_name (city) to determine proximity.
-            # Extract region/city from the tour location for matching.
-            _loc_lower = location.lower()
-            _loc_keywords = set(re.findall(r'[a-z]{4,}', _loc_lower))
-            # Add known Riviera city names that might be near the last stop
-            _riviera_cities = {'nice', 'antibes', 'monaco', 'cannes', 'menton', 'eze'}
+        _part2_tour_clause = ""
+        _part2_verified = False
 
-            for mname, mqid in _co_cur.fetchall():
-                mname_lower = mname.lower()
-                # Check if this museum is in the same region
-                # Match by: city in venue_name matches tour's region,
-                # or museum venue_name contains a city near the last stop
-                mname_words = set(re.findall(r'[a-z]{4,}', mname_lower))
-                # Check geographic proximity via known cities in the name
-                museum_city = None
-                if 'nice' in mname_lower:
-                    museum_city = 'nice'
-                elif 'antibes' in mname_lower:
-                    museum_city = 'antibes'
-                elif 'monaco' in mname_lower:
-                    museum_city = 'monaco'
-                elif 'cannes' in mname_lower:
-                    museum_city = 'cannes'
+        # Try restaurant tour first: check audio_tours for an existing restaurant
+        # tour with coordinates near the last stop (proves capability).
+        _co_cur.execute("""
+            SELECT id, tour_name, lat, lng FROM audio_tours
+            WHERE (LOWER(request_string) LIKE '%%restaurant%%'
+                   OR LOWER(tour_name) LIKE '%%restaurant%%')
+              AND lat IS NOT NULL AND lng IS NOT NULL
+              AND is_test = false
+        """)
+        _restaurant_rows = _co_cur.fetchall()
+        _best_restaurant = None
+        _best_restaurant_dist = float('inf')
+        for _rid, _rname, _rlat, _rlng in _restaurant_rows:
+            d = _haversine((last_lat, last_lng), (float(_rlat), float(_rlng)))
+            if d < 40 and d < _best_restaurant_dist:
+                _best_restaurant_dist = d
+                _best_restaurant = (_rid, _rname)
 
-                if museum_city:
-                    # Known approximate city coordinates for distance check
-                    _city_coords = {
-                        'nice': (43.7102, 7.2620),
-                        'antibes': (43.5804, 7.1251),
-                        'monaco': (43.7384, 7.4246),
-                        'cannes': (43.5528, 7.0174),
-                    }
-                    if museum_city in _city_coords:
-                        d = _haversine((last_lat, last_lng), _city_coords[museum_city])
+        if _best_restaurant:
+            _part2_tour_clause = "If you would like to eat nearby we can build you a restaurant tour"
+            _part2_verified = True
+            print(f"  [LOCAL-275] Part 2 (restaurant): verified via audio_tours id={_best_restaurant[0]} "
+                  f"'{_best_restaurant[1]}' ({_best_restaurant_dist:.1f} km from last stop)")
+        else:
+            # Fallback: museum tour (same logic as LOCAL-273)
+            if tour_category != 'museum':
+                _co_cur.execute("""
+                    SELECT venue_name, qid FROM venue_corpus
+                    WHERE (LOWER(venue_name) LIKE '%%musee%%' OR LOWER(venue_name) LIKE '%%museum%%')
+                """)
+                _nearby_museums = []
+                _city_coords_p2 = {
+                    'nice': (43.7102, 7.2620),
+                    'antibes': (43.5804, 7.1251),
+                    'monaco': (43.7384, 7.4246),
+                    'cannes': (43.5528, 7.0174),
+                }
+                for mname, mqid in _co_cur.fetchall():
+                    mname_lower = mname.lower()
+                    museum_city = None
+                    if 'nice' in mname_lower:
+                        museum_city = 'nice'
+                    elif 'antibes' in mname_lower:
+                        museum_city = 'antibes'
+                    elif 'monaco' in mname_lower:
+                        museum_city = 'monaco'
+                    elif 'cannes' in mname_lower:
+                        museum_city = 'cannes'
+                    if museum_city and museum_city in _city_coords_p2:
+                        d = _haversine((last_lat, last_lng), _city_coords_p2[museum_city])
                         if d < 40:
                             _nearby_museums.append((mname, d))
 
-            if _nearby_museums:
-                _nearby_museums.sort(key=lambda x: x[1])
-                _closest_museum = _nearby_museums[0][0]
-                # Clean up museum name for speech
-                _museum_display = _closest_museum.split(',')[0].strip()
-                sentences.append(
-                    f"There is also a museum tour available at the {_museum_display}."
-                )
-                print(f"  [LOCAL-273] Part 2 (museum capability): {_museum_display}")
+                if _nearby_museums:
+                    _nearby_museums.sort(key=lambda x: x[1])
+                    _closest_museum = _nearby_museums[0][0]
+                    _museum_display = _closest_museum.split(',')[0].strip()
+                    _part2_tour_clause = f"If you would like to visit a museum, the {_museum_display} is nearby"
+                    _part2_verified = True
+                    print(f"  [LOCAL-275] Part 2 (museum fallback): {_museum_display} ({_nearby_museums[0][1]:.1f} km)")
+                else:
+                    print("  [LOCAL-275] Part 2: no restaurant or museum verified nearby")
             else:
-                print("  [LOCAL-273] Part 2: no museum found nearby — museum offer omitted")
+                print("  [LOCAL-275] Part 2: museum tour category, no restaurant found nearby")
+
+        # Build sentence(s) for Part 2: tour clause + Treat Page.
+        # The Treat Page is location-aware (treats_screen.dart calls /treats-near/{lat}/{lng}).
+        # Never claim savings exist — only that the page shows *whether* there are any.
+        #
+        # [LOCAL-275] Sentence budget management:
+        #   - When Part 1 produced a sentence: combine tour + Treat Page into ONE sentence (budget=3).
+        #   - When Part 1 is absent: split into TWO sentences (tour alone + Treat Page alone)
+        #     to maintain exactly 3 total.
+        _has_part1 = len(sentences) > 0
+        if _part2_tour_clause:
+            if _has_part1:
+                # Combined: fits the 3-sentence budget alongside Part 1 + news
+                sentences.append(
+                    f"{_part2_tour_clause}, and the Treat Page shows whether "
+                    f"there are real savings at local shops and restaurants around here."
+                )
+            else:
+                # Split: two sentences to fill the Part 1 gap
+                sentences.append(f"{_part2_tour_clause}.")
+                sentences.append(
+                    "The Treat Page shows whether there are real savings at "
+                    "local shops and restaurants around here."
+                )
+            print(f"  [LOCAL-275] Part 2: Treat Page anchored to last stop ({last_lat:.4f}, {last_lng:.4f})")
+        else:
+            # No tour verified — Treat Page alone
+            sentences.append(
+                "The Treat Page shows whether there are real savings at "
+                "local shops and restaurants around here."
+            )
+            print(f"  [LOCAL-275] Part 2: Treat Page only (no tour verified), anchored to ({last_lat:.4f}, {last_lng:.4f})")
 
         # News capability — always offer if the path exists on this branch
         # Verify: news_orchestrator_service.py exists and has /generate-news
@@ -972,12 +1021,12 @@ def _build_closing_offer(poi_list, tour_category, transport_mode, location):
             sentences.append(
                 "We can also generate news articles for you to listen to on the way back."
             )
-            print("  [LOCAL-273] Part 2 (news): news_orchestrator_service.py confirmed")
+            print("  [LOCAL-275] Part 2 (news): news_orchestrator_service.py confirmed")
         else:
-            print(f"  [LOCAL-273] Part 2: news path not found at {_news_path} — news offer omitted")
+            print(f"  [LOCAL-275] Part 2: news path not found at {_news_path} — news offer omitted")
 
     except Exception as e:
-        print(f"  [LOCAL-273] Part 2 error: {e}")
+        print(f"  [LOCAL-275] Part 2 error: {e}")
 
     # ─── Cap at 3 sentences ─────────────────────────────────────────────
     if len(sentences) > 3:
@@ -985,14 +1034,14 @@ def _build_closing_offer(poi_list, tour_category, transport_mode, location):
 
     if sentences:
         result = " ".join(sentences)
-        print(f"  [LOCAL-273] Closing offer: {len(sentences)} sentence(s)")
+        print(f"  [LOCAL-275] Closing offer: {len(sentences)} sentence(s)")
         return result
 
     # ─── Fallback: one-sentence factual summary ─────────────────────────
     # Tour should not end mid-thought. Summarize what was covered.
     _stop_names_str = " and ".join(p['name'] for p in poi_list[-2:]) if len(poi_list) >= 2 else poi_list[0]['name']
     fallback = f"This tour covered {_stop_names_str}."
-    print(f"  [LOCAL-273] Closing offer fallback (no verification passed)")
+    print(f"  [LOCAL-275] Closing offer fallback (no verification passed)")
     return fallback
 
 
