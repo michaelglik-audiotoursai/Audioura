@@ -7615,3 +7615,69 @@ count cannot serve as a regression bar while stop selection is free (D170). Any
 future must-not-regress condition has to be either normalised against the drawn
 stops' available corpus, or averaged over several runs. Single-run baselines are
 not evidence, and LEAD should stop writing them into task files.
+
+## D193 — OpenAI credits exhausted; continuous dev paused (2026-08-05 18:35)
+
+```
+"You have no credits remaining. Add credits to continue using the API"
+code: credit_balance_exhausted
+```
+
+LEAD verified directly against the API. LOCAL-285 independently confirmed **all
+three keys** — primary, backup, backup-bak — return the same error, so it is the
+**account balance**, not a key problem.
+
+**Everything that generates or verifies-by-generation is blocked.** Michael's
+tour, LOCAL-285 (never ran), and LOCAL-284's Riviera regression.
+
+`.continuous_dev/PAUSE` is set so tasks stop spending 20-minute sessions failing.
+ClickUp `wdvrdaxda6` (👤 Michael, urgent) carries the top-up instructions, the
+measured per-tour costs, and what LEAD will do on "credits added".
+
+**Cost context, measured today:** 2-stop $0.019–$0.026 true, 8-stop
+$0.047–$0.059, about $55 per 1,000 eight-stop tours. Today's ~40 generations plus
+25 Kiro sessions came to roughly $2–4. The balance was already low; today was not
+expensive.
+
+**How this surfaced is worth recording.** LOCAL-284 reported the 429 plainly and
+offered *a structural argument* in place of the Riviera regression evidence.
+That argument is sound on its face — the selector's corpus-tiebreak genuinely
+does not apply to open geographic sets. LEAD would likely have accepted it and
+merged a selection change with **no evidence** it leaves the walking tours
+alone, against Michael's explicit concern. The credit failure is what prompted
+the check.
+
+**So LOCAL-284 is HELD, not merged.** A structural argument is not a regression
+test, and this is precisely the case where Michael asked for proof.
+
+## D194 — The recap splices spans; cutting cannot be fixed by cutting better (2026-08-05)
+
+LOCAL-280 bounced a second time. The first bounce fixed what it targeted:
+imperatives are gone and every item now names its stop. What remains:
+
+```
+"Paloma Beach, built a fort at Saint-Hospice in 1561 to secure"     truncated
+"where he created intimate and profound works"                      orphan pronoun
+"Villefranche-sur-Mer, established Villefranche-sur-Mer as a..."    doubled name
+2-stop names one stop of two                                        spec violation
+```
+
+**The root cause is one thing, not four.** Each recap item is a span **cut out
+of a source sentence and pasted after a stop name**. Cutting produces the
+truncation; pasting produces the doubled name and the orphaned "he". Better
+cutting cannot fix any of them.
+
+The instruction is now to **compose** — write a short noun phrase that stands
+alone — with a model call authorised under LOCAL-269's constraint: rephrase the
+supplied fact, never add one.
+
+```
+built a fort at Saint-Hospice in 1561 to secure  ->  the 1561 fort at Saint-Hospice
+where he created intimate and profound works     ->  the Mougins studio where Picasso worked
+```
+
+**A note on how this task was bounced twice.** Both bounces described the
+symptom precisely and both fixes addressed the symptom. Neither task file said
+"stop cutting, start composing" until now. LEAD specified outputs to avoid
+rather than the method to use, and got two rounds of increasingly careful
+cutting.
