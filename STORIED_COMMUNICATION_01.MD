@@ -489,3 +489,26 @@ what you will see:
    will propose that separately.
 
 ---
+
+## 2026-08-05 12:30 — Michael
+
+> no-no, I do nto want to enforce anything artificial on the tour generation: if
+> they have different stops, so to be it. That is fine.
+
+## 2026-08-05 12:30 — LEAD
+
+Recorded as **D170** — stops stay free, and no future task may "helpfully" pin
+the selector.
+
+The consequence moves to scoring rather than generation. With the pair varying,
+comparing two single tours cannot attribute a difference to a code change: stop
+selection, corpus depth at those stops, and the change all move together. Much
+of today's round-to-round narrative has that weakness in it, including "round 16
+was better than 17M".
+
+The fix is not to remove the variance but to measure past it — rates instead of
+counts (facts per sentence, not per tour), per-stop normalisation against that
+stop's corpus depth, and several runs rather than one when judging a change.
+That is a part 2 proposal, not something to bolt on now.
+
+---
