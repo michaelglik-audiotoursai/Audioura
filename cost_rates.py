@@ -26,6 +26,10 @@ _log = logging.getLogger(__name__)
 
 LLM_RATES = {
     # model-family -> {input_per_1m, output_per_1m}
+    "gpt-4o": {
+        "input_per_1m": 2.50,
+        "output_per_1m": 10.00,
+    },
     "gpt-4o-mini": {
         "input_per_1m": 0.15,
         "output_per_1m": 0.60,
@@ -66,9 +70,12 @@ def _resolve_model_rates(model: str) -> dict:
         return LLM_RATES[model]
 
     # Try substring match (e.g. "gpt-4o-mini-2024-07-18" contains "gpt-4o-mini")
-    for key in LLM_RATES:
-        if key in model:
-            return LLM_RATES[key]
+    # Use longest match to avoid "gpt-4o" matching "gpt-4o-mini-2024-07-18"
+    _matches = [(key, LLM_RATES[key]) for key in LLM_RATES if key in model]
+    if _matches:
+        # Return the longest matching key (most specific)
+        _matches.sort(key=lambda x: len(x[0]), reverse=True)
+        return _matches[0][1]
 
     # Unknown model: warn and use the MOST EXPENSIVE known rate to avoid overcharging users
     _most_expensive = max(
@@ -107,12 +114,19 @@ def llm_cost(
 
     if total_tokens is not None:
         # Deprecated path: caller cannot supply split counts
+        # [LOCAL-278] Identify the caller so it can be fixed independently
+        import traceback
+        _caller_frame = traceback.extract_stack(limit=3)
+        _caller_info = f"{_caller_frame[0].filename}:{_caller_frame[0].lineno}" if _caller_frame else "unknown"
         if not hasattr(llm_cost, "_deprecated_warned"):
+            llm_cost._deprecated_warned = set()
+        if _caller_info not in llm_cost._deprecated_warned:
+            llm_cost._deprecated_warned.add(_caller_info)
             _log.warning(
-                "[LOCAL-197] llm_cost() called with total_tokens (deprecated). "
+                f"[LOCAL-197] llm_cost() called with total_tokens (deprecated) "
+                f"by {_caller_info}. "
                 "Caller should supply input_tokens and output_tokens separately."
             )
-            llm_cost._deprecated_warned = True
         # Assume 70% input, 30% output (conservative — output is more expensive)
         input_tokens = int(total_tokens * 0.7)
         output_tokens = total_tokens - input_tokens
