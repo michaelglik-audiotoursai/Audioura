@@ -2448,6 +2448,13 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     """
     import api_call_logger
 
+    # [LOCAL-230] Reset per-run network failure counter
+    try:
+        from venue_resolver import reset_network_failure_count
+        reset_network_failure_count()
+    except ImportError:
+        pass
+
     # --- Storied: persona handling ---
     _storied_mode = os.environ.get("STORIED_MODE", "false").lower() == "true"
     _persona_enum = None
@@ -4043,12 +4050,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
 
                 # Get DB connection for corpus lookup
                 _cs_conn = None
+                _cs_db_failure = False
                 try:
                     # Try venue_resolver first (same pattern as the later corpus fetch)
                     from venue_resolver import _get_db_connection as _cs_get_conn
                     _cs_conn = _cs_get_conn()
-                except Exception:
-                    pass
+                except Exception as _cs_err1:
+                    print(f"  [LOCAL-230] ERROR: Coverage selection DB connect failed (venue_resolver): {type(_cs_err1).__name__}: {_cs_err1}")
+                    _cs_db_failure = True
                 if not _cs_conn:
                     try:
                         import psycopg2
@@ -4057,7 +4066,16 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             'postgresql://admin:password123@localhost:5433/audiotours'
                         )
                         _cs_conn = psycopg2.connect(_cs_db_url, connect_timeout=5)
-                    except Exception:
+                    except Exception as _cs_err2:
+                        print(f"  [LOCAL-230] ERROR: Coverage selection DB connect failed (direct): {type(_cs_err2).__name__}: {_cs_err2}")
+                        _cs_db_failure = True
+
+                # [LOCAL-230] Count coverage-selection DB failure in the per-run counter
+                if _cs_db_failure:
+                    try:
+                        import venue_resolver as _vr_mod
+                        _vr_mod._network_failure_count += 1
+                    except (ImportError, AttributeError):
                         pass
 
                 if _cs_conn:
@@ -4114,7 +4132,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     if _cs_dropped:
                         print(f"  [LOCAL-212] Dropped:  {[p['name'] + '=' + _cs_verdicts.get(p['name'], '?') for p in _cs_dropped]}")
                 else:
-                    print(f"  [LOCAL-212] Coverage selection: DB unavailable — falling back to position order")
+                    if _cs_db_failure:
+                        print(f"  [LOCAL-212] Coverage selection: DB connection FAILED — falling back to position order")
+                    else:
+                        print(f"  [LOCAL-212] Coverage selection: DB unavailable — falling back to position order")
             except ImportError as _cs_err:
                 print(f"  [LOCAL-212] Coverage selection: import failed ({_cs_err}) — falling back to position order")
             except Exception as _cs_err:
@@ -7509,6 +7530,17 @@ Requirements:
         f.write(complete_tour)
     
     print(f"\nTour text generated successfully!")
+
+    # [LOCAL-230] Report network/API failure count for this generation run
+    try:
+        from venue_resolver import get_network_failure_count
+        _l230_failures = get_network_failure_count()
+        if _l230_failures > 0:
+            print(f"  [LOCAL-230] ⚠ NETWORK FAILURES: {_l230_failures} API call(s) failed during this generation — tour may be degraded")
+        else:
+            print(f"  [LOCAL-230] Network failures: 0 (all API calls succeeded)")
+    except ImportError:
+        pass
     print(f"Saved to: {output_file}")
     
     # [C5-5] Persist D1 evidence JSON
