@@ -5259,3 +5259,66 @@ on its own front page that the gate mislabelled Villefranche and that R10 did
 not run. It did not claim success it had not earned. That disclosure is why
 both defects were fixable within the hour instead of shipping to Michael at 9am
 as "validated".
+
+---
+
+## D133 — The gate is fixed and honest; R10 still misses the promises in the tour it just produced (2026-08-05)
+
+### The gate now knows what kind of venue it is looking at
+
+LOCAL-239 split verification by venue kind — institution versus geographic area
+— and LEAD verified all six boundary rows on `storied` HEAD:
+
+```
+Ulysses Grant au Japon  @ Asian Arts Museum   → blocked
+The Dream               @ Museum of Naïve Art → blocked
+Kannon à mille bras     @ Asian Arts Museum   → blocked
+Villefranche-sur-Mer    @ French Riviera      → verified
+Eze Village             @ French Riviera      → verified
+Cap Ferrat              @ French Riviera      → verified
+```
+
+And invented places do not slip through the relaxed path — `Plage des Sirènes
+Perdues`, `Cap du Roi Oublié` all blocked, because no source was ever found for
+them. Real places with no corpus row (Menton, Roquebrune-Cap-Martin) are also
+blocked, which is correct: we have not sourced them.
+
+**D131's 89.5% was inflated.** The corrected figure for stops that can be
+assessed is **23 of 88 (26%) unverified**. LEAD published the wrong number to
+Michael last night and this is the correction.
+
+### But R10 does not fire on the tour it produced
+
+Round 3, paragraph 3, generated **with R10 active**:
+
+> "…villages **hold a tapestry woven with… whispers of medieval roots**…
+> **forgotten tales that shape its identity**… **stand sentinel** against
+> opulent villas… **masks the secrets of its past**… **its intricate story
+> through each chapter**…"
+
+```
+R10 hits: 0
+```
+
+Five promises in four sentences, none delivered — the exact paragraph shape
+Michael scored 2/5. R10 fires 11× on tour 180 and 0× here, which means it is
+matching **a phrase list, not the phenomenon**.
+
+The distinction that would catch it: a narrative noun governed by a verb of
+*possession or concealment* — hold, mask, conceal, whisper, stand sentinel —
+rather than a verb of statement. "Villages hold forgotten tales" promises; "the
+villages were fortified in 1388" states.
+
+**LOCAL-240** dispatched with a hard 08:00 stop and an explicit instruction:
+if widening R10 is not safe by then, regenerate anyway and **state at the top
+that R10 under-fires, with that paragraph as the example.** A tour that names
+its own weakness beats a missed deadline — and it is the third round running
+where the document's own honesty is what made the defect fixable.
+
+### What Michael gets either way
+
+`RIVIERA_2STOP_ROUND3.md` exists now, with the corrected gate enforcing and both
+stops verified. It is a real improvement on round 2 in one respect only — the
+stops are now provably real places we have sourced — and it still reads the way
+he objected to. That is the honest position to hand him at 09:00, and it points
+at the corpus, which is where D123, D131 and D132 all end up.
