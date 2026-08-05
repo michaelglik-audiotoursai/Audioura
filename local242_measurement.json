@@ -1,0 +1,283 @@
+{
+  "measurement_date": "2026-08-05 03:13:57",
+  "total_queries": 37,
+  "total_cost_usd": 0.037,
+  "cost_per_stop_usd": 0.0025,
+  "results": {
+    "A_COVERED": [
+      {
+        "stop": {
+          "venue": "French Riviera walking area",
+          "stop": "Villa Ephrussi de Rothschild",
+          "why": "2 passages. Michael's Eilenroc benchmark is same tour type. Does decomposition add?"
+        },
+        "today_query": "Villa Ephrussi de Rothschild",
+        "today_found": true,
+        "today_passage": "Located between Nice and Monaco, overlooking the Mediterranean, the Villa Ephrussi de Rothschild is a magnificent palace surrounded by nine themed gardens.",
+        "today_url": "https://www.villa-ephrussi.com/en",
+        "richer_found": true,
+        "richer_passage": "A place of history. By birth and then by marriage, Madame Ephrussi was to become one of the greatest collectors of her century.",
+        "richer_url": "https://www.villa-ephrussi.com/en/an-historic-area",
+        "richer_strategy": "decomposed: title + history",
+        "richer_query": "Villa Ephrussi de Rothschild history",
+        "lifted": false
+      },
+      {
+        "stop": {
+          "venue": "French Riviera walking area",
+          "stop": "Cap d'Antibes",
+          "why": "7 passages already. Can richer queries add Fitzgerald/Monet detail?"
+        },
+        "today_query": "Cap d'Antibes",
+        "today_found": true,
+        "today_passage": "Its cape, the Cap d'Antibes, are two major landforms in the area. widely considered two of the most exclusive hotels in the world.",
+        "today_url": "https://en.wikipedia.org/wiki/Antibes",
+        "richer_found": true,
+        "richer_passage": "Its cape, the Cap d'Antibes, widely considered two of the most exclusive hotels in the world. Antibes is home to the Mus\u00e9e Picasso. Greek colony of Marseille. ...",
+        "richer_url": "https://en.wikipedia.org/wiki/Antibes",
+        "richer_strategy": "decomposed: title + history",
+        "richer_query": "Cap d'Antibes history",
+        "lifted": false
+      },
+      {
+        "stop": {
+          "venue": "French Riviera walking area",
+          "stop": "Chapelle Saint-Pierre",
+          "why": "2 passages, one is wrong chapel (V\u00e9n\u00e9jan). Precision test."
+        },
+        "today_query": "Chapelle Saint-Pierre",
+        "today_found": true,
+        "today_passage": "The ancient Romanesque chapel dedicated to Saint Peter, patron saint of fishermen, was entirely restored and decorated by the \u201cprince of poets\u201d, Jean Cocteau.",
+        "today_url": "https://www.theculturium.com/jean-cocteau-chapelle-saint-pierre-de-villefranche-sur-mer/",
+        "richer_found": true,
+        "richer_passage": "The ancient Romanesque chapel dedicated to Saint Peter, patron saint of fishermen, was entirely restored and decorated by the \u201cprince of poets\u201d, Jean Cocteau.",
+        "richer_url": "https://www.theculturium.com/jean-cocteau-chapelle-saint-pierre-de-villefranche-sur-mer/",
+        "richer_strategy": "decomposed: title + history",
+        "richer_query": "Chapelle Saint-Pierre history",
+        "lifted": false
+      },
+      {
+        "stop": {
+          "venue": "Musee National Marc Chagall, Nice, France",
+          "stop": "Abraham et les trois anges",
+          "why": "Chagall museum is the one fully-verified venue. 5 passages. Baseline."
+        },
+        "today_query": "Abraham et les trois anges",
+        "today_found": true,
+        "today_passage": "Marc Chagall, Abraham et les trois anges, 1960-1966, huile sur toile, 190 cm x 292 cm, donation Marc et Valentina Chagall, 1966, mus\u00e9e national Marc Chagall, ...",
+        "today_url": "https://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/abraham-et-les-trois-anges",
+        "richer_found": true,
+        "richer_passage": "Abraham et les trois anges ... La composition est structur\u00e9e par l'horizontale du banc au premier plan et rythm\u00e9e par le jeu de verticales des figures. La couleur ...",
+        "richer_url": "http://musees-nationaux-alpesmaritimes.fr/chagall/collection/objet/abraham-et-les-trois-anges",
+        "richer_strategy": "decomposed: Chagall + title",
+        "richer_query": "Chagall \"Abraham et les trois anges\"",
+        "lifted": false
+      },
+      {
+        "stop": {
+          "venue": "French Riviera walking area",
+          "stop": "Eze Village",
+          "why": "1 passage. Walking stop with historical depth. Does decomposition help?"
+        },
+        "today_query": "Eze Village",
+        "today_found": true,
+        "today_passage": "This beautiful village dates back to the middle ages and clings impressively to the mountainside above the Mediterranean Sea, between St Jean Cap Ferrat and ...",
+        "today_url": "https://allthingsfrench.com/eze-french-riviera/",
+        "richer_found": true,
+        "richer_passage": "The history of \u00c8ze became turbulent several times. French and Ottoman troops seized the village under the command of Hayreddin Barbarossa in 1543,",
+        "richer_url": "https://en.wikipedia.org/wiki/%C3%88ze",
+        "richer_strategy": "decomposed: title + history",
+        "richer_query": "Eze Village history",
+        "lifted": false
+      }
+    ],
+    "B_VENUE_ONLY": [
+      {
+        "stop": {
+          "venue": "Musee d Art Moderne et d Art Contemporain, Nice, France",
+          "stop": "Richard Long ou la sculpture en marchant",
+          "why": "Only 1 passage and it's the museum's opening date. Subject is clearly an artist."
+        },
+        "today_query": "Richard Long ou la sculpture en marchant",
+        "today_found": true,
+        "today_passage": "N\u00e9 en 1945 \u00e0 Bristol (Grande-Bretagne), Richard Long go\u00fbte peu les exercices r\u00e9trospectifs exhaustifs et d\u00e9sincarn\u00e9s; il leur pr\u00e9f\u00e8re en ...",
+        "today_url": "https://www.culturetheque.com/en/richard-long-ou-la-sculpture-en-marchant-nice-2008-les-fiches-exposition-duniversalis",
+        "richer_found": true,
+        "richer_passage": "http://www.mamac-nice.org/. \"Lorsqu'il est invit\u00e9 \u00e0 investir un ... richard-long-ou-la-sculpture-en-marchant,31195.php. Le site officiel ...",
+        "richer_url": "http://acasculpture.blogspot.com/2008/08/sculptures-installations-de-richard.html",
+        "richer_strategy": "catalogue: MAMAC collection",
+        "richer_query": "\"MAMAC Nice\" collection \"Richard Long ou la sculpture en marchant\"",
+        "lifted": false
+      },
+      {
+        "stop": {
+          "venue": "Musee d Art Moderne et d Art Contemporain, Nice, France",
+          "stop": "Le D\u00e9jeuner sur l'herbe",
+          "why": "3 passages. Alain Jacquet's version specifically at MAMAC."
+        },
+        "today_query": "Le D\u00e9jeuner sur l'herbe",
+        "today_found": false,
+        "today_passage": "",
+        "today_url": "",
+        "richer_found": true,
+        "richer_passage": "Cette \u0153uvre murale est un agrandissement d'un d\u00e9tail d'une \u0153uvre de l'artiste de la collection du MAMAC : Le D\u00e9jeuner sur l'herbe, 1964. Dans cette ...",
+        "richer_url": "https://www.mamac-nice.org/collection/oeuvres-in-situ/",
+        "richer_strategy": "catalogue: MAMAC collection",
+        "richer_query": "\"MAMAC Nice\" collection \"Le D\u00e9jeuner sur l'herbe\"",
+        "lifted": true
+      },
+      {
+        "stop": {
+          "venue": "Palais Lascaris, Nice",
+          "stop": "Sacqueboute t\u00e9nor by Anton Schnitzer (Nuremberg, 1581)",
+          "why": "Highly specific historical instrument. Can we find it in catalogues?"
+        },
+        "today_query": "Sacqueboute t\u00e9nor by Anton Schnitzer (Nuremberg, 1581)",
+        "today_found": true,
+        "today_passage": "Auteur : SCHNITZER, Anton (Nuremberg, avant 1545-Nuremberg, 1608) ; Date : 1581 ; Lieu : Palais Lascaris, Nice ; N\u00b0 inventaire : Inv. : C111 ; Acquisition : Legs ...",
+        "today_url": "https://tresors.nice.fr/oeuvre/saqueboute-nuremberg",
+        "richer_found": true,
+        "richer_passage": "une sacqueboute t\u00e9nor d'Anton Schnitzer (Nuremberg, 1581) un alto d'amour Joannes Florenus Guidanti (Bologna, 1717), Gagliano (Napoli, 1697), Johann Schorn ...",
+        "richer_url": "https://mt.hisour.com/fr/data/palazz-lascaris-nice-france/",
+        "richer_strategy": "decomposed: maker + object",
+        "richer_query": "\"Anton Schnitzer (Nuremberg, 1581)\" Sacqueboute t\u00e9nor",
+        "lifted": false
+      },
+      {
+        "stop": {
+          "venue": "Palais Lascaris, Nice",
+          "stop": "Guitar by Antonio de Torres (Almeria, 1884)",
+          "why": "Torres guitars are well-documented. Subject decomposition should work."
+        },
+        "today_query": "Guitar by Antonio de Torres (Almeria, 1884)",
+        "today_found": false,
+        "today_passage": "",
+        "today_url": "",
+        "richer_found": true,
+        "richer_passage": "... guitar by Pierre Pacherel (Nice, 1834), and that of Antonio de Torres (Almeria, 1884). 6:00 PM, 8:00 PM, and 9:30 PM. At the Museum of Fine Arts. Patio",
+        "richer_url": "https://www.nice-premium.com/nice-is-hosting-its-european-museum-night-this-saturday/",
+        "richer_strategy": "decomposed: maker + object",
+        "richer_query": "\"Antonio de Torres (Almeria, 1884)\" Guitar",
+        "lifted": true
+      },
+      {
+        "stop": {
+          "venue": "Musee Matisse, Nice, France",
+          "stop": "Nu bleu IV",
+          "why": "Matisse's famous cut-out series. Well-known work, should be findable with proper query."
+        },
+        "today_query": "Nu bleu IV",
+        "today_found": true,
+        "today_passage": "Nu Bleu IV is Matisse's most elaborate figure study in gouache decoupee, with the exception of the Barnes mural studies, Precursor B, the compact sculptural ...",
+        "today_url": "https://www.henrimatisse.org/nu-bleu.jsp",
+        "richer_found": true,
+        "richer_passage": "Nu Bleu IV is Matisse's most elaborate figure study in gouache decoupee, with the exception of the Barnes mural studies, Precursor B, which were not intended ...",
+        "richer_url": "https://www.henrimatisse.org/nu-bleu.jsp",
+        "richer_strategy": "decomposed: Matisse + title",
+        "richer_query": "Matisse \"Nu bleu IV\"",
+        "lifted": false
+      }
+    ],
+    "C_UNVERIFIED": [
+      {
+        "stop": {
+          "venue": "Musee des Arts Asiatiques (Asian Art Museum), Nice, France",
+          "stop": "Ulysses Grant au Japon",
+          "why": "D127's test case. We know this is findable (Chikanobu). Does richer query get it?"
+        },
+        "today_query": "Ulysses Grant au Japon",
+        "today_found": false,
+        "today_passage": "",
+        "today_url": "",
+        "richer_found": true,
+        "richer_passage": "Ulysses Grant au Japon. Dat\u00e9e de 1879 et r\u00e9alis\u00e9e par Chikanobu, cette estampe repr\u00e9sente la r\u00e9ception au palais imp\u00e9rial du pr\u00e9sident des ...",
+        "richer_url": "https://maa.departement06.fr/le-japon",
+        "richer_strategy": "catalogue: maa.departement06.fr",
+        "richer_query": "maa.departement06.fr collection Ulysses Grant au Japon",
+        "lifted": true
+      },
+      {
+        "stop": {
+          "venue": "Musee des Arts Asiatiques (Asian Art Museum), Nice, France",
+          "stop": "Kannon a mille bras",
+          "why": "Generic Buddhist subject. Can the museum's own catalogue confirm?"
+        },
+        "today_query": "Kannon a mille bras",
+        "today_found": true,
+        "today_passage": "This image was originally posted to Flickr by dalbera at https://flickr.com/photos/72746018@N00/41441954395 (archive). It was reviewed on 18 October 2019 by ...",
+        "today_url": "https://commons.wikimedia.org/wiki/File:Kannon_assis_aux_mille_bras_(mus%C3%A9e_national_de_Tokyo)_(41441954395).jpg",
+        "richer_found": true,
+        "richer_passage": "mille bras (mus\u00e9e national de Tokyo) (41441954395).jpg. Kannon assis aux mille bras (d\u00e9tail) File history Click on a date/time to view the file as it appeared ...",
+        "richer_url": "https://commons.wikimedia.org/wiki/File:Kannon_assis_aux_mille_bras_(mus%C3%A9e_national_de_Tokyo)_(41441954395).jpg",
+        "richer_strategy": "decomposed: title + history",
+        "richer_query": "Kannon a mille bras history",
+        "lifted": false
+      },
+      {
+        "stop": {
+          "venue": "Musee des Arts Asiatiques (Asian Art Museum), Nice, France",
+          "stop": "L'Armure d'Ando Naoyuki",
+          "why": "Specific name. If real, Japanese armour catalogues would have it."
+        },
+        "today_query": "L'Armure d'Ando Naoyuki",
+        "today_found": true,
+        "today_passage": "Ouvrir un tiroir dans la r\u00e9serve du mus\u00e9e d\u00e9partemental des arts asiatiques \u00e0 Nice - l'elements l'armure d'Ando Naoyuki, une des plus belles armures",
+        "today_url": "https://fr.linkedin.com/posts/adrien-bossard-9a2144107_ouvrir-un-tiroir-dans-la-r%C3%A9serve-du-mus%C3%A9e-activity-7374883621230383104-3lRJ",
+        "richer_found": true,
+        "richer_passage": "Modern and Contemporary Asian Art. Entry is by Country, Topic, and Artist. bilingual Japanese art catalogues. Ando Tadao: Naoyuki, Kinoshita,",
+        "richer_url": "https://www.researchgate.net/profile/Kuiyi-Shen-2/publication/265270497_MODERN_AND_CONTEMPORARY_ASIAN_ART_A_Working_Bibliography_2011_Version_With_the_help_of/links/5730698a08ae74415191189b/MODERN-AND-CONTEMPORARY-ASIAN-ART-A-Working-Bibliography-2011-Version-With-the-help-of.pdf",
+        "richer_strategy": "decomposed: artwork title + medium",
+        "richer_query": "L'Armure d'Ando Naoyuki painting artist",
+        "lifted": false
+      },
+      {
+        "stop": {
+          "venue": "Mus\u00e9e d'art na\u00eff (Museum of Na\u00efve Art), Nice, France",
+          "stop": "The Flight into Egypt",
+          "why": "Classic art subject. Multiple artists. Can we confirm THIS museum holds one?"
+        },
+        "today_query": "The Flight into Egypt",
+        "today_found": false,
+        "today_passage": "",
+        "today_url": "",
+        "richer_found": true,
+        "richer_passage": "Luc-Olivier Merson, The Rest during the flight into Egypt, 1880, oil on ... Mus\u00e9e International d'Art Na\u00eff Anatole Jakovsky \u00b7 Palais Lascaris \u00b7 L ...",
+        "richer_url": "https://www.musee-beaux-arts-nice.org/en/collection/19th-century/",
+        "richer_strategy": "catalogue: Jakovsky museum + title",
+        "richer_query": "\"Mus\u00e9e International d'Art Na\u00eff Anatole Jakovsky\" \"The Flight into Egypt\"",
+        "lifted": true
+      },
+      {
+        "stop": {
+          "venue": "Mus\u00e9e d'art na\u00eff (Museum of Na\u00efve Art), Nice, France",
+          "stop": "The Red Umbrella",
+          "why": "Possibly a real na\u00efve art painting. Jakovsky museum inventory test."
+        },
+        "today_query": "The Red Umbrella",
+        "today_found": false,
+        "today_passage": "",
+        "today_url": "",
+        "richer_found": true,
+        "richer_passage": "Pop culture et ic\u00f4nes, Inspir\u00e9 par le manga ... Art na\u00eff, Surr\u00e9alisme, Fauvisme, Abstraction 4 ... Peinture, The red umbrella painting, Dr. Michelle ...",
+        "richer_url": "https://www.artsper.com/fr/oeuvres-d-art-contemporain/peinture/color-orange?page=5",
+        "richer_strategy": "catalogue: Joconde/POP",
+        "richer_query": "pop.culture.gouv.fr \"art na\u00eff\" Nice \"The Red Umbrella\"",
+        "lifted": true
+      }
+    ]
+  },
+  "summary": {
+    "today_found": 10,
+    "richer_found": 15,
+    "lifted": 5,
+    "lift_rate": 0.333,
+    "extrapolation_88": 29,
+    "extrapolation_190": 63
+  },
+  "table_counts": {
+    "audio_tours_before": 142,
+    "audio_tours_after": 142,
+    "stop_corpus_before": 88,
+    "stop_corpus_after": 88
+  }
+}
