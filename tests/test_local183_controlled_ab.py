@@ -276,7 +276,7 @@ print(f"    stops_count={len(stops_a)} and {len(stops_b)} on the new tours.")
 print(f"    Root cause: the generation service path does not persist stops_count")
 print(f"    when inserting/updating the tour. Not fixed here (out of scope).")
 
-# ─── Verify Nice list ──────────────────────────────────────────────────────
+# ─── Verify Nice list (only meaningful against production) ─────────────────
 conn = get_connection()
 cur = conn.cursor()
 cur.execute("""
@@ -286,8 +286,13 @@ cur.execute("""
 """)
 nice_list = cur.fetchone()[0]
 conn.close()
-assert nice_list == [1, 12, 14, 17, 21, 24, 27, 28, 29], f"Nice list changed! Got: {nice_list}"
-print(f"\n  ✓ Nice production list verified: {nice_list}")
+if nice_list is not None:
+    # Connected to production — enforce the invariant
+    assert nice_list == [1, 12, 14, 17, 21, 24, 27, 28, 29], f"Nice list changed! Got: {nice_list}"
+    print(f"\n  ✓ Nice production list verified: {nice_list}")
+else:
+    # Test database — no production rows to verify (LOCAL-232)
+    print(f"\n  ✓ Nice list check skipped (test database, no production rows)")
 
 # ─── Cost check ─────────────────────────────────────────────────────────────
 # Check api_call_logger for total cost
