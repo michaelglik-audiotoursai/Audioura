@@ -23,9 +23,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Override DB env vars BEFORE importing the orchestrator, so
 # link_stop_metrics_to_tour connects to the host-side port (5433)
+# LOCAL-232: Route to audiotours_test instead of production
 os.environ.setdefault('DB_HOST', 'localhost')
 os.environ.setdefault('DB_PORT', '5433')
-os.environ.setdefault('DB_NAME', 'audiotours')
+os.environ.setdefault('DB_NAME', 'audiotours_test')
 os.environ.setdefault('DB_USER', 'admin')
 os.environ.setdefault('DB_PASSWORD', 'password123')
 
