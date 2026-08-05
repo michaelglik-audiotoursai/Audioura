@@ -25,6 +25,7 @@ from style_validator_detector import (
     check_r7_hallucinated_sensory,
     check_r8_prompt_leakage,
     check_r9_generic,
+    check_r10_unfulfilled_promise,
     _is_style_navigation_sentence,
     _split_sentences,
 )

@@ -6555,6 +6555,44 @@ REWRITE RULES (all mandatory):
                   f"{_r9_total_paras_emptied} paragraphs emptied, "
                   f"{_r9_stops_affected} stops affected")
 
+    # -------- [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion --------
+    # Michael (Round 2): "Either tell us the story or get rid of the sentence!"
+    # A sentence names a subject (story, tale, history, legacy) without delivering
+    # a concrete payload. Behind DISABLE_R10_DELETION=1 flag. $0.00 — deterministic.
+    _r10_deletion_disabled = os.environ.get('DISABLE_R10_DELETION', '').strip() == '1'
+    if _r10_deletion_disabled:
+        print(f"\n  [LOCAL-235] R10 deletion DISABLED by DISABLE_R10_DELETION=1 env var")
+    else:
+        print(f"\n  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...")
+        try:
+            from style_validator_detector import apply_r10_to_description as _r10_apply
+        except ImportError:
+            _r10_apply = None
+            print(f"  [LOCAL-235] WARNING: apply_r10_to_description not importable — R10 skipped")
+
+        if _r10_apply:
+            _r10_total_deleted = 0
+            _r10_total_paras_emptied = 0
+            _r10_stops_affected = 0
+
+            for _si, _poi in enumerate(poi_list):
+                _desc = _poi.get('description', '')
+                if not _desc or _desc.startswith('['):
+                    continue
+
+                _new_desc, _deleted, _emptied = _r10_apply(_desc)
+                if _deleted > 0 or _emptied > 0:
+                    poi_list[_si]['description'] = _new_desc
+                    _r10_total_deleted += _deleted
+                    _r10_total_paras_emptied += _emptied
+                    _r10_stops_affected += 1
+                    print(f"  [LOCAL-235] Stop {_si+1} '{_poi.get('name', '')[:30]}': "
+                          f"{_deleted} sentence(s) deleted, {_emptied} paragraph(s) emptied")
+
+            print(f"  [LOCAL-235] R10 summary: {_r10_total_deleted} sentences deleted, "
+                  f"{_r10_total_paras_emptied} paragraphs emptied, "
+                  f"{_r10_stops_affected} stops affected")
+
     # -------- [LOCAL-229] PHASE 5.16: CONTRADICTED claim block --------
     # D100 (Michael, 2026-08-04): "We should not publish if we are reasonably sure
     # that the data is incorrect." If any sentence group contains a CONTRADICTED

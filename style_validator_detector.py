@@ -25,7 +25,7 @@ Deterministic. No LLM. Read-only against the database. $0.00 spend.
 import os
 import re
 import sys
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 # Import dependencies from tests/ — these are shared helpers used by both
 # the production validator and the test suite.
@@ -1592,6 +1592,425 @@ def apply_r9_to_description(description: str) -> Tuple[str, int, int]:
         else:
             sentences_after = _split_sentences(result)
             deleted_count = len([s for s in sentences_before if len(s) >= 10]) - len([s for s in sentences_after if len(s) >= 10])
+            total_deleted += max(0, deleted_count)
+            new_paragraphs.append(result)
+
+    new_description = '\n\n'.join(new_paragraphs)
+    return new_description, total_deleted, paragraphs_emptied
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# R10: Unfulfilled promise detection (LOCAL-235)
+# ═══════════════════════════════════════════════════════════════════════════════
+# Michael's rule (said seven times): "Either tell us the story or get rid of
+# the sentence!" If a sentence names a subject that requires substantiation
+# (a story, a tale, history, a legacy, a connection, a testament, an allure,
+# a chapter, a secret, a witness to centuries) and NEITHER that sentence NOR
+# its neighbours deliver it — delete.
+#
+# Delivery means a concrete payload: a date, a named person or event, a
+# documented fact. Not another abstraction.
+#
+# MUST FIRE on (his complaints from Round 2):
+#   "each crack and crevice holding a story"
+#   "The hillsides hold a multitude of tales from a bygone era."
+#   "serves as a bridge between ancient civilizations and contemporary life…"
+#   "a harmonious symphony of past and present"
+#   "a testament to the enduring allure…"
+#   "Cycling along the shimmering waters, you are not just exploring a physical
+#    landscape but also delving into a rich tapestry of history…"
+#
+# MUST NOT FIRE on (his own rewrite text — what good looks like):
+#   "In 200 BC, the area surrounding Èze saw its first inhabitants settle
+#    near Mount Bastide."
+#   "The Antonine Itinerary mentions the bay of Èze as Avisionis portus."
+#   "Start cycling south on the main road…" (navigation)
+#   "F. Scott Fitzgerald based the opening hotel of his 1934 novel on Eden-Roc."
+#   "the Hôtel du Cap-Eden-Roc, was built here in 1870, at the southern tip"
+#
+# SEVERITY: 'error' — wired to deletion behind DISABLE_R10_DELETION=1.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Promise trigger phrases ──────────────────────────────────────────────────
+# These signal the sentence is PROMISING something — a story, tale, history,
+# connection, etc. — that requires follow-through.
+_R10_PROMISE_PATTERNS = [
+    # "holding a story / holding stories"
+    r'\bhold(?:s|ing)?\s+(?:a\s+)?(?:stor(?:y|ies)|tale[s]?|secret[s]?|chapter[s]?)\b',
+    # "a multitude of tales / tales from a bygone era"
+    r'\b(?:multitude|wealth|treasure)\s+of\s+(?:tales?|stories?|secrets?|legends?)\b',
+    # "a rich tapestry of history/culture"
+    r'\brich\s+tapestry\s+of\s+(?:history|culture|stories?|heritage)\b',
+    # "a testament to the enduring allure/legacy"
+    r'\ba\s+testament\s+to\s+(?:the\s+)?(?:enduring\s+)?(?:allure|legacy|spirit|charm|beauty|power)\b',
+    # "bridge between ancient civilizations"
+    r'\bbridge\s+between\s+(?:ancient|past|old)\b',
+    # "symphony of past and present"
+    r'\bsymphony\s+of\s+(?:past\s+and\s+present|old\s+and\s+new)\b',
+    # "witness to centuries / stood witness to"
+    r'\bwitness\s+to\s+(?:centuries|generations|ages|history|time)\b',
+    # "delving into a rich tapestry / exploring a rich tapestry"
+    r'\b(?:delving|diving|exploring|dipping)\s+into\s+(?:a\s+)?(?:rich\s+)?(?:tapestry|world|realm)\b',
+    # "whisper tales / whispers of" (personification as filler)
+    r'\bwhisper[s]?\s+(?:tales?|stories?|of\s+(?:a\s+)?bygone)\b',
+    # "tales from a bygone era"
+    r'\btales?\s+(?:from|of)\s+(?:a\s+)?bygone\b',
+    # "steeped in history / steeped in tradition"
+    r'\bsteeped\s+in\s+(?:history|tradition|heritage|legend|lore)\b',
+    # "echoes of a bygone era / echoes of the past"
+    r'\bechoes?\s+of\s+(?:a\s+)?(?:bygone|the\s+past|history|time)\b',
+    # "a chapter in" (metaphorical, no specific chapter)
+    r'\ba\s+chapter\s+in\s+(?:the|its|a)\b',
+    # "enduring legacy / enduring spirit / enduring allure"
+    r'\benduring\s+(?:legacy|spirit|allure|charm|beauty|appeal)\b',
+    # "centuries of history" (without specifying WHICH centuries/events)
+    r'\bcenturies\s+of\s+(?:history|tradition|heritage|culture|stories?)\b',
+    # "palpable sense of antiquity / sense of history"
+    r'\bsense\s+of\s+(?:antiquity|history|heritage|the\s+past|time)\b',
+    # "thread weaving through the fabric of time"
+    r'\b(?:thread|fabric)\s+(?:weaving|of\s+time|through\s+time)\b',
+    # "connection between past and present"
+    r'\bconnection\s+between\s+(?:past\s+and\s+present|old\s+and\s+new|then\s+and\s+now)\b',
+    # "transport visitors back through the annals of time"
+    r'\b(?:transport|take|carry)\s+(?:visitors?|you|us)\s+back\s+(?:through|in|to)\b',
+    # "timeless allure... resides in its ability" — only when paired with
+    # words that promise content delivery (allure, appeal = abstract promise)
+    # NOT "timeless charm" which is just a descriptor
+    r'\btimeless\s+(?:allure|appeal)\s+(?:of|resides)\b',
+]
+_R10_PROMISE_COMPILED = [re.compile(p, re.IGNORECASE) for p in _R10_PROMISE_PATTERNS]
+
+
+def _sentence_has_promise(sentence: str) -> bool:
+    """Check if a sentence contains a promise-trigger phrase."""
+    for pat in _R10_PROMISE_COMPILED:
+        if pat.search(sentence):
+            return True
+    return False
+
+
+def _is_place_name(cap_words: List[str], place_suffixes: set) -> bool:
+    """Determine if a sequence of capitalized words is likely a place name.
+
+    Place names: "Eze Village", "Cap d'Antibes", "Jardin Exotique",
+    "Mont Bastide", "Eden-Roc", "French Riviera"
+    Person names: "F. Scott Fitzgerald", "Claude Monet", "Saracen raiders"
+
+    Heuristic: if the last word (lowercased) is a place-type suffix, or if
+    the sequence is exactly 2 words and one of them is a known geographic term,
+    treat it as a place name rather than a person name.
+    """
+    if not cap_words:
+        return False
+    # Strip trailing possessive ('s) for matching
+    last_clean = re.sub(r"'s$", '', cap_words[-1]).lower()
+    first_clean = re.sub(r"'s$", '', cap_words[0]).lower()
+
+    # If last word is a place suffix (Village, Park, Garden, etc.)
+    if last_clean in place_suffixes:
+        return True
+    # Known geographic proper nouns (regions, seas, etc.)
+    _geo_proper = {'riviera', 'mediterranean', 'adriatic', 'atlantic',
+                   'pacific', 'alps', 'pyrenees', 'sahara', 'amazon',
+                   'danube', 'rhine', 'seine', 'loire', 'nile'}
+    if last_clean in _geo_proper or first_clean in _geo_proper:
+        return True
+    # "Cap", "Mont", "Monte", "Jardin", "Château" at start = geographic
+    if first_clean in {'cap', 'mont', 'monte', 'jardin', 'château', 'chateau',
+                       'lac', 'île', 'ile', 'fort', 'villa', 'hôtel', 'hotel',
+                       'col', 'val', 'port', 'pointe', 'baie', 'pic',
+                       'rue', 'place', 'avenue', 'boulevard', 'piazza',
+                       'via', 'corso', 'calle', 'plage', 'sentier', 'chemin'}:
+        return True
+    # Nationality/region adjectives at start (French, Italian, etc.)
+    if first_clean in {'french', 'italian', 'spanish', 'german', 'english',
+                       'british', 'greek', 'roman', 'turkish', 'portuguese',
+                       'dutch', 'belgian', 'swiss', 'austrian', 'russian',
+                       'chinese', 'japanese', 'indian', 'african', 'european',
+                       'asian', 'american', 'northern', 'southern', 'eastern',
+                       'western'}:
+        return True
+    # Exactly 2 words where one is a known geographic modifier
+    if len(cap_words) == 2:
+        all_lower = {re.sub(r"'s$", '', w).lower() for w in cap_words}
+        geo_modifiers = {'bay', 'lake', 'mount', 'cape', 'port', 'isle',
+                         'point', 'valley', 'peak', 'village', 'old', 'new',
+                         'east', 'west', 'north', 'south', 'upper', 'lower',
+                         'grande', 'petit', 'saint', 'san', 'santa'}
+        if all_lower & geo_modifiers:
+            return True
+    return False
+
+
+def _sentence_has_concrete_payload(sentence: str) -> bool:
+    """Check if a sentence delivers concrete substantiation.
+
+    Concrete means: a date, a named person or event, a documented fact,
+    a measurement. NOT another abstraction or metaphor.
+
+    CRITICAL DISTINCTION from R9's _has_proper_noun:
+    For R10, a PLACE NAME alone does not constitute delivery of a promise.
+    "Eze Village serves as a bridge between ancient civilizations" names Eze
+    but delivers nothing about it. Delivery requires:
+      - A date/year
+      - A named PERSON (not just a place)
+      - A measurement/number with factual context
+      - A specific event or documented fact (multi-word proper noun that's
+        not a known place name)
+
+    Single place names (Eze Village, Cap d'Antibes, Jardin Exotique) provide
+    geographic ANCHORING but not SUBSTANTIATION of a promise.
+    """
+    # 1. Has a year (4-digit number in plausible range)
+    if re.search(r'\b(?:1[0-9]{3}|20[0-2][0-9])\b', sentence):
+        return True
+
+    # 2. Has a century reference
+    if re.search(r'\b\d{1,2}(?:st|nd|rd|th)[\s-]+century\b', sentence, re.IGNORECASE):
+        return True
+
+    # 3. Has a specific measurement/distance
+    if re.search(r'\b\d+\.?\d*\s*(?:km|m|ft|feet|miles?|meters?|metres?|kilometers?)\b', sentence, re.IGNORECASE):
+        return True
+
+    # 4. Has a named person (two+ consecutive capitalized words that aren't
+    #    a place name — "F. Scott Fitzgerald", "Claude Monet", "Mount Bastide")
+    words = sentence.split()
+    consecutive_caps = 0
+    consecutive_cap_words = []
+    _place_only_words = {
+        'village', 'town', 'city', 'park', 'garden', 'bay', 'beach',
+        'coast', 'cape', 'peninsula', 'island', 'mountain', 'hill',
+        'street', 'road', 'path', 'trail', 'square', 'plaza', 'port',
+        'riviera', 'mediterranean', 'french', 'european', 'italian',
+    }
+    # Known place-name patterns (multi-word place names that aren't person names)
+    _place_suffixes = {'village', 'town', 'city', 'park', 'garden', 'bay',
+                       'beach', 'coast', 'cape', 'island', 'hill', 'mountain',
+                       'street', 'road', 'trail', 'square', 'port', 'bridge',
+                       'palace', 'castle', 'church', 'chapel', 'cathedral',
+                       'museum', 'hotel', 'tower', 'gate', 'pass'}
+    for i, word in enumerate(words):
+        if i == 0:
+            consecutive_caps = 0
+            consecutive_cap_words = []
+            continue
+        clean = re.sub(r'[^a-zA-Z\'-]', '', word)
+        if not clean:
+            # Check accumulated caps before resetting
+            if consecutive_caps >= 2 and not _is_place_name(consecutive_cap_words, _place_suffixes):
+                return True
+            consecutive_caps = 0
+            consecutive_cap_words = []
+            continue
+        if clean[0].isupper() and len(clean) > 1 and clean.lower() not in {
+            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'by',
+            'for', 'to', 'of', 'is', 'was', 'are', 'were', 'has', 'had',
+            'its', 'their', 'this', 'that', 'these', 'those',
+        }:
+            consecutive_caps += 1
+            consecutive_cap_words.append(clean)
+        else:
+            if consecutive_caps >= 2 and not _is_place_name(consecutive_cap_words, _place_suffixes):
+                return True
+            consecutive_caps = 0
+            consecutive_cap_words = []
+    # Final check
+    if consecutive_caps >= 2 and not _is_place_name(consecutive_cap_words, _place_suffixes):
+        return True
+
+    # 5. Named entity that's clearly a DOCUMENT, WORK, or PERSON
+    #    (contains title-indicators like "novel", "itinerary", "book")
+    if re.search(r'\b(?:novel|book|work|itinerary|manuscript|treaty|painting|poem|opera)\b', sentence, re.IGNORECASE):
+        # If sentence mentions a literary/historical work by reference
+        for i, word in enumerate(words):
+            if i == 0:
+                continue
+            clean = re.sub(r'[^a-zA-Z\'-]', '', word)
+            if not clean or len(clean) <= 2:
+                continue
+            if clean[0].isupper() and clean.lower() not in _R9_SENTENCE_STARTERS_NOT_PROPER:
+                if clean.lower() not in _place_only_words:
+                    return True
+
+    # 6. Has a specific numeric fact (number of 3+ digits suggests a year,
+    #    measurement, or population — genuine fact)
+    if re.search(r'\b\d{3,}\b', sentence):
+        return True
+
+    # 7. Has a 2-digit number with measurement context (not just "the" + number)
+    if re.search(r'\b\d{2}\b', sentence):
+        # Only count if it's clearly a measurement or specific quantity
+        if re.search(r'\b\d+\s*(?:%|percent|degrees?|floors?|rooms?|steps?|paintings?|works?|pieces?)\b', sentence, re.IGNORECASE):
+            return True
+
+    return False
+
+
+# Look-ahead window: how far forward to look for delivery.
+# One sentence forward is the minimum; we look 2 forward for robustness.
+_R10_LOOKAHEAD = 2
+
+
+def check_r10_unfulfilled_promise(sentences: List[str], index: int) -> Optional[Dict]:
+    """R10: Detect an unfulfilled promise at sentence[index].
+
+    A sentence PROMISES something (names a story, tale, history, legacy, etc.)
+    and neither it nor the next _R10_LOOKAHEAD sentences DELIVER a concrete
+    payload (date, named person/event, documented fact).
+
+    Args:
+        sentences: All sentences in the paragraph (or paragraph + next paragraph)
+        index: Index of the sentence to check
+
+    Returns:
+        Finding dict if unfulfilled, None if OK.
+    """
+    sentence = sentences[index]
+    stripped = sentence.strip()
+    if not stripped or len(stripped) < 15:
+        return None
+
+    # Navigation sentences are exempt
+    if _is_style_navigation_sentence(stripped):
+        return None
+
+    # Does this sentence contain a promise?
+    if not _sentence_has_promise(stripped):
+        return None
+
+    # Does THIS sentence also deliver? (promise + delivery in same sentence = OK)
+    if _sentence_has_concrete_payload(stripped):
+        return None
+
+    # Look forward: do any of the next _R10_LOOKAHEAD sentences deliver?
+    for offset in range(1, _R10_LOOKAHEAD + 1):
+        next_idx = index + offset
+        if next_idx >= len(sentences):
+            break
+        next_sent = sentences[next_idx].strip()
+        if next_sent and _sentence_has_concrete_payload(next_sent):
+            return None  # Delivery found — promise is fulfilled
+
+    # Also look backward 1 sentence — if the PREVIOUS sentence delivered,
+    # this sentence may be a legitimate continuation/summary
+    if index > 0:
+        prev_sent = sentences[index - 1].strip()
+        if prev_sent and _sentence_has_concrete_payload(prev_sent):
+            return None  # Previous sentence delivered — this is continuation
+
+    # Unfulfilled promise
+    return {
+        'rule_id': 'R10_UNFULFILLED_PROMISE',
+        'severity': 'error',
+        'sentence': stripped,
+        'suggestion': (
+            'This sentence names a subject (story, tale, history, legacy) '
+            'without delivering a concrete payload (date, name, fact) in itself '
+            f'or the next {_R10_LOOKAHEAD} sentences. '
+            'Either follow up with specifics or delete the sentence.'
+        ),
+        'lookahead': _R10_LOOKAHEAD,
+    }
+
+
+def apply_r10_deletions(paragraph: str, next_paragraph: str = '') -> str:
+    """Apply R10 deletions to a paragraph.
+
+    Checks each sentence for unfulfilled promises, considering the full
+    context window (this paragraph + start of next paragraph for look-ahead).
+
+    Returns the paragraph with unfulfilled-promise sentences removed.
+    Empty string if all sentences are deleted.
+
+    Behind DISABLE_R10_DELETION=1 env var — caller checks this.
+    """
+    if not paragraph or not paragraph.strip():
+        return paragraph
+
+    sentences = _split_sentences(paragraph)
+    if not sentences:
+        return paragraph
+
+    # Build extended context: this paragraph's sentences + next paragraph's
+    # first few sentences (for look-ahead across paragraph boundaries)
+    next_sentences = []
+    if next_paragraph and next_paragraph.strip():
+        next_sentences = _split_sentences(next_paragraph)
+
+    all_sentences = sentences + next_sentences
+
+    kept = []
+    for i, sentence in enumerate(sentences):
+        if len(sentence) < 15:
+            kept.append(sentence)
+            continue
+        # Navigation sentences are never deleted
+        if _is_style_navigation_sentence(sentence):
+            kept.append(sentence)
+            continue
+        finding = check_r10_unfulfilled_promise(all_sentences, i)
+        if finding is None:
+            kept.append(sentence)
+        # else: sentence is an unfulfilled promise — drop it
+
+    if not kept:
+        return ''  # All sentences deleted — caller removes the paragraph
+
+    # Fix dangling connective on the new first sentence
+    result_text = ' '.join(kept)
+    for pat in _DANGLING_CONNECTIVE_COMPILED:
+        new_text = pat.sub('', result_text, count=1)
+        if new_text != result_text:
+            new_text = new_text.strip()
+            if new_text and new_text[0].islower():
+                new_text = new_text[0].upper() + new_text[1:]
+            result_text = new_text
+            break
+
+    return result_text.strip()
+
+
+def apply_r10_to_description(description: str) -> Tuple[str, int, int]:
+    """Apply R10 deletions to a full stop description (multiple paragraphs).
+
+    Returns:
+        (new_description, sentences_deleted, paragraphs_emptied)
+
+    Behind DISABLE_R10_DELETION=1 — caller must check.
+    """
+    if not description or not description.strip():
+        return description, 0, 0
+
+    paragraphs = [p for p in description.split('\n\n') if p.strip()]
+    if not paragraphs:
+        return description, 0, 0
+
+    new_paragraphs = []
+    total_deleted = 0
+    paragraphs_emptied = 0
+
+    for pi, para in enumerate(paragraphs):
+        para = para.strip()
+        if len(para) <= 30:
+            new_paragraphs.append(para)
+            continue
+
+        # Get next paragraph for cross-boundary look-ahead
+        next_para = paragraphs[pi + 1] if pi + 1 < len(paragraphs) else ''
+
+        sentences_before = _split_sentences(para)
+        result = apply_r10_deletions(para, next_para)
+
+        if not result:
+            paragraphs_emptied += 1
+            total_deleted += len([s for s in sentences_before if len(s) >= 15])
+        else:
+            sentences_after = _split_sentences(result)
+            deleted_count = (
+                len([s for s in sentences_before if len(s) >= 15]) -
+                len([s for s in sentences_after if len(s) >= 15])
+            )
             total_deleted += max(0, deleted_count)
             new_paragraphs.append(result)
 
