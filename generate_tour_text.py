@@ -8077,6 +8077,7 @@ Requirements:
                 'transport_mode': transport_mode if 'transport_mode' in dir() else 'on_foot',
                 'tour_name': location if location else '',
                 'stop_names': _prolog_stop_names,
+                'full_tour_content': complete_tour if 'complete_tour' in dir() else '',
             }
             _prolog_violations = validate_prolog_structure(_saved_prolog, _prolog_meta)
             _prolog_errors = [v for v in _prolog_violations if v['severity'] == 'error']

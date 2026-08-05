@@ -23,6 +23,8 @@ from prolog_structure_validator import (
     extract_prolog_from_tour_content,
     extract_stop_names_from_tour_content,
     extract_transport_mode_from_tour_content,
+    detect_duplicate_tour_descriptions,
+    _is_tour_level_description,
 )
 
 
@@ -290,7 +292,15 @@ def test_sourced_fact_detection():
 
 
 def test_extract_from_tour_content():
-    """Can extract prolog from assembled tour_content format."""
+    """Can extract prolog from assembled tour_content format.
+    
+    LOCAL-260 bounce fix: the extractor must detect the prolog STRUCTURALLY
+    (tour-level language) not positionally (first paragraph after Orientation).
+    The round 16 format has Orientation as a separate field, and the prolog
+    is the paragraph AFTER it.
+    """
+    # Round 16 format: Orientation is a structured field,
+    # prolog is the body paragraph that addresses the tour as a whole
     sample_tour = """Step-by-Step Audio Guided Tour: French Riviera cycling tour
 Tour-Category: walking
 
@@ -300,9 +310,11 @@ Address: Cap d'Antibes, France
 
 Coordinates: 43.5411, 7.1206
 
-Orientation: You are about to embark on a cycling journey. This is a biking route.
+Orientation: Start biking southwest on the coastal road, enjoy the sea breeze.
 
-The stop-specific description goes here.
+You are about to embark on a cycling journey through the French Riviera. This route takes you from Cap d'Antibes to Eze Village, covering 28 kilometers of coastal terrain.
+
+The stop-specific description of Cap d'Antibes goes here with local details.
 
 Directions: Continue north.
 
@@ -311,16 +323,150 @@ Stop 2: Eze Village
 Address: Eze, France
 """
     prolog = extract_prolog_from_tour_content(sample_tour)
-    assert "cycling journey" in prolog
+    assert "cycling journey" in prolog, f"Expected 'cycling journey' in prolog, got: {prolog[:100]}"
+    # Must NOT return the Orientation text
+    assert "Start biking southwest" not in prolog, \
+        f"Extractor returned Orientation text, not prolog: {prolog[:100]}"
     stops = extract_stop_names_from_tour_content(sample_tour)
     assert "Cap d'Antibes" in stops
     mode = extract_transport_mode_from_tour_content(sample_tour)
     assert mode == 'bike'
-    print(f"\n  EXTRACTION FROM TOUR CONTENT:")
-    print(f"    prolog: \"{prolog[:60]}...\"")
+    print(f"\n  EXTRACTION FROM TOUR CONTENT (round 16 format):")
+    print(f"    prolog: \"{prolog[:80]}...\"")
     print(f"    stops: {stops}")
     print(f"    mode: {mode}")
-    print(f"    ✓ All extraction functions work")
+    print(f"    ✓ Extracts prolog (not Orientation)")
+
+
+def test_round16_real_prolog_passes():
+    """The actual round 16 prolog — extracted from the real tour file — must PASS
+    with zero violations.
+    
+    This is the LEAD bounce fix validation: the extractor must correctly identify
+    the prolog paragraph, and the Part 4 check must not false-positive on the
+    specific, dated forward reference.
+    """
+    # This is the exact paragraph from LOCAL259_riviera_2stop_round16.txt
+    round16_prolog = (
+        "You are about to embark on a cycling journey through the French Riviera. "
+        "This route will take you from the opulent Cap d'Antibes to the ancient "
+        "Eze Village, spanning approximately 28 kilometers of coastal terrain. "
+        "The path winds through a landscape where artists like Monet found "
+        "inspiration and where historical events shaped the region's identity. "
+        "Claude Monet's artistic exploration in Antibes and Eze Village's strategic "
+        "significance under the House of Savoy are testaments to the intertwined "
+        "legacies of art and power in the French Riviera. "
+        "In the stops ahead, you will encounter Monet's 1888 paintings at Cap "
+        "d'Antibes and the 1706 destruction of Eze Village's fortifications "
+        "during the War of the Spanish Succession."
+    )
+    meta = {
+        'transport_mode': 'bike',
+        'tour_name': 'French Riviera cycling tour',
+        'stop_names': ["Cap d'Antibes", 'Eze Village'],
+    }
+    violations = validate_prolog_structure(round16_prolog, meta)
+    errors = [v for v in violations if v['severity'] == 'error']
+    print(f"\n  ROUND 16 REAL PROLOG:")
+    print(f"    text: \"{round16_prolog[:100]}...\"")
+    print(f"    violations: {len(violations)} total, {len(errors)} errors")
+    for v in violations:
+        print(f"      [{v['severity']}] Part {v['part']}: {v['code']} — {v['message'][:80]}")
+    assert len(errors) == 0, f"Round 16 prolog must pass with zero errors, got: {errors}"
+    print("    ✓ PASS — zero errors (bounce fix confirmed)")
+
+
+def test_duplicate_tour_description_detected():
+    """A tour with two tour-level descriptions must produce DUPLICATE_TOUR_DESCRIPTION."""
+    tour_with_two = (
+        "Step-by-Step Audio Guided Tour: French Riviera cycling tour\n"
+        "Tour-Category: walking\n\n"
+        "Stop 1: Cap d'Antibes\n\n"
+        "Address: Cap d'Antibes, France\n\n"
+        "Coordinates: 43.5411, 7.1356\n\n"
+        "Orientation: Start biking southwest on the coastal road.\n\n"
+        "You are about to embark on a cycling journey through the French Riviera. "
+        "This route takes you from Cap d'Antibes to Eze Village, covering 28 km.\n\n"
+        "On this cycling tour of the French Riviera, you will discover the stories "
+        "that connect Cap d'Antibes to Eze Village through centuries of art.\n\n"
+        "Directions: Continue north.\n\n"
+        "Stop 2: Eze Village\n\n"
+        "Address: Eze, France\n"
+    )
+    stop_names = ["Cap d'Antibes", "Eze Village"]
+    dups = detect_duplicate_tour_descriptions(tour_with_two, stop_names)
+    print(f"\n  DUPLICATE TOUR DESCRIPTION (two tour-level passages):")
+    print(f"    violations: {len(dups)}")
+    for v in dups:
+        print(f"      [{v['severity']}] {v['code']}")
+    assert len(dups) == 1, f"Expected 1 DUPLICATE_TOUR_DESCRIPTION, got {len(dups)}"
+    assert dups[0]['code'] == 'DUPLICATE_TOUR_DESCRIPTION'
+    print("    ✓ DUPLICATE_TOUR_DESCRIPTION detected")
+
+
+def test_single_tour_description_passes():
+    """A tour with exactly one tour-level description must NOT trigger DUPLICATE."""
+    tour_with_one = (
+        "Step-by-Step Audio Guided Tour: French Riviera cycling tour\n"
+        "Tour-Category: walking\n\n"
+        "Stop 1: Cap d'Antibes\n\n"
+        "Address: Cap d'Antibes, France\n\n"
+        "Coordinates: 43.5411, 7.1356\n\n"
+        "Orientation: Start biking southwest on the coastal road.\n\n"
+        "You are about to embark on a cycling journey through the French Riviera. "
+        "This route takes you from Cap d'Antibes to Eze Village, covering 28 km.\n\n"
+        "Strolling along the Tire-Poil trail, the azure sea stretches before you. "
+        "In 1888, Claude Monet first painted in this region.\n\n"
+        "Directions: Continue north.\n\n"
+        "Stop 2: Eze Village\n\n"
+        "Address: Eze, France\n"
+    )
+    stop_names = ["Cap d'Antibes", "Eze Village"]
+    dups = detect_duplicate_tour_descriptions(tour_with_one, stop_names)
+    print(f"\n  SINGLE TOUR DESCRIPTION (one tour-level passage):")
+    print(f"    violations: {len(dups)}")
+    assert len(dups) == 0, f"Single description should pass, got: {dups}"
+    print("    ✓ No duplicate — PASS")
+
+
+def test_part1_must_name_the_tour():
+    """Part 1 that uses transport mode but never names what the tour IS must get a warning.
+    
+    Michael: 'the serious problem is that it does not name the tour'
+    'From the secluded allure...' → FAIL (never says what it IS)
+    'On this biking tour of French Riviera...' → PASS
+    """
+    meta = {'transport_mode': 'bike', 'stop_names': ["Cap d'Antibes", 'Eze Village']}
+    
+    # MUST FAIL: doesn't name the tour
+    fail_prolog = (
+        "From the secluded allure of Cap d'Antibes to the medieval whispers of Eze Village, "
+        "this biking route covers 28 kilometers of coastal terrain. "
+        "The Rue Obscure was built in 1260 as a fortified street. "
+        "We will explore Monet's 1888 paintings at Cap d'Antibes and Eze Village's medieval fortress."
+    )
+    v1 = validate_prolog_structure(fail_prolog, meta)
+    p1_issues = [v for v in v1 if v['part'] == 1]
+    
+    # MUST PASS: names the tour
+    pass_prolog = (
+        "On this biking tour of the French Riviera, from the secluded allure of Cap d'Antibes "
+        "to the medieval whispers of Eze Village, this route covers 28 kilometers of coastal terrain. "
+        "The Rue Obscure was built in 1260 as a fortified street. "
+        "We will explore Monet's 1888 paintings at Cap d'Antibes and Eze Village's medieval fortress."
+    )
+    v2 = validate_prolog_structure(pass_prolog, meta)
+    errors2 = [v for v in v2 if v['severity'] == 'error']
+    
+    print(f"\n  PART 1 NAMING TEST:")
+    print(f"    'From the secluded allure...' → Part 1 issues: {len(p1_issues)}")
+    for v in p1_issues:
+        print(f"      [{v['severity']}] {v['code']}")
+    print(f"    'On this biking tour of...' → errors: {len(errors2)}")
+    
+    assert len(p1_issues) > 0, "Must-fail case should have Part 1 naming issue"
+    assert len(errors2) == 0, f"Must-pass case should have zero errors, got: {errors2}"
+    print("    ✓ Naming requirement enforced correctly")
 
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
@@ -342,6 +488,10 @@ if __name__ == '__main__':
         test_route_substance_detection,
         test_sourced_fact_detection,
         test_extract_from_tour_content,
+        test_round16_real_prolog_passes,
+        test_duplicate_tour_description_detected,
+        test_single_tour_description_passes,
+        test_part1_must_name_the_tour,
     ]
     
     passed = 0

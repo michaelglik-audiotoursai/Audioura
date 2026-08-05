@@ -226,10 +226,12 @@ def validate_prolog_structure(
             - transport_mode: str (e.g. 'bike', 'on_foot', 'vehicle')
             - tour_name: str (the tour title/request)
             - stop_names: list[str] (names of all stops in the tour)
+            - full_tour_content: str (optional — full assembled tour for
+              duplicate-description detection)
     
     Returns:
         List of violation dicts, each with:
-            - part: int (1-4)
+            - part: int (1-4, or 0 for structural issues)
             - code: str (machine-readable violation code)
             - severity: str ('error' or 'warning')
             - message: str (human-readable description)
@@ -419,20 +421,40 @@ def validate_prolog_structure(
         check_p4_indices = part4_indices if part4_indices else raw_p4_indices
         p4_sents = [sentences[i] for i in check_p4_indices]
         
-        # Check if it's only vague ("more stories await")
-        all_vague = all(
-            _VAGUE_FORWARD_RE.search(s) and not _sentence_names_stop_content(s, stop_names)
-            for s in p4_sents
-        )
+        # A Part 4 sentence is SPECIFIC (passes) if it either:
+        #   (a) names stop content traceable to the tour's actual stops, OR
+        #   (b) contains a date + named work/event (concrete delivery, not promise)
+        # A Part 4 sentence is VAGUE (fails) if it matches the vague pattern
+        # and does NOT have specific content.
         any_specific = False
+        all_vague = True
         named_stops = []
         
-        if stop_names:
-            for s in p4_sents:
-                refs = _sentence_names_stop_content(s, stop_names)
-                if refs:
-                    any_specific = True
-                    named_stops.extend(refs)
+        for s in p4_sents:
+            has_vague_pattern = bool(_VAGUE_FORWARD_RE.search(s))
+            
+            # Check for specific stop references
+            refs = _sentence_names_stop_content(s, stop_names) if stop_names else []
+            
+            # Check for concrete content: date + named event/work/person
+            has_concrete_fact = bool(_YEAR_RE.search(s) and (
+                _NAMED_PERSON_ACTION_RE.search(s) or
+                _DOCUMENTED_EVENT_RE.search(s) or
+                # A year paired with a specific named place/work counts
+                _NAMED_PLACE_RE.search(s)
+            ))
+            
+            if refs:
+                any_specific = True
+                named_stops.extend(refs)
+                all_vague = False
+            elif has_concrete_fact:
+                # Contains dated, specific content — not a vague promise
+                any_specific = True
+                all_vague = False
+            elif not has_vague_pattern:
+                # Forward-looking but not matching the vague patterns
+                all_vague = False
         
         if all_vague and not any_specific:
             violations.append({
@@ -464,22 +486,209 @@ def validate_prolog_structure(
                             'message': f'Part 4 references "{ref}" which is not a stop in this tour.',
                         })
     
+    # ─── CHECK 6: Exactly one tour-level description (DUPLICATE check) ───
+    # Michael explicitly: "we are not going to have two tour descriptions"
+    # If full_tour_content is provided, scan for multiple tour-level passages.
+    full_tour = tour_meta.get('full_tour_content', '')
+    if full_tour:
+        dup_violations = detect_duplicate_tour_descriptions(full_tour, stop_names)
+        violations.extend(dup_violations)
+    
+    # ─── CHECK 7: Part 1 must NAME the tour ──────────────────────────────
+    # Michael: "the serious problem is that it does not name the tour"
+    # "On this biking tour of French Riviera, from the secluded…" → PASS
+    # "From the secluded allure of Cap d'Antibes…" → FAIL (never says what it IS)
+    if parts_present[1]:
+        p1_sents = [sentences[i] for i in part1_indices]
+        # The sentence must explicitly identify what the tour IS, not just use
+        # transport vocabulary in passing. It needs "tour", "journey", "route"
+        # etc. tied to the transport mode AND a geographic/thematic subject.
+        names_the_tour = False
+        for s in p1_sents:
+            # Must say what it IS: "[transport] tour/journey/route of/through [subject]"
+            naming_re = re.compile(
+                r'\b(?:cycling|biking|walking|driving|hiking|sailing|boat|'
+                r'on foot|pedestrian)\s+'
+                r'(?:tour|journey|route|trip|adventure|ride|trek|excursion)\s+'
+                r'(?:of|through|along|across|around)\s+',
+                re.IGNORECASE
+            )
+            # OR: "this is a [transport] [tour-word]"
+            this_is_re = re.compile(
+                r'\bthis\s+(?:is\s+a|route|tour|journey)\b',
+                re.IGNORECASE
+            )
+            if naming_re.search(s) or (this_is_re.search(s) and _sentence_mentions_transport(s, transport_mode)):
+                names_the_tour = True
+                break
+        
+        if not names_the_tour:
+            violations.append({
+                'part': 1,
+                'code': 'PART1_DOES_NOT_NAME_TOUR',
+                'severity': 'warning',
+                'message': (
+                    'Part 1 uses the transport mode but does not explicitly name '
+                    'what the tour IS (e.g. "On this biking tour of the French Riviera…").'
+                ),
+            })
+    
     return violations
+
+
+def detect_duplicate_tour_descriptions(
+    full_tour_content: str,
+    stop_names: List[str],
+) -> List[Dict]:
+    """Detect if a tour has more than one tour-level description.
+    
+    Michael explicitly: "we are not going to have two tour descriptions."
+    
+    A tour-level description is a passage that addresses the tour as a whole
+    (names multiple stops, or opens with tour-scope language). Two such passages
+    in one tour produce DUPLICATE_TOUR_DESCRIPTION.
+    
+    Returns list of violation dicts (empty if exactly one or zero found).
+    """
+    if not full_tour_content:
+        return []
+    
+    # Split by stops
+    stop_sections = re.split(r'\n(?=Stop\s+\d+:)', full_tour_content)
+    
+    tour_level_passages = []
+    
+    for section in stop_sections:
+        # Extract body paragraphs (skip structured fields)
+        # Remove lines that are structured fields
+        lines = section.split('\n')
+        body_lines = []
+        in_body = False
+        for line in lines:
+            # Structured fields start with known labels
+            if re.match(r'^(?:Stop\s+\d+:|Address:|Coordinates:|Type/Specialty:|'
+                       r'Specific Examples:|Orientation:|Directions:)', line):
+                if line.startswith('Orientation:'):
+                    # The Orientation is a structured field; skip it
+                    in_body = False
+                    continue
+                in_body = False
+                continue
+            # After all structured fields, body text begins with a blank line
+            if line.strip() == '' and not in_body:
+                in_body = True
+                continue
+            if in_body:
+                body_lines.append(line)
+        
+        body_text = '\n'.join(body_lines).strip()
+        if not body_text:
+            continue
+        
+        # Split into paragraphs
+        paragraphs = [p.strip() for p in body_text.split('\n\n') if p.strip()]
+        
+        for para in paragraphs:
+            if _is_tour_level_description(para, stop_names):
+                # Record it with a short excerpt for the error message
+                excerpt = para[:100] + ('...' if len(para) > 100 else '')
+                tour_level_passages.append(excerpt)
+    
+    if len(tour_level_passages) > 1:
+        return [{
+            'part': 0,
+            'code': 'DUPLICATE_TOUR_DESCRIPTION',
+            'severity': 'error',
+            'message': (
+                f'Tour contains {len(tour_level_passages)} tour-level descriptions '
+                f'(must be exactly 1). Passages found:\n'
+                + '\n'.join(f'  [{i+1}] "{p}"' for i, p in enumerate(tour_level_passages))
+            ),
+        }]
+    
+    return []
+
+
+def _is_tour_level_description(paragraph: str, stop_names: List[str]) -> bool:
+    """Detect whether a paragraph is a tour-level description (addresses the
+    tour as a whole) rather than a stop-specific one.
+    
+    A tour-level description:
+    - Names multiple stops, OR
+    - Opens with tour-scope language (journey, tour, route, embark), OR
+    - Addresses the full tour arc rather than one location
+    
+    This is the STRUCTURAL detection Michael asked for: "detect it structurally,
+    not by position."
+    """
+    if not paragraph or len(paragraph.strip()) < 40:
+        return False
+    
+    p_lower = paragraph.lower()
+    
+    # Check 1: Names 2+ stops from the tour
+    stops_referenced = 0
+    for name in stop_names:
+        if name.lower() in p_lower:
+            stops_referenced += 1
+        else:
+            # Check significant parts (>4 chars) to avoid false matches
+            parts = re.split(r'[\s,\'-]+', name)
+            for part in parts:
+                if len(part) > 4 and part.lower() in p_lower:
+                    stops_referenced += 1
+                    break
+    if stops_referenced >= 2:
+        return True
+    
+    # Check 2: Tour-scope opening language
+    tour_scope_re = re.compile(
+        r'^(?:you are about to|on this .{0,30}(?:tour|journey|route|trip)|'
+        r'this (?:tour|route|journey|ride|trip|cycling|biking|walking|driving)|'
+        r'embark on|welcome to this|'
+        r'this is a .{0,20}(?:tour|route|journey|trip))',
+        re.IGNORECASE
+    )
+    if tour_scope_re.match(paragraph.strip()):
+        return True
+    
+    # Check 3: Contains forward-looking language about stops ahead
+    forward_re = re.compile(
+        r'\b(?:in the stops? ahead|stops? (?:of|on) this tour|'
+        r'you will (?:encounter|explore|discover|visit).{10,}(?:and|,))',
+        re.IGNORECASE
+    )
+    if forward_re.search(paragraph):
+        return True
+    
+    # Check 4: Transport mode + tour context in opening sentence
+    transport_tour_re = re.compile(
+        r'\b(?:cycling|biking|walking|driving|hiking|sailing)\s+'
+        r'(?:tour|journey|route|trip|adventure)\b',
+        re.IGNORECASE
+    )
+    if transport_tour_re.search(paragraph):
+        return True
+    
+    return False
 
 
 def extract_prolog_from_tour_content(tour_content: str) -> str:
     """Extract the prolog text from assembled tour content.
     
-    The prolog is injected into Stop 1's body (after Orientation, before the
-    stop's own description). It's the text between the Orientation paragraph
-    and the first description-like paragraph that is clearly about the stop's
-    specific subject.
+    The prolog is a tour-level description — it addresses the tour as a whole
+    rather than one specific stop. Detection is STRUCTURAL, not positional:
+    we look for the passage that names multiple stops, or opens with tour-scope
+    language, regardless of where it sits in the text.
     
-    For tours generated before LOCAL-259 (four-part prolog), the prolog is
-    typically the first 1-3 paragraphs of Stop 1's body text after Orientation.
+    LOCAL-259 places the prolog AFTER the Orientation (not inside it).
+    Older tours may have it elsewhere. This function handles both.
     """
     if not tour_content:
         return ""
+    
+    # Get stop names for multi-stop detection
+    stop_names = extract_stop_names_from_tour_content(tour_content)
     
     # Find Stop 1 section
     stop1_match = re.search(r'Stop\s+1:.*?(?=\nStop\s+2:|\Z)', tour_content, re.DOTALL)
@@ -488,41 +697,53 @@ def extract_prolog_from_tour_content(tour_content: str) -> str:
     
     s1_text = stop1_match.group(0)
     
-    # The prolog is in the Orientation field (where it gets injected)
-    # OR in the body text after the structured fields.
-    # Check Orientation first:
+    # Get the Orientation field text (to exclude it from prolog candidates)
+    orient_text = ""
     orient_match = re.search(r'Orientation:\s*(.+?)(?=\n\n)', s1_text, re.DOTALL)
     if orient_match:
         orient_text = orient_match.group(1).strip()
-        # The orientation may contain BOTH the navigation sentence AND the prolog
-        # The prolog is typically longer and non-navigational
-        # Split by paragraph
-        paragraphs = [p.strip() for p in orient_text.split('\n\n') if p.strip()]
-        if paragraphs:
-            # If there's only one paragraph and it's short navigation, no prolog
-            # If there are multiple paragraphs, prolog is after the navigation intro
-            return orient_text
     
-    # Fallback: look for body text between Orientation/structured fields and the
-    # stop's main description. The prolog is often the first block of flowing text.
-    # Find text after all structured fields up to the main description
+    # Get all body paragraphs between structured fields and Directions
+    # These are the candidates for the prolog
     body_start = re.search(
-        r'(?:Specific Examples:.*?\n\n|Orientation:.*?\n\n)',
+        r'Orientation:.*?\n\n',
         s1_text, re.DOTALL
     )
-    if body_start:
-        body_text = s1_text[body_start.end():].strip()
-        # Take text up to Directions:
-        directions_match = re.search(r'\nDirections:', body_text)
-        if directions_match:
-            body_text = body_text[:directions_match.start()].strip()
-        
-        # The prolog is typically the first 1-3 paragraphs (before stop-specific content)
-        paragraphs = [p.strip() for p in body_text.split('\n\n') if p.strip()]
-        if paragraphs:
-            # Heuristic: prolog paragraphs talk about the tour broadly;
-            # stop-specific paragraphs mention the stop name or its specifics
-            return paragraphs[0] if len(paragraphs) == 1 else '\n\n'.join(paragraphs[:2])
+    if not body_start:
+        # Try after Specific Examples
+        body_start = re.search(r'Specific Examples:.*?\n\n', s1_text, re.DOTALL)
+    
+    if not body_start:
+        return ""
+    
+    body_text = s1_text[body_start.end():].strip()
+    
+    # Truncate at Directions: field
+    directions_match = re.search(r'\nDirections:', body_text)
+    if directions_match:
+        body_text = body_text[:directions_match.start()].strip()
+    
+    # Split into paragraphs
+    paragraphs = [p.strip() for p in body_text.split('\n\n') if p.strip()]
+    
+    if not paragraphs:
+        # Check if Orientation itself is a tour-level description (older format)
+        if orient_text and _is_tour_level_description(orient_text, stop_names):
+            return orient_text
+        return ""
+    
+    # Find the paragraph(s) that are tour-level descriptions
+    prolog_parts = []
+    for para in paragraphs:
+        if _is_tour_level_description(para, stop_names):
+            prolog_parts.append(para)
+    
+    if prolog_parts:
+        return '\n\n'.join(prolog_parts)
+    
+    # Fallback: check the Orientation text itself (pre-LOCAL-259 format)
+    if orient_text and _is_tour_level_description(orient_text, stop_names):
+        return orient_text
     
     return ""
 
