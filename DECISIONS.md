@@ -5874,3 +5874,89 @@ Also refreshed the prepush-baseline worktree, which was detached at `fe7eee7`
 rather than `origin/storied`. A stale baseline silently invalidates every
 regression comparison made against it — the exact failure CLAUDE.md warns
 about. It now tracks `d0630cc`.
+
+## D144 — Subscribed is current again; the merge cost seven files as measured (2026-08-05)
+
+LOCAL-248 merged and pushed (`b2e5237`). `git rev-list --count subscribed..storied`
+is **0** — the 366-commit drift is closed, and it closed as a fast-forward, so
+the main worktree never had to leave `storied` while LOCAL-249 was running.
+
+LEAD verified rather than accepted: the three "take storied's version" rules
+were honoured byte for byte (`DECISIONS.md`, `ANSWERS.md`, and the tests shim
+whose hand-written export list once shipped R10 invisible, D135). Both sides
+survive in the four real merges — storied's gates and phases are all present in
+`generate_tour_text.py`, and subscribed's billing markers are intact in
+`tour_orchestrator_service.py` and `cost_meter.py`. LEAD re-ran the two
+subscribed suites instead of reading the numbers: 14 and 34 passing, matching
+the submission exactly. All five service modules compile and import.
+
+The task took 505 seconds. The estimate that made it worth doing now — seven
+conflicting files out of 483 — came from `git merge-tree` before dispatch
+rather than from a guess, and it held.
+
+## D145 — R10 is structural now, and it removes without expanding (2026-08-05)
+
+LOCAL-249 merged (`9c243d9`). Promise detection no longer depends on matching
+an idiom: it extracts the abstract noun a sentence puts forward as its point,
+so "echoing with **stories**" is caught the same as "holds **stories**". Three
+rounds of widening the whitelist were each overtaken by the model's next
+rephrasing; this is the shape Michael specified himself.
+
+LEAD verified all nine boundary rows independently — four promises fire, all
+five that must survive stay silent (Monet 1888, Eden-Roc 1870, the Rue Obscure
+at 130 metres, Èze at 200 BC, navigation). Corpus-wide R10 goes 88 → 249,
+**2.8×**, inside the 3× stop-and-report threshold the task was given. The task
+honoured that threshold rather than shipping past it: it found that including
+`history`/`heritage`/`culture` pushed R10 to 4.1× and excluded them, saying so
+and naming what that leaves uncaught. LEAD sampled the new catches across 29
+real tours and found no false positive.
+
+**Three findings, none of them scope failures.**
+
+*It only removes.* Round 6 is **298 words, down from 680**. Expansion — the
+middle step of "validate, expand, and if cannot expand remove" — was never
+built, so every unsubstantiated sentence is deleted. By Michael's own D100 that
+is the wrong end state: very little information can be worse than unverifiable
+information. A tour that says nothing passes every style rule we own.
+Dispatched as LOCAL-250, with the hard constraint that the model may only
+phrase a fact the corpus supplied and never supply one.
+
+*The tour now opens with a claim the same run deleted elsewhere.* "A hidden
+network of smuggler's tunnels… wartime espionage" was removed from the prolog
+as "unverifiable in corpus" and survives as the first sentence of stop 1. R10
+is a style rule: it removes a sentence that promises and does not deliver, not
+one that simply asserts something we cannot support. **Widening R10 to cover it
+would be wrong** — an assertion is not a promise, and conflating them starts
+deleting facts. A truth gate is separate work.
+
+*R7 still fires once* on the sensory invention Michael scored 1/5 — caught by
+the harness, not removed. The finding does not reach a deletion; why is part of
+LOCAL-250.
+
+## D146 — Four task files said "do not edit DECISIONS.md", so it is now checked mechanically (2026-08-05)
+
+LOCAL-249 deleted **D142 and D143** — entries written that morning. Its branch
+was cut before them and rewrote the file wholesale. The merge dropped the file
+and kept the substance; nothing was lost, because the record is also on origin.
+
+This is the fourth occurrence (LOCAL-77, LOCAL-92, the subscribed merge, now
+LOCAL-249). The instruction is in CLAUDE.md and in every task file, and it has
+not worked, so it is not the control. `.continuous_dev/check_protected_files.sh`
+now reports task branches that touch `DECISIONS.md`, `CLAUDE.md` or
+`BACKLOG.md`, and LEAD runs it before merging.
+
+Writing it took three corrections worth recording, because each was a mistake
+LEAD had just warned about in another context:
+
+- The first version filtered branches with `--is-ancestor BASE branch`, which
+  **skips exactly the dangerous case**: a branch cut before the entry it deletes
+  is not a descendant of the tip. Fixed by diffing from each branch's merge base.
+- The second version reported 12 abandoned branches carrying old protected-file
+  edits that will never be merged — the cry-wolf failure written up in D141 an
+  hour earlier. Fixed with a 24-hour recency filter.
+- The third still flagged the subscribed sync branches, where editing
+  `DECISIONS.md` is the legitimate pattern. Fixed by alarming only on
+  **deletions**, which is the actual harm signature, and noting additions.
+
+A guard is not finished when it fires. It is finished when it fires only on
+what it is for.
