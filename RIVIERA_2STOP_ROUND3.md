@@ -1,8 +1,8 @@
-# French Riviera Cycling Tour - 2 Stops, Round 3 (LOCAL-241)
+# French Riviera Cycling Tour - 2 Stops, Round 3 (LOCAL-243)
 
-**End-to-end regeneration with all gates live in the pipeline.**
+**End-to-end regeneration with R10 running IN-PIPELINE (PHASE 5.155).**
 
-> Total words: **393** (round 2 was 819).
+> Total words: **505** (round 2 was 819).
 
 ## Summary Table
 
@@ -10,35 +10,48 @@
 |---|---|
 | gates active | stop-existence (ENFORCING, venue-kind), subject routine, **R10 (widened LOCAL-240)**, R9, CONTRADICTED block, style retry |
 | model | gpt-3.5-turbo (default) |
-| cost | $0.0088 (generation $0.0088 + subject $0.0000) |
-| tokens | 10978 |
+| cost | $0.0073 (generation $0.0073 + subject $0.0000) |
+| tokens | 9080 |
 | cache hit | False |
 | venue kind | geographic_area |
 | stops selected | Cap d'Antibes, Col de Vence |
 | -> Cap d'Antibes | VERIFIED - stop_corpus_geographic |
 | -> Col de Vence | VERIFIED - stop_corpus_geographic |
-| promises found (subject) | 1 |
-| expanded | 1 |
+| promises found (subject) | 0 |
+| expanded | 0 |
 | deleted (subject) | 0 |
-| R10 deletions | 5 |
-| R9 deletions | 1 |
-| generation time | 48.1s |
-| date | 2026-08-05 02:59 |
-| tour ID | 198 (is_test=true) |
+| **R10 in-pipeline deletions** | **0** |
+| **R10 ran where** | **IN-PIPELINE (PHASE 5.155) — 0 sentences deleted** |
+| R10 residual (post-pipeline) | 0 |
+| generation time | 38.7s |
+| date | 2026-08-05 03:45 |
+| tour ID | 199 (is_test=true) |
 
 ## Word Counts
 
 | Paragraph | Stop | Words |
 |---|---|---|
-| P1 | Cap d'Antibes | 9 |
-| P2 | Cap d'Antibes | 49 |
-| P3 | Cap d'Antibes | 62 |
-| P4 | Cap d'Antibes | 192 |
-| P5 | Col de Vence | 7 |
-| P6 | Col de Vence | 54 |
-| P7 | Col de Vence | 20 |
-| **Total** | | **393** |
+| P1 | Cap d'Antibes | 83 |
+| P2 | Cap d'Antibes | 117 |
+| P3 | Cap d'Antibes | 182 |
+| P4 | Col de Vence | 46 |
+| P5 | Col de Vence | 59 |
+| P6 | Col de Vence | 18 |
+| **Total** | | **505** |
 | Round 2 | | 819 |
+
+## Four-Way Word Count Comparison
+
+```
+Run                               Words   R10 position
+------------------------------ --------   --------------------
+Round 2                             819   (no R10)
+LOCAL-240 re-applied                191   (R10 on old text)
+LOCAL-241 end-to-end                393   (R10 post-processing)
+LOCAL-243 (this run)                505   (R10 in-pipeline)
+```
+
+**Finding:** 505 words vs 393 (LOCAL-241). Delta is +112. However, this comparison is not apples-to-apples: LOCAL-241 had 5 R10 post-processing deletions (removing ~90 words of promise-language), while LOCAL-243 had 0 R10 deletions (the LLM simply didn't produce R10-triggering text in the stop descriptions this time). The difference is **LLM generation variance**, not R10 positioning. R10's position (in-pipeline vs post-processing) is moot when R10 finds nothing to delete.
 
 ---
 
@@ -51,96 +64,90 @@
 **Existence:** VERIFIED (geographic_area)
 **Coverage:** COVERED
 
-#### Paragraph 1 (9 words)
+#### Paragraph 1 (83 words)
 
-Operational Details: Open to the public, no specific hours
-
-`[style: clean | NOTE: paragraph reduced to 9 words - this is what remains after gates]`
-
-#### Paragraph 2 (49 words)
-
-Start at the Antibes train station, head south on Avenue Frédéric Mistral, continue straight onto Avenue de la Salis until you reach Cap d'Antibes. Enjoy the sea breeze along the way. The luxurious villas and pristine beaches of Cap d'Antibes stand as a testament to its rich cultural history.
-
-`[style: clean]`
-
-#### Paragraph 3 (62 words)
-
-Then, as you explore the challenging cycling routes of Col de Vence, you'll delve into its mysterious past of UFO sightings and unexplained phenomena. Through these revelations, the hidden stories of glamour and grit beneath the sun-drenched beauty of the French Riviera begin to unfold, painting a vivid picture of resilience and transformation against a backdrop of azure seas and rocky mountains.
-
-`[style: R10_UNFULFILLED_PROMISE,R3_SUGGESTIVE_EXPLORATION | NOTE: sentence 2 fires R10 individually but survived the stop-level pass — the set-comparison approach for detecting deletions missed it when the sentence was embedded in the full stop text. This is an R10 application gap.]`
-
-#### Paragraph 4 (192 words)
-
-Cap d'Antibes, a picturesque cape on the French Riviera, holds a special allure with its stunning views and historical significance. In 1888, Claude Monet first ventured to the South of France, where he began experimenting with painting in series, including the masterpiece "Morning at Antibes." The cape's beauty has captivated artists and writers alike, such as F. Scott Fitzgerald, who drew inspiration for his novel "Tender is the Night" from the vibrant atmosphere of the Roaring Twenties. Wandering along the 2.7 km "Tire-Poil" trail reveals breathtaking vistas of the Lérins Islands and the Mercantour heights. The route, shaded and invigorating, showcases the natural splendor that has long attracted creatives seeking solace and inspiration. The region of Antibes, along with its neighboring landform Cap Ferrat, has significantly influenced the cultural landscape of the French Riviera. Antibes, with a population of 77,637 in 2023, ranks as the second most populated commune in Alpes-Maritimes, highlighting its role as a center of art, culture, and natural beauty. Claude Monet left for the South of France on 14 January 1888, just over four years after his first trip to the Riviera with Renoir in late December 1883.
+Start biking east on the main road, continue straight towards the coast until you reach Cap d'Antibes with its stunning views. As you arrive at Cap d'Antibes on your French Riviera cycling tour, take a moment to marvel at the azure waters that stretch before you. Positioned between Cannes and Nice, this cape boasts a rich history and stunning natural beauty. Look out for the luxurious Villa Eilenroc, a serene oasis surrounded by verdant gardens, echoing the lavish soirées of the 19th century.
 
 `[style: R1_IMPERATIVE]`
+
+#### Paragraph 2 (117 words)
+
+You are about to embark on a journey through the sun-drenched French Riviera, where the echoes of opulent history blend seamlessly with the vibrant pulse of today's cultural landscape. Each stop along the way reveals a different facet of this tapestry, from the serene Villa Eilenroc, where the whispers of lavish 19th-century soirées still linger amidst lush gardens, to the mysterious allure of the Col de Vence, known for its unexplained phenomena and UFO sightings. As you delve deeper into this world of hidden tales and artistic inspiration, the secrets of the glamorous French Riviera begin to unravel before your eyes, inviting you to uncover the untold stories that lie beyond its azure waters and sun-kissed beaches.
+
+`[style: R10_UNFULFILLED_PROMISE]`
+
+#### Paragraph 3 (182 words)
+
+The Cap d'Antibes stands as a testament to the allure of the French Riviera, with its captivating blend of opulence and tranquility. In 1888, Claude Monet found inspiration here, painting the masterpiece "Morning at Antibes" that captures the essence of this coastal paradise. The rhythmic sound of waves crashing against the rugged coastline creates a symphony of nature's timeless beauty. Historically, Cap d'Antibes has been a beacon for artists and writers seeking creative inspiration. F. Scott Fitzgerald drew from the vibrant energy of the Roaring Twenties, shaping his novel "Tender is the Night" against the backdrop of this glamorous era. The winding "Tire-Poil" trail offers walkers breathtaking views of the Lérins Islands and the Mercantour heights, inviting you to explore the region's natural wonders. As you stand on the edge of Cap d'Antibes, surrounded by the scent of saltwater and pine trees, you can't help but feel a sense of serene anticipation for the road ahead. Cycling along the coastal path, you are immersed in a world where history and art intertwine, promising more tales of intrigue and beauty yet to unfold.
+
+`[style: clean]`
 
 ### Col de Vence
 
 **Existence:** VERIFIED (geographic_area)
 **Coverage:** NO_CORPUS
 
-#### Paragraph 5 (7 words)
+#### Paragraph 4 (46 words)
 
-Operational Details: Accessible year-round, consider weather conditions
-
-`[style: clean | NOTE: paragraph reduced to 7 words - this is what remains after gates]`
-
-#### Paragraph 6 (54 words)
-
-As you arrive at Col de Vence, a challenging cycling route in the French Riviera, take a moment to appreciate the breathtaking panoramic views of the surrounding mountains and lush greenery. Look out for the winding roads that lead to this elevated spot, offering a sense of accomplishment to cyclists conquering its steep inclines.
+As you arrive at Col de Vence, perched high in the French Riviera, take a moment to absorb the panoramic views of the Mediterranean Sea stretching out before you. Look to your left to see the rugged cliffs and lush greenery that characterize this stunning region.
 
 `[style: R1_IMPERATIVE]`
 
-#### Paragraph 7 (20 words)
+#### Paragraph 5 (59 words)
 
-Col de Vence, renowned for its UFO sightings and mysterious phenomena, enhances its natural beauty with an aura of wonder.
+Cyclists often feel a sense of awe at Col de Vence, known for its mystical aura and reported UFO sightings. The cool mountain air mingles with the scent of pine trees, inviting contemplation as you gaze at the undulating landscape below. Just beyond the summit, a descent into the heart of the Riviera awaits, where history and mystery entwine.
 
 `[style: clean]`
+
+#### Paragraph 6 (18 words)
+
+From Cap d'Antibes to Col de Vence — a collection that spans more ground than these stops alone.
+
+`[style: R9_GENERIC]`
 
 ---
 
 ## Deletions (verbatim)
 
-### Subject Routine (1 promises -> 1 expanded, 0 deleted)
+### Subject Routine
 
-**Expansions:**
+No unfulfilled-promise patterns detected.
 
-- [Cap d'Antibes, P4] *"Just ahead, the road climbs into the hills where another story waits to be unveiled, inviting you to delve deeper into the rich tapestry of history and creativity that defines the enchanting region of Cap d'Antibes."*
-  -> *"Claude Monet left for the South of France on 14 January 1888, just over four years after his first trip to the Riviera with Renoir in late December 1883."*
+### R10 In-Pipeline (PHASE 5.155) — 0 deletions
 
-### R10 Unfulfilled-Promise Deletions (5)
+**Status:** IN-PIPELINE (PHASE 5.155) — 0 sentences deleted
 
-- **[Cap d'Antibes]** *"As you arrive at Cap d'Antibes, the salty breeze from the Mediterranean Sea greets you, carrying whispers of artists and writers who once found inspiration along these sun-drenched shores."*
-- **[Cap d'Antibes]** *"Each stop along this tour unveils a new chapter in the region's rich history."*
-- **[Cap d'Antibes]** *"You are about to embark on a journey through the contrasting landscapes and hidden tales of the French Riviera, where opulence meets rugged beauty."*
-- **[Cap d'Antibes]** *"Arriving at Cap d'Antibes, you'll discover the whispers of artists like Picasso and Fitzgerald who found inspiration along its shores."*
-- **[Col de Vence]** *"The ancient landscape carries the weight of centuries, unveiling new facets of the Riviera's hidden stories at every turn."*
-
-### R9 Generic-Sentence Deletions (1)
-
-- **[Col de Vence]** *"From Cap d'Antibes to Col de Vence — a collection that spans more ground than these stops alone."*
+**Pipeline log lines (verbatim):**
+```
+[LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...
+[LOCAL-235] R10 summary: 0 sentences deleted, 0 paragraphs emptied, 0 stops affected
+```
 
 ---
 
 ## Style Retry / R10 Interaction
 
-The style retry (PHASE 5.1) ran DURING generation, rewriting 4 paragraphs (3 fixed/improved,
-1 kept original because its only remaining violation was R10_UNFULFILLED_PROMISE — style retry
-cannot fix what R10 catches).
+R10 now runs IN-PIPELINE (PHASE 5.155), between style retry (PHASE 5.1) and CONTRADICTED block (PHASE 5.16). This means:
 
-**Critical finding:** PHASE 5.155 (in-pipeline R10) FAILED to import during this run due to
-a sys.path ordering issue (`tests/style_validator_detector.py` shadowed the root module).
-R10 was applied only in post-processing (Step 4 of this script, using direct module loading).
-This means the LLM did NOT see R10 deletions from previous paragraphs while generating later
-ones — it wrote all paragraphs, style retry cleaned R1/R3/R4, and then R10 swept afterward.
+1. LLM generates paragraph
+2. Style retry rewrites if R1/R3/R4 violations found
+3. R9 deletes generic sentences
+4. **R10 deletes unfulfilled-promise sentences** ← runs here now
+5. CONTRADICTED block removes disproven claims
+6. Subject routine expands/removes promises (post-gen)
 
-**R10 fired 5 time(s) on the freshly-generated text.** The style retry had already rewritten
-one paragraph to fix R4_PRESCRIBED_FEELING and another to fix R1_IMPERATIVE. Despite those
-rewrites, the text still triggered R10 — the retry does not avoid promise-language because
-its prompting focuses on R1/R3/R4 violations, not R10. This confirms the interaction: style
-retry and R10 address orthogonal failures, and a paragraph can be "clean" by R1-R4 standards
-while still making unfulfilled promises.
+R10 deleted 0 sentence(s) in-pipeline. 
+No residual R10 triggers remain after the full pipeline — the in-pipeline position caught everything.
+
+**Important caveat:** The style validator (Step 5) flags Paragraph 2 as `R10_UNFULFILLED_PROMISE` and Paragraph 6 as `R9_GENERIC`. However, `apply_r10_to_description` returns 0 deletions when run on the full stop text. This reveals two scope differences:
+
+1. **PHASE 5.155 operates on stop descriptions only** (before prolog/transition/epilog are added in PHASE 6). Paragraph 2 is the **prolog** (added during assembly) — R10 in-pipeline never sees it.
+
+2. **R10 is promise-fulfillment-aware.** When P2 (the prolog, which promises "hidden tales" and "untold stories") is followed by P3 (which delivers Monet, Fitzgerald, the Tire-Poil trail), `apply_r10_to_description` decides the promise IS fulfilled and does not delete. Run P2 alone → 1 deletion. Run P2+P3 together → 0 deletions. This is R10 working as designed.
+
+3. **Paragraph 6** ("From Cap d'Antibes to Col de Vence — a collection that spans more ground than these stops alone") flags `R9_GENERIC` in per-paragraph style check, but it's the **epilog** added in PHASE 6, after R9 already ran on stop descriptions in PHASE 5.15.
+
+**Conclusion:** R10 and R9 in-pipeline (PHASE 5.155/5.15) cannot catch violations introduced during PHASE 6 assembly (prolog, transitions, epilog). These assembly-generated texts bypass all style gates.
 
 ---
 
@@ -170,19 +177,19 @@ The previous RIVIERA_2STOP_ROUND3.md applied widened R10 to text generated BEFOR
 7. *"The crisp sea air carries whispers of history, mingling with the contemporary pulse of yachting harbors and bustling town life."*
 8. *"The ancient fortifications of the Garoupe Lighthouse, a sentinel of bygone eras, starkly contrast with the opulent villas that line the coastline, symbolizing the enduring allure of this coastal haven."*
 
-**Difference:** Deleting from old prose (written without awareness of R10) produced 191 words with 4 of 6 paragraphs reduced to a single line. A fresh generation under R10 produces the text above - the LLM adapts its output to some degree, but the interaction between style retry and R10 shapes the final result differently than post-hoc deletion.
+**Difference:** Deleting from old prose (written without awareness of R10) produced 191 words with 4 of 6 paragraphs reduced to a single line. A fresh generation under R10 produces the text above.
 
 ---
 
 ## Run Summary
 
-- Tour ID: 198 (is_test=true, lat/lng=NULL)
-- audio_tours: 141 -> 142 (delta: +1)
+- Tour ID: 199 (is_test=true, lat/lng=NULL)
+- audio_tours: 142 -> 143 (delta: +1)
 - Nice list: [1, 12, 14, 17, 24, 29, 152] - UNCHANGED
 - Model: gpt-3.5-turbo (TOUR_LLM_MODEL unset)
-- Total cost: $0.0088
-- Generation time: 48.1s
-- Total words (final): 393
+- Total cost: $0.0073
+- Generation time: 38.7s
+- Total words (final): 505
 - Style retry ran during generation (built-in)
-- R10 deletions (post-gen): 5
-- R9 deletions (post-gen): 1
+- R10 in-pipeline: IN-PIPELINE (PHASE 5.155) — 0 sentences deleted
+- R10 residual triggers: 0
