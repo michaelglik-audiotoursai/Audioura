@@ -794,3 +794,73 @@ so it reverts to his own earlier and more careful *"shows whether there are
 savings"*.
 
 ---
+
+## 2026-08-05 17:15 — Michael
+
+> But by validating that the exhibit actually is in the museum, we should have
+> been obtaining some information about it: what year it was created, who created
+> it, when was it purchased by the museum, who watched it, etc. Why would nto we
+> want to display the details of the exhibit?
+
+> Yes, I would dispatch both. The only concern I have is that these tasks would
+> nto dimish Riviera tour we had such a great accomplishement today. Can these
+> make the Walking tours suffer?
+
+## 2026-08-05 17:15 — LEAD
+
+**You found something worse than you framed it.** The 5-stop museum tour used
+five objects we hold **zero** corpus for, while seven well-sourced ones sat
+unused:
+
+```
+USED (0 passages)             UNUSED (passages we already have)
+  Les paysages de l'âme         La danse cosmique de Ganesh    6
+  La geste de Bouddha           Ulysses Grant au Japon         6
+  L'art en exil — Hàm Nghi      L'Armure d'Andô Naoyuki        6
+  Hokusai – mont Fuji           Statue de Bouddha              6
+  Armure du Clan Hotta          Kannon à mille bras            5
+```
+
+1.6 facts per stop was **unused** corpus, not thin corpus.
+
+**And your question explains why the gate missed it.** All five verified — via
+`canonical_titles`, a *list of names* scraped from the museum's site. That asks
+"is this title on the list?", gets yes, and learns nothing. The objects verified
+the other way carry exactly what you describe: the Grant print's corpus holds
+artist, dates, era, medium, donor and **inventory number 2015.6.A.1**. Fetched,
+stored, never used.
+
+**Verification and enrichment are the same fetch and we split them.** We read
+the catalogue to prove a thing exists, throw away what it said, then ask a model
+to describe an object whose entry we just read.
+
+### On your concern — one is safe, one is not
+
+**LOCAL-283 (harvest on verification) is additive.** It cannot change selection
+or how Riviera tours are written. Its real risk is corpus *pollution* — D157's
+failure, where venue-level text inflated counts while saying nothing. Guarded
+explicitly.
+
+**LOCAL-284 (selector prefers corpus) is where your worry is justified, and it
+brushes against D170.** This morning you said not to enforce anything artificial
+on selection. A selector preferring stops we happen to have scraped is a soft
+version of that, and would narrow every Riviera tour toward Cap d'Antibes and
+Èze — because our corpus is deepest there, not because they are the best stops.
+
+So it is constrained to **tiebreak only, never exclusion**. If Port de Nice
+belongs on the route it stays, and the answer is to fix its corpus. The museum
+case is treated differently and the task must justify why: there the candidate
+set is a closed list of the venue's own objects, all equally notable, so
+choosing the seven we can describe is competence rather than narrowing.
+
+### Both carry today's numbers as a must-not-regress
+
+| baseline | value |
+|---|---|
+| Cap d'Antibes + Port de Nice | **6.0** facts/stop |
+| 8-stop Riviera | **8.8** facts/stop, 53 total |
+| distinct stops drawn across runs | reported before and after |
+
+Below those, or a materially narrower stop set, is a bounce rather than a merge.
+
+---
