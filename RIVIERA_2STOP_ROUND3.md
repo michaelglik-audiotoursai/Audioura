@@ -4,6 +4,28 @@
 
 > Total words: **488** (round 2 was 819).
 
+> ## ⚠️ Read this first — LEAD's note, 2026-08-05 04:40
+>
+> **Stop 2, Corniche d'Or, is UNVERIFIED and was narrated anyway.** The
+> stop-existence gate is listed as active in the table below, but it ran in
+> LOG_ONLY mode — it recorded the verdict and did not drop the stop. So two of
+> the six paragraphs describe a place we have no source for. Treat them the way
+> you treated the Chikanobu print.
+>
+> Everything else held: **zero residual R10** in the delivered text, and the
+> tour prolog passed through the gates for the first time (it has never been
+> checked by anything before today — it is generated separately and injected
+> after every gate finishes).
+>
+> **R1 still fires on four of six paragraphs.** That is your original
+> complaint, unresolved.
+>
+> Word counts across the night: round 2 **819** → R10 on old text **191** →
+> end-to-end **393** → R10 in-pipeline **505** → this, with the prolog gated,
+> **488**. The variance is generation noise; what holds is that 40–75% of what
+> the model writes unprompted is promise language with nothing behind it.
+
+
 ## Summary Table
 
 | Field | Value |
