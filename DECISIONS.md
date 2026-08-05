@@ -5382,3 +5382,70 @@ is that there is almost nothing to validate. Every thread this week — the
 89.5%-corrected-to-26% unverified stops, the 18% expansion rate, the 25 of 29
 tours with no venue corpus, and now 191 words from 819 — converges on the same
 sentence: **the corpus is the product, and we do not have one.**
+
+---
+
+## D135 — The tour generates properly, the routine expanded a promise for the first time, and the shim shipped R10 invisible (2026-08-05)
+
+### LOCAL-241: a real end-to-end run
+
+```
+393 words   (round 2 was 819; R10-on-old-text was 191)
+48.1s · $0.0088 · tour 198 · both stops VERIFIED
+R10 deletions 5 · R9 1 · promises found 1 · expanded 1
+```
+
+**The first successful in-tour expansion.** A promise —
+
+> *"Just ahead, the road climbs into the hills where another story waits to be
+> unveiled, inviting you to delve deeper into the rich tapestry of history…"*
+
+— was replaced with:
+
+> *"Claude Monet left for the South of France on 14 January 1888, just over
+> four years after his first trip to the Riviera with Renoir in late December
+> 1883."*
+
+Sourced, dated, specific. That is Michael's routine doing what he asked for
+rather than deleting.
+
+### And the honest disclosure that mattered more
+
+> *"PHASE 5.155 (in-pipeline R10) FAILED to import — `tests/style_validator_detector.py`
+> shadowed the root module. R10 was applied only in post-processing."*
+
+**LEAD's own shim caused it.** `tests/style_validator_detector.py` re-exports a
+**hand-written list** of names. R10 was added to the canonical module and never
+to that list, so anything importing through `tests/` got a module with no R10 —
+silently, since the import of `style_validator_detector` itself succeeds.
+
+Seventh "built and inert" defect, and the first one LEAD authored. Fixed: the
+shim now forwards every public name dynamically. A shim that must be maintained
+in step with the module it forwards is a shim that will drift.
+
+**LOCAL-243** dispatched for one more run, with an explicit requirement to
+confirm PHASE 5.155 actually executed rather than report success on a quiet
+fallback.
+
+### LOCAL-242: what better retrieval is worth
+
+**4 of 15 stops (27%) lifted from unsourced to D74-compliant sourced**, at
+**$0.0025 per stop**. The task marked a fifth as lifted and then removed it on
+review — the honest count is 4.
+
+```
+institutional catalogue (maa.departement06.fr, mamac-nice.org)   2 lifts
+subject decomposition (maker + object)                           1
+event/person search — Michael's Chikanobu insight                1
+single distinctive token — the "Cornelie" lesson                 0 (never triggered)
+```
+
+It also states its own bias plainly: the sample favoured museums with
+catalogues, so **15–25% is the realistic rate across all 190 stops**, and
+outdoor tours, camel tours and dog-sledding have no catalogue to query at all.
+
+**So the answer to "is retrieval worth a sprint" is yes, with a ceiling.** A
+quarter of the gap is reachable for about half a dollar across the whole
+corpus. The other three quarters is not a retrieval problem — it is venues with
+no public record, and for those the honest options remain licensed data,
+institutional partnerships, or covering fewer venues properly.
