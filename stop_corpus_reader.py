@@ -26,6 +26,82 @@ def _normalize_for_match(text: str) -> str:
     return re.sub(r'[^a-z0-9\s]', '', text.lower()).strip()
 
 
+def _accent_fold(text: str) -> str:
+    """Fold accented characters to ASCII equivalents for matching.
+
+    LOCAL-277: Île/Ile, Èze/Eze, Château/Chateau, Carré/Carre etc.
+    """
+    import unicodedata
+    nfkd = unicodedata.normalize('NFKD', text)
+    return ''.join(c for c in nfkd if not unicodedata.combining(c))
+
+
+# LOCAL-277: Name variant groups — these drawn names refer to the same place.
+# Each tuple is (canonical_corpus_title, [variant_names_the_selector_may_use]).
+# Only equivalent places; distinct places (e.g. Cap Ferrat Lighthouse vs Cap Ferrat) stay separate.
+_NAME_VARIANT_MAP = {
+    # Port/Harbor forms for the same place
+    'saint-tropez harbor': ['port de saint-tropez', 'port of saint-tropez', 'saint-tropez port',
+                            'saint-tropez harbour', 'vieux port de saint-tropez'],
+    'port de nice': ['port lympia', 'port of nice', 'nice harbor', 'nice harbour',
+                     'old port of nice', 'vieux port de nice'],
+    'port grimaud': ['port de grimaud', 'port of grimaud'],
+    # Accent/article variants
+    'ile sainte-marguerite': ['ile sainte marguerite', 'ile ste-marguerite',
+                              'ile ste marguerite', 'saint margaret island'],
+    # "Old Town" with/without "of"
+    'old town of antibes': ['old town antibes', 'vieil antibes', 'vieille ville d\'antibes'],
+    # Croisette variants
+    'la croisette': ['cannes croisette', 'boulevard de la croisette',
+                     'promenade de la croisette', 'the croisette'],
+    # Chateau variants
+    'chateau de la chevre d\'or': ['la chevre d\'or', 'chevre d\'or',
+                                    'chateau chevre d\'or'],
+    # Saint-Paul hyphen variants
+    'saint-paul-de-vence': ['saint-paul de vence', 'saint paul de vence',
+                            'st-paul-de-vence', 'st paul de vence'],
+    # Cap Ferrat variants (note: Cap Ferrat Lighthouse IS arguably different — kept separate)
+    'cap ferrat': ['saint-jean-cap-ferrat', 'st-jean-cap-ferrat'],
+    # Fort variants
+    'fort carre d\'antibes': ['fort carre', 'fort carre antibes'],
+    # Eze
+    'eze village': ['village d\'eze', 'eze'],
+    # Mougins
+    'vieux village de mougins': ['mougins village', 'old village of mougins',
+                                  'mougins old village', 'mougins'],
+}
+
+
+def _match_via_variants(stop_name: str, corpus_rows: List[Dict]) -> Optional[Dict]:
+    """LOCAL-277: Match a drawn stop name to corpus via known variant groups.
+
+    Accent-folded, case-insensitive comparison. Returns the best matching row
+    or None if no variant match found.
+    """
+    stop_folded = _accent_fold(stop_name).lower().strip()
+
+    for row in corpus_rows:
+        corpus_folded = _accent_fold(row['stop_title']).lower().strip()
+
+        # Direct accent-folded match
+        if stop_folded == corpus_folded:
+            return row
+
+    # Check variant map: is the drawn name a known variant of a corpus title?
+    for canonical, variants in _NAME_VARIANT_MAP.items():
+        all_forms = [canonical] + variants
+        all_folded = [_accent_fold(f).lower().strip() for f in all_forms]
+
+        if stop_folded in all_folded:
+            # Find corpus row matching canonical or any variant
+            for row in corpus_rows:
+                row_folded = _accent_fold(row['stop_title']).lower().strip()
+                if row_folded in all_folded:
+                    return row
+
+    return None
+
+
 def get_stop_corpus_for_tour(
     venue_name: str,
     stop_names: List[str],
@@ -168,23 +244,36 @@ def _find_corpus_venue_name(venue_name: str, conn) -> Optional[str]:
 def _match_stop_to_corpus(stop_name: str, corpus_rows: List[Dict]) -> Optional[Dict]:
     """Match a stop name to its corpus row using multi-strategy matching.
 
-    Same strategy as the detector: exact → ILIKE → fuzzy word overlap.
+    Strategy: exact → accent-folded → variant map → containment → fuzzy word overlap.
+    LOCAL-277: Added accent folding (step 2) and variant map (step 3) to resolve
+    name fragmentation that caused 11/23 drawn stops to find zero corpus.
     """
     stop_norm = _normalize_for_match(stop_name)
 
-    # 1. Exact match
+    # 1. Exact match (case-insensitive)
     for row in corpus_rows:
         if row['stop_title'].lower().strip() == stop_name.lower().strip():
             return row
 
-    # 2. Containment match (either direction)
+    # 2. LOCAL-277: Accent-folded exact match (Île→Ile, Château→Chateau, etc.)
+    stop_folded = _accent_fold(stop_name).lower().strip()
+    for row in corpus_rows:
+        if _accent_fold(row['stop_title']).lower().strip() == stop_folded:
+            return row
+
+    # 3. LOCAL-277: Known variant groups (Port de/Port of/Harbor, Old Town/Old Town of, etc.)
+    variant_match = _match_via_variants(stop_name, corpus_rows)
+    if variant_match:
+        return variant_match
+
+    # 4. Containment match (either direction)
     for row in corpus_rows:
         title_lower = row['stop_title'].lower()
         name_lower = stop_name.lower()
         if name_lower in title_lower or title_lower in name_lower:
             return row
 
-    # 3. Normalized word overlap (significant words)
+    # 5. Normalized word overlap (significant words)
     for row in corpus_rows:
         corpus_title_norm = _normalize_for_match(row['stop_title'])
         corpus_words = set(w for w in corpus_title_norm.split() if len(w) >= 4)
