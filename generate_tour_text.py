@@ -7786,6 +7786,16 @@ NARRATIVE THREAD (weave into Part 3 as the central intrigue):
                 if entrance_directions:
                     _orientation_prefix += entrance_directions + " "
         
+        # [LOCAL-264] Michael, 2026-08-05: the tour's general description must come
+        # BEFORE the orientation directive, not after it. His words: "it follows the
+        # direction of orientation. Logically it should proceed it. The word
+        # Orientation is important, so let's keep it, but then start with the General
+        # description of the tour and place the directive of where to go after."
+        # So for Stop 1 the order is: general description, then "Orientation: <where
+        # to go>", then the stop's own description.
+        if i == 0 and _saved_prolog:
+            poi_content += f"{_saved_prolog}\n\n"
+
         # Add the orientation text — [R3] only if substantive (museum tours)
         # Strip any leading "Orientation:" from the LLM text to avoid duplication
         _clean_orientation = re.sub(r'^Orientation:\s*', '', orientation, flags=re.IGNORECASE).strip()
@@ -7801,10 +7811,6 @@ NARRATIVE THREAD (weave into Part 3 as the central intrigue):
             # else: skip orientation entirely — go straight to description
         else:
             poi_content += f"{_orientation_prefix}{_clean_orientation}\n\n"
-        
-        # [R2] For Stop 1: inject prolog before description
-        if i == 0 and _saved_prolog:
-            poi_content += f"{_saved_prolog}\n\n"
         
         # Add description
         poi_content += description + "\n\n"
