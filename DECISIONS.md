@@ -7217,3 +7217,81 @@ Dispatched LOCAL-274 to make the check actually decide: mid-sentence capitals,
 initial capital, finite verb, repeated clause — and **return the original
 unchanged when any fails**. A rewrite that cannot be done cleanly should not be
 done.
+
+## D181 — The closing offers something real again, and the news check mattered (2026-08-05)
+
+LOCAL-273 merged (`7f975c8`). Michael asked why the closing summary and
+next-trip offer were missing; they existed and **we deleted them** under
+LOCAL-44 as preaching, with three regression tests guarding their return. The
+tests were right about the words and wrong about the function.
+
+The closing is now concrete and existence-verified, three sentences:
+
+> "Place Masséna is 5 kilometres from here — we can build a cycling tour there.
+> There is also a museum tour available at the Musée d'Art Moderne et d'Art
+> Contemporain. We can also generate news articles for you to listen to on the
+> way back."
+
+Every offer is checked before it is made: the similar tour matches the tour's
+own category with a verified stop and distance; the museum is offered only where
+one exists. **The news check earned its place** — LEAD did not know whether news
+existed on this branch and required the task to verify or report a gap. It
+verified: `news_orchestrator_service.py` carries `@app.route('/generate-news')`.
+Had it not existed, we would have shipped an offer the product cannot honour.
+
+All 34 preaching tests pass. Incomplete against Michael's full spec — no
+restaurant offer, no Treat Page — because his addendum arrived seven minutes
+after dispatch. Dispatched as LOCAL-275, and it must **re-cut** the
+three-sentence budget rather than extend it.
+
+## D182 — A rewrite that cannot be done cleanly is not done (2026-08-05)
+
+LOCAL-274 merged (`4feade3`). The well-formedness check now decides, and LEAD
+verified all five rows. The capital-after-comma is gone; *"Take a moment to
+breathe in the salty sea air…"* returns **unchanged** rather than becoming a
+lowercase fragment. Both regression risks held — "you can admire the
+breathtaking views" and Michael's endorsed "Eze Village is a medieval gem…".
+
+Fallback rate **2.5% of R1 hits**: decisive without being trigger-happy.
+
+That closes the R1 damage class Michael saw in rounds 10, 19 and 23 and which
+LEAD flagged four times before dispatching a fix. Worth noting the gap between
+noticing and acting — the fix took twenty minutes once dispatched.
+
+## D183 — The high score holds when the stops do (2026-08-05)
+
+Michael asked whether round 26's quality still stands. Three regression runs on
+the merged tree answer it:
+
+| run | stops | facts/stop | words | time | cost |
+|---|---|---|---|---|---|
+| round 26 | Cap d'Antibes + Èze | **7.0** | 710 | 43.7s | $0.0135 |
+| 32B | Cap d'Antibes + Èze | **6.5** | 797 | 48.2s | $0.0147 |
+| 32A | Cap d'Antibes + **Port de Nice** | **1.5** | 513 | 44.3s | $0.0133 |
+| 31 | 8 stops, all delivered | 3.1 | 2223 | 117.7s | $0.0476 |
+
+**32B reproduced round 26 on the same pair.** The pipeline is reliable. 32A
+collapsed because it drew a stop with no corpus. Èze has delivered 7–9 facts in
+every run it appears in; Port de Nice delivered one.
+
+Then LEAD counted every Riviera stop the selector drew today against its corpus
+depth: **11 of 23 have zero passages, 15 have ≤2.** Sixty-five percent of what
+the selector picks has nothing to write from.
+
+**So further rule work has diminishing returns.** Quality varies **4×** on
+corpus depth and much less than that on everything built today — and today built
+a great deal. Dispatched LOCAL-277 to deepen the drawn-but-empty stops.
+
+**A second finding inside the same measurement, and it is a multiplier.** The
+selector produces name variants that fragment the corpus, which is keyed on stop
+title: `Saint-Tropez Harbor` / `Port de Saint-Tropez` / `Port of Saint-Tropez` /
+`Saint-Tropez`; `Saint-Paul-de-Vence` / `Saint-Paul de Vence`. Corpus built for
+one variant is invisible to a draw of another. Deepening without normalising the
+match would waste much of the work.
+
+**A LEAD error worth recording.** The first version of this measurement counted
+every file in `tours/`, including months of museum tours, and reported Chagall
+paintings as the most-drawn stops. It also failed accent-folding, showing
+`L'Armure d'Andô Naoyuki` with 1 passage when LOCAL-262 had restored it to 6.
+Both were caught by the numbers looking wrong rather than by any check —
+the same class of error as every blind metric recorded today.
