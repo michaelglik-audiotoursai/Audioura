@@ -6534,6 +6534,119 @@ REWRITE RULES (all mandatory):
                   f"{_r9_total_paras_emptied} paragraphs emptied, "
                   f"{_r9_stops_affected} stops affected")
 
+    # -------- [LOCAL-229] PHASE 5.16: CONTRADICTED claim block --------
+    # D100 (Michael, 2026-08-04): "We should not publish if we are reasonably sure
+    # that the data is incorrect." If any sentence group contains a CONTRADICTED
+    # claim, drop that group from the narration. UNSUPPORTED does NOT block (D100).
+    # Behind DISABLE_CONTRADICTED_BLOCK=1 for A/B measurement.
+    _contradicted_block_disabled = os.environ.get('DISABLE_CONTRADICTED_BLOCK', '').strip() == '1'
+    if _contradicted_block_disabled:
+        print(f"\n  [LOCAL-229] CONTRADICTED block DISABLED by DISABLE_CONTRADICTED_BLOCK=1 env var")
+    else:
+        print(f"\n  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...")
+        _cb_groups_blocked = 0
+        _cb_stops_affected = 0
+        _cb_log_entries = []
+
+        try:
+            from claim_check import check_paragraph as _cb_check_paragraph, CONTRADICTED as _CB_CONTRADICTED
+            from sentence_group_scorer import split_into_sentence_groups as _cb_split_groups
+
+            for _si, _poi in enumerate(poi_list):
+                _desc = _poi.get('description', '')
+                if not _desc or _desc.startswith('['):
+                    continue
+
+                _stop_name = _poi.get('name', f'Stop {_si + 1}')
+                _venue_for_check = _museum_venue_name if tour_category == 'museum' else ''
+
+                # Get corpus passages for this stop
+                _cb_passages = []
+                if _stop_corpus_data and _stop_name in _stop_corpus_data:
+                    _sc_entry = _stop_corpus_data[_stop_name]
+                    if _sc_entry and _sc_entry.get('passages'):
+                        _cb_passages = _sc_entry['passages']
+
+                if not _cb_passages:
+                    # No corpus passages → claim_check cannot find contradictions
+                    continue
+
+                # Split each paragraph into sentence groups and check each group
+                _paragraphs = [p.strip() for p in _desc.split('\n\n') if p.strip()]
+                _new_paragraphs = []
+                _stop_blocked = False
+
+                for _para in _paragraphs:
+                    if len(_para) <= 30:
+                        _new_paragraphs.append(_para)
+                        continue
+
+                    _groups = _cb_split_groups(_para)
+                    _surviving_groups = []
+
+                    for _group_sentences in _groups:
+                        _group_text = ' '.join(_group_sentences)
+
+                        # Run claim_check on this group
+                        _claim_result = _cb_check_paragraph(
+                            _group_text,
+                            stop_title=_stop_name,
+                            venue_name=_venue_for_check,
+                            passages=_cb_passages,
+                        )
+
+                        _contradicted_count = _claim_result['verdict_counts'].get('contradicted', 0)
+
+                        if _contradicted_count > 0:
+                            # BLOCK: drop this sentence group
+                            _cb_groups_blocked += 1
+                            _stop_blocked = True
+
+                            # Log the block: claim, contradicting passage, action
+                            _contradicted_claims = [
+                                c for c in _claim_result['claims']
+                                if c['verdict'] == _CB_CONTRADICTED
+                            ]
+                            for _cc in _contradicted_claims:
+                                _log_entry = {
+                                    'stop': _stop_name,
+                                    'stop_index': _si + 1,
+                                    'claim': _cc['text'],
+                                    'claim_sentence': _cc.get('sentence', ''),
+                                    'contradicting_evidence': _cc.get('evidence', ''),
+                                    'group_text': _group_text[:200],
+                                    'action': 'DROPPED',
+                                }
+                                _cb_log_entries.append(_log_entry)
+                                print(f"  [LOCAL-229] BLOCKED Stop {_si+1} '{_stop_name[:30]}': "
+                                      f"claim='{_cc['text'][:60]}' "
+                                      f"contradicted_by='{(_cc.get('evidence') or '')[:80]}' → DROPPED")
+                        else:
+                            _surviving_groups.append(_group_text)
+
+                    # Reassemble paragraph from surviving groups
+                    if _surviving_groups:
+                        _new_paragraphs.append(' '.join(_surviving_groups))
+                    # else: entire paragraph dropped (all groups blocked)
+
+                if _stop_blocked:
+                    _cb_stops_affected += 1
+                    # Reassemble description
+                    _new_desc = '\n\n'.join(_new_paragraphs).strip()
+                    poi_list[_si]['description'] = _new_desc
+
+            # Summary
+            print(f"  [LOCAL-229] CONTRADICTED block summary: {_cb_groups_blocked} group(s) blocked, "
+                  f"{_cb_stops_affected} stop(s) affected")
+            if _cb_log_entries:
+                print(f"  [LOCAL-229] Block log ({len(_cb_log_entries)} entries):")
+                for _le in _cb_log_entries:
+                    print(f"    stop={_le['stop_index']} claim='{_le['claim'][:50]}' "
+                          f"evidence='{_le['contradicting_evidence'][:50]}' action={_le['action']}")
+
+        except ImportError as _cb_import_err:
+            print(f"  [LOCAL-229] WARNING: import failed — CONTRADICTED block skipped: {_cb_import_err}")
+
     # -------- PHASE 5.5: post-description validation for museum tours --------
     # Fix 4 (Claude session 7): second validate_enhanced_poi_knowledge() call for ALL tour types.
     # At this point descriptions are populated — the fictional-content patterns now have text to match.
