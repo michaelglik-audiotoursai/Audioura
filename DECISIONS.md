@@ -6750,3 +6750,54 @@ exemption must survive the new phases — that boundary row is in the task.
 
 **Standing check added to review:** for every detector, confirm a path to the
 output exists. A rule that only reports is a rule that does nothing.
+
+## D166 — Michael's rule: the same sentence is bad unsupported and good supported (2026-08-05)
+
+Reading round 15, Michael approved this pair and asked for a guarantee it keeps
+surviving:
+
+> "This iconic cape, situated on the French Riviera, holds a significant place
+> in the region's landscape." + "In 2023, Antibes boasted a population of
+> 77,637, making it the second most populous area in Alpes-Maritimes after
+> Nice."
+>
+> *"…is good because it immediately followed by [the fact] that supports it; and
+> makes both sentences worth while."*
+
+In **round 2** he scored **2/5** on a near-identical sentence — *"Cap d'Antibes,
+situated on the French Riviera, holds a special place in the region's history
+and culture"* — with the reasoning *"nothing about aspects named such as place,
+history, and culture are described in the following sentence"*.
+
+**Same shape, opposite verdict. The entire difference is what comes next.** This
+is the clearest statement yet of the standard he has been applying since round 2,
+and it is not a style rule at all — it is a rule about adjacency.
+
+LEAD verified both against today's pipeline:
+
+- the **approved** pair: nothing fires. Safe — but by accident.
+- the **rejected** round-2 twin, unsupported: **nothing fires either.** It would
+  ship today.
+
+So we cannot currently tell them apart. The mechanism that should decide this
+already exists — R10's delivery lookahead, which excuses a promise when the
+following sentence substantiates it on the same subject. It never engages
+because R10 does not recognise "holds a significant place" as a promise.
+
+**Two consequences, both acted on.**
+
+1. **LOCAL-261 must not delete on wording alone.** It is adding deletion phases
+   for R2/R3/R4/R8, and a naive R4 rule for this shape would destroy Michael's
+   approved pair along with the bad twin. Addendum appended: every new deletion
+   phase applies the R10 delivery lookahead first, and the approved pair is a
+   mandatory must-survive boundary row.
+2. **LOCAL-262 dispatched** to teach R10 this promise shape, after which the
+   existing delivery check does the right thing automatically — deletes the
+   unsupported instance, keeps the supported one. That is a two-line change in
+   effect and it implements Michael's distinction exactly.
+
+**The wider point.** Every rule we own judges a sentence in isolation, except
+R10. Michael has never once judged a sentence in isolation — round 2's review is
+almost entirely about interconnection ("senseless combination of words and facts
+with no interconnectedness between them"). The gap between how we measure and
+how he reads is adjacency, and R10 is the only place we model it.
