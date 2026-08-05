@@ -7575,3 +7575,43 @@ and fixing one exposes the other — the abort was hiding the selection bug
 entirely. And **`"through ."` reaching text bound for text-to-speech** means no
 guard catches an empty span; LOCAL-285 adds one at the post-assembly gate where
 LOCAL-251's placeholder check already lives.
+
+## D192 — Verification harvests; and LEAD set a regression bar against an unstable number (2026-08-05)
+
+LOCAL-283 merged (`c7c6166`). Michael's observation implemented: the gate now
+harvests fact-carrying passages from the source it verified against, and flags
+`verified_no_detail` when a stop passes by name alone.
+
+**On the museum tour it harvested nothing and flagged all five stops.** That is
+the correct outcome, not a failure — those five are *exhibition titles* rather
+than collection objects, and the museum's page carries no per-object detail for
+them. Previously that produced five stops with nothing to say and no signal at
+all. The gap is now visible and LOCAL-284 can act on it.
+
+**The Riviera numbers came in below the bar LEAD set, and the bar was wrong.**
+
+```
+2-stop  6.0 -> 4.0        8-stop  8.8 -> 5.4, 53 -> 43 facts
+```
+
+LEAD made those a hard bounce condition on Michael's explicit concern that
+today's gains survive. Investigating rather than bouncing:
+
+- the run drew **eight entirely different stops**, including Port de Monaco and
+  Antibes Old Town at **zero corpus**;
+- the 8.8 baseline came from LOCAL-277's run, **which drew the eight stops
+  LOCAL-277 had just enriched**;
+- the harvester logged `0 harvested, 8 already had corpus` — it writes only where
+  a stop has none, so Riviera tours take the skip path and are untouched.
+
+So it is not a regression. **LEAD set an acceptance criterion against a figure
+measured on a favourable draw** — exactly the confound D183 documented this
+morning, where facts per stop moves 4× on selection alone. Having written that
+finding, LEAD then built a gate on a single observation of the metric it
+describes as unstable.
+
+**The correction, and it belongs in Michael's agenda part 2.** A per-tour fact
+count cannot serve as a regression bar while stop selection is free (D170). Any
+future must-not-regress condition has to be either normalised against the drawn
+stops' available corpus, or averaged over several runs. Single-run baselines are
+not evidence, and LEAD should stop writing them into task files.
