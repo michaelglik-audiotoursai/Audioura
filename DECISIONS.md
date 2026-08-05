@@ -6051,3 +6051,52 @@ rule, not a compromise.
 
 **Round 6 remains the deliverable** for this morning, with LEAD's note at its
 head flagging the 298-word length and the unverifiable opening claim.
+
+## D150 — Round 7 merged and it is the morning's tour. Stop 2 shows the detectors are blind, not the text clean (2026-08-05)
+
+LOCAL-250 v2 merged (`fc68048`) and round 7 replaces round 6 as Michael's tour:
+both stops present, real facts in each — Monet's 1888 series, Fitzgerald 1934,
+the 1960s circle at Saint-Paul-de-Vence, Sartre and Picasso at La Colombe d'Or.
+All four bounce defects fixed, verified against the artifact rather than the
+summary: two stops (was one), one Fitzgerald mention (was three, twice
+consecutively), no `Description:` label in narration, and a one-passage-per-tour
+rule so a spent corpus passage cannot substantiate a second sentence.
+
+Both investigations came back honest and matched LEAD's own measurements.
+`Tour-Category: walking` is not a regression — same on the storied base, an
+internal template classifier. R7's zero on the orientation is real for the
+rule: orientation IS inside residual scope, R7 simply does not fire on "the
+gentle sea breeze carries the salty tang", and PHASE 5.95 does not gate R7.
+
+**What it exposed is larger than what it fixed.** LEAD measured delivered stop
+2 sentence by sentence: **every rule silent on all eleven sentences, nine of
+which carry no fact.** The residual table says clean. Three mechanisms:
+
+1. **A person's name counts as delivery.** "The legacy of artists like Marc
+   Chagall and Bernard-Henri Lévy lingers in the very air you breathe" is
+   excused because it names Chagall, while telling you nothing about him.
+   `_sentence_has_concrete_payload`'s own docstring draws this line for places
+   — *"place names provide geographic ANCHORING but not SUBSTANTIATION"* — and
+   LOCAL-247 enforced it there. Nobody applied it to people.
+2. **The excuse spreads.** "The village's artistic spirit is palpable" is
+   correctly flagged and then cancelled by the name-drop sentence beside it
+   through the topic-matched delivery check. Failure 1 poisons its neighbour.
+3. **No promise noun, no rule.** "The ancient pathways bear the weight of
+   history on their worn stones" and "a portal to a world where art and culture
+   intertwine seamlessly" name nothing, so R10 never looks and R9 is silent.
+   This is the class Michael's round 2 review called "senseless combination of
+   words and facts with no interconnectedness".
+
+Dispatched as LOCAL-251 with ten boundary rows. The right column is the harder
+half: Monet-1888, Sartre-at-La-Colombe-d'Or and the 1960s-Montand sentence must
+all survive, because each pairs a name with a date, an event or a documented
+fact. Only names floating in abstraction should fall. Mechanism 3 is assigned
+to R9, not R10 — a contentless sentence is not an unfulfilled promise, and
+conflating them would push R10 past the 3× ceiling it has already been held to
+once.
+
+**Standing pattern worth naming.** Four times this week a residual of zero has
+been reported over text that plainly had the defect, and every time the harness
+was measuring correctly against a rule that could not see. The number was true
+and useless. Task files now require sentence-level detail behind every residual,
+and LEAD measures the delivered artifact by hand before believing any of them.
