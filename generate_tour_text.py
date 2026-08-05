@@ -6954,6 +6954,65 @@ REWRITE RULES (all mandatory):
                   f"{_r10_total_paras_emptied} paragraphs emptied, "
                   f"{_r10_stops_affected} stops affected")
 
+    # -------- [LOCAL-263] PHASE 5.156: Unsupported-claim gate --------
+    # D166: a claim survives only if something adjacent substantiates it.
+    # Four claim types (PROMISE, SENSORY, FEELING, QUALITY), one shared test.
+    # Subsumes R4/R7/R9/R10 for coverage — old detectors kept reporting.
+    # Behind DISABLE_UNSUPPORTED_CLAIM_GATE=1 flag. $0.00 unless escalation fires.
+    _ucg_disabled = os.environ.get('DISABLE_UNSUPPORTED_CLAIM_GATE', '').strip() == '1'
+    if _ucg_disabled:
+        print(f"\n  [LOCAL-263] Unsupported-claim gate DISABLED by DISABLE_UNSUPPORTED_CLAIM_GATE=1 env var")
+    else:
+        print(f"\n  [LOCAL-263] PHASE 5.156: Unsupported-claim gate...")
+        try:
+            from unsupported_claim_gate import apply_gate_to_stop_descriptions as _ucg_apply
+        except ImportError as _ucg_err:
+            _ucg_apply = None
+            print(f"  [LOCAL-263] WARNING: unsupported_claim_gate not importable — gate skipped ({_ucg_err})")
+
+        if _ucg_apply:
+            _ucg_api_key = api_key  # For escalation if needed
+            _ucg_model = os.environ.get('ESCALATION_MODEL', 'gpt-4o-mini')
+
+            _ucg_stats = _ucg_apply(
+                poi_list,
+                stop_corpus_data=_stop_corpus_data if '_stop_corpus_data' in dir() else None,
+                api_key=_ucg_api_key,
+                model=_ucg_model,
+            )
+
+            print(f"  [LOCAL-263] Unsupported-claim gate summary:")
+            print(f"    Sentences removed: {_ucg_stats['total_removed']}")
+            print(f"    Sentences kept (substantiated): {_ucg_stats['total_kept_substantiated']}")
+            print(f"    By type: PROMISE={_ucg_stats['claim_types_removed']['PROMISE']}, "
+                  f"SENSORY={_ucg_stats['claim_types_removed']['SENSORY']}, "
+                  f"FEELING={_ucg_stats['claim_types_removed']['FEELING']}, "
+                  f"QUALITY={_ucg_stats['claim_types_removed']['QUALITY']}")
+            print(f"    Escalation calls: {_ucg_stats['escalation_calls']}")
+            if _ucg_stats['escalation_cost'] > 0:
+                print(f"    Escalation cost: ${_ucg_stats['escalation_cost']:.4f} "
+                      f"({_ucg_stats['escalation_tokens']} tokens)")
+                total_tokens += _ucg_stats['escalation_tokens']
+                total_cost += _ucg_stats['escalation_cost']
+            print(f"    Stops affected: {_ucg_stats['stops_affected']}")
+
+            # D55 safety: if total removal exceeds 15%, stop and report
+            _total_sentences_in_tour = 0
+            for _poi_check in poi_list:
+                _desc_check = _poi_check.get('description', '')
+                if _desc_check and not _desc_check.startswith('['):
+                    from style_validator_detector import _split_sentences as _ss_check
+                    _total_sentences_in_tour += len([
+                        s for s in _ss_check(_desc_check) if len(s) >= 15
+                    ])
+            if _total_sentences_in_tour > 0:
+                _ucg_removal_rate = _ucg_stats['total_removed'] / _total_sentences_in_tour
+                print(f"    Deletion rate: {_ucg_removal_rate:.1%} "
+                      f"({_ucg_stats['total_removed']}/{_total_sentences_in_tour})")
+                if _ucg_removal_rate > 0.15:
+                    print(f"  [LOCAL-263] WARNING: Deletion rate {_ucg_removal_rate:.1%} "
+                          f"exceeds 15% ceiling — review before shipping")
+
     # -------- [LOCAL-229] PHASE 5.16: CONTRADICTED claim block --------
     # D100 (Michael, 2026-08-04): "We should not publish if we are reasonably sure
     # that the data is incorrect." If any sentence group contains a CONTRADICTED
