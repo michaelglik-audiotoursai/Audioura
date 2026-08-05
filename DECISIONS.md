@@ -4768,3 +4768,47 @@ instead of an assumption prevented an incorrect verdict. The pattern is
 consistent enough to state as a rule: **when a probe disagrees with a
 submission, the probe is the more likely error** — it was written in a minute,
 the submission had an hour.
+
+---
+
+## D123 — We have built corpus for seven venues. Twenty-five of twenty-nine real tours have none (2026-08-04)
+
+D119 measured that 24 of 29 real tours have every stop EMPTY. LEAD went one
+level up and asked *which venues do we have corpus for at all*:
+
+```
+venues with any stop_corpus rows       7
+real tours matching one of those       4 of 29
+real tours with no matching venue     25 of 29
+```
+
+The seven: French Riviera walking area, MAMAC, Palais Lascaris, Musée Matisse,
+Musée Chagall, Boston Common, "walking tour in Nice". Everything else — the
+National Constitution Center, the Museum of Naïve Art, the Nice restaurants
+tour, the Abu Dhabi camel tours, the Big Lake dog-sledding tours — has never
+had a single passage mined for it.
+
+**This reframes the week's work.** The style rules, the claim checker, the
+coverage gate, the contradiction block — all of it operates on text the model
+wrote from nothing, for six tours in seven. We have spent the week sharpening
+instruments and the thing they measure is mostly absent.
+
+It also explains why the numbers look the way they do. Contradicted claims: 0
+of 29 — because there is nothing to contradict. Unsupported claims: a low
+0.065 per group — because nothing can be checked. Both figures read as health
+and are actually the absence of a test (D94's trap, at product scale).
+
+**LOCAL-234** dispatched: acquire corpus for the uncovered *museums* first,
+where `stop_subject_acquisition.py` has been hardened through three rounds.
+Outdoor and transport venues are a different problem and explicitly out of
+scope — a camel tour in the Abu Dhabi desert has no catalogue to mine, and
+pretending otherwise would produce exactly the fabrication we are trying to
+stop.
+
+The task carries D74's rule at the top: **a wrong attribution is worse than an
+empty stop**, and a high left-empty count is a good result. An empty stop is
+caught by the gate and degraded honestly; a wrongly-populated one produces
+confident, sourced-looking, false narration.
+
+**Safe to run during Michael's read** — it changes `stop_corpus` data, which
+affects tours generated later. The file he is reading is static.
