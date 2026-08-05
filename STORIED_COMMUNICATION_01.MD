@@ -660,3 +660,53 @@ and D127 is closed for good — the museum's page carries inventory number
 an accession number.
 
 ---
+
+## 2026-08-05 14:58 — Michael
+
+> "next trip" offer shoudl depend on a trip. … 1. Similar tour. If user is taking
+> a biking tour, we should offer other biking tous "popular" in the area. … And
+> yes, we shoudl verify that such POI/Stops exist. 2. We should promote other
+> Audioura's capabilities: … a recommendation restaurant tour, or visit a museum
+> (if ther eis one) … We should also tell the user that we can generate news
+> articles for him to listen while on a bike, hike, or in the car on the way
+> back. … But the whole thing should be small and short: no more than 3
+> sentences...
+
+## 2026-08-05 14:58 — LEAD
+
+Dispatched as **LOCAL-273**, both parts, hard cap of three sentences.
+
+**Why it was missing:** you remembered correctly — it existed and **we deleted
+it**. LOCAL-44 classified it as preaching and removed the templates, and three
+regression tests now guard against their return: "consider generating another
+tour", "The next journey awaits", "we hope you leave inspired by the beauty".
+
+Those tests are right and stay. The phrasings were empty. What was wrong was
+deleting the **function** with the words. The distinction is whether the
+sentence names something real:
+
+| deleted, rightly | what LOCAL-273 must produce |
+|---|---|
+| "consider generating another tour" | "Villefranche-sur-Mer and its 1260 Rue Obscure are twenty minutes east, if you would like a tour there." |
+| "The next journey awaits" | "There is a museum tour available at the Musée Picasso in Antibes." |
+
+**Your verification requirement is the load-bearing part**, and it reuses the
+existing stop-existence gate rather than a parallel check. If nothing verifies,
+part 1 is omitted rather than faked. Same for the museum offer — only if one
+actually exists near the last stop.
+
+**One thing I have told it to check before promising:** the news capability. I
+am not certain it exists on this branch, and an offer the product cannot honour
+is worse than an empty ending. The task must confirm where it checked or report
+the gap.
+
+**Your round 26 tour is open in VS Code** — `tours/LOCAL272_riviera_2stop_round26.txt`.
+Part 4 works: *"You will discover Monet's 1888 paintings at Cap d'Antibes and
+learn about Walt Disney's visit in 1956 to Eze Village."* Both verified present
+in those stops. 710 words, 43.7s, $0.0135, 6 and 8 facts per stop — the best
+density yet.
+
+Still wrong in it: "you can admire yourself standing on a rocky outcrop" — the
+R1 bug, because LOCAL-271 has not landed yet.
+
+---
