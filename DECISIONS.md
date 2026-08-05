@@ -7471,3 +7471,44 @@ acceptance criteria, because the absence of one is what caused this.
 Michael also reported no stop-1 description. There is one — it is simply thin
 and unlabelled, one fact against another stop's three. That is the corpus
 problem, not the regression, and the two should not be conflated.
+
+## D189 — The recap machinery is right and the prose is not (2026-08-05)
+
+LOCAL-280 bounced. Everything structural works and is kept:
+
+- the thank-you is gone and the recap replaces it, per Michael's ruling;
+- the scale is stated and **honest** — the 8-stop run delivered 5 and the recap
+  says 5;
+- the Treats wording is exactly right, *"shows whether there are real
+  savings"*;
+- it reuses LOCAL-276's `_recap_ranked_facts` rather than building a second
+  ranker, which is what the task asked;
+- **D177 verification runs and catches failures** — its own log shows
+  `Recap: D177 FAILED for 'Fort Carré d'Antibes': fact not in delivered text`.
+
+**What it emits is unreadable.** Delivered 2-stop:
+
+> "That's 2 stops and 18 kilometres — **Cycle along the coastline, carrying
+> whispers of past revelries and the promise** and **Step into the Saint
+> Charles-Saint Claude chapel**."
+
+Three faults in one sentence. *"Cycle along…"* and *"Step into…"* are
+**imperatives** — not facts, and precisely the shape R1 exists to remove from
+narration; the recap pulls them back in. *"…and the promise"* is **truncated
+mid-phrase**, a span cut at a fixed length and emitted as a stub. And two
+fragments joined by a bare "and" produce something nobody would say aloud.
+
+The 8-stop is better and fails the same way: *"the island is most famous for its
+fortress prison"* is lifted mid-sentence and **never names the island**, so the
+listener cannot tell which of five stops is meant.
+
+**The distinction worth recording.** The ranking chose reasonable *material* —
+Île Sainte-Marguerite's prison is genuinely the most interesting thing in that
+tour. What failed is **composition**: the recap concatenates source text instead
+of writing a clause. Selecting the right fact and stating it well are different
+jobs, and this task did the first and skipped the second.
+
+The fix is specified as: every item names its stop *and* the fact
+(*"the fortress prison on Île Sainte-Marguerite"*), never emit a truncated span,
+and filter candidates through `check_r1_imperatives` before ranking — the same
+discipline part 4 already applies.
