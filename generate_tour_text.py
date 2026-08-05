@@ -2493,6 +2493,16 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         "total_stops_parameter": total_stops,
         "output_file": output_file,
     })
+
+    # [LOCAL-245] Log existence gate mode at startup — single source of truth
+    try:
+        from stop_existence_gate import get_gate_mode
+        _existence_gate_mode = get_gate_mode()
+        print(f"  [LOCAL-245] Stop-existence gate mode: {_existence_gate_mode.upper()}")
+    except ImportError:
+        _existence_gate_mode = 'off'
+        print(f"  [LOCAL-245] Stop-existence gate: unavailable (import failed)")
+
     # Get API key from environment variable or prompt user (only if interactive)
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
@@ -2532,7 +2542,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
 
     # -------- [S20] Storied: check tour cache before generation --------
     _cache_hit = None
-    if _storied_mode:
+    _disable_cache = os.environ.get("DISABLE_TOUR_CACHE", "").strip() == "1"
+    if _storied_mode and not _disable_cache:
         _db_url = os.environ.get("DATABASE_URL")
         if _db_url:
             try:
@@ -4152,6 +4163,62 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         elif _coverage_selection_disabled:
             print(f"  [LOCAL-212] Coverage selection: DISABLED by DISABLE_COVERAGE_SELECTION=1")
         # ──── END [LOCAL-212] COVERAGE-AWARE STOP SELECTION ───────────────────
+
+        # ──── [LOCAL-245] STOP-EXISTENCE GATE (INLINE ENFORCEMENT) ────────────
+        # Three modes: off / log_only / enforce.
+        # In enforce mode, unverified stops are removed from poi_list before
+        # narration. The tour may be shorter — this is logged explicitly.
+        try:
+            from stop_existence_gate import get_gate_mode, run_existence_gate, verify_stop_existence
+
+            _seg_mode = get_gate_mode()
+            if _seg_mode != 'off':
+                # Get DB connection (same pattern as LOCAL-212)
+                _seg_conn = None
+                try:
+                    from venue_resolver import _get_db_connection as _seg_get_conn
+                    _seg_conn = _seg_get_conn()
+                except Exception:
+                    pass
+                if not _seg_conn:
+                    try:
+                        import psycopg2
+                        _seg_db_url = os.environ.get('DATABASE_URL')
+                        if _seg_db_url:
+                            _seg_conn = psycopg2.connect(_seg_db_url, connect_timeout=5)
+                    except Exception:
+                        pass
+
+                if _seg_conn:
+                    _seg_venue = (_museum_venue_name or location) if tour_category == 'museum' else location
+                    _seg_stop_names = [p['name'] for p in poi_list]
+                    _seg_result = run_existence_gate(_seg_stop_names, _seg_venue, _seg_conn)
+                    _seg_conn.close()
+
+                    if _seg_mode == 'enforce' and _seg_result['unverified_stops']:
+                        _seg_unverified_set = set(_seg_result['unverified_stops'])
+                        _seg_before = len(poi_list)
+                        poi_list = [p for p in poi_list if p['name'] not in _seg_unverified_set]
+                        _seg_after = len(poi_list)
+                        _seg_dropped = _seg_before - _seg_after
+                        if _seg_dropped > 0:
+                            print(f"  [LOCAL-245] EXISTENCE-GATE ENFORCE: dropped {_seg_dropped} unverified stop(s), "
+                                  f"{_seg_after} remain (requested {total_stops})")
+                            for _seg_u in _seg_result['unverified_stops']:
+                                print(f"    DROPPED: {_seg_u!r}")
+                            if _seg_after < total_stops:
+                                print(f"  [LOCAL-245] EXISTENCE-GATE: delivering SHORT tour — "
+                                      f"{_seg_after}/{total_stops} stops (reason: not enough verified candidates)")
+                                total_stops = _seg_after
+                else:
+                    print(f"  [LOCAL-245] EXISTENCE-GATE: DB unavailable — gate cannot run, proceeding without")
+            else:
+                print(f"  [LOCAL-245] EXISTENCE-GATE: OFF (STOP_EXISTENCE_GATE_MODE=off)")
+        except ImportError as _seg_err:
+            print(f"  [LOCAL-245] EXISTENCE-GATE: import failed ({_seg_err}) — proceeding without")
+        except Exception as _seg_err:
+            print(f"  [LOCAL-245] EXISTENCE-GATE error (non-fatal): {_seg_err}")
+        # ──── END [LOCAL-245] STOP-EXISTENCE GATE ─────────────────────────────
 
         # Hard cap and final sanity
         if len(poi_list) > total_stops:
