@@ -4890,3 +4890,66 @@ flat, with short elevated sections on the capes themselves."*
 
 Not yet dispatched — R10 and theme threads first, because a better-structured
 prolog full of unfulfilled promises is still a bad prolog.
+
+---
+
+## D125 — Three more museums, and 17 of 18 stops correctly left uncovered (2026-08-05)
+
+LOCAL-234 acquired corpus for the three uncovered museums. The headline number
+looks like failure and is not:
+
+```
+before   COVERED=52  CREATOR_ONLY=6  VENUE_ONLY=12
+after    COVERED=53  CREATOR_ONLY=6  VENUE_ONLY=29
+```
+
+**One new COVERED stop out of eighteen.** The reasoning is right, and it is the
+finding:
+
+- **Museum of Naïve Art** — its stops are "The Dream", "The Wedding", "The
+  Sleeping Gypsy". Rousseau's *The Sleeping Gypsy* is at MoMA in New York.
+  Attaching it to a Nice stop because the title matches is the D74
+  Manet-for-Jacquet failure exactly. Refused.
+- **Asian Art Museum** — Wikipedia has good articles on Ganesha, Guanyin and
+  Noh masks, and **none of them mention the Nice museum**. D74's rule is that
+  venue confirmation must come from the same source as the subject claim.
+  Refused.
+- **National Constitution Center** — the institution's article does not name
+  the exhibit. Refused.
+
+**So the ceiling for these venues is not our acquisition code; it is the public
+web.** Their stops are generic object names that no general source can
+disambiguate to one museum's holdings. The only routes are the institutions'
+own catalogues — Joconde/POP for the French ones — or nothing.
+
+That is worth telling Michael plainly: **some tours cannot be made good from
+public sources at all**, and the honest options are to source them properly, or
+not to offer them.
+
+Outdoor and transport venues (Abu Dhabi camel, Big Lake dog sledding, the Nice
+restaurants tour) were skipped as out of scope and remain entirely uncovered.
+
+---
+
+## D126 — LEAD unparked a task by renaming the file and left the "do not start" notice inside it (2026-08-05)
+
+LOCAL-223 (theme threads) was dispatched and exited in **9 seconds**:
+
+> *"I'll wait for the unpark signal. Let me know when LEAD moves this
+> forward…"*
+
+The agent was right. LEAD renamed `PARKED_kiro_task_LOCAL-223.md` to
+`new_kiro_session_is_required_LOCAL-223.md` but left the body beginning:
+
+```
+# ⛔ PARKED — do not start until LEAD moves this to
+  `new_kiro_session_is_required_LOCAL-223.md`
+```
+
+Filename and content contradicted each other, and the agent obeyed the content
+— which is the correct precedence. Header stripped, re-dispatched.
+
+Cheap mistake, but worth recording because the parking mechanism now has two
+states that must be changed together, and only one of them is visible in a
+directory listing. The instruction lives in the file; the dispatcher reads the
+name. **If a task is ever parked again, the unpark must edit both.**
