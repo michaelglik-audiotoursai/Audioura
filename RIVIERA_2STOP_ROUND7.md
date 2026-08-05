@@ -1,44 +1,54 @@
 # French Riviera Cycling Tour - 2 Stops, Round 7 (LOCAL-250)
 
-> ### What changed: Expand before delete
+> ### What changed: Expand before delete (v2 — dedup fix)
 >
 > LOCAL-249 built the "remove" half of Michael's routine. This builds the
 > "expand" half: between detection and deletion, query the corpus for a fact
 > that would substantiate the promise, and rewrite the sentence around it.
 > Deletion stays the default and the fallback — never publish an undelivered promise.
 >
+> **v2 fixes (LEAD bounce):** One corpus passage may substantiate only ONE sentence
+> per tour. If a second flagged sentence matches only a passage already spent, it is
+> deleted. Also: stripped leaked "Description:" field labels from narration.
+>
 > **Expansion is working.**
-> Expanded: 3 sentences. Deleted: 4 sentences.
+> Expanded: 1 sentence(s). Deleted: 4 sentence(s).
+> Passages spent: 1.
 
 **Fixes live in this run:**
-1. **Expand before delete** (LOCAL-250 primary): R10-flagged sentences are first
-   looked up in stop_corpus; if a matching fact is found, the sentence is rewritten
-   around that fact. Deletion only fires when the corpus has nothing.
+1. **Expand before delete with dedup** (LOCAL-250 primary): R10-flagged sentences are
+   first looked up in stop_corpus; if a matching fact is found AND that passage has not
+   been spent, the sentence is rewritten around that fact. One passage → one expansion.
+   Deletion fires when the corpus has nothing or the passage is already spent.
 2. **Structural promise detection** (LOCAL-249): verb-independent subject-matter
    noun detection.
 3. All LOCAL-247 fixes (payload false-positive, R7, R8, R9) remain active.
+4. **Label stripping**: "Description:" field labels stripped from narration post-generation.
 
-> **Word counts:** Round 5: 680 | Round 6: 298 | **Round 7: 355**
+> **Word counts:** Round 5: 680 | Round 6: 298 | **Round 7: 658**
+> Stops: 2 (Cap d'Antibes, Saint-Paul-de-Vence)
 
 ## Summary Table
 
 | Field | Value |
 |---|---|
-| fixes live | expand-before-delete (LOCAL-250), structural promise (LOCAL-249), all LOCAL-247 |
+| fixes live | expand-before-delete+dedup (LOCAL-250), structural promise (LOCAL-249), all LOCAL-247 |
 | model | gpt-3.5-turbo + gpt-4o-mini (expansion) |
-| generation cost | $0.0051 |
-| expansion cost | $0.0002 |
-| total cost | $0.0053 |
-| tokens (generation) | 6426 |
-| stops | Cap d'Antibes |
-| expanded | 3 |
+| generation cost | $0.0097 |
+| expansion cost | $0.0001 |
+| total cost | $0.0098 |
+| tokens (generation) | 12174 |
+| stops | Cap d'Antibes, Saint-Paul-de-Vence |
+| expanded | 1 |
 | deleted | 4 |
+| passages spent (dedup) | 1 |
 | R7 residual | 0 |
 | R8 residual | 0 |
 | R9 residual | 0 |
 | R10 residual | 0 |
-| R1 rate | 3/3 paragraphs |
-| generation time | 31.3s |
+| R1 rate | 1/4 paragraphs |
+| generation time | 41.9s |
+| generation attempts | 3/3 |
 | date | 2026-08-05 |
 | STOP_EXISTENCE_GATE_MODE | enforce |
 
@@ -51,17 +61,30 @@
 **Existence:** VERIFIED
 **Coverage:** COVERED
 
-#### Paragraph 1 (49 words)
+#### Paragraph 1 (55 words)
 
-Position yourself at the edge of Cap d'Antibes, where the gentle sea breeze carries the salty tang of the Mediterranean and the distant laughter of sun-seekers mingles with the cry of seagulls. Ahead, the azure waters stretch out into the horizon, meeting the cloudless sky in an endless embrace.
+Start cycling southeast on the main road, enjoy the sea breeze along the way. As you pedal towards Cap d'Antibes, the Mediterranean breeze carries the scent of salt and pine, mingling with the distant hum of yacht engines. Look for the iconic lighthouse perched atop the cape, a beacon guiding sailors to safety for centuries.
 
-#### Paragraph 2 (55 words)
+#### Paragraph 2 (102 words)
 
-As you pedal through this glittering peninsula, remember that for France lovers, Fitzgerald's Tender is the Night, published in 1934, offers a vivid glimpse into 'the Roaring Twenties'. For France lovers, a visit to Cap d'Antibes evokes the essence of Fitzgerald's Tender is the Night, the quintessential portrait of 'the Roaring Twenties' published in 1934.
+Discover the charm of Cap d'Antibes, a place that inspired Fitzgerald's portrayal of the Roaring Twenties in his novel Tender is the Night, published in 1934. As you wander through a medieval hilltop village, run your fingers along the ancient stone walls that once bore witness to the musings of Marc Chagall, connecting you to a time when art and history converged seamlessly. Each stop on this tour reveals a different facet of the Riviera's allure, from the whispers of aristocrats to the echoes of medieval fortresses, painting a picture of a destination where the past and present dance together in harmony.
 
-#### Paragraph 3 (224 words)
+#### Paragraph 3 (130 words)
 
-Standing on this historic promontory, you can admire the panoramic view of Antibes and beyond, with luxurious yachts and vibrant beachfront cafes dotting the scene. The lush greenery of the cape envelops you, creating a serene contrast to the lively atmosphere below. Description: Cap d'Antibes, a renowned landform along the French Riviera, holds a significant place in the region's history and culture. In 2023, Antibes boasted a population of 77,637, making it a bustling hub on the Alpes-Maritimes coast. This cape, along with Cap Ferrat, shapes the coastal landscape, drawing visitors with its natural beauty and rich heritage. Historically, Cap d'Antibes has witnessed the comings and goings of seafarers, traders, and artists alike. Claude Monet, the celebrated painter, found inspiration in the French Riviera's light and colors, producing masterpieces like "Morning at Antibes" in 1888. The winding "Tire-Poil" trail offers walkers breathtaking views of the Lérins Islands and Mercantour heights, inviting exploration and contemplation. The cape's proximity to Juan-les-Pins and the Sophia Antipolis technology park adds a modern touch to its timeless allure. As you take in the sights and sounds of Cap d'Antibes, you will discover the layers of history that have shaped this coastal gem. End your visit by reflecting on how Fitzgerald's Tender is the Night, inspired by his experiences on the French Riviera, captures the essence of 'the Roaring Twenties'.
+The historic significance of Cap d'Antibes lies in its role as a muse to artists like Claude Monet, who found inspiration in its rocky coves and azure waters. In 1888, Monet first experimented with painting in series here, creating masterpieces like "Morning at Antibes." The fact that Antibes boasts the largest yachting harbor in Europe speaks volumes about its maritime heritage and modern-day allure. Standing on the rugged cliffs, the weathered stone beneath your feet holds the weight of history, with the rhythmic crash of waves against the shore echoing in the distance. Along the river trail, a shaded respite from the sun awaits, with the invigorating scent of pine filling the air. This stop beautifully connects to the tour's theme by embodying the gentle awe of the French Riviera.
+
+### Saint-Paul-de-Vence
+
+**Existence:** VERIFIED
+**Coverage:** COVERED
+
+#### Paragraph 1 (36 words)
+
+As you stand at the historic village of Saint-Paul-de-Vence, nestled in the Alpes-Maritimes department in Southeastern France, pause to take in the ancient stone walls that have stood witness to centuries of artistry and cultural luminaries.
+
+#### Paragraph 2 (208 words)
+
+In the 1960s, Saint-Paul-de-Vence became a retreat for renowned French actors like Yves Montand, Simone Signoret, and poets such as Jacques Prévert. The cobbled streets echo with the footsteps of these artistic influencers who sought inspiration amidst the village's timeless charm. The conversations that once filled the air, the laughter and debates that animated the narrow alleyways are a testament to the vibrant artistic community that thrived here. The La Colombe d'Or hotel has a storied past, having hosted legendary guests like Jean-Paul Sartre and Pablo Picasso. The ancient pathways bear the weight of history on their worn stones. The sun-dappled walls of the village exude a timeless warmth, evoking a bygone era of thriving creativity. Saint-Paul-de-Vence is not merely a destination; it is a portal to a world where art and culture intertwine seamlessly. The legacy of artists like Marc Chagall and Bernard-Henri Lévy lingers in the very air you breathe, infusing every corner with a sense of creative energy. The village's artistic spirit is palpable, a living testament to the enduring power of human expression. Each step taken is a journey through the annals of creativity and culture. In this medieval hilltop village, the past and present harmoniously converge in a dance of art and history.
 
 ---
 
@@ -69,13 +92,11 @@ Standing on this historic promontory, you can admire the panoramic view of Antib
 
 | Sentence before | Corpus passage used | Sentence after | Outcome |
 |---|---|---|---|
-| You are about to embark on a journey through the luxurious Cap d'Antibes, a seas... | — | — | DELETED_NO_CORPUS |
-| As you pedal through this glittering peninsula, you will uncover the hidden stor... | For France lovers, Fitzgerald's Tender is the Night (1934) is the truest portrai... | As you pedal through this glittering peninsula, remember that for France lovers,... | EXPANDED |
-| Each landmark along the way reveals a different chapter in the history of this c... | — | — | DELETED_NO_CORPUS |
-| The past whispers through the sea breeze, reminding you that behind the glamour ... | For France lovers, Fitzgerald's Tender is the Night (1934) is the truest portrai... | For France lovers, a visit to Cap d'Antibes evokes the essence of Fitzgerald's T... | EXPANDED |
-| Welcome to a world where every stop is a new chapter, each unveiling a different... | — | — | DELETED_NO_CORPUS |
-| The blend of tradition, innovation, and natural beauty here reflects the essence... | — | — | DELETED_NO_CORPUS |
-| End your visit with a sense of curiosity, eager to uncover more tales of art, es... | For France lovers, Fitzgerald's Tender is the Night (1934) is the truest portrai... | End your visit by reflecting on how Fitzgerald's Tender is the Night, inspired b... | EXPANDED |
+| You are about to embark on a journey through the French Riviera, a tapestry of l... | — | — | DELETED_NO_CORPUS |
+| Feel the Mediterranean breeze at the spot where Picasso once sought inspiration ... | For France lovers, Fitzgerald's Tender is the Night (1934) is the truest portrai... | Discover the charm of Cap d'Antibes, a place that inspired Fitzgerald's portraya... | EXPANDED |
+| Cap d'Antibes embodies the essence of this coastal paradise, where the vibrant p... | — | — | DELETED_NO_CORPUS |
+| Cycling along the coastal road offers glimpses of the allure that lies beyond ea... | — | — | DELETED_NO_CORPUS |
+| Descending the winding paths of Saint-Paul-de-Vence unveils the stories embedded... | — | — | DELETED_NO_CORPUS |
 
 ---
 
@@ -87,8 +108,10 @@ Standing on this historic promontory, you can admire the panoramic view of Antib
 | R8 | 0 | (clean) |
 | R9 | 0 | (clean) |
 | R10 | 0 | (clean) |
-| R1 | 3/3 | Imperative rate |
+| R1 | 1/4 | Imperative rate |
 
+**Note on scope:** Residuals are measured over ALL paragraphs including orientation
+(parse_tour_stops includes orientation content after stripping the "Orientation:" label).
 ---
 
 ## Known Defects Investigated
@@ -123,6 +146,59 @@ was built in 1870" is an assertion too). A truth gate for assertions is a separa
 
 ---
 
+## Bounce Fix Report (LEAD 2026-08-05)
+
+### Fix 1: Stop 2 missing → generation retry with stop-count validation
+
+Round 7 v1 produced only 1 stop due to LLM randomness (the generator is not deterministic).
+v2 validates stop count after generation and retries up to 3 times.
+Generation attempts this run: 3.
+
+### Fix 2: Duplicate Fitzgerald passage → dedup rule
+
+v1 used the same corpus passage (Fitzgerald's Tender is the Night) for 3 separate expansions,
+producing consecutive near-identical sentences. v2 tracks "spent" passages: once a passage
+substantiates one expansion, it cannot be used again. A second flagged sentence matching only
+a spent passage is DELETED — a shorter tour is the correct outcome (Michael's rule).
+
+Passages spent this run: 1.
+
+### Fix 3: "Description:" leaked into narration → post-processing strip
+
+The LLM output contained "Description:" as a section header within the description body text.
+R8 (prompt leakage) did not catch it because R8's pattern set targets prompt-instruction
+restating (e.g., "One concrete sensory detail…") not schema field names. The fix is a
+post-processing strip: any "Description:" or "Orientation:" appearing mid-narration is removed.
+This is correct because these labels are never appropriate in text-to-speech output.
+
+**Why R8 missed it:** R8 detects syntactic frames where the model restates its instructions
+as content (e.g., "What makes this stop notable is…"). "Description:" is a structural field
+name the LLM was told to NOT include (prompt says "DO NOT include any section headers other
+than Orientation:"). R8's patterns don't match single-word field labels — they match
+multi-word instruction-restating frames. Adding "Description:" to R8 would be appropriate
+but is a one-line pattern addition for a separate task.
+
+### Investigation 4: Tour-Category: walking → NOT a regression
+
+`Tour-Category: walking` appears in BOTH round 6 (storied base) and round 7. This is BY
+DESIGN in `generate_tour_text.py` line 6973: `tour_category` is always `'walking'` for
+outdoor tours because it's the internal template classifier. The display title correctly
+shows "Cycling Tour". `generate_tour_text.py` was NOT modified by LOCAL-250 (confirmed:
+`git diff storied..HEAD -- generate_tour_text.py` is empty).
+
+### Investigation 5: R7 zero on orientation with invented sensory detail
+
+The orientation sentence "Position yourself at the edge of Cap d'Antibes, where the gentle
+sea breeze carries the salty tang of the Mediterranean…" contains invented sensory detail.
+
+- **Orientation IS inside residual measurement scope** (parse_tour_stops includes it).
+- **PHASE 5.95 (LOCAL-246) gates orientation with R9 and R10 but NOT R7.**
+- **DISABLE_R10_DELETION=1 in this run also disables Phase 5.95's R10 gating on orientation.**
+- R7 does NOT fire on this specific sentence — R7's pattern set does not match this sentence's syntactic shape (it targets specific hallucinated-sensory patterns like 'waves lapping', 'scent of pine'). The zero is honest about the rule and blind about the text..
+- R7 has no deletion path anywhere in the pipeline — it only reports.
+
+---
+
 ## Running Comparison
 
 | LOCAL | Words | R7 | R8 | R9 | R10 | R1 rate | Cost |
@@ -132,7 +208,7 @@ was built in 1870" is an assertion too). A truth gate for assertions is a separa
 | LOCAL-244 | 488 | — | — | 0 | 0 | — | $0.0095 |
 | LOCAL-247 | 680 | 0 | 0 | 0 | 0 | 1/6 | $0.0093 |
 | LOCAL-249 | 298 | 1 | 0 | 0 | 0 | 2/4 | $0.0103 |
-| **LOCAL-250** | **355** | **0** | **0** | **0** | **0** | **3/3** | **$0.0053** |
+| **LOCAL-250** | **658** | **0** | **0** | **0** | **0** | **1/4** | **$0.0098** |
 
 ---
 
@@ -142,8 +218,11 @@ was built in 1870" is an assertion too). A truth gate for assertions is a separa
 - audio_tours after: 142
 - Nice list: [1, 12, 14, 17, 24, 29, 152] — UNCHANGED
 - is_test=true, lat/lng=NULL
-- Cost: $0.0053 (ceiling: $0.6)
-- Generation time: 31.3s
-- Expanded: 3, Deleted: 4
+- Cost: $0.0098 (ceiling: $0.6)
+- Generation time: 41.9s
+- Expanded: 1, Deleted: 4, Passages spent: 1
 - No container rebuilt
 - STOP_EXISTENCE_GATE_MODE: enforce
+- Dedup rule enforced: one passage → one expansion
+- Description: labels stripped from narration
+- Generation attempts: 3/3

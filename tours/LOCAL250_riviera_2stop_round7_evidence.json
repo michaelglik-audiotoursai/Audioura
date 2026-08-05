@@ -2,58 +2,10 @@
   "expansion_log": [
     {
       "stop": "Cap d'Antibes",
-      "sentence_before": "You are about to embark on a journey through the luxurious Cap d'Antibes, a seaside paradise steeped in opulence and intrigue.",
-      "subject_nouns": [
-        "intrigue",
-        "opulence"
-      ],
-      "corpus_passage": null,
-      "sentence_after": null,
-      "outcome": "DELETED_NO_CORPUS",
-      "cost": 0.0
-    },
-    {
-      "stop": "Cap d'Antibes",
-      "sentence_before": "As you pedal through this glittering peninsula, you will uncover the hidden stories that lie beneath the fa\u00e7ade of sun-drenched villas and azure beaches.",
-      "subject_nouns": [
-        "stories"
-      ],
-      "corpus_passage": "For France lovers, Fitzgerald's Tender is the Night (1934) is the truest portrait of 'the Roaring Twenties', and was inspired by his racy ...",
-      "sentence_after": "As you pedal through this glittering peninsula, remember that for France lovers, Fitzgerald's Tender is the Night, published in 1934, offers a vivid glimpse into 'the Roaring Twenties'.",
-      "outcome": "EXPANDED",
-      "cost": 6.165e-05
-    },
-    {
-      "stop": "Cap d'Antibes",
-      "sentence_before": "Each landmark along the way reveals a different chapter in the history of this captivating enclave, from clandestine wartime operations to the creative inspirations of famous artists and writers who once roamed its shores.",
-      "subject_nouns": [
-        "chapter"
-      ],
-      "corpus_passage": null,
-      "sentence_after": null,
-      "outcome": "DELETED_NO_CORPUS",
-      "cost": 0.0
-    },
-    {
-      "stop": "Cap d'Antibes",
-      "sentence_before": "The past whispers through the sea breeze, reminding you that behind the glamour of today, lies a tapestry woven with secrets and tales waiting to be discovered.",
+      "sentence_before": "You are about to embark on a journey through the French Riviera, a tapestry of lavish modernity and ancient secrets waiting to be unraveled by the curious traveler.",
       "subject_nouns": [
         "secrets",
-        "tales",
-        "tapestry",
-        "whispers"
-      ],
-      "corpus_passage": "For France lovers, Fitzgerald's Tender is the Night (1934) is the truest portrait of 'the Roaring Twenties', and was inspired by his racy ...",
-      "sentence_after": "For France lovers, a visit to Cap d'Antibes evokes the essence of Fitzgerald's Tender is the Night, the quintessential portrait of 'the Roaring Twenties' published in 1934.",
-      "outcome": "EXPANDED",
-      "cost": 6.165e-05
-    },
-    {
-      "stop": "Cap d'Antibes",
-      "sentence_before": "Welcome to a world where every stop is a new chapter, each unveiling a different facet of Cap d'Antibes' rich and storied past.",
-      "subject_nouns": [
-        "chapter",
-        "facet"
+        "tapestry"
       ],
       "corpus_passage": null,
       "sentence_after": null,
@@ -62,9 +14,22 @@
     },
     {
       "stop": "Cap d'Antibes",
-      "sentence_before": "The blend of tradition, innovation, and natural beauty here reflects the essence of the French Riviera, a region where past and present harmoniously coexist.",
+      "sentence_before": "Feel the Mediterranean breeze at the spot where Picasso once sought inspiration amidst the azure waters and rocky coves, setting the stage for a story of artistic allure.",
       "subject_nouns": [
-        "essence"
+        "allure",
+        "story"
+      ],
+      "corpus_passage": "For France lovers, Fitzgerald's Tender is the Night (1934) is the truest portrait of 'the Roaring Twenties', and was inspired by his racy ...",
+      "sentence_after": "Discover the charm of Cap d'Antibes, a place that inspired Fitzgerald's portrayal of the Roaring Twenties in his novel Tender is the Night, published in 1934.",
+      "outcome": "EXPANDED",
+      "cost": 6.539999999999999e-05
+    },
+    {
+      "stop": "Cap d'Antibes",
+      "sentence_before": "Cap d'Antibes embodies the essence of this coastal paradise, where the vibrant pulse of everyday life interweaves with the rich tapestry of history and art.",
+      "subject_nouns": [
+        "essence",
+        "tapestry"
       ],
       "corpus_passage": null,
       "sentence_after": null,
@@ -73,14 +38,26 @@
     },
     {
       "stop": "Cap d'Antibes",
-      "sentence_before": "End your visit with a sense of curiosity, eager to uncover more tales of art, espionage, and luxury along the glittering coastline that stretches before you.",
+      "sentence_before": "Cycling along the coastal road offers glimpses of the allure that lies beyond each curve, revealing more of the heart of the French Riviera.",
       "subject_nouns": [
-        "tales"
+        "allure"
       ],
-      "corpus_passage": "For France lovers, Fitzgerald's Tender is the Night (1934) is the truest portrait of 'the Roaring Twenties', and was inspired by his racy ...",
-      "sentence_after": "End your visit by reflecting on how Fitzgerald's Tender is the Night, inspired by his experiences on the French Riviera, captures the essence of 'the Roaring Twenties'.",
-      "outcome": "EXPANDED",
-      "cost": 5.85e-05
+      "corpus_passage": null,
+      "sentence_after": null,
+      "outcome": "DELETED_NO_CORPUS",
+      "cost": 0.0
+    },
+    {
+      "stop": "Saint-Paul-de-Vence",
+      "sentence_before": "Descending the winding paths of Saint-Paul-de-Vence unveils the stories embedded in the streets and the secrets hidden within ancient walls.",
+      "subject_nouns": [
+        "secrets",
+        "stories"
+      ],
+      "corpus_passage": null,
+      "sentence_after": null,
+      "outcome": "DELETED_NO_CORPUS",
+      "cost": 0.0
     }
   ],
   "gen_cost": {
@@ -89,19 +66,26 @@
     "cache_hit": false,
     "breakdown": {}
   },
-  "expansion_cost": 0.00018179999999999997,
-  "total_cost": 0.0052818000000000006,
-  "expanded_count": 3,
+  "expansion_cost": 6.539999999999999e-05,
+  "total_cost": 0.0097654,
+  "expanded_count": 1,
   "deleted_count": 4,
-  "words_before": 452,
-  "words_after": 355,
+  "spent_passages": [
+    "for france lovers, fitzgerald's tender is the night (1934) is the truest portrait of 'the roaring tw"
+  ],
+  "words_before": 757,
+  "words_after": 658,
   "stops": [
-    "Cap d'Antibes"
+    "Cap d'Antibes",
+    "Saint-Paul-de-Vence"
   ],
   "residuals": {
     "R7": 0,
     "R8": 0,
     "R9": 0,
     "R10": 0
-  }
+  },
+  "generation_attempts": 3,
+  "dedup_enabled": true,
+  "label_stripping_enabled": true
 }
