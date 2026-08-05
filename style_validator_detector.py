@@ -1501,7 +1501,7 @@ def _is_pure_instruction(sentence: str) -> bool:
     return False
 
 
-# ── LOCAL-256: Finite-verb checker ───────────────────────────────────────────
+# ── LOCAL-256/257: Finite-verb checker ────────────────────────────────────────
 # A sentence without a finite main verb is a fragment. Every R1 rewrite must
 # pass this check; if it fails, the original sentence is kept (an imperative
 # is better than a fragment).
@@ -1518,6 +1518,23 @@ def _is_pure_instruction(sentence: str) -> bool:
 # Strategy: strip relative clauses (that/which + ...) and participial phrases
 # (, founded in ..., , perched high ...) then check if ANYTHING remains that
 # looks like a finite verb.
+#
+# LOCAL-257: MASK QUOTED SPANS before any verb search. A verb inside a book
+# title, artwork name, or other quoted text is part of a noun phrase, not the
+# sentence's predicate. E.g. "Tender is the Night" — "is" here does not make
+# the sentence containing it a complete clause.
+
+# Regex to match quoted spans: "…", '…', «…», *…* (emphasis/italic markers)
+_QUOTED_SPAN = re.compile(
+    '\u201c[^\u201d]*\u201d'    # "curly" double quotes (U+201C…U+201D)
+    '|"[^"]*"'                   # straight double quotes
+    '|\u2018[^\u2019]*\u2019'    # 'curly' single quotes (U+2018…U+2019)
+    r"|(?<!\w)'[^']*'(?!\w)"     # straight single quotes (not contractions)
+    '|\xab[^\xbb]*\xbb'         # «guillemets» (U+00AB…U+00BB)
+    r'|\*[^*]+\*'               # *emphasis*
+    r'|_[^_]+_'                  # _italic_
+    , re.UNICODE
+)
 
 _FINITE_VERB_FORMS = re.compile(
     r'\b(?:is|are|was|were|has|have|had|does|do|did|can|could|will|would|'
@@ -1525,7 +1542,17 @@ _FINITE_VERB_FORMS = re.compile(
     r'unfolds|sweeps|reaches|rises|towers|lies|sits|overlooks|faces|'
     r'remains|holds|carries|contains|features|offers|provides|marks|'
     r'dates|runs|winds|leads|connects|separates|dominates|reveals|'
-    r'houses|displays|showcases|preserves|reflects|represents|serves)\b',
+    r'houses|displays|showcases|preserves|reflects|represents|serves|'
+    r'forms|includes|combines|embodies|captures|draws|creates|transforms|'
+    r'attracts|hosts|produces|joins|crowns|graces|defines|illustrates|'
+    # LOCAL-257: additional verbs found in generation output
+    r'held|drew|found|built|wrote|lived|came|became|began|grew|went|'
+    r'took|made|saw|gave|knew|fell|brought|kept|left|stood|'
+    r'lay|sat|ran|won|met|paid|told|sent|led|'
+    r'shimmers?|glimmers?|gleams?|glows?|sparkles?|'
+    r'beckons?|buzzes?|echoes?|whispers?|resonates?|'
+    r'flourished|thrived|emerged|evolved|survived|endured|'
+    r'witnessed|experienced|underwent|bore|borne)\b',
     re.IGNORECASE
 )
 
@@ -1544,6 +1571,9 @@ def _has_finite_main_verb(sentence: str) -> bool:
     """Check if a sentence has a finite verb in the main clause.
 
     LOCAL-256: Used to reject rewrites that produce fragments.
+    LOCAL-257: Masks quoted spans before checking. A verb inside a title
+    (e.g. "Tender is the Night") does not make the sentence complete.
+
     Returns True if the sentence appears to have a complete main clause.
 
     Design: conservative — returns True (allow) in ambiguous cases. The
@@ -1556,6 +1586,35 @@ def _has_finite_main_verb(sentence: str) -> bool:
     stripped = sentence.strip().rstrip('.')
     if not stripped:
         return False
+
+    # LOCAL-257: Strip field-label prefixes that precede actual content
+    # "Orientation: Start cycling..." → check "Start cycling..."
+    _label_match = re.match(r'^(?:Orientation|Directions|Description|Address|Type/Specialty|Specific Examples|Coordinates|Tour-Category):\s*', stripped)
+    if _label_match:
+        stripped = stripped[_label_match.end():]
+        if not stripped:
+            return False
+
+    # LOCAL-257: Imperative sentences ARE grammatically complete — the verb
+    # is finite in imperative mood. "Start cycling south..." is a sentence.
+    # Check before masking quotes since the imperative verb is at the start.
+    _first_word = stripped.split()[0].lower() if stripped.split() else ''
+    if _first_word in ('start', 'head', 'turn', 'follow', 'continue', 'cross',
+                       'walk', 'cycle', 'ride', 'pedal', 'take', 'go', 'proceed',
+                       'look', 'find', 'explore', 'discover', 'enter', 'exit',
+                       'pass', 'climb', 'descend', 'stop', 'notice', 'observe',
+                       'admire', 'enjoy', 'imagine', 'picture', 'consider',
+                       'remember', 'note', 'keep', 'bear', 'let', 'make',
+                       'prepare', 'position', 'place', 'stand', 'listen',
+                       'park', 'hey', 'once'):
+        return True
+
+    # LOCAL-257: "Once/When/As you [verb]..." has a finite verb in the subordinate
+    if re.match(r'^(?:Once|When|As|After|Before)\s+you\s+\w+', stripped, re.IGNORECASE):
+        return True
+
+    # LOCAL-257: Mask quoted spans — verbs inside titles/quotes are not predicates
+    stripped = _QUOTED_SPAN.sub(' QUOTED ', stripped)
 
     # Strip relative clauses and participial phrases to isolate main clause
     main_clause = _RELATIVE_CLAUSE.sub('', stripped)
@@ -1588,13 +1647,29 @@ def _has_finite_main_verb(sentence: str) -> bool:
 
     # Check for verbs ending in -s (3rd person present): "beckons", "holds"
     # But exclude words that are commonly nouns ending in -s: "views", "streets", "walls"
+    # LOCAL-257: Also exclude possessives and adjectives ending in -ous/-ious/-us
     _COMMON_NOUN_S = {'views', 'streets', 'walls', 'trees', 'arts', 'works',
                       'examples', 'gardens', 'galleries', 'paths', 'stones',
                       'waters', 'waves', 'sounds', 'scents', 'facts', 'years',
-                      'words', 'names', 'steps', 'stops', 'tours', 'times'}
+                      'words', 'names', 'steps', 'stops', 'tours', 'times',
+                      'heights', 'lights', 'nights', 'sights', 'rights',
+                      'twenties', 'forties', 'sixties', 'things', 'buildings',
+                      'paintings', 'carvings', 'surroundings', 'proceedings',
+                      'artists', 'inhabitants', 'visitors', 'residents',
+                      'mountains', 'islands', 'ruins', 'remains', 'hills',
+                      'cliffs', 'fields', 'banks', 'shores', 'woods', 'plains',
+                      'this', 'thus', 'plus', 'minus', 'versus', 'atlas'}
+    # Adjectives/adverbs ending in -s that are NOT verbs
+    _ADJ_S_SUFFIXES = ('ous', 'ious', 'eous', 'uous', 'ous', 'less', 'ness')
     words = main_clause.split()
     for w in words:
         wl = w.lower().rstrip('.,;:!?')
+        # LOCAL-257: Skip possessives — "Fitzgerald's" is not a verb
+        if "'s" in wl or "\u2019s" in wl:
+            continue
+        # Skip adjectives ending in -ous, -less, etc.
+        if any(wl.endswith(suf) for suf in _ADJ_S_SUFFIXES):
+            continue
         if wl.endswith('s') and len(wl) > 3 and wl not in _COMMON_NOUN_S:
             # Check if preceded by a noun phrase (likely verb position)
             idx = main_clause.lower().find(wl)
@@ -1615,12 +1690,127 @@ def _has_finite_main_verb(sentence: str) -> bool:
     if len(words_remaining) <= 4:
         return False
 
-    # If main clause has > 8 meaningful words, assume it has a verb somewhere
-    # (our rewrite fragments are typically short noun phrases)
-    if len(words_remaining) > 8:
+    # LOCAL-257: Instead of blindly passing long sentences, check for verb
+    # indicators more broadly. A long noun-phrase fragment like
+    # "Scott Fitzgerald's QUOTED a vivid portrayal of the Roaring Twenties..."
+    # has 15 words but no verb.
+    #
+    # Broader verb check: any past tense (-ed), 3rd-person present that looks
+    # like a verb in context (preceded by a noun/pronoun), or common verb
+    # patterns we may have missed above.
+    if re.search(r'\b(?:became|began|came|gave|grew|knew|made|saw|went|took|'
+                 r'found|built|wrote|lived|died|born|moved|worked|arrived|'
+                 r'created|painted|composed|inspired|captured|attracted|'
+                 r'transformed|developed|produced|hosted|gathered|brought|'
+                 r'flourished|thrived|emerged|evolved|survived|endured|'
+                 r'welcomed|celebrated|exhibited|inaugurated|embarked|'
+                 r'experimented|discovered|explored|settled|constructed|'
+                 r'restored|renovated|demolished|expanded|connected|'
+                 r'commissioned|dedicated|renamed|merged|split|formed|'
+                 r'introduced|launched|published|recorded|documented|'
+                 r'established|erected|sculpted|adorned|permeates|emanates|'
+                 r'beckons|buzzes|buzzed|echoes|breathes|pulses|pulsed|'
+                 r'whispers|resonates|embodies)\b', main_clause, re.IGNORECASE):
         return True
 
+    # Check for any word that looks like a past-tense verb (ending in -ed)
+    # but NOT after a comma (which would be participial)
+    if re.search(r'(?:^|(?<![,]))\s+\w+ed\b', main_clause):
+        # Extra check: the -ed word should not be an adjective before a noun
+        ed_matches = re.finditer(r'\b(\w+ed)\b', main_clause)
+        for em in ed_matches:
+            word = em.group(1).lower()
+            # Skip known adjectives that end in -ed
+            if word in ('renowned', 'famed', 'named', 'storied', 'sacred',
+                        'detailed', 'cobbled', 'walled', 'gilded', 'vaulted',
+                        'arched', 'terraced', 'landscaped', 'elevated',
+                        'illustrated', 'animated', 'documented', 'rugged'):
+                continue
+            # If followed by a preposition or end-of-clause, likely a verb
+            after_pos = em.end()
+            after_text = main_clause[after_pos:after_pos+10].strip()
+            if not after_text or after_text[0] in '.,;:!?' or \
+               re.match(r'^(?:in|on|at|by|to|for|with|from|of|the|a|an|and|but|or|that|this|it|he|she|they)\b', after_text, re.IGNORECASE):
+                return True
+
+    # If main clause has > 12 meaningful words AND contains what looks like
+    # a subject-verb pattern (capitalized word followed by lowercase word
+    # that could be a verb), cautiously allow
+    if len(words_remaining) > 12:
+        # Look for patterns like "Name verb" or "The Noun verbs"
+        if re.search(r'(?:[A-Z][a-z]+|the\s+\w+)\s+(?:is|are|was|were|has|have|had|'
+                     r'does|did|will|would|can|could|shall|should|may|might|must)\b',
+                     main_clause, re.IGNORECASE):
+            return True
+
     return False
+
+
+# ── LOCAL-257: Determiner restoration ────────────────────────────────────────
+# When stripping an imperative ("Explore the charming village of X…"), the LLM
+# or a deterministic rule may drop the article along with the verb, producing
+# "Charming village of X is…" instead of "The charming village of X is…".
+# This function detects the pattern and restores "The".
+
+# Common adjectives that frequently precede nouns in tour text
+_BARE_ADJ_START = re.compile(
+    r'^(?:charming|quaint|bustling|ancient|historic|medieval|majestic|opulent|'
+    r'picturesque|stunning|beautiful|magnificent|narrow|famous|renowned|'
+    r'legendary|hidden|tranquil|serene|vibrant|colourful|colorful|elegant|'
+    r'grand|imposing|impressive|scenic|idyllic|enchanting|lovely|striking|'
+    r'dramatic|remarkable|spectacular|breathtaking|winding|cobbled|steep|'
+    r'rugged|lush|verdant|azure|golden|crimson|pristine|sleepy|tiny|vast|'
+    r'enormous|sprawling|compact|towering|crumbling|weathered|ornate|'
+    r'delicate|exquisite|intricate)\s+'
+    r'(?:village|town|city|street|streets|road|path|trail|castle|church|'
+    r'chapel|cathedral|abbey|monastery|palace|fortress|tower|bridge|'
+    r'garden|gardens|park|square|plaza|courtyard|harbour|harbor|port|'
+    r'beach|bay|coast|coastline|cliff|cliffs|cape|peninsula|island|'
+    r'hill|hills|mountain|mountains|valley|river|lake|fountain|statue|'
+    r'museum|gallery|market|quarter|district|promenade|boulevard|avenue|'
+    r'building|mansion|villa|hotel|restaurant|café|cafe|terrace|'
+    r'landscape|panorama|view|vista|area|region|neighborhood|neighbourhood)\b',
+    re.IGNORECASE
+)
+
+# Bare common nouns without preceding determiner (no article, no possessive)
+_BARE_NOUN_START = re.compile(
+    r'^(?:village|town|city|castle|church|chapel|cathedral|abbey|monastery|'
+    r'palace|fortress|tower|bridge|garden|gardens|park|square|plaza|'
+    r'courtyard|harbour|harbor|port|museum|gallery|market|quarter|'
+    r'district|promenade|boulevard|avenue|building|mansion|villa|hotel|'
+    r'restaurant|café|cafe|terrace|landscape|panorama|area|region|'
+    r'neighbourhood|neighborhood)\s+(?:of|at|in|on|near|by|along|beside)\b',
+    re.IGNORECASE
+)
+
+
+def _restore_determiner(sentence: str) -> str:
+    """LOCAL-257: Restore 'The' when a rewrite stripped it with the imperative.
+
+    "Charming village of X is…" → "The charming village of X is…"
+    Only triggers when the sentence starts with an adjective+noun or bare
+    common noun followed by a preposition — patterns that require an article
+    in English.
+    """
+    stripped = sentence.strip()
+    if not stripped:
+        return stripped
+
+    # Don't add "The" if already starts with a determiner or proper noun
+    first_word = stripped.split()[0] if stripped.split() else ''
+    if first_word.lower() in ('the', 'a', 'an', 'this', 'that', 'these', 'those',
+                               'my', 'your', 'his', 'her', 'its', 'our', 'their'):
+        return stripped
+
+    # Check if first word is capitalized and might be a proper noun
+    # (proper nouns don't need articles). But adjectives at sentence start
+    # are also capitalized, so we check the pattern.
+    if _BARE_ADJ_START.match(stripped) or _BARE_NOUN_START.match(stripped):
+        # Restore "The" with proper capitalization
+        return 'The ' + stripped[0].lower() + stripped[1:]
+
+    return stripped
 
 
 def rewrite_r1_sentence_deterministic(sentence: str) -> str:
@@ -1845,6 +2035,8 @@ def apply_r1_rewrites(paragraph: str, api_key: str = None, model: str = None) ->
                         # LLM produced a fragment — keep original
                         kept.append(sentence)
                         continue
+                    # LOCAL-257: restore determiner if rewrite stripped it
+                    llm_result = _restore_determiner(llm_result)
                     kept.append(llm_result)
                     rewritten_count += 1
                     continue
@@ -1859,6 +2051,8 @@ def apply_r1_rewrites(paragraph: str, api_key: str = None, model: str = None) ->
                 # is better than a fragment)
                 kept.append(sentence)
                 continue
+            # LOCAL-257: restore determiner if rewrite stripped it
+            result = _restore_determiner(result)
             kept.append(result)
             rewritten_count += 1
             continue
