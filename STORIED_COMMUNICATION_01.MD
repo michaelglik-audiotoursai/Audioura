@@ -605,3 +605,58 @@ often. Tours are full of named entities. This is the first change today that
 should genuinely move both the cost and the clock.
 
 ---
+
+## 2026-08-05 13:40 — Michael
+
+> Why round 20 has 8 stops instead of 2? Why the general tour description does
+> nto include a preview of the stories found later in the stops?
+
+> Yes, please "dispatch that reordering" I am looking forward for a tour that has
+> intrigue and stop reference in the generic tour description.
+
+## 2026-08-05 13:40 — LEAD
+
+**Round 20 has 8 stops because LEAD set it that way** to test your hypothesis
+that more stops yield more intrigue. It confirmed it — 5.0 facts per stop against
+2.0 in round 19. The filename `..._2stop_round20_8stop.txt` is LEAD's error: the
+script was derived from the 2-stop one and the template kept the old label.
+
+**Part 4 is missing because the tour description is written before the stories
+exist.** The call order:
+
+```
+PHASE 3A  pick stops
+PHASE 3B  resolve details
+SPINE     <- writes the description INCLUDING part 4
+Stop 1..N <- the stories are written HERE, afterwards
+```
+
+So when the spine writes "in the stops ahead you will encounter…", **no stop
+narration exists yet.** It guesses from canonical titles.
+
+| round | part 4 |
+|---|---|
+| 16 | present, good |
+| 19 | partial |
+| 20 | **absent entirely** |
+
+Same code each time. **Round 16 was luck** — which also means every comparison
+we made today between round 16 and later rounds was partly comparing two coin
+flips.
+
+**Dispatched LOCAL-270.** Part 4 leaves the spine prompt and is composed *after*
+narration, from the delivered and gated text. Every entity it names is verified
+present in the stop it is attributed to — so it becomes structurally impossible
+to promise something the tour does not contain. If a tour has too little
+surviving content to name anything specific, it emits **no** part 4 rather than
+"more stories await", which is the exact failure R10 exists to catch.
+
+Both a 2-stop and an 8-stop tour will be regenerated, since the 8-stop case is
+where part 4 vanished completely and is therefore the one that proves the fix.
+
+**Also merged this tick:** the corpus LEAD wrongly ordered deleted is restored,
+and D127 is closed for good — the museum's page carries inventory number
+**2015.6.A.1** and donor **"Don Herrli"** for the Grant print. No model invents
+an accession number.
+
+---
