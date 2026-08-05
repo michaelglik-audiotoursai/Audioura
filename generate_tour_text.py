@@ -6197,6 +6197,14 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                         orientation = "Position yourself to best view this location." if tour_category != 'museum' else "Look for this work in the galleries."
                         description = description_text.strip()
 
+                    # [LOCAL-256] Strip "Description:" label the LLM sometimes echoes
+                    # as a field header between orientation and body text. This is a
+                    # schema field name that must never reach TTS-bound narration.
+                    if description:
+                        description = re.sub(r'^Description:\s*\n?', '', description, count=1, flags=re.IGNORECASE).strip()
+                    if orientation:
+                        orientation = re.sub(r'^Description:\s*\n?', '', orientation, count=1, flags=re.IGNORECASE).strip()
+
                     # [LOCAL-26] Validate: reject if description is a placeholder echo
                     _placeholder_leaked = _detect_placeholder_leak(description)
                     if _placeholder_leaked:
@@ -8030,6 +8038,27 @@ Requirements:
         complete_tour = complete_tour.replace("Look for this work in the galleries.", "")
         # Clean up double-spaces and triple-newlines left behind
         complete_tour = re.sub(r'  +', ' ', complete_tour)
+        complete_tour = re.sub(r'\n\s*\n\s*\n', '\n\n', complete_tour)
+
+    # -------- [LOCAL-256] Bare field-label gate --------
+    # Schema field names (Description:, Orientation:, etc.) must never reach the
+    # TTS-bound artifact. LOCAL-250 round 7 v1 bounced on this exact defect;
+    # LOCAL-255 round 12 shipped it again because the LLM echoed "Description:"
+    # after the orientation split. The fix at the split point (above) prevents
+    # new occurrences; this gate catches any that slip through assembly.
+    _BARE_FIELD_LABELS = re.compile(
+        r'^\s*(?:Description|Orientation|Directions|Sources|Coordinates|'
+        r'Type/Specialty|Specific Examples|Museum Information|Operational Details):\s*$',
+        re.MULTILINE
+    )
+    _field_label_matches = _BARE_FIELD_LABELS.findall(complete_tour)
+    if _field_label_matches:
+        print(f"\n  [LOCAL-256] ⚠️  BARE FIELD-LABEL GATE: {len(_field_label_matches)} label(s) in output!")
+        for _fl in _field_label_matches:
+            print(f"    STRIPPING: '{_fl.strip()}'")
+        # Strip bare labels — they carry no content for TTS
+        complete_tour = _BARE_FIELD_LABELS.sub('', complete_tour)
+        # Clean up resulting empty lines
         complete_tour = re.sub(r'\n\s*\n\s*\n', '\n\n', complete_tour)
 
     # Print word count statistics
