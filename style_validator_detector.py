@@ -1839,6 +1839,81 @@ def _sentence_has_structural_promise(sentence: str) -> bool:
     return True
 
 
+# ─── Subject-matter promise detection (LOCAL-249) ────────────────────────────
+# Michael's complaint: R10 relies on matching verb+noun idioms, but a language
+# model rephrases endlessly. "hinting at the secrets", "echoing with stories",
+# "reveal different facets" — all promise subject matter without delivering it,
+# and none match the verb whitelist.
+#
+# The structural insight: the PRESENCE of abstract subject-matter nouns as the
+# point of the sentence IS the promise, regardless of verb. A sentence that
+# asserts the existence of "secrets", "stories", "facets", "grandeur" etc.
+# without concrete substantiation (date, person, measurement) is making a
+# promise by construction.
+#
+# Guard against false positives: sentences with concrete payload self-deliver
+# and are handled downstream by _sentence_has_concrete_payload in the R10 flow.
+# Navigation sentences are exempt via _is_navigation_sentence.
+#
+# This is VERB-INDEPENDENT: we do not require a specific carrying verb.
+# The abstract noun itself, positioned as the object of the sentence's claim,
+# is sufficient.
+
+_R10_SUBJECT_MATTER_NOUNS = frozenset({
+    # Core narrative-promise nouns (from existing _R10_STRUCTURAL_PROMISE_NOUNS)
+    'tale', 'tales', 'story', 'stories', 'secret', 'secrets',
+    'chapter', 'chapters', 'legacy', 'legacies', 'roots',
+    'tapestry', 'whispers', 'whisper', 'essence', 'juxtaposition', 'symphony',
+    # Extended set (LOCAL-249): abstract nouns Michael identified as the defect
+    'allure', 'grandeur', 'opulence', 'elegance', 'splendor', 'splendour',
+    'intrigue', 'mystique', 'enigma',
+    'facets', 'facet',
+    'spirit',
+    'treasures',  # "hidden treasures" with no follow-up
+    'wonders',
+    'mysteries', 'mystery',
+    'introspection',  # "quiet introspection" — what introspection?
+})
+
+# NOTE: "history", "heritage", "culture", "beauty", "charm", "tradition",
+# "modernity" are intentionally EXCLUDED. They are too common as incidental
+# words in substantiated sentences (e.g., "the hotel's history began in 1870")
+# and their inclusion pushed R10 beyond the 3x corpus-wide threshold.
+# They ARE part of the defect Michael describes, but catching them requires
+# a syntactic role check (are they the POINT of the sentence?) which is
+# beyond deterministic detection without an LLM. Future work (LOCAL-249+).
+
+
+def _sentence_has_subject_matter_promise(sentence: str) -> bool:
+    """LOCAL-249: Detect promise by subject-matter noun presence (verb-independent).
+
+    A sentence that puts forward abstract subject-matter nouns as its assertion
+    is making a promise regardless of the verb carrying them. "hinting at the
+    secrets", "echoing with stories", "reveal different facets" all promise
+    without the specific verbs in the old whitelist.
+
+    Returns True if the sentence contains subject-matter nouns that make it a
+    promise. The concrete-payload check downstream prevents false positives on
+    sentences that self-deliver (have dates, names, measurements).
+    """
+    words = set(re.findall(r'[a-z]+', sentence.lower()))
+    if words & _R10_SUBJECT_MATTER_NOUNS:
+        return True
+    return False
+
+
+def _extract_subject_matter(sentence: str) -> list:
+    """Extract the abstract subject-matter nouns from a sentence.
+
+    Returns a list of the abstract nouns found, for evidence/reporting purposes.
+    """
+    words = set(re.findall(r'[a-z]+', sentence.lower()))
+    found = []
+    for noun in sorted(words & _R10_SUBJECT_MATTER_NOUNS):
+        found.append(noun)
+    return found
+
+
 def _sentence_has_promise(sentence: str) -> bool:
     """Check if a sentence contains a promise-trigger phrase or shape."""
     # Path 1: original regex patterns (exact phrases)
@@ -1847,6 +1922,10 @@ def _sentence_has_promise(sentence: str) -> bool:
             return True
     # Path 2: structural detection (LOCAL-240) — noun + verb shape
     if _sentence_has_structural_promise(sentence):
+        return True
+    # Path 3: subject-matter detection (LOCAL-249) — verb-independent
+    # The sentence puts forward abstract nouns as its assertion.
+    if _sentence_has_subject_matter_promise(sentence):
         return True
     return False
 
