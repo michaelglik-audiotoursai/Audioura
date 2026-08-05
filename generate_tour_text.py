@@ -7145,69 +7145,144 @@ REWRITE RULES (all mandatory):
             if _venue_identity_prompt_block:
                 _identity_section = f"\n\n{_venue_identity_prompt_block}"
             
-            # [LOCAL-21] When story elements exist, constrain prolog to ONLY use facts
-            # from those elements. This prevents G4 failures where the prolog LLM invents
-            # dates/causal claims that can't trace back to story elements.
-            _grounding_constraint = ""
+            # [LOCAL-259] Four-part prolog structure per Michael's specification.
+            # Parts: 1) Tour name + transport, 2) Route/physicality, 3) Purpose/intrigue, 4) Forward connection.
+            # Each part is sourced from real data: transport_mode, coordinates, stop_corpus.
+
+            # --- Part 2 data: compute distance from coordinates ---
+            _prolog_stop_names = [p.get('name', '') for p in poi_list]
+            _prolog_coords = []
+            for _pp in poi_list:
+                _pc = _parse_coords(_pp.get('coordinates', ''))
+                if _pc:
+                    _prolog_coords.append(_pc)
+            _prolog_total_km = 0.0
+            if len(_prolog_coords) >= 2:
+                for _ci in range(len(_prolog_coords) - 1):
+                    _prolog_total_km += _haversine_km(_prolog_coords[_ci], _prolog_coords[_ci + 1])
+            _prolog_distance_str = f"{_prolog_total_km:.0f} km" if _prolog_total_km >= 1 else f"{_prolog_total_km * 1000:.0f} m"
+
+            # Transport mode display
+            _prolog_transport_display = {
+                'on_foot': 'walking', 'bike': 'cycling', 'vehicle': 'driving',
+                'animal': 'riding', 'country_scale': 'road trip'
+            }.get(transport_mode, transport_mode)
+
+            # --- Part 3 data: extract sourced facts from stop_corpus ---
+            _prolog_corpus_facts = {}  # stop_name → [fact strings]
+            if _stop_corpus_data:
+                for _sc_name, _sc_data in _stop_corpus_data.items():
+                    if _sc_data and _sc_data.get('passages'):
+                        _facts_for_stop = []
+                        for _passage in _sc_data['passages'][:8]:
+                            # Extract sentences with dates or proper nouns + verbs
+                            _p_sents = re.split(r'(?<=[.!?])\s+', _passage)
+                            for _ps in _p_sents:
+                                if len(_ps) < 20:
+                                    continue
+                                _has_date = bool(re.search(r'\b\d{3,4}\b', _ps))
+                                _has_proper = bool(re.search(r'[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*', _ps))
+                                _has_verb = bool(re.search(
+                                    r'\b(?:built|founded|opened|painted|wrote|designed|'
+                                    r'constructed|captured|destroyed|transformed|visited|'
+                                    r'published|established|ordered|integrated|settled|'
+                                    r'mentioned|served|drew|required|created)\b', _ps, re.IGNORECASE))
+                                if _has_date or (_has_proper and _has_verb):
+                                    _facts_for_stop.append(_ps.strip())
+                        _prolog_corpus_facts[_sc_name] = _facts_for_stop[:6]
+
+            # Also gather from _story_elements if available
+            _prolog_story_facts = []
+            if _story_elements:
+                for _se in _story_elements[:12]:
+                    _se_text = _se.get('text', '')
+                    if _se_text and len(_se_text) > 15:
+                        _prolog_story_facts.append(f"({_se.get('type','?')}) {_se_text}")
+
+            # Build the corpus facts section for the prompt
+            _corpus_facts_prompt = ""
+            if _prolog_corpus_facts:
+                _corpus_lines = []
+                for _cfn, _cff in _prolog_corpus_facts.items():
+                    if _cff:
+                        _corpus_lines.append(f"\n  [{_cfn}]:")
+                        for _cf in _cff:
+                            _corpus_lines.append(f"    - {_cf[:200]}")
+                _corpus_facts_prompt = "\n".join(_corpus_lines)
+            if _prolog_story_facts:
+                _corpus_facts_prompt += "\n\n  [Story elements]:\n" + "\n".join(
+                    f"    - {sf}" for sf in _prolog_story_facts[:8])
+
+            # --- Part 4 data: what the stops actually cover ---
+            _prolog_stop_previews = []
+            for _sp_entry in _arc[:len(poi_list)]:
+                _sp_role = _sp_entry.get("chapter_role", "")
+                _sp_angle = _sp_entry.get("unique_angle", "")
+                if _sp_role or _sp_angle:
+                    _prolog_stop_previews.append(f"{_sp_role}: {_sp_angle}")
+
+            # --- Build the four-part prolog prompt ---
+            _prolog_prompt = f"""[LOCAL-259] Write a tour prolog in EXACTLY four sequential parts. Each part has a specific purpose. Output them as one flowing paragraph (no labels, no numbering), but ensure all four parts are present in order.
+
+TOUR DATA:
+- Tour name/location: {location}
+- Transport mode: {_prolog_transport_display}
+- Stops: {', '.join(_prolog_stop_names)}
+- Stop 1 coordinates: {poi_list[0].get('coordinates', 'unknown') if poi_list else 'unknown'}
+- Stop {len(poi_list)} coordinates: {poi_list[-1].get('coordinates', 'unknown') if poi_list else 'unknown'}
+- Approximate straight-line distance between first and last stop: {_prolog_distance_str}
+- Theme: {_connecting_thread}
+
+SOURCED FACTS (use ONLY these for any factual claim):
+{_corpus_facts_prompt if _corpus_facts_prompt else '  (no corpus facts available — use only general geographic/transport facts for Part 2, omit specific historical claims in Part 3)'}
+
+STOP CONTENT PREVIEWS (for Part 4):
+{chr(10).join(f'  - {sp}' for sp in _prolog_stop_previews) if _prolog_stop_previews else '  - ' + ', '.join(_prolog_stop_names)}
+
+THE FOUR PARTS (produce in this exact order, flowing as natural prose):
+
+PART 1 — TOUR NAME + TRANSPORT (1-2 sentences):
+State the tour name and mode of transport. Example shape: "You are about to embark on a [cycling/walking/driving] journey through [location]."
+
+PART 2 — ROUTE AND PHYSICALITY (2-3 sentences):
+State the transport mode again concretely, name the endpoints ({_prolog_stop_names[0] if _prolog_stop_names else '?'} to {_prolog_stop_names[-1] if _prolog_stop_names else '?'}), give the approximate distance ({_prolog_distance_str}). Describe only terrain/landscape features that are KNOWN from the sourced facts or that are trivially true of the geography (e.g. "coastal" for a coast). Do NOT invent elevation, flatness, or terrain claims unless supported by corpus facts above.
+
+PART 3 — PURPOSE/INTRIGUE (2-4 sentences):
+This is the story hook — WHY someone takes this tour. Thread sourced facts into a causal or thematic sentence. Use ONLY facts from the SOURCED FACTS section above. If the facts support a causal link (X led to Y, which explains Z), write it. If they do NOT support a causal chain, write the plainest true version: state two sourced facts without manufacturing a connection between them. A false causal claim is worse than a plain factual one.
+
+PART 4 — FORWARD CONNECTION (1-2 sentences):
+Connect to the upcoming stops by naming SPECIFIC content they cover. Do NOT say vague things like "more stories await" or "hints at the region's role." You MUST name at least one specific date, person, or event from each stop. Example: "In the stops ahead, you will trace Monet's 1888 paintings at Cap d'Antibes and the 1306 chapel crowning Eze Village." The promise must be dischargeable by the tour itself.
+
+CONSTRAINTS:
+- Total length: 100-180 words (MUST be at least 100 words — short prologs are rejected)
+- Second-person present tense throughout
+- Every date, name, or causal claim MUST come from SOURCED FACTS above
+- No questions at the end
+- ABSOLUTELY NO sensory fabrication: no "sun-drenched", "azure waters", "gentle breeze", "sparkling", "shimmering", "rugged cliffs" unless you have evidence. State geography plainly: "coastal", "hillside", "peninsula".
+- No adjective-heavy fillers like "rich tapestry", "vibrant pulse", "timeless charm"
+- Return ONLY the paragraph text, no labels or part markers"""
+
+            # [LOCAL-21] Append grounding constraint if story elements exist
             if _story_elements:
                 _elem_facts = "\n".join(
                     f"  - ({e.get('type','?')}) {e.get('text','')}"
                     for e in _story_elements[:10]
                 )
-                # [LOCAL-42] Venue-identity facts (architect, year, style) are corpus-sourced
-                # and explicitly whitelisted — they are NOT hallucination.
-                _vi_exception = ""
-                if _venue_identity_prompt_block:
-                    _vi_exception = """
+                _prolog_prompt += f"""
 
-EXCEPTION: The VENUE-IDENTITY FACTS provided above are sourced from the crawled corpus 
-and are verified. You MAY and SHOULD use those facts (architect name, inauguration year, 
-architectural style) even if they do not appear in the story-elements list below."""
-                
-                _grounding_constraint = f"""{_vi_exception}
-
-GROUNDING CONSTRAINT — CRITICAL:
-The following are the ONLY documented facts you may reference for artwork-specific claims. 
-Do NOT invent any dates, names of people, founding events, or causal claims (who 
-created/founded/donated/built what) that are not present in this list OR in the 
-venue-identity facts above:
-{_elem_facts}
-
-If you want to mention a year, person, or event, it MUST appear verbatim in the facts above 
-OR in the venue-identity section. You may use evocative, atmospheric language without factual 
-claims (e.g. "a journey through light and colour" is fine; "founded in 1973 by André Malraux" 
-is NOT fine unless that fact appears above). Prefer thematic/emotional framing over specific 
-historical claims that lack sourcing."""
-
-            _prolog_prompt = f"""Write a compelling 80-190 word tour introduction that frames this experience as a journey — a book of connected chapters.
-
-Theme/connecting thread: {_connecting_thread}
-Tour hook: {_tour_hook}
-Chapter previews: {'; '.join(_chapter_previews)}{_identity_section}{_grounding_constraint}"""
+GROUNDING CONSTRAINT (reinforcement):
+These are the documented story elements. Any historical claim must trace to one of these:
+{_elem_facts}"""
 
             # [SQ-S6b] Inject thread promise into prolog prompt
             _thread_prolog_section = ""
             if _thread_result and _thread_result.mode == "threaded" and _thread_result.prolog_promise:
                 _thread_prolog_section = f"""
 
-NARRATIVE THREAD (pose this as the tour's central promise — a question the visitor will answer by the end):
-{_thread_result.prolog_promise}
-The prolog should frame this thread as a mystery or journey of discovery.
-Secondary threads ({', '.join(t.name for t in _thread_result.threads[1:3])}) can be hinted at."""
+NARRATIVE THREAD (weave into Part 3 as the central intrigue):
+{_thread_result.prolog_promise}"""
 
             _prolog_prompt += _thread_prolog_section
-
-            _prolog_prompt += """
-
-Requirements:
-- Write in second-person present tense ("You are about to embark...")
-- Name the journey's central theme/goal
-- Preview how the stops connect into one arc (each reveals a different facet)
-- Make it read like a book's opening page — compelling, with a sense of discovery
-- If venue-identity facts are provided above, integrate them prominently into the opening paragraph — they ground the intro in THIS specific place and are sourced facts (not hallucination)
-- 80-190 words exactly
-- Do NOT end with a question
-- Return ONLY the paragraph, no quotes or labels"""
 
             # [LOCAL-119] Prolog LLM call with retry for transient failures.
             # Transient: timeout, connection error, HTTP 429/500/502/503/504.
