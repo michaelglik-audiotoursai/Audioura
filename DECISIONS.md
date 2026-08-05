@@ -7367,3 +7367,38 @@ the module was written with, and it has never been tested against a cheaper
 model. The task runs an A/B across at least three models, ≥3 runs each because
 D183 showed stop selection alone moves facts-per-stop 4×, and **recommends
 without changing anything**. Michael decides; it is his money.
+
+## D186 — The spine stays on gpt-4o. Michael pays for reliability (2026-08-05)
+
+LOCAL-278's A/B, 3 models × 4 runs, same stops:
+
+| model | cost | latency | quality | valid runs |
+|---|---|---|---|---|
+| **gpt-4o** | $0.0064 | 3.9s | **3.0/4** | **4/4** |
+| gpt-3.5-turbo | $0.0010 | 3.2s | **3.0/4** | **3/4** |
+| gpt-4o-mini | $0.0004 | 4.7s | 2.5/4 | 4/4 |
+
+gpt-3.5-turbo matches gpt-4o on measured quality at a sixth of the price and
+slightly faster — about **$0.0054 per tour, roughly 30% of total cost**. The one
+thing separating them is that it produced a valid spine in **3 of 4** runs
+against 4 of 4.
+
+LEAD put it to Michael as a number rather than deciding, noting the sample was
+too small to act on a 3-of-4 signal.
+
+**Michael: "I am willing to pay for the reliability, if that was your
+question."**
+
+Settled. **The spine stays on gpt-4o.** Do not switch it to save money, and do
+not re-run this A/B expecting a different answer — the decision is not about the
+quality scores, which tie, but about a one-in-four failure rate being
+unacceptable at the component that produces the tour's skeleton and its opening.
+
+At $0.0054 per tour that is about **$5.40 per thousand tours** for a reliability
+margin. Cheap, and Michael judged it so explicitly.
+
+**What this does not settle:** the same question for the *other* model calls.
+Gloss triage, claim-gate escalation and intrigue ranking all run on gpt-4o-mini,
+which scored 2.5/4 here. That score was for spine generation, a harder task than
+ranking or adjudication, so it does not transfer — but nobody has measured those
+either. Worth doing before the next cost conversation, not now.

@@ -5332,6 +5332,20 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 thread_result=_thread_result,
             )
 
+            # [LOCAL-278] Fold the spine's cost into the pipeline total. It was
+            # metered to the ledger but excluded from this line, so every cost
+            # figure reported was ~half the truth (D185). LOCAL-278 could not
+            # touch this file while LOCAL-277 held it; this is the one line it
+            # said would close the gap.
+            try:
+                import spine_generator as _sg
+                _spine_cost = (_sg.LAST_SPINE_COST or {}).get("cost_usd", 0.0)
+                if _spine_cost:
+                    total_cost += _spine_cost
+                    print(f"  [LOCAL-278] Spine cost folded into total: ${_spine_cost:.4f}")
+            except Exception as _e:
+                print(f"  [LOCAL-278] Spine cost not folded (non-fatal): {_e}")
+
             # [LOCAL-111] Spine quality gate — score and retry on low quality.
             # Design: D14 quality instrumentation — scoring failure logs WARNING
             # and delivers the spine as-is. Never blocks a tour because a scorer errored.
