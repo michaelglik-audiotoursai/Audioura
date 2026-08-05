@@ -7295,3 +7295,75 @@ paintings as the most-drawn stops. It also failed accent-folding, showing
 `L'Armure d'Andô Naoyuki` with 1 passage when LOCAL-262 had restored it to 6.
 Both were caught by the numbers looking wrong rather than by any check —
 the same class of error as every blind metric recorded today.
+
+## D184 — Part 4 prefers the story; the closing offers what Michael asked for (2026-08-05)
+
+**LOCAL-276 merged (`98754ea`).** Michael found the 8-stop description offering
+"once owned by King Léopold II" and "graced by Charlie Chaplin" while the Man in
+the Iron Mask sat unused in stop 6. Part 4 selected by name recognition, and
+famous names are usually the least interesting thing in a stop.
+
+An intrigue ranking now sits between extraction and composition, classifying
+candidates as reversal / mystery / cause / celebrity_trivia and excluding the
+last. LEAD checked the model's actual output against Michael's judgement —
+**3 of 4 boundary rows agree**:
+
+```
+Iron Mask (mystery)        beat  King Leopold II (celebrity_trivia)
+Henri Negresco (reversal)  beat  the Cap Ferrat celebrity list
+Rue Obscure 1260 (mystery) beat  Walt Disney's 1956 visit
+```
+
+Row 4 is reported as **untestable** rather than massaged into agreement: the
+Cannes cancellation was not in that run's delivered text, and the ranking can
+only choose among facts that are there. That distinction — an input limitation
+stated plainly instead of a result tuned until it agrees — is the thing that has
+been missing from most submissions this week.
+
+D177's verification still binds and still passes; LEAD checked the delivered
+part 4 itself.
+
+**LOCAL-275 merged (`eaa6f94`).** The closing now carries the restaurant offer
+and the Treat Page, in three sentences, by re-cutting the budget rather than
+extending it. The wording that mattered is exactly right: *"the Treat Page shows
+**whether** there are real savings"* — availability, not a promise. All 34
+preaching tests pass, so the function is restored without the phrasings LOCAL-44
+rightly deleted.
+
+**The first change today with a real price tag.** Everything else built since
+this morning was deterministic and free. The intrigue ranking is one batched
+model call:
+
+| | before | after | ranking call |
+|---|---|---|---|
+| 8-stop | $0.0476 | **$0.0587** (+23%) | $0.0162 |
+| 2-stop | $0.0206 | **$0.0185** (−10%) | $0.0057 |
+
+Whether 1.6 cents is worth the Iron Mask replacing Charlie Chaplin is Michael's
+call. It is put to him as a number rather than absorbed.
+
+## D185 — Half of every tour's cost has been invisible all day (2026-08-05)
+
+Dispatched LOCAL-278 on debt LEAD has been carrying since 12:24.
+
+`spine_generator.py` computes its own cost, prints `SPINE_COST:` to stdout, and
+**never registers with the cost meter** — so it is excluded from the pipeline's
+own `Total API cost`. Measured today:
+
+```
+round 15   reported $0.0099   spine $0.0107 (hidden)   true $0.0206   52%
+round 16   reported $0.0101   spine $0.0083            true $0.0184   45%
+round 26   reported $0.0135   spine $0.0106            true $0.0241   44%
+```
+
+Every figure reported to Michael today has been roughly half the truth until
+LEAD added the spine by hand. He asked explicitly to be kept informed on price
+**without having to ask**, and the pipeline's own number cannot honour that.
+
+**And nobody chose the model that spends it.** The spine calls `gpt-4o` at
+$0.005/$0.015 per 1k while every other call uses `gpt-3.5-turbo` at roughly a
+tenth. It is 9% of tokens and ~50% of cost. That is not a decision — it is what
+the module was written with, and it has never been tested against a cheaper
+model. The task runs an A/B across at least three models, ≥3 runs each because
+D183 showed stop selection alone moves facts-per-stop 4×, and **recommends
+without changing anything**. Michael decides; it is his money.
