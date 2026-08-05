@@ -6906,3 +6906,68 @@ it:
 
 To be proposed properly in part 2 of Michael's agenda (scoring and evaluation),
 not bolted on. Recorded here so no future task "helpfully" pins the selector.
+
+## D171 — Four detectors can act now; three still cannot see (2026-08-05)
+
+LOCAL-261 merged (`655477a`). R2, R3, R4 and R8 each have a deletion phase, so
+the D165 disconnection is closed: every detector now has a path to the output.
+
+LEAD verified the boundary rows. **All four must-survive cases hold**, including
+the two that matter — Michael's approved pair ("This iconic cape … holds a
+significant place" followed by the 2023 population fact) and the D164 navigation
+sentence carrying an appended instruction.
+
+**One of four must-remove cases fires**, and that is correct against the brief.
+The task was told to add action, not detection. R4 does not detect "invites
+contemplation and serenity" or "the waves crash against the rocky shore" — the
+three sentences Michael flagged are not caught by any detector, which is what
+LEAD measured before dispatching. Corpus rates came back 1.00× on all four
+rules, confirming nothing was widened. The submission states the gaps plainly
+instead of hiding them.
+
+So the position is now: **the wiring problem is solved, the vocabulary problem
+is not.** That is LOCAL-263's scope.
+
+**A latent hazard is recorded rather than fixed.** These phases delete
+unconditionally, with no delivery lookahead. Michael's approved pair survives
+today only because R4 does not fire on it. The moment anyone widens R4 or R9 to
+catch "holds a significant place" — an entirely reasonable thing to want — the
+approved pair dies alongside the twin it is supposed to be distinguished from.
+**Until LOCAL-263 owns the substantiation test for all claim types, do not widen
+R4.**
+
+## D172 — LEAD moved the prolog three times and broke its validator twice (2026-08-05)
+
+LOCAL-260 merged (`d325996`). Both bounce defects are fixed: quoted-span
+handling aside, the extractor now finds the description structurally, round 16
+passes with **0** violations, round 15's opening produces **4**, the
+keyword-stuffed decoy **3**, and `DUPLICATE_TOUR_DESCRIPTION` — the check
+Michael asked for — is implemented.
+
+**And it is already broken again, by LEAD.** Against the current layout
+(`round17M`) the extractor returns a stop paragraph and reports `PART1_MISSING`
+and `PART4_MISSING` on a tour that has both.
+
+The prolog has moved three times in ninety minutes:
+
+1. after the `Orientation:` line, as a separate paragraph (round 16);
+2. above the `Orientation:` line (round 17L) — LEAD's reading of Michael;
+3. inside the Orientation section, after the label (round 17M) — Michael's
+   actual instruction, because TTS and translation key on that word.
+
+Each move was correct as an instruction and each broke a downstream consumer.
+D168 recorded the lesson — *"task files that specify POSITION propagate errors;
+prefer structural specs"* — and LEAD then moved the position twice more while
+the validator was mid-flight.
+
+The deeper point: **the tour text has no structure, only conventions.** Every
+consumer — the validator, the extractor, TTS, translation — re-derives meaning
+by pattern-matching a flat string, so any layout change silently breaks
+whichever consumer nobody re-ran. Michael's own reason for the third move is the
+evidence: the word `Orientation:` is load-bearing for translation because there
+is nothing else to key on.
+
+That belongs in part 3 of his agenda. A tour with typed sections — description,
+orientation, directive, narration — would make all three moves free. Dispatched
+LOCAL-265 for the immediate extractor fix; the structural question is his to
+decide.
