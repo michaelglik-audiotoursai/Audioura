@@ -331,3 +331,57 @@ cases: *"From the secluded allure of Cap d'Antibes…"* must **fail** part 1, an
 d'Antibes…"* must **pass**.
 
 ---
+
+## 2026-08-05 12:04 — Michael
+
+> The second sentence "This iconic cape, situated on the French Riviera, holds a
+> significant place in the region's landscape." is good because it immidiately
+> followed by "In 2023, Antibes boasted a population of 77,637, making it the
+> second most populous area in Alpes-Maritimes after Nice" that supports it; and
+> makes both sentences worth while. Please confirm that this will continue be the
+> case.
+
+## 2026-08-05 12:04 — LEAD
+
+**Confirmed — it is safe. But it survives by accident, and its evil twin
+survives too.**
+
+Nothing fires on either sentence today, so LOCAL-261's new deletion phases will
+not touch them. Good.
+
+The catch: in **round 2** you scored **2/5** on a nearly identical sentence —
+*"Cap d'Antibes, situated on the French Riviera, holds a special place in the
+region's history and culture"* — with the reasoning *"nothing about aspects
+named such as place, history, and culture are described in the following
+sentence."*
+
+I ran that unsupported version through today's pipeline. **Nothing fires. It
+would ship.**
+
+Same shape, opposite verdict from you, and our rules cannot tell them apart.
+Your distinction is entirely about **what comes next** — which is exactly what
+R10's delivery lookahead was built to do. It never engages here because R10 does
+not recognise "holds a significant place" as a promise in the first place.
+
+**So the fix is not to teach R4 or R9 to delete this shape** — that would kill
+your good pair along with the bad one. It is to teach **R10** the shape, after
+which the existing delivery check decides automatically: deleted when nothing
+follows, kept when the population fact does.
+
+Two things done:
+
+1. **Addendum on LOCAL-261** — no new deletion phase may delete a claim on its
+   own wording; each must apply the R10 delivery lookahead first. Your approved
+   pair is now a mandatory must-survive boundary row.
+2. **LOCAL-262 queued** — teach R10 this promise shape. Small change, and it
+   implements your distinction exactly.
+
+**The wider point, recorded as D166.** Every rule we own judges a sentence in
+isolation, except R10. You have never once judged a sentence in isolation —
+round 2 is almost entirely about interconnection: *"senseless combination of
+words and facts with no interconnectedness between them."* The gap between how
+we measure and how you read is **adjacency**, and R10 is the only place we model
+it. That is probably the single most useful thing to come out of this session so
+far, and it belongs in part 1 of your agenda.
+
+---
