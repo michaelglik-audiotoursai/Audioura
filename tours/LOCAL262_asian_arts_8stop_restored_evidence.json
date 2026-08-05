@@ -1,0 +1,96 @@
+{
+  "Accéder au portail \"Activités\"   Fermer Activités": {
+    "status": "DROPPED",
+    "reason": "no canonical match"
+  },
+  "Achat, 2002": {
+    "status": "DROPPED",
+    "reason": "no canonical match"
+  },
+  "Achat, 2001": {
+    "status": "DROPPED",
+    "reason": "no canonical match"
+  },
+  "Achat, 1999": {
+    "status": "DROPPED",
+    "reason": "no canonical match"
+  },
+  "Don Herrli": {
+    "status": "DROPPED",
+    "reason": "no canonical match"
+  },
+  "Adresse: 405, Promenade des Anglais, 06200 Nice": {
+    "status": "DROPPED",
+    "reason": "no canonical match"
+  },
+  "les paysages de l'âme": {
+    "status": "VERIFIED",
+    "canonical_title": "les paysages de l'âme",
+    "snippet": "né par le Japon sans jamais s'y être rendu, Edgar P. Jacobs s'appuie sur une documentation exceptionnelle pour recréer avec une précision remarquable paysages, architecture, objets du quotidien et traditions. Son regard interroge autant la réalité que l'imaginaire d'un pays où modernité technologique et hér",
+    "method": "canonical_title_match",
+    "qid": "Q112189823"
+  },
+  "la geste de Bouddha": {
+    "status": "VERIFIED",
+    "canonical_title": "la geste de Bouddha",
+    "snippet": "servateur du Musėe départemental des arts asiatiques\n\nVoix off : Adrien Bossard - Directeur- Conservateur du musėe départemental des arts asiatiques\n\nBouddha debout\nPakistan\nIIe-IIIe siècles\nSchiste\nAchat, 2001\nInv. 2001.1.1Statue de BouddhaLes conquêtes d’Alexandre le Grand ont durablement marqué l’histoi",
+    "method": "canonical_title_match",
+    "qid": "Q112189881"
+  },
+  "l’art en exil - Hàm Nghi, Prince d'Annam (1871-1944)": {
+    "status": "VERIFIED",
+    "canonical_title": "l’art en exil - Hàm Nghi, Prince d'Annam (1871-1944)",
+    "snippet": "ce crânienne évoquant ici un chignon, et l’urna, petite touffe de poils entre les sourcils.\n\nSes lobes d’oreilles sont allongés et rappellent que les princes indiens portent de lourdes boucles. Bien qu’épais, son costume monastique, au drapé finement sculpté, laisse entrevoir un corps au modelé soigné. On",
+    "method": "canonical_title_match",
+    "qid": "Q112190412"
+  },
+  "Hokusai – Voyage au pied du mont Fuji": {
+    "status": "VERIFIED",
+    "canonical_title": "Hokusai – Voyage au pied du mont Fuji",
+    "snippet": "dra celle-ci effective.\n\nLe musée des arts asiatiques est un outil pédagogique original qui permet de susciter la curiosité des élèves en les faisant voyager vers de nouvelles cultures.\n\nLes enseignants souhaitant mettre en place un projet particulier pour leurs classes peuvent contacter l'unité de médiat",
+    "method": "canonical_title_match",
+    "qid": "Q114732591"
+  },
+  "Robe de prêtre taoïste": {
+    "status": "VERIFIED",
+    "canonical_title": "Robe de prêtre taoïste",
+    "snippet": "Conservateur du Musėe départemental des arts asiatiques.\n\nAdrien Bossard - Directeur- Conservateur du musėe départemental des arts asiatiques\n\nCette robe de prêtre, appelée jiangyi, servait aux rituels taoïstes. D'abord doctrine philosophique, le taoïsme prend, par la suite, une forme religieuse. Reche",
+    "method": "canonical_title_match",
+    "qid": ""
+  },
+  "Daim et Daine symbolisant le premier sermon de Bouddha": {
+    "status": "VERIFIED",
+    "canonical_title": "Daim et Daine symbolisant le premier sermon de Bouddha",
+    "snippet": "d’aujourd’hui : peint de couleurs vives, vêtu de brocards, le dieu était aussi paré de bijoux glissés dans les lobes d’oreilles.\n\n\n=== Daim et Daine symbolisant le premier sermon de Bouddha ===\nA l’origine, ce couple de cervidés était accompagné d’une roue de la Loi au dessus du portail d'entrée d'un monastèr",
+    "method": "canonical_title_match",
+    "qid": ""
+  },
+  "Masque du vieillard kojô": {
+    "status": "VERIFIED",
+    "canonical_title": "Masque du vieillard kojô",
+    "snippet": "rée, assemblées par plus de 200 mètres de tresse de soie. Son casque est garni de cornes de cerf stylisées et d’un shishi : un lion gardien. Son demi-masque terrifiant , en acier laqué, est agrémenté d’une longue moustache blanche.\n\nPartout sur l’armure, on retrouve les armoiries de la branche cadette des",
+    "method": "canonical_title_match",
+    "qid": ""
+  },
+  "Statue de Bouddha": {
+    "status": "VERIFIED",
+    "canonical_title": "Statue de Bouddha",
+    "snippet": "servateur du Musėe départemental des arts asiatiques\n\nVoix off : Adrien Bossard - Directeur- Conservateur du musėe départemental des arts asiatiques\n\nBouddha debout\nPakistan\nIIe-IIIe siècles\nSchiste\nAchat, 2001\nInv. 2001.1.1Statue de BouddhaLes conquêtes d’Alexandre le Grand ont durablement marqué l’histoi",
+    "method": "canonical_title_match",
+    "qid": ""
+  },
+  "Kannon à mille bras": {
+    "status": "VERIFIED",
+    "canonical_title": "Kannon à mille bras",
+    "snippet": "u Musėe départemental des arts asiatiques.\n\nVoix off : Adrien Bossard - Directeur- Conservateur du musėe départemental des arts asiatiques\n\nJûichimen Kannon\nJapon\nXIIe siècle\nBois, dorure, laque\nAchat, 2002\nInv. 2002.1.1Kannon, le bodhisattva de la compassionRéalisée dans un bois de cyprès durant la secon",
+    "method": "canonical_title_match",
+    "qid": ""
+  },
+  "L’Armure d’Andô Naoyuki": {
+    "status": "VERIFIED",
+    "canonical_title": "L’Armure d’Andô Naoyuki",
+    "snippet": "03-1868), vers 1850\nAcier, cuivre, cuir, soie, laque et feuille d’or\nAchat, 2002\nInv. 2002.3.1©Musée départemental des arts asiatiquesL’Armure d’Andô NaoyukiMilieu du XIXe siècle, Japon\n\nAu milieu du XIXe siècle, au Japon, Andô Naoyuki va avoir 15 ans. Héritier du fief de Tanabe, il est destiné au titre de",
+    "method": "canonical_title_match",
+    "qid": ""
+  }
+}
