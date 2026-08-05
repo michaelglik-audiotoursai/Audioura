@@ -5960,3 +5960,94 @@ LEAD had just warned about in another context:
 
 A guard is not finished when it fires. It is finished when it fires only on
 what it is for.
+
+## D147 — CORRECTION to D146: LOCAL-249 never touched DECISIONS.md. LEAD misread a moved tip (2026-08-05)
+
+D146 states that LOCAL-249 deleted D142 and D143, calls it the fourth such
+violation, and the LOCAL-249 merge commit says the same. **All of that is
+wrong.** The branch never modified `DECISIONS.md`:
+
+```
+$ MB=$(git merge-base 5078ac2 kiro/local249-structural-promise)
+$ git diff --name-only $MB..kiro/local249-structural-promise -- DECISIONS.md
+(nothing)
+```
+
+What LEAD actually saw was `git diff --stat storied..HEAD` reporting
+`DECISIONS.md | 77 ----`. That diff compares the branch against storied's
+**tip**, and D142/D143 had been appended to the tip *after* the branch was cut.
+Entries that exist on one side and not the other read as deletions regardless
+of which side moved. The branch was behind, not destructive.
+
+The same artifact appeared twice more within the hour — LOCAL-250 showing
+`-86` (D144–D146) and LOCAL-232 showing LOCAL-249's files as deleted — which is
+how it was finally caught.
+
+**The sharp part:** `check_protected_files.sh` was written an hour earlier
+specifically to diff from each branch's merge base, and D146 records fixing
+exactly this bug in the guard. The guard was right and reported clean; LEAD
+overrode it by eyeballing a `--stat` line. A control is worthless if its output
+loses to a glance at the wrong number.
+
+So the standing count of tasks that have edited LEAD's record is **three**
+(LOCAL-77, LOCAL-92, the subscribed merge), not four. The guard stays — those
+three were real — but D146's fourth instance is withdrawn, and the LOCAL-249
+merge commit message is wrong on that point and cannot be amended now that it
+is pushed. The bounce note on LOCAL-250's task file was corrected in place.
+
+**Rule:** never claim a branch changed a protected file from a `storied..HEAD`
+diff. Diff from `git merge-base`, or run the guard, which already does.
+
+## D148 — Tests are off the production database (2026-08-05)
+
+LOCAL-232 merged (`f3bbbf1`). Under pytest, `get_connection()` resolves to
+`audiotours_test`; LEAD verified with its own probe asserting
+`current_database()`, not by reading the submission. `audio_tours` unchanged at
+142, Nice list intact.
+
+This is the structural answer to D141. Two row-loss investigations have each
+cost a morning, and both ended in the same place: tests and production share a
+table, so a falling count looks identical whether it is required cleanup or the
+tour-29 event. Separating them removes the ambiguity instead of improving the
+alarm — which is the better class of fix, and the reason the task was unparked
+today rather than left waiting on a read-evaluation it does not touch.
+
+Carried forward, both honestly reported rather than papered over:
+`test_local183_controlled_ab` was not executed because it makes ~$0.10 of live
+generation calls against a $0.10 ceiling; and its `expected_subset` still names
+tours 21, 27 and 28, which were retired — against production that assertion
+would now fail, and against the test DB it skips, so the staleness is masked
+rather than fixed.
+
+## D149 — Round 7 bounced: expansion works, the artifact does not (2026-08-05)
+
+LOCAL-250 built expand-before-delete and it functions — 3 sentences expanded, 4
+deleted, words back from 298 to 355. Both defect investigations it was asked
+for are correct and worth keeping: R7 is orthogonal to R10 and has no deletion
+path, and an assertion genuinely is not a promise, so widening R10 to catch the
+smuggler's-tunnels claim would start deleting facts.
+
+**The delivered tour is not shippable, and the tour is what Michael reads.**
+
+- It has **one stop of two**. Round 6 had both. Nothing in the submission
+  mentions losing one; the summary reports residuals for a tour that is half
+  missing, which are therefore not comparable to round 6's.
+- `Tender is the Night` appears **three times** in 355 words, twice in
+  consecutive near-identical sentences, because all three expansions drew on
+  the single corpus passage that had both a date and subject-noun overlap. The
+  submission's own limitations section predicted this and shipped it anyway. A
+  known defect that reaches the artifact is not a limitation.
+- `Description:` — a schema field name — sits mid-paragraph in text bound for
+  text-to-speech, and R8, the prompt-leakage rule, reported 0.
+- `Tour-Category: walking` on a cycling tour.
+- R7 residual 0 was measured over an orientation that opens "the gentle sea
+  breeze carries the salty tang… the distant laughter of sun-seekers". LEAD ran
+  R7 on it: silent. Third blind zero this week.
+
+The fix required is a one-passage-per-tour rule: a corpus passage may
+substantiate one sentence, and a second flagged sentence matching only a spent
+passage is deleted. A shorter tour is the correct outcome — that is Michael's
+rule, not a compromise.
+
+**Round 6 remains the deliverable** for this morning, with LEAD's note at its
+head flagging the 298-word length and the unverifiable opening claim.
