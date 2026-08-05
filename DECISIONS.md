@@ -5797,3 +5797,80 @@ consistent, because it is what distinguishes them. CLAUDE.md is amended to say
 that instead of contradicting itself. The real answer remains LOCAL-232, moving
 tests off the production database entirely; that is still parked, and this is
 the interim rule until it lands.
+
+## D142 — R10's zero is honest now. The rules are still narrower than the standard (2026-08-05)
+
+LOCAL-247 merged (`d0630cc`). The bug was real and is fixed:
+`_sentence_has_concrete_payload` returned True for a sentence carrying no fact,
+because the lowercase particle in `d'Antibes` broke the capitalized-word run
+and left the fragment `['Coastal','Path']`, which neither place vocabulary
+claimed — `'path'` was in `_place_only_words`, a set that code path never
+consults. Two capitalized words that were not a known place read as a named
+person, counted as delivery, and cancelled the R10 promise in the next
+sentence. That is how round 4 reported `R10 residual 0` on a paragraph ending
+in a textbook unfulfilled promise.
+
+Fixed at the source — one vocabulary instead of two that disagreed, particles
+that no longer break runs, adjective/stem resolution — rather than by adding
+`'path'` to a list. LEAD verified all six boundary rows independently: the
+generic sentence is no longer a payload, both dated facts still are, R7/R8/R9
+and R10 all fire on their probes, navigation still survives. The
+`test_local188` failure seen during review is **not** a regression — it is a
+live-generation test and the review shell had no `OPENAI_API_KEY`; the output
+says so verbatim.
+
+**And the number is still wrong about the text.** Round 5's paragraph 2,
+measured by LEAD with the fixed detector, reports R7/R8/R9/R10 all zero while
+containing "hinting at the **secrets** of the elite", "its gardens echoing with
+**stories** of extravagant parties", and "These stops reveal different
+**facets** of opulence". `_sentence_has_promise` returns False for all three.
+
+The cause is not the cancellation logic this time — it is that
+`_R10_PROMISE_PATTERNS` is about ten regexes over fixed idioms. It matches "the
+coastline **holds stories**" and misses "its gardens **echoing with stories**",
+the same defect wearing a different verb. A whitelist of phrasings cannot keep
+pace with a language model's ability to rephrase, and three rounds of widening
+it have each been overtaken by the next generation.
+
+So the fix is the one Michael proposed himself: *"gather a subject matter in
+the sentence or paragraph and then validate, expand, and if cannot expand
+[remove]."* Extract the abstract noun the sentence puts forward as its point,
+check whether anything substantiates it on the same subject, expand from the
+corpus or delete. Dispatched as LOCAL-249 with nine boundary rows, five of
+which are sentences that must NOT be touched — that half is the harder one, and
+a rule that deletes the Monet sentence is a failure even if it catches every
+promise.
+
+**Process note.** Two rounds running, a residual of 0 was reported over text
+that plainly had the defect, and both times the harness was measuring correctly
+against a detector that was wrong. The number was true and meaningless. Task
+files now require sentence-level detail behind every residual, because a bare
+count cannot distinguish a clean tour from a blind rule.
+
+## D143 — The subscribed branch is 366 commits behind and merging now costs seven files (2026-08-05)
+
+`storied` is fully pushed, so the Subscribed gate is met. The subscribed track
+itself is complete short of deployment, which stays Michael's call — but the
+branch has drifted badly: 366 commits behind storied, 179 ahead, merge base
+back at LOCAL-111. Neither is a subset of the other. Subscribed carries the
+wallet, ledger, voice-control and user-tracking code; storied carries every
+tour-quality gate built since. **Subscribed generates tours too, and today it
+generates them with none of that.**
+
+D77 is the warning already on record: subscribed's `DECISIONS.md` sat frozen at
+D31 while five tasks were dispatched against it. It is now frozen at D111
+against a live D142.
+
+LEAD measured the conflict surface with `git merge-tree` before dispatching
+rather than guessing at it: **seven files conflict out of 483 changed**
+(`ANSWERS.md`, `DECISIONS.md`, `cost_meter.py`, `generate_tour_text.py`,
+`tour_orchestrator_service.py`, and two test files). That is a two-hour job
+today and a two-day job next month, which is the whole argument for doing it
+now. Dispatched as LOCAL-248, subscribed as base, with the four real merges
+required to preserve both sides and five verification rows spanning both
+tracks. Nothing is pushed by the task; LEAD verifies and pushes.
+
+Also refreshed the prepush-baseline worktree, which was detached at `fe7eee7`
+rather than `origin/storied`. A stale baseline silently invalidates every
+regression comparison made against it — the exact failure CLAUDE.md warns
+about. It now tracks `d0630cc`.
