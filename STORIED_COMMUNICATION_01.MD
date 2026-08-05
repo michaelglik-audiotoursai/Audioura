@@ -550,3 +550,58 @@ regenerating. It has nothing to do with tour generation speed, and the two will
 be reported separately so neither is read as the other.
 
 ---
+
+## 2026-08-05 13:20 — Michael
+
+> on ..._round19.txt I see a sentence "The town transformed from a military
+> stronghold to a vibrant hub of maritime activity. In the early 20th century,
+> Saint-Tropez was a quiet fishing village until World War II, when it became the
+> first town liberated during Operation Dragoon." -- beautiful and ineresting,
+> but it mentions Operation Dragoon with no explanation. Don't we have a rule
+> that if an action or a person is mentionned we should briefly follow up with
+> the story?
+
+> let's try to dispatch on anything a general audience likely doesn't know, AND
+> glosse things the tour itself has made load-bearing. If it becomes too much in
+> generation time, listening time, and cost, we will cortail it later. Feel free
+> to engage with AI despite more cost.
+
+## 2026-08-05 13:20 — LEAD
+
+**No such rule existed, and it is the inverse of everything built today.**
+Dispatched as **LOCAL-269** with both of your triggers.
+
+| | failure | example |
+|---|---|---|
+| the claim gate | a claim with no fact behind it | "holds a significant place in the region's landscape" |
+| **this** | **a fact assuming knowledge the listener lacks** | "liberated during Operation Dragoon" |
+
+A rule catching the first cannot catch the second, because the second **is** the
+delivery the first is looking for. That sentence passes every gate precisely
+because it carries facts.
+
+It also completes a directive we implemented only half of. Round 2: *"if we
+claim history, we must tell the story or remove the sentence."* We built removal
+and read "tell the story" as "have a fact". You meant the listener should end up
+**knowing** something.
+
+**The risk I have guarded hardest.** A gloss is a factual claim. If the model
+writes it from memory we reintroduce unsourced facts — laundered through a stage
+built to improve accuracy, which is D127 and D162 all over again. So the order
+is: corpus first; a model gloss only with a citable basis shown in the
+submission; and if neither, **degrade the reference rather than delete the
+sentence** — "the first town liberated in 1944" keeps your good fact without
+confusing anyone or inventing anything. Deletion is last resort.
+
+Glosses capped at **8–14 words**, because you named listening time as a cost.
+
+**Cost and time will be reported against these baselines, unprompted:**
+$0.0206 per 2-stop tour, 43s generation for 2 stops / 73.5s for 8, 620 words.
+The task must flag prominently if added cost exceeds $0.02 or added time exceeds
+30s — you can only curtail if the number is in front of you.
+
+Unlike the claim gate, whose escalation fired **zero** times, this one will fire
+often. Tours are full of named entities. This is the first change today that
+should genuinely move both the cost and the clock.
+
+---
