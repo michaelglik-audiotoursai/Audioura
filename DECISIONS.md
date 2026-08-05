@@ -6290,3 +6290,79 @@ ramparts surrounding the village" attributed to Cap d'Antibes, which is a cape
 with no village ramparts and is not Chagall's place; and stop 2 shipped three
 sentences with zero facts despite Saint-Paul-de-Vence now holding seven
 passages — the same stop that reached 7 of 8 under LOCAL-252.
+
+## D155 — The directions bug was one unpassed argument, hidden by an exemption (2026-08-05)
+
+LOCAL-253 merged (`c32147e`). A cycling tour was routing riders onto the A8
+autoroute and onto trains. The cause is a single line:
+
+```python
+_storied_directions = generate_walking_directions(poi_name, next_poi['name'], location, api_key)
+```
+
+`transport_mode` is set correctly at line 2617 and drives the whole
+stop-selection phase — the "CRITICAL CONSTRAINT — THIS IS A BIKING TOUR" prompt,
+the cycling distance tiers. At line 7675 it was simply never passed on. The
+function name, `generate_walking_directions`, was the tell and nobody read it.
+
+Mode is now passed and used, and `validate_directions_mode()` rejects motorway
+and public-transport instructions on foot/bike/animal tours plus wrong-mode
+verbs. LEAD ran all seven boundary rows: the three navigation sentences that
+must survive do, and all four violations are caught with specific reasons,
+including `A8` and "Enjoy the walk". 14 unit tests pass. The delivered leg now
+reads "Start your ride at Cap d'Antibes and pedal east… Happy cycling!"
+
+**The general lesson is about the exemption.** D107 exempts navigation from the
+style rules, correctly — "start cycling south on the main road" must never be
+deleted for being an imperative. But that exemption is *why this survived eleven
+rounds of scrutiny*: the only place we systematically read tour text is the
+style pass, and directions are invisible to it. An exemption is not a small
+carve-out; it is an unwatched region. Every other exemption on the books
+deserves the same question — what checks that region instead? For directions the
+answer is now `validate_directions_mode`. For the five injection points D139
+left ungated, the answer is still nothing.
+
+**A probe error worth recording.** LEAD's first boundary run reported 0/4
+violations caught and looked like a failed fix. The probe passed `mode='biking'`
+where the pipeline's value is `'bike'`. The submission was right and the probe
+was wrong — the third time this rule has paid for itself, and the reason LEAD
+checks the signature before believing a disagreement.
+
+**Round 11 is not a quality comparison and is labelled as such.** Its harness
+sets `DISABLE_R10_DELETION='1'`, inherited from LOCAL-250's script where the
+harness performed that deletion itself; round 11's harness does not, so nothing
+replaced it. LEAD measured 6 unfulfilled promises and 7 imperatives in the
+delivered text against R10=0 in round 10. Harness misconfiguration, not a
+pipeline regression — but a copied run script silently disabling a gate is a
+hazard in its own right, and LOCAL-255 is told explicitly not to inherit it.
+
+Round 10 remains the best tour.
+
+## D156 — R1 gets a rewrite path, because deletion at 36% would gut every tour (2026-08-05)
+
+Dispatched LOCAL-255. R1 is Michael's most-repeated complaint — scored **2/5**
+twice, *"provides instructions; I thought we should have overcome that error by
+now"* — measured at 36.2% of paragraphs corpus-wide, with 7 imperative
+sentences in round 11 this morning.
+
+It is the same shape R7 was in yesterday: a detector with no path to the
+output. R7 got a deletion path and it worked. R1 cannot have one — at 36% of
+paragraphs, deleting every hit would empty the tours.
+
+So the path is **rewrite**, and Michael has already specified and endorsed the
+transformation. From his round 2 review: "Position yourself at the entrance of
+Eze Village, a medieval gem perched high above the French Riviera" becomes "Eze
+Village is a medieval gem perched high above the French Riviera", and his
+verdict was *"absolutely agree! After [is] immeasurably better than before."*
+The command goes; the content stays.
+
+Two constraints carried into the task. Content preservation is the acceptance
+bar — a rewrite that drops "founded in 1964 by Marguerite and Aimé Maeght" has
+destroyed the sentence, not fixed it. And navigation stays exempt: "start
+cycling south on the main road" is the one kind of instruction a tour *should*
+give, and LOCAL-253 has just built the mode check that governs it.
+
+His follow-up caveat is recorded in the task as the trap to avoid: *"it does not
+bring any information I am not feeling or seeing or having without that
+phrase."* A de-imperatived sentence that still says nothing is R9's problem, not
+R1's, and conflating them would push both past their D55 ceilings.
