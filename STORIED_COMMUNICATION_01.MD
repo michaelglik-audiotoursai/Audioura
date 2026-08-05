@@ -452,3 +452,40 @@ will also copy the artifact across explicitly, which is the step I missed on
 round 16 and why you got an empty buffer.
 
 ---
+
+## 2026-08-05 12:27 — Michael
+
+> Great! I am waiting for round18 to continue. BTW, in round 16 I liked the tour
+> description much better, almost perfect so I am ego to see if 18 would be as
+> good.
+
+## 2026-08-05 12:27 — LEAD
+
+Round 16's description is now a **must-survive boundary case** on LOCAL-263,
+quoted verbatim, with the specific sentence at risk called out.
+
+That sentence is the third one: *"The path winds through a landscape where
+artists like Monet found inspiration and where historical events shaped the
+region's identity."* Classified on its own it is a `QUALITY` claim carrying no
+date and no specific event — **a naive gate deletes it.** It must survive
+because the next sentence substantiates it (Monet in Antibes, Èze under the
+House of Savoy). That is exactly the adjacency test the gate exists to
+implement, so this paragraph is the case that proves whether it works.
+
+The task now says: if the gate deletes sentence three, the gate is wrong, not
+your paragraph. It must report a verdict and a reason for all five sentences.
+
+Round 18 is ~4 minutes into a run that typically takes 12–25. Two caveats on
+what you will see:
+
+1. It was dispatched **before** the Orientation reordering, so it may emit the
+   old shape. The addendum tells it to reconcile; if it does not, that is a
+   merge detail rather than a quality signal — judge the description text, not
+   its position.
+2. **The stop selector varies between runs.** Round 17M came back with Cap
+   Ferrat instead of Cap d'Antibes. So a round-to-round comparison is partly
+   comparing different tours, which has been quietly weakening every comparison
+   we have made today. Worth pinning the stop pair for evaluation runs, and I
+   will propose that separately.
+
+---
