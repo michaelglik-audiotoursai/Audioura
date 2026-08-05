@@ -6601,6 +6601,88 @@ REWRITE RULES (all mandatory):
                   f"{_style_retry_successes} fixed/improved, {_style_retry_failures} kept original")
             print(f"  [LOCAL-192] Retry cost: ${_style_retry_cost:.4f} ({_style_retry_tokens} tokens)")
 
+    # -------- [LOCAL-255] PHASE 5.13: R1 imperative rewrite --------
+    # Michael scored R1 2/5 twice. At 36% of paragraphs, deletion would gut every
+    # tour. Rewrite first (deterministic rules + LLM fallback); delete only pure
+    # instructions with no content. Behind DISABLE_R1_REWRITE=1 flag.
+    _r1_rewrite_disabled = os.environ.get('DISABLE_R1_REWRITE', '').strip() == '1'
+    if _r1_rewrite_disabled:
+        print(f"\n  [LOCAL-255] R1 rewrite DISABLED by DISABLE_R1_REWRITE=1 env var")
+    else:
+        print(f"\n  [LOCAL-255] PHASE 5.13: R1 imperative rewrite...")
+        try:
+            from style_validator_detector import apply_r1_to_description as _r1_apply
+        except ImportError:
+            _r1_apply = None
+            print(f"  [LOCAL-255] WARNING: apply_r1_to_description not importable — R1 rewrite skipped")
+
+        if _r1_apply:
+            _r1_total_rewritten = 0
+            _r1_total_deleted = 0
+            _r1_total_llm_tokens = 0
+            _r1_stops_affected = 0
+
+            # Get API key for LLM fallback
+            _r1_api_key = api_key  # From enclosing generate_tour_text scope
+            _r1_model = os.environ.get('TOUR_LLM_MODEL', 'gpt-4o-mini')
+
+            for _si, _poi in enumerate(poi_list):
+                _stop_rewritten = 0
+                _stop_deleted = 0
+                _stop_llm_tok = 0
+
+                # Process description
+                _desc = _poi.get('description', '')
+                if _desc and not _desc.startswith('['):
+                    _new_desc, _rewritten, _deleted, _llm_tok = _r1_apply(
+                        _desc, api_key=_r1_api_key, model=_r1_model
+                    )
+                    if _rewritten > 0 or _deleted > 0:
+                        poi_list[_si]['description'] = _new_desc
+                        _stop_rewritten += _rewritten
+                        _stop_deleted += _deleted
+                        _stop_llm_tok += _llm_tok
+
+                # Process orientation (same treatment)
+                _orient = _poi.get('orientation', '')
+                if _orient and not _orient.startswith('['):
+                    _new_orient, _o_rewritten, _o_deleted, _o_llm_tok = _r1_apply(
+                        _orient, api_key=_r1_api_key, model=_r1_model
+                    )
+                    if _o_rewritten > 0 or _o_deleted > 0:
+                        poi_list[_si]['orientation'] = _new_orient
+                        _stop_rewritten += _o_rewritten
+                        _stop_deleted += _o_deleted
+                        _stop_llm_tok += _o_llm_tok
+
+                if _stop_rewritten > 0 or _stop_deleted > 0:
+                    _r1_total_rewritten += _stop_rewritten
+                    _r1_total_deleted += _stop_deleted
+                    _r1_total_llm_tokens += _stop_llm_tok
+                    _r1_stops_affected += 1
+                    print(f"  [LOCAL-255] Stop {_si+1} '{_poi.get('name', '')[:30]}': "
+                          f"{_stop_rewritten} rewritten, {_stop_deleted} deleted")
+
+            # Cost accounting for LLM tokens used
+            if _r1_total_llm_tokens > 0:
+                _r1_llm_cost = _tour_llm_cost(_r1_total_llm_tokens)
+                total_tokens += _r1_total_llm_tokens
+                total_cost += _r1_llm_cost
+            else:
+                _r1_llm_cost = 0.0
+
+            print(f"  [LOCAL-255] R1 summary: {_r1_total_rewritten} rewritten, "
+                  f"{_r1_total_deleted} deleted, "
+                  f"{_r1_stops_affected} stops affected, "
+                  f"LLM tokens: {_r1_total_llm_tokens} (${_r1_llm_cost:.4f})")
+
+            # D55 safety check: if deletion > 10% of total R1 hits, warn
+            _r1_total_hits = _r1_total_rewritten + _r1_total_deleted
+            if _r1_total_hits > 0 and _r1_total_deleted / _r1_total_hits > 0.10:
+                print(f"  [LOCAL-255] WARNING: deletion rate {_r1_total_deleted}/{_r1_total_hits} "
+                      f"= {_r1_total_deleted/_r1_total_hits:.1%} exceeds 10% — "
+                      f"rewriter may be failing and quietly shortening tours")
+
     # -------- [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion --------
     # Michael scored this class 1/5. R7 has fired without a deletion path since
     # LOCAL-247. Now it deletes. Behind DISABLE_R7_DELETION=1 flag. $0.00 — deterministic.
