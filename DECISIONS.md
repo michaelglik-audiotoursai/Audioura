@@ -5209,3 +5209,53 @@ Michael's rewrite prose stays clean.
 Fifth "built and inert" defect in ten days. The pattern is stable enough to
 predict: **a new rule is not shipped until something calls it and a real
 document proves it.**
+
+---
+
+## D132 — The existence gate is museum-shaped, so it fails on places — and D131's headline number is inflated (2026-08-05)
+
+LOCAL-238 generated round 3 and disclosed two defects in its own summary, both
+real.
+
+**1. The gate marks good stops unverified.** Measured by LEAD across the 88
+stops that have a `stop_corpus` row:
+
+```
+verified 50 · not 38
+
+Cap d'Antibes         verified
+Villefranche-sur-Mer  NOT   (COVERED in stop_corpus)
+Eze Village           NOT   (COVERED)
+Cap Ferrat            NOT   (COVERED)
+Mont Boron            NOT   (COVERED)
+```
+
+Venue confirmation requires the source passage to contain content words from
+the venue name. For a museum that is exactly right — an object's source must
+tie it to that institution, and this is what catches the Chikanobu print and
+the Asian Arts Museum's invented stops. But **"French Riviera walking area" is
+our own internal label**, not a phrase any source uses. Èze's article will
+never contain it. Cap d'Antibes passes only because its passages happen to say
+"Riviera".
+
+**So D131's "170 of 190 stops unverified (89.5%)" is inflated**, and LEAD
+published that figure to Michael last night. Some unknown share of those 170
+are real places failing a museum-shaped test. LOCAL-239 recomputes it.
+
+The fix is to distinguish venue kinds — institution versus geographic area —
+with the institution path unchanged. The boundary is explicit in the task: the
+Asian Arts Museum's invented stops must stay unverified, or the fix is worse
+than the bug.
+
+**2. R10 was skipped at runtime.** `generate_tour_text.py` could not import
+`apply_r10_to_description` from the process's cwd and printed a silent WARNING.
+Sixth "built and inert" defect (D131 predicted the fifth would not be the
+last). Fixed by LEAD: the file now puts its own directory on `sys.path`, so
+siblings resolve however we are invoked, and the failure branch now says it is
+a defect rather than a configuration.
+
+**What round 3 got right, and it is the part that matters:** the document says
+on its own front page that the gate mislabelled Villefranche and that R10 did
+not run. It did not claim success it had not earned. That disclosure is why
+both defects were fixable within the hour instead of shipping to Michael at 9am
+as "validated".
