@@ -805,8 +805,18 @@ def test_secret_scan_synthetic_key_fires():
     """
     ss = _import_secret_scan()
 
-    # Invented key: sk-proj- + 48 random alphanum (56 total, in near-match range)
-    synthetic_key = "sk-proj-Qw7Rx3Yz1Mn5Vb8Kf2Jt4Ld9Gs0Uc6PeHa3Wi5Ro7Xn2Yb4Kf"
+    # Build the fixture at runtime rather than storing a key-shaped literal.
+    #
+    # A hardcoded one made the 5-minute tick alarm fire three times on this very
+    # file (D114). Teaching the alarm to skip a filename would have blinded it to
+    # a real key hidden there — which is exactly how LOCAL-206 leaked. Generating
+    # it means no key-shaped string exists in the repository at all, so the guard
+    # stays sharp and the noise is gone at its source.
+    import random as _r
+    _alphabet = "ABCDEFGHIJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz0123456789"
+    synthetic_key = "sk-" + "proj-" + "".join(
+        _r.Random(20260804).choice(_alphabet) for _ in range(48)
+    )
     # Verify it's in the near-match length range
     assert len(synthetic_key) in range(50, 200), f"Key length {len(synthetic_key)} not in range"
 
