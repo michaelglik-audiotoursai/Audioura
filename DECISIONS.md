@@ -6695,3 +6695,58 @@ instruction-giving in *narration*, not to warmth attached to a genuine
 direction — which is the distinction Michael has been drawing all along:
 he objects to being told what to feel *instead of* being told something, not to
 a pleasant word alongside a real instruction.
+
+## D165 — Four of seven detectors can see and cannot act (2026-08-05)
+
+Michael, reading round 15's second paragraph, asked why this survived:
+
+> "As you stand on Cap d'Antibes, **you are surrounded by history and natural
+> beauty**." — *"there are millions of stops where listener is 'surrounded by
+> history and natural beauty'. Why was not it removed?"*
+
+LEAD ran every rule against it. **R4 fires.** It was detected and shipped.
+
+The cause is structural. LEAD measured all seven detectors over 1,957 sentences
+in 29 real tours and checked which have a phase in the pipeline:
+
+```
+rule  fires  %       path to output
+R1     556   28.41%  rewrite  PHASE 5.13
+R2      38    1.94%  *** NONE ***
+R3      43    2.20%  *** NONE ***
+R4      47    2.40%  *** NONE ***
+R7      24    1.23%  delete   PHASE 5.14
+R8       7    0.36%  *** NONE ***
+R9      38    1.94%  delete   PHASE 5.15
+```
+
+`R4_PRESCRIBED_FEELING` is not referenced anywhere in `generate_tour_text.py`.
+Neither are R2, R3 or R8. They fire inside PHASE 5.1 style validation, which
+triggers a *retry* — the model is asked again — and when the retry fails, the
+sentence ships. CLAUDE.md already records that the retry cannot reliably remove
+R1; the same holds for these four, and unlike R1 nothing catches them
+afterwards.
+
+**This is the third instance of one pattern.** R7 was detect-only until D154
+gave it PHASE 5.14. R1 was detect-only until D156 gave it PHASE 5.13. Both were
+found the same way: Michael read a tour and asked why an obvious defect
+survived. The detectors were built as a *suite* and wired in one at a time, so
+"is there a detector for this?" and "does anything act on it?" drifted apart
+and nobody was checking the second question.
+
+**The honest framing of the last two days:** we have been improving detection
+quality — R10's whitelist, the payload false positive, name-drops, fragments —
+while four rules sat fully built and disconnected. Michael found each of the
+three disconnections by reading, not by any measurement we run.
+
+Dispatched as LOCAL-261: deletion phases for all four, following the PHASE 5.14
+pattern. All four are deletion rather than rewrite — a sentence whose whole job
+is to prescribe a feeling has nothing underneath to preserve. Michael also
+observed that removing only the offending clause leaves *"As you stand on Cap
+d'Antibes,"*, a fragment, so the whole sentence goes.
+
+Total added deletion pressure is under 7% of sentences, and the D164 navigation
+exemption must survive the new phases — that boundary row is in the task.
+
+**Standing check added to review:** for every detector, confirm a path to the
+output exists. A rule that only reports is a rule that does nothing.
