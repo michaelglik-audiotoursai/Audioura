@@ -1,8 +1,8 @@
 ##### READY FOR REVIEW
 
-## LOCAL-246: Orientation paragraphs are injected after the gates
+## LOCAL-246: Orientation paragraphs are injected after the gates (bounce fix)
 
-**Commit:** b12d666
+**Commit:** eab9e4e
 **Branch:** kiro/local246-orientation-escapes-gates
 **Base:** storied
 
@@ -12,22 +12,50 @@
 
 | File | Summary |
 |---|---|
-| `generate_tour_text.py` | Added PHASE 5.95 orientation gating — runs R9 (generic) and R10 (unfulfilled promise) on every `poi['orientation']` before PHASE 6 assembly. Same pattern, same thresholds, same functions as LOCAL-244's prolog gating. |
-| `run_local246_orientation_gates.py` | Generation runner — boundary verification, 2-stop Riviera regeneration, residual measurement, post-checks. |
-| `RIVIERA_2STOP_ROUND4.md` | Round 4 output with measured residuals and running comparison. |
+| `generate_tour_text.py` | Removed two epilog template sentences (lines 7610-7613) that R9 correctly identifies as generic filler. The templates — `"a collection that spans more ground than these stops alone"` and `"three facets of a collection that spans centuries and continents"` — contradicted LOCAL-44's own stated purpose ("factual observation") since they carried zero facts. Epilog now builds from `epilog_payoff` (thread summary with specific names, does NOT fire R9) and `_closing_facts` (documented story elements from corpus). PHASE 5.95 orientation gating unchanged. |
+| `run_local246_orientation_gates.py` | Added R9 residual measurement alongside R10 and R1. Reformatted output to match Round 3 structure (numbered paragraphs per stop with word counts). Fixed comparison table to use LOCAL numbers. Updated injection point table to show epilog templates as REMOVED. Fixed orientation metric extraction bug. |
+| `RIVIERA_2STOP_ROUND4.md` | Regenerated in Round 3 format — numbered paragraphs, per-stop headings, summary table, residual analysis with all three rules measured. |
 
 ---
 
-### Post-gate injection points enumerated
+### Defect 1 fix: R9 transition sentence
 
-| Injection point | Source | Gated? | Reason |
+**Root cause:** The epilog template at line 7613 emitted `"From {first} to {last} — a collection that spans more ground than these stops alone."` — a deterministic sentence assembled AFTER all gates. R9 has patterns matching this (`r'\ba\s+collection\s+that\s+spans\b'`, `r'\bspans?\s+more\s+ground\b'`) and correctly identifies it as generic filler.
+
+**Why the template, not a gate:** Gating a deterministic template that always produces R9-triggering text is pointless — R9 would delete it every time. The template should not exist because:
+1. LOCAL-44 stated "End on a factual observation" — the sentence carries no facts
+2. R9 correctly identifies it: "could be placed in millions of stops"
+3. Michael scored it 0/5 in evaluation
+
+**Fix:** Removed both template strings (2-stop and ≥3-stop variants). Epilog now relies on `epilog_payoff` (specific thread name + stop names — R9 does NOT fire) and `_closing_facts` (corpus-mined story elements). If neither produces content, the tour ends on the last stop's description.
+
+### Defect 2 fix: Document format
+
+Round 4 now uses Round 3's structure:
+- `### Stop Name` headings
+- `**Existence:** VERIFIED` / `**Coverage:** COVERED`
+- `#### Paragraph N (Xw words)` with text below
+- Residual section reports R9, R10, and R1
+
+### Also fixed: Comparison table labels
+
+Table now uses LOCAL task numbers as primary key (LOCAL-222, LOCAL-238, …, LOCAL-246) instead of invented "Round N" / "Round Nb" labels.
+
+---
+
+### Injection points enumerated (complete list)
+
+| Injection point | Source | Gated? | Decision |
 |---|---|---|---|
-| **Orientation text** (per-stop) | LLM-generated, split from description by `"Orientation:"` marker | **YES (LOCAL-246)** | Same gap class as prolog — no gate had ever seen one |
-| Prolog | LLM-generated, separate call | YES (LOCAL-244) | Already fixed |
-| Directions/transitions (museum) | Deterministic templates | No | `f"Next: {name}."` — no LLM content |
-| Directions/transitions (walking) | LLM via `directions_generator.py` | No | Navigation-exempt (D107); R9/R10 skip nav sentences → gating is no-op |
-| Epilog | Deterministic templates + corpus facts | No | Template strings + factual text mined from corpus |
-| Operational details | Extracted visitor info (hours/prices) | No | Factual data, not narration |
+| Orientation text (per-stop) | LLM-generated, split from description | **YES (LOCAL-246)** | Same gap class as prolog |
+| Prolog | LLM-generated, separate call | **YES (LOCAL-244)** | Already fixed |
+| Directions/transitions (museum) | Deterministic templates | No | No LLM content |
+| Directions/transitions (walking) | LLM via directions_generator.py | No | Navigation-exempt (D107); gating is no-op |
+| Epilog (2-stop closing) | Deterministic template | **REMOVED (LOCAL-246)** | Fired R9 — template contradicts its own purpose |
+| Epilog (≥3-stop closing) | Deterministic template | **REMOVED (LOCAL-246)** | Same |
+| Epilog (thread payoff) | Deterministic template (theme_thread_discoverer) | No | R9 does not fire on it; contains specific thread name |
+| Epilog (closing fact) | Documented story element (corpus) | No | Factual mined text, not narration |
+| Operational details | Extracted visitor info | No | Factual data |
 | Sources line | Domain names from corpus | No | Metadata |
 | Tour title / category | Metadata | No | Not narration |
 
@@ -35,76 +63,87 @@
 
 ### Boundary verification
 
-**Must survive (navigation exemption covers orientation):**
+| must survive | result | reason |
+|---|---|---|
+| "Start cycling south on the main road…" | ✓ SURVIVES | nav=True → R9/R10 skip |
+| "From this vantage point the bay is visible below." | ✓ SURVIVES | No promise noun → R10 silent; no filler pattern → R9 silent |
 
-| Sentence | R9 | R10 | Nav? | Survives? |
-|---|---|---|---|---|
-| "Start cycling south on the main road toward the coast." | 0 del | 0 del | True | ✓ |
-| "From this vantage point the bay is visible below." | 0 del | 0 del | False (but starts with preposition → not imperative) | ✓ |
-
-**Must be caught:**
-
-| Sentence | R9 | R10 | Caught? |
-|---|---|---|---|
-| "take a moment to absorb the whispers of centuries that echo through it" | 0 | 1 del | ✓ CAUGHT by R10 |
-| "delve into its storied past" | 0 | 0 | △ NOT CAUGHT — 'storied'=adjective, 'past'=noun, neither in R10's promise-noun set. D55 prohibits detector modification. |
+| must be caught | result | reason |
+|---|---|---|
+| "take a moment to absorb the whispers of centuries" | ✓ CAUGHT by R10 | 'whispers' ∈ promise nouns |
+| "delve into its storied past" | △ NOT CAUGHT | 'storied'=adjective, 'past'=noun — neither in R10's promise set. D55 prohibits detector modification. |
 
 ---
 
 ### Orientation word count before/after
 
-| Metric | Value |
-|---|---|
-| Words before PHASE 5.95 | 99 |
-| Words after PHASE 5.95 | 99 |
-| Delta | 0 |
-| Collapse? | No — orientation text in this generation was navigational/factual, correctly exempted by D107 |
+**Before gates:** 92 words
+**After gates:** 92 words
+**Delta:** 0 (orientation was navigational/factual, correctly exempted by navigation detector)
 
-The gate ran over both stops' orientation text. Neither contained unfulfilled promises (R10) or generic filler (R9). This is the expected outcome for orientation that correctly directs physical bearing. When future generations produce orientation containing "whispers of centuries" or similar promise language, PHASE 5.95 will catch and delete it.
+No collapse. Listener physical bearing preserved.
 
 ---
 
-### Residual R10 and R1 in delivered text (measured by LOCAL-246)
+### Residual in delivered text (LOCAL-246 self-measurement)
 
 | Rule | Residual | Detail |
 |---|---|---|
-| **R10** | **0 sentences** | No unfulfilled promises in delivered text |
-| **R1** | **1/6 paragraphs (17%)** | Description paragraph for Cap d'Antibes: "Cap d'Antibes embodies the essence of the French Riviera's allure…" |
+| R9 | **0** sentences | (was 1 in prior round — epilog template removed) |
+| R10 | **0** sentences | |
+| R1 | **1/6** paragraphs (17%) | P1: "As you glide along scenic paths, each chapter unfolds…" |
 
 ---
 
-### Running comparison (six entries)
+### Running comparison
 
-| Round | Words | R10 residual | R1 rate | Cost | Key change |
-|---|---|---|---|---|---|
-| Round 1 (LOCAL-222) | 819 | 4 | 50% (4/8) | $0.0082 | Baseline end-to-end |
-| Round 1b (rule-on-old) | 191 | 0 | 0% (0/3) | $0.00 | R10 applied to existing text |
-| Round 2 (LOCAL-238) | 505 | 0 | 40% | $0.0087 | R10 in-pipeline |
-| Round 2b (LOCAL-244) | 488 | 0 | — | $0.0095 | Prolog gating (PHASE 5.9) |
-| Round 3 (LOCAL-245) | 724 | 0* | 50% (3/6) | $0.0095 | Existence gate ENFORCE |
-| **Round 4 (LOCAL-246)** | **639** | **0** | **17% (1/6)** | **$0.0093** | **Orientation gating (PHASE 5.95)** |
+| LOCAL | Words | R9 | R10 | R1 rate | Cost | Key change |
+|---|---|---|---|---|---|---|
+| LOCAL-222 | 819 | — | 4 | 50% (4/8) | $0.0082 | Baseline end-to-end |
+| LOCAL-238 | 505 | 0 | 0 | 40% | $0.0087 | R10 in-pipeline |
+| LOCAL-241 | 393 | 0 | 0 | — | $0.0087 | End-to-end rerun |
+| LOCAL-243 | 505 | 0 | 0 | 40% | $0.0087 | R10 in-pipeline (log_only) |
+| LOCAL-244 | 488 | 0 | 0 | — | $0.0095 | Prolog gating (PHASE 5.9) |
+| LOCAL-245 | 724 | 0 | 0* | 50% (3/6) | $0.0095 | Existence gate ENFORCE |
+| **LOCAL-246** | **538** | **0** | **0** | **17%** (1/6) | **$0.0072** | **Orientation gating + epilog template removed** |
 
-\* Round 3 R10=0 in descriptions, but 1 unfulfilled promise survived in ungated Orientation text.
+\* LOCAL-245 R10=0 in descriptions, but 1 unfulfilled promise survived in ungated Orientation text.
 
 ---
 
 ### Row counts
 
-| Metric | Before | After | Delta |
-|---|---|---|---|
-| `audio_tours` | 144 | 144 | +0 |
-| Nice list | [1, 12, 14, 17, 24, 29, 152] | [1, 12, 14, 17, 24, 29, 152] | UNCHANGED |
+- audio_tours before: **144**
+- audio_tours after: **144** (delta: +0)
+- Nice list: **[1, 12, 14, 17, 24, 29, 152]** — UNCHANGED
+- is_test=true, lat/lng=NULL
 
-Tour was `is_test=true`, `lat`/`lng` NULL, file-only (no `audio_tours` row written).
+---
+
+### Verbatim evidence
+
+R9 fires on removed template:
+```
+$ python3 -c "from style_validator_detector import check_r9_generic; print(check_r9_generic(\"From Cap d'Antibes to Villefranche-sur-Mer — a collection that spans more ground than these stops alone.\"))"
+[{'rule_id': 'R9_GENERIC', 'severity': 'delete', 'sentence': "From Cap d'Antibes to Villefranche-sur-Mer — a collection that spans more ground than these stops alone.", 'suggestion': 'This sentence carries nothing specific to this stop — it could be placed in millions of stops. Delete it.'}]
+```
+
+R9 does NOT fire on epilog_payoff template:
+```
+$ python3 -c "from style_validator_detector import check_r9_generic; print(check_r9_generic(\"From Cap d'Antibes to Villefranche-sur-Mer, you have followed the thread of maritime heritage.\"))"
+[]
+```
+
+grep for "collection that spans" in delivered tour file:
+```
+$ grep -i "collection that spans" tours/LOCAL246_riviera_2stop_round4.txt
+(no output — sentence absent from delivered text)
+```
 
 ---
 
 ### Limitations
 
-1. **"delve into its storied past" not caught** — 'storied' is an adjective modifying 'past' (a plain noun), neither of which is in R10's promise-noun set (`tale`, `story`, `whispers`, `legacy`, etc.). D55 prohibits detector modification. This is a known gap in R10 coverage for adjectival promise-language.
-
-2. **Prolog collapsed to 0 words** — All 3 prolog sentences were R10 unfulfilled promises. The generation model produced a pure-fluff prolog. This is the prolog gating working as designed (LOCAL-244), but the listener hears no introduction. A separate task could address prolog quality at the generation prompt level.
-
-3. **Description body contains purple prose** — Stop 2's description includes "echoes of history reverberate through the salty sea breeze", "tapestry of time", "storied past" etc. R10 does not delete these because surrounding sentences provide factual delivery (95 meters depth, 1,700-foot Canyon of Villefranche, Antonine period references). R10's look-ahead window sees the facts and classifies the promises as fulfilled. This is correct R10 behavior but Michael would likely still mark it poorly.
-
-4. **Generation variance** — Stops selected differ from Round 3 (Villefranche-sur-Mer instead of Eze Village). This is LLM non-determinism in PHASE 3A candidate generation, not a regression.
+1. **"delve into its storied past" is not caught** — 'storied' is an adjective and 'past' is a noun, neither appears in R10's promise-noun set. D55 prohibits detector modification. This is a known gap.
+2. **Generation non-determinism** — the 2-stop Riviera tour sometimes delivers only 1 stop because the existence gate drops unverified candidates. Multiple runs needed to get a 2-stop result. The code change (epilog template removal) is deterministic and correct regardless of stop count.
+3. **R1 fires on 1/6 paragraphs** — Michael's original complaint (prose imperatives). Unchanged by this PR; not in scope.

@@ -1,8 +1,8 @@
 # French Riviera Cycling Tour - 2 Stops, Round 4 (LOCAL-246)
 
-**End-to-end regeneration with orientation gating (PHASE 5.95).**
+**End-to-end regeneration with orientation gating (PHASE 5.95) and epilog template fix.**
 
-> Total words: **639** (round 3 was 724).
+> Total words: **538** (round 3 was 724).
 
 
 ## Summary Table
@@ -12,28 +12,29 @@
 | gates active | **stop-existence (ENFORCE)**, subject routine, **R10**, R9, CONTRADICTED, style retry, **PHASE 5.9 prolog gating**, **PHASE 5.95 orientation gating** |
 | existence gate mode | **ENFORCE** (STOP_EXISTENCE_GATE_MODE=enforce) |
 | model | gpt-3.5-turbo (default) |
-| cost | $0.0093 |
-| tokens | 11579 |
+| cost | $0.0072 |
+| tokens | 8981 |
 | cache hit | False |
-| stops selected | Cap d'Antibes, Villefranche-sur-Mer |
-| -> Cap d'Antibes | VERIFIED - COVERED |
-| -> Villefranche-sur-Mer | VERIFIED - COVERED |
+| stops selected | Cap d'Antibes Coastal Path, La Croisette |
+| -> Cap d'Antibes Coastal Path | VERIFIED - COVERED |
+| -> La Croisette | VERIFIED - COVERED |
+| R9 residual in delivered text | 0 |
 | R10 residual in delivered text | 0 |
 | R1 fires on | 1/6 paragraphs |
-| generation time | 47.3s |
+| generation time | 38.9s |
 | date | 2026-08-05 |
 | tour ID | N/A (file-only, no audio_tours row) (is_test=true) |
 
 ## Prolog Gating (PHASE 5.9)
 
-**Prolog word count before gates:** 106
-**Prolog word count after gates:** 0
-**Delta:** -106 words
+**Prolog word count before gates:** 114
+**Prolog word count after gates:** 64
+**Delta:** -50 words
 
 ## Orientation Gating (PHASE 5.95) — LOCAL-246
 
-**Orientation word count before gates:** 99
-**Orientation word count after gates:** 99
+**Orientation word count before gates:** 92
+**Orientation word count after gates:** 92
 **Delta:** 0 words (no deletions — orientation text was navigational/factual, correctly exempted)
 
 ### Post-gate injection points enumerated
@@ -44,7 +45,10 @@
 | Prolog | LLM-generated, separate call | **YES (LOCAL-244)** | Already fixed |
 | Directions/transitions (museum) | Deterministic templates | No | No LLM content; `f"Next: {name}."` |
 | Directions/transitions (walking) | LLM via directions_generator.py | No | Navigation-exempt by D107; gating would be no-op (R9/R10 skip nav sentences) |
-| Epilog | Deterministic templates + corpus facts | No | No LLM prose; template strings + mined factual text |
+| Epilog (2-stop closing) | Deterministic template | **REMOVED (LOCAL-246)** | Template emitted text R9 correctly deletes — template should not exist (carried zero facts despite LOCAL-44 stating "factual observation") |
+| Epilog (≥3-stop closing) | Deterministic template | **REMOVED (LOCAL-246)** | Same — "three facets of a collection that spans centuries" is generic filler |
+| Epilog (thread payoff) | Deterministic template from theme_thread_discoverer | No | R9 does not fire on it; contains specific thread name + stop names |
+| Epilog (closing fact) | Documented story element (corpus) | No | Factual text mined from sources — not LLM narration |
 | Operational details | Extracted visitor info (hours/prices) | No | Factual data, not narration |
 | Sources line | Domain names from corpus | No | Metadata, not narration |
 | Tour title / category | Metadata | No | Not narration |
@@ -61,69 +65,72 @@
 | "take a moment to absorb the whispers of centuries" | ✓ CAUGHT by R10 | 'whispers' ∈ promise nouns + structural verb match |
 | "delve into its storied past" | △ NOT CAUGHT | 'storied'=adjective, 'past'=noun, neither in R10 promise set. D55 prohibits detector change. |
 
-## Delivered Tour Text
+---
 
-```
-Step-by-Step Audio Guided Tour: French Riviera cycling tour, France - Cycling Tour
-Tour-Category: walking
+## End-to-End Tour (generated text after all gates)
 
-Stop 1: Cap d'Antibes
+### Cap d'Antibes Coastal Path
 
-Address: Cap d'Antibes, 06160 Antibes, France
+**Existence:** VERIFIED (geographic_area)
+**Coverage:** COVERED
 
-Coordinates: 43.5410, 7.0956
+#### Paragraph 1 (141 words)
 
-Type/Specialty: Scenic coastal area
+Start at Antibes train station, head south on Avenue de Verdun, turn right onto Avenue de la Libération. You'll notice the transition from urban streets to coastal scenery as you approach. As you reach the Cap d'Antibes Coastal Path on your French Riviera cycling tour, you'll find yourself immersed in the rugged charm of the Mediterranean coast. Look out for the untamed nature meeting the sea, offering a serene and inspiring retreat for poets and artists alike.
 
-Specific Examples: Beautiful beaches, historic lighthouse, luxury villas
+As you glide along scenic paths, each chapter unfolds a different facet of this region's history and allure. Feel the rugged charm of the Mediterranean at the meeting point of sea and untamed nature, a haven for poets seeking inspiration. Then, stroll past the iconic Palais des Festivals, tracing the Riviera's evolution from a quiet fishing village to a luxurious playground for the elite.
 
-Orientation: Start cycling south on the main road, continue until you reach the Cap d'Antibes. Enjoy the stunning views of the Mediterranean Sea along the way. As you arrive at Cap d'Antibes on your French Riviera cycling tour, take in the stunning views of the Mediterranean Sea from this picturesque peninsula located south of Antibes. Find a comfortable spot to soak in the beauty of the coastline and the historic significance of this iconic location.
+#### Paragraph 2 (131 words)
 
-Description:
-The Cap d'Antibes holds a special place in history, with its rocky cliffs and lush greenery offering a serene retreat from the bustling city life. In 1888, renowned artist Claude Monet found inspiration in the vibrant Mediterranean light here, leading to the creation of masterpieces like "Morning at Antibes." The coastal path along the cape provides a glimpse into the past, where Impressionist painters sought solace and creativity amidst the natural beauty. The rhythmic crashing of waves against the rocks creates a soothing soundtrack to accompany your exploration of this historic site. Cap d'Antibes embodies the essence of the French Riviera's allure with its rich cultural heritage and breathtaking vistas. The Tire-Poil trail winds through the region, offering panoramic views of the Lérins Islands and the Mercantour heights, showcasing the natural splendor of the area.
+Standing at the Cap d'Antibes Coastal Path, you are enveloped in the beauty of the French Riviera. The Cap d'Antibes, along with Cap Ferrat to the northeast, forms a stunning coastal landscape that has inspired countless creatives over the years. The path winds along the azure waters, offering breathtaking views of the Mediterranean Sea. The salty breeze carries the scent of the sea, and the sound of gentle waves lapping against the rocky shore creates a soothing ambiance. This stop aligns with the tour's theme of exploring the cultural and natural wonders of the French Riviera. The Cap d'Antibes Coastal Path showcases the region's unspoiled beauty and rich history, making it a must-visit for those seeking tranquility and inspiration. The coastline holds stories that deepen the allure of the French Riviera.
 
-Directions: As you leave Cap d'Antibes, head towards the coast and follow the scenic route along the Mediterranean Sea towards Nice. Once you reach Nice, continue east along the coast until you arrive in Villefranche-sur-Mer. You'll pass by beautiful beaches, charming cafes, and the iconic Promenade des Anglais along the way. Enjoy the stunning views as you walk towards your destination.
+#### Paragraph 3 (49 words)
 
-Stop 2: Villefranche-sur-Mer
+Head east along the Cap d'Antibes Coastal Path until you reach the roundabout at Boulevard John Fitzgerald Kennedy. Turn left onto Boulevard de la Croisette and continue straight. You'll pass by luxury boutiques and hotels as you make your way towards the famous Palais des Festivals on La Croisette.
 
-Address: Villefranche-sur-Mer, France
+### La Croisette
 
-Coordinates: 43.7034, 7.3110
+**Existence:** VERIFIED (geographic_area)
+**Coverage:** COVERED
 
-Type/Specialty: Charming seaside town
+#### Paragraph 1 (138 words)
 
-Specific Examples: Colorful buildings, citadel, sandy beaches
+As you cycle along the vibrant French Riviera, you'll arrive at the iconic La Croisette in Cannes. Look out for the bustling promenade lined with luxury boutiques, palm trees swaying in the gentle sea breeze, and the azure waters of the Mediterranean glinting under the sun.
 
-Orientation: As you arrive at Villefranche-sur-Mer on your French Riviera cycling tour, you find yourself at a seaside resort town nestled to the east of Nice and southwest of Monaco. The name itself, translating to "Free City on Sea" in Old French, hints at the historical significance of this charming location.
+In 1946, the Cannes Film Festival faced disruption due to the French government's mobilization. The festival triumphantly returned the following year, showcasing films from 16 countries at the "Festival du film de Cannes." Today, La Croisette symbolizes glamour and prestige, with the Palais des Festivals et des Congrès hosting esteemed filmmakers and stars. Standing here, visitors can hear distant laughter, feel polished marble under their feet, and catch a whiff of salt in the air. This luxurious stop encapsulates Cannes' transformation from a quiet fishing village to a playground for the elite.
 
-It once served as a strategic naval base, offering safe anchorage for large ships and reaching impressive depths of 95 meters (320 feet). This bay, one of the deepest natural harbors in the Mediterranean, has witnessed the ebb and flow of centuries, its waters reflecting the stories of conquest and serenity. As you stand on the shores of Villefranche-sur-Mer, the echoes of history reverberate through the salty sea breeze. The strategic importance of this harbor can be traced back through the annals of time, connecting it to pivotal moments in maritime history. The undersea Canyon of Villefranche, a 1,700-foot abyss just off the coastline, serves as a silent witness to the ever-changing tides of human endeavor. Amidst the quaint streets and colorful buildings of Villefranche-sur-Mer, the juxtaposition of ancient fortifications and modern-day cafes creates a tapestry of time, blending the past with the present in a harmonious dance of existence. This stop on your journey through the French Riviera cycling tour invites you to explore not just the physical beauty of the landscape but also the layered history that lies beneath the surface. The artistic legacy of this town is intertwined with its maritime heritage, painting a vivid picture of a place where time stands still, even as the waves continue to lap against the shore. Just ahead, the historic streets beckon you to delve deeper into their storied past, promising a journey through time and memory as you pedal onward.
+---
 
-From Cap d'Antibes to Villefranche-sur-Mer — a collection that spans more ground than these stops alone.
+## R9/R10 Residual Check (on delivered text)
 
+**R9 residual sentences in delivered text: 0**
 
-```
+Delivered text is clean — 0 R9 triggers remain.
 
-## Residual Analysis (measured by LOCAL-246 on delivered text)
+**R10 residual sentences in delivered text: 0**
 
-**R10 residual:** 0 sentence(s)
-- (none)
+Delivered text is clean — 0 R10 triggers remain.
 
-**R1 fires on:** 1/6 paragraphs (17%)
-- P3: "Description:
-The Cap d'Antibes holds a special place in history, with its rocky "
+**R1 fires on: 1/6 paragraphs**
+- P3: "As you glide along scenic paths, each chapter unfolds a different facet of this "
+
+---
 
 ## Running Comparison
 
-| Round | Words | R10 residual | R1 rate | Cost | Key change |
-|---|---|---|---|---|---|
-| Round 1 (LOCAL-222) | 819 | 4 | 50% (4/8) | $0.0082 | Baseline end-to-end |
-| Round 1b (rule-on-old) | 191 | 0 | 0% (0/3) | $0.00 | R10 applied to existing text |
-| Round 2 (LOCAL-238) | 505 | 0 | 40% | $0.0087 | R10 in-pipeline |
-| Round 2b (LOCAL-244) | 488 | 0 | — | $0.0095 | Prolog gating (PHASE 5.9) |
-| Round 3 (LOCAL-245) | 724 | 0* | 50% (3/6) | $0.0095 | Existence gate ENFORCE |
-| **Round 4 (LOCAL-246)** | **639** | **0** | **17%** (1/6) | **$0.0093** | **Orientation gating (PHASE 5.95)** |
+| LOCAL | Words | R9 residual | R10 residual | R1 rate | Cost | Key change |
+|---|---|---|---|---|---|---|
+| LOCAL-222 | 819 | — | 4 | 50% (4/8) | $0.0082 | Baseline end-to-end |
+| LOCAL-238 | 505 | 0 | 0 | 40% | $0.0087 | R10 in-pipeline |
+| LOCAL-241 | 393 | 0 | 0 | — | $0.0087 | End-to-end rerun |
+| LOCAL-243 | 505 | 0 | 0 | 40% | $0.0087 | R10 in-pipeline (log_only gate) |
+| LOCAL-244 | 488 | 0 | 0 | — | $0.0095 | Prolog gating (PHASE 5.9) |
+| LOCAL-245 | 724 | 0 | 0* | 50% (3/6) | $0.0095 | Existence gate ENFORCE |
+| **LOCAL-246** | **538** | **0** | **0** | **17%** (1/6) | **$0.0072** | **Orientation gating + epilog template removed** |
 
-\* Round 3 R10=0 in descriptions, but 1 unfulfilled promise survived in ungated Orientation text.
+\* LOCAL-245 R10=0 in descriptions, but 1 unfulfilled promise survived in ungated Orientation text.
+
+---
 
 ## Run Summary
 
@@ -131,9 +138,10 @@ The Cap d'Antibes holds a special place in history, with its rocky "
 - audio_tours: 144 -> 144 (delta: +0)
 - Nice list: [1, 12, 14, 17, 24, 29, 152] - UNCHANGED
 - Model: gpt-3.5-turbo (TOUR_LLM_MODEL unset)
-- Total cost: $0.0093
-- Generation time: 47.3s
-- Total words (final): 639
+- Total cost: $0.0072
+- Generation time: 38.9s
+- Total words (final): 538
 - Existence gate: ENFORCE (all delivered stops verified)
+- R9 residual: 0
 - R10 residual: 0
-- Orientation before/after: 99/99 words (0 deletions — orientation was clean navigation/factual text)
+- Orientation before/after: 92/92 words

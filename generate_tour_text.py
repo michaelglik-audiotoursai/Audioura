@@ -7607,10 +7607,11 @@ Requirements:
                 
                 # [LOCAL-44] End on a factual observation tying the collection together.
                 # No instructions, no promotional language, no "consider/reflect/imagine".
-                if _mid:
-                    epilog += f"\n\nFrom {_first} through {_mid} to {_last} — three facets of a collection that spans centuries and continents."
-                else:
-                    epilog += f"\n\nFrom {_first} to {_last} — a collection that spans more ground than these stops alone."
+                # [LOCAL-246] Removed generic template sentences — they carried no facts
+                # and R9 correctly identified them as "could be placed in millions of stops."
+                # Epilog now relies solely on epilog_payoff (thread summary) and
+                # _closing_facts (documented story elements). If neither has content,
+                # the tour ends on the last stop's description — which is correct.
                 
                 poi_content += epilog
                 
