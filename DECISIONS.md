@@ -4466,3 +4466,65 @@ Second false alarm in two days (D108 was our own SHA-256 cache keys), and the
 same principle applied both times: **fix what makes the alarm wrong, never
 teach the alarm to look away.** An alarm with exceptions accumulates them until
 it means nothing.
+
+---
+
+## D116 — Network failure is now distinguishable from "not found" (2026-08-04)
+
+LOCAL-230 fixed the five sites LOCAL-228 found blind. Verified by LEAD against
+`storied` HEAD with `requests.get` forced to raise:
+
+```
+_get_coordinates  → (None, None)     was (0.0, 0.0)
+_geocode_city     → (None, None)     was (0.0, 0.0)
+_search_entities  → None             was []
+_get_instance_of  → None + ERROR log  was silent None
+coverage-select DB → failure flag + ERROR
+network failure counter: 4
+```
+
+**`(0.0, 0.0)` now means only "this entity has no coordinates."** It no longer
+doubles as "the network broke" — a distinction that matters because 0,0 is a
+real point in the Gulf of Guinea and `tours-near` filters on lat/lng. No live
+tour has ever landed there; this closes the path that could have put one there.
+
+Callers were updated to treat `None` exactly as they treated `(0.0, 0.0)`, so
+a healthy tour is unchanged. All 36 falsification tests green, including
+LOCAL-228's, which were rewritten to assert the *distinction* rather than the
+blindness they originally documented.
+
+That rewrite is the part worth noticing: a test that recorded a bug became the
+test that proves it fixed, without either being rewritten from scratch.
+
+---
+
+## D117 — The secret alarm gets a reviewed-and-cleared ledger, not a filename filter (2026-08-04)
+
+Third false alarm in two days, and this one exposed a structural problem: the
+tick scans the last **20 commits**, so a finding stays visible for ~20 commits
+*after* the tip is fixed. D115 removed the fixture from the tip; the commit
+that introduced it (`a510305`) still sits in the window.
+
+**The tempting fix was a filename filter, for the third time, and it is still
+wrong.** A real key in a filtered file would be invisible — which is precisely
+how LOCAL-206 leaked: a live key in a test file, caught only by GitHub's push
+protection.
+
+Instead: `.continuous_dev/secret_scan_cleared.txt`, entries pinned to a
+specific **commit : path : line**, each carrying the reason it was cleared and
+what was measured. Verified — a *new* key planted in that same file is still
+detected:
+
+```
+new key, same file → detected (openai_key, near_match_secret)
+cleared finding    → suppressed
+alarm              → quiet
+```
+
+Nothing in the ledger is a wildcard or a directory. An entry expires naturally
+when its commit scrolls out of the window.
+
+**The rule, now applied three times (D108, D115, D117):** *fix what makes the
+alarm wrong; never teach the alarm to look away.* Each exception granted to a
+guard is permanent in practice, and a guard with enough exceptions is a guard
+nobody reads.
