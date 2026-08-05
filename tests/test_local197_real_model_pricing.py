@@ -9,6 +9,19 @@ import os
 import sys
 import logging
 
+import pytest
+
+# These two guard the Subscribed billing modules, which exist only on the
+# `subscribed` branch. On `storied` there is no wallet and no overdraft floor
+# (D58: Storied users are never shown a cost), so the guards are skipped
+# rather than deleted — the file is shared by both branches.
+_subscribed_only = pytest.mark.skipif(
+    __import__("importlib").util.find_spec("wallet_ledger") is None,
+    reason="Subscribed-only module; not present on storied",
+)
+
+
+
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
@@ -232,6 +245,7 @@ def test_no_hardcoded_0002_in_cost_path():
               f"found {len(matches)} occurrences")
 
 
+@_subscribed_only
 def test_wallet_ledger_unchanged():
     """Verify wallet_ledger.py imports and constants are untouched."""
     print("\n--- Test: Wallet ledger unchanged ---")
@@ -246,6 +260,7 @@ def test_wallet_ledger_unchanged():
           "charge" in VALID_MOVEMENT_TYPES)
 
 
+@_subscribed_only
 def test_projected_costs_unchanged():
     """Verify projected_costs.py is untouched (D41 overdraft logic)."""
     print("\n--- Test: Projected costs unchanged ---")

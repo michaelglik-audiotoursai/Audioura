@@ -16,6 +16,7 @@ the terminal scroll.**
 
 ## Contents
 
+- [Q20 — Status while you were away, 2026-08-04 (LEAD-raised: 2 credentials need rotating)](#q20)
 - [Q19 — Should the billing layer move to `storied`? **Answered: No**](#q19)
 - [Q18 — Translation pricing: what is $2.71 for, can it be cheaper?](#q18)
 - [Q17 — What is the credential pipeline, for whom, for what?](#q17)
@@ -39,6 +40,64 @@ the terminal scroll.**
 ---
 
 <a name="q19"></a>
+<a name="q20"></a>
+## Q20 — "Please let me know the status" (asked 2026-08-04, ~08:35 EDT)
+
+**Short answer:** 24 tasks reviewed overnight, 19 merged, 5 bounced. Two
+findings need you: **two live credentials must be rotated**, and the tour
+pipeline's real ceiling turned out to be the corpus, not the prompt.
+
+### 1. Rotate two credentials (D81, corrected by D82)
+
+| credential | where | on origin since | recoverable |
+|---|---|---|---|
+| OpenAI `sk-proj-wpIWgoRa…` | `sk.py`, full value | **2025-10-26** | **yes — rotate** |
+| AWS `AKIAWLW3…` | two review docs, both branches; **this is the key in your `.env`** | 2026-06-07 | **yes — rotate** |
+
+Redacted at the tip on both branches. Not rotated — that is outward-facing and
+would break Polly for every running container. Not purged from history — that
+needs a force-push. **Rotate → update `.env` → restart → then decide about
+history.** Once the keys are dead the history is cosmetic.
+
+A third item I reported yesterday was **wrong**: `SUBMISSION_LOCAL-39.md`
+holds a 15-character prefix of your live OpenAI key, not the key. I saw a grep
+hit and did not read the line. Corrected in D82.
+
+### 2. The tour ceiling was never the prompt (D78)
+
+Five rounds fought fabrication in the prompt and the model. The cause was that
+**the two MAMAC stops every experiment used have no source material about the
+artworks** — we hold artist biographies and nothing describing the objects.
+The model was not failing to use the corpus; there was no corpus to use.
+
+Corpus now: **51 COVERED · 7 CREATOR_ONLY · 2 VENUE_ONLY · 1 EMPTY** of 61 stops.
+
+### 3. Model choice: switch for cost, not quality (D83)
+
+On a properly covered venue the two models are equivalent on grounding
+(1.87 vs 1.93 unsupported claims/paragraph) and indistinguishable on style.
+gpt-4o-mini is **3.6x cheaper and 11% faster**. I will flip it *after* your
+evaluation baseline is agreed, not underneath it.
+
+### 4. Subscribed: five features built, none running (D76)
+
+Truncation, real token rates, cache-hit charging and its wiring are all merged
+and green on `subscribed`, and none of them execute — every image builds from
+the `storied` working tree. LOCAL-204 built the path (project
+`subscribed-204`, ports 5200/5202/5212, database `audiotours_subscribed`).
+**Nothing is deployed**; a stack that starts charging wallets is not something
+to switch on while you cannot field-test.
+
+### 5. Two decisions waiting on you
+
+- **CREATOR_ONLY stops** (D80): the gate cuts object-description 76%, but a
+  gated stop reads as a detached artist biography that never acknowledges you
+  are standing in front of something. With 2 stops, spending one on that is a
+  poor trade. My lean: drop the stop, fix the corpus.
+- **Truncation limits** (D65): I picked 5,000 free / 15,000 subscribed. Both
+  are config; overturn freely.
+
+
 ## Q19 — [LEAD-raised] Should the billing layer move to `storied`?
 
 **Found:** 2026-08-03, 17:15 EDT. **Needs Michael's decision.**

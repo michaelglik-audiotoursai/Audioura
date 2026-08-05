@@ -48,7 +48,7 @@ services:
       - ./tours:/app/tours
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -136,7 +136,35 @@ services:
       - ./tours:/app/tours
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Tour Editing (Phase 2 — serves the app's edit screens on port 5022)
+  tour-editing-phase2:
+    image: audioura-tour-generator:latest
+    container_name: tour-editing-phase2-1
+    command: sh -c "pip install boto3 --quiet && python tour_editing_phase2.py"
+    ports:
+      - "5022:5022"
+    environment:
+      - DB_HOST=postgres-2
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
+      - DB_PORT=5432
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=us-east-1
+      - POLLY_TTS_URL=http://polly-tts-1:5018
+    volumes:
+      - ./tours:/app/tours
+    restart: unless-stopped
+    depends_on:
+      - postgres-2
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5022/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -209,7 +237,7 @@ services:
       - postgres-2
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5005/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5005/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -237,7 +265,7 @@ services:
       - "5008:5008"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5008/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5008/health')"]
       interval: 30s
       timeout: 10s
       retries: 3

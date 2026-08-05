@@ -1,0 +1,46 @@
+[
+  {
+    "idx": 0,
+    "before_rules": [
+      "R1_IMPERATIVE"
+    ],
+    "before_errors": 1,
+    "after_rules": [],
+    "after_errors": 0,
+    "outcome": "FIXED",
+    "before": "Position yourself at the entrance of Eze Village, a medieval gem perched high above the French Riviera. As you arrive, take in the stunning views of the azure Mediterranean Sea stretching out before you and the ancient stone walls that guard the village's rich history.",
+    "after": "Eze Village is a medieval gem perched high above the French Riviera. From this vantage point, you can admire the stunning views of the azure Mediterranean Sea stretching out before you and the ancient stone walls that guard the village's rich history.",
+    "tokens": 350
+  },
+  {
+    "idx": 1,
+    "before_rules": [
+      "R3_SUGGESTIVE_EXPLORATION"
+    ],
+    "before_errors": 1,
+    "after_rules": [
+      "R3_SUGGESTIVE_EXPLORATION"
+    ],
+    "after_errors": 1,
+    "outcome": "FAILED",
+    "before": "As you wander through the village, the scent of fresh lavender mingles with the salty tang of the sea, transporting you to a bygone era of traders and sailors. The ancient stones beneath your feet bear the weight of countless generations, each step a connection to the past that lingers in the present. Eze Village is not just a historic site; it is a living testament to the enduring spirit of the French Riviera. The village's architecture, with its weathered stone facades and terracotta roofs, speaks of a time when artisans crafted each building by hand. Every corner turned reveals a new vista, a new story waiting to be discovered. At the pinnacle of Eze Village, the Jardin Exotique offers a panoramic view that once inspired the philosopher Nietzsche during his visits. Standing at the garden's edge, you can overlook the rugged coastline and the shimmering sea, contemplating the vastness of time and the countless lives that have passed through this ancient village.",
+    "after": "As you explore the village, the scent of fresh lavender mingles with the salty tang of the sea. The ancient stones beneath your feet bear the weight of countless generations, each step a connection to the past. Eze Village is a living testament to the enduring spirit of the French Riviera. The village's architecture, with weathered stone facades and terracotta roofs, speaks of a time when artisans crafted each building by hand. The Jardin Exotique at the pinnacle of Eze Village offers a panoramic view that inspired the philosopher Nietzsche during his visits. From the garden's edge, you can overlook the rugged coastline and the shimmering sea, contemplating the vastness of time and the countless lives that have passed through this ancient village.",
+    "tokens": 612
+  },
+  {
+    "idx": 2,
+    "before_rules": [
+      "R1_IMPERATIVE",
+      "R3_SUGGESTIVE_EXPLORATION"
+    ],
+    "before_errors": 3,
+    "after_rules": [
+      "R1_IMPERATIVE"
+    ],
+    "after_errors": 1,
+    "outcome": "IMPROVED",
+    "before": "At Cap d'Antibes, history whispers through the rocky terrain and hidden coves that once harbored pirates and smugglers, adding a layer of intrigue to this picturesque peninsula. As you gaze out at the sea, imagine the clandestine activities that once unfolded along these shores during the Riviera's less glamorous past. The cape's significance lies in its natural beauty and cultural heritage, as part of the larger commune of Antibes, known for its vibrant seaside resort atmosphere. Antibes had a population of 77,637 in 2023, making it the second most populated area in the Alpes-Maritimes region after Nice. The cape is not only a geographic landmark but a hub of luxury and exclusivity. It is home to the prestigious H\u00f4tel du Cap-Eden-Roc, a symbol of elegance and sophistication that has hosted celebrities and dignitaries for decades. The neighboring Grand-H\u00f4tel du Cap-Ferrat adds to the aura of opulence that surrounds the area. Cap d'Antibes is also steeped in literary history, with connections to F. Scott Fitzgerald's novel \"Tender Is the Night.\" Set in the French Riviera, the novel captures the allure and decadence of the Jazz Age, mirroring the author's own experiences during that time. As you continue your journey, cycling past the luxurious villas that dot the landscape, contemplate the secrets hidden within the ancient walls of Eze Village just ahead. Cap d'Antibes stands as a testament to the region's rich past, where the whispers of history mingle with the sounds of the sea, inviting you to explore further into the depths of the French Riviera's storied past.",
+    "after": "At Cap d'Antibes, history whispers through the rocky terrain and hidden coves that once harbored pirates and smugglers, adding a layer of intrigue to this picturesque peninsula. As you gaze out at the sea, imagine the clandestine activities that once unfolded along these shores during the Riviera's less glamorous past. The cape's significance lies in its natural beauty and cultural heritage, as part of the larger commune of Antibes, known for its vibrant seaside resort atmosphere. Antibes had a population of 77,637 in 2023, making it the second most populated area in the Alpes-Maritimes region after Nice. The cape is not only a geographic landmark but a hub of luxury and exclusivity. It is home to the prestigious H\u00f4tel du Cap-Eden-Roc, a symbol of elegance and sophistication that has hosted celebrities and dignitaries for decades. The neighboring Grand-H\u00f4tel du Cap-Ferrat adds to the aura of opulence that surrounds the area. Cap d'Antibes has connections to F. Scott Fitzgerald's novel \"Tender Is the Night,\" set in the French Riviera, capturing the allure and decadence of the Jazz Age, mirroring the author's own experiences during that time. Cycling past the luxurious villas that dot the landscape, contemplate the secrets hidden within the ancient walls of Eze Village just ahead. The whispers of history mingle with the sounds of the sea, revealing the depths of the French Riviera's storied past.",
+    "tokens": 1032
+  }
+]

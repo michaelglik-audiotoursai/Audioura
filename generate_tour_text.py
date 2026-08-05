@@ -2,6 +2,28 @@
 Modified version of generate_tour_text.py that includes geo coordinates for the first stop
 """
 import os
+from cost_rates import llm_cost as _llm_cost
+
+# Sixth "built and inert" defect (D131): a rule implemented, wired, and then
+# skipped at runtime because the root module was not importable from whatever
+# cwd the process happened to have. Put this file's own directory on sys.path
+# so every sibling module resolves regardless of how we are invoked.
+import sys as _sys, os as _os
+_MODULE_DIR = _os.path.dirname(_os.path.abspath(__file__))
+if _MODULE_DIR not in _sys.path:
+    _sys.path.insert(0, _MODULE_DIR)
+
+
+def _tour_llm_cost(tokens: int) -> float:
+    """Cost of a call at the model actually in use.
+
+    LOCAL-197 moved rates into cost_rates.py; LOCAL-194 made the model runtime
+    config. Both matter here: pricing a gpt-4o-mini call at gpt-3.5-turbo rates
+    overstates our cost ~7x, and Subscribed charges the user 5x that number.
+    """
+    return _llm_cost(total_tokens=tokens,
+                     model=os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"))
+
 import sys
 import json
 import time
@@ -248,7 +270,7 @@ def _verify_transport_accessibility(poi_list, transport_mode, location, api_key)
             "https://api.openai.com/v1/chat/completions",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={
-                "model": "gpt-3.5-turbo",
+                "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
                 "messages": [
                     {"role": "system", "content": "You return ONLY a valid JSON array. No markdown, no commentary."},
                     {"role": "user", "content": prompt},
@@ -518,7 +540,7 @@ Examples:
     }
     
     data = {
-        "model": "gpt-3.5-turbo",
+        "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
         "messages": [
             {"role": "system", "content": "You are a tour planning assistant. Respond only with valid JSON."},
             {"role": "user", "content": intent_prompt}
@@ -598,7 +620,7 @@ Example: For "Paul Revere House" and poi_type "restaurant":
     }
     
     data = {
-        "model": "gpt-3.5-turbo",
+        "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
         "messages": [
             {"role": "system", "content": "You are a location verification assistant. Respond only with valid JSON."},
             {"role": "user", "content": verification_prompt}
@@ -658,7 +680,7 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12):
             '{"inside_scope": true/false, "confidence": "high/medium/low", "reason": "<brief>"}'
         )
         data = {
-            "model": "gpt-3.5-turbo",
+            "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
             "messages": [
                 {"role": "system", "content": "You are a geography fact-checker. Respond only with valid JSON."},
                 {"role": "user", "content": prompt},
@@ -793,7 +815,7 @@ def _validate_museum_stop_descriptions(poi_list, venue_name, headers):
             '{"inside_venue": true/false, "confidence": "high/medium/low", "reason": "<brief>"}'
         )
         data = {
-            "model": "gpt-3.5-turbo",
+            "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
             "messages": [
                 {"role": "system", "content": "You are a fact-checker. Respond only with valid JSON."},
                 {"role": "user", "content": prompt}
@@ -2436,6 +2458,13 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     """
     import api_call_logger
 
+    # [LOCAL-230] Reset per-run network failure counter
+    try:
+        from venue_resolver import reset_network_failure_count
+        reset_network_failure_count()
+    except ImportError:
+        pass
+
     # --- Storied: persona handling ---
     _storied_mode = os.environ.get("STORIED_MODE", "false").lower() == "true"
     _persona_enum = None
@@ -2465,6 +2494,16 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         "total_stops_parameter": total_stops,
         "output_file": output_file,
     })
+
+    # [LOCAL-245] Log existence gate mode at startup — single source of truth
+    try:
+        from stop_existence_gate import get_gate_mode
+        _existence_gate_mode = get_gate_mode()
+        print(f"  [LOCAL-245] Stop-existence gate mode: {_existence_gate_mode.upper()}")
+    except ImportError:
+        _existence_gate_mode = 'off'
+        print(f"  [LOCAL-245] Stop-existence gate: unavailable (import failed)")
+
     # Get API key from environment variable or prompt user (only if interactive)
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
@@ -2504,7 +2543,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
 
     # -------- [S20] Storied: check tour cache before generation --------
     _cache_hit = None
-    if _storied_mode:
+    _disable_cache = os.environ.get("DISABLE_TOUR_CACHE", "").strip() == "1"
+    if _storied_mode and not _disable_cache:
         _db_url = os.environ.get("DATABASE_URL")
         if _db_url:
             try:
@@ -3205,7 +3245,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             '[{"name": "...", "address": "..."}, ...]'
         )
         phase_3a_data = {
-            "model": "gpt-3.5-turbo",
+            "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
             "messages": [
                 {"role": "system", "content": "You return ONLY a valid JSON array. No markdown, no commentary."},
                 {"role": "user", "content": phase_3a_prompt}
@@ -3235,8 +3275,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             info_text = info_result["choices"][0]["message"]["content"]
             tokens_used = info_result["usage"]["total_tokens"]
             total_tokens += tokens_used
-            total_cost += _llm_cost(total_tokens=tokens_used)
-            print(f"PHASE 3A API call cost: ${_llm_cost(total_tokens=tokens_used):.4f} ({tokens_used} tokens)")
+            total_cost += _tour_llm_cost(tokens_used)
+            print(f"PHASE 3A API call cost: ${_tour_llm_cost(tokens_used):.4f} ({tokens_used} tokens)")
 
             api_call_logger.log_openai_call(phase_3a_prompt, total_stops, info_text, info_response.status_code)
 
@@ -3443,7 +3483,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         _r4_prompt += "You may include works from this list AND other works you know are there.\n"
                 _r4_prompt += f"Return ONLY a JSON array: [{{\"name\": \"...\", \"address\": \"...\"}}]"
                 _r4_data = {
-                    "model": "gpt-3.5-turbo",
+                    "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
                     "messages": [
                         {"role": "system", "content": "Return ONLY valid JSON arrays."},
                         {"role": "user", "content": _r4_prompt}
@@ -3463,7 +3503,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     _r4_text = _r4_result["choices"][0]["message"]["content"]
                     tokens_used = _r4_result["usage"]["total_tokens"]
                     total_tokens += tokens_used
-                    total_cost += _llm_cost(total_tokens=tokens_used)
+                    total_cost += _tour_llm_cost(tokens_used)
                     
                     _r4_candidates = _parse_json_array_loose(_r4_text)
                     if not _r4_candidates:
@@ -3919,7 +3959,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 '[{"name": "...", "address": "..."}, ...]'
             )
             replacement_data = {
-                "model": "gpt-3.5-turbo",
+                "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
                 "messages": [
                     {"role": "system", "content": "You return ONLY a valid JSON array. No markdown, no commentary."},
                     {"role": "user", "content": replacement_prompt}
@@ -3940,7 +3980,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 rep_text = rep_result["choices"][0]["message"]["content"]
                 tokens_used = rep_result["usage"]["total_tokens"]
                 total_tokens += tokens_used
-                total_cost += _llm_cost(total_tokens=tokens_used)
+                total_cost += _tour_llm_cost(tokens_used)
 
                 new_candidates = _parse_json_array_loose(rep_text)
                 if not new_candidates or not isinstance(new_candidates, list):
@@ -4013,6 +4053,174 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 print(f"   Part C attempt {attempts}: exception {e}")
                 continue
 
+        # ──── [LOCAL-212] COVERAGE-AWARE STOP SELECTION ────────────────────────
+        # When enabled (DISABLE_COVERAGE_SELECTION != '1'), reorder candidates
+        # so COVERED stops are preferred over CREATOR_ONLY, VENUE_ONLY, EMPTY.
+        # This is the structural fix: instead of prompting the model not to
+        # fabricate on stops with no material, select stops that HAVE material.
+        _coverage_selection_disabled = os.environ.get('DISABLE_COVERAGE_SELECTION', '').strip() == '1'
+
+        if not _coverage_selection_disabled and len(poi_list) > total_stops:
+            try:
+                from stop_corpus_reader import get_stop_corpus_for_tour
+                from corpus_coverage import assess_stop_coverage
+
+                # Determine venue name for corpus lookup
+                _cs_venue = (_museum_venue_name or location) if tour_category == 'museum' else location
+                _cs_stop_names = [p['name'] for p in poi_list]
+
+                # Get DB connection for corpus lookup
+                _cs_conn = None
+                _cs_db_failure = False
+                try:
+                    # Try venue_resolver first (same pattern as the later corpus fetch)
+                    from venue_resolver import _get_db_connection as _cs_get_conn
+                    _cs_conn = _cs_get_conn()
+                except Exception as _cs_err1:
+                    print(f"  [LOCAL-230] ERROR: Coverage selection DB connect failed (venue_resolver): {type(_cs_err1).__name__}: {_cs_err1}")
+                    _cs_db_failure = True
+                if not _cs_conn:
+                    try:
+                        import psycopg2
+                        _cs_db_url = os.environ.get(
+                            'DATABASE_URL',
+                            'postgresql://admin:password123@localhost:5433/audiotours'
+                        )
+                        _cs_conn = psycopg2.connect(_cs_db_url, connect_timeout=5)
+                    except Exception as _cs_err2:
+                        print(f"  [LOCAL-230] ERROR: Coverage selection DB connect failed (direct): {type(_cs_err2).__name__}: {_cs_err2}")
+                        _cs_db_failure = True
+
+                # [LOCAL-230] Count coverage-selection DB failure in the per-run counter
+                if _cs_db_failure:
+                    try:
+                        import venue_resolver as _vr_mod
+                        _vr_mod._network_failure_count += 1
+                    except (ImportError, AttributeError):
+                        pass
+
+                if _cs_conn:
+                    _cs_corpus = get_stop_corpus_for_tour(
+                        venue_name=_cs_venue,
+                        stop_names=_cs_stop_names,
+                        conn=_cs_conn,
+                    )
+                    _cs_conn.close()
+
+                    # Assess coverage for each candidate
+                    _COVERAGE_PRIORITY = {'COVERED': 0, 'CREATOR_ONLY': 1, 'VENUE_ONLY': 2, 'EMPTY': 3}
+                    _cs_verdicts = {}  # stop_name → verdict string
+
+                    for _cs_name in _cs_stop_names:
+                        _cs_data = _cs_corpus.get(_cs_name)
+                        if _cs_data and _cs_data.get('passages'):
+                            _cs_roles = _cs_data.get('passage_roles')
+                            _cs_assessment = assess_stop_coverage(
+                                _cs_name, _cs_venue, _cs_data['passages'],
+                                passage_roles=_cs_roles
+                            )
+                        else:
+                            _cs_assessment = {'verdict': 'EMPTY'}
+                        _cs_verdicts[_cs_name] = _cs_assessment['verdict']
+
+                    # Stable sort: preserve original order within each tier
+                    poi_list.sort(key=lambda p: _COVERAGE_PRIORITY.get(
+                        _cs_verdicts.get(p['name'], 'EMPTY'), 3
+                    ))
+
+                    # Log the selection
+                    _cs_selected = poi_list[:total_stops]
+                    _cs_dropped = poi_list[total_stops:]
+                    _cs_selected_verdicts = [_cs_verdicts.get(p['name'], 'EMPTY') for p in _cs_selected]
+                    _cs_dropped_verdicts = [_cs_verdicts.get(p['name'], 'EMPTY') for p in _cs_dropped]
+
+                    # Count fallbacks
+                    _cs_covered_count = sum(1 for v in _cs_selected_verdicts if v == 'COVERED')
+                    _cs_fallback_count = total_stops - _cs_covered_count
+                    if _cs_fallback_count > 0:
+                        _cs_fallback_reasons = []
+                        for v in ('CREATOR_ONLY', 'VENUE_ONLY', 'EMPTY'):
+                            _cs_cnt = sum(1 for sv in _cs_selected_verdicts if sv == v)
+                            if _cs_cnt > 0:
+                                _cs_fallback_reasons.append(f"{_cs_cnt}×{v}")
+                        print(f"  [LOCAL-212] Coverage selection: {_cs_covered_count} COVERED, "
+                              f"fallback needed: {', '.join(_cs_fallback_reasons)} "
+                              f"(not enough covered candidates to fill {total_stops} stops)")
+                    else:
+                        print(f"  [LOCAL-212] Coverage selection: all {total_stops} stops COVERED")
+
+                    print(f"  [LOCAL-212] Selected: {[p['name'] + '=' + _cs_verdicts.get(p['name'], '?') for p in _cs_selected]}")
+                    if _cs_dropped:
+                        print(f"  [LOCAL-212] Dropped:  {[p['name'] + '=' + _cs_verdicts.get(p['name'], '?') for p in _cs_dropped]}")
+                else:
+                    if _cs_db_failure:
+                        print(f"  [LOCAL-212] Coverage selection: DB connection FAILED — falling back to position order")
+                    else:
+                        print(f"  [LOCAL-212] Coverage selection: DB unavailable — falling back to position order")
+            except ImportError as _cs_err:
+                print(f"  [LOCAL-212] Coverage selection: import failed ({_cs_err}) — falling back to position order")
+            except Exception as _cs_err:
+                print(f"  [LOCAL-212] Coverage selection error (non-fatal): {_cs_err}")
+        elif _coverage_selection_disabled:
+            print(f"  [LOCAL-212] Coverage selection: DISABLED by DISABLE_COVERAGE_SELECTION=1")
+        # ──── END [LOCAL-212] COVERAGE-AWARE STOP SELECTION ───────────────────
+
+        # ──── [LOCAL-245] STOP-EXISTENCE GATE (INLINE ENFORCEMENT) ────────────
+        # Three modes: off / log_only / enforce.
+        # In enforce mode, unverified stops are removed from poi_list before
+        # narration. The tour may be shorter — this is logged explicitly.
+        try:
+            from stop_existence_gate import get_gate_mode, run_existence_gate, verify_stop_existence
+
+            _seg_mode = get_gate_mode()
+            if _seg_mode != 'off':
+                # Get DB connection (same pattern as LOCAL-212)
+                _seg_conn = None
+                try:
+                    from venue_resolver import _get_db_connection as _seg_get_conn
+                    _seg_conn = _seg_get_conn()
+                except Exception:
+                    pass
+                if not _seg_conn:
+                    try:
+                        import psycopg2
+                        _seg_db_url = os.environ.get('DATABASE_URL')
+                        if _seg_db_url:
+                            _seg_conn = psycopg2.connect(_seg_db_url, connect_timeout=5)
+                    except Exception:
+                        pass
+
+                if _seg_conn:
+                    _seg_venue = (_museum_venue_name or location) if tour_category == 'museum' else location
+                    _seg_stop_names = [p['name'] for p in poi_list]
+                    _seg_result = run_existence_gate(_seg_stop_names, _seg_venue, _seg_conn)
+                    _seg_conn.close()
+
+                    if _seg_mode == 'enforce' and _seg_result['unverified_stops']:
+                        _seg_unverified_set = set(_seg_result['unverified_stops'])
+                        _seg_before = len(poi_list)
+                        poi_list = [p for p in poi_list if p['name'] not in _seg_unverified_set]
+                        _seg_after = len(poi_list)
+                        _seg_dropped = _seg_before - _seg_after
+                        if _seg_dropped > 0:
+                            print(f"  [LOCAL-245] EXISTENCE-GATE ENFORCE: dropped {_seg_dropped} unverified stop(s), "
+                                  f"{_seg_after} remain (requested {total_stops})")
+                            for _seg_u in _seg_result['unverified_stops']:
+                                print(f"    DROPPED: {_seg_u!r}")
+                            if _seg_after < total_stops:
+                                print(f"  [LOCAL-245] EXISTENCE-GATE: delivering SHORT tour — "
+                                      f"{_seg_after}/{total_stops} stops (reason: not enough verified candidates)")
+                                total_stops = _seg_after
+                else:
+                    print(f"  [LOCAL-245] EXISTENCE-GATE: DB unavailable — gate cannot run, proceeding without")
+            else:
+                print(f"  [LOCAL-245] EXISTENCE-GATE: OFF (STOP_EXISTENCE_GATE_MODE=off)")
+        except ImportError as _seg_err:
+            print(f"  [LOCAL-245] EXISTENCE-GATE: import failed ({_seg_err}) — proceeding without")
+        except Exception as _seg_err:
+            print(f"  [LOCAL-245] EXISTENCE-GATE error (non-fatal): {_seg_err}")
+        # ──── END [LOCAL-245] STOP-EXISTENCE GATE ─────────────────────────────
+
         # Hard cap and final sanity
         if len(poi_list) > total_stops:
             poi_list = poi_list[:total_stops]
@@ -4074,7 +4282,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 + _json_schema_block
             )
             req_data = {
-                "model": "gpt-3.5-turbo",
+                "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
                 "messages": [
                     {"role": "system", "content": "You return ONLY a valid JSON array. No markdown, no commentary."},
                     {"role": "user", "content": prompt}
@@ -4096,8 +4304,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 b_text = b_result["choices"][0]["message"]["content"]
                 tokens_used = b_result["usage"]["total_tokens"]
                 total_tokens += tokens_used
-                total_cost += _llm_cost(total_tokens=tokens_used)
-                print(f"PHASE 3B API call cost: ${_llm_cost(total_tokens=tokens_used):.4f} ({tokens_used} tokens)")
+                total_cost += _tour_llm_cost(tokens_used)
+                print(f"PHASE 3B API call cost: ${_tour_llm_cost(tokens_used):.4f} ({tokens_used} tokens)")
                 parsed = _parse_json_array_loose(b_text)
                 if not parsed or not isinstance(parsed, list):
                     print(f"! PHASE 3B unparseable response; keeping current order")
@@ -4327,7 +4535,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 + ".\nFormat: Latitude: [number]\nLongitude: [number]\nOnly coordinates, nothing else."
             )
             data = {
-                "model": "gpt-3.5-turbo",
+                "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
                 "messages": [
                     {"role": "system", "content": "You provide accurate GPS coordinates. Respond only with Latitude and Longitude lines."},
                     {"role": "user", "content": prompt}
@@ -4357,7 +4565,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     if coords:
                         poi['coordinates'] = coords
                         total_tokens += tokens_used
-                        total_cost += _llm_cost(total_tokens=tokens_used)
+                        total_cost += _tour_llm_cost(tokens_used)
                         print(f"   Coords fallback OK '{poi['name']}': {coords}")
                     else:
                         print(f"   Coords fallback FAILED '{poi['name']}' — no map pin for this stop")
@@ -4382,7 +4590,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             if coords:
                                 poi['coordinates'] = coords
                                 total_tokens += tokens_used
-                                total_cost += _llm_cost(total_tokens=tokens_used)
+                                total_cost += _tour_llm_cost(tokens_used)
                                 print(f"   Cluster refetch OK '{poi['name']}': {coords}")
                             else:
                                 print(f"   Cluster refetch FAILED '{poi['name']}' -- no map pin")
@@ -4449,7 +4657,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             '[{"name": "...", "address": "..."}, ...]'
                         )
                         rep_data = {
-                            "model": "gpt-3.5-turbo",
+                            "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
                             "messages": [
                                 {"role": "system", "content": "You return ONLY a valid JSON array. No markdown, no commentary."},
                                 {"role": "user", "content": rep_prompt}
@@ -4466,7 +4674,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             if rep_resp.status_code == 200:
                                 rep_tokens = rep_resp.json()["usage"]["total_tokens"]
                                 total_tokens += rep_tokens
-                                total_cost += _llm_cost(total_tokens=rep_tokens)
+                                total_cost += _tour_llm_cost(rep_tokens)
                                 new_candidates = _parse_json_array_loose(rep_resp.json()["choices"][0]["message"]["content"])
                                 if new_candidates and isinstance(new_candidates, list):
                                     new_stops = []
@@ -4494,7 +4702,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                                 if coords_r:
                                     poi_r['coordinates'] = coords_r
                                     total_tokens += tok_r
-                                    total_cost += _llm_cost(total_tokens=tok_r)
+                                    total_cost += _tour_llm_cost(tok_r)
                                     print(f"   GEO-CHECK coords OK '{poi_r['name']}': {coords_r}")
                                 else:
                                     print(f"   GEO-CHECK coords FAILED '{poi_r['name']}'")
@@ -4652,6 +4860,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     _three_class_results = {}  # [LOCAL-37] poi_name → three-class retrieval result
     _diversity_adjusted_selections = {}  # [LOCAL-37] poi_name → diversity-adjusted element selection
     _stop_corpus_data = {}  # [LOCAL-183] poi_name → {passages, sources} from stop_corpus table
+    _corpus_gate_shortened_stops = set()  # [LOCAL-198] Stops flagged for venue-only narration
+    _corpus_gate_empty_stops = set()  # [LOCAL-209] Stops with NO corpus at all (stricter than VENUE_ONLY)
+    _corpus_gate_creator_only_stops = set()  # [LOCAL-203] Stops with only creator-role passages
+    _corpus_gate_log = []  # [LOCAL-198] Per-stop gate decisions
     _thread_result = None  # [LOCAL-186] Initialize before storied block so closure doesn't NameError
     if _storied_mode:
         print(f"\n[Storied] STORIED_MODE=true — generating spine + fact sheets...")
@@ -4894,6 +5106,86 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     print(f"  [LOCAL-183] stop_corpus_reader not available: {_sc_err}")
                 except Exception as _sc_err:
                     print(f"  [LOCAL-183] stop_corpus fetch error (non-fatal): {_sc_err}")
+
+            # ──── [LOCAL-198] CORPUS COVERAGE GATE ────────────────────────────────
+            # When enabled (DISABLE_CORPUS_GATE != '1'), checks each stop's corpus
+            # for actual subject coverage. Stops with only venue-level text get
+            # flagged for shortened, venue-grounded narration.
+            # [LOCAL-209] Gate now iterates _poi_names unconditionally — a stop
+            # absent from _stop_corpus_data is EMPTY, not invisible.
+            _corpus_gate_disabled = os.environ.get('DISABLE_CORPUS_GATE', '').strip() == '1'
+            
+            if not _corpus_gate_disabled:
+                try:
+                    # LEAD fixup on merge: the canonical module is at the repo
+                    # root. `tests/` is not in the tour-generator image, so an
+                    # import from there fails in Docker and the gate silently
+                    # never runs — the LOCAL-192 defect, two rounds later.
+                    from corpus_coverage import (
+                        assess_stop_coverage, extract_content_words, _extract_passage_texts
+                    )
+                    print(f"  [LOCAL-198] Corpus gate: ENABLED — checking stop coverage...")
+                    
+                    for _poi_name in _poi_names:
+                        _sc_data = _stop_corpus_data.get(_poi_name)
+                        if _sc_data and _sc_data.get('passages'):
+                            _passages_text = _sc_data['passages']
+                            # [LOCAL-203] Pass passage_roles for role-aware verdicts
+                            _passage_roles = _sc_data.get('passage_roles')
+                            _assessment = assess_stop_coverage(
+                                _poi_name, _venue_name, _passages_text,
+                                passage_roles=_passage_roles
+                            )
+                        else:
+                            # [LOCAL-209] No corpus row at all → EMPTY verdict.
+                            # Previously this was unreachable when _stop_corpus_data was empty.
+                            _assessment = {'verdict': 'EMPTY', 'content_words': extract_content_words(_poi_name, _venue_name), 'subject_match_words': []}
+                        
+                        if _assessment['verdict'] == 'COVERED':
+                            _corpus_gate_log.append({
+                                'stop': _poi_name, 'verdict': 'COVERED', 'action': 'PASSED'
+                            })
+                            print(f"  [CORPUS-GATE] stop='{_poi_name}' "
+                                  f"verdict=COVERED action=PASSED")
+                        elif _assessment['verdict'] == 'CREATOR_ONLY':
+                            # [LOCAL-203] CREATOR_ONLY: narration may discuss the maker
+                            # but must not describe the object itself.
+                            _corpus_gate_creator_only_stops.add(_poi_name)
+                            _corpus_gate_log.append({
+                                'stop': _poi_name, 'verdict': 'CREATOR_ONLY', 'action': 'CREATOR_RESTRICTED'
+                            })
+                            print(f"  [CORPUS-GATE] stop='{_poi_name}' "
+                                  f"verdict=CREATOR_ONLY action=CREATOR_RESTRICTED")
+                        elif _assessment['verdict'] == 'EMPTY':
+                            # [LOCAL-209] EMPTY: no corpus at all — stricter than VENUE_ONLY.
+                            _corpus_gate_empty_stops.add(_poi_name)
+                            _corpus_gate_log.append({
+                                'stop': _poi_name, 'verdict': 'EMPTY', 'action': 'EMPTY_RESTRICTED'
+                            })
+                            print(f"  [CORPUS-GATE] stop='{_poi_name}' "
+                                  f"verdict=EMPTY action=EMPTY_RESTRICTED")
+                        else:
+                            # VENUE_ONLY — shorten narration
+                            _corpus_gate_shortened_stops.add(_poi_name)
+                            _action = 'SHORTENED'
+                            _corpus_gate_log.append({
+                                'stop': _poi_name, 'verdict': _assessment['verdict'], 'action': _action
+                            })
+                            print(f"  [CORPUS-GATE] stop='{_poi_name}' "
+                                  f"verdict={_assessment['verdict']} action={_action}")
+                    
+                    _passed = sum(1 for g in _corpus_gate_log if g['action'] == 'PASSED')
+                    _creator_only = sum(1 for g in _corpus_gate_log if g['action'] == 'CREATOR_RESTRICTED')
+                    _empty = sum(1 for g in _corpus_gate_log if g['action'] == 'EMPTY_RESTRICTED')
+                    _shortened = sum(1 for g in _corpus_gate_log if g['action'] == 'SHORTENED')
+                    print(f"  [LOCAL-198] Corpus gate: {_passed} PASSED, {_creator_only} CREATOR_ONLY, {_empty} EMPTY, {_shortened} SHORTENED")
+                except ImportError:
+                    print(f"  [LOCAL-198] Corpus gate: module not importable — gate DISABLED")
+                except Exception as _gate_err:
+                    print(f"  [LOCAL-198] Corpus gate error (non-fatal): {_gate_err}")
+            elif _corpus_gate_disabled:
+                print(f"  [LOCAL-198] Corpus gate: DISABLED by DISABLE_CORPUS_GATE=1")
+            # ──── END [LOCAL-198] CORPUS COVERAGE GATE ────────────────────────────
 
             _storied_fact_sheets = generate_fact_sheets_parallel(
                 poi_list=_poi_names,
@@ -5159,9 +5451,9 @@ NO DESCRIBING THE OBVIOUS:
 Start with an orientation section that explains how the visitor arrives at this stop and what they should look for.
 
 Then provide a detailed description. Include:
-- What makes this stop notable or interesting — with specific evidence, not adjectives
+- The specific evidence for why this place matters — a fact, a number, a named person, not adjectives
 - Historical or cultural context: name a date, a person, an event, a cause-and-effect
-- One concrete sensory detail that places the listener HERE (a sound, material, smell)
+- Ground the listener in the physical present — weave in a real sound, texture, or smell they can perceive right now at this spot
 - How this stop connects to the tour's theme — show the connection, don't just assert it
 
 EXPLAIN-WHAT-YOU-NAME RULE (critical):
@@ -5720,6 +6012,77 @@ DO NOT include directions to the next stop - these will be added separately.
         if _word_target_instruction:
             description_prompt += f"\nLENGTH CONSTRAINT: {_word_target_instruction}\n"
 
+        # [LOCAL-209] CORPUS GATE: EMPTY — no corpus exists for this stop at all.
+        # Stricter than VENUE_ONLY: there is no venue-level material either.
+        # The paragraph must not assert dates, measurements, nicknames, or attributions.
+        if hasattr(poi_name, '__hash__') and poi_name in _corpus_gate_empty_stops:
+            description_prompt += f"""
+CORPUS GATE: EMPTY (D50 enforcement — LOCAL-209):
+There is NO verified source material for "{poi_name}" — no stop-level corpus,
+no venue-level corpus, nothing. Every specific claim you might generate about
+this place comes from your training data and CANNOT be verified.
+
+YOU MUST NOT:
+- Assert any specific date, year, century, or historical period
+- State any measurement (depth, height, distance, area)
+- Attribute a nickname, title, or epithet to this place
+- Name specific people, architects, artists, or historical figures
+- Claim specific events happened here
+- Describe specific architectural features as fact
+
+YOU MAY ONLY:
+- Name the stop and its general geographic context (e.g. "a coastal town east of Nice")
+- Describe what is physically visible to a cyclist arriving now (sea, buildings, streets)
+- Provide wayfinding and orientation ("look to your left", "the harbor is ahead")
+- Use hedging language ("this area is known for…", "visitors often notice…")
+- Note the atmosphere and sensory experience (sounds, smells, light)
+
+Write 60-80 words maximum. This is an orientation-only placeholder. No factual claims.
+"""
+        # [LOCAL-198] CORPUS GATE: SHORTENED narration for stops without subject coverage.
+        # When the gate detected this stop as VENUE_ONLY, override the prompt
+        # to request only venue-grounded content that does NOT describe the artwork.
+        elif hasattr(poi_name, '__hash__') and poi_name in _corpus_gate_shortened_stops:
+            description_prompt += f"""
+CRITICAL CORPUS GATE RESTRICTION (D50 enforcement — LOCAL-198):
+The corpus for this stop does NOT contain information about the specific artwork/exhibit
+"{poi_name}". The available text is about the venue generally.
+
+YOU MUST NOT:
+- Describe the artwork's appearance, materials, technique, or composition
+- Name the artist's practice, style, or art-historical movement
+- Claim anything about what the visitor will see at this specific stop
+- Invent details about the work from your training data
+
+YOU MAY ONLY:
+- Note the stop's name and its location within the venue
+- Share venue-level facts that ARE in the corpus (opening date, general collection scope)
+- Describe the physical surroundings and wayfinding
+- Acknowledge that detailed information about this specific work is limited
+
+Write 80-100 words maximum. This is a venue-grounded placeholder, not a full stop narration.
+"""
+        # [LOCAL-203] CORPUS GATE: CREATOR_ONLY — may discuss the maker, must not describe the object.
+        elif hasattr(poi_name, '__hash__') and poi_name in _corpus_gate_creator_only_stops:
+            description_prompt += f"""
+CORPUS GATE: CREATOR_ONLY (D75 enforcement — LOCAL-203):
+The corpus for this stop contains information about the MAKER/ARTIST of "{poi_name}",
+but does NOT contain verified information about the specific object/artwork itself.
+
+YOU MAY:
+- Discuss the artist's or maker's biography, career, and significance
+- Mention their techniques, style, and historical context — IF stated in the passages
+- Note that this maker created the work at this stop
+
+YOU MUST NOT:
+- Describe the object's appearance, dimensions, materials, or condition
+- Claim what the visitor will see at this specific stop
+- Invent details about the physical work from your training data
+- State facts about the object that are not in the provided passages
+
+Ground all claims about the maker in the passages provided. Do not describe the object.
+"""
+
         # [LOCAL-183] Inject per-stop corpus passages with provenance and grounding rule.
         # This is the production wiring that D31/D54/D57 identified as missing:
         # stop_corpus was only read by the detector, never fed to the generator.
@@ -5792,7 +6155,7 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
             description_prompt += _final_binding
 
         description_data = {
-            "model": "gpt-3.5-turbo",
+            "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
             "messages": [
                 {"role": "system", "content": "You are a knowledgeable museum guide with expertise in art, architecture, and history."},
                 {"role": "user", "content": description_prompt}
@@ -5816,7 +6179,7 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                     description_text = description_result["choices"][0]["message"]["content"]
 
                     tokens_used = description_result["usage"]["total_tokens"]
-                    call_cost = _llm_cost(total_tokens=tokens_used)
+                    call_cost = _tour_llm_cost(tokens_used)
                     print(f"Stop {stop_num} API call cost: ${call_cost:.4f} ({tokens_used} tokens)")
 
                     parts = description_text.split("Orientation:", 1)
@@ -6053,6 +6416,375 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
             total_tokens += tokens_used
             total_cost += call_cost
     
+    # -------- [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry --------
+    # D63: prompt instruction alone does not fix style faults. Validate generated
+    # text and re-ask for paragraphs that violate error-severity rules (R1–R4).
+    # R7 is warning-only (D62) — does NOT trigger retry.
+    # One retry per paragraph max. If retry also fails, keep the better of two.
+    # Behind DISABLE_STYLE_RETRY=1 flag for A/B measurement.
+    _style_retry_disabled = os.environ.get('DISABLE_STYLE_RETRY', '').strip() == '1'
+    if _style_retry_disabled:
+        print(f"\n  [LOCAL-192] Style retry DISABLED by DISABLE_STYLE_RETRY=1 env var")
+    else:
+        print(f"\n  [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry...")
+        _style_retry_count = 0
+        _style_retry_tokens = 0
+        _style_retry_cost = 0.0
+        _style_retry_successes = 0
+        _style_retry_failures = 0
+
+        # Import the validator (same one used in measurement — D55: do not modify it)
+        # [LOCAL-192 fix 1] Validator now lives at repo root (same directory as this file),
+        # so it is importable without sys.path manipulation — works inside Docker too.
+        try:
+            from style_validator_detector import validate_paragraph as _sv_validate_paragraph
+        except ImportError:
+            _sv_validate_paragraph = None
+            print(f"  [LOCAL-192] WARNING: style_validator_detector not importable — retry skipped")
+
+        if _sv_validate_paragraph:
+            _ERROR_SEVERITIES = {'error'}  # Only error-severity triggers retry (not 'warning')
+
+            for _si, _poi in enumerate(poi_list):
+                _desc = _poi.get('description', '')
+                if not _desc or _desc.startswith('['):
+                    continue  # Skip failed/placeholder descriptions
+
+                _stop_num = _si + 1
+                _poi_name = _poi.get('name', f'Stop {_stop_num}')
+
+                # Split description into paragraphs — keep ALL segments for reassembly,
+                # but only validate content paragraphs (>30 chars). Short segments
+                # (assembly lines, spacing) pass through unchanged.
+                # [LOCAL-192 fix 2] Previous code dropped ≤30-char paragraphs on reassembly.
+                _all_segments = [p for p in _desc.split('\n\n') if p.strip()]
+                if not _all_segments:
+                    continue
+
+                _new_paragraphs = []
+                _stop_had_retry = False
+                _stop_retry_tokens = 0
+                _stop_retry_cost = 0.0
+
+                for _pi, _seg in enumerate(_all_segments):
+                    _para = _seg.strip()
+                    # Short segments: keep as-is, do not validate
+                    if len(_para) <= 30:
+                        _new_paragraphs.append(_para)
+                        continue
+
+                    _result = _sv_validate_paragraph(_para)
+
+                    # Check for ERROR-severity findings only (R7 is warning → skip)
+                    _error_findings = [f for f in _result.get('findings', [])
+                                       if f.get('severity') in _ERROR_SEVERITIES]
+
+                    if not _error_findings or _result.get('is_navigation'):
+                        _new_paragraphs.append(_para)
+                        continue
+
+                    # ── This paragraph has error-severity violations → retry ──
+                    _style_retry_count += 1
+                    _stop_had_retry = True
+
+                    # Build the retry prompt: tell the model exactly which rule it broke
+                    # and quote the offending sentence. Fabrication guard (D50): only
+                    # rewrite using what's already in the paragraph.
+                    _violated_rules = set(f['rule_id'] for f in _error_findings)
+                    _offending_sentences = [f['sentence'][:150] for f in _error_findings[:3]]
+
+                    _retry_prompt = f"""Rewrite the following paragraph to fix style violations.
+
+PARAGRAPH TO REWRITE:
+\"\"\"{_para}\"\"\"
+
+VIOLATIONS FOUND:
+"""
+                    for _ef in _error_findings[:3]:
+                        _retry_prompt += f"- Rule {_ef['rule_id']}: {_ef['suggestion']}\n"
+                        _retry_prompt += f"  Offending sentence: \"{_ef['sentence'][:150]}\"\n"
+
+                    _retry_prompt += f"""
+REWRITE RULES (all mandatory):
+1. Fix the violations listed above — remove prescribed feelings, imperatives, suggestive exploration, or questions as indicated.
+2. DO NOT ADD ANY NEW FACTS, claims, dates, names, or information not already present in the paragraph above. Rewrite using ONLY what is already stated. Adding facts risks fabrication.
+3. Keep the same approximate length (±20%).
+4. Keep the same subject matter and narrative flow.
+5. Write declarative prose only — state what IS, not what the listener should feel or do.
+6. Return ONLY the rewritten paragraph text. No explanations, no headers, no "Here is the rewrite:".
+"""
+
+                    # LEAD, merging LOCAL-192 into LOCAL-194: the rewriter must be
+                    # the same model as the writer, or a model A/B silently compares
+                    # new-model prose against old-model repairs.
+                    _retry_data = {
+                        "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                        "messages": [
+                            {"role": "system", "content": "You are a copy editor fixing style violations in audio tour narration. You rewrite only — never add new information."},
+                            {"role": "user", "content": _retry_prompt}
+                        ],
+                        "temperature": 0.3,  # Lower temp for more faithful rewrite
+                        "max_tokens": 500
+                    }
+
+                    try:
+                        _retry_resp = requests.post(
+                            "https://api.openai.com/v1/chat/completions",
+                            headers=headers,
+                            data=json.dumps(_retry_data)
+                        )
+
+                        if _retry_resp.status_code == 200:
+                            _retry_result = _retry_resp.json()
+                            _retry_text = _retry_result["choices"][0]["message"]["content"].strip()
+                            _retry_tok = _retry_result["usage"]["total_tokens"]
+                            _retry_c = _tour_llm_cost(_retry_tok)
+                            _style_retry_tokens += _retry_tok
+                            _style_retry_cost += _retry_c
+                            _stop_retry_tokens += _retry_tok
+                            _stop_retry_cost += _retry_c
+
+                            # Strip any preamble the model might add
+                            _retry_text = re.sub(r'^(?:Here (?:is|\'s) the rewrite[d paragraph]*[:\s]*|Rewritten paragraph[:\s]*)', '', _retry_text, flags=re.IGNORECASE).strip()
+                            # Strip wrapping quotes if present
+                            if _retry_text.startswith('"""') and _retry_text.endswith('"""'):
+                                _retry_text = _retry_text[3:-3].strip()
+                            elif _retry_text.startswith('"') and _retry_text.endswith('"'):
+                                _retry_text = _retry_text[1:-1].strip()
+
+                            # Validate the retry
+                            _retry_validation = _sv_validate_paragraph(_retry_text)
+                            _retry_errors = [f for f in _retry_validation.get('findings', [])
+                                             if f.get('severity') in _ERROR_SEVERITIES]
+
+                            if not _retry_errors:
+                                # Retry is clean — use it
+                                _new_paragraphs.append(_retry_text)
+                                _style_retry_successes += 1
+                                print(f"  [LOCAL-192] Stop {_stop_num} para {_pi+1}: retry FIXED ({', '.join(_violated_rules)})")
+                            else:
+                                # Retry also has errors — keep whichever has fewer
+                                if len(_retry_errors) < len(_error_findings):
+                                    _new_paragraphs.append(_retry_text)
+                                    _style_retry_successes += 1  # partial improvement
+                                    print(f"  [LOCAL-192] Stop {_stop_num} para {_pi+1}: retry IMPROVED ({len(_error_findings)}→{len(_retry_errors)} errors)")
+                                else:
+                                    _new_paragraphs.append(_para)  # keep original
+                                    _style_retry_failures += 1
+                                    print(f"  [LOCAL-192] Stop {_stop_num} para {_pi+1}: retry FAILED — keeping original ({', '.join(_violated_rules)})")
+                        else:
+                            # API error — keep original
+                            _new_paragraphs.append(_para)
+                            _style_retry_failures += 1
+                            print(f"  [LOCAL-192] Stop {_stop_num} para {_pi+1}: retry API error {_retry_resp.status_code} — keeping original")
+                    except Exception as _retry_err:
+                        _new_paragraphs.append(_para)
+                        _style_retry_failures += 1
+                        print(f"  [LOCAL-192] Stop {_stop_num} para {_pi+1}: retry exception — keeping original: {_retry_err}")
+
+                # Reassemble description if any paragraph was retried
+                if _stop_had_retry:
+                    poi_list[_si]["description"] = '\n\n'.join(_new_paragraphs)
+                    # [LOCAL-192 fix 3] Add only THIS stop's retry cost, not the
+                    # cumulative total (previous code was quadratic double-counting).
+                    total_tokens += _stop_retry_tokens
+                    total_cost += _stop_retry_cost
+
+            # Summary
+            print(f"  [LOCAL-192] Style retry summary: {_style_retry_count} paragraphs retried, "
+                  f"{_style_retry_successes} fixed/improved, {_style_retry_failures} kept original")
+            print(f"  [LOCAL-192] Retry cost: ${_style_retry_cost:.4f} ({_style_retry_tokens} tokens)")
+
+    # -------- [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion --------
+    # D89: a sentence that fits any stop belongs to no stop — delete it.
+    # Behind DISABLE_R9_DELETION=1 flag. $0.00 — deterministic, no LLM call.
+    _r9_deletion_disabled = os.environ.get('DISABLE_R9_DELETION', '').strip() == '1'
+    if _r9_deletion_disabled:
+        print(f"\n  [LOCAL-216] R9 deletion DISABLED by DISABLE_R9_DELETION=1 env var")
+    else:
+        print(f"\n  [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion...")
+        try:
+            from style_validator_detector import apply_r9_to_description as _r9_apply
+        except ImportError:
+            _r9_apply = None
+            print(f"  [LOCAL-216] WARNING: apply_r9_to_description not importable — R9 skipped")
+
+        if _r9_apply:
+            _r9_total_deleted = 0
+            _r9_total_paras_emptied = 0
+            _r9_stops_affected = 0
+
+            for _si, _poi in enumerate(poi_list):
+                _desc = _poi.get('description', '')
+                if not _desc or _desc.startswith('['):
+                    continue
+
+                _new_desc, _deleted, _emptied = _r9_apply(_desc)
+                if _deleted > 0 or _emptied > 0:
+                    poi_list[_si]['description'] = _new_desc
+                    _r9_total_deleted += _deleted
+                    _r9_total_paras_emptied += _emptied
+                    _r9_stops_affected += 1
+                    print(f"  [LOCAL-216] Stop {_si+1} '{_poi.get('name', '')[:30]}': "
+                          f"{_deleted} sentence(s) deleted, {_emptied} paragraph(s) emptied")
+
+            print(f"  [LOCAL-216] R9 summary: {_r9_total_deleted} sentences deleted, "
+                  f"{_r9_total_paras_emptied} paragraphs emptied, "
+                  f"{_r9_stops_affected} stops affected")
+
+    # -------- [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion --------
+    # Michael (Round 2): "Either tell us the story or get rid of the sentence!"
+    # A sentence names a subject (story, tale, history, legacy) without delivering
+    # a concrete payload. Behind DISABLE_R10_DELETION=1 flag. $0.00 — deterministic.
+    _r10_deletion_disabled = os.environ.get('DISABLE_R10_DELETION', '').strip() == '1'
+    if _r10_deletion_disabled:
+        print(f"\n  [LOCAL-235] R10 deletion DISABLED by DISABLE_R10_DELETION=1 env var")
+    else:
+        print(f"\n  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...")
+        try:
+            from style_validator_detector import apply_r10_to_description as _r10_apply
+        except ImportError as _r10_err:
+            _r10_apply = None
+            print(f"  [LOCAL-235] ERROR: R10 NOT APPLIED — apply_r10_to_description "
+                  f"unimportable ({_r10_err}). This is a defect, not a configuration: "
+                  f"the module sits beside this file. sys.path[0]={sys.path[0]}")
+
+        if _r10_apply:
+            _r10_total_deleted = 0
+            _r10_total_paras_emptied = 0
+            _r10_stops_affected = 0
+
+            for _si, _poi in enumerate(poi_list):
+                _desc = _poi.get('description', '')
+                if not _desc or _desc.startswith('['):
+                    continue
+
+                _new_desc, _deleted, _emptied = _r10_apply(_desc)
+                if _deleted > 0 or _emptied > 0:
+                    poi_list[_si]['description'] = _new_desc
+                    _r10_total_deleted += _deleted
+                    _r10_total_paras_emptied += _emptied
+                    _r10_stops_affected += 1
+                    print(f"  [LOCAL-235] Stop {_si+1} '{_poi.get('name', '')[:30]}': "
+                          f"{_deleted} sentence(s) deleted, {_emptied} paragraph(s) emptied")
+
+            print(f"  [LOCAL-235] R10 summary: {_r10_total_deleted} sentences deleted, "
+                  f"{_r10_total_paras_emptied} paragraphs emptied, "
+                  f"{_r10_stops_affected} stops affected")
+
+    # -------- [LOCAL-229] PHASE 5.16: CONTRADICTED claim block --------
+    # D100 (Michael, 2026-08-04): "We should not publish if we are reasonably sure
+    # that the data is incorrect." If any sentence group contains a CONTRADICTED
+    # claim, drop that group from the narration. UNSUPPORTED does NOT block (D100).
+    # Behind DISABLE_CONTRADICTED_BLOCK=1 for A/B measurement.
+    _contradicted_block_disabled = os.environ.get('DISABLE_CONTRADICTED_BLOCK', '').strip() == '1'
+    if _contradicted_block_disabled:
+        print(f"\n  [LOCAL-229] CONTRADICTED block DISABLED by DISABLE_CONTRADICTED_BLOCK=1 env var")
+    else:
+        print(f"\n  [LOCAL-229] PHASE 5.16: CONTRADICTED claim block (D100 enforcement)...")
+        _cb_groups_blocked = 0
+        _cb_stops_affected = 0
+        _cb_log_entries = []
+
+        try:
+            from claim_check import check_paragraph as _cb_check_paragraph, CONTRADICTED as _CB_CONTRADICTED
+            from sentence_group_scorer import split_into_sentence_groups as _cb_split_groups
+
+            for _si, _poi in enumerate(poi_list):
+                _desc = _poi.get('description', '')
+                if not _desc or _desc.startswith('['):
+                    continue
+
+                _stop_name = _poi.get('name', f'Stop {_si + 1}')
+                _venue_for_check = _museum_venue_name if tour_category == 'museum' else ''
+
+                # Get corpus passages for this stop
+                _cb_passages = []
+                if _stop_corpus_data and _stop_name in _stop_corpus_data:
+                    _sc_entry = _stop_corpus_data[_stop_name]
+                    if _sc_entry and _sc_entry.get('passages'):
+                        _cb_passages = _sc_entry['passages']
+
+                if not _cb_passages:
+                    # No corpus passages → claim_check cannot find contradictions
+                    continue
+
+                # Split each paragraph into sentence groups and check each group
+                _paragraphs = [p.strip() for p in _desc.split('\n\n') if p.strip()]
+                _new_paragraphs = []
+                _stop_blocked = False
+
+                for _para in _paragraphs:
+                    if len(_para) <= 30:
+                        _new_paragraphs.append(_para)
+                        continue
+
+                    _groups = _cb_split_groups(_para)
+                    _surviving_groups = []
+
+                    for _group_sentences in _groups:
+                        _group_text = ' '.join(_group_sentences)
+
+                        # Run claim_check on this group
+                        _claim_result = _cb_check_paragraph(
+                            _group_text,
+                            stop_title=_stop_name,
+                            venue_name=_venue_for_check,
+                            passages=_cb_passages,
+                        )
+
+                        _contradicted_count = _claim_result['verdict_counts'].get('contradicted', 0)
+
+                        if _contradicted_count > 0:
+                            # BLOCK: drop this sentence group
+                            _cb_groups_blocked += 1
+                            _stop_blocked = True
+
+                            # Log the block: claim, contradicting passage, action
+                            _contradicted_claims = [
+                                c for c in _claim_result['claims']
+                                if c['verdict'] == _CB_CONTRADICTED
+                            ]
+                            for _cc in _contradicted_claims:
+                                _log_entry = {
+                                    'stop': _stop_name,
+                                    'stop_index': _si + 1,
+                                    'claim': _cc['text'],
+                                    'claim_sentence': _cc.get('sentence', ''),
+                                    'contradicting_evidence': _cc.get('evidence', ''),
+                                    'group_text': _group_text[:200],
+                                    'action': 'DROPPED',
+                                }
+                                _cb_log_entries.append(_log_entry)
+                                print(f"  [LOCAL-229] BLOCKED Stop {_si+1} '{_stop_name[:30]}': "
+                                      f"claim='{_cc['text'][:60]}' "
+                                      f"contradicted_by='{(_cc.get('evidence') or '')[:80]}' → DROPPED")
+                        else:
+                            _surviving_groups.append(_group_text)
+
+                    # Reassemble paragraph from surviving groups
+                    if _surviving_groups:
+                        _new_paragraphs.append(' '.join(_surviving_groups))
+                    # else: entire paragraph dropped (all groups blocked)
+
+                if _stop_blocked:
+                    _cb_stops_affected += 1
+                    # Reassemble description
+                    _new_desc = '\n\n'.join(_new_paragraphs).strip()
+                    poi_list[_si]['description'] = _new_desc
+
+            # Summary
+            print(f"  [LOCAL-229] CONTRADICTED block summary: {_cb_groups_blocked} group(s) blocked, "
+                  f"{_cb_stops_affected} stop(s) affected")
+            if _cb_log_entries:
+                print(f"  [LOCAL-229] Block log ({len(_cb_log_entries)} entries):")
+                for _le in _cb_log_entries:
+                    print(f"    stop={_le['stop_index']} claim='{_le['claim'][:50]}' "
+                          f"evidence='{_le['contradicting_evidence'][:50]}' action={_le['action']}")
+
+        except ImportError as _cb_import_err:
+            print(f"  [LOCAL-229] WARNING: import failed — CONTRADICTED block skipped: {_cb_import_err}")
+
     # -------- PHASE 5.5: post-description validation for museum tours --------
     # Fix 4 (Claude session 7): second validate_enhanced_poi_knowledge() call for ALL tour types.
     # At this point descriptions are populated — the fictional-content patterns now have text to match.
@@ -6361,7 +7093,7 @@ Requirements:
                         "https://api.openai.com/v1/chat/completions",
                         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                         json={
-                            "model": "gpt-3.5-turbo",
+                            "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
                             "messages": [
                                 {"role": "system", "content": "You write immersive, literary audio tour introductions."},
                                 {"role": "user", "content": _prolog_prompt},
@@ -6468,6 +7200,210 @@ Requirements:
                 f"[LOCAL-119] Prolog block outer error ({type(e).__name__}: {e}). "
                 f"Tour delivery continues without prolog."
             )
+
+    # -------- [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine) --------
+    # D64: the prolog is generated by a separate LLM call and injected at assembly.
+    # Until LOCAL-244 it bypassed all style/quality gates. Now we apply the same
+    # gates that run over stop descriptions: R9 (generic), R10 (unfulfilled promise),
+    # and the subject routine. Prolog findings are logged SEPARATELY.
+    if _saved_prolog:
+        _prolog_words_before = len(_saved_prolog.split())
+        _prolog_deletions_verbatim = []
+        _prolog_r9_deleted = 0
+        _prolog_r10_deleted = 0
+        _prolog_subject_expanded = 0
+        _prolog_subject_deleted = 0
+        _prolog_subject_cost = 0.0
+
+        print(f"\n  [LOCAL-244] PHASE 5.9: Prolog gating (R9, R10, subject routine)...")
+        print(f"  [LOCAL-244] Prolog before gates: {_prolog_words_before} words")
+
+        # --- R9: generic-sentence deletion on prolog ---
+        _r9_disabled_for_prolog = os.environ.get('DISABLE_R9_DELETION', '').strip() == '1'
+        if not _r9_disabled_for_prolog:
+            try:
+                from style_validator_detector import apply_r9_to_description as _prolog_r9_apply
+                _prolog_after_r9, _pr9_del, _pr9_emp = _prolog_r9_apply(_saved_prolog)
+                if _pr9_del > 0:
+                    # Identify what was removed
+                    _old_sents = set(s.strip() for p in _saved_prolog.split('\n\n')
+                                     for s in re.split(r'(?<=[.!?])\s+', p) if s.strip())
+                    _new_sents = set(s.strip() for p in _prolog_after_r9.split('\n\n')
+                                     for s in re.split(r'(?<=[.!?])\s+', p) if s.strip())
+                    for s in _old_sents - _new_sents:
+                        _prolog_deletions_verbatim.append(('R9_GENERIC', s))
+                    _saved_prolog = _prolog_after_r9
+                    _prolog_r9_deleted = _pr9_del
+                    print(f"  [LOCAL-244] Prolog R9: {_pr9_del} sentence(s) deleted")
+                else:
+                    print(f"  [LOCAL-244] Prolog R9: 0 deletions")
+            except ImportError as _e:
+                print(f"  [LOCAL-244] Prolog R9: SKIPPED (import error: {_e})")
+
+        # --- R10: unfulfilled-promise deletion on prolog ---
+        _r10_disabled_for_prolog = os.environ.get('DISABLE_R10_DELETION', '').strip() == '1'
+        if not _r10_disabled_for_prolog:
+            try:
+                from style_validator_detector import apply_r10_to_description as _prolog_r10_apply
+                _prolog_after_r10, _pr10_del, _pr10_emp = _prolog_r10_apply(_saved_prolog)
+                if _pr10_del > 0:
+                    _old_sents = set(s.strip() for p in _saved_prolog.split('\n\n')
+                                     for s in re.split(r'(?<=[.!?])\s+', p) if s.strip())
+                    _new_sents = set(s.strip() for p in _prolog_after_r10.split('\n\n')
+                                     for s in re.split(r'(?<=[.!?])\s+', p) if s.strip())
+                    for s in _old_sents - _new_sents:
+                        _prolog_deletions_verbatim.append(('R10_UNFULFILLED_PROMISE', s))
+                    _saved_prolog = _prolog_after_r10
+                    _prolog_r10_deleted = _pr10_del
+                    print(f"  [LOCAL-244] Prolog R10: {_pr10_del} sentence(s) deleted")
+                else:
+                    print(f"  [LOCAL-244] Prolog R10: 0 deletions")
+            except ImportError as _e:
+                print(f"  [LOCAL-244] Prolog R10: SKIPPED (import error: {_e})")
+
+        # --- Subject routine: expand or remove promises in prolog ---
+        _subject_disabled_for_prolog = os.environ.get('DISABLE_SUBJECT_ROUTINE', '').strip() == '1'
+        if not _subject_disabled_for_prolog and _saved_prolog.strip():
+            try:
+                from subject_validate_expand import process_paragraph as _prolog_subject_process
+                from subject_validate_expand import is_subject_routine_enabled as _prolog_sr_enabled
+                if _prolog_sr_enabled():
+                    # Use Stop 1 name as context for the subject routine
+                    _stop1_name = poi_list[0]['name'] if poi_list else "Tour Introduction"
+                    _sr_result = _prolog_subject_process(
+                        paragraph=_saved_prolog,
+                        stop_title=_stop1_name,
+                        venue_name=location if location else "",
+                        conn=None,
+                        existence_verified=True,
+                    )
+                    _prolog_subject_expanded = _sr_result['expanded_count']
+                    _prolog_subject_deleted = _sr_result['deleted_count']
+                    _prolog_subject_cost = _sr_result['cost']
+                    if _sr_result['expanded_count'] > 0 or _sr_result['deleted_count'] > 0:
+                        _saved_prolog = _sr_result['processed']
+                        for p in _sr_result.get('promises_found', []):
+                            if p.get('outcome') == 'deleted':
+                                _prolog_deletions_verbatim.append(
+                                    ('SUBJECT_DELETED', p.get('sentence', '')))
+                    print(f"  [LOCAL-244] Prolog subject: {_prolog_subject_expanded} expanded, "
+                          f"{_prolog_subject_deleted} deleted, cost=${_prolog_subject_cost:.4f}")
+                else:
+                    print(f"  [LOCAL-244] Prolog subject: routine not enabled")
+            except ImportError as _e:
+                print(f"  [LOCAL-244] Prolog subject: SKIPPED (import error: {_e})")
+
+        _prolog_words_after = len(_saved_prolog.split()) if _saved_prolog.strip() else 0
+        print(f"  [LOCAL-244] Prolog after gates: {_prolog_words_after} words "
+              f"(delta: {_prolog_words_after - _prolog_words_before})")
+        if _prolog_deletions_verbatim:
+            print(f"  [LOCAL-244] Prolog deletions ({len(_prolog_deletions_verbatim)}):")
+            for _rule, _sent in _prolog_deletions_verbatim:
+                print(f"    [{_rule}] \"{_sent[:100]}{'...' if len(_sent) > 100 else ''}\"")
+
+        # If prolog collapsed to near-nothing, warn but still inject what remains
+        if _prolog_words_after < 15 and _prolog_words_before > 30:
+            print(f"  [LOCAL-244] ⚠️  WARNING: Prolog collapsed from {_prolog_words_before} to "
+                  f"{_prolog_words_after} words — nearly empty stub")
+
+    # -------- [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10) --------
+    # D136/D137: Orientation paragraphs are generated by the same LLM call as
+    # descriptions but extracted separately ("Orientation:" split) and injected
+    # at assembly without passing through any gate. Same class of gap as the
+    # prolog (LOCAL-244). Gate them now with R9 and R10, same thresholds.
+    # Navigation exemption (D107, D122) is built into both R9 and R10: any
+    # sentence classified as route-movement (_is_style_navigation_sentence) is
+    # skipped by both deleters. Orientation text that directs physical bearing
+    # via route verbs + directional words survives; unfulfilled promises do not.
+    _orient_total_words_before = 0
+    _orient_total_words_after = 0
+    _orient_stops_affected = 0
+    _orient_deletions_verbatim = []
+
+    print(f"\n  [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10)...")
+
+    _r9_disabled_for_orient = os.environ.get('DISABLE_R9_DELETION', '').strip() == '1'
+    _r10_disabled_for_orient = os.environ.get('DISABLE_R10_DELETION', '').strip() == '1'
+
+    for _oi, _opoi in enumerate(poi_list):
+        _orient_text = _opoi.get('orientation', '')
+        if not _orient_text or not _orient_text.strip():
+            continue
+        # Skip default/fallback orientation (nothing to gate)
+        if _orient_text.strip() in (
+            "Position yourself to best view this location.",
+            "Position yourself to best view this artwork.",
+            "Look for this work in the galleries.",
+        ):
+            continue
+
+        _ow_before = len(_orient_text.split())
+        _orient_total_words_before += _ow_before
+        _orient_changed = False
+
+        # --- R9: generic-sentence deletion on orientation ---
+        if not _r9_disabled_for_orient:
+            try:
+                from style_validator_detector import apply_r9_to_description as _orient_r9_apply
+                _orient_after_r9, _or9_del, _or9_emp = _orient_r9_apply(_orient_text)
+                if _or9_del > 0:
+                    _old_sents = set(s.strip() for p in _orient_text.split('\n\n')
+                                     for s in re.split(r'(?<=[.!?])\s+', p) if s.strip())
+                    _new_sents = set(s.strip() for p in _orient_after_r9.split('\n\n')
+                                     for s in re.split(r'(?<=[.!?])\s+', p) if s.strip())
+                    for s in _old_sents - _new_sents:
+                        _orient_deletions_verbatim.append((_oi + 1, 'R9_GENERIC', s))
+                    _orient_text = _orient_after_r9
+                    _orient_changed = True
+                    print(f"    Stop {_oi+1} orientation R9: {_or9_del} sentence(s) deleted")
+            except ImportError as _e:
+                print(f"    Stop {_oi+1} orientation R9: SKIPPED (import error: {_e})")
+
+        # --- R10: unfulfilled-promise deletion on orientation ---
+        if not _r10_disabled_for_orient:
+            try:
+                from style_validator_detector import apply_r10_to_description as _orient_r10_apply
+                _orient_after_r10, _or10_del, _or10_emp = _orient_r10_apply(_orient_text)
+                if _or10_del > 0:
+                    _old_sents = set(s.strip() for p in _orient_text.split('\n\n')
+                                     for s in re.split(r'(?<=[.!?])\s+', p) if s.strip())
+                    _new_sents = set(s.strip() for p in _orient_after_r10.split('\n\n')
+                                     for s in re.split(r'(?<=[.!?])\s+', p) if s.strip())
+                    for s in _old_sents - _new_sents:
+                        _orient_deletions_verbatim.append((_oi + 1, 'R10_UNFULFILLED_PROMISE', s))
+                    _orient_text = _orient_after_r10
+                    _orient_changed = True
+                    print(f"    Stop {_oi+1} orientation R10: {_or10_del} sentence(s) deleted")
+            except ImportError as _e:
+                print(f"    Stop {_oi+1} orientation R10: SKIPPED (import error: {_e})")
+
+        if _orient_changed:
+            # If orientation collapsed to nothing, use a minimal fallback
+            if not _orient_text.strip():
+                _orient_text = "Position yourself to best view this location."
+                print(f"    Stop {_oi+1} orientation: COLLAPSED — using fallback")
+            poi_list[_oi]['orientation'] = _orient_text
+            _orient_stops_affected += 1
+
+        _ow_after = len(_orient_text.split()) if _orient_text.strip() else 0
+        _orient_total_words_after += _ow_after
+
+    print(f"  [LOCAL-246] Orientation gating summary:")
+    print(f"    Words before: {_orient_total_words_before}")
+    print(f"    Words after:  {_orient_total_words_after}")
+    print(f"    Delta: {_orient_total_words_after - _orient_total_words_before}")
+    print(f"    Stops affected: {_orient_stops_affected}/{len(poi_list)}")
+    if _orient_deletions_verbatim:
+        print(f"    Deletions ({len(_orient_deletions_verbatim)}):")
+        for _stop_n, _rule, _sent in _orient_deletions_verbatim:
+            print(f"      [Stop {_stop_n}][{_rule}] \"{_sent[:100]}{'...' if len(_sent) > 100 else ''}\"")
+
+    # Collapse warning (same threshold as prolog)
+    if _orient_total_words_before > 0:
+        _orient_ratio = _orient_total_words_after / _orient_total_words_before
+        if _orient_ratio < 0.3:
+            print(f"  [LOCAL-246] ⚠️  WARNING: Orientation collapsed to {_orient_ratio:.0%} of original — "
+                  f"listener may not know where to stand")
 
     # Add each POI with its description and directions
     for i, poi in enumerate(poi_list):
@@ -6672,10 +7608,11 @@ Requirements:
                 
                 # [LOCAL-44] End on a factual observation tying the collection together.
                 # No instructions, no promotional language, no "consider/reflect/imagine".
-                if _mid:
-                    epilog += f"\n\nFrom {_first} through {_mid} to {_last} — three facets of a collection that spans centuries and continents."
-                else:
-                    epilog += f"\n\nFrom {_first} to {_last} — a collection that spans more ground than these stops alone."
+                # [LOCAL-246] Removed generic template sentences — they carried no facts
+                # and R9 correctly identified them as "could be placed in millions of stops."
+                # Epilog now relies solely on epilog_payoff (thread summary) and
+                # _closing_facts (documented story elements). If neither has content,
+                # the tour ends on the last stop's description — which is correct.
                 
                 poi_content += epilog
                 
@@ -6915,6 +7852,17 @@ Requirements:
         f.write(complete_tour)
     
     print(f"\nTour text generated successfully!")
+
+    # [LOCAL-230] Report network/API failure count for this generation run
+    try:
+        from venue_resolver import get_network_failure_count
+        _l230_failures = get_network_failure_count()
+        if _l230_failures > 0:
+            print(f"  [LOCAL-230] ⚠ NETWORK FAILURES: {_l230_failures} API call(s) failed during this generation — tour may be degraded")
+        else:
+            print(f"  [LOCAL-230] Network failures: 0 (all API calls succeeded)")
+    except ImportError:
+        pass
     print(f"Saved to: {output_file}")
     
     # [C5-5] Persist D1 evidence JSON

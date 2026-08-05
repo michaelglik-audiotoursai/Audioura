@@ -7,6 +7,9 @@ whether catalogue date+material survive into the prose for each stop.
 
 The orchestrator updates the existing tour row (same tour_name+request_string),
 so row count stays stable at 60.
+
+LOCAL-141: Migrated to TestTourFactory.adopt_and_ensure_flagged() — the flag
+is set structurally after HTTP creation, regardless of Docker env vars.
 """
 import os
 import sys
@@ -17,6 +20,10 @@ import requests
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from db_connection import get_connection
+from test_tour_factory import TestTourFactory
+
+# Factory instance — adopt tours created via HTTP so is_test=TRUE is structural
+_factory = TestTourFactory(auto_cleanup=True)
 
 ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL", "http://localhost:5002")
 
@@ -57,6 +64,9 @@ def generate_and_wait():
         if sd.get('status') == 'completed':
             tour_id = sd.get('final_tour_id')
             print(f"  Completed: tour_id={tour_id} ({(i+1)*5}s)")
+            # LOCAL-141: Structurally ensure is_test=TRUE regardless of Docker env
+            if tour_id:
+                _factory.adopt_and_ensure_flagged(tour_id)
             # Read tour_content from DB
             conn = get_connection()
             cur = conn.cursor()

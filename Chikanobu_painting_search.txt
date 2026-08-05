@@ -1,0 +1,51 @@
+From tour 21, Musée des Arts Asiatiques, Nice — stored OpenAI output, not a paraphrase:
+
+▎ "In the year 1879, Chikanobu masterfully crafted a xylogravure on papier, employing a polychrome technique that brings vibrant colors to life. The print vividly depicts the reception at the imperial palace of the President of the United States, Ulysses Grant, and his wife during their visit to Japan."
+
+Our verdict: 1879 → UNSUPPORTED. depicts the reception… → UNSUPPORTED.
+
+Why: we hold 23 corpus passages for that venue and zero of them mention Chikanobu. Everything we have is the museum's own Wikipedia page — the building, Kenzō Tange, the collection in general. Nothing about this print.
+
+What would settle it
+
+If you can find public sources that confirm — with the museum, not just in general —
+
+- that Chikanobu made this print in 1879,
+- that it shows Grant's reception at the imperial palace,
+- and that this museum holds it,
+
+then my claim is wrong for this venue, and the gap is our retrieval, not the web.
+———
+From Meta.AI:
+This claim from Tour 21 is partially true on date/artist, false on subject and location.
+Here is the public source breakdown:
+1. Did Chikanobu make this print in 1879? YES - but with nuance
+	•	Artist: Yōshū Chikanobu (1838-1912) 
+	•	Title: Illustration of President Grant Being Entertained at Ueno Park 
+	•	Publication: Notification delivered of intent to publish (otodoke) July 1879 
+Conceived in early July 1879, over a month before the actual celebration for former President Grant in Ueno Park on August 25, this print was the artist's invention, based upon the announced festivities. 
+
+So yes, 1879, Chikanobu.
+2. Does it show Grant's reception at the imperial palace? NO - Falsehood
+The print shows Ueno Park, not the Imperial Palace.
+The Lavenberg Collection description:
+	•	Illustration of President Grant Being Entertained at Ueno Park 
+	•	The culminating event was a festival, open to the public, in Ueno Park on August 25, 1879 attended by Emperor Meiji 
+The Imperial Palace reception was a separate event:
+Arriving in Tokyo by train on July 3rd, Grant was informed that he would be received by the 27 year old Emperor the next day, July 4 at the Imperial Palace. 
+
+Grant did have an audience at the Imperial Palace on July 4, but Chikanobu's triptych depicts the Ueno Park entertainment pavilion with kendo, horsemanship and fireworks. The claim conflates two different events. 
+
+3. Does Musée des Arts Asiatiques, Nice hold it? NO EVIDENCE - Likely Falsehood
+	•	The museum was established in 1998, operated by Alpes-Maritimes. 
+	•	Public search for Musée des Arts Asiatiques Nice collection Chikanobu Grant returns no inventory record. TripAdvisor, Wanderlog and official tourism listings describe a compact but elegant collection, no mention of this print. 
+	•	Major public holders of this specific print are documented as Museum of Fine Arts, Boston, Metropolitan Museum of Art etc., not Nice.
+	•	The museum's Japanese holdings are general Asian art, not documented as holding this specific 1879 Grant triptych.
+Conclusion for Kiro:
+You must rewrite Tour 21. The current text:
+In the year 1879, Chikanobu masterfully crafted a xylogravure on papier, employing a polychrome technique that brings vibrant colors to life. The print vividly depicts the reception at the imperial palace of the President...
+Should become:
+In July 1879, Yōshū Chikanobu produced a polychrome woodblock triptych titled Illustration of President Grant Being Entertained at Ueno Park. The print imagines the public festival held on August 25, 1879 in Ueno Park for former U.S. President Ulysses S. Grant, with Emperor Meiji, not a reception at the Imperial Palace.
+And remove the Nice museum holding claim unless you have an internal inventory number from maa.departement06.fr to cite.
+— 
+My conclusion: this work has nothing to do with Nice museum and should be excluded entirely as false.

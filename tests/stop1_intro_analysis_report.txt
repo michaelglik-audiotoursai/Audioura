@@ -1,0 +1,166 @@
+==============================================================================
+STOP 1 INTRO DETECTOR — LOCAL-191: Structural Analysis
+==============================================================================
+
+Hypothesis: Stop 1 is a 'tour description wearing a stop's clothes'.
+Mechanism: generate_tour_text.py line 6594 injects _saved_prolog
+           into Stop 1 before its description (STORIED_MODE only).
+
+audio_tours row count: 117
+Tours analyzed: 10
+
+──────────────────────────────────────────────────────────────────────────────
+PER-TOUR COMPARISON: Stop 1 vs Stops 2..N
+──────────────────────────────────────────────────────────────────────────────
+
+Tour   Name                                          Stops  S1¶   Rest¶  S1chars  Restchars  S1anch   Restanch  S1frame  Restframe
+----------------------------------------------------------------------------------------------------------------------------------
+1      Palais Lascaris, Nice, France - museum Tour   3      7     5.5    2372     1702       0%       0%        0.29     0.07
+29     French Riviera Biking Tour                    15     3     2.1    1578     1187       0%       0%        1.33     0.90
+12     walking tour in Nice, france - walking Tour   10     6     6.1    2554     1897       0%       0%        0.33     0.29
+24     Musée Marc Chagall, Nice, France - museum To  6      5     5.0    2118     1743       0%       5%        0.40     0.07
+14     Museum Of Naïve Art, Nice, France - museum T  9      6     5.2    2210     1606       0%       0%        0.50     0.07
+46     Boston Common, Boston MA - historical Tour    5      3     2.2    1597     1543       0%       0%        0.33     0.21
+44     Musee d Art Moderne et d Art Contemporain, N  10     3     1.6    1769     1608       33%      54%       0.67     0.04
+152    French Riviera cycling tour, France - Cyclin  15     3     2.1    2480     1466       0%       11%       1.67     1.07
+156    French Riviera Cycling Tour [LOCAL-183 test]  15     3     2.1    2905     1728       0%       0%        1.67     1.13
+162    LOCAL-186 test: Musée Picasso disambiguation  1      3     0.0    1276     0          67%      0%        0.67     0.00
+
+──────────────────────────────────────────────────────────────────────────────
+AGGREGATE: Stop 1 (N=10) vs Stops 2..N
+──────────────────────────────────────────────────────────────────────────────
+
+  Metric                         Stop 1 (avg)    Stops 2..N (avg)   Delta        Ratio
+  ------------------------------ --------------- ------------------ ------------ --------
+  Paragraph count                4.2             3.1                +1.1         1.37x
+  Character length               2086            1570               +516         1.33x
+  ANCHORED rate                  10%             8%                 +1.6        pp —
+  Tour framing (per ¶)           0.79            0.61               +0.17        1.28x
+  Stops with ANY framing         10/10             58/79                —            —
+
+  Medians: S1 ¶=3, chars=2210  |  Rest ¶=2, chars=1675
+
+──────────────────────────────────────────────────────────────────────────────
+VERBATIM EVIDENCE: Stop 1 opening paragraph (first 300 chars)
+──────────────────────────────────────────────────────────────────────────────
+
+Tour 1 — Palais Lascaris, Nice, France - museum Tour
+  Stop 1 title: The Triumph of David
+  Tour framing matches: 0  |  Navigation: True
+  >>> As you enter the Palais Lascaris, make your way to the Grand Salon on the first floor, where a masterpiece awaits your admiration.
+
+Tour 29 — French Riviera Biking Tour
+  Stop 1 title: Old Town of Antibes
+  Tour framing matches: 0  |  Navigation: False
+  >>> Stand at the edge of the bustling Marché Provençal in Antibes' Old Town. Look for the ancient stone walls that once safeguarded the town from marauders.
+
+Tour 12 — walking tour in Nice, france - walking Tour
+  Stop 1 title: Promenade des Anglais
+  Tour framing matches: 0  |  Navigation: True
+  >>> Start at the main entrance of the Promenade, facing the sea. Walk straight ahead. As you approach the Promenade des Anglais in Nice, France, find a spot near the azure sea where you can take in the elegant walkway stretching out before you. Look for the blend of historic charm and modern vibrancy th
+      [...333 total chars]
+
+Tour 24 — Musée Marc Chagall, Nice, France - museum Tour
+  Stop 1 title: Abraham et les trois anges
+  Tour framing matches: 2  |  Navigation: False
+  >>> You are about to embark on a journey through the chapters of Chagall’s artistic symphony, where the merging of art, music, and performance creates a timeless sensory experience. At the heart of this museum, discover why Marc Chagall insisted on a performance hall to accompany his masterpieces. Each 
+      [...689 total chars]
+
+Tour 14 — Museum Of Naïve Art, Nice, France - museum Tour
+  Stop 1 title: The Flight into Egypt
+  Tour framing matches: 0  |  Navigation: True
+  >>> As you approach The Museum of Naïve Art in Nice, France, make your way to the central hall on the second floor for a unique perspective on the exhibit "The Flight into Egypt."
+
+Tour 46 — Boston Common, Boston MA - historical Tour
+  Stop 1 title: Frog Pond
+  Tour framing matches: 0  |  Navigation: False
+  >>> Walk southeast towards the large pond with the fountain. As you approach Frog Pond on your left, take a moment to notice the gentle ripples on the water's surface catching the sunlight. Look for children running around the fountain and the sounds of their laughter echoing through the air.
+
+Tour 44 — Musee d Art Moderne et d Art Contemporain, Nice, F
+  Stop 1 title: Richard Long ou la sculpture en marchant
+  Tour framing matches: 0  |  Navigation: False
+  >>> Stand at the entrance of the Musee d'Art Moderne et d'Art Contemporain, facing towards the exhibit "Richard Long ou la sculpture en marchant." From this vantage point, the expansive nature of Long's work unfolds before you, inviting a dialogue between art and environment within the museum's architec
+      [...316 total chars]
+
+Tour 152 — French Riviera cycling tour, France - Cycling Tour
+  Stop 1 title: La Croisette
+  Tour framing matches: 1  |  Navigation: False
+  >>> Head south on Promenade de la Croisette with views of the Mediterranean Sea. As you cycle along the enchanting French Riviera, you arrive at the iconic La Croisette in Cannes. Pause near the palm-lined boulevard, soaking in the Mediterranean breeze as it carries whispers of the past. Position yourse
+      [...382 total chars]
+
+Tour 156 — French Riviera Cycling Tour [LOCAL-183 test]
+  Stop 1 title: Old Town Antibes
+  Tour framing matches: 1  |  Navigation: False
+  >>> Head southeast on Main Street towards the waterfront, notice the vibrant colors of the local market stalls. Position yourself at the entrance to Old Town Antibes, a historic district located within the seaside resort city in the Alpes-Maritimes department in Provence-Alpes-Côte d'Azur, Southeastern 
+      [...491 total chars]
+
+Tour 162 — LOCAL-186 test: Musée Picasso disambiguation (2026
+  Stop 1 title: Musée Picasso
+  Tour framing matches: 0  |  Navigation: False
+  >>> **Orientation:** As you approach the Musée Picasso, you'll find it nestled in the picturesque town of Antibes. Look for the sturdy stone walls of the Château Grimaldi, a historical monument classified since April 29, 1928. The museum is situated near the Mediterranean Sea, offering stunning coastal 
+      [...400 total chars]
+
+──────────────────────────────────────────────────────────────────────────────
+MECHANISM: Where Stop 1's extra content comes from
+──────────────────────────────────────────────────────────────────────────────
+
+File: generate_tour_text.py
+
+1. PROLOG GENERATION (lines 6316-6345):
+   - Activated only when STORIED_MODE=true AND spine generation succeeds
+   - Calls GPT-3.5-turbo with prompt: 'Write a compelling 80-190 word tour
+     introduction that frames this experience as a journey'
+   - Uses: connecting_thread, tour_hook, chapter previews, venue-identity facts
+   - Stored in _saved_prolog (declared at line 4650)
+
+2. PROLOG INJECTION INTO STOP 1 (line 6594-6595):
+   # [R2] For Stop 1: inject prolog before description
+   if i == 0 and _saved_prolog:
+       poi_content += f"{_saved_prolog}\n\n"
+
+3. ADDITIONAL STOP 1 EXCLUSIVES:
+   - Museum Information / operational details (hours, admission)
+     → line 6580: if tour_category == 'museum' and i == 0
+   - Entrance directions (non-museum tours)
+   - Coordinates always shown (museum: only Stop 1 shows them)
+
+4. FALLBACK PATH (LOCAL-119, lines 6430-6460):
+   If prolog LLM fails:
+   a) Use Stop 1's first two description sentences
+   b) Use raw tour_hook (last resort)
+   c) Empty (tour opens directly on Stop 1 content)
+
+RESULT: Stop 1 always receives 80-190 extra words (prolog) that are
+ABOUT THE TOUR, not about the POI. This is the structural phenomenon
+Michael observed. The prolog text describes the journey, names the region,
+previews the arc — none of which belongs to Stop 1's POI specifically.
+
+──────────────────────────────────────────────────────────────────────────────
+VERDICT
+──────────────────────────────────────────────────────────────────────────────
+
+CONFIRMED: The effect is real and systematic.
+
+  - Stop 1 is 1.33x longer than average stop (chars)
+  - Stop 1 has 1.37x more paragraphs
+  - Tour framing rate: Stop 1 = 0.79/¶ vs rest = 0.61/¶
+  - 10/10 Stop 1s contain tour-level framing
+
+The prolog IS the tour introduction. It is legitimate content that
+belongs in its own slot rather than inside Stop 1.
+
+WHAT SEPARATING IT WOULD TOUCH:
+  1. generate_tour_text.py line 6594: the injection point
+     Change: emit prolog as a separate 'Introduction' section
+     above Stop 1, instead of inside it.
+  2. parse_tour_stops() in stop_anchor_detector_v2.py: would need
+     to recognize an 'Introduction' section as non-stop content.
+  3. App tour player: if it parses stops by 'Stop N:' headers,
+     an Introduction section needs its own rendering path.
+  4. Tour delivery / existing tours: all existing tours have the
+     prolog inside Stop 1. Migration or backward compat needed.
+
+RISK:
+  - Low code risk (1 injection point, clear boundary)
+  - Medium integration risk (app player, delivery, existing tours)
+  - The prolog is good content — the fault is placement, not quality

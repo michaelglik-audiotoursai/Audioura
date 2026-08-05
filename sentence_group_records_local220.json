@@ -1,0 +1,308 @@
+{
+  "schema_version": "1.0",
+  "task": "LOCAL-220",
+  "description": "Per-sentence-group records for Riviera 2-stop tour, calibrated against Michael's evaluation",
+  "group_boundary_agreement": "6/11 = 54.5%",
+  "known_disagreements": {
+    "320_feet_quality_vs_publishability": true,
+    "cycling_navigation_clean": true
+  },
+  "records": [
+    {
+      "paragraph": 1,
+      "group_label": "A",
+      "michael_score": 5,
+      "michael_reason": "Excellent cycling directions",
+      "classification": "NAVIGATION",
+      "sentences": [
+        "Start biking southeast on the main road, continue straight until you reach the roundabout near the coast.",
+        "Take the second exit onto the coastal path towards Cap d'Antibes."
+      ],
+      "style_rules_violated": [],
+      "claim_verdict_counts": {
+        "supported": 0,
+        "supported_elsewhere": 0,
+        "unsupported": 0,
+        "contradicted": 0,
+        "not_checkable": 0
+      },
+      "claims": [],
+      "publishable": true,
+      "block_reasons": [],
+      "unsupported_claims": 0
+    },
+    {
+      "paragraph": 1,
+      "group_label": "B",
+      "michael_score": 1,
+      "michael_reason": "Instructions to the user (listen, look out for)",
+      "classification": "CONTENT",
+      "sentences": [
+        "As you arrive at Cap d'Antibes on your cycling tour of the French Riviera, listen to the gentle lapping of waves against the rocky coastline.",
+        "Look out for the Villa Eilenroc, an opulent mansion surrounded by lush gardens, symbolizing the lavish parties once hosted here by the elite of the 19th century."
+      ],
+      "style_rules_violated": [
+        "R1_IMPERATIVE"
+      ],
+      "claim_verdict_counts": {
+        "supported": 0,
+        "supported_elsewhere": 0,
+        "unsupported": 0,
+        "contradicted": 0,
+        "not_checkable": 0
+      },
+      "claims": [],
+      "publishable": true,
+      "block_reasons": [],
+      "unsupported_claims": 0
+    },
+    {
+      "paragraph": 2,
+      "group_label": "prolog",
+      "michael_score": 3,
+      "michael_reason": "Conditional 3/5 \u2014 only if promises are kept later",
+      "classification": "CONTENT",
+      "sentences": [
+        "You are about to embark on a journey through the sun-kissed allure of the French Riviera, a tapestry woven with whispers of opulence and intrigue.",
+        "Each stop along this tour serves as a chapter in a grand story, connecting the glitz of the past with the tranquil beauty that endures today.",
+        "From the opulent Villa Eilenroc, where the elite of the 19th century once reveled in lavish soir\u00e9es, to the shadowy Rue Obscure, a secret passageway that provided escape for the town's inhabitants in the 13th century, every corner holds hidden tales waiting to be unearthed.",
+        "Join us as we delve into the timeless elegance of this coastal paradise, where every whisper of the azure waves carries echoes of a bygone era."
+      ],
+      "style_rules_violated": [
+        "R1_IMPERATIVE"
+      ],
+      "claim_verdict_counts": {
+        "supported": 0,
+        "supported_elsewhere": 0,
+        "unsupported": 0,
+        "contradicted": 0,
+        "not_checkable": 0
+      },
+      "claims": [],
+      "publishable": true,
+      "block_reasons": [],
+      "unsupported_claims": 0
+    },
+    {
+      "paragraph": 3,
+      "group_label": "A",
+      "michael_score": 3,
+      "michael_reason": "Acceptable \u2014 Monet 1888, Tire-Poil trail, factual",
+      "classification": "CONTENT",
+      "sentences": [
+        "The Cap d'Antibes, a peninsula located south of Antibes and east of Juan-les-Pins, offers a picturesque landscape that has attracted artists and travelers for centuries.",
+        "In January 1888, the renowned artist Claude Monet visited this stunning location during his journey through the south of France.",
+        "Inspired by the beauty of Cap d'Antibes, Monet stayed at the Ch\u00e2teau de la Pin\u00e8de on the advice of his friend Guy de Maupassant, immersing himself in the coastal scenery that captivated his artistic soul.",
+        "One concrete sensory detail that envelops you in the atmosphere of Cap d'Antibes is the sound of the waves crashing against the rugged rocks, echoing the timeless rhythm of the sea.",
+        "The Tire-Poil coastal trail allows you to explore the cape's natural beauty, stretching from the Garoupe Beach parking lot to the Villa Eilenroc.",
+        "Along this 2.7 km route, you'll traverse rocky cliffs, pass by ancient chapels, and witness the panoramic views of the L\u00e9rins Islands to the west and the Mercantour Mountains to the east."
+      ],
+      "style_rules_violated": [
+        "R8_PROMPT_LEAKAGE"
+      ],
+      "claim_verdict_counts": {
+        "supported": 1,
+        "supported_elsewhere": 0,
+        "unsupported": 1,
+        "contradicted": 0,
+        "not_checkable": 0
+      },
+      "claims": [
+        {
+          "text": "1888 (in context: \"In January 1888, the renowned artist Claude Monet visit\")",
+          "verdict": "SUPPORTED_PARAPHRASE",
+          "type": "DATE"
+        },
+        {
+          "text": "2.7 km",
+          "verdict": "UNSUPPORTED",
+          "type": "NUMBER"
+        }
+      ],
+      "publishable": true,
+      "block_reasons": [],
+      "unsupported_claims": 1
+    },
+    {
+      "paragraph": 3,
+      "group_label": "B",
+      "michael_score": 2,
+      "michael_reason": "Too many imperatives without substance (take in, pedal, envision)",
+      "classification": "CONTENT",
+      "sentences": [
+        "As you stand at the highest point of Cap d'Antibes near the ancient Notre Dame de Bon Port chapel, take in the sight of the Garoupe lighthouse overlooking the Gulf of Juan and the Bay of Angels.",
+        "The nearby Abri de l'Olivette, a sheltered harbor for traditional local boats, adds to the maritime charm of this coastal gem.",
+        "Pedal along the coastline, envisioning the hidden coves and stories that lie just beyond the horizon, immersing yourself in the history and natural beauty of Cap d'Antibes."
+      ],
+      "style_rules_violated": [],
+      "claim_verdict_counts": {
+        "supported": 0,
+        "supported_elsewhere": 0,
+        "unsupported": 0,
+        "contradicted": 0,
+        "not_checkable": 0
+      },
+      "claims": [],
+      "publishable": true,
+      "block_reasons": [],
+      "unsupported_claims": 0
+    },
+    {
+      "paragraph": 4,
+      "group_label": "A",
+      "michael_score": 1,
+      "michael_reason": "Instruction (pause to take in)",
+      "classification": "CONTENT",
+      "sentences": [
+        "As you arrive at Villefranche-sur-Mer on your French Riviera cycling tour, pause to take in the breathtaking view of the deep natural harbor, a historic port that has welcomed ships for centuries."
+      ],
+      "style_rules_violated": [],
+      "claim_verdict_counts": {
+        "supported": 0,
+        "supported_elsewhere": 0,
+        "unsupported": 0,
+        "contradicted": 0,
+        "not_checkable": 0
+      },
+      "claims": [],
+      "publishable": true,
+      "block_reasons": [],
+      "unsupported_claims": 0
+    },
+    {
+      "paragraph": 4,
+      "group_label": "B",
+      "michael_score": 1,
+      "michael_reason": "Instruction (Look for), missing story",
+      "classification": "CONTENT",
+      "sentences": [
+        "Look for the Rue Obscure, a mysterious 13th-century passageway that once served as an escape route for the town's inhabitants."
+      ],
+      "style_rules_violated": [
+        "R1_IMPERATIVE"
+      ],
+      "claim_verdict_counts": {
+        "supported": 0,
+        "supported_elsewhere": 0,
+        "unsupported": 0,
+        "contradicted": 0,
+        "not_checkable": 0
+      },
+      "claims": [],
+      "publishable": true,
+      "block_reasons": [],
+      "unsupported_claims": 0
+    },
+    {
+      "paragraph": 5,
+      "group_label": "A",
+      "michael_score": 5,
+      "michael_reason": "Excellent \u2014 specific, informative, no instructions",
+      "classification": "CONTENT",
+      "sentences": [
+        "Villefranche-sur-Mer, known as the \"Free City on Sea,\" has ancient streets that exude a timeless charm.",
+        "The town's strategic location east of Nice and southwest of Monaco has been pivotal in its history.",
+        "The deep bay of Villefranche provides secure anchorage for ships, with depths reaching 320 feet, a natural wonder in the Mediterranean."
+      ],
+      "style_rules_violated": [],
+      "claim_verdict_counts": {
+        "supported": 0,
+        "supported_elsewhere": 0,
+        "unsupported": 2,
+        "contradicted": 0,
+        "not_checkable": 0
+      },
+      "claims": [
+        {
+          "text": "known as \"the\"",
+          "verdict": "UNSUPPORTED",
+          "type": "NICKNAME"
+        },
+        {
+          "text": "320 feet",
+          "verdict": "UNSUPPORTED",
+          "type": "NUMBER"
+        }
+      ],
+      "publishable": true,
+      "block_reasons": [],
+      "unsupported_claims": 2
+    },
+    {
+      "paragraph": 5,
+      "group_label": "B",
+      "michael_score": 1,
+      "michael_reason": "Style violations (evoke, whispers tales, adds depth to your understanding)",
+      "classification": "CONTENT",
+      "sentences": [
+        "Walking through the narrow streets may evoke the scent of sea salt, linking you to the town's maritime legacy.",
+        "The Rue Obscure, with its shadowy passageways, whispers tales of a bygone era when it provided shelter and secrecy to the town's residents.",
+        "This historical gem adds depth to your understanding of Villefranche-sur-Mer's past and its resilience through the centuries."
+      ],
+      "style_rules_violated": [],
+      "claim_verdict_counts": {
+        "supported": 0,
+        "supported_elsewhere": 0,
+        "unsupported": 0,
+        "contradicted": 0,
+        "not_checkable": 0
+      },
+      "claims": [],
+      "publishable": true,
+      "block_reasons": [],
+      "unsupported_claims": 0
+    },
+    {
+      "paragraph": 5,
+      "group_label": "C",
+      "michael_score": 0,
+      "michael_reason": "Generic \u2014 can be placed in millions of stops",
+      "classification": "CONNECTIVE",
+      "sentences": [
+        "As you continue your journey through this charming town, consider how these hidden paths have shaped the stories of this place, leading you to uncover more of its intriguing history."
+      ],
+      "style_rules_violated": [
+        "R9_GENERIC"
+      ],
+      "claim_verdict_counts": {
+        "supported": 0,
+        "supported_elsewhere": 0,
+        "unsupported": 0,
+        "contradicted": 0,
+        "not_checkable": 0
+      },
+      "claims": [],
+      "publishable": false,
+      "block_reasons": [
+        "GENERIC_DELETE"
+      ],
+      "unsupported_claims": 0
+    },
+    {
+      "paragraph": 6,
+      "group_label": "transition",
+      "michael_score": 0,
+      "michael_reason": "Generic \u2014 can be placed in millions of stops",
+      "classification": "CONNECTIVE",
+      "sentences": [
+        "From Cap d'Antibes to Villefranche-sur-Mer \u2014 a collection that spans more ground than these stops alone."
+      ],
+      "style_rules_violated": [
+        "R9_GENERIC"
+      ],
+      "claim_verdict_counts": {
+        "supported": 0,
+        "supported_elsewhere": 0,
+        "unsupported": 0,
+        "contradicted": 0,
+        "not_checkable": 0
+      },
+      "claims": [],
+      "publishable": false,
+      "block_reasons": [
+        "GENERIC_DELETE"
+      ],
+      "unsupported_claims": 0
+    }
+  ]
+}

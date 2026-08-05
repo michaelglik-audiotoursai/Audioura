@@ -21,6 +21,23 @@ import requests
 
 logger = logging.getLogger(__name__)
 
+# ─── LOCAL-230: Per-run failure counter ──────────────────────────────────────
+# Incremented when a network/API call fails (as opposed to returning a legitimate
+# empty result). Reported in the generation log so tours built during outages
+# are identifiable.
+_network_failure_count = 0
+
+
+def get_network_failure_count() -> int:
+    """Return the number of network failures encountered this run."""
+    return _network_failure_count
+
+
+def reset_network_failure_count() -> None:
+    """Reset the failure counter (call at start of each generation run)."""
+    global _network_failure_count
+    _network_failure_count = 0
+
 _USER_AGENT = "Audioura/2.2 (tour-generation; contact: support@audioura.com)"
 _WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 _SPARQL_ENDPOINT = "https://query.wikidata.org/sparql"
@@ -404,19 +421,25 @@ def _validate_city_match(qid: str, city: str) -> bool:
     
     # Fallback: check coordinates proximity
     city_lat, city_lng = _geocode_city(city)
-    if city_lat == 0.0 and city_lng == 0.0:
-        return False  # Can't verify
+    if city_lat is None or (city_lat == 0.0 and city_lng == 0.0):
+        return False  # Can't verify (network failure or no coords)
     
     entity_lat, entity_lng = _get_coordinates(qid)
-    if entity_lat == 0.0 and entity_lng == 0.0:
-        return False  # Entity has no coordinates
+    if entity_lat is None or (entity_lat == 0.0 and entity_lng == 0.0):
+        return False  # Entity has no coordinates (or network failed)
     
     dist = _haversine(city_lat, city_lng, entity_lat, entity_lng)
     return dist < 30  # Within 30km of city center
 
 
-def _search_entities(query: str) -> List[Tuple[str, str]]:
-    """Search Wikidata for entities matching a query string."""
+def _search_entities(query: str) -> Optional[List[Tuple[str, str]]]:
+    """Search Wikidata for entities matching a query string.
+
+    Returns:
+        List of (qid, label) tuples on success (may be empty for no results).
+        None on network/API failure (LOCAL-230: distinguishable from empty).
+    """
+    global _network_failure_count
     try:
         resp = requests.get(
             _WIKIDATA_API,
@@ -431,18 +454,29 @@ def _search_entities(query: str) -> List[Tuple[str, str]]:
             timeout=10,
         )
         if resp.status_code != 200:
-            return []
+            logger.error(f"[LOCAL-230] _search_entities failed: HTTP {resp.status_code} for query '{query}'")
+            _network_failure_count += 1
+            return None
         
         data = resp.json()
         results = [(r["id"], r.get("label", "")) for r in data.get("search", [])]
         return results
     except Exception as e:
-        logger.warning(f"Wikidata search error: {e}")
-        return []
+        logger.error(f"[LOCAL-230] _search_entities failed: {type(e).__name__}: {e} (query='{query}')")
+        _network_failure_count += 1
+        return None
 
 
 def _get_instance_of(qid: str) -> Optional[str]:
-    """Get the P31 (instance-of) value for an entity. Returns first matching museum type or None."""
+    """Get the P31 (instance-of) value for an entity. Returns first matching museum type or None.
+
+    Returns:
+        A museum-type QID string if the entity is a museum type.
+        None if the entity is not a museum type OR if the lookup failed.
+        (LOCAL-230: failure is now logged at ERROR and counted, even though
+        the return value is the same — callers degrade identically either way.)
+    """
+    global _network_failure_count
     try:
         resp = requests.get(
             _WIKIDATA_API,
@@ -456,6 +490,8 @@ def _get_instance_of(qid: str) -> Optional[str]:
             timeout=10,
         )
         if resp.status_code != 200:
+            logger.error(f"[LOCAL-230] _get_instance_of failed: HTTP {resp.status_code} for qid '{qid}'")
+            _network_failure_count += 1
             return None
         
         data = resp.json()
@@ -470,7 +506,9 @@ def _get_instance_of(qid: str) -> Optional[str]:
                 return type_qid
         
         return None
-    except Exception:
+    except Exception as e:
+        logger.error(f"[LOCAL-230] _get_instance_of failed: {type(e).__name__}: {e} (qid='{qid}')")
+        _network_failure_count += 1
         return None
 
 
@@ -493,8 +531,8 @@ def _geo_disambiguate(candidates: List[Tuple[str, str]], city: str) -> Optional[
     # Step 1: Get city coordinates from Wikidata
     city_lat, city_lng = _geocode_city(city)
     
-    if city_lat == 0.0 and city_lng == 0.0:
-        # Can't geocode city — fall back to P131 chain matching
+    if city_lat is None or (city_lat == 0.0 and city_lng == 0.0):
+        # Can't geocode city (or network failed) — fall back to P131 chain matching
         for qid, label in candidates:
             if _is_located_in(qid, city):
                 print(f"  [venue_resolver] Geo-disambiguated by P131: {qid} ({label}) in {city}")
@@ -508,8 +546,8 @@ def _geo_disambiguate(candidates: List[Tuple[str, str]], city: str) -> Optional[
     
     for qid, label in candidates:
         lat, lng = _get_coordinates(qid)
-        if lat == 0.0 and lng == 0.0:
-            # No coordinates — check P131 as fallback
+        if lat is None or (lat == 0.0 and lng == 0.0):
+            # No coordinates or network failed — check P131 as fallback
             if _is_located_in(qid, city):
                 print(f"  [venue_resolver] Geo-disambiguated by P131 (no coords): {qid} ({label})")
                 return (qid, label)
@@ -528,27 +566,47 @@ def _geo_disambiguate(candidates: List[Tuple[str, str]], city: str) -> Optional[
     return candidates[0]
 
 
-def _geocode_city(city: str) -> Tuple[float, float]:
-    """Get coordinates for a city name via Wikidata search."""
+def _geocode_city(city: str) -> Tuple[Optional[float], Optional[float]]:
+    """Get coordinates for a city name via Wikidata search.
+
+    Returns:
+        (lat, lng) floats on success. (0.0, 0.0) if city found but no coords.
+        (None, None) on network/API failure (LOCAL-230: distinguishable from absent).
+    """
+    global _network_failure_count
     try:
         # Search for the city
         results = _search_entities(city)
+        if results is None:
+            # _search_entities already logged and counted — propagate failure signal
+            return None, None
         if not results:
             return 0.0, 0.0
         
         # Take first result and get its coordinates
         for qid, label in results[:3]:
             lat, lng = _get_coordinates(qid)
+            if lat is None:
+                # _get_coordinates already logged and counted — propagate failure
+                return None, None
             if lat != 0.0 or lng != 0.0:
                 return lat, lng
         
         return 0.0, 0.0
-    except Exception:
-        return 0.0, 0.0
+    except Exception as e:
+        logger.error(f"[LOCAL-230] _geocode_city failed: {type(e).__name__}: {e} (city='{city}')")
+        _network_failure_count += 1
+        return None, None
 
 
-def _get_coordinates(qid: str) -> Tuple[float, float]:
-    """Get P625 coordinates for a Wikidata entity."""
+def _get_coordinates(qid: str) -> Tuple[Optional[float], Optional[float]]:
+    """Get P625 coordinates for a Wikidata entity.
+
+    Returns:
+        (lat, lng) floats on success. (0.0, 0.0) means entity has no P625 claim.
+        (None, None) on network/API failure (LOCAL-230: distinguishable from absent).
+    """
+    global _network_failure_count
     try:
         resp = requests.get(
             _WIKIDATA_API,
@@ -562,7 +620,9 @@ def _get_coordinates(qid: str) -> Tuple[float, float]:
             timeout=10,
         )
         if resp.status_code != 200:
-            return 0.0, 0.0
+            logger.error(f"[LOCAL-230] _get_coordinates failed: HTTP {resp.status_code} for qid '{qid}'")
+            _network_failure_count += 1
+            return None, None
         
         data = resp.json()
         entity = data.get("entities", {}).get(qid, {})
@@ -576,8 +636,10 @@ def _get_coordinates(qid: str) -> Tuple[float, float]:
                 return lat, lng
         
         return 0.0, 0.0
-    except Exception:
-        return 0.0, 0.0
+    except Exception as e:
+        logger.error(f"[LOCAL-230] _get_coordinates failed: {type(e).__name__}: {e} (qid='{qid}')")
+        _network_failure_count += 1
+        return None, None
 
 
 def _is_located_in(qid: str, city: str) -> bool:
@@ -902,25 +964,61 @@ CORPUS_VERSION = 4  # LOCAL-24: Work-vs-nonwork filter added; invalidate stale c
 
 
 # TODO(S94): remove in-code password fallback; prod must use DATABASE_URL/DB_PASSWORD env only
+def _is_inside_container():
+    """Return True if running inside a Docker container (/.dockerenv present)."""
+    return os.path.exists('/.dockerenv')
+
+
 def _get_db_connection():
-    """Get a Postgres connection for venue_corpus cache. Returns None if unavailable."""
+    """Get a Postgres connection for venue_corpus cache.
+
+    Returns None if no DB is configured (normal on host without DATABASE_URL).
+    Raises on misconfiguration (env var set but connection fails) — caller
+    should not silently degrade when the user intended a cache.
+    """
     try:
         import psycopg2
-        # Use VENUE_CACHE_DB_URL first, fall back to DATABASE_URL, then container default
-        db_url = os.environ.get('VENUE_CACHE_DB_URL',
-                 os.environ.get('DATABASE_URL', 'postgresql://admin:password123@postgres-2:5432/audiotours'))
-        # Fix localhost references for container-to-container communication
+    except ImportError:
+        print("  [venue_cache] psycopg2 not installed — venue cache unavailable")
+        return None
+
+    # Use VENUE_CACHE_DB_URL first, fall back to DATABASE_URL, then container default
+    db_url = os.environ.get('VENUE_CACHE_DB_URL',
+             os.environ.get('DATABASE_URL'))
+
+    _url_from_env = db_url is not None
+
+    if db_url is None:
+        if _is_inside_container():
+            # Container default: postgres-2 is on the Docker network
+            db_url = 'postgresql://admin:password123@postgres-2:5432/audiotours'
+        else:
+            # Host with no DB env: venue cache simply not configured — this is fine
+            print("  [venue_cache] No DATABASE_URL set (host mode) — venue cache skipped")
+            return None
+
+    # Rewrite localhost → postgres-2 ONLY inside a container (LOCAL-214)
+    if _is_inside_container():
         if '@localhost:' in db_url:
             db_url = db_url.replace('@localhost:', '@postgres-2:')
         # Fix auth mismatch: tour-generator uses admin:admin but postgres-2 expects password123
         if 'admin:admin@' in db_url and 'postgres-2' in db_url:
             db_url = db_url.replace('admin:admin@', 'admin:password123@')
+
+    try:
         conn = psycopg2.connect(db_url, connect_timeout=5)
         # Auto-create venue_corpus table if not exists (idempotent)
         _ensure_table(conn)
         return conn
     except Exception as e:
-        print(f"  [venue_cache] DB connection failed: {e}")
+        if _url_from_env:
+            # User explicitly configured a DB URL but it doesn't work — this is a defect
+            print(f"  [venue_cache] ERROR: DB connection FAILED (misconfiguration): {e}")
+            print(f"  [venue_cache]   URL source: {'VENUE_CACHE_DB_URL' if os.environ.get('VENUE_CACHE_DB_URL') else 'DATABASE_URL'}")
+            print(f"  [venue_cache]   This is a bug — the configured database is unreachable.")
+        else:
+            # Container default failed — also a defect (container should always reach postgres-2)
+            print(f"  [venue_cache] ERROR: container default DB unreachable: {e}")
         return None
 
 

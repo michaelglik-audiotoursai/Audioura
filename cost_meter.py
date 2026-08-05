@@ -45,6 +45,9 @@ VALID_OPERATION_TYPES = frozenset([
     "translation_generate",
     "translation_cache_hit",
     "news_generate",
+    # Ported with LOCAL-197: storied already meters news_generate, and the
+    # shared test asserts the full set. This is a metering label only — the
+    # Wallet-facing parts of cost_meter deliberately stay on subscribed (D58).
     "news_cache_hit",
     "photo_extension",
 ])

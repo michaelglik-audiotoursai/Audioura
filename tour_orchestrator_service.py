@@ -10,10 +10,13 @@ import threading
 import requests
 import traceback
 import re
+import logging
 from datetime import datetime
 import flask
 from flask import Flask, request, jsonify, send_file as _send_file, make_response
 import inspect as _inspect
+
+_orch_logger = logging.getLogger("tour_orchestrator_service")
 
 
 def _compat_send_file(path_or_file, **kwargs):
@@ -601,6 +604,40 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         print(f"Traceback: {traceback.format_exc()}")
         return _result(success=False, action="error", error=str(e))
 
+
+def link_stop_metrics_to_tour(tour_id, job_id):
+    """LOCAL-128: Set tour_id on stop_metrics rows that were written before the tour existed.
+
+    The evaluator in generate_tour_text_service writes stop_metrics with job_id
+    but cannot set tour_id (the tour row doesn't exist yet). After store_audio_tour
+    creates the tour row, this function backfills the link.
+
+    Returns the number of rows updated, or -1 on error.
+    """
+    import psycopg2
+    try:
+        conn = psycopg2.connect(
+            host=os.getenv('DB_HOST', 'postgres-2'),
+            database=os.getenv('DB_NAME', 'audiotours'),
+            user=os.getenv('DB_USER', 'admin'),
+            password=os.getenv('DB_PASSWORD', 'password123'),
+            port=os.getenv('DB_PORT', '5432')
+        )
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE stop_metrics SET tour_id = %s WHERE job_id = %s AND tour_id IS NULL",
+            (tour_id, job_id)
+        )
+        updated = cur.rowcount
+        conn.commit()
+        cur.close()
+        conn.close()
+        return updated
+    except Exception as e:
+        print(f"[LOCAL-128] link_stop_metrics_to_tour failed: {e}")
+        return -1
+
+
 def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=None, request_string=None, language='en', persona=None, is_test=None):
     """Orchestrate the complete tour generation pipeline asynchronously."""
     print(f"\n==== ORCHESTRATE_TOUR_ASYNC STARTED: {datetime.now().isoformat()} ====")
@@ -1024,6 +1061,19 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             except Exception as db_error:
                 print(f"Warning: Could not get tour ID from database: {db_error}")
         
+        # LOCAL-128: Link stop_metrics to this tour via tour_id.
+        # The text generator wrote stop_metrics with job_id = job_id_1
+        # but could not set tour_id (the tour didn't exist yet).
+        # Now that store_audio_tour has created the row, backfill it.
+        if english_tour_id and job_id_1:
+            _sm_updated = link_stop_metrics_to_tour(english_tour_id, job_id_1)
+            if _sm_updated > 0:
+                print(f"[LOCAL-128] Linked {_sm_updated} stop_metrics rows to tour_id={english_tour_id} (job_id={job_id_1})")
+            elif _sm_updated == 0:
+                print(f"[LOCAL-128] No stop_metrics rows found for job_id={job_id_1} (i-con may not have run)")
+            else:
+                print(f"[LOCAL-128] stop_metrics tour_id update failed (non-fatal)")
+
         if language != 'en':
             pass  # translation block below handles non-English
         
@@ -1337,48 +1387,6 @@ def get_coordinates_direct(location):
         print(f"Traceback: {traceback.format_exc()}")
         return (0, 0)  # Return 0,0 as fallback
 
-# Direct function to call coordinates-fromai service
-def call_coordinates_service(location):
-    # Get coordinates directly from the coordinates-fromai service
-    import requests
-    import urllib.parse
-    
-    print(f"\n==== DIRECT CALL TO COORDINATES-FROMAI SERVICE ====")
-    print(f"Time: {datetime.now().isoformat()}")
-    print(f"Location: {location}")
-    
-    try:
-        # URL-encode the location
-        encoded_location = urllib.parse.quote(location)
-        
-        # Make the request to the coordinates-fromai service
-        url = f"{COORDINATES_URL}/coordinates/{encoded_location}"
-        print(f"Requesting URL: {url}")
-        
-        _auth = _get_auth_headers(COORDINATES_URL); response = requests.get(url, headers=_auth, timeout=60)
-        
-        print(f"Response status code: {response.status_code}")
-        print(f"Response time: {datetime.now().isoformat()}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            print(f"Response data: {data}")
-            
-            if "coordinates" in data and len(data["coordinates"]) >= 2:
-                lat, lng = data["coordinates"]
-                print(f"Received coordinates: lat={lat}, lng={lng}")
-                return (lat, lng)
-            else:
-                print(f"Invalid response format: {data}")
-        else:
-            print(f"Error response: {response.text}")
-        
-        print(f"No coordinates found for {location}")
-        return None
-    except Exception as e:
-        print(f"Error getting coordinates from coordinates-fromai service: {e}")
-        print(f"Traceback: {traceback.format_exc()}")
-        return None
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -1386,7 +1394,8 @@ def health_check():
     try:
         from cost_ceiling_monitor import get_ceiling_stats
         _ceiling_stats = get_ceiling_stats()
-    except ImportError:
+    except ImportError as _ceil_err:
+        _orch_logger.error(f"[LOCAL-146] MISSING: cost_ceiling_monitor (get_ceiling_stats) — ceiling stats unavailable in health endpoint: {_ceil_err}")
         _ceiling_stats = {}
     return jsonify({
         "status": "healthy",

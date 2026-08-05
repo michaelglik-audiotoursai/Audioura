@@ -172,6 +172,128 @@ Every serious failure in 45 tasks was at a seam:
 
 ---
 
+## 5b. Never match an identifier without a word boundary
+
+Four confident, wrong conclusions in one week came from substring matching:
+
+| Where | What matched wrongly |
+|---|---|
+| a callback counter | any two words of an earlier stop's title, appearing anywhere later |
+| a collision test | a pair of names that could not actually collide |
+| LEAD's materials check | English-only vocabulary; missed chlorite, soie, bois, xylogravure |
+| LEAD's entry-point check | `news_search_service.py` inside `simple_news_search_service.py` |
+
+The last one caused a wrongful bounce: a file was protected as a live
+container entry point when the container actually runs a *longer* filename
+containing that string.
+
+**Use `grep -w`, or `(^|[^a-z_])name([^a-z_]|$)`.** A bare substring search
+over identifiers is not evidence. It fails toward *false confidence* — it
+returns a hit, so it feels like a result, and the reviewer stops looking.
+
+The same applies to metrics built on matching. **A number is unverified
+until you have read the code that produced it**, not just the number. Two of
+the four above were reported as measurements and believed.
+
+## 5c. Static analysis cannot see an entry point
+
+An import graph will confidently tell you a module has zero callers when it
+is the `CMD` of a running container.
+
+A module can be reached by:
+- `Dockerfile` `CMD` / `ENTRYPOINT`
+- `docker-compose` `command:`
+- a launchd / cron / Task Scheduler job
+- being run directly as a script
+- string-based dispatch, `getattr`, Flask decorators, template references
+
+None appear in an import graph. Before deleting anything on "no importers",
+check every one of those, **per symbol**, and say so per symbol — a blanket
+"Docker does not use these" sentence is where the mistake hides.
+
+## 5d. The host is part of the system
+
+Continuous development assumes the machine keeps working. It may not.
+
+Observed in one week on a Mac Mini running Docker plus three concurrent
+agents:
+- swap at 91% (2783 MB of 3072 MB)
+- container builds failing with `DeadlineExceeded`, including a three-line
+  Alpine image timing out at 180 seconds
+- workers killed before writing a single log line
+
+**A task that dies with no log should be read as environmental until proven
+otherwise.** Re-dispatching it is how a resource problem becomes a resource
+spiral — each death leaked an orphaned agent process, and the liveness check
+faithfully fed the loop.
+
+So: reap orphans on a timer, cap retries and quarantine a task that keeps
+dying, and size concurrency to what the host sustains *including builds*.
+Three workers was one too many.
+
+## 5e. Noise floors for every metric — report three runs with a number behind it
+
+D22 established a noise floor for museum fact counts: stdev ~7 at n=3. That
+discipline must apply to every number this project quotes. Without a floor,
+any metric can be moved by noise and reported as an improvement.
+
+**The table below was derived from existing artefacts (LOCAL-72 A/B, LOCAL-96
+3-run, LOCAL-100 5-run, cost_ledger 85 rows). No new tours were generated.**
+
+| Metric | Source | Samples | Mean | Stdev | Min believable Δ (n=3) | Min believable Δ (n=5) |
+|--------|--------|---------|------|-------|------------------------|------------------------|
+| **Rubric score** | LOCAL-100 (5 runs) | 5 | 98.8 | 9.2 | 10.6 | 8.2 |
+| **Museum fact count** (rule present) | LOCAL-72 ARM B | 3 | 39.7 | 2.1 | 2.4 | — |
+| **Museum fact count** (rule removed) | LOCAL-72 ARM A | 3 | 32.7 | 7.0 | 8.1 | — |
+| **Cost per tour** (museum N=8) | cost_ledger + submissions | 9 | $0.068 | $0.002 | $0.003 | $0.002 |
+| **Cost per tour** (all sizes) | cost_ledger (instrumented) | 40 | $0.050 | $0.023 | — | — |
+| **Fact coverage** (stops with catalogue facts /8) | LOCAL-98 + LEAD | 4 | 5.75 | 0.50 | TOO FEW SAMPLES | — |
+| **Callback count** | LOCAL-95 (broken counter) | — | — | — | INVALID — D25 | — |
+
+**"Min believable Δ" = 2σ/√n.** A change smaller than this at the stated n
+cannot be distinguished from noise. Report it as "within noise" rather than
+as an improvement or regression.
+
+### How to use this table in a task file
+
+```
+## Acceptance criteria
+- Rubric score: report 3 runs. A claimed improvement must exceed Δ=10.6.
+- Fact count: report 3 runs. A change of ≤8 facts (rule-removed variant)
+  or ≤2 facts (rule-present variant) is noise.
+- Cost: report the figure. Variation under $0.003 for museum N=8 is noise.
+```
+
+### Metrics with insufficient data to floor
+
+- **Fact coverage:** Only 4 observations (3 from the same task, 1 independent).
+  Needs ≥3 independent runs to set a floor.
+- **Callback count:** The counter (substring matching) is itself unreliable
+  per D25. No floor can be set until the measurement is replaced.
+
+### Cost distribution detail (from `cost_ledger`, 85 rows)
+
+The ledger contains three distinct populations:
+
+| Population | n | Mean | Stdev | Interpretation |
+|-----------|---|------|-------|----------------|
+| Small tours (< $0.03) | 12 | $0.018 | $0.001 | Likely 2–4 stop tours |
+| Mid tours ($0.03–$0.055) | 4 | $0.043 | $0.003 | Likely 5–7 stop tours |
+| Full museum tours (> $0.055) | 24 | $0.067 | $0.004 | 8+ stop tours |
+| Flat-rate entries ($0.0700 exact, no breakdown) | 43 | $0.070 | 0 | Pre-instrumentation estimates |
+
+The 43 flat-rate entries (all 2026-07-31, NULL breakdown) appear to be
+placeholder estimates inserted before cost instrumentation was live. They
+are not measurements. **When quoting cost, cite only instrumented entries
+(those with a non-empty `breakdown` column).**
+
+For the museum N=8 tours specifically, the 9 measured values (LOCAL-96 ×3,
+LOCAL-100 ×5, LOCAL-72 ×1) span $0.065–$0.072 with stdev $0.002. Cost
+variation within this tour type is negligible — a claimed cost change of
+less than half a cent is noise.
+
+---
+
 ## 6. Protect production data before the first agent runs
 
 An agent deleted a real tour and its two translations during autonomous

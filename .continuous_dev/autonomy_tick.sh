@@ -57,8 +57,46 @@ fi
 # test tours becoming visible, which happened 2026-08-01 with row count UP.
 "$CD/check_user_visible.sh"
 
+# --- Reap orphaned kiro processes; quarantine tasks that keep dying. ---
+# Added 2026-08-01: LOCAL-112/113 each died twice with no log, swap at 91%,
+# and every death leaked an orphaned kiro-cli. The liveness check kept
+# re-dispatching them into the same wall.
+"$CD/reap_orphans.sh"
+
+# --- Reclaim disk: drop worktrees whose branch is already merged. ---
+# Added 2026-08-04 after 188 accumulated worktrees filled the disk to 98% and
+# a dispatch failed mid-checkout. Nothing is lost; unmerged branches are kept.
+"$CD/prune_worktrees.sh"
+
 # --- Dispatch any unclaimed task files. ---
 # The dispatcher is idempotent: already-claimed files are skipped, and
 # MAX_CONCURRENT bounds the worker count. Safe to run every 5 minutes.
 /usr/bin/python3 "$REPO/kiro_dispatcher.py" >> "$LOG" 2>&1
 echo "$(date -u +%FT%TZ) | tick complete (unpushed=$UNPUSHED)" >> "$LOG"
+
+# --- Secret scan of the pushed tip (LOCAL-207 / D81). ---
+# Two live credentials sat on origin for months because nothing looked. This
+# scans the last 20 commits each tick and alarms; it does not block.
+if [ -f "$REPO/secret_scan.py" ]; then
+  /usr/bin/python3 "$REPO/secret_scan.py" --range "origin/storied~20..origin/storied" >/tmp/secret_tick.out 2>&1
+  # The scanner's own docs and tests carry invented fixtures by design; a
+  # standing alarm on them would train us to ignore this line. Filter them out
+  # and alarm only on what is left.
+  # Drop findings LEAD has reviewed and cleared. Entries are pinned to a
+  # specific commit:path:line — never a filename or a directory — so a real key
+  # added to the same file tomorrow still fires. See secret_scan_cleared.txt.
+  CLEARED="$CD/secret_scan_cleared.txt"
+  REAL=$(grep -E "^\s+\[" /tmp/secret_tick.out \
+         | grep -v "SUBMISSION_LOCAL-207.md" \
+         | grep -v "tests/test_secret_scan.py" \
+         | grep -v "secret_scan.py" \
+         | while read -r line; do
+             KEY=$(echo "$line" | sed -E 's/.*\] ([0-9a-f]+) [0-9-]+ ([^ ]+):([0-9]+).*/\1:\2:\3/')
+             SHORT=$(echo "$KEY" | cut -c1-7)
+             REST=$(echo "$KEY" | cut -d: -f2-)
+             grep -qs "^${SHORT}:${REST}[[:space:]]" "$CLEARED" || echo "$line"
+           done | wc -l | tr -d " ")
+  if [ "$REAL" != "0" ]; then
+    echo "$(date -u +%FT%TZ) | *** SECRET DETECTED in recent storied commits ($REAL finding/s) — see /tmp/secret_tick.out ***" >> "$CD/ALERTS.md"
+  fi
+fi

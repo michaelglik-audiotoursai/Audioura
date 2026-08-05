@@ -1,0 +1,109 @@
+================================================================================
+STOP CORPUS COVERAGE REPORT — LOCAL-198
+================================================================================
+
+┌─ Boston Common, Boston MA (4 stops)
+│
+│  ✓  1 passages | COVERED     | Granary Burying Ground (matched: granary, burying, ground)
+│  ✓  1 passages | COVERED     | Parkman Bandstand (matched: parkman, bandstand)
+│  ✓  1 passages | COVERED     | Soldiers and Sailors Monument (matched: soldiers, sailors, monument)
+│  ✓  1 passages | COVERED     | Brewer Fountain (matched: brewer, fountain)
+│
+└─ Summary: 4 COVERED, 0 VENUE_ONLY, 0 EMPTY
+
+┌─ French Riviera walking area (15 stops)
+│
+│  ✓  2 passages | COVERED     | Cap d'Antibes (matched: antibes)
+│  ✓  1 passages | COVERED     | Chapelle Saint-Pierre (matched: chapelle, saint, pierre)
+│  ⚠  1 passages | VENUE_ONLY  | Eze Village (sought: village — NOT FOUND)
+│  ⚠  1 passages | VENUE_ONLY  | Paloma Beach (sought: paloma, beach — NOT FOUND)
+│  ✓  1 passages | COVERED     | Cours Saleya Market (matched: cours, saleya, market)
+│  ✓  1 passages | COVERED     | Musee Matisse (matched: matisse)
+│  ✓  1 passages | COVERED     | Castle Hill of Nice (matched: castle, hill)
+│  ⚠  1 passages | VENUE_ONLY  | Parc Phoenix (sought: phoenix — NOT FOUND)
+│  ✓  1 passages | COVERED     | Place Massena (matched: massena)
+│  ✓  1 passages | COVERED     | Old Town of Antibes (matched: antibes)
+│  ✓  1 passages | COVERED     | Port Vauban (matched: vauban)
+│  ✓  1 passages | COVERED     | Marineland Antibes (matched: marineland, antibes)
+│  ✓  1 passages | COVERED     | Villa Ephrussi de Rothschild (matched: ephrussi, rothschild)
+│  ✓  1 passages | COVERED     | Promenade Maurice Rouvier (matched: promenade, maurice, rouvier)
+│  ✓  1 passages | COVERED     | Mont Boron (matched: mont, boron)
+│
+└─ Summary: 12 COVERED, 3 VENUE_ONLY, 0 EMPTY
+
+┌─ Musee Matisse, Nice, France (6 stops)
+│
+│  ✓  5 passages | COVERED     | Nature morte aux grenades (matched: nature, morte, grenades)
+│  ✓  1 passages | COVERED     | Nymphe dans la forêt (matched: nymphe, foret)
+│  ✓  1 passages | COVERED     | Lectrice à la table jaune (matched: lectrice, table, jaune)
+│  ✓  1 passages | COVERED     | Odalisque au coffret rouge (matched: odalisque, coffret, rouge)
+│  ✓  1 passages | COVERED     | Papeete-Tahiti (matched: papeete, tahiti)
+│  ✓  1 passages | COVERED     | Tempête à Nice (matched: tempete)
+│
+└─ Summary: 6 COVERED, 0 VENUE_ONLY, 0 EMPTY
+
+┌─ Musee National Marc Chagall, Nice, France (4 stops)
+│
+│  ✓  2 passages | COVERED     | Abraham et les trois anges (matched: abraham)
+│  ⚠  2 passages | VENUE_ONLY  | L'Arche de Noé (sought: arche — NOT FOUND)
+│  ✓  2 passages | COVERED     | La Bible : Abraham et Isaac en route (matched: bible, abraham, isaac, route)
+│  ✓  2 passages | COVERED     | Le Cirque bleu (matched: cirque, bleu)
+│
+└─ Summary: 3 COVERED, 1 VENUE_ONLY, 0 EMPTY
+
+┌─ Musee d Art Moderne et d Art Contemporain, Nice, France (10 stops)
+│
+│  ✓ 23 passages | COVERED     | Le Mur de Feu d’Yves Klein (matched: yves, klein)
+│  ✓ 22 passages | COVERED     | Tir, séance 26 juin 1961 (matched: seance, juin)
+│  ✓  3 passages | COVERED     | Le Déjeuner sur l’herbe (matched: dejeuner, herbe)
+│  ⚠  2 passages | VENUE_ONLY  | She-Bam Pow POP Wizz (sought: wizz — NOT FOUND)
+│  ✓  2 passages | COVERED     | Expositions temporaires (matched: expositions, temporaires)
+│  ✓  2 passages | COVERED     | La mariée sous l’arbre (matched: mariee, sous, arbre)
+│  ✓  2 passages | COVERED     | Le Village de grand-mère (matched: village, grand, mere)
+│  ✓  1 passages | COVERED     | Donations et dépôts (matched: donations, depots)
+│  ⚠  1 passages | VENUE_ONLY  | Richard Long ou la sculpture en marchant (sought: richard, long, sculpture, marchant — NOT FOUND)
+│  ✓  1 passages | COVERED     | Donations and deposits (matched: donations, deposits)
+│
+└─ Summary: 8 COVERED, 2 VENUE_ONLY, 0 EMPTY
+
+┌─ Palais Lascaris, Nice (12 stops)
+│
+│  ✓  1 passages | COVERED     | The Triumph of David (matched: triumph, david)
+│  ✓  1 passages | COVERED     | Harpe by Naderman (Paris, 1780) (matched: naderman, paris)
+│  ✓  1 passages | COVERED     | Guitar by Antonio de Torres (Almeria, 1884) (matched: guitar, antonio, torres)
+│  ✓  1 passages | COVERED     | Basse de violon by Paolo Antonio Testore (Milan, 1696) (matched: paolo, antonio, testore, milan)
+│  ✓  1 passages | COVERED     | Guitare baroque by Giovanni Tesler (Ancona, 1618) (matched: baroque, giovanni, tesler, ancona)
+│  ✓  1 passages | COVERED     | Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581) (matched: sacqueboute, tenor, anton, schnitzer)
+│  ✓  1 passages | COVERED     | Guitare baroque by Jean Christophle (Avignon, 1645) (matched: jean, christophle, avignon)
+│  ✓  1 passages | COVERED     | Violes d'amour by Joannes Florenus Guidanti (Bologne, 1717) (matched: joannes, florenus, guidanti)
+│  ✓  1 passages | COVERED     | Guitare baroque by René Voboam (Paris, 1650) (matched: baroque, rene, voboam, paris)
+│  ✓  1 passages | COVERED     | Violes gambe by William Turner (Londres, 1652) (matched: william, turner)
+│  ✓  1 passages | COVERED     | Raquel (matched: raquel)
+│  ✗  0 passages | EMPTY       | The Annunciation (sought: annunciation — NOT FOUND)
+│
+└─ Summary: 11 COVERED, 0 VENUE_ONLY, 1 EMPTY
+
+┌─ walking tour in Nice, france (10 stops)
+│
+│  ✓  1 passages | COVERED     | Cours Saleya Market (matched: cours, saleya, market)
+│  ✓  1 passages | COVERED     | Old Town (Vieux Nice) (matched: vieux)
+│  ✓  1 passages | COVERED     | Marc Chagall National Museum (matched: chagall)
+│  ✓  1 passages | COVERED     | Nice Opera House (matched: opera)
+│  ✓  1 passages | COVERED     | Albert 1st Gardens (matched: albert, gardens)
+│  ✓  1 passages | COVERED     | Promenade des Anglais (matched: promenade, anglais)
+│  ✓  1 passages | COVERED     | Russian Orthodox Cathedral (matched: russian, orthodox, cathedral)
+│  ✓  1 passages | COVERED     | Museum of Modern and Contemporary Art (MAMAC) (matched: mamac)
+│  ✓  1 passages | COVERED     | Place Massena (matched: massena)
+│  ✓  1 passages | COVERED     | Castle Hill (Colline du Chateau) (matched: colline)
+│
+└─ Summary: 10 COVERED, 0 VENUE_ONLY, 0 EMPTY
+
+================================================================================
+OVERALL SUMMARY
+================================================================================
+  Total stops in corpus:  61
+  COVERED (writable):     54 (89%)
+  VENUE_ONLY (dangerous): 6 (10%)
+  EMPTY (impossible):     1 (2%)
+
+  ** Writable stops (the real ceiling on tour quality): 54/61 **

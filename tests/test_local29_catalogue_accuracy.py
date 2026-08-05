@@ -355,17 +355,18 @@ Réalisée dans un bois de cyprès durant la seconde moitié du XIIe siècle, ce
         ganesh_works = [w for w in works if 'ganesh' in w['title'].lower()]
         kannon_works = [w for w in works if 'kannon' in w['title'].lower()]
         
-        if ganesh_works:
-            ganesh = ganesh_works[0]
-            assert 'XIIe' not in ganesh.get('period', ''), \
-                f"HTML parser bleed: Ganesh got Kannon's XIIe siècle! period='{ganesh.get('period')}'"
-            assert 'Xe' in ganesh.get('period', '') or not ganesh.get('period'), \
-                f"Ganesh should have Xe siècle or empty, got: '{ganesh.get('period')}'"
+        assert ganesh_works, "Parser must extract Ganesh from controlled HTML — got empty list"
+        assert kannon_works, "Parser must extract Kannon from controlled HTML — got empty list"
         
-        if kannon_works:
-            kannon = kannon_works[0]
-            assert 'XIIe' in kannon.get('period', ''), \
-                f"Kannon should have XIIe siècle, got: '{kannon.get('period')}'"
+        ganesh = ganesh_works[0]
+        assert 'XIIe' not in ganesh.get('period', ''), \
+            f"HTML parser bleed: Ganesh got Kannon's XIIe siècle! period='{ganesh.get('period')}'"
+        assert 'Xe' in ganesh.get('period', '') or not ganesh.get('period'), \
+            f"Ganesh should have Xe siècle or empty, got: '{ganesh.get('period')}'"
+        
+        kannon = kannon_works[0]
+        assert 'XIIe' in kannon.get('period', ''), \
+            f"Kannon should have XIIe siècle, got: '{kannon.get('period')}'"
 
 
 # ============================================================================
@@ -404,7 +405,9 @@ class TestVisitorInfoTranslation:
         """French time format '10h30' should become '10:30'."""
         from generate_tour_text import _translate_visitor_info_to_language
         result = _translate_visitor_info_to_language("Ouvert de 10h à 18h30", "en")
-        assert '10:00' in result or '10h' not in result, f"Time format not converted: {result}"
+        assert result != "", "Translation must not return empty for French time input"
+        assert '10:00' in result, f"Time format not converted — expected '10:00' in result: {result}"
+        assert '18:30' in result, f"Time format not converted — expected '18:30' in result: {result}"
 
     def test_french_language_returns_raw(self):
         """When tour language is French, should return raw (no translation needed)."""
@@ -472,17 +475,18 @@ Donated to the collection in 1978.""",
         
         works = extract_catalogue_works_from_pages(pages)
         
-        # If both are extracted, verify their metadata doesn't bleed
-        if len(works) >= 2:
-            for work in works:
-                title_lower = work['title'].lower()
-                if 'warrior' in title_lower:
-                    # Warrior should have bronze, 5th century; NOT silver, 14th century
-                    if work.get('period'):
-                        assert '14th' not in work['period'].lower() and 'XIVe' not in work['period'], \
-                            f"Warrior got Chalice's period: {work['period']}"
-                elif 'chalice' in title_lower:
-                    # Chalice should have silver/gold, 14th century; NOT bronze, 5th century
-                    if work.get('period'):
-                        assert '5th' not in work['period'].lower() and 'Ve' not in work['period'], \
-                            f"Chalice got Warrior's period: {work['period']}"
+        # Must extract both works from the controlled input
+        assert len(works) >= 2, \
+            f"Parser must extract >= 2 works from controlled text, got {len(works)}: {[w.get('title') for w in works]}"
+        for work in works:
+            title_lower = work['title'].lower()
+            if 'warrior' in title_lower:
+                # Warrior should have bronze, 5th century; NOT silver, 14th century
+                if work.get('period'):
+                    assert '14th' not in work['period'].lower() and 'XIVe' not in work['period'], \
+                        f"Warrior got Chalice's period: {work['period']}"
+            elif 'chalice' in title_lower:
+                # Chalice should have silver/gold, 14th century; NOT bronze, 5th century
+                if work.get('period'):
+                    assert '5th' not in work['period'].lower() and 'Ve' not in work['period'], \
+                        f"Chalice got Warrior's period: {work['period']}"

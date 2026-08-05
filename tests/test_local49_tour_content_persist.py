@@ -7,6 +7,9 @@ Verifies that:
 3. The HTTP-response path is used (tour_content from text generator status response)
 
 This test hits the live orchestrator and database — requires services running.
+
+LOCAL-141: Migrated to TestTourFactory.adopt_and_ensure_flagged() — the flag
+is set structurally after HTTP creation, regardless of Docker env vars.
 """
 import json
 import os
@@ -23,9 +26,13 @@ ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL", "http://localhost:5002")
 # Import shared DB config
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from db_connection import get_db_config
+from test_tour_factory import TestTourFactory
 DB_CONFIG = get_db_config()
 # Remap 'dbname' to 'database' for psycopg2.connect compatibility
 DB_CONFIG['database'] = DB_CONFIG.pop('dbname')
+
+# Factory instance — adopt tours created via HTTP so is_test=TRUE is structural
+_factory = TestTourFactory(auto_cleanup=True)
 
 # Timeout for tour generation (seconds)
 GENERATION_TIMEOUT = 180
@@ -129,6 +136,9 @@ def test_tour_content_persisted_on_generation():
     assert row is not None, f"Tour row not found in DB for '{location}'"
 
     tour_id, tour_name, tour_content, stops_count = row
+
+    # LOCAL-141: Structurally ensure is_test=TRUE regardless of Docker env
+    _factory.adopt_and_ensure_flagged(tour_id)
 
     # 1. tour_content must be non-NULL and non-empty
     assert tour_content is not None, (

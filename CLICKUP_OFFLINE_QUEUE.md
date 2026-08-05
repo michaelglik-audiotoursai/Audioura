@@ -3144,3 +3144,191 @@ Smaller: stop 3 describes a generic French armchair (Wikipedia's `fauteuil`
 article, not the museum's object); stop 6 attributes Buddhist iconography
 (urna, elongated earlobes) to a Hàm Nghi portrait. Both source
 contamination. Without the two big defects the same tour scores ~64.
+
+---
+
+## QUEUED 2026-08-04 — ClickUp rate-limited (131 min). Post to 👤 Michael (`1000410000000735`) when it clears.
+
+**Task name:** 📄 Approve the accuracy disclaimer wording — the app has none today
+**Priority:** high
+
+You wrote: *"we should in the disclaimer when people are installing / use our
+application that the data comes from Internet sources. **If we do not, we
+should.**"*
+
+**We do not.** I searched `audio_tour_app/lib` — there is no accuracy
+disclaimer anywhere. The only "AI-generated" strings concern replacing a custom
+audio recording.
+
+This matters more now, because your D100 ruling makes it policy: **we publish
+unverifiable claims deliberately**, on the reasoning that "having no
+information may be worse than having unverifiable information." Defensible —
+but only if we say so.
+
+### Pick or edit the wording
+
+Two places: the **About screen**, and a **one-time notice on first launch**.
+
+**Draft A — plain**
+> Audioura tours are generated from public internet sources, including
+> Wikipedia and museum websites. We check facts against those sources where we
+> can, but some details may be incomplete or wrong. Please don't rely on tour
+> content for anything important.
+
+**Draft B — confident (LEAD's recommendation)**
+> Every Audioura tour is written from public sources — Wikipedia, museum
+> catalogues, and the institutions' own websites. We verify what we can and
+> leave out what we believe is wrong. Some details will still be unverified.
+> If something sounds off, it may be.
+
+**Draft C — short, for the first-launch notice**
+> Tours are generated from public internet sources. Some details may be
+> unverified.
+
+**Why B:** it states what we actually do, including the part he decided — block
+what we believe is wrong, allow what we merely cannot confirm. A and C imply we
+do not check at all, which undersells the work and reads as boilerplate. "If
+something sounds off, it may be" invites the listener to act as a check on us,
+worth more than a legal shield.
+
+### Needed from Michael
+1. Which draft, or his edit.
+2. First-launch notice: yes or no? LEAD's view is yes — a disclaimer only in
+   About is one nobody reads, and this one is load-bearing.
+
+Then LEAD dispatches: About screen + first-launch notice + the same text in
+both store listings (which `wdvrdaw6em`/`wdvrdaw6en` need anyway).
+
+**Separate from** the privacy policy (`wdvrdaw6em`), which is about data
+handling and is required by both stores. This one is about content accuracy and
+is required by nobody — we do it because it is honest.
+
+---
+
+## QUEUED 2026-08-04 — ClickUp still rate-limited (77 min). Post to 👤 Michael (`1000410000000735`).
+
+**Task name:** 🔑 GitHub PAT expiring ~Aug 7 — it is NOT the one this Mac uses. Let it expire.
+**Priority:** normal
+
+### Is it phishing?
+Form is right (`noreply@github.com`, real URL pattern) but form is what phishing
+copies. Verify the way that works regardless: **do not click the link** — type
+`github.com`, avatar → Settings → Developer settings → Personal access tokens →
+Tokens (classic). If "Ubuntu VM Token" is there expiring ~7 Aug, it was real.
+
+### It is not this machine's token — verified
+| | expiring token (email) | Mac Mini's token |
+|---|---|---|
+| scopes | 11, incl. repo, read:org, read:audit_log, codespace:secrets | **repo only** |
+| expiry | ~7 Aug | **none set** |
+
+Different tokens. Letting it expire breaks nothing here.
+
+### Recommendation: let it expire, do not regenerate
+1. Nothing here uses it; there is no Ubuntu VM in the current setup.
+2. Broad scopes — `repo` is full read/write to every repository.
+3. **Expiry is a free test.** If something forgotten uses it, that breaks
+   visibly ~7 Aug and a new token takes two minutes. Regenerating keeps an
+   unaccounted-for credential alive another year and tests nothing.
+
+Decisive option: delete it on that page now.
+
+### Separate finding: this Mac stores its token in plaintext
+```
+git config credential.helper → store
+~/.git-credentials           → https://user:ghp_xxxx@github.com
+```
+Keychain helper is already installed and a github.com keychain entry exists.
+Fix is `git config --global credential.helper osxkeychain` then
+`rm ~/.git-credentials`; next push prompts once.
+
+**LEAD will not do this unattended** — if it half-fails the dispatcher's pushes
+break. Needs Michael present, with the token to hand for the one prompt.
+
+Also: the Mac's token has **no expiry**. Put a 12-month expiry on its
+replacement.
+
+---
+
+## QUEUED 2026-08-04 — ClickUp rate-limited (63 min). Post to 👤 Michael (`1000410000000735`). **Michael asked for this one explicitly.**
+
+**Task name:** 🔑 Check whether the Windows laptop uses the expiring GitHub token (before ~Aug 7)
+**Priority:** high · **Due:** 2026-08-06
+
+### Step 1 — "Last used" (any computer, 30 seconds)
+Do NOT use the email link. Type github.com → avatar → Settings → Developer
+settings → Personal access tokens → Tokens (classic) → find "Ubuntu VM Token"
+→ read **Last used**.
+
+| Last used | meaning |
+|---|---|
+| within the last week | something uses it → Step 3 |
+| a month or more ago | probably dormant → Step 3 to confirm |
+| Never used | nothing uses it → Step 4 |
+| token not listed at all | the email was phishing; stop |
+
+### Step 2 — Mac Mini already ruled out
+| | Ubuntu VM Token | Mac Mini |
+|---|---|---|
+| scopes | 11, incl. repo, read:org, read:packages | **repo only** |
+| expiry | ~7 Aug | none |
+
+### Step 3 — On the Windows laptop (PowerShell)
+
+3a. Is there a stored credential?
+```powershell
+cmdkey /list | Select-String github
+```
+Nothing → skip to Step 4.
+
+3b. Which scopes? (does not print the token)
+```powershell
+$c = "protocol=https`nhost=github.com`n" | git credential fill
+$tok = ($c | Select-String '^password=') -replace '^password=',''
+$r = Invoke-WebRequest -Uri https://api.github.com/user -Headers @{Authorization="token $tok"} -UseBasicParsing
+"scopes : " + $r.Headers['X-OAuth-Scopes']
+"expiry : " + $r.Headers['github-authentication-token-expiration']
+```
+
+3c. Read it:
+- long scope list (repo + read:org + read:packages + read:audit_log…) → **this IS the expiring token** → Step 5
+- just `repo`, blank expiry → different token → Step 4
+- auth error → credential already dead → Step 4
+
+### Step 4 — Nothing uses it: let it expire
+Broad scopes, unaccounted for, and expiry is a free test — if something
+forgotten uses it, it fails visibly and a replacement takes two minutes.
+Decisive option: delete it on that page.
+
+### Step 5 — The laptop uses it: regenerate
+1. Tokens (classic) → "Ubuntu VM Token" → **Regenerate token**
+2. **Expiration: 90 days** — not "No expiration"
+3. Trim scopes to `repo` if the laptop only pushes code
+4. Copy the new token (shown once)
+
+Then on the laptop:
+```powershell
+cmdkey /delete:LegacyGeneric:target=git:https://github.com
+git -C C:\path\to\Audioura fetch origin
+```
+Username `michaelglik-audiotoursai`, password = the **new token**. Confirm:
+```powershell
+git -C C:\path\to\Audioura ls-remote origin | Select-Object -First 2
+```
+
+### Context
+The Windows laptop has not pushed to origin since **30 June**
+(`services-migration`), so even the worst case interrupts nothing in progress.
+
+
+---
+
+## ✅ ALL THREE QUEUED TASKS POSTED — 2026-08-04, rate limit cleared
+
+| task | ClickUp |
+|---|---|
+| Windows-laptop token check (Michael asked for this one) | `wdvrdaxbkf` |
+| Accuracy disclaimer wording | `wdvrdaxbkh` |
+| Mac Mini plaintext token → Keychain | `wdvrdaxbkv` |
+
+Nothing left in this queue.

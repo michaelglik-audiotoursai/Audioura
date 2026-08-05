@@ -42,12 +42,15 @@ def _compat_send_file(path_or_file, **kwargs):
 send_file = _compat_send_file
 import threading
 import re
+import logging
 
 # Import the tour text generator
 from generate_tour_text import generate_tour_text
 import api_call_logger
 from job_store import get_job_store
 from storied_version_constants import STORIED_SERVICE_VERSION
+
+_svc_logger = logging.getLogger("generate_tour_text_service")
 
 SERVICE_VERSION = STORIED_SERVICE_VERSION
 
@@ -57,6 +60,14 @@ CORS(app)
 # Register sharing blueprint (LOCAL-110: POST /tour/share + GET /tour/<id>)
 from sharing_endpoints import sharing_bp
 app.register_blueprint(sharing_bp)
+
+# Register referral blueprint (LOCAL-114: POST /referral/create + POST /referral/redeem)
+from referral_endpoints import referral_bp
+app.register_blueprint(referral_bp)
+
+# Register persona blueprint (LOCAL-113: POST/GET /user/persona)
+from persona_endpoints import persona_bp
+app.register_blueprint(persona_bp)
 
 # Global variables
 TOURS_DIR = "/app/tours"
@@ -167,8 +178,10 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                     _error_msg = "This venue could not be verified with enough works to generate a quality tour."
                     import generate_tour_text as _gtt
                     _gtt._LAST_CLEAN_FAIL_EVIDENCE = {}  # Reset for next request
-            except (ImportError, AttributeError):
-                pass
+            except ImportError as _cfe_err:
+                _svc_logger.error(f"[LOCAL-146] MISSING: generate_tour_text._LAST_CLEAN_FAIL_EVIDENCE — degradation evidence unavailable: {_cfe_err}")
+            except AttributeError as _cfe_err:
+                _svc_logger.error(f"[LOCAL-146] generate_tour_text._LAST_CLEAN_FAIL_EVIDENCE not defined: {_cfe_err}")
             ACTIVE_JOBS.update(job_id, status="error", error=_error_msg, **_error_extra)
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
@@ -390,8 +403,10 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                         try:
                             from generate_tour_text import _LAST_VERIFICATION_TIER
                             _gen_tier = _LAST_VERIFICATION_TIER or ''
-                        except (ImportError, AttributeError):
-                            pass
+                        except ImportError as _tier_err:
+                            _svc_logger.error(f"[LOCAL-146] MISSING: generate_tour_text._LAST_VERIFICATION_TIER — tier context unavailable for G4 check: {_tier_err}")
+                        except AttributeError as _tier_err:
+                            _svc_logger.error(f"[LOCAL-146] generate_tour_text._LAST_VERIFICATION_TIER not defined: {_tier_err}")
                         _venue_ctx = {
                             'venue_tokens': _venue_tokens,
                             'city': _city_raw,
@@ -496,8 +511,10 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                             for i, stop_result in enumerate(_icon_result["stops"]):
                                 if i < len(poi_list):
                                     stop_result["verified"] = poi_list[i].get("verified", True)
-                    except (ImportError, AttributeError):
-                        pass
+                    except ImportError as _poi_err:
+                        _svc_logger.error(f"[LOCAL-146] MISSING: generate_tour_text._LAST_POI_LIST — verified flag propagation DISABLED: {_poi_err}")
+                    except AttributeError as _poi_err:
+                        _svc_logger.error(f"[LOCAL-146] generate_tour_text._LAST_POI_LIST not defined: {_poi_err}")
 
                 # Persist to stop_metrics (non-blocking)
                 try:
@@ -549,7 +566,8 @@ def health_check():
     try:
         from cost_ceiling_monitor import get_ceiling_stats
         _ceiling_stats = get_ceiling_stats()
-    except ImportError:
+    except ImportError as _ceil_err:
+        _svc_logger.error(f"[LOCAL-146] MISSING: cost_ceiling_monitor (get_ceiling_stats) — ceiling stats unavailable in health endpoint: {_ceil_err}")
         _ceiling_stats = {}
 
     return jsonify({
