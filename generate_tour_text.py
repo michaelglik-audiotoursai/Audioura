@@ -7013,6 +7013,54 @@ REWRITE RULES (all mandatory):
                     print(f"  [LOCAL-263] WARNING: Deletion rate {_ucg_removal_rate:.1%} "
                           f"exceeds 15% ceiling — review before shipping")
 
+    # -------- [LOCAL-269] PHASE 5.157: Unglossed-reference gate --------
+    # The inverse of LOCAL-263: a fact that assumes knowledge the listener lacks.
+    # Detects named entities with no explanation, triages via model, supplies gloss.
+    # Behind DISABLE_UNGLOSSED_REFERENCE_GATE=1 flag.
+    _urg_disabled = os.environ.get('DISABLE_UNGLOSSED_REFERENCE_GATE', '').strip() == '1'
+    if _urg_disabled:
+        print(f"\n  [LOCAL-269] Unglossed-reference gate DISABLED by DISABLE_UNGLOSSED_REFERENCE_GATE=1 env var")
+    else:
+        print(f"\n  [LOCAL-269] PHASE 5.157: Unglossed-reference gate...")
+        try:
+            from unglossed_reference_gate import apply_gate_to_stop_descriptions as _urg_apply
+        except ImportError as _urg_err:
+            _urg_apply = None
+            print(f"  [LOCAL-269] WARNING: unglossed_reference_gate not importable — gate skipped ({_urg_err})")
+
+        if _urg_apply:
+            _urg_api_key = api_key
+            _urg_model = os.environ.get('GLOSS_MODEL', 'gpt-4o-mini')
+
+            _urg_stats = _urg_apply(
+                poi_list,
+                stop_corpus_data=_stop_corpus_data if '_stop_corpus_data' in dir() else None,
+                api_key=_urg_api_key,
+                model=_urg_model,
+            )
+
+            print(f"  [LOCAL-269] Unglossed-reference gate summary:")
+            print(f"    References detected: {_urg_stats['total_detected']}")
+            print(f"    Glossed: {_urg_stats['total_glossed']}")
+            print(f"    Degraded: {_urg_stats['total_degraded']}")
+            print(f"    Known (skipped): {_urg_stats['total_known']}")
+            print(f"    Triage: {_urg_stats['triage_tokens']} tokens, "
+                  f"${_urg_stats['triage_cost']:.4f}, {_urg_stats['triage_latency']:.1f}s")
+            print(f"    Gloss: {_urg_stats['gloss_tokens']} tokens, "
+                  f"${_urg_stats['gloss_cost']:.4f}, {_urg_stats['gloss_latency']:.1f}s")
+            print(f"    Total added cost: ${_urg_stats['total_cost']:.4f}")
+            if _urg_stats['total_cost'] > 0:
+                total_tokens += _urg_stats['total_tokens']
+                total_cost += _urg_stats['total_cost']
+            print(f"    Stops affected: {_urg_stats['stops_affected']}")
+            if _urg_stats['all_glosses']:
+                print(f"    Glosses applied:")
+                for g in _urg_stats['all_glosses']:
+                    if g.get('gloss'):
+                        print(f"      • {g['entity']} → \"{g['gloss']}\" [source: {g['source']}]")
+                    else:
+                        print(f"      • {g['entity']} → DEGRADED")
+
     # -------- [LOCAL-229] PHASE 5.16: CONTRADICTED claim block --------
     # D100 (Michael, 2026-08-04): "We should not publish if we are reasonably sure
     # that the data is incorrect." If any sentence group contains a CONTRADICTED
