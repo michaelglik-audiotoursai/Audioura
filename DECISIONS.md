@@ -6877,3 +6877,32 @@ conflating them.
 
 The measure of success is not the gate — it is stops with a description, and
 facts per stop.
+
+## D170 — Stop selection stays free. Michael's ruling (2026-08-05)
+
+LEAD proposed pinning the stop pair to Cap d'Antibes + Èze for evaluation runs,
+because round-to-round comparison is confounded when the selector varies —
+round 16 drew Cap d'Antibes + Èze, round 17M drew Cap Ferrat + Èze, and the
+"better description" in round 16 may partly reflect deeper corpus at those stops
+rather than any change we made.
+
+**Michael: "no-no, I do not want to enforce anything artificial on the tour
+generation: if they have different stops, so to be it. That is fine."**
+
+Settled. Do not pin stops, and do not add an evaluation-only selection mode.
+
+**The consequence belongs to scoring, not generation.** If the stop pair varies,
+a single-tour-vs-single-tour comparison cannot attribute a difference to a code
+change — stop selection, corpus depth at those stops, and the change all move
+together. Today's entire round-to-round narrative has that weakness in it.
+
+The answer is not to remove the variance but to measure something that survives
+it:
+
+- **rates rather than counts** — facts per sentence, not facts per tour;
+- **per-stop normalisation** against that stop's available corpus depth, since
+  D153 established depth is the dominant driver of fact density;
+- **several runs rather than one** when a change is being judged.
+
+To be proposed properly in part 2 of Michael's agenda (scoring and evaluation),
+not bolted on. Recorded here so no future task "helpfully" pins the selector.
