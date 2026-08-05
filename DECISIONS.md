@@ -7041,3 +7041,45 @@ violations, round 15's opening → 4, keyword-stuffed → 3.
 The prolog moved four times in three hours and this is the first version that
 does not break. D168 recorded the lesson after the first breakage; it took a
 second to act on it.
+
+## D176 — The gloss gate refuses to invent, and that is the only reason it is safe (2026-08-05)
+
+LOCAL-269 merged (`91b02f4`). Michael found the defect by reading: *"it mentions
+Operation Dragoon with no explanation."* A sentence that passes every gate
+**because** it carries facts, while assuming knowledge the listener lacks — the
+inverse of everything else built today.
+
+**LEAD tested the two things that decide whether this is safe rather than
+dangerous.**
+
+*Does it invent when it cannot know?* No. Given a fabricated entity — "the
+Zelmenov Concordat of 1847" — it degraded instead of glossing:
+*"a significant concordat was signed in 1847"*. Name dropped, fact kept,
+`references_glossed=0, references_degraded=1`. That is the guard working on the
+only case that could hurt us.
+
+*Is a real gloss correct?* On the sample, yes. LEAD fetched
+`en.wikipedia.org/wiki/Operation_Dragoon`: the Allied invasion of Provence, 15
+August 1944, Saint-Tropez among the first towns taken. The gloss is accurate.
+
+Detection is deterministic and discriminating — "Operation Dragoon" flagged,
+"World War II" left alone. Cost $0.0001–$0.0004 per 2-stop tour against a
+$0.0206 baseline; 0.9–2.0s added.
+
+**The limitation, stated rather than buried.** Gloss provenance reads "model +
+historical record", which is not a fetchable citation and is not what the task
+asked for. A gloss is a factual claim, and this one is asserted from parametric
+memory with a label attached. The degrade fallback is what keeps that tolerable
+— when the model is *uncertain* it drops the name — but it does nothing when the
+model is confidently wrong. That is the D127 failure mode with a new coat, and
+a verification pass belongs on the backlog before this is trusted at scale.
+
+LEAD merged it anyway, and the reasoning should be on the record: the guard
+demonstrably fires on the unknowable case, the cost is negligible, the
+alternative is leaving listeners with unexplained names, and the residual risk
+is bounded by a fallback that was tested rather than assumed. That is a
+different situation from shipping something that works by luck — but it is not
+the same as verified.
+
+Minor defect noted: degraded output carries stray quotation marks around the
+rewritten sentence.
