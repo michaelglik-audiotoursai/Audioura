@@ -6728,6 +6728,155 @@ REWRITE RULES (all mandatory):
                   f"{_r7_total_paras_emptied} paragraphs emptied, "
                   f"{_r7_stops_affected} stops affected")
 
+    # -------- [LOCAL-261] PHASE 5.141: R2 question deletion --------
+    # D165: R2 fires but had no path to the output. Questions (?) are always
+    # wrong in narration. Behind DISABLE_R2_DELETION=1 flag. $0.00 — deterministic.
+    _r2_deletion_disabled = os.environ.get('DISABLE_R2_DELETION', '').strip() == '1'
+    if _r2_deletion_disabled:
+        print(f"\n  [LOCAL-261] R2 deletion DISABLED by DISABLE_R2_DELETION=1 env var")
+    else:
+        print(f"\n  [LOCAL-261] PHASE 5.141: R2 question deletion...")
+        try:
+            from style_validator_detector import apply_r2_to_description as _r2_apply
+        except ImportError:
+            _r2_apply = None
+            print(f"  [LOCAL-261] WARNING: apply_r2_to_description not importable — R2 deletion skipped")
+
+        if _r2_apply:
+            _r2_total_deleted = 0
+            _r2_total_paras_emptied = 0
+            _r2_stops_affected = 0
+
+            for _si, _poi in enumerate(poi_list):
+                _desc = _poi.get('description', '')
+                if not _desc or _desc.startswith('['):
+                    continue
+
+                _new_desc, _deleted, _emptied = _r2_apply(_desc)
+                if _deleted > 0 or _emptied > 0:
+                    poi_list[_si]['description'] = _new_desc
+                    _r2_total_deleted += _deleted
+                    _r2_total_paras_emptied += _emptied
+                    _r2_stops_affected += 1
+                    print(f"  [LOCAL-261] Stop {_si+1} '{_poi.get('name', '')[:30]}': "
+                          f"{_deleted} sentence(s) deleted, {_emptied} paragraph(s) emptied")
+
+            print(f"  [LOCAL-261] R2 summary: {_r2_total_deleted} sentences deleted, "
+                  f"{_r2_total_paras_emptied} paragraphs emptied, "
+                  f"{_r2_stops_affected} stops affected")
+
+    # -------- [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion --------
+    # D165: R3 fires but had no path to the output. "you might discover…" is
+    # always wrong. Behind DISABLE_R3_DELETION=1 flag. $0.00 — deterministic.
+    _r3_deletion_disabled = os.environ.get('DISABLE_R3_DELETION', '').strip() == '1'
+    if _r3_deletion_disabled:
+        print(f"\n  [LOCAL-261] R3 deletion DISABLED by DISABLE_R3_DELETION=1 env var")
+    else:
+        print(f"\n  [LOCAL-261] PHASE 5.142: R3 suggestive-exploration deletion...")
+        try:
+            from style_validator_detector import apply_r3_to_description as _r3_apply
+        except ImportError:
+            _r3_apply = None
+            print(f"  [LOCAL-261] WARNING: apply_r3_to_description not importable — R3 deletion skipped")
+
+        if _r3_apply:
+            _r3_total_deleted = 0
+            _r3_total_paras_emptied = 0
+            _r3_stops_affected = 0
+
+            for _si, _poi in enumerate(poi_list):
+                _desc = _poi.get('description', '')
+                if not _desc or _desc.startswith('['):
+                    continue
+
+                _new_desc, _deleted, _emptied = _r3_apply(_desc)
+                if _deleted > 0 or _emptied > 0:
+                    poi_list[_si]['description'] = _new_desc
+                    _r3_total_deleted += _deleted
+                    _r3_total_paras_emptied += _emptied
+                    _r3_stops_affected += 1
+                    print(f"  [LOCAL-261] Stop {_si+1} '{_poi.get('name', '')[:30]}': "
+                          f"{_deleted} sentence(s) deleted, {_emptied} paragraph(s) emptied")
+
+            print(f"  [LOCAL-261] R3 summary: {_r3_total_deleted} sentences deleted, "
+                  f"{_r3_total_paras_emptied} paragraphs emptied, "
+                  f"{_r3_stops_affected} stops affected")
+
+    # -------- [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion --------
+    # D165: R4 fires but had no path to the output. Michael's reference case:
+    # "you are surrounded by history and natural beauty" — scored 1/5.
+    # Behind DISABLE_R4_DELETION=1 flag. $0.00 — deterministic.
+    _r4_deletion_disabled = os.environ.get('DISABLE_R4_DELETION', '').strip() == '1'
+    if _r4_deletion_disabled:
+        print(f"\n  [LOCAL-261] R4 deletion DISABLED by DISABLE_R4_DELETION=1 env var")
+    else:
+        print(f"\n  [LOCAL-261] PHASE 5.143: R4 prescribed-feeling deletion...")
+        try:
+            from style_validator_detector import apply_r4_to_description as _r4_apply
+        except ImportError:
+            _r4_apply = None
+            print(f"  [LOCAL-261] WARNING: apply_r4_to_description not importable — R4 deletion skipped")
+
+        if _r4_apply:
+            _r4_total_deleted = 0
+            _r4_total_paras_emptied = 0
+            _r4_stops_affected = 0
+
+            for _si, _poi in enumerate(poi_list):
+                _desc = _poi.get('description', '')
+                if not _desc or _desc.startswith('['):
+                    continue
+
+                _new_desc, _deleted, _emptied = _r4_apply(_desc)
+                if _deleted > 0 or _emptied > 0:
+                    poi_list[_si]['description'] = _new_desc
+                    _r4_total_deleted += _deleted
+                    _r4_total_paras_emptied += _emptied
+                    _r4_stops_affected += 1
+                    print(f"  [LOCAL-261] Stop {_si+1} '{_poi.get('name', '')[:30]}': "
+                          f"{_deleted} sentence(s) deleted, {_emptied} paragraph(s) emptied")
+
+            print(f"  [LOCAL-261] R4 summary: {_r4_total_deleted} sentences deleted, "
+                  f"{_r4_total_paras_emptied} paragraphs emptied, "
+                  f"{_r4_stops_affected} stops affected")
+
+    # -------- [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion --------
+    # D165: R8 fires but had no path to the output. Model restating its own
+    # instructions as narration. Behind DISABLE_R8_DELETION=1 flag. $0.00.
+    _r8_deletion_disabled = os.environ.get('DISABLE_R8_DELETION', '').strip() == '1'
+    if _r8_deletion_disabled:
+        print(f"\n  [LOCAL-261] R8 deletion DISABLED by DISABLE_R8_DELETION=1 env var")
+    else:
+        print(f"\n  [LOCAL-261] PHASE 5.144: R8 prompt-leakage deletion...")
+        try:
+            from style_validator_detector import apply_r8_to_description as _r8_apply
+        except ImportError:
+            _r8_apply = None
+            print(f"  [LOCAL-261] WARNING: apply_r8_to_description not importable — R8 deletion skipped")
+
+        if _r8_apply:
+            _r8_total_deleted = 0
+            _r8_total_paras_emptied = 0
+            _r8_stops_affected = 0
+
+            for _si, _poi in enumerate(poi_list):
+                _desc = _poi.get('description', '')
+                if not _desc or _desc.startswith('['):
+                    continue
+
+                _new_desc, _deleted, _emptied = _r8_apply(_desc)
+                if _deleted > 0 or _emptied > 0:
+                    poi_list[_si]['description'] = _new_desc
+                    _r8_total_deleted += _deleted
+                    _r8_total_paras_emptied += _emptied
+                    _r8_stops_affected += 1
+                    print(f"  [LOCAL-261] Stop {_si+1} '{_poi.get('name', '')[:30]}': "
+                          f"{_deleted} sentence(s) deleted, {_emptied} paragraph(s) emptied")
+
+            print(f"  [LOCAL-261] R8 summary: {_r8_total_deleted} sentences deleted, "
+                  f"{_r8_total_paras_emptied} paragraphs emptied, "
+                  f"{_r8_stops_affected} stops affected")
+
     # -------- [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion --------
     # D89: a sentence that fits any stop belongs to no stop — delete it.
     # Behind DISABLE_R9_DELETION=1 flag. $0.00 — deterministic, no LLM call.

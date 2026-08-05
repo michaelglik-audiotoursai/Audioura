@@ -2028,6 +2028,364 @@ def apply_r7_to_description(description: str) -> Tuple[str, int, int]:
     return new_description, total_deleted, paragraphs_emptied
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# LOCAL-261: Deletion paths for R2, R3, R4, R8
+# ═══════════════════════════════════════════════════════════════════════════════
+# D165: Four of seven detectors can see and cannot act. R2, R3, R4, R8 fire
+# during PHASE 5.1 style validation (triggering a retry) but when the retry
+# fails to fix the sentence, it ships. These four are deletion-only — unlike
+# R1, there is no content to preserve beneath the violation.
+#
+# Pattern copied from apply_r7_deletions / apply_r7_to_description (D154).
+# Navigation exemption carries through: nav sentences are never deleted.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def apply_r2_deletions(paragraph: str) -> str:
+    """Apply R2 (question) deletions to a paragraph.
+
+    Removes sentences flagged by check_r2_questions (severity=error only).
+    R2_INTERROGATIVE_OPENER (warning) is NOT deleted — many are declaratives
+    like "What began as a fishing village became…" (D165 scope: do not widen).
+
+    Behind DISABLE_R2_DELETION=1 — caller checks.
+    """
+    if not paragraph or not paragraph.strip():
+        return paragraph
+
+    sentences = _split_sentences(paragraph)
+    if not sentences:
+        return paragraph
+
+    kept = []
+    for sentence in sentences:
+        if len(sentence) < 10:
+            kept.append(sentence)
+            continue
+        if _is_style_navigation_sentence(sentence):
+            kept.append(sentence)
+            continue
+        findings = check_r2_questions(sentence)
+        # Only delete on ERROR severity (contains '?'), not WARNING
+        has_error = any(f['severity'] == 'error' for f in findings)
+        if not has_error:
+            kept.append(sentence)
+
+    if not kept:
+        return ''
+
+    result_text = ' '.join(kept)
+    for pat in _DANGLING_CONNECTIVE_COMPILED:
+        new_text = pat.sub('', result_text, count=1)
+        if new_text != result_text:
+            new_text = new_text.strip()
+            if new_text and new_text[0].islower():
+                new_text = new_text[0].upper() + new_text[1:]
+            result_text = new_text
+            break
+
+    return result_text.strip()
+
+
+def apply_r2_to_description(description: str) -> Tuple[str, int, int]:
+    """Apply R2 deletions to a full stop description (multiple paragraphs).
+
+    Returns:
+        (new_description, sentences_deleted, paragraphs_emptied)
+
+    Behind DISABLE_R2_DELETION=1 — caller must check.
+    """
+    if not description or not description.strip():
+        return description, 0, 0
+
+    paragraphs = [p for p in description.split('\n\n') if p.strip()]
+    if not paragraphs:
+        return description, 0, 0
+
+    new_paragraphs = []
+    total_deleted = 0
+    paragraphs_emptied = 0
+
+    for para in paragraphs:
+        para = para.strip()
+        if len(para) <= 30:
+            new_paragraphs.append(para)
+            continue
+
+        sentences_before = _split_sentences(para)
+        result = apply_r2_deletions(para)
+
+        if not result:
+            paragraphs_emptied += 1
+            total_deleted += len([s for s in sentences_before if len(s) >= 10])
+        else:
+            sentences_after = _split_sentences(result)
+            deleted_count = (
+                len([s for s in sentences_before if len(s) >= 10]) -
+                len([s for s in sentences_after if len(s) >= 10])
+            )
+            total_deleted += max(0, deleted_count)
+            new_paragraphs.append(result)
+
+    new_description = '\n\n'.join(new_paragraphs)
+    return new_description, total_deleted, paragraphs_emptied
+
+
+def apply_r3_deletions(paragraph: str) -> str:
+    """Apply R3 (suggestive exploration) deletions to a paragraph.
+
+    Removes sentences flagged by check_r3_suggestive_exploration.
+    Behind DISABLE_R3_DELETION=1 — caller checks.
+    """
+    if not paragraph or not paragraph.strip():
+        return paragraph
+
+    sentences = _split_sentences(paragraph)
+    if not sentences:
+        return paragraph
+
+    kept = []
+    for sentence in sentences:
+        if len(sentence) < 10:
+            kept.append(sentence)
+            continue
+        if _is_style_navigation_sentence(sentence):
+            kept.append(sentence)
+            continue
+        findings = check_r3_suggestive_exploration(sentence)
+        if not findings:
+            kept.append(sentence)
+
+    if not kept:
+        return ''
+
+    result_text = ' '.join(kept)
+    for pat in _DANGLING_CONNECTIVE_COMPILED:
+        new_text = pat.sub('', result_text, count=1)
+        if new_text != result_text:
+            new_text = new_text.strip()
+            if new_text and new_text[0].islower():
+                new_text = new_text[0].upper() + new_text[1:]
+            result_text = new_text
+            break
+
+    return result_text.strip()
+
+
+def apply_r3_to_description(description: str) -> Tuple[str, int, int]:
+    """Apply R3 deletions to a full stop description (multiple paragraphs).
+
+    Returns:
+        (new_description, sentences_deleted, paragraphs_emptied)
+
+    Behind DISABLE_R3_DELETION=1 — caller must check.
+    """
+    if not description or not description.strip():
+        return description, 0, 0
+
+    paragraphs = [p for p in description.split('\n\n') if p.strip()]
+    if not paragraphs:
+        return description, 0, 0
+
+    new_paragraphs = []
+    total_deleted = 0
+    paragraphs_emptied = 0
+
+    for para in paragraphs:
+        para = para.strip()
+        if len(para) <= 30:
+            new_paragraphs.append(para)
+            continue
+
+        sentences_before = _split_sentences(para)
+        result = apply_r3_deletions(para)
+
+        if not result:
+            paragraphs_emptied += 1
+            total_deleted += len([s for s in sentences_before if len(s) >= 10])
+        else:
+            sentences_after = _split_sentences(result)
+            deleted_count = (
+                len([s for s in sentences_before if len(s) >= 10]) -
+                len([s for s in sentences_after if len(s) >= 10])
+            )
+            total_deleted += max(0, deleted_count)
+            new_paragraphs.append(result)
+
+    new_description = '\n\n'.join(new_paragraphs)
+    return new_description, total_deleted, paragraphs_emptied
+
+
+def apply_r4_deletions(paragraph: str) -> str:
+    """Apply R4 (prescribed feeling) deletions to a paragraph.
+
+    Removes sentences flagged by check_r4_prescribed_feeling.
+    Behind DISABLE_R4_DELETION=1 — caller checks.
+    """
+    if not paragraph or not paragraph.strip():
+        return paragraph
+
+    sentences = _split_sentences(paragraph)
+    if not sentences:
+        return paragraph
+
+    kept = []
+    for sentence in sentences:
+        if len(sentence) < 10:
+            kept.append(sentence)
+            continue
+        if _is_style_navigation_sentence(sentence):
+            kept.append(sentence)
+            continue
+        findings = check_r4_prescribed_feeling(sentence)
+        if not findings:
+            kept.append(sentence)
+
+    if not kept:
+        return ''
+
+    result_text = ' '.join(kept)
+    for pat in _DANGLING_CONNECTIVE_COMPILED:
+        new_text = pat.sub('', result_text, count=1)
+        if new_text != result_text:
+            new_text = new_text.strip()
+            if new_text and new_text[0].islower():
+                new_text = new_text[0].upper() + new_text[1:]
+            result_text = new_text
+            break
+
+    return result_text.strip()
+
+
+def apply_r4_to_description(description: str) -> Tuple[str, int, int]:
+    """Apply R4 deletions to a full stop description (multiple paragraphs).
+
+    Returns:
+        (new_description, sentences_deleted, paragraphs_emptied)
+
+    Behind DISABLE_R4_DELETION=1 — caller must check.
+    """
+    if not description or not description.strip():
+        return description, 0, 0
+
+    paragraphs = [p for p in description.split('\n\n') if p.strip()]
+    if not paragraphs:
+        return description, 0, 0
+
+    new_paragraphs = []
+    total_deleted = 0
+    paragraphs_emptied = 0
+
+    for para in paragraphs:
+        para = para.strip()
+        if len(para) <= 30:
+            new_paragraphs.append(para)
+            continue
+
+        sentences_before = _split_sentences(para)
+        result = apply_r4_deletions(para)
+
+        if not result:
+            paragraphs_emptied += 1
+            total_deleted += len([s for s in sentences_before if len(s) >= 10])
+        else:
+            sentences_after = _split_sentences(result)
+            deleted_count = (
+                len([s for s in sentences_before if len(s) >= 10]) -
+                len([s for s in sentences_after if len(s) >= 10])
+            )
+            total_deleted += max(0, deleted_count)
+            new_paragraphs.append(result)
+
+    new_description = '\n\n'.join(new_paragraphs)
+    return new_description, total_deleted, paragraphs_emptied
+
+
+def apply_r8_deletions(paragraph: str) -> str:
+    """Apply R8 (prompt leakage) deletions to a paragraph.
+
+    Removes sentences flagged by check_r8_prompt_leakage.
+    Behind DISABLE_R8_DELETION=1 — caller checks.
+    """
+    if not paragraph or not paragraph.strip():
+        return paragraph
+
+    sentences = _split_sentences(paragraph)
+    if not sentences:
+        return paragraph
+
+    kept = []
+    for sentence in sentences:
+        if len(sentence) < 10:
+            kept.append(sentence)
+            continue
+        if _is_style_navigation_sentence(sentence):
+            kept.append(sentence)
+            continue
+        findings = check_r8_prompt_leakage(sentence)
+        if not findings:
+            kept.append(sentence)
+
+    if not kept:
+        return ''
+
+    result_text = ' '.join(kept)
+    for pat in _DANGLING_CONNECTIVE_COMPILED:
+        new_text = pat.sub('', result_text, count=1)
+        if new_text != result_text:
+            new_text = new_text.strip()
+            if new_text and new_text[0].islower():
+                new_text = new_text[0].upper() + new_text[1:]
+            result_text = new_text
+            break
+
+    return result_text.strip()
+
+
+def apply_r8_to_description(description: str) -> Tuple[str, int, int]:
+    """Apply R8 deletions to a full stop description (multiple paragraphs).
+
+    Returns:
+        (new_description, sentences_deleted, paragraphs_emptied)
+
+    Behind DISABLE_R8_DELETION=1 — caller must check.
+    """
+    if not description or not description.strip():
+        return description, 0, 0
+
+    paragraphs = [p for p in description.split('\n\n') if p.strip()]
+    if not paragraphs:
+        return description, 0, 0
+
+    new_paragraphs = []
+    total_deleted = 0
+    paragraphs_emptied = 0
+
+    for para in paragraphs:
+        para = para.strip()
+        if len(para) <= 30:
+            new_paragraphs.append(para)
+            continue
+
+        sentences_before = _split_sentences(para)
+        result = apply_r8_deletions(para)
+
+        if not result:
+            paragraphs_emptied += 1
+            total_deleted += len([s for s in sentences_before if len(s) >= 10])
+        else:
+            sentences_after = _split_sentences(result)
+            deleted_count = (
+                len([s for s in sentences_before if len(s) >= 10]) -
+                len([s for s in sentences_after if len(s) >= 10])
+            )
+            total_deleted += max(0, deleted_count)
+            new_paragraphs.append(result)
+
+    new_description = '\n\n'.join(new_paragraphs)
+    return new_description, total_deleted, paragraphs_emptied
+
+
 # ─── R8: Prompt leakage (LOCAL-213) ──────────────────────────────────────────
 # The model restates its own instructions as narration. The listener hears
 # the recipe instead of the dish. Error severity — this is never acceptable.
