@@ -6100,3 +6100,54 @@ been reported over text that plainly had the defect, and every time the harness
 was measuring correctly against a rule that could not see. The number was true
 and useless. Task files now require sentence-level detail behind every residual,
 and LEAD measures the delivered artifact by hand before believing any of them.
+
+## D151 — The detector fix landed; the tour it produced did not (2026-08-05)
+
+LOCAL-251 merged as `998025f`, **detector changes only**. All three mechanisms
+from D150 are fixed and LEAD verified every one:
+
+- A person's name no longer substantiates by itself. "The legacy of artists
+  like Marc Chagall lingers in the very air you breathe" fires; Monet-in-1888,
+  Sartre-at-La-Colombe-d'Or and the 1960s-Montand sentence all stay silent,
+  because each pairs a name with a date, an act or a documented fact.
+- The knock-on is gone: that sentence no longer cancels "the village's artistic
+  spirit is palpable" through the delivery check.
+- R9 now sees sentences carrying no promise noun at all — "the ancient pathways
+  bear the weight of history", "a portal to a world where art and culture
+  intertwine seamlessly". Michael's "senseless combination of words" class.
+
+**19/19 boundary rows**, both directions, LEAD-run. Corpus-wide R9 0.60% →
+1.46%, ratio 2.41 against a 3× ceiling; LEAD's independent count over 29
+non-test tours agrees in magnitude (38/1957 vs the task's 41/2810 — different
+denominators, same order).
+
+**The round 8 artifact was withheld from storied and bounced.** Merging a
+verified detector while refusing the tour it generated is the right split here:
+everything downstream depends on the detector, and nothing depends on the tour.
+
+- `[Description for Cap d'Antibes could not be generated.]` shipped **inside**
+  the delivered text, where stop 1's body belongs — so the residuals and the
+  fact tally were computed over a tour missing half its content. Last round
+  shipped a `Description:` label and was bounced; this shipped the failure
+  message.
+- **The Rue Obscure was placed at Cap d'Antibes.** It is in Villefranche-sur-Mer
+  — where it also appears, correctly, in stop 2. Expansion reached for a corpus
+  passage belonging to a different stop. This is a factual error we introduced
+  ourselves, arriving through the expansion path rather than the generator, and
+  LOCAL-250's one-passage-per-tour dedupe did not fire on it.
+- "Look for this work in the galleries." in the orientation for a coastal cape.
+- R7 still reports 0 over "the aroma of freshly baked pastries from nearby
+  cafes" and "the sound of seagulls overhead". Fifth blind zero this week, and
+  the class Michael scored 1/5.
+
+Round 8 also switched stop 2 from Saint-Paul-de-Vence to Villefranche-sur-Mer
+without saying so, which made its hand-counted fact tally incomparable to the
+round it was presented against. The re-dispatch pins the stop pair.
+
+**The pattern that matters.** Expansion now writes from the corpus, and the
+corpus is thin (D-next: 49 of 88 stops hold one passage). A thin corpus plus an
+eager expander produces confident, well-formed, *wrong* sentences — the Rue
+Obscure at the wrong cape is exactly that. The style rules cannot catch it; it
+is grammatical, specific, and dated. Only two things can: passages scoped to
+the stop being written, and more passages per stop. The first is in the
+re-dispatch; the second is LOCAL-252, already running.
