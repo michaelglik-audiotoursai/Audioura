@@ -7083,3 +7083,84 @@ the same as verified.
 
 Minor defect noted: degraded output carries stray quotation marks around the
 rewritten sentence.
+
+## D177 — Part 4 previews the guest list, not the story (2026-08-05)
+
+Michael, reading round 23: *"the both do nto have anything intruiging in the
+General Tour description, while some stops have something interesting in them
+worth to mention."*
+
+LEAD extracted the most fact-dense sentence from every stop of the 8-stop tour
+and checked which reached the description. **None did.** What is sitting unused:
+
+| stop | the story in the tour |
+|---|---|
+| Île Sainte-Marguerite | the **Man in the Iron Mask**, imprisoned at Fort Royal from 1687 |
+| Promenade des Anglais | **Henri Negresco** — born Alexandru Negrescu, a Bucharest confectioner who became director of Nice's Municipal Casino |
+| La Croisette | the **1946 Cannes Film Festival cancelled** by a government mobilisation order |
+| Port de Saint-Tropez | first town on the coast **liberated, 1944** |
+| Paloma Beach | named after **Picasso's daughter** |
+| Eze Village | **seized 1543**, castle destroyed by **Louis XIV** |
+
+What the description offers instead: "once owned by King Léopold II", "graced by
+Charlie Chaplin and Elizabeth Taylor", "the legacy of the Grimaldi brothers".
+
+**A guest list, not a story.** Part 4 selects by name recognition, and famous
+names are usually the least interesting thing in a stop — Chaplin visited, which
+is trivia; a Bucharest confectioner becoming the man behind the Negresco has a
+shape.
+
+**LEAD's verification criterion was also wrong, and this is the sharper
+lesson.** LEAD checked "does this entity appear in the stop it is credited to" —
+5 of 6 passed. That tests **presence**, not **interest**. It would pass a
+description assembled entirely from the dullest true facts in the tour. The
+check could not detect what Michael saw in one reading.
+
+It also explains his verdict on round 16: its part 4 named *"Monet's 1888
+paintings"* and *"the 1706 destruction of Eze Village's fortifications"* — a
+painting series and a destruction, both events with tension. Not owners.
+
+The fix is a **selection criterion**, not more verification: rank candidate
+facts by whether they carry a reversal, a mystery or a cause, and prefer those
+over recognisable names. That is a judgement a model can make and a regex
+cannot — the second good use for the escalation budget Michael authorised.
+
+Also found, and the reason LOCAL-270 will be bounced rather than merged: part 4
+credits *"Port Vauban, where Pablo Picasso left his mark"* and **Picasso does
+not appear in the Port Vauban stop.** That is precisely the failure the task was
+built to prevent.
+
+## D178 — Every defect Michael finds is a sentence the gate cannot name (2026-08-05)
+
+On the last sentence of round 23's stop 2 — *"Just ahead, journey back through
+the centuries."* — he asked *"why was not that expanched?"*
+
+Every gate is silent. Not a promise, not sensory, not a feeling, not a quality
+claim, not navigation. R9 catches "the ancient pathways bear the weight of
+history" and misses this at any length, so it is the shape, not a threshold.
+
+It is an **empty exhortation**: urging the listener toward something without
+saying what. And it is the **last sentence of the final stop** — "Just ahead"
+pointing at nothing, because nothing checks that a forward reference has
+somewhere to point.
+
+Expansion only runs on classified sentences. Unclassified ones are neither
+expanded nor deleted; they pass through untouched. **Our system never considered
+it.**
+
+**The pattern across the whole afternoon.** Every defect Michael has found by
+reading — the three sensory sentences, "you are surrounded by history and
+natural beauty", the unexplained Operation Dragoon, and now this — has been a
+sentence outside the classifier's vocabulary. Each time the response has been to
+add a category. He named the alternative himself in effect: the gate should work
+from **"does this sentence carry information"** rather than from a list of the
+ways a sentence can fail to.
+
+Adding claim types one at a time will keep losing to a language model's
+inventiveness. That is the substance of part 1 of his agenda and should be put
+to him as a design choice rather than absorbed as another category.
+
+Dispatched LOCAL-271 for the immediate items: the R1 rewrite damage LEAD has
+flagged in four rounds without fixing ("you can admire yourself standing at the
+tip of the cape"), the empty-exhortation type, and the final-stop forward
+transition.
