@@ -4578,3 +4578,87 @@ suites report.
 **Not treating this as urgent** because the guard that matters — user-visible
 drift — is intact and checked every five minutes. This is hygiene with a known
 failure mode, not an active fault.
+
+---
+
+## D119 — 24 of 29 real tours have no source material at all (2026-08-04)
+
+LOCAL-231 profiled every stored tour read-only. Its headline is the most
+important measurement produced today, and it generalises D78 from one venue to
+the product:
+
+```
+real tours (n=29)
+  all stops EMPTY — no stop-level corpus       24 of 29   (83%)
+  at least one COVERED stop                     5 of 29
+  contradicted claims                           0 of 29
+  unsupported claims per group          mean 0.065
+```
+
+And the reading that matters, in the task's own words:
+
+> "The low unsupported-claim rate is not a sign of truthfulness — it is an
+> artefact of having nothing to check claims against. Claims in those tours are
+> **unchecked, not clean**."
+
+That is D94's trap measured across the whole product. **The corpus is the
+ceiling, everywhere, not just at MAMAC.** Five tours out of twenty-nine have a
+single stop with its own sourced material.
+
+Style, across all 84 tours and 2,854 groups:
+
+```
+R1_IMPERATIVE            27.9%     ← more than a quarter of all groups
+R3_SUGGESTIVE             5.4%
+R4_PRESCRIBED             3.5%
+R7_HALLUCINATED           2.4%
+R9_GENERIC                2.2%
+R8_PROMPT_LEAKAGE         0.6%
+```
+
+Six of twenty-nine tours are **more than half** instruction. R1 is not a
+stylistic quibble; it is the dominant defect in the product, and it is exactly
+what Michael's listener complained about.
+
+**Bounced anyway** — see D120. The calibration section misreports the one thing
+that demonstrably works.
+
+---
+
+## D120 — A submission's calibration path disagreed with the library it claims to use (2026-08-04)
+
+LOCAL-231's §5 reported that the machine **misses** both sentences Michael
+scored 0/5:
+
+```
+| 9  | 0 | CONTENT    | clean | ✗ machine misses; his 0 was R9 |
+| 10 | 0 | NAVIGATION | clean | ✗ machine classifies as NAVIGATION |
+```
+
+LEAD ran tour 163's real text through `split_into_sentence_groups` and the
+unmodified validator:
+
+```
+grp 22: R9=True  nav=False   "As you continue your journey through this…"
+grp 23: R9=True  nav=False   "From Cap d'Antibes to Villefranche-sur-Mer…"
+total groups: 24            (the submission says 18)
+```
+
+**R9 fires on both.** Neither is navigation. Two numbers disagree with a direct
+run — the group count and the verdicts.
+
+Why it matters beyond being wrong: LOCAL-216 verified R9 against Michael's
+marks with **zero disagreements**, and LOCAL-222 watched it delete that exact
+sentence in all three runs. This table would have told him the one piece of
+this work that demonstrably succeeds does not.
+
+**The bounce asks for the mechanism, not the correction.** A code path
+producing different results from the library it imports is this week's
+signature failure (D83 a key that did not exist, D91 a swallowed exception,
+D103 formats that did not compose, D110 an assertion satisfied by breakage).
+Silently fixing the table would discard the finding.
+
+One candidate LEAD flagged: the paragraph filter. LEAD used `len > 60`; if the
+task used something else, that alone could explain 18 vs 24 — and would mean
+the §1 rates are computed over a different denominator than stated. Which
+would matter, because those rates are the part worth keeping.
