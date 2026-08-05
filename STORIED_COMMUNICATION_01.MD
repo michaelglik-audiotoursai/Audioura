@@ -283,3 +283,51 @@ telling you what to feel *instead of* telling you something. A pleasant clause
 attached to a real direction is not that.
 
 ---
+
+## 2026-08-05 11:52 — Michael
+
+> I am looking at ..._round15.txt and after the Orientation, I see the paragraph
+> of the tour description, so claiming that we missed it was wrong: "From the
+> secluded allure of Cap d'Antibes to the medieval whispers of Eze Village, each
+> stop reveals a layer of history and culture, painting a vivid picture of a
+> region shaped by time and tide. …" So the serious problem that it does not name
+> the tour. If it started with "On this biking tour of French Riviera, from the
+> secluded..." I would not have missed it. I assume that the new generation
+> includes this task -- needs the confirmation and we are not going to have two
+> tour descriptions because of me missing this one, please confirm that also.
+
+## 2026-08-05 11:52 — LEAD
+
+**Your diagnosis is better than mine.** I framed round 15's opening as "matching
+none of the four parts", which is true but abstract. Yours is the operative
+fact: **the description exists and you read straight past it, because nothing in
+it says what the tour is.** That is the defect — not absence, unrecognisability.
+Recorded that way.
+
+**(a) Does the new generation name the tour? Yes — confirmed.**
+LOCAL-259 part 1 is "the tour name and including transportation", and LOCAL-260's
+validator requires part 1 to name **both** the subject and the transport mode.
+A biking tour whose opening never says it is a biking tour fails the check.
+
+**(b) Two descriptions? You caught a real gap — it was not guarded.**
+LOCAL-259 says "place it before the orientation of stop 1" and **never says it
+replaces the existing one.** The existing description is the spine's `tour_hook`,
+which sits *after* the orientation. A literal reading produces exactly the two
+descriptions you are worried about.
+
+Fixed two ways:
+
+1. **Addendum appended to LOCAL-259** — the four-part opening REPLACES the
+   `tour_hook`; two descriptions is a bounce. It is mid-run, so this binds on
+   re-dispatch and I will check the artifact myself at review.
+2. **`DUPLICATE_TOUR_DESCRIPTION` added to LOCAL-260's validator** — exactly one
+   tour-level description per tour, detected structurally rather than by
+   position, with both spans quoted on failure. That is the durable guard; the
+   addendum only covers this round.
+
+I also added your two strings to the validator's boundary rows as the reference
+cases: *"From the secluded allure of Cap d'Antibes…"* must **fail** part 1, and
+*"On this biking tour of the French Riviera, from the secluded allure of Cap
+d'Antibes…"* must **pass**.
+
+---
