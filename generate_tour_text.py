@@ -4,6 +4,15 @@ Modified version of generate_tour_text.py that includes geo coordinates for the 
 import os
 from cost_rates import llm_cost as _llm_cost
 
+# Sixth "built and inert" defect (D131): a rule implemented, wired, and then
+# skipped at runtime because the root module was not importable from whatever
+# cwd the process happened to have. Put this file's own directory on sys.path
+# so every sibling module resolves regardless of how we are invoked.
+import sys as _sys, os as _os
+_MODULE_DIR = _os.path.dirname(_os.path.abspath(__file__))
+if _MODULE_DIR not in _sys.path:
+    _sys.path.insert(0, _MODULE_DIR)
+
 
 def _tour_llm_cost(tokens: int) -> float:
     """Cost of a call at the model actually in use.
@@ -6566,9 +6575,11 @@ REWRITE RULES (all mandatory):
         print(f"\n  [LOCAL-235] PHASE 5.155: R10 unfulfilled-promise deletion...")
         try:
             from style_validator_detector import apply_r10_to_description as _r10_apply
-        except ImportError:
+        except ImportError as _r10_err:
             _r10_apply = None
-            print(f"  [LOCAL-235] WARNING: apply_r10_to_description not importable — R10 skipped")
+            print(f"  [LOCAL-235] ERROR: R10 NOT APPLIED — apply_r10_to_description "
+                  f"unimportable ({_r10_err}). This is a defect, not a configuration: "
+                  f"the module sits beside this file. sys.path[0]={sys.path[0]}")
 
         if _r10_apply:
             _r10_total_deleted = 0

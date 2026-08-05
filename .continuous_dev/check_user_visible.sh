@@ -21,7 +21,13 @@ LOG="$HOME/audioura-backups/backup.log"
 # generate so he could compare it paragraph-by-paragraph with his field-tested
 # tour 29. Real generation, real coords, is_test=false — a deliberate gain,
 # not a leaked test artifact.
-EXPECTED="1,12,14,17,21,24,27,28,29,152"
+# 2026-08-05: 21, 27, 28 (Asian Arts Museum) retired at Michael's instruction.
+# Their stops were invented — the venue has no venue_corpus row at all, so the
+# model produced plausible object names and narrated them. His verdict on the
+# Chikanobu print: "has nothing to do with Nice museum and should be excluded
+# entirely as false." Coordinates nulled, not deleted; backup at
+# ~/audioura-backups/coords_asian_arts_20260805T003824.json
+EXPECTED="1,12,14,17,24,29,152"
 
 ACTUAL=$(curl -s -m 20 "http://localhost:5005/tours-near/43.7009358/7.2683912?radius=50" 2>/dev/null \
   | /usr/bin/python3 -c "
