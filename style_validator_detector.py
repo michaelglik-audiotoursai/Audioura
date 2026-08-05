@@ -1070,6 +1070,20 @@ _R7_PATTERNS = [
     r'\b(?:the\s+)?(?:salty|gentle|soft|warm|cool|sweet|fresh)\s+(?:breeze|wind|air|scent|aroma|fragrance)\s+(?:carries|brings|fills|wafts)\b.*\b(?:ambiance|ambience|atmosphere|serenity|tranquility|tranquillity|calm|peace)\b',
     # Sound + abstract emotional causation: "the sound of X creates a [feeling]"
     r'\bthe\s+sound\s+of\s+.*\b(?:creates?|produces?|evokes?|offers?|provides?|conjures?)\s+(?:a\s+)?(?:soothing|calming|serene|peaceful|tranquil|harmonious|magical|enchanting)\s+(?:ambiance|ambience|atmosphere|backdrop|setting|mood)\b',
+    # LOCAL-251: "breathe in the [scent/aroma] of X" without absence marker —
+    # When the inhaled sensory combines MULTIPLE invented details (sea + pastries,
+    # lavender + baking) that the narrator cannot source, this is fabrication.
+    # Pattern: "breathe in" + scent/aroma + "mingling/mixed/combined" (multi-source indicator)
+    r'\bbreathe\s+in\s+.*\b(?:scent|smell|aroma|fragrance)\b.*\b(?:mingling|mixed|combined|blending|intertwined)\b',
+    # LOCAL-251: "The sound of X" + "provide/offer" + "backdrop/soundtrack/accompaniment"
+    # Fabricated ambient scene presented as stage-setting. The narrator
+    # invents a soundscape for atmosphere. Does NOT fire on factual statements
+    # about real audible things ("The sound of the fountain is audible from the square").
+    r'\b(?:the\s+)?sound\s+of\s+\w+.*\b(?:provide|offer|create|lend|give|add)\w*\s+(?:a\s+)?(?:sensory|sonic|auditory|natural|perfect|soothing)?\s*(?:backdrop|soundtrack|accompaniment|setting|tapestry)\b',
+    # LOCAL-251: "the gentle lapping of waves" + sensory descriptor
+    # Fabricated seaside ambiance — cannot be sourced from documents.
+    # Does NOT fire on "waves crash against the seawall" (bare factual observation).
+    r'\b(?:gentle|soft|rhythmic)\s+(?:lapping|lapping|crashing|splashing)\s+of\s+(?:waves|water)\b.*\b(?:provide|create|offer|lend|add|give)\b',
 ]
 
 _R7_COMPILED = [re.compile(p, re.IGNORECASE) for p in _R7_PATTERNS]
@@ -1103,6 +1117,113 @@ def check_r7_hallucinated_sensory(sentence: str) -> List[Dict]:
             break  # One R7 finding per sentence
 
     return findings
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# R7 DELETION LOGIC (assembly-time) — LOCAL-251
+# ═══════════════════════════════════════════════════════════════════════════════
+# Michael scored this class 1/5: "guessing what one would feel: very annoying
+# to humans." R7 fires on fabricated sensory claims; until now it only reported.
+#
+# The distinction between legitimate and invented sensory:
+#   LEGITIMATE: "the Mediterranean is visible below" — observable fact
+#   INVENTED:   "breathe in the salty scent mingling with freshly baked pastries"
+#               — the narrator cannot know this from any source
+#
+# R7's patterns already encode this distinction (absence markers, multi-sensory
+# fabrication, fabricated soundscapes). The deletion path trusts the detection.
+#
+# Behind DISABLE_R7_DELETION=1 env var — caller checks this.
+
+def apply_r7_deletions(paragraph: str) -> str:
+    """Apply R7 deletions to a paragraph.
+
+    - Removes sentences flagged by check_r7_hallucinated_sensory
+    - Strips dangling connectives from the resulting first sentence
+    - Returns empty string if all sentences are deleted
+
+    Behind DISABLE_R7_DELETION=1 env var — caller checks this.
+    """
+    if not paragraph or not paragraph.strip():
+        return paragraph
+
+    sentences = _split_sentences(paragraph)
+    if not sentences:
+        return paragraph
+
+    kept = []
+    for sentence in sentences:
+        if len(sentence) < 10:
+            kept.append(sentence)
+            continue
+        # Navigation sentences are never deleted
+        if _is_style_navigation_sentence(sentence):
+            kept.append(sentence)
+            continue
+        findings = check_r7_hallucinated_sensory(sentence)
+        if not findings:
+            kept.append(sentence)
+        # else: sentence is fabricated sensory — drop it
+
+    if not kept:
+        return ''  # All sentences deleted — caller removes the paragraph
+
+    # Fix dangling connective on the new first sentence
+    result_text = ' '.join(kept)
+    for pat in _DANGLING_CONNECTIVE_COMPILED:
+        new_text = pat.sub('', result_text, count=1)
+        if new_text != result_text:
+            new_text = new_text.strip()
+            if new_text and new_text[0].islower():
+                new_text = new_text[0].upper() + new_text[1:]
+            result_text = new_text
+            break
+
+    return result_text.strip()
+
+
+def apply_r7_to_description(description: str) -> Tuple[str, int, int]:
+    """Apply R7 deletions to a full stop description (multiple paragraphs).
+
+    Returns:
+        (new_description, sentences_deleted, paragraphs_emptied)
+
+    Behind DISABLE_R7_DELETION=1 — caller must check.
+    """
+    if not description or not description.strip():
+        return description, 0, 0
+
+    paragraphs = [p for p in description.split('\n\n') if p.strip()]
+    if not paragraphs:
+        return description, 0, 0
+
+    new_paragraphs = []
+    total_deleted = 0
+    paragraphs_emptied = 0
+
+    for para in paragraphs:
+        para = para.strip()
+        if len(para) <= 30:
+            new_paragraphs.append(para)
+            continue
+
+        sentences_before = _split_sentences(para)
+        result = apply_r7_deletions(para)
+
+        if not result:
+            paragraphs_emptied += 1
+            total_deleted += len([s for s in sentences_before if len(s) >= 10])
+        else:
+            sentences_after = _split_sentences(result)
+            deleted_count = (
+                len([s for s in sentences_before if len(s) >= 10]) -
+                len([s for s in sentences_after if len(s) >= 10])
+            )
+            total_deleted += max(0, deleted_count)
+            new_paragraphs.append(result)
+
+    new_description = '\n\n'.join(new_paragraphs)
+    return new_description, total_deleted, paragraphs_emptied
 
 
 # ─── R8: Prompt leakage (LOCAL-213) ──────────────────────────────────────────
