@@ -6664,3 +6664,34 @@ museum's catalogue is exactly right.
 Two stops still produced no description (`La danse cosmique de Ganesh`,
 one other) for want of per-work context. That is the next constraint at this
 venue, and it is a corpus problem, not a gate problem.
+
+## D164 — Navigation sentences may carry an appended instruction. Michael's ruling (2026-08-05)
+
+Michael, reading round 15, asked whether "enjoy the sea breeze" surviving in the
+orientation was because orientation is exempt from the instruction rules. It is
+not, and LEAD corrected the premise before answering:
+
+- Orientation **is** run through R1. R1 **fires** on that sentence.
+- The sentence is classified as **navigation**, so D107 exempts it from rewrite.
+- The same instruction *alone* — "Enjoy the sea breeze along the coast." — is
+  not navigation, R1 fires, and the rewrite **deletes it entirely**.
+
+So the instruction survives only because it is comma-joined to a genuine
+navigation clause. The exemption is sentence-level; the content is clause-level.
+LEAD flagged this as arguably wrong — "enjoy the sea breeze" is prescribed
+feeling, the class Michael has scored 1/5 and 2/5 — and offered a clause-level
+fix, free and contained.
+
+**Michael's answer: "All good, as intended."**
+
+So this is settled and deliberate. A navigation sentence may carry an appended
+sensory or invitational clause: *"Start cycling southeast on the main road,
+enjoy the sea breeze along the coast"*, *"pedal east along the coastal road,
+soaking in the Mediterranean views"*.
+
+**Do not "fix" this.** Any future task that narrows the navigation exemption to
+clause level must leave this pattern intact. R1's prohibition applies to
+instruction-giving in *narration*, not to warmth attached to a genuine
+direction — which is the distinction Michael has been drawing all along:
+he objects to being told what to feel *instead of* being told something, not to
+a pleasant word alongside a real instruction.
