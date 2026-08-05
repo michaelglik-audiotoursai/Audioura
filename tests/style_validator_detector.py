@@ -21,19 +21,18 @@ _spec = importlib.util.spec_from_file_location("_style_validator_canonical", _CA
 _mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)
 
-# Re-export public API
-validate_paragraph = _mod.validate_paragraph
-analyze_tour_style = _mod.analyze_tour_style
-run_report = _mod.run_report
-check_r1_imperatives = _mod.check_r1_imperatives
-check_r2_questions = _mod.check_r2_questions
-check_r3_suggestive_exploration = _mod.check_r3_suggestive_exploration
-check_r4_prescribed_feeling = _mod.check_r4_prescribed_feeling
-check_r7_hallucinated_sensory = _mod.check_r7_hallucinated_sensory
-check_r8_prompt_leakage = _mod.check_r8_prompt_leakage
-check_r9_generic = _mod.check_r9_generic
-apply_r9_deletions = _mod.apply_r9_deletions
-apply_r9_to_description = _mod.apply_r9_to_description
-_is_style_navigation_paragraph = _mod._is_style_navigation_paragraph
-_is_style_navigation_sentence = _mod._is_style_navigation_sentence
-_split_sentences = _mod._split_sentences
+# Re-export EVERYTHING the canonical module defines.
+#
+# This used to be a hand-written list, and it cost us twice: R10 shipped and
+# was invisible to anything importing through this shim, because nobody
+# remembered to add `apply_r10_to_description` and `check_r10_unfulfilled_promise`
+# to the list. LOCAL-241's generation silently fell back to post-processing for
+# exactly that reason (D135).
+#
+# A shim that has to be maintained in step with the module it forwards is a
+# shim that will drift. Forward dynamically instead.
+for _name in dir(_mod):
+    if not _name.startswith('__'):
+        globals()[_name] = getattr(_mod, _name)
+
+del _name
