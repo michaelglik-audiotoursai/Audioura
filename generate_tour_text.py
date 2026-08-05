@@ -7421,16 +7421,13 @@ REWRITE RULES (all mandatory):
                 _corpus_facts_prompt += "\n\n  [Story elements]:\n" + "\n".join(
                     f"    - {sf}" for sf in _prolog_story_facts[:8])
 
-            # --- Part 4 data: what the stops actually cover ---
-            _prolog_stop_previews = []
-            for _sp_entry in _arc[:len(poi_list)]:
-                _sp_role = _sp_entry.get("chapter_role", "")
-                _sp_angle = _sp_entry.get("unique_angle", "")
-                if _sp_role or _sp_angle:
-                    _prolog_stop_previews.append(f"{_sp_role}: {_sp_angle}")
+            # --- Part 4 data: REMOVED from spine prompt (LOCAL-270) ---
+            # Part 4 (forward connection) is now composed AFTER stop narrations
+            # are generated and gated, from the actual delivered text.
+            # See PHASE 5.96 below.
 
-            # --- Build the four-part prolog prompt ---
-            _prolog_prompt = f"""[LOCAL-259] Write a tour prolog in EXACTLY four sequential parts. Each part has a specific purpose. Output them as one flowing paragraph (no labels, no numbering), but ensure all four parts are present in order.
+            # --- Build the three-part prolog prompt (LOCAL-270: Part 4 moved to post-narration) ---
+            _prolog_prompt = f"""[LOCAL-259/LOCAL-270] Write a tour prolog in EXACTLY three sequential parts. Each part has a specific purpose. Output them as one flowing paragraph (no labels, no numbering), but ensure all three parts are present in order.
 
 TOUR DATA:
 - Tour name/location: {location}
@@ -7444,10 +7441,7 @@ TOUR DATA:
 SOURCED FACTS (use ONLY these for any factual claim):
 {_corpus_facts_prompt if _corpus_facts_prompt else '  (no corpus facts available — use only general geographic/transport facts for Part 2, omit specific historical claims in Part 3)'}
 
-STOP CONTENT PREVIEWS (for Part 4):
-{chr(10).join(f'  - {sp}' for sp in _prolog_stop_previews) if _prolog_stop_previews else '  - ' + ', '.join(_prolog_stop_names)}
-
-THE FOUR PARTS (produce in this exact order, flowing as natural prose):
+THE THREE PARTS (produce in this exact order, flowing as natural prose):
 
 PART 1 — TOUR NAME + TRANSPORT (1-2 sentences):
 State the tour name and mode of transport. Example shape: "You are about to embark on a [cycling/walking/driving] journey through [location]."
@@ -7458,11 +7452,10 @@ State the transport mode again concretely, name the endpoints ({_prolog_stop_nam
 PART 3 — PURPOSE/INTRIGUE (2-4 sentences):
 This is the story hook — WHY someone takes this tour. Thread sourced facts into a causal or thematic sentence. Use ONLY facts from the SOURCED FACTS section above. If the facts support a causal link (X led to Y, which explains Z), write it. If they do NOT support a causal chain, write the plainest true version: state two sourced facts without manufacturing a connection between them. A false causal claim is worse than a plain factual one.
 
-PART 4 — FORWARD CONNECTION (1-2 sentences):
-Connect to the upcoming stops by naming SPECIFIC content they cover. Do NOT say vague things like "more stories await" or "hints at the region's role." You MUST name at least one specific date, person, or event from each stop. Example: "In the stops ahead, you will trace Monet's 1888 paintings at Cap d'Antibes and the 1306 chapel crowning Eze Village." The promise must be dischargeable by the tour itself.
+DO NOT include a forward connection to upcoming stops — that will be added separately after the stops are written.
 
 CONSTRAINTS:
-- Total length: 100-180 words (MUST be at least 100 words — short prologs are rejected)
+- Total length: 80-150 words (MUST be at least 80 words — short prologs are rejected)
 - Second-person present tense throughout
 - Every date, name, or causal claim MUST come from SOURCED FACTS above
 - No questions at the end
@@ -7887,6 +7880,236 @@ NARRATIVE THREAD (weave into Part 3 as the central intrigue):
         if _orient_ratio < 0.3:
             print(f"  [LOCAL-246] ⚠️  WARNING: Orientation collapsed to {_orient_ratio:.0%} of original — "
                   f"listener may not know where to stand")
+
+    # -------- [LOCAL-270] PHASE 5.96: Compose Part 4 from delivered narrations --------
+    # Part 4 (forward connection) was removed from the prolog prompt because the spine
+    # writes it before stop narrations exist. Now that all descriptions are generated
+    # and gated, compose Part 4 from the actual delivered text.
+    # Rules:
+    #   - Every entity named in Part 4 must appear in that stop's final text (verified)
+    #   - At least two stops named, by name
+    #   - No fact from a stop that produced no description
+    #   - 1-2 sentences max
+    #   - If too little content survives, emit NO Part 4 rather than a vague one
+    if _saved_prolog and _storied_mode and poi_list:
+        print(f"\n  [LOCAL-270] PHASE 5.96: Composing Part 4 (forward connection) from delivered narrations...")
+
+        # Gather delivered descriptions — only stops with real content
+        _p4_stop_data = []
+        for _p4i, _p4poi in enumerate(poi_list):
+            _p4_desc = _p4poi.get('description', '')
+            _p4_name = _p4poi.get('name', '')
+            # Skip stops with no description or generation failures
+            if (not _p4_desc or _p4_desc.startswith('[') or
+                'GENERATION_FAILED' in _p4_desc or
+                len(_p4_desc.split()) < 30):
+                continue
+            _p4_stop_data.append({
+                'index': _p4i,
+                'name': _p4_name,
+                'description': _p4_desc,
+            })
+
+        print(f"    Stops with delivered content: {len(_p4_stop_data)}/{len(poi_list)}")
+
+        if len(_p4_stop_data) >= 2:
+            # Build a summary of each stop's key facts for the LLM
+            _p4_stop_summaries = []
+            for _p4s in _p4_stop_data:
+                # Extract sentences with dates, proper nouns, or specific facts
+                _p4_sents = re.split(r'(?<=[.!?])\s+', _p4s['description'])
+                _p4_fact_sents = []
+                for _p4sent in _p4_sents:
+                    if len(_p4sent) < 20:
+                        continue
+                    _has_date = bool(re.search(r'\b\d{3,4}\b', _p4sent))
+                    _has_proper = bool(re.search(r'[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*', _p4sent))
+                    if _has_date or _has_proper:
+                        _p4_fact_sents.append(_p4sent.strip())
+                _p4_stop_summaries.append({
+                    'name': _p4s['name'],
+                    'facts': _p4_fact_sents[:10],  # Cap to avoid token overflow
+                })
+
+            _p4_stops_text = ""
+            for _p4sum in _p4_stop_summaries:
+                if _p4sum['facts']:
+                    _p4_stops_text += f"\n  [{_p4sum['name']}]:\n"
+                    for _p4f in _p4sum['facts'][:6]:
+                        _p4_stops_text += f"    - {_p4f[:200]}\n"
+
+            if _p4_stops_text.strip():
+                # LLM call to compose Part 4 — with one retry on verification failure
+                _p4_prompt = f"""Write 1-2 sentences connecting a tour introduction to its upcoming stops. Name SPECIFIC content from at least two different stops, using the stop names.
+
+STOP NAMES: {', '.join(s['name'] for s in _p4_stop_data)}
+
+DELIVERED STOP CONTENT (these are the ONLY facts you may reference — do NOT invent or add ANY fact not listed here):
+{_p4_stops_text}
+
+RULES:
+- Pick exactly ONE specific fact (a date, person, or event) from at least 2 DIFFERENT stops
+- ALWAYS include the stop name next to its fact — format: "<fact> at <stop name>"
+- Example: "In the stops ahead, you will encounter Monet's 1888 paintings at Cap d'Antibes and the 1706 destruction of Eze Village's fortifications."
+- Second-person present tense
+- 1-2 sentences ONLY (max 50 words)
+- Do NOT use vague language: no "rich history", "many tales", "more stories", "fascinating", "explore the history"
+- ONLY name facts that appear VERBATIM in the DELIVERED STOP CONTENT above
+- Return ONLY the sentence(s), no labels or markers"""
+
+                import requests as _p4_requests
+                _p4_logger = logging.getLogger("generate_tour_text.part4")
+
+                _p4_max_attempts = 2
+                _p4_success = False
+                _p4_text = ""
+                _p4_total_cost = 0.0
+
+                for _p4_attempt in range(_p4_max_attempts):
+                    try:
+                        _p4_resp = _p4_requests.post(
+                            "https://api.openai.com/v1/chat/completions",
+                            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                            json={
+                                "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                                "messages": [
+                                    {"role": "system", "content": "You write concise, factual tour preview sentences. Use ONLY facts from the provided content."},
+                                    {"role": "user", "content": _p4_prompt},
+                                ],
+                                "temperature": 0.3 + (_p4_attempt * 0.2),  # slightly higher on retry
+                                "max_tokens": 120,
+                            },
+                            timeout=15,
+                        )
+                        if _p4_resp.status_code != 200:
+                            print(f"    Part 4 LLM call failed (HTTP {_p4_resp.status_code}) — attempt {_p4_attempt+1}")
+                            continue
+
+                        _p4_result = _p4_resp.json()
+                        _p4_text = _p4_result["choices"][0]["message"]["content"].strip()
+                        if _p4_text.startswith('"') and _p4_text.endswith('"'):
+                            _p4_text = _p4_text[1:-1].strip()
+
+                        # Cost tracking
+                        _p4_usage = _p4_result.get("usage", {})
+                        _p4_cost = (_p4_usage.get("prompt_tokens", 0) / 1000 * 0.005) + \
+                                   (_p4_usage.get("completion_tokens", 0) / 1000 * 0.015)
+                        _p4_total_cost += _p4_cost
+                        total_cost += _p4_cost
+                        total_tokens += _p4_usage.get("total_tokens", 0)
+                        print(f"    Part 4 LLM cost: ${_p4_cost:.4f} ({_p4_usage.get('total_tokens', 0)} tokens) [attempt {_p4_attempt+1}]")
+
+                        # --- STRUCTURAL VERIFICATION ---
+                        # Simplified approach: check that every factual claim (date, multi-word
+                        # proper noun) in Part 4 exists in at least one stop's delivered text.
+                        # Then verify at least 2 different stops are referenced by name.
+                        _p4_verified = True
+                        _p4_stops_referenced = 0
+                        _p4_verification_log = []
+
+                        # All delivered descriptions combined (for global fact check)
+                        _all_desc_lower = ' '.join(s['description'].lower() for s in _p4_stop_data)
+
+                        # Count how many stops are referenced by name
+                        _p4_lower = _p4_text.lower()
+                        for _p4s in _p4_stop_data:
+                            _sname = _p4s['name'].lower()
+                            # Check full name or significant portion (>5 chars)
+                            if _sname in _p4_lower:
+                                _p4_stops_referenced += 1
+                            else:
+                                # Try significant name parts
+                                _sig_parts = [p for p in _sname.split() if len(p) > 4
+                                              and p not in ('saint', 'sainte', 'ville')]
+                                if any(sp in _p4_lower for sp in _sig_parts):
+                                    _p4_stops_referenced += 1
+
+                        # Check all dates in Part 4 exist in delivered descriptions
+                        _p4_dates = re.findall(r'\b(\d{4})\b', _p4_text)
+                        for _pd in _p4_dates:
+                            if _pd not in _all_desc_lower:
+                                _p4_verified = False
+                                _p4_verification_log.append(
+                                    f"FAIL: date '{_pd}' not found in any stop description")
+
+                        # Check multi-word proper nouns (person/place names) exist in descriptions
+                        # Pattern: "Word Word" or "Word de Word" etc.
+                        _p4_multi_proper = re.findall(
+                            r'\b([A-Z][a-zéèêëàâùûôîïç]+(?:\s+(?:de|du|la|le|des|von|van|di|d\'|sur|en)?\s*[A-Z][a-zéèêëàâùûôîïç]+)+)\b',
+                            _p4_text)
+                        _p4_skip_names = {s['name'] for s in _p4_stop_data}
+                        _p4_skip_phrases = {
+                            'French Riviera', 'Mediterranean Sea', 'Cap d\'Antibes',
+                        }
+                        for _pm in _p4_multi_proper:
+                            _pm_clean = _pm.strip()
+                            # Skip stop names themselves
+                            if any(_pm_clean.lower() in sn.lower() or sn.lower() in _pm_clean.lower()
+                                   for sn in _p4_skip_names):
+                                continue
+                            if _pm_clean in _p4_skip_phrases:
+                                continue
+                            # Check if at least one significant word (>4 chars) appears in descriptions
+                            _pm_words = [w for w in _pm_clean.split()
+                                         if len(w) > 4 and w.lower() not in
+                                         {'french', 'riviera', 'saint', 'sainte', 'grand',
+                                          'petit', 'coast', 'route', 'along', 'about'}]
+                            if _pm_words and not any(w.lower() in _all_desc_lower for w in _pm_words):
+                                _p4_verified = False
+                                _p4_verification_log.append(
+                                    f"FAIL: '{_pm_clean}' not found in any stop description")
+
+                        # Must reference at least 2 stops by name
+                        if _p4_stops_referenced < 2:
+                            _p4_verified = False
+                            _p4_verification_log.append(
+                                f"FAIL: only {_p4_stops_referenced} stop(s) referenced by name, need ≥2")
+
+                        # Check for vague language (R10-style)
+                        _vague_patterns = [
+                            r'\bmore stories\b', r'\bmany tales\b', r'\bmany more\b',
+                            r'\brich history\b', r'\bfascinating\b', r'\bhints at\b',
+                            r'\bmore awaits\b', r'\bstories await\b', r'\bmore to discover\b',
+                            r'\bmore wonders\b', r'\bcountless\b', r'\bexplore the history\b',
+                        ]
+                        for _vp in _vague_patterns:
+                            if re.search(_vp, _p4_text, re.IGNORECASE):
+                                _p4_verified = False
+                                _p4_verification_log.append(
+                                    f"FAIL: vague language detected in Part 4")
+                                break
+
+                        if _p4_verified:
+                            _p4_success = True
+                            break
+                        else:
+                            print(f"    ✗ Part 4 attempt {_p4_attempt+1} FAILED verification:")
+                            print(f"      Candidate: \"{_p4_text}\"")
+                            for _vlog in _p4_verification_log:
+                                print(f"      {_vlog}")
+
+                    except Exception as _p4_err:
+                        _p4_logger.warning(f"[LOCAL-270] Part 4 attempt {_p4_attempt+1} error: {_p4_err}")
+                        print(f"    Part 4 attempt {_p4_attempt+1} error ({type(_p4_err).__name__})")
+
+                if _p4_success:
+                    # Append Part 4 to the prolog (before "Your first stop is X.")
+                    _saved_prolog = _saved_prolog.rstrip() + " " + _p4_text.strip()
+                    print(f"    ✓ Part 4 composed and verified ({len(_p4_text.split())} words):")
+                    print(f"      \"{_p4_text}\"")
+                    print(f"      Stops referenced: {_p4_stops_referenced}")
+                else:
+                    print(f"    ✗ Part 4 FAILED all {_p4_max_attempts} attempts — omitting")
+                    if _p4_text:
+                        print(f"      Last candidate: \"{_p4_text}\"")
+
+                print(f"    Part 4 total cost: ${_p4_total_cost:.4f}")
+            else:
+                print(f"    No factual sentences found in delivered stops — omitting Part 4")
+        else:
+            print(f"    Fewer than 2 stops with content — omitting Part 4")
+    elif not _saved_prolog:
+        print(f"\n  [LOCAL-270] PHASE 5.96: No prolog — skipping Part 4 composition")
 
     # Add each POI with its description and directions
     for i, poi in enumerate(poi_list):
