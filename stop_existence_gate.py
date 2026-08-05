@@ -587,6 +587,19 @@ def run_existence_gate(
         ev = v['evidence'][:80] if v['evidence'] else "no evidence"
         print(f"    [{status}] {v['stop_title']!r:.50s} — {ev}")
 
+    # ──── LOCAL-283: HARVEST PASSAGES ON VERIFICATION ─────────────────────
+    # When a stop is verified (especially via name-in-a-list), attempt to
+    # harvest fact-carrying passages from the same source into stop_corpus.
+    harvest_summary = None
+    try:
+        from verification_harvester import harvest_on_verification
+        harvest_summary = harvest_on_verification(verdicts, venue_name, db_conn)
+    except ImportError:
+        pass  # Module not available — skip silently
+    except Exception as _harv_err:
+        print(f"    [HARVEST] Error (non-fatal): {_harv_err}")
+    # ──── END LOCAL-283 ───────────────────────────────────────────────────
+
     return {
         'mode': mode,
         'total_stops': len(poi_list),
@@ -594,4 +607,5 @@ def run_existence_gate(
         'unverified_stops': unverified_stops,
         'verdicts': verdicts,
         'action': action,
+        'harvest_summary': harvest_summary,
     }
