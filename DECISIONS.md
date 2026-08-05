@@ -5136,3 +5136,76 @@ this is a retirement.
 change made without asking, on the strength of his "exclude entirely as false"
 — stated for one tour and applying identically to the other two. If he wants 27
 and 28 back it is one command.
+
+---
+
+## D131 — 170 of 190 stops are unverifiable, and 4 of Michael's 6 facts were findable. Both matter (2026-08-05)
+
+Three tasks landed overnight and together they answer the question Michael's
+Chikanobu search opened.
+
+### The stop-existence gate: the number is 89.5%
+
+```
+170 of 190 stops across 29 real tours are UNVERIFIED
+
+Asian Arts Museum (all languages)   70 stops   100% unverified
+Museum of Naïve Art                 27 stops   100%
+Abu Dhabi camel tours               19 stops   100%
+Nice walking tour                   10 stops   100%
+French Riviera (biking/cycling)     30 stops    60%
+Palais Lascaris                      3 stops    33%
+Musée Chagall                        6 stops     0%   ← the only clean venue
+```
+
+Enforcing this today would empty nearly every tour, so it shipped **LOG_ONLY**
+by default, which is what LEAD asked for. **Michael's own field-tested tour 29
+is 60% unverified.**
+
+Only Chagall fully verifies, because it is the one venue with proper SPARQL
+works in `venue_corpus`.
+
+### The subject routine: 18% expanded, 82% deleted
+
+Michael's instruction was *"either tell us the story or get rid of the
+sentence."* Across the Nice list, the second branch fires four times in five.
+That is D123 as a number: with no corpus, there is nothing to expand from, and
+the routine correctly refuses to expand from memory.
+
+### And the finding that vindicates his pushback
+
+On his own Villa Eilenroc rewrite, the routine found **4 of his 6 facts**:
+
+```
+Charles Garnier          ✓  antibes tourism site
+1867                     ✓  ville-antibes.fr
+Hugh-Hope Loudon         ✓  travel blog
+Fitzgerald               ✓  stop_corpus
+"Eilenroc" = Cornelie    ✗  the passage IS in the results — token matching
+                            required "Eilenroc" and "Cornelie" together
+Beaumonts, 1927          ✗  not in the top results
+```
+
+**Both misses are retrieval precision, not web availability.** He said the
+public web would produce a meaningful story and it does; LEAD's D127 claim was
+wrong, and this quantifies by how much — 67% findable with a first
+implementation, and the failures are fixable query construction.
+
+**So the ordering is now clear.** Corpus depth is the binding constraint, and
+the corpus is obtainable. Style rules operate on text that has nothing in it;
+the routine deletes because there is nothing to expand from; the existence gate
+cannot pass stops nobody has sourced. All three are the same problem seen from
+different angles.
+
+### One LEAD fixup at merge
+
+R10 was implemented, correct, and **never called** — `validate_paragraph` never
+invoked it, so every consumer saw zero findings while the rule itself fired on
+8 of 12 sentences in tour 180's Eze paragraph. The rule needs the whole
+sentence list (it checks neighbours for delivery) and the existing loop passes
+one sentence at a time. Wired in; R10 now reports 11 findings on tour 180, and
+Michael's rewrite prose stays clean.
+
+Fifth "built and inert" defect in ten days. The pattern is stable enough to
+predict: **a new rule is not shipped until something calls it and a real
+document proves it.**
