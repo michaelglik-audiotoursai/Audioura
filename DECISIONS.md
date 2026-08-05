@@ -6443,3 +6443,60 @@ Fixed forward as LOCAL-256 rather than reverted, because the rewrite path is
 sound and nothing deploys from `storied` automatically. The new acceptance bar
 is a finite verb in every rewritten sentence, with fallback to the original
 imperative when no rule can produce one — an imperative beats a fragment.
+
+## D159 — The existence gate verifies 74% corpus-wide, and the three zeros have three different causes (2026-08-05)
+
+Nobody had measured the gate across the whole corpus. LEAD ran
+`verify_stop_existence` over all 88 `stop_corpus` rows:
+
+```
+  28/28  French Riviera walking area
+  13/13  Musee d'Art Moderne et d'Art Contemporain, Nice
+  11/11  Palais Lascaris, Nice
+    6/6  Musee Matisse, Nice
+    4/4  Musee National Marc Chagall, Nice
+    3/3  Boston Common
+    0/9  Musee d'art naif, Nice
+    0/8  Musee des Arts Asiatiques        <- Michael's gate venue
+    0/5  walking tour in Nice
+    0/1  National Constitution Center
+                    CORPUS-WIDE: 65/88 (74%)
+```
+
+**First: the gate is not fooled by padding.** It requires a *single* passage to
+contain both a content word from the stop title and a venue signal. LEAD
+suspected LOCAL-254's Matisse boilerplate might be what earned that venue 6/6;
+it is not. `Nu bleu IV` verifies on a passage that names the work itself —
+*"'Nu bleu IV' (Blue Nude IV) is part of Henri Matisse's Blue Nudes"* — which
+carries both signals honestly. The padding is still padding (D157), but it buys
+no verification. Good design, and worth knowing before anyone "fixes" the gate.
+
+**The three zeros are three different problems, not one.**
+
+1. **Passages that are not about their stop.** `Statue de Bouddha` holds six
+   passages and not one contains "bouddha" or "statue" — they describe the
+   museum, Kenzō Tange, a Gandhara sculpture. Same for `La danse cosmique de
+   Ganesh`, `Robe de prêtre taoiste` and `Kannon`: **zero** stop-word matches
+   across all their passages. The corpus for this venue is venue-level text
+   distributed across object rows.
+2. **French titles, English sources.** Stop titles are French and the fetched
+   passages are English Wikipedia, so `bouddha` never appears in text that says
+   "Buddha". The gate matches content words literally after accent-stripping,
+   which cannot cross that gap.
+3. **Objects filed under the wrong venue.** `Kannon à mille bras` and `Masque
+   du vieillard Kojo` — museum objects — sit under venue `walking tour in
+   Nice`. That is a data error independent of both other causes.
+
+A minor real bug also surfaced: venue signals are split on whitespace without
+stripping punctuation, so `(Asian` and `Museum)` become tokens that can never
+match anything. Harmless today because `arts`/`asiatiques`/`nice` carry the
+match, but it is dead weight in the one venue that most needs signals.
+
+**Why this matters now.** Michael's gate is 75 at N=8 on the Asian Arts Museum.
+Every stop there fails existence, so under `enforce` the venue yields nothing
+to score. Corpus depth alone will not move it — LOCAL-254 added passages there
+and the count went 2.9 → 4.1 with the pass rate still 0/8, because the passages
+are about the museum rather than its objects. The fix is per-object sources
+that name the object, in a language the title uses, at the venue it is actually
+in. That is a retrieval problem, not a gate problem, and the gate is right to
+reject.
