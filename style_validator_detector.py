@@ -1539,12 +1539,97 @@ def _has_filler_signal(sentence: str) -> bool:
     return False
 
 
+def _has_contentless_signal(sentence: str) -> bool:
+    """LOCAL-251: Detect sentences with NO content — metaphorical language about nothing.
+
+    Michael's round 2 review: "senseless combination of words and facts with no
+    interconnectedness… they make listener confused instead of informed."
+
+    These sentences have no proper noun, no date, no number, AND use metaphorical
+    or abstract language that says nothing concrete about the stop. They differ from
+    filler (which uses journey/charming/uncover patterns) in that they use:
+      - Metaphorical verbs with abstract objects (bear the weight of, echo with,
+        exude, intertwine, linger)
+      - "portal to a world" / "journey through the annals" type constructions
+      - Abstract nouns as the entire substance (history, culture, creativity,
+        warmth, spirit) with no concrete predicate
+
+    CONSERVATIVE: Only fires when the sentence is ENTIRELY metaphorical/abstract.
+    A sentence that has metaphorical language but ALSO contains a fact should NOT
+    fire — the fact saves it. The caller ensures no specifics are present.
+
+    Guard: this is called ONLY when _has_proper_noun, _has_date, and _has_number
+    have all returned False. So by the time we get here, the sentence has no
+    anchoring specifics at all.
+    """
+    lower = sentence.lower()
+
+    # Pattern 1: Metaphorical verbs paired with abstract objects
+    # "bear the weight of history", "echo with the footsteps", "exude warmth"
+    _METAPHORICAL_PATTERNS = [
+        # [subject] bear/carry/hold the weight/burden of [abstract]
+        r'\b(?:bear|bears|carry|carries|carried|hold|holds)\s+the\s+(?:weight|burden)\s+of\b',
+        # [subject] echo/resound/ring with [abstract]
+        r'\b(?:echo|echoes|echoed|echoing|resound|resounds|ring|rings)\s+with\b',
+        # [subject] exude/radiate/emanate [abstract]
+        r'\b(?:exude|exudes|exuded|radiate|radiates|emanate|emanates|emanating)\s+(?:\w+\s+){0,3}(?:warmth|charm|elegance|beauty|sense|aura|energy|spirit)\b',
+        # [subject] intertwine/weave/blend seamlessly/together
+        r'\b(?:intertwine|intertwines|weave|weaves|blend|blends)\s+(?:seamlessly|together|harmoniously)\b',
+        # "lingers in the very air" / "infusing every corner"
+        r'\blingers?\s+in\s+the\s+(?:very\s+)?(?:air|atmosphere|streets?|walls?)\b',
+        r'\binfusing\s+(?:every|each|the)\s+(?:corner|street|wall|stone)\b',
+        # "testament to the enduring power/spirit of"
+        r'\btestament\s+to\s+the\s+(?:enduring|lasting|timeless|eternal)\b',
+        # "palpable" as standalone quality claim
+        r'\b(?:is|are|was|were)\s+palpable\b',
+        # "living testament" / "a living [metaphor]"
+        r'\ba\s+living\s+(?:testament|proof|reminder|example|embodiment)\b',
+    ]
+
+    # Pattern 2: Journey/portal metaphors (not the "continue your journey" filler
+    # but the "is a portal to a world" / "journey through the annals" type)
+    _JOURNEY_METAPHORS = [
+        # "is a portal/gateway to a world where"
+        r'\b(?:is|becomes?|serves?\s+as)\s+(?:a\s+)?(?:portal|gateway|window|bridge|doorway)\s+(?:to|into|between)\b',
+        # "a journey through the annals of"
+        r'\bjourney\s+through\s+the\s+(?:annals|pages|chapters|corridors)\s+of\b',
+        # "is not merely a destination" (meta-comment about the place)
+        r'\bnot\s+merely\s+a\s+(?:destination|stop|place|village|town|city)\b',
+        # "each step taken is a [metaphor]"
+        r'\beach\s+step\s+(?:taken\s+)?(?:is|becomes)\s+a\b',
+    ]
+
+    # Pattern 3: Abstract nouns as entire predicate with no concrete detail
+    # "the enduring power of human expression"
+    # "a sense of creative energy"
+    _ABSTRACT_PREDICATE = [
+        # "the enduring/timeless [power/spirit/essence] of [abstract]"
+        r'\bthe\s+(?:enduring|timeless|eternal|lasting|profound)\s+(?:power|spirit|essence|allure|beauty|charm|nature)\s+of\b',
+        # "a sense of [abstract noun]"
+        r'\ba\s+(?:sense|feeling|aura|air|atmosphere)\s+of\s+(?:creative|artistic|historic|historical|cultural|spiritual|timeless|ancient)\b',
+        # "[noun]'s artistic/creative/cultural spirit is"
+        r"\b(?:artistic|creative|cultural|spiritual)\s+spirit\s+(?:is|are|was|were)\b",
+    ]
+
+    for patterns in (_METAPHORICAL_PATTERNS, _JOURNEY_METAPHORS, _ABSTRACT_PREDICATE):
+        for pat in patterns:
+            if re.search(pat, lower):
+                return True
+
+    return False
+
+
 def check_r9_generic(sentence: str) -> List[Dict]:
     """R9: Detect generic sentences that carry no stop-specific content.
 
     A sentence is generic when:
     1. It has NO proper noun, date, or number (nothing tying it to this stop)
     2. It HAS generic filler signals (stance/atmosphere/transition language)
+
+    LOCAL-251 extension: ALSO fires when:
+    1. It has NO proper noun, date, or number (nothing tying it to this stop)
+    2. It HAS contentless signals — metaphorical/abstract language about nothing
+       (the "senseless combination of words" class Michael identified in round 2)
 
     BOTH conditions must be true. A terse factual sentence without specifics
     but also without filler is NOT generic — it's just short.
@@ -1572,17 +1657,28 @@ def check_r9_generic(sentence: str) -> List[Dict]:
     if has_specifics:
         return findings  # Has something tying it to a specific place/time
 
-    # Check for filler signals
-    if not _has_filler_signal(stripped):
-        return findings  # No filler detected — not clearly generic
+    # Check for filler signals (original path)
+    if _has_filler_signal(stripped):
+        findings.append({
+            'rule_id': 'R9_GENERIC',
+            'severity': 'delete',
+            'sentence': stripped,
+            'suggestion': 'This sentence carries nothing specific to this stop — it could be placed in millions of stops. Delete it.',
+        })
+        return findings
 
-    # Both conditions met: no specifics + filler present → generic
-    findings.append({
-        'rule_id': 'R9_GENERIC',
-        'severity': 'delete',
-        'sentence': stripped,
-        'suggestion': 'This sentence carries nothing specific to this stop — it could be placed in millions of stops. Delete it.',
-    })
+    # LOCAL-251: Check for contentless signals — metaphorical/abstract language
+    # that says nothing concrete. This catches "The ancient pathways bear the
+    # weight of history on their worn stones" and "Each step taken is a journey
+    # through the annals of creativity and culture."
+    if _has_contentless_signal(stripped):
+        findings.append({
+            'rule_id': 'R9_GENERIC',
+            'severity': 'delete',
+            'sentence': stripped,
+            'suggestion': 'This sentence uses metaphorical language about nothing concrete — no fact, no date, no specific claim. Delete it.',
+        })
+        return findings
 
     return findings
 
@@ -2118,7 +2214,20 @@ def _sentence_has_concrete_payload(sentence: str) -> bool:
     #      break a capitalized run. "Cap d'Antibes Coastal Path" is one name.
     #   b) Uses _PLACE_WORDS (unified vocabulary) instead of separate sets.
     #   c) Adjective forms resolved via _normalize_for_place_check.
+    #
+    # LOCAL-251 fix: A person's name ALONE is not delivery. It must be paired
+    # with a date, an event, or a named work. "The legacy of artists like Marc
+    # Chagall lingers in the very air you breathe" names Chagall but tells you
+    # NOTHING about Chagall — it is anchoring, not substantiation.
+    # Same reasoning LOCAL-247 applied to place names now applied to people.
+    #
+    # A person name IS delivery when paired with:
+    #   - A date/year (already caught by checks 1-2 above, so won't reach here)
+    #   - An event verb: hosted, visited, painted, wrote, built, founded, etc.
+    #   - A named work: title in quotes, or "novel"/"painting"/"book" nearby
+    #   - A documented fact about what the person DID at this place
     words = sentence.split()
+    has_person_name = False
     consecutive_caps = 0
     consecutive_cap_words = []
     _skip_words = {
@@ -2135,7 +2244,7 @@ def _sentence_has_concrete_payload(sentence: str) -> bool:
         if not clean:
             # Check accumulated caps before resetting
             if consecutive_caps >= 2 and not _is_place_name(consecutive_cap_words, _PLACE_WORDS):
-                return True
+                has_person_name = True
             consecutive_caps = 0
             consecutive_cap_words = []
             continue
@@ -2169,12 +2278,55 @@ def _sentence_has_concrete_payload(sentence: str) -> bool:
                 consecutive_cap_words.append(clean)
             else:
                 if consecutive_caps >= 2 and not _is_place_name(consecutive_cap_words, _PLACE_WORDS):
-                    return True
+                    has_person_name = True
                 consecutive_caps = 0
                 consecutive_cap_words = []
     # Final check
     if consecutive_caps >= 2 and not _is_place_name(consecutive_cap_words, _PLACE_WORDS):
-        return True
+        has_person_name = True
+
+    # LOCAL-251: If a person name was found, check whether the sentence also
+    # contains a substantiating context (event, date, or work). A name floating
+    # in an abstraction ("the legacy of artists like X lingers in the air") is
+    # NOT delivery. A name paired with a factual claim IS delivery.
+    if has_person_name:
+        # Event verbs: the sentence says what the person DID or what happened
+        # involving them. "hosted", "painted", "wrote", "visited", "built", etc.
+        _EVENT_VERB_RE = re.compile(
+            r'\b(?:hosted|visited|painted|wrote|built|founded|created|composed|'
+            r'performed|directed|established|designed|sculpted|discovered|'
+            r'invented|published|recorded|filmed|opened|launched|introduced|'
+            r'lived|stayed|resided|settled|retreated|frequented|gathered|'
+            r'died|born|married|arrived|departed|fled|exiled|returned|'
+            r'became|served|worked|taught|studied|graduated|'
+            r'won|awarded|received|commissioned|donated|'
+            r'inspired|influenced|mentored|collaborated|'
+            r'hosting|painting|writing|building|creating|performing)\b',
+            re.IGNORECASE
+        )
+        if _EVENT_VERB_RE.search(sentence):
+            return True
+
+        # Named work: quotes in the sentence suggest a title
+        if '"' in sentence or '\u201c' in sentence or '\u201d' in sentence:
+            return True
+
+        # Work-type nouns already checked in #5 below, but also here:
+        if re.search(r'\b(?:novel|book|work|painting|poem|opera|film|song|'
+                     r'sculpture|composition|masterpiece|series|collection|'
+                     r'exhibition|memoir|autobiography|biography)\b',
+                     sentence, re.IGNORECASE):
+            return True
+
+        # Decades pattern: "In the 1960s" — not caught by check #1's strict
+        # year pattern but is a factual temporal anchor
+        if re.search(r'\b\d{4}s\b', sentence):
+            return True
+
+        # If none of the above, the person name is just ANCHORING, not DELIVERY.
+        # Same reasoning as LOCAL-247 for place names: naming ≠ substantiating.
+        # Fall through to remaining checks (5, 6, 7) which may still trigger.
+        pass
 
     # 5. Named entity that's clearly a DOCUMENT, WORK, or PERSON
     #    (contains title-indicators like "novel", "itinerary", "book")
