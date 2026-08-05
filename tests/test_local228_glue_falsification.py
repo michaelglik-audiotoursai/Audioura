@@ -241,169 +241,195 @@ def test_key_contract_anchor_detector_classification():
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def test_swallowed_exception_venue_resolver_get_instance_of():
-    """D91 pattern: venue_resolver._get_instance_of swallows all exceptions.
+    """D91 pattern: venue_resolver._get_instance_of NOW logs and counts failures.
 
-    Line 473: `except Exception: return None`
-    A network failure is indistinguishable from 'not a museum type'.
+    LOCAL-230 fix: the function still returns None on failure (same degradation),
+    but the per-run failure counter increments and an ERROR is logged.
+    Callers cannot distinguish via return value alone (None means both),
+    but the system can now detect that a failure occurred during the run.
     """
     vr = _import_module('venue_resolver', os.path.join(REPO_ROOT, 'venue_resolver.py'))
     import requests
 
-    # Healthy: call with a known museum QID (if network available)
-    # We monkeypatch requests.get to simulate failure
     original_get = requests.get
-    failure_detected_by_caller = False
 
     try:
+        # Reset failure counter
+        vr._network_failure_count = 0
+
         def failing_get(*args, **kwargs):
             raise ConnectionError("Simulated network failure")
 
         requests.get = failing_get
 
-        # Call _get_instance_of — it should fail, but what does caller see?
+        # Call _get_instance_of — it should fail
         result = vr._get_instance_of("Q123456")
 
-        # The function returns None on exception — same as "not a museum"
-        # A caller cannot distinguish network failure from genuinely-not-a-museum
-        failure_detected_by_caller = (result is not None)  # Always False here
+        # Return value is still None (same degradation as "not a museum")
+        # But the failure counter has incremented — the run knows it degraded
+        failure_counted = vr._network_failure_count > 0
     finally:
         requests.get = original_get
 
     return {
         'glue_point': "venue_resolver._get_instance_of() except block (line ~473)",
         'what_was_broken': "requests.get raises ConnectionError",
-        'what_caller_sees': f"return value = {repr(result)}",
-        'can_distinguish_failure_from_absence': failure_detected_by_caller,
-        'notices_breakage': failure_detected_by_caller,
-        'impact': "A museum is classified as 'not a museum' during network outage — silent data loss",
+        'what_caller_sees': f"return value = {repr(result)}, failure_count = {vr._network_failure_count}",
+        'can_distinguish_failure_from_absence': failure_counted,
+        'notices_breakage': failure_counted,
+        'impact': "LOCAL-230: failure now counted and logged at ERROR — run report shows degradation",
     }
 
 
 def test_swallowed_exception_venue_resolver_get_coordinates():
-    """venue_resolver._get_coordinates swallows exceptions, returns (0.0, 0.0).
+    """venue_resolver._get_coordinates NOW returns (None, None) on failure.
 
-    Line ~580: `except Exception: return 0.0, 0.0`
-    A network failure is indistinguishable from 'entity has no coordinates'.
+    LOCAL-230 fix: failure returns (None, None), legitimate empty returns (0.0, 0.0).
+    The (0.0, 0.0) sentinel is gone from the failure path.
     """
     vr = _import_module('venue_resolver', os.path.join(REPO_ROOT, 'venue_resolver.py'))
     import requests
 
     original_get = requests.get
     try:
+        # Reset failure counter
+        vr._network_failure_count = 0
+
         def failing_get(*args, **kwargs):
             raise ConnectionError("Simulated network failure")
         requests.get = failing_get
 
         lat, lng = vr._get_coordinates("Q123456")
         
-        # Returns (0.0, 0.0) on exception — same as "no coordinates in Wikidata"
-        can_distinguish = not (lat == 0.0 and lng == 0.0)
+        # LOCAL-230: failure now returns (None, None) — distinguishable from (0.0, 0.0)
+        can_distinguish = (lat is None and lng is None)
+        failure_counted = vr._network_failure_count > 0
     finally:
         requests.get = original_get
 
     return {
-        'glue_point': "venue_resolver._get_coordinates() except block (line ~580)",
+        'glue_point': "venue_resolver._get_coordinates() except block",
         'what_was_broken': "requests.get raises ConnectionError",
-        'what_caller_sees': f"({lat}, {lng})",
+        'what_caller_sees': f"({lat}, {lng}), failure_count = {vr._network_failure_count}",
         'can_distinguish_failure_from_absence': can_distinguish,
-        'notices_breakage': can_distinguish,
-        'impact': "Geo-disambiguation uses (0,0) during network issues — wrong candidate selected silently",
+        'notices_breakage': can_distinguish and failure_counted,
+        'impact': "LOCAL-230: (None, None) on failure vs (0.0, 0.0) on legitimate empty — no more null island",
     }
 
 
 def test_swallowed_exception_venue_resolver_geocode_city():
-    """venue_resolver._geocode_city swallows exceptions, returns (0.0, 0.0)."""
+    """venue_resolver._geocode_city NOW returns (None, None) on failure.
+
+    LOCAL-230 fix: failure returns (None, None), legitimate empty returns (0.0, 0.0).
+    Propagates failure signal from _search_entities and _get_coordinates.
+    """
     vr = _import_module('venue_resolver', os.path.join(REPO_ROOT, 'venue_resolver.py'))
     import requests
 
     original_get = requests.get
     try:
+        # Reset failure counter
+        vr._network_failure_count = 0
+
         def failing_get(*args, **kwargs):
             raise ConnectionError("Simulated network failure")
         requests.get = failing_get
 
         lat, lng = vr._geocode_city("Paris")
-        can_distinguish = not (lat == 0.0 and lng == 0.0)
+
+        # LOCAL-230: failure now returns (None, None) — distinguishable from (0.0, 0.0)
+        can_distinguish = (lat is None and lng is None)
+        failure_counted = vr._network_failure_count > 0
     finally:
         requests.get = original_get
 
     return {
         'glue_point': "venue_resolver._geocode_city() except block",
         'what_was_broken': "requests.get raises ConnectionError",
-        'what_caller_sees': f"({lat}, {lng})",
+        'what_caller_sees': f"({lat}, {lng}), failure_count = {vr._network_failure_count}",
         'can_distinguish_failure_from_absence': can_distinguish,
-        'notices_breakage': can_distinguish,
-        'impact': "City geocoding silently returns null island — all distance comparisons wrong",
+        'notices_breakage': can_distinguish and failure_counted,
+        'impact': "LOCAL-230: (None, None) on failure vs (0.0, 0.0) for 'city has no coords' — null island gone",
     }
 
 
 def test_swallowed_exception_venue_resolver_sparql():
-    """venue_resolver SPARQL query handler: returns [] on exception.
+    """venue_resolver._search_entities NOW returns None on failure (vs [] for empty).
 
-    Line ~235: `except Exception as e: logger.warning(...); return []`
-    A caller cannot distinguish 'no results found' from 'query failed'.
+    LOCAL-230 fix: failure returns None, legitimate empty returns [].
+    Both are falsy so callers degrade identically, but the values are distinguishable.
     """
     vr = _import_module('venue_resolver', os.path.join(REPO_ROOT, 'venue_resolver.py'))
     import requests
 
     original_get = requests.get
     try:
+        # Reset failure counter
+        vr._network_failure_count = 0
+
         def failing_get(*args, **kwargs):
             raise ConnectionError("Simulated SPARQL endpoint failure")
         requests.get = failing_get
 
-        # Call a function that uses SPARQL internally
-        # _search_entities is the entry point for wikidata search
+        # Call _search_entities
         if hasattr(vr, '_search_entities'):
             result = vr._search_entities("Musée Matisse Nice")
-            can_distinguish = result is not None and result != []
+            # LOCAL-230: failure returns None (not [])
+            can_distinguish = (result is None)
+            failure_counted = vr._network_failure_count > 0
         else:
             result = "function not found"
             can_distinguish = False
+            failure_counted = False
     finally:
         requests.get = original_get
 
     return {
-        'glue_point': "venue_resolver._search_entities() SPARQL except block (line ~235/439)",
+        'glue_point': "venue_resolver._search_entities() except block",
         'what_was_broken': "requests.get raises ConnectionError on Wikidata API",
-        'what_caller_sees': f"result = {repr(result)[:100]}",
+        'what_caller_sees': f"result = {repr(result)[:100]}, failure_count = {vr._network_failure_count}",
         'can_distinguish_failure_from_absence': can_distinguish,
-        'notices_breakage': can_distinguish,
-        'impact': "Venue not found during API outage — tour generation proceeds without venue data",
+        'notices_breakage': can_distinguish and failure_counted,
+        'impact': "LOCAL-230: None on failure vs [] for 'no results' — callers degrade same but system detects",
     }
 
 
 def test_swallowed_exception_coverage_selection_db():
-    """generate_tour_text coverage selection: DB failure silently skips selection.
+    """generate_tour_text coverage selection: DB failure NOW logged and counted.
 
-    Lines ~4057-4064: Two nested `except Exception: pass` blocks around DB connect.
-    If the database is down, coverage selection is silently skipped and stops
-    are selected in position order. No log distinguishes 'DB down' from
-    'feature disabled'.
+    LOCAL-230 fix: the except blocks now print ERROR messages and set _cs_db_failure flag.
+    The `else` branch now distinguishes 'DB connection FAILED' from 'DB unavailable'.
+    Failure is counted in the per-run network failure counter.
     """
-    # This is a static analysis finding — the except blocks at lines 4057 and 4064
-    # both do `pass`, making DB failure indistinguishable from "no DB needed".
-    # We verify by reading the source.
-    
+    # Verify by reading the source — the except blocks should now have error logging
     gen_path = os.path.join(REPO_ROOT, 'generate_tour_text.py')
     with open(gen_path, 'r') as f:
         content = f.read()
 
-    # Find the coverage selection DB connection pattern
-    # Pattern: try: ... _cs_conn = ... except Exception: pass
     import re
-    # Look for the double-except pattern around _cs_conn
-    pattern = r'_cs_conn.*?except\s+Exception.*?pass'
-    matches = re.findall(pattern, content, re.DOTALL)
+
+    # LOCAL-230: Check that the except blocks now log errors (not just `pass`)
+    # Pattern: except Exception as _cs_err: ... print(... LOCAL-230 ... ERROR ...)
+    has_error_logging = 'LOCAL-230] ERROR: Coverage selection DB connect failed' in content
+
+    # Check that _cs_db_failure flag is used to distinguish in the else branch
+    has_failure_distinction = 'DB connection FAILED' in content
+
+    # Check that failure count is incremented
+    has_counter_increment = '_network_failure_count += 1' in content and '_cs_db_failure' in content
+
+    can_distinguish = has_error_logging and has_failure_distinction
 
     return {
         'glue_point': "generate_tour_text.py coverage selection DB connect (lines ~4057-4064)",
         'what_was_broken': "DB unreachable",
-        'what_caller_sees': "_cs_conn remains None → selection skipped",
-        'can_distinguish_failure_from_absence': False,
-        'notices_breakage': False,
-        'except_pass_count': len(matches),
-        'impact': "Coverage selection silently degrades to position-order when DB is down — no error logged in the first try block",
+        'what_caller_sees': "_cs_conn remains None BUT error is logged and counted",
+        'can_distinguish_failure_from_absence': can_distinguish,
+        'notices_breakage': can_distinguish,
+        'has_error_logging': has_error_logging,
+        'has_failure_distinction': has_failure_distinction,
+        'has_counter_increment': has_counter_increment,
+        'impact': "LOCAL-230: failure now logged at ERROR and counted — 'DB FAILED' vs 'DB unavailable' in log",
     }
 
 
