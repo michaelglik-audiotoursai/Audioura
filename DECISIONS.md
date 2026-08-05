@@ -5689,3 +5689,51 @@ numbered, annotated paragraphs. Michael needs to be able to say "paragraph 4"
 and have us both know what he means.
 
 `RIVIERA_2STOP_ROUND3.md` is untouched and remains what he reads this morning.
+
+---
+
+## D140 — The regression is fixed by deleting the template, not by gating it (2026-08-05)
+
+LOCAL-246 resubmitted. LEAD's independent measurement of the delivered text:
+
+```
+P1  R1        P2  R4        P3  clean      P4  R1
+R9 residual 0 · R10 residual 0
+the 0/5 transition sentence: gone
+```
+
+**The fix is the right one and worth recording as a principle.** Rather than
+gate the epilog path, it removed the templates:
+
+```python
+"From {first} to {last} — a collection that spans more ground than these stops alone."
+"three facets of a collection that spans centuries and continents"
+```
+
+Its reasoning: *"Gating a deterministic template that always produces
+R9-triggering text is pointless — R9 would delete it every time. The template
+should not exist."*
+
+That is correct, and it generalises. A template is a decision made once by us;
+a gate is a filter applied every time to work around that decision. When a
+deterministic string always fails a rule, the string is the bug. The epilog now
+builds from `epilog_payoff` (thread name plus specific stop names — R9 does not
+fire) and `_closing_facts` (corpus-mined elements), and if neither has content
+the tour simply ends on the last stop.
+
+Michael scored that sentence **0/5** — *"can be placed in millions of stops"* —
+and the honest reading is that **we were generating it deliberately**, from a
+template written under LOCAL-44 whose stated purpose was "factual observation"
+and which carried no facts at all.
+
+**Residual analysis now covers every rule**, which is what let the regression
+be caught at all. R4 appears in the new run where it had not before — noted,
+not chased; single-run variance on a 2-stop tour.
+
+### The eight-injection-point map is the durable artifact
+
+Prolog and Orientation are now gated. Museum directions, walking directions,
+operational details, sources and title are deliberately not, each with a
+recorded reason. The epilog is gone. That map is the thing to consult the next
+time text appears in a tour that no rule seems to have seen — and there will be
+a next time, because it was found three times this week by tripping over it.
