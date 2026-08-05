@@ -1198,13 +1198,15 @@ _R1_REWRITE_RULES = [
 
     # "As you arrive at X, take in / observe / admire the Y" → "From X, the Y..."
     # or "At X, the Y..." or "From this vantage point, you can admire the Y..."
+    # LOCAL-271: Must not produce "you can admire yourself" when the verb's object
+    # is reflexive or a participle phrase ("find yourself amidst X").
     (re.compile(
         r'^As you (?:arrive|approach|reach|come)\s+'
         r'(?:at|to|near)?\s*(.+?),\s*'
         r'(?:take in|observe|admire|notice|see|behold|absorb|enjoy|appreciate|discover|find)\s+'
         r'(.+)$',
         re.IGNORECASE | re.DOTALL),
-     lambda m: f"From {m.group(1).strip().rstrip(',')}, you can admire {m.group(2).strip()}"
+     '_as_you_arrive_handler'
     ),
 
     # "Take in / Admire / Observe the X [that VERB ...]" → supply a predicate
@@ -1259,13 +1261,14 @@ _R1_REWRITE_RULES = [
 
     # Mid-sentence: "As you X, pause/take in/notice/observe/admire Y"
     # → "From this vantage point, Y"
+    # LOCAL-271: Must not produce "you can admire yourself" — delegate to handler.
     (re.compile(
         r'^(?:As you|While you|When you)\s+.+?,\s*'
         r'(?:pause to |stop to )?'
         r'(?:take in|observe|admire|notice|absorb|appreciate|enjoy|discover|look at|look for)\s+'
         r'(.+)$',
         re.IGNORECASE | re.DOTALL),
-     lambda m: f"From this vantage point, you can admire {m.group(1).strip()}"
+     '_as_you_mid_handler'
     ),
 
     # "Imagine X" → "X ..." (just state it)
@@ -1328,6 +1331,73 @@ _FEELING_TERMS = re.compile(
 )
 
 
+def _as_you_arrive_handler(m):
+    """Handle 'As you arrive at X, admire/take in Y' — LOCAL-271 reflexive fix.
+
+    The old lambda blindly produced "you can admire {tail}" which becomes nonsense
+    when tail starts with "yourself" (e.g. "find yourself amidst the lush greenery").
+
+    Strategy:
+    - If tail starts with "yourself" or a gerund phrase, state the scene declaratively.
+    - Otherwise use "From X, the Y stretches out..." or "From X, you can see the Y."
+    """
+    location = m.group(1).strip().rstrip(',')
+    tail = m.group(2).strip()
+
+    # LOCAL-271 fix: detect reflexive / gerund-led tail
+    if re.match(r'^yourself\b', tail, re.IGNORECASE):
+        # "find yourself amidst the lush greenery" → "The lush greenery of X..."
+        # Strip "yourself amidst/surrounded by/standing at" etc.
+        inner = re.sub(
+            r'^yourself\s+(?:amidst|surrounded by|standing (?:at|on|in)|immersed in|lost in|'
+            r'amongst|in the midst of|in|at|on)\s+',
+            '', tail, flags=re.IGNORECASE
+        )
+        if inner and inner != tail:
+            # Capitalize and add determiner if needed
+            if inner[0].islower() and not re.match(r'^(?:the|a|an|this|that)\b', inner, re.IGNORECASE):
+                inner = f"The {inner}"
+            elif inner[0].islower():
+                inner = inner[0].upper() + inner[1:]
+            # Supply a verb: "surrounds [location]" or "defines [location]"
+            inner_clean = inner.rstrip('.')
+            return f"From {location}, {inner_clean} is visible."
+        else:
+            # Can't parse — fall back to simple declarative
+            return f"From {location}, the surrounding landscape is visible."
+
+    # Normal case: safe to say "From X, the Y..."
+    # But check for doubled "stretches out before you" risk
+    return f"From {location}, you can admire {tail}"
+
+
+def _as_you_mid_handler(m):
+    """Handle 'As you X, admire/take in Y' (mid-sentence) — LOCAL-271 reflexive fix.
+
+    Same problem: "you can admire yourself standing at the tip" is nonsense.
+    """
+    tail = m.group(1).strip()
+
+    # LOCAL-271: detect reflexive-led tail
+    if re.match(r'^yourself\b', tail, re.IGNORECASE):
+        inner = re.sub(
+            r'^yourself\s+(?:amidst|surrounded by|standing (?:at|on|in)|immersed in|lost in|'
+            r'amongst|in the midst of|in|at|on)\s+',
+            '', tail, flags=re.IGNORECASE
+        )
+        if inner and inner != tail:
+            if inner[0].islower() and not re.match(r'^(?:the|a|an|this|that)\b', inner, re.IGNORECASE):
+                inner = f"The {inner}"
+            elif inner[0].islower():
+                inner = inner[0].upper() + inner[1:]
+            inner_clean = inner.rstrip('.')
+            return f"{inner_clean} is visible from this vantage point."
+        else:
+            return None  # Can't salvage — delete
+
+    return f"From this vantage point, you can admire {tail}"
+
+
 def _take_in_handler(m):
     """Handle 'Take in / Admire / Observe the X' — LOCAL-256 fragment fix.
 
@@ -1374,12 +1444,31 @@ def _take_in_handler(m):
 
     # Case 3: no relative clause — supply a predicate
     # "the breathtaking views of the azure waters" → "The breathtaking views of the azure waters stretch out before you."
+    # LOCAL-271: AVOID doubling if the tail already contains "stretching/stretches out before you"
     if tail and tail[0].islower():
         tail = tail[0].upper() + tail[1:]
     if not re.match(r'^(?:The|A|An|This|That)\b', tail):
         tail = f"The {tail}"
     # Rstrip period so we can add our predicate
     tail_clean = tail.rstrip('.')
+    # LOCAL-271: Check if tail already contains a "stretch/extend/spread out before you" phrase
+    if re.search(r'\b(?:stretch|extend|spread|unfold|sweep|reach)(?:es|ing)?\s+out\s+before\s+you\b', tail_clean, re.IGNORECASE):
+        # Already has the phrase — just make it the main verb
+        # "The panoramic views of the Mediterranean Sea stretching out before you, while..."
+        # → convert participle to finite: "stretching" → "stretch"
+        tail_fixed = re.sub(
+            r'\b(stretch|extend|spread|unfold|sweep|reach)ing\s+out\s+before\s+you\b',
+            r'\1 out before you',
+            tail_clean, flags=re.IGNORECASE
+        )
+        # Ensure subject-verb agreement (singular subject → "stretches")
+        # Heuristic: if subject looks singular, use -es form
+        tail_fixed = re.sub(
+            r'\b(stretch|extend|spread|unfold|sweep|reach)\s+out\s+before\s+you\b',
+            lambda sv: sv.group(1) + ('es' if not re.match(r'^(?:The\s+)?.*s\b', tail_fixed.split(',')[0]) else '') + ' out before you',
+            tail_fixed, count=1, flags=re.IGNORECASE
+        )
+        return f"{tail_fixed}."
     return f"{tail_clean} stretches out before you."
 
 
@@ -1854,6 +1943,16 @@ def rewrite_r1_sentence_deterministic(sentence: str) -> str:
                 if result is None:
                     return None
                 return result
+            elif handler == '_as_you_arrive_handler':
+                result = _as_you_arrive_handler(m)
+                if result is None:
+                    return None
+                return result
+            elif handler == '_as_you_mid_handler':
+                result = _as_you_mid_handler(m)
+                if result is None:
+                    return None
+                return result
             elif callable(handler):
                 result = handler(m)
                 if result is None:
@@ -1965,6 +2064,96 @@ EXAMPLES:
         return '__KEEP_ORIGINAL__', 0
 
 
+def _r1_rewrite_wellformed(original: str, rewritten: str) -> bool:
+    """LOCAL-271: Post-rewrite well-formedness check.
+
+    After any R1 rewrite, verify the result is a well-formed sentence:
+    1. Has a finite main verb (no fragments)
+    2. No repeated clause (doubled "stretches out before you")
+    3. Correct capitalisation (no mid-sentence capitals from splicing)
+    4. No reflexive nonsense ("you can admire yourself standing at")
+
+    Returns True if well-formed, False if the rewrite should be rejected
+    (and the original imperative kept instead, per D158).
+    """
+    if not rewritten or not rewritten.strip():
+        return False
+
+    stripped = rewritten.strip()
+
+    # Check 1: finite main verb (already existed in LOCAL-256, but re-confirm)
+    if not _has_finite_main_verb(stripped):
+        return False
+
+    # Check 2: repeated clause — detect near-duplicate phrases > 5 words
+    # "stretching out before you ... stretches out before you"
+    words = stripped.lower().split()
+    if len(words) > 12:
+        # Sliding window: look for 5-word sequences repeated
+        _window = 5
+        seen_ngrams = set()
+        for i in range(len(words) - _window + 1):
+            ngram = tuple(words[i:i + _window])
+            if ngram in seen_ngrams:
+                return False  # Doubled clause detected
+            seen_ngrams.add(ngram)
+
+    # Check 3: mid-sentence capitals
+    # After the first word, a capitalized word should only appear if it's:
+    # - After a period/colon
+    # - A proper noun (heuristic: multiple consecutive caps, or known patterns)
+    # - "I" (pronoun)
+    # Detect: "The Vibrant mix" / "The Panoramic views" — adjective wrongly capitalised
+    # Strategy: find words after the first that are capitalized but followed by
+    # a lowercase word (adjective+noun pattern where adj shouldn't be capped)
+    _sent_words = stripped.split()
+    if len(_sent_words) > 2:
+        for i in range(1, len(_sent_words) - 1):
+            w = _sent_words[i]
+            # Skip if preceded by sentence-ending punctuation
+            prev = _sent_words[i - 1]
+            if prev.endswith(('.', '!', '?', ':')):
+                continue
+            # Skip proper noun indicators: word is part of a multi-cap sequence
+            # or is a known French/geographic particle
+            clean_w = re.sub(r'[^a-zA-Z\u00C0-\u024F]', '', w)
+            if not clean_w or len(clean_w) <= 1:
+                continue
+            if clean_w[0].isupper() and clean_w[1:].islower():
+                # Potentially wrongly capitalised — but could be proper noun
+                # Check: is the next word lowercase? If so, this looks like
+                # a wrongly-capped adjective ("The Panoramic views")
+                next_w = re.sub(r'[^a-zA-Z\u00C0-\u024F]', '', _sent_words[i + 1])
+                if next_w and next_w[0].islower():
+                    # Check this isn't a known proper-noun-before-common pattern
+                    # e.g. "French riviera" (proper adj + noun) — actually "French" is legit
+                    _PROPER_ADJS = {'french', 'british', 'italian', 'spanish', 'german',
+                                    'roman', 'greek', 'byzantine', 'moorish', 'ottoman',
+                                    'mediterranean', 'atlantic', 'pacific', 'european',
+                                    'american', 'african', 'asian', 'christian', 'jewish',
+                                    'muslim', 'buddhist', 'hindu', 'victorian', 'baroque',
+                                    'gothic', 'renaissance', 'neoclassical', 'art'}
+                    if clean_w.lower() not in _PROPER_ADJS:
+                        # Is it a common adjective that should NOT be capitalised?
+                        _COMMON_ADJS = {'vibrant', 'panoramic', 'breathtaking', 'stunning',
+                                        'beautiful', 'magnificent', 'ancient', 'historic',
+                                        'medieval', 'narrow', 'charming', 'picturesque',
+                                        'scenic', 'dramatic', 'remarkable', 'spectacular',
+                                        'lush', 'verdant', 'azure', 'golden', 'pristine',
+                                        'serene', 'tranquil', 'bustling', 'quaint',
+                                        'gentle', 'rugged', 'steep', 'winding', 'cobbled',
+                                        'ornate', 'elegant', 'grand', 'imposing', 'vast',
+                                        'sprawling', 'towering', 'tiny', 'sleepy'}
+                        if clean_w.lower() in _COMMON_ADJS:
+                            return False  # Mid-sentence capital on common adjective
+
+    # Check 4: reflexive nonsense — "you can admire yourself"
+    if re.search(r'\byou can admire yourself\b', stripped, re.IGNORECASE):
+        return False
+
+    return True
+
+
 def apply_r1_rewrites(paragraph: str, api_key: str = None, model: str = None) -> tuple:
     """Apply R1 rewrites to a paragraph.
 
@@ -2030,9 +2219,9 @@ def apply_r1_rewrites(paragraph: str, api_key: str = None, model: str = None) ->
                     kept.append(sentence)
                     continue
                 else:
-                    # LLM rewrite accepted — LOCAL-256: verify finite verb
-                    if not _has_finite_main_verb(llm_result):
-                        # LLM produced a fragment — keep original
+                    # LLM rewrite accepted — LOCAL-271: full well-formedness check
+                    if not _r1_rewrite_wellformed(sentence, llm_result):
+                        # LLM produced damaged output — keep original
                         kept.append(sentence)
                         continue
                     # LOCAL-257: restore determiner if rewrite stripped it
@@ -2045,10 +2234,10 @@ def apply_r1_rewrites(paragraph: str, api_key: str = None, model: str = None) ->
                 kept.append(sentence)
                 continue
         else:
-            # Deterministic rewrite succeeded — LOCAL-256: verify finite verb
-            if not _has_finite_main_verb(result):
-                # Rewrite produced a fragment — keep original (D156: an imperative
-                # is better than a fragment)
+            # Deterministic rewrite succeeded — LOCAL-271: full well-formedness check
+            if not _r1_rewrite_wellformed(sentence, result):
+                # Rewrite produced damaged output — keep original (D158: an imperative
+                # is better than nonsense)
                 kept.append(sentence)
                 continue
             # LOCAL-257: restore determiner if rewrite stripped it
@@ -4258,6 +4447,102 @@ def analyze_tour_style(tour_id: int, conn) -> Dict:
         'stops': stop_results,
         'totals': totals,
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LOCAL-271: FORWARD TRANSITION AT FINAL STOP DETECTION
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Patterns that indicate a forward-looking transition — pointing at "what's next"
+_FORWARD_TRANSITION_PATTERNS = [
+    re.compile(r'\bjust\s+ahead\b', re.IGNORECASE),
+    re.compile(r'\bup\s+ahead\b', re.IGNORECASE),
+    re.compile(r'\bahead\s+(?:of\s+you|lies|awaits|is|stands)\b', re.IGNORECASE),
+    re.compile(r'\bnext\s+(?:stop|you\'?ll?\s+(?:find|see|discover|reach|come\s+to))\b', re.IGNORECASE),
+    re.compile(r'\bcontinue\s+(?:on|to|towards|toward|along)\b', re.IGNORECASE),
+    re.compile(r'\bmoving\s+(?:on|forward|ahead)\b', re.IGNORECASE),
+    re.compile(r'\bas\s+you\s+(?:continue|move|proceed|head|make\s+your\s+way)\b', re.IGNORECASE),
+    re.compile(r'\bour\s+(?:next|final)\s+(?:stop|destination)\b', re.IGNORECASE),
+    re.compile(r'\bwhat\s+(?:awaits|lies)\s+(?:ahead|next|beyond)\b', re.IGNORECASE),
+    re.compile(r'\blead(?:s|ing)?\s+(?:you\s+)?(?:to|toward|towards)\s+(?:the\s+)?next\b', re.IGNORECASE),
+    re.compile(r'\bfurther\s+(?:along|ahead|on|down)\b', re.IGNORECASE),
+]
+
+
+def check_forward_transition_final_stop(description: str) -> List[Dict]:
+    """LOCAL-271: Detect forward-looking transitions in what is the final stop.
+
+    A forward transition in the last stop points at nothing — there is no next
+    stop. Returns a list of violations (sentence + pattern matched).
+    """
+    violations = []
+    if not description or not description.strip():
+        return violations
+
+    sentences = _split_sentences(description)
+    for sent in sentences:
+        if len(sent) < 10:
+            continue
+        for pat in _FORWARD_TRANSITION_PATTERNS:
+            if pat.search(sent):
+                violations.append({
+                    'sentence': sent,
+                    'pattern': pat.pattern,
+                    'rule': 'FORWARD_TRANSITION_FINAL_STOP',
+                })
+                break  # One match per sentence is enough
+    return violations
+
+
+def remove_forward_transitions_final_stop(description: str) -> Tuple[str, List[str]]:
+    """LOCAL-271: Remove forward-looking transitions from the final stop.
+
+    Only removes sentences that carry no content of their own (the forward
+    reference IS the sentence). Sentences with factual content that happen
+    to also contain a forward reference are reported but kept.
+
+    Returns: (cleaned_description, list_of_removed_sentences)
+    """
+    if not description or not description.strip():
+        return description, []
+
+    paragraphs = [p for p in description.split('\n\n') if p.strip()]
+    new_paragraphs = []
+    removed = []
+
+    for para in paragraphs:
+        sentences = _split_sentences(para)
+        kept = []
+        for sent in sentences:
+            if len(sent) < 10:
+                kept.append(sent)
+                continue
+
+            is_forward = False
+            for pat in _FORWARD_TRANSITION_PATTERNS:
+                if pat.search(sent):
+                    is_forward = True
+                    break
+
+            if is_forward:
+                # Check if sentence has its own content (date, proper noun, fact)
+                has_content = bool(
+                    re.search(r'\d{3,4}', sent) or  # dates/numbers
+                    re.search(r'[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,}', sent)  # multi-word proper noun
+                )
+                if has_content:
+                    # Has content — keep it, but report
+                    kept.append(sent)
+                else:
+                    # Pure forward reference — remove
+                    removed.append(sent)
+            else:
+                kept.append(sent)
+
+        if kept:
+            new_paragraphs.append(' '.join(kept))
+
+    return '\n\n'.join(new_paragraphs), removed
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

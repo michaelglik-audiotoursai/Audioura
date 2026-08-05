@@ -147,11 +147,43 @@ _QUALITY_PATTERNS = [
 ]
 _QUALITY_COMPILED = [re.compile(p, re.IGNORECASE) for p in _QUALITY_PATTERNS]
 
+# EXHORTATION (LOCAL-271): sentence urges the listener toward a vague experience
+# without naming WHAT lies ahead. "Just ahead, journey back through the centuries."
+# — tells the listener to do something but doesn't say what's there.
+# Must NOT match sentences that name a concrete target: "Just ahead, the Chapelle..."
+_EXHORTATION_PATTERNS = [
+    # "Journey back through the centuries/ages/time"
+    r'\bjourney\s+back\s+(?:through|across|into)\s+(?:the\s+)?(?:centuries|ages|time|history|past)\b',
+    # "Step into a world where..." — vague invitation
+    r'\bstep\s+into\s+(?:a\s+)?(?:world|realm|era|time|place)\s+(?:where|of|in which)\b',
+    # "Prepare to be transported/taken/carried to/into..."
+    r'\bprepare\s+to\s+be\s+(?:transported|taken|carried|swept|whisked)\b',
+    # "Transport yourself to another era/time/world"
+    r'\btransport\s+yourself\s+(?:to|into)\s+(?:a(?:nother)?|the)\s+(?:era|time|world|age|period|past)\b',
+    # "Let history come alive" / "Watch history unfold"
+    r'\b(?:let|watch|see|feel)\s+(?:the\s+)?history\s+(?:come alive|unfold|surround|envelop)\b',
+    # "Prepare to discover/explore/uncover" (without naming what)
+    r'\bprepare\s+to\s+(?:discover|explore|uncover|experience|witness)\b',
+    # "Get ready to" (without naming what)
+    r'\bget\s+ready\s+to\s+(?:discover|explore|experience|witness|uncover|be\s+(?:amazed|transported|swept))\b',
+    # "Just ahead, [verb imperative]" where the verb is vague (journey/step/prepare/discover)
+    r'\bjust\s+ahead[,.]?\s*(?:you\s+(?:can|will)\s+)?(?:journey|step|discover|explore|experience|uncover|find)\s+(?:back|into|through)\b',
+    # "Step back in time" / "Travel back in time"
+    r'\b(?:step|travel|go|venture)\s+back\s+in\s+time\b',
+    # "Enter a world of" + abstract noun
+    r'\b(?:enter|step\s+into)\s+(?:a\s+)?world\s+of\s+(?:wonder|mystery|enchantment|beauty|history|art|culture)\b',
+    # "Discover what lies ahead/beyond/within" (vague — doesn't name it)
+    r'\bdiscover\s+what\s+(?:lies|awaits|lurks)\s+(?:ahead|beyond|within|beneath)\b',
+    # "Be transported to another era/time"
+    r'\bbe\s+transported\s+to\s+(?:a(?:nother)?|the)\s+(?:era|time|world|age|period|past)\b',
+]
+_EXHORTATION_COMPILED = [re.compile(p, re.IGNORECASE) for p in _EXHORTATION_PATTERNS]
+
 
 def classify_claim(sentence: str) -> Optional[str]:
     """Classify what type of claim a sentence makes.
 
-    Returns one of: 'PROMISE', 'SENSORY', 'FEELING', 'QUALITY', or None.
+    Returns one of: 'PROMISE', 'SENSORY', 'FEELING', 'QUALITY', 'EXHORTATION', or None.
     A sentence with none of these is not a claim and is left alone.
     Navigation is exempt (checked by caller).
     """
@@ -159,7 +191,7 @@ def classify_claim(sentence: str) -> Optional[str]:
     if not stripped or len(stripped) < 15:
         return None
 
-    # Check in priority order: PROMISE > SENSORY > FEELING > QUALITY
+    # Check in priority order: PROMISE > SENSORY > FEELING > QUALITY > EXHORTATION
     for pat in _PROMISE_COMPILED:
         if pat.search(stripped):
             return 'PROMISE'
@@ -175,6 +207,11 @@ def classify_claim(sentence: str) -> Optional[str]:
     for pat in _QUALITY_COMPILED:
         if pat.search(stripped):
             return 'QUALITY'
+
+    # LOCAL-271: Empty exhortation — urges listener toward vague experience
+    for pat in _EXHORTATION_COMPILED:
+        if pat.search(stripped):
+            return 'EXHORTATION'
 
     return None
 
@@ -503,7 +540,7 @@ def apply_unsupported_claim_gate(
     """
     stats = {
         'sentences_removed': 0,
-        'claim_types_removed': {'PROMISE': 0, 'SENSORY': 0, 'FEELING': 0, 'QUALITY': 0},
+        'claim_types_removed': {'PROMISE': 0, 'SENSORY': 0, 'FEELING': 0, 'QUALITY': 0, 'EXHORTATION': 0},
         'sentences_kept_substantiated': 0,
         'escalation_tokens': 0,
         'escalation_cost': 0.0,
@@ -536,10 +573,18 @@ def apply_unsupported_claim_gate(
             if len(sent) < 15:
                 classifications.append((i, sent, None))
                 continue
+            # LOCAL-271: Check exhortation BEFORE navigation exemption.
+            # "Step into a world where time stands still" looks navigational
+            # (verb "step" + "into") but is actually a vague exhortation.
+            # If it classifies as EXHORTATION, treat it as such regardless
+            # of navigation detection.
+            claim_type = classify_claim(sent)
+            if claim_type == 'EXHORTATION':
+                classifications.append((i, sent, 'EXHORTATION'))
+                continue
             if _is_style_navigation_sentence(sent):
                 classifications.append((i, sent, None))  # Exempt
                 continue
-            claim_type = classify_claim(sent)
             classifications.append((i, sent, claim_type))
 
         # For each claim, check substantiation
@@ -651,7 +696,7 @@ def apply_gate_to_stop_descriptions(
     total_stats = {
         'total_removed': 0,
         'total_kept_substantiated': 0,
-        'claim_types_removed': {'PROMISE': 0, 'SENSORY': 0, 'FEELING': 0, 'QUALITY': 0},
+        'claim_types_removed': {'PROMISE': 0, 'SENSORY': 0, 'FEELING': 0, 'QUALITY': 0, 'EXHORTATION': 0},
         'escalation_tokens': 0,
         'escalation_cost': 0.0,
         'escalation_calls': 0,
@@ -683,7 +728,7 @@ def apply_gate_to_stop_descriptions(
 
         total_stats['total_removed'] += stats['sentences_removed']
         total_stats['total_kept_substantiated'] += stats['sentences_kept_substantiated']
-        for ct in ('PROMISE', 'SENSORY', 'FEELING', 'QUALITY'):
+        for ct in ('PROMISE', 'SENSORY', 'FEELING', 'QUALITY', 'EXHORTATION'):
             total_stats['claim_types_removed'][ct] += stats['claim_types_removed'][ct]
         total_stats['escalation_tokens'] += stats['escalation_tokens']
         total_stats['escalation_cost'] += stats['escalation_cost']
