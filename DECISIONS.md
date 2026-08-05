@@ -6366,3 +6366,80 @@ His follow-up caveat is recorded in the task as the trap to avoid: *"it does not
 bring any information I am not feeling or seeing or having without that
 phrase."* A de-imperatived sentence that still says nothing is R9's problem, not
 R1's, and conflating them would push both past their D55 ceilings.
+
+## D157 — Corpus depth done three ways: one right, one padded, one prohibited (2026-08-05)
+
+LOCAL-254 bounced. Three venues, three outcomes, and the differences are the
+useful part.
+
+**Palais Lascaris — correct.** 11 stops, 1.0 → **5.7** passages, only **one**
+passage common to all stops and 4–6 unique to each. Real per-stop material,
+URLs throughout. This is the shape LOCAL-252 proved works and it is kept.
+
+**Musée Matisse — the count is real, the depth is not.** 1.2 → **7.0**, but
+**five of those passages are common to every stop**: the museum's own Wikipedia
+article about the building, the 1670 villa, the 1950 city purchase, the 1993
+expansion. True, sourced, and not about `Nu bleu IV`, which is what that stop
+*is*. Genuine per-stop gain is 1–3.
+
+This matters beyond one venue. D153's finding — corpus depth drives fact
+density — was measured with *per-stop* passages. A `passage_count` inflated
+with venue boilerplate makes that relationship untestable going forward. Venue
+text belongs in `venue_corpus`; copying it into every `stop_corpus` row buys a
+number and nothing else.
+
+**Musée des Arts Asiatiques — the prohibited thing happened.** The three D127
+suspected fabrications each received **three passages, none with a URL**, and
+all three received the *identical* set: the museum's 1998 founding, a Toraja
+sarcophagus, a Cambodian Vishnu. Every other stop the task touched has a URL on
+every passage.
+
+LEAD ran the existence gate against all eight stops: it **still rejects** the
+fabrications, so nothing was laundered into a tour. **That is luck, not
+design.** The passages were too generic to satisfy the gate; slightly more
+specific ones would have made a fabricated Chikanobu attribution look sourced
+to both the gate and the generator, which is precisely the outcome the task
+file called "the worst possible".
+
+Also surfaced, and reported rather than fixed: the gate verifies **0 of 8**
+Asian Arts stops, including the five sourced properly. Not a regression — it
+was 8/8 unverified before — but this is Michael's gate venue, and a venue where
+every stop fails existence cannot reach any score at all. The re-dispatch asks
+for a diagnosis, not a fix.
+
+## D158 — R1 rewriting works, and LEAD merged it with three defects in the artifact (2026-08-05)
+
+LOCAL-255 merged (`c339ead`). R1 finally has a path to the output: at 36% of
+paragraphs deletion was never possible, so PHASE 5.13 rewrites instead, using
+the transformation Michael endorsed himself. Nav untouched, deletion rate 0%
+against a 10% ceiling, corpus R1 26.9% → 9.4%, 13 tests green. Round 12
+measured R7/R8/R9/R10 all zero — the cleanest artifact yet by rule residual.
+
+**Then LEAD read the delivered tour and found three defects the measurements
+cannot see.** All three are now on `storied`.
+
+1. **The rewrite emits sentence fragments.** "Take in the panoramic view that
+   stretches out before you…" becomes "The panoramic view that stretches out
+   before you…" — no finite verb, shipped into an orientation bound for
+   text-to-speech. Stripping a leading imperative yields a sentence only when
+   the remainder is an independent clause; "Position yourself at X, a Y" → "X
+   is a Y" works because a copula is supplied, and "Take in the N that…" does
+   not.
+2. **`Description:` is back in the narration** — the field-label leak bounced on
+   LOCAL-250 round 7 v1.
+3. **R7 is silent at the orientation injection point** on two textbook sensory
+   inventions, the class Michael scored 1/5.
+
+**The review failure is LEAD's and worth naming precisely.** The fragment
+appeared in the task's *own* accepted boundary row — "The Fondation Maeght,
+founded in 1964 by Marguerite and Aimé Maeght." LEAD saw it, checked that the
+1964 attribution survived, judged the missing verb minor, and merged. Content
+preservation was the stated acceptance bar and it was met; the bar was
+incomplete. **A rule-residual measurement plus a fact count cannot see
+ungrammatical output**, and four rounds of learning to distrust residuals had
+trained LEAD to check facts and rules, not sentences.
+
+Fixed forward as LOCAL-256 rather than reverted, because the rewrite path is
+sound and nothing deploys from `storied` automatically. The new acceptance bar
+is a finite verb in every rewritten sentence, with fallback to the original
+imperative when no rule can produce one — an imperative beats a fragment.
