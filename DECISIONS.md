@@ -6151,3 +6151,71 @@ Obscure at the wrong cape is exactly that. The style rules cannot catch it; it
 is grammatical, specific, and dated. Only two things can: passages scoped to
 the stop being written, and more passages per stop. The first is in the
 re-dispatch; the second is LOCAL-252, already running.
+
+## D152 — LEAD withdrew a bounce finding, then killed the wrong task twice fixing it (2026-08-05)
+
+Three LEAD errors in one tick, all recovered, all worth recording because each
+was avoidable by a check LEAD already had.
+
+**1. The bounce finding was wrong.** D151 said round 8 "placed the Rue Obscure
+at Cap d'Antibes" and told LOCAL-251 to scope expansion to the stop being
+written. Both wrong. The sentence sits in the **prolog** — a tour-level
+overview injected into stop 1 (D64) — and round 8's stop 2 *was*
+Villefranche-sur-Mer, so previewing it there is legitimate. LEAD then checked
+the code and the data instead of reasoning further: expansion already scopes
+via `stop_corpus_map.get(stop_title)`, and an audit of all 88 `stop_corpus`
+rows found exactly one cross-reference, itself benign (a Chagall painting
+naming other Chagall works).
+
+What survives is much smaller: the prolog says "the Rue Obscure… offering a
+glimpse into the enduring spirit of **this modern town**" right after naming
+Cap d'Antibes, without naming Villefranche. Ambiguous, not false. A clarity
+fix, not a scoping fix. The task file was corrected in place before the
+corrected run started.
+
+**2. Killing LOCAL-251 killed LOCAL-252 instead.** The command was
+
+```
+pgrep -f "kiro-cli chat" | while read p; do
+  ps -o command= -p $p | grep -q "LOCAL-251" && kill -9 $p; done
+```
+
+The entire task prompt sits on the command line, and **LOCAL-252's prompt
+contains the sentence "LOCAL-251 is changing it right now"** — a warning LEAD
+itself had written into that file to prevent the two tasks colliding. So a
+substring match on a task id hits any task that *mentions* it. LOCAL-252 was 28
+minutes in.
+
+**3. Killing the parent did not kill the run.** Both stale children survived
+their parents and kept working from outdated task files for several minutes.
+One of them was executing the withdrawn instruction from error 1. They had to
+be reaped by PID after inspecting each command line.
+
+**Recovered.** LOCAL-252's corpus work had already landed before the kill:
+Saint-Paul-de-Vence 1 → 7 passages, Cap Ferrat 1 → 6, corpus 211 → 241. LEAD
+fetched `en.wikipedia.org/wiki/Saint-Paul-de-Vence` and matched three passages
+**verbatim** — the Wilder/Radner marriage of 18 September 1984, Baldwin's 17
+years to 1987, and the La Colombe d'Or guest list. Extracted, not model-written,
+which was the one thing that could not be allowed to go wrong. Merged at
+`9f27901`.
+
+Its round 7b measurement was **not** merged: `$0.0000` cost, 0 expanded, 0
+deleted, "generation attempts 4/3". Expansion never ran, so the experiment never
+tested its own question — does more corpus produce more facts? The stop pair
+came back as Promenade des Anglais and Cap d'Antibes, without
+Saint-Paul-de-Vence, which likely explains it: the deepened corpus belongs to a
+stop that was never written. Re-dispatched for the measurement alone, with the
+pair pinned.
+
+**`.continuous_dev/kill_task.sh`** now exists and is the only sanctioned way to
+stop a session. It matches the task's own `**Task ID:** LOCAL-NN` declaration
+rather than any mention of the string, anchors so `LOCAL-25` cannot match
+`LOCAL-251`, matches both spawn forms (`kiro-cli chat` and the exec'd
+`kiro-cli-chat chat` — a pattern covering only the first reported "no running
+session" while two were live), and returns wrapper and child together. Verified
+against both live sessions and the prefix case.
+
+**The lesson under all three:** LEAD twice reached a conclusion from a shape
+that looked conclusive — a `--stat` line in D147, a `grep -q` here — when the
+precise check was one command away. The guards keep being right and keep being
+overridden by something quicker.
