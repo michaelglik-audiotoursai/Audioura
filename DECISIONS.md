@@ -5737,3 +5737,63 @@ operational details, sources and title are deliberately not, each with a
 recorded reason. The epilog is gone. That map is the thing to consult the next
 time text appears in a tour that no rule seems to have seen — and there will be
 a next time, because it was found three times this week by tripping over it.
+
+## D141 — The second unattributed row loss was attributed, and it was correct behaviour (2026-08-05)
+
+`ALERTS.md` at 08:20Z: `*** ROW LOSS: audio_tours went 145 -> 144 ***`. The
+first instinct was the right one — this is the second row-loss event on the
+project and the first (tour 29, Michael's field-tested Riviera tour) was
+recovered only by luck. It got a full investigation.
+
+**It was LOCAL-244 cleaning up after itself.** From its own session log:
+
+```
+> the first run inserted tour_id=200, second inserted 201.
+cur.execute("DELETE FROM audio_tours WHERE id IN (200, 201)")
+audio_tours count after cleanup: 143
+```
+
+It inserted 200 and 201, deleted both by ids it had captured at creation, then
+its final run inserted 202. The 5-minute tick sampled 145 before the cleanup
+and 144 after. Nothing was lost that anyone wanted.
+
+**Two things were wrong, and neither was the deletion.**
+
+*First, the alarm could not name what it lost.* It reported a count delta and
+nothing else. The only way back to an identity was the snapshot archive, and
+retention there is 12 files — one hour — because each dump is **224 MB** (the
+table carries audio blobs). The alert fired at 08:20Z; the first read of it was
+at 10:34Z; the evidence was gone. An earlier version of this fix raised
+retention to 288 snapshots before checking the file size — that would have been
+64 GB on a disk that hit 98% last week.
+
+The fix is not more snapshots, it is a cheaper artifact. Every tick now writes
+`id|is_test|name` for the whole table to `.manifest_ids` — **8 KB** for 144
+rows. On a loss the previous manifest is diffed against the current one, the
+vanished rows are named in the alert, and the pre-loss manifest is copied aside
+permanently. The name only exists in the instant before the row goes; that is
+the instant to capture it.
+
+*Second, the alarm cried wolf on correct behaviour.* A guard that fires on
+required test cleanup is a guard that stops being read — which is exactly how
+tour 29 went unnoticed for hours. Severity now depends on what was lost, not on
+the count moving: rows with `is_test = true` are logged quietly to
+`backup.log`, and anything else — a real tour, or a row whose `is_test` cannot
+be determined — still writes to `ALERTS.md` with the row named. Both paths were
+tested by priming a sandbox manifest with a fake lost row of each kind.
+
+**A rule conflict in CLAUDE.md is resolved by this.** The live-DB section says
+both "**No task may `DELETE FROM audio_tours`**" and "test cleanup must be
+scoped to rows the test created, by an id captured at creation" — which
+presupposes deletion. LOCAL-244 followed the second and appeared to break the
+first. Read strictly, the absolute ban would leave every test row in the table
+forever, and the user-visible list would be defended only by `lat`/`lng` being
+NULL.
+
+The ban stands for anything that is or might be a real tour. A test may delete
+rows it created in the same run, by captured id, **after** confirming
+`is_test = true` on each — the read is what makes the ban and the cleanup rule
+consistent, because it is what distinguishes them. CLAUDE.md is amended to say
+that instead of contradicting itself. The real answer remains LOCAL-232, moving
+tests off the production database entirely; that is still parked, and this is
+the interim rule until it lands.

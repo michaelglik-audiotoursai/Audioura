@@ -220,12 +220,16 @@ unproven.
 
 **Rules, binding on every task file from now on:**
 
-- **No task may `DELETE FROM audio_tours`.** To hide a test tour, set
-  `lat`/`lng` to NULL — `tours-near` filters on those, not on `draft` — and
-  back up the values first.
-- **Test cleanup must be scoped to rows the test created**, by an id or a
-  user id captured at creation. Never by name pattern, never by date range,
-  never "everything above id N".
+- **No task may `DELETE FROM audio_tours`** for anything that is or might be
+  a real tour. To hide a real tour, set `lat`/`lng` to NULL — `tours-near`
+  filters on those, not on `draft` — and back up the values first.
+- **The one exception is a test deleting its own rows**, and it is narrow: an
+  id captured at creation in the same run, and a `SELECT is_test` on that id
+  confirming `true` immediately before the `DELETE`. The read is what makes
+  this safe — without it there is no difference between cleanup and the
+  tour-29 event. Never by name pattern, never by date range, never
+  "everything above id N". (D141; superseded once LOCAL-232 moves tests off
+  the production DB.)
 - **Any task touching the live DB must report a row count before and after**
   for every table it writes. A drop is a bounce.
 - Tasks must **declare live-DB changes explicitly** in their submission —
