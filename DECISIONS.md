@@ -6219,3 +6219,74 @@ against both live sessions and the prefix case.
 that looked conclusive — a `--stat` line in D147, a `grep -q` here — when the
 precise check was one command away. The guards keep being right and keep being
 overridden by something quicker.
+
+## D153 — Corpus depth is the lever, and it works upstream of expansion (2026-08-05)
+
+LOCAL-252 merged (`8d2e693`). The measurement its first run never produced:
+
+```
+Saint-Paul-de-Vence, 1 corpus passage  ->  2 of 11 sentences carry a fact
+Saint-Paul-de-Vence, 7 corpus passages ->  7 of 8  sentences carry a fact
+```
+
+LEAD read the stop, and every fact traces to a passage verified against
+Wikipedia this morning: Sartre and Picasso at La Colombe d'Or, the 1960s circle
+of Montand, Signoret and Ventura, Prévert and Chagall, the Fondation Maeght
+founded 1964 by Marguerite and Aimé Maeght with Josep Lluís Sert's
+architecture, and the Wilder/Radner marriage of 1984.
+
+**The nuance is the finding.** Expansion contributed **zero** — the post-hoc
+expander found nothing to do. The gain came from the generator writing better
+because the corpus was richer *at generation time*, with in-pipeline R10
+deleting seven unsupported sentences afterwards. So corpus depth pays off at
+the fact-sheet stage, upstream of expand-before-delete entirely.
+
+That reframes the roadmap. LOCAL-250's expander was built on the theory that
+sentences get rescued after the fact; the evidence says the corpus decides what
+gets written in the first place, and deletion cleans up the remainder. The
+cheapest next win is more passages per stop — 49 of 88 stops still hold exactly
+one — not a smarter expander.
+
+## D154 — R7 finally deletes; round 9's tour routed a cyclist onto a motorway (2026-08-05)
+
+LOCAL-251's round 9 **code** merged (`0d60a64`), artifact withheld.
+
+R7 has flagged Michael's 1/5 sensory inventions since it was written and
+nothing ever removed them — it had no deletion path. PHASE 5.14 now deletes
+what it flags, ahead of R9 at 5.15. Contained: LEAD counts R7 at 22/1957
+sentences (1.12%) corpus-wide, and the path removes only what the detector
+already found. Verified: R7 fires on three of the four sensory inventions
+Michael scored 1/5, while "the Mediterranean is visible below", "from this
+vantage point the bay is visible", Monet-1888 and navigation all stay silent.
+The 19 earlier boundary rows still hold.
+
+Also landed: a generation-failure gate, so `[GENERATION_FAILED:x]` and
+`[Description for x could not be generated.]` can no longer reach the artifact
+silently; prolog disambiguation; and a tour-type-appropriate orientation
+fallback, so "Look for this work in the galleries" stops appearing on a coastal
+cape.
+
+**The artifact was bounced, and one defect is a safety matter.** On a
+`tour_type="biking"` tour, round 9's directions read *"continue east until you
+hit the A8 highway"* and signed off *"Enjoy the walk!"*. The A8 is an
+autoroute; cycling it is illegal and dangerous. Round 10, generated
+independently by LEAD an hour earlier, has the same class of failure: *"Start
+your walk… take a train towards Eze Village."*
+
+The stop selector plainly knows the mode — its prompt carries "CRITICAL
+CONSTRAINT — THIS IS A BIKING TOUR" and it applies cycling-leg distances. The
+directions generator does not. **And directions are exempt from the style rules
+by D107**, which is why this shipped unseen through eleven rounds of scrutiny:
+the exemption that protects "start cycling south" from R1 also means nothing
+looks at directions at all. An exemption is not a small thing; it is a hole in
+the only place we were watching.
+
+Dispatched as LOCAL-253, ahead of everything else on the board, with seven
+boundary rows that keep navigation exempt from *style* while adding a mode
+check. Michael field-tests these on an actual bicycle.
+
+Round 9's other defects, recorded for the re-run: Marc Chagall and "the
+ramparts surrounding the village" attributed to Cap d'Antibes, which is a cape
+with no village ramparts and is not Chagall's place; and stop 2 shipped three
+sentences with zero facts despite Saint-Paul-de-Vence now holding seven
+passages — the same stop that reached 7 of 8 under LOCAL-252.
