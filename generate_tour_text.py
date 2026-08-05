@@ -3211,6 +3211,27 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     }
     _transport_stop_constraint = _TRANSPORT_STOP_CONSTRAINTS.get(transport_mode, "")
 
+    # [LOCAL-285] Restaurant/dining venue constraint — guides Phase 3A toward actual
+    # eating establishments rather than museums or landmarks that happen to be notable.
+    _restaurant_venue_constraint = ""
+    if tour_category == 'restaurant':
+        # Determine the area name for the constraint
+        _restaurant_area = (intent.get('geographic_scope') or '').strip() if intent else ''
+        if not _restaurant_area:
+            # Fall back to location (e.g. "Nice, France")
+            _restaurant_area = location
+        _restaurant_venue_constraint = (
+            f"\nCRITICAL CONSTRAINT — THIS IS A RESTAURANT/DINING TOUR:\n"
+            f"- Every stop MUST be a named, real, currently-operating eating establishment "
+            f"(restaurant, bistro, brasserie, café, trattoria, tavern, or similar).\n"
+            f"- Each stop must have a verifiable street address in or near {_restaurant_area}.\n"
+            f"- Do NOT include museums, galleries, parks, monuments, or any non-dining venue.\n"
+            f"- Do NOT include fictional or closed restaurants.\n"
+            f"- Prefer well-known, established restaurants that a visitor could actually dine at.\n"
+            f"- Include a mix of styles/price ranges unless the request specifies otherwise.\n"
+        )
+        print(f"  [LOCAL-285] Restaurant constraint injected for area='{_restaurant_area}'")
+
     if tour_category == 'museum':
         # Prefer PHASE 1 intent result (most accurate, handles all formats).
         # IMPORTANT: only apply the single-venue constraint when intent explicitly provides
@@ -3563,6 +3584,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             "- NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.\n"
             "- Include a complete street address with ZIP code where applicable.\n"
             + _museum_venue_constraint
+            + _restaurant_venue_constraint
             + _transport_stop_constraint
             + _scope_constraint
             + _compactness_constraint
@@ -7835,7 +7857,7 @@ PART 1 — TOUR NAME + TRANSPORT (1-2 sentences):
 State the tour name and mode of transport. Example shape: "You are about to embark on a [cycling/walking/driving] journey through [location]."
 
 PART 2 — ROUTE AND PHYSICALITY (2-3 sentences):
-State the transport mode again concretely, name the endpoints ({_prolog_stop_names[0] if _prolog_stop_names else '?'} to {_prolog_stop_names[-1] if _prolog_stop_names else '?'}), give the approximate distance ({_prolog_distance_str}). Describe only terrain/landscape features that are KNOWN from the sourced facts or that are trivially true of the geography (e.g. "coastal" for a coast). Do NOT invent elevation, flatness, or terrain claims unless supported by corpus facts above.
+{f"State the transport mode again concretely, name the endpoints ({_prolog_stop_names[0]} to {_prolog_stop_names[-1]}), give the approximate distance ({_prolog_distance_str})." if len(_prolog_stop_names) >= 2 and _prolog_stop_names[0] != _prolog_stop_names[-1] else "State the transport mode again concretely and describe what the visitor will experience at this single stop. Do NOT describe a route between two endpoints — this tour has only one location."} Describe only terrain/landscape features that are KNOWN from the sourced facts or that are trivially true of the geography (e.g. "coastal" for a coast). Do NOT invent elevation, flatness, or terrain claims unless supported by corpus facts above.
 
 PART 3 — PURPOSE/INTRIGUE (2-4 sentences):
 This is the story hook — WHY someone takes this tour. Thread sourced facts into a causal or thematic sentence. Use ONLY facts from the SOURCED FACTS section above. If the facts support a causal link (X led to Y, which explains Z), write it. If they do NOT support a causal chain, write the plainest true version: state two sourced facts without manufacturing a connection between them. A false causal claim is worse than a plain factual one.
@@ -9136,6 +9158,49 @@ RULES:
     # LOCAL-255 round 12 shipped it again because the LLM echoed "Description:"
     # after the orientation split. The fix at the split point (above) prevents
     # new occurrences; this gate catches any that slip through assembly.
+
+    # -------- [LOCAL-285] Empty venue phrase gate --------
+    # An empty venue span (e.g. "through ." or "through ,") must never reach TTS.
+    # This catches the case where the prolog model emits a template with a blank
+    # location/venue variable. Fix: replace with the location if available.
+    _empty_venue_pattern = re.compile(r'(through|across|around|in|of)\s+([.,;!])')
+    _empty_venue_matches = _empty_venue_pattern.findall(complete_tour)
+    if _empty_venue_matches:
+        print(f"\n  [LOCAL-285] ⚠️  EMPTY VENUE PHRASE GATE: {len(_empty_venue_matches)} empty venue span(s) detected!")
+        # Fill with the location name (first comma-segment for brevity)
+        _venue_fill = location.split(',')[0].strip() if location else "this area"
+        for _ev_prep, _ev_punct in _empty_venue_matches:
+            _old = f"{_ev_prep} {_ev_punct}"
+            _new = f"{_ev_prep} {_venue_fill}{_ev_punct}"
+            print(f"    FIXING: '{_old}' → '{_new}'")
+        complete_tour = _empty_venue_pattern.sub(
+            lambda m: f"{m.group(1)} {_venue_fill}{m.group(2)}", complete_tour
+        )
+
+    # -------- [LOCAL-285] Self-referential route guard --------
+    # A single-stop tour must not say "from X to X" or "take you from X to X".
+    # This catches the case where the prolog describes a route between identical endpoints.
+    _self_route_pattern = re.compile(
+        r'((?:from|between)\s+)(.{3,80}?)(\s+to\s+)\2',
+        re.IGNORECASE
+    )
+    _self_route_matches = _self_route_pattern.findall(complete_tour)
+    if _self_route_matches:
+        print(f"\n  [LOCAL-285] ⚠️  SELF-REFERENTIAL ROUTE GATE: {len(_self_route_matches)} self-route(s) detected!")
+        for _sr_prefix, _sr_name, _sr_mid in _self_route_matches:
+            _old_route = f"{_sr_prefix}{_sr_name}{_sr_mid}{_sr_name}"
+            print(f"    REMOVING: '{_old_route}'")
+        # Remove the self-referential route clause (including surrounding commas/sentences)
+        # Strategy: remove "from X to X" and the distance clause that follows
+        _self_route_sentence = re.compile(
+            r'[^.]*(?:from|between)\s+(.{3,80}?)\s+to\s+\1[^.]*\.\s*',
+            re.IGNORECASE
+        )
+        complete_tour = _self_route_sentence.sub(' ', complete_tour)
+        # Clean up double-spaces
+        complete_tour = re.sub(r'  +', ' ', complete_tour)
+        complete_tour = re.sub(r'\n\s*\n\s*\n', '\n\n', complete_tour)
+
     _BARE_FIELD_LABELS = re.compile(
         r'^\s*(?:Description|Orientation|Directions|Sources|Coordinates|'
         r'Type/Specialty|Specific Examples|Museum Information|Operational Details):\s*$',
