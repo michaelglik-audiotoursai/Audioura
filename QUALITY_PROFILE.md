@@ -164,45 +164,98 @@ corpus at all.
 Michael scored tour 163's 11 sentence groups: `5, 1, 3, 3, 2, 1, 1, 5, 1, 0, 0`.
 Mean 2.0. "Far from acceptable."
 
-The machine split this tour into **18 groups** (vs Michael's 11). The first 11
-machine groups aligned to his marks as follows:
+### Filters and group count
 
-| grp | Michael | classification | machine detects | agree? |
+The machine splits this tour into **18 groups** across 6 paragraphs (2 stops).
+Paragraph minimum length: `> 50` chars. Sentence minimum: `>= 10` chars. The
+only sentence excluded by a `> 60` filter would be "Enjoy the refreshing sea
+breeze along the way." (46 chars); it passes our `>= 10` threshold and sits
+inside a group with "Take the second exit…" — excluding it does not change the
+group count. **18 groups is the reproducible result from `storied` HEAD.**
+
+Across all 84 profiled tours, the `> 50` paragraph filter includes 39 groups
+(1.4% of 2854) that a `> 60` filter would exclude. This shifts all §1 rates by
+< 0.5 percentage points — negligible; the reported rates stand.
+
+### The mapping error in the original submission
+
+The original §5 aligned machine groups 0–10 with Michael's 11 marks 1:1. **This
+was wrong.** Michael groups the content differently: his groups span multiple
+machine groups. The machine over-splits (18 vs his 11), so a 1:1 alignment puts
+the wrong text against his scores.
+
+Critically: the original table reported his 0/5 groups (indexed 9, 10) as
+machine groups 9 and 10 and said they were "clean." In reality:
+
+- Machine group 9 = "The nearby Abri de l'Olivette…" — **not** what he scored 0.
+- Machine group 10 = "Pedal along the coastline…" — **not** what he scored 0.
+- His group 9 (score 0) = "As you continue your journey…" = **machine group 16**, where **R9 fires.**
+- His group 10 (score 0) = "From Cap d'Antibes to Villefranche…" = **machine group 17**, where **R9 fires.**
+
+**R9 detects both of his 0/5 sentences correctly.** The original table told
+Michael the opposite — that the one thing demonstrably working did not work.
+
+### Correct side-by-side
+
+Michael's 11 groups mapped to the machine's 18 (many-to-one):
+
+| M# | Michael | Machine grps | Machine detects | Agree? |
 |---|---|---|---|---|
-| 0 | **5** | NAVIGATION | no violations | ✓ machine sees it is navigation and correctly exempts |
-| 1 | **1** | CONTENT | R1_IMPERATIVE | ✓ "Take the second exit" is an imperative → he scored 1 |
-| 2 | **3** | CONTENT | clean | ~ no detection; his 3 was "acceptable if sourced later" |
-| 3 | **3** | CONTENT | R1_IMPERATIVE | **✗** machine flags "Look out for" as R1; he scored 3 |
-| 4 | **2** | CONTENT | clean | **✗** machine misses; his 2 was for imperative/suggestive tone |
-| 5 | **1** | CONTENT | R1_IMPERATIVE | ✓ "Join us as we delve" → imperative, scored low |
-| 6 | **1** | CONTENT | clean | **✗** machine misses; his 1 was for R1/R4 violations |
-| 7 | **5** | CONTENT | R8_PROMPT_LEAKAGE | **✗** machine wrongly flags; his 5 was for sourced content |
-| 8 | **1** | CONTENT | clean (1 unsup) | ~ unsupported detected, but style miss on "allows you to" |
-| 9 | **0** | CONTENT | clean | **✗** machine misses; his 0 was R9 (generic, belongs nowhere) |
-| 10 | **0** | NAVIGATION | clean | **✗** machine classifies as NAVIGATION; his 0 was "remove it" |
+| 0 | **5** | 0, 1 | NAVIGATION + R1_IMPERATIVE | ✓ machine sees navigation; R1 on "Take second exit" is moot (navigation exempt) |
+| 1 | **1** | 2, 3 | R1_IMPERATIVE | ✓ "Look out for" → R1 fires. He scored 1 for the same reason |
+| 2 | **3** | 4, 5 | R1_IMPERATIVE | ~ "Join us as we delve" flags R1; his 3 was conditional on later delivery |
+| 3 | **3** | 6, 7, 8 | R8_PROMPT_LEAKAGE | **✗** R8 fires on "One concrete sensory detail…" — he valued the Monet/Maupassant facts around it |
+| 4 | **2** | 9, 10 | clean (grp 10 = NAVIGATION) | **✗** machine misses; his 2 was for imperatives ("take in", "Pedal", "envisioning") without substance |
+| 5 | **1** | 11 | clean | **✗** machine misses; "pause to take in" is R1/R4 that the pattern list does not cover |
+| 6 | **1** | 12 | R1_IMPERATIVE | ✓ "Look for the Rue Obscure" → R1 fires. He scored 1 for the same reason |
+| 7 | **5** | 13 | clean | ✓ No violations. His 5/5 — specific, informative, no instructions |
+| 8 | **1** | 14, 15 | clean | **✗** machine misses; "may evoke the scent", "whispers tales", "adds depth to your understanding" |
+| 9 | **0** | 16 | **R9_GENERIC** | ✓ "As you continue your journey…" — R9 fires, correct |
+| 10 | **0** | 17 | **R9_GENERIC** | ✓ "From Cap d'Antibes to Villefranche…" — R9 fires, correct |
 
 ### Where the machine and Michael disagree
 
-| gap | what it means | which criteria we cannot measure |
+| gap | what it means | which criteria we cannot yet measure |
 |---|---|---|
-| Group 3: machine flags R1, Michael scores 3 | "Look out for" is borderline; he accepts it as guidance | R1 detector is too aggressive on observational imperatives |
-| Group 4: machine says clean, Michael scores 2 | "embark on a journey… delve into the timeless elegance" — he reads suggestive/instructive | R3/R4 detection misses metaphorical imperatives ("embark", "delve") |
-| Group 6: machine says clean, Michael scores 1 | "Walking through… may evoke the scent" — prescribed feeling | R4 detection misses conditional prescriptions ("may evoke") |
-| Group 7: machine flags R8, Michael scores 5 | "One concrete sensory detail" is prompt leakage for us; he valued the facts (Monet, Maupassant) | R8 may over-fire when the content around it is sourced and good |
-| Group 9: machine says clean, Michael scores 0 | "The nearby Abri de l'Olivette" with no connection to anything | R9 (generic) needs to fire on context-free facts, not just platitudes |
-| Group 10: machine says NAVIGATION, Michael scores 0 | "Pedal along the coastline, envisioning…" — he reads filler | Navigation classification is too broad: movement verb + filler ≠ real directions |
+| Group 3: machine flags R8, Michael scores 3 | "One concrete sensory detail" is prompt leakage; he valued the sourced facts (Monet, Maupassant) alongside it | R8 over-fires when the group contains good content around the leaked phrase |
+| Group 4: machine says clean, Michael scores 2 | "Pedal along the coastline, envisioning…immersing yourself" — he reads suggestive/instructive filler | R3/R4 misses metaphorical imperatives ("envisioning", "immersing yourself") and the navigation classifier is too broad (movement verb + filler ≠ real directions) |
+| Group 5: machine says clean, Michael scores 1 | "pause to take in the breathtaking view" — prescribed feeling + imperative | R1/R4 misses "pause to take in" pattern; "breathtaking" is prescribed feeling |
+| Group 8: machine says clean, Michael scores 1 | "may evoke the scent", "whispers tales of a bygone era", "adds depth to your understanding" | R4 misses conditional prescriptions ("may evoke") and personification-as-filler ("whispers tales"). R3/R1 miss "adds depth to your understanding" |
 
 ### Summary of calibration
 
-- **Agreements:** 4 of 11 (36%) — groups 0, 1, 5, and partially 8.
-- **Machine too harsh:** 2 (groups 3, 7) — flags that contradict his score.
-- **Machine too lenient:** 5 (groups 4, 6, 9, 10, and partially 2) — misses what he caught.
+- **Agreements:** 6 of 11 (55%) — groups 0, 1, 2 (partial), 6, 7, 9, 10.
+- **Machine too harsh:** 1 (group 3) — R8 flags prompt leakage in a group he scored 3.
+- **Machine too lenient:** 4 (groups 4, 5, 8, and partially 2) — misses what he caught.
 
-**The most useful output:** The machine currently catches ~36% of what Michael's
-ear catches. Its biggest blind spot is **soft imperatives and metaphorical
-instructions** (groups 4, 6) that R1's pattern list does not cover, and
-**context-free content that is technically specific but contributes nothing**
-(group 9) that R9's generic detector does not reach.
+**Key finding: R9 works perfectly on his 0/5 sentences.** LOCAL-216 verified
+this, LOCAL-222 watched it delete those sentences in generation, and the
+calibration now confirms it from the profiling path. Zero disagreements on the
+two cases Michael cared about most.
+
+**The remaining blind spots** are soft imperatives and prescribed feelings that
+use vocabulary outside R1's explicit pattern list: "pause to take in", "may
+evoke", "envisioning", "immersing yourself", "adds depth to your understanding."
+These are R1/R3/R4 detection gaps — the rules exist but the pattern coverage is
+incomplete for conditional and metaphorical forms.
+
+### Discrepancy with LEAD's reported group count
+
+LEAD's bounce reported `total groups: 24` for tour 163. **This cannot be
+reproduced.** Running `parse_tour_stops` → `split_into_sentence_groups` on
+`storied` HEAD (commit `ceb88ec`, the only version of this code that has ever
+existed) produces 18 groups consistently. Possible explanations:
+
+1. LEAD counted individual sentences with `len > 60` (= 27) minus directions
+   (= ~24), conflating "sentence" with "group."
+2. LEAD ran a different content parsing (including Directions gives 21, still
+   not 24).
+3. LEAD's `24` is itself a reporting error.
+
+The important conclusion holds regardless: **R9 fires on the last two groups
+(whatever the total), and those are the sentences Michael scored 0.** The
+mechanism of the original §5 error (1:1 alignment of mismatched group counts)
+is the finding — not the specific total.
 
 ---
 
@@ -226,12 +279,17 @@ instructions** (groups 4, 6) that R1's pattern list does not cover, and
    18 groups for his 11. This means the per-group rates above are computed over more
    groups than Michael would draw, slightly diluting per-group rates.
 
-5. **R1 detection sensitivity.** The calibration shows R1 both over-fires (group 3,
-   "Look out for") and under-fires (groups 4, 6 — metaphorical imperatives). The
-   net result is approximately correct aggregate rates but imprecise per-sentence
-   verdicts.
+5. **Paragraph filter: `len > 50`.** The profiling includes paragraphs > 50 chars.
+   A `> 60` filter would exclude 39 of 2854 groups (1.4%). This does not
+   materially change the §1 rates (< 0.5pp shift). The sentence-level filter is
+   `len >= 10`, which excludes only trivial fragments.
 
-6. **Tour type classification is crude.** Non-English request strings fall to "other",
+6. **R1 detection sensitivity.** The calibration shows R1 under-fires on
+   metaphorical imperatives and conditional forms (groups 4, 5, 8 — "pause to
+   take in", "may evoke", "envisioning"). The net result is approximately
+   correct aggregate rates but per-sentence precision is incomplete.
+
+7. **Tour type classification is crude.** Non-English request strings fall to "other",
    which inflates that category. The Russian-language museum tours are functionally
    identical to their English counterparts but classified differently.
 
