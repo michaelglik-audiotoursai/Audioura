@@ -385,3 +385,70 @@ it. That is probably the single most useful thing to come out of this session so
 far, and it belongs in part 1 of your agenda.
 
 ---
+
+## 2026-08-05 12:18 — Michael
+
+> yes, dispatch it first, generate a new tour and add it to my VS code view where
+> ...round16.txt is seating. One thing is important: not everything can be
+> algorithmic and free however preferrable, so if this rule (to me it complex and
+> if it works great compliment to you) does nto work efficiently enough we may
+> use another call to AI to verify that fact and find the sentence set
+> replacement. Please keep it in mind.
+
+## 2026-08-05 12:18 — LEAD
+
+**Dispatched as LOCAL-263.** Your escalation point is built in as a first-class
+part of the design, not a footnote — it is quoted verbatim in the task.
+
+### The gate
+
+Two stages, one shared test.
+
+**Stage 1 — classify what the sentence asserts:**
+
+| type | example | today |
+|---|---|---|
+| `PROMISE` | "holds stories that deepen the allure" | R10 |
+| `SENSORY` | "the waves crash against the rocky shore…" | R7, partially |
+| `FEELING` | "invites contemplation and serenity" | R4, partially |
+| `QUALITY` | "holds a significant place in the region's landscape" | **nothing** |
+
+**Stage 2 — one substantiation test for all four:** does a nearby sentence
+supply a concrete payload on the same subject — a date, a named person and what
+they did, a documented event, a measurement? Substantiated, keep. Not, remove.
+
+That single test replaces four divergent pattern lists, and it makes your rule
+directly expressible instead of approximated.
+
+### Your escalation instruction, as specified
+
+Deterministic first. A model is called **only** when the claim is unsubstantiated
+*and* the stop's corpus holds a fact that plausibly bears on it. Its job is
+narrow and bounded:
+
+1. verify whether the passage actually substantiates the claim;
+2. if so, rewrite claim and support as a coherent sentence set — **using only
+   that passage, adding no fact**;
+3. if it cannot ground it, return "delete" — deletion stays the fallback.
+
+One call per stop maximum, batching that stop's uncertain sentences, and the
+escalation cost is reported separately from generation. Baseline to beat is
+$0.0206 per 2-stop tour, of which $0.0107 is the gpt-4o spine. If escalation
+never fires on the Riviera tour, that is a good result and the task must say so.
+
+### On "to me it complex"
+
+It is less complex than what we have. Today four rules each carry their own
+pattern list and none of them looks at the next sentence. This is one rule with
+four labels and one question. The complexity you are sensing is real but it sits
+in the *substantiation test* — and that already exists and already works, in
+R10.
+
+### The tour
+
+The task generates **round 18** and writes it to `~/Audioura/tours/`. I will open
+it in the same VS Code view as round 16 when it lands — roughly 20 minutes. It
+will also copy the artifact across explicitly, which is the step I missed on
+round 16 and why you got an empty buffer.
+
+---
