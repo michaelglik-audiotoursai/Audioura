@@ -123,3 +123,79 @@ figures above are the baseline to measure any proposal against, and I will flag
 the delta on each one without being asked.
 
 ---
+
+## 2026-08-05 11:32 — Michael
+
+> As soon it is working please create another tour txt file and place it in
+> VSCode where ...round15.txt is currently placed. And plese calculate the cost
+> and let me know how it is changed by the includsion of the tour's overall
+> general description. BTW, I gave instructions for the components and order for
+> overall general tour description; I assume there are being incorporated into
+> the tasks to create and then validate the overall general description of the
+> tour. Please confirm.
+
+## 2026-08-05 11:32 — LEAD
+
+### Confirming: partly — creation yes, validation no. Now fixed.
+
+| | in place? |
+|---|---|
+| **Creation** in your four parts, in your order | **yes** — LOCAL-259, running now |
+| Each part passes the existing style gates (R1/R7/R9/R10) | **yes** — inherited |
+| **Structural check** that all four parts exist, in order, each doing its job | **no — this was the gap** |
+
+Acceptance for the structure was going to be me reading it once. That is not
+good enough on this project: every requirement without an automated check has
+regressed silently — the `Description:` label came back after being fixed, R9's
+transition sentence came back, the epilog templates came back. A structural
+requirement with no detector holds until the next generation and no longer.
+
+Dispatched **LOCAL-260** to build `validate_prolog_structure`, checking each
+part is present, in order, and carrying substance:
+
+- part 1 must name the tour subject **and** the transport mode;
+- part 2 must carry at least two of endpoints / distance / terrain / duration;
+- part 3 must carry a sourced fact — a date, a named person and what they did;
+- part 4 must name real stop content, cross-checked against the stops actually
+  in the tour, so "more stories await" fails and "Monet's 1888 series at
+  Antibes, and the 1306 chapel at Èze" passes.
+
+Round 15's opening is the reference failure: **if the validator passes it, the
+validator is wrong.** It also has to fail a keyword-stuffed prolog, because the
+obvious way to fake this check is to mention "cycling" and say nothing.
+
+### Cost of the general description — it is already the most expensive thing we do
+
+The tour's overall description is **not a new call**. It is the spine's
+`tour_hook`, produced by `spine_generator.py`, which is the one component
+calling **gpt-4o**:
+
+| | |
+|---|---|
+| current spine call (produces the opening) | **$0.0107** — 1,275 tokens, in=841 out=434 |
+| share of the true $0.0206 tour cost | **52%** |
+| every other call | gpt-3.5-turbo, ~11× cheaper per token |
+
+So restructuring it into your four parts changes the **prompt**, not the number
+of calls. The delta is output length: a proper four-part opening is perhaps
+600–700 output tokens against 434 today, and gpt-4o output is $0.015/1k.
+
+| | cost |
+|---|---|
+| tour today (true) | $0.0206 |
+| four-part opening, estimated | **+$0.003** |
+| **estimated new total** | **≈ $0.024** (+15%) |
+
+I will replace that estimate with the measured figure when LOCAL-259 lands.
+
+The structural validator (LOCAL-260) is specified to be **deterministic and
+free**, like every other gate we have. If any part of it needs a model, the
+task requires it to say so and justify it.
+
+### Next
+
+When LOCAL-259 lands and passes review I will generate the tour, write it to
+`tours/`, open it in VS Code in the same place round 15 is now, and report the
+measured cost alongside the $0.0206 baseline.
+
+---
