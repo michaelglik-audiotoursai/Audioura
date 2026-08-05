@@ -13,12 +13,22 @@ A stop is VERIFIED if:
 
 If none holds, the stop is UNVERIFIED and must not be narrated.
 
-Feature flag (default OFF pending LEAD review of blast-radius numbers):
-  ENABLE_STOP_EXISTENCE_GATE=1   → gate active, UNVERIFIED stops dropped
-  DISABLE_STOP_EXISTENCE_GATE=1  → gate disabled even if previously enabled
+Mode control (LOCAL-245):
+  STOP_EXISTENCE_GATE_MODE = off | log_only | enforce
 
-When OFF, the gate still LOGS verdicts (measurement mode) but does not
-drop stops. This allows assessment without affecting output.
+  off      — gate disabled entirely, no verification, no logging
+  log_only — verdicts computed and logged, nothing dropped
+  enforce  — unverified stops dropped, tour may be shorter
+
+  The mode is logged at startup so a run can never claim one mode while
+  behaving in another.
+
+Legacy compat (deprecated):
+  ENABLE_STOP_EXISTENCE_GATE=1   → treated as 'enforce'
+  DISABLE_STOP_EXISTENCE_GATE=1  → treated as 'off'
+  neither set                    → treated as 'log_only'
+
+  The new env var takes precedence when set.
 """
 
 import json
@@ -477,6 +487,39 @@ def verify_stop_existence(
     return result
 
 
+def get_gate_mode() -> str:
+    """Resolve the stop-existence gate mode from environment.
+
+    Single source of truth: STOP_EXISTENCE_GATE_MODE env var.
+    Valid values: 'off', 'log_only', 'enforce'.
+    Default: 'off' (explicit — no silent behaviour).
+
+    Legacy compat: if the new var is not set, falls back to the old flags:
+        DISABLE_STOP_EXISTENCE_GATE=1 → 'off'
+        ENABLE_STOP_EXISTENCE_GATE=1  → 'enforce'
+        neither                       → 'log_only' (old default)
+
+    Returns one of: 'off', 'log_only', 'enforce'.
+    """
+    mode = os.environ.get('STOP_EXISTENCE_GATE_MODE', '').strip().lower()
+    if mode in ('off', 'log_only', 'enforce'):
+        return mode
+
+    # Legacy fallback
+    if os.environ.get('DISABLE_STOP_EXISTENCE_GATE', '').strip() == '1':
+        return 'off'
+    if os.environ.get('ENABLE_STOP_EXISTENCE_GATE', '').strip() == '1':
+        return 'enforce'
+    return 'log_only'
+
+
+def _log_gate_startup():
+    """Log the resolved gate mode at startup. Call once per run."""
+    mode = get_gate_mode()
+    print(f"  [EXISTENCE-GATE] Mode at startup: {mode.upper()}")
+    return mode
+
+
 def run_existence_gate(
     poi_list: List[str],
     venue_name: str,
@@ -484,40 +527,34 @@ def run_existence_gate(
 ) -> Dict:
     """Run the stop-existence gate over a list of candidate stops.
 
-    Feature flags:
-        ENABLE_STOP_EXISTENCE_GATE=1  → gate enforced (unverified stops dropped)
-        DISABLE_STOP_EXISTENCE_GATE=1 → gate completely off (no logging either)
-
-    When gate is NOT enabled, verdicts are still logged for measurement but
-    stops are NOT dropped.
+    Mode is read from STOP_EXISTENCE_GATE_MODE (or legacy flags).
+      'off'      → gate completely disabled, no verification, no logging
+      'log_only' → verdicts computed and logged, nothing dropped
+      'enforce'  → unverified stops dropped from the returned list
 
     Returns:
         {
-            'gate_enabled': bool,
-            'gate_enforced': bool,
+            'mode': 'off' | 'log_only' | 'enforce',
             'total_stops': int,
             'verified_stops': list of stop titles,
             'unverified_stops': list of stop titles,
             'verdicts': list of verify_stop_existence results,
-            'action': 'ENFORCED' | 'LOG_ONLY' | 'DISABLED',
+            'action': 'ENFORCE' | 'LOG_ONLY' | 'OFF',
         }
     """
-    # Feature flag logic
-    disabled = os.environ.get('DISABLE_STOP_EXISTENCE_GATE', '').strip() == '1'
-    enabled = os.environ.get('ENABLE_STOP_EXISTENCE_GATE', '').strip() == '1'
+    mode = get_gate_mode()
 
-    if disabled:
+    if mode == 'off':
         return {
-            'gate_enabled': False,
-            'gate_enforced': False,
+            'mode': 'off',
             'total_stops': len(poi_list),
             'verified_stops': list(poi_list),
             'unverified_stops': [],
             'verdicts': [],
-            'action': 'DISABLED',
+            'action': 'OFF',
         }
 
-    # Run verification on all stops regardless of enforcement
+    # Run verification on all stops (both log_only and enforce)
     verdicts = []
     verified_stops = []
     unverified_stops = []
@@ -535,9 +572,9 @@ def run_existence_gate(
     n_unver = len(unverified_stops)
     pct_ver = n_ver / len(poi_list) * 100 if poi_list else 0
 
-    if enabled:
-        action = 'ENFORCED'
-        print(f"  [EXISTENCE-GATE] ENFORCED — {n_ver}/{len(poi_list)} stops verified "
+    if mode == 'enforce':
+        action = 'ENFORCE'
+        print(f"  [EXISTENCE-GATE] ENFORCE — {n_ver}/{len(poi_list)} stops verified "
               f"({pct_ver:.0f}%), dropping {n_unver} unverified")
     else:
         action = 'LOG_ONLY'
@@ -551,8 +588,7 @@ def run_existence_gate(
         print(f"    [{status}] {v['stop_title']!r:.50s} — {ev}")
 
     return {
-        'gate_enabled': True,
-        'gate_enforced': enabled,
+        'mode': mode,
         'total_stops': len(poi_list),
         'verified_stops': verified_stops,
         'unverified_stops': unverified_stops,
