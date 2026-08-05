@@ -4528,3 +4528,53 @@ when its commit scrolls out of the window.
 alarm wrong; never teach the alarm to look away.* Each exception granted to a
 guard is permanent in practice, and a guard with enough exceptions is a guard
 nobody reads.
+
+---
+
+## D118 — `audio_tours` grows every time we run the test suite (2026-08-04)
+
+LEAD noticed the row count move 133 → 138 with no generation task running. The
+five new rows:
+
+```
+186-188  "LOCAL139 Acceptance Test 1785887540"        23:52
+189      "LOCAL-186 test: Musée Picasso disambiguation" 23:55
+190      "LOCAL-186 test: …"                            00:45
+```
+
+Created while LOCAL-228/229/230 were running — not by those tasks' own work,
+but because **the falsification and regression work runs the existing test
+suites, and eight of those suites INSERT real rows into the production
+`audio_tours` table as fixtures**:
+
+```
+test_local128_stop_metrics_tourid.py   test_local183_controlled_ab.py
+test_local183_stop_corpus_wiring.py    test_local186_venue_disambiguation.py
+test_local139_acceptance.py            test_local183_evidence.py
+test_tour_factory.py                   test_tour_helper.py
+```
+
+**Harmless today, and that is not the point.** All five are `is_test = true`
+with `lat`/`lng` NULL, so they cannot reach the Nice list — LEAD verified it is
+still `[1,12,14,17,21,24,27,28,29,152]`. But:
+
+- it explains the steady drift in `audio_tours` that has forced the row-count
+  baseline up repeatedly;
+- it means the row-loss alarm (`backup_tours.sh`) is watching a number that
+  moves for reasons unrelated to production;
+- and it is one forgotten `is_test` flag away from **LOCAL-49**, which put two
+  test tours in Michael's app.
+
+CLAUDE.md already binds tasks: *"test cleanup must be scoped to rows the test
+created."* These suites create and do not clean.
+
+**The right fix is not more cleanup discipline.** It is that a test should not
+write to the production database at all — the subscribed track already has a
+separate database (`audiotours_subscribed`, D109), and the same pattern applies
+here. Recorded now; LEAD will dispatch once Michael's read is finished, since
+touching the test fixtures while he is evaluating risks changing what the
+suites report.
+
+**Not treating this as urgent** because the guard that matters — user-visible
+drift — is intact and checked every five minutes. This is hygiene with a known
+failure mode, not an active fault.
