@@ -7402,3 +7402,72 @@ Gloss triage, claim-gate escalation and intrigue ranking all run on gpt-4o-mini,
 which scored 2.5/4 here. That score was for spine generation, a harder task than
 ranking or adjudication, so it does not transfer — but nobody has measured those
 either. Worth doing before the next cost conversation, not now.
+
+## D187 — Corpus depth moves quality 4×, exactly as predicted (2026-08-05)
+
+LOCAL-277 merged (`f661659`). D183 predicted that corpus depth, not rule work,
+was the binding constraint. Tested directly:
+
+```
+                                before        after
+Cap d'Antibes + Port de Nice    1.5 f/stop -> 6.0 f/stop   (SAME PAIR)
+8-stop                          3.1 f/stop -> 8.8 f/stop
+total facts, 8-stop             25         -> 53
+corpus                          72 psg     -> 119 psg
+```
+
+LEAD applied D162's rule before believing any of it and fetched
+`en.wikipedia.org/wiki/Ile_Sainte-Marguerite`. Four sampled claims verbatim:
+the island's 3,200 × 950 metres, the Man in the Iron Mask held at Fort Royal for
+11 years (1687–1698) of 34, the Celtic-Ligurian occupation in 6 BC, the Roman
+name Lero. Extracted, not written.
+
+**The Iron Mask had been appearing in generated tours all day sourced from
+nothing but the model's memory.** It now has provenance.
+
+Name fragmentation was a genuine multiplier: "Old Town Antibes" resolved to
+nothing while "Old Town of Antibes" held five passages; same for Cannes
+Croisette / La Croisette and the Fort Carré accent variants. All 17 drawn stops
+now resolve.
+
+## D188 — Two category failures, found by trying a category we had never tried (2026-08-05)
+
+Michael asked for a 5-stop museum tour and a 3-stop restaurant tour. Everything
+built today was tested on Riviera cycling tours only. Both new categories
+failed, in different ways.
+
+**Restaurant tours cannot be generated at all.**
+
+```
+EXISTENCE-GATE ENFORCE: dropped 3 unverified stop(s), 0 remain
+    DROPPED: 'Le Chantecler'      Michelin-starred, Hôtel Negresco
+    DROPPED: 'La Petite Maison'   one of the best-known in Nice
+    DROPPED: "L'Univers"          Christian Plumail, Michelin-starred
+FATAL: All generation attempts returned None
+```
+
+Three real restaurants, three false negatives, no tour. **This is D132's bug
+again**: the gate requires a source passage tying the stop to the *venue*, and
+for a restaurant tour the venue is `"restaurant tour in Nice, France"` — our own
+label, which no source contains. LOCAL-239 fixed exactly this for geographic
+areas by adding venue kinds; a third kind for establishments was never added.
+Dispatched as LOCAL-281.
+
+**Museum tours lost the tour overview, and that one is LEAD's.**
+
+Michael: *"No the overview of the tour?"* Correct — no `Orientation:` line at
+all, so no overview.
+
+When he asked for the description to sit inside the Orientation section, LEAD
+appended it to `_orientation_prefix`. Museum tours then hit the R3 rule, which
+drops the entire orientation block when the stop's orientation lacks a grounded
+viewing note — **taking the tour overview with it**.
+
+LEAD verified that change three times, all on cycling tours, which always emit
+an orientation. **One category silently broken by a change tested only on
+another.** Dispatched as LOCAL-282, with a three-category check written into the
+acceptance criteria, because the absence of one is what caused this.
+
+Michael also reported no stop-1 description. There is one — it is simply thin
+and unlabelled, one fact against another stop's three. That is the corpus
+problem, not the regression, and the two should not be conflated.
