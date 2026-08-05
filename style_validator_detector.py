@@ -2194,6 +2194,16 @@ def validate_paragraph(paragraph: str) -> Dict:
         all_findings.extend(check_r8_prompt_leakage(sentence))
         all_findings.extend(check_r9_generic(sentence))
 
+    # LEAD fixup on merge: R10 was implemented and never called from here.
+    # It fires on 8 of 12 sentences in tour 180's Eze paragraph — exactly
+    # Michael's complaints — but validate_paragraph reported none, because the
+    # rule needs the whole sentence list (it looks for delivery in neighbours)
+    # and the loop above passes one sentence at a time.
+    for _i in range(len(sentences)):
+        _f = check_r10_unfulfilled_promise(sentences, _i)
+        if _f:
+            all_findings.append(_f)
+
     rules_violated = set(f['rule_id'] for f in all_findings)
 
     return {
