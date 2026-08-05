@@ -352,19 +352,34 @@ def _check_stop_corpus(
         return False, ""
 
 
-def _classify_venue_kind(venue_name: str, db_conn) -> Tuple[str, str]:
-    """Classify a venue as 'institution' or 'geographic_area'.
+def _classify_venue_kind(venue_name: str, db_conn, tour_type: Optional[str] = None) -> Tuple[str, str]:
+    """Classify a venue as 'institution', 'geographic_area', or 'dining'.
 
     LOCAL-239: An institution (museum, palace, named building) and a geographic
     area (walking route, region, coastal path) need different confirmation logic.
 
-    Classification signal: venue_corpus.sparql_works_json presence.
-      - Institution: has sparql_works_json (a list of held works from Wikidata)
-      - Geographic area: no sparql_works_json (canonical_titles are POIs/sections)
+    LOCAL-281: A dining/restaurant tour needs a third kind. The question for a
+    restaurant is "does Le Chantecler exist in Nice?" — not "does a source tie
+    Le Chantecler to 'restaurant tour in Nice, France'" (our internal label).
+
+    Classification priority:
+      1. Explicit tour_type signal (or EXISTENCE_GATE_TOUR_TYPE env var):
+         - restaurant/food/dining → 'dining'
+      2. venue_corpus.sparql_works_json presence:
+         - Institution: has sparql_works_json (a list of held works from Wikidata)
+         - Geographic area: no sparql_works_json (canonical_titles are POIs/sections)
 
     Returns:
-        (kind: 'institution' | 'geographic_area' | 'unknown', evidence: str)
+        (kind: 'institution' | 'geographic_area' | 'dining' | 'unknown', evidence: str)
     """
+    # LOCAL-281: Check tour_type signal first (explicit kwarg or env fallback)
+    _effective_tour_type = tour_type or os.environ.get('EXISTENCE_GATE_TOUR_TYPE', '')
+    if _effective_tour_type:
+        _tt_lower = _effective_tour_type.lower()
+        _DINING_KEYWORDS = ('restaurant', 'food', 'dining', 'culinary', 'bistro', 'cafe', 'eatery')
+        if any(kw in _tt_lower for kw in _DINING_KEYWORDS):
+            return 'dining', f'tour_type={_effective_tour_type!r} signals dining'
+
     try:
         rows = _find_venue_corpus_rows(venue_name, db_conn)
         if not rows:
@@ -418,29 +433,361 @@ def _check_stop_corpus_geographic(
         return False, ""
 
 
+def _check_dining_existence(
+    stop_title: str, venue_name: str, db_conn
+) -> Tuple[bool, str]:
+    """Check whether a restaurant/dining establishment exists at the claimed location.
+
+    LOCAL-281: For dining tours, the "venue" is a city/region (our internal label,
+    e.g. "Nice, France"). No source will ever tie a restaurant to that label. The
+    right question is: "Does Le Chantecler exist in Nice?" — verified by external
+    evidence from Wikipedia, Wikidata, or an authoritative culinary source.
+
+    Strategy (using existing retrieval infrastructure):
+      1. Wikipedia REST API: fetch summary for the restaurant name — if it exists
+         and mentions the city/region, that's Tier-1 evidence.
+      2. Wikipedia search API: search for "restaurant_name city" — if a search
+         result's snippet mentions BOTH the stop name and the city, that's
+         evidence (covers restaurants without standalone articles, e.g. Le
+         Chantecler mentioned in the Hotel Negresco article).
+      3. French Wikipedia (many Nice restaurants have fr.wiki coverage).
+      4. Wikidata: search for the entity.
+
+    A restaurant is VERIFIED if any one of these returns a positive signal tying
+    the establishment to the geographic area in venue_name. A plausible name with
+    no external trace remains UNVERIFIED.
+    """
+    import requests as _http
+    from urllib.parse import quote
+
+    # Extract city/location signal from venue_name
+    # venue_name for restaurant tours is typically "Nice, France" or "Nice"
+    _city_signals = set()
+    for part in re.split(r'[,\s]+', venue_name):
+        part_clean = _strip_accents(part).lower().strip()
+        if len(part_clean) >= 3 and part_clean not in ('france', 'italy', 'spain', 'usa', 'uk',
+                                                        'the', 'tour', 'restaurant', 'food',
+                                                        'dining', 'culinary'):
+            _city_signals.add(part_clean)
+
+    # Stop title words for snippet matching — split on whitespace AND apostrophes
+    _stop_words = [w for w in re.split(r"[\s'\u2019-]+", _strip_accents(stop_title).lower())
+                   if len(w) >= 3 and w not in ('the', 'les', 'des', 'une', 'la', 'le', 'du')]
+
+    def _snippet_has_evidence(snippet_text: str) -> bool:
+        """Check if a snippet mentions the restaurant, the city, and a dining signal.
+        
+        Three requirements:
+          1. Stop words present in snippet
+          2. City signal present in snippet
+          3. A dining-related word present (prevents museums/markets from passing)
+          4. Proximity: city within 120 chars of stop word
+        """
+        s = _strip_accents(re.sub(r'<[^>]+>', '', snippet_text)).lower()
+        # Also decode HTML entities
+        s = s.replace('&#039;', "'").replace('&amp;', '&').replace('&quot;', '"')
+        # Need at least half the stop words present
+        word_hits = sum(1 for w in _stop_words if w in s)
+        has_stop = word_hits >= max(1, len(_stop_words) // 2) if _stop_words else False
+        if not has_stop:
+            return False
+        has_city = any(sig in s for sig in _city_signals) if _city_signals else False
+        if not has_city:
+            return False
+        # Require a dining signal in the snippet
+        _dining_snippet_signals = ('restaurant', 'chef', 'michelin', 'cuisine', 'bistro',
+                                   'brasserie', 'gastronomic', 'dining', 'starred',
+                                   'food', 'culinary', 'cook', 'kitchen',
+                                   'hotel-restaurant', 'hôtel-restaurant')
+        has_dining = any(sig in s for sig in _dining_snippet_signals)
+        if not has_dining:
+            return False
+        # Proximity check: find closest distance between any stop word and any city signal
+        for sw in _stop_words:
+            sw_pos = s.find(sw)
+            if sw_pos < 0:
+                continue
+            for cs in _city_signals:
+                cs_pos = s.find(cs)
+                if cs_pos < 0:
+                    continue
+                if abs(sw_pos - cs_pos) <= 120:
+                    return True
+        return False
+
+    _HEADERS = {
+        "User-Agent": "Audioura/2.2 (tour-generation; contact: support@audioura.com)",
+        "Accept": "application/json",
+    }
+
+    # --- Check 1: Wikipedia summary for the restaurant ---
+    try:
+        encoded_title = quote(stop_title.strip().replace(" ", "_"), safe="")
+        url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{encoded_title}"
+        resp = _http.get(url, headers=_HEADERS, timeout=8, allow_redirects=True)
+        if resp.status_code == 200:
+            data = resp.json()
+            extract = data.get("extract", "")
+            title_returned = data.get("title", "")
+            description = data.get("description", "")
+            full_text = f"{extract} {description}".lower()
+            full_text_normalized = _strip_accents(full_text)
+
+            # For dining verification, we need BOTH:
+            #   1. City/location mention
+            #   2. Evidence it's a dining/food establishment (not just any place)
+            _restaurant_signals = ('restaurant', 'dining', 'chef', 'michelin', 'cuisine',
+                                   'bistro', 'brasserie', 'gastronomic', 'starred', 'food',
+                                   'culinary', 'menu', 'kitchen', 'cook', 'dine', 'meal')
+            is_dining = any(sig in full_text for sig in _restaurant_signals)
+            has_city = _city_signals and any(sig in full_text_normalized for sig in _city_signals)
+
+            if has_city and is_dining:
+                return True, f"wikipedia_summary: '{title_returned}' is dining+city"
+            # If it's clearly about a restaurant (even without explicit city in summary)
+            # but title matches exactly, accept it
+            if is_dining and _title_match(stop_title, title_returned):
+                return True, f"wikipedia_summary: '{title_returned}' is a restaurant"
+    except Exception as e:
+        logger.debug(f"[EXISTENCE-GATE] Wikipedia summary check failed for {stop_title!r}: {e}")
+
+    # --- Check 2: Wikipedia search — snippet-based evidence ---
+    # Key insight: many restaurants don't have standalone articles but are mentioned
+    # in other articles (e.g. Le Chantecler in the Hotel Negresco article).
+    # We search and check if the SNIPPET mentions both the restaurant and the city.
+    try:
+        city_hint = next(iter(_city_signals), "")
+        # Try multiple search variants: quoted exact name, then unquoted keywords
+        _search_variants = [
+            f'"{stop_title}" {city_hint} restaurant',  # exact match preferred
+        ]
+        # For names with apostrophes (L'Univers), also try without the article
+        _clean_name = re.sub(r"^(L'|Le |La |Les |L )", "", stop_title, flags=re.IGNORECASE).strip()
+        if _clean_name != stop_title:
+            _search_variants.append(f'"{_clean_name}" {city_hint} restaurant')
+            _search_variants.append(f'{_clean_name} {city_hint} restaurant chef')
+
+        search_url = "https://en.wikipedia.org/w/api.php"
+        for sq in _search_variants:
+            params = {
+                "action": "query",
+                "list": "search",
+                "srsearch": sq,
+                "srnamespace": "0",
+                "srlimit": "5",
+                "format": "json",
+            }
+            resp = _http.get(search_url, params=params, headers=_HEADERS, timeout=8)
+            if resp.status_code == 200:
+                results = resp.json().get("query", {}).get("search", [])
+                for r in results:
+                    snippet_raw = r.get("snippet", "")
+                    if _snippet_has_evidence(snippet_raw):
+                        r_title = r.get("title", "")
+                        return True, f"wikipedia_search: snippet in '{r_title}' mentions stop+city"
+                    # Fallback: if snippet has the restaurant but not the city,
+                    # fetch the article summary and check if IT has both
+                    snippet_clean = _strip_accents(re.sub(r'<[^>]+>', '', snippet_raw)).lower()
+                    snippet_clean = snippet_clean.replace('&#039;', "'").replace('&amp;', '&')
+                    stop_in_snippet = any(w in snippet_clean for w in _stop_words)
+                    if stop_in_snippet and not _snippet_has_evidence(snippet_raw):
+                        # Snippet mentions restaurant but not city — check article
+                        try:
+                            r_title = r.get("title", "")
+                            art_url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{quote(r_title.replace(' ', '_'), safe='')}"
+                            art_resp = _http.get(art_url, headers=_HEADERS, timeout=5, allow_redirects=True)
+                            if art_resp.status_code == 200:
+                                art_data = art_resp.json()
+                                art_text = _strip_accents(f"{art_data.get('extract', '')} {art_data.get('description', '')}").lower()
+                                art_has_stop = any(w in art_text for w in _stop_words)
+                                art_has_city = any(sig in art_text for sig in _city_signals)
+                                if art_has_stop and art_has_city:
+                                    # Proximity check: stop and city within 300 chars
+                                    _art_proximity_ok = False
+                                    for sw in _stop_words:
+                                        sw_pos = art_text.find(sw)
+                                        if sw_pos < 0:
+                                            continue
+                                        for cs in _city_signals:
+                                            cs_pos = art_text.find(cs)
+                                            if cs_pos < 0:
+                                                continue
+                                            if abs(sw_pos - cs_pos) <= 300:
+                                                _art_proximity_ok = True
+                                                break
+                                        if _art_proximity_ok:
+                                            break
+                                    if _art_proximity_ok:
+                                        return True, f"wikipedia_article: '{r_title}' extract mentions stop+city"
+                        except Exception:
+                            pass
+    except Exception as e:
+        logger.debug(f"[EXISTENCE-GATE] Wikipedia search check failed for {stop_title!r}: {e}")
+
+    # --- Check 3: French Wikipedia (restaurants in France often have fr.wiki coverage) ---
+    try:
+        # Summary lookup
+        encoded_title_fr = quote(stop_title.strip().replace(" ", "_"), safe="")
+        url_fr = f"https://fr.wikipedia.org/api/rest_v1/page/summary/{encoded_title_fr}"
+        resp_fr = _http.get(url_fr, headers=_HEADERS, timeout=8, allow_redirects=True)
+        if resp_fr.status_code == 200:
+            data_fr = resp_fr.json()
+            extract_fr = data_fr.get("extract", "")
+            title_fr = data_fr.get("title", "")
+            description_fr = data_fr.get("description", "")
+            full_text_fr = f"{extract_fr} {description_fr}".lower()
+            full_text_fr_normalized = _strip_accents(full_text_fr)
+
+            if _city_signals and any(sig in full_text_fr_normalized for sig in _city_signals):
+                return True, f"wikipedia_fr_summary: '{title_fr}' mentions city"
+
+            _restaurant_signals_fr = ('restaurant', 'chef', 'michelin', 'cuisine', 'etoile',
+                                      'gastronomique', 'bistrot', 'brasserie', 'table', 'cuisinier')
+            if any(sig in full_text_fr_normalized for sig in _restaurant_signals_fr):
+                return True, f"wikipedia_fr_summary: '{title_fr}' is a restaurant (fr.wiki)"
+
+        # French Wikipedia search (snippet-based)
+        _search_variants_fr = [
+            f'"{stop_title}" {city_hint} restaurant',
+        ]
+        if _clean_name != stop_title:
+            _search_variants_fr.append(f'"{_clean_name}" {city_hint} restaurant')
+            _search_variants_fr.append(f'{_clean_name} {city_hint} restaurant chef')
+
+        for sq_fr in _search_variants_fr:
+            resp_fr_search = _http.get(
+                "https://fr.wikipedia.org/w/api.php",
+                params={"action": "query", "list": "search", "srsearch": sq_fr,
+                        "srnamespace": "0", "srlimit": "5", "format": "json"},
+                headers=_HEADERS, timeout=8
+            )
+            if resp_fr_search.status_code == 200:
+                results_fr = resp_fr_search.json().get("query", {}).get("search", [])
+                for r in results_fr:
+                    snippet_raw = r.get("snippet", "")
+                    if _snippet_has_evidence(snippet_raw):
+                        r_title = r.get("title", "")
+                        return True, f"wikipedia_fr_search: snippet in '{r_title}' mentions stop+city"
+                    # Fallback: if snippet mentions restaurant + stop but not city,
+                    # fetch the article intro via action API and check for city there
+                    snippet_clean_fr = _strip_accents(re.sub(r'<[^>]+>', '', snippet_raw)).lower()
+                    snippet_clean_fr = snippet_clean_fr.replace('&#039;', "'").replace('&amp;', '&')
+                    stop_in_fr = any(w in snippet_clean_fr for w in _stop_words)
+                    _dining_in_fr = any(sig in snippet_clean_fr for sig in (
+                        'restaurant', 'chef', 'hotel-restaurant', 'hôtel-restaurant',
+                        'cuisine', 'gastronomique', 'bistrot'))
+                    if stop_in_fr and _dining_in_fr:
+                        try:
+                            r_title_fr = r.get("title", "")
+                            # Fetch article extract via action API (full text, no truncation)
+                            art_resp_fr = _http.get(
+                                "https://fr.wikipedia.org/w/api.php",
+                                params={"action": "query", "prop": "extracts",
+                                        "titles": r_title_fr,
+                                        "explaintext": "true",
+                                        "format": "json"},
+                                headers=_HEADERS, timeout=8
+                            )
+                            if art_resp_fr.status_code == 200:
+                                pages = art_resp_fr.json().get("query", {}).get("pages", {})
+                                for _, page in pages.items():
+                                    art_text_fr = _strip_accents(page.get("extract", "")).lower()
+                                    art_has_stop = any(w in art_text_fr for w in _stop_words)
+                                    art_has_city = any(sig in art_text_fr for sig in _city_signals)
+                                    if art_has_stop and art_has_city:
+                                        # Proximity check in article: stop and city within 300 chars
+                                        for sw in _stop_words:
+                                            sw_pos = art_text_fr.find(sw)
+                                            if sw_pos < 0:
+                                                continue
+                                            for cs in _city_signals:
+                                                cs_pos = art_text_fr.find(cs)
+                                                if cs_pos < 0:
+                                                    continue
+                                                if abs(sw_pos - cs_pos) <= 300:
+                                                    return True, f"wikipedia_fr_article: '{r_title_fr}' mentions stop+city (dining context)"
+                        except Exception:
+                            pass
+    except Exception as e:
+        logger.debug(f"[EXISTENCE-GATE] French Wikipedia check failed for {stop_title!r}: {e}")
+
+    # --- Check 4: Wikidata entity search ---
+    try:
+        wd_url = "https://www.wikidata.org/w/api.php"
+        wd_params = {
+            "action": "wbsearchentities",
+            "search": stop_title,
+            "language": "en",
+            "limit": "5",
+            "format": "json",
+        }
+        resp_wd = _http.get(wd_url, params=wd_params, headers=_HEADERS, timeout=8)
+        if resp_wd.status_code == 200:
+            wd_results = resp_wd.json().get("search", [])
+            for wd_r in wd_results:
+                wd_label = wd_r.get("label", "")
+                wd_desc = wd_r.get("description", "").lower()
+                wd_desc_normalized = _strip_accents(wd_desc)
+                if _title_match(stop_title, wd_label):
+                    # Check if description mentions the city or restaurant-related terms
+                    if _city_signals and any(sig in wd_desc_normalized for sig in _city_signals):
+                        return True, f"wikidata: '{wd_label}' (QID:{wd_r.get('id','?')}) description mentions city"
+                    if any(sig in wd_desc for sig in ('restaurant', 'dining', 'chef', 'michelin', 'cuisine')):
+                        return True, f"wikidata: '{wd_label}' (QID:{wd_r.get('id','?')}) is a restaurant"
+        # Also try Wikidata in French
+        wd_params_fr = {
+            "action": "wbsearchentities",
+            "search": stop_title,
+            "language": "fr",
+            "limit": "5",
+            "format": "json",
+        }
+        resp_wd_fr = _http.get(wd_url, params=wd_params_fr, headers=_HEADERS, timeout=8)
+        if resp_wd_fr.status_code == 200:
+            wd_results_fr = resp_wd_fr.json().get("search", [])
+            for wd_r in wd_results_fr:
+                wd_label = wd_r.get("label", "")
+                wd_desc = wd_r.get("description", "").lower()
+                wd_desc_normalized = _strip_accents(wd_desc)
+                if _title_match(stop_title, wd_label):
+                    if _city_signals and any(sig in wd_desc_normalized for sig in _city_signals):
+                        return True, f"wikidata_fr: '{wd_label}' (QID:{wd_r.get('id','?')}) description mentions city"
+                    if any(sig in wd_desc for sig in ('restaurant', 'chef', 'michelin', 'cuisine',
+                                                      'gastronomique', 'etoile')):
+                        return True, f"wikidata_fr: '{wd_label}' (QID:{wd_r.get('id','?')}) is a restaurant"
+    except Exception as e:
+        logger.debug(f"[EXISTENCE-GATE] Wikidata check failed for {stop_title!r}: {e}")
+
+    return False, ""
+
+
 def verify_stop_existence(
     stop_title: str,
     venue_name: str,
     db_conn,
+    tour_type: Optional[str] = None,
 ) -> Dict:
     """Verify whether a stop actually exists at the claimed venue.
 
     LOCAL-239: Uses venue kind to determine verification strictness:
       - institution: source must tie the object to THAT institution (D74, D127)
       - geographic_area: stop must be a real place in the region (relaxed)
+    LOCAL-281: Added 'dining' kind for restaurant tours.
+      - dining: establishment must have external evidence of existence at the
+        location (Wikipedia, Wikidata, or authoritative culinary source).
 
     Returns:
         {
             'stop_title': str,
             'venue_name': str,
-            'venue_kind': 'institution' | 'geographic_area' | 'unknown',
+            'venue_kind': 'institution' | 'geographic_area' | 'dining' | 'unknown',
             'verified': bool,
             'evidence': str (what confirmed it, or '' if unverified),
-            'source': 'venue_corpus' | 'stop_corpus' | 'stop_corpus_geographic' | '',
+            'source': 'venue_corpus' | 'stop_corpus' | 'stop_corpus_geographic' | 'dining_external' | '',
         }
     """
-    # Classify venue kind first
-    venue_kind, kind_evidence = _classify_venue_kind(venue_name, db_conn)
+    # Classify venue kind first (with tour_type for dining detection)
+    venue_kind, kind_evidence = _classify_venue_kind(venue_name, db_conn, tour_type=tour_type)
 
     result = {
         'stop_title': stop_title,
@@ -470,6 +817,16 @@ def verify_stop_existence(
             result['verified'] = True
             result['evidence'] = evidence
             result['source'] = 'stop_corpus_geographic'
+            return result
+    elif venue_kind == 'dining':
+        # LOCAL-281: Restaurant/dining verification via external sources.
+        # The question is "does this establishment exist at this location?" —
+        # verified via Wikipedia, Wikidata, or authoritative culinary sources.
+        verified, evidence = _check_dining_existence(stop_title, venue_name, db_conn)
+        if verified:
+            result['verified'] = True
+            result['evidence'] = evidence
+            result['source'] = 'dining_external'
             return result
     else:
         # Institution or unknown: strict same-source rule (D74, D127).
@@ -524,6 +881,7 @@ def run_existence_gate(
     poi_list: List[str],
     venue_name: str,
     db_conn,
+    tour_type: Optional[str] = None,
 ) -> Dict:
     """Run the stop-existence gate over a list of candidate stops.
 
@@ -531,6 +889,15 @@ def run_existence_gate(
       'off'      → gate completely disabled, no verification, no logging
       'log_only' → verdicts computed and logged, nothing dropped
       'enforce'  → unverified stops dropped from the returned list
+
+    Args:
+        poi_list: List of stop title strings to verify.
+        venue_name: The venue/location string (city for restaurants, museum name
+                    for institutions, area label for geographic).
+        db_conn: Database connection.
+        tour_type: Optional tour type hint (e.g. 'restaurant'). When provided,
+                   used to classify venue kind. Falls back to
+                   EXISTENCE_GATE_TOUR_TYPE env var if not passed.
 
     Returns:
         {
@@ -560,7 +927,7 @@ def run_existence_gate(
     unverified_stops = []
 
     for stop_title in poi_list:
-        verdict = verify_stop_existence(stop_title, venue_name, db_conn)
+        verdict = verify_stop_existence(stop_title, venue_name, db_conn, tour_type=tour_type)
         verdicts.append(verdict)
         if verdict['verified']:
             verified_stops.append(stop_title)
