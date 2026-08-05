@@ -6192,7 +6192,9 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                             orientation = orientation_text
                             description = ""
                     else:
-                        orientation = "Look for this work in the galleries."
+                        # [LOCAL-251] Tour-type-appropriate fallback when LLM doesn't
+                        # include "Orientation:" section. The description is the full response.
+                        orientation = "Position yourself to best view this location." if tour_category != 'museum' else "Look for this work in the galleries."
                         description = description_text.strip()
 
                     # [LOCAL-26] Validate: reject if description is a placeholder echo
@@ -6379,14 +6381,19 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                     return idx, orientation, description, word_count, tokens_used, call_cost
                 else:
                     print(f"Stop {stop_num} error: API returned status code {description_response.status_code}")
-                    return idx, "Look for this work in the galleries.", f"[Description for {poi_name} could not be generated.]", 0, 0, 0.0
+                    # [LOCAL-251] Tour-type-appropriate fallback; mark as generation failure
+                    _fallback_orient = "Position yourself to best view this location." if tour_category != 'museum' else "Look for this work in the galleries."
+                    return idx, _fallback_orient, f"[GENERATION_FAILED:{poi_name}]", 0, 0, 0.0
 
             except Exception as e:
                 print(f"Stop {stop_num} error: {str(e)}")
-                return idx, "Look for this work in the galleries.", f"[Description for {poi_name} could not be generated.]", 0, 0, 0.0
+                # [LOCAL-251] Tour-type-appropriate fallback; mark as generation failure
+                _fallback_orient = "Position yourself to best view this location." if tour_category != 'museum' else "Look for this work in the galleries."
+                return idx, _fallback_orient, f"[GENERATION_FAILED:{poi_name}]", 0, 0, 0.0
 
         # Should not reach here, but safety fallback
-        return idx, "Look for this work in the galleries.", f"{poi_name} — an exhibit at this venue.", 0, 0, 0.0
+        _fallback_orient = "Position yourself to best view this location." if tour_category != 'museum' else "Look for this work in the galleries."
+        return idx, _fallback_orient, f"{poi_name} — a stop on this tour.", 0, 0, 0.0
 
     max_workers = min(len(poi_list), 5)
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -6593,6 +6600,43 @@ REWRITE RULES (all mandatory):
             print(f"  [LOCAL-192] Style retry summary: {_style_retry_count} paragraphs retried, "
                   f"{_style_retry_successes} fixed/improved, {_style_retry_failures} kept original")
             print(f"  [LOCAL-192] Retry cost: ${_style_retry_cost:.4f} ({_style_retry_tokens} tokens)")
+
+    # -------- [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion --------
+    # Michael scored this class 1/5. R7 has fired without a deletion path since
+    # LOCAL-247. Now it deletes. Behind DISABLE_R7_DELETION=1 flag. $0.00 — deterministic.
+    _r7_deletion_disabled = os.environ.get('DISABLE_R7_DELETION', '').strip() == '1'
+    if _r7_deletion_disabled:
+        print(f"\n  [LOCAL-251] R7 deletion DISABLED by DISABLE_R7_DELETION=1 env var")
+    else:
+        print(f"\n  [LOCAL-251] PHASE 5.14: R7 hallucinated-sensory deletion...")
+        try:
+            from style_validator_detector import apply_r7_to_description as _r7_apply
+        except ImportError:
+            _r7_apply = None
+            print(f"  [LOCAL-251] WARNING: apply_r7_to_description not importable — R7 deletion skipped")
+
+        if _r7_apply:
+            _r7_total_deleted = 0
+            _r7_total_paras_emptied = 0
+            _r7_stops_affected = 0
+
+            for _si, _poi in enumerate(poi_list):
+                _desc = _poi.get('description', '')
+                if not _desc or _desc.startswith('['):
+                    continue
+
+                _new_desc, _deleted, _emptied = _r7_apply(_desc)
+                if _deleted > 0 or _emptied > 0:
+                    poi_list[_si]['description'] = _new_desc
+                    _r7_total_deleted += _deleted
+                    _r7_total_paras_emptied += _emptied
+                    _r7_stops_affected += 1
+                    print(f"  [LOCAL-251] Stop {_si+1} '{_poi.get('name', '')[:30]}': "
+                          f"{_deleted} sentence(s) deleted, {_emptied} paragraph(s) emptied")
+
+            print(f"  [LOCAL-251] R7 summary: {_r7_total_deleted} sentences deleted, "
+                  f"{_r7_total_paras_emptied} paragraphs emptied, "
+                  f"{_r7_stops_affected} stops affected")
 
     # -------- [LOCAL-216] PHASE 5.15: R9 generic-sentence deletion --------
     # D89: a sentence that fits any stop belongs to no stop — delete it.
@@ -7305,6 +7349,54 @@ Requirements:
             print(f"  [LOCAL-244] ⚠️  WARNING: Prolog collapsed from {_prolog_words_before} to "
                   f"{_prolog_words_after} words — nearly empty stub")
 
+        # -------- [LOCAL-251] PHASE 5.91: Prolog stop-name disambiguation --------
+        # The prolog previews content from multiple stops. Because it is injected
+        # into stop 1, a deictic reference like "this town" or "this village" after
+        # mentioning a stop-2 landmark will be heard as referring to stop 1.
+        # Fix: when a sentence mentions a named feature from a later stop and is
+        # followed by a deictic ("this town", "this village", "this modern town",
+        # "this coastal town"), replace the deictic with the stop's actual name.
+        if _saved_prolog and len(poi_list) > 1:
+            _stop_names_for_prolog = [p.get('name', '') for p in poi_list]
+            _stop1_name = _stop_names_for_prolog[0] if _stop_names_for_prolog else ''
+            # Build a map: feature → stop name (for stops beyond stop 1)
+            # Features come from the corpus and from the stop names themselves
+            _later_stop_features = {}
+            for _psi in range(1, len(poi_list)):
+                _ps_name = poi_list[_psi].get('name', '')
+                if _ps_name:
+                    _later_stop_features[_ps_name.lower()] = _ps_name
+                    # Also register short forms (e.g. "Villefranche" for "Villefranche-sur-Mer")
+                    _short = _ps_name.split('-')[0].split(',')[0].strip()
+                    if len(_short) > 3:
+                        _later_stop_features[_short.lower()] = _ps_name
+
+            # Check if the prolog mentions any later-stop name followed by a deictic
+            _deictic_pattern = re.compile(
+                r'\bthis\s+(?:modern|coastal|ancient|medieval|historic|charming|quaint|vibrant|picturesque|small|old)?\s*'
+                r'(?:town|village|city|place|port|harbor|harbour|commune|settlement)\b',
+                re.IGNORECASE
+            )
+            _prolog_sentences = re.split(r'(?<=[.!?])\s+', _saved_prolog)
+            _prolog_modified = False
+            for _psi, _psent in enumerate(_prolog_sentences):
+                _psent_lower = _psent.lower()
+                _found_later_stop = None
+                for _feat_key, _feat_stop in _later_stop_features.items():
+                    if _feat_key in _psent_lower:
+                        _found_later_stop = _feat_stop
+                        break
+                if _found_later_stop and _found_later_stop.lower() != _stop1_name.lower():
+                    # This sentence references a later stop — check for deictics
+                    _dm = _deictic_pattern.search(_psent)
+                    if _dm:
+                        _replacement = _found_later_stop
+                        _prolog_sentences[_psi] = _psent[:_dm.start()] + _replacement + _psent[_dm.end():]
+                        _prolog_modified = True
+                        print(f"  [LOCAL-251] Prolog disambiguated: '{_dm.group()}' → '{_replacement}'")
+            if _prolog_modified:
+                _saved_prolog = ' '.join(_prolog_sentences)
+
     # -------- [LOCAL-246] PHASE 5.95: Orientation gating (R9, R10) --------
     # D136/D137: Orientation paragraphs are generated by the same LLM call as
     # descriptions but extracted separately ("Orientation:" split) and injected
@@ -7339,6 +7431,25 @@ Requirements:
         _ow_before = len(_orient_text.split())
         _orient_total_words_before += _ow_before
         _orient_changed = False
+
+        # --- R7: hallucinated-sensory deletion on orientation ---
+        _r7_disabled_for_orient = os.environ.get('DISABLE_R7_DELETION', '').strip() == '1'
+        if not _r7_disabled_for_orient:
+            try:
+                from style_validator_detector import apply_r7_to_description as _orient_r7_apply
+                _orient_after_r7, _or7_del, _or7_emp = _orient_r7_apply(_orient_text)
+                if _or7_del > 0:
+                    _old_sents = set(s.strip() for p in _orient_text.split('\n\n')
+                                     for s in re.split(r'(?<=[.!?])\s+', p) if s.strip())
+                    _new_sents = set(s.strip() for p in _orient_after_r7.split('\n\n')
+                                     for s in re.split(r'(?<=[.!?])\s+', p) if s.strip())
+                    for s in _old_sents - _new_sents:
+                        _orient_deletions_verbatim.append((_oi + 1, 'R7_HALLUCINATED_SENSORY', s))
+                    _orient_text = _orient_after_r7
+                    _orient_changed = True
+                    print(f"    Stop {_oi+1} orientation R7: {_or7_del} sentence(s) deleted")
+            except ImportError as _e:
+                print(f"    Stop {_oi+1} orientation R7: SKIPPED (import error: {_e})")
 
         # --- R9: generic-sentence deletion on orientation ---
         if not _r9_disabled_for_orient:
@@ -7812,6 +7923,24 @@ Requirements:
         print("  [LOCAL-36] practical_facts_gate not available — skipped")
     except Exception as _pf_err:
         print(f"  [LOCAL-36] Practical facts gate error (non-fatal): {_pf_err}")
+
+    # -------- [LOCAL-251] Generation failure gate --------
+    # A generation failure must not reach the output silently. If any stop
+    # contains a [GENERATION_FAILED:...] or [Description for ... could not be generated.]
+    # placeholder, strip it and log the failure loudly.
+    _gen_fail_pattern = re.compile(r'\[(?:GENERATION_FAILED:[^\]]+|Description for [^\]]+ could not be generated\.)\]')
+    _gen_fail_matches = _gen_fail_pattern.findall(complete_tour)
+    if _gen_fail_matches:
+        print(f"\n  [LOCAL-251] ⚠️  GENERATION FAILURE GATE: {len(_gen_fail_matches)} placeholder(s) detected!")
+        for _gf in _gen_fail_matches:
+            print(f"    STRIPPING: {_gf}")
+        # Strip the placeholders — an empty gap is better than shipping error text to TTS
+        complete_tour = _gen_fail_pattern.sub('', complete_tour)
+        # Also strip "Look for this work in the galleries." if it leaked
+        complete_tour = complete_tour.replace("Look for this work in the galleries.", "")
+        # Clean up double-spaces and triple-newlines left behind
+        complete_tour = re.sub(r'  +', ' ', complete_tour)
+        complete_tour = re.sub(r'\n\s*\n\s*\n', '\n\n', complete_tour)
 
     # Print word count statistics
     print("\n=== Word Count Statistics ===")
