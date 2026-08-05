@@ -15,6 +15,45 @@
 > Expanded: 1 sentence(s). Deleted: 4 sentence(s).
 > Passages spent: 1.
 
+> ### LEAD's verified note — read this first
+>
+> **This replaces round 6 as the morning's tour.** Round 6 was 298 words and thin;
+> this one has both stops and real facts in each — Monet's 1888 series at Antibes,
+> Fitzgerald's 1934 novel, the 1960s circle at Saint-Paul-de-Vence with Montand,
+> Signoret and Prévert, Sartre and Picasso at La Colombe d'Or.
+>
+> **What is new.** Between detecting an unsupported sentence and deleting it, we
+> now search the corpus for a fact that would substantiate it and rewrite the
+> sentence around that fact — the "expand" step of your routine. Deletion is still
+> the fallback. A corpus passage may now be used only once per tour: round 7's
+> first attempt cited *Tender is the Night* three times, twice in consecutive
+> near-identical sentences, and I sent it back.
+>
+> **Read stop 2 critically — I do not think it is good enough.** After the opening
+> facts, nine of its eleven sentences carry no information: "the ancient pathways
+> bear the weight of history", "a portal to a world where art and culture
+> intertwine", "each step taken is a journey through the annals of creativity".
+> Our rules report stop 2 as **clean**. I measured it myself, sentence by sentence,
+> and every rule is silent on all eleven.
+>
+> **Why they are silent** — three mechanisms, now diagnosed and dispatched:
+>
+> 1. "The legacy of artists like **Marc Chagall** lingers in the very air you
+>    breathe" is treated as substantiating itself, *because it names a person*. It
+>    tells you nothing about Chagall. We already ruled that a place name is
+>    anchoring rather than substantiation; we never applied that to people.
+> 2. That sentence then cancels the one after it — "the village's artistic spirit
+>    is palpable" is correctly flagged as an empty promise, then excused because
+>    the name-drop beside it looks like delivery.
+> 3. "The ancient pathways bear the weight of history" names nothing at all, so no
+>    rule sees it. This is the class your round 2 review called "senseless
+>    combination of words".
+>
+> **Also still true:** `Tour-Category: walking` on a cycling tour. I checked — not
+> a regression, it is an internal classifier that has always done this. And R7
+> still misses the invented sensory detail in the orientation ("the Mediterranean
+> breeze carries the scent of salt and pine"), the class you scored 1/5.
+
 **Fixes live in this run:**
 1. **Expand before delete with dedup** (LOCAL-250 primary): R10-flagged sentences are
    first looked up in stop_corpus; if a matching fact is found AND that passage has not
