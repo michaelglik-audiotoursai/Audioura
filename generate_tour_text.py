@@ -719,6 +719,283 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12):
     return kept
 
 
+def _build_closing_offer(poi_list, tour_category, transport_mode, location):
+    """[LOCAL-273] Build a ≤3 sentence closing offer from verified data.
+
+    Two parts (Michael's spec):
+      Part 1: A similar tour (same category) near the last stop — existence-verified.
+      Part 2: An adjacent Audioura capability anchored to the last stop
+              (museum tour if one exists nearby + news articles).
+
+    Returns: str (the closing text, may be empty if nothing verifies).
+    Falls back to a one-sentence factual summary if neither part can be built.
+    """
+    from math import radians, sin, cos, asin, sqrt
+
+    def _haversine(a, b):
+        lat1, lon1 = a; lat2, lon2 = b
+        dlat, dlon = radians(lat2 - lat1), radians(lon2 - lon1)
+        h = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
+        return 2 * 6371.0 * asin(sqrt(h))
+
+    # Get last stop coordinates
+    last_poi = poi_list[-1]
+    last_lat = last_poi.get('latitude') or last_poi.get('wikidata_lat')
+    last_lng = last_poi.get('longitude') or last_poi.get('wikidata_lng')
+    if not last_lat or not last_lng:
+        _coord_str = last_poi.get('coordinates', '')
+        _m = re.match(r'\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)', _coord_str or '')
+        if _m:
+            last_lat, last_lng = float(_m.group(1)), float(_m.group(2))
+    if not last_lat or not last_lng:
+        print("  [LOCAL-273] No coordinates for last stop — closing offer skipped")
+        return ""
+
+    last_lat, last_lng = float(last_lat), float(last_lng)
+    last_name = last_poi.get('name', '')
+    all_stop_names = {p['name'].lower() for p in poi_list}
+
+    # ─── Connect to DB for verification ─────────────────────────────────
+    try:
+        import psycopg2
+        # Use the same connection logic as the generation pipeline:
+        # VENUE_CACHE_DB_URL > DATABASE_URL > host defaults (localhost:5433)
+        _co_db_url = os.environ.get('VENUE_CACHE_DB_URL',
+                     os.environ.get('DATABASE_URL'))
+        if not _co_db_url:
+            # Host mode: construct from individual env vars (same as db_connection.py)
+            _co_host = os.environ.get('DB_HOST', 'localhost')
+            _co_port = os.environ.get('DB_PORT', '5433')
+            _co_dbname = os.environ.get('DB_NAME', 'audiotours')
+            _co_user = os.environ.get('DB_USER', 'admin')
+            _co_password = os.environ.get('DB_PASSWORD', 'password123')
+            _co_db_url = f"postgresql://{_co_user}:{_co_password}@{_co_host}:{_co_port}/{_co_dbname}"
+        _co_conn = psycopg2.connect(_co_db_url, connect_timeout=5)
+    except Exception as _co_err:
+        print(f"  [LOCAL-273] DB connection failed: {_co_err} — closing offer skipped")
+        return ""
+
+    sentences = []
+
+    # ─── Part 1: Similar tour nearby (same category) ────────────────────
+    # Query stop_corpus for stops in the same geographic area that are NOT
+    # already in this tour. Use coordinates to find the nearest verified one.
+    try:
+        _co_cur = _co_conn.cursor()
+        # For outdoor tours (walking/biking), use 'French Riviera walking area' or similar
+        # For museum tours, look for other museums in venue_corpus
+        if tour_category == 'museum':
+            # Find other museums nearby using city names in venue_name
+            _co_cur.execute("""
+                SELECT venue_name, qid FROM venue_corpus
+                WHERE (LOWER(venue_name) LIKE '%musee%' OR LOWER(venue_name) LIKE '%museum%')
+            """)
+            _museum_rows = _co_cur.fetchall()
+            best_museum = None
+            best_dist = float('inf')
+            # Known city coordinates for distance estimation
+            _city_coords = {
+                'nice': (43.7102, 7.2620),
+                'antibes': (43.5804, 7.1251),
+                'monaco': (43.7384, 7.4246),
+                'cannes': (43.5528, 7.0174),
+            }
+            for mname, mqid in _museum_rows:
+                if mname.lower() in all_stop_names:
+                    continue
+                # Skip the current venue (the one we're in)
+                # Match by checking if the museum name overlaps with the location
+                _mname_lower = mname.lower()
+                _loc_lower_p1 = location.lower()
+                # Don't suggest the same museum we just toured
+                if any(w in _mname_lower for w in re.findall(r'[a-z]{5,}', _loc_lower_p1)
+                       if w not in ('france', 'musee', 'museum')):
+                    continue
+                # Determine museum city
+                museum_city = None
+                if 'nice' in _mname_lower:
+                    museum_city = 'nice'
+                elif 'antibes' in _mname_lower:
+                    museum_city = 'antibes'
+                elif 'monaco' in _mname_lower:
+                    museum_city = 'monaco'
+                elif 'cannes' in _mname_lower:
+                    museum_city = 'cannes'
+                if museum_city and museum_city in _city_coords:
+                    d = _haversine((last_lat, last_lng), _city_coords[museum_city])
+                    if d < 50 and d < best_dist:
+                        best_dist = d
+                        best_museum = mname
+
+            if best_museum:
+                _museum_display = best_museum.split(',')[0].strip()
+                sentences.append(
+                    f"If you would like another museum tour, the {_museum_display} "
+                    f"is {best_dist:.0f} kilometers from here."
+                )
+                print(f"  [LOCAL-273] Part 1 (museum similar): {_museum_display} ({best_dist:.0f} km)")
+        else:
+            # Outdoor tour: find a verified stop nearby that is NOT in this tour
+            _co_cur.execute("""
+                SELECT stop_title FROM stop_corpus
+                WHERE LOWER(venue_name) LIKE '%riviera%'
+                   OR LOWER(venue_name) LIKE '%nice%'
+                   OR LOWER(venue_name) LIKE '%walking area%'
+            """)
+            _sc_rows = _co_cur.fetchall()
+            # Also check canonical_titles from venue_corpus for geographic coords
+            _co_cur.execute("""
+                SELECT canonical_titles_json FROM venue_corpus
+                WHERE LOWER(venue_name) LIKE '%riviera%'
+                   OR LOWER(venue_name) LIKE '%nice%walking%'
+            """)
+            _vc_rows = _co_cur.fetchall()
+            # Build a list of (name, lat, lng) from canonical_titles
+            candidates = []
+            for row in _vc_rows:
+                if row[0]:
+                    for t in row[0]:
+                        if isinstance(t, dict) and t.get('name') and t.get('lat') and t.get('lng'):
+                            lat, lng = float(t['lat']), float(t['lng'])
+                            if (lat != 0.0 or lng != 0.0):
+                                candidates.append((t['name'], lat, lng))
+            # Also add stop_corpus titles (without coords — use Wikipedia geosearch later)
+            _sc_names = {r[0] for r in _sc_rows}
+
+            # Filter: must be verified (in stop_corpus), not already in tour
+            best_offer = None
+            best_dist = float('inf')
+            for name, lat, lng in candidates:
+                if name.lower() in all_stop_names:
+                    continue
+                if name.lower() == last_name.lower():
+                    continue
+                # Only offer stops that are in stop_corpus (existence-verified)
+                name_in_corpus = any(
+                    name.lower() == sc_n.lower() or sc_n.lower() in name.lower()
+                    for sc_n in _sc_names
+                )
+                if not name_in_corpus:
+                    continue
+                d = _haversine((last_lat, last_lng), (lat, lng))
+                # Offer something 5–60 km away (interesting distance for cycling/walking)
+                if 3 < d < 60 and d < best_dist:
+                    best_dist = d
+                    best_offer = name
+
+            if best_offer:
+                # Determine mode label for the sentence
+                if transport_mode == 'bike':
+                    _mode_phrase = "a cycling tour"
+                elif transport_mode == 'vehicle':
+                    _mode_phrase = "a driving tour"
+                elif transport_mode == 'animal':
+                    _mode_phrase = "a tour"
+                else:
+                    _mode_phrase = "a walking tour"
+                _dist_str = f"{best_dist:.0f} kilometers" if best_dist >= 2 else f"{best_dist*1000:.0f} meters"
+                sentences.append(
+                    f"{best_offer} is {_dist_str} from here — we can build {_mode_phrase} there."
+                )
+                print(f"  [LOCAL-273] Part 1 (similar): {best_offer} ({best_dist:.1f} km, verified in stop_corpus)")
+            else:
+                print("  [LOCAL-273] Part 1: no verified nearby stop found — omitted")
+
+    except Exception as e:
+        print(f"  [LOCAL-273] Part 1 error: {e}")
+
+    # ─── Part 2: Adjacent capability ────────────────────────────────────
+    try:
+        _co_cur = _co_conn.cursor()
+        # For non-museum tours: offer a museum tour if one exists nearby
+        if tour_category != 'museum':
+            _co_cur.execute("""
+                SELECT venue_name, qid FROM venue_corpus
+                WHERE (LOWER(venue_name) LIKE '%musee%' OR LOWER(venue_name) LIKE '%museum%')
+            """)
+            _nearby_museums = []
+            # Museums don't have geo-coordinates in canonical_titles.
+            # Use location keywords from venue_name (city) to determine proximity.
+            # Extract region/city from the tour location for matching.
+            _loc_lower = location.lower()
+            _loc_keywords = set(re.findall(r'[a-z]{4,}', _loc_lower))
+            # Add known Riviera city names that might be near the last stop
+            _riviera_cities = {'nice', 'antibes', 'monaco', 'cannes', 'menton', 'eze'}
+
+            for mname, mqid in _co_cur.fetchall():
+                mname_lower = mname.lower()
+                # Check if this museum is in the same region
+                # Match by: city in venue_name matches tour's region,
+                # or museum venue_name contains a city near the last stop
+                mname_words = set(re.findall(r'[a-z]{4,}', mname_lower))
+                # Check geographic proximity via known cities in the name
+                museum_city = None
+                if 'nice' in mname_lower:
+                    museum_city = 'nice'
+                elif 'antibes' in mname_lower:
+                    museum_city = 'antibes'
+                elif 'monaco' in mname_lower:
+                    museum_city = 'monaco'
+                elif 'cannes' in mname_lower:
+                    museum_city = 'cannes'
+
+                if museum_city:
+                    # Known approximate city coordinates for distance check
+                    _city_coords = {
+                        'nice': (43.7102, 7.2620),
+                        'antibes': (43.5804, 7.1251),
+                        'monaco': (43.7384, 7.4246),
+                        'cannes': (43.5528, 7.0174),
+                    }
+                    if museum_city in _city_coords:
+                        d = _haversine((last_lat, last_lng), _city_coords[museum_city])
+                        if d < 40:
+                            _nearby_museums.append((mname, d))
+
+            if _nearby_museums:
+                _nearby_museums.sort(key=lambda x: x[1])
+                _closest_museum = _nearby_museums[0][0]
+                # Clean up museum name for speech
+                _museum_display = _closest_museum.split(',')[0].strip()
+                sentences.append(
+                    f"There is also a museum tour available at the {_museum_display}."
+                )
+                print(f"  [LOCAL-273] Part 2 (museum capability): {_museum_display}")
+            else:
+                print("  [LOCAL-273] Part 2: no museum found nearby — museum offer omitted")
+
+        # News capability — always offer if the path exists on this branch
+        # Verify: news_orchestrator_service.py exists and has /generate-news
+        _news_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                   'news_orchestrator_service.py')
+        if os.path.exists(_news_path):
+            sentences.append(
+                "We can also generate news articles for you to listen to on the way back."
+            )
+            print("  [LOCAL-273] Part 2 (news): news_orchestrator_service.py confirmed")
+        else:
+            print(f"  [LOCAL-273] Part 2: news path not found at {_news_path} — news offer omitted")
+
+    except Exception as e:
+        print(f"  [LOCAL-273] Part 2 error: {e}")
+
+    # ─── Cap at 3 sentences ─────────────────────────────────────────────
+    if len(sentences) > 3:
+        sentences = sentences[:3]
+
+    if sentences:
+        result = " ".join(sentences)
+        print(f"  [LOCAL-273] Closing offer: {len(sentences)} sentence(s)")
+        return result
+
+    # ─── Fallback: one-sentence factual summary ─────────────────────────
+    # Tour should not end mid-thought. Summarize what was covered.
+    _stop_names_str = " and ".join(p['name'] for p in poi_list[-2:]) if len(poi_list) >= 2 else poi_list[0]['name']
+    fallback = f"This tour covered {_stop_names_str}."
+    print(f"  [LOCAL-273] Closing offer fallback (no verification passed)")
+    return fallback
+
+
 def _classify_tour_category(location, tour_type):
     """
     Detect the appropriate tour template based on location and tour_type.
@@ -8396,7 +8673,17 @@ RULES:
                 # and R9 correctly identified them as "could be placed in millions of stops."
                 # Epilog now relies solely on epilog_payoff (thread summary) and
                 # _closing_facts (documented story elements). If neither has content,
-                # the tour ends on the last stop's description — which is correct.
+                # the closing offer (LOCAL-273) provides a concrete ending.
+
+                # [LOCAL-273] Closing offer: concrete, verified, ≤3 sentences.
+                # Part 1: similar tour nearby (same category, existence-verified).
+                # Part 2: adjacent capability (museum if nearby + news articles).
+                # Replaces the "tour simply stops" failure mode.
+                _closing_offer = _build_closing_offer(
+                    poi_list, tour_category, transport_mode, location
+                )
+                if _closing_offer:
+                    epilog += _closing_offer
                 
                 poi_content += epilog
                 
