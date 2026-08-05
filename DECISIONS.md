@@ -4721,3 +4721,50 @@ direction, because the instrument and the analysis shared an assumption about
 where imperatives live. **Only comparing against a human's marks exposed it.**
 Eleven hand-scored groups have now found more than four rounds of automated
 measurement did.
+
+---
+
+## D122 — R1 now sees the imperatives we actually write. The rate is 36.2%, not 27.9% (2026-08-04)
+
+LOCAL-233 closed the gap D121 identified. Verified by LEAD on `storied` HEAD:
+
+```
+as-you-arrive + pause   → R1_IMPERATIVE           (was clean)
+pedal + suggestive tail → R4_PRESCRIBED_FEELING   (was clean)
+bare route clause       → CLEAN                   (correctly exempt)
+his 5/5 directions      → CLEAN                   (untouched)
+```
+
+**Corpus-wide R1: 27.9% → 36.2%** of sentence groups, +279 groups. By type:
+walking 39.9%, cycling 35.5%, museum 32.5%.
+
+That is not a regression; it is the same defect, finally visible. **More than a
+third of every sentence group we write tells the listener what to do**, and
+Michael's listener noticed before any instrument did.
+
+**Calibration against his 11 marks: 5 agree → 7 agree, 3 partial, 1 disagree.**
+The one remaining is M#8, *"whispers tales of a bygone era… adds depth to your
+understanding"* — personification and conditional prescription, which R4 does
+not model. Declared out of scope rather than quietly missed, which is the right
+call.
+
+### A near-bounce worth recording
+
+LEAD's boundary probe marked *"Pedal along the coastline, envisioning the hidden
+coves…"* as a FAILURE because **R1** did not fire. Checking every rule rather
+than the one LEAD expected:
+
+```
+nav=True   R4_PRESCRIBED_FEELING fires on the suggestive tail
+           bare "Pedal along the coastline." stays clean
+```
+
+Which is exactly the clause-scoped behaviour the task asked for: the route
+clause is exempt, the tail is reachable by another rule. **LEAD's probe checked
+the wrong rule and would have produced a wrong bounce.**
+
+Third time this week (D114, D120, now) that reproducing the specific case
+instead of an assumption prevented an incorrect verdict. The pattern is
+consistent enough to state as a rule: **when a probe disagrees with a
+submission, the probe is the more likely error** — it was written in a minute,
+the submission had an hour.
