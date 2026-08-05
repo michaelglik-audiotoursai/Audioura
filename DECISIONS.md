@@ -6500,3 +6500,77 @@ are about the museum rather than its objects. The fix is per-object sources
 that name the object, in a language the title uses, at the venue it is actually
 in. That is a retrieval problem, not a gate problem, and the gate is right to
 reject.
+
+## D160 — Corpus cleanup verified; the Asian Arts blocker is a parenthesis (2026-08-05)
+
+LOCAL-254 merged (`44f7aa3`). Every bounce item fixed and checked against the
+live database, not the report:
+
+- The three D127 fabrication stops now hold **zero** passages. It went further
+  than asked — restored to empty rather than to their prior single passage —
+  which is over-correction in the safe direction: a fabricated stop with no
+  corpus fails existence, and that is the outcome we want.
+- Matisse de-duplicated: passages shared across every stop **5 → 0**, mean
+  **7.0 → 2.0**. The count fell because the count was wrong.
+- Palais Lascaris untouched at 5.7 with genuine per-stop sources.
+
+**No verification regression:** the gate still reads 65/88, and Matisse still
+verifies 6/6 having lost the boilerplate — confirming D159's finding that the
+padding never earned those passes.
+
+Its diagnosis corroborates D159 on the main cause and **escalates what LEAD had
+filed as a nuisance**. LEAD noticed venue signals keep punctuation, producing
+dead tokens `(asian` and `museum)`, and judged it harmless. The task found the
+same parenthetical breaks `venue_resolver`'s Wikidata lookup outright: no
+entity, no canonical titles, no generation at all for that venue. The museum is
+Q3330160 and the data exists. **A cosmetic-looking parsing flaw was the thing
+blocking Michael's gate venue end to end** — a reminder that "harmless" is a
+claim about consequences one has not traced.
+
+Its proposed fix is deliberately not built here. Registering
+`canonical_titles_json` so stops "verify instantly without needing per-object
+prose" would let us verify our own stop titles against a list we wrote
+ourselves. That list must come from the museum's collection record or the gate
+stops meaning anything — the Chikanobu failure (D127) is exactly a stop title
+we invented.
+
+## D161 — Rewrites are sentences again; the fragment checker reads a book title as a predicate (2026-08-05)
+
+LOCAL-256 merged (`b0b1e0a`). The three defects D158 recorded are fixed and
+LEAD verified each through the real entry point: "Take in the panoramic view
+that stretches out before you…" → "The panoramic view **stretches** out before
+you…", and the row that exposed the bug now reads "The Fondation Maeght **was**
+founded in 1964 by Marguerite and Aimé Maeght". `Description:` is blocked at
+the post-assembly gate — round 13 has zero. R7 reaches the orientation at a
+**1.06×** corpus cost, which is effectively free.
+
+**And the new fragment checker reports 0 fragments over a fragment.**
+
+```
+Scott Fitzgerald's "Tender is the Night," a vivid portrayal of the Roaring
+Twenties set against the backdrop of this opulent paradise.
+```
+
+`_has_finite_main_verb` returns True because it matches **"is" inside the
+quoted title**. The fix worked; the measurement of the fix did not.
+
+**This is the fifth time this week a metric has read clean over text that
+plainly had the defect** — D142, D145, D151, D158, now this. The shape is
+identical every time: the check is real, and something in the text slips past
+an assumption nobody stated. Residual counts, fact tallies, and now
+grammaticality have each in turn been trusted and each in turn been blind. The
+only thing that has caught every one of them is reading the delivered tour as
+prose. That is now a standing step in the review, not a fallback.
+
+Second defect, smaller: the rewrite strips a leading article along with the
+imperative — "Explore the charming village of Saint-Paul-de-Vence…" becomes
+"Charming village of Saint-Paul-de-Vence is…". A finite verb, a missing "The".
+
+Third, and the one Michael would care about: **Marc Chagall is placed at Cap
+d'Antibes again**, in stop 1's body — "the clandestine atelier of Marc
+Chagall… hidden behind the quaint village's cobbled streets". Chagall belongs
+to Saint-Paul-de-Vence, which is stop 2 of the same tour. Cap d'Antibes is a
+cape, not a village with cobbled streets. Round 9 had the identical failure and
+LEAD wrongly withdrew it as a prolog preview (D152) — **this one is not in the
+prolog**, so that withdrawal should not be read as clearing the class. All
+three dispatched as LOCAL-257.
