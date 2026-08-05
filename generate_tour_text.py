@@ -8007,6 +8007,17 @@ NARRATIVE THREAD (weave into Part 3 as the central intrigue):
         # and the prolog is never emitted as a separate block above the label.
         if i == 0 and _saved_prolog:
             _orientation_prefix += _saved_prolog.strip() + " "
+
+        # [LOCAL-268] Michael, 2026-08-05: after the general description, NAME the
+        # stop before describing it. "the listner coudl have forgiven what this stop
+        # is and where he should stand to start the tour." The listener hears
+        # narration, not the "Stop 1:" header, so without this they are standing
+        # somewhere unnamed. Deterministic, no model call.
+        if i == 0 and _saved_prolog:
+            _stop_name = (poi.get("name") or "").strip()
+            if _stop_name:
+                _orientation_prefix += f"Your first stop is {_stop_name}. "
+
         _orientation_prefix += _entrance_directive
 
         # Add the orientation text — [R3] only if substantive (museum tours)
