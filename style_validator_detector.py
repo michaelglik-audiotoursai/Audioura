@@ -499,15 +499,249 @@ def _is_navigation_sentence(sentence: str) -> bool:
     return _is_style_navigation_sentence(sentence)
 
 
+def _check_nav_sentence_suggestive_tail(sentence: str) -> List[Dict]:
+    """LOCAL-233: Clause-level navigation exemption.
+
+    A sentence that starts with genuine navigation may have a suggestive tail
+    after a comma, conjunction, or participle phrase. The navigation exemption
+    covers ONLY the route-movement clause, not the whole sentence.
+
+    Example:
+      "Pedal along the coastline, envisioning the hidden coves and immersing
+       yourself in the beauty."
+      → "Pedal along the coastline" = navigation (exempt)
+      → "envisioning the hidden coves and immersing yourself..." = suggestive
+
+    The SPLIT: find the first comma after the navigation verb phrase.
+    The tail after that split point is checked for:
+      1. R3/R4 patterns (existing rules for suggestive/prescribed feeling)
+      2. Prescriptive gerund participials — "envisioning", "immersing yourself",
+         "absorbing", "imagining" — which are imperative-equivalent in context.
+         These only fire in navigation tails (a gerund in free prose is not
+         automatically prescriptive).
+      3. Mid-sentence imperatives (base-form verb after the comma)
+
+    Returns findings from the tail, or empty list if the tail is clean.
+    """
+    findings = []
+    stripped = sentence.strip()
+    if not stripped:
+        return findings
+
+    # Find the split point: first comma after the navigation verb phrase
+    comma_idx = stripped.find(',')
+    if comma_idx < 0:
+        return findings  # No comma → entire sentence is navigation, exempt
+
+    tail = stripped[comma_idx + 1:].strip()
+    if not tail:
+        return findings
+
+    # Check if the tail is ALSO navigation (e.g. "Turn left, then continue straight")
+    # If so, the whole sentence is navigation — exempt.
+    if _is_style_navigation_sentence(tail):
+        return findings
+
+    # ── Check R3 (suggestive) and R4 (prescribed feeling) on the tail ──
+    findings.extend(check_r3_suggestive_exploration(tail))
+    findings.extend(check_r4_prescribed_feeling(tail))
+
+    # ── LOCAL-233: Prescriptive gerund participials in navigation tails ──
+    # "envisioning the hidden coves", "immersing yourself in the beauty",
+    # "absorbing the atmosphere", "imagining the past" — these are
+    # imperative-equivalent when attached to a navigation clause.
+    # They prescribe what the listener should experience while moving.
+    if not findings:  # Only check if R3/R4 didn't already fire
+        _NAV_TAIL_PRESCRIPTIVE_GERUNDS = re.compile(
+            r'\b(?:'
+            r'envisioning|imagining|picturing|visualizing|visualising|'
+            r'absorbing|embracing|savoring|savouring|relishing|'
+            r'contemplating|pondering|reflecting|marveling|marvelling|'
+            r'immersing\s+yourself|letting\s+yourself|allowing\s+yourself'
+            r')\b',
+            re.IGNORECASE
+        )
+        if _NAV_TAIL_PRESCRIPTIVE_GERUNDS.search(tail):
+            findings.append({
+                'rule_id': 'R4_PRESCRIBED_FEELING',
+                'severity': 'error',
+                'sentence': stripped,
+                'suggestion': 'The navigation clause is exempt, but the participial tail prescribes feeling/experience. Rewrite the tail as factual content or remove it.',
+            })
+
+    # ── Check if the tail itself starts with a mid-sentence imperative ──
+    # (after the comma). This catches "Pedal along, take in the sight of..."
+    if not findings:  # Only if nothing else fired
+        tail_verb = _check_clause_for_imperative(tail)
+        if tail_verb:
+            findings.append({
+                'rule_id': 'R1_IMPERATIVE',
+                'severity': 'error',
+                'sentence': stripped,
+                'suggestion': f'Rewrite as declarative statement. Remove the imperative "{tail_verb}" and state the fact directly.',
+            })
+
+    return findings
+
+
+def _extract_clause_after_subordinate(sentence: str):
+    """Extract the main clause after a leading subordinate clause.
+
+    LOCAL-233: Detects the pattern "<subordinate clause>, <main clause>" where
+    the subordinate clause starts with a known subordinating conjunction or
+    adverbial phrase (As, While, When, After, Before, Once, Upon, If).
+
+    Returns the main clause (after the comma) if the pattern matches, else None.
+
+    The pattern is: sentence starts with a subordinating word, has a comma
+    followed by a space and then content that could be an imperative.
+
+    Examples that match:
+      "As you arrive at X, pause to take in..." → "pause to take in..."
+      "While cycling past Z, notice the..." → "notice the..."
+      "As you stand before Y, take in the sight of..." → "take in the sight of..."
+
+    Examples that do NOT match (no subordinate clause):
+      "Pause to take in the view." → None (no leading clause)
+      "The chapel, built in 1648, stands..." → None (comma is parenthetical)
+    """
+    lower = sentence.lower().strip()
+
+    # Known subordinating openers that introduce a temporal/conditional clause
+    # before the imperative. These are the ONLY patterns where a mid-sentence
+    # imperative legitimately appears in our pipeline's house style.
+    _SUBORDINATE_STARTERS = (
+        'as you ', 'as we ', 'as the ',
+        'while you ', 'while cycling', 'while walking', 'while biking',
+        'while riding', 'while hiking', 'while pedaling', 'while pedalling',
+        'while driving', 'while strolling',
+        'when you ', 'when the ',
+        'after you ', 'after the ',
+        'before you ', 'before the ',
+        'once you ', 'once the ',
+        'upon ',
+        'if you ',
+    )
+
+    starts_with_subordinate = False
+    for starter in _SUBORDINATE_STARTERS:
+        if lower.startswith(starter):
+            starts_with_subordinate = True
+            break
+
+    if not starts_with_subordinate:
+        return None
+
+    # Find the first comma that separates the subordinate clause from the main clause.
+    # Must be followed by a space (not inside a quoted phrase or parenthetical).
+    # Skip commas inside quoted strings.
+    in_quote = False
+    paren_depth = 0
+    for i, ch in enumerate(sentence):
+        if ch == '"' or ch == '\u201c' or ch == '\u201d':
+            in_quote = not in_quote
+        elif ch == '(' and not in_quote:
+            paren_depth += 1
+        elif ch == ')' and not in_quote:
+            paren_depth = max(0, paren_depth - 1)
+        elif ch == ',' and not in_quote and paren_depth == 0:
+            # Found the clause-separating comma
+            rest = sentence[i + 1:].strip()
+            if rest:
+                return rest
+            break
+
+    return None
+
+
+def _check_clause_for_imperative(clause: str) -> str:
+    """Check if a clause (after a subordinate intro) starts with an imperative verb.
+
+    Same logic as the sentence-initial check but adapted for mid-sentence position:
+    - The clause is NOT capitalized (lowercase after comma+space)
+    - No need for Gate D2/D3 (proper noun / quoted heuristics) since
+      mid-sentence clauses don't start with capitalized words unless forced
+    - Navigation exemption still applies (if the clause itself is navigational,
+      it's exempt)
+
+    Returns the matched verb if imperative detected, else None.
+    """
+    if not clause:
+        return None
+
+    # Navigation exemption at clause level
+    if _is_style_navigation_sentence(clause):
+        return None
+
+    lower = clause.lower().strip()
+    words = lower.split()
+    if not words:
+        return None
+
+    # ── Check multi-word imperative phrases first ──
+    for phrase in _R1_MULTI_WORD_VERBS:
+        if re.match(rf'{re.escape(phrase)}\b', lower):
+            return phrase
+
+    # ── Single-word analysis ──
+    first_word = words[0]
+
+    # Strip leading punctuation
+    first_word = re.sub(r'^["\'\u201c\u201d\u2018\u2019\u2014\u2013\u2014\u2013-]+', '', first_word)
+    if not first_word:
+        return None
+
+    # Gate A: Known non-verb starters
+    if first_word in _R1_NON_VERB_STARTERS:
+        return None
+
+    # Gate B: Non-base-form morphology (but allow known verb exceptions)
+    if first_word not in _VERB_DESPITE_SUFFIX and _NON_BASE_SUFFIXES.search(first_word):
+        return None
+
+    # Gate C: Third-person -s
+    if _looks_like_third_person_s(first_word):
+        return None
+
+    # Gate D: Likely noun subject — adapted for mid-sentence
+    # In mid-sentence position, a noun subject is less likely (the subject
+    # is usually in the subordinate clause), but still possible:
+    # "As you arrive, visitors gather..." — but this is rare in our corpus.
+    if _is_likely_noun_subject(clause):
+        return None
+
+    # Gate E: Navigation verbs — exempt ONLY with directional content
+    if first_word in _NAV_VERBS_R1:
+        rest_words = words[1:] if len(words) > 1 else []
+        for w in rest_words[:3]:
+            clean_w = re.sub(r'[^a-z]', '', w)
+            if clean_w in _DIRECTIONAL_WORDS:
+                return None  # Genuine navigation — exempt
+        # NOT followed by directional content → this IS an imperative
+        return first_word
+
+    # Gate F: Very short words (1-2 chars) are unlikely imperatives
+    if len(first_word) <= 2:
+        return None
+
+    return first_word
+
+
 def check_r1_imperatives(sentence: str) -> List[Dict]:
-    """R1: Detect sentence-initial imperatives aimed at the listener.
+    """R1: Detect imperatives aimed at the listener.
 
     LOCAL-196 INVERTED DESIGN: Detects ANY sentence-initial base-form verb
     with no subject, then subtracts exemptions. Imperatives are open-class;
     the exemption list is the closed, enumerable part.
 
+    LOCAL-233 EXTENSION: Also detects mid-sentence imperatives after a leading
+    subordinate clause. Pattern: "<As you X>, <imperative>". The pipeline's
+    house style puts imperatives after subordinate clauses ("As you arrive at X,
+    pause to take in..."), which the original R1 could not see.
+
     Fires when:
     - Sentence starts with a base-form verb (morphological heuristic)
+    - OR: Sentence has a leading subordinate clause followed by a base-form verb
     - No explicit subject before the verb (imperative form)
     - Not a navigation sentence (route verb + directional content)
 
@@ -525,6 +759,12 @@ def check_r1_imperatives(sentence: str) -> List[Dict]:
 
     # Navigation exemption at sentence level (existing check)
     if _is_navigation_sentence(stripped):
+        # LOCAL-233: Even if the sentence as a whole is "navigation", check
+        # whether it has a suggestive tail after the route-movement clause.
+        # "Pedal along the coastline, envisioning the hidden coves..." — the
+        # first clause is navigation, but the second is pure suggestion.
+        # This is handled by _check_nav_sentence_tail below.
+        findings.extend(_check_nav_sentence_suggestive_tail(stripped))
         return findings
 
     lower = stripped.lower()
@@ -546,75 +786,78 @@ def check_r1_imperatives(sentence: str) -> List[Dict]:
         # Strip leading punctuation (quotes, em-dash)
         first_word = re.sub(r'^["\'\u201c\u201d\u2018\u2019\u2014\u2013—–-]+', '', first_word)
         if not first_word:
-            return findings
+            # Fall through to mid-sentence check
+            pass
+        else:
+            # Gate A: Known non-verb starters
+            if first_word in _R1_NON_VERB_STARTERS:
+                # Not a sentence-initial imperative, but check for mid-sentence
+                pass
+            # Gate B: Non-base-form morphology (but allow known verb exceptions)
+            elif first_word not in _VERB_DESPITE_SUFFIX and _NON_BASE_SUFFIXES.search(first_word):
+                pass
+            # Gate C: Third-person -s (but not -ss base forms like "pass", "cross")
+            elif _looks_like_third_person_s(first_word):
+                pass
+            # Gate D: Likely noun subject (plural agent nouns, nominalizations)
+            elif _is_likely_noun_subject(stripped):
+                pass
+            else:
+                # Gate D2: Proper noun heuristic
+                if len(words) > 1:
+                    second_word = stripped.split()[1] if len(stripped.split()) > 1 else ''
+                    # Possessive: "Klein's", "Niki's", "Saint Phalle's"
+                    if second_word.endswith("'s") or second_word.endswith("\u2019s"):
+                        pass
+                    # Comma after first word: "Klein, a pioneer..." (appositive)
+                    elif stripped.split()[0].endswith(','):
+                        pass
+                    # Second word is capitalized (proper noun continuation): "Saint Phalle"
+                    elif len(second_word) > 1 and second_word[0].isupper() and not stripped.startswith('"'):
+                        pass
+                    # Foreign name particles
+                    elif second_word.lower() in {'de', 'von', 'van', 'di', 'del', 'la', 'le', 'les',
+                                                  'des', 'du', 'da', 'das', 'den', 'der', 'het', 'el'}:
+                        pass
+                    else:
+                        # Gate D3: Quoted content at sentence start
+                        if stripped.startswith('"') or stripped.startswith('\u201c') or stripped.startswith("'"):
+                            pass
+                        # Gate E: Navigation verbs — exempt ONLY with directional content
+                        elif first_word in _NAV_VERBS_R1:
+                            rest_words = words[1:] if len(words) > 1 else []
+                            for w in rest_words[:3]:
+                                clean_w = re.sub(r'[^a-z]', '', w)
+                                if clean_w in _DIRECTIONAL_WORDS:
+                                    break  # Genuine navigation — exempt
+                            else:
+                                # NOT followed by directional content → imperative
+                                matched_verb = first_word
+                        # Gate F: Very short words (1-2 chars)
+                        elif len(first_word) <= 2:
+                            pass
+                        else:
+                            matched_verb = first_word
+                else:
+                    # Single word sentence — Gate D3 and D2 don't apply
+                    if stripped.startswith('"') or stripped.startswith('\u201c') or stripped.startswith("'"):
+                        pass
+                    elif first_word in _NAV_VERBS_R1:
+                        pass  # Single nav verb with nothing after — not useful
+                    elif len(first_word) <= 2:
+                        pass
+                    else:
+                        matched_verb = first_word
 
-        # Gate A: Known non-verb starters
-        if first_word in _R1_NON_VERB_STARTERS:
-            return findings
-
-        # Gate B: Non-base-form morphology (but allow known verb exceptions)
-        if first_word not in _VERB_DESPITE_SUFFIX and _NON_BASE_SUFFIXES.search(first_word):
-            return findings
-
-        # Gate C: Third-person -s (but not -ss base forms like "pass", "cross")
-        if _looks_like_third_person_s(first_word):
-            return findings
-
-        # Gate D: Likely noun subject (plural agent nouns, nominalizations)
-        if _is_likely_noun_subject(stripped):
-            return findings
-
-        # Gate D2: Proper noun heuristic — if the word after the first is
-        # a possessive ('s), a proper noun (capitalized), a comma, or a
-        # preposition introducing an appositive, the first word is likely a
-        # proper noun subject, not an imperative verb.
-        if len(words) > 1:
-            second_word = stripped.split()[1] if len(stripped.split()) > 1 else ''
-            # Possessive: "Klein's", "Niki's", "Saint Phalle's"
-            if second_word.endswith("'s") or second_word.endswith("\u2019s"):
-                return findings
-            # Comma after first word: "Klein, a pioneer..." (appositive)
-            first_token = stripped.split()[0]
-            if first_token.endswith(','):
-                return findings
-            # Second word is capitalized (proper noun continuation): "Saint Phalle"
-            # But only if it's NOT a quoted/titled work (those start with quotes)
-            if len(second_word) > 1 and second_word[0].isupper() and not stripped.startswith('"'):
-                return findings
-            # Foreign name particles: "Niki de Saint Phalle", "Ludwig van Beethoven"
-            _NAME_PARTICLES = {'de', 'von', 'van', 'di', 'del', 'la', 'le', 'les',
-                               'des', 'du', 'da', 'das', 'den', 'der', 'het', 'el'}
-            if second_word.lower() in _NAME_PARTICLES:
-                return findings
-
-        # Gate D3: Quoted content at sentence start (artwork titles, etc.)
-        if stripped.startswith('"') or stripped.startswith('\u201c') or stripped.startswith("'"):
-            return findings
-
-        # Gate E: Navigation verbs — exempt ONLY with directional content
-        if first_word in _NAV_VERBS_R1:
-            # Check if followed by directional word
-            rest_words = words[1:] if len(words) > 1 else []
-            # Look at the first meaningful word after the verb
-            for w in rest_words[:3]:  # Check first 3 words after verb
-                clean_w = re.sub(r'[^a-z]', '', w)
-                if clean_w in _DIRECTIONAL_WORDS:
-                    return findings  # Genuine navigation — exempt
-            # NOT followed by directional content → this IS an imperative
-            # e.g., "Turn your attention to…" — fires R1
-            matched_verb = first_word
-
-        # Gate F: Very short words (1-2 chars) are unlikely imperatives
-        if len(first_word) <= 2:
-            return findings
-
-        # Gate G: Words starting with a capital in the original that could be
-        # proper nouns — but ALL sentence-initial words are capitalized, so
-        # we can't use this as a gate. Instead we rely on gates A-E.
-
-        # If we passed all gates, this is a candidate imperative
-        if not matched_verb:
-            matched_verb = first_word
+    # ── Step 3 (LOCAL-233): Mid-sentence imperative detection ──
+    # If no sentence-initial imperative was found, check for imperatives after
+    # a leading subordinate clause: "As you arrive at X, pause to take in..."
+    if not matched_verb:
+        main_clause = _extract_clause_after_subordinate(stripped)
+        if main_clause:
+            mid_verb = _check_clause_for_imperative(main_clause)
+            if mid_verb:
+                matched_verb = mid_verb
 
     # Final confirmation: we have a matched verb
     if matched_verb:
@@ -1373,6 +1616,29 @@ def validate_paragraph(paragraph: str) -> Dict:
     # Navigation exemption — uses STYLE-SPECIFIC test (narrower than anchor's)
     # Only genuine route-movement is exempt; attention-directing is NOT.
     if _is_style_navigation_paragraph(paragraph):
+        # LOCAL-233: Even navigation paragraphs need clause-level analysis.
+        # "Pedal along the coastline, envisioning..." — the route-movement clause
+        # is exempt, but the suggestive tail is NOT. Check tails ONLY.
+        #
+        # IMPORTANT: Do NOT apply full R1 to sentences within a navigation
+        # paragraph. The paragraph-level exemption covers them. "Take the
+        # second exit" in a navigation paragraph is exempt even if the
+        # sentence-level heuristic doesn't individually classify it as nav.
+        # Only suggestive tails lose their exemption.
+        sentences = _split_sentences(paragraph)
+        tail_findings = []
+        for sentence in sentences:
+            if len(sentence) < 10:
+                continue
+            # Check for suggestive tails on ALL sentences in a nav paragraph
+            tail_findings.extend(_check_nav_sentence_suggestive_tail(sentence))
+        if tail_findings:
+            rules_violated = set(f['rule_id'] for f in tail_findings)
+            return {
+                'is_navigation': True,
+                'findings': tail_findings,
+                'rules_violated': rules_violated,
+            }
         return {
             'is_navigation': True,
             'findings': [],
@@ -1388,7 +1654,9 @@ def validate_paragraph(paragraph: str) -> Dict:
             continue
 
         # Navigation exemption at sentence level for mixed paragraphs
+        # LOCAL-233: Still check the suggestive tail of navigation sentences
         if _is_style_navigation_sentence(sentence):
+            all_findings.extend(_check_nav_sentence_suggestive_tail(sentence))
             continue
 
         all_findings.extend(check_r1_imperatives(sentence))
