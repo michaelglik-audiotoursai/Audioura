@@ -7164,3 +7164,56 @@ Dispatched LOCAL-271 for the immediate items: the R1 rewrite damage LEAD has
 flagged in four rounds without fixing ("you can admire yourself standing at the
 tip of the cape"), the empty-exhortation type, and the final-stop forward
 transition.
+
+## D179 — Part 4 is composed after the stops; the guard is untested rather than proven (2026-08-05)
+
+LOCAL-270 merged (`4c4988d`). Part 4 leaves the spine prompt and is built from
+the delivered, gated text. LEAD verified every factual claim in the 8-stop run
+against the stop it is credited to — Fort Carré, 1550, Henry II at Old Town
+Antibes; Villa Ephrussi, 1907 at Cap Ferrat — **5 of 5**.
+
+An earlier draft credited *"Port Vauban, where Pablo Picasso left his mark"*
+with Picasso absent from that stop, the exact failure the task exists to
+prevent. The task regenerated afterwards and the final artifact does not
+reproduce it — **but the stop selection also changed**, so the guard is untested
+on the failing case rather than demonstrated correct. Recorded as such.
+
+**A probe error worth keeping.** LEAD's first verification script matched stop
+*names* against each other's bodies and produced 18 spurious failures. A stop's
+text naturally does not contain other stops' names. D155's rule paid for itself
+again: when a probe disagrees, suspect the probe.
+
+Still not fixed and dispatched separately: part 4 selects by name recognition
+rather than intrigue (D177).
+
+## D180 — Empty exhortation gets a name; the rewrite checker still does not fire (2026-08-05)
+
+LOCAL-271 merged (`f2912c8`). Michael asked why *"Just ahead, journey back
+through the centuries."* survived every gate. It was a sentence type the
+classifier could not name. It can now, and LEAD verified 4/4 — both empty
+exhortations deleted, the substantive *"Just ahead, the Chapelle de la Sainte
+Croix, built in 1306, comes into view"* kept, and D164 navigation kept.
+
+**The R1 half is partial, and one failure is newly introduced.** The task was
+asked for a well-formedness check with fallback to the original. It is not
+firing:
+
+```
+"find yourself amidst the lush greenery"
+  -> "From Cap d'Antibes, The lush greenery of the promontory is visible."
+                           ^ capital after a comma — a NEW error
+
+"Take a moment to breathe in the salty sea air..."
+  -> "breathe in the salty sea air and listen to..."
+      ^ lowercase start — unchanged, still broken
+```
+
+"admire yourself" is genuinely gone, which Michael saw in three delivered tours
+and LEAD flagged four times without dispatching a fix. Net the tree is better.
+But two of three damage shapes remain and one is new, so this is progress
+recorded honestly rather than a fix claimed.
+
+Dispatched LOCAL-274 to make the check actually decide: mid-sentence capitals,
+initial capital, finite verb, repeated clause — and **return the original
+unchanged when any fails**. A rewrite that cannot be done cleanly should not be
+done.
