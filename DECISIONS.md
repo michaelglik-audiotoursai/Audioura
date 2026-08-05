@@ -6801,3 +6801,79 @@ R10. Michael has never once judged a sentence in isolation — round 2's review 
 almost entirely about interconnection ("senseless combination of words and facts
 with no interconnectedness between them"). The gap between how we measure and
 how he reads is adjacency, and R10 is the only place we model it.
+
+## D167 — Round 16 delivers Michael's four-part opening (2026-08-05)
+
+LOCAL-259 merged (`36ac81a`). The specification he wrote in his round 2 review,
+deferred by LOCAL-244 as "a separate task" and never created until he noticed
+the gap himself, is now built. LEAD verified each part against the artifact:
+
+| part | delivered |
+|---|---|
+| 1 name + transport | "You are about to embark on a **cycling** journey through the **French Riviera**" |
+| 2 route + physicality | "from Cap d'Antibes to Eze Village, spanning approximately **28 kilometres** of coastal terrain" |
+| 3 sourced purpose | Monet at Antibes; Èze under the House of Savoy |
+| 4 forward connection | "Monet's **1888** paintings at Cap d'Antibes and the **1706** destruction of Eze Village's fortifications" |
+
+LEAD computed the haversine from the tour's own coordinates: **27.6 km** against
+the claimed "approximately 28". Real arithmetic, not an invented number. Part 4
+names content the tour actually contains, so it is not another unfulfilled
+promise.
+
+**Exactly one tour-level description** in the delivered text — the duplication
+Michael was worried about did not occur.
+
+**LEAD's spec was wrong about placement.** The task said "place it before the
+orientation". Michael had already written *"Stop 1 starts with orientation —
+that is good"*, so the delivered order — orientation, then description — is what
+he wants and the task file was not. Recorded because it then broke LOCAL-260,
+which inherited the same wrong assumption.
+
+652 words, no placeholders, no field labels, directions clean in bike mode,
+residual R1×3. Cost $0.0096 reported, ≈$0.020 true with the unmetered spine —
+**no measurable increase from the richer opening**, as estimated.
+
+## D168 — The prolog validator fails every correct tour, because it reads the wrong paragraph (2026-08-05)
+
+LOCAL-260 bounced. The core is good: LEAD ran its reference cases and round 15's
+opening produces **4 violations**, the keyword-stuffed decoy **3**. The
+keyword-stuffing defence in particular is well built.
+
+Two defects in how it reaches the text.
+
+**`extract_prolog_from_tour_content` returns the Orientation.** Against the real
+round 16 tour it extracts "Start biking southwest on the coastal road…" — the
+orientation — and therefore reports `PART1_MISSING` and `PART4_MISSING` on a
+tour that has both. It would fail every correctly-built tour.
+
+The cause is LEAD's, and it is the same error as D167: the task file told it the
+prolog sits *before* the orientation. LOCAL-259 correctly placed it after. **One
+wrong sentence in a task file propagated into two tasks** — the generator got it
+right by following Michael, the validator got it wrong by following LEAD. Its
+own brief already said "detect it structurally, not by position", which would
+have been immune.
+
+**`PART4_VAGUE_PROMISE` fires on the must-pass example** — the Monet-1888 /
+1706-fortifications sentence, which is the exact case the task file named as
+required to pass.
+
+Report-only and non-fatal, so nothing was damaged. But a validator that fails
+every correct tour is the cry-wolf failure D141 already cost a morning to learn:
+it would be ignored within a day.
+
+## D169 — Restoring what LEAD had deleted (2026-08-05)
+
+Dispatched LOCAL-262. Three stops sit at zero passages because LEAD, acting on
+D127, instructed LOCAL-254 to strip them as fabrications. D162 established they
+are genuine — the museum's own catalogue lists all eight.
+
+The task restores per-object passages for those three from
+`maa.departement06.fr/les-oeuvres-commentees`, and extends the same treatment to
+the other five, which D159 showed hold venue-level text rather than object-level.
+That distinction is why LOCAL-258's run produced descriptions for only 6 of 8
+stops even with the gate passing 8 of 8: **verifying that a stop exists and
+having something to say about it are different problems**, and we have been
+conflating them.
+
+The measure of success is not the gate — it is stops with a description, and
+facts per stop.
