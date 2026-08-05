@@ -742,3 +742,55 @@ real saving" — is exactly right; promising savings we have not checked would b
 the same error as promising a museum that is not there.
 
 ---
+
+## 2026-08-05 16:45 — Michael
+
+> Round 31 with 8 stops. looks good. The last phraise does not promote Treats
+> page and coming out of the blue. Also It feels we do need a conclusion,
+> especially when number of stops is high, to remind listeners what they
+> experienced and how "well we did". … "Thank you for taking Audioura tour, we
+> hope you enjoyed the experience. …" What do you think?
+
+> I agree with your both points! … let's replace the thank-you entirely. …
+> recap should be short, so when the listener took the tour of many stops, we
+> should only choose the most interesting with the most facts we created for
+> them. Obviously when user had only 2 stops, we should remind them about them
+> briefly.
+
+## 2026-08-05 16:45 — LEAD
+
+Dispatched as **LOCAL-280**.
+
+**Where LEAD pushed back and Michael agreed:** his draft opened *"Thank you for
+taking Audioura tour, we hope you enjoyed the experience"* — which thanks
+without reminding, and is close kin to *"we hope you leave inspired by the
+beauty"* that LOCAL-44 deleted and a test now blocks. He said he wanted a
+reminder of what they experienced; that sentence gives none.
+
+The recap now **replaces** it and is built from the tour:
+
+> "That's eight stops and 92 kilometres, from a harbour in use before the Roman
+> Empire to the village Louis XIV razed in 1706 — including the cell where the
+> Man in the Iron Mask spent eleven years."
+
+It demonstrates how well we did by **showing** the substance rather than
+asserting the listener enjoyed it. Same principle he taught: the claim earns its
+place when something concrete follows.
+
+**A pleasing consequence of his "most interesting with the most facts" rule:**
+that machinery already exists. LOCAL-276's intrigue ranking classifies
+reversal / mystery / cause / celebrity-trivia, and the per-stop fact tally is
+already computed. **The recap is the mirror of part 4** — part 4 previews, the
+recap concludes, same ranking, same verification. Nothing new to build, and
+consistent by construction.
+
+Scaling per his ruling: 2 stops → both, briefly; 6+ → scale plus the top 2–3 by
+intrigue, never a list of every stop. Always state the scale, because that is
+the part a listener cannot reconstruct after eight stops.
+
+**Two corrections carried in:** *"we can generate Musée Océanographique"* needed
+"a tour of"; and *"look at Treats Page for coupons"* promises coupons exist,
+so it reverts to his own earlier and more careful *"shows whether there are
+savings"*.
+
+---
