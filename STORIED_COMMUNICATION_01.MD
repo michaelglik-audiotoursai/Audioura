@@ -864,3 +864,59 @@ choosing the seven we can describe is competence rather than narrowing.
 Below those, or a materially narrower stop set, is a bounce rather than a merge.
 
 ---
+
+## 2026-08-05 19:40 — LEAD (unprompted: part 2 finding, and a blocker)
+
+### ⛔ Blocked: OpenAI credits exhausted
+
+`credit_balance_exhausted` on all three keys — the account balance, not a key.
+No tour can be generated. ClickUp **wdvrdaxda6** (urgent) has the top-up steps.
+Continuous dev is paused so tasks stop failing after 20 minutes of setup.
+
+Measured cost context: 2-stop $0.019–$0.026, 8-stop $0.047–$0.059, about $55 per
+1,000 eight-stop tours. Today's ~40 generations came to roughly $2–4 — the
+balance was already low rather than today being expensive.
+
+### The rubric ranks your rejected tour above your praised one
+
+Blocked from generating, LEAD ran `tour_rubric_scorer.py` — which had
+essentially never been run — against today's tours:
+
+```
+  round 15 (this morning)          125.0
+  round 26 ("excellent")           100.0
+  8-stop after corpus work         114.5
+  museum 5-stop                     71.2
+```
+
+**Round 15 is the tour that prompted a day of work. Round 26 is the one you
+called excellent, with stop 2 "wonderful!!!". The rubric puts the rejected one
+25 points ahead.**
+
+The whole margin is the cross-stop correlation bonus, and LEAD traced what
+earned it:
+
+> "This route will take you from the opulent Cap d'Antibes to the ancient **Eze
+> Village**, spanning approximately 28 kilometres…"
+
+That is **part 2 of your four-part opening, stating its route endpoints.** The
+rubric saw stop 2's name inside stop 1's text and counted it as narrative
+interconnection. An itinerary is not a callback.
+
+Three things follow:
+
+1. The +50% bonus is the rubric's largest lever and the only way past 100. It is
+   firing on a sentence whose job is to say where the route goes.
+2. **This morning's arithmetic was built on it.** LEAD told you 75 at N=8
+   "cannot be reached by per-stop quality alone — it needs callbacks." That rests
+   on the bonus meaning something. It does not.
+3. The museum scores **71.2**, just under your 75 gate — on a metric now shown
+   to rank a bad tour above a good one. **The gate number is not measuring what
+   you think it measures.**
+
+**Recommendation, for your decision:** score facts-per-sentence normalised
+against available corpus; drop the correlation bonus until a real callback can
+be told apart from an itinerary mention; stop treating 100 as a ceiling bonuses
+may exceed. Nothing dispatched — this is yours to rule on.
+
+---
