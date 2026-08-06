@@ -7949,3 +7949,62 @@ LEAD did not see the interaction until Michael asked the question.
 definition of a narrative callback in the code, and a term that rewards a tour
 for naming its own stops is worse than no term. It stays at zero until a real
 definition exists — SQ-S6b's theme threads are the natural home for one.
+
+## D201a — Correlation bonus: redefined as declared, coverage-scaled (2026-08-05)
+
+Michael: *"let's redefine it. Any suggestions?"* — overruling LEAD's proposal to
+switch it off. He is right that deleting it would silently move his gate: with
+the D200 classifier only **5.1% of stops reach RICH**, so eight RICH stops is
+close to unreachable and the bonus is what keeps 75-at-N=8 attainable.
+
+**Why it cannot be fixed as a text matcher.** Three successive tightenings were
+measured against all 325 multi-stop tours:
+
+| rule | fires on |
+|---|---|
+| current (title words in another stop's body) | 287 tours — 88% |
+| + shared *entity* (person/year/work), directional, non-list, extra fact | 120 — 37% |
+| + venue-boilerplate excluded, non-duplicate sentence | 83 — 26% |
+
+Every surviving example was still the same thing: *"The Asian Arts Museum was
+inaugurated on October 16, 1998"* repeated across stops. Strict enough to exclude
+boilerplate finds nothing; loose enough to fire measures vocabulary. **There is
+no threshold between, because the generator has never produced a thread.**
+SQ-S6b — theme threads, the dominant story — is fully specified in
+`STORY_QUALITY_DESIGN.md` and has never been built.
+
+**Redefinition: the generator declares the thread; the scorer reads it.** A
+thread carries an id, its participating stop indices, and the binding entity —
+all of which SQ-S6b's deterministic entity clustering already knows. The scorer
+stops inferring from prose. That removes vocabulary gaming, the recap trigger,
+and the direction ambiguity in one move, and it rewards the feature Michael's
+gate has actually been waiting on.
+
+Today the bonus contributes **zero**, because nothing declares a thread. That is
+the same practical effect as switching it off, but it is a definition rather
+than a deletion and it activates by itself when SQ-S6b ships.
+
+### The two questions LEAD put to Michael, decided by LEAD (RULE ZERO)
+
+He was asked and is away; both are reversible and recorded here for him to
+overturn.
+
+**1. Scale with thread coverage — YES.** A thread spanning 6 of 8 stops is a
+larger achievement than one spanning 2, and coverage-proportional blending is
+already in the SQ-S6b spec, so the data will exist. Bonus scales linearly with
+the fraction of delivered stops the thread touches.
+
+**2. A tour with no thread is unrewarded, NOT penalised.** Penalising would make
+threads mandatory — a product decision, not a scoring one — and would conflate
+"no thread" with "bad tour". It would also retroactively fail every tour ever
+generated, and a 2-stop tour cannot meaningfully carry a thread at all. Threads
+count only at **N ≥ 3**.
+
+**Weight**: +15% of share per declared thread link, capped at **+30% of base**,
+replacing the current +50% of affected stops' value. The old term was the only
+one allowed to exceed 100 and could nearly double a tour; 75-at-N=8 stays
+reachable with a genuine thread without one feature dominating the index.
+
+**Not yet implemented** — the scorer keeps the old term until SQ-S6b exists to
+declare threads. Implementing a reader for data nothing writes would be the same
+mistake as the rubric having no callers (D200).
