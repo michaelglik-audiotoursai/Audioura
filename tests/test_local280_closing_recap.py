@@ -283,3 +283,118 @@ class TestRecapSpecAcceptance:
         source = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                     'generate_tour_text.py')).read()
         assert "for coupons" not in source.lower()
+
+
+class TestRecapNavigationFilter:
+    """[LOCAL-280 bounce 4] Navigation sentences must never be recap candidates."""
+
+    def _make_poi(self, name, desc, lat, lng):
+        return {
+            'name': name,
+            'description': desc,
+            'latitude': lat,
+            'longitude': lng,
+        }
+
+    def test_navigation_sentence_rejected(self):
+        """A fact that is actually a navigation sentence must not appear in recap."""
+        from generate_tour_text import _build_closing_recap
+
+        # The description contains both a navigation sentence AND a real fact.
+        nav_sent = "Pedal along the coastal road from Cap d'Antibes towards the fortified village of Eze."
+        real_fact = "Scott Fitzgerald wrote Tender is the Night at Cap d'Antibes in 1934."
+        desc = (nav_sent + " " + real_fact + " ") * 2  # repeat to hit 30+ words
+
+        poi_list = [
+            self._make_poi("Cap d'Antibes", desc, 43.5604, 7.1251),
+            self._make_poi("Eze Village",
+                          "Louis XIV razed the walls and castle in 1706 during the War of Spanish Succession. " * 3,
+                          43.7284, 7.3614),
+        ]
+        # Ranked facts include the navigation one as first choice
+        ranked = [
+            {'stop': "Cap d'Antibes", 'best_fact': nav_sent, 'reason': 'cause'},
+            {'stop': "Cap d'Antibes", 'best_fact': real_fact, 'reason': 'cause'},
+            {'stop': "Eze Village", 'best_fact': "Louis XIV razed the walls and castle in 1706 during the War of Spanish Succession.", 'reason': 'reversal'},
+        ]
+
+        result = _build_closing_recap(poi_list, ranked, api_key=None)
+        if result:
+            assert "pedal" not in result.lower()
+            assert "coastal road" not in result.lower()
+
+    def test_verb_start_navigation_rejected(self):
+        """Sentences starting with transport verbs must not be candidates."""
+        from generate_tour_text import _build_closing_recap
+
+        nav_sent = "Cycle towards Eze for medieval tales and stunning vistas along the corniche."
+        real_fact = "The 1561 fort at Saint-Hospice was built to defend against Ottoman raids."
+        desc = (real_fact + " " + nav_sent + " ") * 2
+
+        poi_list = [
+            self._make_poi("Paloma Beach", desc, 43.6863, 7.3270),
+            self._make_poi("Eze Village",
+                          "Louis XIV razed the walls and castle in 1706 during the War of Spanish Succession. " * 3,
+                          43.7284, 7.3614),
+        ]
+        ranked = [
+            {'stop': "Paloma Beach", 'best_fact': nav_sent, 'reason': 'cause'},
+            {'stop': "Paloma Beach", 'best_fact': real_fact, 'reason': 'cause'},
+            {'stop': "Eze Village", 'best_fact': "Louis XIV razed the walls and castle in 1706 during the War of Spanish Succession.", 'reason': 'reversal'},
+        ]
+
+        result = _build_closing_recap(poi_list, ranked, api_key=None)
+        if result:
+            assert "cycle towards" not in result.lower()
+
+    def test_cross_stop_naming_rejected(self):
+        """A fact credited to stop A that names stop B must be rejected."""
+        from generate_tour_text import _build_closing_recap
+
+        # This sentence is credited to Cap d'Antibes but mentions Eze Village
+        cross_fact = "From Cap d'Antibes cycle towards the fortified village of Eze Village along the coast."
+        real_fact = "Monet painted his famous 1888 series at Cap d'Antibes capturing Mediterranean light."
+        desc = (cross_fact + " " + real_fact + " ") * 2
+
+        poi_list = [
+            self._make_poi("Cap d'Antibes", desc, 43.5604, 7.1251),
+            self._make_poi("Eze Village",
+                          "Louis XIV razed the walls and castle in 1706 during the War of Spanish Succession. " * 3,
+                          43.7284, 7.3614),
+        ]
+        ranked = [
+            {'stop': "Cap d'Antibes", 'best_fact': cross_fact, 'reason': 'cause'},
+            {'stop': "Cap d'Antibes", 'best_fact': real_fact, 'reason': 'cause'},
+            {'stop': "Eze Village", 'best_fact': "Louis XIV razed the walls and castle in 1706 during the War of Spanish Succession.", 'reason': 'reversal'},
+        ]
+
+        result = _build_closing_recap(poi_list, ranked, api_key=None)
+        if result:
+            # The cross-stop sentence should have been rejected
+            assert "cycle towards" not in result.lower()
+
+    def test_2stop_both_named_after_nav_rejection(self):
+        """At 2 stops, if first candidate is navigation, both stops still appear."""
+        from generate_tour_text import _build_closing_recap
+
+        nav_sent = "Pedal along the coastal road towards Eze Village for medieval tales."
+        real_fact_a = "Scott Fitzgerald wrote Tender is the Night at this villa in 1934."
+        real_fact_b = "Louis XIV razed the walls and castle in 1706 during the War of Spanish Succession."
+
+        poi_list = [
+            self._make_poi("Cap d'Antibes",
+                          (nav_sent + " " + real_fact_a + " ") * 2,
+                          43.5604, 7.1251),
+            self._make_poi("Eze Village",
+                          (real_fact_b + " ") * 3,
+                          43.7284, 7.3614),
+        ]
+        ranked = [
+            {'stop': "Cap d'Antibes", 'best_fact': nav_sent, 'reason': 'cause'},
+            {'stop': "Cap d'Antibes", 'best_fact': real_fact_a, 'reason': 'cause'},
+            {'stop': "Eze Village", 'best_fact': real_fact_b, 'reason': 'reversal'},
+        ]
+
+        result = _build_closing_recap(poi_list, ranked, api_key=None)
+        assert result, "Recap should not be empty"
+        assert "That's 2 stops" in result

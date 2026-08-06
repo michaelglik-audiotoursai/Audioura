@@ -791,6 +791,15 @@ def _build_closing_recap(poi_list, ranked_facts_for_recap, api_key=None):
     # Verify each ranked fact actually appears in its stop's delivered text.
     verified_highlights = []
     _d177_rejected = 0
+    _nav_rejected = 0
+
+    # [LOCAL-280 bounce 4] Import navigation detector — navigation sentences are
+    # never recap facts. R1 *exempts* navigation from imperative checks, so
+    # check_r1_imperatives cannot catch them. We must reject explicitly.
+    from style_validator_detector import _is_style_navigation_sentence as _is_nav_sentence
+
+    # Collect all delivered stop names for the cross-stop naming guard.
+    _all_stop_names = [p['name'].lower() for p in delivered]
 
     if ranked_facts_for_recap:
         for rf in ranked_facts_for_recap:
@@ -799,6 +808,45 @@ def _build_closing_recap(poi_list, ranked_facts_for_recap, api_key=None):
             rf_reason = rf.get('reason', '')
             if not rf_stop or not rf_fact:
                 continue
+
+            # [LOCAL-280 bounce 4] NAVIGATION FILTER — reject Directions text.
+            # _is_style_navigation_sentence catches verb+directional patterns.
+            # Also reject broader imperative navigation starts that the sentence-
+            # level detector may miss (e.g. "Pedal from X to Y" without a
+            # canonical directional word).
+            if _is_nav_sentence(rf_fact):
+                _nav_rejected += 1
+                print(f"  [LOCAL-280] Recap: NAVIGATION rejected for '{rf_stop}': "
+                      f"\"{rf_fact[:80]}...\"")
+                continue
+            # Broader catch: first word is a transport/route verb
+            _first_word = rf_fact.split()[0].lower().rstrip('.,;:') if rf_fact else ''
+            if _first_word in ('head', 'turn', 'continue', 'proceed', 'walk',
+                               'cycle', 'follow', 'cross', 'step', 'pedal',
+                               'ride', 'bike', 'drive', 'hike', 'stroll',
+                               'cruise', 'trot', 'gallop', 'start', 'set'):
+                _nav_rejected += 1
+                print(f"  [LOCAL-280] Recap: NAVIGATION (verb start) rejected for '{rf_stop}': "
+                      f"\"{rf_fact[:80]}...\"")
+                continue
+
+            # [LOCAL-280 bounce 4] CROSS-STOP NAMING GUARD — a recap clause
+            # credited to stop A must not name stop B. This catches cases where
+            # a Directions sentence like "Cycle from A towards B" passes as a
+            # fact for A but actually describes the route to B.
+            _other_stops = [s for s in _all_stop_names if s != rf_stop.lower()]
+            _fact_lower = rf_fact.lower()
+            _names_other_stop = False
+            for _other in _other_stops:
+                if _other in _fact_lower:
+                    _nav_rejected += 1
+                    _names_other_stop = True
+                    print(f"  [LOCAL-280] Recap: CROSS-STOP rejected for '{rf_stop}': "
+                          f"names '{_other}' — \"{rf_fact[:80]}...\"")
+                    break
+            if _names_other_stop:
+                continue
+
             # Find the matching delivered stop
             matched_poi = None
             for p in delivered:
@@ -846,9 +894,28 @@ def _build_closing_recap(poi_list, ranked_facts_for_recap, api_key=None):
                 # Skip imperatives and navigation
                 if _check_r1(s):
                     continue
+                # [LOCAL-280 bounce 4] Explicit navigation filter
+                if _is_nav_sentence(s):
+                    _nav_rejected += 1
+                    continue
                 _first_w = s.split()[0].lower().rstrip('.,') if s else ''
                 if _first_w in ('head', 'turn', 'continue', 'proceed', 'walk',
-                                'cycle', 'follow', 'cross', 'step', 'pedal'):
+                                'cycle', 'follow', 'cross', 'step', 'pedal',
+                                'ride', 'bike', 'drive', 'hike', 'stroll',
+                                'cruise', 'trot', 'gallop', 'start', 'set'):
+                    _nav_rejected += 1
+                    continue
+                # [LOCAL-280 bounce 4] Cross-stop naming guard
+                _other_stops_fb = [n for n in _all_stop_names
+                                   if n != p['name'].lower()]
+                _s_lower = s.lower()
+                _skip_cross = False
+                for _other in _other_stops_fb:
+                    if _other in _s_lower:
+                        _nav_rejected += 1
+                        _skip_cross = True
+                        break
+                if _skip_cross:
                     continue
                 # Accept: has a date, OR has a proper noun with a past-tense verb
                 _has_date = bool(re.search(r'\b\d{3,4}\b', s))
@@ -871,7 +938,7 @@ def _build_closing_recap(poi_list, ranked_facts_for_recap, api_key=None):
 
     if not verified_highlights:
         print(f"  [LOCAL-280] Recap: no verifiable highlights found "
-              f"({_d177_rejected} rejected by D177) — skipped")
+              f"({_d177_rejected} rejected by D177, {_nav_rejected} rejected as navigation) — skipped")
         return ""
 
     # --- Determine how many highlights to include ---
@@ -967,7 +1034,7 @@ def _build_closing_recap(poi_list, ranked_facts_for_recap, api_key=None):
 
     # Print verification
     print(f"  [LOCAL-280] Recap built: {len(recap.split())} words, {len(clauses)} composed clauses"
-          f" ({_d177_rejected} D177 rejected)")
+          f" ({_d177_rejected} D177 rejected, {_nav_rejected} navigation rejected)")
     for i, h in enumerate(selected[:len(clauses)]):
         print(f"    [{h['stop']}] ({h['reason']}): \"{h['fact'][:80]}...\"")
         print(f"      → composed: \"{clauses[i]}\"")
