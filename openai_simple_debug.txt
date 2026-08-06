@@ -1,6 +1,6 @@
 === EXACT PROMPT SENT TO OPENAI (PHASE 3A) ===
 You are a knowledgeable local guide for French Riviera cycling tour, France.
-List exactly 2 specific, real, well-known French Riviera relevant to: French Riviera cycling tour, France.
+List exactly 20 specific, real, well-known French Riviera relevant to: French Riviera cycling tour, France.
 
 Requirements:
 - Use REAL, SPECIFIC names of actual establishments or landmarks.
@@ -25,9 +25,29 @@ Return ONLY a JSON array, no other text, no markdown fences:
 [{"name": "...", "address": "..."}, ...]
 
 === OPENAI RESPONSE ===
-[{"name": "Promenade des Anglais", "address": "Promenade des Anglais, 06000 Nice, France"},
-{"name": "Cap d'Antibes", "address": "Cap d'Antibes, 06160 Antibes, France"}]
+[
+    {"name": "Promenade des Anglais", "address": "06000 Nice"},
+    {"name": "Cap Ferrat", "address": "06230 Saint-Jean-Cap-Ferrat"},
+    {"name": "Old Town Antibes", "address": "06600 Antibes"},
+    {"name": "La Croisette", "address": "06400 Cannes"},
+    {"name": "Marineland Antibes", "address": "306 Avenue Mozart, 06600 Antibes"},
+    {"name": "Fort Carré", "address": "06600 Antibes"},
+    {"name": "Île Sainte-Marguerite", "address": "06400 Cannes"},
+    {"name": "Eze Village", "address": "06360 Èze"},
+    {"name": "Vieux Menton", "address": "06500 Menton"},
+    {"name": "Paloma Beach", "address": "06230 Saint-Jean-Cap-Ferrat"},
+    {"name": "Villa Ephrussi de Rothschild", "address": "06230 Saint-Jean-Cap-Ferrat"},
+    {"name": "Port Vauban", "address": "06600 Antibes"},
+    {"name": "Mont Boron", "address": "06300 Nice"},
+    {"name": "Cap d'Antibes", "address": "06160 Antibes"},
+    {"name": "Lérins Islands", "address": "06400 Cannes"},
+    {"name": "Villefranche-sur-Mer", "address": "06230 Villefranche-sur-Mer"},
+    {"name": "Château de la Chèvre d'Or", "address": "06360 Èze"},
+    {"name": "Parc du Cap Martin", "address": "06190 Roquebrune-Cap-Martin"},
+    {"name": "Musée Matisse", "address": "06000 Nice"},
+    {"name": "Théâtre de Verdure", "address": "06400 Cannes"}
+]
 
 === ANALYSIS ===
-Requested stops: 2
-See full chain log: /app/api_call_chain_20260805_233526.txt
+Requested stops: 15
+See full chain log: /app/api_call_chain_20260806_030732.txt
