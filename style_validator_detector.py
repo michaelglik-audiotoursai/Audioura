@@ -1191,6 +1191,17 @@ _R7_PATTERNS = [
     # the pattern already existed but required a specific causation verb.
     # This standalone version fires whenever the model fabricates ambient sound.
     r'\b(?:gentle|soft|rhythmic)\s+(?:lapping|crashing|splashing)\s+of\s+(?:waves?|water)\b',
+    # ──────────────────────────────────────────────────────────────────────────
+    # LOCAL-303: Additional sensory-assertion shapes caught during verification
+    # ──────────────────────────────────────────────────────────────────────────
+    # "waves [adverb] lapping/crashing against" — word-order variant of the above
+    r'\bwaves?\s+\w*\s*(?:lapping|crashing|splashing)\s+(?:against|on|upon)\b.*\b(?:mingles?|hum|scent|distant|reminder)\b',
+    # "the air carries/holds/is filled with the [adj] scent/smell of" —
+    # fabricated atmospheric scene (narrator invents what the air smells like)
+    r'\b(?:the\s+)?air\s+(?:carries|holds|is\s+filled\s+with|is\s+thick\s+with|is\s+heavy\s+with)\s+(?:the\s+)?(?:\w+\s+)?(?:scent|smell|fragrance|aroma)\b',
+    # "faint/lingering scent of X ... mingling/mixing" — catches intervening words
+    # between the scent descriptor and the mingling verb
+    r'\b(?:faint|lingering|subtle)\s+(?:scent|smell|fragrance|aroma)\s+of\b.*\b(?:mingling|mixing|blending|intertwining)\b',
 ]
 
 _R7_COMPILED = [re.compile(p, re.IGNORECASE) for p in _R7_PATTERNS]
