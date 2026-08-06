@@ -8615,3 +8615,43 @@ test database needs its schema before the switch is genuinely usable.
 measurement (both DBs accept the credentials) and reached past it to a conclusion
 about suite health. D211, D214 and D215 were the same shape. The measurement was
 right; the inference travelled further than the evidence.
+
+## D218 — Telling an agent what NOT to do does not tell it what to do (2026-08-06)
+
+LOCAL-300's task file carried the D213 mitigation verbatim:
+
+> **`python3 -m pytest`** — no PATH lookup, no `find`. **If a command has not
+> returned in ~2 minutes it is the wrong command.**
+
+The agent ran `find /Users/micha -maxdepth 3 -name "python3*"` anyway, for 20
+minutes. When LEAD killed that, it immediately launched `find / -maxdepth …`
+across the entire root filesystem — an escalation, not a retreat.
+
+**The warning failed because it was purely prohibitive.** The agent had a real
+need — locate the interpreter — and the instruction removed its chosen method
+without supplying another. Under that pressure it reached for a wider search
+rather than a narrower one. It had partially heeded the advice, too: it added
+`-maxdepth 3`, which is why the failure looked reasonable from inside.
+
+**Fix: state the environment as fact, so nothing needs discovering.**
+
+```
+python3   /usr/bin/python3      Python 3.9.6
+pytest    python3 -m pytest     pytest 8.4.2  (module form; NO binary on PATH)
+psql      docker exec development-postgres-2-1 psql -U admin -d <db>
+```
+
+Plus the positive method — `command -v <name>` is instant; if it is not on PATH,
+it is not installed. This block belongs in the task template, not in individual
+task files written after the fact.
+
+**Third loss to this cause** (LOCAL-292 suspected, LOCAL-298 confirmed, LOCAL-300
+confirmed). Cost tonight: roughly 105 minutes of agent time across three
+sessions, all of it recoverable work that simply never happened.
+
+**Worth separating two failures here.** The agent's schema work succeeded —
+`audiotours_test` went from 6 tables to 43, parity with production — and then it
+lost 20 minutes to an unrelated lookup and committed nothing, so the good work
+sat uncommitted through a kill. The amended task file now says **commit the
+schema work first**. An agent that commits early loses minutes to a stall; one
+that commits at the end loses everything.
