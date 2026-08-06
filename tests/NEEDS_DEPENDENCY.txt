@@ -41,7 +41,7 @@ tests/test_bg_subscription_url.py
 tests/test_blocked_url.py
 tests/test_boston_globe_auth.py
 tests/test_boston_globe_credentials.py
-tests/test_enhanced_spotify.py
+tests/run_enhanced_spotify.py
 tests/test_flutter_web_demo.py
 tests/test_guy_raz_browser.py
 tests/test_nytimes_auth.py
@@ -49,14 +49,14 @@ tests/test_real_articles.py
 tests/test_real_bg_url.py
 tests/test_real_spotify_urls.py
 tests/test_specific_article.py
-tests/test_spotify_text.py
+tests/run_spotify_text.py
 #
 # Needs: pycryptodome (Crypto) — declared in requirements.txt (pycryptodome)
 tests/test_32byte_truncation.py
 tests/test_dh_integration.py
 tests/test_key_variations.py
 tests/test_known_values.py
-tests/test_mobile_decryption.py
+tests/run_mobile_decryption.py
 #
 # Needs: cryptography — declared in requirements.txt
 tests/test_secure_compatibility.py
