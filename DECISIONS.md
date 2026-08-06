@@ -8008,3 +8008,73 @@ reachable with a genuine thread without one feature dominating the index.
 **Not yet implemented** — the scorer keeps the old term until SQ-S6b exists to
 declare threads. Implementing a reader for data nothing writes would be the same
 mistake as the rubric having no callers (D200).
+
+## D201b — Michael's three corrections to the thread bonus (2026-08-05)
+
+He reviewed the four proposed rules. Rule 1 stands. Rules 2, 3 and 4 were wrong
+and are revised below — two of them changed the design, not just the wording.
+
+### Rule 2 — count participants, not pairs. Both ends earn.
+
+LEAD proposed "only a later stop can call back". Michael:
+
+> *"both directions should be beneficial. Say, the general description names a
+> famous person and their deeds and tells that later on in the tour that would be
+> discussed more. That is valuable. Say stop #4 names a person, and then Stop #8
+> adds something about the person: both stops must be rewarded. However, what if
+> 3 stops mention the same person, then this person mention carries 6 times of
+> the value, while it probably should carry only 3."*
+
+He is right, and his arithmetic is the fix. LEAD had conflated *who is rewarded*
+with *how often the link is counted*. Three stops sharing an entity produce six
+pairwise links (3 pairs × 2 directions) for what should be worth about three.
+
+**Revised: a thread is an entity plus the set of stops that carry it. It earns
+one unit per participating stop — k stops, k units.** No direction rule is
+needed; participant-counting removes the double-credit that the direction rule
+was reaching for. This also collapses cleanly into the coverage scaling of D201a:
+the coverage *is* the reward.
+
+### Rule 3 — the setup is exempt. Setup promises, payoff pays.
+
+LEAD required every referring sentence to carry a fact beyond the shared entity.
+Michael pointed out this would penalise the prolog, which has no room to carry
+content and whose job is the promise.
+
+He is right, and under LEAD's rule the description would have been excluded from
+every thread it set up — exactly the wrong incentive, since the anticipation it
+creates is what makes the payoff land.
+
+**Revised: the sentence that INTRODUCES an entity and signals more to come needs
+no additional fact. The sentence that PAYS OFF must carry one.**
+
+### Rule 4 — recap presence is a structural check, not a thread signal.
+
+LEAD proposed excluding list-like sentences from thread detection. Michael:
+
+> *"I would be careful about not rewarding recap or an itinerary: how else should
+> we punish the tour if recap or itinerary disappear?"*
+
+The objection is right; the remedy is not. Letting the recap earn thread credit
+is the precise gaming vector D201 identified — one sentence naming eight stops
+triggers eight callbacks, and LOCAL-280's recap would inflate every future tour.
+
+These are two different measurements and LEAD had collapsed them:
+
+| question | mechanism |
+|---|---|
+| does the tour HAVE a recap and closing offer? | **structural surcharge** if absent — same mechanism as template placeholders and voice breaks (D200) |
+| does a story SPAN stops? | thread bonus |
+
+**Revised: recap and closing-offer presence become required structural elements,
+penalised by surcharge when missing. Recap sentences remain excluded from thread
+detection.** Michael gets the enforcement he asked for and the gaming vector
+closes, because the two are no longer the same term.
+
+### Net effect on the rubric
+
+- thread = entity + participating stops; **k participants → k units**
+- setup exempt from the extra-fact requirement; payoff not
+- recap/offer absence → structural surcharge (new)
+- recap sentences → never thread evidence
+- weight, cap and N≥3 floor from D201a unchanged pending SQ-S6b
