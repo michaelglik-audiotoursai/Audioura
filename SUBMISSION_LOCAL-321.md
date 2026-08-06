@@ -17,12 +17,44 @@
 | Rows stored | **0** | `SELECT COUNT(*) FROM user_subscription_credentials` → 0 |
 | `CREDENTIAL_ENCRYPTION_ENABLED` | **off** (empty string default) | `newsletter_processor_service.py:43` |
 | `migrate_credentials_encrypt.py` | Written, **never run** | Columns it would create don't exist |
-| Production read path (`subscription_article_processor.py:59`) | Was: `SELECT decrypted_username, decrypted_password` | Now fixed (see §3) |
+| Production read path 1 (`subscription_article_processor.py:59`) | Was: `SELECT decrypted_username, decrypted_password` | Now fixed — uses `credential_store` |
+| Production read path 2 (`user_consolidation_service.py:38,67`) | Was: reads/matches plaintext columns | Now fixed — uses `credential_store` + blind index |
 | `audio_tours` real count | **29** | `SELECT COUNT(*) FROM audio_tours WHERE is_test = false` |
 
 ---
 
-## 2. Design Proposal — Preventing Database-Only Decryption
+## 2. Complete Enumeration of All Readers of Plaintext Columns
+
+Searched via `grep -rn "decrypted_username\|decrypted_password" --include="*.py"` across all files.
+
+### Live Service Read Paths (all fixed)
+
+| File | Line(s) | What it did | Status |
+|------|---------|-------------|--------|
+| `subscription_article_processor.py` | 59 | `SELECT decrypted_username, decrypted_password` | **Fixed (prior commit)** — uses `credential_store` |
+| `user_consolidation_service.py` | 38 | `SELECT domain, decrypted_username, decrypted_password, consolidated_user_id` | **Fixed (this commit)** — uses `credential_store` |
+| `user_consolidation_service.py` | 67 | `WHERE domain = %s AND decrypted_username = %s AND decrypted_password = %s` | **Fixed (this commit)** — uses blind index HMAC |
+
+### Live Write Path (NOT a read; gated behind disabled flag)
+
+| File | Line(s) | What it does | Status |
+|------|---------|-------------|--------|
+| `newsletter_processor_service.py` | 2517-2523 | `INSERT INTO ... decrypted_username, decrypted_password` | **Not changed** — this is the write path, gated behind `CREDENTIAL_ENDPOINTS_ENABLED` (off). When KMS is provisioned, this must be modified to encrypt before writing. Documented as limitation. |
+
+### Non-service files (not changed, not live read paths)
+
+| Category | Files | Reason not changed |
+|----------|-------|--------------------|
+| Migration script | `migrate_credentials_encrypt.py` | Designed to read plaintext and encrypt it — that's its purpose. Only runs manually. |
+| Decrypt utilities | `decrypt_*.py` (7 files) | Debug/diagnostic tools, not called by any service. |
+| Test helper | `generate_test_credentials.py` | Test utility only. |
+| DB seed job | `db-job/run.py:65` | Pre-existing test data INSERT. Explicitly excluded from this task. |
+| Test files | `tests/test_phase2_*.py`, `tests/test_phase3_*.py` | Test harnesses that simulate the write path. |
+| Docs/reviews | Various `.md` files | Documentation only. |
+
+---
+
+## 3. Design Proposal — Preventing Database-Only Decryption
 
 ### The Threat
 
@@ -86,6 +118,8 @@ Combine Options A and B: use KMS envelope encryption at rest, AND require the de
 - Provision KMS keyring on GCP (Michael's action)
 - Run `migrate_credentials_encrypt.py --add-columns` (non-destructive)
 - Modify `submit_credentials` write path to encrypt before storage
+- Add `credential_blind_index` BYTEA column (for consolidation matching)
+- Populate blind index at write time using `CREDENTIAL_BLIND_INDEX_KEY` env var
 - Flip `CREDENTIAL_ENCRYPTION_ENABLED=true` only after verification
 - This gives: DB dump alone cannot reveal credentials
 
@@ -99,48 +133,92 @@ Combine Options A and B: use KMS envelope encryption at rest, AND require the de
 
 ---
 
-## 3. Changes Made (This Commit)
+## 4. The Consolidation Matching Problem (Line 67)
 
-### `credential_store.py` (NEW)
-Centralized credential-reading module. Reads ONLY the encrypted columns (`encrypted_username`, `encrypted_password`, `wrapped_dek`, `encryption_nonce`). Returns `None` if no encrypted data exists. **Never reads `decrypted_username` or `decrypted_password`.**
+### Why it's worse than a simple plaintext read
 
-### `subscription_article_processor.py`
-- **Removed:** Direct SQL query reading `decrypted_username, decrypted_password`
-- **Replaced with:** `from credential_store import get_credentials_for_device`
-- Line 48–55: new 8-line method that delegates to credential_store
+The original `find_matching_credentials()` used:
+```sql
+WHERE domain = %s AND decrypted_username = %s AND decrypted_password = %s
+```
 
-### `newsletter_processor_service.py`
-- **Line ~1930:** Replaced inline SQL reading plaintext with `get_credentials_for_device()`
-- **Line ~2065:** Same replacement at second read site
-- Both sites wrapped in `try/except` to maintain existing error handling
+This is defeated by encryption at rest because:
+1. AES-GCM ciphertext is randomized — you cannot do equality matching on it
+2. The plaintext secret appears in query parameters and statement logs
+3. SQL equality is non-constant-time (timing side channel)
 
-### `credential_encryption.py`
-- **Removed:** Plaintext fallback from `read_credentials()`. It no longer reads `decrypted_username`/`decrypted_password` and no longer logs "falling back to plaintext."
-- Now returns `(None, None)` if encrypted columns are absent.
+### Solution: Blind Index (keyed HMAC)
 
-### `tests/test_credential_store.py` (NEW)
-Three tests:
-1. `test_plaintext_only_returns_none` — proves credential_store refuses to read plaintext columns
-2. `test_encrypted_round_trip` — proves encrypt/decrypt works with AES-256-GCM (local DEK, mocked KMS)
-3. `test_credential_store_query_excludes_plaintext_columns` — proves the SQL WHERE clause filters properly
+A blind index stores `HMAC-SHA256(key, domain||username||password)` alongside the encrypted credential. Properties:
+- **Deterministic**: same inputs → same HMAC → SQL equality works
+- **Non-reversible**: the HMAC cannot be inverted to recover the credential
+- **Key-separated**: requires `CREDENTIAL_BLIND_INDEX_KEY` (held in environment, not DB)
+- **Constant-time comparison available**: `hmac.compare_digest()` can be used app-side if needed
+
+### Schema addition needed (Phase 1)
+
+```sql
+ALTER TABLE user_subscription_credentials
+    ADD COLUMN credential_blind_index BYTEA;  -- HMAC-SHA256, 32 bytes
+
+CREATE INDEX idx_cred_blind_domain ON user_subscription_credentials
+    (domain, credential_blind_index);
+```
+
+### What's implemented now
+
+`user_consolidation_service.py` already uses the blind index path:
+- If `CREDENTIAL_BLIND_INDEX_KEY` is not set → returns `[]` (no matches, graceful degradation)
+- If set → queries `credential_blind_index` column instead of plaintext
+
+**Today with 0 rows and the flag off**, consolidation always returns "new_user" — which is correct and safe.
 
 ---
 
-## 4. Verification Evidence
+## 5. Changes Made (This Commit)
 
-### Tests
+### `user_consolidation_service.py` (MODIFIED)
+- **`get_user_credentials_by_device()`**: Replaced `SELECT decrypted_username, decrypted_password` with a two-step approach: (1) SELECT non-secret columns (domain, consolidated_user_id) filtering for `wrapped_dek IS NOT NULL`, (2) decrypt via `credential_store.get_credentials_for_device()`.
+- **`find_matching_credentials()`**: Replaced plaintext WHERE clause with blind index (HMAC-SHA256) comparison. Falls back to empty list if `CREDENTIAL_BLIND_INDEX_KEY` is not configured.
+- **Added `_compute_credential_blind_index()`**: Module-level function computing `HMAC-SHA256(key, domain\x00username\x00password)`. Returns `None` if key env var is absent.
+- **No `decrypted_username` or `decrypted_password` appears in any SQL query in this file.**
+
+### `credential_store.py` (unchanged from prior commit)
+Centralized credential-reading module. Reads ONLY encrypted columns.
+
+### `subscription_article_processor.py` (unchanged from prior commit)
+Delegates to `credential_store.get_credentials_for_device()`.
+
+### `tests/test_consolidation_no_plaintext.py` (NEW)
+8 tests verifying:
+- Blind index is deterministic, domain-sensitive, password-sensitive
+- Returns None without env var key
+- Output is 32 bytes (SHA-256)
+- `find_matching_credentials` returns [] without key
+- SQL executed by `find_matching_credentials` uses `credential_blind_index`, not `decrypted_*`
+- SQL executed by `get_user_credentials_by_device` does not reference `decrypted_*`
+
+---
+
+## 6. Verification Evidence
+
+### Tests (all pass)
 ```
+tests/test_consolidation_no_plaintext.py::TestBlindIndex::test_deterministic PASSED
+tests/test_consolidation_no_plaintext.py::TestBlindIndex::test_different_domain_different_index PASSED
+tests/test_consolidation_no_plaintext.py::TestBlindIndex::test_different_password_different_index PASSED
+tests/test_consolidation_no_plaintext.py::TestBlindIndex::test_output_is_32_bytes PASSED
+tests/test_consolidation_no_plaintext.py::TestBlindIndex::test_returns_none_without_key PASSED
+tests/test_consolidation_no_plaintext.py::TestConsolidationNoPlaintext::test_find_matching_credentials_no_key_returns_empty PASSED
+tests/test_consolidation_no_plaintext.py::TestConsolidationNoPlaintext::test_find_matching_uses_blind_index_column PASSED
+tests/test_consolidation_no_plaintext.py::TestConsolidationNoPlaintext::test_get_user_credentials_no_plaintext_sql PASSED
+
 tests/test_credential_store.py::test_plaintext_only_returns_none PASSED
 tests/test_credential_store.py::test_encrypted_round_trip PASSED
 tests/test_credential_store.py::test_credential_store_query_excludes_plaintext_columns PASSED
-3 passed in 0.14s
-```
 
-### Encrypted Round-Trip Proof
-The test inserts a row with encrypted columns, then reads back via `credential_store`. The stored bytes are AES-256-GCM ciphertext (not plaintext):
-- `encrypted_username`: opaque BYTEA (46 bytes including GCM tag)
-- `encrypted_password`: opaque BYTEA (34 bytes including GCM tag)
-- The DB never holds a readable secret.
+11 passed total
+```
 
 ### Production Safety
 ```sql
@@ -155,11 +233,20 @@ SELECT COUNT(*) FROM user_subscription_credentials;
 `CREDENTIAL_ENCRYPTION_ENABLED` remains off (line 43, empty-string default). Credential endpoints remain disabled.
 
 ### Syntax Validation
-All 4 modified/new Python files pass `py_compile`.
+```
+python3 -c "import py_compile; py_compile.compile('user_consolidation_service.py', doraise=True)"
+# Success — no output
+```
+
+### No Remaining Live Reads of Plaintext Columns
+```
+grep -rn "decrypted_username\|decrypted_password" --include="*.py" | grep -v tests/ | grep -v decrypt_ | grep -v generate_test | grep -v migrate_credentials | grep -v db-job/
+```
+Results: only docstrings/comments in `credential_store.py` and `user_consolidation_service.py`, plus the disabled write path in `newsletter_processor_service.py:2517-2523`.
 
 ---
 
-## 5. Plaintext Column Removal Plan (NOT EXECUTED)
+## 7. Plaintext Column Removal Plan (NOT EXECUTED)
 
 Once encrypted storage is live and verified:
 1. Confirm 0 rows have `wrapped_dek IS NULL` (all migrated)
@@ -170,10 +257,13 @@ Once encrypted storage is live and verified:
 
 ---
 
-## 6. Limitations
+## 8. Limitations
 
 1. **KMS is not provisioned.** The encrypted write path cannot be activated until the GCP KMS keyring is created. This is an infrastructure action outside this task's scope.
 2. **Split-key requires mobile app changes.** The strongest design (device holds part of the key) cannot be implemented from the server alone. It requires a new mobile protocol endpoint and Dart-side changes.
-3. **The plaintext columns still exist in the schema.** They are now unreachable from the read path, but a direct SQL INSERT into `decrypted_password` would still succeed. Column removal (§5) is the only complete mitigation, and requires Michael's approval.
-4. **No real credential was tested.** All test values are obviously fake (`fake_test_user_local321@example.com`, `F4k3P@ssw0rd_L321!`).
-5. **The `submit_credentials` write path still writes plaintext** — but it's gated behind `CREDENTIAL_ENDPOINTS_ENABLED` which is off. When the flag is enabled (after KMS provisioning), the write path in `submit_credentials` must also be updated to encrypt before writing.
+3. **The plaintext columns still exist in the schema.** They are now unreachable from all read paths, but a direct SQL INSERT into `decrypted_password` would still succeed. Column removal (§7) is the only complete mitigation, and requires Michael's approval.
+4. **No real credential was tested.** All test values are obviously fake (`fake_user@example.com`, `F4k3P@ss!`).
+5. **The `submit_credentials` write path still writes plaintext** (newsletter_processor_service.py:2517) — but it's gated behind `CREDENTIAL_ENDPOINTS_ENABLED` which is off. When the flag is enabled (after KMS provisioning), the write path must be updated to: (a) encrypt before writing, and (b) compute and store the blind index.
+6. **The `credential_blind_index` column does not yet exist in the database.** The consolidation service gracefully returns empty results until both the column is added and `CREDENTIAL_BLIND_INDEX_KEY` is configured. The schema migration for this column should be included in the Phase 1 KMS provisioning work.
+7. **Consolidation matching is unavailable until Phase 1 is complete.** With the blind index key absent and 0 rows in the table, `handle_credential_submission_with_consolidation` always returns `{"action": "new_user"}`. This is correct behavior — there are no credentials to consolidate.
+8. **`db-job/run.py:65` contains a literal test password.** Pre-existing, not introduced by this task, explicitly excluded from scope.

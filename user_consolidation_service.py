@@ -2,15 +2,49 @@
 """
 User Consolidation Service - Phase 3 Implementation
 Handles intelligent device merging based on credential matching
+
+LOCAL-321: Removed all reads of decrypted_username / decrypted_password.
+  - get_user_credentials_by_device: uses credential_store (encrypted columns only)
+  - find_matching_credentials: uses credential_blind_index (HMAC comparison)
+    instead of plaintext SQL WHERE clause equality.
+
+When encryption is not yet provisioned (no wrapped_dek in rows), both methods
+return empty results — consolidation degrades gracefully to "new_user" for
+every submission. This is safe: the table currently has 0 rows, and the
+credential endpoints are disabled.
 """
 
 import os
+import hmac
+import hashlib
 import psycopg2
 import logging
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
+
+
+def _compute_credential_blind_index(domain: str, username: str, password: str) -> bytes:
+    """Compute a blind index (keyed HMAC-SHA256) over domain+username+password.
+
+    The blind index allows equality matching on credentials without storing
+    them in plaintext. The HMAC key must be held outside the database (env var).
+    If the key is absent, returns None — matching is unavailable.
+
+    The index is NOT reversible: holding the database alone (including this
+    column) does not reveal the credential. An attacker would also need
+    CREDENTIAL_BLIND_INDEX_KEY from the environment.
+    """
+    key = os.environ.get('CREDENTIAL_BLIND_INDEX_KEY')
+    if not key:
+        return None
+
+    # Canonical input: domain || NUL || username || NUL || password
+    # NUL separator prevents domain+user ambiguity (e.g., "a.com\0user" vs "a.co\0muser")
+    message = f"{domain}\x00{username}\x00{password}".encode('utf-8')
+    return hmac.new(key.encode('utf-8'), message, hashlib.sha256).digest()
+
 
 class UserConsolidationService:
     """Service for managing user consolidation and device merging"""
@@ -29,26 +63,38 @@ class UserConsolidationService:
         return psycopg2.connect(**self.db_config)
     
     def get_user_credentials_by_device(self, device_id: str) -> List[Dict]:
-        """Get all credentials for a device"""
+        """Get all credentials for a device.
+
+        LOCAL-321: Reads ONLY via credential_store (encrypted columns).
+        Returns empty list if no encrypted credentials exist.
+        Never reads decrypted_username or decrypted_password.
+        """
+        from credential_store import get_credentials_for_device
         conn = self.get_db_connection()
         cursor = conn.cursor()
         
         try:
+            # Get domains and consolidation metadata (non-secret columns only)
             cursor.execute("""
-                SELECT domain, decrypted_username, decrypted_password, consolidated_user_id
+                SELECT domain, consolidated_user_id
                 FROM user_subscription_credentials 
-                WHERE device_id = %s
+                WHERE device_id = %s AND wrapped_dek IS NOT NULL
                 ORDER BY domain
             """, (device_id,))
             
             credentials = []
             for row in cursor.fetchall():
-                credentials.append({
-                    'domain': row[0],
-                    'username': row[1],
-                    'password': row[2],
-                    'consolidated_user_id': row[3]
-                })
+                domain = row[0]
+                consolidated_user_id = row[1]
+                # Decrypt credentials via credential_store (KMS envelope)
+                cred = get_credentials_for_device(device_id, domain)
+                if cred:
+                    credentials.append({
+                        'domain': domain,
+                        'username': cred['username'],
+                        'password': cred['password'],
+                        'consolidated_user_id': consolidated_user_id
+                    })
             
             return credentials
             
@@ -57,15 +103,37 @@ class UserConsolidationService:
             conn.close()
     
     def find_matching_credentials(self, domain: str, username: str, password: str) -> List[str]:
-        """Find devices with matching credentials for a domain"""
+        """Find devices with matching credentials for a domain.
+
+        LOCAL-321: Uses blind index (HMAC) comparison instead of plaintext
+        SQL WHERE clause. Requires:
+          1. CREDENTIAL_BLIND_INDEX_KEY env var set
+          2. credential_blind_index column populated on target rows
+
+        If either prerequisite is unmet, returns [] (no matches). This is
+        safe: consolidation degrades to "new_user" for every submission.
+
+        Design note (why not plaintext equality):
+          Comparing secrets in a SQL WHERE clause puts them in query
+          parameters, statement logs, and pg_stat_statements. It also
+          uses non-constant-time comparison. A blind index avoids all of
+          these: the HMAC is not reversible, and the secret never appears
+          in the query.
+        """
+        blind_index = _compute_credential_blind_index(domain, username, password)
+        if blind_index is None:
+            logging.info("[CONSOLIDATION] Blind index key not configured — "
+                         "credential matching unavailable")
+            return []
+
         conn = self.get_db_connection()
         cursor = conn.cursor()
         
         try:
             cursor.execute("""
                 SELECT device_id FROM user_subscription_credentials 
-                WHERE domain = %s AND decrypted_username = %s AND decrypted_password = %s
-            """, (domain, username, password))
+                WHERE domain = %s AND credential_blind_index = %s
+            """, (domain, blind_index))
             
             return [row[0] for row in cursor.fetchall()]
             
