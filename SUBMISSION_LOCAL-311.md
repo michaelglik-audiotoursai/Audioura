@@ -1,7 +1,8 @@
 ##### READY FOR REVIEW
 
-**Commit:** `3714196` on branch `kiro/local311-versioned-evaluator`
-**Base:** `storied` (merge-base `357f69f`)
+**Commit:** `19ccdc3`  
+**Branch:** `kiro/local311-versioned-evaluator`  
+**Commits since storied:** 3
 
 ---
 
@@ -9,128 +10,116 @@
 
 | File | Change |
 |------|--------|
-| `tour_evaluator.py` | **New.** Single entry point `evaluate(tour_text, n_requested, **context) -> Evaluation`. Algorithm identity with version + config hash. In-memory registry. Stale version detection. Historical version registration (LOCAL-306-v1 pre-registered). |
-| `tour_scoring_service.py` | Removed imports of `parse_tour`, `analyze_stop`, `classify_stop`, `compute_score`, `detect_venue_identity`. Now uses `evaluate()` exclusively. `SCORER_VERSION` is now the algorithm_id. `compute_edit_delta` uses `evaluate()` for both tour versions. |
-| `generate_tour_text_service.py` | Added LOCAL-311 scoring block: tours generated via the direct generate path are now scored before delivery (gates nothing). |
-| `tests/test_local311_versioned_evaluator.py` | 10 tests covering: identical scores, stale detection, registry, no-internals-in-callers, algorithm identity on Evaluation, empty input, config hash sensitivity. |
+| `tour_evaluator.py` | (1) Added cross-population of `callbacks_to` in `evaluate()` matching `score_tour_file`'s logic. (2) Changed threshold reads from frozen `from X import Y` bindings to live `_scorer.RICH_MIN_FACTS` via `import tour_rubric_scorer as _scorer`. (3) `_validate_version_consistency()` now rebuilds config fresh from live module values on every call. (4) `_compute_config_hash()` accepts zero arguments (uses current config). (5) New public `get_current_config_hash()` for external stale-version validation. |
 
 ---
 
-## Evidence
+## Verification evidence
 
-### 1. Single entry point; internals private; no caller reaches past it
-
-```
-$ grep -n "from tour_rubric_scorer import" tour_scoring_service.py tour_orchestrator_service.py tour_editing_phase2.py generate_tour_text_service.py quality_guardrails.py
-tour_scoring_service.py:34:from tour_rubric_scorer import TourScore, StopAnalysis
-quality_guardrails.py:39:from tour_rubric_scorer import TourScore
-```
-
-Only data classes (`TourScore`, `StopAnalysis`) imported — no algorithm functions
-(`parse_tour`, `analyze_stop`, `classify_stop`, `compute_score`, `detect_venue_identity`).
-
-### 2. Algorithm identity includes threshold/weight identity, with a registry
+### 1. Scores provably unchanged (both paths identical)
 
 ```
+tours/LOCAL303_museum_8stop_gate.txt (N=8, no callbacks):
+  score_tour_file: total=94.5  base=87.5  corr=+0.0
+  evaluate():      total=94.5  base=87.5  corr=+0.0
+
+tours/LOCAL262_asian_arts_8stop_restored.txt (N=8, has callbacks):
+  score_tour_file: total=103.1  base=78.1  corr=+23.4
+  evaluate():      total=103.1  base=78.1  corr=+23.4
+
+tours/matisse_nice.txt (N=10, highest callback density):
+  score_tour_file: total=82.5  corr=+27.5
+  evaluate():      total=82.5  corr=+27.5
+
+tours/Palais_Lascaris__Nice_museum_tour_20260727_174018.txt (N=8):
+  score_tour_file: total=40.6  corr=+21.9
+  evaluate():      total=40.6  corr=+21.9
+
+All 46 tours in tours/: 0 mismatches (checked total_score to 0.01 tolerance).
+```
+
+### 2. Stale-version detection demonstrated
+
+```
+=== Before threshold change ===
 ALGORITHM_ID: LOCAL-311-v1@41db0d2f
+validate: OK
 
-Registry:
-  LOCAL-311-v1@41db0d2f -> registered_at=2026-08-06T16:55:53.148701+00:00
-  LOCAL-306-v1@03bbb773 -> registered_at=2026-08-06T16:55:53.148828+00:00
-
-Lookup LOCAL-306-v1:
-  Found: LOCAL-306-v1@03bbb773
-  Config: rich_min_facts=4, adequate_min_facts=3, rich_min_density=0.60, ...
-```
-
-The config hash (`41db0d2f`) is derived from all thresholds and weights. Changing
-any single value changes the hash. The version + hash together form the
-algorithm_id stored in every `tour_scores.scorer_version` row.
-
-### 3. Stale-version detection demonstrated
-
-```
-$ python3 -c "..." (injects conflicting registration)
-SUCCESS: Caught AlgorithmVersionError
-  Message: Stale version detected! ALGORITHM_VERSION='LOCAL-311-v1' was previously
-  registered with config_hash='FAKE1234', but current config produces
-  hash='41db0d2f'. A threshold or weight changed without bumping the version.
+=== Simulating: RICH_MIN_FACTS changed from 4 to 5 ===
+=== Calling _validate_version_consistency() ===
+CAUGHT AlgorithmVersionError:
+  Stale version detected! ALGORITHM_VERSION='LOCAL-311-v1' was registered with
+  config_hash='41db0d2f', but current thresholds produce hash='404d85e4'.
+  A threshold or weight changed without bumping the version.
   Bump ALGORITHM_VERSION in tour_evaluator.py.
+
+=== Calling evaluate() with changed threshold ===
+CAUGHT on evaluate(): AlgorithmVersionError
+  (same message — evaluate() calls _validate on every invocation)
+
+=== After restoring threshold ===
+validate: OK
 ```
 
-### 4. All three paths record; coverage stated
-
-| Path | File | Mechanism | Status |
-|------|------|-----------|--------|
-| Orchestrator | `tour_orchestrator_service.py:929` | `score_tour_text()` | Already existed (LOCAL-306) |
-| Direct generate | `generate_tour_text_service.py:423` | `score_tour_text()` | **Added by LOCAL-311** |
-| Edit | `tour_editing_phase2.py:1734` | `score_edited_tour()` | Already existed (LOCAL-306) |
-
-The orchestrator and edit paths were already covered by LOCAL-306. The direct
-generate path was the gap — LOCAL-311 added it.
-
-### 5. Scores provably unchanged
+### 3. No caller touches internals (grep proof)
 
 ```
-=== BEFORE (direct scorer internals) ===
-  base=87.50, structural=0.00, correlation=0.00, venue_id=7.00
-  TOTAL=94.50
-  Stop 1: RICH, Stop 2: RICH, Stop 3: RICH, Stop 4: RICH, Stop 5: RICH
-  Stop 6: ADEQUATE, Stop 7: THIN, Stop 8: ADEQUATE
-
-=== AFTER (evaluate() entry point) ===
-  base=87.50, structural=0.00, correlation=0.00, venue_id=7.00
-  TOTAL=94.50
-  Stop 1: RICH, Stop 2: RICH, Stop 3: RICH, Stop 4: RICH, Stop 5: RICH
-  Stop 6: ADEQUATE, Stop 7: THIN, Stop 8: ADEQUATE
-  algorithm_id=LOCAL-311-v1@41db0d2f
-
-  ✓ All components match exactly
+$ grep -rn "analyze_stop\|classify_stop\|compute_score\|score_tour_file" --include="*.py" \
+    | grep -v tour_rubric_scorer.py | grep -v tour_evaluator.py | grep -v test_ | grep -v __pycache__
+(no output — zero hits)
 ```
 
-### 6. Latency and constraints
+`parse_tour` is imported by `groundedness_check.py` and `run_local291_adjudication.py` for **parsing only** (not scoring). These never call `analyze_stop`/`classify_stop`/`compute_score`. Data types (`TourScore`, `StopAnalysis`) are imported by `tour_scoring_service.py` and `quality_guardrails.py` — acceptable, as types don't encode scoring logic.
 
-- Latency: min=4.2ms, max=8.6ms, avg=4.7ms (10 runs) — well under 200ms
-- Production real count: 29 (unchanged)
-- No container rebuilt
-- `git status --short`: clean
-- No LLM calls, no network in scorer path
-
-### 7. Tests
+### 4. Registry lookup — two versions
 
 ```
-tests/test_local311_versioned_evaluator.py  10 passed
-tests/test_local306_inflight_scoring.py      5 passed
-tests/test_local305_missing_stop_fairness.py 9 passed (regression)
-tests/test_local291_groundedness.py         38 passed (regression)
+Registry has 2 entries:
+  LOCAL-311-v1@41db0d2f (current)
+    rich_min_facts: 4, adequate_min_facts: 3
+  LOCAL-306-v1@03bbb773 (historical, pre-refactoring)
+    rich_min_facts: 4, adequate_min_facts: 3
+```
+
+`lookup_algorithm("LOCAL-306-v1@03bbb773")` returns the full config snapshot including all thresholds and weights — interpretable without checking out the repo.
+
+### 5. All three generation paths record scores
+
+| Path | Location | Evidence |
+|------|----------|----------|
+| **Orchestrator** | `tour_orchestrator_service.py:932` | `score_tour_text(tour_content, n_requested=...)` |
+| **Direct generate** | `generate_tour_text_service.py:430` | `score_tour_text(tour_content_str, n_requested=total_stops, ...)` |
+| **Edit** | `tour_editing_phase2.py:1715` | `score_edited_tour(...)` with delta |
+
+All three were already present (LOCAL-306 + first submission). No new hooks needed.
+
+### 6. Performance
+
+```
+Average: 4.3ms per evaluation (sub-200ms requirement: PASS)
+```
+
+### 7. What the fix actually changed
+
+**Before fix:** `evaluate()` skipped the cross-population loop. Only `callbacks_from` was populated; `callbacks_to` was always empty. `compute_score` saw half the callback set, producing a lower correlation bonus on any tour with cross-stop references (27 of 46 tours affected, differences ranging from 3.1 to 21.9 points).
+
+**After fix:** `evaluate()` performs the identical loop that `score_tour_file` performs:
+```python
+for sa in stop_analyses:
+    for ref_idx in sa.callbacks_from:
+        for other_sa in stop_analyses:
+            if other_sa.index == ref_idx:
+                other_sa.callbacks_to.append(sa.index)
 ```
 
 ---
 
 ## Limitations
 
-1. **Registry is in-memory only.** The registry of algorithm versions lives in
-   module-level state. A process restart loses registered historical versions
-   (except LOCAL-306-v1 which is hardcoded). For production persistence, the
-   registry should be backed by a DB table or a file. This is adequate for
-   LOCAL-311's scope since every score row carries the algorithm_id string, and
-   the config can be reconstructed from the source at that commit via `code_sha`.
+1. **Cross-population lives in `evaluate()`, not in `compute_score`.** The bounce suggested moving it into `compute_score` — but LOCAL-309 is actively editing `compute_score`, and placing it there would create a merge conflict. The architectural guarantee holds: `evaluate()` is the single entry point, so the loop cannot be forgotten by any caller.
 
-2. **`groundedness_check.py` still imports `parse_tour` directly.** This module
-   is not a scoring caller — it uses `parse_tour` as a text parser for its own
-   groundedness measurement, not for scoring. Including it in the interface
-   boundary would conflate parsing (a utility) with evaluation (the algorithm).
-   Flagged but not changed.
+2. **`parse_tour` is still importable by non-scoring modules.** `groundedness_check.py` uses it as a text parser (not for scoring). Making it fully private would require duplicating the parser or adding a `parse_only()` export. The scoring-relevant internals (`analyze_stop`, `classify_stop`, `compute_score`, `detect_venue_identity`) are fully encapsulated.
 
-3. **LOCAL-309 coordination.** LOCAL-309 is editing `compute_score`. If their
-   changes alter thresholds or weights, the config hash will change and the stale
-   version check will fire on their next import, requiring them to bump
-   `ALGORITHM_VERSION`. This is by design — it's the "fail loudly" behaviour
-   the task requested.
+3. **Registry is in-memory only.** Historical versions are registered at import time via `register_historical_version()`. If the process restarts, only explicitly-registered versions are available. A persistent registry (DB or file) would survive restarts but is not required by the task scope.
 
-4. **Direct generate path scoring has no `tour_id` backfill.** When the generate
-   service scores independently (not through orchestrator), the `tour_id` in the
-   score row is NULL because the tour is not yet stored in `audio_tours`. The
-   orchestrator path already handles backfill. If direct-generate tours need
-   `tour_id` linkage, a similar backfill would be needed in whatever stores the
-   tour downstream.
+4. **Stale-version detection requires the process to have imported `tour_evaluator` before the threshold changed.** It cannot detect a stale version if the module is imported fresh with already-changed thresholds and a matching (bumped) version string. The guard catches drift within a session and across edits where the version string was not updated.
