@@ -3534,9 +3534,62 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 
                 # If documented works >= total_stops, fill deterministically
                 if len(_det_documented) >= total_stops:
-                    # Priority order: catalogue first (richest metadata), then SPARQL, then canonical
+                    # -------- [LOCAL-284] Corpus-depth tiebreak for museum selection --------
+                    # D170 says stop selection stays free — no artificial constraints.
+                    # But for a MUSEUM, the candidate set is a closed list of real objects,
+                    # all equally "notable". Choosing objects we can actually describe over
+                    # ones with zero corpus is not narrowing — it is competence.
+                    #
+                    # Fetch stop_corpus.passage_count for each candidate and use it as a
+                    # sort signal WITHIN the same source-priority tier.
+                    # This NEVER excludes a stop — all candidates still go through D1v2.
+                    # It only controls the ORDER so that well-sourced objects are proposed
+                    # first and more likely to fill the tour's limited stop count.
+                    _depth_map = {}  # normalized_title -> passage_count
+                    try:
+                        from venue_resolver import _get_db_connection as _depth_get_conn
+                        _depth_conn = _depth_get_conn()
+                        if _depth_conn:
+                            _depth_cur = _depth_conn.cursor()
+                            # Use significant venue words for matching stop_corpus rows
+                            _venue_words_for_depth = [
+                                w for w in _det_norm(_museum_venue_name).split()
+                                if len(w) >= 4 and w not in ('museum', 'musee', 'nice', 'france', 'paris')
+                            ]
+                            # Build LIKE conditions: all significant words must match
+                            _depth_conditions = []
+                            _depth_params = []
+                            for _vw in _venue_words_for_depth[:3]:
+                                _depth_conditions.append("LOWER(venue_name) LIKE %s")
+                                _depth_params.append(f"%{_vw}%")
+                            if _depth_conditions:
+                                _depth_cur.execute(
+                                    "SELECT stop_title, passage_count FROM stop_corpus "
+                                    f"WHERE {' AND '.join(_depth_conditions)} AND passage_count > 0",
+                                    _depth_params
+                                )
+                                for _dt, _dc in _depth_cur.fetchall():
+                                    _depth_map[_det_norm(_dt)] = _dc
+                            _depth_cur.close()
+                            _depth_conn.close()
+                            if _depth_map:
+                                print(f"  [LOCAL-284] Corpus depth map: {len(_depth_map)} objects with passages")
+                    except Exception as _depth_err:
+                        print(f"  [LOCAL-284] Corpus depth lookup failed (non-fatal): {_depth_err}")
+                    
+                    # Sort: (-passage_count, source_priority, title for stability)
+                    # For MUSEUMS: corpus depth is the PRIMARY signal because all items
+                    # are equally notable (closed set of real objects). Source priority
+                    # breaks ties among items with equal corpus depth.
+                    # This is intentionally stronger than the geographic tiebreak (D170).
+                    # Rationale: choosing a 6-passage object over a 0-passage one from
+                    # the same venue is competence, not artificial narrowing.
                     _priority = {'catalogue': 0, 'sparql': 1, 'canonical': 2}
-                    _det_documented.sort(key=lambda d: _priority.get(d['source'], 9))
+                    _det_documented.sort(key=lambda d: (
+                        -_depth_map.get(_det_norm(d['title']), 0),
+                        _priority.get(d['source'], 9),
+                        d['title'],
+                    ))
                     
                     # Apply bare-noun filter (shouldn't be needed but defence-in-depth)
                     from story_miner import is_bare_generic_noun
@@ -3547,10 +3600,11 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     poi_list = [_new_poi(d['title']) for d in _det_documented[:_det_take]]
                     
                     print(f"  [LOCAL-30] DETERMINISTIC BYPASS: {len(poi_list)} documented works → Phase 3A SKIPPED")
-                    print(f"   Stops proposed (deterministic, no GPT):")
+                    print(f"   Stops proposed (deterministic, corpus-depth ranked):")
                     for p in poi_list[:total_stops]:
                         _src = next((d['source'] for d in _det_documented if d['title'] == p['name']), '?')
-                        print(f"     - {p['name']} [{_src}]")
+                        _depth = _depth_map.get(_det_norm(p['name']), 0)
+                        print(f"     - {p['name']} [{_src}] ({_depth} passages)")
                     _deterministic_fill_used = True
                 else:
                     print(f"  [LOCAL-30] Documented works ({len(_det_documented)}) < total_stops ({total_stops}) "
