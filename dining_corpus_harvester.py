@@ -60,16 +60,92 @@ _DISH_SIGNALS = re.compile(
 )
 
 
-def _passage_carries_dining_fact(text: str) -> bool:
-    """Check if a passage carries at least one dining-relevant fact.
+def _passage_is_review_or_rating(text: str) -> bool:
+    """Reject passages that are reviewer opinions, ratings, or listing metadata.
 
-    A fact-carrying dining passage has:
+    LOCAL-314 bounce: "Never store a rating or review score. Not as a passage,
+    not as context." The Bistrot example shows why — a blog's 7.5/10 laundered
+    into prose that reads like a fact is a fabrication route.
+
+    Also rejects: photo counts, phone numbers, star ratings, "try our" marketing,
+    and user-review language.
+    """
+    text_lower = text.lower()
+
+    # Star ratings (4.4/5, 3 stars, ★★★)
+    if re.search(r'\b\d\.?\d?\s*/\s*5\b', text):
+        return True
+    if re.search(r'\b\d\s*stars?\b', text_lower):
+        return True
+    if '★' in text or '⭐' in text:
+        return True
+
+    # Numeric scores (7.5/10, 15/20, 8.5/10) — these are critic opinions, not facts
+    if re.search(r'\b\d+\.?\d*\s*/\s*(?:10|20)\b', text):
+        return True
+
+    # Review-language signals
+    review_signals = [
+        'had a great meal', 'we went', 'i went', 'we visited', 'i visited',
+        'highly recommend', 'would recommend', 'must visit', 'don\'t miss',
+        'i\'d recommend', 'i\'d suggested', 'i recommend', 'i\'d recommended',
+        'amazing experience', 'wonderful experience', 'great experience',
+        'loved it', 'loved the', 'my favorite', 'our favorite',
+        'food was excellent', 'food was amazing', 'food was great',
+        'great value', 'good value', 'worth the wait',
+        'the service was', 'our waiter', 'our server',
+        'went again', 'came back', 'return visit',
+        'try our new', 'book now', 'reserve now', 'order online',
+        'earning the restaurant', 'earning high marks',
+    ]
+    if any(s in text_lower for s in review_signals):
+        return True
+
+    # Photo/review counts (96 photos, 234 reviews, 4.4 stars)
+    if re.search(r'\b\d+\s*(?:photos?|reviews?|ratings?|avis)\b', text_lower):
+        return True
+
+    # Phone numbers (international format, or +33...)
+    if re.search(r'\+\d{1,3}\s*\d', text):
+        return True
+    if re.search(r'\b\d{2,4}[\s.-]\d{2,4}[\s.-]\d{2,4}\b', text):
+        return True
+
+    # "Creativity: 7.5/10 · Execution: 8.5/10" style scorecards
+    if re.search(r'(?:creativity|execution|ambiance|service|presentation|value)\s*[:]\s*\d', text_lower):
+        return True
+
+    # Yelp/TripAdvisor listing fragments
+    if re.search(r'Mon\s*-\s*\d{1,2}:\d{2}\s*(?:am|pm)', text, re.I):
+        return True
+    if re.search(r'(?:open|hours|closed)\s*:?\s*(?:mon|tue|wed|thu|fri|sat|sun)', text_lower):
+        return True
+
+    # Atmospheric descriptions with no factual anchor
+    atmospheric_phrases = [
+        'clinking of cutlery', 'hum of conversation', 'cheerful hum',
+        'aroma of garlic', 'herbs and simmering', 'clatter of pans',
+        'warm atmosphere', 'cozy atmosphere', 'charming atmosphere',
+        'buzzing with energy', 'fills the air', 'inviting ambiance',
+    ]
+    if any(s in text_lower for s in atmospheric_phrases):
+        return True
+
+    return False
+
+
+def _passage_carries_dining_fact(text: str) -> bool:
+    """Check if a passage carries at least one concrete dining fact.
+
+    A fact-carrying dining passage has at least one of:
       - A year (founding, opening, renovation, chef tenure)
-      - A named person (chef, founder, owner) with an action
-      - A price or price range
-      - A specific dish name or cuisine descriptor
-      - A concrete measurement (seats, covers, Michelin stars)
-      - A guide rating (Gault&Millau score, numeric rating out of 10/20)
+      - A named person (chef, founder, owner) with a documented action
+      - A price or price range (€20, three courses for 25 euros)
+      - A named dish (socca, daube, pâté croûte)
+      - A concrete measurement (25 seats, three courses)
+
+    LOCAL-314 quality bar: "Every passage carries a date, a named person,
+    a documented event, a dish, or a price. 'Warm atmosphere' is not a passage."
     """
     if _YEAR_RE.search(text):
         return True
@@ -79,9 +155,6 @@ def _passage_carries_dining_fact(text: str) -> bool:
         return True
     # Seat count / covers
     if re.search(r'\b\d+\s*(seats?|covers?|couverts?|places?)\b', text, re.I):
-        return True
-    # Guide ratings (7.5/10, 15/20, etc.)
-    if re.search(r'\b\d+\.?\d*\s*/\s*(?:10|20)\b', text):
         return True
     # Named person with biographical verb
     if re.search(r'(?:chef|owner|founder|patron|propri[eé]taire)\s+\w+', text, re.I):
@@ -96,6 +169,26 @@ def _passage_carries_dining_fact(text: str) -> bool:
     if re.search(r'\b(?:opened|founded|established|re-opened)\s+(?:in\s+)?\d{4}\b', text, re.I):
         return True
     return False
+
+
+def _passage_qualifies(text: str, stop_title: str) -> Tuple[bool, str]:
+    """Two-stage quality gate for dining passages.
+
+    Returns (admitted, reason).
+    Stage 1: REJECT if passage is a review, rating, or listing metadata.
+    Stage 2: REJECT if passage fails the fact test (no year/person/dish/price/event).
+    Stage 3: REJECT if passage is generic (about area, not this restaurant).
+    """
+    # Stage 1: reject reviews, ratings, listing metadata
+    if _passage_is_review_or_rating(text):
+        return (False, "rejected: review/rating/listing_metadata")
+    # Stage 2: must carry a concrete fact
+    if not _passage_carries_dining_fact(text):
+        return (False, "rejected: no_qualifying_fact")
+    # Stage 3: must be about THIS restaurant, not the area in general
+    if _is_generic_not_specific(text, stop_title):
+        return (False, "rejected: generic_not_specific")
+    return (True, "admitted")
 
 
 def _is_generic_not_specific(text: str, stop_title: str) -> bool:
@@ -154,12 +247,16 @@ def _search_wikipedia_for_restaurant(
                 city_lower = _strip_accents(city).lower()
                 if (city_lower in _strip_accents(extract).lower() or
                         any(s in extract_lower for s in ('restaurant', 'chef', 'cuisine', 'dining', 'bistro'))):
-                    if _passage_carries_dining_fact(extract) and not _is_generic_not_specific(extract, stop_title):
+                    admitted, reason = _passage_qualifies(extract, stop_title)
+                    if admitted:
                         passages.append({
                             'text': extract[:500],
                             'url': page_url or f"https://en.wikipedia.org/wiki/{encoded}",
                             'language': 'en',
+                            'admission_reason': reason,
                         })
+                    else:
+                        logger.debug(f"[DINING-HARVEST] Wikipedia EN {stop_title!r}: {reason}")
         time.sleep(0.3)
     except Exception as e:
         logger.debug(f"[DINING-HARVEST] Wikipedia EN failed for {stop_title!r}: {e}")
@@ -179,12 +276,16 @@ def _search_wikipedia_for_restaurant(
                 city_lower = _strip_accents(city).lower()
                 if (city_lower in _strip_accents(extract_fr).lower() or
                         any(s in extract_fr_lower for s in ('restaurant', 'chef', 'cuisine', 'bistro', 'cuisinier'))):
-                    if _passage_carries_dining_fact(extract_fr) and not _is_generic_not_specific(extract_fr, stop_title):
+                    admitted, reason = _passage_qualifies(extract_fr, stop_title)
+                    if admitted:
                         passages.append({
                             'text': extract_fr[:500],
                             'url': page_url_fr or f"https://fr.wikipedia.org/wiki/{encoded_fr}",
                             'language': 'fr',
+                            'admission_reason': reason,
                         })
+                    else:
+                        logger.debug(f"[DINING-HARVEST] Wikipedia FR {stop_title!r}: {reason}")
         time.sleep(0.3)
     except Exception as e:
         logger.debug(f"[DINING-HARVEST] Wikipedia FR failed for {stop_title!r}: {e}")
@@ -210,11 +311,13 @@ def _search_wikipedia_for_restaurant(
                     # Must mention the restaurant
                     stop_words = [w for w in _normalize(stop_title).split() if len(w) >= 4]
                     if any(w in _normalize(snippet) for w in stop_words):
-                        if _passage_carries_dining_fact(snippet):
+                        admitted, reason = _passage_qualifies(snippet, stop_title)
+                        if admitted:
                             passages.append({
                                 'text': snippet[:500],
                                 'url': f"https://en.wikipedia.org/wiki/{quote(title.replace(' ', '_'), safe='')}",
                                 'language': 'en',
+                                'admission_reason': reason,
                             })
         time.sleep(0.3)
     except Exception as e:
@@ -232,6 +335,11 @@ def _web_search_restaurant(
 
     Uses the Serper.dev API (SERP_API_KEY + SERP_PROVIDER=serper) or
     SerpAPI as fallback. Returns fact-carrying passages with source URLs.
+
+    Source preference (LOCAL-314 bounce):
+      - PREFER press/guides: Forbes, Gault&Millau, local press, Wikipedia
+      - DEPRIORITIZE aggregators: Yelp, TripAdvisor, Google reviews
+      - Results from preferred sources are tried first
     """
     import requests as _http
 
@@ -239,36 +347,74 @@ def _web_search_restaurant(
     serp_key = os.environ.get("SERP_API_KEY") or os.environ.get("SERPAPI_KEY")
     serp_provider = os.environ.get("SERP_PROVIDER", "").lower()
 
+    # Domains that carry editorial content (press, guides, food journalism)
+    _PREFERRED_DOMAINS = {
+        'forbes.com', 'gaultmillau.com', 'lemonde.fr', 'lefigaro.fr',
+        'theguardian.com', 'nytimes.com', 'timeout.com', 'eater.com',
+        'france24.com', 'nicematin.com', 'rivierabuzz.com',
+        'bonappetit.com', 'saveur.com', 'france-voyage.com',
+        'thefork.com',  # structured restaurant data (not reviews)
+    }
+    # Domains that carry user-generated reviews (rarely factual)
+    _REVIEW_DOMAINS = {
+        'yelp.com', 'tripadvisor.com', 'tripadvisor.fr',
+        'google.com/maps', 'foursquare.com', 'zomato.com',
+    }
+
+    def _is_from_preferred_source(url: str) -> bool:
+        url_lower = url.lower()
+        return any(d in url_lower for d in _PREFERRED_DOMAINS)
+
+    def _is_from_review_site(url: str) -> bool:
+        url_lower = url.lower()
+        return any(d in url_lower for d in _REVIEW_DOMAINS)
+
     if serp_key and serp_provider == "serper":
-        # Serper.dev API
+        # Serper.dev API — prefer search for press/guide content
         try:
             headers = {"X-API-KEY": serp_key, "Content-Type": "application/json"}
-            payload = {"q": f'"{stop_title}" {city} restaurant', "num": 5}
+            # Search query biased toward editorial/press content
+            payload = {"q": f'"{stop_title}" {city} restaurant chef founded history', "num": 8}
             resp = _http.post("https://google.serper.dev/search", json=payload,
                              headers=headers, timeout=12)
             if resp.status_code == 200:
                 data = resp.json()
-                for result in data.get("organic", [])[:5]:
+                organic = data.get("organic", [])[:8]
+
+                # Sort: preferred sources first, review sites last
+                preferred = [r for r in organic if _is_from_preferred_source(r.get("link", ""))]
+                neutral = [r for r in organic if not _is_from_preferred_source(r.get("link", ""))
+                           and not _is_from_review_site(r.get("link", ""))]
+                review = [r for r in organic if _is_from_review_site(r.get("link", ""))]
+                sorted_results = preferred + neutral + review
+
+                for result in sorted_results:
                     snippet = result.get("snippet", "")
                     url = result.get("link", "")
                     if snippet and len(snippet) > 50:
                         stop_words = [w for w in _normalize(stop_title).split() if len(w) >= 4]
                         if any(w in _normalize(snippet) for w in stop_words):
-                            if _passage_carries_dining_fact(snippet):
-                                if not _is_generic_not_specific(snippet, stop_title):
-                                    passages.append({
-                                        'text': snippet[:500],
-                                        'url': url,
-                                    })
+                            admitted, reason = _passage_qualifies(snippet, stop_title)
+                            if admitted:
+                                passages.append({
+                                    'text': snippet[:500],
+                                    'url': url,
+                                    'admission_reason': reason,
+                                })
+                            else:
+                                logger.debug(f"[DINING-HARVEST] Serper result for {stop_title!r} "
+                                            f"from {url[:60]}: {reason}")
                 # Knowledge graph
                 kg = data.get("knowledgeGraph", {})
                 if kg:
                     description = kg.get("description", "")
-                    if description and _passage_carries_dining_fact(description):
-                        if not _is_generic_not_specific(description, stop_title):
+                    if description:
+                        admitted, reason = _passage_qualifies(description, stop_title)
+                        if admitted:
                             passages.append({
                                 'text': description[:500],
-                                'url': kg.get("website", url),
+                                'url': kg.get("website", ""),
+                                'admission_reason': reason,
                             })
             elif resp.status_code == 429:
                 logger.warning("[DINING-HARVEST] Serper 429 — rate limited")
@@ -283,26 +429,27 @@ def _web_search_restaurant(
         # SerpAPI fallback
         try:
             params = {
-                "q": f'"{stop_title}" {city} restaurant chef founded',
+                "q": f'"{stop_title}" {city} restaurant chef founded history',
                 "api_key": serp_key,
-                "num": "5",
+                "num": "8",
                 "engine": "google",
             }
             resp = _http.get("https://serpapi.com/search", params=params, timeout=12)
             if resp.status_code == 200:
                 data = resp.json()
-                for result in data.get("organic_results", [])[:5]:
+                for result in data.get("organic_results", [])[:8]:
                     snippet = result.get("snippet", "")
                     url = result.get("link", "")
                     if snippet and len(snippet) > 50:
                         stop_words = [w for w in _normalize(stop_title).split() if len(w) >= 4]
                         if any(w in _normalize(snippet) for w in stop_words):
-                            if _passage_carries_dining_fact(snippet):
-                                if not _is_generic_not_specific(snippet, stop_title):
-                                    passages.append({
-                                        'text': snippet[:500],
-                                        'url': url,
-                                    })
+                            admitted, reason = _passage_qualifies(snippet, stop_title)
+                            if admitted:
+                                passages.append({
+                                    'text': snippet[:500],
+                                    'url': url,
+                                    'admission_reason': reason,
+                                })
             elif resp.status_code == 429:
                 logger.warning("[DINING-HARVEST] SerpAPI 429 — rate limited")
                 raise RuntimeError("SerpAPI rate limited (429)")
@@ -325,17 +472,16 @@ def _web_search_restaurant(
                 abstract = data.get("Abstract", "")
                 abstract_url = data.get("AbstractURL", "")
                 if abstract and len(abstract) > 60:
-                    if _passage_carries_dining_fact(abstract):
-                        if not _is_generic_not_specific(abstract, stop_title):
-                            passages.append({
-                                'text': abstract[:500],
-                                'url': abstract_url,
-                            })
+                    admitted, reason = _passage_qualifies(abstract, stop_title)
+                    if admitted:
+                        passages.append({
+                            'text': abstract[:500],
+                            'url': abstract_url,
+                            'admission_reason': reason,
+                        })
             time.sleep(0.3)
         except Exception as e:
             logger.debug(f"[DINING-HARVEST] DuckDuckGo failed for {stop_title!r}: {e}")
-
-    return passages
 
     return passages
 
