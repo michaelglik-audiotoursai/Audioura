@@ -8356,3 +8356,37 @@ what the evidence shows is more dangerous than a wrong result, because reviews
 read headers. LEAD has made this error too — D196 generalised from one example
 and D197 had to correct it. The discipline is the same in both directions: state
 what was measured, and when the measurement found nothing, say it found nothing.
+
+## D210 — A file named test_*.py that writes to a database on import (2026-08-06)
+
+LOCAL-296's implementation is right: `AUDIOURA_DB_TARGET` resolves default →
+`audiotours`, `test` → `audiotours_test`, invalid → fatal with no silent
+fallback. Verified directly. Production untouched at 143 = 29 real + 114 test,
+Nice list intact, and both `DELETE`s in the verification are textbook D141.
+
+**Bounced on the test file.** `tests/test_local296_db_target_switch.py` has
+**zero `def test_` functions** and executes its body — including
+`INSERT INTO audio_tours` — at module scope.
+
+```
+$ python3 -m pytest tests/test_local296_db_target_switch.py -q
+no tests ran in 0.14s
+```
+
+pytest **imports** files during collection. A `test_*.py` that writes to a
+database on import means `pytest tests/` performs writes as a side effect of
+*collecting*, against production by default.
+
+**The task's own Traps section warned about this exact pattern**, citing
+`test_local115_referral_abuse_controls_guard.py` — the file that has made a
+full-suite run impossible all night by calling `sys.exit()` at module scope. The
+warning was there to prevent a repeat and did not.
+
+**Worth generalising:** the repo already has the right convention —
+`run_local*.py` for harnesses that execute, `test_local*.py` for pytest suites.
+The convention exists precisely so collection is safe. Two files now violate it.
+When LOCAL-296 returns, `test_local115` should probably be renamed too; that is a
+one-line change that would restore `pytest tests/` for everyone.
+
+Also flagged: the fatal banner prints ~70 times in one run. Failing loudly is
+correct; burying the log is not.
