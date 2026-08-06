@@ -759,16 +759,19 @@ def _sparql_p131_query(area_qid: str) -> List[Landmark]:
 
 
 def _wikipedia_landmark_extraction(area: AreaResolution) -> List[Landmark]:
-    """Extract landmark names from the area's Wikipedia article (section headers, bold names)."""
-    landmarks = []
-    
+    """Extract landmark candidates from the area's Wikipedia article, then resolve via Wikidata.
+
+    LOCAL-293: A section heading is NOT a landmark. Only candidates that resolve to a
+    Wikidata entity with coordinates inside the area's bounding box are returned.
+    This ensures Path 3 produces the same quality as Paths 1/2 (QID + coordinates).
+    """
     # Fetch the neighborhood or city Wikipedia article
     target_name = area.neighborhood_name or area.city_name
     if not target_name:
         return []
-    
+
+    candidates = []  # raw heading strings that pass syntax filter
     try:
-        # Use Wikipedia API to get article text
         resp = requests.get(
             "https://en.wikipedia.org/w/api.php",
             params={
@@ -783,44 +786,176 @@ def _wikipedia_landmark_extraction(area: AreaResolution) -> List[Landmark]:
         )
         if resp.status_code != 200:
             return []
-        
+
         data = resp.json()
         pages = data.get("query", {}).get("pages", {})
-        
+
         for page_id, page in pages.items():
             if page_id == "-1":
                 continue
             text = page.get("extract", "")
             if not text:
                 continue
-            
+
             # Extract from section headers (== Name ==)
             sections = re.findall(r'^==+\s*(.+?)\s*==+', text, re.MULTILINE)
-            # Filter out generic sections and geographic/political names
             generic = {'history', 'geography', 'demographics', 'economy', 'transportation',
-                      'education', 'government', 'politics', 'climate', 'references',
-                      'see also', 'external links', 'further reading', 'notes',
-                      'notable residents', 'sister cities', 'demographics', 'culture',
-                      'media', 'sports', 'infrastructure', 'architecture', 'overview',
-                      'etymology', 'description', 'location', 'population', 'gallery',
-                      'places', 'communities', 'countries', 'states', 'regions',
-                      'canada', 'united states', 'united kingdom', 'england', 'wales',
-                      'scotland', 'ireland', 'australia', 'france', 'germany', 'italy',
-                      'other uses', 'fictional places', 'people', 'music', 'film',
-                      'television', 'books', 'other', 'arts and entertainment'}
+                       'education', 'government', 'politics', 'climate', 'references',
+                       'see also', 'external links', 'further reading', 'notes',
+                       'notable residents', 'sister cities', 'demographics', 'culture',
+                       'media', 'sports', 'infrastructure', 'architecture', 'overview',
+                       'etymology', 'description', 'location', 'population', 'gallery',
+                       'places', 'communities', 'countries', 'states', 'regions',
+                       'canada', 'united states', 'united kingdom', 'england', 'wales',
+                       'scotland', 'ireland', 'australia', 'france', 'germany', 'italy',
+                       'other uses', 'fictional places', 'people', 'music', 'film',
+                       'television', 'books', 'other', 'arts and entertainment'}
             for section in sections:
                 section_lower = section.lower().strip()
-                if (section_lower not in generic and 
-                    len(section) > 3 and len(section) < 60 and
-                    not section_lower.startswith('list of') and
-                    not section_lower.startswith('see ') and
-                    # Must look like a proper name (starts with capital, not all caps)
-                    section[0].isupper() and not section.isupper()):
-                    landmarks.append(Landmark(name=section))
-            
+                if (section_lower not in generic and
+                        len(section) > 3 and len(section) < 60 and
+                        not section_lower.startswith('list of') and
+                        not section_lower.startswith('see ') and
+                        section[0].isupper() and not section.isupper()):
+                    candidates.append(section)
+
     except Exception:
         pass
-    
+
+    if not candidates:
+        return []
+
+    # LOCAL-293: Resolve candidates — only keep those with a Wikidata entity + in-area coords.
+    resolved = _resolve_wikipedia_candidates(candidates, area)
+    print(f"    [LOCAL-293] Wikipedia headings: {len(candidates)} candidates → "
+          f"{len(resolved)} resolved with QID + in-area coords")
+    return resolved
+
+
+def _resolve_wikipedia_candidates(
+    candidates: List[str], area: AreaResolution
+) -> List[Landmark]:
+    """Resolve Wikipedia heading candidates to Wikidata entities with in-area coordinates.
+
+    LOCAL-293: A candidate is only promoted to a Landmark if:
+      1. It resolves to a Wikipedia article (not a redirect to a disambiguation page).
+      2. That article has a Wikidata QID.
+      3. The entity has P625 coordinates.
+      4. Those coordinates fall within the area's bounding radius.
+
+    Returns only fully-resolved Landmarks (QID + coordinates guaranteed).
+    """
+    if not candidates:
+        return []
+
+    # Step 1: Batch-resolve candidate names to Wikipedia page titles + QIDs.
+    # Wikipedia API accepts up to 50 titles per request.
+    title_to_qid = {}
+    for batch_start in range(0, len(candidates), 50):
+        batch = candidates[batch_start:batch_start + 50]
+        titles_str = "|".join(batch)
+        try:
+            resp = requests.get(
+                "https://en.wikipedia.org/w/api.php",
+                params={
+                    "action": "query",
+                    "titles": titles_str,
+                    "prop": "pageprops|coordinates",
+                    "ppprop": "wikibase_item",
+                    "format": "json",
+                    "redirects": 1,
+                },
+                headers={"User-Agent": _USER_AGENT},
+                timeout=10,
+            )
+            if resp.status_code != 200:
+                continue
+
+            data = resp.json()
+            pages = data.get("query", {}).get("pages", {})
+            # Build redirect map (original → resolved title)
+            redirects = {r["from"]: r["to"]
+                         for r in data.get("query", {}).get("redirects", [])}
+
+            for page_id, page in pages.items():
+                if page_id == "-1":
+                    continue
+                title = page.get("title", "")
+                qid = page.get("pageprops", {}).get("wikibase_item", "")
+                if title and qid:
+                    title_to_qid[title] = qid
+                    # Also map any original candidate that redirected here
+                    for orig, resolved in redirects.items():
+                        if resolved == title:
+                            title_to_qid[orig] = qid
+        except Exception:
+            continue
+
+    if not title_to_qid:
+        return []
+
+    # Step 2: For candidates with QIDs, fetch P625 coordinates from Wikidata (batch).
+    qids_to_fetch = list(set(title_to_qid.values()))
+    qid_to_coords = {}  # qid → (lat, lng)
+
+    for batch_start in range(0, len(qids_to_fetch), 50):
+        batch = qids_to_fetch[batch_start:batch_start + 50]
+        ids_str = "|".join(batch)
+        try:
+            resp = requests.get(
+                _WIKIDATA_API,
+                params={
+                    "action": "wbgetentities",
+                    "ids": ids_str,
+                    "props": "claims",
+                    "format": "json",
+                },
+                headers={"User-Agent": _USER_AGENT},
+                timeout=15,
+            )
+            if resp.status_code != 200:
+                continue
+
+            data = resp.json()
+            entities = data.get("entities", {})
+            for qid, entity in entities.items():
+                claims = entity.get("claims", {})
+                for claim in claims.get("P625", []):
+                    value = claim.get("mainsnak", {}).get("datavalue", {}).get("value", {})
+                    lat = value.get("latitude", 0.0)
+                    lng = value.get("longitude", 0.0)
+                    if lat or lng:
+                        qid_to_coords[qid] = (lat, lng)
+                        break
+        except Exception:
+            continue
+
+    # Step 3: Filter — keep only candidates whose coordinates are inside the area bbox.
+    landmarks = []
+    # Use a generous radius: area bounding radius + 50% margin for Path 3 candidates
+    # that sit just outside the primary search circle.
+    max_dist_km = area.bounding_radius_km * 1.5
+
+    # Exclude the area's own QID — a section heading that redirects to the area
+    # article is not a distinct landmark (e.g. "Place Garibaldi" → Nice#Place_Garibaldi).
+    area_qids = {area.city_qid, area.neighborhood_qid} - {""}
+
+    for candidate in candidates:
+        qid = title_to_qid.get(candidate, "")
+        if not qid:
+            continue
+        if qid in area_qids:
+            continue
+        coords = qid_to_coords.get(qid)
+        if not coords:
+            continue
+        lm_lat, lm_lng = coords
+        dist = _haversine_km(area.center_lat, area.center_lng, lm_lat, lm_lng)
+        if dist <= max_dist_km:
+            landmarks.append(Landmark(
+                name=candidate, qid=qid, lat=lm_lat, lng=lm_lng, type_label="",
+            ))
+
     return landmarks
 
 
