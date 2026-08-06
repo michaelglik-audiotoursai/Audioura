@@ -9425,3 +9425,58 @@ zero-fact stops contain uncounted material terms* — which would have given 29 
 **Standing consequence:** Chagall staying flagged is now a *correct* signal, not
 an outstanding defect. The monitor should keep flagging it until its corpus
 improves, and nobody should treat clearing that flag as the goal.
+
+## D238 — Two defects found by reading tours, not by any check (2026-08-06)
+
+Queue was empty and nothing needed reviewing. Rather than invent work (D198),
+LEAD tasked two defects it had observed while reading delivered tours and had
+explicitly said needed tasking. Both verified still present on `storied` before
+dispatch.
+
+### R7 has never been tested against a restaurant
+
+```
+MISSED  the aroma of garlic, herbs, and simmering sauces fills the air
+MISSED  the clinking of cutlery and the cheerful hum of conversation
+MISSED  The sounds from the kitchen and the gentle hum of conversations
+MISSED  The scent of garlic and herbs weaves through the cozy space
+```
+
+Four of four. LOCAL-303 widened R7 this morning and it now catches *azure sky*,
+*shimmering waters*, *the rough texture beneath your fingertips* — the coastal
+register it was built against, and none of the culinary one.
+
+**Third instance of one pattern** (D236). R7 caught `azure waters`, missed
+`azure sky`. The material rule caught `carved from chlorite`, missed `oil on
+canvas`. R7 now catches sea-and-stone, misses kitchen-and-food. **Each fix
+generalises exactly as far as the examples that prompted it** — and the
+instruction to "generalise by category" does not change that, because the author
+still only imagines the categories they have seen.
+
+→ **LOCAL-317**, with the hard line stated: naming a dish is content, asserting
+the listener can smell it is fabrication.
+
+### A demonstrative pointing at nothing
+
+Stop 2 of a delivered tour: *"**This chickpea flour pancake**, cooked to a golden
+crisp, exemplifies the region's resourcefulness."* No pancake was mentioned.
+"Socca" appears once in the whole tour — in **Stop 4**, inside a
+`Specific Examples:` schema line that is never spoken.
+
+PHASE 5.7's dangling-reference scrub ran on this tour and missed it. Likely it
+checks pronouns but not demonstrative noun phrases; LOCAL-318 must verify that
+rather than assume it.
+
+Two things worth stating as rules, both now in the task:
+
+- **An antecedent must be in the same stop.** Stops are heard minutes apart and
+  can be reordered or dropped. Stop 4 naming socca does not license Stop 2 saying
+  "this pancake".
+- **Schema lines are never antecedents.** They are not spoken. That is exactly
+  how this one slipped through — a reference resolved against text no listener
+  ever hears.
+
+**Both defects were found by reading tours as prose (D161), not by any automated
+check.** Every gate, scorer and monitor we built today passed this tour. The
+score was 55.0 with facts verified against Forbes. Neither of these is visible in
+any number.
