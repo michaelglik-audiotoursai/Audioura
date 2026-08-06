@@ -81,6 +81,13 @@ _PERSON_CONTEXT_RE = re.compile(
 #: How far either side of a candidate name to look for that context.
 _PERSON_CONTEXT_WINDOW = 90
 
+#: Tokens whose trailing full stop is an abbreviation mark, not a sentence end.
+#: "Henry Clews Jr., a talented painter" is correct prose, not a splice.
+_NOT_A_SPLICE_ABBREV = {
+    'Jr', 'Sr', 'St', 'Ste', 'Mr', 'Mrs', 'Ms', 'Dr', 'Prof', 'Rev', 'Hon',
+    'Inc', 'Ltd', 'Co', 'Mt', 'Ft', 'No', 'vs', 'etc', 'al', 'cf', 'ca',
+}
+
 
 @dataclass
 class StopAnalysis:
@@ -295,10 +302,18 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
     # structural defects while carrying "existentialism., and Pablo Picasso",
     # a tour LEAD had already held as undeliverable. An index that cannot see
     # the defect that blocks delivery is not measuring quality.
-    if re.search(r'\w\.\,', body):
-        # A full stop immediately followed by a comma: a whole sentence has been
-        # inserted mid-sentence. Signature of the LOCAL-269 gloss gate.
-        sa.structural_defects.append('spliced_sentence')
+    # A full stop immediately followed by a comma: a whole sentence has been
+    # inserted mid-sentence. Signature of a splice.
+    #
+    # [LOCAL-288] Abbreviations are NOT splices. The first version of this check
+    # flagged "Henry Clews Jr., a talented painter" in a LOCAL-287 tour whose
+    # glosses were in fact correct — a false positive that would have bounced
+    # good work. Python cannot express this as a variable-width lookbehind, so
+    # the preceding token is checked directly.
+    for _sm in re.finditer(r'(\w+)\.\,', body):
+        if _sm.group(1) not in _NOT_A_SPLICE_ABBREV:
+            sa.structural_defects.append('spliced_sentence')
+            break
     if re.search(r'(?i)\b(?:on|of|in|at|to|the|a|an|with|for|by|from|and)\.(?:\s|$)', body):
         # A span cut mid-phrase and terminated: "...in 1964 on the."
         sa.structural_defects.append('truncated_span')
