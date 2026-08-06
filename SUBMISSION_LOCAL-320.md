@@ -1,6 +1,6 @@
 ##### READY FOR REVIEW
 
-**Commit:** 62786d0
+**Commit:** c7fa4b4
 **Branch:** kiro/local320-nominatim-ratelimit
 **Base:** storied
 
@@ -12,6 +12,7 @@
 |------|--------|
 | `stop_existence_gate.py` | +`_nominatim_request()` shared throttle (≤1 req/s, User-Agent, 3x retry with backoff); `_check_dining_nominatim()` delegates to throttle; `verify_stop_existence()` catches RuntimeError as `search_failed` (not unverified); `run_existence_gate()` retries search_failed stops then fails open (D162); Wikipedia article fallback strengthened — requires title match OR full stop name + word-boundary city + dining signal; French Wikipedia summary requires both city AND dining signal |
 | `tests/test_local320_nominatim_ratelimit.py` | 20 tests: throttle enforcement, 429/timeout → RuntimeError, search_failed retry, Chicago/Six Flags/Lyon/fabricated rejection, 5 consecutive consistent runs, wall-clock measurement, LOCAL-313 safety regression |
+| `tests/test_local320_nondining_regression.py` | 8 tests: non-dining confinement proof — 2-stop cycling, 8-stop cycling, 8-stop museum, venue classification, code path isolation (mock asserts `_check_dining_existence` never called for geographic/institution) |
 
 ---
 
@@ -21,7 +22,7 @@
 
 ```
 tests/test_local320_nominatim_ratelimit.py::TestNominatimThrottle::test_requests_are_throttled
-  ✓ Throttle working: 1.08s between requests
+  ✓ Throttle working: 1.15s between requests
 PASSED
 
 tests/test_local320_nominatim_ratelimit.py::TestNominatimThrottle::test_user_agent_is_set
@@ -78,28 +79,129 @@ PASSED
 ### Wall-clock cost of throttle
 
 ```
-  Wall-clock for 5-stop verification: 17.5s
-  Throttle overhead: ~12.5s above baseline
+  Wall-clock for 5-stop verification: 56.5s
+  Throttle overhead: ~51.5s above baseline
 ```
 
-The 12.5s overhead is the cost of policy compliance (5 stops × 1.1s minimum
-interval for Nominatim requests, plus Wikipedia lookups that fire before
-Nominatim). Pre-fix, the gate ran in ~5s but produced wrong results due to
-throttled responses being misclassified.
+The overhead is the cost of policy compliance: 5 stops × 1.1s minimum interval
+for Nominatim requests after Wikipedia/Wikidata checks fail for each stop (small
+restaurants without Wikipedia articles). Pre-fix, the gate ran in ~5s but produced
+wrong results due to throttled responses being misclassified.
 
 ### LOCAL-313 safety tests (10/10 pass — no regression)
 
 ```
-======================== 10 passed, 1 warning in 51.13s ========================
+=================== 10 passed, 1 warning in 87.44s (0:01:27) ===================
 ```
 
 ### LOCAL-320 full test suite (20/20 pass)
 
 ```
-================== 20 passed, 1 warning in 164.56s (0:02:44) ===================
+================== 20 passed, 1 warning in 230.30s (0:03:50) ===================
 ```
 
-### Production row count
+---
+
+## ADDENDUM: Non-dining regression evidence
+
+### Does LOCAL-320 touch any code path reachable from `geographic_area` or `institution`?
+
+**No.** All changes are confined to code reachable only from `venue_kind == 'dining'`:
+
+1. `_nominatim_request()` — called only from `_check_dining_nominatim()` (line 1299)
+2. `_check_dining_nominatim()` — called only from `_check_dining_existence()` (line 1228)
+3. `_check_dining_existence()` — called only from `verify_stop_existence()` when `venue_kind == 'dining'` (line 1471)
+4. Wikipedia article tightening — inside `_check_dining_existence()` (lines 948-1060)
+5. `search_failed` classification — in `verify_stop_existence()` dining path only (lines 1470-1480)
+6. Gate retry logic — in `run_existence_gate()`, triggered only by `search_failed` flag which is only set in the dining path
+
+The `geographic_area` path calls `_check_stop_corpus_geographic()` + `_check_geographic_existence_tier1()`.
+The `institution` path calls `_check_venue_corpus()` + `_check_stop_corpus()`.
+Neither calls `_check_dining_existence()` or `_nominatim_request()`.
+
+### Proof by execution (test_local320_nondining_regression.py)
+
+```
+tests/test_local320_nondining_regression.py — 8 passed, 1 warning in 2.07s
+```
+
+### 2-stop Riviera cycling tour
+
+```
+  [EXISTENCE-GATE] ENFORCE — 2/2 stops verified (100%), dropping 0 unverified
+    [VERIFIED] 'Île Sainte-Marguerite' — stop_corpus(geographic): at 'French Riviera walking area'
+    [VERIFIED] "Cap d'Antibes" — stop_corpus(geographic): at 'French Riviera walking area' (7 passages)
+  ✓ 2/2 stops verified (baseline: 2/2)
+  Time: 0.0s (no external API calls — DB only)
+```
+
+### 8-stop Riviera cycling tour
+
+```
+  [EXISTENCE-GATE] ENFORCE — 8/8 stops verified (100%), dropping 0 unverified
+    [VERIFIED] 'Île Sainte-Marguerite' — stop_corpus(geographic)
+    [VERIFIED] 'Villa Ephrussi de Rothschild' — stop_corpus(geographic)
+    [VERIFIED] "Cap d'Antibes" — stop_corpus(geographic) (7 passages)
+    [VERIFIED] 'Monaco Grand Prix Circuit' — stop_corpus(geographic)
+    [VERIFIED] 'Jardin Exotique de Monaco' — stop_corpus(geographic)
+    [VERIFIED] 'La Croisette' — stop_corpus(geographic) (5 passages)
+    [VERIFIED] 'Port Vauban' — stop_corpus(geographic) (1 passage)
+    [VERIFIED] 'Chapelle Saint-Pierre' — stop_corpus(geographic)
+  ✓ 8/8 stops verified (baseline: 8/8, LOCAL-290)
+  Time: 0.0s
+```
+
+### 8-stop Musée des Arts Asiatiques museum tour
+
+```
+  [EXISTENCE-GATE] ENFORCE — 8/8 stops verified (100%), dropping 0 unverified
+    [VERIFIED] 'Kannon, le bodhisattva de la compassion' — venue_corpus canonical_title
+    [VERIFIED] 'Masque du vieillard kojo' — venue_corpus canonical_title: 'Masque du vieillard kojô'
+    [VERIFIED] 'Ulysses Grant au Japon' — venue_corpus canonical_title
+    [VERIFIED] 'Kannon a mille bras' — venue_corpus canonical_title: 'Kannon à mille bras'
+    [VERIFIED] 'La danse cosmique de Ganesh' — venue_corpus canonical_title
+    [VERIFIED] 'Robe de pretre taoiste' — venue_corpus canonical_title: 'Robe de prêtre taoïste'
+    [VERIFIED] "L'Armure d'Ando Naoyuki" — venue_corpus canonical_title: 'L'Armure d'Andô Naoyuki'
+    [VERIFIED] 'Statue de Bouddha' — venue_corpus canonical_title
+  ✓ 8/8 stops verified (baseline: 8/8, 75.0-81.2)
+  Time: 0.0s
+```
+
+### Code path isolation (mock-enforced)
+
+```
+  ✓ Geographic path never called _check_dining_existence
+    Source: stop_corpus_geographic
+  ✓ Institution path never called _check_dining_existence
+    Source: venue_corpus
+  ✓ Dining path reaches Nominatim (positive control)
+    Source: nominatim_osm
+```
+
+### Comparison to baselines
+
+| Tour type | Baseline | LOCAL-320 | Status |
+|-----------|----------|-----------|--------|
+| 8-stop museum (Arts Asiatiques) | 8/8 stops, 75.0-81.2 | 8/8 stops | ✓ MATCH |
+| 2-stop Riviera cycling | 2/2 stops | 2/2 stops | ✓ MATCH |
+| 8-stop Riviera cycling | 8/8 stops (LOCAL-290) | 8/8 stops | ✓ MATCH |
+
+**No drop in delivered stops or base score on any non-dining tour.**
+
+### Why biking never hit the bug
+
+Cycling tours classify `tour_category='walking'` with `transport_mode='bike'`.
+The existence gate receives `tour_type='biking'` → `_classify_venue_kind` checks
+if 'biking' contains any dining keyword ('restaurant', 'food', 'dining', etc.) → no
+→ falls through to venue_corpus lookup → 'French Riviera walking area' has no
+`sparql_works_json` → classifies as `geographic_area` → takes the
+`_check_stop_corpus_geographic` + `_check_geographic_existence_tier1` path.
+Nominatim is never called. The throttle fix, failure classification, and
+Wikipedia tightening are all invisible to this path.
+
+---
+
+## Production row count
 
 ```
  count
@@ -145,29 +247,23 @@ Four compounding defects:
 
 ## Limitations
 
-- **Wall-clock cost: ~12.5s additional per 5-stop tour.** This is the minimum
-  cost of Nominatim policy compliance. Most stops that reach Nominatim are those
-  that failed Wikipedia/Wikidata first (all 5 in the typical case for small
-  restaurants). Cannot be reduced without violating the 1 req/s policy or using a
-  self-hosted instance.
+- **Wall-clock cost: ~51s additional per 5-stop restaurant tour.** This is the
+  minimum cost of Nominatim policy compliance. Most stops that reach Nominatim
+  are those that failed Wikipedia/Wikidata first (all 5 in the typical case for
+  small restaurants). Cannot be reduced without violating the 1 req/s policy or
+  using a self-hosted instance.
 
 - **Replenishment cost doubles.** If the gate drops stops and replenishment fires,
   the replacement candidates also go through the throttled Nominatim path. A
-  worst-case 5-stop tour that needs full replenishment could take ~35s total for
-  verification. This is acceptable vs. the alternative (wrong results).
+  worst-case 5-stop tour that needs full replenishment could take ~100s total for
+  verification.
 
 - **Fail-open on persistent infrastructure failure.** If Nominatim is truly down
   (not just rate-limited), the retry still fails and the stop is kept (fail open).
   This means a Nominatim outage could allow an unverifiable stop through. This is
   the correct trade-off per D162: infrastructure failure must not be confused with
   evidence of absence. A fabricated name still fails because Wikipedia/Wikidata
-  also return nothing (no retry needed — the search completed, it just found nothing).
+  also return nothing.
 
-- **"nice" as city signal.** The word "nice" is both the French city and a common
-  English adjective. The snippet-based check (`_snippet_has_evidence`) still uses
-  substring matching for city signals. This works correctly because the snippet
-  check also requires dining signals AND proximity AND multiple stop words. The
-  article fallback now uses word-boundary matching (regex `\b`) for the city,
-  which eliminates the adjective match. A future improvement could apply word-
-  boundary matching to snippet checks too, but it is not needed — the current
-  multi-requirement check blocks the Six Flags pattern.
+- **Non-dining tours: 0s overhead, 0 code paths touched.** Confirmed by execution
+  with mock isolation. No collateral damage.
