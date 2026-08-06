@@ -7807,3 +7807,36 @@ reason is worse than no term.
 compelling example and generalised. The generalisation was wrong in degree. The
 example was real and the conclusion directionally right, which is exactly the
 kind of error that survives review — it feels verified because part of it was.
+
+## D198 — Idle-tick discipline during the outage (2026-08-05 20:35)
+
+Credits still exhausted after two hours (checked 19:04, 19:34, 20:04, 20:34).
+Nothing in flight, nothing mergeable, no task dispatchable.
+
+**LEAD stopped generating analysis.** D196 was written from one example and D197
+had to correct it in degree. Producing further unverifiable findings during an
+outage risks more of the same, and a wrong finding recorded in `DECISIONS.md`
+costs more than an idle hour — three task files were built on D127 before it was
+overturned.
+
+Instead LEAD checked the resume path and found a real defect: **a tracked file
+deleted by LEAD's own cleanup.** While copying round-23 artifacts LEAD used a
+glob that matched the wrong files, copied `tours/cil_chagall_cycle5.txt` six
+times, and then removed it with `rm`. It was tracked, from commit `f03a9aa`, not
+a stray copy. Restored.
+
+That is the third glob or pattern error today — the `LOCAL-251` process match
+that killed LOCAL-252 (D152), the `tours/` scan that counted museum tours as
+Riviera draws (D183), and this. All three shared a shape: a pattern written
+quickly, matching more than intended, with no check on what it caught before
+acting.
+
+Outstanding on resume, verified against the branches that still hold work:
+
+```
+kiro/local280-closing-recap              2 commits  (bounced twice, needs composition)
+kiro/local284-selector-corpus-tiebreak   1 commit   (HELD — Riviera regression unrun)
+```
+
+Plus: run a restaurant tour to prove LOCAL-285's unverified core claim, and
+generate the tour Michael has been waiting for since 17:25.
