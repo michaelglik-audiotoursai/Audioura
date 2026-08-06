@@ -116,8 +116,16 @@ class TestGroundednessClassification:
         assert 'capped by groundedness floor' in evidence
 
     def test_groundedness_does_not_penalise(self):
-        """Low groundedness does not push below ADEQUATE to THIN."""
-        sa = self._make_stop_analysis(facts=2, density=0.25, filler=0.3, groundedness=0.10)
+        """Low groundedness does not push below ADEQUATE to THIN.
+
+        [LOCAL-304] Fixture uses facts=3, not 2. LOCAL-304 raised
+        ADEQUATE_MIN_FACTS from 2 to 3 when it widened the fact detector, so
+        facts=2 is now THIN on the fact count alone and no longer constructs the
+        scenario this test describes. The assertion is unchanged — the property
+        under test is that groundedness caps RICH and never demotes below
+        ADEQUATE, verified separately across groundedness 100%/50%/20%/0%.
+        """
+        sa = self._make_stop_analysis(facts=3, density=0.25, filler=0.3, groundedness=0.10)
         cls, _ = classify_stop(sa)
         # Meets ADEQUATE criteria → ADEQUATE (groundedness only caps RICH)
         assert cls == 'ADEQUATE'
