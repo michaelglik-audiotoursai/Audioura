@@ -8776,3 +8776,41 @@ his phone against it) and deleting the 122 existing rows (his call).
 noticing a number move — 118 to 122 — and asking why *before* theorising. The
 answer took two commands: list the newest test rows, then `docker inspect` the
 service they named. No wrong theory in between (contrast D220).
+
+## D222 — LOCAL-302 merged; the leaked row is LEAD's, not the task's (2026-08-06)
+
+The service-write leak is closed. Verified on a clean run:
+
+```
+production  152 before, 152 after
+LOCAL49     23 rows before, 23 after
+```
+
+The DELETE is guarded by a `SELECT is_test` with an early return and a warning
+if it is not true — textbook D141. The other 40 changed files contain nothing
+but `import pytest` and `@pytest.mark.service`; 38 files carry the marker, and
+it is registered in `conftest.py`. No container was repointed.
+
+**One row (id=299) was leaked tonight and LEAD caused it.** An earlier
+verification run used `timeout 100`, which SIGKILLed the test before its
+`finally` could execute. The next clean run created id=300 and removed it
+correctly.
+
+Two things follow.
+
+**First, the harness was the variable, not the code.** LEAD's first reading of
+`151 → 152` was "the fix does not work". It was "my timeout killed it". That is
+the same shape as D220, where a probe missing a User-Agent manufactured a 403 —
+and this time LEAD caught it before writing anything down, because the question
+asked was *what did I change?* rather than *what is broken?*
+
+**Second, id=299 stays.** It is a test row and `is_test` is true, so deleting it
+would be trivially safe — and LEAD is not deleting it. Row deletion is on
+Michael's ask-first list, D141's exception covers *a test removing an id it
+captured at creation*, and LEAD is neither. Having spent the night telling agents
+not to delete the other 122 rows, the reviewer taking a shortcut the tasks forbid
+would be the wrong precedent regardless of the row's harmlessness.
+
+**Residual, stated plainly:** a hard kill mid-test still leaks. Nothing defends
+against SIGKILL, and this is not worth engineering around — the fix holds
+whenever the test completes, which is the case that occurs in practice.
