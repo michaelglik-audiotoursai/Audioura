@@ -8226,3 +8226,34 @@ signal.
 **Still true and still worth repeating to Michael:** absence of FABRICATED is
 not evidence of accuracy. Groundedness measures coverage by our corpus, not
 truth.
+
+## D206 — Venue-identity bonus sign error fixed (bug, not a weighting decision) (2026-08-06)
+
+D202 listed three index problems for Michael. Two are product judgements and
+remain his. **The third was a plain sign error and is now fixed.**
+
+`venue_identity_bonus = 0.10 × base_score × identity_fraction` multiplied the
+**signed** base. On an under-delivered tour the base is negative, so the bonus
+was negative too — the rubric **penalised a tour for naming its architect and
+founder**. Two unrelated quantities multiplied together.
+
+```
+before:  base -62.5, 2 identity facts -> bonus -2.50
+after:   base -62.5, 2 identity facts -> bonus +0.00
+         base +100.0, 2 identity facts -> bonus +4.00   (unchanged)
+```
+
+Now computed against `max(0.0, base_score)`: the term can add but never
+subtract.
+
+**Deliberately unchanged:** the 10% rate and the ÷5 fraction. Those are the
+weighting questions D202 put to Michael, and this touches neither. Recorded as a
+bug fix so he is not handed a decision he did not make.
+
+**Consequence for the published artifact:** the six under-delivered tours showing
+`-0.0` in the venue column were carrying a small extra penalty. Their totals move
+up by up to a couple of points. The headline figures — 67% vs 11% clearing 75,
+median 80.0, 24 tours above 100 — are unaffected, since all of those are driven
+by the correlation bonus on tours with positive base.
+
+175 tests pass.

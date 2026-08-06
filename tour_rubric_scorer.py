@@ -522,10 +522,21 @@ def compute_score(stops: List[StopAnalysis], n_requested: int,
                 affected_value += ts.per_stop_base[i]
         ts.correlation_bonus = 0.5 * affected_value
     
-    # Venue-identity bonus: up to +10% 
+    # Venue-identity bonus: up to +10%
     # Scale by how many identity facts present (max 5 categories)
+    #
+    # [D202] BUG FIX, not a weighting change. This multiplied the *signed* base,
+    # so an under-delivered tour with a negative base got a NEGATIVE bonus —
+    # i.e. it was penalised for naming its architect and founder. Measured:
+    # base -62.5 with 2 identity facts produced a bonus of -2.50. Two unrelated
+    # quantities multiplied together.
+    #
+    # The bonus is now computed against the positive part of the base only, so
+    # it can add but never subtract. The 10% rate and the /5 fraction are
+    # deliberately unchanged — those are Michael's to set (D202), and this fixes
+    # only the sign error.
     identity_fraction = min(len(venue_identity_facts), 5) / 5.0
-    ts.venue_identity_bonus = 0.10 * ts.base_score * identity_fraction
+    ts.venue_identity_bonus = 0.10 * max(0.0, ts.base_score) * identity_fraction
     
     # Total
     ts.total_score = (ts.base_score + ts.structural_surcharge + 
