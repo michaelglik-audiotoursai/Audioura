@@ -9523,3 +9523,202 @@ name suggests and does not classify obvious navigation; that is latent and will
 matter to some future rule, so it is recorded here even though nothing depends on
 it today. Second, the cost of checking was one generation; the cost of the D188
 version of this mistake was a regression Michael found himself.
+
+---
+
+## D237 — Cost governance: what the guard actually covers, and the build order
+**2026-08-06. Michael's requirement; LEAD's decisions where he left room.**
+
+Michael: cap what we **spend**, not what we ship. Targets — per tour **$2.00**
+total; per customer per month **$10 unsubscribed**, **subscription cost if
+subscribed**; **$0.15 target / $1.30 max on the generation phase in BOTH**
+Storied and Subscribed; and, in Subscribed, **warn and obtain consent** before
+an expensive tour even when the customer has credits.
+
+**Measured, not assumed:**
+```
+generation    ~$0.07  (real max $0.0973)   <- all the $1.30 guard sees
+translation   ~$0.31  per language, real
+TTS            none   — 0 ledger rows, never metered
+unattributed  101/268 rows (38%), $1.72
+plans table    tours_per_day, tour_max_poi — NO dollar column
+```
+The three $12.50 `tour_generate` rows are synthetic (`test_*_unlim_*`).
+
+**D237.1 — $2.00 covers the whole artifact family** (tour + all its TTS + all
+its translations), per Michael's "including sound and translation". Consequence
+recorded and told to him: at ~$0.31/language the **binding constraint is
+translation count, not stops or generation**; three languages cannot fit under
+$2.00. If he wants per-language ceilings instead, that is a one-line switch.
+
+**D237.2 — Post-hoc abort is replaced by phase-boundary checkpoints.** Today
+`generate_tour_text_service.py:219` aborts *after* generation completes: we pay
+AND the customer gets nothing — the worst of both. Meter at each phase boundary
+and stop mid-flight. This is the actual "real problem" Michael named.
+
+**D237.3 — Estimation happens after a cheap probe, never from stop count.**
+Michael's example (50 French stops may cost less than 40 Saharan) is correct:
+the driver is corpus scarcity causing retries and external searches. The area
+resolver and existence gate already probe availability cheaply — that is the
+only honest basis for an estimate, and it must run before the consent prompt.
+
+**D237.4 — No monthly cap ships until attribution is sound.** A per-user dollar
+cap over a ledger where 38% of rows have no user_id leaks by construction.
+
+**Build order (LOCAL-323 dispatched first for this reason):**
+1. **LOCAL-323** — meter TTS; make every row attributable. Release-agnostic,
+   therefore Storied. *Nothing else is buildable until a total cost exists.*
+2. Phase-boundary checkpoint abort; keep $0.15/$1.30 on the generation phase.
+   Storied + Subscribed.
+3. Scarcity-based pre-flight estimate. Subscribed.
+4. $2.00 artifact cap + monthly caps + consent flow. **Subscribed only**, and
+   gated on 1 and 3.
+
+Steps 3-4 are deliberately NOT dispatched into Storied. Michael scoped them to
+Subscribed and the prerequisites are not merged.
+
+## D238 — TTS is the dominant per-tour cost, not generation (correcting D237)
+**2026-08-06, from LOCAL-323's measurements.**
+
+LOCAL-323 metered Polly for the first time. Rates confirmed against AWS
+pricing: **standard $4 / 1M chars, neural $16 / 1M chars**; this codebase uses
+neural for Joanna/Matthew/Amy/Brian and standard otherwise.
+
+A ~15,000-char English tour on a neural voice costs **~$0.24 in TTS alone** —
+roughly **3-4x the ~$0.07 text generation**. Revised per-tour picture:
+
+```
+text generation   ~$0.07
+TTS (neural, en)  ~$0.24   <- largest single component
+translation       ~$0.31   per language (plus that language's own TTS)
+```
+
+**What LEAD told Michael needs this correction.** LEAD reported translation as
+the expensive stage and TTS as merely unmeasured. Translation is still the
+binding constraint on a multi-language tour, but for a **single English tour
+the dominant cost is TTS**, and LEAD's "regeneration costs ~$0.14" figure
+counted only text — a regenerated tour that is also re-synthesised is closer to
+**~$0.60**, four times what was quoted. Still inside the $1.30 generation-phase
+limit, but no longer trivially so, and it strengthens the case for
+pick-the-better-one comparing text BEFORE synthesis rather than after.
+
+The $0.24 is LOCAL-323's estimate from a round 15,000-char assumption, not a
+measured row — the no-rebuild rule (D48) prevented an end-to-end service run.
+Treat it as an order-of-magnitude finding until a real row exists; the
+resubmission is required to state a real tour's character count.
+
+## D239 — Credential blind index: the column must exist before the key is set
+**2026-08-06, merged with LOCAL-321.**
+
+`user_consolidation_service.find_matching_credentials` now matches on a keyed
+HMAC blind index instead of comparing plaintext passwords in a SQL WHERE
+clause. Two prerequisites, and **the order matters**:
+
+1. `ALTER TABLE user_subscription_credentials ADD COLUMN credential_blind_index BYTEA;`
+   plus the `(domain, credential_blind_index)` index — **declared but NOT
+   applied.**
+2. `CREDENTIAL_BLIND_INDEX_KEY` in the environment — **not set.**
+
+With the key absent the function returns `[]` before touching the column, so
+today it is inert and safe (0 rows, endpoints off, consolidation correctly
+reports "new_user"). **If the key is ever set before the migration runs, the
+query raises UndefinedColumn.** Apply the schema first, then the key, then
+backfill the index for any existing rows, then enable.
+
+The write path does not populate the column yet either — that lands with the
+encryption work, not here.
+
+LEAD is not applying the migration now: nothing writes the column, no row
+exists to index, and an unused column on a credential table is one more thing
+to get wrong later. It goes in with the phase that populates it.
+
+## D240 — Module-scope AUDIOURA_DB_TARGET is a session-wide switch, not a file-local one
+**2026-08-06.**
+
+Two test files set `AUDIOURA_DB_TARGET` at module scope. pytest imports every
+test module during collection, before running anything, so these are not
+file-local settings — **the last module imported wins for the whole session.**
+
+- `test_credential_store.py` set `'test'`. It made 7 LOCAL-320 non-dining tests
+  fail in a combined run while both files passed alone. Fixed with an autouse
+  fixture (D214's second occurrence — same defect, different file).
+- `test_local320_nondining_regression.py:21` sets `'production'`. **Still
+  unfixed.** The same fixture fix does not work there: `db_connection` resolves
+  the target at import time, so the module-scope assignment is load-bearing.
+
+The second one is the dangerous direction. A file that only ever *reads* can
+route another test's *writes* to the live database — the hazard class behind
+the tour-29 loss (D141) and the one D221 already warned is only half-closed.
+
+**The fix is not another per-file workaround.** `db_connection` should resolve
+the target lazily, per call, so an autouse fixture can scope it. Until that
+lands, treat any module-scope `AUDIOURA_DB_TARGET` write as a session-wide
+change and review it as such.
+
+Also recorded: `test_local291_groundedness.py` was **uncollectable from 6949dca
+until this tick** — 23 tests silently absent from every run. Green suites prove
+nothing about files that never parsed. A syntax scan across all 165 test files
+now exists; run it after any bulk edit.
+
+## D241 — Corpus passage COUNT is anti-correlated with tour quality
+**2026-08-06. Michael asked how to raise scores; LEAD measured instead of guessing.**
+
+Hypothesis (LEAD's): corpus depth per stop drives quality. **Wrong.** Across 4
+tours / 26 stops joined against `stop_corpus.passage_count`:
+
+```
+THIN      n=10   mean 4.2 passages
+ADEQUATE  n=10   mean 2.7
+RICH      n= 6   mean 3.7
+```
+
+`L'Armure d'Andô Naoyuki`: 1 museum_official passage -> RICH, 12 facts.
+`La Rossettisserie`: 5 web_search passages -> THIN, **0 facts, in both runs**.
+Those five are signage, keyword spam, a directory listing, and one usable line.
+
+**Source type predicts yield; volume does not.** Dining stops accumulate
+web_search sludge; museum stops get a few dense catalogue passages. Dispatched
+as LOCAL-328.
+
+**Three levers, ranked, in answer to Michael's question:**
+1. Corpus source quality (LOCAL-328) — largest.
+2. Per-STOP best-of-N regeneration. Measured: best-of-2 chosen per stop scores
+   **84.4** vs **81.2** for taking the better whole tour, because no run wins
+   everywhere. Only the weak stops need regenerating (4 of 8), so ~half cost.
+3. Run-to-run variance is large and free: the same stop, same corpus, swung
+   2 -> 6 facts between runs.
+
+**Caveat that blocks 2 and 3 (LOCAL-327).** `Robe de prêtre taoïste` and
+`Masque du vieillard kojô` have **zero corpus passages** and produced **5 facts
+each**, counting fully toward 81.2. Groundedness caps RICH only, never
+ADEQUATE. **Optimising against the current score rewards confident invention.**
+Close that before tuning anything to the number.
+
+## D242 — Verify an agent's measurement before accepting the design built on it
+**2026-08-06.**
+
+LOCAL-327 reported "96% of ADEQUATE+ stops reach their band on zero corpus" and
+designed a scoring ceiling around it. The figure came from an ILIKE that
+matched a header-scraped venue string against `stop_corpus.venue_name`:
+
+```
+'%Musée des Arts Asiatiques, Nice - Museu%'  ->  0 rows
+'%Arts Asiatiques%'                          ->  8 rows, 41 passages
+```
+
+Accents and a name-format mismatch. The true figure is ~25%. Had LEAD accepted
+the number, the threshold would have been tuned to a fiction.
+
+**The check that caught it cost one query:** take the agent's own predicate and
+run it against a case you already know the answer to. LEAD knew this venue had
+corpus because of the D241 join an hour earlier.
+
+Generalised, with LOCAL-328 alongside it (correct measurement, zero production
+callers — the `story_element_extractor.py` pattern again):
+
+- **A number in a submission is a claim, not evidence.** Re-run it.
+- **A module is not a change until something imports it.** Grep for the caller.
+- **A test is not evidence until it fails against the unfixed code.** Break it.
+
+Four occurrences this session (LOCAL-322, 325, 327, 328). All four were caught
+by one of those three checks, and none by reading the submission.
