@@ -967,3 +967,52 @@ geographic wording unchanged.
 
 **Still blocked on OpenAI credits** — sixth consecutive `credit_balance_exhausted`
 at 21:34. LOCAL-286 dispatches the moment they return.
+
+---
+
+## Credits restored — and round 34 is not deliverable
+
+Michael funded $30 at 22:04. Queue resumed immediately.
+
+**Round 34**, the tour he had been waiting for: 685 words, 2 stops, 54.5s,
+**$0.0257**. Both stops `tier=rich, facts=8` — the strong draw.
+
+**LEAD read it as prose before handing it over (D161), and held it.**
+
+### The gloss feature Michael authorised this morning shipped broken
+
+LOCAL-269 — *"dispatch on anything a general audience likely doesn't know"* — is
+merged and firing, and its output is unreadable:
+
+> "attracting luminaries like Jean-Paul Sartre, **The influential French
+> philosopher and playwright known for existentialism.,** and Pablo Picasso"
+
+> "French actors Yves Montand, **During the 1960s, the village was frequented by
+> French actors Yves Montand, Simone Signoret.,** Simone Signoret, and Lino
+> Ventura"
+
+> "by Marguerite and Aimé Maeght, **The Fondation Maeght was established by
+> Marguerite and Aimé Maeght in 1964 on the.,** stands as"
+
+Whole sentences spliced mid-sentence, capital and full stop intact; the name
+repeated inside its own gloss; the host sentence restated; one truncated at *"on
+the."*. Bound for text-to-speech.
+
+**This is the same defect LEAD bounced LOCAL-280 for twice today** — splicing
+spans instead of composing clauses (D194). Caught in one feature, missed in
+another, because LOCAL-269 was reviewed on its unit tests and not on a delivered
+tour. The prose read is what caught it, hours later than it should have.
+
+Also found: R7 reports zero deletions on an orientation containing *azure
+waters*, *sun-kissed peninsula*, *rugged cliffs*; the prolog's last sentence
+repeats verbatim in stop 1's body; and `Tour-Category: walking` on a cycling tour.
+
+→ **LOCAL-287** written for the gloss composition. Faults 2–4 folded into
+LOCAL-286, which was killed and re-queued because it had dispatched five minutes
+before the addendum existed.
+
+### On whether to keep reading the museum tour
+
+Michael asked. **No** — the opening is fully diagnosed in LOCAL-286 and the empty
+stop bodies are LOCAL-283/284. Reading further would re-derive work already
+written down. Wait for the regenerated one.
