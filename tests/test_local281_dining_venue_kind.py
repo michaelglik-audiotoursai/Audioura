@@ -42,6 +42,102 @@ def db_conn():
     conn.close()
 
 
+@pytest.fixture(autouse=True, scope="module")
+def corpus_fixtures(db_conn):
+    """Insert minimum venue_corpus / stop_corpus rows the existence-gate tests need.
+
+    LOCAL-301: These tests exercise _classify_venue_kind and the existence gate,
+    which read venue_corpus and stop_corpus. The test database is schema-only
+    (D217), so we supply exactly the rows the assertions require and remove them
+    on teardown.
+
+    Required by:
+      - TestMuseumRegression: venue_corpus row for Musée Matisse with
+        sparql_works_json (→ 'institution') and canonical_titles_json containing
+        'Odalisque au coffret rouge'.
+      - TestGeographicRegression: venue_corpus row for French Riviera (no
+        sparql_works_json → 'geographic_area') and stop_corpus rows for Eze
+        Village, Cap Ferrat, Villefranche-sur-Mer with passages.
+    """
+    import json
+    from datetime import datetime, timedelta
+
+    cur = db_conn.cursor()
+    expires = (datetime.utcnow() + timedelta(days=365)).isoformat()
+
+    # ── venue_corpus: Musée Matisse (institution) ───────────────────────────
+    cur.execute(
+        """INSERT INTO venue_corpus
+           (qid, venue_name, canonical_titles_json, sparql_works_json,
+            tier, corpus_version, expires_at)
+           VALUES (%s, %s, %s, %s, %s, %s, %s)
+           ON CONFLICT (qid) DO NOTHING""",
+        (
+            "Q3329731",
+            "Musée Matisse, Nice",
+            json.dumps(["Odalisque au coffret rouge", "Nature morte aux grenades"]),
+            json.dumps([{"qid": "Q29907066", "label_en": "Odalisque au coffret rouge"}]),
+            "tier1",
+            1,
+            expires,
+        ),
+    )
+
+    # ── venue_corpus: French Riviera walking area (geographic_area) ─────────
+    cur.execute(
+        """INSERT INTO venue_corpus
+           (qid, venue_name, canonical_titles_json,
+            tier, corpus_version, expires_at)
+           VALUES (%s, %s, %s, %s, %s, %s)
+           ON CONFLICT (qid) DO NOTHING""",
+        (
+            "Q40978",
+            "French Riviera walking area",
+            json.dumps([
+                {"name": "Eze Village", "qid": "Q204638"},
+                {"name": "Cap Ferrat", "qid": "Q1034668"},
+                {"name": "Villefranche-sur-Mer", "qid": "Q209663"},
+            ]),
+            "tier1",
+            1,
+            expires,
+        ),
+    )
+
+    # ── stop_corpus: geographic stops with passages ─────────────────────────
+    _geo_stops = [
+        ("Eze Village", "Medieval hilltop village on the French Riviera between Nice and Monaco."),
+        ("Cap Ferrat", "Peninsula on the French Riviera near Nice, known for Villa Ephrussi de Rothschild."),
+        ("Villefranche-sur-Mer", "Coastal town on the French Riviera east of Nice with a deep natural harbour."),
+    ]
+    for stop_title, passage_text in _geo_stops:
+        cur.execute(
+            """INSERT INTO stop_corpus
+               (venue_name, stop_title, passages_json, source_pages, passage_count)
+               VALUES (%s, %s, %s, %s, %s)
+               ON CONFLICT (venue_name, stop_title) DO NOTHING""",
+            (
+                "French Riviera walking area",
+                stop_title,
+                json.dumps([passage_text]),
+                json.dumps(["https://en.wikipedia.org/wiki/" + stop_title.replace(" ", "_")]),
+                1,
+            ),
+        )
+
+    db_conn.commit()
+    yield
+
+    # ── Teardown: remove all fixture rows ───────────────────────────────────
+    cur = db_conn.cursor()
+    cur.execute("DELETE FROM venue_corpus WHERE qid IN ('Q3329731', 'Q40978')")
+    cur.execute(
+        "DELETE FROM stop_corpus WHERE venue_name = 'French Riviera walking area' "
+        "AND stop_title IN ('Eze Village', 'Cap Ferrat', 'Villefranche-sur-Mer')"
+    )
+    db_conn.commit()
+
+
 class TestDiningVenueKind:
     """LOCAL-281: Dining/restaurant venue kind classification and verification."""
 
