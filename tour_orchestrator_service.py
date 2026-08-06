@@ -709,6 +709,11 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             modernized_data = {"tour_file": tour_file}
             print(f"Using tour_file for modernized service: {tour_file}")
         
+        # [LOCAL-323] Forward user_id and job_id for TTS cost attribution
+        if user_id:
+            modernized_data["user_id"] = user_id
+        modernized_data["job_id"] = job_id
+
         print(f"Calling MODERNIZED service: {datetime.now().isoformat()}")
         modernized_response = _authenticated_request("POST", f"{MODERNIZED_URL}/process",
             headers={"Content-Type": "application/json"},

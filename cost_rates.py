@@ -48,7 +48,18 @@ GPT4O_MINI_COST_PER_1K_TOKENS = 0.000285  # ~($0.15*0.7 + $0.60*0.3) / 1000
 # --- Search (Serper) ---
 SERPER_COST_PER_QUERY = 0.001
 
-# --- TTS ---
+# --- TTS (AWS Polly) ---
+# Source: https://aws.amazon.com/polly/pricing/
+# Read: 2026-08-06
+# Standard voices: $4.00 per 1M characters
+# Neural voices: $16.00 per 1M characters
+# Neural voices used: Joanna, Matthew, Amy, Brian (see polly_tts_service.py:124,136)
+POLLY_STANDARD_COST_PER_1M_CHARS = 4.00
+POLLY_NEURAL_COST_PER_1M_CHARS = 16.00
+POLLY_STANDARD_COST_PER_CHAR = POLLY_STANDARD_COST_PER_1M_CHARS / 1_000_000  # $0.000004
+POLLY_NEURAL_COST_PER_CHAR = POLLY_NEURAL_COST_PER_1M_CHARS / 1_000_000  # $0.000016
+
+# Legacy single-rate constant — kept for existing callers (uses standard rate)
 POLLY_COST_PER_1M_CHARS = 4.00
 POLLY_COST_PER_CHAR = POLLY_COST_PER_1M_CHARS / 1_000_000  # $0.000004
 
@@ -138,8 +149,19 @@ def search_cost(num_queries: int) -> float:
     return num_queries * SERPER_COST_PER_QUERY
 
 
-def tts_cost(char_count: int) -> float:
-    return char_count * POLLY_COST_PER_CHAR
+def tts_cost(char_count: int, engine: str = "standard") -> float:
+    """Compute TTS cost from character count and engine type.
+
+    Args:
+        char_count: Number of characters submitted to Polly.
+        engine: 'neural' or 'standard'. Defaults to 'standard'.
+
+    Returns:
+        Cost in USD.
+    """
+    if engine == "neural":
+        return char_count * POLLY_NEURAL_COST_PER_CHAR
+    return char_count * POLLY_STANDARD_COST_PER_CHAR
 
 
 DEPLOYED_TRANSLATION_PASSES = 1

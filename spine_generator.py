@@ -75,6 +75,7 @@ def generate_spine(
     thread_result=None,
     model: Optional[str] = None,
     job_id: Optional[str] = None,
+    user_id: Optional[str] = None,
 ) -> Optional[dict]:
     """Generate a narrative spine for a tour.
 
@@ -90,6 +91,7 @@ def generate_spine(
                       When provided and mode == "threaded", spine uses discovered themes.
         model: OpenAI model to use. Defaults to SPINE_MODEL env var or "gpt-4o".
         job_id: Optional job correlation ID for cost_meter recording.
+        user_id: Optional user_id for cost attribution (LOCAL-323).
 
     Returns:
         Parsed spine dict with all 11 fields + optional grounded_on per arc entry.
@@ -225,6 +227,7 @@ REQUIREMENTS for story-grounded spine:
                 operation_type="spine_generate",
                 our_cost_usd=cost,
                 cache_hit=False,
+                user_id=user_id,
                 job_id=job_id,
                 breakdown={"llm": cost, "model": _model, "input_tokens": input_tokens, "output_tokens": output_tokens},
             )
