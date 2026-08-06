@@ -1016,3 +1016,79 @@ before the addendum existed.
 Michael asked. **No** — the opening is fully diagnosed in LOCAL-286 and the empty
 stop bodies are LOCAL-283/284. Reading further would re-derive work already
 written down. Wait for the regenerated one.
+
+---
+
+## 2026-08-05 22:40 — Michael
+
+> *"Let's go back discussing the evaluation index. I asked you to specify how we
+> evaluate the tour hoping to adjust to more fair evaluation. I remember asking
+> you about it 4-5 hours ago, but see nothing in STORIED_COMMUNICATION_01.MD.
+> Can you repeat it?"*
+
+He is right — it was never logged. LEAD's miss. Recorded now, from a full read of
+`tour_rubric_scorer.py` (449 lines) rather than from recall.
+
+## 2026-08-05 22:40 — LEAD
+
+### The index
+
+```
+total = base + structural surcharge + correlation bonus + venue-identity bonus
+```
+
+- **share = 100 / N**, N = stops **requested**.
+- **Base**: per stop, classification × share —
+  RICH ×1.0 · ADEQUATE ×0.75 · THIN ×0.5 · FABRICATED ×−1.0 · MISSING ×−1.0.
+  A requested-but-undelivered stop also scores −1.0 × share.
+- **Structural surcharge**: −0.25 × share per defect, capped −0.5 × share per
+  stop. Three defects detected: bracketed template placeholder, voice break
+  ("One time, I"), meta-reference ("Stop 3").
+- **Correlation bonus**: +50% of the combined base value of all stops involved
+  in a callback. Explicitly allowed to push the total above 100.
+- **Venue-identity bonus**: +10% × base × (identity facts ÷ 5).
+
+### The fairness problem, which is bigger than LEAD said at 17:15
+
+**The classification is not computed — it is passed in by hand.**
+`score_tour_file(filepath, n_requested, classifications=None)`. With no dict
+supplied every stop is unclassified and `base = 0.0` (line 283). So the dominant
+term of the index is a human judgement typed into the call, normally LEAD's.
+
+The scorer *does* compute `has_specific_verifiable_facts` (fact_count ≥ 3, line
+176) and `has_generic_filler` (>40% of sentences, line 205) — and **wires
+neither to the classification.** They are computed and discarded.
+
+**Consequence for Michael's gate: 75 at N=8 on the Asian Arts Museum is
+currently partly self-graded.** Whoever runs the scorer supplies the labels that
+generate most of the score. This needs saying plainly before the gate is used to
+authorise a field test.
+
+### Four further defects
+
+1. **N is requested, not delivered, and denominates everything.** Ask 8, get 5:
+   three missing at −12.5 each, five delivered capped at 62.5. The same five
+   requested as 5 would score 100. Selector reliability and prose quality move
+   one number; they cannot be separated.
+2. **The correlation bonus cannot distinguish a callback from an itinerary**
+   (D197, measured across all 41 tours: 6 itinerary-only, 13 narrative, 22
+   inactive). It fires on title words appearing in another stop's body — and
+   every stop's Directions line names the next stop, so navigation boilerplate
+   earns the largest lever in the rubric.
+3. **Fact detection is regex over a hardcoded Asian-art vocabulary**
+   (`schist|lacquer|bronze|cypress wood|silk|gold leaf|cedar|metalwork|lost-wax|
+   embroidery|woodblock print`, lines 154–159). A Riviera tour scores zero
+   materials however well sourced. `named_people` carries a hand-maintained
+   blocklist (`'Musée des'`, `'Nice France'`), i.e. it has been patched per venue.
+4. **Nothing verifies truth.** FABRICATED is a hand-assigned label; the index
+   cannot separate an accurate stop from a fluent invented one.
+
+### Recommendation (D196/D197, now better evidenced)
+
+- **Compute the classification**: facts per sentence, normalised against the
+  corpus passages actually available for that stop. Removes the hand-labelling
+  and the D183 selection confound in one move.
+- **Drop or redefine the correlation bonus** so nothing in a Directions line can
+  trigger it.
+- **Stop treating 100 as a ceiling** — the bonus is designed to exceed it, so
+  "75" is not the fraction it appears to be.
