@@ -8287,3 +8287,36 @@ two tasks were waiting and neither was moving.
 **Not fixing `already_claimed()` itself.** Treating FAILED as terminal is
 correct — a genuinely failed task should not loop forever. The bug was in the
 write order, not the read logic.
+
+## D208 — The empty stops were never network failures (2026-08-06)
+
+LOCAL-292 was written to stop empty stops shipping, and it does — zero across
+seven tours, corpus-wide 13/1782 → 14/1843 with the +1 pre-existing. But its
+verification overturned the premise LEAD wrote the task on.
+
+The task said: *"Generation failed on a stop with rich corpus, which suggests a
+transient fault rather than missing material. Retry at least once."* The agent
+built that retry, and reported:
+
+> HTTP-level retry did not fire — no 5xx/timeout errors during this run.
+> Content-level retry fired on 2 stops with placeholder leaks.
+
+**Every lost stop was a content failure, not a network one.** Scope item 1 as
+LEAD specified it addressed a cause that does not occur. The removal gate —
+scope item 2 — is what actually fixed the shipped defect.
+
+Reading `_detect_placeholder_leak()` afterwards shows why it may be misfiring:
+three of its four conditions are sound (empty, bracketed echo, wholly bracketed),
+and the fourth is `word_count < 30`. **A short description is not a placeholder.**
+With LOCAL-291 measuring ~32% of claims ungrounded, a thin-corpus stop plausibly
+produces short-but-valid prose that is retried three times identically and then
+discarded. → LOCAL-295, written as a hypothesis to confirm or refute with the
+verbatim rejected text, not as an assertion.
+
+**Second-order point worth keeping.** LOCAL-292's delivery numbers look worse
+than LOCAL-290's — 1/2, 2/2, 2/2, 0/2, 1/2, 7/8, 5/8 against 8/8. They are not a
+regression. Previously a failed generation shipped as an empty shell and *counted
+as delivered*: LOCAL-290's own 8/8 tour contains an empty Paloma Beach. Fixing the
+shell made the true failure rate visible for the first time. A metric getting
+worse because it started telling the truth is the outcome to want, and it would
+have been easy to read as a regression and bounce the work.
