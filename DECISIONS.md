@@ -8655,3 +8655,44 @@ lost 20 minutes to an unrelated lookup and committed nothing, so the good work
 sat uncommitted through a kill. The amended task file now says **commit the
 schema work first**. An agent that commits early loses minutes to a stall; one
 that commits at the end loses everything.
+
+## D219 — The failure count rose as predicted, for the wrong reason (2026-08-06)
+
+LOCAL-300 gave `audiotours_test` production's schema: **6 tables → 43**, no data,
+with a committed rebuild script that greps its own `pg_dump --schema-only`
+output for leaked `INSERT`/`COPY`. Production's real row count unchanged at 29.
+
+The suite against the real schema: **13 failed / 987 passed**, against the stub's
+10 / 990. **+3, exactly as the task predicted.**
+
+**The prediction was right and its stated mechanism was wrong.** The task said:
+
+> A test that starts failing once the schema is real was passing vacuously, and
+> that is a finding.
+
+The submission was honest that it could not attribute the 3 without the baseline
+failure list, which it did not have. LEAD did have it — from a 06:04 run — and
+the diff gives `test_local281_dining_venue_kind.py`, the existence-gate
+regression classes. Then measured the cause:
+
+```
+AUDIOURA_DB_TARGET=production  ->  14 passed, 0 failed   venue_corpus 18, stop_corpus 94
+AUDIOURA_DB_TARGET=test        ->   3 failed             venue_corpus  0, stop_corpus  0
+```
+
+Not vacuous passes. **Tests that need corpus rows**, failing because the test
+database now has schema and no fixtures. Same number, different cause, and the
+remedy is different too — fixtures, not deleting a bad test.
+
+**Also corrected in passing:** LEAD ran that file "against production" earlier
+and got identical failures, concluding the tests were broken regardless of
+target. That was wrong — `_default_dbname()` routes to `audiotours_test` under
+pytest even with no env var, so both runs hit the same empty database. Only
+`AUDIOURA_DB_TARGET=production` actually reaches production. An A/B where both
+arms are the same arm.
+
+**Fifth time tonight the measurement was sound and the reading was not** (D211,
+D214, D215, D217, now D219). The consistent shape: a real observation, extended
+one step to a cause that was never tested. The observation costs seconds to make
+and the extension costs nothing to check — `AUDIOURA_DB_TARGET=production` was
+one flag away the whole time.
