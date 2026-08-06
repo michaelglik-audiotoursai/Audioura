@@ -8390,3 +8390,40 @@ one-line change that would restore `pytest tests/` for everyone.
 
 Also flagged: the fatal banner prints ~70 times in one run. Failing loudly is
 correct; burying the log is not.
+
+## D211 — "A one-line change" was wrong by a factor of forty (2026-08-06)
+
+At 02:34 LEAD wrote that renaming `test_local115_referral_abuse_controls_guard.py`
+was *"a one-line change that would restore `pytest tests/` for everyone."*
+
+It was not. Renaming it let collection proceed past that file and straight into a
+hang. Measuring properly:
+
+```
+test_*.py files in tests/:            188
+  with ZERO test functions:            40
+  ...of those, touching the database:  25
+```
+
+**`pytest tests/` executes 25 database-touching scripts as a side effect of
+collection** — against production, since `AUDIOURA_DB_TARGET` (LOCAL-296)
+defaults there unless a caller opts in. Several of those scripts `INSERT` and
+`DELETE`.
+
+This is the same defect LOCAL-296 was bounced for (D210), at 40× the scale, and
+it predates that task by months. LEAD found one instance, generalised from it to
+"one file", and only discovered the true size by acting on the claim and
+watching it fail.
+
+**The pattern to notice:** the error was not the diagnosis — a `test_*.py` that
+runs at import genuinely is the bug. It was the *scoping*, asserted from a single
+observed instance without counting. D197 recorded the identical mistake ("D196
+generalised from one compelling example and was wrong in degree"), and D209
+bounced an agent for a headline its own evidence did not support. Same failure,
+third form: **state what was counted, and count before stating.**
+
+`test_local115` stays renamed — correct in isolation. LOCAL-297 does the other
+39, with reference-updating and a row-count check spanning collection.
+
+**Why this went unnoticed for so long:** nobody could run the full suite, so
+nobody saw what collection did. The thing that hid the problem was the problem.
