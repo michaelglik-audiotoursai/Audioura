@@ -9480,3 +9480,46 @@ Two things worth stating as rules, both now in the task:
 check.** Every gate, scorer and monitor we built today passed this tour. The
 score was 55.0 with facts verified against Forbes. Neither of these is visible in
 any number.
+
+## D239 — R7's culinary widening does not empty orientations (2026-08-06)
+
+LOCAL-317 and LOCAL-318 merged. Both verified by execution:
+
+```
+R7 must fire  — 5/5 including "The scent of jasmine fills the courtyard"
+R7 must not   — 4/4 clean: "The menu features socca and ratatouille",
+                "Daube is a beef stew braised in wine"
+false-positive rate on parsed bodies   2.72% -> 2.98%   (ceiling 4.47%)
+
+dangling demonstrative fires on the Acchiardo case; 3 clean cases unaffected
+corpus-wide: 12 dangling demonstratives across 52 tour files
+```
+
+**LEAD then chased a risk that turned out not to exist, and the checking was the
+point.** Widening R7 into the culinary register meant it now fires on *"Listen
+for the hum of conversation and the clinking of cutlery"* — which sits in an
+**Orientation**, and Michael explicitly approved instructions there ("enjoy the
+sea breeze… All good, as intended").
+
+Worse, `_is_style_navigation_sentence` returns **False** for that sentence *and*
+for *"Follow Rue Droite until you reach the welcoming facade"* — plainly
+navigation. So the exemption LEAD assumed was protecting orientation text does
+not protect it. That is the exact shape of D188, where R3 deleted the museum
+overview because LEAD verified a change only on cycling tours.
+
+Generated a tour on merged `storied` rather than reasoning about it:
+
+```
+R7 summary: 2 sentences deleted, 0 paragraphs emptied, 2 stops affected
+3 stops, 3 orientations, 0 empty
+```
+
+**No regression.** R7 removes the fabricated sensory sentences and leaves the
+orientations standing. And *"Enjoy the sea breeze along the way"* — Michael's own
+approved example — does not fire at all.
+
+**Two things worth keeping.** First, the navigation exemption is weaker than its
+name suggests and does not classify obvious navigation; that is latent and will
+matter to some future rule, so it is recorded here even though nothing depends on
+it today. Second, the cost of checking was one generation; the cost of the D188
+version of this mistake was a regression Michael found himself.
