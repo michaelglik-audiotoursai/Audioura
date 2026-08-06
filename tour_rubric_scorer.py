@@ -119,8 +119,13 @@ class StopAnalysis:
     callbacks_to: List[int] = field(default_factory=list)    # stops that reference this
     
     # Classification (manual)
-    classification: str = ""  # FABRICATED, MISSING, THIN, ADEQUATE, RICH
+    classification: str = ""  # FABRICATED, MISSING, THIN, ADEQUATE, RICH, CONTRADICTED
     classification_evidence: str = ""
+
+    # [LOCAL-291] Groundedness — computed from corpus coverage
+    groundedness_fraction: float = 1.0  # 1.0 = fully grounded or no claims to check
+    contradicted_share: float = 0.0     # fraction of claims contradicted by corpus
+    ungrounded_claims: List[str] = field(default_factory=list)  # corpus worklist
 
 
 @dataclass 
@@ -366,6 +371,12 @@ ADEQUATE_MIN_DENSITY = 0.20
 ADEQUATE_MIN_FACTS = 2
 ADEQUATE_MAX_FILLER = 0.40
 
+# [LOCAL-291] Groundedness floor — a stop below this cannot be classified RICH.
+# Measured post-289/290 over 37 stops with corpus: p25 = 0.43, median = 0.60.
+# Floor set at 0.40 (just below p25) so it captures clearly-ungrounded stops
+# without penalising stops near the boundary. This is a ceiling, NEVER a penalty.
+RICH_MIN_GROUNDEDNESS = 0.40
+
 
 def classify_stop(sa: 'StopAnalysis') -> Tuple[str, str]:
     """Derive a classification from the measured signals.
@@ -378,6 +389,16 @@ def classify_stop(sa: 'StopAnalysis') -> Tuple[str, str]:
     Assigning FABRICATED remains an explicit operator override, and the absence
     of it is never proof of accuracy.
 
+    [LOCAL-291] CONTRADICTED is computed from the claim_check CONTRADICTED
+    signal: if the CONTRADICTED share (fraction of claims contradicted by
+    corpus) exceeds zero, the stop is classified CONTRADICTED with weight
+    −1.0 × share, scored as the negative of the CONTRADICTED portion.
+
+    [LOCAL-291] Groundedness is a RICH ceiling: a stop whose groundedness
+    fraction (claims verified in stop_corpus) falls below RICH_MIN_GROUNDEDNESS
+    cannot be classified RICH, regardless of density. This never reduces a
+    score — it only prevents a stop from reaching RICH.
+
     The original design made all classification manual "to honor the do-not-game
     constraint". That constraint is preserved two ways: an explicit
     classification always wins over this one, and the evidence string records
@@ -386,13 +407,24 @@ def classify_stop(sa: 'StopAnalysis') -> Tuple[str, str]:
     facts = sa.distinct_fact_count
     density = sa.fact_density
     filler = sa.generic_filler_fraction
+    groundedness = sa.groundedness_fraction
 
     evidence = (
         f"{facts} distinct facts over {sa.content_sentences} content sentences "
-        f"(density {density:.2f}), filler {filler:.0%}"
+        f"(density {density:.2f}), filler {filler:.0%}, "
+        f"groundedness {groundedness:.0%}"
     )
 
+    # [LOCAL-291] CONTRADICTED check — if corpus positively contradicts claims,
+    # this is evidence of error (not absence of evidence). Score negatively.
+    if sa.contradicted_share > 0:
+        return 'CONTRADICTED', evidence + f" — contradicted_share={sa.contradicted_share:.2f}"
+
     if facts >= RICH_MIN_FACTS and density >= RICH_MIN_DENSITY and filler <= RICH_MAX_FILLER:
+        # [LOCAL-291] Groundedness ceiling: a stop below the floor cannot be RICH.
+        # It must not reduce the score — it only caps the band.
+        if groundedness < RICH_MIN_GROUNDEDNESS:
+            return 'ADEQUATE', evidence + f" (RICH capped by groundedness floor {RICH_MIN_GROUNDEDNESS})"
         return 'RICH', evidence
     if facts >= ADEQUATE_MIN_FACTS and density >= ADEQUATE_MIN_DENSITY and filler <= ADEQUATE_MAX_FILLER:
         return 'ADEQUATE', evidence
@@ -440,6 +472,13 @@ def compute_score(stops: List[StopAnalysis], n_requested: int,
             base = -1.0 * share
         elif cls == 'MISSING':
             base = -1.0 * share
+        elif cls == 'CONTRADICTED':
+            # [LOCAL-291] CONTRADICTED: scored at −1.0 × share × contradicted_share.
+            # A stop with 1 contradicted claim out of 5 total scores
+            # −1.0 × share × 0.2 = −0.2 × share, not the full −1.0 × share.
+            # This is proportional to the severity: one wrong date in an
+            # otherwise-good stop should not destroy the entire stop's value.
+            base = -1.0 * share * stop.contradicted_share
         elif cls == 'THIN':
             base = 0.5 * share
         elif cls == 'ADEQUATE':
@@ -547,7 +586,8 @@ def print_score(ts: TourScore):
 
 
 def score_tour_file(filepath: str, n_requested: int,
-                    classifications: Optional[dict] = None) -> TourScore:
+                    classifications: Optional[dict] = None,
+                    corpus_data: Optional[dict] = None) -> TourScore:
     """Score a tour file with the rubric.
     
     Args:
@@ -555,6 +595,10 @@ def score_tour_file(filepath: str, n_requested: int,
         n_requested: Number of stops requested (N)
         classifications: Optional dict of {stop_index: (classification, evidence)}
                         If not provided, stops are analyzed but not classified.
+        corpus_data: Optional dict of {stop_title: {passages: [...], ...}} from
+                    stop_corpus_reader. When provided, groundedness and
+                    CONTRADICTED signals are computed. When absent, groundedness
+                    defaults to 1.0 (no ceiling applied).
     """
     with open(filepath, 'r', encoding='utf-8') as f:
         text = f.read()
@@ -568,6 +612,11 @@ def score_tour_file(filepath: str, n_requested: int,
     analyses = []
     for stop in stops:
         sa = analyze_stop(stop, stops)
+
+        # [LOCAL-291] Compute groundedness and CONTRADICTED signals from corpus.
+        if corpus_data:
+            _compute_groundedness_for_stop(sa, stop, corpus_data)
+
         if classifications and stop['index'] in classifications:
             cls, evidence = classifications[stop['index']]
             sa.classification = cls
@@ -590,6 +639,55 @@ def score_tour_file(filepath: str, n_requested: int,
     ts = compute_score(analyses, n_requested, venue_facts)
     
     return ts
+
+
+def _compute_groundedness_for_stop(sa: 'StopAnalysis', stop: dict, corpus_data: dict):
+    """[LOCAL-291] Compute groundedness fraction and contradicted share for a stop.
+
+    Uses groundedness_check module to measure which fact-claims are supported
+    by corpus passages. Name normalisation (D187) is applied.
+
+    Sets sa.groundedness_fraction (0..1) and sa.contradicted_share (0..1).
+    """
+    from groundedness_check import measure_stop_groundedness
+
+    # Look up corpus passages for this stop
+    stop_title = stop.get('title', sa.title)
+    corpus_entry = corpus_data.get(stop_title)
+    if not corpus_entry:
+        # No corpus for this stop — groundedness stays 1.0 (no ceiling)
+        # and contradicted_share stays 0.0 (no penalty).
+        return
+
+    passages = corpus_entry.get('passages', [])
+    if not passages:
+        return
+
+    body = stop.get('body', sa.text)
+    result = measure_stop_groundedness(body, stop_title, passages)
+
+    sa.groundedness_fraction = result.groundedness_fraction
+    sa.ungrounded_claims = [c['claim_text'] for c in result.corpus_worklist]
+
+    # CONTRADICTED share: fraction of claims that are CONTRADICTED.
+    # This uses the claim_check module's CONTRADICTED signal — positive evidence
+    # of error, not absence of support.
+    if result.total_claims > 0:
+        # Use claim_check for the real CONTRADICTED verdict (same-subject + number conflict)
+        try:
+            from claim_check import check_paragraph, CONTRADICTED as CC_VERDICT
+            cc_result = check_paragraph(
+                text=body,
+                stop_title=stop_title,
+                venue_name='',
+                passages=passages,
+            )
+            cc_contradicted = cc_result['verdict_counts']['contradicted']
+            total_cc_claims = len(cc_result['claims'])
+            if total_cc_claims > 0 and cc_contradicted > 0:
+                sa.contradicted_share = cc_contradicted / total_cc_claims
+        except ImportError:
+            pass  # claim_check not available — no CONTRADICTED signal
 
 
 if __name__ == '__main__':
