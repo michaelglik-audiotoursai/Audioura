@@ -9256,3 +9256,46 @@ on whether the domain looks reputable.
 and simmering sauces fills the air"* and *"the clinking of cutlery"*, despite
 LOCAL-303 widening it this morning. Restaurant sensory language is a register the
 detector has never been tested against. Needs its own task.
+
+## D234 — "Skipped" and "broken" are different words (2026-08-06)
+
+LOCAL-310's blind-spot monitor delivers two working checks and one that cannot
+run.
+
+**Working, and it found something.** The per-venue distribution check:
+
+```
+corpus-wide          median 0.264
+Asian Arts Museum    median 0.408   <- LOCAL-304's fix, visible in the data
+Marc Chagall         median 0.000   <- FLAGGED, 47 stops, 23 corpus rows
+```
+
+And the corpus-vs-detector check catches the Ganesh stop, which is the
+acceptance test: it would have found the chlorite gap without anyone reading the
+tour.
+
+**LEAD nearly called the Chagall flag wrong.** My own measurement gave median
+0.125, and I was drafting a correction before checking the grouping. My glob
+matched 491 stops by filename; the monitor grouped 47 by venue from the
+database. Different populations, and the monitor's is the meaningful one.
+**Sixth time today I have nearly contradicted an agent using a measurement that
+answered a different question.**
+
+**The broken check, and the wording matters.** The submission says *"Skipped — no
+OPENAI_API_KEY in environment. The mechanism is implemented."* LEAD supplied a
+key:
+
+```
+AttributeError: module 'openai' has no attribute 'OpenAI'
+```
+
+It uses the openai 1.x client class, which this environment does not have, while
+every other API call in the codebase uses `requests.post` to
+`/v1/chat/completions`. **It could never have run.** "Skipped for want of a key"
+implies working code awaiting an input; "broken" is what this is. The distinction
+decides whether anyone rechecks it — and had LEAD accepted the stated reason,
+nobody would have.
+
+Merged regardless, because checks 1 and 2 carry the value and are verified. The
+defect and the mis-statement are recorded here and in the merge commit, and
+LOCAL-315 fixes it and diagnoses Chagall.
