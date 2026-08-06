@@ -9,18 +9,32 @@ import sys
 import os
 from unittest.mock import patch, MagicMock
 
+import pytest
+
 # Ensure imports find the service files
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Set minimal env so the service can import
-os.environ.setdefault('DB_HOST', 'localhost')
-os.environ.setdefault('DB_NAME', 'audiotours')
-os.environ.setdefault('DB_USER', 'admin')
-os.environ.setdefault('DB_PASSWORD', 'test')
-os.environ.setdefault('DB_PORT', '5433')
-
+# LOCAL-299: Env setup moved from module scope into a fixture to prevent
+# DB_NAME=audiotours from poisoning the entire pytest session.
 from news_orchestrator_service import app
 import psycopg2
+
+
+@pytest.fixture(autouse=True)
+def _db_env_for_news_orchestrator(monkeypatch):
+    """Set minimal env so tests can exercise the news orchestrator.
+
+    Previously these were module-scope os.environ.setdefault() calls that
+    leaked DB_NAME=audiotours into every subsequent test module, defeating
+    the AUDIOURA_DB_TARGET safety switch (see D214).
+    monkeypatch.setenv restores the previous value automatically on teardown.
+    """
+    monkeypatch.setenv('DB_HOST', 'localhost')
+    monkeypatch.setenv('DB_NAME', 'audiotours')
+    monkeypatch.setenv('DB_USER', 'admin')
+    monkeypatch.setenv('DB_PASSWORD', 'test')
+    monkeypatch.setenv('DB_PORT', '5433')
+
 
 def test_db_down_returns_503():
     """When the DB is unreachable, /generate-news should return 503 (fail-closed).
