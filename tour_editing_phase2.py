@@ -1710,6 +1710,8 @@ def promote_custom_tour(tour_id):
 
         # [LOCAL-306] Score the edited tour and record the delta.
         # Gates NOTHING — this is observation only.
+        # [LOCAL-312] If edit scores below threshold: record internally, NO message
+        # to the author. "We should know about this" but never tell them.
         if tour_content and derived_from_tour_id:
             try:
                 from tour_scoring_service import (
@@ -1739,6 +1741,43 @@ def promote_custom_tour(tour_id):
                         tour_name=custom_name,
                         original_score_id=orig_score_id,
                     )
+
+                    # [LOCAL-312] Record internally if below threshold.
+                    # NEVER message the author — this is the author asymmetry rule.
+                    if _edit_score:
+                        from quality_guardrails import MESSAGE_THRESHOLD
+                        if _edit_score.total_score < MESSAGE_THRESHOLD:
+                            # Look up the author's secret_id from tour_requests
+                            _author_secret_id = None
+                            try:
+                                cur2 = conn.cursor()
+                                cur2.execute(
+                                    "SELECT secret_id FROM tour_requests WHERE tour_id = %s LIMIT 1",
+                                    (str(derived_from_tour_id),)
+                                )
+                                _author_row = cur2.fetchone()
+                                if _author_row:
+                                    _author_secret_id = _author_row[0]
+                                cur2.close()
+                            except Exception:
+                                pass
+
+                            from user_quality_index import (
+                                record_author_edit_score,
+                                ensure_author_edit_scores_table,
+                            )
+                            ensure_author_edit_scores_table()
+                            record_author_edit_score(
+                                secret_id=_author_secret_id or "unknown",
+                                tour_id=new_id,
+                                score=_edit_score.total_score,
+                                delta=_delta,
+                            )
+                            print(
+                                f"[LOCAL-312] Author edit below threshold "
+                                f"({_edit_score.total_score:.1f} < {MESSAGE_THRESHOLD}): "
+                                f"recorded internally, NO message to author."
+                            )
                 else:
                     print(f"[SCORING] No original tour_content for derived_from_tour_id={derived_from_tour_id}")
             except Exception as scoring_err:

@@ -120,5 +120,44 @@ else
     echo -e "   ${GREEN}✓ tour_scores table present (LOCAL-306)${NC}"
 fi
 
+# Step 7: Verify LOCAL-312 user_quality_index table exists
+UQI_EXISTS=$(docker exec "${CONTAINER}" psql -U "${DB_USER}" -d "${TEST_DB}" -t -c \
+    "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name='user_quality_index';")
+UQI_EXISTS=$(echo "${UQI_EXISTS}" | tr -d ' ')
+if [ "${UQI_EXISTS}" != "1" ]; then
+    echo -e "${RED}WARNING: user_quality_index table missing (LOCAL-312). Creating...${NC}"
+    docker exec "${CONTAINER}" psql -U "${DB_USER}" -d "${TEST_DB}" -c "
+        CREATE TABLE IF NOT EXISTS user_quality_index (
+            secret_id       VARCHAR(255) PRIMARY KEY,
+            mean_score      REAL NOT NULL,
+            tour_count      INTEGER NOT NULL DEFAULT 0,
+            last_scored_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+    "
+else
+    echo -e "   ${GREEN}✓ user_quality_index table present (LOCAL-312)${NC}"
+fi
+
+# Step 8: Verify LOCAL-312 author_edit_scores table exists
+AES_EXISTS=$(docker exec "${CONTAINER}" psql -U "${DB_USER}" -d "${TEST_DB}" -t -c \
+    "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name='author_edit_scores';")
+AES_EXISTS=$(echo "${AES_EXISTS}" | tr -d ' ')
+if [ "${AES_EXISTS}" != "1" ]; then
+    echo -e "${RED}WARNING: author_edit_scores table missing (LOCAL-312). Creating...${NC}"
+    docker exec "${CONTAINER}" psql -U "${DB_USER}" -d "${TEST_DB}" -c "
+        CREATE TABLE IF NOT EXISTS author_edit_scores (
+            id              SERIAL PRIMARY KEY,
+            secret_id       VARCHAR(255) NOT NULL,
+            tour_id         INTEGER,
+            score           REAL NOT NULL,
+            delta           JSONB,
+            recorded_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_author_edit_scores_secret_id ON author_edit_scores (secret_id);
+    "
+else
+    echo -e "   ${GREEN}✓ author_edit_scores table present (LOCAL-312)${NC}"
+fi
+
 echo ""
 echo "=== Done. ${TEST_DB} has ${TEST_TABLES} tables, 0 rows. ==="

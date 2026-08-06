@@ -55,15 +55,14 @@ GUARDRAILS_ENABLED = os.environ.get("QUALITY_GUARDRAILS_ENABLED", "false").lower
 #   probably failed to retrieve good corpus, not an area problem.
 #
 # MESSAGE_THRESHOLD: Score below which an UNAVAILABLE tour gets a user message.
-#   Proposed: 60.0 (between P25 and Median)
-#   Rationale: 6/16 tours (37.5%) fall at or below 60. But a message only
-#   fires when the cause is UNAVAILABLE (area is thin), so the actual trigger
-#   rate is much lower.
+#   Default: 50.0 (per Michael's decision, LOCAL-312)
+#   Rationale: Michael wants listener told when a tour is thin, but only
+#   for clearly thin tours (below 50). Env-overridable without code change.
 #
-# These are PROPOSALS. They are read from env vars so Michael can tune without
-# code changes, but the default is OFF (GUARDRAILS_ENABLED=false).
+# These are read from env vars so Michael can tune without code changes,
+# but the default is OFF (GUARDRAILS_ENABLED=false).
 RETRY_THRESHOLD = float(os.environ.get("QUALITY_RETRY_THRESHOLD", "55.0"))
-MESSAGE_THRESHOLD = float(os.environ.get("QUALITY_MESSAGE_THRESHOLD", "60.0"))
+MESSAGE_THRESHOLD = float(os.environ.get("QUALITY_MESSAGE_THRESHOLD", "50.0"))
 
 
 @dataclass
