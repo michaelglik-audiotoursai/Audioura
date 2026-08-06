@@ -766,12 +766,18 @@ def _check_dining_existence(
 
     # Extract city/location signal from venue_name
     # venue_name for restaurant tours is typically "Nice, France" or "Nice"
+    # but can also be "restaurant tour in Old Nice (Vieux Nice), France"
     _city_signals = set()
-    for part in re.split(r'[,\s]+', venue_name):
+    # Strip parenthetical content and split on delimiters
+    _venue_cleaned = re.sub(r'\([^)]*\)', ' ', venue_name)
+    for part in re.split(r'[,\s]+', _venue_cleaned):
         part_clean = _strip_accents(part).lower().strip()
+        # Remove any leftover punctuation
+        part_clean = re.sub(r'[^a-z]', '', part_clean)
         if len(part_clean) >= 3 and part_clean not in ('france', 'italy', 'spain', 'usa', 'uk',
                                                         'the', 'tour', 'restaurant', 'food',
-                                                        'dining', 'culinary'):
+                                                        'dining', 'culinary', 'old', 'new',
+                                                        'vieux', 'stop', 'stops'):
             _city_signals.add(part_clean)
 
     # Stop title words for snippet matching — split on whitespace AND apostrophes
@@ -1110,15 +1116,27 @@ def _check_dining_nominatim(
     }
 
     # Build city hint for search constraint
+    # For venue_names like "restaurant tour in Old Nice (Vieux Nice), France"
+    # we need to extract the actual city name (Nice), not noise words.
+    _venue_cleaned = re.sub(r'\([^)]*\)', ' ', venue_name)
     city_hint = ""
-    for part in re.split(r'[,\s]+', venue_name):
+    _NOISE_WORDS = {
+        'france', 'italy', 'spain', 'usa', 'uk', 'the', 'tour',
+        'restaurant', 'food', 'dining', 'culinary', 'old', 'new',
+        'vieux', 'in', 'stop', 'stops',
+    }
+    for part in re.split(r'[,\s]+', _venue_cleaned):
         part_clean = part.strip()
-        if len(part_clean) >= 3 and part_clean.lower() not in (
-            'france', 'italy', 'spain', 'usa', 'uk', 'the', 'tour',
-            'restaurant', 'food', 'dining', 'culinary',
-        ):
-            city_hint = part_clean
-            break
+        # Remove punctuation
+        part_alpha = re.sub(r'[^a-zA-ZÀ-ÿ]', '', part_clean)
+        if len(part_alpha) >= 3 and part_alpha.lower() not in _NOISE_WORDS:
+            # Prefer a word that starts with uppercase (proper noun = city name)
+            if part_alpha[0].isupper():
+                city_hint = part_alpha
+                break
+    # Fallback: just use first qualifying city signal
+    if not city_hint and city_signals:
+        city_hint = next(iter(city_signals))
 
     if not city_hint:
         return False, ""
