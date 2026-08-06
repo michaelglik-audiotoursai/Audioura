@@ -949,34 +949,347 @@ def _insert_composed_gloss(sentence: str, entity: str, gloss: str) -> str:
 
 
 def _degrade_reference_in_text(text: str, entity: str, sentence: str) -> str:
-    """Remove entity name from its sentence in the text (fallback).
+    """Remove the governed construction around an entity from its sentence.
 
-    Tries to gracefully remove just the name while preserving sentence flow.
-    If the entity is the subject and removal would break the sentence,
-    the sentence is left unchanged (the gloss is simply not applied).
+    LOCAL-289: Degrading must remove the WHOLE construction the name governed,
+    not just the name itself. A bare name deletion leaves stranded prepositions,
+    possessive clitics, and dangling articles.
+
+    Strategy:
+      1. Remove the entity plus any possessive clitic bound to it
+         (e.g. "X's landscape" → "the landscape")
+      2. Remove orphaned preposition+article preceding the entity
+         (e.g. "along with X" → remove "along with X" or "with X")
+      3. Remove trailing article left with no noun
+         (e.g. "tour a." → "tour.")
+      4. Clean empty appositives (", ," or ", .")
+      5. Collapse double spaces
+
+    If the result fails the degrade guards, DROP THE WHOLE SENTENCE — that is
+    strictly better than emitting broken syntax to TTS.
     """
-    # Try removing "entity, " or ", entity" patterns
-    # Pattern: "by Entity" or "Entity," in a list
-    patterns_to_try = [
-        # "by Entity" → "by" removed too if it leaves orphan
-        (f'{entity}, ', ''),
-        (f', {entity}', ''),
-        (f'{entity} ', ''),
-    ]
+    if sentence not in text:
+        return text
 
-    new_sentence = sentence
-    for old, new in patterns_to_try:
-        if old in new_sentence:
-            candidate = new_sentence.replace(old, new, 1)
-            # Don't produce empty or broken results
-            if len(candidate.strip()) > 20:
-                new_sentence = candidate
-                break
+    new_sentence = _excise_governed_construction(sentence, entity)
 
-    if new_sentence != sentence and sentence in text:
+    # Validate the degraded sentence with post-hoc guards
+    if new_sentence != sentence and _degrade_sentence_is_wellformed(new_sentence):
         return text.replace(sentence, new_sentence, 1)
 
-    return text  # No change — leave as-is rather than damage
+    # Sentence cannot be repaired — drop it entirely
+    return _drop_sentence_from_text(text, sentence)
+
+
+def _excise_governed_construction(sentence: str, entity: str) -> str:
+    """Remove entity and its governed syntax from the sentence.
+
+    Returns the cleaned sentence (may still be malformed — caller validates).
+    """
+    pos = sentence.find(entity)
+    if pos < 0:
+        return sentence
+
+    end_pos = pos + len(entity)
+    before = sentence[:pos]
+    after = sentence[end_pos:]
+
+    # ── Extend entity backward for hyphenated prefix: "Pierre-[Yves Trémois]" ──
+    # If the character before entity is '-' preceded by a word, include it
+    if before.endswith('-') or (len(before) >= 2 and before[-1] == '-'):
+        # Find the start of the hyphenated prefix word
+        prefix_before_hyphen = before.rstrip('-')
+        m_prefix = re.search(r'\b([A-Za-zà-ÿ]+)-$', prefix_before_hyphen + '-')
+        if m_prefix:
+            # Extend: include "Pierre-" in the removal
+            prefix_start = prefix_before_hyphen.rfind(m_prefix.group(1))
+            before = sentence[:prefix_start]
+
+    # ── Handle possessive: "Entity's X" → "the X" ──────────────────────────
+    if after.startswith("'s ") or after.startswith("\u2019s "):
+        # Replace "Entity's" with "the"
+        after = after[3:]  # skip "'s "
+        # If "the" is already there, don't double it
+        if not after.lstrip().lower().startswith('the '):
+            after = 'the ' + after.lstrip()
+        else:
+            after = after.lstrip()
+        # Remove any preceding article/preposition that targeted the entity
+        before = _strip_trailing_function_words(before)
+        new_sentence = before + after
+        return _clean_degrade_artifacts(new_sentence)
+
+    # Also handle possessive with curly quote: Entity' (without s, rare)
+    if after.startswith("' ") or after.startswith("\u2019 "):
+        after = after[2:]
+        before = _strip_trailing_function_words(before)
+        new_sentence = before + ' ' + after.lstrip() if after.strip() else before
+        return _clean_degrade_artifacts(new_sentence)
+
+    # ── Handle ", along with Entity," or ", Entity," (appositive/coordination) ─
+    # Pattern: ", <prep-phrase> Entity" or ", Entity"
+    appositive_pat = re.compile(
+        r',\s*(?:along with|together with|including|such as|like|notably|'
+        r'particularly|especially)\s*$', re.IGNORECASE
+    )
+    m_appositive = appositive_pat.search(before)
+    if m_appositive:
+        # Remove from the prep-phrase start through the entity
+        before = before[:m_appositive.start()]
+        # Also consume trailing comma/space after entity
+        after = re.sub(r'^,?\s*', '', after)
+        new_sentence = before + ' ' + after if after else before
+        return _clean_degrade_artifacts(new_sentence)
+
+    # Simpler case: ", Entity," → remove the whole appositive slot
+    if before.rstrip().endswith(',') and (after.lstrip().startswith(',') or
+                                           after.lstrip().startswith('.')):
+        before = before.rstrip().rstrip(',')
+        new_sentence = before + after.lstrip().lstrip(',')
+        return _clean_degrade_artifacts(new_sentence)
+
+    # ── Handle "prep Entity" — remove prep + entity ────────────────────────
+    # e.g. "along with to the northeast" means "along with [Entity] to the..."
+    # The entity sat between "with" and "to", remove "with Entity"
+    prep_before_pat = re.compile(
+        r'\b(along\s+with|together\s+with|designated\s+as|known\s+as|'
+        r'with|of|by|from|for|at|to|in|as|on|'
+        r'near|beside|behind|between|among|through)\s*$', re.IGNORECASE
+    )
+    m_prep = prep_before_pat.search(before)
+    if m_prep:
+        # Remove the preposition along with the entity
+        before = before[:m_prep.start()]
+        # Also consume trailing comma after entity if present
+        after = re.sub(r'^,?\s*', ' ', after)
+        new_sentence = before.rstrip() + after
+        return _clean_degrade_artifacts(new_sentence)
+
+    # ── Handle "Entity rest" — entity at beginning or mid-sentence ─────────
+    # Remove entity, plus any trailing comma and article left dangling
+    after_stripped = after.lstrip(', ')
+    # Remove a dangling article at the start of what follows
+    after_stripped = re.sub(r'^(?:a|an|the)\s+(?=[A-Z])', '', after_stripped)
+
+    # Remove preceding article: "the Entity" → ""
+    before_stripped = re.sub(r'\b(?:the|a|an)\s*$', '', before, flags=re.IGNORECASE)
+    # Remove preceding comma+space if it creates ", ,"
+    before_stripped = before_stripped.rstrip()
+    if before_stripped.endswith(','):
+        # Only strip comma if what follows also starts with comma/period
+        if after_stripped and after_stripped[0] in ',.':
+            before_stripped = before_stripped.rstrip(',').rstrip()
+
+    new_sentence = before_stripped
+    if new_sentence and after_stripped:
+        # Ensure proper spacing
+        if not new_sentence.endswith(' ') and not after_stripped.startswith(' '):
+            new_sentence += ' '
+        new_sentence += after_stripped
+    elif after_stripped:
+        new_sentence = after_stripped
+
+    return _clean_degrade_artifacts(new_sentence)
+
+
+def _strip_trailing_function_words(text: str) -> str:
+    """Strip trailing prepositions/articles that no longer have an object."""
+    # Repeatedly strip trailing function words
+    func_word_pat = re.compile(
+        r'\s+(?:of|in|at|by|to|from|with|for|on|near|the|a|an)\s*$', re.IGNORECASE
+    )
+    for _ in range(3):  # max 3 layers (e.g. "in the" → "in" → "")
+        m = func_word_pat.search(text)
+        if m:
+            text = text[:m.start()]
+        else:
+            break
+    return text
+
+
+def _clean_degrade_artifacts(sentence: str) -> str:
+    """Clean up artifacts left by construction excision."""
+    # Remove empty appositives: ", ," or ", ."
+    sentence = re.sub(r',\s*,', ',', sentence)
+    sentence = re.sub(r',\s*\.', '.', sentence)
+    # Remove double spaces
+    sentence = re.sub(r'  +', ' ', sentence)
+    # Remove space before period/comma
+    sentence = re.sub(r'\s+([.,;:!?])', r'\1', sentence)
+    # Remove trailing article before period: "tour a." → "tour."
+    sentence = re.sub(r'\b(a|an|the)\s*\.$', '.', sentence, flags=re.IGNORECASE)
+    # Remove stacked prepositions: "with to", "of in", "at of", "in of", "to of"
+    sentence = re.sub(
+        r'\b(with|of|at|in|to|from|by|for|on)\s+(to|of|in|at|from|by|for|on)\b',
+        lambda m: m.group(2),  # keep the second prep (it likely belongs to what follows)
+        sentence, flags=re.IGNORECASE
+    )
+    # Remove orphan possessive: " 's " with no word before it (or space before it)
+    sentence = re.sub(r"(\s)'s\b", r'\1', sentence)
+    sentence = re.sub(r"\u2019s\b", '', sentence)
+    # Capitalize first letter if sentence starts lowercase after cleanup
+    sentence = sentence.strip()
+    if sentence and sentence[0].islower() and not sentence.startswith('...'):
+        sentence = sentence[0].upper() + sentence[1:]
+    return sentence.strip()
+
+
+def _drop_sentence_from_text(text: str, sentence: str) -> str:
+    """Remove an entire sentence from the text, cleaning up spacing."""
+    if sentence not in text:
+        return text
+    # Remove the sentence and normalize spacing
+    result = text.replace(sentence, '', 1)
+    # Clean up double spaces and orphan whitespace
+    result = re.sub(r'  +', ' ', result)
+    result = re.sub(r'\n\s*\n\s*\n', '\n\n', result)
+    result = result.strip()
+    return result
+
+
+# ─── Degrade output validators (LOCAL-289) ─────────────────────────────────────
+
+# Patterns that must NEVER appear in delivered text
+_DEGRADE_GUARD_BARE_POSSESSIVE = re.compile(r"\s's\b")
+_DEGRADE_GUARD_STACKED_PREPS = re.compile(
+    r'\b(with\s+to|of\s+in|at\s+of|in\s+of|to\s+of|of\s+to|'
+    r'with\s+of|from\s+to\s+to|at\s+to|in\s+to|of\s+at|from\s+of|'
+    r'as\s+of|on\s+it\s+marks|designated\s+as\s+of|known\s+as\s+of)\b',
+    re.IGNORECASE
+)
+_DEGRADE_GUARD_SENTENCE_ENDING_FUNC = re.compile(
+    r'\b(a|an|the|of|in|at|to|with|from|and)\.$'
+)
+_DEGRADE_GUARD_EMPTY_APPOSITIVE = re.compile(r',\s*[,.]')
+_DEGRADE_GUARD_DOUBLE_SPACE = re.compile(r'  ')
+_DEGRADE_GUARD_ORPHAN_HYPHEN = re.compile(r'\b[A-Z][a-zà-ÿ]+-\s')  # "Pierre- " with no continuation
+_DEGRADE_GUARD_ORPHAN_ADJECTIVE = re.compile(
+    r'\bthe\s+nearby\s+(?:forms|has|is|was|were|are|had|have)\b', re.IGNORECASE
+)  # "the nearby forms" — adjective without noun object
+
+
+def _degrade_sentence_is_wellformed(sentence: str) -> bool:
+    """Check that a degraded sentence passes all five degrade guards.
+
+    Returns True if well-formed, False if any guard fires.
+    """
+    if len(sentence.strip()) < 15:
+        return False
+    if _DEGRADE_GUARD_BARE_POSSESSIVE.search(sentence):
+        return False
+    if _DEGRADE_GUARD_STACKED_PREPS.search(sentence):
+        return False
+    if _DEGRADE_GUARD_SENTENCE_ENDING_FUNC.search(sentence):
+        return False
+    if _DEGRADE_GUARD_EMPTY_APPOSITIVE.search(sentence):
+        return False
+    if _DEGRADE_GUARD_DOUBLE_SPACE.search(sentence):
+        return False
+    if _DEGRADE_GUARD_ORPHAN_HYPHEN.search(sentence):
+        return False
+    if _DEGRADE_GUARD_ORPHAN_ADJECTIVE.search(sentence):
+        return False
+    return True
+
+
+def validate_degrade_output(full_text: str) -> List[Dict]:
+    """Run all five degrade guards over the FULL assembled tour text.
+
+    LOCAL-289: Guards run on every sentence, not just the one modified.
+    Returns list of violations (empty = clean).
+
+    Each violation: {sentence, guard, pattern_matched}
+    """
+    violations = []
+    sentences = _split_sentences(full_text)
+
+    for sent in sentences:
+        sent_stripped = sent.strip()
+        if not sent_stripped:
+            continue
+
+        # Guard 1: Bare possessive — "'s" with no preceding word
+        if _DEGRADE_GUARD_BARE_POSSESSIVE.search(sent_stripped):
+            violations.append({
+                'sentence': sent_stripped[:100],
+                'guard': 'bare_possessive',
+                'pattern_matched': _DEGRADE_GUARD_BARE_POSSESSIVE.search(sent_stripped).group(),
+            })
+
+        # Guard 2: Stacked prepositions
+        m = _DEGRADE_GUARD_STACKED_PREPS.search(sent_stripped)
+        if m:
+            violations.append({
+                'sentence': sent_stripped[:100],
+                'guard': 'stacked_prepositions',
+                'pattern_matched': m.group(),
+            })
+
+        # Guard 3: Sentence ending in article/preposition
+        if _DEGRADE_GUARD_SENTENCE_ENDING_FUNC.search(sent_stripped):
+            violations.append({
+                'sentence': sent_stripped[:100],
+                'guard': 'sentence_ending_function_word',
+                'pattern_matched': _DEGRADE_GUARD_SENTENCE_ENDING_FUNC.search(sent_stripped).group(),
+            })
+
+        # Guard 4: Empty appositive
+        if _DEGRADE_GUARD_EMPTY_APPOSITIVE.search(sent_stripped):
+            violations.append({
+                'sentence': sent_stripped[:100],
+                'guard': 'empty_appositive',
+                'pattern_matched': _DEGRADE_GUARD_EMPTY_APPOSITIVE.search(sent_stripped).group(),
+            })
+
+        # Guard 6: Orphan hyphen (e.g., "Pierre- envisioned")
+        m = _DEGRADE_GUARD_ORPHAN_HYPHEN.search(sent_stripped)
+        if m:
+            violations.append({
+                'sentence': sent_stripped[:100],
+                'guard': 'orphan_hyphen',
+                'pattern_matched': m.group(),
+            })
+
+    # Guard 5: Double space (check full text, not per-sentence)
+    for m in _DEGRADE_GUARD_DOUBLE_SPACE.finditer(full_text):
+        # Get surrounding context
+        start = max(0, m.start() - 30)
+        end = min(len(full_text), m.end() + 30)
+        violations.append({
+            'sentence': full_text[start:end],
+            'guard': 'double_space',
+            'pattern_matched': '  ',
+        })
+
+    return violations
+
+
+def validate_and_repair_full_text(full_text: str) -> Tuple[str, List[Dict]]:
+    """Run degrade guards over full text and DROP sentences that fail.
+
+    LOCAL-289: This is the final safety net. Any sentence with a guard violation
+    is removed from the text entirely. This catches violations from ALL sources,
+    not just the current degrade pass.
+
+    Returns (repaired_text, dropped_sentences_log).
+    """
+    dropped = []
+    sentences = _split_sentences(full_text)
+
+    for sent in sentences:
+        sent_stripped = sent.strip()
+        if not sent_stripped or len(sent_stripped) < 10:
+            continue
+
+        if not _degrade_sentence_is_wellformed(sent_stripped):
+            # Drop this sentence
+            full_text = _drop_sentence_from_text(full_text, sent_stripped)
+            dropped.append({
+                'sentence': sent_stripped[:200],
+                'reason': 'degrade_guard_violation',
+            })
+
+    return full_text, dropped
 
 
 def apply_glosses_to_text(text: str, glossed_refs: List[Dict]) -> Tuple[str, List[Dict]]:
@@ -1139,6 +1452,12 @@ def apply_unglossed_reference_gate(
     new_description, guard_failures = apply_glosses_to_text(description, refs)
     stats['guard_failures'] = guard_failures
 
+    # LOCAL-289: Run degrade guards over the FULL assembled text as final safety net.
+    # Any sentence with a violation is dropped entirely.
+    new_description, dropped_sentences = validate_and_repair_full_text(new_description)
+    stats['sentences_dropped_by_guard'] = len(dropped_sentences)
+    stats['dropped_sentences'] = dropped_sentences
+
     # Count results
     for ref in refs:
         if ref.get('triage') == 'known_enough':
@@ -1202,6 +1521,7 @@ def apply_gate_to_stop_descriptions(
         'total_suppressed': 0,
         'total_known': 0,
         'total_guard_failed': 0,
+        'total_sentences_dropped': 0,
         'triage_tokens': 0,
         'triage_cost': 0.0,
         'triage_latency': 0.0,
@@ -1217,6 +1537,7 @@ def apply_gate_to_stop_descriptions(
         'stops_affected': 0,
         'all_glosses': [],
         'guard_failures': [],
+        'dropped_sentences': [],
         'per_stop': [],
     }
 
@@ -1263,6 +1584,8 @@ def apply_gate_to_stop_descriptions(
         total_stats['compose_latency'] += stats['compose_latency']
         total_stats['all_glosses'].extend(stats['glossed_list'])
         total_stats['guard_failures'].extend(stats['guard_failures'])
+        total_stats['total_sentences_dropped'] += stats.get('sentences_dropped_by_guard', 0)
+        total_stats['dropped_sentences'].extend(stats.get('dropped_sentences', []))
 
         total_stats['per_stop'].append({
             'stop_name': stop_name,
