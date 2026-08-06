@@ -8814,3 +8814,59 @@ would be the wrong precedent regardless of the row's harmlessness.
 **Residual, stated plainly:** a hard kill mid-test still leaks. Nothing defends
 against SIGKILL, and this is not worth engineering around — the fix holds
 whenever the test completes, which is the case that occurs in practice.
+
+## D223 — LEAD's diagnostic probe generated a real production tour (2026-08-06)
+
+Investigating why `test_user_integration` crashed on a NULL `request_string`,
+LEAD probed the orchestrator to establish whether a 429 quota error was global or
+per-user. The probe used a valid payload and **queued a real tour generation**:
+
+```
+POST /generate-complete-tour {"user_id":"quota_probe_lead","location":"Nice, France",...}
+  -> {"job_id":"2699aff3...","status":"queued"}   ... then completed
+  -> id=301  is_test=False  "Nice, France - Walking Tour"  lat=43.6942 lng=7.2797
+```
+
+**Real rows went 29 → 30.** That is the baseline every check tonight has been
+measured against, and the row carried coordinates, so it would have appeared in
+Michael's Nice tour list.
+
+**Handled, not hidden:**
+- `is_test` set to TRUE — the row genuinely is a test artifact, and leaving it
+  mislabelled would have corrupted the 29-real baseline. Real count back to 29.
+- `lat`/`lng` set to NULL, values recorded here (**43.6942, 7.2797**) — the
+  procedure CLAUDE.md prescribes for keeping a test artifact out of the
+  user-facing list, chosen precisely because it is reversible.
+- **Not deleted.** Row deletion remains Michael's call. The row is id=301 and he
+  can remove it or restore its coordinates from the values above.
+
+**The lesson is about probe design, not about the finding.** The question was
+"is this quota global or per-user?" — answerable by sending an *invalid* payload
+and reading the error precedence, or by inspecting quota state directly. LEAD
+chose the one method that has a side effect on production, while spending the
+night writing "do not write to production" into task after task.
+
+Same family as D220, where a probe missing a User-Agent manufactured a 403. There
+the probe produced false evidence; here it produced a real row. **A diagnostic
+that mutates the system it measures is not a diagnostic.**
+
+## D224 — The tour quota is per-user, and `test_user_123` is exhausted (2026-08-06)
+
+The finding the probe was chasing, which is real and useful:
+
+```
+test_user_123     -> 429 quota_exceeded, tours_per_day, used 10/10, plan free
+quota_probe_lead  -> 200 queued
+```
+
+**Per-user, not global.** Tour generation is not blocked; the hardcoded test user
+has spent its daily allowance, and resets at 00:00 UTC (20:00 EDT today).
+
+This explains a cluster of the remaining suite failures — every service test that
+generates a tour as `test_user_123` fails with "Tour generation service call
+failed" regardless of code correctness. It is not a code defect and no amount of
+test-fixing will clear it.
+
+**Two possible remedies, both Michael's call** since they change product
+behaviour: give test runs a unique user id per run, or raise the test user's
+quota. Recorded rather than chosen.
