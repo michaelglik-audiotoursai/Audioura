@@ -8427,3 +8427,33 @@ third form: **state what was counted, and count before stating.**
 
 **Why this went unnoticed for so long:** nobody could run the full suite, so
 nobody saw what collection did. The thing that hid the problem was the problem.
+
+## D212 — The suite has 26 failing tests nobody could see (2026-08-06)
+
+LOCAL-297 made `pytest tests/` completable for the first time. The first honest
+full-suite result:
+
+```
+26 failed, 960 passed, 16 skipped, 50 errors in 335s
+```
+
+**960 passing tests, and 26 failures that have been invisible for months** —
+because collection aborted with `INTERNALERROR: SystemExit` or hung, so nobody
+ever reached the run phase. Every "tests pass" claim made in this project,
+including LEAD's own tonight, was scoped to hand-picked files.
+
+Of the 50 errors, 38 are missing third-party modules — `bs4` (18), `selenium`
+(12), `Crypto` (4), `cryptography` (1) — a dependency gap, not a code defect.
+The other 12 are runtime errors.
+
+**Do not mass-fix these.** Some will be genuinely stale tests for removed
+features; some will be real defects. Triaging 26 failures at 03:30 unattended,
+with no way to tell which is which, is how a green suite gets manufactured
+rather than earned. They should be worked through in daylight, individually,
+with Michael able to say which features still matter.
+
+**What this changes immediately:** "tests pass" is no longer an acceptable claim
+without naming what ran. LEAD has been reporting counts like "175 passed" all
+night; those were real, but they covered six chosen files out of 1014 collected
+tests. The honest form is the one used in this decision — the command, the
+counts, and the failures.

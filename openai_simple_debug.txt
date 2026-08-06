@@ -25,28 +25,26 @@ Return ONLY a JSON array, no other text, no markdown fences:
 [{"name": "...", "address": "..."}, ...]
 
 === OPENAI RESPONSE ===
-[
-    {"name": "Promenade des Anglais", "address": "06000 Nice"},
-    {"name": "Cap Ferrat", "address": "06230 Saint-Jean-Cap-Ferrat"},
-    {"name": "Old Town Antibes", "address": "06600 Antibes"},
-    {"name": "La Croisette", "address": "06400 Cannes"},
-    {"name": "Marineland Antibes", "address": "306 Avenue Mozart, 06600 Antibes"},
-    {"name": "Fort Carré", "address": "06600 Antibes"},
-    {"name": "Île Sainte-Marguerite", "address": "06400 Cannes"},
-    {"name": "Eze Village", "address": "06360 Èze"},
-    {"name": "Vieux Menton", "address": "06500 Menton"},
-    {"name": "Paloma Beach", "address": "06230 Saint-Jean-Cap-Ferrat"},
-    {"name": "Villa Ephrussi de Rothschild", "address": "06230 Saint-Jean-Cap-Ferrat"},
-    {"name": "Port Vauban", "address": "06600 Antibes"},
-    {"name": "Mont Boron", "address": "06300 Nice"},
-    {"name": "Cap d'Antibes", "address": "06160 Antibes"},
-    {"name": "Lérins Islands", "address": "06400 Cannes"},
-    {"name": "Villefranche-sur-Mer", "address": "06230 Villefranche-sur-Mer"},
-    {"name": "Château de la Chèvre d'Or", "address": "06360 Èze"},
-    {"name": "Parc du Cap Martin", "address": "06190 Roquebrune-Cap-Martin"},
-    {"name": "Musée Matisse", "address": "06000 Nice"},
-    {"name": "Théâtre de Verdure", "address": "06400 Cannes"}
-]
+[{"name": "Promenade des Anglais", "address": "06000 Nice, France"},
+{"name": "Cap d'Antibes", "address": "06160 Antibes, France"},
+{"name": "Old Town of Menton", "address": "06500 Menton, France"},
+{"name": "Port of Saint-Tropez", "address": "83990 Saint-Tropez, France"},
+{"name": "Île Saint-Honorat", "address": "06400 Cannes, France"},
+{"name": "Villa Ephrussi de Rothschild", "address": "06230 Saint-Jean-Cap-Ferrat, France"},
+{"name": "Paloma Beach", "address": "06230 Saint-Jean-Cap-Ferrat, France"},
+{"name": "Fort Carré d'Antibes", "address": "06600 Antibes, France"},
+{"name": "Château de la Napoule", "address": "06210 Mandelieu-la-Napoule, France"},
+{"name": "Vieux Port", "address": "06400 Cannes, France"},
+{"name": "Lérins Islands", "address": "06400 Cannes, France"},
+{"name": "Mont Boron", "address": "06300 Nice, France"},
+{"name": "La Croisette", "address": "06400 Cannes, France"},
+{"name": "Château Grimaldi", "address": "06600 Antibes, France"},
+{"name": "Eze Village", "address": "06360 Èze, France"},
+{"name": "Port Lympia", "address": "06300 Nice, France"},
+{"name": "Gorges du Loup", "address": "06450 Tourrettes-sur-Loup, France"},
+{"name": "Parc Phœnix", "address": "06200 Nice, France"},
+{"name": "Château de Crémat", "address": "06200 Nice, France"},
+{"name": "Saint-Paul-de-Vence", "address": "06570 Saint-Paul-de-Vence, France"}]
 
 === ANALYSIS ===
 Requested stops: 15
