@@ -1221,7 +1221,8 @@ _R7_PATTERNS = [
     # wafts/hangs/drifts/permeates/envelops" — broadens the existing pattern by
     # (a) adding fills/weaves/envelops/suffuses to the verb list and (b) not
     # requiring "the air" after the verb — any location works.
-    r'\b(?:the\s+)?(?:aroma|scent|fragrance|perfume|smell)\s+of\s+.+?\b(?:fills?|weaves?|wafts?|hangs?|lingers?|drifts?|floats?|permeates?|envelops?|suffuses?|spills?)\b',
+    # Handles both singular and plural (aromas/scents).
+    r'\b(?:the\s+)?(?:aroma|scent|fragrance|perfume|smell)s?\s+of\s+.+?\b(?:fills?|weaves?|wafts?|hangs?|lingers?|drifts?|floats?|permeates?|envelops?|suffuses?|spills?)\b',
     # AMBIENT SOUND ASSERTED AS PRESENT: "the [adj] clinking/clatter/hum/buzz/
     # murmur/chatter of X" — requires a sensory-atmospheric adjective to confirm
     # the sentence is asserting an ambient experience, not a bare factual mention.
