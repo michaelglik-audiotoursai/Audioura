@@ -7201,6 +7201,78 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
         # exhibition checks) and the model paraphrased or dropped the required facts.
         # The block now uses explicit English target strings and a "FINAL REQUIREMENT" header
         # to maximise compliance.
+        #
+        # [LOCAL-322] FR→EN material mapping. The catalogue materials extracted by
+        # story_miner._extract_material() are in French. The narration is English.
+        # This mapping translates every French material term the extractor can
+        # return (its _MATERIALS list) into its standard English art-history
+        # equivalent. Built from the actual corpus terms, not invented.
+        _FR_EN_MATERIAL_MAP = {
+            'acier': 'steel',
+            'cuivre': 'copper',
+            'cuir': 'leather',
+            'soie': 'silk',
+            'laque': 'lacquer',
+            'schiste': 'schist',
+            'chlorite': 'chlorite',
+            'bois': 'wood',
+            'bronze': 'bronze',
+            'marbre': 'marble',
+            'porcelaine': 'porcelain',
+            'céramique': 'ceramic',
+            'jade': 'jade',
+            'ivoire': 'ivory',
+            'laiton': 'brass',
+            'terre cuite': 'terracotta',
+            'grès': 'stoneware',
+            'fer': 'iron',
+            'argent': 'silver',
+            'papier': 'paper',
+            'encre': 'ink',
+            'gouache': 'gouache',
+            'huile': 'oil',
+            'aquarelle': 'watercolor',
+            'pastel': 'pastel',
+            "feuille d'or": 'gold leaf',
+            'dorure': 'gilding',
+            'xylogravure': 'woodblock print',
+            'soie brodée': 'embroidered silk',
+            'bois laqué': 'lacquered wood',
+            'cuir laqué': 'lacquered leather',
+            'polychrome': 'polychrome',
+            'laqué': 'lacquered',
+            'laquée': 'lacquered',
+            'or': 'gold',
+        }
+
+        # [LOCAL-322] Translate a single French material term to English.
+        # If the full term matches, use it. Otherwise try each word.
+        # Returns None if no translation is known (caller should omit, not emit French).
+        def _translate_material_to_english(fr_term):
+            """Translate a French material term to English using the corpus-derived map."""
+            fr_lower = fr_term.strip().lower()
+            if fr_lower in _FR_EN_MATERIAL_MAP:
+                return _FR_EN_MATERIAL_MAP[fr_lower]
+            # Try multi-word compound (e.g., "bois laqué")
+            for fr_key, en_val in _FR_EN_MATERIAL_MAP.items():
+                if fr_key == fr_lower:
+                    return en_val
+            return None
+
+        # [LOCAL-322] Translate the full comma-separated material string.
+        # Returns (english_primary, english_all_list) where english_primary is
+        # the first material translated (or None), and english_all_list are all
+        # successfully translated terms.
+        _material_english = None  # The primary material in English
+        _material_english_all = []  # All translated materials
+        if _c51_material:
+            _mat_parts = [p.strip() for p in _c51_material.split(',')]
+            for _mp in _mat_parts:
+                _en = _translate_material_to_english(_mp)
+                if _en:
+                    _material_english_all.append(_en)
+            _material_english = _material_english_all[0] if _material_english_all else None
+
         if _c51_period or _c51_material:
             _final_binding = "\n━━━ FINAL REQUIREMENT (non-negotiable — your description will be REJECTED if these are missing) ━━━\n"
             if _c51_period:
@@ -7237,11 +7309,16 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                 _final_binding += f'YOUR DESCRIPTION MUST CONTAIN THIS DATE: "{_period_english}"\n'
                 _final_binding += f'  Write the exact string "{_period_english}" somewhere in your text. Not "around that time", not a vague century — the literal string "{_period_english}".\n'
             if _c51_material:
-                # [LOCAL-98] Use the primary (first) material for binding — multi-value
-                # strings like "bois, bois laqué, laqué" can't be embedded verbatim.
-                _primary_material = _c51_material.split(',')[0].strip()
-                _final_binding += f'YOUR DESCRIPTION MUST CONTAIN THIS MATERIAL: "{_primary_material}"\n'
-                _final_binding += f'  Write the word "{_primary_material}" somewhere in your text. Do not substitute a different material.\n'
+                # [LOCAL-322] Use English material name in the prompt binding.
+                # If no English translation exists, omit material binding entirely
+                # (a false pass costs nothing; a false fail ships broken French prose).
+                if _material_english:
+                    _final_binding += f'YOUR DESCRIPTION MUST MENTION THIS MATERIAL: "{_material_english}"\n'
+                    _final_binding += f'  Mention that this work is made of/crafted from "{_material_english}" somewhere in your text.\n'
+                else:
+                    # [LOCAL-322] No known English translation — do not ask the LLM to
+                    # write an untranslatable French term. Skip material binding.
+                    print(f"  [LOCAL-322] Stop {stop_num}: no EN translation for material '{_c51_material}' — skipping material binding")
             _final_binding += "━━━ END FINAL REQUIREMENT ━━━\n"
             description_prompt += _final_binding
 
@@ -7389,7 +7466,22 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                                         continue
                             else:
                                 # [LOCAL-98] Other period formats — check literal presence
-                                if _c51_period.lower() not in _desc_lower:
+                                # [LOCAL-322] Also accept _period_english (the translated form).
+                                # For era names (e.g., "Époque Edo"), the LLM writes "Edo period"
+                                # which won't match the French literal. Same bug shape as material.
+                                _period_literal_found = (
+                                    _c51_period.lower() in _desc_lower or
+                                    _period_english.lower() in _desc_lower
+                                )
+                                # [LOCAL-322] Also try extracting key era name (e.g., "Edo" from "Époque Edo")
+                                if not _period_literal_found:
+                                    import re as _re322p
+                                    _era_name_m = _re322p.search(r'(?:[EÉ]poque|[EÈ]re)\s+(?:d[e\']?\s*)?([\w]+)', _c51_period, _re322p.IGNORECASE)
+                                    if _era_name_m:
+                                        _era_keyword = _era_name_m.group(1).lower()
+                                        if _era_keyword in _desc_lower:
+                                            _period_literal_found = True
+                                if not _period_literal_found:
                                     _period_ok = False
                                     print(f"  [LOCAL-98] Stop {stop_num}: catalogue period '{_c51_period}' missing from description.")
                                     if _attempt < _max_retries:
@@ -7397,27 +7489,41 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                                         continue
 
                         # Check material
+                        # [LOCAL-322] Language-aware check: compare the ENGLISH
+                        # translation against English prose. If no translation
+                        # exists, treat as satisfied (false pass is harmless;
+                        # false fail ships broken French prose).
                         _material_ok = True
                         if _c51_material:
-                            # [LOCAL-98] Check primary material (first in comma-separated list)
-                            _primary_mat = _c51_material.split(',')[0].strip().lower()
-                            if _primary_mat not in _desc_lower:
-                                _material_ok = False
-                                print(f"  [LOCAL-98] Stop {stop_num}: catalogue material '{_primary_mat}' missing from description.")
-                                if _attempt < _max_retries and _period_ok:
-                                    # Only retry for material if period was OK (avoid double-retry)
-                                    print(f"  [LOCAL-98] Stop {stop_num}: retrying (attempt {_attempt+1}) for material...")
-                                    continue
+                            if _material_english:
+                                # Check English term in description
+                                if _material_english.lower() not in _desc_lower:
+                                    # [LOCAL-322] Also accept common variants/synonyms
+                                    # e.g., "schist" matches "grey schist", "lacquer" matches "lacquered"
+                                    _mat_stem = _material_english.lower().rstrip('ed').rstrip('er')
+                                    if len(_mat_stem) >= 4 and _mat_stem not in _desc_lower:
+                                        _material_ok = False
+                                        print(f"  [LOCAL-98] Stop {stop_num}: material '{_material_english}' (from FR '{_c51_material.split(',')[0].strip()}') missing from description.")
+                                        if _attempt < _max_retries and _period_ok:
+                                            print(f"  [LOCAL-98] Stop {stop_num}: retrying (attempt {_attempt+1}) for material...")
+                                            continue
+                                    # else: stem found (e.g., "lacquer" in "lacquered wood") — pass
+                            else:
+                                # [LOCAL-322] No English translation known — skip check.
+                                # A false pass costs nothing; a false fail injects French.
+                                print(f"  [LOCAL-322] Stop {stop_num}: no EN translation for '{_c51_material.split(',')[0].strip()}' — treating as satisfied")
 
-                        # [LOCAL-31] Patch missing material/period into the description
-                        # (last resort after retries exhausted)
+                        # [LOCAL-31] [LOCAL-322] Patch missing material/period into the description
+                        # (last resort after retries exhausted).
+                        # LOCAL-322: patches now use ENGLISH terms and form a complete sentence.
                         if not _period_ok or not _material_ok:
                             _patch_parts = []
-                            if not _material_ok and _c51_material:
-                                _primary_mat_patch = _c51_material.split(',')[0].strip()
-                                _patch_parts.append(f"crafted in {_primary_mat_patch}")
+                            if not _material_ok and _material_english:
+                                # [LOCAL-322] Use English material name, never French
+                                _patch_parts.append(f"crafted from {_material_english}")
                             if not _period_ok and _c51_period:
-                                _patch_parts.append(f"dating from the {_c51_period}")
+                                # [LOCAL-322] Use _period_english (computed earlier) not raw French
+                                _patch_parts.append(f"dating from the {_period_english}")
                                 # Also fix any WRONG century that was detected in the text
                                 if _arabic_century:
                                     # Replace wrong ordinal century with correct one
@@ -7431,16 +7537,19 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                                     elif _arabic_century == '3': _correct_ordinal = "3rd-century"
                                     description = _wrong_ordinal.sub(_correct_ordinal, description)
                             if _patch_parts:
-                                _patch_sentence = f"This work, {', '.join(_patch_parts)}, "
+                                # [LOCAL-322] Build a grammatical standalone sentence.
+                                # Old: "This work, crafted in schiste, " (fragment, comma-spliced)
+                                # New: "This work was crafted from schist." (complete sentence)
+                                _patch_sentence = "This work was " + " and ".join(_patch_parts) + "."
                                 # Insert after first sentence
                                 _first_period_idx = description.find('. ')
                                 if _first_period_idx > 20:
                                     description = (description[:_first_period_idx + 2]
-                                                   + _patch_sentence
+                                                   + _patch_sentence + " "
                                                    + description[_first_period_idx + 2:].lstrip())
                                 else:
-                                    description = _patch_sentence + description[0].lower() + description[1:]
-                                print(f"  [LOCAL-31] Stop {stop_num}: patched missing metadata into description.")
+                                    description = _patch_sentence + " " + description
+                                print(f"  [LOCAL-31] Stop {stop_num}: patched missing metadata into description (EN: {', '.join(_patch_parts)}).")
 
                         # [LOCAL-31] Check for unsourced provenance assertion
                         # If no origin in catalogue, but description asserts one, flag it
