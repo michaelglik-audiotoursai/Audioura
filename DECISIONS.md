@@ -7764,3 +7764,46 @@ Recommendation to put to Michael: score facts-per-sentence normalised against
 available corpus, drop the correlation bonus until a real callback can be
 distinguished from an itinerary mention, and stop treating 100 as a ceiling that
 bonuses may exceed. Not to be dispatched without his decision.
+
+## D197 — Refining D196: the bonus is not always an artifact, it is undiscriminating (2026-08-05)
+
+D196 concluded from round 15 that the cross-stop correlation bonus is "a
+measurement artifact". LEAD then measured it across **all 41 Riviera tours** on
+disk, classifying each callback by whether route language sits near the mention:
+
+```
+  bonus earned ONLY by itinerary mentions      6 tours
+  at least one genuine narrative callback     13 tours
+  no callback at all                          22 tours
+```
+
+**So the blanket claim was too strong.** Roughly a third of bonused tours earn it
+purely from an itinerary sentence; two thirds have something that reads like a
+real callback. D196's specific finding stands — round 15's entire +25 margin came
+from *"from the opulent Cap d'Antibes to the ancient Eze Village"* — but "the
+bonus is an artifact" overstates it.
+
+**The accurate statement:** the bonus **cannot distinguish** a narrative callback
+from an itinerary mention, and fires on both. That is still disqualifying for a
+score used to compare tours — it means a tour can gain 25 points for stating
+where it goes — but it is a discrimination failure, not a pure artifact.
+
+Two further observations from the same measurement:
+
+- **22 of 41 tours receive no correlation bonus at all.** The rubric's largest
+  lever is inactive on more than half the corpus, which makes it a source of
+  variance between tours rather than a consistent measure of them.
+- LEAD's narrative/itinerary split is itself heuristic — proximity of route
+  language. Some of the 13 "narrative" cases may also be spurious. The honest
+  reading is an upper bound on genuine callbacks, not a count of them.
+
+**What this changes in the recommendation to Michael:** not "drop the bonus"
+outright, but "the bonus needs a real test for what a callback *is* before it
+can carry 50% weight." If that test proves hard to write, dropping it is the
+safer default — a term that fires on a third of eligible tours for the wrong
+reason is worse than no term.
+
+**And a note on LEAD's own reasoning.** D196 was written from a single
+compelling example and generalised. The generalisation was wrong in degree. The
+example was real and the conclusion directionally right, which is exactly the
+kind of error that survives review — it feels verified because part of it was.
