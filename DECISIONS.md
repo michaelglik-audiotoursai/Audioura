@@ -8986,3 +8986,52 @@ whether the message exists, so it is sound.
 
 **Outstanding for Michael:** approving the regeneration cost. Until then the
 guardrails observe and log, which the flag default already enforces.
+
+## D228 — The 75 gate is met on four independent draws (2026-08-06)
+
+Michael's field-test gate, set 2026-07-29: **75 at N=8 on the Asian Arts
+Museum**, deliberately not softened to N=6.
+
+LEAD reported 75.0 on one draw earlier today and explicitly declined to call it a
+pass — *"exactly 75, not comfortably above; the instrument changed an hour ago;
+one tour on one stop-draw, where D183 records 4× variance."* Ran three more.
+
+```
+draw                       stops    base   defensible   RICH
+LOCAL303 (this morning)      8/8     75.0        75.0      3
+LOCAL308 draw 1              8/8     78.1        79.7      3
+LOCAL308 draw 2              8/8     75.0        79.4      2
+LOCAL308 draw 3              8/8     81.2        84.5      4
+
+4 draws: min 75.0  median 79.5  max 84.5   clears 75: 4/4   all 8/8 stops
+```
+
+**"Defensible" excludes the cross-stop correlation bonus**, which LEAD documented
+as spurious (D201, D219) — on these tours it fires on two stops both being about
+Kannon and on the recap sentence naming several stops. Including it, the rubric
+prints 101.6 to 108. The figures above are the honest ones.
+
+**What this does and does not establish.**
+
+It establishes that the venue now yields eight verified stops every time — it was
+capped at six canonical titles in July — and that scores cluster around 79 rather
+than sitting on the line. The single 75.0 was the floor of four, not a fluke
+ceiling.
+
+It does **not** establish that tours are accurate. FABRICATED remains
+uncomputable (D200): nothing in the scorer checks whether a fact is true, and
+groundedness measures corpus coverage, not truth. **A tour can score 84.5 and
+contain invented claims.**
+
+Nor is it evidence about other venues. Four draws on one museum is what was
+asked for and all that was measured.
+
+**Two honest caveats on the instrument.** The fact detector was widened this
+morning (LOCAL-304), which moved this venue from 71.9 to 75.0 — the measure
+changed on the same day the target was reached, and that ordering deserves to be
+visible. And LOCAL-305 raised FABRICATED to −1.5 and split MISSING, neither of
+which affects a tour delivering 8/8.
+
+**This is Michael's call, not LEAD's.** The gate is his and the field test is
+his. What LEAD can say is that the condition he named is now met on four
+consecutive draws, measured without the term LEAD believes is unsound.
