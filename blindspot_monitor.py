@@ -343,10 +343,14 @@ def run_venue_distribution_check(tour_dir: str, conn) -> Tuple[List[VenueStats],
 # ---------------------------------------------------------------------------
 
 def _count_facts_with_llm(stop_title: str, stop_text: str) -> Tuple[int, str, float]:
-    """Ask an LLM to count verifiable facts in a stop. Returns (count, explanation, cost_usd)."""
-    import openai
+    """Ask an LLM to count verifiable facts in a stop. Returns (count, explanation, cost_usd).
 
-    client = openai.OpenAI(api_key=os.environ['OPENAI_API_KEY'])
+    Uses requests.post to the OpenAI chat completions endpoint — the same
+    pattern every other service in this codebase uses. No openai library needed.
+    """
+    import requests as _requests
+
+    api_key = os.environ['OPENAI_API_KEY']
 
     prompt = f"""Count the verifiable facts in this audio tour stop narration. 
 A "verifiable fact" is a specific, concrete claim that could be checked against a reference:
@@ -370,25 +374,41 @@ Stop text:
 Respond in this exact JSON format:
 {{"fact_count": <integer>, "facts_listed": ["fact 1", "fact 2", ...], "explanation": "brief reasoning"}}"""
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.0,
-        max_tokens=1000,
+    response = _requests.post(
+        "https://api.openai.com/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": "gpt-4o-mini",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.0,
+            "max_tokens": 1000,
+        },
+        timeout=30,
     )
 
-    # Calculate cost (gpt-4o-mini: $0.15/1M input, $0.60/1M output)
-    usage = response.usage
-    cost = (usage.prompt_tokens * 0.15 / 1_000_000) + (usage.completion_tokens * 0.60 / 1_000_000)
+    if response.status_code != 200:
+        error_msg = response.text[:200]
+        raise RuntimeError(f"OpenAI API error {response.status_code}: {error_msg}")
 
-    content = response.choices[0].message.content.strip()
+    data = response.json()
+
+    # Calculate cost (gpt-4o-mini: $0.15/1M input, $0.60/1M output)
+    usage = data.get("usage", {})
+    prompt_tokens = usage.get("prompt_tokens", 0)
+    completion_tokens = usage.get("completion_tokens", 0)
+    cost = (prompt_tokens * 0.15 / 1_000_000) + (completion_tokens * 0.60 / 1_000_000)
+
+    content = data["choices"][0]["message"]["content"].strip()
     # Parse JSON response
     try:
         # Handle markdown code blocks
         if content.startswith('```'):
             content = content.split('\n', 1)[1].rsplit('```', 1)[0].strip()
-        data = json.loads(content)
-        return data.get('fact_count', 0), content, cost
+        parsed = json.loads(content)
+        return parsed.get('fact_count', 0), content, cost
     except (json.JSONDecodeError, KeyError):
         return 0, content, cost
 
