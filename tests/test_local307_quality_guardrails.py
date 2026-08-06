@@ -20,8 +20,7 @@ import os
 import sys
 import json
 
-# Route to test database
-os.environ["AUDIOURA_DB_TARGET"] = "test"
+# LOCAL-325: Route to test database via fixture, not module-scope assignment.
 # Ensure guardrails flag is OFF by default for most tests
 os.environ.pop("QUALITY_GUARDRAILS_ENABLED", None)
 
@@ -32,6 +31,14 @@ import pytest
 from unittest.mock import patch
 from dataclasses import dataclass, field
 from typing import List
+
+
+@pytest.fixture(autouse=True)
+def _force_test_db(monkeypatch):
+    """Scope AUDIOURA_DB_TARGET to this module — no session-wide pollution."""
+    monkeypatch.setenv('AUDIOURA_DB_TARGET', 'test')
+    yield
+
 
 # Import the modules under test
 from quality_guardrails import (

@@ -18,7 +18,8 @@ import pytest
 
 # This test reads venue_corpus and stop_corpus which only exist in production DB.
 # It does NOT write. Safe to target production for reads.
-os.environ['AUDIOURA_DB_TARGET'] = 'production'
+# LOCAL-325: Scoped via autouse fixture instead of module-scope assignment to
+# prevent env pollution across test files in the same pytest session.
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -31,8 +32,24 @@ from stop_existence_gate import (
 )
 
 
+@pytest.fixture(autouse=True, scope="module")
+def _force_production_db(monkeypatch_module):
+    """Route this module to production DB (read-only) without polluting other modules."""
+    monkeypatch_module.setenv('AUDIOURA_DB_TARGET', 'production')
+    yield
+
+
 @pytest.fixture(scope="module")
-def db_conn():
+def monkeypatch_module():
+    """Module-scoped monkeypatch (pytest's monkeypatch is function-scoped)."""
+    from _pytest.monkeypatch import MonkeyPatch
+    mp = MonkeyPatch()
+    yield mp
+    mp.undo()
+
+
+@pytest.fixture(scope="module")
+def db_conn(_force_production_db):
     if not check_db_available():
         pytest.skip("Database unavailable")
     conn = get_connection()

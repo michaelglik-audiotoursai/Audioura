@@ -20,8 +20,7 @@ import json
 import importlib
 import re
 
-# Route to test database BEFORE any imports
-os.environ["AUDIOURA_DB_TARGET"] = "test"
+# LOCAL-325: Route to test database via fixture, not module-scope assignment.
 os.environ.pop("QUALITY_GUARDRAILS_ENABLED", None)
 os.environ.pop("QUALITY_MESSAGE_THRESHOLD", None)
 
@@ -30,6 +29,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 
 import pytest
 from unittest.mock import patch, MagicMock
+
+
+@pytest.fixture(autouse=True)
+def _force_test_db(monkeypatch):
+    """Scope AUDIOURA_DB_TARGET to this module — no session-wide pollution."""
+    monkeypatch.setenv('AUDIOURA_DB_TARGET', 'test')
+    yield
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────

@@ -158,11 +158,24 @@ def _default_dbname():
     return _PRODUCTION_DBNAME
 
 
-DEFAULT_DBNAME = _default_dbname()
-DEFAULT_DATABASE_URL = (
-    f"postgresql://{DEFAULT_USER}:{DEFAULT_PASSWORD}"
-    f"@{DEFAULT_HOST}:{DEFAULT_PORT}/{DEFAULT_DBNAME}"
-)
+# LOCAL-325: These were previously module-scope constants computed at import
+# time.  That baked in the AUDIOURA_DB_TARGET value from the moment of first
+# import, making monkeypatch.setenv in test fixtures ineffective.  They are
+# now lazy — re-evaluated on every access via __getattr__ — so that per-test
+# fixtures can change the target and have get_connection() honour it.
+
+
+def __getattr__(name):
+    """Lazy module-level attributes — resolved on access, not at import."""
+    if name == "DEFAULT_DBNAME":
+        return _default_dbname()
+    if name == "DEFAULT_DATABASE_URL":
+        dbname = _default_dbname()
+        return (
+            f"postgresql://{DEFAULT_USER}:{DEFAULT_PASSWORD}"
+            f"@{DEFAULT_HOST}:{DEFAULT_PORT}/{dbname}"
+        )
+    raise AttributeError(f"module 'db_connection' has no attribute {name!r}")
 
 EXIT_DB_UNREACHABLE = 7
 
