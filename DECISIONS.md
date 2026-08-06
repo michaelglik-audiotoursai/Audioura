@@ -9386,3 +9386,42 @@ magnitude — but the direction is the finding.
 → **LOCAL-316** adds painting and print media, including French forms, since the
 corpus is bilingual and Chagall's catalogue is French. It is forbidden from
 changing thresholds and must report the corpus distribution before and after.
+
+## D237 — Chagall was both, and the agent reported not clearing the bar (2026-08-06)
+
+LOCAL-316 added painting and print media, including French forms. Measured:
+
+```
+corpus     before  RICH 8.0%  ADEQ 26.6%  THIN 65.3%
+           after   RICH 8.4%  ADEQ 30.0%  THIN 61.5%
+Chagall    0.000 -> 0.083   (monitor, all 47 stops)
+Asian Arts unregressed
+generic art language still 0
+```
+
+**Chagall is still flagged.** The threshold is 0.087; it reached 0.083. The
+agent said so plainly instead of nudging a vocabulary entry to clear it — the
+easiest possible dishonesty in a task like this, and it did not take it.
+
+**LOCAL-315 diagnosed Chagall as a detector blind spot. That was half right, and
+the half matters.** LEAD read the stops that remain at zero:
+
+> *"As you gaze upon 'Le prophète Jérémie,' you are greeted by a striking
+> composition depicting the biblical prophet Jeremiah, his sorrowful expression
+> capturing the weight of his prophetic burden."*
+
+No date, no medium, no dimension — description and interpretation only. **For
+that stop the detector is correct.** The 29 stops containing "canvas" were a
+blind spot and are now fixed; the remainder are genuinely thin and the answer
+there is corpus work, not vocabulary.
+
+The task asked LOCAL-315 to choose between "blind spot" and "thin corpus". It was
+**both, in different stops**, and the binary framing came from LEAD. A venue-level
+median can be depressed by two unrelated causes at once, and asking which one it
+is invites a wrong answer. The better question was *what fraction of the
+zero-fact stops contain uncounted material terms* — which would have given 29 of
+47 and pointed at both remedies immediately.
+
+**Standing consequence:** Chagall staying flagged is now a *correct* signal, not
+an outstanding defect. The monitor should keep flagging it until its corpus
+improves, and nobody should treat clearing that flag as the goal.
