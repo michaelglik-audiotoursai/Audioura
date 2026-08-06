@@ -6901,6 +6901,49 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                     _work_facts.append(_ev['snippet'])
             if _work_facts:
                 _facts_text = '. '.join(f[:200] for f in _work_facts[:4])
+                # [LOCAL-322] Replace known French material terms with English in the
+                # injected context, so the LLM doesn't echo them into English prose.
+                # This is the same map used for FINAL BINDING translation.
+                _fr_en_context_map = {
+                    'xylogravure polychrome': 'polychrome woodblock print',
+                    'xylogravure': 'woodblock print',
+                    'xylographie': 'woodcut',
+                    'bois laqué': 'lacquered wood',
+                    'cuir laqué': 'lacquered leather',
+                    'soie brodée': 'embroidered silk',
+                    'terre cuite': 'terracotta',
+                    "feuille d'or": 'gold leaf',
+                    'schiste gris': 'grey schist',
+                    'schiste': 'schist',
+                    'acier': 'steel',
+                    'cuivre': 'copper',
+                    'cuir': 'leather',
+                    'soie': 'silk',
+                    'laque': 'lacquer',
+                    'bois': 'wood',
+                    'marbre': 'marble',
+                    'porcelaine': 'porcelain',
+                    'céramique': 'ceramic',
+                    'ivoire': 'ivory',
+                    'laiton': 'brass',
+                    'grès': 'stoneware',
+                    'fer': 'iron',
+                    'argent': 'silver',
+                    'papier': 'paper',
+                    'encre': 'ink',
+                    'huile': 'oil',
+                    'dorure': 'gilding',
+                }
+                # Replace longest matches first to avoid partial substitution
+                for _fr_ctx, _en_ctx in sorted(_fr_en_context_map.items(), key=lambda x: -len(x[0])):
+                    if _fr_ctx in _facts_text.lower():
+                        import re as _re322ctx
+                        _facts_text = _re322ctx.sub(
+                            r'\b' + _re322ctx.escape(_fr_ctx) + r'\b',
+                            _en_ctx,
+                            _facts_text,
+                            flags=_re322ctx.IGNORECASE
+                        )
                 description_prompt += f"\nDOCUMENTED FACTS FOR THIS WORK (incorporate at least one):\n{_facts_text}\n"
 
         # [B6] Scored story elements → generation wiring (per-status phrasing)
@@ -7315,10 +7358,17 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                 if _material_english:
                     _final_binding += f'YOUR DESCRIPTION MUST MENTION THIS MATERIAL: "{_material_english}"\n'
                     _final_binding += f'  Mention that this work is made of/crafted from "{_material_english}" somewhere in your text.\n'
+                    # [LOCAL-322] If there are additional translated materials, mention them
+                    if len(_material_english_all) > 1:
+                        _all_en_str = ', '.join(_material_english_all)
+                        _final_binding += f'  The full material list in English is: {_all_en_str}. You may mention multiple materials.\n'
                 else:
                     # [LOCAL-322] No known English translation — do not ask the LLM to
                     # write an untranslatable French term. Skip material binding.
                     print(f"  [LOCAL-322] Stop {stop_num}: no EN translation for material '{_c51_material}' — skipping material binding")
+            # [LOCAL-322] Prevent French material terms from leaking into English narration
+            # from the DOCUMENTED FACTS context injected earlier.
+            _final_binding += 'LANGUAGE: Write ONLY in English. If the context above contains French terms for materials or techniques (e.g., "xylogravure", "bois", "soie"), translate them to English (e.g., "woodblock print", "wood", "silk"). Never write French words in your description.\n'
             _final_binding += "━━━ END FINAL REQUIREMENT ━━━\n"
             description_prompt += _final_binding
 
