@@ -1729,6 +1729,11 @@ _LAST_VERIFICATION_TIER = ""
 # Keys: total_cost, total_tokens, cache_hit, breakdown (dict with llm/tts/search)
 _LAST_GENERATION_COST = {"total_cost": 0.0, "total_tokens": 0, "cache_hit": False, "breakdown": {}}
 
+# [LOCAL-323] Module-level: set by the service layer before calling generate_tour_text.
+# Used by spine_generator to attribute cost. Same pattern as _LAST_GENERATION_COST
+# but write-before/read-during instead of read-after.
+_CURRENT_JOB_USER_ID = None
+_CURRENT_JOB_ID = None
 
 
 def _is_artist_human(artist_qid: str) -> bool:
@@ -6048,6 +6053,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 theme_name="",
                 story_elements=_story_elements if _story_elements else None,
                 thread_result=_thread_result,
+                user_id=_CURRENT_JOB_USER_ID,
+                job_id=_CURRENT_JOB_ID,
             )
 
             # [LOCAL-278] Fold the spine's cost into the pipeline total. It was
@@ -6087,6 +6094,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             theme_name="",
                             story_elements=_story_elements if _story_elements else None,
                             thread_result=_thread_result,
+                            user_id=_CURRENT_JOB_USER_ID,
+                            job_id=_CURRENT_JOB_ID,
                         )
                         if _retry_spine:
                             _retry_score, _retry_breakdown = _score_spine(_retry_spine, total_stops=len(_poi_names))

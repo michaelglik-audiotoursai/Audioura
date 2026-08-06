@@ -322,7 +322,7 @@ self.addEventListener('install', function(event) {
 });
 '''
 
-def generate_modernized_tour_async(job_id, tour_file_path):
+def generate_modernized_tour_async(job_id, tour_file_path, user_id=None, orchestrator_job_id=None):
     """Generate modernized tour from existing tour text file"""
     try:
         ACTIVE_JOBS.update(job_id, status="processing", progress="Processing tour text file...")
@@ -343,10 +343,19 @@ def generate_modernized_tour_async(job_id, tour_file_path):
                 # Call Polly TTS service (with auth for Cloud Run)
                 tts_headers = {"Content-Type": "application/json"}
                 tts_headers.update(_get_auth_token(POLLY_TTS_URL))
+                # [LOCAL-323] Forward user_id and job_id for cost attribution
+                tts_payload = {
+                    "text": _strip_nav_fields_for_tts(text_content),
+                    "voice": "Joanna",
+                }
+                if user_id:
+                    tts_payload["user_id"] = user_id
+                if orchestrator_job_id:
+                    tts_payload["job_id"] = orchestrator_job_id
                 tts_response = requests.post(
                     f"{POLLY_TTS_URL}/synthesize",
                     headers=tts_headers,
-                    json={"text": _strip_nav_fields_for_tts(text_content), "voice": "Joanna"},
+                    json=tts_payload,
                     timeout=30
                 )
                 
@@ -465,6 +474,9 @@ def process_tour():
     Accepts EITHER:
       - tour_file: filename to read from /app/tours/ (local Docker mode)
       - tour_content: inline text content (Cloud Run mode, no shared volume)
+    Optional attribution fields (LOCAL-323):
+      - user_id: user who triggered the tour (forwarded to TTS metering)
+      - job_id: orchestrator job_id (forwarded to TTS metering)
     """
     data = request.json
     if not data:
@@ -472,6 +484,9 @@ def process_tour():
     
     tour_file = data.get('tour_file')
     tour_content = data.get('tour_content')
+    # [LOCAL-323] Accept user_id and job_id for cost attribution
+    user_id = data.get('user_id')
+    orchestrator_job_id = data.get('job_id')
     
     if not tour_file and not tour_content:
         return jsonify({"error": "Either 'tour_file' or 'tour_content' parameter is required"}), 400
@@ -504,7 +519,7 @@ def process_tour():
     
     thread = threading.Thread(
         target=generate_modernized_tour_async,
-        args=(job_id, tour_file_path)
+        args=(job_id, tour_file_path, user_id, orchestrator_job_id)
     )
     thread.daemon = True
     thread.start()

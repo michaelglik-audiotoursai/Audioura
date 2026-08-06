@@ -51,6 +51,9 @@ VALID_OPERATION_TYPES = frozenset([
     "photo_extension",
     # LOCAL-278: spine generation was invisible to the meter until now.
     "spine_generate",
+    # LOCAL-323: TTS metering — previously invisible to the ledger.
+    "tts_generate",
+    "tts_cache_hit",
 ])
 
 

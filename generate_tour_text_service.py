@@ -161,6 +161,11 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
             "log_file": api_call_logger.get_log_path(),
         })
         
+        # [LOCAL-323] Set module-level job context for spine attribution
+        import generate_tour_text as _gtt_module
+        _gtt_module._CURRENT_JOB_USER_ID = user_id
+        _gtt_module._CURRENT_JOB_ID = job_id
+
         # Generate the tour text - PASS total_stops and persona parameters
         tour_text, _, coordinates = generate_tour_text(location, tour_type, temp_path, total_stops, persona=_persona_value)
         
