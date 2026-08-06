@@ -4,6 +4,7 @@ Script to test that existing endpoints still work after extending the service
 """
 import requests
 import json
+import pytest
 
 def test_endpoint(url, description):
     """Test an endpoint and report results"""

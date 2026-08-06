@@ -4,7 +4,9 @@ Test Guy Raz newsletter processing with fixed transaction handling
 """
 import requests
 import json
+import pytest
 
+@pytest.mark.service
 def test_guy_raz_newsletter():
     url = "http://localhost:5017/process_newsletter"
     

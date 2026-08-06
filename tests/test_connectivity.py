@@ -5,6 +5,7 @@ Script to test connectivity between services
 import requests
 import time
 import sys
+import pytest
 
 def test_service(service_name, url, max_retries=3):
     print(f"Testing connection to {service_name} at {url}")

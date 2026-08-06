@@ -7,6 +7,7 @@ import requests
 import json
 import psycopg2
 from datetime import datetime
+import pytest
 
 def cleanup_nytimes_newsletter():
     """Clean up any existing NY Times newsletter records"""
@@ -30,6 +31,7 @@ def cleanup_nytimes_newsletter():
         if 'conn' in locals():
             conn.close()
 
+@pytest.mark.service
 def test_nytimes_newsletter():
     """Test NY Times newsletter processing"""
     newsletter_url = "https://nl.nytimes.com/f/a/U1pikD1QtR3tGYamysXC2Q~~/AAAAARA~/-8uIGU8r2JbBucijsG_B2mMYtFPB1bVYjJ2GDx0U6XnmPbA1BOf2XfTZO8qDtcAaO3wTn5H2-_SY0IrJ38od4-X26ZZgdDZY6PPd1BmRlb_k23PSwGIM4pUCVJakVaWFa1FIDTcpLUHZVPRNWJ3L_tUgSEiJTtkHbV9A86NTP_PEc6PyXBwBVj2B36mF327c-w_UC3-7pL63ofzV5khb9WDz3ME5LMyzKpBHAwlEz6PX2ZBvYDfVOEZ-jf780_tPCPqEkz95kIUgqYoRy231aNBrWc8Y_Ox9NpwV9_vSC9S_L-6fzaDDf8i1P1534GVshe8iO_HEoeRUYzuU5XpHsCX1GmyQLrl-z8eCyywz6oNKki4Z7RTJG4MoYaDAzFHF8VsrPnO1g39_5TzBaOAdirqulKG7S6UAgNtSUXS-Cs28tYCAROiXsNLT7K7SCwropjCLK4dBQxstcNgFMwU8o7GJUoXeWMm5hvGeHQPsLzGaZvaWvHwIiNjGY5DJsJ4YykwkoUyPa006fA_v-wnikaSH_HJdc0gyez6jER0GyE8~"

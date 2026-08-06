@@ -207,6 +207,21 @@ def _get_db_source():
 
 
 def get_database_url():
+    # ─── LOCAL-302: Scope limitation ────────────────────────────────────────────
+    #
+    # This function (and the AUDIOURA_DB_TARGET switch) governs IN-PROCESS
+    # database access only. Tests that drive a running Docker service over HTTP
+    # (e.g. POST to localhost:5002/generate-complete-tour) write wherever the
+    # SERVICE's own DATABASE_URL points — typically production. The switch in
+    # THIS process has no effect on what the container does.
+    #
+    # Such tests are marked @pytest.mark.service and can be excluded with:
+    #     pytest -m "not service"
+    #
+    # That gives a suite run that provably cannot touch production through a
+    # service, regardless of what AUDIOURA_DB_TARGET is set to.
+    # ────────────────────────────────────────────────────────────────────────────
+    #
     # [D214] An explicit AUDIOURA_DB_TARGET outranks ambient environment.
     #
     # This function previously consulted DATABASE_URL first and passed

@@ -25,6 +25,7 @@ import time
 import requests
 import argparse
 from datetime import datetime
+import pytest
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -64,6 +65,7 @@ def make_headers(api_key_required=False):
     return headers
 
 
+@pytest.mark.service
 def test_health(base_url):
     """Verify gateway/service is reachable."""
     print("\n--- Health Check ---")
@@ -79,6 +81,7 @@ def test_health(base_url):
         return False
 
 
+@pytest.mark.service
 def test_newsletters_list(base_url):
     """GET /newsletters_v2 — list existing newsletters."""
     print("\n--- List Newsletters ---")
@@ -102,6 +105,7 @@ def test_newsletters_list(base_url):
         return False
 
 
+@pytest.mark.service
 def test_process_newsletter(base_url, newsletter_url, name, is_cloud=True):
     """POST /process_newsletter — submit a newsletter for processing."""
     print(f"\n--- Process Newsletter: {name} ---")
@@ -142,6 +146,7 @@ def test_process_newsletter(base_url, newsletter_url, name, is_cloud=True):
         return None
 
 
+@pytest.mark.service
 def test_get_articles(base_url, newsletter_id, is_cloud=True):
     """POST /get_articles_by_newsletter_id — get articles for a newsletter."""
     print(f"\n--- Get Articles for newsletter {newsletter_id} ---")
@@ -169,6 +174,7 @@ def test_get_articles(base_url, newsletter_id, is_cloud=True):
         return []
 
 
+@pytest.mark.service
 def test_download_article(base_url, article_id, is_cloud=True):
     """GET /news-download/<id> — download a processed article ZIP."""
     print(f"\n--- Download Article {article_id} ---")

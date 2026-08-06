@@ -4,7 +4,9 @@ Simple Phase 2 Boston Globe Test
 """
 import requests
 import json
+import pytest
 
+@pytest.mark.service
 def test_phase2_simple():
     """Simple test of Phase 2 deployment"""
     
@@ -54,6 +56,7 @@ def test_phase2_simple():
         print(f"ERROR: {e}")
         return None
 
+@pytest.mark.service
 def test_browser_automation():
     """Test browser automation with Boston Globe"""
     print("\n2. Testing browser automation...")

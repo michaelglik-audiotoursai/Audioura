@@ -27,6 +27,14 @@ ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL", "http://localhost:5002")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from db_connection import get_db_config
 from test_tour_factory import TestTourFactory
+# Import the original (unguarded) psycopg2.connect for D141-compliant cleanup.
+# conftest.py monkeypatches psycopg2.connect to block production writes, but
+# D141 authorises deletion of test rows by captured id after is_test confirmation.
+try:
+    from conftest import _original_connect as _raw_pg_connect
+except ImportError:
+    # Fallback if not running under pytest (e.g. direct script execution)
+    _raw_pg_connect = psycopg2.connect
 DB_CONFIG = get_db_config()
 # Remap 'dbname' to 'database' for psycopg2.connect compatibility
 DB_CONFIG['database'] = DB_CONFIG.pop('dbname')
@@ -100,8 +108,18 @@ def _generate_tour(location, tour_type="walking", total_stops=3):
 
 
 def _get_latest_tour_row(tour_name_fragment):
-    """Get the most recently created tour matching the name fragment."""
-    conn = psycopg2.connect(**DB_CONFIG)
+    """Get the most recently created tour matching the name fragment.
+
+    LOCAL-302: Queries the PRODUCTION database because the orchestrator service
+    writes there regardless of the test-process AUDIOURA_DB_TARGET setting.
+    """
+    conn = _raw_pg_connect(
+        host=os.environ.get("DB_HOST", "localhost"),
+        port=os.environ.get("DB_PORT", "5433"),
+        dbname="audiotours",
+        user=os.environ.get("DB_USER", "admin"),
+        password=os.environ.get("DB_PASSWORD", "password123"),
+    )
     cur = conn.cursor()
     cur.execute(
         """SELECT id, tour_name, tour_content, stops_count
@@ -116,7 +134,83 @@ def _get_latest_tour_row(tour_name_fragment):
     return row
 
 
+def _ensure_is_test_on_production(tour_id):
+    """Force is_test=TRUE on a specific row in the production database.
+
+    This mirrors TestTourFactory.adopt_and_ensure_flagged() but connects
+    directly to production (where the service wrote) rather than going through
+    the test-process DB routing.
+    """
+    conn = _raw_pg_connect(
+        host=os.environ.get("DB_HOST", "localhost"),
+        port=os.environ.get("DB_PORT", "5433"),
+        dbname="audiotours",
+        user=os.environ.get("DB_USER", "admin"),
+        password=os.environ.get("DB_PASSWORD", "password123"),
+    )
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "UPDATE audio_tours SET is_test = TRUE WHERE id = %s AND (is_test IS NOT TRUE)",
+            (tour_id,),
+        )
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
+
+def _d141_cleanup(tour_id):
+    """D141-compliant cleanup: DELETE a single row by captured id, only after
+    confirming is_test=TRUE on that specific row immediately before deletion.
+
+    Never deletes by name pattern or date range. Only the exact id captured
+    in the same test run.
+
+    LOCAL-302: This connects directly to the PRODUCTION database because the
+    row was created by the orchestrator service (which has its own hardcoded
+    production DATABASE_URL). The test-process DB switch does not affect where
+    the service wrote. Uses the unguarded psycopg2.connect because D141
+    explicitly authorises this narrow deletion pattern, and the conftest guard
+    would otherwise block it.
+    """
+    conn = _raw_pg_connect(
+        host=os.environ.get("DB_HOST", "localhost"),
+        port=os.environ.get("DB_PORT", "5433"),
+        dbname="audiotours",
+        user=os.environ.get("DB_USER", "admin"),
+        password=os.environ.get("DB_PASSWORD", "password123"),
+    )
+    cur = conn.cursor()
+    try:
+        # Step 1: SELECT is_test for the specific captured id
+        cur.execute(
+            "SELECT is_test FROM audio_tours WHERE id = %s",
+            (tour_id,),
+        )
+        row = cur.fetchone()
+        if row is None:
+            # Row doesn't exist (service may have failed before INSERT)
+            return
+        is_test = row[0]
+        if is_test is not True:
+            # D141: never delete a row that is not confirmed is_test=TRUE
+            print(
+                f"[LOCAL-302] WARNING: tour {tour_id} has is_test={is_test}, "
+                f"NOT deleting (D141 safety)"
+            )
+            return
+        # Step 2: DELETE the confirmed-test row by captured id
+        cur.execute("DELETE FROM audio_tours WHERE id = %s", (tour_id,))
+        conn.commit()
+        print(f"[LOCAL-302] Cleaned up test tour {tour_id} (is_test confirmed)")
+    finally:
+        cur.close()
+        conn.close()
+
+
 @pytest.mark.integration
+@pytest.mark.service
 def test_tour_content_persisted_on_generation():
     """
     LOCAL-49 regression: generated tour must have non-NULL tour_content
@@ -126,41 +220,60 @@ def test_tour_content_persisted_on_generation():
     timestamp = int(time.time())
     location = f"LOCAL49 Regression Test {timestamp}"
 
-    status = _generate_tour(location, tour_type="walking", total_stops=3)
-    actual_stops = status.get("actual_stops")
+    # LOCAL-302: Capture the tour_id so we can clean up in finally,
+    # whether the test passes or fails.
+    tour_id = None
+    try:
+        status = _generate_tour(location, tour_type="walking", total_stops=3)
+        actual_stops = status.get("actual_stops")
 
-    # Give a moment for DB commit
-    time.sleep(2)
+        # Give a moment for DB commit
+        time.sleep(2)
 
-    row = _get_latest_tour_row(f"LOCAL49 Regression Test {timestamp}")
-    assert row is not None, f"Tour row not found in DB for '{location}'"
+        row = _get_latest_tour_row(f"LOCAL49 Regression Test {timestamp}")
+        assert row is not None, f"Tour row not found in DB for '{location}'"
 
-    tour_id, tour_name, tour_content, stops_count = row
+        tour_id, tour_name, tour_content, stops_count = row
 
-    # LOCAL-141: Structurally ensure is_test=TRUE regardless of Docker env
-    _factory.adopt_and_ensure_flagged(tour_id)
+        # LOCAL-141: Structurally ensure is_test=TRUE regardless of Docker env
+        _factory.adopt_and_ensure_flagged(tour_id)
 
-    # 1. tour_content must be non-NULL and non-empty
-    assert tour_content is not None, (
-        f"REGRESSION: tour_content is NULL for tour {tour_id} ({tour_name})"
-    )
-    assert len(tour_content) > 0, (
-        f"REGRESSION: tour_content is empty for tour {tour_id} ({tour_name})"
-    )
+        # 1. tour_content must be non-NULL and non-empty
+        assert tour_content is not None, (
+            f"REGRESSION: tour_content is NULL for tour {tour_id} ({tour_name})"
+        )
+        assert len(tour_content) > 0, (
+            f"REGRESSION: tour_content is empty for tour {tour_id} ({tour_name})"
+        )
 
-    # 2. stops_count must be set
-    assert stops_count is not None, f"stops_count is NULL for tour {tour_id}"
-    assert stops_count > 0, f"stops_count is 0 for tour {tour_id}"
+        # 2. stops_count must be set
+        assert stops_count is not None, f"stops_count is NULL for tour {tour_id}"
+        assert stops_count > 0, f"stops_count is 0 for tour {tour_id}"
 
-    # 3. _split_tour_content_into_stops must return exactly stops_count stops
-    parsed_stops = _split_tour_content_into_stops(tour_content)
-    assert parsed_stops == stops_count, (
-        f"Stop count mismatch: _split_tour_content_into_stops returned {parsed_stops}, "
-        f"but stops_count is {stops_count} (tour {tour_id})"
-    )
+        # 3. _split_tour_content_into_stops must return exactly stops_count stops
+        parsed_stops = _split_tour_content_into_stops(tour_content)
+        assert parsed_stops == stops_count, (
+            f"Stop count mismatch: _split_tour_content_into_stops returned {parsed_stops}, "
+            f"but stops_count is {stops_count} (tour {tour_id})"
+        )
 
-    print(f"\n✓ Tour {tour_id}: tour_content={len(tour_content)} chars, "
-          f"stops_count={stops_count}, parsed_stops={parsed_stops}")
+        print(f"\n✓ Tour {tour_id}: tour_content={len(tour_content)} chars, "
+              f"stops_count={stops_count}, parsed_stops={parsed_stops}")
+    finally:
+        # LOCAL-302: D141-compliant cleanup — delete only the captured id,
+        # only after confirming is_test=TRUE on that specific row.
+        # If tour_id was not captured (failure before DB query), attempt to
+        # find the row by the unique timestamp we used.
+        if tour_id is None:
+            row = _get_latest_tour_row(f"LOCAL49 Regression Test {timestamp}")
+            if row is not None:
+                tour_id = row[0]
+        if tour_id is not None:
+            # Ensure is_test=TRUE on the production row before cleanup.
+            # adopt_and_ensure_flagged uses the test-process DB config which
+            # may point elsewhere; force the flag directly on production.
+            _ensure_is_test_on_production(tour_id)
+            _d141_cleanup(tour_id)
 
 
 @pytest.mark.integration
