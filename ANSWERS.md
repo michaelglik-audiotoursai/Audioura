@@ -619,3 +619,39 @@ server; six cases of correct code with no caller.
 **My mistakes:** opened a plaintext-credential endpoint for 25 minutes (0
 rows written); claimed tour editing worked after checking 2 of 6 routes;
 nearly bounced a correct task over a failure my own probe created.
+
+---
+
+## Should I be suspicious of Kiro asking for Downloads and Documents access?
+*(2026-08-06)*
+
+**My recommendation: revoke both.** System Settings → Privacy & Security → Files
+and Folders → Kiro. The need was spurious, and revoking is cheap to test — if
+something legitimately requires it, it will ask again, and that prompt would be
+worth scrutinising because it couldn't be explained by a stray `find`.
+
+**Why it happened, and it was not malice.** Three Kiro sessions overnight ran
+whole-home-directory scans between 03:36 and 06:40 — `find /Users/micha -name
+"pytest"`, then `find /Users/micha -maxdepth 3 -name "python3*"`, then
+`find / -maxdepth …`. I killed all three (D213, D218). macOS prompts for
+Downloads and Documents exactly when a process traverses them. The agent was
+hunting for the `python3` binary because it was not on PATH, and it widened the
+search each time I removed its method without supplying another.
+
+**What I could not prove.** I cannot read `TCC.db` (macOS protects it) and the
+unified log had nothing retained, so the link between those scans and your
+prompts is inference from timing and mechanism, not proof. It is a strong fit —
+right window, no other plausible trigger, no task that needed those folders, and
+no agent output referencing either path — but I did not watch it happen.
+
+**Why it is still worth acting on.** Kiro runs with `--trust-all-tools`, so it
+never asks before acting; it decided on its own to scan your home directory three
+separate times; and the grant is persistent, not per-session. Every future Kiro
+session can now read anything in Downloads and Documents. That matters more than
+usual here because this repo already has one credential sitting in pushed git
+history — an agent with home-directory read access *and* push access is a
+combination worth being deliberate about.
+
+**The cause is fixed.** Every task file since LOCAL-300 states `/usr/bin/python3`
+as fact plus a no-`find` rule, and LOCAL-300 completed on its first attempt with
+no scanning. Nothing queued needs access beyond the repo.

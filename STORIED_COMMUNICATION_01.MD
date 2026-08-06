@@ -1092,3 +1092,26 @@ authorise a field test.
   trigger it.
 - **Stop treating 100 as a ceiling** — the bonus is designed to exceed it, so
   "75" is not the fraction it appears to be.
+
+---
+
+## 2026-08-06 — Michael: "Kiro keeps asking for Downloads and Documents. Should I be suspicious?"
+
+**LEAD's recommendation: revoke both.** System Settings → Privacy & Security →
+Files and Folders → Kiro. The need was spurious, and revoking is cheap to test —
+if something legitimately requires it, it will ask again, and that prompt would
+be worth scrutinising because it couldn't be explained by a stray `find`.
+
+Cause: three overnight Kiro sessions ran `find /Users/micha …` and `find / …`
+between 03:36 and 06:40, hunting for the `python3` binary (D213, D218). macOS
+prompts for those folders exactly when a process traverses them. Not malice.
+
+Caveat stated to Michael: LEAD could not read `TCC.db` or find retained log
+entries, so the link is inference from timing and mechanism, not proof.
+
+Still worth acting on because Kiro runs `--trust-all-tools`, chose the scan
+itself three times, and the grant is persistent rather than per-session — and
+this repo already has a credential in pushed history.
+
+Cause fixed: task files since LOCAL-300 state the interpreter path as fact;
+LOCAL-300 then completed with no scanning at all.
