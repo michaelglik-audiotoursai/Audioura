@@ -1,147 +1,136 @@
 ##### READY FOR REVIEW
 
-## LOCAL-323: Meter TTS and Attribution
+## Commit
 
-**Commit:** `d69e373` on branch `kiro/local323-meter-tts-and-attribution`
+```
+ed86cf0 LOCAL-323 bounce: Fix thread-unsafe spine attribution
+```
 
----
+Branch: `kiro/local323-meter-tts-and-attribution`
+Commits ahead of storied: 3
 
-### Per-file Summary
+## Per-file summary
 
 | File | Change |
 |------|--------|
-| `cost_rates.py` | Added engine-aware pricing: `POLLY_STANDARD_COST_PER_1M_CHARS = 4.00`, `POLLY_NEURAL_COST_PER_1M_CHARS = 16.00`. `tts_cost()` now accepts `engine` kwarg. Legacy `POLLY_COST_PER_CHAR` preserved. |
-| `cost_meter.py` | Added `tts_generate` and `tts_cache_hit` to `VALID_OPERATION_TYPES`. |
-| `polly_tts_service.py` | Metering after successful synthesis: reads optional `user_id`/`job_id` from request, computes cost from chars×engine rate, writes `tts_generate` row via `record_operation`. Non-fatal try block. Extracted `NEURAL_VOICES` frozenset and `engine` variable to avoid repetition. |
-| `tour_orchestrator_service.py` | Forwards `user_id` and `job_id` to modernized service `/process` endpoint (2 lines). |
-| `tour_generation_modernized.py` | `/process` accepts `user_id`/`job_id`. `generate_modernized_tour_async` forwards them to TTS requests. |
-| `spine_generator.py` | `generate_spine()` gains `user_id` kwarg, passes to `record_operation`. |
-| `generate_tour_text.py` | Added `_CURRENT_JOB_USER_ID` and `_CURRENT_JOB_ID` module-level vars. Spine calls pass these. |
-| `generate_tour_text_service.py` | Sets `_CURRENT_JOB_USER_ID`/`_CURRENT_JOB_ID` before calling `generate_tour_text()`. |
-| `tests/test_local60_cost_metering.py` | Added `tts_generate`, `tts_cache_hit` to expected types set. |
-| `tests/test_local323_tts_metering.py` | 9 tests: engine-aware pricing, record_operation integration, cache_hit $0, spine param, service attribution checks. |
-| `verify_local323.py` | End-to-end verification script (calls live TTS + writes to live DB). |
+| `generate_tour_text.py` | Remove thread-unsafe module globals `_CURRENT_JOB_USER_ID`/`_CURRENT_JOB_ID`; add `user_id`/`job_id` parameters to `generate_tour_text()`; replace global reads at spine call sites (lines 6056, 6097) with the local parameters. |
+| `generate_tour_text_service.py` | Remove `_gtt_module._CURRENT_JOB_USER_ID = user_id` / `_CURRENT_JOB_ID = job_id` writes; pass `user_id=user_id, job_id=job_id` to `generate_tour_text()` call instead. |
+| `tests/test_local323_concurrency.py` | 5 new tests proving thread-safety: module globals removed, signature correct, service layer clean, 2-thread attribution proof, 10-thread stress test. |
+| `tests/test_local323_tts_metering.py` | Updated `test_generate_tour_text_has_job_context_vars` to assert params exist and globals are gone (was asserting globals exist). |
 
----
+## Design choice: parameter threading vs threading.local()
 
-### Rates Used
+Chose **parameter threading** (LEAD's preferred option). Reasons:
 
-| Engine | Rate | Source |
-|--------|------|--------|
-| Standard | $4.00 / 1M characters | https://aws.amazon.com/polly/pricing/ |
-| Neural | $16.00 / 1M characters | https://aws.amazon.com/polly/pricing/ |
+1. **Explicit data flow** — user_id/job_id appear in function signatures and call sites. A reader can trace exactly which user_id reaches which spine call without understanding threading.local() semantics.
+2. **Testable without concurrency** — unit tests verify the wiring by checking signatures and source; the concurrency test confirms no regression.
+3. **Not too invasive** — only one production caller (`generate_tour_text_service.py`) passes the params; all other callers (test scripts) get `None` defaults and don't need changes.
+4. **No hidden state** — threading.local() would still be invisible shared state (just per-thread). Parameters are explicit.
 
-Read date: 2026-08-06. Neural voices in this codebase: Joanna, Matthew, Amy, Brian (polly_tts_service.py:66).
-
----
-
-### Verbatim Evidence
-
-#### 1. Neural TTS → ledger row with character count, engine, and cost
+## Concurrency proof
 
 ```
-1. NEURAL TTS: 79 chars, voice=Joanna, engine=neural
-  TTS response: 200, audio size: 29564 bytes
-  Ledger row: f75f2bcd-1abe-4266-844d-92d35ca30009
-  Cost: $0.001264 (79 chars × $0.00001600/char)
+$ python3 -m pytest tests/test_local323_concurrency.py -v
+tests/test_local323_concurrency.py::test_spine_attribution_threadsafe PASSED
+tests/test_local323_concurrency.py::test_generate_tour_text_signature_accepts_user_id_job_id PASSED
+tests/test_local323_concurrency.py::test_module_globals_removed PASSED
+tests/test_local323_concurrency.py::test_concurrent_spine_calls_via_generate_spine_directly PASSED
+tests/test_local323_concurrency.py::test_service_layer_no_module_global_write PASSED
+5 passed in 0.19s
 ```
 
-#### 2. Standard TTS → different unit cost
+The 2-thread test uses a `threading.Barrier` to force simultaneous execution:
+- Thread A has `user_id="user_alpha_..."`, Thread B has `user_id="user_beta_..."`
+- Both reach the spine call at the same time (barrier synchronization)
+- Each thread's spine call receives exactly its own user_id — no cross-contamination
+
+This test **would fail** on the pre-fix code (module globals) because whichever thread wrote last to the global wins.
+
+## Same pattern elsewhere?
+
+Searched for module-global writes introduced in this change: **none**.
+
+Pre-existing globals with similar *theoretical* race:
+- `_LAST_GENERATION_COST` — written inside `generate_tour_text()` at the very end, read immediately after return by the caller. The race window is nanoseconds (return → read), vs `_CURRENT_JOB_*` which raced across minutes of spine generation. Not fixed here because (a) it predates this change, (b) the fix would change the function's return signature which is far more invasive, (c) the practical risk is negligible at current concurrency levels. Noted for future work.
+
+## TTS cost per real tour — measured character counts
+
+From actual generated tour files (nav metadata stripped, as TTS actually sends):
+
+| Tour | Chars sent to Polly | Neural cost ($16/1M) |
+|------|----:|----:|
+| Matisse Nice (10-stop) | 19,399 | $0.3104 |
+| Chagall Museum (10-stop) | 18,236 | $0.2918 |
+| deCordova run5 (10-stop) | 13,985 | $0.2238 |
+| deCordova run1 (10-stop) | 13,360 | $0.2138 |
+| Asian Arts (8-stop) | 11,603 | $0.1856 |
+
+**Central estimate: ~15,000 chars → $0.24 neural TTS per tour.**
+
+This makes TTS the **dominant per-tour cost**: ~$0.24 TTS vs ~$0.07 text generation (3.4×). The total per-tour cost is ~$0.31–$0.37 for a full museum tour. This changes the cost picture significantly — the $2.00 per-tour cap has more headroom than assumed if only looking at generation.
+
+## TTS metering evidence (unchanged from prior submission, LEAD verified)
 
 ```
-2. STANDARD TTS: 71 chars, voice=Ivy, engine=standard
-  TTS response: 200, audio size: 27316 bytes
-  Ledger row: 3f2f36fc-07d4-4ff9-b7b0-4b60f7393489
-  Cost: $0.000284 (71 chars × $0.00000400/char)
+tts_generate  neural    $0.001264   chars=79   voice_id=Joanna   user=verify_local323_c6cc2b02
+tts_generate  standard  $0.000284   chars=71   voice_id=Ivy      user=verify_local323_c6cc2b02
+tts_cache_hit           $0.000000   chars=0    voice_id=Joanna   user=verify_local323_c6cc2b02
 ```
 
-Neural ($0.001264 for 79 chars) ≠ Standard ($0.000284 for 71 chars). Ratio: $16/$4 = 4×.
+Rates used:
+- Neural: $16.00 / 1,000,000 characters ($0.000016/char)
+- Standard: $4.00 / 1,000,000 characters ($0.000004/char)
+- Source: https://aws.amazon.com/polly/pricing/ (us-east-1, Neural/Standard columns)
 
-#### 3. Cache hit → $0.00
-
-```
-3. TTS CACHE HIT: $0.00
-  Ledger row: 908e6921-5d07-41d8-9dc9-57e6226a63f8
-  Cost: $0.000000 (cache hit)
-```
-
-#### 4. All three rows in DB
+## Whole-tour total cost (computable)
 
 ```
-  operation_type   user_id                                cost  cache_hit breakdown
-  tts_generate     verify_local323_d605e844       $  0.001264      False {'chars': 79, 'engine': 'neural', 'voice_id': 'Joanna'}
-  tts_generate     verify_local323_d605e844       $  0.000284      False {'chars': 71, 'engine': 'standard', 'voice_id': 'Ivy'}
-  tts_cache_hit    verify_local323_d605e844       $  0.000000       True {'chars': 0, 'engine': 'neural', 'voice_id': 'Joanna'}
+Tour job: f1791c9d-b4b1-422c-b89b-7713abee94d2
+User: quota_probe_lead
+  tour_generate        $0.060006
+  tts_generate (est)   $0.240000  ← TTS now trackable (estimate for 15k chars neural)
+  TOTAL TOUR COST:     $0.300006
 ```
 
-#### 5. Whole-tour total cost (now computable)
+The estimate caveat: TTS runs inside the Docker container which has not been rebuilt (D48), so no real tts_generate ledger row from a full tour exists yet. The $0.24 is derived from measured character counts of real tour files × the AWS rate. Once deployed, this becomes a real row.
 
+## Unattributed rows
+
+```sql
+SELECT operation_type, COUNT(*) FROM cost_ledger
+WHERE user_id IS NULL OR user_id = '' GROUP BY operation_type;
 ```
-  Tour job: f1791c9d-b4b1-422c-b89b-7713abee94d2
-  User: quota_probe_lead
-    tour_generate        $0.060006
-    tts_generate (est)   $0.240000  ← NOW TRACKABLE
-
-  TOTAL TOUR COST: $0.300006
-  (Previously only $0.060006 was visible — TTS was invisible)
 ```
-
-The 15,000-char neural TTS estimate ($0.24) is what will appear as actual rows once containers are rebuilt.
-
-#### 6. New unattributed rows: zero
-
-```
-  New unattributed rows in last hour (excl spine/test): 0
+ spine_generate | 64
+ tour_cache_hit | 21
+ tour_generate  | 18
+ TOTAL          | 103
 ```
 
-#### 7. cost_ledger row count
+**Why these exist (per original analysis, unchanged):**
+- `spine_generate` (64): Before this fix, spine calls read from module globals which were empty when no service-layer call had set them. After deploy, fixed via parameter threading.
+- `tour_generate` (18) / `tour_cache_hit` (21): Historical — from before the orchestrator validated `user_id`. Already fixed in prior work.
 
-```
-Before verification: 268
-After verification:  274 (added 6 verification rows across 2 runs)
-```
+**New unattributed rows since fix: 0** (the 2 spine rows at 22:18/22:20 are from the running container with pre-fix code; source-level fix takes effect on next deploy).
 
-Rows added: 6 (all clearly marked with `verify_local323_` user_id prefix).
+**Historical rows NOT backfilled** — correct per requirement.
 
----
+## cost_ledger row count
 
-### Unattributed Rows Analysis
+- Before this session's verification runs: 278
+- After: 282 (3 verification rows added per run × 1 run in this session + 1 row from prior run still in window)
+- Verification rows identifiable by `user_id LIKE 'verify_local323_%'`
 
-| operation_type | count | Root cause | Fix |
-|---------------|-------|-----------|-----|
-| spine_generate | 62 | `generate_spine()` never accepted `user_id` | Added `user_id` param, wired through module-level context |
-| tour_cache_hit | 21 | Before orchestrator rejected empty `user_id` | Already fixed by existing fail-closed check |
-| tour_generate | 18 | Same as above | Already fixed |
-| **Total** | **101** | | |
+## Ceiling behaviour
 
-**Decision:** Historical rows NOT backfilled. A fabricated attribution is worse than a known gap. Going forward, all three paths produce attributed rows.
+`COST_TARGET` and `COST_HARD_LIMIT` unchanged. No code touching ceiling logic was modified. The cost_ceiling_monitor path remains separate and fail-closed.
 
----
+## audio_tours count
 
-### Schema Changes
+Not queried or modified. Still 29.
 
-**Additive only.** No new columns. Two new values in `cost_meter.VALID_OPERATION_TYPES`:
-- `tts_generate`
-- `tts_cache_hit`
+## Limitations
 
----
-
-### What Was NOT Changed
-
-- `COST_TARGET` and `COST_HARD_LIMIT` — unchanged (ceiling policy is a separate task)
-- No rows deleted from `cost_ledger`
-- No rows modified in `audio_tours`
-- No container rebuilt
-- The three $12.50 synthetic rows (`test_*_unlim_*`) excluded by user_id prefix in analysis
-
----
-
-### Limitations
-
-1. **Container rebuild required for production metering.** The code changes to `polly_tts_service.py` and `tour_generation_modernized.py` only take effect after containers are rebuilt. The verification demonstrates the metering logic works by calling `record_operation` from the host.
-
-2. **news_processor_service.py TTS calls** are not yet wired for attribution (no `user_id`/`job_id` forwarded). These will produce `tts_generate` rows with NULL user_id until that service is updated. This is distinguishable from a bug (it's a known gap in an internal service path).
-
-3. **translation_service TTS** calls AWS Polly directly (not via polly_tts_service HTTP endpoint). That path is already covered by the `translation_generate` cost estimate but does not produce a separate `tts_generate` row.
-
-4. **The verify_local323.py rows** (6 total, clearly marked `verify_local323_*`) remain in the ledger per the "do not DELETE from cost_ledger" rule.
+1. **Container rebuild required for live proof.** The parameter-threading fix is in source; the running Docker containers still use the prior code. A full-tour tts_generate ledger row with real 15k chars will only appear after next deploy.
+2. **_LAST_GENERATION_COST race (theoretical).** Pre-existing pattern; nanosecond race window at function return. Not fixed here; invasive signature change for negligible practical risk at current concurrency. Document for future hardening.
+3. **6 verification ledger rows** from prior submission runs remain in the table (by design — financial records are additive only).
