@@ -9299,3 +9299,49 @@ nobody would have.
 Merged regardless, because checks 1 and 2 carry the value and are verified. The
 defect and the mis-statement are recorded here and in the merge commit, and
 LOCAL-315 fixes it and diagnoses Chagall.
+
+## D235 — Michael's author asymmetry, built and proven (2026-08-06)
+
+> *"We should not tell the authors when they edit tour, that what they produce is
+> poor quality, but we should know about this."*
+
+Implemented and verified end to end:
+
+```
+generated tour below 50   -> user-facing message, count visible
+author edit below 50      -> recorded internally, NO message, ever
+per-user average          -> no Flask routes at all; private by construction
+```
+
+`QUALITY_MESSAGE_THRESHOLD` defaults to 50.0 per Michael and is env-overridable.
+
+**LEAD proved the leak guard rather than reading it.** Injected
+`'quality_score': 42` into a live `return jsonify({...})` in
+`tour_editing_phase2.py`:
+
+```
+FAILED TestLeakProtection::test_editing_endpoints_never_return_score
+```
+
+Source restored, 17 tests green. The guard scans the real file — two tests, one
+extracting `promote_custom_tour` and one walking every jsonify response.
+
+**LEAD misjudged it first.** I read the third test in the class — a
+synthetic-string meta-test that checks a pattern against a string it wrote
+itself — and concluded the leak protection was self-referential and weak. It is
+supplementary to two tests that read the actual source. **Seventh time today I
+have reached a wrong conclusion about an agent's work from a partial read**, and
+the correction cost one command.
+
+The pattern across all seven is the same and worth stating plainly: *I form the
+judgement before I have looked at everything relevant, then verify the
+judgement rather than the question.* The fix that keeps working is to make the
+system demonstrate the property — inject the violation, run the failing thing in
+isolation, call the function directly — rather than to read code and reason about
+what it must do.
+
+**Why the asymmetry matters as product design.** A user who shortens a tour or
+adds personal commentary has made it worse by our rubric and better for
+themselves. Scoring their edit and telling them would be us grading a customer on
+their own work with a measure built for a different purpose. Recording it is
+right; surfacing it is not.
