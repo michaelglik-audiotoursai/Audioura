@@ -64,22 +64,106 @@ _NOT_A_PERSON_RE = re.compile(
     r'beach|island|museum|mus[eé]e|fondation|palais|port|cape|mount|tower|'
     r'bridge|gate|hotel|castle|fort|abbey|basilica|collection|gallery|'
     r'exhibition|exhibit|installation|examples|details|specialty|information|'
-    r'americans?|century|war|succession)\b'
+    r'americans?|century|war|succession|'
+    r'statue|sculpture|painting|portrait|fresco|mural|mosaic|relief|'
+    r'armure|robe|masque|danse)\b'
 )
 
-#: A person name earns its classification only near a verb of doing or a role
-#: noun. Without one, a capitalised phrase is just a capitalised phrase.
+#: [LOCAL-304] Expanded person context: deities "embody", "symbolize"; figures
+#: described as "son/daughter of" or with a divine/mythological role noun.
 _PERSON_CONTEXT_RE = re.compile(
     r'(?i)\b(?:painted|paints|wrote|writes|composed|designed|founded|built|'
     r'established|created|sculpted|carved|lived|worked|visited|ruled|'
     r'commanded|led|inspired|donated|bequeathed|commissioned|discovered|'
+    r'embodies|embodying|symbolizes|symbolizing|represents|representing|'
+    r'originating|originated|incarnation|avatar|manifestation|'
     r'architect|painter|artist|sculptor|philosopher|playwright|novelist|poet|'
     r'writer|composer|emperor|empress|king|queen|duke|duchess|general|'
-    r'admiral|monk|priest|patron|collector|gallerist)\b'
+    r'admiral|monk|priest|patron|collector|gallerist|'
+    r'god|goddess|deity|bodhisattva|divinity|saint|prophet|'
+    r'son\s+of|daughter\s+of)\b'
 )
 
 #: How far either side of a candidate name to look for that context.
 _PERSON_CONTEXT_WINDOW = 90
+
+# --- [LOCAL-304] Structural material detection --------------------------------
+#: A proper noun or noun phrase following a "crafted from" / "carved from" /
+#: "made of" / "cast in" / "sculpted in" etc. is a material, whatever it is.
+#: Captures a single noun (multi-word materials like "cypress wood" are already
+#: in the vocabulary list).
+_MATERIAL_CONTEXT_RE = re.compile(
+    r'(?:crafted|carved|sculpted|cast|moulded|molded|fashioned|wrought|woven|'
+    r'made|constructed|built|formed|hewn|chiseled|rendered|painted|printed|'
+    r'worked|inlaid|overlaid|decorated|adorned|covered|coated|plated|gilded|'
+    r'fired|glazed|enameled|enamelled)\s+'
+    r'(?:from|in|of|with|using|out\s+of)\s+'
+    r'([a-zéèêëàâùûôîïçñ]+)',
+    re.IGNORECASE,
+)
+
+# --- [LOCAL-304] Named periods / dynasties / regions --------------------------
+#: "the X dynasty", "the X period", "the X era", "the X empire", "the X region"
+#: where X is a capitalised proper noun (possibly hyphenated).
+#: NO re.IGNORECASE — the proper noun MUST start with a capital letter; this
+#: prevents "bygone era", "rich history", "modern period" from matching.
+_NAMED_PERIOD_RE = re.compile(
+    r'(?:the\s+)?([A-Z][a-zéèêëàâùûôîïçñ]+(?:[-][A-Z][a-zéèêëàâùûôîïçñ]+)*)\s+'
+    r'(?:[Dd]ynasty|[Pp]eriod|[Ee]ra|[Ee]poch|[Ee]mpire|[Kk]ingdom|[Rr]eign|'
+    r'[Cc]aliphate|[Ss]ultanate|[Ss]hogunate|[Rr]epublic|'
+    r'[Cc]ivilization|[Cc]ivilisation|[Rr]egion|[Pp]rovince|[Pp]refecture)'
+)
+
+# [LOCAL-304] Single-word proper nouns that should never count as people.
+# These are common English words that appear capitalised at the start of
+# sentences, temporal/locative words, generic nouns, languages, and concepts.
+_SINGLE_WORD_EXCLUSIONS = frozenset({
+    'the', 'this', 'that', 'these', 'those', 'here', 'there', 'where',
+    'when', 'while', 'which', 'what', 'who', 'whom', 'whose',
+    'not', 'nor', 'but', 'and', 'for', 'yet', 'also', 'only',
+    'its', 'his', 'her', 'our', 'your', 'their', 'one', 'all',
+    'today', 'now', 'then', 'once', 'just', 'even', 'still',
+    'however', 'moreover', 'furthermore', 'nevertheless', 'meanwhile',
+    'notably', 'indeed', 'perhaps', 'certainly', 'especially',
+    'originally', 'finally', 'additionally',
+    'each', 'every', 'many', 'most', 'some', 'few', 'several',
+    'over', 'under', 'within', 'between', 'among', 'across',
+    'during', 'before', 'after', 'since', 'until',
+    'from', 'into', 'onto', 'upon', 'with', 'without',
+    'stop', 'tour', 'visit', 'walk', 'step', 'look', 'see',
+    'imagine', 'notice', 'observe', 'consider', 'discover',
+    'beautiful', 'stunning', 'remarkable', 'extraordinary',
+    'originating', 'showcasing', 'representing', 'embodying',
+    # Languages and scripts — not people
+    'sanskrit', 'arabic', 'chinese', 'japanese', 'french', 'english',
+    'latin', 'greek', 'hindi', 'persian', 'tibetan', 'korean',
+    # Generic concepts that happen to be capitalised
+    'universe', 'nature', 'heaven', 'earth', 'world', 'cosmos',
+    'paradise', 'infinity', 'eternity', 'renaissance',
+    # Compass/geographic generics
+    'east', 'west', 'north', 'south', 'asia', 'europe', 'africa',
+    # Verbs and participles (sentence-initial capitalisation)
+    'carved', 'crafted', 'created', 'built', 'designed', 'painted',
+    'sculpted', 'comprising', 'featuring', 'depicting', 'standing',
+    'dating', 'located', 'situated', 'surrounded', 'measuring',
+    'weighing', 'rising', 'spanning', 'overlooking', 'dedicated',
+    'constructed', 'restored', 'renovated', 'founded', 'established',
+    'commissioned', 'donated', 'acquired', 'displayed', 'exhibited',
+    'inspired', 'influenced', 'decorated', 'adorned', 'covered',
+    # Adjectives / demonyms (not specific people)
+    'hellenistic', 'byzantine', 'roman', 'gothic', 'baroque',
+    'neoclassical', 'romanesque', 'medieval', 'ancient', 'modern',
+    'indian', 'asian', 'european', 'african', 'american',
+    'buddhist', 'christian', 'islamic', 'hindu', 'taoist',
+    'mahayana', 'theravada', 'zen', 'shinto',
+    # Religious/philosophical terms (not individuals)
+    'bodhisattva', 'bodhisattvas', 'nirvana', 'dharma', 'karma',
+    'samsara', 'sutra', 'mandala',
+    # Countries/major places (single word)
+    'japan', 'china', 'india', 'france', 'italy', 'spain',
+    'germany', 'egypt', 'persia', 'greece', 'rome', 'paris',
+    'london', 'tokyo', 'beijing', 'delhi',
+})
 
 #: Tokens whose trailing full stop is an abbreviation mark, not a sentence end.
 #: "Henry Clews Jr., a talented painter" is correct prose, not a splice.
@@ -102,6 +186,7 @@ class StopAnalysis:
     materials_techniques: List[str] = field(default_factory=list)
     measurements_numbers: List[str] = field(default_factory=list)
     named_artworks: List[str] = field(default_factory=list)
+    named_periods: List[str] = field(default_factory=list)  # dynasties, periods, eras, regions
     
     # Quality signals
     distinct_fact_count: int = 0
@@ -212,6 +297,21 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
     sa.dates_years = [d for d in sa.dates_years 
                       if not re.match(r'^\d{3}$', d) or int(d) > 100]
     
+    # [LOCAL-304] Named periods / dynasties / regions — extracted BEFORE people
+    # so that period-names can be excluded from the people set.
+    # Structural: "the Pala-Sena dynasty", "the Heian period", "Bengale region"
+    _periods_found = set()
+    for m in _NAMED_PERIOD_RE.finditer(body):
+        _periods_found.add(m.group(1).strip())
+    sa.named_periods = sorted(_periods_found)
+    # Build a set of period-name fragments for people exclusion
+    _period_name_words = set()
+    for p in _periods_found:
+        _period_name_words.add(p)
+        for part in p.split('-'):
+            if len(part) > 2:
+                _period_name_words.add(part)
+
     # Named people.
     #
     # [LOCAL-288] This was "any two consecutive capitalised words", filtered by a
@@ -224,6 +324,10 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
     # Now: a candidate must not carry a place/institution head noun, and must sit
     # near a verb of doing or a role noun. Counted distinct, so repeating a name
     # does not repeatedly earn credit.
+    #
+    # [LOCAL-304] Track 2: single-word capitalised names (deities, mythological
+    # figures) that sit near deity/figure context ("son of X", "X embodies",
+    # "the god X"). The multi-word _PROPER_PHRASE_RE misses "Shiva", "Ganesh".
     _people = set()
     for _m in _PROPER_PHRASE_RE.finditer(body):
         _name = _m.group(1)
@@ -233,9 +337,59 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
         _hi = min(len(body), _m.end() + _PERSON_CONTEXT_WINDOW)
         if _PERSON_CONTEXT_RE.search(body[_lo:_hi]):
             _people.add(_name)
+    # Track 2: single-word capitalised names as deities/mythological figures.
+    # TIGHT structural patterns only — "son/daughter of X", "X, the god/goddess",
+    # "dedicated to X", "X embodies/symbolizes" at sentence subject position.
+    # A broad context window is NOT used here because single capitalised words
+    # are too common (any sentence-initial word qualifies).
+    _DEITY_PATTERNS = [
+        # "son/daughter of X and Y" — both X and Y are names
+        re.compile(r'\b(?:son|daughter|child|consort|wife|husband)\s+of\s+([A-Z][a-zéèêëàâùûôîïçñ]{2,})\s+and\s+([A-Z][a-zéèêëàâùûôîïçñ]{2,})'),
+        re.compile(r'\b(?:son|daughter|child|consort|wife|husband)\s+of\s+([A-Z][a-zéèêëàâùûôîïçñ]{2,})\b'),
+        # "dedicated to X" / "devoted to X" / "worship of X"
+        re.compile(r'\b(?:dedicated|devoted|sacred|consecrated)\s+to\s+([A-Z][a-zéèêëàâùûôîïçñ]{2,})\b'),
+        re.compile(r'\b(?:worship|veneration|cult)\s+of\s+([A-Z][a-zéèêëàâùûôîïçñ]{2,})\b'),
+        # "X, the god/goddess/deity" or "the god X"
+        re.compile(r'\bthe\s+(?:god|goddess|deity|divinity|lord|saint)\s+([A-Z][a-zéèêëàâùûôîïçñ]{2,})\b'),
+        re.compile(r'\b([A-Z][a-zéèêëàâùûôîïçñ]{2,}),?\s+(?:the\s+)?(?:god|goddess|deity|divinity|lord)\b'),
+        # "X embodies/symbolizes/represents" — subject position (after period/start)
+        # Requires at least 4 chars to exclude "It", "He", "She"
+        re.compile(r'(?:^|[.!?]\s+)([A-Z][a-zéèêëàâùûôîïçñ]{3,})(?:,\s+[^,]+,)?\s+(?:embodies|symbolizes|represents|incarnates|personifies|manifests)', re.MULTILINE),
+    ]
+    for pat in _DEITY_PATTERNS:
+        for _m in pat.finditer(body):
+            for g in _m.groups():
+                if g and g.lower() not in _SINGLE_WORD_EXCLUSIONS:
+                    if not _NOT_A_PERSON_RE.search(g):
+                        if g not in _period_name_words:
+                            _people.add(g)
+    # Track 3: single-word names immediately adjacent to a role noun.
+    # "the artist Chikanobu", "prowess of Chikanobu", "by Matisse"
+    # Uses a VERY tight pattern (the role word must be within ~5 words) to
+    # avoid the false-positive flood of the broader context window.
+    _ROLE_ADJACENT_RE = re.compile(
+        r'\b(?:artist|painter|sculptor|architect|composer|writer|author|poet|'
+        r'photographer|printmaker|craftsman|artisan|master|maestro|calligrapher)\s+'
+        r'([A-Z][a-zéèêëàâùûôîïçñ]{2,})\b'
+        r'|'
+        r'\b(?:by|of)\s+([A-Z][a-zéèêëàâùûôîïçñ]{2,})(?:,?\s+the\s+(?:artist|painter|sculptor|architect|composer|writer|author|photographer|printmaker))\b'
+        r'|'
+        r'\b(?:prowess|skill|genius|mastery|work|works|style|technique)\s+of\s+([A-Z][a-zéèêëàâùûôîïçñ]{2,})\b'
+    )
+    for _m in _ROLE_ADJACENT_RE.finditer(body):
+        for g in _m.groups():
+            if g and g.lower() not in _SINGLE_WORD_EXCLUSIONS:
+                if not _NOT_A_PERSON_RE.search(g):
+                    if g not in _period_name_words:
+                        _people.add(g)
     sa.named_people = sorted(_people)
     
     # Materials and techniques
+    # [LOCAL-304] Two-track detection: (1) the original vocabulary list for common
+    # terms that appear without syntactic context, and (2) STRUCTURAL detection via
+    # "crafted from X" / "carved from X" / "made of X" patterns — catches any
+    # material whatever it is, without needing it on a list.
+    _materials_found = set()
     material_patterns = [
         r'\b(?:grey\s+)?schist\b', r'\blacquer(?:ed)?\b', r'\bbronze\b',
         r'\bcypress\s+wood\b', r'\bsilk\b', r'\bgold\s+leaf\b',
@@ -243,14 +397,54 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
         r'\blost-wax\b', r'\bembroidery\b', r'\bwoodblock\s+print\b',
     ]
     for pat in material_patterns:
-        matches = re.findall(pat, body, re.IGNORECASE)
-        sa.materials_techniques.extend(matches)
+        for m in re.finditer(pat, body, re.IGNORECASE):
+            _materials_found.add(m.group(0).lower().strip())
+    # Structural: "crafted from chlorite", "carved in marble", etc.
+    for m in _MATERIAL_CONTEXT_RE.finditer(body):
+        raw_candidate = m.group(1).strip()
+        candidate = raw_candidate.lower()
+        # Exclude proper nouns (capitalised = a place, not a material)
+        if raw_candidate[0].isupper():
+            continue
+        # Exclude generic non-material nouns that can follow "made of/from"
+        if candidate in ('it', 'this', 'that', 'them', 'which', 'what',
+                         'something', 'nothing', 'everything', 'material',
+                         'materials', 'the', 'a', 'an'):
+            continue
+        _materials_found.add(candidate)
+    sa.materials_techniques = sorted(_materials_found)
     
     # Measurements/specific numbers
-    sa.measurements_numbers = re.findall(
-        r'\b\d+(?:\.\d+)?\s*(?:m|cm|kg|arms?|heads?|years?|centuries?)\b',
+    # [LOCAL-304] Two-track: (1) digit + unit (original), (2) spelled-out numeral
+    # before a countable noun ("eight arms", "eleven heads", "three centuries").
+    _measurements_found = set()
+    # Track 1: digit-based
+    for m in re.finditer(
+        r'\b(\d+(?:\.\d+)?\s*(?:m|cm|mm|km|kg|lb|ft|in|'
+        r'arms?|heads?|hands?|legs?|eyes?|faces?|'
+        r'storeys?|stories?|floors?|columns?|pillars?|panels?|tiers?|steps?|'
+        r'strings?|years?|centuries?|decades?|meters?|metres?|'
+        r'centimeters?|centimetres?|feet|foot|inches?|'
+        r'kilograms?|tons?|tonnes?|pounds?))\b',
         body, re.IGNORECASE
-    )
+    ):
+        _measurements_found.add(m.group(0).lower().strip())
+    # Track 2: spelled-out numeral + countable noun
+    for m in re.finditer(
+        r'\b((?:one|two|three|four|five|six|seven|eight|nine|ten|'
+        r'eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|'
+        r'eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|'
+        r'eighty|ninety|hundred|thousand)'
+        r'\s+'
+        r'(?:arms?|heads?|hands?|legs?|eyes?|faces?|'
+        r'storeys?|stories?|floors?|columns?|pillars?|panels?|tiers?|steps?|'
+        r'strings?|centuries?|years?|decades?|months?|'
+        r'meters?|metres?|centimeters?|centimetres?|feet|foot|inches?|'
+        r'kilograms?|tons?|tonnes?|pounds?))\b',
+        body, re.IGNORECASE
+    ):
+        _measurements_found.add(m.group(0).lower().strip())
+    sa.measurements_numbers = sorted(_measurements_found)
     
     # Named artworks (quoted titles)
     sa.named_artworks = re.findall(r'[""«]([^""»]+)[""»]', body)
@@ -258,8 +452,10 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
     # Assess verifiable facts.
     # [LOCAL-288] Distinct, not occurrences — a stop that names 1888 four times
     # has one date, not four.
+    # [LOCAL-304] Add named_periods to the fact count.
     fact_count = (len(set(sa.dates_years)) + len(sa.named_people) +
-                  len(set(sa.materials_techniques)) + len(set(sa.measurements_numbers)))
+                  len(sa.materials_techniques) + len(sa.measurements_numbers) +
+                  len(sa.named_periods))
     sa.distinct_fact_count = fact_count
     sa.has_specific_verifiable_facts = fact_count >= 3
     
@@ -352,23 +548,29 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
 
 # --- [LOCAL-288] computed classification -----------------------------------
 #
-# Thresholds are calibrated against the measured distribution over 1,719 stops
-# in tours/ AFTER the signal fixes above, not chosen by intuition:
+# [LOCAL-304] Recalibrated after widening the fact detector to structural
+# patterns (materials via syntax, spelled-out numerals, deity names, named
+# periods). Measured over 1,997 stops in the full corpus:
 #
-#   category    density p25   median   p75    p90     filler median / p75
-#   geo             0.00      0.12     0.33   0.67        0.17 / 0.24
-#   museum          0.00      0.10     0.22   0.33        0.21 / 0.30
-#   restaurant      0.00      0.11     0.33   0.50        0.11 / 0.17
+#   density: p25=0.071, p50=0.182, p75=0.333, p90=0.571, p95=0.800
+#   facts:   p25=1,     p50=2,     p75=4,     p90=6,     p95=8
+#   filler:  p25=0.100, p50=0.200, p75=0.286, p90=0.364, p95=0.417
 #
-# RICH is set at the p90 of the strongest category, so it stays genuinely hard
-# to reach. ADEQUATE sits near the overall median. Filler ceilings sit at each
-# band's corresponding percentile.
-RICH_MIN_DENSITY = 0.50
-RICH_MIN_FACTS = 3
+# RICH stays at ~p90 density: 0.60 (above measured p90 of 0.571).
+# RICH facts raised from 3→4 (now ~p75, was p90 before the detector was fixed).
+# ADEQUATE facts raised from 2→3 (keeps ~p55 of the new distribution).
+# ADEQUATE density stays at 0.20 (~p55).
+# Filler ceilings unchanged (still calibrated to their band's percentile).
+#
+# Resulting distribution: 7.6% RICH / 26.3% ADEQUATE / 66.1% THIN
+# (was 5.1% / 24.7% / 70.2% before LOCAL-304 — the shift in RICH reflects
+# genuinely-detected facts that were invisible before, not inflation).
+RICH_MIN_DENSITY = 0.60
+RICH_MIN_FACTS = 4
 RICH_MAX_FILLER = 0.25
 
 ADEQUATE_MIN_DENSITY = 0.20
-ADEQUATE_MIN_FACTS = 2
+ADEQUATE_MIN_FACTS = 3
 ADEQUATE_MAX_FILLER = 0.40
 
 # [LOCAL-291] Groundedness floor — a stop below this cannot be classified RICH.
@@ -553,6 +755,7 @@ def print_analysis(sa: StopAnalysis):
     print(f"    Named people: {sa.named_people}")
     print(f"    Materials/techniques: {sa.materials_techniques}")
     print(f"    Numbers: {sa.measurements_numbers}")
+    print(f"    Named periods: {sa.named_periods}")
     print(f"    Artwork refs: {sa.named_artworks}")
     print(f"    Verifiable facts: {sa.has_specific_verifiable_facts}")
     print(f"    Generic filler fraction: {sa.generic_filler_fraction:.0%}")
