@@ -8731,3 +8731,48 @@ That is real but low-value to chase — they pass standalone, the production pat
 is unaffected, and making them hermetic means mocking Wikidata, which would
 remove the only check that the live lookup still works. Worth Michael's view
 rather than an autonomous decision.
+
+## D221 — The DB safety switch is in-process only (2026-08-06)
+
+Production `audio_tours` test rows grew **118 → 122** across two suite runs
+tonight, *while* `AUDIOURA_DB_TARGET=test` was set. The rows are one per suite
+run, hours apart:
+
+```
+id=294  11:36:49  LOCAL49 Regression Test 1786016159 - Walking Tour
+id=293  11:12:47  LOCAL49 Regression Test 1786014717 - Walking Tour
+id=292  10:46:10  LOCAL49 Regression Test 1786013120 - Walking Tour
+```
+
+Cause:
+
+```
+tests/test_local49_tour_content_persist.py:24  ORCHESTRATOR_URL = http://localhost:5002
+docker inspect audioura-tour-generator-1:
+  DATABASE_URL=postgresql://admin:password123@postgres-2:5432/audiotours
+```
+
+The test asks a **running service** to generate a tour. The service has
+production hardcoded in its own environment and never sees the test process's
+env var.
+
+**LOCAL-296 protects in-process database access and nothing else.** Any test that
+drives a container writes wherever that container points. This is a limitation of
+the design, not a defect in it — and LEAD did not state it when merging LOCAL-296,
+LOCAL-300 or LOCAL-301, all of which were described as making the suite safe
+against production. They made it *safer*, in one of two paths.
+
+The test is also one of the 10 known failures — *"Tour generation service call
+failed"* — so it creates the row and dies before cleanup. A failing test that
+leaks is worse than one that merely fails.
+
+**→ LOCAL-302:** make the leak stop (D141-compliant `finally`), mark
+service-dependent tests so `-m "not service"` gives a provably safe run, and
+document the limitation in `get_database_url()` where someone will actually read
+it. Explicitly forbidden: repointing any container (Michael tests the app from
+his phone against it) and deleting the 122 existing rows (his call).
+
+**Method note, since tonight has produced several of these:** this one came from
+noticing a number move — 118 to 122 — and asking why *before* theorising. The
+answer took two commands: list the newest test rows, then `docker inspect` the
+service they named. No wrong theory in between (contrast D220).
