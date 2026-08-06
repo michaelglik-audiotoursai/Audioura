@@ -19,6 +19,9 @@ All environment variables controlling Storied behavior. This document is the sin
 | `PLAY_INTEGRITY_API_KEY` | (empty) | api-gateway | Google Cloud API key for Play Integrity verification. Only needed when `ATTESTATION_MODE=log_only` or `enforce`. |
 | `APP_PACKAGE_NAME` | `com.audioura.audiotours` | api-gateway | Android package name for Play Integrity API calls. |
 | `APP_BUNDLE_ID` | `com.glikfamily.audioura` | api-gateway | iOS bundle ID for App Attest verification. |
+| `QUALITY_GUARDRAILS_ENABLED` | `false` | tour-orchestrator | Master switch for quality guardrails (LOCAL-307). When `true`: retries PIPELINE_LOST tours once, emits user messages for UNAVAILABLE. When `false`: logs what it would do, takes no action. |
+| `QUALITY_RETRY_THRESHOLD` | `55.0` | tour-orchestrator | Score below which a PIPELINE_LOST tour is retried. P25 of corpus distribution. |
+| `QUALITY_MESSAGE_THRESHOLD` | `60.0` | tour-orchestrator | Score below which an UNAVAILABLE tour gets a user-facing message. Between P25 and median. |
 
 ---
 
@@ -40,6 +43,9 @@ All environment variables controlling Storied behavior. This document is the sin
 | `BASE_URL` | `sharing_endpoints.py`, `docker-compose-master.yml` |
 | `REFERRAL_BASE_URL` | `referral_endpoints.py`, `docker-compose-master.yml` |
 | `DATABASE_URL` | `persona_preference_store.py`, `persona_endpoints.py`, `sharing_endpoints.py`, `referral_endpoints.py`, `tour_cache_layer1.py`, `run_storied_db_migration.py` |
+| `QUALITY_GUARDRAILS_ENABLED` | `quality_guardrails.py`, `tour_orchestrator_service.py` |
+| `QUALITY_RETRY_THRESHOLD` | `quality_guardrails.py` |
+| `QUALITY_MESSAGE_THRESHOLD` | `quality_guardrails.py` |
 
 ---
 
