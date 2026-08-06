@@ -5100,7 +5100,9 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 if _seg_conn:
                     _seg_venue = (_museum_venue_name or location) if tour_category == 'museum' else location
                     _seg_stop_names = [p['name'] for p in poi_list]
-                    _seg_result = run_existence_gate(_seg_stop_names, _seg_venue, _seg_conn)
+                    # LOCAL-313: pass tour_category so dining tours use the correct
+                    # verification path (Nominatim/OSM) instead of museum-shaped checks
+                    _seg_result = run_existence_gate(_seg_stop_names, _seg_venue, _seg_conn, tour_type=tour_category)
                     _seg_conn.close()
 
                     if _seg_mode == 'enforce' and _seg_result['unverified_stops']:
@@ -5227,8 +5229,9 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     if _rep_conn:
                         _rep_venue = location
                         _rep_name_list = [n for n, _ in _rep_new_names]
+                        # LOCAL-313: pass tour_category for dining verification
                         _rep_gate_result = run_existence_gate(
-                            _rep_name_list, _rep_venue, _rep_conn)
+                            _rep_name_list, _rep_venue, _rep_conn, tour_type=tour_category)
                         _rep_conn.close()
 
                         _rep_verified_names = set(_rep_gate_result.get('verified_stops', []))

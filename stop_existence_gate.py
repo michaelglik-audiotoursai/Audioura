@@ -766,12 +766,18 @@ def _check_dining_existence(
 
     # Extract city/location signal from venue_name
     # venue_name for restaurant tours is typically "Nice, France" or "Nice"
+    # but can also be "restaurant tour in Old Nice (Vieux Nice), France"
     _city_signals = set()
-    for part in re.split(r'[,\s]+', venue_name):
+    # Strip parenthetical content and split on delimiters
+    _venue_cleaned = re.sub(r'\([^)]*\)', ' ', venue_name)
+    for part in re.split(r'[,\s]+', _venue_cleaned):
         part_clean = _strip_accents(part).lower().strip()
+        # Remove any leftover punctuation
+        part_clean = re.sub(r'[^a-z]', '', part_clean)
         if len(part_clean) >= 3 and part_clean not in ('france', 'italy', 'spain', 'usa', 'uk',
                                                         'the', 'tour', 'restaurant', 'food',
-                                                        'dining', 'culinary'):
+                                                        'dining', 'culinary', 'old', 'new',
+                                                        'vieux', 'stop', 'stops'):
             _city_signals.add(part_clean)
 
     # Stop title words for snippet matching — split on whitespace AND apostrophes
@@ -1061,6 +1067,185 @@ def _check_dining_existence(
                         return True, f"wikidata_fr: '{wd_label}' (QID:{wd_r.get('id','?')}) is a restaurant"
     except Exception as e:
         logger.debug(f"[EXISTENCE-GATE] Wikidata check failed for {stop_title!r}: {e}")
+
+    # --- Check 5: Nominatim / OpenStreetMap (LOCAL-313) ---
+    # Restaurants exist as POIs in OpenStreetMap even when they have no Wikipedia
+    # or Wikidata entry. Nominatim's structured search returns amenity=restaurant
+    # entries with addresses. This is the cheapest, most reliable source for
+    # "does this establishment exist at this address in this city?"
+    #
+    # Proximity constraint: the result must be in the city extracted from
+    # venue_name. A restaurant in Lyon must not pass for a Nice tour.
+    try:
+        verified_osm, evidence_osm = _check_dining_nominatim(stop_title, venue_name, _city_signals)
+        if verified_osm:
+            return True, evidence_osm
+    except Exception as e:
+        logger.debug(f"[EXISTENCE-GATE] Nominatim check failed for {stop_title!r}: {e}")
+
+    return False, ""
+
+
+def _check_dining_nominatim(
+    stop_title: str, venue_name: str, city_signals: Set[str]
+) -> Tuple[bool, str]:
+    """Check restaurant existence via Nominatim (OpenStreetMap) geocoding.
+
+    LOCAL-313: Most restaurants do not have Wikipedia articles. They DO exist as
+    named POIs in OpenStreetMap. Nominatim's search API returns structured results
+    including the display name, address components, and category.
+
+    Strategy:
+      1. Search Nominatim for the restaurant name + city.
+      2. A result must:
+         a) Have a name that fuzzy-matches the stop title.
+         b) Be in the correct city (address.city or address.town matches).
+         c) Be a plausible dining category (amenity, tourism, shop categories
+            that include restaurants/cafes/bars).
+      3. First match confirms existence.
+
+    Rate limit: Nominatim usage policy allows 1 req/s with a custom User-Agent.
+    We already set a descriptive UA. One query per stop is well within limits.
+    """
+    import requests as _http
+    from urllib.parse import quote
+
+    _HEADERS = {
+        "User-Agent": "Audioura/2.2 (tour-generation; contact: support@audioura.com)",
+        "Accept": "application/json",
+    }
+
+    # Build city hint for search constraint
+    # For venue_names like "restaurant tour in Old Nice (Vieux Nice), France"
+    # we need to extract the actual city name (Nice), not noise words.
+    _venue_cleaned = re.sub(r'\([^)]*\)', ' ', venue_name)
+    city_hint = ""
+    _NOISE_WORDS = {
+        'france', 'italy', 'spain', 'usa', 'uk', 'the', 'tour',
+        'restaurant', 'food', 'dining', 'culinary', 'old', 'new',
+        'vieux', 'in', 'stop', 'stops',
+    }
+    for part in re.split(r'[,\s]+', _venue_cleaned):
+        part_clean = part.strip()
+        # Remove punctuation
+        part_alpha = re.sub(r'[^a-zA-ZÀ-ÿ]', '', part_clean)
+        if len(part_alpha) >= 3 and part_alpha.lower() not in _NOISE_WORDS:
+            # Prefer a word that starts with uppercase (proper noun = city name)
+            if part_alpha[0].isupper():
+                city_hint = part_alpha
+                break
+    # Fallback: just use first qualifying city signal
+    if not city_hint and city_signals:
+        city_hint = next(iter(city_signals))
+
+    if not city_hint:
+        return False, ""
+
+    # Nominatim search: "restaurant_name, city"
+    search_query = f"{stop_title}, {city_hint}"
+    nominatim_url = "https://nominatim.openstreetmap.org/search"
+    params = {
+        "q": search_query,
+        "format": "jsonv2",
+        "addressdetails": "1",
+        "limit": "5",
+        "accept-language": "en,fr",
+    }
+
+    resp = _http.get(nominatim_url, params=params, headers=_HEADERS, timeout=10)
+
+    if resp.status_code == 429:
+        # Rate limited — treat as search failure, not "no data" (D220)
+        logger.warning(f"[EXISTENCE-GATE] Nominatim 429 for {stop_title!r} — failing closed")
+        raise RuntimeError(f"Nominatim rate limited (429) for {stop_title!r}")
+
+    if resp.status_code != 200:
+        return False, ""
+
+    results = resp.json()
+    if not results:
+        return False, ""
+
+    # Normalize stop title for matching
+    norm_stop = _strip_accents(stop_title).lower()
+    # Extract significant words for matching (≥3 chars, no articles)
+    _stop_words_osm = [w for w in re.split(r"[\s'\u2019-]+", norm_stop)
+                       if len(w) >= 3 and w not in ('the', 'les', 'des', 'une', 'la', 'le', 'du', 'chez')]
+
+    # Dining-related OSM categories
+    _DINING_CATEGORIES = (
+        'restaurant', 'cafe', 'bar', 'pub', 'fast_food', 'bistro',
+        'brasserie', 'food_court', 'ice_cream',
+    )
+    # Also accept by category/type fields in Nominatim results
+    _DINING_TYPE_SIGNALS = (
+        'restaurant', 'cafe', 'bar', 'pub', 'amenity', 'food',
+        'bistro', 'brasserie',
+    )
+
+    for result in results:
+        display_name = result.get("display_name", "")
+        name = result.get("name", "")
+        category = result.get("category", "")
+        osm_type = result.get("type", "")
+        address = result.get("address", {})
+
+        # --- Name match: does this result refer to our restaurant? ---
+        norm_name = _strip_accents(name).lower() if name else ""
+        norm_display = _strip_accents(display_name).lower()
+
+        # Check: at least 50% of stop words appear in result name or display_name
+        name_words_hit = sum(1 for w in _stop_words_osm if w in norm_name or w in norm_display)
+        if _stop_words_osm and name_words_hit < max(1, len(_stop_words_osm) * 0.5):
+            continue
+
+        # --- City match: is this result in the correct city? ---
+        result_city = _strip_accents(
+            address.get("city", "") or address.get("town", "") or
+            address.get("municipality", "") or address.get("village", "")
+        ).lower()
+        result_state = _strip_accents(address.get("state", "")).lower()
+        result_county = _strip_accents(address.get("county", "")).lower()
+
+        city_match = False
+        for sig in city_signals:
+            if sig in result_city or sig in result_state or sig in result_county:
+                city_match = True
+                break
+        # Also check display_name for city signal
+        if not city_match:
+            for sig in city_signals:
+                if sig in norm_display:
+                    city_match = True
+                    break
+
+        if not city_match:
+            continue
+
+        # --- Category match: is this a dining establishment? ---
+        # Nominatim returns category+type (e.g. category=amenity, type=restaurant)
+        is_dining = (
+            osm_type in _DINING_CATEGORIES or
+            category in ('amenity',) and osm_type in _DINING_CATEGORIES or
+            any(sig in osm_type for sig in _DINING_TYPE_SIGNALS) or
+            any(sig in category for sig in _DINING_TYPE_SIGNALS)
+        )
+
+        # For well-known names, even if OSM category is 'tourism' or 'building',
+        # accept if the name is a strong match (≥75% of words)
+        strong_name_match = (
+            _stop_words_osm and
+            name_words_hit >= max(1, len(_stop_words_osm) * 0.75)
+        )
+
+        if is_dining or strong_name_match:
+            addr_str = ""
+            street = address.get("road", "")
+            house = address.get("house_number", "")
+            if street:
+                addr_str = f" ({house} {street}, {result_city})".strip() if house else f" ({street}, {result_city})"
+            return True, (f"nominatim_osm: '{name}' found in {result_city or city_hint}"
+                          f"{addr_str} [category={category}/{osm_type}]")
 
     return False, ""
 
