@@ -7840,3 +7840,33 @@ kiro/local284-selector-corpus-tiebreak   1 commit   (HELD — Riviera regression
 
 Plus: run a restaurant tour to prove LOCAL-285's unverified core claim, and
 generate the tour Michael has been waiting for since 17:25.
+
+## D199 — Naming the transport mode is information only when it is not the default (2026-08-05)
+
+Michael, on the museum tour's opening: *"when the means of transportation are
+other then human legs/feet the journey on Camels or dogs make sense, but in the
+museum, 'walking journey' sounds strange."*
+
+**Rule:** part 1 announces the mode where the mode tells the listener something
+they did not know and may need to prepare for — cycling, driving, riding, dog
+sled. It does not announce walking for a museum or other indoor tour, where
+walking is the default and the word carries nothing.
+
+This is the same test as the unsupported-claim gate: not "is it true" but "does
+it inform". "A walking journey through the museum" is true and empty, the same
+shape as "surrounded by history and natural beauty" (D171).
+
+Paired with the part-2 defect — `0 meters`, from taking the haversine between two
+objects that share a building's coordinates — the diagnosis is one thing, not
+two: **the four-part opening was designed for geographic tours and treats a
+museum as a very small one.** Both go in LOCAL-286 rather than separate tasks,
+because they are the same code block and the same LLM call.
+
+**LEAD note:** the "route stretches" phrasing was written into the task as
+*consider and report your view*, not as scope, on the grounds that Michael has
+been specific about this opening's wording and D168/D172 record LEAD moving the
+prolog three times in 90 minutes and breaking its validator twice. He then said
+plainly it has to change. Leaving it as a question cost one exchange; changing
+his approved wording unilaterally would have cost more. The judgement stands, but
+the general form is: **propose the change and say why, rather than either
+silently making it or silently leaving it.**

@@ -920,3 +920,50 @@ be told apart from an itinerary mention; stop treating 100 as a ceiling bonuses
 may exceed. Nothing dispatched — this is yours to rule on.
 
 ---
+
+---
+
+## The museum opening is a geographic tour opening in the wrong building
+
+**Michael, reading `tours/LOCAL282_museum_5stop.txt`:**
+
+> *"I understand that when the means of transportation are other then human
+> legs/feet the journey on Camels or dogs make sense, but in the museum,
+> 'walking journey' sounds strange."*
+
+> *"The route stretches from Les paysages de l'âme to Armure du Clan Hotta,
+> covering an approximate distance of 0 meters. I hope it is obvious that this
+> has to change for Museum tours."*
+
+**The chain, traced:** `_prolog_transport_display` (`generate_tour_text.py:7784`)
+maps `on_foot`→"walking". A museum tour is `on_foot`. Part 1's instruction says
+*"State the tour name and mode of transport"*, so the model announces walking.
+Part 2 then takes the haversine between the first and last stop — both of which
+carry the building's coordinates — and reads out zero.
+
+**One root cause, two symptoms: the four-part opening was built for geographic
+tours and treats a museum as a very small one.**
+
+Michael's line on transport is the useful one and is now the rule: naming the
+mode is **information** when it is a camel, a dog sled, or a bicycle — the
+listener may need to prepare. In a museum, walking is the default, so saying it
+is not false but **empty**. Same family as *"surrounded by history and natural
+beauty"*, which he had removed this morning.
+
+**Folded into LOCAL-286** (one task, not two — same code block, same LLM call;
+splitting them would mean two rounds on one paragraph). Part 1 drops the
+locomotion word for museums and keeps it everywhere it informs; part 2 gets the
+whole sentence rewritten for museums, plus a distance floor that omits the clause
+rather than states a near-zero — that guard applies to every category, since any
+single-building tour hits it.
+
+Michael's second message settled something I had deliberately left open: I had
+written "route stretches" up as *consider and report*, not scope, because he has
+been specific about this opening's wording and I did not want it changed
+silently. He answered it, so it is now a requirement.
+
+Task file carries an explicit fence: parts 3 and 4 untouched, order intact,
+geographic wording unchanged.
+
+**Still blocked on OpenAI credits** — sixth consecutive `credit_balance_exhausted`
+at 21:34. LOCAL-286 dispatches the moment they return.
