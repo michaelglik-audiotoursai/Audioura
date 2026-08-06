@@ -9218,3 +9218,41 @@ the scorer is next touched.
 **Process note that worked:** the test gate held. The merge completed, the push
 did not, and nothing reached `origin` until the suite was green. That is the fix
 from three failed pushes earlier today doing its job.
+
+## D233 — Corpus quality determines tour quality, demonstrated in one tour (2026-08-06)
+
+LOCAL-314 harvested restaurant corpus. Bounced on the quality filter, but it
+produced the cleanest natural experiment we have: **one pipeline, one tour, five
+stops, and the only variable is the source.**
+
+**Acchiardo — Forbes:**
+
+> *"Since 1927, Acchiardo has remained true to its roots… The socca, a chickpea
+> pancake, reflects the city's Italian influences, while the daube, a hearty beef
+> stew, embodies the French heart of Niçoise cooking."*
+
+**Le Bistrot d'Antoine — Yelp review and a scoring blog:**
+
+> *"the clinking of cutlery… the aroma of garlic, herbs, and simmering sauces
+> fills the air… earning the restaurant high marks in creativity and execution."*
+
+Same generator, same prompt, same day. **The generator does not invent atmosphere
+because it prefers atmosphere — it invents when given nothing.** Every previous
+argument for corpus depth (LOCAL-252, 277, 283) was a before/after across time,
+where other variables moved. This is side by side.
+
+**A new fabrication route, and it is subtle.** *"Earning the restaurant high
+marks in creativity and execution"* is a blogger's `Creativity: 7.5/10` restated
+as a property of the restaurant. Not hallucinated — *laundered*. A subjective
+rating entered the corpus and left as an apparent fact. Storing review scores
+creates claims that survive every grounding check we have, because they *are*
+grounded: in an opinion.
+
+The bounce therefore forbids storing ratings at all, and filters passages on
+content — year, named person, named dish, price, documented event — rather than
+on whether the domain looks reputable.
+
+**Also unfixed and now twice-observed:** R7 missed *"the aroma of garlic, herbs,
+and simmering sauces fills the air"* and *"the clinking of cutlery"*, despite
+LOCAL-303 widening it this morning. Restaurant sensory language is a register the
+detector has never been tested against. Needs its own task.
