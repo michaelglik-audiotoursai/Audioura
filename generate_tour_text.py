@@ -1729,11 +1729,10 @@ _LAST_VERIFICATION_TIER = ""
 # Keys: total_cost, total_tokens, cache_hit, breakdown (dict with llm/tts/search)
 _LAST_GENERATION_COST = {"total_cost": 0.0, "total_tokens": 0, "cache_hit": False, "breakdown": {}}
 
-# [LOCAL-323] Module-level: set by the service layer before calling generate_tour_text.
-# Used by spine_generator to attribute cost. Same pattern as _LAST_GENERATION_COST
-# but write-before/read-during instead of read-after.
-_CURRENT_JOB_USER_ID = None
-_CURRENT_JOB_ID = None
+# [LOCAL-323] REMOVED module-level globals _CURRENT_JOB_USER_ID / _CURRENT_JOB_ID.
+# They were not thread-safe: concurrent jobs sharing the same module meant one
+# thread's write would clobber another's. Fixed by threading user_id/job_id as
+# parameters through generate_tour_text() → generate_spine(). See bounce review.
 
 
 def _is_artist_human(artist_qid: str) -> bool:
@@ -3268,7 +3267,7 @@ def _check_type_prose_contradiction(poi_list: list) -> list:
     return warnings
 
 
-def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None):
+def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None):
     """
     Generate audio tour text using OpenAI API with geo coordinates.
     
@@ -3281,6 +3280,9 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                  When STORIED_MODE=true and persona is provided, biases story-type
                  assignment and injects persona tone into descriptions.
                  When STORIED_MODE=false or persona=None: no effect.
+        user_id: Optional user_id for cost attribution (LOCAL-323).
+                 Threaded to spine_generator for per-operation ledger rows.
+        job_id: Optional job correlation ID for cost_meter recording.
     
     Returns:
         tuple: (tour_text, output_file, coordinates)
@@ -6053,8 +6055,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 theme_name="",
                 story_elements=_story_elements if _story_elements else None,
                 thread_result=_thread_result,
-                user_id=_CURRENT_JOB_USER_ID,
-                job_id=_CURRENT_JOB_ID,
+                user_id=user_id,
+                job_id=job_id,
             )
 
             # [LOCAL-278] Fold the spine's cost into the pipeline total. It was
@@ -6094,8 +6096,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             theme_name="",
                             story_elements=_story_elements if _story_elements else None,
                             thread_result=_thread_result,
-                            user_id=_CURRENT_JOB_USER_ID,
-                            job_id=_CURRENT_JOB_ID,
+                            user_id=user_id,
+                            job_id=job_id,
                         )
                         if _retry_spine:
                             _retry_score, _retry_breakdown = _score_spine(_retry_spine, total_stops=len(_poi_names))

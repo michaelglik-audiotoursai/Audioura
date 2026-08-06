@@ -165,14 +165,26 @@ def test_polly_service_accepts_attribution_fields():
 
 
 def test_generate_tour_text_has_job_context_vars():
-    """generate_tour_text module exposes _CURRENT_JOB_USER_ID and _CURRENT_JOB_ID."""
+    """generate_tour_text function accepts user_id/job_id as parameters (thread-safe).
+
+    LOCAL-323 bounce: module-level globals were not thread-safe. Replaced with
+    parameter threading. This test verifies the new contract.
+    """
+    import inspect
+    from generate_tour_text import generate_tour_text
+
+    sig = inspect.signature(generate_tour_text)
+    params = list(sig.parameters.keys())
+    assert "user_id" in params, "generate_tour_text must accept user_id param"
+    assert "job_id" in params, "generate_tour_text must accept job_id param"
+
+    # Module globals must be gone (they were the thread-safety defect)
     import generate_tour_text as gtt
-    assert hasattr(gtt, "_CURRENT_JOB_USER_ID"), "Must have _CURRENT_JOB_USER_ID"
-    assert hasattr(gtt, "_CURRENT_JOB_ID"), "Must have _CURRENT_JOB_ID"
-    # Default values should be None
-    assert gtt._CURRENT_JOB_USER_ID is None
-    assert gtt._CURRENT_JOB_ID is None
-    print("PASS: generate_tour_text exposes job context variables")
+    assert not hasattr(gtt, "_CURRENT_JOB_USER_ID"), \
+        "_CURRENT_JOB_USER_ID must be removed (thread-unsafe)"
+    assert not hasattr(gtt, "_CURRENT_JOB_ID"), \
+        "_CURRENT_JOB_ID must be removed (thread-unsafe)"
+    print("PASS: generate_tour_text uses parameter threading (thread-safe)")
 
 
 def test_modernized_service_accepts_attribution():
