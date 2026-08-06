@@ -1735,6 +1735,39 @@ _LAST_GENERATION_COST = {"total_cost": 0.0, "total_tokens": 0, "cache_hit": Fals
 # parameters through generate_tour_text() → generate_spine(). See bounce review.
 
 
+# [LOCAL-326] Phase-boundary cost ceiling check.
+# Reads COST_HARD_LIMIT from the same env var as cost_ceiling_monitor.py —
+# single source of truth. Check is pure in-memory comparison (no DB round-trip).
+_PHASE_COST_HARD_LIMIT = float(os.environ.get("COST_HARD_LIMIT_USD", "1.30"))
+
+
+class _CostCeilingBreached(Exception):
+    """Raised when accumulated generation cost exceeds COST_HARD_LIMIT at a phase boundary.
+
+    Carries the phase name and current cost so the caller can assemble a partial tour.
+    """
+    def __init__(self, phase: str, cost: float, limit: float):
+        self.phase = phase
+        self.cost = cost
+        self.limit = limit
+        super().__init__(
+            f"[LOCAL-326] Cost ceiling breached at {phase}: "
+            f"${cost:.4f} > ${limit:.4f} — stopping generation"
+        )
+
+
+def _check_phase_boundary_cost(total_cost: float, phase_name: str) -> None:
+    """Compare accumulated cost against hard limit. Raise on breach.
+
+    Called at natural phase boundaries — no DB call, no LLM call.
+    Normal tours (~$0.07) pass this in < 1µs.
+    """
+    if total_cost > _PHASE_COST_HARD_LIMIT:
+        print(f"[LOCAL-326] COST CEILING BREACHED at {phase_name}: "
+              f"${total_cost:.4f} > ${_PHASE_COST_HARD_LIMIT:.4f}")
+        raise _CostCeilingBreached(phase_name, total_cost, _PHASE_COST_HARD_LIMIT)
+
+
 def _is_artist_human(artist_qid: str) -> bool:
     """Check if a Wikidata entity is a human (P31=Q5).
     
@@ -3371,6 +3404,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     
     # [LOCAL-60] Declare global for cost exposure
     global _LAST_GENERATION_COST
+    global _LAST_POI_LIST  # [LOCAL-326] needed for partial-tour early returns
 
     # -------- [S20] Storied: check tour cache before generation --------
     _cache_hit = None
@@ -5413,6 +5447,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         for i, p in enumerate(poi_list):
             p["stop_number"] = i + 1
 
+        # [LOCAL-326] Phase-boundary cost checkpoint: before Phase 3B.
+        # Saves Phase 3B + Phase 5 on breach.
+        _check_phase_boundary_cost(total_cost, "pre-Phase3B")
+
         # -------- PHASE 3B: ordering + structured details + directions --------
         # Extracted into _run_phase_3b() so it can be called again after geo-check replacements.
         def _run_phase_3b(current_poi_list):
@@ -5993,6 +6031,36 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # fallback from producing a 'completed' tour full of 'Location N' placeholders.
         print(f"X PHASE 3C rejected all stops: {e}")
         return None, None, (None, None)
+    except _CostCeilingBreached as _ccb:
+        # [LOCAL-326] Cost ceiling breached before Phase 5. We have poi_list with names
+        # but no descriptions yet. Assemble a stub tour listing the stops so downstream
+        # knows what was planned. This is the "degrade, not vanish" path.
+        print(f"[LOCAL-326] Assembling partial tour (no descriptions): "
+              f"breached at {_ccb.phase}, ${_ccb.cost:.4f} > ${_ccb.limit:.4f}")
+        _partial_header = (
+            f"Step-by-Step Audio Guided Tour: {location}\n"
+            f"Tour-Category: {tour_category}\n"
+            f"[PARTIAL TOUR — generation stopped at {_ccb.phase} due to cost ceiling "
+            f"(${_ccb.cost:.4f} > ${_ccb.limit:.4f})]\n\n"
+        )
+        _partial_body = ""
+        for _pi, _pp in enumerate(poi_list):
+            _partial_body += f"Stop {_pi + 1}: {_pp.get('name', 'Unknown')}\n"
+            if _pp.get('address'):
+                _partial_body += f"Address: {_pp['address']}\n"
+            _partial_body += "[Description not generated — cost ceiling reached]\n\n"
+        _partial_tour = _partial_header + _partial_body
+        # Expose cost for metering (cost was spent even though tour is partial)
+        _LAST_GENERATION_COST = {
+            "total_cost": total_cost,
+            "total_tokens": total_tokens,
+            "cache_hit": False,
+            "breakdown": {"llm": total_cost, "tts": 0.0, "search": 0.0},
+        }
+        if output_file:
+            with open(output_file, "w", encoding="utf-8") as _pf:
+                _pf.write(_partial_tour)
+        return _partial_tour, output_file, (None, None)
     except Exception as e:
         print(f"Error in PHASE 3A/3B pipeline: {str(e)}")
         import traceback
@@ -6523,6 +6591,40 @@ All narration must be declarative. These rules are enforced by automated validat
 These rules apply to the NARRATION paragraphs only. Navigation/orientation directions
 ("Head south", "Turn left", "Continue past") are exempt — imperative form is correct there.
 """
+
+    # [LOCAL-326] Phase-boundary cost checkpoint: before Phase 5.
+    # Saves the expensive per-stop description generation on breach.
+    # Cannot raise here (would escape to caller without partial assembly),
+    # so return a partial tour directly.
+    if total_cost > _PHASE_COST_HARD_LIMIT:
+        print(f"[LOCAL-326] COST CEILING BREACHED at pre-Phase5: "
+              f"${total_cost:.4f} > ${_PHASE_COST_HARD_LIMIT:.4f} — "
+              f"assembling partial tour with {len(poi_list)} stops (no descriptions)")
+        _partial_header = (
+            f"Step-by-Step Audio Guided Tour: {location}\n"
+            f"Tour-Category: {tour_category}\n"
+            f"[PARTIAL TOUR — generation stopped before Phase 5 due to cost ceiling "
+            f"(${total_cost:.4f} > ${_PHASE_COST_HARD_LIMIT:.4f})]\n\n"
+        )
+        _partial_body = ""
+        for _pi, _pp in enumerate(poi_list):
+            _partial_body += f"Stop {_pi + 1}: {_pp.get('name', 'Unknown')}\n"
+            if _pp.get('address'):
+                _partial_body += f"Address: {_pp['address']}\n"
+            if _pp.get('directions'):
+                _partial_body += f"Directions: {_pp['directions']}\n"
+            _partial_body += "[Description not generated — cost ceiling reached]\n\n"
+        _partial_tour = _partial_header + _partial_body
+        _LAST_GENERATION_COST = {
+            "total_cost": total_cost,
+            "total_tokens": total_tokens,
+            "cache_hit": False,
+            "breakdown": {"llm": total_cost, "tts": 0.0, "search": 0.0},
+        }
+        if output_file:
+            with open(output_file, "w", encoding="utf-8") as _pf:
+                _pf.write(_partial_tour)
+        return _partial_tour, output_file, first_poi_coordinates
 
     # PHASE 5: Generate detailed descriptions for each POI (parallelized)
     print(f"\nPHASE 5: Generating detailed descriptions for each POI (parallel)...")
@@ -7851,6 +7953,7 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
         return idx, _fallback_orient, f"[GENERATION_FAILED:{poi_name}]", 0, 0, 0.0
 
     max_workers = min(len(poi_list), 5)
+    _phase5_ceiling_breached = False  # [LOCAL-326] Track mid-Phase5 breach
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # [S9/S10/S11] Pass spine_stop and fact_sheet per stop (None when not in Storied mode)
         _spine_arc = _storied_spine.get("arc", []) if _storied_mode and _storied_spine else []
@@ -7876,7 +7979,63 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
             poi_list[idx]["word_count"] = word_count
             total_tokens += tokens_used
             total_cost += call_cost
+            # [LOCAL-326] Check cost after each stop completes. On breach, mark
+            # remaining stops as ungenerated but do NOT cancel already-inflight
+            # futures (they were launched in parallel). The ceiling prevents
+            # further phases from running — the savings is real.
+            if not _phase5_ceiling_breached and total_cost > _PHASE_COST_HARD_LIMIT:
+                _phase5_ceiling_breached = True
+                _completed_stop_count = sum(
+                    1 for p in poi_list
+                    if p.get("description") and not p["description"].startswith("[GENERATION_FAILED")
+                )
+                print(f"[LOCAL-326] COST CEILING BREACHED during Phase 5: "
+                      f"${total_cost:.4f} > ${_PHASE_COST_HARD_LIMIT:.4f} — "
+                      f"{_completed_stop_count}/{len(poi_list)} stops completed")
     
+    # [LOCAL-326] If cost ceiling was breached during Phase 5, skip all post-processing
+    # (Phase 5.1, 5.5, 5.6, 5.10 etc.) and assemble a partial tour immediately.
+    # Stops that completed before the breach have full descriptions; others don't.
+    if _phase5_ceiling_breached:
+        _completed_stops = [
+            p for p in poi_list
+            if p.get("description") and not p["description"].startswith("[GENERATION_FAILED")
+        ]
+        _n_completed = len(_completed_stops)
+        print(f"[LOCAL-326] Assembling partial tour: {_n_completed}/{len(poi_list)} stops have descriptions")
+        _partial_header = (
+            f"Step-by-Step Audio Guided Tour: {location}\n"
+            f"Tour-Category: {tour_category}\n"
+            f"[PARTIAL TOUR — {_n_completed} of {len(poi_list)} stops generated; "
+            f"cost ceiling reached during Phase 5 (${total_cost:.4f} > ${_PHASE_COST_HARD_LIMIT:.4f})]\n\n"
+        )
+        _partial_body = ""
+        for _pi, _pp in enumerate(poi_list):
+            _stop_name = _pp.get('name', 'Unknown')
+            _partial_body += f"Stop {_pi + 1}: {_stop_name}\n"
+            if _pp.get('address'):
+                _partial_body += f"Address: {_pp['address']}\n"
+            if _pp.get('orientation'):
+                _partial_body += f"\n{_pp['orientation']}\n"
+            _desc = _pp.get('description', '')
+            if _desc and not _desc.startswith("[GENERATION_FAILED"):
+                _partial_body += f"\n{_desc}\n"
+            else:
+                _partial_body += "\n[Description not generated — cost ceiling reached]\n"
+            _partial_body += "\n"
+        _partial_tour = _partial_header + _partial_body
+        _LAST_GENERATION_COST = {
+            "total_cost": total_cost,
+            "total_tokens": total_tokens,
+            "cache_hit": False,
+            "breakdown": {"llm": total_cost, "tts": 0.0, "search": 0.0},
+        }
+        _LAST_POI_LIST = list(poi_list)
+        if output_file:
+            with open(output_file, "w", encoding="utf-8") as _pf:
+                _pf.write(_partial_tour)
+        return _partial_tour, output_file, first_poi_coordinates
+
     # -------- [LOCAL-192] PHASE 5.1: Style validation + per-paragraph retry --------
     # D63: prompt instruction alone does not fix style faults. Validate generated
     # text and re-ask for paragraphs that violate error-severity rules (R1–R4).
@@ -10689,7 +10848,6 @@ RULES:
     print(complete_tour[:preview_length] + "...\n")
     
     # [B1b] Expose poi_list at module level for stop_metrics verified-flag mapping
-    global _LAST_POI_LIST
     _LAST_POI_LIST = list(poi_list)
 
     # [LOCAL-60] Expose generation cost at module level for cost metering
