@@ -8457,3 +8457,40 @@ without naming what ran. LEAD has been reporting counts like "175 passed" all
 night; those were real, but they covered six chosen files out of 1014 collected
 tests. The honest form is the one used in this decision — the command, the
 counts, and the failures.
+
+## D213 — Two of the last three agent sessions died on unbounded operations (2026-08-06)
+
+**LOCAL-292** (00:41): 58 minutes, 0% CPU, nothing committed. Suspected an
+unbounded `sleep` in a retry loop.
+
+**LOCAL-298** (04:07): 27 minutes, nothing produced. Root cause confirmed this
+time — the whole run was spent inside:
+
+```
+find /Users/micha -name "pytest" -type f
+```
+
+That path holds Docker volumes, `node_modules`, and `~/audioura-backups` with
+twelve 224 MB dumps. The agent was looking for the pytest binary. Killing the
+`find` alone did not revive the session; the wrapper had to go too.
+
+**The shared shape: an agent reaches for an unbounded operation when it cannot
+find something, and has no notion that a command is taking too long.** Neither
+session was deadlocked. Both were patiently waiting on work that would never
+finish in useful time.
+
+**Two mitigations, applied to LOCAL-298's task file and worth putting in the
+template:**
+
+1. Give the exact invocation for anything the agent might otherwise hunt for.
+   `python3 -m pytest` needs no binary on PATH; saying so removes the reason to
+   search.
+2. State a wall-clock rule explicitly: *if a command has not returned in about
+   two minutes, it is the wrong command — stop it and reconsider.* Agents do not
+   infer this.
+
+**Detection worked, and that is the part to keep.** Both stalls were caught by a
+tick noticing 0% CPU and no worktree activity, then checking child processes
+rather than assuming a hang. The `pgrep -P` on the agent pid is what turned
+"stalled, unknown cause" into "spent 27 minutes in find" — a diagnosis precise
+enough to fix. Checking children before killing should be standard.
