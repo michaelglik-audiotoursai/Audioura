@@ -47,6 +47,107 @@ LANDMARK_ROOTS = [
     "Q839954",   # archaeological site
 ]
 
+# LOCAL-294: P31 types to EXCLUDE — administrative divisions and transit infrastructure.
+# These are real Wikidata entities with coordinates, but not places a listener visits on a tour.
+# Filtering by P31 (not by name) so it generalises across languages and areas.
+_EXCLUDED_P31_TYPES = {
+    # Administrative divisions
+    "Q484170",    # commune of France
+    "Q18524218",  # canton of France (post-2015)
+    "Q674687",    # canton of France (pre-2015)
+    "Q194203",    # arrondissement of France
+    "Q6465",      # arrondissement (generic)
+    "Q36784",     # region of France
+    "Q34876",     # province
+    "Q1221156",   # department of France (collectivité territoriale)
+    "Q6138528",   # department of France (entity)
+    "Q515",       # city (the area itself, not a place to visit within it)
+    "Q1549591",   # big city
+    "Q5119",      # capital city
+    "Q3957",      # town
+    "Q532",       # village
+    "Q1357964",   # quarter (urban subdivision)
+    "Q1523821",   # département of France
+    "Q34876",     # province
+    "Q3624078",   # sovereign state
+    "Q6256",      # country
+    "Q15284",     # municipality
+    "Q15042",     # municipality of Italy
+    "Q747074",    # canton (administrative division)
+    "Q2989457",   # administrative territorial entity of France
+    "Q1115575",   # civil parish
+    "Q1093829",   # city of the United States
+    # Transit infrastructure
+    "Q55488",     # railway station
+    "Q928830",    # metro station
+    "Q953806",    # bus stop
+    "Q18543139",  # railway stop
+    "Q55485",     # train station (alternate)
+    "Q4663385",   # tram stop
+    "Q44782",     # port
+    "Q94993",     # bus station
+    "Q1248784",   # airport
+    "Q11707",     # restaurant (not transit, but commonly a non-POI in tour context)
+    "Q2175765",   # halt (railway)
+    "Q22808404",  # railway halt in France
+    "Q15640053",  # tram system
+    "Q18706073",  # public institution of intermunicipal cooperation (e.g. Métropole Nice)
+    "Q1620908",   # historical region
+    "Q3024240",   # historical country
+    "Q353344",    # countship (former administrative division)
+}
+
+# LOCAL-294: P31 types known to be TOUR-WORTHY — used for logging unknown types.
+_KNOWN_GOOD_P31_TYPES = {
+    "Q811979",    # architectural structure
+    "Q4989906",   # monument
+    "Q22698",     # park
+    "Q174782",    # town square (plaza)
+    "Q860861",    # sculpture
+    "Q557141",    # public art
+    "Q12280",     # bridge
+    "Q16970",     # church building
+    "Q5003624",   # memorial
+    "Q839954",    # archaeological site
+    "Q33506",     # museum
+    "Q23413",     # castle
+    "Q570116",    # tourist attraction
+    "Q16560",     # palace
+    "Q483110",    # stadium
+    "Q57821",     # fortification
+    "Q751876",    # château
+    "Q3947",      # house
+    "Q41176",     # building
+    "Q35112127",  # public building
+    "Q655686",    # historic building
+    "Q1030034",   # art museum
+    "Q207694",    # art gallery
+    "Q24354",     # theatre (building)
+    "Q18674739",  # event venue
+    "Q1244442",   # promenade
+    "Q1457376",   # viewpoint
+    "Q39614",     # cemetery
+    "Q190928",    # fountain
+    "Q1007870",   # bay
+    "Q40080",     # beach
+    "Q131681",    # triumphal arch
+    "Q162875",    # marketplace
+    "Q7075",      # library
+    "Q16917",     # hospital
+    "Q24398318",  # religious building
+    "Q44613",     # monastery
+    "Q80638",     # ruin
+    "Q3152824",   # cultural property
+    "Q2065736",   # cultural heritage site
+    "Q35127",     # website  — skip, but not excluded (let it through silently)
+    "Q133215",    # cave
+    "Q8502",      # mountain
+    "Q34038",     # waterfall
+    "Q46831",     # mountain pass
+    "Q4022",      # river
+    "Q23442",     # island
+}
+
 # Default bounding radii (A2)
 NEIGHBORHOOD_RADIUS_KM = 1.5
 CITY_RADIUS_KM = 2.0
@@ -213,6 +314,15 @@ def discover_landmarks(area: AreaResolution) -> List[Landmark]:
             wiki_added += 1
     print(f"  [landmark_discovery] Wikipedia extraction: +{wiki_added} new names "
           f"(total: {len(landmarks)})")
+    
+    # LOCAL-294: Final QID enforcement — every Landmark must carry a QID.
+    # Path 1 already enforces this; Paths 2 and 3 produce QID-bearing results by design.
+    # This is a safety net.
+    before_final = len(landmarks)
+    landmarks = [lm for lm in landmarks if lm.qid]
+    if before_final != len(landmarks):
+        print(f"  [LOCAL-294] Final QID enforcement: dropped {before_final - len(landmarks)} "
+              f"landmarks without QID")
     
     return landmarks
 
@@ -643,8 +753,18 @@ def _sparql_coordinate_query(lat: float, lng: float, radius_km: float) -> List[L
                 type_label="",
             ))
         
-        # Enrich top landmarks with Wikidata QIDs (batch lookup)
-        _enrich_with_qids(landmarks[:30])
+        # Enrich ALL landmarks with Wikidata QIDs (batch lookup)
+        _enrich_with_qids(landmarks)
+        
+        # LOCAL-294: Drop landmarks that failed QID enrichment (cannot be type-checked)
+        before_qid_filter = len(landmarks)
+        landmarks = [lm for lm in landmarks if lm.qid]
+        if before_qid_filter != len(landmarks):
+            print(f"  [LOCAL-294] QID enforcement: {before_qid_filter} → {len(landmarks)} "
+                  f"(dropped {before_qid_filter - len(landmarks)} without QID)")
+        
+        # LOCAL-294: Filter by P31 type — exclude admin divisions and transit
+        landmarks = _filter_by_p31_type(landmarks)
         
         return landmarks
         
@@ -657,50 +777,171 @@ def _sparql_coordinate_query(lat: float, lng: float, radius_km: float) -> List[L
 
 
 def _enrich_with_qids(landmarks: List[Landmark]):
-    """Enrich landmarks with Wikidata QIDs via Wikipedia→Wikidata sitelink lookup."""
+    """Enrich landmarks with Wikidata QIDs via Wikipedia→Wikidata sitelink lookup.
+
+    LOCAL-294: Processes ALL landmarks (not just first 30) in batches of 50
+    to ensure every geosearch result gets a QID lookup opportunity.
+    """
     if not landmarks:
         return
-    
-    # Batch lookup: get Wikidata item IDs for Wikipedia titles
-    titles = [lm.name for lm in landmarks[:30]]
-    titles_str = "|".join(titles)
-    
-    try:
-        resp = requests.get(
-            "https://en.wikipedia.org/w/api.php",
-            params={
-                "action": "query",
-                "titles": titles_str,
-                "prop": "pageprops",
-                "ppprop": "wikibase_item",
-                "format": "json",
-            },
-            headers={"User-Agent": _USER_AGENT},
-            timeout=10,
-        )
-        if resp.status_code != 200:
-            return
-        
-        data = resp.json()
-        pages = data.get("query", {}).get("pages", {})
-        
-        # Build title→QID map
-        title_to_qid = {}
-        for page_id, page in pages.items():
-            if page_id == "-1":
+
+    # Process all landmarks in batches of 50 (Wikipedia API limit)
+    for batch_start in range(0, len(landmarks), 50):
+        batch = landmarks[batch_start:batch_start + 50]
+        titles = [lm.name for lm in batch]
+        titles_str = "|".join(titles)
+
+        try:
+            resp = requests.get(
+                "https://en.wikipedia.org/w/api.php",
+                params={
+                    "action": "query",
+                    "titles": titles_str,
+                    "prop": "pageprops",
+                    "ppprop": "wikibase_item",
+                    "format": "json",
+                },
+                headers={"User-Agent": _USER_AGENT},
+                timeout=10,
+            )
+            if resp.status_code != 200:
                 continue
-            title = page.get("title", "")
-            qid = page.get("pageprops", {}).get("wikibase_item", "")
-            if title and qid:
-                title_to_qid[title] = qid
-        
-        # Apply QIDs to landmarks
-        for lm in landmarks:
-            if lm.name in title_to_qid:
-                lm.qid = title_to_qid[lm.name]
-                
-    except Exception:
-        pass
+
+            data = resp.json()
+            pages = data.get("query", {}).get("pages", {})
+
+            # Build title→QID map
+            title_to_qid = {}
+            for page_id, page in pages.items():
+                if page_id == "-1":
+                    continue
+                title = page.get("title", "")
+                qid = page.get("pageprops", {}).get("wikibase_item", "")
+                if title and qid:
+                    title_to_qid[title] = qid
+
+            # Apply QIDs to landmarks in this batch
+            for lm in batch:
+                if lm.name in title_to_qid:
+                    lm.qid = title_to_qid[lm.name]
+
+        except Exception:
+            continue
+
+
+def _fetch_p31_types(qids: List[str]) -> Dict[str, List[str]]:
+    """Fetch P31 (instance of) types for a list of Wikidata QIDs.
+
+    LOCAL-294: Returns a dict mapping QID → list of P31 type QIDs.
+    Batch-fetches in groups of 50 via wbgetentities.
+    """
+    if not qids:
+        return {}
+
+    qid_to_types: Dict[str, List[str]] = {}
+
+    for batch_start in range(0, len(qids), 50):
+        batch = qids[batch_start:batch_start + 50]
+        ids_str = "|".join(batch)
+        try:
+            resp = requests.get(
+                _WIKIDATA_API,
+                params={
+                    "action": "wbgetentities",
+                    "ids": ids_str,
+                    "props": "claims",
+                    "format": "json",
+                },
+                headers={"User-Agent": _USER_AGENT},
+                timeout=15,
+            )
+            if resp.status_code != 200:
+                continue
+
+            data = resp.json()
+            entities = data.get("entities", {})
+            for qid, entity in entities.items():
+                claims = entity.get("claims", {})
+                p31_claims = claims.get("P31", [])
+                types = []
+                for claim in p31_claims:
+                    type_id = (claim.get("mainsnak", {})
+                               .get("datavalue", {})
+                               .get("value", {})
+                               .get("id", ""))
+                    if type_id:
+                        types.append(type_id)
+                qid_to_types[qid] = types
+        except Exception:
+            continue
+
+    return qid_to_types
+
+
+def _filter_by_p31_type(landmarks: List[Landmark]) -> List[Landmark]:
+    """Filter landmarks by P31 (instance of) type.
+
+    LOCAL-294: Excludes administrative divisions and transit infrastructure.
+    Keeps unknown types and logs them for future tuning.
+    Returns the filtered list plus prints excluded/unknown entities.
+    """
+    if not landmarks:
+        return []
+
+    # Collect QIDs that need type checking
+    qids_to_check = [lm.qid for lm in landmarks if lm.qid]
+    if not qids_to_check:
+        return landmarks
+
+    qid_to_types = _fetch_p31_types(qids_to_check)
+
+    kept = []
+    excluded = []
+    unknown_types_seen: Dict[str, str] = {}  # type_qid → first landmark name that had it
+
+    for lm in landmarks:
+        if not lm.qid:
+            # No QID — cannot verify type, will be removed later by QID enforcement
+            continue
+
+        types = qid_to_types.get(lm.qid, [])
+        if not types:
+            # No P31 at all — keep it (missing type is not a reason to exclude)
+            kept.append(lm)
+            continue
+
+        # Check if ANY type is excluded
+        excluded_types = [t for t in types if t in _EXCLUDED_P31_TYPES]
+        if excluded_types:
+            # Look up human-readable label for log (use first excluded type)
+            excluded.append((lm.name, lm.qid, excluded_types[0]))
+            continue
+
+        # Check for unknown types (not in known-good or excluded)
+        for t in types:
+            if t not in _KNOWN_GOOD_P31_TYPES and t not in _EXCLUDED_P31_TYPES:
+                if t not in unknown_types_seen:
+                    unknown_types_seen[t] = lm.name
+
+        # Not excluded → keep
+        kept.append(lm)
+
+    # Log exclusions
+    if excluded:
+        print(f"  [LOCAL-294] P31 type filter: excluded {len(excluded)} entities:")
+        for name, qid, type_qid in excluded:
+            print(f"    EXCLUDED: {name} ({qid}) — P31={type_qid}")
+
+    # Log unknown types (kept, but flagged for future tuning)
+    if unknown_types_seen:
+        print(f"  [LOCAL-294] Unknown P31 types encountered (kept, not excluded):")
+        for type_qid, first_name in unknown_types_seen.items():
+            print(f"    UNKNOWN TYPE: {type_qid} — first seen on: {first_name}")
+
+    print(f"  [LOCAL-294] P31 filter result: {len(landmarks)} → {len(kept)} kept, "
+          f"{len(excluded)} excluded, {len(unknown_types_seen)} unknown types logged")
+
+    return kept
 
 
 def _sparql_p131_query(area_qid: str) -> List[Landmark]:
