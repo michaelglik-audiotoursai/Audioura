@@ -8870,3 +8870,47 @@ test-fixing will clear it.
 **Two possible remedies, both Michael's call** since they change product
 behaviour: give test runs a unique user id per run, or raise the test user's
 quota. Recorded rather than chosen.
+
+## D225 — In-flight scoring: yes to all three, but nothing gates until the detector is fixed (2026-08-06)
+
+Michael proposed scoring every tour just before delivery, for three purposes:
+performance tracking, evaluating client edits, and guardrails that regenerate or
+warn.
+
+**Agreed on all three. Sequenced so the third cannot fire on a broken measure.**
+
+The prerequisite is concrete, not theoretical. Scoring this morning's 8-stop
+museum tour, stop 3 — containing chlorite, eight arms, a rosary, modakas, the
+Pala-Sena dynasty, Shiva and Parvati — came back **THIN, 1 fact**. A guardrail
+live today would have regenerated one of the best stops in the tour, paying money
+and latency to replace good work. Meanwhile the correlation bonus would have
+waved the tour through at +25 for saying "Kannon" twice.
+
+**Dispatched:**
+- **LOCAL-304** — the fact detector. Four structural gaps: materials are a
+  hardcoded 12-item list, measurements require digits so "eight arms" never
+  counts, deities fail the person filter, and dynasties/regions/periods are not a
+  category. Fix by category, not by extending lists — the same instruction given
+  to LOCAL-293/294, now applied to LEAD's own code.
+- **LOCAL-305** — split MISSING into PIPELINE-LOST (−1.0 × share) and UNAVAILABLE
+  (−0.15), FABRICATED to −1.5, coverage reported separately from quality. Michael
+  approved these weights. **Cannot-tell defaults to PIPELINE-LOST** — the opposite
+  default lets our bugs hide behind "the internet is thin here".
+- **LOCAL-306** — score at assembly, persist to a new `tour_scores` table, one row
+  per scoring event so edits produce history. **Gates nothing.** Delivery must be
+  byte-identical with scoring on and off.
+- **LOCAL-307** — parked, self-aborting until 304 and 306 are both merged.
+
+**Two design positions worth keeping.**
+
+**On evaluating client edits: score the tour, never the user.** *"This edit
+removed 3 sourced facts and added 2 unsourced claims"* is useful. *"Your edit
+scored 62"* is presumptuous — someone who shortens a tour or adds personal
+commentary has made it worse by our rubric and better for themselves. The delta
+is the product; the verdict is not. Written into LOCAL-306 as a hard constraint.
+
+**On guardrails: regenerate when we failed, tell the user when the world is
+thin.** That is the PIPELINE-LOST / UNAVAILABLE split doing real product work.
+Retrying an UNAVAILABLE tour produces the same tour and charges twice. *"We found
+3 well-documented places rather than the 6 you asked for"* is a better product
+than 6 padded stops, and more honest than silence.
