@@ -421,6 +421,24 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
         except Exception as content_err:
             print(f"Warning: Could not read tour_content: {content_err}")
         
+        # [LOCAL-311] Score every tour before delivery — direct generate path.
+        # Gates NOTHING. Mirrors the orchestrator's scoring (LOCAL-306 rule).
+        if tour_content_str:
+            try:
+                from tour_scoring_service import score_tour_text, ensure_tour_scores_table
+                ensure_tour_scores_table()
+                _tour_score, _score_row_id, _scoring_ms = score_tour_text(
+                    tour_content_str,
+                    n_requested=total_stops,
+                    tour_id=None,
+                    tour_name=f"{location} ({tour_type})",
+                )
+                if _tour_score:
+                    print(f"[LOCAL-311] Direct-generate scored: total={_tour_score.total_score:.1f} row_id={_score_row_id}")
+            except Exception as _scoring_err:
+                # Scoring failure MUST NOT block delivery (LOCAL-306 rule)
+                print(f"[LOCAL-311] Non-fatal scoring error (direct generate): {_scoring_err}")
+
         ACTIVE_JOBS.update(job_id, status="completed",
                           progress="Tour text generation completed successfully!",
                           output_file=output_filename,

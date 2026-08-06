@@ -22,25 +22,23 @@ import sys
 import time
 from datetime import datetime, timezone
 
-# --- Import the scorer (LOCAL-304/305 own it; we import, never modify) ------
+# --- Import the evaluator (LOCAL-311: single entry point) --------------------
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from tour_rubric_scorer import (
-    parse_tour,
-    analyze_stop,
-    classify_stop,
-    compute_score,
-    detect_venue_identity,
-    TourScore,
-    StopAnalysis,
+from tour_evaluator import (
+    evaluate,
+    Evaluation,
+    ALGORITHM_ID,
+    ALGORITHM_VERSION,
+    AlgorithmVersionError,
 )
+from tour_rubric_scorer import TourScore, StopAnalysis
 
 # --- DB connection: use tests/db_connection.py pattern ----------------------
 # Import at function call time to allow tests to set env before first connect.
 
-# Version string — bump when scoring logic changes (helps track which scorer
-# produced which row). This is the LOCAL-306 integration version, not the
-# rubric version (which lives in tour_rubric_scorer.py).
-SCORER_VERSION = "LOCAL-306-v1"
+# SCORER_VERSION is now derived from the evaluator's algorithm identity.
+# Kept as a computed property for backward compatibility with DB rows.
+SCORER_VERSION = ALGORITHM_ID
 
 
 def _get_code_sha():
@@ -126,42 +124,15 @@ def score_tour_text(tour_text, n_requested, tour_id=None, tour_name=None,
         print("[SCORING] Skipped: empty tour_text")
         return None, None, 0.0
 
-    t0 = time.perf_counter()
-
-    # Parse and score
-    stops_parsed = parse_tour(tour_text)
-    if not stops_parsed:
+    # Use the single entry point
+    evaluation = evaluate(tour_text, n_requested)
+    if evaluation is None:
         print("[SCORING] Skipped: no stops parsed from tour_text")
         return None, None, 0.0
 
-    all_stops = stops_parsed  # needed for cross-stop analysis
-    stop_analyses = []
-    for stop in stops_parsed:
-        sa = analyze_stop(stop, all_stops)
-        cls, evidence = classify_stop(sa)
-        sa.classification = cls
-        sa.classification_evidence = evidence
-        stop_analyses.append(sa)
-
-    venue_facts = detect_venue_identity(tour_text)
-    tour_score = compute_score(stop_analyses, n_requested, venue_facts)
-
-    scoring_ms = (time.perf_counter() - t0) * 1000.0
-
-    # Build per_stop JSON
-    per_stop_data = []
-    for sa in stop_analyses:
-        per_stop_data.append({
-            "index": sa.index,
-            "title": sa.title,
-            "classification": sa.classification,
-            "facts": sa.distinct_fact_count,
-            "sentences": sa.content_sentences,
-            "density": round(sa.fact_density, 3),
-            "filler": round(sa.generic_filler_fraction, 3),
-            "groundedness": round(sa.groundedness_fraction, 3),
-        })
-
+    tour_score = evaluation.score
+    scoring_ms = evaluation.scoring_ms
+    per_stop_data = evaluation.per_stop
     code_sha = _get_code_sha()
 
     # Persist
@@ -211,7 +182,7 @@ def score_tour_text(tour_text, n_requested, tour_id=None, tour_name=None,
         f"({tour_score.n_delivered}/{tour_score.n_requested} stops) "
         f"base={tour_score.base_score:.1f} structural={tour_score.structural_surcharge:.1f} "
         f"correlation={tour_score.correlation_bonus:.1f} venue_id={tour_score.venue_identity_bonus:.1f} "
-        f"time={scoring_ms:.1f}ms row_id={row_id}"
+        f"time={scoring_ms:.1f}ms row_id={row_id} algorithm={ALGORITHM_ID}"
     )
 
     return tour_score, row_id, scoring_ms
@@ -232,30 +203,15 @@ def compute_edit_delta(original_text, edited_text, n_requested):
     quality. "This edit removed 3 sourced facts" is useful. "Your edit scored
     62" is presumptuous.
     """
-    # Score both versions
-    orig_stops = parse_tour(original_text)
-    edit_stops = parse_tour(edited_text)
+    # Evaluate both versions through the single entry point
+    orig_eval = evaluate(original_text, n_requested)
+    edit_eval = evaluate(edited_text, n_requested)
 
-    if not orig_stops or not edit_stops:
+    if orig_eval is None or edit_eval is None:
         return None
 
-    # Analyze original
-    orig_analyses = []
-    for stop in orig_stops:
-        sa = analyze_stop(stop, orig_stops)
-        cls, ev = classify_stop(sa)
-        sa.classification = cls
-        sa.classification_evidence = ev
-        orig_analyses.append(sa)
-
-    # Analyze edited
-    edit_analyses = []
-    for stop in edit_stops:
-        sa = analyze_stop(stop, edit_stops)
-        cls, ev = classify_stop(sa)
-        sa.classification = cls
-        sa.classification_evidence = ev
-        edit_analyses.append(sa)
+    orig_analyses = orig_eval.score.stops
+    edit_analyses = edit_eval.score.stops
 
     # Build per-stop comparison (match by index)
     per_stop_delta = []
