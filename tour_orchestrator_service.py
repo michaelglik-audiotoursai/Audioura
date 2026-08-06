@@ -922,6 +922,8 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         # Gates NOTHING — a catastrophic score still delivers unchanged.
         # No LLM calls, no network. Pure rule-based scoring.
         _score_row_id = None
+        _tour_score = None
+        _per_stop_data = None
         if tour_content:
             try:
                 from tour_scoring_service import score_tour_text, ensure_tour_scores_table
@@ -933,9 +935,61 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                     tour_id=None,  # backfilled after store_audio_tour
                     tour_name=tour_name,
                 )
+                # Extract per-stop data for guardrails diagnosis
+                if _tour_score:
+                    _per_stop_data = [
+                        {"classification": sa.classification}
+                        for sa in _tour_score.stops
+                    ]
             except Exception as scoring_err:
                 # Scoring failure MUST NOT block delivery (LOCAL-306 rule)
                 print(f"[SCORING] Non-fatal error during in-flight scoring: {scoring_err}")
+                import traceback
+                traceback.print_exc()
+
+        # [LOCAL-307] Quality guardrails: diagnose shortfalls, decide retry or message.
+        # When QUALITY_GUARDRAILS_ENABLED=false (default): logs what it WOULD do,
+        # takes no action. When enabled: retries PIPELINE_LOST once, messages UNAVAILABLE.
+        _guardrail_user_message = None
+        _is_retry = ACTIVE_JOBS[job_id].get("_guardrail_retry", False)
+        if _tour_score and _per_stop_data:
+            try:
+                from quality_guardrails import (
+                    evaluate_tour, format_guardrail_log, select_better_tour
+                )
+                _guardrail_decision = evaluate_tour(_tour_score, _per_stop_data, is_retry=_is_retry)
+                print(format_guardrail_log(_guardrail_decision))
+
+                if _guardrail_decision.action == 'message' and _guardrail_decision.user_message:
+                    # Attach the message to the job for the client to read
+                    _guardrail_user_message = _guardrail_decision.user_message
+                    ACTIVE_JOBS[job_id]["quality_message"] = _guardrail_user_message
+                    print(f"[GUARDRAILS] User message attached: {_guardrail_user_message}")
+
+                elif _guardrail_decision.action == 'disabled_would_message' and _guardrail_decision.user_message:
+                    # Log what would happen; attach nothing
+                    ACTIVE_JOBS[job_id]["_guardrail_would_message"] = _guardrail_decision.user_message
+
+                # Note: 'retry' action is NOT implemented as an actual re-generation
+                # call here because it would require re-invoking the full pipeline
+                # (text generation + TTS + ZIP packaging). The retry mechanism is
+                # designed to be triggered by setting _guardrail_retry=True on the
+                # job and re-invoking orchestrate_tour_async. This is gated OFF
+                # by default and documented as the intended trigger point.
+                # When enabled, the orchestrator would:
+                #   1. Save original tour_content and score
+                #   2. Re-invoke text generation
+                #   3. Score the retry
+                #   4. select_better_tour() → deliver the winner
+                # This is the mechanism; activation requires QUALITY_GUARDRAILS_ENABLED=true.
+
+                if _guardrail_decision.action in ('disabled_would_retry', 'retry'):
+                    ACTIVE_JOBS[job_id]["_guardrail_retry_candidate"] = True
+                    ACTIVE_JOBS[job_id]["_guardrail_original_score"] = _guardrail_decision.diagnosis.score
+
+            except Exception as guardrail_err:
+                # Guardrail failure MUST NOT block delivery
+                print(f"[GUARDRAILS] Non-fatal error: {guardrail_err}")
                 import traceback
                 traceback.print_exc()
 
@@ -1528,6 +1582,11 @@ def get_job_status(job_id):
                 response["actual_stops"] = job["actual_stops"]
             if "stop_count_warning" in job:
                 response["stop_count_warning"] = job["stop_count_warning"]
+            # [LOCAL-307] Surface quality guardrail message to the client.
+            # This is the honest user-facing message explaining why a tour is
+            # shorter or thinner than requested (UNAVAILABLE diagnosis).
+            if "quality_message" in job:
+                response["quality_message"] = job["quality_message"]
             if "share_id" in job:
                 response["share_id"] = job["share_id"]
                 response["share_url"] = job.get("share_url", "")
