@@ -9070,3 +9070,70 @@ action that helps. Unlike the scanner's output, it does not scroll away.
 **Not changing the 20-commit window.** A wider window means more noise on every
 tick and does not fix the underlying issue, which is that a rolling scanner is
 the wrong instrument for tracking an unresolved finding. The standing note is.
+
+## D230 — Michael's evaluation rulings, and what to take from Meta.AI (2026-08-06)
+
+### His rulings, adopted
+
+**Weights.** FABRICATED **−3.0 × share** (was −1.5); PIPELINE_LOST −1.0;
+UNAVAILABLE **0.0** — but *only when a live search confirms it*. An unverified
+UNAVAILABLE costs the full −1.0.
+
+That last clause is LEAD's addition and it is the load-bearing one: it makes
+looking cheaper than assuming. Michael's instruction was *"we should not trust
+the log, we should do a quick Internet search to see if the data really is not
+available"* — the failure mode being guarded against is our own records saying
+"no data" when they mean "we did not look". Exactly Menton (D162, LOCAL-290).
+
+**Coverage separate from quality.** He agreed and left the numbers to LEAD:
+`quality` is the headline (mean per-stop score, 0–100, independent of count);
+`coverage` sits beside it as a plain fraction — *"quality 79, coverage 5/8"*. **No
+composite.** The moment they multiply, a thin-prose problem and a selector
+problem become indistinguishable, which is the confusion that produced the
+original 26-vs-10 muddle.
+
+→ **LOCAL-309.**
+
+### His hardest question: blind spots we do not know about
+
+> *"We made a mistake counting facts... I do not know what to do if we are not
+> aware of that fact."*
+
+**A better vocabulary cannot answer this** — the next gap is by definition one
+nobody has thought of. The answer is a cross-check against an **independent
+signal**, and the strongest one is free and already computed:
+
+**A stop with rich corpus and few detected facts is either a generation failure
+or a detector blind spot.** The Ganesh stop had 6 passages and 1 detected fact.
+That discrepancy was visible in data we already had; nobody was looking at it.
+
+Three checks, increasing in cost: corpus-vs-detector discrepancy (free), per-venue
+distribution outliers (free, catches vocabulary gaps by domain), and an LLM
+spot-check on 5% of stops (measured, diagnostic only — its count must never enter
+a score).
+
+→ **LOCAL-310**, explicitly a monitor: it may not change `analyze_stop`, may not
+run in the delivery path, and must report findings rather than tune them away.
+
+### Meta.AI's evaluation — two axes worth taking, the scores not
+
+Michael shared an external evaluation of a museum stop and said he prefers ours.
+
+**Worth borrowing:** *"The facts are listed, not connected by a because."*
+Cohesion/causality is a real quality dimension we do not measure at all — and
+Michael specified it himself in prolog part 3 ("if the facts support a causal
+link, write it"). Also **compliance as its own visible axis**, rather than folded
+into a structural surcharge where it is invisible.
+
+**Worth rejecting, and this matters:** it marked `Position yourself` and the
+forward-tease to the next stop as **hard failures**. Both are Michael's own
+deliberate decisions — he approved orientation instructions explicitly ("All
+good, as intended") and part 4's forward connection is his specification. Its
+scores (2/5, 0/5) carry no stated thresholds; ours are calibrated against 1,997
+measured stops.
+
+**The general lesson:** an unanchored external rubric will confidently penalise
+deliberate product decisions it has no way of knowing about. Borrow its
+*questions*, never its *numbers*.
+
+Cohesion is not yet a task. It should be one, after 309 and 310 land.
