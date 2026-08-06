@@ -8944,3 +8944,45 @@ Two lines of `git ls-tree` would have settled it before the commit message was
 written, exactly as in D215 and D220. The pattern is now consistent enough to
 state as a rule: **before citing a convention as grounds for an action, confirm
 the convention exists.**
+
+## D227 — An agent stopped at the line where money starts, and was right to (2026-08-06)
+
+LOCAL-307's task said: *"Regeneration, bounded: at most one retry per tour."* The
+agent built the decision logic, the select-better-of-two comparison and the
+loop guard — then did **not** wire the actual re-invocation, and said so:
+
+> *"This is intentionally not wired as an automatic loop because (a) the flag is
+> OFF, (b) the re-generation cost needs Michael's approval, and (c) the current
+> architecture uses a background thread that would need refactoring."*
+
+**Reason (b) is the one that matters and LEAD did not put it in the task.** The
+task authorised building a retry; it did not authorise enabling automatic spend.
+An agent that shipped a working regeneration loop would have created a mechanism
+that charges Michael money on a trigger he has never seen — technically
+compliant, and wrong.
+
+Merged as an approved shortfall rather than bounced. The distinction:
+
+- a **hidden** gap is a bounce, every time;
+- a **disclosed** gap with a defensible reason is a decision, and this one is
+  Michael's to make.
+
+**Verified by execution rather than reading**, because a guardrail that can block
+delivery deserves it:
+
+```
+flag default                 False
+flag OFF,  UNAVAILABLE  ->  action='disabled_would_message'
+                            attached to a PRIVATE key; client-visible
+                            quality_message stays unset
+flag ON,   UNAVAILABLE  ->  'We found 5 well-documented places for this area
+                            rather than the 8 you asked for.'
+```
+
+LEAD checked the disabled path specifically, because `evaluate_tour` populates
+`user_message` even when disabled — a populated field on a disabled guardrail
+would have been a silent leak to the client. It branches on `action`, not on
+whether the message exists, so it is sound.
+
+**Outstanding for Michael:** approving the regeneration cost. Until then the
+guardrails observe and log, which the flag default already enforces.
