@@ -8914,3 +8914,33 @@ thin.** That is the PIPELINE-LOST / UNAVAILABLE split doing real product work.
 Retrying an UNAVAILABLE tour produces the same tour and charges twice. *"We found
 3 well-documented places rather than the 6 you asked for"* is a better product
 than 6 padded stops, and more honest than silence.
+
+## D226 — Right action, wrong reason: the tours/ fixture removal (2026-08-06)
+
+LOCAL-305 committed two tour files under `tours/`. LEAD removed them from the
+index with a commit message stating *"tours/ is gitignored by design… convention
+preserved."*
+
+**That reason is wrong.** `tours/` appears in `.gitignore`, but **90 files there
+were already tracked** before LOCAL-305, and previous tasks — LOCAL-252,
+LOCAL-262 — committed tour files there deliberately. Git's ignore rules apply
+only to untracked files, so tracking fixtures under `tours/` is established
+practice, not a violation of it.
+
+**The action was still correct, for a different reason.**
+`tours/LOCAL303_museum_8stop_gate.txt` on their branch is **a different tour** —
+67 lines, titled "(Asian Art Museum)" — sharing a filename with the 104-line
+8-stop tour LEAD generated for Michael this morning, which is open in his editor
+and is the subject of `TOUR_EVALUATION_museum_8stop.md`. Merging it would have
+silently replaced an artifact he is actively reading. Their tests reference
+neither file, so nothing was lost by leaving them out.
+
+**The distinction matters** because "this violates our convention" and "this
+would destroy something Michael is reading" justify different remedies. The first
+would argue for a policy fix; the second argues only for renaming one file. I
+reached for the first without checking whether the convention existed.
+
+Two lines of `git ls-tree` would have settled it before the commit message was
+written, exactly as in D215 and D220. The pattern is now consistent enough to
+state as a rule: **before citing a convention as grounds for an action, confirm
+the convention exists.**
