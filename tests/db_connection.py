@@ -65,6 +65,11 @@ _VALID_DB_TARGETS = {"test", "production"}
 # LOCAL-296: Track whether we've logged the target database this session
 _db_target_logged = False
 
+# LOCAL-296: Ensure invalid-target banner prints only once (pytest catches
+# SystemExit, so without this guard the banner reprints on every subsequent
+# call to _resolve_db_target within the same process).
+_invalid_target_reported = False
+
 
 def _resolve_db_target():
     """Resolve AUDIOURA_DB_TARGET env var if set.
@@ -73,23 +78,27 @@ def _resolve_db_target():
     Returns None if the var is not set (fall through to other logic).
     Raises SystemExit if the var is set to an invalid value — no silent wrong choice.
     """
+    global _invalid_target_reported
     target = os.environ.get("AUDIOURA_DB_TARGET")
     if target is None:
         return None
     target = target.strip().lower()
     if target not in _VALID_DB_TARGETS:
-        print(
-            "\n" + "=" * 70 + "\n"
-            "FATAL: AUDIOURA_DB_TARGET has invalid value\n"
-            "=" * 70 + "\n"
-            f"  Value: {os.environ.get('AUDIOURA_DB_TARGET')!r}\n"
-            f"  Valid: 'test' or 'production'\n"
-            "\n"
-            "  An ambiguous database target is exactly how production data gets\n"
-            "  touched by test scripts. Set a valid value or unset the variable.\n"
-            "=" * 70 + "\n",
-            file=sys.stderr,
-        )
+        if not _invalid_target_reported:
+            _invalid_target_reported = True
+            banner = "=" * 70
+            print(
+                f"\n{banner}\n"
+                f"FATAL: AUDIOURA_DB_TARGET has invalid value\n"
+                f"{banner}\n"
+                f"  Value: {os.environ.get('AUDIOURA_DB_TARGET')!r}\n"
+                f"  Valid: 'test' or 'production'\n"
+                f"\n"
+                f"  An ambiguous database target is exactly how production data gets\n"
+                f"  touched by test scripts. Set a valid value or unset the variable.\n"
+                f"{banner}",
+                file=sys.stderr,
+            )
         sys.exit(1)
     if target == "test":
         return _TEST_DBNAME

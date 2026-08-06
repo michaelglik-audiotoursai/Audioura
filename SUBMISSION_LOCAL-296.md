@@ -1,6 +1,6 @@
 ##### READY FOR REVIEW
 
-**Commit:** `df7da13`  
+**Commit:** `a319861`  
 **Branch:** `kiro/local296-tests-off-production`  
 **Base:** `storied`
 
@@ -8,9 +8,21 @@
 
 ## Summary
 
-Added `AUDIOURA_DB_TARGET` env var switch to `tests/db_connection.py` so that
-generation scripts invoked from verification harnesses can explicitly target
-`audiotours_test` instead of writing to production.
+Bounce fix: resolves the three issues LEAD identified while preserving the
+verified `db_connection.py` switch logic.
+
+1. **Renamed** `test_local296_db_target_switch.py` →
+   `run_local296_verification.py` (verification harness with module-scope DB
+   writes must not be pytest-collected).
+2. **New proper pytest file** `test_local296_db_target_switch.py` with `def
+   test_` functions: pure string-logic tests of get_database_url() resolution,
+   no database access, safe for pytest collection (4 tests, all pass).
+3. **Fixed banner printing 70×:** implicit string concatenation + `*` operator
+   precedence bug. `"FATAL:...\n" "=" * 70` multiplied the concatenated string
+   70 times instead of producing a 70-char separator. Replaced with f-strings
+   and a pre-computed `banner` variable.
+4. **Added `_invalid_target_reported` guard** so the banner prints at most once
+   even if `SystemExit` is caught (e.g. by pytest).
 
 ---
 
@@ -18,84 +30,85 @@ generation scripts invoked from verification harnesses can explicitly target
 
 ### `tests/db_connection.py` (modified)
 
-- Added `AUDIOURA_DB_TARGET` env var support: `test` → `audiotours_test`,
-  `production` → `audiotours`. Any other value is a **fatal exit** (no silent
-  wrong choice).
-- Added `log_db_target(context)` function: prints `[DB TARGET] context → dbname
-  (source)` exactly once per session at first call.
-- Added `_resolve_db_target()`: validates the env var, returns target dbname or
-  None if unset.
-- Added `_effective_dbname()` and `_get_db_source()`: used by `log_db_target()`
-  to accurately report the effective database and why.
-- Priority chain documented and implemented:
-  `DB_NAME` (explicit) > `AUDIOURA_DB_TARGET` > `_is_pytest()` > default (production).
-- Production remains the default when the var is unset — no behaviour change to
-  existing scripts, the app, or the running services.
+- Added `_invalid_target_reported` module-level flag: ensures the fatal banner
+  prints exactly once per process, even when `SystemExit` is caught.
+- Fixed banner formatting: replaced implicit-concat + `*` with f-strings and
+  pre-computed `banner = "=" * 70`. The original code had a Python operator
+  precedence bug where `"FATAL:...\n" "=" * 70` produced 70 copies of the
+  error message (implicit string concatenation binds before `*`).
 
-### `tests/test_local296_db_target_switch.py` (new)
+### `tests/run_local296_verification.py` (renamed from test_local296_...)
 
-Verification script proving both paths work and production is unchanged.
+- Content unchanged — this is the integration verification harness that inserts
+  rows, confirms routing, and cleans up. Renamed so pytest does not collect it.
+
+### `tests/test_local296_db_target_switch.py` (rewritten)
+
+- Now contains 4 proper `def test_` functions:
+  - `test_target_test_resolves_to_audiotours_test` — AUDIOURA_DB_TARGET=test
+  - `test_target_production_resolves_to_audiotours` — AUDIOURA_DB_TARGET=production
+  - `test_invalid_target_exits_fatally` — AUDIOURA_DB_TARGET=bogus → SystemExit(1)
+  - `test_unset_under_pytest_resolves_to_test_db` — no var, pytest detection
+- Uses `monkeypatch.setenv` for env isolation; no database connections.
 
 ---
 
 ## Verification evidence
 
-```
-======================================================================
-LOCAL-296 VERIFICATION: AUDIOURA_DB_TARGET switch
-======================================================================
+### pytest suite (4/4 pass, no DB access)
 
+```
+$ python3 -m pytest tests/test_local296_db_target_switch.py -v
+
+tests/test_local296_db_target_switch.py::test_target_test_resolves_to_audiotours_test PASSED
+tests/test_local296_db_target_switch.py::test_target_production_resolves_to_audiotours PASSED
+tests/test_local296_db_target_switch.py::test_invalid_target_exits_fatally PASSED
+tests/test_local296_db_target_switch.py::test_unset_under_pytest_resolves_to_test_db PASSED
+
+4 passed in 0.07s
+```
+
+### Integration verification (run_local296_verification.py)
+
+```
 [BEFORE] Production audio_tours: 143 total = 29 real + 114 test
 [BEFORE] Nice list (non-translation): [1, 12, 14, 17, 24, 29, 152]
 
-──────────────────────────────────────────────────────────────────────
 TEST 1: Switch OFF (default) — generation writes to audiotours
-──────────────────────────────────────────────────────────────────────
 [DB TARGET] verification-switch-off → audiotours (default → production)
   Connected to: audiotours
-  Inserted test row id=283 (is_test=true)
-  Cleaned up row id=283 (confirmed is_test=true before delete)
-  ✓ TEST 1 PASSED: default path writes to audiotours
+  Inserted test row id=286 (is_test=true)
+  Cleaned up row id=286 (confirmed is_test=true before delete)
+  ✓ TEST 1 PASSED
 
-──────────────────────────────────────────────────────────────────────
 TEST 2: Switch ON (AUDIOURA_DB_TARGET=test) — writes to audiotours_test
-──────────────────────────────────────────────────────────────────────
 [DB TARGET] verification-switch-on → audiotours_test (AUDIOURA_DB_TARGET=test)
   Connected to: audiotours_test
-  Inserted test row id=18 in audiotours_test (is_test=true)
-  Cleaned up row id=18 from audiotours_test
-  ✓ TEST 2 PASSED: switch routes to audiotours_test
+  Inserted test row id=21 in audiotours_test (is_test=true)
+  Cleaned up row id=21 from audiotours_test
+  ✓ TEST 2 PASSED
 
-──────────────────────────────────────────────────────────────────────
 TEST 3: Invalid value (AUDIOURA_DB_TARGET=bogus) — must fail loudly
-──────────────────────────────────────────────────────────────────────
   Exit code: 1
-  FATAL: AUDIOURA_DB_TARGET has invalid value
-  Value: 'bogus'
-  Valid: 'test' or 'production'
-  ✓ TEST 3 PASSED: invalid value exits fatally
+  FATAL: AUDIOURA_DB_TARGET has invalid value   ← ONE banner, not 70
+  ✓ TEST 3 PASSED
 
-──────────────────────────────────────────────────────────────────────
 TEST 4: Production unchanged
-──────────────────────────────────────────────────────────────────────
 [AFTER] Production audio_tours: 143 total = 29 real + 114 test
 [AFTER] Nice list (non-translation): [1, 12, 14, 17, 24, 29, 152]
-  ✓ TEST 4 PASSED: production row counts unchanged
-
-======================================================================
-ALL TESTS PASSED
-======================================================================
-  Production: 143 rows (29 real + 114 test) — unchanged
-  Nice list: [1, 12, 14, 17, 24, 29, 152]
-  Switch OFF → audiotours (production, default)
-  Switch ON  → audiotours_test (test database)
-  Invalid    → fatal exit (no silent wrong choice)
+  ✓ TEST 4 PASSED
 ```
 
-### Existing test regression check
+### Banner fix proof
 
 ```
-tests/test_local232_guard_demo.py: 5 passed
+# Before fix:
+$ AUDIOURA_DB_TARGET=bogus python3 -c "..." 2>&1 | grep -c "FATAL"
+70
+
+# After fix:
+$ AUDIOURA_DB_TARGET=bogus python3 -c "..." 2>&1 | grep -c "FATAL"
+1
 ```
 
 ---
@@ -123,45 +136,17 @@ tests/test_local232_guard_demo.py: 5 passed
 - ✓ `is_test` still written and still meaningful
 - ✓ `git status --short` clean
 - ✓ No container rebuilt
-- ✓ No protected files edited (DECISIONS.md, CLAUDE.md, BACKLOG.md, .continuous_dev/*)
-
----
-
-## Usage for verification scripts
-
-```python
-# At the top of a verification/generation script:
-import os
-os.environ['AUDIOURA_DB_TARGET'] = 'test'  # Route writes to audiotours_test
-
-# Then import db_connection as usual:
-sys.path.insert(0, os.path.join(PROJECT_ROOT, 'tests'))
-from db_connection import get_connection, log_db_target
-
-log_db_target("my-verification")  # Prints once: [DB TARGET] my-verification → audiotours_test
-conn = get_connection()            # Connects to audiotours_test
-```
+- ✓ No protected files edited
+- ✓ test file is proper pytest (4 `def test_` functions, collected, all pass)
+- ✓ verification harness renamed to `run_` prefix (not pytest-collected)
+- ✓ Invalid-value banner prints once, not 70×
 
 ---
 
 ## Limitations
 
-- **Existing scripts not migrated.** `tests/run_local293_tour_generation.py` and
-  `tests/run_local294_tour_generation.py` hardcode
-  `DATABASE_URL=postgresql://...audiotours` which bypasses `get_connection()`
-  entirely (they call `psycopg2.connect(url)` directly). Migrating them to use
-  `AUDIOURA_DB_TARGET` would be the next step but is out of scope.
-
-- **`DATABASE_URL` bypasses the switch.** By design, a fully-specified
-  `DATABASE_URL` env var takes priority in `get_database_url()`. Scripts that
-  set `DATABASE_URL` and then call `psycopg2.connect()` with it will not be
-  affected by `AUDIOURA_DB_TARGET`. The switch only governs the `get_connection()`
-  / `get_db_config()` path.
-
-- **The 114 test rows remain.** Cleaning them up is explicitly out of scope per
-  the task definition (audio_tours deletion is on Michael's ask-first list). A
-  cleanup task should be dispatched: `DELETE FROM audio_tours WHERE is_test = true`
-  on production would remove 114 rows and bring the table back to 29 real rows.
-
-- **Cost: $0.00.** No API calls, no generation runs. Verification is purely
-  database-level.
+- **Existing scripts not migrated.** `run_local293` and `run_local294` hardcode
+  `DATABASE_URL` and bypass `get_connection()`. Migrating them is out of scope.
+- **`DATABASE_URL` bypasses the switch** (by design — explicit full URL wins).
+- **The 114 test rows remain.** Cleanup is on Michael's ask-first list.
+- **Cost: $0.00.** No API calls, no generation runs.
