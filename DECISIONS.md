@@ -8078,3 +8078,73 @@ closes, because the two are no longer the same term.
 - recap/offer absence → structural surcharge (new)
 - recap sentences → never thread evidence
 - weight, cap and N≥3 floor from D201a unchanged pending SQ-S6b
+
+## D202 — Three more index defects, by count, value and proportion (2026-08-05)
+
+Michael, going to sleep: *"If you see that we are missing something for
+evaluation index either by count, value, or proportion, let me know."*
+Three found. None is fixed yet; all are recorded for his call.
+
+### By VALUE — a missing stop is penalised exactly as hard as a lie
+
+`MISSING = -1.0 × share` and `FABRICATED = -1.0 × share`. They are not equally
+bad. A tour that omits a stop **disappoints**; a tour that invents one
+**misleads**, and misleading is the failure Michael's whole grounding programme
+exists to prevent. Under the current weights the rubric is indifferent between
+them.
+
+LEAD's view: fabrication should cost more than omission. Proposed −1.5 × share
+for FABRICATED against −1.0 for MISSING, but the ratio is a product judgement
+about what harms a listener most, so it is Michael's to set.
+
+### By PROPORTION — the venue-identity bonus is a PENALTY on weak tours
+
+```
+venue_identity_bonus = 0.10 × base_score × (facts ÷ 5)
+```
+
+It multiplies `base_score`. When a tour under-delivers, `base_score` goes
+negative — and the bonus goes negative with it. Verified:
+
+```
+under-delivered tour, 2 venue-identity facts present:
+  base = -62.5   venue_identity_bonus = -2.50
+```
+
+**A tour is punished for naming its architect and founder**, purely because it
+was short on stops. Two unrelated things multiplied together. It should scale
+against the positive component or a fixed ceiling, never the signed base. This
+is a plain bug, not a judgement call.
+
+### By COUNT — the structural surcharge saturates at two defects
+
+`-0.25 × share per defect, capped at -0.5 × share per stop`. A stop with five
+structural defects scores exactly the same as one with two. After D200 added the
+splice artifacts there are now six detectable defect types, so the cap binds far
+more often than when it was written against three.
+
+LEAD's view: the cap should rise, or a stop past some defect count should fall
+to THIN outright regardless of density — a stop that is broken in five ways is
+not an ADEQUATE stop. Also Michael's call.
+
+### Related, already recorded
+
+- N is the **requested** count, so selector reliability and prose quality move
+  one number and cannot be separated (D200).
+- The correlation bonus is the largest lever and measures vocabulary (D201/D201a/D201b).
+- **No stop in the 270-tour recalculation is marked FABRICATED** — every score
+  published tonight assumes all claims are true (noted on the artifact).
+
+## D203 — LOCAL-291 gated behind 289 and 290 at Michael's instruction (2026-08-05)
+
+*"hold this task until LOCAL-289 and LOCAL-290 are completed. Then execute it."*
+
+Parked as `PARKED_kiro_task_LOCAL-291.md`, outside the dispatcher glob, carrying
+a self-abort that greps `storied` for both merge commits — the pattern CLAUDE.md
+prescribes for a gated task, so one gate never idles the queue.
+
+The gate is also methodologically right, not just an instruction: both tasks
+change how much real corpus exists, and tonight's 20% ungrounded rate is the
+number a threshold would be calibrated against. Calibrating now would bake in a
+corpus gap that 290 exists to close. The task file says so and requires
+re-measurement.
