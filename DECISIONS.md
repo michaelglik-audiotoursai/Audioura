@@ -8184,3 +8184,45 @@ the rubric. The rubric even scored it ADEQUATE/THIN without noticing one stop wa
 empty. It was found by reading the file as prose (D161) — and only because LEAD
 ran a fresh generation after merging rather than trusting four green submissions.
 **Merging several verified features does not verify their combination.**
+
+## D205 — Michael's gate on LOCAL-291 was right, and the numbers show why (2026-08-06)
+
+He instructed: *"hold this task until LOCAL-289 and LOCAL-290 are completed.
+Then execute it."* LEAD recorded the gate as methodologically sound (D203). It
+turned out to be more than that.
+
+Re-measured after both merges: **68.4% grounded / 31.6% ungrounded**, against
+**80/20** measured the night before. Groundedness went **down**, because
+LOCAL-290 now admits real places — Old Town of Menton, Corniche d'Or — that we
+hold no corpus for. A RICH-ceiling threshold calibrated on the 80% figure would
+have been calibrated against a corpus that no longer exists, and would have been
+wrong in the strict direction: capping stops that are fine.
+
+The floor was set instead at **0.40**, from the measured p25 of 0.43 on the
+post-290 corpus. It caps 9 of 54 stops from reaching RICH and reduces no score.
+
+**Verified by LEAD directly rather than from the submission's checklist:**
+
+```
+groundedness 100% -> RICH         base +100.0
+groundedness  50% -> RICH         base +100.0
+groundedness  20% -> ADEQUATE     base  +75.0
+groundedness   0% -> ADEQUATE     base  +75.0   <- caps the band, never penalises
+contradicted  50% -> CONTRADICTED base  -50.0
+contradicted 100% -> CONTRADICTED base -100.0
+operator FABRICATED override      base -100.0   <- still the only route
+```
+
+Two things better than LEAD specified: CONTRADICTED is **proportional to the
+contradicted share** rather than binary, and the merged path makes **no LLM
+calls** — it is entirely rule-based, with adjudication measured separately at
+~$0.009/tour against $0.026 generation.
+
+CONTRADICTED fires at **0%** on post-289/290 tours and **1.39%** on older ones,
+which says PHASE 5.16 already drops contradicted groups before output. The
+scorer can now see them when they survive; it is a backstop, not a primary
+signal.
+
+**Still true and still worth repeating to Michael:** absence of FABRICATED is
+not evidence of accuracy. Groundedness measures coverage by our corpus, not
+truth.
