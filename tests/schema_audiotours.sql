@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 0QjI6CA1OUUREbEad88ByvHns5NtGDn0kQlpPNMXq8C8yCeGqhmQKOxzyiInvsC
+\restrict cILgdZsfcTdCy1SAWtEcZ8SdptxPmjFbzy4DcJYmn0NFIW9wvkbw2dOMdaLDeIv
 
 -- Dumped from database version 15.18
 -- Dumped by pg_dump version 15.18
@@ -906,6 +906,52 @@ ALTER SEQUENCE public.tour_requests_id_seq OWNED BY public.tour_requests.id;
 
 
 --
+-- Name: tour_scores; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.tour_scores (
+    id integer NOT NULL,
+    tour_id integer,
+    tour_name text,
+    scored_at timestamp with time zone DEFAULT now() NOT NULL,
+    code_sha character varying(12),
+    n_requested integer NOT NULL,
+    n_delivered integer NOT NULL,
+    base_score real NOT NULL,
+    structural real NOT NULL,
+    correlation real NOT NULL,
+    venue_identity real NOT NULL,
+    total real NOT NULL,
+    per_stop jsonb NOT NULL,
+    scorer_version character varying(64) NOT NULL,
+    scoring_ms real,
+    is_rescore boolean DEFAULT false NOT NULL,
+    previous_score_id integer,
+    delta jsonb
+);
+
+
+--
+-- Name: tour_scores_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.tour_scores_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: tour_scores_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.tour_scores_id_seq OWNED BY public.tour_scores.id;
+
+
+--
 -- Name: treats; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1378,6 +1424,13 @@ ALTER TABLE ONLY public.tour_requests ALTER COLUMN id SET DEFAULT nextval('publi
 
 
 --
+-- Name: tour_scores id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tour_scores ALTER COLUMN id SET DEFAULT nextval('public.tour_scores_id_seq'::regclass);
+
+
+--
 -- Name: treats id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1674,6 +1727,14 @@ ALTER TABLE ONLY public.tour_cache
 
 ALTER TABLE ONLY public.tour_requests
     ADD CONSTRAINT tour_requests_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: tour_scores tour_scores_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tour_scores
+    ADD CONSTRAINT tour_scores_pkey PRIMARY KEY (id);
 
 
 --
@@ -2058,6 +2119,13 @@ CREATE INDEX idx_tour_requests_language ON public.tour_requests USING btree (lan
 
 
 --
+-- Name: idx_tour_scores_tour_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_tour_scores_tour_id ON public.tour_scores USING btree (tour_id);
+
+
+--
 -- Name: idx_treats_location; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2265,5 +2333,5 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 0QjI6CA1OUUREbEad88ByvHns5NtGDn0kQlpPNMXq8C8yCeGqhmQKOxzyiInvsC
+\unrestrict cILgdZsfcTdCy1SAWtEcZ8SdptxPmjFbzy4DcJYmn0NFIW9wvkbw2dOMdaLDeIv
 
