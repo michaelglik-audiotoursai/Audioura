@@ -7789,7 +7789,19 @@ REWRITE RULES (all mandatory):
         # Otherwise, create a title that incorporates the category naturally
         tour_title = f"Step-by-Step Audio Guided Tour: {location} - {_display_category} Tour"
     
-    complete_tour = tour_title + "\n" + f"Tour-Category: {tour_category}" + "\n\n"
+    # [LOCAL-286] Tour-Category header: write the effective category.
+    # For non-on_foot tours that classify as 'walking' (biking, driving, animal),
+    # the header should reflect the transport mode, not the generic 'walking' fallback.
+    _header_category = tour_category
+    if tour_category == 'walking' and transport_mode == 'bike':
+        _header_category = 'biking'
+    elif tour_category == 'walking' and transport_mode == 'vehicle':
+        _header_category = 'driving'
+    elif tour_category == 'walking' and transport_mode == 'animal':
+        _header_category = 'animal'
+    elif tour_category == 'walking' and transport_mode == 'country_scale':
+        _header_category = 'road_trip'
+    complete_tour = tour_title + "\n" + f"Tour-Category: {_header_category}" + "\n\n"
 
     # -------- [LOCAL-11] Venue-identity mining (free path — no new API calls) --------
     _venue_identity_prompt_block = ""
@@ -7846,6 +7858,13 @@ REWRITE RULES (all mandatory):
                 for _ci in range(len(_prolog_coords) - 1):
                     _prolog_total_km += _haversine_km(_prolog_coords[_ci], _prolog_coords[_ci + 1])
             _prolog_distance_str = f"{_prolog_total_km:.0f} km" if _prolog_total_km >= 1 else f"{_prolog_total_km * 1000:.0f} m"
+
+            # [LOCAL-286] Distance floor: if under 50 meters, the distance is
+            # meaningless (single-building / co-located stops). Omit it entirely.
+            _prolog_distance_meaningful = (_prolog_total_km * 1000) >= 50
+
+            # [LOCAL-286] Detect museum tours for prolog specialization
+            _is_museum_prolog = (tour_category == 'museum')
 
             # Transport mode display
             _prolog_transport_display = {
@@ -7904,15 +7923,66 @@ REWRITE RULES (all mandatory):
             # See PHASE 5.96 below.
 
             # --- Build the three-part prolog prompt (LOCAL-270: Part 4 moved to post-narration) ---
+            # [LOCAL-286] Part 1 and Part 2 branch for museums vs geographic tours.
+            # Museums: no locomotion word, venue+collection instead; stop count instead of distance.
+            # Geographic: existing behaviour (transport mode, endpoints, distance).
+            if _is_museum_prolog:
+                _part1_instruction = (
+                    'State the tour name and the venue. Do NOT mention walking or any mode of '
+                    'transport — inside a museum, walking is the default and stating it is empty. '
+                    'Example shape: "You are about to explore the [venue name] in [city]." '
+                    'Name the venue and its collection or character.'
+                )
+                _part2_instruction = (
+                    f"Describe what the visitor will encounter: {len(_prolog_stop_names)} works "
+                    f"from the collection. Do NOT use geographic language like 'route', 'stretches', "
+                    f"'journey', or state a distance — these are rooms, not a road. "
+                    f"Say something true about the tour's shape: the number of works, the nature of "
+                    f"the collection, or a unifying medium/period if the stop names suggest one. "
+                    f"Do NOT invent floor or wing locations unless the sourced facts explicitly state them."
+                )
+            else:
+                _part1_instruction = (
+                    f'State the tour name and mode of transport. '
+                    f'Example shape: "You are about to embark on a [{_prolog_transport_display}] '
+                    f'journey through [{location}]."'
+                )
+                if len(_prolog_stop_names) >= 2 and _prolog_stop_names[0] != _prolog_stop_names[-1] and _prolog_distance_meaningful:
+                    _part2_instruction = (
+                        f"State the transport mode again concretely, name the endpoints "
+                        f"({_prolog_stop_names[0]} to {_prolog_stop_names[-1]}), give the "
+                        f"approximate distance ({_prolog_distance_str}). Describe only terrain/"
+                        f"landscape features that are KNOWN from the sourced facts or that are "
+                        f"trivially true of the geography (e.g. \"coastal\" for a coast). Do NOT "
+                        f"invent elevation, flatness, or terrain claims unless supported by corpus "
+                        f"facts above."
+                    )
+                elif len(_prolog_stop_names) >= 2 and _prolog_stop_names[0] != _prolog_stop_names[-1] and not _prolog_distance_meaningful:
+                    # [LOCAL-286] Distance under floor — omit the distance clause entirely
+                    _part2_instruction = (
+                        f"Name the endpoints ({_prolog_stop_names[0]} to {_prolog_stop_names[-1]}). "
+                        f"Do NOT state a distance — the stops are too close together for distance "
+                        f"to be meaningful. Describe only terrain/landscape features that are KNOWN "
+                        f"from the sourced facts or that are trivially true of the geography."
+                    )
+                else:
+                    _part2_instruction = (
+                        "State the transport mode again concretely and describe what the visitor "
+                        "will experience at this single stop. Do NOT describe a route between two "
+                        "endpoints — this tour has only one location."
+                    )
+
             _prolog_prompt = f"""[LOCAL-259/LOCAL-270] Write a tour prolog in EXACTLY three sequential parts. Each part has a specific purpose. Output them as one flowing paragraph (no labels, no numbering), but ensure all three parts are present in order.
 
 TOUR DATA:
 - Tour name/location: {location}
 - Transport mode: {_prolog_transport_display}
+- Tour category: {'museum' if _is_museum_prolog else 'geographic'}
 - Stops: {', '.join(_prolog_stop_names)}
+- Number of stops: {len(_prolog_stop_names)}
 - Stop 1 coordinates: {poi_list[0].get('coordinates', 'unknown') if poi_list else 'unknown'}
 - Stop {len(poi_list)} coordinates: {poi_list[-1].get('coordinates', 'unknown') if poi_list else 'unknown'}
-- Approximate straight-line distance between first and last stop: {_prolog_distance_str}
+- Approximate straight-line distance between first and last stop: {_prolog_distance_str if _prolog_distance_meaningful else 'N/A (single building)'}
 - Theme: {_connecting_thread}
 
 SOURCED FACTS (use ONLY these for any factual claim):
@@ -7920,11 +7990,11 @@ SOURCED FACTS (use ONLY these for any factual claim):
 
 THE THREE PARTS (produce in this exact order, flowing as natural prose):
 
-PART 1 — TOUR NAME + TRANSPORT (1-2 sentences):
-State the tour name and mode of transport. Example shape: "You are about to embark on a [cycling/walking/driving] journey through [location]."
+PART 1 — TOUR INTRODUCTION (1-2 sentences):
+{_part1_instruction}
 
-PART 2 — ROUTE AND PHYSICALITY (2-3 sentences):
-{f"State the transport mode again concretely, name the endpoints ({_prolog_stop_names[0]} to {_prolog_stop_names[-1]}), give the approximate distance ({_prolog_distance_str})." if len(_prolog_stop_names) >= 2 and _prolog_stop_names[0] != _prolog_stop_names[-1] else "State the transport mode again concretely and describe what the visitor will experience at this single stop. Do NOT describe a route between two endpoints — this tour has only one location."} Describe only terrain/landscape features that are KNOWN from the sourced facts or that are trivially true of the geography (e.g. "coastal" for a coast). Do NOT invent elevation, flatness, or terrain claims unless supported by corpus facts above.
+PART 2 — TOUR SHAPE (2-3 sentences):
+{_part2_instruction}
 
 PART 3 — PURPOSE/INTRIGUE (2-4 sentences):
 This is the story hook — WHY someone takes this tour. Thread sourced facts into a causal or thematic sentence. Use ONLY facts from the SOURCED FACTS section above. If the facts support a causal link (X led to Y, which explains Z), write it. If they do NOT support a causal chain, write the plainest true version: state two sourced facts without manufacturing a connection between them. A false causal claim is worse than a plain factual one.
@@ -8125,6 +8195,29 @@ NARRATIVE THREAD (weave into Part 3 as the central intrigue):
                     print(f"  [LOCAL-244] Prolog R9: 0 deletions")
             except ImportError as _e:
                 print(f"  [LOCAL-244] Prolog R9: SKIPPED (import error: {_e})")
+
+        # --- [LOCAL-286] R7: hallucinated-sensory deletion on prolog ---
+        # The prolog was never passed through R7 (PHASE 5.14 iterates poi_list only).
+        # Round 34 proved the gap: "azure waters", "sun-kissed peninsula", "rugged cliffs"
+        # all survived because R7 never saw the prolog text.
+        _r7_disabled_for_prolog = os.environ.get('DISABLE_R7_DELETION', '').strip() == '1'
+        if not _r7_disabled_for_prolog:
+            try:
+                from style_validator_detector import apply_r7_to_description as _prolog_r7_apply
+                _prolog_after_r7, _pr7_del, _pr7_emp = _prolog_r7_apply(_saved_prolog)
+                if _pr7_del > 0:
+                    _old_sents = set(s.strip() for p in _saved_prolog.split('\n\n')
+                                     for s in re.split(r'(?<=[.!?])\s+', p) if s.strip())
+                    _new_sents = set(s.strip() for p in _prolog_after_r7.split('\n\n')
+                                     for s in re.split(r'(?<=[.!?])\s+', p) if s.strip())
+                    for s in _old_sents - _new_sents:
+                        _prolog_deletions_verbatim.append(('R7_HALLUCINATED_SENSORY', s))
+                    _saved_prolog = _prolog_after_r7
+                    print(f"  [LOCAL-286] Prolog R7: {_pr7_del} sentence(s) deleted")
+                else:
+                    print(f"  [LOCAL-286] Prolog R7: 0 deletions")
+            except ImportError as _e:
+                print(f"  [LOCAL-286] Prolog R7: SKIPPED (import error: {_e})")
 
         # --- R10: unfulfilled-promise deletion on prolog ---
         _r10_disabled_for_prolog = os.environ.get('DISABLE_R10_DELETION', '').strip() == '1'
@@ -8745,6 +8838,52 @@ RULES:
             print(f"    Fewer than 2 stops with content — omitting Part 4")
     elif not _saved_prolog:
         print(f"\n  [LOCAL-270] PHASE 5.96: No prolog — skipping Part 4 composition")
+
+    # -------- [LOCAL-286] PHASE 5.97: Prolog-body deduplication --------
+    # If the prolog (including Part 4) repeats a clause ≥8 consecutive words
+    # in any stop body, the listener hears the same thing twice within 90 seconds.
+    # Remove the duplicated sentence from the stop body to prevent this.
+    if _saved_prolog and poi_list:
+        print(f"\n  [LOCAL-286] PHASE 5.97: Prolog-body deduplication (≥8 word overlap)...")
+        _prolog_words_list = _saved_prolog.lower().split()
+        _dedup_total_removed = 0
+
+        # Build all 8-word sequences from the prolog
+        _prolog_8grams = set()
+        for _wi in range(len(_prolog_words_list) - 7):
+            _prolog_8grams.add(' '.join(_prolog_words_list[_wi:_wi + 8]))
+
+        if _prolog_8grams:
+            for _di, _dpoi in enumerate(poi_list):
+                _d_desc = _dpoi.get('description', '')
+                if not _d_desc or _d_desc.startswith('['):
+                    continue
+
+                _d_sentences = re.split(r'(?<=[.!?])\s+', _d_desc)
+                _kept_sentences = []
+                _removed_in_stop = 0
+
+                for _d_sent in _d_sentences:
+                    _d_sent_words = _d_sent.lower().split()
+                    _has_overlap = False
+                    if len(_d_sent_words) >= 8:
+                        for _si in range(len(_d_sent_words) - 7):
+                            _test_gram = ' '.join(_d_sent_words[_si:_si + 8])
+                            if _test_gram in _prolog_8grams:
+                                _has_overlap = True
+                                break
+                    if _has_overlap:
+                        _removed_in_stop += 1
+                        print(f"    Stop {_di+1} '{_dpoi.get('name', '')[:30]}': "
+                              f"removed duplicate sentence: \"{_d_sent[:80]}...\"")
+                    else:
+                        _kept_sentences.append(_d_sent)
+
+                if _removed_in_stop > 0:
+                    poi_list[_di]['description'] = ' '.join(_kept_sentences)
+                    _dedup_total_removed += _removed_in_stop
+
+        print(f"  [LOCAL-286] Deduplication: {_dedup_total_removed} sentence(s) removed from stop bodies")
 
     # Add each POI with its description and directions
     for i, poi in enumerate(poi_list):

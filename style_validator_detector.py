@@ -1105,7 +1105,7 @@ _R7_PATTERNS = [
     # Fabricated ambient scene presented as stage-setting. The narrator
     # invents a soundscape for atmosphere. Does NOT fire on factual statements
     # about real audible things ("The sound of the fountain is audible from the square").
-    r'\b(?:the\s+)?sound\s+of\s+\w+.*\b(?:provide|offer|create|lend|give|add)\w*\s+(?:a\s+)?(?:sensory|sonic|auditory|natural|perfect|soothing)?\s*(?:backdrop|soundtrack|accompaniment|setting|tapestry)\b',
+    r'\b(?:the\s+)?sound\s+of\s+\w+.*\b(?:provide|offer|create|lend|give|add)\w*\s+(?:a\s+)?(?:sensory|sonic|auditory|natural|perfect|soothing|rhythmic|gentle|calming|constant)?\s*(?:backdrop|soundtrack|accompaniment|setting|tapestry)\b',
     # LOCAL-251: "the gentle lapping of waves" + sensory descriptor
     # Fabricated seaside ambiance — cannot be sourced from documents.
     # Does NOT fire on "waves crash against the seawall" (bare factual observation).
@@ -1123,6 +1123,33 @@ _R7_PATTERNS = [
     # The narrator invents TWO scent sources combined. Does NOT fire on a single
     # factual scent ("The scent of lavender fills the garden" — one source, factual).
     r'\b(?:the\s+)?(?:scent|smell|fragrance|aroma)\s+of\s+.+?\b(?:mingles?|mixes?|blends?|intertwines?|combines?)\s+with\s+(?:the\s+)?(?:scent|smell|fragrance|aroma)\b',
+    # LOCAL-286: Fabricated scenic adjective-noun compounds that are standard
+    # model hallucinations. These never come from sources — they are atmospheric
+    # fillers the model generates to sound "immersive". Each pattern requires
+    # the specific compound adjective that is the hallmark of fabrication.
+    # "azure/turquoise/cerulean waters/sea/expanse" — model default for coastal
+    r'\b(?:azure|turquoise|cerulean|sapphire|crystal-clear|crystalline)\s+(?:waters?|sea|ocean|waves?|depths?|expanse)\b',
+    # "sun-kissed/sun-drenched/sun-soaked" — model default warm-climate filler
+    r'\bsun-(?:kissed|drenched|soaked|bathed|warmed|bleached)\b',
+    # "rugged/craggy/jagged cliffs/terrain" + sensory context — fabricated dramatic landscape
+    # Only fires when combined with another sensory element in the same sentence
+    # to avoid false positives on factual geography descriptions.
+    r'\b(?:rugged|craggy|jagged|towering)\s+(?:cliffs?|rocks?|coastline|terrain)\b.*\b(?:waves?|breeze|wind|sea|scent|sound|crash|pine)',
+    # "salty/briny breeze/air" — standalone fabricated atmospheric marker.
+    # This is ALWAYS a fabrication in a narrated tour — it cannot be sourced
+    # from documents. Allows an intervening adjective (e.g. "salty sea breeze").
+    r'\b(?:salty|briny)\s+\w*\s*(?:breeze|air|wind)\b',
+    # "the sound of waves crashing" — fabricated soundscape unless reporting a real observation
+    # Fires when combined with another fabricated sensory element (scent, breeze, etc.)
+    r'\b(?:sound|crash(?:ing)?)\s+(?:of\s+)?waves?\b.*\b(?:salty|scent|breeze|pine|mingling|rugged)\b',
+    # "scent of X mingling with Y" (without requiring second "scent" keyword)
+    # Catches "scent of pine trees mingling with the sea air" which the earlier
+    # pattern missed because it requires "scent of Y" not just "the Y".
+    r'\b(?:scent|smell|fragrance|aroma)\s+of\s+\w+(?:\s+\w+)?\s+(?:mingling|blending|mixing|intertwining)\s+with\b',
+    # "gentle/soft lapping of waves" without requiring "provide/create" —
+    # the pattern already existed but required a specific causation verb.
+    # This standalone version fires whenever the model fabricates ambient sound.
+    r'\b(?:gentle|soft|rhythmic)\s+(?:lapping|crashing|splashing)\s+of\s+(?:waves?|water)\b',
 ]
 
 _R7_COMPILED = [re.compile(p, re.IGNORECASE) for p in _R7_PATTERNS]
