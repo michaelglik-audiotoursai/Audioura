@@ -8494,3 +8494,41 @@ tick noticing 0% CPU and no worktree activity, then checking child processes
 rather than assuming a hang. The `pgrep -P` on the agent pid is what turned
 "stalled, unknown cause" into "spent 27 minutes in find" — a diagnosis precise
 enough to fix. Checking children before killing should be standard.
+
+## D215 — LEAD nearly bounced correct work on a faulty AST scan (2026-08-06)
+
+LOCAL-299 claimed *"AST-based scan of all tests/test_*.py module-scope
+statements confirmed zero mutations of DB_*, DATABASE_URL, or
+AUDIOURA_DB_TARGET."*
+
+LEAD's own scan reported **4 files still doing it** and a bounce was drafted.
+The scan was wrong:
+
+```python
+for node in tree.body:        # top-level nodes
+    for sub in ast.walk(node):   # <- descends INTO function bodies
+```
+
+`ast.walk` recurses. A `FunctionDef` is a top-level node, so every mutation
+*inside* a function was counted as module-scope. Re-run against direct
+module-level statements only: **zero**. Confirmed two more ways — `grep` finds
+no such line in the flagged files, and importing one leaks nothing.
+
+**The agent was right and the reviewer was wrong**, and the reviewer's evidence
+looked more authoritative because it was code rather than prose.
+
+**Third instance of the same failure tonight.** D211: "a one-line change",
+asserted from one instance without counting, wrong by 40×. D214: a switch
+verified in isolation, defeated in a full run. Now D215: a scan whose method did
+not match its claim. All three were LEAD checks that produced confident wrong
+answers, and all three were caught only by testing the check itself rather than
+trusting its output.
+
+**The rule that keeps working:** before acting on a measurement — especially one
+that contradicts a submission — verify the measurement against a case where the
+answer is already known. Here, `grep` for the literal string would have taken
+five seconds and settled it before the scan was ever trusted.
+
+Also worth noting because it cuts the other way: D209 and D210 were bounces the
+evidence *did* support. The discipline is not "trust the agent" or "trust the
+reviewer" — it is "check the instrument".
