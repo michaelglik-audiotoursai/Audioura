@@ -165,14 +165,13 @@ class TestPatchSentence:
     """The fallback patch produces a complete English sentence."""
 
     def _build_patch(self, material_english=None, period_english=None):
-        """Replicate the LOCAL-322 patch logic."""
-        patch_parts = []
-        if material_english:
-            patch_parts.append(f"crafted from {material_english}")
-        if period_english:
-            patch_parts.append(f"dating from the {period_english}")
-        if patch_parts:
-            return "This work was " + " and ".join(patch_parts) + "."
+        """Replicate the LOCAL-322 patch logic (three grammatical branches)."""
+        if material_english and period_english:
+            return f"This work, crafted from {material_english}, dates from the {period_english}."
+        elif material_english:
+            return f"This work was crafted from {material_english}."
+        elif period_english:
+            return f"This work dates from the {period_english}."
         return ""
 
     def test_material_only_patch(self):
@@ -187,13 +186,13 @@ class TestPatchSentence:
     def test_period_only_patch(self):
         """Period-only patch is a complete sentence."""
         patch = self._build_patch(period_english="19th century")
-        assert patch == "This work was dating from the 19th century."
+        assert patch == "This work dates from the 19th century."
         assert patch.endswith('.')
 
     def test_both_patch(self):
         """Material + period patch is a complete sentence."""
         patch = self._build_patch(material_english="schist", period_english="10th century")
-        assert patch == "This work was crafted from schist and dating from the 10th century."
+        assert patch == "This work, crafted from schist, dates from the 10th century."
         assert patch.endswith('.')
         # No comma-spliced fragment pattern
         assert not re.search(r'This work, .*, [A-Z]', patch)
@@ -239,15 +238,13 @@ class TestPeriodPatchEnglish:
         c51_period = "2nde moitié du Xe siècle"
         # The code computes: _period_english = "second half of the 10th century"
         period_english = "second half of the 10th century"
-        patch_parts = [f"dating from the {period_english}"]
-        patch = "This work was " + " and ".join(patch_parts) + "."
+        patch = f"This work dates from the {period_english}."
         assert "siècle" not in patch
         assert "10th century" in patch
 
     def test_period_patch_year(self):
         """Raw year stays as-is (no translation needed)."""
-        patch_parts = [f"dating from the 1879"]
-        patch = "This work was " + " and ".join(patch_parts) + "."
+        patch = f"This work dates from the 1879."
         assert "1879" in patch
 
 

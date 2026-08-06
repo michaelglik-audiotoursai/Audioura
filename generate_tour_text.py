@@ -7589,8 +7589,19 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                             if _patch_parts:
                                 # [LOCAL-322] Build a grammatical standalone sentence.
                                 # Old: "This work, crafted in schiste, " (fragment, comma-spliced)
-                                # New: "This work was crafted from schist." (complete sentence)
-                                _patch_sentence = "This work was " + " and ".join(_patch_parts) + "."
+                                # Three cases, each must read as correct English:
+                                #   material only  -> "This work was crafted from schist."
+                                #   period only    -> "This work dates from the 19th century."
+                                #   both           -> "This work, crafted from schist, dates from the 19th century."
+                                if not _material_ok and _material_english and not _period_ok and _c51_period:
+                                    # Both material and period missing
+                                    _patch_sentence = f"This work, crafted from {_material_english}, dates from the {_period_english}."
+                                elif not _material_ok and _material_english:
+                                    # Material only
+                                    _patch_sentence = f"This work was crafted from {_material_english}."
+                                else:
+                                    # Period only
+                                    _patch_sentence = f"This work dates from the {_period_english}."
                                 # Insert after first sentence
                                 _first_period_idx = description.find('. ')
                                 if _first_period_idx > 20:
