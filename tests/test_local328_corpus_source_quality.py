@@ -78,6 +78,30 @@ class TestSludgeDetection:
         result, reason = is_sludge(text)
         assert result is True
 
+    def test_directory_breadcrumb_listing(self):
+        """Directory pages with dash-separated breadcrumbs and enumeration index.
+
+        This is the canonical La Rossettisserie passage LEAD cited as missed.
+        The structural signal: 3+ dash-separated segments (breadcrumb nav) PLUS
+        a bare enumeration index (digit.space) = directory listing page.
+        """
+        text = "La Rossettisserie - Restaurants near me - Nice, Alpes-Maritimes. 11. La ... The head chef and owner of the restaurant is so extremely passionate about ..."
+        result, reason = is_sludge(text)
+        assert result is True, f"Directory breadcrumb listing not caught: {reason}"
+        assert reason == "directory_breadcrumb_listing"
+
+    def test_breadcrumb_with_different_category(self):
+        """The signal is structural — works for any category, not just restaurants."""
+        text = "Le Negresco - Hotels near me - Nice, France. 3. Le ... A palace hotel on the Promenade des Anglais ..."
+        result, reason = is_sludge(text)
+        assert result is True, f"Expected sludge: {reason}"
+
+    def test_legitimate_dash_usage_not_flagged(self):
+        """Dashes in prose (em-dash, compound words) must not trigger false positive."""
+        text = "The museum - originally a private villa - was converted into a public gallery in 1963 by the city of Nice."
+        result, reason = is_sludge(text)
+        assert result is False, f"Legit dash usage flagged: {reason}"
+
     def test_proper_noun_not_matched(self):
         """D236 trap: do not regex proper nouns. Pierre is a name, not stone."""
         text = "Pierre Matisse, the artist's son, opened a gallery in New York in 1931 that became one of the most influential in American art."
@@ -223,3 +247,80 @@ class TestFailsWithoutFix:
         count = cur.fetchone()[0]
         cur.close()
         assert count == 112, f"Expected 112 rows, got {count}. ROWS WERE DELETED!"
+
+    def test_rossettisserie_directory_listing_caught(self, prod_conn):
+        """La Rossettisserie's canonical directory passage must be caught.
+
+        This is the specific passage LEAD cited as missed in the bounce:
+        'La Rossettisserie - Restaurants near me - Nice, Alpes-Maritimes. 11. La ...'
+        """
+        from corpus_source_quality import classify_passage
+        import json
+
+        cur = prod_conn.cursor()
+        cur.execute(
+            "SELECT passages_json FROM stop_corpus WHERE stop_title ILIKE %s LIMIT 1",
+            ('%Rossettisserie%',)
+        )
+        row = cur.fetchone()
+        cur.close()
+        assert row is not None, "La Rossettisserie not found in stop_corpus"
+
+        passages = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+        # Find the directory listing passage
+        directory_caught = False
+        for p in passages:
+            c = classify_passage(p)
+            if 'Restaurants near me' in c['text']:
+                assert c['is_sludge'], (
+                    f"Directory listing passage NOT caught as sludge: {c['text'][:80]}"
+                )
+                directory_caught = True
+                break
+        assert directory_caught, "Could not find the 'Restaurants near me' passage in corpus"
+
+    def test_selection_uses_quality_score_not_passage_count(self):
+        """The generate_tour_text.py selection code must import and use quality scoring.
+
+        This test verifies the wiring exists by checking the actual source code.
+        Without LOCAL-328's wiring, the code uses 'SELECT stop_title, passage_count'
+        and sorts by -passage_count. After wiring, it uses passages_json and
+        compute_quality_score.
+        """
+        import inspect
+        # Read the source file to check the wiring
+        gen_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                'generate_tour_text.py')
+        with open(gen_path, 'r') as f:
+            source = f.read()
+
+        # The wired version imports and uses compute_quality_score
+        assert 'compute_quality_score' in source, (
+            "generate_tour_text.py does not import compute_quality_score — "
+            "selection still uses passage_count as quality signal!"
+        )
+        assert 'classify_passage' in source, (
+            "generate_tour_text.py does not import classify_passage — "
+            "passages are not being classified for quality scoring!"
+        )
+        # The old code used 'SELECT stop_title, passage_count' — this must be gone
+        assert 'SELECT stop_title, passage_count' not in source, (
+            "generate_tour_text.py still queries passage_count for selection sorting! "
+            "This is the anti-correlated signal that must be replaced."
+        )
+
+    def test_filter_applied_in_stop_corpus_reader(self):
+        """stop_corpus_reader.py must call filter_passages_for_generation.
+
+        Without this wiring, sludge passages reach the generation prompt
+        and inflate the apparent corpus without contributing facts.
+        """
+        reader_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                   'stop_corpus_reader.py')
+        with open(reader_path, 'r') as f:
+            source = f.read()
+
+        assert 'filter_passages_for_generation' in source, (
+            "stop_corpus_reader.py does not call filter_passages_for_generation — "
+            "sludge passages still reach the generation prompt!"
+        )

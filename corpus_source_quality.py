@@ -120,6 +120,32 @@ def is_sludge(text: str) -> tuple:
         if ellipsis_count >= 2 or delimiters >= 2:
             return (True, "truncated_snippet")
 
+    # Signal 5: ENUMERATION INDEX — directory/listing pages contain bare
+    # enumeration indices (digits followed by a period or parenthesis) in the
+    # middle of what should be prose.  "11. La ..." or "(3)" within a passage
+    # whose first segment is a dash-separated breadcrumb trail is a listing.
+    #
+    # The structural pattern is: Name - [words] - Place[, Region]. \d+\.
+    # This catches venue directory pages regardless of what category words
+    # they use ("Restaurants near me", "Hotels", "Things to do").
+    if ' - ' in text:
+        dash_segments = text.split(' - ')
+        if len(dash_segments) >= 3:
+            # 3+ dash-separated segments = breadcrumb navigation pattern
+            # Check for enumeration index anywhere in the text
+            has_enum_index = bool(re.search(r'\b\d{1,3}\.\s', text))
+            if has_enum_index:
+                return (True, "directory_breadcrumb_listing")
+
+        # Even with 2 dash segments, if there's an enumeration index AND the
+        # text is relatively short, it's a listing entry
+        if len(dash_segments) >= 2:
+            has_enum_index = bool(re.search(r'\b\d{1,3}\.\s', text))
+            # Also check for trailing "..." (truncated listing entry)
+            ends_truncated = text.rstrip().endswith('...')
+            if has_enum_index and ends_truncated and len(text) < 200:
+                return (True, "directory_breadcrumb_listing")
+
     return (False, "")
 
 

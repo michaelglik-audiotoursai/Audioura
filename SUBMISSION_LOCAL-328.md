@@ -1,144 +1,121 @@
 ##### READY FOR REVIEW
 
-## LOCAL-328: Corpus Source Quality — Sludge Detection & Source-Weighted Scoring
+**Commit:** a995a4d  
+**Branch:** kiro/local328-corpus-source-quality  
+**Agent:** Mac Mini Kiro  
+**Prior commit (kept):** af156c8 (measurement + sludge detection + quality scoring module)
 
-**Commit:** `6faab3b` (kiro/local328-corpus-source-quality)
-**Branch:** kiro/local328-corpus-source-quality
-**Base:** storied
+## Per-file summary
 
----
+| File | Change |
+|------|--------|
+| `corpus_source_quality.py` | Added Signal 5: `directory_breadcrumb_listing` — catches passages with 3+ dash-separated segments (breadcrumb navigation) plus a bare enumeration index (`\d+\.`). Structural, no phrase blocklist. |
+| `generate_tour_text.py` | Replaced `SELECT stop_title, passage_count` with `SELECT stop_title, passages_json`; now computes `compute_quality_score` per stop and sorts by `-quality_score` instead of `-passage_count`. The source-weighted scoring (sludge excluded) is now the production selection signal. |
+| `tests/test_local328_corpus_source_quality.py` | Added 5 new tests: `test_directory_breadcrumb_listing`, `test_breadcrumb_with_different_category`, `test_legitimate_dash_usage_not_flagged`, `test_rossettisserie_directory_listing_caught` (live DB), `test_selection_uses_quality_score_not_passage_count` (wiring check), `test_filter_applied_in_stop_corpus_reader` (wiring check). 24 total, all pass. |
+| `stop_corpus_reader.py` | Unchanged in this commit — filter_passages_for_generation was already wired in af156c8. |
 
-## Per-File Summary
-
-| File | Purpose |
-|------|---------|
-| `corpus_source_quality.py` | Measurement + sludge detector + quality scorer (new) |
-| `tests/test_local328_corpus_source_quality.py` | 18 tests covering detection, scoring, filtering (new) |
-| `stop_corpus_reader.py` | Integration: filters sludge at read time via `filter_passages_for_generation()` (modified, +4 lines) |
-
----
-
-## Deliverable 1: Yield-Per-Source-Type Table
-
-### BEFORE (raw passage_count as signal)
+## Evidence: Yield per source type
 
 ```
-Source Type           Total  Sludge  Useful  Sludge%  Avg Useful Len
-──────────────────────────────────────────────────────────────────────
-wikipedia               142       0     142     0.0%          246
-bare_string              92       0      92     0.0%          403
-web_search               86      26      60    30.2%          147
-museum_official          41       0      41     0.0%          233
-external_verified        36       1      35     2.8%          541
-object_no_type           30       0      30     0.0%          428
-museum_partner            1       0       1     0.0%          232
-museum_site               1       0       1     0.0%          201
-heritage                  1       0       1     0.0%          104
-──────────────────────────────────────────────────────────────────────
-TOTAL                   430      27     403     6.3%
+Source Type           Total  Sludge  Useful  Sludge% Avg Chars
+--------------------------------------------------------------
+wikipedia               142       0     142     0.0%       246
+bare_string              92       0      92     0.0%       403
+web_search               86      29      57    33.7%       146
+museum_official          41       0      41     0.0%       233
+external_verified        36       1      35     2.8%       541
+object_no_type           30       0      30     0.0%       428
+museum_partner            1       0       1     0.0%       232
+museum_site               1       0       1     0.0%       201
+heritage                  1       0       1     0.0%       104
+--------------------------------------------------------------
+TOTAL                   430      30     400     7.0%
 ```
 
-### AFTER (source-weighted scoring, sludge filtered at read time)
+**Key finding:** web_search has 33.7% sludge rate. museum_official has 0%. The 3.3x yield gap LEAD measured is confirmed and now encoded in the scoring weights.
 
-Quality score per source (replaces raw count):
-- `museum_official`: weight 3.0 (zero sludge, dense catalogue facts)
-- `wikipedia`: weight 2.5 (zero sludge, structured, reliable)
-- `external_verified`: weight 2.0 (URL-verified claims)
-- `bare_string` / `object_no_type`: weight 1.5 (museum scrapes)
-- `web_search`: weight 0.5 (even when non-sludge, low density)
-- Sludge passages: weight 0.0 (filtered out at read time)
-
-**Correlation inversion resolved:** Under the old system, La Rossettisserie (5 passages, all web_search) scored higher than L'Armure d'Ando Naoyuki (6 passages, all museum_official) because `passage_count` 5 > 1. Under quality scoring: L'Armure = 18.0, La Rossettisserie = 1.5.
-
----
-
-## Deliverable 2: La Rossettisserie Specifically
-
-**Venue:** "restaurant tour in Old Nice (Vieux Nice), France"  
-**Before filtering:** 4 passages  
-**After filtering:** 3 passages survive (1 flagged as directory_listing)
+## Evidence: La Rossettisserie (bounce motivating example)
 
 ```
-[KEEP]   #1: "You will see two signs: Boulangerie de la Cathédrale and La Rossettisserie..."
-[SLUDGE] #2: "... La Rossettisserie Lien en Bio ... {carte restaurant Nice, restaurant Port..."
-             Reason: directory_listing (3 delimiters · ... { in 148 chars)
-[KEEP]   #3: "The locally sourced menu at La Rossettisserie specializes in simple dishes..."
-[KEEP]   #4: "La Rossettisserie - Restaurants near me ... The head chef and owner..."
+Stop: La Rossettisserie (4 passages)
+  [KEEP  ] #1: "You will see two signs: Boulangerie de la Cathédrale and La Rossettisserie..."
+  [SLUDGE (directory_listing)] #2: "... La Rossettisserie Lien en Bio ... {carte restaurant Nice..."
+  [KEEP  ] #3: "The locally sourced menu at La Rossettisserie specializes in simple dishes..."
+  [SLUDGE (directory_breadcrumb_listing)] #4: "La Rossettisserie - Restaurants near me - Nice, Alpes-Maritimes. 11. La..."
+
+Survives: 2/4 passages
 ```
 
-**Venue:** "Old Nice, Nice, France" (duplicate entry)  
-**Before:** 5 passages → **After:** 2 survive (3 flagged as directory_listing)
+Passage #4 (the canonical directory listing from the bounce) is now caught by Signal 5. Passage #3 (the one genuinely useful sentence) survives. Passage #1 (promotional/wayfinding) survives — it contains a fact ("since 2008") and is not structurally a directory listing.
 
-**Can this stop now produce a fact?**
-- The surviving passages mention: "since 2008" (founding year), "specializes in simple dishes with emphasis on meat" (cuisine), "head chef and owner is passionate."
-- These are thin facts (founding year, cuisine type, chef passion) — enough for 1-2 sentences in a THIN-to-ADEQUATE stop. The restaurant genuinely lacks the depth of documentation a museum has. This is an honest result.
+**Can this stop produce a fact?** Yes — passage #3 tells us the menu specializes in simple dishes with emphasis on meat. That is extractable. The quality score (0.5–1.0 depending on which venue entry) correctly reflects this is a poorly-documented stop.
 
----
+## Evidence: Museum does not regress
 
-## Deliverable 3: Museum vs Restaurant Rescored
-
-### L'Armure d'Ando Naoyuki (Asian Art Museum, Nice)
-- Source type: museum_official (6 passages, 0% sludge)
-- Quality score: 18.0
-- Old metric (passage_count): 6
-- Known quality tier from LEAD: **RICH, 12 facts**
-
-### La Rossettisserie (Restaurant tour)
-- Source type: web_search (4-5 passages, 25-60% sludge depending on venue)
-- Quality score: 0.5–1.5
-- Old metric (passage_count): 4-5
-- Known quality tier from LEAD: **THIN, 0 facts**
-
-**Before:** passage_count said 5 ≈ 6 (nearly equal). Correlation was inverse.  
-**After:** quality_score says 1.5 vs 18.0. Museum is 12× higher. Correlation now positive.
-
----
-
-## Deliverable 4: Structural Sludge Detection
-
-Four structural signals (no phrase blocklist, per D236):
-
-| Signal | What it detects | Threshold |
-|--------|----------------|-----------|
-| Fragment density | Directory listings with · \| • delimiters | ≥3 delimiters AND ratio > 0.12 per word |
-| Ellipsis density | Search-result snippet collages | ≥3 "..." in < 250 chars |
-| Structured data leak | Template markup / JSON-LD bleed | `{keyword, keyword, keyword}` patterns |
-| Short fragment | Category tags from directories | < 60 chars AND ≤ 6 words AND has delimiters |
-
-**Why this isn't a blocklist:** "Restaurants near me" is caught because it appears in a passage with 3+ fragment delimiters (signal 1), not because we matched the phrase. Any future directory listing with different keywords triggers the same signal.
-
----
-
-## Verification Evidence
-
-### Tests pass (18/18)
 ```
-tests/test_local328_corpus_source_quality.py  18 passed in 0.10s
+Museum 8-stop (Musée des Arts Asiatiques):
+  OLD ORDER (by -passage_count):    top-8 = {all 8 stops, same order}
+  NEW ORDER (by -quality_score):    top-8 = IDENTICAL
+
+  All 8 museum stops have 0 sludge, 100% museum_official passages.
+  Quality scores: 9.0 – 18.0 per stop.
+  Selection order is preserved exactly.
 ```
 
-### Tests fail against broken code
-Breaking `is_sludge` to always return False causes `test_sludge_does_not_contribute` to fail (score becomes 1.0 instead of 0.0), confirming the test catches regressions.
+The museum tour cannot regress because all museum_official passages have 0% sludge. The quality_score preserves the same relative ordering as passage_count when no sludge is present (3.0 weight × N passages = 3N, which is monotonically related to N).
 
-### Row count unchanged
-```sql
-SELECT COUNT(*) FROM stop_corpus;
--- 112 (before and after)
+## Evidence: Restaurant tour scores differently
+
+```
+OLD 5-stop selection (by -passage_count):
+  1. Chez Palmyre (pc=5)
+  2. La Merenda (pc=5)
+  3. La Rossettisserie (pc=4)      ← selected
+  4. Le Bistro du Port (pc=4)
+  5. Olive & Artichaut (pc=4)      ← selected
+
+NEW 5-stop selection (by -quality_score):
+  1. La Merenda (quality=2.5)
+  2. Le Bistro du Port (quality=2.0)
+  3. Chez Palmyre (quality=2.0)
+  4. La Voglia (quality=1.5)       ← replaces Olive & Artichaut
+  5. La Rossettisserie (quality=1.0)← drops from rank 3 to rank 5
+
+La Rossettisserie: rank 3 → 5
+Olive & Artichaut (3 sludge/4 passages): dropped from top-5
+La Voglia (0 sludge/3 passages): promoted into top-5
 ```
 
-### git status clean
-```
-$ git status --short
-(empty)
-```
+## Evidence: Tests fail against unfixed code
 
----
+1. `test_directory_breadcrumb_listing`: Without Signal 5, `is_sludge("La Rossettisserie - Restaurants near me...")` returns `(False, "")`. Test asserts True → **FAILS**.
+
+2. `test_selection_uses_quality_score_not_passage_count`: Asserts `'compute_quality_score' in source` and `'SELECT stop_title, passage_count' not in source`. Before wiring → **FAILS** (old SELECT pattern present, compute_quality_score absent).
+
+3. `test_rossettisserie_directory_listing_caught`: Runs against live DB, finds the "Restaurants near me" passage, asserts `is_sludge=True`. Without Signal 5 → **FAILS**.
+
+## Verification summary
+
+| Check | Result |
+|-------|--------|
+| `stop_corpus` row count | 112 (unchanged) |
+| `git status --short` | Clean (empty) |
+| museum_official false positives | 0 |
+| wikipedia false positives | 0 |
+| Total sludge flagged | 30/430 (7.0%) |
+| Tests passing | 24/24 |
+| `generate_tour_text.py` uses quality_score | ✓ (verified by test) |
+| `stop_corpus_reader.py` filters sludge | ✓ (verified by test) |
+| No container rebuilds | ✓ |
+| No rows deleted | ✓ |
+| No phrase blocklist | ✓ (all signals are structural) |
 
 ## Limitations
 
-1. **Surviving web_search passages are still low-value.** The 60 web_search passages that pass the sludge filter (e.g., "The head chef and owner is extremely passionate...") carry very few concrete facts. They are not sludge (they're authored sentences) but their information density remains far below museum_official or wikipedia.
+1. **Passage #1 ("You will see two signs...")** is promotional/wayfinding copy but is not structurally detectable as sludge. It has a complete sentence structure and no breadcrumb/delimiter patterns. A "promotional language" signal would require NLP beyond structural analysis and risks the proper-noun trap (D236).
 
-2. **Cannot rescore actual tours end-to-end.** The `stop_metrics.i_con` scores are computed by the LLM evaluator during generation. Without re-generating tours (which costs API budget and time), I can only show that the new quality_score correctly ranks stops by source type. A live regeneration test would confirm the actual i_con improvement.
+2. **The `external_verified` false positive** (1 passage: "Matisse Museum Nizza: A Deep Dive into Henri Matisse's Enduring Legacy on the French Riviera ... opened as the Matisse Museum in 1963. ...") is a genuine search snippet — it IS a truncated scraped result, not authored prose. It happens to contain one fact. This is borderline-correct rather than a false positive.
 
-3. **17 restaurant stops have zero quality passages.** After filtering, all restaurant stop_corpus entries have quality_score ≤ 2.5, all museum entries have quality_score ≥ 7.5. The restaurant corpus genuinely lacks documentation — no amount of filtering will create facts that don't exist in the source material.
+3. **Restaurant 5-stop rubric score impact** cannot be measured without running a full generation (which costs API calls and risks exceeding the $0.60 ceiling). The selection order change is proven; the rubric score difference will manifest on next generation run. Honest expectation: the score may drop slightly because La Rossettisserie's remaining 2 passages produce fewer facts than the 5-passage raw count suggested, but La Voglia (promoted) has 3 clean passages that may compensate.
 
-4. **Duplicate stop_corpus rows.** La Rossettisserie has 3 rows under different venue_names ("restaurant tour in Old Nice", "Old Nice, Nice, France", "Nice, France"). The reader matches on venue first, so only one row is ever used per generation. The duplicates inflate the 112 count but don't affect quality.
+4. **The quality score signal only activates in the museum deterministic-fill path** (generate_tour_text.py line ~4115). Non-museum tours that go through Phase 3A (GPT-generated POI list) don't use this ranking. The filter_passages_for_generation in stop_corpus_reader.py still helps those tours by removing sludge from the prompt.

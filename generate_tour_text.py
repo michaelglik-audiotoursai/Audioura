@@ -4112,12 +4112,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     # all equally "notable". Choosing objects we can actually describe over
                     # ones with zero corpus is not narrowing — it is competence.
                     #
-                    # Fetch stop_corpus.passage_count for each candidate and use it as a
-                    # sort signal WITHIN the same source-priority tier.
-                    # This NEVER excludes a stop — all candidates still go through D1v2.
-                    # It only controls the ORDER so that well-sourced objects are proposed
-                    # first and more likely to fill the tour's limited stop count.
-                    _depth_map = {}  # normalized_title -> passage_count
+                    # ────── [LOCAL-328] Source-weighted quality score ──────
+                    # D241: passage_count is ANTI-CORRELATED with quality.
+                    # web_search passages accumulate sludge (directory listings,
+                    # keyword blobs) while museum_official passages are dense
+                    # with catalogue facts.  Sort by source-weighted quality
+                    # score (sludge excluded, sources weighted by measured
+                    # fact yield) instead of raw passage_count.
+                    _depth_map = {}  # normalized_title -> quality_score (float)
                     try:
                         from venue_resolver import _get_db_connection as _depth_get_conn
                         _depth_conn = _depth_get_conn()
@@ -4136,26 +4138,30 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                                 _depth_params.append(f"%{_vw}%")
                             if _depth_conditions:
                                 _depth_cur.execute(
-                                    "SELECT stop_title, passage_count FROM stop_corpus "
+                                    "SELECT stop_title, passages_json FROM stop_corpus "
                                     f"WHERE {' AND '.join(_depth_conditions)} AND passage_count > 0",
                                     _depth_params
                                 )
-                                for _dt, _dc in _depth_cur.fetchall():
-                                    _depth_map[_det_norm(_dt)] = _dc
+                                # Compute quality score per stop (source-weighted, sludge excluded)
+                                from corpus_source_quality import classify_passage, compute_quality_score
+                                import json as _depth_json
+                                for _dt, _pj in _depth_cur.fetchall():
+                                    _passages_raw = _depth_json.loads(_pj) if isinstance(_pj, str) else _pj
+                                    _classified = [classify_passage(p) for p in (_passages_raw or [])]
+                                    _depth_map[_det_norm(_dt)] = compute_quality_score(_classified)
                             _depth_cur.close()
                             _depth_conn.close()
                             if _depth_map:
-                                print(f"  [LOCAL-284] Corpus depth map: {len(_depth_map)} objects with passages")
+                                print(f"  [LOCAL-328] Quality score map: {len(_depth_map)} objects scored (source-weighted, sludge excluded)")
                     except Exception as _depth_err:
-                        print(f"  [LOCAL-284] Corpus depth lookup failed (non-fatal): {_depth_err}")
+                        print(f"  [LOCAL-328] Quality score lookup failed (non-fatal): {_depth_err}")
                     
-                    # Sort: (-passage_count, source_priority, title for stability)
-                    # For MUSEUMS: corpus depth is the PRIMARY signal because all items
-                    # are equally notable (closed set of real objects). Source priority
-                    # breaks ties among items with equal corpus depth.
-                    # This is intentionally stronger than the geographic tiebreak (D170).
-                    # Rationale: choosing a 6-passage object over a 0-passage one from
-                    # the same venue is competence, not artificial narrowing.
+                    # Sort: (-quality_score, source_priority, title for stability)
+                    # [LOCAL-328] For MUSEUMS: source-weighted quality score is the
+                    # PRIMARY signal. This replaces passage_count (D241: anti-correlated
+                    # with quality — web_search sludge inflates counts without adding
+                    # facts). Quality score = sum of non-sludge passages weighted by
+                    # source type yield (museum_official 3.0, wikipedia 2.5, etc.).
                     _priority = {'catalogue': 0, 'sparql': 1, 'canonical': 2}
                     _det_documented.sort(key=lambda d: (
                         -_depth_map.get(_det_norm(d['title']), 0),
@@ -4172,11 +4178,11 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     poi_list = [_new_poi(d['title']) for d in _det_documented[:_det_take]]
                     
                     print(f"  [LOCAL-30] DETERMINISTIC BYPASS: {len(poi_list)} documented works → Phase 3A SKIPPED")
-                    print(f"   Stops proposed (deterministic, corpus-depth ranked):")
+                    print(f"   Stops proposed (deterministic, quality-score ranked):")
                     for p in poi_list[:total_stops]:
                         _src = next((d['source'] for d in _det_documented if d['title'] == p['name']), '?')
-                        _depth = _depth_map.get(_det_norm(p['name']), 0)
-                        print(f"     - {p['name']} [{_src}] ({_depth} passages)")
+                        _qscore = _depth_map.get(_det_norm(p['name']), 0)
+                        print(f"     - {p['name']} [{_src}] (quality={_qscore:.1f})")
                     _deterministic_fill_used = True
                 else:
                     print(f"  [LOCAL-30] Documented works ({len(_det_documented)}) < total_stops ({total_stops}) "
