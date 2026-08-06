@@ -1115,3 +1115,106 @@ this repo already has a credential in pushed history.
 
 Cause fixed: task files since LOCAL-300 state the interpreter path as fact;
 LOCAL-300 then completed with no scanning at all.
+
+---
+
+# 2026-08-06, evening — everything since 10:08
+
+*(This file went 9 hours without an update while the queue ran. Michael asked
+for it. LEAD's lapse, not a tooling problem.)*
+
+## Which tour to read
+
+| File | Stops | Base | Read it because |
+|---|---|---|---|
+| `tours/LOCAL320_museum_8stop.txt` | **8/8** | **81.2** | Best this venue has scored. Was 71.9 this morning, 75.0 midday. **No THIN stops.** |
+| `tours/LOCAL320_run5_restaurant.txt` | **5/5** | 55.0 | **Your 2-of-5 complaint is fixed.** But 4 of 5 stops are THIN and stop 1 has zero facts — we can find the restaurants, we can't say much about them. |
+
+Both were generated at ~18:20 and predate this evening's merges.
+
+## Your three questions, answered
+
+**1. Why only 2 of 5 restaurants.** Nominatim rate-limiting. A throttled lookup
+was swallowed by `except Exception: return False` and became "does not exist" —
+D162 for the fourth time. The gate was simultaneously *accepting* junk
+(`'Le Safari' — Six Flags Great Adventure`, `'La Tapenade' — found in chicago`)
+while rejecting real places. Re-running the same four names 1.2s apart verified
+all four correctly in Nice. **Fixed and merged (LOCAL-320).** Now ≤1 req/s,
+proper User-Agent, bounded retry, and a search that fails is INCONCLUSIVE — kept
+for delivery but never counted as verified.
+
+**2. The Boston Globe credentials.** Ciphertext on line 59 of
+`tests/run_mobile_decryption.py`, the key that decrypts it on line 28, same
+file, pushed to GitHub. **Rotating the password is the only thing that helps**
+once something is pushed. Task `wdvrdaxe5p` is in your list, high priority.
+
+I inverted the order you gave me and created it *before* the security fix.
+Reason: that credential is already public, while customer credential storage
+had **0 rows** and disabled endpoints — a bad design with no victims. Waiting
+would have protected nothing. Overrule me if you disagree.
+
+**Customer credential storage is now fixed (LOCAL-321, merged):** both live
+read paths off the plaintext columns, and the query that matched users by
+comparing plaintext passwords in SQL now uses a keyed HMAC blind index.
+Encryption at rest still needs GCP KMS provisioning (your infrastructure call);
+your split-key instinct is the stronger design but needs mobile app changes we
+cannot make from the server.
+
+**3. The cost ceiling — you asked if it was $2.00.** It is not.
+
+```
+COST_TARGET     $0.15   warn
+COST_HARD_LIMIT $1.30   abort
+```
+
+And it covered **text generation only**. TTS and translation never called it.
+Then we metered TTS for the first time (LOCAL-323) and the picture inverted:
+
+```
+text generation   ~$0.07    the only thing the guard watched
+TTS               ~$0.24    11,603-19,399 chars on real tours = $0.19-$0.31
+translation       ~$0.31    per language
+```
+
+**TTS is the dominant per-tour cost, 3-4x generation.** I had told you
+translation was the expensive stage — that was wrong for a single English tour.
+My "regeneration costs ~$0.14" was also wrong: with re-synthesis it is nearer
+**$0.60**.
+
+**Your "cap what we spend, not what we ship" is now built (LOCAL-326, merged).**
+The ceiling ran *after* generation finished, so we paid in full and delivered
+nothing. It now checks at phase boundaries and stops mid-flight. Measured
+saving on a breach: **$0.410, 23.9%**.
+
+**Still needs your decision:** whether $2.00 covers a tour *and all its
+translations* (my current assumption) or is *per delivered language*. At
+~$0.31/language the cap will bind on translation count — a three-language tour
+cannot fit under $2.00. Everything else in the cost work I decided and recorded
+(D237, D238).
+
+## What else merged today
+
+LOCAL-320 (rate limiting), 321 (credentials), 322 (French material terms
+leaking into English narration — `"This work, crafted in schiste, Carved from
+grey schist"` — 47 occurrences), 323 (TTS metering + thread-safe cost
+attribution), 324, 325, 326.
+
+## What I got wrong today, so you can calibrate
+
+- Predicted the museum rescore would land "high 70s or low 80s". It was **75.0**
+  — the bottom of my range, not inside it.
+- Told you translation was the dominant cost. **It is TTS.**
+- Gave a task file counts (47 splices / 18 files) it could not reproduce, because
+  those tour files are untracked. The agent's confusion was my fault.
+
+## One pattern worth your attention
+
+**Three times today an agent's new tests passed whether or not the fix was
+present.** The worst printed *"PASS: grammatical English"* for
+`"This work was dating from the 19th century."` I now break the production code
+deliberately and check the test goes red before believing it. That check has
+caught something every time I have run it.
+
+Related: `tests/test_local291_groundedness.py` had been **uncollectable since
+LOCAL-309** — 23 tests silently not running for days. A green suite says nothing
+about files that never parsed.
