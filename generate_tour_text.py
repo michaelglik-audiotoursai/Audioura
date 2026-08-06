@@ -3785,6 +3785,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
 
     # [LOCAL-285] Restaurant/dining venue constraint — guides Phase 3A toward actual
     # eating establishments rather than museums or landmarks that happen to be notable.
+    # [LOCAL-329] Enhanced: asks for notability reasons to select by documentedness.
     _restaurant_venue_constraint = ""
     if tour_category == 'restaurant':
         # Determine the area name for the constraint
@@ -3799,10 +3800,17 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             f"- Each stop must have a verifiable street address in or near {_restaurant_area}.\n"
             f"- Do NOT include museums, galleries, parks, monuments, or any non-dining venue.\n"
             f"- Do NOT include fictional or closed restaurants.\n"
-            f"- Prefer well-known, established restaurants that a visitor could actually dine at.\n"
+            f"- Prefer restaurants that are NOTABLE and DOCUMENTED — venues that people write "
+            f"about because they have a distinctive story (founding year, named chef, "
+            f"signature dish, culinary tradition, architectural feature, historical event).\n"
+            f"- For each restaurant, include a 'reason' field explaining WHY it is notable. "
+            f"The reason must cite a SPECIFIC fact: a year, a named person, a named dish, "
+            f"a documented tradition, or a verifiable event. "
+            f"Do NOT use vague phrases like 'popular', 'top-ranked', 'well-known', "
+            f"or 'appears in many lists'.\n"
             f"- Include a mix of styles/price ranges unless the request specifies otherwise.\n"
         )
-        print(f"  [LOCAL-285] Restaurant constraint injected for area='{_restaurant_area}'")
+        print(f"  [LOCAL-285/329] Restaurant constraint injected for area='{_restaurant_area}'")
 
     if tour_category == 'museum':
         # Prefer PHASE 1 intent result (most accurate, handles all formats).
@@ -3906,6 +3914,8 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 f"from its nearest neighbour in the tour.\n"
                 f"- Prefer a tight set of stops in one walkable area over famous landmarks scattered "
                 f"across the city. A shorter, denser route is better than a long, spread-out one.\n"
+                f"- Prefer landmarks that are DOCUMENTED — places with a specific story (a date, "
+                f"a named architect, a historical event). Include a 'reason' for each.\n"
             )
         elif transport_mode == 'bike':
             # [LOCAL-46] Biking tour: wider spacing, route coherence still matters
@@ -4204,10 +4214,21 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         print(f"OK PHASE 3A parsed {len(poi_list)} candidate POI(s):")
         for p in poi_list:
             print(f"   - {p['name']}")
+        # [LOCAL-329] No selection reasons when deterministic fill is used
+        _selection_reasons = {}
     else:
         pass  # Fall through to normal Phase 3A GPT call below
 
     if not _deterministic_fill_used:
+        # [LOCAL-329] Include "reason" in the JSON schema for restaurant/walking tours
+        # so the LLM returns notability reasons at selection time.
+        if tour_category == 'restaurant':
+            _phase3a_json_hint = '[{"name": "...", "address": "...", "reason": "Founded in 1927 by the Acchiardo family; known for handmade ravioli and slow-cooked daube niçoise"}, ...]'
+        elif tour_category == 'walking':
+            _phase3a_json_hint = '[{"name": "...", "address": "...", "reason": "Brief reason why this landmark is notable — a specific date, person, or event"}, ...]'
+        else:
+            _phase3a_json_hint = '[{"name": "...", "address": "..."}, ...]'
+
         phase_3a_prompt = (
             f"You are a knowledgeable local guide for {location}.\n"
             f"List exactly {_phase3a_count} specific, real, well-known {poi_type_hint} relevant to: {user_request}.\n\n"
@@ -4221,7 +4242,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             + _scope_constraint
             + _compactness_constraint
             + "\n\nReturn ONLY a JSON array, no other text, no markdown fences:\n"
-            '[{"name": "...", "address": "..."}, ...]'
+            + _phase3a_json_hint
         )
         phase_3a_data = {
             "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
@@ -4286,6 +4307,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 print(f"X PHASE 3A returned unparseable response: {info_text[:300]}")
                 return None, None, (None, None)
 
+            # [LOCAL-329] Track selection reasons for substance filtering and corpus persistence
+            _selection_reasons = {}  # name_lower → reason text
+            _hollow_reason_rejects = []  # names rejected for ranking-only reasons
+
             for c in candidates:
                 if not isinstance(c, dict):
                     continue
@@ -4299,7 +4324,28 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 if _is_name_corrupted(name):
                     print(f"   ! [LOCAL-22] Rejected corrupted name from PHASE 3A: '{name[:80]}'")
                     continue
+
+                # [LOCAL-329] Capture and filter selection reasons
+                reason = (c.get("reason") or "").strip()
+                if reason and tour_category in ('restaurant', 'walking'):
+                    from selection_reason_filter import reason_has_substance
+                    if reason_has_substance(reason):
+                        _selection_reasons[name.lower()] = reason
+                    else:
+                        # Hollow reason — the venue may still be real, but the LLM
+                        # couldn't cite a specific fact. Deprioritize.
+                        _hollow_reason_rejects.append(name)
+                        print(f"   ! [LOCAL-329] Hollow reason for '{name}': '{reason[:80]}'")
+                        continue  # skip this candidate
+
                 poi_list.append(_new_poi(name, c.get("address") or ""))
+
+            # [LOCAL-329] Report substance filtering
+            if _hollow_reason_rejects:
+                print(f"  [LOCAL-329] Substance filter: {len(_hollow_reason_rejects)} candidate(s) "
+                      f"rejected for ranking-only reasons")
+            if _selection_reasons:
+                print(f"  [LOCAL-329] Captured {len(_selection_reasons)} substantive selection reason(s)")
 
             if len(poi_list) == 0:
                 print(f"X PHASE 3A: no usable POIs after parsing")
@@ -5624,6 +5670,26 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # coordinates for verified stops, GPT's guessed coordinates as fallback.
         if tour_category == 'walking' and len(poi_list) >= 3:
             poi_list = _compute_route_order(poi_list)
+
+        # ──── [LOCAL-329] PERSIST SELECTION REASONS AS CORPUS ─────────────────
+        # Selection-stage reasons are leads, not claims. Persist them in stop_corpus
+        # with source attribution so downstream content has material to work with.
+        # Only persist for stops that survived all gates (existence, type, geo).
+        if _selection_reasons and tour_category in ('restaurant', 'walking'):
+            try:
+                from selection_reason_filter import persist_selection_reasons
+                _surviving_names = [p['name'] for p in poi_list]
+                _venue_for_reasons = location
+                _reasons_persisted = persist_selection_reasons(
+                    _selection_reasons, _surviving_names, _venue_for_reasons
+                )
+                if _reasons_persisted > 0:
+                    print(f"  [LOCAL-329] Persisted {_reasons_persisted} selection reason(s) to stop_corpus")
+            except ImportError as _sr_err:
+                print(f"  [LOCAL-329] Selection reason persistence: import failed ({_sr_err})")
+            except Exception as _sr_err:
+                print(f"  [LOCAL-329] Selection reason persistence error (non-fatal): {_sr_err}")
+        # ──── END [LOCAL-329] ─────────────────────────────────────────────────
 
         print(f"\nPHASE 3B: Requesting structured details and walking directions for {len(poi_list)} stop(s)...")
         api_call_logger.log("PHASE_3B_REQUEST", {
