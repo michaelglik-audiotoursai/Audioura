@@ -8379,6 +8379,35 @@ REWRITE RULES (all mandatory):
                       f"of stop {p['stop_number']}: '{p['name']}'")
     print(f"OK PHASE 5.7: Dangling-reference scrub complete ({_final_stop_count} stops)")
 
+    # -------- [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub --------
+    # Detect "this/these/that/those + noun" where the noun has no antecedent in
+    # the same stop's spoken text. Schema lines are excluded as antecedents.
+    # Repair from corpus if possible; delete sentence otherwise.
+    print(f"\n  [LOCAL-318] PHASE 5.7b: Dangling-demonstrative scrub...")
+    try:
+        from dangling_demonstrative_gate import apply_dangling_demonstrative_gate as _ddg_apply
+    except ImportError as _ddg_err:
+        _ddg_apply = None
+        print(f"  [LOCAL-318] WARNING: dangling_demonstrative_gate not importable — gate skipped ({_ddg_err})")
+
+    if _ddg_apply:
+        _ddg_stats = _ddg_apply(
+            poi_list,
+            stop_corpus_data=_stop_corpus_data if '_stop_corpus_data' in dir() else None,
+        )
+        print(f"  [LOCAL-318] Dangling-demonstrative scrub summary:")
+        print(f"    Detected: {_ddg_stats['total_detected']}")
+        print(f"    Repaired (name substituted): {_ddg_stats['total_repaired']}")
+        print(f"    Deleted (unrepairable): {_ddg_stats['total_deleted']}")
+        print(f"    Stops affected: {_ddg_stats['stops_affected']}")
+        if _ddg_stats['findings']:
+            for _f in _ddg_stats['findings']:
+                if _f['action'] == 'repaired':
+                    print(f"    [{_f['stop']}] REPAIRED: '{_f['demonstrative_np']}' → {_f['after'][:80]}")
+                else:
+                    print(f"    [{_f['stop']}] DELETED: '{_f['demonstrative_np']}' in: {_f['sentence'][:80]}")
+    print(f"OK PHASE 5.7b: Dangling-demonstrative scrub complete")
+
     # -------- [LOCAL-27] PHASE 5.8: Self-contradiction check --------
     # Verify that declared type_specialty is consistent with prose description.
     # If contradicting, clear the type_specialty rather than ship a lie.
