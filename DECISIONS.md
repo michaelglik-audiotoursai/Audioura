@@ -8257,3 +8257,33 @@ median 80.0, 24 tours above 100 — are unaffected, since all of those are drive
 by the correlation bonus on tours with positive base.
 
 175 tests pass.
+
+## D207 — Killing a task can permanently block its re-dispatch (2026-08-06)
+
+`already_claimed()` reads the **last** status line for a task file and treats
+`STARTED / COMPLETED / FAILED / TIMEOUT` as claimed. Only `ABANDONED` re-opens it.
+
+When LEAD killed the stalled LOCAL-292 at 00:41, the sequence written was:
+
+```
+STARTED    23:42
+ABANDONED  00:41   <- LEAD, immediately after kill_task.sh
+FAILED     00:41   <- the dying wrapper, a moment later
+```
+
+`FAILED` landed last, so the task read as terminal and the dispatcher skipped it
+silently. It sat unclaimed for 26 minutes with an empty queue and nothing said
+so — `kiro_sessions_ran.md` looked normal and `STATUS.md` recorded it as
+"re-queued", which it was not.
+
+**Rule: write the ABANDONED line AFTER confirming the process is dead**, or
+re-check `already_claimed()` afterwards. `kill_task.sh` returns once the
+processes are signalled, not once the wrapper has finished logging.
+
+Caught only because a tick found 0 tasks in flight and asked why. The queue
+being empty is itself a signal worth treating as an alarm rather than a lull —
+two tasks were waiting and neither was moving.
+
+**Not fixing `already_claimed()` itself.** Treating FAILED as terminal is
+correct — a genuinely failed task should not loop forever. The bug was in the
+write order, not the read logic.
