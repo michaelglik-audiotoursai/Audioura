@@ -4114,10 +4114,16 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             traceback.print_exc()
 
     # For museum tours with D1v2 verification: ask for 2x candidates to improve hit rate
-    _phase3a_count = total_stops
+    # [LOCAL-290 Fault 1] For ALL tours, request N + margin so the existence gate has
+    # candidates to work with. Previously non-museum tours asked for exactly N — if GPT
+    # returned N-1 or the gate dropped any, the tour was already short.
+    _phase3a_count = total_stops + max(3, total_stops // 2)  # at least N+3, up to N+N/2
+    _phase3a_count = min(_phase3a_count, 20)  # hard cap to avoid bloating the prompt
     if tour_category == 'museum' and _museum_venue_name:
         _phase3a_count = min(total_stops * 2, 20)
         print(f"  [R4] Museum tour: asking for {_phase3a_count} candidates (2x for D1v2 filtering)")
+    else:
+        print(f"  [LOCAL-290] Asking for {_phase3a_count} candidates (N={total_stops} + margin for gate filtering)")
 
     if _deterministic_fill_used:
         # Skip Phase 3A entirely — poi_list already filled deterministically
@@ -5069,6 +5075,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # Three modes: off / log_only / enforce.
         # In enforce mode, unverified stops are removed from poi_list before
         # narration. The tour may be shorter — this is logged explicitly.
+        _seg_requested_stops = total_stops  # [LOCAL-290] Save original request count for replenishment
         try:
             from stop_existence_gate import get_gate_mode, run_existence_gate, verify_stop_existence
 
@@ -5104,13 +5111,12 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                         _seg_dropped = _seg_before - _seg_after
                         if _seg_dropped > 0:
                             print(f"  [LOCAL-245] EXISTENCE-GATE ENFORCE: dropped {_seg_dropped} unverified stop(s), "
-                                  f"{_seg_after} remain (requested {total_stops})")
+                                  f"{_seg_after} remain (requested {_seg_requested_stops})")
                             for _seg_u in _seg_result['unverified_stops']:
                                 print(f"    DROPPED: {_seg_u!r}")
-                            if _seg_after < total_stops:
-                                print(f"  [LOCAL-245] EXISTENCE-GATE: delivering SHORT tour — "
-                                      f"{_seg_after}/{total_stops} stops (reason: not enough verified candidates)")
-                                total_stops = _seg_after
+                            if _seg_after < _seg_requested_stops:
+                                print(f"  [LOCAL-245] EXISTENCE-GATE: tour SHORT — "
+                                      f"{_seg_after}/{_seg_requested_stops} stops, triggering replenishment")
                 else:
                     print(f"  [LOCAL-245] EXISTENCE-GATE: DB unavailable — gate cannot run, proceeding without")
             else:
@@ -5120,6 +5126,140 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         except Exception as _seg_err:
             print(f"  [LOCAL-245] EXISTENCE-GATE error (non-fatal): {_seg_err}")
         # ──── END [LOCAL-245] STOP-EXISTENCE GATE ─────────────────────────────
+
+        # ──── [LOCAL-290 Fault 4] GEOGRAPHIC REPLENISHMENT ────────────────────
+        # When the existence gate drops stops from a non-museum tour, replenish
+        # by asking GPT for fresh candidates and verifying them through the same
+        # gate. A replenished stop must pass the same verification as an original.
+        # This mirrors R4 for museum tours but uses the existence gate (not D1v2).
+        if (tour_category != 'museum' and len(poi_list) < _seg_requested_stops
+                and len(poi_list) > 0):
+            _rep_needed = _seg_requested_stops - len(poi_list)
+            _rep_tried = set(p['name'].lower() for p in poi_list)
+            # Also exclude all names we already tried (including dropped ones)
+            _rep_tried.update(n.lower() for n in (_seg_result.get('unverified_stops', [])
+                                                  if '_seg_result' in dir() else []))
+            _REP_MAX_ROUNDS = 2
+            _rep_round = 0
+
+            print(f"\n  [LOCAL-290] REPLENISHMENT: need {_rep_needed} more stops "
+                  f"(have {len(poi_list)}/{_seg_requested_stops})")
+
+            while len(poi_list) < _seg_requested_stops and _rep_round < _REP_MAX_ROUNDS:
+                _rep_round += 1
+                _rep_ask = min(_rep_needed + 4, 12)
+                _rep_forbidden = sorted(_rep_tried)[:30]
+                _rep_forbidden_str = "; ".join(_rep_forbidden) if _rep_forbidden else "(none)"
+
+                _rep_prompt = (
+                    f"You are a knowledgeable local guide for {location}.\n"
+                    f"List exactly {_rep_ask} specific, real, well-known {poi_type_hint} "
+                    f"relevant to: {user_request}.\n"
+                    f"DO NOT include: {_rep_forbidden_str}\n"
+                    "Requirements:\n"
+                    "- Use REAL, SPECIFIC names of actual places/landmarks.\n"
+                    "- These must be well-documented places that appear on Wikipedia or maps.\n"
+                    "- Include a complete street address where applicable.\n"
+                    '\nReturn ONLY a JSON array: [{"name": "...", "address": "..."}]'
+                )
+                _rep_data = {
+                    "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                    "messages": [
+                        {"role": "system", "content": "Return ONLY valid JSON arrays."},
+                        {"role": "user", "content": _rep_prompt}
+                    ],
+                    "temperature": 0.7,
+                    "max_tokens": 600,
+                }
+                try:
+                    _rep_resp = requests.post(
+                        "https://api.openai.com/v1/chat/completions",
+                        headers=headers, data=json.dumps(_rep_data)
+                    )
+                    if _rep_resp.status_code != 200:
+                        print(f"    [LOCAL-290] Replenishment API error {_rep_resp.status_code}")
+                        break
+                    _rep_result = _rep_resp.json()
+                    _rep_text = _rep_result["choices"][0]["message"]["content"]
+                    tokens_used = _rep_result["usage"]["total_tokens"]
+                    total_tokens += tokens_used
+                    total_cost += _tour_llm_cost(tokens_used)
+
+                    _rep_candidates = _parse_json_array_loose(_rep_text)
+                    if not _rep_candidates:
+                        print(f"    [LOCAL-290] Replenishment round {_rep_round}: unparseable response")
+                        continue
+
+                    # Deduplicate and verify through existence gate
+                    _rep_new_names = []
+                    for c in _rep_candidates:
+                        if not isinstance(c, dict):
+                            continue
+                        name = (c.get("name") or "").strip()
+                        if not name or name.lower() in _rep_tried:
+                            continue
+                        if _is_name_corrupted(name):
+                            _rep_tried.add(name.lower())
+                            continue
+                        _rep_tried.add(name.lower())
+                        _rep_new_names.append((name, c.get("address") or ""))
+
+                    if not _rep_new_names:
+                        print(f"    [LOCAL-290] Replenishment round {_rep_round}: no new candidates after dedup")
+                        break
+
+                    # Verify new candidates through the same existence gate
+                    _rep_conn = None
+                    try:
+                        from venue_resolver import _get_db_connection as _rep_get_conn
+                        _rep_conn = _rep_get_conn()
+                    except Exception:
+                        pass
+                    if not _rep_conn:
+                        try:
+                            import psycopg2
+                            _rep_db_url = os.environ.get('DATABASE_URL')
+                            if _rep_db_url:
+                                _rep_conn = psycopg2.connect(_rep_db_url, connect_timeout=5)
+                        except Exception:
+                            pass
+
+                    if _rep_conn:
+                        _rep_venue = location
+                        _rep_name_list = [n for n, _ in _rep_new_names]
+                        _rep_gate_result = run_existence_gate(
+                            _rep_name_list, _rep_venue, _rep_conn)
+                        _rep_conn.close()
+
+                        _rep_verified_names = set(_rep_gate_result.get('verified_stops', []))
+                        _rep_added = 0
+                        for name, addr in _rep_new_names:
+                            if name in _rep_verified_names and len(poi_list) < _seg_requested_stops:
+                                poi_list.append(_new_poi(name, addr))
+                                _rep_added += 1
+                                # Find evidence for logging
+                                _rep_ev = ""
+                                for v in _rep_gate_result.get('verdicts', []):
+                                    if v.get('stop_title') == name:
+                                        _rep_ev = v.get('evidence', '')[:60]
+                                        break
+                                print(f"    [LOCAL-290] REPLENISHED: '{name}' — {_rep_ev}")
+                        print(f"    [LOCAL-290] Round {_rep_round}: +{_rep_added} verified, "
+                              f"total now {len(poi_list)}/{_seg_requested_stops}")
+                    else:
+                        print(f"    [LOCAL-290] Replenishment: DB unavailable for verification")
+                        break
+                except Exception as e:
+                    print(f"    [LOCAL-290] Replenishment error: {e}")
+                    break
+
+            if len(poi_list) < _seg_requested_stops:
+                print(f"  [LOCAL-290] Replenishment exhausted: {len(poi_list)}/{_seg_requested_stops} stops")
+                total_stops = len(poi_list)
+            else:
+                total_stops = _seg_requested_stops
+                print(f"  [LOCAL-290] Replenishment SUCCESS: {len(poi_list)}/{_seg_requested_stops} stops")
+        # ──── END [LOCAL-290] GEOGRAPHIC REPLENISHMENT ────────────────────────
 
         # Hard cap and final sanity
         if len(poi_list) > total_stops:
