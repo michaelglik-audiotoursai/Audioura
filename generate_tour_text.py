@@ -719,7 +719,481 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12):
     return kept
 
 
-def _build_closing_offer(poi_list, tour_category, transport_mode, location):
+def _build_closing_recap(poi_list, ranked_facts_for_recap, api_key=None):
+    """[LOCAL-280] Build a closing recap sentence from delivered tour content.
+
+    The recap replaces any thank-you sentence. It states scale (stop count +
+    total distance) then names real content chosen by the LOCAL-276 intrigue
+    ranking. Every fact referenced must appear verbatim in its stop's delivered
+    description — the D177 rule.
+
+    Scaling (per Michael):
+      2 stops:  both stops, briefly — one clause each
+      3–5:     scale + top 2 by intrigue
+      6+:      scale + top 2–3 by intrigue; never list every stop
+
+    Composition (bounce 3 fix): An LLM call composes each recap item into a
+    short clause (≤12 words) that names the stop and its fact. This replaces
+    the regex extraction that produced truncated spans and dangling pronouns.
+    The LLM may only rephrase — never add facts. D177 verification runs on
+    the source fact; the composed clause is a faithful restatement.
+
+    Args:
+        poi_list: The list of POIs with 'name', 'description', coordinates.
+        ranked_facts_for_recap: List of dicts from LOCAL-276 intrigue ranking,
+            each with 'stop', 'best_fact', 'reason'. Only non-celebrity_trivia
+            entries, sorted by intrigue priority.
+        api_key: OpenAI API key for the composition call.
+
+    Returns:
+        str: The recap sentence, or "" if nothing can be verified.
+    """
+    from math import radians, sin, cos, asin, sqrt
+
+    def _hav(a, b):
+        lat1, lon1 = a; lat2, lon2 = b
+        dlat, dlon = radians(lat2 - lat1), radians(lon2 - lon1)
+        h = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
+        return 2 * 6371.0 * asin(sqrt(h))
+
+    # --- Count delivered stops (only those with real descriptions) ---
+    delivered = []
+    for p in poi_list:
+        desc = p.get('description', '')
+        if (desc and not desc.startswith('[') and
+            'GENERATION_FAILED' not in desc and len(desc.split()) >= 30):
+            delivered.append(p)
+
+    n_delivered = len(delivered)
+    if n_delivered < 2:
+        print("  [LOCAL-280] Recap: fewer than 2 delivered stops — skipped")
+        return ""
+
+    # --- Compute total route distance ---
+    coords = []
+    for p in delivered:
+        lat = p.get('latitude') or p.get('wikidata_lat')
+        lng = p.get('longitude') or p.get('wikidata_lng')
+        if not lat or not lng:
+            _cs = p.get('coordinates', '')
+            _m = re.match(r'\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)', _cs or '')
+            if _m:
+                lat, lng = float(_m.group(1)), float(_m.group(2))
+        if lat and lng:
+            coords.append((float(lat), float(lng)))
+
+    total_km = 0.0
+    if len(coords) >= 2:
+        for i in range(len(coords) - 1):
+            total_km += _hav(coords[i], coords[i + 1])
+
+    # --- Select facts by intrigue ranking ---
+    # Verify each ranked fact actually appears in its stop's delivered text.
+    verified_highlights = []
+    _d177_rejected = 0
+    _nav_rejected = 0
+
+    # [LOCAL-280 bounce 4] Import navigation detector — navigation sentences are
+    # never recap facts. R1 *exempts* navigation from imperative checks, so
+    # check_r1_imperatives cannot catch them. We must reject explicitly.
+    from style_validator_detector import _is_style_navigation_sentence as _is_nav_sentence
+
+    # Collect all delivered stop names for the cross-stop naming guard.
+    _all_stop_names = [p['name'].lower() for p in delivered]
+
+    if ranked_facts_for_recap:
+        for rf in ranked_facts_for_recap:
+            rf_stop = rf.get('stop', '')
+            rf_fact = rf.get('best_fact', '')
+            rf_reason = rf.get('reason', '')
+            if not rf_stop or not rf_fact:
+                continue
+
+            # [LOCAL-280 bounce 4] NAVIGATION FILTER — reject Directions text.
+            # _is_style_navigation_sentence catches verb+directional patterns.
+            # Also reject broader imperative navigation starts that the sentence-
+            # level detector may miss (e.g. "Pedal from X to Y" without a
+            # canonical directional word).
+            if _is_nav_sentence(rf_fact):
+                _nav_rejected += 1
+                print(f"  [LOCAL-280] Recap: NAVIGATION rejected for '{rf_stop}': "
+                      f"\"{rf_fact[:80]}...\"")
+                continue
+            # Broader catch: first word is a transport/route verb
+            _first_word = rf_fact.split()[0].lower().rstrip('.,;:') if rf_fact else ''
+            if _first_word in ('head', 'turn', 'continue', 'proceed', 'walk',
+                               'cycle', 'follow', 'cross', 'step', 'pedal',
+                               'ride', 'bike', 'drive', 'hike', 'stroll',
+                               'cruise', 'trot', 'gallop', 'start', 'set'):
+                _nav_rejected += 1
+                print(f"  [LOCAL-280] Recap: NAVIGATION (verb start) rejected for '{rf_stop}': "
+                      f"\"{rf_fact[:80]}...\"")
+                continue
+
+            # [LOCAL-280 bounce 4] CROSS-STOP NAMING GUARD — a recap clause
+            # credited to stop A must not name stop B. This catches cases where
+            # a Directions sentence like "Cycle from A towards B" passes as a
+            # fact for A but actually describes the route to B.
+            _other_stops = [s for s in _all_stop_names if s != rf_stop.lower()]
+            _fact_lower = rf_fact.lower()
+            _names_other_stop = False
+            for _other in _other_stops:
+                if _other in _fact_lower:
+                    _nav_rejected += 1
+                    _names_other_stop = True
+                    print(f"  [LOCAL-280] Recap: CROSS-STOP rejected for '{rf_stop}': "
+                          f"names '{_other}' — \"{rf_fact[:80]}...\"")
+                    break
+            if _names_other_stop:
+                continue
+
+            # Find the matching delivered stop
+            matched_poi = None
+            for p in delivered:
+                if p['name'].lower() == rf_stop.lower():
+                    matched_poi = p
+                    break
+                # Fuzzy: check if stop name is contained
+                if rf_stop.lower() in p['name'].lower() or p['name'].lower() in rf_stop.lower():
+                    matched_poi = p
+                    break
+            if not matched_poi:
+                print(f"  [LOCAL-280] Recap: stop '{rf_stop}' not found in delivered — skipped")
+                continue
+            # D177 verification: fact text must appear in the delivered description
+            desc = matched_poi.get('description', '')
+            # Normalize whitespace for comparison
+            _norm_desc = ' '.join(desc.split())
+            _norm_fact = ' '.join(rf_fact.split())
+            if _norm_fact not in _norm_desc:
+                # Try a shorter substring (first 60 chars) — the ranking may have
+                # truncated the sentence slightly
+                _short = _norm_fact[:60]
+                if _short not in _norm_desc:
+                    print(f"  [LOCAL-280] Recap: D177 FAILED for '{rf_stop}': fact not in delivered text")
+                    print(f"    Fact: \"{rf_fact[:80]}...\"")
+                    _d177_rejected += 1
+                    continue
+            verified_highlights.append({
+                'stop': matched_poi['name'],
+                'fact': rf_fact,
+                'reason': rf_reason,
+            })
+
+    # --- Fallback: if ranking unavailable, extract key facts manually ---
+    if not verified_highlights:
+        # Pick from delivered stops: find sentences with dates or key events.
+        from style_validator_detector import check_r1_imperatives as _check_r1
+        for p in delivered:
+            desc = p.get('description', '')
+            sents = re.split(r'(?<=[.!?])\s+', desc.strip())
+            _stop_candidates = 0
+            for s in sents:
+                if len(s) < 30:
+                    continue
+                # Skip imperatives and navigation
+                if _check_r1(s):
+                    continue
+                # [LOCAL-280 bounce 4] Explicit navigation filter
+                if _is_nav_sentence(s):
+                    _nav_rejected += 1
+                    continue
+                _first_w = s.split()[0].lower().rstrip('.,') if s else ''
+                if _first_w in ('head', 'turn', 'continue', 'proceed', 'walk',
+                                'cycle', 'follow', 'cross', 'step', 'pedal',
+                                'ride', 'bike', 'drive', 'hike', 'stroll',
+                                'cruise', 'trot', 'gallop', 'start', 'set'):
+                    _nav_rejected += 1
+                    continue
+                # [LOCAL-280 bounce 4] Cross-stop naming guard
+                _other_stops_fb = [n for n in _all_stop_names
+                                   if n != p['name'].lower()]
+                _s_lower = s.lower()
+                _skip_cross = False
+                for _other in _other_stops_fb:
+                    if _other in _s_lower:
+                        _nav_rejected += 1
+                        _skip_cross = True
+                        break
+                if _skip_cross:
+                    continue
+                # Accept: has a date, OR has a proper noun with a past-tense verb
+                _has_date = bool(re.search(r'\b\d{3,4}\b', s))
+                _has_event = bool(re.search(
+                    r'\b(built|designed|destroyed|seized|founded|opened|'
+                    r'constructed|completed|liberated|imprisoned|spent|'
+                    r'became|arrived|transformed|painted|created)\b',
+                    s, re.IGNORECASE))
+                if _has_date or _has_event:
+                    verified_highlights.append({
+                        'stop': p['name'],
+                        'fact': s.strip(),
+                        'reason': 'dated_event' if _has_date else 'cause',
+                    })
+                    _stop_candidates += 1
+                    if _stop_candidates >= 3:
+                        break
+            if len(verified_highlights) >= 8:
+                break
+
+    if not verified_highlights:
+        print(f"  [LOCAL-280] Recap: no verifiable highlights found "
+              f"({_d177_rejected} rejected by D177, {_nav_rejected} rejected as navigation) — skipped")
+        return ""
+
+    # --- Determine how many highlights to include ---
+    if n_delivered == 2:
+        max_highlights = 2
+    elif n_delivered <= 5:
+        max_highlights = 2
+    else:
+        max_highlights = min(3, len(verified_highlights))
+
+    # Deduplicate by stop (one fact per stop)
+    _seen_stops = set()
+    _deduped = []
+    for h in verified_highlights:
+        if h['stop'] not in _seen_stops:
+            _deduped.append(h)
+            _seen_stops.add(h['stop'])
+    verified_highlights = _deduped
+
+    selected = verified_highlights[:max_highlights]
+
+    # At 2 stops, we need both. If selected has fewer than 2 (e.g. ranking
+    # only returned 1), fill from the other delivered stop.
+    if n_delivered == 2 and len(selected) < 2:
+        _covered = {h['stop'] for h in selected}
+        for p in delivered:
+            if p['name'] not in _covered and len(selected) < 2:
+                # Grab a fact sentence from this stop
+                desc = p.get('description', '')
+                sents = re.split(r'(?<=[.!?])\s+', desc.strip())
+                for s in sents:
+                    if len(s) < 30:
+                        continue
+                    _has_date = bool(re.search(r'\b\d{3,4}\b', s))
+                    _has_event = bool(re.search(
+                        r'\b(built|designed|destroyed|seized|founded|opened|'
+                        r'constructed|completed|liberated|imprisoned|spent|'
+                        r'became|arrived|transformed|painted|created)\b',
+                        s, re.IGNORECASE))
+                    if _has_date or _has_event:
+                        selected.append({
+                            'stop': p['name'],
+                            'fact': s.strip(),
+                            'reason': 'dated_event' if _has_date else 'cause',
+                        })
+                        break
+
+    # --- Build the recap sentence ---
+    # Scale part: "That's N stops and X kilometres"
+    _stop_word = "stop" if n_delivered == 1 else "stops"
+    if total_km >= 1:
+        scale_part = f"That's {n_delivered} {_stop_word} and {total_km:.0f} kilometres"
+    else:
+        scale_part = f"That's {n_delivered} {_stop_word}"
+
+    # --- LLM COMPOSITION (bounce 3 fix) ---
+    # One batched call composes all recap items into short clauses.
+    # Each clause names its stop and the key fact, ≤12 words.
+    # The LLM may only rephrase the supplied fact — never add.
+    clauses = _compose_recap_clauses_llm(selected, api_key)
+
+    if not clauses:
+        print(f"  [LOCAL-280] Recap: composition call failed — skipped")
+        return ""
+
+    # --- Assemble the sentence ---
+    def _lc_if_not_proper(s):
+        """Lowercase first char if it's a common word (The/This/That/A/An/In/It)."""
+        if not s:
+            return s
+        _lc_starts = ('The ', 'This ', 'That ', 'These ', 'Those ',
+                      'It ', 'In ', 'A ', 'An ', 'Here')
+        if any(s.startswith(p) for p in _lc_starts):
+            return s[0].lower() + s[1:]
+        return s
+
+    if n_delivered == 2:
+        if len(clauses) >= 2:
+            content_part = f" — {clauses[0]} and {_lc_if_not_proper(clauses[1])}"
+        elif len(clauses) == 1:
+            content_part = f" — {clauses[0]}"
+        else:
+            content_part = ""
+    else:
+        if len(clauses) == 1:
+            content_part = f" — including {_lc_if_not_proper(clauses[0])}"
+        elif len(clauses) == 2:
+            content_part = f" — {clauses[0]} and {_lc_if_not_proper(clauses[1])}"
+        else:
+            content_part = f" — {clauses[0]}, {_lc_if_not_proper(clauses[1])}, and {_lc_if_not_proper(clauses[2])}"
+
+    recap = scale_part + content_part + "."
+
+    # Print verification
+    print(f"  [LOCAL-280] Recap built: {len(recap.split())} words, {len(clauses)} composed clauses"
+          f" ({_d177_rejected} D177 rejected, {_nav_rejected} navigation rejected)")
+    for i, h in enumerate(selected[:len(clauses)]):
+        print(f"    [{h['stop']}] ({h['reason']}): \"{h['fact'][:80]}...\"")
+        print(f"      → composed: \"{clauses[i]}\"")
+    print(f"    D177 verified: all {len(selected[:len(clauses)])} source facts present in delivered text")
+
+    return recap
+
+
+def _compose_recap_clauses_llm(selected_highlights, api_key):
+    """[LOCAL-280 bounce 3] Compose recap clauses via a single batched LLM call.
+
+    Each recap item is composed into a short noun phrase (≤12 words) that names
+    its stop and the key fact. The LLM may only rephrase the supplied fact —
+    never add facts. This replaces the regex extraction that produced truncated
+    spans and dangling pronouns.
+
+    Like LOCAL-269's gloss call: same constraint (rephrase only), batched,
+    single call.
+
+    Args:
+        selected_highlights: List of dicts with 'stop', 'fact', 'reason'.
+        api_key: OpenAI API key.
+
+    Returns:
+        list[str]: Composed clauses (one per highlight), or [] on failure.
+    """
+    import time
+
+    if not selected_highlights:
+        return []
+
+    if not api_key:
+        print("  [LOCAL-280] Recap composition: no API key — using fallback")
+        return _compose_recap_clauses_fallback(selected_highlights)
+
+    # Build the prompt: one item per line, ask for short clauses
+    _items_text = ""
+    for i, h in enumerate(selected_highlights):
+        _items_text += f"\n{i+1}. STOP: {h['stop']}\n   FACT: {h['fact']}\n"
+
+    _compose_prompt = f"""You are composing a tour recap. For each item below, write ONE short clause
+(maximum 12 words, no period) that names the stop and states the key fact.
+
+RULES:
+- The clause must name the stop so the listener knows which place is meant.
+- The clause must be self-contained — no pronouns without antecedents (no "he", "she", "it" unless the referent is named in the same clause).
+- Never truncate mid-phrase. Every clause must read as complete English.
+- The stop name appears ONCE per clause, never twice.
+- You may ONLY rephrase the supplied fact. Do NOT add facts, dates, or details that are not in the FACT line.
+- Do NOT use imperatives ("Visit...", "Step into...", "Cycle along...").
+- Shape examples:
+  "the 1561 fort at Saint-Hospice on Paloma Beach"
+  "the Carlton Hotel, designed by Charles Dalmas in 1913"
+  "Èze Village, seized in 1543 and razed by Louis XIV"
+  "the Mougins studio where Picasso spent his final years"
+  "Villefranche-sur-Mer, founded as a free port"
+
+ITEMS:{_items_text}
+OUTPUT: Return one clause per line (no numbering, no bullet points, no periods). Same order as input."""
+
+    _start = time.time()
+    try:
+        _resp = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                "messages": [
+                    {"role": "system", "content": "You rephrase facts into short clauses. You never invent. You return plain text, one clause per line."},
+                    {"role": "user", "content": _compose_prompt},
+                ],
+                "temperature": 0.2,
+                "max_tokens": 300,
+            },
+            timeout=20,
+        )
+        _elapsed = time.time() - _start
+
+        if _resp.status_code == 200:
+            _result = _resp.json()
+            _usage = _result.get("usage", {})
+            _cost = (_usage.get("prompt_tokens", 0) / 1000 * 0.005) + \
+                    (_usage.get("completion_tokens", 0) / 1000 * 0.015)
+            _tokens = _usage.get("total_tokens", 0)
+            print(f"  [LOCAL-280] Recap composition: {_elapsed:.1f}s, ${_cost:.4f}, {_tokens} tokens")
+
+            _text = _result["choices"][0]["message"]["content"].strip()
+            # Parse: one clause per line
+            _lines = [ln.strip().rstrip('.') for ln in _text.split('\n') if ln.strip()]
+            # Remove any numbering prefix (1. or 1) or bullet)
+            _cleaned = []
+            for ln in _lines:
+                ln = re.sub(r'^\d+[\.\)]\s*', '', ln)
+                ln = re.sub(r'^[-•]\s*', '', ln)
+                ln = ln.strip().rstrip('.')
+                if ln:
+                    _cleaned.append(ln)
+
+            if len(_cleaned) < len(selected_highlights):
+                print(f"  [LOCAL-280] Recap composition: got {len(_cleaned)} clauses "
+                      f"for {len(selected_highlights)} items — padding with fallback")
+                # Pad with fallback clauses
+                _fb = _compose_recap_clauses_fallback(selected_highlights[len(_cleaned):])
+                _cleaned.extend(_fb)
+
+            # Validate each clause:
+            _valid = []
+            for i, clause in enumerate(_cleaned[:len(selected_highlights)]):
+                _words = clause.split()
+                # Reject: >15 words, contains imperative start, or has no stop reference
+                if len(_words) > 15:
+                    clause = ' '.join(_words[:12]).rstrip('.,;')
+                # Reject bare pronouns at start
+                if re.match(r'^(?:he|she|it|they)\b', clause, re.IGNORECASE):
+                    # Use fallback for this item
+                    _fb_single = _compose_recap_clauses_fallback([selected_highlights[i]])
+                    clause = _fb_single[0] if _fb_single else selected_highlights[i]['stop']
+                # Reject imperatives
+                _imp_starts = ('visit', 'step', 'cycle', 'walk', 'head',
+                               'follow', 'cross', 'take', 'proceed', 'ride')
+                if clause.split()[0].lower().rstrip('.,') in _imp_starts:
+                    _fb_single = _compose_recap_clauses_fallback([selected_highlights[i]])
+                    clause = _fb_single[0] if _fb_single else selected_highlights[i]['stop']
+                _valid.append(clause)
+
+            return _valid[:len(selected_highlights)]
+        else:
+            _elapsed = time.time() - _start
+            print(f"  [LOCAL-280] Recap composition failed (HTTP {_resp.status_code}) "
+                  f"after {_elapsed:.1f}s — using fallback")
+            return _compose_recap_clauses_fallback(selected_highlights)
+
+    except Exception as e:
+        _elapsed = time.time() - _start
+        print(f"  [LOCAL-280] Recap composition error: {e} ({_elapsed:.1f}s) — using fallback")
+        return _compose_recap_clauses_fallback(selected_highlights)
+
+
+def _compose_recap_clauses_fallback(selected_highlights):
+    """Deterministic fallback when LLM is unavailable. Produces safe, minimal clauses.
+
+    This is NOT the regex extraction from bounce 1/2. It produces the stop name
+    only — deliberately minimal rather than risk truncation or dangling pronouns.
+    Used only when: no API key, API exhausted, or network error.
+    """
+    clauses = []
+    for h in selected_highlights:
+        stop = h['stop']
+        fact = h.get('fact', '')
+        # Try to extract a date from the fact for minimal context
+        _date = re.search(r'\b(\d{4})\b', fact)
+        if _date:
+            clauses.append(f"{stop} ({_date.group(1)})")
+        else:
+            clauses.append(stop)
+    return clauses
+
+
+def _build_closing_offer(poi_list, tour_category, transport_mode, location, sentence_budget=3):
     """[LOCAL-273/275] Build a ≤3 sentence closing offer from verified data.
 
     Three sentences (Michael's spec, LOCAL-275 addendum):
@@ -985,14 +1459,39 @@ def _build_closing_offer(poi_list, tour_category, transport_mode, location):
         # The Treat Page is location-aware (treats_screen.dart calls /treats-near/{lat}/{lng}).
         # Never claim savings exist — only that the page shows *whether* there are any.
         #
-        # [LOCAL-275] Sentence budget management:
-        #   - When Part 1 produced a sentence: combine tour + Treat Page into ONE sentence (budget=3).
-        #   - When Part 1 is absent: split into TWO sentences (tour alone + Treat Page alone)
-        #     to maintain exactly 3 total.
+        # [LOCAL-275/280] Sentence budget management:
+        #   - sentence_budget=2 (recap present): merge Part 1 + Part 2 + Treat Page
+        #     into ONE sentence so news still fits within the 2-sentence budget.
+        #     Michael's spec: "the similar-tour offer and the capability offer,
+        #     merged, with the Treat Page" = one sentence.
+        #   - sentence_budget=3 (no recap): original logic —
+        #     When Part 1 produced a sentence: combine Part 2 + Treat Page into ONE.
+        #     When Part 1 is absent: split into TWO sentences.
         _has_part1 = len(sentences) > 0
         if _part2_tour_clause:
-            if _has_part1:
-                # Combined: fits the 3-sentence budget alongside Part 1 + news
+            if sentence_budget <= 2 and _has_part1:
+                # Tight budget: merge Part 1 (similar tour) into Part 2 + Treat Page
+                # as a single sentence. Drop Part 1's standalone sentence and build
+                # a combined one that mentions both offers.
+                _part1_text = sentences.pop(0)  # Remove Part 1 standalone
+                # Extract the destination from Part 1 for a brief mention
+                _p1_dest_match = re.search(r'^(.+?)\s+is\s+\d+\s+kilomet', _part1_text)
+                if _p1_dest_match:
+                    _p1_dest = _p1_dest_match.group(1)
+                    sentences.append(
+                        f"There is also a tour of {_p1_dest} nearby; "
+                        f"{_part2_tour_clause[0].lower() + _part2_tour_clause[1:]}, "
+                        f"and the Treat Page shows whether there are real savings "
+                        f"at local shops and restaurants around here."
+                    )
+                else:
+                    # Fallback: just use Part 2 + Treats (drop Part 1 text)
+                    sentences.append(
+                        f"{_part2_tour_clause}, and the Treat Page shows whether "
+                        f"there are real savings at local shops and restaurants around here."
+                    )
+            elif _has_part1 or sentence_budget <= 2:
+                # Combined: fits the budget alongside Part 1 + news
                 sentences.append(
                     f"{_part2_tour_clause}, and the Treat Page shows whether "
                     f"there are real savings at local shops and restaurants around here."
@@ -1028,9 +1527,9 @@ def _build_closing_offer(poi_list, tour_category, transport_mode, location):
     except Exception as e:
         print(f"  [LOCAL-275] Part 2 error: {e}")
 
-    # ─── Cap at 3 sentences ─────────────────────────────────────────────
-    if len(sentences) > 3:
-        sentences = sentences[:3]
+    # ─── Cap at sentence_budget ─────────────────────────────────────────
+    if len(sentences) > sentence_budget:
+        sentences = sentences[:sentence_budget]
 
     if sentences:
         result = " ".join(sentences)
@@ -8452,6 +8951,9 @@ NARRATIVE THREAD (weave into Part 3 as the central intrigue):
                   f"listener may not know where to stand")
 
     # -------- [LOCAL-270] PHASE 5.96: Compose Part 4 from delivered narrations --------
+    # [LOCAL-280] Also persist intrigue-ranked facts for the closing recap.
+    _recap_ranked_facts = []  # Will be populated by LOCAL-276 ranking if available
+
     # Part 4 (forward connection) was removed from the prolog prompt because the spine
     # writes it before stop narrations exist. Now that all descriptions are generated
     # and gated, compose Part 4 from the actual delivered text.
@@ -8646,6 +9148,9 @@ Return ONLY the JSON array. Do not alter the fact text — copy it exactly as pr
                     )
 
                     print(f"    [LOCAL-276] {len(_intriguing_facts)} intriguing / {_excluded_count} excluded (celebrity_trivia)")
+
+                    # [LOCAL-280] Persist for closing recap — same ranking, same verification
+                    _recap_ranked_facts = list(_intriguing_facts)
 
                     if len(_intriguing_facts) >= 2:
                         _ranked_stops_text = ""
@@ -9122,20 +9627,26 @@ RULES:
                         _fact = _closing_facts[0]
                         epilog += _fact + " "
                 
-                # [LOCAL-44] End on a factual observation tying the collection together.
-                # No instructions, no promotional language, no "consider/reflect/imagine".
-                # [LOCAL-246] Removed generic template sentences — they carried no facts
-                # and R9 correctly identified them as "could be placed in millions of stops."
-                # Epilog now relies solely on epilog_payoff (thread summary) and
-                # _closing_facts (documented story elements). If neither has content,
-                # the closing offer (LOCAL-273) provides a concrete ending.
+                # [LOCAL-280] CLOSING RECAP — replaces any thank-you sentence.
+                # Sentence 1: recap built from the tour that was actually delivered.
+                # States scale + names real content, using the LOCAL-276 intrigue
+                # ranking (same ranking, same verification as Part 4).
+                # No thank-you, no "we hope you enjoyed" — show substance instead.
+                _recap = _build_closing_recap(poi_list, _recap_ranked_facts, api_key=api_key)
+                if _recap:
+                    epilog += _recap + " "
+                    _offer_budget = 2  # recap took sentence 1
+                    print(f"  [LOCAL-280] Recap added: \"{_recap}\"")
+                else:
+                    _offer_budget = 3  # no recap — offer gets full budget
+                    print(f"  [LOCAL-280] No recap — closing offer gets full 3-sentence budget")
 
-                # [LOCAL-273] Closing offer: concrete, verified, ≤3 sentences.
-                # Part 1: similar tour nearby (same category, existence-verified).
-                # Part 2: adjacent capability (museum if nearby + news articles).
-                # Replaces the "tour simply stops" failure mode.
+                # [LOCAL-273/280] Closing offer: concrete, verified.
+                # When recap present: 2 sentences (similar-tour+Treats, news).
+                # When no recap: 3 sentences (original budget).
                 _closing_offer = _build_closing_offer(
-                    poi_list, tour_category, transport_mode, location
+                    poi_list, tour_category, transport_mode, location,
+                    sentence_budget=_offer_budget
                 )
                 if _closing_offer:
                     epilog += _closing_offer
