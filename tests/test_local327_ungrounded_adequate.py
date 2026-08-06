@@ -316,3 +316,71 @@ class TestIntegrationScoreTourFile:
             # (ADEQUATE or higher if density is sufficient)
         finally:
             os.unlink(filepath)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 7. Integration with evaluate() — the default scoring path
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestEvaluatePathCeiling:
+    """[LOCAL-327 bounce fix] The ceiling must fire in evaluate() when conn is provided."""
+
+    def test_evaluate_with_corpus_data_applies_ceiling(self):
+        """evaluate() with corpus_data applies the ceiling before classification."""
+        from tour_evaluator import evaluate
+
+        tour_text = (
+            "Step-by-Step Audio Guided Tour: Test Venue\n"
+            "Tour-Category: museum\n\n"
+            "Stop 1: Grounded Stop\n\n"
+            "Claude Monet painted magnificent water lilies here in 1899. "
+            "Pierre-Auguste Renoir visited in 1900 and admired the garden. "
+            "The Japanese bridge was designed by architect Hans Meyer in 1895. "
+            "Louis Leroy wrote criticism of the garden scene. "
+            "Gustave Caillebotte donated funds for the renovation in 1894.\n\n"
+            "Stop 2: Ungrounded Stop\n\n"
+            "Henri Matisse worked in this studio from 1917 to 1954. "
+            "Pablo Picasso visited Matisse here in 1946 and discussed technique. "
+            "Raoul Dufy painted nearby coastline scenes in 1928. "
+            "André Derain established a studio in the neighbourhood around 1905. "
+            "The building was constructed by Pierre Lefebvre in 1880.\n"
+        )
+        # corpus_data has passages for Stop 1 but NOT Stop 2
+        corpus_data = {
+            'Grounded Stop': {
+                'passages': ['Monet painted water lilies in 1899.', 'Renoir admired the garden.']
+            }
+            # 'Ungrounded Stop' is deliberately absent → no corpus
+        }
+
+        # With corpus_data, evaluate() should apply the ceiling
+        evaluation = evaluate(tour_text, 2, corpus_data=corpus_data)
+        assert evaluation is not None
+
+        # Stop 2 should be capped to THIN (has no corpus, lookup was attempted)
+        stop2 = evaluation.per_stop[1]
+        assert stop2['classification'] == 'THIN', \
+            f"Expected THIN, got {stop2['classification']}"
+
+    def test_evaluate_without_conn_or_corpus_no_ceiling(self):
+        """evaluate() without conn or corpus_data does NOT apply ceiling."""
+        from tour_evaluator import evaluate
+
+        tour_text = (
+            "Step-by-Step Audio Guided Tour: Test Venue\n"
+            "Tour-Category: museum\n\n"
+            "Stop 1: Dense Stop\n\n"
+            "Claude Monet painted magnificent water lilies here in 1899. "
+            "Pierre-Auguste Renoir visited in 1900 and admired the garden. "
+            "The Japanese bridge was designed by architect Hans Meyer in 1895. "
+            "Louis Leroy wrote criticism of the garden scene. "
+            "Gustave Caillebotte donated funds for the renovation in 1894.\n"
+        )
+
+        # Without corpus_data or conn, no ceiling is applied
+        evaluation = evaluate(tour_text, 1)
+        assert evaluation is not None
+        # Stop should classify on density/facts alone (ADEQUATE or higher)
+        stop1 = evaluation.per_stop[0]
+        assert stop1['classification'] in ('ADEQUATE', 'RICH'), \
+            f"Expected ADEQUATE or RICH without ceiling, got {stop1['classification']}"

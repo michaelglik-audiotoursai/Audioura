@@ -38,6 +38,7 @@ from tour_rubric_scorer import (
     classify_stop as _classify_stop,
     compute_score as _compute_score,
     detect_venue_identity as _detect_venue_identity,
+    _compute_groundedness_for_stop as _compute_groundedness,
     TourScore,
     StopAnalysis,
 )
@@ -305,10 +306,42 @@ def evaluate(tour_text: str, n_requested: int, **context) -> Optional[Evaluation
     if not stops_parsed:
         return None
 
+    # [LOCAL-327] Extract corpus_data BEFORE classification so the
+    # corpus-availability ceiling fires in the default scoring path.
+    # Previously corpus_data was popped after classify, making the ceiling inert.
+    gate_log = context.pop('gate_log', None)
+    corpus_data = context.pop('corpus_data', None)
+    conn = context.pop('conn', None)
+
+    # [LOCAL-327] Auto-load corpus from DB when conn is provided but
+    # corpus_data is not.  This makes the ceiling reachable in the default
+    # path (tour_scoring_service calls evaluate without pre-loading corpus).
+    if corpus_data is None and conn is not None:
+        try:
+            from stop_corpus_reader import get_stop_corpus_for_tour
+            import re as _re
+            # Extract venue name from tour header
+            first_line = tour_text.split('\n')[0] if tour_text else ''
+            _m = _re.match(r'^Step-by-Step.*?:\s*(.+)$', first_line)
+            _venue = _m.group(1).strip() if _m else ''
+            if _venue:
+                stop_names = [s['title'] for s in stops_parsed]
+                corpus_data = get_stop_corpus_for_tour(_venue, stop_names, conn)
+        except Exception:
+            pass  # DB unavailable — no ceiling, which is safe
+
     # Analyze each stop
     stop_analyses = []
     for stop in stops_parsed:
         sa = _analyze_stop(stop, stops_parsed)
+
+        # [LOCAL-327] Apply corpus groundedness BEFORE classification so
+        # corpus_lookup_attempted and corpus_available are set when
+        # classify_stop checks them.
+        if corpus_data is not None:
+            sa.corpus_lookup_attempted = True
+            _compute_groundedness(sa, stop, corpus_data)
+
         cls, evidence = _classify_stop(sa)
         sa.classification = cls
         sa.classification_evidence = evidence
@@ -329,8 +362,6 @@ def evaluate(tour_text: str, n_requested: int, **context) -> Optional[Evaluation
     venue_facts = _detect_venue_identity(tour_text)
 
     # Compute score
-    gate_log = context.pop('gate_log', None)
-    corpus_data = context.pop('corpus_data', None)
     tour_score = _compute_score(
         stop_analyses, n_requested, venue_facts,
         gate_log=gate_log, corpus_data=corpus_data,

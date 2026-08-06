@@ -1,153 +1,110 @@
 #!/usr/bin/env python3
-"""run_local327_rescore.py — LOCAL-327: Rescore tours with corpus availability ceiling.
+"""run_local327_rescore.py — LOCAL-327: Before/after scores with corpus ceiling.
 
-Shows before/after scores for the tour corpus. The "before" is computed with
-corpus_lookup_attempted=False (pre-fix behavior). The "after" uses the actual
-corpus data from the database (corpus_lookup_attempted=True).
+Shows the effect of the corpus-availability ceiling on tour scores.
+"Before" = evaluate() without conn (no corpus lookup, no ceiling).
+"After"  = evaluate() with conn (corpus loaded, ceiling applied).
 """
 import os
 import sys
-import json
-import re
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests'))
 
-from tour_rubric_scorer import (
-    parse_tour,
-    analyze_stop,
-    classify_stop,
-    compute_score,
-    detect_venue_identity,
-    StopAnalysis,
-    score_tour_file,
-)
-from stop_corpus_reader import get_stop_corpus_for_tour
+from db_connection import get_connection, log_db_target
+from tour_evaluator import evaluate
 
 
-def extract_venue_from_tour(text: str) -> str:
-    first_line = text.split('\n')[0] if text else ''
-    m = re.match(r'^Step-by-Step.*?:\s*(.+)$', first_line)
-    return m.group(1).strip() if m else ''
-
-
-def score_tour_with_corpus(filepath: str, n_requested: int, conn) -> dict:
-    """Score a tour with corpus data loaded from the DB."""
+def rescore_tour(filepath: str, n_requested: int, conn):
+    """Score a tour before/after corpus ceiling."""
     with open(filepath, 'r', encoding='utf-8') as f:
-        text = f.read()
-    
-    stops = parse_tour(text)
-    if not stops:
-        return None
-    
-    venue_name = extract_venue_from_tour(text)
-    stop_titles = [s['title'] for s in stops]
-    
-    # Get corpus from DB via the production reader
-    corpus_data_raw = get_stop_corpus_for_tour(venue_name, stop_titles, conn)
-    
-    # Convert to format expected by score_tour_file (only entries with passages)
-    corpus_for_scorer = {}
-    for title, data in corpus_data_raw.items():
-        if data and data.get('passages'):
-            corpus_for_scorer[title] = data
-    
-    # Score WITH corpus (post-fix behavior)
-    ts_after = score_tour_file(filepath, n_requested, corpus_data=corpus_for_scorer)
-    
-    # Score WITHOUT corpus (pre-fix: no corpus_lookup_attempted)
-    ts_before = score_tour_file(filepath, n_requested, corpus_data=None)
-    
-    return {
-        'file': os.path.basename(filepath),
-        'venue': venue_name,
-        'n_stops': len(stops),
-        'before_score': ts_before.base_score,
-        'after_score': ts_after.base_score,
-        'delta': ts_after.base_score - ts_before.base_score,
-        'before_stops': [(s.title, s.classification) for s in ts_before.stops],
-        'after_stops': [(s.title, s.classification, s.corpus_available) for s in ts_after.stops],
-    }
+        tour_text = f.read()
+
+    # Before: no conn = no corpus lookup = no ceiling
+    eval_before = evaluate(tour_text, n_requested)
+    # After: with conn = corpus loaded = ceiling applies
+    eval_after = evaluate(tour_text, n_requested, conn=conn)
+
+    return eval_before, eval_after
 
 
 def main():
-    from tests.db_connection import get_connection, log_db_target
     conn = get_connection()
-    log_db_target(conn)
-    
+    log_db_target("rescore")
+
     tours_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tours')
-    
-    # Key tours to score (including the two named in the task)
-    target_tours = [
-        ('LOCAL262_asian_arts_8stop_restored.txt', 8),
-        ('LOCAL317_5stop_old_nice_restaurant.txt', 5),
-        ('LOCAL318_5stop_old_nice_restaurant.txt', 5),
-        ('matisse_nice.txt', 8),
-        ('pilot_chagall_resubmit.txt', 5),
-        ('Palais_Lascaris__Nice_museum_tour_20260727_174018.txt', 5),
+
+    # Tours to rescore (at least 6 including the two named by Michael)
+    tours = [
+        ('LOCAL262_asian_arts_8stop_restored.txt', 8, 'Museum 8-stop (Asian Arts)'),
+        ('LOCAL317_5stop_old_nice_restaurant.txt', 5, 'Old Nice Restaurant 317'),
+        ('LOCAL318_5stop_old_nice_restaurant.txt', 5, 'Old Nice Restaurant 318'),
+        ('Palais_Lascaris__Nice_museum_tour_20260727_174018.txt', 8, 'Palais Lascaris'),
+        ('Musee_Matisse__Nice__France_museum_tour_20260709_150601.txt', 8, 'Musée Matisse'),
+        ('pilot_chagall_resubmit.txt', 8, 'Chagall (pilot resubmit)'),
+        ('Musee_national_Marc_Chagall__Nice__France_museum_tour_20260709_205602.txt', 8, 'Chagall 205602'),
+        ('Musee_national_Marc_Chagall__Nice__France_museum_tour_20260709_213940.txt', 8, 'Chagall 213940'),
     ]
-    
-    # Also score some riviera tours
-    riviera_tours = [
-        ('LOCAL208_riviera_2stop_for_michael.txt', 2),
-        ('LOCAL222_riviera_run1.txt', 2),
-        ('LOCAL250_riviera_2stop_round7.txt', 2),
-    ]
-    
-    all_tours = target_tours + riviera_tours
-    
+
     print("=" * 110)
-    print(f"{'File':<55} {'N':<3} {'Before':<8} {'After':<8} {'Delta':<8}")
+    print("LOCAL-327 RESCORE: Before/After Corpus-Availability Ceiling")
     print("=" * 110)
-    
-    results = []
-    for filename, n in all_tours:
+    print(f"{'Tour':<45} {'Before':<10} {'After':<10} {'Delta':<10} {'Stops changed'}")
+    print("-" * 110)
+
+    for filename, n, label in tours:
         filepath = os.path.join(tours_dir, filename)
         if not os.path.exists(filepath):
-            print(f"{filename:<55} — FILE NOT FOUND")
+            print(f"  SKIP {filename}: file not found")
             continue
-        
-        result = score_tour_with_corpus(filepath, n, conn)
-        if result:
-            results.append(result)
-            delta_str = f"{result['delta']:+.1f}"
-            print(f"{result['file']:<55} {n:<3} {result['before_score']:<8.1f} {result['after_score']:<8.1f} {delta_str:<8}")
-    
+
+        eval_before, eval_after = rescore_tour(filepath, n, conn)
+        if not eval_before or not eval_after:
+            print(f"  SKIP {filename}: could not score")
+            continue
+
+        before_score = eval_before.score.base_score
+        after_score = eval_after.score.base_score
+        delta = after_score - before_score
+
+        # Find changed stops
+        changed = []
+        for sb, sa_after in zip(eval_before.per_stop, eval_after.per_stop):
+            if sb['classification'] != sa_after['classification']:
+                changed.append(f"{sb['title'][:25]}:{sb['classification']}→{sa_after['classification']}")
+
+        changed_str = '; '.join(changed) if changed else '(none)'
+        print(f"  {label:<43} {before_score:>6.1f}    {after_score:>6.1f}    {delta:>+6.1f}    {changed_str}")
+
+    # Detail for the museum 8-stop
+    print("\n" + "=" * 110)
+    print("DETAIL: Museum 8-stop (Asian Arts)")
+    print("=" * 110)
+    filepath = os.path.join(tours_dir, 'LOCAL262_asian_arts_8stop_restored.txt')
+    if os.path.exists(filepath):
+        eval_before, eval_after = rescore_tour(filepath, 8, conn)
+        print(f"{'Stop':<45} {'Before':<12} {'After':<12} {'G%':<6}")
+        print("-" * 75)
+        for sb, sa in zip(eval_before.per_stop, eval_after.per_stop):
+            marker = " ←" if sb['classification'] != sa['classification'] else ""
+            print(f"  {sb['title'][:42]:<43} {sb['classification']:<12} {sa['classification']:<12} {sa['groundedness']:.0%}{marker}")
+
+    # Detail for the restaurant tours
+    for rname in ['LOCAL317_5stop_old_nice_restaurant.txt', 'LOCAL318_5stop_old_nice_restaurant.txt']:
+        print(f"\n{'─' * 110}")
+        print(f"DETAIL: {rname}")
+        print(f"{'─' * 110}")
+        filepath = os.path.join(tours_dir, rname)
+        if os.path.exists(filepath):
+            eval_before, eval_after = rescore_tour(filepath, 5, conn)
+            if eval_before and eval_after:
+                print(f"{'Stop':<45} {'Before':<12} {'After':<12} {'G%':<6}")
+                print("-" * 75)
+                for sb, sa in zip(eval_before.per_stop, eval_after.per_stop):
+                    marker = " ←" if sb['classification'] != sa['classification'] else ""
+                    print(f"  {sb['title'][:42]:<43} {sb['classification']:<12} {sa['classification']:<12} {sa['groundedness']:.0%}{marker}")
+
     conn.close()
-    
-    # ─── Detailed stop-level comparison for key tours ─────────────────────────
-    print(f"\n{'═' * 110}")
-    print("DETAILED STOP-LEVEL CHANGES")
-    print(f"{'═' * 110}")
-    
-    for result in results:
-        changes = []
-        for (t_b, c_b), (t_a, c_a, corpus) in zip(result['before_stops'], result['after_stops']):
-            if c_b != c_a:
-                corpus_str = "corpus=yes" if corpus else "corpus=NO"
-                changes.append(f"  {t_b[:50]}: {c_b} → {c_a}  ({corpus_str})")
-        
-        if changes:
-            print(f"\n{result['file']}:")
-            for c in changes:
-                print(c)
-    
-    # ─── Summary ──────────────────────────────────────────────────────────────
-    print(f"\n{'═' * 110}")
-    print("SUMMARY")
-    print(f"{'═' * 110}")
-    tours_that_dropped = [r for r in results if r['delta'] < 0]
-    tours_unchanged = [r for r in results if r['delta'] == 0]
-    tours_that_rose = [r for r in results if r['delta'] > 0]
-    
-    print(f"  Tours scored:       {len(results)}")
-    print(f"  Scores dropped:     {len(tours_that_dropped)}")
-    print(f"  Scores unchanged:   {len(tours_unchanged)}")
-    print(f"  Scores rose:        {len(tours_that_rose)} (should be 0 — investigate if > 0)")
-    
-    if tours_that_dropped:
-        total_drop = sum(r['delta'] for r in tours_that_dropped)
-        avg_drop = total_drop / len(tours_that_dropped)
-        print(f"  Average drop:       {avg_drop:.1f} points")
 
 
 if __name__ == '__main__':
