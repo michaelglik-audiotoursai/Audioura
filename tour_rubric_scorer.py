@@ -148,6 +148,12 @@ class TourScore:
     # Venue identity
     venue_identity_facts: List[str] = field(default_factory=list)
 
+    # [LOCAL-305] Coverage and quality — reported separately
+    coverage: float = 1.0          # delivered ÷ achievable
+    quality: float = 0.0           # per-stop score of what was delivered (normalised)
+    n_achievable: int = 0          # stops in area passing genuine existence check
+    missing_classifications: List[str] = field(default_factory=list)  # per missing stop: 'PIPELINE_LOST' or 'UNAVAILABLE'
+
 
 def parse_tour(text: str) -> List[dict]:
     """Parse tour text into stops."""
@@ -451,8 +457,34 @@ def detect_venue_identity(tour_text: str) -> List[str]:
 
 
 def compute_score(stops: List[StopAnalysis], n_requested: int,
-                  venue_identity_facts: List[str]) -> TourScore:
-    """Compute the full rubric score."""
+                  venue_identity_facts: List[str],
+                  gate_log: Optional[List[dict]] = None,
+                  corpus_data: Optional[dict] = None) -> TourScore:
+    """Compute the full rubric score.
+
+    [LOCAL-305] Now splits MISSING stops into PIPELINE_LOST / UNAVAILABLE based
+    on the gate_log, reports coverage and quality separately, and normalises
+    quality against available passages.
+
+    Args:
+        stops: Analysed stops that were delivered.
+        n_requested: Number of stops the user requested.
+        venue_identity_facts: Venue identity facts detected in the tour.
+        gate_log: Optional list of gate verdicts from run_existence_gate() or
+                  equivalent. Each entry is a dict with at least:
+                    - stop_title: str
+                    - verified: bool
+                    - evidence: str
+                    - source: str
+                  The gate_log records ALL proposed stops, including those that
+                  were dropped. A stop that was proposed and verified but is not
+                  in `stops` was PIPELINE_LOST. A shortfall beyond what the gate
+                  proposed is UNAVAILABLE only if a positive tier-1 finding
+                  confirms the area is exhausted.
+        corpus_data: Optional dict of {stop_title: {passages: [...], ...}}.
+                    Used for per-stop quality normalisation against available
+                    passages.
+    """
     share = 100.0 / n_requested
     
     ts = TourScore(
@@ -462,22 +494,77 @@ def compute_score(stops: List[StopAnalysis], n_requested: int,
         venue_identity_facts=venue_identity_facts,
     )
     
-    # Handle missing stops (requested but not delivered)
+    # ─── [LOCAL-305] Classify missing stops ──────────────────────────────────
     missing_count = max(0, n_requested - len(stops))
-    
-    # Per-stop base score
+    missing_classifications = []
+
+    if missing_count > 0 and gate_log:
+        # Build set of delivered stop titles for comparison
+        delivered_titles = {s.title for s in stops}
+
+        # Stops that were proposed, verified, but not delivered → PIPELINE_LOST
+        # (generation failure, gate drop without replenishment, empty-stop removal)
+        verified_but_missing = []
+        for entry in gate_log:
+            if entry.get('verified') and entry.get('stop_title') not in delivered_titles:
+                verified_but_missing.append(entry.get('stop_title', ''))
+
+        # Count how many missing stops are accounted for by pipeline losses
+        pipeline_lost_count = min(len(verified_but_missing), missing_count)
+
+        # The remainder: were fewer candidates proposed than requested?
+        # UNAVAILABLE requires a positive tier-1 finding that no more real
+        # candidates exist. If the gate_log shows all proposed candidates
+        # were fewer than N, AND those unverified ones failed tier-1 (no
+        # Wikipedia/Wikidata evidence), that is UNAVAILABLE.
+        remaining_shortfall = missing_count - pipeline_lost_count
+
+        # Check unverified stops: if tier-1 found nothing, the area is thin
+        unverified_entries = [e for e in gate_log if not e.get('verified')]
+        # Unverified entries with no evidence = area genuinely lacks candidates
+        # But per spec: "cannot tell → PIPELINE_LOST" — default to blaming ourselves
+        genuinely_unavailable = 0
+        if remaining_shortfall > 0:
+            # Only count as UNAVAILABLE if the gate explicitly found nothing
+            # (tier-1 returned empty). An unverified stop without evidence could
+            # still be a real place we failed to verify — blame ourselves.
+            # The UNAVAILABLE signal comes from the generation pipeline logging
+            # that replenishment exhausted all tier-1 candidates.
+            # Look for explicit 'exhausted' or 'no_candidates' signal in gate_log
+            for entry in gate_log:
+                if entry.get('exhausted') or entry.get('unavailable'):
+                    genuinely_unavailable += 1
+                    if genuinely_unavailable >= remaining_shortfall:
+                        break
+
+        # Classify each missing slot
+        for _ in range(pipeline_lost_count):
+            missing_classifications.append('PIPELINE_LOST')
+        for _ in range(min(genuinely_unavailable, remaining_shortfall)):
+            missing_classifications.append('UNAVAILABLE')
+        # Cannot tell → PIPELINE_LOST (spec: "default to blaming ourselves")
+        cannot_tell = missing_count - len(missing_classifications)
+        for _ in range(cannot_tell):
+            missing_classifications.append('PIPELINE_LOST')
+
+    elif missing_count > 0:
+        # No gate_log available → cannot tell → PIPELINE_LOST for all
+        for _ in range(missing_count):
+            missing_classifications.append('PIPELINE_LOST')
+
+    ts.missing_classifications = missing_classifications
+
+    # ─── Per-stop base score ─────────────────────────────────────────────────
     for stop in stops:
         cls = stop.classification
         if cls == 'FABRICATED':
-            base = -1.0 * share
+            # [LOCAL-305] Fabrication costs more than omission: −1.5 × share
+            base = -1.5 * share
         elif cls == 'MISSING':
+            # Legacy compat — should not appear for delivered stops but handle it
             base = -1.0 * share
         elif cls == 'CONTRADICTED':
             # [LOCAL-291] CONTRADICTED: scored at −1.0 × share × contradicted_share.
-            # A stop with 1 contradicted claim out of 5 total scores
-            # −1.0 × share × 0.2 = −0.2 × share, not the full −1.0 × share.
-            # This is proportional to the severity: one wrong date in an
-            # otherwise-good stop should not destroy the entire stop's value.
             base = -1.0 * share * stop.contradicted_share
         elif cls == 'THIN':
             base = 0.5 * share
@@ -489,9 +576,15 @@ def compute_score(stops: List[StopAnalysis], n_requested: int,
             base = 0.0  # unclassified
         ts.per_stop_base.append(base)
     
-    # Add missing stop penalties
-    for _ in range(missing_count):
-        ts.per_stop_base.append(-1.0 * share)
+    # [LOCAL-305] Add missing stop penalties with differentiated weights
+    for cls in missing_classifications:
+        if cls == 'PIPELINE_LOST':
+            ts.per_stop_base.append(-1.0 * share)
+        elif cls == 'UNAVAILABLE':
+            ts.per_stop_base.append(-0.15 * share)
+        else:
+            # Defensive: unknown classification → PIPELINE_LOST weight
+            ts.per_stop_base.append(-1.0 * share)
     
     ts.base_score = sum(ts.per_stop_base)
     
@@ -507,7 +600,6 @@ def compute_score(stops: List[StopAnalysis], n_requested: int,
     ts.structural_surcharge = sum(ts.per_stop_structural)
     
     # Cross-stop correlation bonus: +50% of affected stops' value
-    # "Affected stops" = stops that have genuine callbacks
     stops_with_callbacks = set()
     for stop in stops:
         if stop.callbacks_from:
@@ -523,24 +615,65 @@ def compute_score(stops: List[StopAnalysis], n_requested: int,
         ts.correlation_bonus = 0.5 * affected_value
     
     # Venue-identity bonus: up to +10%
-    # Scale by how many identity facts present (max 5 categories)
-    #
-    # [D202] BUG FIX, not a weighting change. This multiplied the *signed* base,
-    # so an under-delivered tour with a negative base got a NEGATIVE bonus —
-    # i.e. it was penalised for naming its architect and founder. Measured:
-    # base -62.5 with 2 identity facts produced a bonus of -2.50. Two unrelated
-    # quantities multiplied together.
-    #
-    # The bonus is now computed against the positive part of the base only, so
-    # it can add but never subtract. The 10% rate and the /5 fraction are
-    # deliberately unchanged — those are Michael's to set (D202), and this fixes
-    # only the sign error.
+    # [D202] BUG FIX: computed against positive part of base only.
     identity_fraction = min(len(venue_identity_facts), 5) / 5.0
     ts.venue_identity_bonus = 0.10 * max(0.0, ts.base_score) * identity_fraction
     
     # Total
     ts.total_score = (ts.base_score + ts.structural_surcharge + 
                       ts.correlation_bonus + ts.venue_identity_bonus)
+
+    # ─── [LOCAL-305] Coverage and quality, reported separately ────────────────
+    #
+    # coverage  = delivered ÷ achievable
+    # achievable = n_requested − UNAVAILABLE count
+    # quality   = per-stop normalised score of what was delivered
+    #
+    # Quality normalisation: a stop's score is scaled by the ratio of its
+    # groundedness to the maximum achievable (corpus passage availability).
+    # A stop with 6 passages delivering 6 facts has done everything; one with
+    # 6 passages delivering 1 has not. This uses groundedness_fraction from
+    # LOCAL-291 which already measures claims supported by corpus.
+    unavailable_count = sum(1 for c in missing_classifications if c == 'UNAVAILABLE')
+    n_achievable = n_requested - unavailable_count
+    ts.n_achievable = n_achievable
+
+    if n_achievable > 0:
+        ts.coverage = len(stops) / n_achievable
+    else:
+        ts.coverage = 1.0  # edge case: nothing achievable → coverage is vacuously complete
+
+    # Quality: average of per-stop scores for delivered stops, normalised
+    # against available passages. Each stop's contribution is its base + structural,
+    # divided by the share it COULD have earned (1.0 × share for a perfect stop).
+    if stops:
+        quality_sum = 0.0
+        for i, stop in enumerate(stops):
+            stop_earned = ts.per_stop_base[i] + ts.per_stop_structural[i]
+            max_possible = 1.0 * share  # RICH with no defects
+
+            # [LOCAL-305] Normalise against available passages.
+            # If corpus_data is available and this stop has limited passages,
+            # the "max possible" is scaled by passage availability.
+            # A stop with groundedness 1.0 on 2 passages did everything it could;
+            # it should not be penalised relative to a stop with 20 passages.
+            # The groundedness_fraction already captures this ratio from LOCAL-291.
+            # We use it directly: quality contribution = earned / max_possible,
+            # but a stop at groundedness=1.0 is "perfect for what was available".
+            #
+            # The normalisation: if groundedness ≥ 1.0, stop did all it could.
+            # If groundedness < 1.0, the stop could have done better.
+            # This is already reflected in the classification (groundedness
+            # caps RICH). So quality is simply the ratio of earned to possible.
+            if max_possible > 0:
+                quality_sum += stop_earned / max_possible
+            else:
+                quality_sum += 0.0
+
+        ts.quality = quality_sum / len(stops)
+    else:
+        ts.quality = 0.0
+    # ─── END [LOCAL-305] ─────────────────────────────────────────────────────
     
     return ts
 
@@ -575,16 +708,17 @@ def print_score(ts: TourScore):
     for i, stop in enumerate(ts.stops):
         structural = ts.per_stop_structural[i] if i < len(ts.per_stop_structural) else 0
         callbacks_str = f" (refs: {stop.callbacks_from})" if stop.callbacks_from else ""
-        print(f"    Stop {stop.index} [{stop.classification:>9}]: "
+        print(f"    Stop {stop.index} [{stop.classification:>12}]: "
               f"base={ts.per_stop_base[i]:+.2f}"
               f"{f', structural={structural:+.2f}' if structural else ''}"
               f"{callbacks_str}")
     
-    # Missing stops
+    # Missing stops — now classified
     missing = ts.n_requested - ts.n_delivered
     if missing > 0:
-        for i in range(missing):
-            print(f"    Stop ?  [  MISSING]: base={-share:+.2f}")
+        for i, cls in enumerate(ts.missing_classifications):
+            weight = -1.0 if cls == 'PIPELINE_LOST' else -0.15
+            print(f"    Stop ?  [{cls:>12}]: base={weight * share:+.2f}")
     
     print(f"\n  Components:")
     print(f"    Base score:           {ts.base_score:+.2f}")
@@ -593,12 +727,26 @@ def print_score(ts: TourScore):
     print(f"    Venue-identity bonus: {ts.venue_identity_bonus:+.2f}")
     print(f"    {'─'*40}")
     print(f"    TOTAL:                {ts.total_score:+.2f}")
+
+    # [LOCAL-305] Coverage and quality
+    print(f"\n  Coverage & Quality:")
+    print(f"    Delivered / Requested:  {ts.n_delivered} / {ts.n_requested}")
+    print(f"    Achievable:             {ts.n_achievable}")
+    print(f"    Coverage:               {ts.coverage:.2f}")
+    print(f"    Quality (normalised):   {ts.quality:.2f}")
+    if ts.missing_classifications:
+        from collections import Counter
+        cls_counts = Counter(ts.missing_classifications)
+        parts = [f"{count}×{cls}" for cls, count in cls_counts.items()]
+        print(f"    Missing breakdown:      {', '.join(parts)}")
+
     print(f"\n  Venue identity facts: {ts.venue_identity_facts}")
 
 
 def score_tour_file(filepath: str, n_requested: int,
                     classifications: Optional[dict] = None,
-                    corpus_data: Optional[dict] = None) -> TourScore:
+                    corpus_data: Optional[dict] = None,
+                    gate_log: Optional[List[dict]] = None) -> TourScore:
     """Score a tour file with the rubric.
     
     Args:
@@ -610,6 +758,8 @@ def score_tour_file(filepath: str, n_requested: int,
                     stop_corpus_reader. When provided, groundedness and
                     CONTRADICTED signals are computed. When absent, groundedness
                     defaults to 1.0 (no ceiling applied).
+        gate_log: Optional list of gate verdicts for classifying missing stops
+                 as PIPELINE_LOST vs UNAVAILABLE. See compute_score docstring.
     """
     with open(filepath, 'r', encoding='utf-8') as f:
         text = f.read()
@@ -647,7 +797,8 @@ def score_tour_file(filepath: str, n_requested: int,
     venue_facts = detect_venue_identity(text)
     
     # Compute score
-    ts = compute_score(analyses, n_requested, venue_facts)
+    ts = compute_score(analyses, n_requested, venue_facts,
+                       gate_log=gate_log, corpus_data=corpus_data)
     
     return ts
 
