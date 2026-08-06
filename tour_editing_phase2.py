@@ -1707,6 +1707,46 @@ def promote_custom_tour(tour_id):
                 'message': f'A tour named "{custom_name}" already exists. Please choose a different name.'
             }), 409
         print(f"[PROMOTE] Created audio_tours id={new_id} name={custom_name!r} lang={content_language} derived_from={derived_from_tour_id}")
+
+        # [LOCAL-306] Score the edited tour and record the delta.
+        # Gates NOTHING — this is observation only.
+        if tour_content and derived_from_tour_id:
+            try:
+                from tour_scoring_service import (
+                    score_edited_tour, ensure_tour_scores_table,
+                    get_latest_score_for_tour,
+                )
+                ensure_tour_scores_table()
+
+                # Fetch original tour_content for delta comparison
+                cur.execute(
+                    "SELECT tour_content, stops_count FROM audio_tours WHERE id = %s",
+                    (derived_from_tour_id,)
+                )
+                orig_row = cur.fetchone()
+                if orig_row and orig_row[0]:
+                    original_content = orig_row[0]
+                    _n_req = orig_row[1] or stops_count or 0
+
+                    # Find the original score row for linking
+                    orig_score_id = get_latest_score_for_tour(derived_from_tour_id)
+
+                    _edit_score, _edit_row_id, _delta, _edit_ms = score_edited_tour(
+                        original_content,
+                        tour_content,
+                        n_requested=_n_req,
+                        tour_id=new_id,
+                        tour_name=custom_name,
+                        original_score_id=orig_score_id,
+                    )
+                else:
+                    print(f"[SCORING] No original tour_content for derived_from_tour_id={derived_from_tour_id}")
+            except Exception as scoring_err:
+                # Scoring failure MUST NOT block delivery
+                print(f"[SCORING] Non-fatal error during edit scoring: {scoring_err}")
+                import traceback
+                traceback.print_exc()
+
         return jsonify({'status': 'created', 'tour_id': new_id}), 201
 
     except Exception as e:

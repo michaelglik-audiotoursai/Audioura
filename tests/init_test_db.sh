@@ -87,5 +87,38 @@ if [ "${ROW_COUNT}" != "0" ]; then
 fi
 echo -e "   ${GREEN}✓ No data copied — test database is schema-only${NC}"
 
+# Step 6: Verify LOCAL-306 tour_scores table exists
+TOUR_SCORES_EXISTS=$(docker exec "${CONTAINER}" psql -U "${DB_USER}" -d "${TEST_DB}" -t -c \
+    "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name='tour_scores';")
+TOUR_SCORES_EXISTS=$(echo "${TOUR_SCORES_EXISTS}" | tr -d ' ')
+if [ "${TOUR_SCORES_EXISTS}" != "1" ]; then
+    echo -e "${RED}WARNING: tour_scores table missing (LOCAL-306). Creating...${NC}"
+    docker exec "${CONTAINER}" psql -U "${DB_USER}" -d "${TEST_DB}" -c "
+        CREATE TABLE IF NOT EXISTS tour_scores (
+            id              SERIAL PRIMARY KEY,
+            tour_id         INTEGER,
+            tour_name       TEXT,
+            scored_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            code_sha        VARCHAR(12),
+            n_requested     INTEGER NOT NULL,
+            n_delivered     INTEGER NOT NULL,
+            base_score      REAL NOT NULL,
+            structural      REAL NOT NULL,
+            correlation     REAL NOT NULL,
+            venue_identity  REAL NOT NULL,
+            total           REAL NOT NULL,
+            per_stop        JSONB NOT NULL,
+            scorer_version  VARCHAR(64) NOT NULL,
+            scoring_ms      REAL,
+            is_rescore      BOOLEAN NOT NULL DEFAULT FALSE,
+            previous_score_id INTEGER,
+            delta           JSONB
+        );
+        CREATE INDEX IF NOT EXISTS idx_tour_scores_tour_id ON tour_scores (tour_id);
+    "
+else
+    echo -e "   ${GREEN}✓ tour_scores table present (LOCAL-306)${NC}"
+fi
+
 echo ""
 echo "=== Done. ${TEST_DB} has ${TEST_TABLES} tables, 0 rows. ==="

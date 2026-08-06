@@ -918,6 +918,27 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             except Exception as zip_error:
                 print(f"Warning: Could not add tour_content.txt to ZIP: {zip_error}")
         
+        # [LOCAL-306] Score the final tour before delivery.
+        # Gates NOTHING — a catastrophic score still delivers unchanged.
+        # No LLM calls, no network. Pure rule-based scoring.
+        _score_row_id = None
+        if tour_content:
+            try:
+                from tour_scoring_service import score_tour_text, ensure_tour_scores_table
+                ensure_tour_scores_table()
+                _n_req = int(total_stops) if total_stops else (ACTIVE_JOBS[job_id].get("actual_stops") or 0)
+                _tour_score, _score_row_id, _scoring_ms = score_tour_text(
+                    tour_content,
+                    n_requested=_n_req,
+                    tour_id=None,  # backfilled after store_audio_tour
+                    tour_name=tour_name,
+                )
+            except Exception as scoring_err:
+                # Scoring failure MUST NOT block delivery (LOCAL-306 rule)
+                print(f"[SCORING] Non-fatal error during in-flight scoring: {scoring_err}")
+                import traceback
+                traceback.print_exc()
+
         # Store in database with tour content
         store_result = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"), is_test=is_test)
         
@@ -986,6 +1007,14 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                 print(f"[LOCAL-128] No stop_metrics rows found for job_id={job_id_1} (i-con may not have run)")
             else:
                 print(f"[LOCAL-128] stop_metrics tour_id update failed (non-fatal)")
+
+        # [LOCAL-306] Backfill tour_id on the score row now that we know it.
+        if english_tour_id and _score_row_id:
+            try:
+                from tour_scoring_service import update_tour_id_on_score
+                update_tour_id_on_score(_score_row_id, english_tour_id)
+            except Exception as _bf_err:
+                print(f"[SCORING] Non-fatal: could not backfill tour_id on score: {_bf_err}")
 
         if language != 'en':
             pass  # translation block below handles non-English
