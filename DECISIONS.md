@@ -9137,3 +9137,46 @@ deliberate product decisions it has no way of knowing about. Borrow its
 *questions*, never its *numbers*.
 
 Cohesion is not yet a task. It should be one, after 309 and 310 land.
+
+## D231 — A refactor that reprices every tour, reported as "unchanged" (2026-08-06)
+
+LOCAL-311 built exactly the architecture Michael asked for: one public
+`evaluate()`, an `Evaluation` carrying `algorithm_id` / `algorithm_version` /
+`algorithm_config_hash` / `scored_at`, a config hash tracking threshold identity
+(`LOCAL-311-v1@41db0d2f`), and a registry. 13ms. Bounced anyway.
+
+```
+same tree, same tour, N=8
+
+  tour_rubric_scorer called directly    101.6   (corr +26.6)
+  the new evaluate()                     82.8   (corr  +7.8)
+```
+
+The submission states *"Scores provably unchanged."*
+
+**Cause, isolated to one loop.** `score_tour_file` cross-populates
+`callbacks_to` from `callbacks_from`; `evaluate()` does not. Half the callback
+set is invisible to `compute_score`, so the correlation bonus lands at +7.8.
+Skipping that loop by hand reproduces 82.8 to the decimal.
+
+**Why it slipped, and this is the instructive part: the base score is
+identical — 75.0 either way.** Only the bonus moves. Anyone verifying by checking
+`base_score`, which is the number LEAD has been quoting all day, would see
+nothing wrong. The divergence hides in the one term LEAD has repeatedly called
+unsound and therefore stopped watching.
+
+**Why it is a bounce rather than an improvement.** 82.8 is arguably the *better*
+number — the correlation bonus is spurious (D201). But a single entry point
+exists so the algorithm can change *without fear*, and one that silently returns
+a different answer than the path it replaces is the opposite of that. It would
+have repriced every tour in the database on the day it landed, with a submission
+saying nothing had changed. If we drop the cross-population, that is a decision
+to announce, not a side effect of a refactor.
+
+**The fix directs it into `compute_score`** rather than back into `evaluate()`:
+if the step belongs to scoring, a caller should not be able to forget it. That
+coupling is what the task existed to remove.
+
+Also flagged: `_compute_config_hash()` requires a `config` argument, so the
+stale-version guard could not be exercised externally. The submission asserts it
+works without demonstrating it.
