@@ -6384,22 +6384,56 @@ These rules apply to the NARRATION paragraphs only. Navigation/orientation direc
     print(f"\nPHASE 5: Generating detailed descriptions for each POI (parallel)...")
 
     # [LOCAL-26] Helper: detect when GPT echoed back a template placeholder instead of content
-    def _detect_placeholder_leak(text):
-        """Return True if text appears to be a placeholder echo rather than real content."""
+    # [LOCAL-295] Refactored: returns a classification tuple instead of bare bool.
+    #   ("placeholder", reason)  — true placeholder echo, should retry/reject
+    #   ("short_valid", word_count) — real prose that is merely short (thin corpus)
+    #   (None, None)              — normal content, no issue
+    def _classify_placeholder_leak(text):
+        """Classify text as placeholder echo, short-but-valid prose, or normal content.
+
+        Returns:
+            ("placeholder", reason_str) — genuine placeholder echo; retry is warranted
+            ("short_valid", word_count)  — real prose, just short; keep it, do not retry
+            (None, None)                — normal content, no issue
+        """
         if not text or not text.strip():
-            return True
+            return ("placeholder", "empty_text")
         stripped = text.strip()
         # Bracketed line matching "[...word description...]"
         if re.search(r'\[.*\bword\b.*\bdescription\b.*\]', stripped, re.IGNORECASE):
-            return True
+            return ("placeholder", "bracketed_word_description_echo")
         # Output wholly enclosed in square brackets (entire text is a placeholder)
         if stripped.startswith('[') and stripped.endswith(']') and '\n' not in stripped:
-            return True
-        # Output far below the minimum useful length (< 30 words when we asked for 120+)
+            return ("placeholder", "wholly_bracketed")
+        # [LOCAL-295] Short text: distinguish placeholder from valid short prose.
+        # A placeholder is template-like (contains instruction keywords, ellipsis patterns,
+        # or is just a POI name echo). Short real prose contains sentences with periods
+        # and reads as natural language.
         word_count = len(stripped.split())
         if word_count < 30:
-            return True
-        return False
+            # Check for signs this IS a placeholder/instruction echo, not real prose
+            _lower = stripped.lower()
+            _is_placeholder_like = (
+                # Contains instruction/template keywords
+                re.search(r'\b(insert|placeholder|description here|your .* here|todo|tbd)\b', _lower) or
+                # Mostly ellipsis or filler tokens
+                stripped.count('...') >= 2 or
+                # Echoes back the prompt structure (e.g. "Create a detailed description for...")
+                re.search(r'\b(create a|write a|generate a)\s+(detailed|brief)?\s*(description|narration)', _lower) or
+                # Just a bare name or title with no sentence structure
+                (word_count < 8 and '.' not in stripped)
+            )
+            if _is_placeholder_like:
+                return ("placeholder", f"short_and_template_like ({word_count} words)")
+            # It's short but reads as real prose — this is a thin-corpus result, not a leak
+            return ("short_valid", word_count)
+        return (None, None)
+
+    # [LOCAL-295] Backward-compat wrapper — other code paths that just need bool
+    def _detect_placeholder_leak(text):
+        """Return True only for genuine placeholder echoes (not short-but-valid prose)."""
+        classification, _ = _classify_placeholder_leak(text)
+        return classification == "placeholder"
 
     def _generate_description(args):
         idx, poi, spine_stop, fact_sheet, story_type = args
@@ -7261,16 +7295,29 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                     if orientation:
                         orientation = re.sub(r'^Description:\s*\n?', '', orientation, count=1, flags=re.IGNORECASE).strip()
 
-                    # [LOCAL-26] Validate: reject if description is a placeholder echo
-                    _placeholder_leaked = _detect_placeholder_leak(description)
-                    if _placeholder_leaked:
+                    # [LOCAL-26] [LOCAL-295] Validate: classify description as placeholder/short/normal
+                    _leak_class, _leak_detail = _classify_placeholder_leak(description)
+                    if _leak_class == "placeholder":
+                        # Log verbatim rejected text for diagnosis
+                        _rejected_wc = len(description.split()) if description else 0
+                        print(f"  [LOCAL-295] Stop {stop_num}: PLACEHOLDER REJECTED (reason: {_leak_detail})")
+                        print(f"  [LOCAL-295]   verbatim ({_rejected_wc} words): {repr(description[:200])}")
                         if _attempt < _max_retries:
-                            print(f"  [LOCAL-26] Stop {stop_num}: placeholder leak detected (attempt {_attempt+1}), retrying...")
-                            continue  # retry
+                            # [LOCAL-295] Vary the request: bump temperature to avoid identical retry
+                            description_data["temperature"] = min(0.7 + 0.15 * (_attempt + 1), 1.0)
+                            print(f"  [LOCAL-26] Stop {stop_num}: placeholder leak detected (attempt {_attempt+1}), retrying (temp={description_data['temperature']:.2f})...")
+                            continue  # retry with varied temperature
                         else:
                             # All retries exhausted — produce honest short description, never ship placeholder
                             print(f"  [LOCAL-26] Stop {stop_num}: placeholder leak persists after {_max_retries+1} attempts, using fallback")
                             description = f"{poi_name} — an exhibit at this venue. Detailed information was not available at generation time."
+                    elif _leak_class == "short_valid":
+                        # [LOCAL-295] Short but valid prose — keep it. Do NOT retry identically.
+                        # This is thin corpus, not a generation failure.
+                        print(f"  [LOCAL-295] Stop {stop_num}: SHORT BUT VALID — keeping ({_leak_detail} words, corpus likely thin)")
+                        print(f"  [LOCAL-295]   verbatim: {repr(description[:300])}")
+                        # Reset temperature in case it was bumped by a prior retry
+                        description_data["temperature"] = 0.7
 
                     # [LOCAL-31] [LOCAL-98] Post-generation metadata binding validation.
                     # If the catalogue record specified a period or material, verify
@@ -9566,15 +9613,25 @@ RULES:
     # delivered tour. A stop with a header and no narration is worse than a missing
     # stop — the listener is told to stand somewhere and then told nothing.
     # This gate runs BEFORE assembly so the empty stop never enters the text.
+    # [LOCAL-295] Use _classify_placeholder_leak instead of bare <15 word check,
+    # so short-but-valid prose (thin corpus) is preserved.
     _l292_requested_stops = len(poi_list)
     _l292_failed_stops = []
     _l292_survivors = []
     for _l292_poi in poi_list:
         _l292_desc = _l292_poi.get('description', '')
-        if ('GENERATION_FAILED' in _l292_desc or
+        _l292_is_failure = (
+            'GENERATION_FAILED' in _l292_desc or
             _l292_desc.startswith('[') or
-            (not _l292_desc.strip()) or
-            len(_l292_desc.split()) < 15):
+            (not _l292_desc.strip())
+        )
+        if not _l292_is_failure:
+            # [LOCAL-295] Check if it's a genuine placeholder (not short-valid prose)
+            _l292_class, _l292_detail = _classify_placeholder_leak(_l292_desc)
+            if _l292_class == "placeholder":
+                _l292_is_failure = True
+                print(f"  [LOCAL-295] Gate rejected '{_l292_poi['name']}': placeholder ({_l292_detail})")
+        if _l292_is_failure:
             _l292_failed_stops.append(_l292_poi['name'])
         else:
             _l292_survivors.append(_l292_poi)
