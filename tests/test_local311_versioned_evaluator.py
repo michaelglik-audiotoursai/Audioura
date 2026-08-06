@@ -32,6 +32,7 @@ from tour_evaluator import (
     _CURRENT_CONFIG_HASH,
 )
 from tour_rubric_scorer import (
+    score_tour_file,
     parse_tour,
     analyze_stop,
     classify_stop,
@@ -63,17 +64,25 @@ def test_evaluate_produces_identical_scores(museum_tour_text):
     as the old direct-internal path."""
     n_requested = 8
 
-    # OLD PATH: reach into internals directly (what callers used to do)
-    stops_parsed = parse_tour(museum_tour_text)
-    stop_analyses_old = []
-    for stop in stops_parsed:
-        sa = analyze_stop(stop, stops_parsed)
-        cls, evidence = classify_stop(sa)
-        sa.classification = cls
-        sa.classification_evidence = evidence
-        stop_analyses_old.append(sa)
-    venue_facts_old = detect_venue_identity(museum_tour_text)
-    old_score = compute_score(stop_analyses_old, n_requested, venue_facts_old)
+    # OLD PATH: score_tour_file, which is what callers actually used.
+    #
+    # [LEAD] This previously hand-wired parse_tour -> analyze_stop ->
+    # classify_stop -> compute_score and OMITTED the callbacks_to
+    # cross-population that score_tour_file performs. That omission is the exact
+    # bug LOCAL-311 was bounced for, so the baseline reproduced it: the test
+    # passed only because both sides were broken (82.81 == 82.81), and began
+    # failing the moment evaluate() was fixed.
+    #
+    # The real pre-existing public path is score_tour_file. Comparing against it
+    # is what the test claims to do.
+    import tempfile, os as _os
+    with tempfile.NamedTemporaryFile('w', suffix='.txt', delete=False) as _f:
+        _f.write(museum_tour_text)
+        _tmp = _f.name
+    try:
+        old_score = score_tour_file(_tmp, n_requested)
+    finally:
+        _os.unlink(_tmp)
 
     # NEW PATH: single entry point
     evaluation = evaluate(museum_tour_text, n_requested)
@@ -93,7 +102,7 @@ def test_evaluate_produces_identical_scores(museum_tour_text):
     assert new_score.n_requested == old_score.n_requested
 
     # Verify per-stop classifications match
-    for old_sa, new_ps in zip(stop_analyses_old, evaluation.per_stop):
+    for old_sa, new_ps in zip(old_score.stops, evaluation.per_stop):
         assert old_sa.classification == new_ps["classification"], (
             f"Stop {old_sa.index} classification mismatch: "
             f"{old_sa.classification} != {new_ps['classification']}"
