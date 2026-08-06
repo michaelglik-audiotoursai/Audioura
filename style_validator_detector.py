@@ -1205,6 +1205,43 @@ _R7_PATTERNS = [
     # "faint/lingering scent of X ... mingling/mixing" — catches intervening words
     # between the scent descriptor and the mingling verb
     r'\b(?:faint|lingering|subtle)\s+(?:scent|smell|fragrance|aroma)\s+of\b.*\b(?:mingling|mixing|blending|intertwining)\b',
+    # ──────────────────────────────────────────────────────────────────────────
+    # LOCAL-317: Culinary/interior sensory register — asserted-experience shapes
+    # that fire on structural pattern, not on food-word lists.
+    #
+    # Rule: a sentence asserting a sensory experience the listener cannot be
+    # guaranteed to have, presented as fact, without a source. A kitchen smell
+    # is exactly that — we have no evidence the garlic is cooking today.
+    # "The scent of jasmine fills the courtyard" has the identical fault.
+    #
+    # These patterns do NOT fire on dish-naming facts ("The menu features socca")
+    # because naming a dish uses none of these assertion structures.
+    # ──────────────────────────────────────────────────────────────────────────
+    # SMELL ASSERTED AS PRESENT: "the aroma/scent/fragrance of X fills/weaves/
+    # wafts/hangs/drifts/permeates/envelops" — broadens the existing pattern by
+    # (a) adding fills/weaves/envelops/suffuses to the verb list and (b) not
+    # requiring "the air" after the verb — any location works.
+    # Handles both singular and plural (aromas/scents).
+    r'\b(?:the\s+)?(?:aroma|scent|fragrance|perfume|smell)s?\s+of\s+.+?\b(?:fills?|weaves?|wafts?|hangs?|lingers?|drifts?|floats?|permeates?|envelops?|suffuses?|spills?)\b',
+    # AMBIENT SOUND ASSERTED AS PRESENT: "the [adj] clinking/clatter/hum/buzz/
+    # murmur/chatter of X" — requires a sensory-atmospheric adjective to confirm
+    # the sentence is asserting an ambient experience, not a bare factual mention.
+    # Excludes "hum of visitors/tourists" which describes present factual activity.
+    r'\bthe\s+(?:gentle|soft|cheerful|rhythmic|faint|muffled|constant)\s+(?:clinking|clink|clatter|clang|clanging|rattle|rattling|hum|humming|buzz|buzzing|murmur|chatter|chattering|sizzle|sizzling|din|hubbub|cacophony)\s+of\s+(?!the\s+(?:bell|clock|hammer|chisel)\b)(?!visitors?\b|tourists?\b)',
+    # AMBIENT SOUND bare form: "the clinking/clatter of X" WITHOUT an adjective,
+    # but only when the same sentence contains another sensory marker (scent,
+    # aroma, hum, murmur, glow, candlelight). This catches paired sensory
+    # fabrications without over-firing on single factual sound mentions.
+    r'\bthe\s+(?:clinking|clink|clatter|clang|sizzle|sizzling)\s+of\s+\w+.*\b(?:aroma|scent|fragrance|smell|hum|murmur|buzz|chatter|glow|candlelight|warmth)\b',
+    # AMBIENT SOUND variant: "the [adj] hum/buzz/murmur of conversation/voices/
+    # diners" — with an intervening adjective
+    r'\bthe\s+(?:\w+\s+)?(?:hum|buzz|murmur|chatter|din)\s+of\s+(?:conversations?|voices?|diners?|patrons?|guests?|crowds?|people|laughter|life)\b',
+    # AMBIENT SOUND: "the sounds from the kitchen/market/street" — asserts
+    # a soundscape from a specific source location
+    r'\bthe\s+sounds?\s+(?:from|of)\s+the\s+(?:kitchen|market|street|café|restaurant|bakery|workshop|forge|courtyard)\b',
+    # AMBIENT WARMTH/GLOW: "the golden glow/warmth/light of its/the interior"
+    # Asserts an interior atmospheric experience the listener cannot verify.
+    r'\bthe\s+(?:golden|warm|soft|amber|gentle|inviting|cozy|cosy)\s+(?:glow|warmth|light|radiance)\s+of\s+(?:its|the|this)\b',
 ]
 
 _R7_COMPILED = [re.compile(p, re.IGNORECASE) for p in _R7_PATTERNS]
