@@ -173,8 +173,8 @@ class TestOperatorOverride:
             ts = score_tour_file(filepath, 1, classifications={1: ('FABRICATED', 'operator marked')})
             assert ts.stops[0].classification == 'FABRICATED'
             assert 'OPERATOR OVERRIDE' in ts.stops[0].classification_evidence
-            # FABRICATED scores -1.0 × share
-            assert ts.per_stop_base[0] == pytest.approx(-100.0)
+            # [LOCAL-305] FABRICATED scores -1.5 × share (increased from -1.0)
+            assert ts.per_stop_base[0] == pytest.approx(-150.0)
         finally:
             os.unlink(filepath)
 
