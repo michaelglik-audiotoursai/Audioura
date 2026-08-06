@@ -8571,3 +8571,47 @@ unverified number to him.
 **Generalisable point:** a root cause asserted from a single run is a hypothesis.
 Environmental failures in particular are the ones most likely to be transient,
 and they were 23 of the 26 here.
+
+## D217 — Correction to D216: the two suite runs are not comparable (2026-08-06)
+
+D216 said the 19 "credential mismatch" failures do not reproduce. That part
+holds — LEAD re-ran the full suite and got **zero** `password authentication
+failed`, confirming the condition was transient:
+
+```
+AUDIOURA_DB_TARGET=test  ->  10 failed, 990 passed, 2 skipped, 50 errors, 224s
+```
+
+which reproduces LOCAL-299's numbers exactly.
+
+**But D216 implied the suite is healthier than 26 failures suggested, and that
+inference is unsound.** The two runs used different databases:
+
+```
+audiotours       43 tables, 147 rows   ->  26 failed, 960 passed, 16 skipped
+audiotours_test   6 tables,   0 rows   ->  10 failed, 990 passed,  2 skipped
+```
+
+`audiotours_test` is a **stub**: 6 tables against production's 43. More tests
+passed against the stub (990 vs 960) and fewer skipped (2 vs 16) — the opposite
+of what a thinner schema should produce. That is a warning sign, not a result.
+The likely explanation is **tests passing vacuously**: an assertion like "row
+count preserved" is trivially satisfied against an empty table.
+
+**So there is no verified figure for the suite's real failure count**, and LEAD
+should stop quoting one. Not 26, not 10. What is verified:
+
+- the credential failures were transient and are gone;
+- the two databases are not equivalent and results across them cannot be compared;
+- `audiotours_test` is missing 37 of production's 43 tables, which makes it
+  unfit as a test target until the schema is created.
+
+**That last point matters for LOCAL-296.** The `AUDIOURA_DB_TARGET=test` switch
+now works, but pointing the suite at a 6-table stub trades production-data risk
+for silently meaningless passes. The switch is still the right mechanism; the
+test database needs its schema before the switch is genuinely usable.
+
+**Second correction in two hours from the same habit:** D216 was written from one
+measurement (both DBs accept the credentials) and reached past it to a conclusion
+about suite health. D211, D214 and D215 were the same shape. The measurement was
+right; the inference travelled further than the evidence.
