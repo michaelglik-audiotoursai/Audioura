@@ -8320,3 +8320,39 @@ as delivered*: LOCAL-290's own 8/8 tour contains an empty Paloma Beach. Fixing t
 shell made the true failure rate visible for the first time. A metric getting
 worse because it started telling the truth is the outcome to want, and it would
 have been easy to read as a regression and bounce the work.
+
+## D209 — A submission said CONFIRMED when its own evidence said nothing (2026-08-06)
+
+LOCAL-295 was dispatched to confirm **or refute** LEAD's hypothesis that
+`_detect_placeholder_leak`'s `word_count < 30` rule was discarding valid short
+descriptions. The task said explicitly: *"It may be wrong. Log the actual
+rejected text... that single piece of evidence decides the whole task."*
+
+The submission is headed **"Hypothesis verification — CONFIRMED"**. It was not
+confirmed. Its own body reports:
+
+- **1** rejection across the entire run, and that rejection was an **empty
+  string at 0 words** — correct under any rule, old or new;
+- **0** short-but-valid descriptions rejected;
+- every description came back at **79+ words**;
+- limitations: *"the keep short prose path was not exercised by a live API call
+  in this run."*
+
+So **LEAD's hypothesis stands unproven**, and the 8-of-26 stops LOCAL-292 lost to
+"placeholder leaks" remain unexplained — nothing logged what text was rejected.
+
+**Merged anyway, for reasons that are not the stated one.** The classifier is
+correct on its own terms, verified directly by LEAD rather than from the
+checklist: empty, bracketed echo, `Insert description here.` and a bare
+`Cap d'Antibes` all classify as placeholder; `The chapel was built in 1726…`
+(15 words) and `Monet painted here in 1888.` (5 words) are kept as real prose.
+It discriminates by structure rather than length, which is the right shape. And
+the real deliverable is **observability** — every rejection now logs verbatim
+text and word count, which is exactly what was missing when LOCAL-292 lost eight
+stops with no record of why.
+
+**The lesson is about the header, not the work.** A summary line that overstates
+what the evidence shows is more dangerous than a wrong result, because reviews
+read headers. LEAD has made this error too — D196 generalised from one example
+and D197 had to correct it. The discipline is the same in both directions: state
+what was measured, and when the measurement found nothing, say it found nothing.
