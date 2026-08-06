@@ -30,11 +30,14 @@ FABRICATED remains uncomputable here. Nothing in this module checks whether a
 fact is true, so a stop can score RICH on evidence and be entirely invented.
 Absence of FABRICATED is never evidence of accuracy.
 """
+import logging
 import re
 import sys
 import json
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 # --- [LOCAL-288] shared patterns -------------------------------------------
@@ -238,6 +241,7 @@ class TourScore:
     quality: float = 0.0           # per-stop score of what was delivered (normalised)
     n_achievable: int = 0          # stops in area passing genuine existence check
     missing_classifications: List[str] = field(default_factory=list)  # per missing stop: 'PIPELINE_LOST' or 'UNAVAILABLE'
+    shortfall_evidence: List[dict] = field(default_factory=list)  # [LOCAL-309] evidence for each classification
 
 
 def parse_tour(text: str) -> List[dict]:
@@ -661,12 +665,26 @@ def detect_venue_identity(tour_text: str) -> List[str]:
 def compute_score(stops: List[StopAnalysis], n_requested: int,
                   venue_identity_facts: List[str],
                   gate_log: Optional[List[dict]] = None,
-                  corpus_data: Optional[dict] = None) -> TourScore:
+                  corpus_data: Optional[dict] = None,
+                  venue_name: Optional[str] = None) -> TourScore:
     """Compute the full rubric score.
 
     [LOCAL-305] Now splits MISSING stops into PIPELINE_LOST / UNAVAILABLE based
     on the gate_log, reports coverage and quality separately, and normalises
     quality against available passages.
+
+    [LOCAL-309] Updated weights per Michael's ruling 2026-08-06:
+      - FABRICATED: −3.0 × share (was −1.5) — 3× worse than omission
+      - PIPELINE_LOST: −1.0 × share (unchanged)
+      - UNAVAILABLE, search-confirmed: 0.0 × share (was −0.15)
+      - UNAVAILABLE, unverified (no search): −1.0 × share (treat as PIPELINE_LOST)
+
+    The last line is the point: UNAVAILABLE at zero cost is ONLY available to a
+    shortfall that a live search confirms. Absent that search, the shortfall is
+    our failure and costs the full amount.
+
+    When venue_name is provided and there are missing stops, a bounded internet
+    search is run to verify whether further candidates exist in the area.
 
     Args:
         stops: Analysed stops that were delivered.
@@ -686,6 +704,9 @@ def compute_score(stops: List[StopAnalysis], n_requested: int,
         corpus_data: Optional dict of {stop_title: {passages: [...], ...}}.
                     Used for per-stop quality normalisation against available
                     passages.
+        venue_name: Optional venue/area name. When provided and there are missing
+                    stops, triggers a live internet search to verify whether the
+                    shortfall is genuine (UNAVAILABLE) or our failure (PIPELINE_LOST).
     """
     share = 100.0 / n_requested
     
@@ -696,9 +717,11 @@ def compute_score(stops: List[StopAnalysis], n_requested: int,
         venue_identity_facts=venue_identity_facts,
     )
     
-    # ─── [LOCAL-305] Classify missing stops ──────────────────────────────────
+    # ─── [LOCAL-305/309] Classify missing stops ────────────────────────────────
     missing_count = max(0, n_requested - len(stops))
     missing_classifications = []
+    # [LOCAL-309] Evidence for each missing stop's classification
+    shortfall_evidence: List[dict] = []
 
     if missing_count > 0 and gate_log:
         # Build set of delivered stop titles for comparison
@@ -715,29 +738,45 @@ def compute_score(stops: List[StopAnalysis], n_requested: int,
         pipeline_lost_count = min(len(verified_but_missing), missing_count)
 
         # The remainder: were fewer candidates proposed than requested?
-        # UNAVAILABLE requires a positive tier-1 finding that no more real
-        # candidates exist. If the gate_log shows all proposed candidates
-        # were fewer than N, AND those unverified ones failed tier-1 (no
-        # Wikipedia/Wikidata evidence), that is UNAVAILABLE.
         remaining_shortfall = missing_count - pipeline_lost_count
 
-        # Check unverified stops: if tier-1 found nothing, the area is thin
-        unverified_entries = [e for e in gate_log if not e.get('verified')]
-        # Unverified entries with no evidence = area genuinely lacks candidates
-        # But per spec: "cannot tell → PIPELINE_LOST" — default to blaming ourselves
+        # [LOCAL-309] For the remaining shortfall, run a live search to verify
+        # whether the area genuinely lacks candidates. Only a confirmed search
+        # earns the zero-cost UNAVAILABLE classification.
         genuinely_unavailable = 0
-        if remaining_shortfall > 0:
-            # Only count as UNAVAILABLE if the gate explicitly found nothing
-            # (tier-1 returned empty). An unverified stop without evidence could
-            # still be a real place we failed to verify — blame ourselves.
-            # The UNAVAILABLE signal comes from the generation pipeline logging
-            # that replenishment exhausted all tier-1 candidates.
-            # Look for explicit 'exhausted' or 'no_candidates' signal in gate_log
-            for entry in gate_log:
-                if entry.get('exhausted') or entry.get('unavailable'):
-                    genuinely_unavailable += 1
-                    if genuinely_unavailable >= remaining_shortfall:
-                        break
+        if remaining_shortfall > 0 and venue_name:
+            try:
+                from shortfall_search import search_for_shortfall
+                delivered_title_list = [s.title for s in stops]
+                shortfall_result = search_for_shortfall(
+                    venue_name=venue_name,
+                    n_requested=n_requested,
+                    delivered_titles=delivered_title_list,
+                    gate_log=gate_log,
+                )
+                # Count how many slots the search confirmed as genuinely unavailable
+                for v in shortfall_result.verdicts[:remaining_shortfall]:
+                    if v.classification == 'UNAVAILABLE':
+                        genuinely_unavailable += 1
+                    shortfall_evidence.append({
+                        'classification': v.classification,
+                        'search_query': v.search_query,
+                        'candidates_found': v.candidates_found,
+                        'evidence': v.evidence,
+                        'search_error': v.search_error,
+                        'cached': v.cached,
+                    })
+            except ImportError:
+                # shortfall_search not available — fail closed
+                logger.warning("[SCORER] shortfall_search module not available — "
+                               "treating all shortfall as PIPELINE_LOST")
+            except Exception as e:
+                # Any error in search → fail closed (PIPELINE_LOST)
+                logger.warning(f"[SCORER] shortfall search failed: {e} — "
+                               "treating shortfall as PIPELINE_LOST")
+        elif remaining_shortfall > 0 and not venue_name:
+            # No venue_name → cannot search → fail closed
+            pass
 
         # Classify each missing slot
         for _ in range(pipeline_lost_count):
@@ -749,19 +788,52 @@ def compute_score(stops: List[StopAnalysis], n_requested: int,
         for _ in range(cannot_tell):
             missing_classifications.append('PIPELINE_LOST')
 
+    elif missing_count > 0 and venue_name:
+        # No gate_log but we have venue_name → run shortfall search
+        try:
+            from shortfall_search import search_for_shortfall
+            delivered_title_list = [s.title for s in stops]
+            shortfall_result = search_for_shortfall(
+                venue_name=venue_name,
+                n_requested=n_requested,
+                delivered_titles=delivered_title_list,
+                gate_log=gate_log,
+            )
+            for v in shortfall_result.verdicts[:missing_count]:
+                missing_classifications.append(v.classification)
+                shortfall_evidence.append({
+                    'classification': v.classification,
+                    'search_query': v.search_query,
+                    'candidates_found': v.candidates_found,
+                    'evidence': v.evidence,
+                    'search_error': v.search_error,
+                    'cached': v.cached,
+                })
+            # Fill any remaining with PIPELINE_LOST
+            while len(missing_classifications) < missing_count:
+                missing_classifications.append('PIPELINE_LOST')
+        except ImportError:
+            for _ in range(missing_count):
+                missing_classifications.append('PIPELINE_LOST')
+        except Exception as e:
+            logger.warning(f"[SCORER] shortfall search failed: {e}")
+            for _ in range(missing_count):
+                missing_classifications.append('PIPELINE_LOST')
+
     elif missing_count > 0:
-        # No gate_log available → cannot tell → PIPELINE_LOST for all
+        # No gate_log, no venue_name → cannot tell → PIPELINE_LOST for all
         for _ in range(missing_count):
             missing_classifications.append('PIPELINE_LOST')
 
     ts.missing_classifications = missing_classifications
+    ts.shortfall_evidence = shortfall_evidence
 
     # ─── Per-stop base score ─────────────────────────────────────────────────
     for stop in stops:
         cls = stop.classification
         if cls == 'FABRICATED':
-            # [LOCAL-305] Fabrication costs more than omission: −1.5 × share
-            base = -1.5 * share
+            # [LOCAL-309] Fabrication costs 3× what omission costs: −3.0 × share
+            base = -3.0 * share
         elif cls == 'MISSING':
             # Legacy compat — should not appear for delivered stops but handle it
             base = -1.0 * share
@@ -778,12 +850,15 @@ def compute_score(stops: List[StopAnalysis], n_requested: int,
             base = 0.0  # unclassified
         ts.per_stop_base.append(base)
     
-    # [LOCAL-305] Add missing stop penalties with differentiated weights
+    # [LOCAL-309] Add missing stop penalties with updated weights:
+    #   PIPELINE_LOST:               -1.0 × share (our failure)
+    #   UNAVAILABLE (search-confirmed): 0.0 × share (genuine scarcity)
+    # A zero-cost UNAVAILABLE requires recorded search evidence.
     for cls in missing_classifications:
         if cls == 'PIPELINE_LOST':
             ts.per_stop_base.append(-1.0 * share)
         elif cls == 'UNAVAILABLE':
-            ts.per_stop_base.append(-0.15 * share)
+            ts.per_stop_base.append(0.0 * share)
         else:
             # Defensive: unknown classification → PIPELINE_LOST weight
             ts.per_stop_base.append(-1.0 * share)
@@ -949,7 +1024,8 @@ def print_score(ts: TourScore):
 def score_tour_file(filepath: str, n_requested: int,
                     classifications: Optional[dict] = None,
                     corpus_data: Optional[dict] = None,
-                    gate_log: Optional[List[dict]] = None) -> TourScore:
+                    gate_log: Optional[List[dict]] = None,
+                    venue_name: Optional[str] = None) -> TourScore:
     """Score a tour file with the rubric.
     
     Args:
@@ -963,11 +1039,23 @@ def score_tour_file(filepath: str, n_requested: int,
                     defaults to 1.0 (no ceiling applied).
         gate_log: Optional list of gate verdicts for classifying missing stops
                  as PIPELINE_LOST vs UNAVAILABLE. See compute_score docstring.
+        venue_name: Optional venue/area name for shortfall search (LOCAL-309).
+                   When provided and there are missing stops, a live search
+                   verifies whether the area genuinely lacks candidates.
     """
     with open(filepath, 'r', encoding='utf-8') as f:
         text = f.read()
     
     stops = parse_tour(text)
+
+    # [LOCAL-309] Extract venue_name from tour header if not provided
+    _effective_venue_name = venue_name
+    if not _effective_venue_name:
+        # Try to extract from first line: "Step-by-Step Audio Guided Tour: VENUE"
+        first_line = text.split('\n')[0] if text else ''
+        m = re.match(r'^Step-by-Step.*?:\s*(.+)$', first_line)
+        if m:
+            _effective_venue_name = m.group(1).strip()
 
     # Analyze each stop.
     # [LOCAL-288] The classification is now COMPUTED by default. An explicit
@@ -1001,7 +1089,8 @@ def score_tour_file(filepath: str, n_requested: int,
     
     # Compute score
     ts = compute_score(analyses, n_requested, venue_facts,
-                       gate_log=gate_log, corpus_data=corpus_data)
+                       gate_log=gate_log, corpus_data=corpus_data,
+                       venue_name=_effective_venue_name)
     
     return ts
 
