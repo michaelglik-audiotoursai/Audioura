@@ -7085,7 +7085,8 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                 description_response = requests.post(
                     "https://api.openai.com/v1/chat/completions",
                     headers=headers,
-                    data=json.dumps(description_data)
+                    data=json.dumps(description_data),
+                    timeout=90  # [LOCAL-292] Explicit timeout — prevents unbounded stall
                 )
 
                 if description_response.status_code == 200:
@@ -7303,12 +7304,42 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                     print(f"Stop {stop_num} description word count: {word_count} words")
                     return idx, orientation, description, word_count, tokens_used, call_cost
                 else:
+                    # [LOCAL-292] Retry transient failures following _PROLOG_MAX_RETRIES pattern (LOCAL-119)
+                    _DESC_TRANSIENT_CODES = {429, 500, 502, 503, 504}
+                    if description_response.status_code in _DESC_TRANSIENT_CODES and _attempt < _max_retries:
+                        _backoff = min(2 ** (_attempt + 1), 8)  # cap at 8s
+                        print(f"  [LOCAL-292] Stop {stop_num}: transient failure (HTTP {description_response.status_code}), "
+                              f"retrying in {_backoff}s (attempt {_attempt + 2}/{_max_retries + 1})")
+                        time.sleep(_backoff)
+                        continue  # retry within the existing _attempt loop
                     print(f"Stop {stop_num} error: API returned status code {description_response.status_code}")
+                    if _attempt < _max_retries:
+                        print(f"  [LOCAL-292] Stop {stop_num}: non-transient failure (HTTP {description_response.status_code}), "
+                              f"retrying (attempt {_attempt + 2}/{_max_retries + 1})")
+                        continue  # retry once even for non-transient (covers flaky 4xx)
                     # [LOCAL-251] Tour-type-appropriate fallback; mark as generation failure
                     _fallback_orient = "Position yourself to best view this location." if tour_category != 'museum' else "Look for this work in the galleries."
                     return idx, _fallback_orient, f"[GENERATION_FAILED:{poi_name}]", 0, 0, 0.0
 
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as _net_err:
+                # [LOCAL-292] Network transient — retry with backoff (follows LOCAL-119 pattern)
+                if _attempt < _max_retries:
+                    _backoff = min(2 ** (_attempt + 1), 8)  # cap at 8s
+                    print(f"  [LOCAL-292] Stop {stop_num}: network error ({type(_net_err).__name__}), "
+                          f"retrying in {_backoff}s (attempt {_attempt + 2}/{_max_retries + 1})")
+                    time.sleep(_backoff)
+                    continue  # retry
+                print(f"Stop {stop_num} error: {str(_net_err)}")
+                # [LOCAL-251] Tour-type-appropriate fallback; mark as generation failure
+                _fallback_orient = "Position yourself to best view this location." if tour_category != 'museum' else "Look for this work in the galleries."
+                return idx, _fallback_orient, f"[GENERATION_FAILED:{poi_name}]", 0, 0, 0.0
+
             except Exception as e:
+                # [LOCAL-292] Unexpected error — retry once (may be transient JSON parse error)
+                if _attempt < _max_retries:
+                    print(f"  [LOCAL-292] Stop {stop_num}: unexpected error ({type(e).__name__}: {e}), "
+                          f"retrying (attempt {_attempt + 2}/{_max_retries + 1})")
+                    continue  # retry
                 print(f"Stop {stop_num} error: {str(e)}")
                 # [LOCAL-251] Tour-type-appropriate fallback; mark as generation failure
                 _fallback_orient = "Position yourself to best view this location." if tour_category != 'museum' else "Look for this work in the galleries."
@@ -7316,7 +7347,7 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
 
         # Should not reach here, but safety fallback
         _fallback_orient = "Position yourself to best view this location." if tour_category != 'museum' else "Look for this work in the galleries."
-        return idx, _fallback_orient, f"{poi_name} — a stop on this tour.", 0, 0, 0.0
+        return idx, _fallback_orient, f"[GENERATION_FAILED:{poi_name}]", 0, 0, 0.0
 
     max_workers = min(len(poi_list), 5)
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -9390,6 +9421,52 @@ RULES:
 
         print(f"  [LOCAL-286] Deduplication: {_dedup_total_removed} sentence(s) removed from stop bodies")
 
+    # -------- [LOCAL-292] EMPTY STOP REMOVAL GATE --------
+    # A stop whose description failed generation must be removed entirely from the
+    # delivered tour. A stop with a header and no narration is worse than a missing
+    # stop — the listener is told to stand somewhere and then told nothing.
+    # This gate runs BEFORE assembly so the empty stop never enters the text.
+    _l292_requested_stops = len(poi_list)
+    _l292_failed_stops = []
+    _l292_survivors = []
+    for _l292_poi in poi_list:
+        _l292_desc = _l292_poi.get('description', '')
+        if ('GENERATION_FAILED' in _l292_desc or
+            _l292_desc.startswith('[') or
+            (not _l292_desc.strip()) or
+            len(_l292_desc.split()) < 15):
+            _l292_failed_stops.append(_l292_poi['name'])
+        else:
+            _l292_survivors.append(_l292_poi)
+
+    if _l292_failed_stops:
+        print(f"\n  [LOCAL-292] ⚠️  EMPTY STOP REMOVAL GATE: {len(_l292_failed_stops)} stop(s) removed for failed/empty description")
+        for _l292_name in _l292_failed_stops:
+            print(f"    REMOVED: '{_l292_name}' — no narration generated (would ship as empty shell)")
+        poi_list = _l292_survivors
+        # Renumber surviving stops sequentially
+        for _l292_i, _l292_p in enumerate(poi_list):
+            _l292_p['stop_number'] = _l292_i + 1
+        # Update total_stops to reflect reality
+        total_stops = len(poi_list)
+        print(f"    SUMMARY: requested={_l292_requested_stops} / generated={_l292_requested_stops - len(_l292_failed_stops)} / "
+              f"failed={len(_l292_failed_stops)} / delivered={len(poi_list)}")
+    else:
+        print(f"\n  [LOCAL-292] Empty stop removal gate: PASSED (all {_l292_requested_stops} stops have narration)")
+
+    # [LOCAL-292] Rebuild tour title with correct stop count if stops were removed
+    if _l292_failed_stops and poi_list:
+        # The tour_title line is the first line of complete_tour; rebuild complete_tour header
+        if tour_type.lower() in location.lower():
+            tour_title = f"Step-by-Step Audio Guided Tour: {location}"
+        else:
+            tour_title = f"Step-by-Step Audio Guided Tour: {location} - {_display_category} Tour"
+        complete_tour = tour_title + "\n" + f"Tour-Category: {_header_category}" + "\n\n"
+
+    if len(poi_list) == 0:
+        print(f"  [LOCAL-292] ✗ ALL stops failed generation — cannot deliver tour")
+        return None, None, (None, None)
+
     # Add each POI with its description and directions
     for i, poi in enumerate(poi_list):
         stop_num = i + 1   # always sequential; ignore whatever AI emitted
@@ -9851,20 +9928,57 @@ RULES:
     except Exception as _pf_err:
         print(f"  [LOCAL-36] Practical facts gate error (non-fatal): {_pf_err}")
 
-    # -------- [LOCAL-251] Generation failure gate --------
+    # -------- [LOCAL-251] [LOCAL-292] Generation failure gate --------
     # A generation failure must not reach the output silently. If any stop
     # contains a [GENERATION_FAILED:...] or [Description for ... could not be generated.]
-    # placeholder, strip it and log the failure loudly.
+    # placeholder, the ENTIRE stop block must be removed — not just the marker.
+    # A header + address with no narration is worse than a missing stop.
+    # [LOCAL-292] After removal, the failure must be logged at the same prominence
+    # as an existence-gate drop, and recorded in the run's summary counts.
     _gen_fail_pattern = re.compile(r'\[(?:GENERATION_FAILED:[^\]]+|Description for [^\]]+ could not be generated\.)\]')
     _gen_fail_matches = _gen_fail_pattern.findall(complete_tour)
     if _gen_fail_matches:
         print(f"\n  [LOCAL-251] ⚠️  GENERATION FAILURE GATE: {len(_gen_fail_matches)} placeholder(s) detected!")
+        print(f"  [LOCAL-292] ⚠️  GENERATION FAILURE — SAME SEVERITY AS EXISTENCE-GATE DROP:")
+        _l292_post_assembly_failed = []
         for _gf in _gen_fail_matches:
-            print(f"    STRIPPING: {_gf}")
-        # Strip the placeholders — an empty gap is better than shipping error text to TTS
+            # Extract the stop name from the marker
+            _gf_name_match = re.search(r'(?:GENERATION_FAILED:|Description for )([^\]]+?)(?:\]| could not)', _gf)
+            _gf_stop_name = _gf_name_match.group(1).strip() if _gf_name_match else _gf
+            _l292_post_assembly_failed.append(_gf_stop_name)
+            print(f"    ✗ FAILED: '{_gf_stop_name}' — description generation failed after retries")
+            print(f"    REMOVING ENTIRE STOP BLOCK (not just marker)")
+
+        # [LOCAL-292] Remove entire stop blocks containing failure markers.
+        # A stop block runs from "Stop N:" to the next "Stop M:" or end of text.
+        _stop_block_fail_pattern = re.compile(
+            r'Stop\s+\d+:[^\n]*\n'
+            r'(?:(?!Stop\s+\d+:).)*?'
+            r'\[(?:GENERATION_FAILED:[^\]]+|Description for [^\]]+ could not be generated\.)\]'
+            r'(?:(?!Stop\s+\d+:).)*',
+            re.DOTALL
+        )
+        complete_tour = _stop_block_fail_pattern.sub('', complete_tour)
+
+        # Also strip any orphaned markers not inside a stop block
         complete_tour = _gen_fail_pattern.sub('', complete_tour)
-        # Also strip "Look for this work in the galleries." if it leaked
+        # Strip leaked orientation fallbacks
         complete_tour = complete_tour.replace("Look for this work in the galleries.", "")
+        complete_tour = complete_tour.replace("Position yourself to best view this location.", "")
+
+        # [LOCAL-292] Renumber remaining stops sequentially so count matches reality
+        _remaining_stop_headers = list(re.finditer(r'Stop\s+\d+:', complete_tour))
+        # Renumber in reverse to avoid offset shifts
+        for _rs_i, _rs_m in enumerate(reversed(_remaining_stop_headers), 1):
+            _correct_num = len(_remaining_stop_headers) - _rs_i + 1
+            complete_tour = complete_tour[:_rs_m.start()] + f"Stop {_correct_num}:" + complete_tour[_rs_m.end():]
+        _l292_delivered_post = len(_remaining_stop_headers)
+
+        print(f"  [LOCAL-292] RUN SUMMARY: requested={_l292_requested_stops} / "
+              f"failed_pre_assembly={len(_l292_failed_stops)} / "
+              f"failed_post_assembly={len(_l292_post_assembly_failed)} / "
+              f"delivered={_l292_delivered_post}")
+
         # Clean up double-spaces and triple-newlines left behind
         complete_tour = re.sub(r'  +', ' ', complete_tour)
         complete_tour = re.sub(r'\n\s*\n\s*\n', '\n\n', complete_tour)
