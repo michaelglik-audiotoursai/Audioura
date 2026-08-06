@@ -1571,6 +1571,7 @@ def run_existence_gate(
             'total_stops': len(poi_list),
             'verified_stops': list(poi_list),
             'unverified_stops': [],
+            'inconclusive_stops': [],
             'verdicts': [],
             'action': 'OFF',
         }
@@ -1579,6 +1580,7 @@ def run_existence_gate(
     verdicts = []
     verified_stops = []
     unverified_stops = []
+    inconclusive_stops = []  # LOCAL-320 bounce: third state — kept but NOT verified
 
     for stop_title in poi_list:
         verdict = verify_stop_existence(stop_title, venue_name, db_conn, tour_type=tour_type)
@@ -1611,33 +1613,52 @@ def run_existence_gate(
                 verified_stops.append(stop_title)
                 print(f"    [RETRY OK] {stop_title!r} — {retry_verdict['evidence'][:60]}")
             elif retry_verdict.get('search_failed'):
-                # Still failing — treat as INCONCLUSIVE, not unverified.
-                # In enforce mode, keep the stop (fail open on infrastructure error).
-                # D162: do not reject based on a search that never completed.
-                verified_stops.append(stop_title)
-                print(f"    [RETRY FAILED] {stop_title!r} — search still failing, "
-                      f"keeping stop (D162: fail open on infrastructure error)")
+                # LOCAL-320 bounce fix: Still failing after retry.
+                # This is INCONCLUSIVE — NOT verified, NOT unverified.
+                # The stop is kept for delivery (D162: don't reject based on a
+                # search that never completed), but it MUST NOT enter
+                # verified_stops and MUST NOT be counted as verified in the log.
+                # A fabricated name must not be called "verified" just because
+                # the search infrastructure failed. Michael's rule: a fabricated
+                # stop costs 3× an illegitimate omission.
+                inconclusive_stops.append(stop_title)
+                # Mark the verdict so downstream can distinguish
+                retry_verdict['inconclusive'] = True
+                retry_verdict['search_failed'] = True
+                for j, v in enumerate(verdicts):
+                    if v['stop_title'] == stop_title:
+                        verdicts[j] = retry_verdict
+                        break
+                print(f"    [RETRY FAILED] {stop_title!r} — INCONCLUSIVE "
+                      f"(search still failing, kept for delivery but NOT verified)")
             else:
                 unverified_stops.append(stop_title)
                 print(f"    [RETRY] {stop_title!r} — genuinely unverified")
 
-    # Log results
+    # Log results — report inconclusive as its own count (never claim verified)
     n_ver = len(verified_stops)
     n_unver = len(unverified_stops)
+    n_inconclusive = len(inconclusive_stops)
     pct_ver = n_ver / len(poi_list) * 100 if poi_list else 0
 
+    _inc_suffix = f", {n_inconclusive} inconclusive" if n_inconclusive else ""
     if mode == 'enforce':
         action = 'ENFORCE'
         print(f"  [EXISTENCE-GATE] ENFORCE — {n_ver}/{len(poi_list)} stops verified "
-              f"({pct_ver:.0f}%), dropping {n_unver} unverified")
+              f"({pct_ver:.0f}%), dropping {n_unver} unverified{_inc_suffix}")
     else:
         action = 'LOG_ONLY'
         print(f"  [EXISTENCE-GATE] LOG_ONLY — {n_ver}/{len(poi_list)} stops verified "
-              f"({pct_ver:.0f}%), {n_unver} would be dropped if enforced")
+              f"({pct_ver:.0f}%), {n_unver} would be dropped{_inc_suffix}")
 
     # Log individual verdicts
     for v in verdicts:
-        status = "VERIFIED" if v['verified'] else "UNVERIFIED"
+        if v['verified']:
+            status = "VERIFIED"
+        elif v.get('inconclusive'):
+            status = "INCONCLUSIVE"
+        else:
+            status = "UNVERIFIED"
         ev = v['evidence'][:80] if v['evidence'] else "no evidence"
         print(f"    [{status}] {v['stop_title']!r:.50s} — {ev}")
 
@@ -1677,6 +1698,7 @@ def run_existence_gate(
         'total_stops': len(poi_list),
         'verified_stops': verified_stops,
         'unverified_stops': unverified_stops,
+        'inconclusive_stops': inconclusive_stops,  # LOCAL-320 bounce: kept but not verified
         'verdicts': verdicts,
         'action': action,
         'harvest_summary': harvest_summary,
