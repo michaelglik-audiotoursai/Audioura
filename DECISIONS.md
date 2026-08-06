@@ -9345,3 +9345,44 @@ adds personal commentary has made it worse by our rubric and better for
 themselves. Scoring their edit and telling them would be us grading a customer on
 their own work with a measure built for a different purpose. Recording it is
 right; surfacing it is not.
+
+## D236 — A structural rule generalises only across the forms its author imagined (2026-08-06)
+
+The blind-spot monitor earned its existence within an hour of merging. It flagged
+Musée National Marc Chagall at median fact density **0.000** against a corpus
+median of 0.264, and the diagnosis holds:
+
+```
+"canvas"        in 29 zero-fact Chagall stops
+"oil on canvas" in 3 more
+materials vocabulary: canvas NO, oil NO, gouache NO
+```
+
+**LOCAL-304 was told to fix this class of gap "by category, not by
+list-extension", and it did exactly that** — `_MATERIAL_CONTEXT_RE` matching
+*"crafted from X"*, *"carved from X"*, *"cast in X"*. Correct for sculpture, and
+it fixed the Ganesh stop.
+
+**"Oil on canvas" contains none of those verbs.** It is a bare medium phrase, a
+different grammatical construction, and the structural rule never saw it. The
+instruction to generalise was followed and still produced a rule that
+generalises only across the forms its author happened to consider.
+
+This is R7's collocation failure one layer up. R7 caught `azure waters` and
+missed `azure sky`; the material rule catches `carved from chlorite` and misses
+`oil on canvas`. **Each fix generalises exactly as far as the examples that
+prompted it.**
+
+The practical consequence is that "widen by category" is not a sufficient
+instruction on its own. What actually caught this was **an independent signal
+disagreeing with the detector** — which is the argument for the monitor, and why
+its per-venue check paid for itself immediately.
+
+The LLM spot-check, now working, says the same thing more broadly: divergence
+**+2.6, one-directional on 5 of 5 sampled stops**. The detector under-counts
+generally, not only for Chagall. Small sample, so a direction rather than a
+magnitude — but the direction is the finding.
+
+→ **LOCAL-316** adds painting and print media, including French forms, since the
+corpus is bilingual and Chagall's catalogue is French. It is forbidden from
+changing thresholds and must report the corpus distribution before and after.
