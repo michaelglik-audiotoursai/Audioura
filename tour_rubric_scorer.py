@@ -105,6 +105,51 @@ _MATERIAL_CONTEXT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# --- [LOCAL-316] Painting / print medium detection ----------------------------
+#: Bare medium phrases: "<medium> on <support>" — "oil on canvas", "gouache on
+#: paper", "huile sur toile", "tempera on panel". A different grammatical
+#: construction from LOCAL-304's verb+preposition patterns. Captures both medium
+#: and support as materials (e.g. "oil" + "canvas").
+#: French: "huile sur toile/lin", "gouache sur papier", "acrylique sur toile".
+_PAINTING_MEDIUM_RE = re.compile(
+    r'\b(oil|oils|huile|gouache|tempera|acrylic|acrylique|watercolou?r|aquarelle|'
+    r'encaustic|pastel|ink|encre|charcoal|fusain|crayon|graphite|sanguine)\s+'
+    r'(?:on|sur|over)\s+'
+    r'(canvas|toile|linen|lin|panel|panneau|board|paper|papier|vellum|'
+    r'cardboard|carton|masonite|copper|cuivre|wood|bois|silk|soie|burlap|jute)',
+    re.IGNORECASE,
+)
+
+#: [LOCAL-316] "on the canvas" / "sur la toile" — a support noun used as a
+#: physical surface reference. In an artwork context, "on the canvas" identifies
+#: the medium just as clearly as "oil on canvas". Requires the definite article
+#: ("the"/"la"/"le") or possessive to avoid matching bare metaphors. Only fires
+#: for unambiguous support nouns that identify a painting/drawing surface.
+#: "board" excluded here (ambiguous with committee) — caught by _PAINTING_MEDIUM_RE
+#: when preceded by a medium noun.
+_ON_SUPPORT_RE = re.compile(
+    r'\bon\s+(?:the|this|that|his|her|its|their|a)\s+'
+    r'(canvas|toile|linen|lin|panel|panneau|vellum)\b'
+    r'|'
+    r'\bsur\s+(?:la|le|les|cette|ce|son|sa)\s+'
+    r'(toile|lin|panneau|papier|carton|bois)\b',
+    re.IGNORECASE,
+)
+
+#: [LOCAL-316] Standalone print and technique terms that appear without
+#: syntactic context — the same pattern as the LOCAL-304 vocabulary list but
+#: for painting/printmaking media. These have no bare-noun ambiguity risk
+#: (nobody says "a lithograph of emotion" the way they say "a canvas of ideas").
+_PRINT_TECHNIQUE_PATTERNS = [
+    r'\blithograph(?:y|s)?\b', r'\betching(?:s)?\b', r'\bengraving(?:s)?\b',
+    r'\baquatint(?:s)?\b', r'\bdrypoint(?:s)?\b', r'\bscreenprint(?:s)?\b',
+    r'\bwoodcut(?:s)?\b', r'\bfresco(?:es|s)?\b', r'\bmosaic(?:s)?\b',
+    r'\bstained\s+glass\b', r'\bvitrail\b', r'\bvitraux\b',
+    r'\bgouache(?:s)?\b', r'\btempera\b', r'\bencaustic\b',
+    r'\blinocut(?:s)?\b', r'\bmonotype(?:s)?\b', r'\bmezzotint(?:s)?\b',
+    r'\bserigraph(?:y|s)?\b', r'\bgravure(?:s)?\b',
+]
+
 # --- [LOCAL-304] Named periods / dynasties / regions --------------------------
 #: "the X dynasty", "the X period", "the X era", "the X empire", "the X region"
 #: where X is a capitalised proper noun (possibly hyphenated).
@@ -399,6 +444,8 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
     # terms that appear without syntactic context, and (2) STRUCTURAL detection via
     # "crafted from X" / "carved from X" / "made of X" patterns — catches any
     # material whatever it is, without needing it on a list.
+    # [LOCAL-316] Track 3: painting/print media — bare medium phrases
+    # "<medium> on <support>" and standalone print technique terms.
     _materials_found = set()
     material_patterns = [
         r'\b(?:grey\s+)?schist\b', r'\blacquer(?:ed)?\b', r'\bbronze\b',
@@ -417,11 +464,27 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
         if raw_candidate[0].isupper():
             continue
         # Exclude generic non-material nouns that can follow "made of/from"
+        # [LOCAL-316] Added colour/appearance terms (hues, shades, tones, colours)
         if candidate in ('it', 'this', 'that', 'them', 'which', 'what',
                          'something', 'nothing', 'everything', 'material',
-                         'materials', 'the', 'a', 'an'):
+                         'materials', 'the', 'a', 'an',
+                         'hues', 'shades', 'tones', 'colours', 'colors'):
             continue
         _materials_found.add(candidate)
+    # [LOCAL-316] Bare medium phrases: "oil on canvas", "huile sur toile", etc.
+    # Both medium and support count as material facts.
+    for m in _PAINTING_MEDIUM_RE.finditer(body):
+        _materials_found.add(m.group(1).lower().strip())
+        _materials_found.add(m.group(2).lower().strip())
+    # [LOCAL-316] "on the canvas" / "sur la toile" — support noun as surface.
+    for m in _ON_SUPPORT_RE.finditer(body):
+        # One of the two groups will be non-None (EN vs FR alternation)
+        support = (m.group(1) or m.group(2)).lower().strip()
+        _materials_found.add(support)
+    # [LOCAL-316] Standalone print/technique terms (lithograph, etching, etc.)
+    for pat in _PRINT_TECHNIQUE_PATTERNS:
+        for m in re.finditer(pat, body, re.IGNORECASE):
+            _materials_found.add(m.group(0).lower().strip())
     sa.materials_techniques = sorted(_materials_found)
     
     # Measurements/specific numbers
