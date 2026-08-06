@@ -8148,3 +8148,39 @@ change how much real corpus exists, and tonight's 20% ungrounded rate is the
 number a threshold would be calibrated against. Calibrating now would bake in a
 corpus gap that 290 exists to close. The task file says so and requires
 re-measurement.
+
+## D204 — An empty stop ships; the integration check is what caught it (2026-08-05)
+
+After merging LOCAL-280/284/286/287, LEAD generated one fresh 2-stop Riviera
+tour to confirm the four features compose. They do — **zero splice or degrade
+artifacts**, correct opening, correct `Tour-Category`. But the tour was 444 words
+against 685 earlier, and reading it showed why:
+
+```
+Stop 2: Eze Village
+Address: 06360 Èze, France
+Orientation: Position yourself to best view this location.
+[end of tour]
+```
+
+**Stop 2 had no narration at all.** The log: `STRIPPING:
+[GENERATION_FAILED:Eze Village]`, on a stop logged moments earlier as
+`tier=rich, facts=8` with `CORPUS-GATE verdict=COVERED`. The post-assembly gate
+stripped the failure marker — removing the evidence and leaving the empty stop
+in the tour. The recap then suppressed itself, correctly detecting only one stop
+had content, so the tour lost its conclusion too.
+
+**Not a regression from tonight's merges.** LEAD's first suspect was LOCAL-286's
+new prolog-body dedup; the log shows it removed 0 sentences. The marker-stripping
+path predates tonight. Checking before accusing is the D147/D179 lesson applied.
+
+Measured: **13 of 1 782 stops (0.7%)** have a header and under 15 words of body.
+Negligible in aggregate, half the product on a 2-stop tour — which is the shape
+Michael reads most. → LOCAL-292.
+
+**The methodological point worth keeping:** every metric looked fine. Word count
+plausible, stop count 2, cost normal, all 112 tests green, no defect flagged by
+the rubric. The rubric even scored it ADEQUATE/THIN without noticing one stop was
+empty. It was found by reading the file as prose (D161) — and only because LEAD
+ran a fresh generation after merging rather than trusting four green submissions.
+**Merging several verified features does not verify their combination.**
