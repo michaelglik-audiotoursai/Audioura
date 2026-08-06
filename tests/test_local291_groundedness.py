@@ -174,7 +174,10 @@ class TestOperatorOverride:
             assert ts.stops[0].classification == 'FABRICATED'
             assert 'OPERATOR OVERRIDE' in ts.stops[0].classification_evidence
             # [LOCAL-305] FABRICATED scores -1.5 × share (increased from -1.0)
-            assert ts.per_stop_base[0] == pytest.approx(-150.0)
+            # [LOCAL-309] FABRICATED is -3.0 x share, not -1.5. Michael's ruling:
+        # "Fabricated stop should be penalized 3 times more than omitted stop."
+        # This assertion tracked -100 (original), then -150 (LOCAL-305), now -300.
+        assert ts.per_stop_base[0] == pytest.approx(-300.0)
         finally:
             os.unlink(filepath)
 
