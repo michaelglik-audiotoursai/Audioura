@@ -128,9 +128,9 @@ def test_pipeline_lost_disabled():
 
 def test_unavailable_disabled():
     """UNAVAILABLE with flag OFF logs the message it would show."""
-    # Score 50 (below message threshold of 60), all stops delivered but all THIN
+    # Score 45 (below message threshold of 50), all stops delivered but all THIN
     ts = _make_tour_score(
-        n_requested=2, n_delivered=2, total_score=50.0,
+        n_requested=2, n_delivered=2, total_score=45.0,
         classifications=['THIN', 'THIN'],
         missing_classifications=[],
     )

@@ -21,7 +21,7 @@ All environment variables controlling Storied behavior. This document is the sin
 | `APP_BUNDLE_ID` | `com.glikfamily.audioura` | api-gateway | iOS bundle ID for App Attest verification. |
 | `QUALITY_GUARDRAILS_ENABLED` | `false` | tour-orchestrator | Master switch for quality guardrails (LOCAL-307). When `true`: retries PIPELINE_LOST tours once, emits user messages for UNAVAILABLE. When `false`: logs what it would do, takes no action. |
 | `QUALITY_RETRY_THRESHOLD` | `55.0` | tour-orchestrator | Score below which a PIPELINE_LOST tour is retried. P25 of corpus distribution. |
-| `QUALITY_MESSAGE_THRESHOLD` | `60.0` | tour-orchestrator | Score below which an UNAVAILABLE tour gets a user-facing message. Between P25 and median. |
+| `QUALITY_MESSAGE_THRESHOLD` | `50.0` | tour-orchestrator | Score below which an UNAVAILABLE tour gets a user-facing message. Set per Michael (LOCAL-312); env-overridable. |
 
 ---
 

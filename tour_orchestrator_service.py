@@ -993,6 +993,17 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                 import traceback
                 traceback.print_exc()
 
+        # [LOCAL-312] Update per-user quality index (private, for review solicitation).
+        # This runs for generated tours only (not edits). The user_id here is secret_id.
+        if _tour_score and user_id:
+            try:
+                from user_quality_index import update_user_index, ensure_user_quality_index_table
+                ensure_user_quality_index_table()
+                update_user_index(user_id, _tour_score.total_score)
+            except Exception as idx_err:
+                # Index update must NOT block delivery
+                print(f"[USER_INDEX] Non-fatal error: {idx_err}")
+
         # Store in database with tour content
         store_result = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"), is_test=is_test)
         
