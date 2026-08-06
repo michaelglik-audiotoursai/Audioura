@@ -7455,15 +7455,19 @@ REWRITE RULES (all mandatory):
                 model=_urg_model,
             )
 
-            print(f"  [LOCAL-269] Unglossed-reference gate summary:")
+            print(f"  [LOCAL-269] Unglossed-reference gate summary (LOCAL-287: compose, not splice):")
             print(f"    References detected: {_urg_stats['total_detected']}")
-            print(f"    Glossed: {_urg_stats['total_glossed']}")
-            print(f"    Degraded: {_urg_stats['total_degraded']}")
+            print(f"    Glossed (composed): {_urg_stats['total_glossed']}")
+            print(f"    Suppressed (already explained): {_urg_stats.get('total_suppressed', 0)}")
+            print(f"    Degraded (name dropped): {_urg_stats['total_degraded']}")
+            print(f"    Guard failures: {_urg_stats.get('total_guard_failed', 0)}")
             print(f"    Known (skipped): {_urg_stats['total_known']}")
             print(f"    Triage: {_urg_stats['triage_tokens']} tokens, "
                   f"${_urg_stats['triage_cost']:.4f}, {_urg_stats['triage_latency']:.1f}s")
             print(f"    Gloss: {_urg_stats['gloss_tokens']} tokens, "
                   f"${_urg_stats['gloss_cost']:.4f}, {_urg_stats['gloss_latency']:.1f}s")
+            print(f"    Compose: {_urg_stats.get('compose_tokens', 0)} tokens, "
+                  f"${_urg_stats.get('compose_cost', 0.0):.4f}, {_urg_stats.get('compose_latency', 0.0):.1f}s")
             print(f"    Total added cost: ${_urg_stats['total_cost']:.4f}")
             if _urg_stats['total_cost'] > 0:
                 total_tokens += _urg_stats['total_tokens']
@@ -7472,10 +7476,19 @@ REWRITE RULES (all mandatory):
             if _urg_stats['all_glosses']:
                 print(f"    Glosses applied:")
                 for g in _urg_stats['all_glosses']:
+                    action = g.get('action', '')
                     if g.get('gloss'):
-                        print(f"      • {g['entity']} → \"{g['gloss']}\" [source: {g['source']}]")
+                        print(f"      • {g['entity']} → \"{g['gloss']}\" [source: {g.get('source', 'composed')}]")
+                    elif action == 'suppressed':
+                        print(f"      • {g['entity']} → SUPPRESSED (already explained)")
+                    elif action == 'guard_failed':
+                        print(f"      • {g['entity']} → GUARD FAILED ({g.get('reason', '?')}), name dropped")
                     else:
-                        print(f"      • {g['entity']} → DEGRADED")
+                        print(f"      • {g['entity']} → DEGRADED (name dropped)")
+            if _urg_stats.get('guard_failures'):
+                print(f"    Guard failures detail:")
+                for gf in _urg_stats['guard_failures']:
+                    print(f"      ✗ {gf['entity']}: \"{gf['gloss']}\" — {gf['reason']}")
 
     # -------- [LOCAL-229] PHASE 5.16: CONTRADICTED claim block --------
     # D100 (Michael, 2026-08-04): "We should not publish if we are reasonably sure
