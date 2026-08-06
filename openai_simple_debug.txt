@@ -26,10 +26,10 @@ Return ONLY a JSON array, no other text, no markdown fences:
 
 === OPENAI RESPONSE ===
 [
-    {"name": "Promenade des Anglais", "address": "Prom. des Anglais, 06000 Nice, France"},
+    {"name": "Promenade des Anglais", "address": "Promenade des Anglais, 06000 Nice, France"},
     {"name": "Cap d'Antibes", "address": "Cap d'Antibes, 06160 Antibes, France"}
 ]
 
 === ANALYSIS ===
 Requested stops: 2
-See full chain log: /app/api_call_chain_20260805_091705.txt
+See full chain log: /app/api_call_chain_20260805_220525.txt
