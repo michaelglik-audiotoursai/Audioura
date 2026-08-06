@@ -35,10 +35,102 @@ import json
 import logging
 import os
 import re
+import threading
+import time
 import unicodedata
 from typing import Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
+
+
+# ──── LOCAL-320: Nominatim shared throttle ────────────────────────────────────
+# Nominatim usage policy: max 1 request/second, descriptive User-Agent required.
+# A throttled (429) or failed lookup must classify as "unknown" (retry), NEVER as
+# "unverified" (which would reject a stop based on non-evidence). D162 rule:
+# absence of evidence from a failed search is not evidence of absence.
+
+_NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
+_NOMINATIM_HEADERS = {
+    "User-Agent": "Audioura/2.2 (tour-generation; contact: support@audioura.com)",
+    "Accept": "application/json",
+}
+_NOMINATIM_MIN_INTERVAL = 1.1  # seconds between requests (slightly above 1s for safety)
+_NOMINATIM_MAX_RETRIES = 3
+_NOMINATIM_RETRY_BACKOFF = 2.0  # seconds base for exponential backoff
+
+_nominatim_lock = threading.Lock()
+_nominatim_last_request_time = 0.0
+
+
+def _nominatim_request(params: dict, context: str = "") -> "requests.Response":
+    """Make a rate-limited Nominatim request with retry on 429/timeout.
+
+    LOCAL-320: Serialises all Nominatim requests at ≤1/second using a shared
+    lock. Retries up to 3 times with exponential backoff on 429 or timeout.
+
+    Returns:
+        requests.Response with status 200
+
+    Raises:
+        RuntimeError: If all retries exhausted (429), timeout, or connection
+        error. The caller MUST treat this as "unknown" — not "unverified".
+    """
+    import requests as _http
+
+    global _nominatim_last_request_time
+
+    for attempt in range(_NOMINATIM_MAX_RETRIES):
+        # Serialise and enforce minimum interval
+        with _nominatim_lock:
+            now = time.time()
+            elapsed = now - _nominatim_last_request_time
+            if elapsed < _NOMINATIM_MIN_INTERVAL:
+                sleep_time = _NOMINATIM_MIN_INTERVAL - elapsed
+                time.sleep(sleep_time)
+            _nominatim_last_request_time = time.time()
+
+        try:
+            resp = _http.get(
+                _NOMINATIM_URL, params=params, headers=_NOMINATIM_HEADERS, timeout=10
+            )
+        except (_http.exceptions.Timeout, _http.exceptions.ConnectionError) as e:
+            logger.warning(f"[EXISTENCE-GATE] Nominatim {type(e).__name__} for "
+                           f"{context!r} (attempt {attempt + 1}/{_NOMINATIM_MAX_RETRIES})")
+            if attempt < _NOMINATIM_MAX_RETRIES - 1:
+                time.sleep(_NOMINATIM_RETRY_BACKOFF * (2 ** attempt))
+                continue
+            raise RuntimeError(
+                f"Nominatim connection failed for {context!r} after "
+                f"{_NOMINATIM_MAX_RETRIES} attempts: {e}"
+            )
+
+        if resp.status_code == 429:
+            logger.warning(f"[EXISTENCE-GATE] Nominatim 429 for {context!r} "
+                           f"(attempt {attempt + 1}/{_NOMINATIM_MAX_RETRIES})")
+            if attempt < _NOMINATIM_MAX_RETRIES - 1:
+                time.sleep(_NOMINATIM_RETRY_BACKOFF * (2 ** attempt))
+                continue
+            raise RuntimeError(
+                f"Nominatim rate limited (429) for {context!r} after "
+                f"{_NOMINATIM_MAX_RETRIES} retries"
+            )
+
+        if resp.status_code != 200:
+            logger.warning(f"[EXISTENCE-GATE] Nominatim HTTP {resp.status_code} for "
+                           f"{context!r}")
+            # Non-429 errors: don't retry, but also don't silently return False
+            # Return the response and let the caller decide
+            raise RuntimeError(
+                f"Nominatim HTTP {resp.status_code} for {context!r}"
+            )
+
+        return resp
+
+    # Should not reach here, but safety
+    raise RuntimeError(f"Nominatim request failed for {context!r}")
+
+
+# ──── END LOCAL-320 ───────────────────────────────────────────────────────────
 
 
 def _strip_accents(text: str) -> str:
@@ -865,6 +957,15 @@ def _check_dining_existence(
     # Key insight: many restaurants don't have standalone articles but are mentioned
     # in other articles (e.g. Le Chantecler in the Hotel Negresco article).
     # We search and check if the SNIPPET mentions both the restaurant and the city.
+    #
+    # LOCAL-320: The article fallback (fetching full article when snippet is partial)
+    # must require the article to be ABOUT the establishment. An article about
+    # Six Flags Great Adventure matched "Safari" + "nice" (the English adjective)
+    # and was accepted as evidence for "Le Safari" in Nice. This is wrong.
+    # The fix: the article fallback requires EITHER:
+    #   (a) The article title matches the stop title (it IS the restaurant's article), OR
+    #   (b) The article mentions the FULL stop name (not just partial word overlap)
+    #       AND a dining signal AND the city as a proper noun (word boundary).
     try:
         city_hint = next(iter(_city_signals), "")
         # Try multiple search variants: quoted exact name, then unquoted keywords
@@ -904,31 +1005,54 @@ def _check_dining_existence(
                         # Snippet mentions restaurant but not city — check article
                         try:
                             r_title = r.get("title", "")
+                            # LOCAL-320: Article must be ABOUT the establishment.
+                            # If article title doesn't match stop title, this is
+                            # a tangential mention — require much stronger evidence.
+                            _article_is_about_stop = _title_match(stop_title, r_title)
+
                             art_url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{quote(r_title.replace(' ', '_'), safe='')}"
                             art_resp = _http.get(art_url, headers=_HEADERS, timeout=5, allow_redirects=True)
                             if art_resp.status_code == 200:
                                 art_data = art_resp.json()
                                 art_text = _strip_accents(f"{art_data.get('extract', '')} {art_data.get('description', '')}").lower()
-                                art_has_stop = any(w in art_text for w in _stop_words)
-                                art_has_city = any(sig in art_text for sig in _city_signals)
-                                if art_has_stop and art_has_city:
-                                    # Proximity check: stop and city within 300 chars
-                                    _art_proximity_ok = False
-                                    for sw in _stop_words:
-                                        sw_pos = art_text.find(sw)
-                                        if sw_pos < 0:
-                                            continue
-                                        for cs in _city_signals:
-                                            cs_pos = art_text.find(cs)
-                                            if cs_pos < 0:
-                                                continue
-                                            if abs(sw_pos - cs_pos) <= 300:
-                                                _art_proximity_ok = True
-                                                break
-                                        if _art_proximity_ok:
+
+                                if _article_is_about_stop:
+                                    # Article IS the restaurant — just need city mention
+                                    art_has_city = any(sig in art_text for sig in _city_signals)
+                                    if art_has_city:
+                                        return True, f"wikipedia_article: '{r_title}' is about the establishment+city"
+                                else:
+                                    # Article is about something ELSE (e.g. Six Flags).
+                                    # LOCAL-320: Require the FULL stop name (not just
+                                    # partial words) to appear in the article, PLUS a
+                                    # dining signal, PLUS the city as a word boundary.
+                                    # This prevents "Safari" in "Six Flags" + "nice"
+                                    # (adjective) from passing.
+                                    _full_stop_normalized = _strip_accents(stop_title).lower()
+                                    art_has_full_stop = _full_stop_normalized in art_text
+                                    if not art_has_full_stop:
+                                        continue
+
+                                    # City must appear as a word boundary (not as substring
+                                    # of another word or as the English adjective "nice")
+                                    art_has_city_proper = False
+                                    for sig in _city_signals:
+                                        # Word boundary: preceded/followed by non-alpha
+                                        pattern = r'(?<![a-z])' + re.escape(sig) + r'(?![a-z])'
+                                        if re.search(pattern, art_text):
+                                            art_has_city_proper = True
                                             break
-                                    if _art_proximity_ok:
-                                        return True, f"wikipedia_article: '{r_title}' extract mentions stop+city"
+                                    if not art_has_city_proper:
+                                        continue
+
+                                    # Dining signal required
+                                    _dining_sigs = ('restaurant', 'chef', 'michelin',
+                                                    'cuisine', 'bistro', 'dining', 'food')
+                                    art_has_dining = any(sig in art_text for sig in _dining_sigs)
+                                    if not art_has_dining:
+                                        continue
+
+                                    return True, f"wikipedia_article: '{r_title}' extract mentions stop+city+dining"
                         except Exception:
                             pass
     except Exception as e:
@@ -948,12 +1072,18 @@ def _check_dining_existence(
             full_text_fr = f"{extract_fr} {description_fr}".lower()
             full_text_fr_normalized = _strip_accents(full_text_fr)
 
-            if _city_signals and any(sig in full_text_fr_normalized for sig in _city_signals):
-                return True, f"wikipedia_fr_summary: '{title_fr}' mentions city"
-
+            # LOCAL-320: Require BOTH city AND dining signal (same logic as Check 1).
+            # Previously just city was enough — but "Le Safari" could resolve to
+            # an unrelated article that mentions "nice" (the adjective).
             _restaurant_signals_fr = ('restaurant', 'chef', 'michelin', 'cuisine', 'etoile',
                                       'gastronomique', 'bistrot', 'brasserie', 'table', 'cuisinier')
-            if any(sig in full_text_fr_normalized for sig in _restaurant_signals_fr):
+            has_city_fr = _city_signals and any(sig in full_text_fr_normalized for sig in _city_signals)
+            is_dining_fr = any(sig in full_text_fr_normalized for sig in _restaurant_signals_fr)
+
+            if has_city_fr and is_dining_fr:
+                return True, f"wikipedia_fr_summary: '{title_fr}' is dining+city (fr.wiki)"
+            # If title matches exactly and it's clearly a restaurant, accept
+            if is_dining_fr and _title_match(stop_title, title_fr):
                 return True, f"wikipedia_fr_summary: '{title_fr}' is a restaurant (fr.wiki)"
 
         # French Wikipedia search (snippet-based)
@@ -989,6 +1119,10 @@ def _check_dining_existence(
                     if stop_in_fr and _dining_in_fr:
                         try:
                             r_title_fr = r.get("title", "")
+                            # LOCAL-320: Same rule as English path — article must be
+                            # ABOUT the establishment. Title match = strong signal.
+                            _article_is_about_stop_fr = _title_match(stop_title, r_title_fr)
+
                             # Fetch article extract via action API (full text, no truncation)
                             art_resp_fr = _http.get(
                                 "https://fr.wikipedia.org/w/api.php",
@@ -1002,20 +1136,28 @@ def _check_dining_existence(
                                 pages = art_resp_fr.json().get("query", {}).get("pages", {})
                                 for _, page in pages.items():
                                     art_text_fr = _strip_accents(page.get("extract", "")).lower()
-                                    art_has_stop = any(w in art_text_fr for w in _stop_words)
-                                    art_has_city = any(sig in art_text_fr for sig in _city_signals)
-                                    if art_has_stop and art_has_city:
-                                        # Proximity check in article: stop and city within 300 chars
-                                        for sw in _stop_words:
-                                            sw_pos = art_text_fr.find(sw)
-                                            if sw_pos < 0:
-                                                continue
-                                            for cs in _city_signals:
-                                                cs_pos = art_text_fr.find(cs)
-                                                if cs_pos < 0:
-                                                    continue
-                                                if abs(sw_pos - cs_pos) <= 300:
-                                                    return True, f"wikipedia_fr_article: '{r_title_fr}' mentions stop+city (dining context)"
+
+                                    if _article_is_about_stop_fr:
+                                        # Article IS the restaurant — city mention suffices
+                                        art_has_city = any(sig in art_text_fr for sig in _city_signals)
+                                        if art_has_city:
+                                            return True, f"wikipedia_fr_article: '{r_title_fr}' is about establishment+city"
+                                    else:
+                                        # Article is about something else — require full
+                                        # stop name + city as word boundary + dining signal
+                                        _full_stop_norm_fr = _strip_accents(stop_title).lower()
+                                        if _full_stop_norm_fr not in art_text_fr:
+                                            continue
+                                        # City as word boundary
+                                        art_has_city_proper_fr = False
+                                        for sig in _city_signals:
+                                            pattern = r'(?<![a-z])' + re.escape(sig) + r'(?![a-z])'
+                                            if re.search(pattern, art_text_fr):
+                                                art_has_city_proper_fr = True
+                                                break
+                                        if not art_has_city_proper_fr:
+                                            continue
+                                        return True, f"wikipedia_fr_article: '{r_title_fr}' mentions stop+city (dining context)"
                         except Exception:
                             pass
     except Exception as e:
@@ -1076,10 +1218,18 @@ def _check_dining_existence(
     #
     # Proximity constraint: the result must be in the city extracted from
     # venue_name. A restaurant in Lyon must not pass for a Nice tour.
+    #
+    # LOCAL-320: RuntimeError from _nominatim_request means the search FAILED
+    # (throttled/timeout/connection error). This MUST propagate — it is NOT
+    # "no evidence", it is "could not search". D162: absence of evidence from
+    # a failed search is not evidence of absence.
     try:
         verified_osm, evidence_osm = _check_dining_nominatim(stop_title, venue_name, _city_signals)
         if verified_osm:
             return True, evidence_osm
+    except RuntimeError:
+        # LOCAL-320: Search failure — propagate so gate classifies as "unknown"
+        raise
     except Exception as e:
         logger.debug(f"[EXISTENCE-GATE] Nominatim check failed for {stop_title!r}: {e}")
 
@@ -1095,6 +1245,11 @@ def _check_dining_nominatim(
     named POIs in OpenStreetMap. Nominatim's search API returns structured results
     including the display name, address components, and category.
 
+    LOCAL-320: All Nominatim requests are serialised through _nominatim_request()
+    which enforces ≤1 req/s, a descriptive User-Agent, and bounded retry on 429.
+    A throttled/failed lookup raises RuntimeError (classified as "unknown" by
+    the caller), never returns False (which would mean "searched and not found").
+
     Strategy:
       1. Search Nominatim for the restaurant name + city.
       2. A result must:
@@ -1103,18 +1258,7 @@ def _check_dining_nominatim(
          c) Be a plausible dining category (amenity, tourism, shop categories
             that include restaurants/cafes/bars).
       3. First match confirms existence.
-
-    Rate limit: Nominatim usage policy allows 1 req/s with a custom User-Agent.
-    We already set a descriptive UA. One query per stop is well within limits.
     """
-    import requests as _http
-    from urllib.parse import quote
-
-    _HEADERS = {
-        "User-Agent": "Audioura/2.2 (tour-generation; contact: support@audioura.com)",
-        "Accept": "application/json",
-    }
-
     # Build city hint for search constraint
     # For venue_names like "restaurant tour in Old Nice (Vieux Nice), France"
     # we need to extract the actual city name (Nice), not noise words.
@@ -1143,7 +1287,6 @@ def _check_dining_nominatim(
 
     # Nominatim search: "restaurant_name, city"
     search_query = f"{stop_title}, {city_hint}"
-    nominatim_url = "https://nominatim.openstreetmap.org/search"
     params = {
         "q": search_query,
         "format": "jsonv2",
@@ -1152,15 +1295,8 @@ def _check_dining_nominatim(
         "accept-language": "en,fr",
     }
 
-    resp = _http.get(nominatim_url, params=params, headers=_HEADERS, timeout=10)
-
-    if resp.status_code == 429:
-        # Rate limited — treat as search failure, not "no data" (D220)
-        logger.warning(f"[EXISTENCE-GATE] Nominatim 429 for {stop_title!r} — failing closed")
-        raise RuntimeError(f"Nominatim rate limited (429) for {stop_title!r}")
-
-    if resp.status_code != 200:
-        return False, ""
+    # LOCAL-320: Use shared throttled request (≤1/s, retries on 429)
+    resp = _nominatim_request(params, context=stop_title)
 
     results = resp.json()
     if not results:
@@ -1200,6 +1336,8 @@ def _check_dining_nominatim(
             continue
 
         # --- City match: is this result in the correct city? ---
+        # LOCAL-320: Proximity MUST bind — a Chicago address must not pass for Nice.
+        # Check structured address fields (not just display_name substring).
         result_city = _strip_accents(
             address.get("city", "") or address.get("town", "") or
             address.get("municipality", "") or address.get("village", "")
@@ -1212,7 +1350,8 @@ def _check_dining_nominatim(
             if sig in result_city or sig in result_state or sig in result_county:
                 city_match = True
                 break
-        # Also check display_name for city signal
+        # Also check display_name for city signal (but only structured address
+        # above truly guarantees proximity — this is a soft fallback)
         if not city_match:
             for sig in city_signals:
                 if sig in norm_display:
@@ -1220,6 +1359,9 @@ def _check_dining_nominatim(
                     break
 
         if not city_match:
+            # LOCAL-320: Log the rejection so it's visible in diagnostics
+            logger.debug(f"[EXISTENCE-GATE] Nominatim result '{name}' in "
+                         f"'{result_city}' rejected — not in {city_signals}")
             continue
 
         # --- Category match: is this a dining establishment? ---
@@ -1320,11 +1462,25 @@ def verify_stop_existence(
         # LOCAL-281: Restaurant/dining verification via external sources.
         # The question is "does this establishment exist at this location?" —
         # verified via Wikipedia, Wikidata, or authoritative culinary sources.
-        verified, evidence = _check_dining_existence(stop_title, venue_name, db_conn)
-        if verified:
-            result['verified'] = True
-            result['evidence'] = evidence
-            result['source'] = 'dining_external'
+        #
+        # LOCAL-320: RuntimeError means search infrastructure failed (rate limit,
+        # timeout, connection error). This is NOT "no evidence" — it is "could
+        # not search". D162: a search that did not really run must never be
+        # evidence of absence. Classify as "unknown" so the gate retries.
+        try:
+            verified, evidence = _check_dining_existence(stop_title, venue_name, db_conn)
+            if verified:
+                result['verified'] = True
+                result['evidence'] = evidence
+                result['source'] = 'dining_external'
+                return result
+        except RuntimeError as e:
+            # Search failed — classify as "unknown" (not unverified)
+            result['evidence'] = f'search_failed: {e}'
+            result['source'] = 'search_failed'
+            # Mark as unknown so the gate can distinguish from "searched and not found"
+            result['search_failed'] = True
+            logger.warning(f"[EXISTENCE-GATE] Search failed for {stop_title!r}: {e}")
             return result
     else:
         # Institution or unknown: strict same-source rule (D74, D127).
@@ -1415,6 +1571,7 @@ def run_existence_gate(
             'total_stops': len(poi_list),
             'verified_stops': list(poi_list),
             'unverified_stops': [],
+            'inconclusive_stops': [],
             'verdicts': [],
             'action': 'OFF',
         }
@@ -1423,32 +1580,85 @@ def run_existence_gate(
     verdicts = []
     verified_stops = []
     unverified_stops = []
+    inconclusive_stops = []  # LOCAL-320 bounce: third state — kept but NOT verified
 
     for stop_title in poi_list:
         verdict = verify_stop_existence(stop_title, venue_name, db_conn, tour_type=tour_type)
         verdicts.append(verdict)
         if verdict['verified']:
             verified_stops.append(stop_title)
+        elif verdict.get('search_failed'):
+            # LOCAL-320: Search infrastructure failed (rate limit, timeout).
+            # D162: a search that did not really run must never be evidence of
+            # absence. These stops are "unknown" — retry once after a pause.
+            pass  # Will be retried below
         else:
             unverified_stops.append(stop_title)
 
-    # Log results
+    # LOCAL-320: Retry any search_failed stops after a pause (the throttle likely
+    # just needed more time between requests). One retry per stop, max.
+    _failed_stops = [v['stop_title'] for v in verdicts if v.get('search_failed')]
+    if _failed_stops:
+        print(f"  [EXISTENCE-GATE] {len(_failed_stops)} stop(s) had search failures — "
+              f"retrying after pause")
+        time.sleep(_NOMINATIM_MIN_INTERVAL * 2)  # Extra breathing room
+        for i, stop_title in enumerate(_failed_stops):
+            retry_verdict = verify_stop_existence(stop_title, venue_name, db_conn, tour_type=tour_type)
+            # Replace the failed verdict
+            for j, v in enumerate(verdicts):
+                if v['stop_title'] == stop_title and v.get('search_failed'):
+                    verdicts[j] = retry_verdict
+                    break
+            if retry_verdict['verified']:
+                verified_stops.append(stop_title)
+                print(f"    [RETRY OK] {stop_title!r} — {retry_verdict['evidence'][:60]}")
+            elif retry_verdict.get('search_failed'):
+                # LOCAL-320 bounce fix: Still failing after retry.
+                # This is INCONCLUSIVE — NOT verified, NOT unverified.
+                # The stop is kept for delivery (D162: don't reject based on a
+                # search that never completed), but it MUST NOT enter
+                # verified_stops and MUST NOT be counted as verified in the log.
+                # A fabricated name must not be called "verified" just because
+                # the search infrastructure failed. Michael's rule: a fabricated
+                # stop costs 3× an illegitimate omission.
+                inconclusive_stops.append(stop_title)
+                # Mark the verdict so downstream can distinguish
+                retry_verdict['inconclusive'] = True
+                retry_verdict['search_failed'] = True
+                for j, v in enumerate(verdicts):
+                    if v['stop_title'] == stop_title:
+                        verdicts[j] = retry_verdict
+                        break
+                print(f"    [RETRY FAILED] {stop_title!r} — INCONCLUSIVE "
+                      f"(search still failing, kept for delivery but NOT verified)")
+            else:
+                unverified_stops.append(stop_title)
+                print(f"    [RETRY] {stop_title!r} — genuinely unverified")
+
+    # Log results — report inconclusive as its own count (never claim verified)
     n_ver = len(verified_stops)
     n_unver = len(unverified_stops)
+    n_inconclusive = len(inconclusive_stops)
     pct_ver = n_ver / len(poi_list) * 100 if poi_list else 0
 
+    _inc_suffix = f", {n_inconclusive} inconclusive" if n_inconclusive else ""
     if mode == 'enforce':
         action = 'ENFORCE'
         print(f"  [EXISTENCE-GATE] ENFORCE — {n_ver}/{len(poi_list)} stops verified "
-              f"({pct_ver:.0f}%), dropping {n_unver} unverified")
+              f"({pct_ver:.0f}%), dropping {n_unver} unverified{_inc_suffix}")
     else:
         action = 'LOG_ONLY'
         print(f"  [EXISTENCE-GATE] LOG_ONLY — {n_ver}/{len(poi_list)} stops verified "
-              f"({pct_ver:.0f}%), {n_unver} would be dropped if enforced")
+              f"({pct_ver:.0f}%), {n_unver} would be dropped{_inc_suffix}")
 
     # Log individual verdicts
     for v in verdicts:
-        status = "VERIFIED" if v['verified'] else "UNVERIFIED"
+        if v['verified']:
+            status = "VERIFIED"
+        elif v.get('inconclusive'):
+            status = "INCONCLUSIVE"
+        else:
+            status = "UNVERIFIED"
         ev = v['evidence'][:80] if v['evidence'] else "no evidence"
         print(f"    [{status}] {v['stop_title']!r:.50s} — {ev}")
 
@@ -1488,6 +1698,7 @@ def run_existence_gate(
         'total_stops': len(poi_list),
         'verified_stops': verified_stops,
         'unverified_stops': unverified_stops,
+        'inconclusive_stops': inconclusive_stops,  # LOCAL-320 bounce: kept but not verified
         'verdicts': verdicts,
         'action': action,
         'harvest_summary': harvest_summary,

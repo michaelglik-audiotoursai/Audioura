@@ -5126,6 +5126,13 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             if _seg_after < _seg_requested_stops:
                                 print(f"  [LOCAL-245] EXISTENCE-GATE: tour SHORT — "
                                       f"{_seg_after}/{_seg_requested_stops} stops, triggering replenishment")
+                    # LOCAL-320 bounce: Log inconclusive stops (kept but not verified)
+                    _seg_inconclusive = _seg_result.get('inconclusive_stops', [])
+                    if _seg_inconclusive:
+                        print(f"  [LOCAL-320] {len(_seg_inconclusive)} INCONCLUSIVE stop(s) "
+                              f"(kept for delivery, eligible for replacement if verified alternative found)")
+                        for _seg_inc in _seg_inconclusive:
+                            print(f"    INCONCLUSIVE: {_seg_inc!r}")
                 else:
                     print(f"  [LOCAL-245] EXISTENCE-GATE: DB unavailable — gate cannot run, proceeding without")
             else:
@@ -5270,6 +5277,129 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 total_stops = _seg_requested_stops
                 print(f"  [LOCAL-290] Replenishment SUCCESS: {len(poi_list)}/{_seg_requested_stops} stops")
         # ──── END [LOCAL-290] GEOGRAPHIC REPLENISHMENT ────────────────────────
+
+        # ──── LOCAL-320 bounce: INCONCLUSIVE REPLACEMENT ──────────────────────
+        # If any stops are inconclusive (search failed, kept for delivery),
+        # try to find verified replacements. Prefer a verified stop over an
+        # unchecked one. If no replacement verifies, keep the inconclusive stop
+        # (do not lose delivery — D162).
+        _seg_inconclusive_set = set(_seg_result.get('inconclusive_stops', [])
+                                    if '_seg_result' in dir() else [])
+        if (tour_category != 'museum' and _seg_inconclusive_set
+                and _seg_mode == 'enforce' and len(poi_list) > 0):
+            _inc_tried = set(p['name'].lower() for p in poi_list)
+            _inc_tried.update(n.lower() for n in (_seg_result.get('unverified_stops', [])
+                                                  if '_seg_result' in dir() else []))
+            print(f"\n  [LOCAL-320] INCONCLUSIVE REPLACEMENT: attempting to replace "
+                  f"{len(_seg_inconclusive_set)} inconclusive stop(s) with verified alternatives")
+
+            _inc_ask = min(len(_seg_inconclusive_set) + 4, 12)
+            _inc_forbidden = sorted(_inc_tried)[:30]
+            _inc_forbidden_str = "; ".join(_inc_forbidden) if _inc_forbidden else "(none)"
+
+            _inc_prompt = (
+                f"You are a knowledgeable local guide for {location}.\n"
+                f"List exactly {_inc_ask} specific, real, well-known {poi_type_hint} "
+                f"relevant to: {user_request}.\n"
+                f"DO NOT include: {_inc_forbidden_str}\n"
+                "Requirements:\n"
+                "- Use REAL, SPECIFIC names of actual places/landmarks.\n"
+                "- These must be well-documented places that appear on Wikipedia or maps.\n"
+                "- Include a complete street address where applicable.\n"
+                '\nReturn ONLY a JSON array: [{"name": "...", "address": "..."}]'
+            )
+            _inc_data = {
+                "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+                "messages": [
+                    {"role": "system", "content": "Return ONLY valid JSON arrays."},
+                    {"role": "user", "content": _inc_prompt}
+                ],
+                "temperature": 0.7,
+                "max_tokens": 600,
+            }
+            try:
+                _inc_resp = requests.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers=headers, data=json.dumps(_inc_data)
+                )
+                if _inc_resp.status_code == 200:
+                    _inc_result = _inc_resp.json()
+                    _inc_text = _inc_result["choices"][0]["message"]["content"]
+                    tokens_used = _inc_result["usage"]["total_tokens"]
+                    total_tokens += tokens_used
+                    total_cost += _tour_llm_cost(tokens_used)
+
+                    _inc_candidates = _parse_json_array_loose(_inc_text)
+                    _inc_new_names = []
+                    for c in (_inc_candidates or []):
+                        if not isinstance(c, dict):
+                            continue
+                        name = (c.get("name") or "").strip()
+                        if not name or name.lower() in _inc_tried:
+                            continue
+                        if _is_name_corrupted(name):
+                            _inc_tried.add(name.lower())
+                            continue
+                        _inc_tried.add(name.lower())
+                        _inc_new_names.append((name, c.get("address") or ""))
+
+                    if _inc_new_names:
+                        _inc_conn = None
+                        try:
+                            from venue_resolver import _get_db_connection as _inc_get_conn
+                            _inc_conn = _inc_get_conn()
+                        except Exception:
+                            pass
+                        if not _inc_conn:
+                            try:
+                                import psycopg2
+                                _inc_db_url = os.environ.get('DATABASE_URL')
+                                if _inc_db_url:
+                                    _inc_conn = psycopg2.connect(_inc_db_url, connect_timeout=5)
+                            except Exception:
+                                pass
+
+                        if _inc_conn:
+                            _inc_name_list = [n for n, _ in _inc_new_names]
+                            _inc_gate_result = run_existence_gate(
+                                _inc_name_list, location, _inc_conn, tour_type=tour_category)
+                            _inc_conn.close()
+
+                            _inc_verified_names = set(_inc_gate_result.get('verified_stops', []))
+                            _inc_replaced = 0
+                            # Replace inconclusive stops with verified alternatives
+                            for name, addr in _inc_new_names:
+                                if name in _inc_verified_names and _seg_inconclusive_set:
+                                    # Find an inconclusive stop to replace
+                                    _target = next(iter(_seg_inconclusive_set))
+                                    _seg_inconclusive_set.discard(_target)
+                                    # Swap in poi_list
+                                    for idx, p in enumerate(poi_list):
+                                        if p['name'] == _target:
+                                            poi_list[idx] = _new_poi(name, addr)
+                                            _inc_replaced += 1
+                                            _inc_ev = ""
+                                            for v in _inc_gate_result.get('verdicts', []):
+                                                if v.get('stop_title') == name:
+                                                    _inc_ev = v.get('evidence', '')[:60]
+                                                    break
+                                            print(f"    [LOCAL-320] REPLACED inconclusive '{_target}' "
+                                                  f"with verified '{name}' — {_inc_ev}")
+                                            break
+                            if _inc_replaced:
+                                print(f"    [LOCAL-320] Replaced {_inc_replaced} inconclusive stop(s)")
+                            else:
+                                print(f"    [LOCAL-320] No verified replacements found — "
+                                      f"keeping inconclusive stops for delivery")
+                        else:
+                            print(f"    [LOCAL-320] DB unavailable for inconclusive replacement")
+                    else:
+                        print(f"    [LOCAL-320] No new candidates for inconclusive replacement")
+                else:
+                    print(f"    [LOCAL-320] Inconclusive replacement API error {_inc_resp.status_code}")
+            except Exception as _inc_err:
+                print(f"    [LOCAL-320] Inconclusive replacement error (non-fatal): {_inc_err}")
+        # ──── END LOCAL-320 INCONCLUSIVE REPLACEMENT ──────────────────────────
 
         # Hard cap and final sanity
         if len(poi_list) > total_stops:
