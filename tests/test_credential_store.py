@@ -15,12 +15,22 @@ import os
 import sys
 import pytest
 
-# Force test database
-os.environ['AUDIOURA_DB_TARGET'] = 'test'
+# Force test database — SCOPED, not module-level.
+# [LEAD] D214 exactly: setting AUDIOURA_DB_TARGET at module scope leaks into
+# every test collected afterwards in the same session, routing them to
+# audiotours_test. It made 7 LOCAL-320 non-dining tests fail when run in the
+# same invocation as this file, while both files passed alone. An autouse
+# fixture confines it to this module and restores the prior value.
 os.environ.setdefault('DB_HOST', 'localhost')
 os.environ.setdefault('DB_PORT', '5433')
 os.environ.setdefault('DB_USER', 'admin')
 os.environ.setdefault('DB_PASSWORD', 'password123')
+
+
+@pytest.fixture(autouse=True)
+def _force_test_db(monkeypatch):
+    monkeypatch.setenv('AUDIOURA_DB_TARGET', 'test')
+    yield
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
