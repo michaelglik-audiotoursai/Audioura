@@ -1123,14 +1123,55 @@ _R7_PATTERNS = [
     # The narrator invents TWO scent sources combined. Does NOT fire on a single
     # factual scent ("The scent of lavender fills the garden" — one source, factual).
     r'\b(?:the\s+)?(?:scent|smell|fragrance|aroma)\s+of\s+.+?\b(?:mingles?|mixes?|blends?|intertwines?|combines?)\s+with\s+(?:the\s+)?(?:scent|smell|fragrance|aroma)\b',
-    # LOCAL-286: Fabricated scenic adjective-noun compounds that are standard
-    # model hallucinations. These never come from sources — they are atmospheric
-    # fillers the model generates to sound "immersive". Each pattern requires
-    # the specific compound adjective that is the hallmark of fabrication.
-    # "azure/turquoise/cerulean waters/sea/expanse" — model default for coastal
-    r'\b(?:azure|turquoise|cerulean|sapphire|crystal-clear|crystalline)\s+(?:waters?|sea|ocean|waves?|depths?|expanse)\b',
-    # "sun-kissed/sun-drenched/sun-soaked" — model default warm-climate filler
+    # ──────────────────────────────────────────────────────────────────────────
+    # LOCAL-303 CATEGORY 1: Fabricated-sensory adjectives — fire regardless of
+    # what noun follows. These adjectives are NEVER sourced from documents in a
+    # narrated tour; they are atmospheric fillers the model invents.
+    #
+    # The adjective alone is the signal. "azure sky" is as fabricated as
+    # "azure waters". Unlike factual colors (red, white, blue), these are
+    # literary/poetic intensifiers that assert a visual experience.
+    #
+    # Guard: requires the adjective to modify a noun (followed by \w+ or
+    # end-of-clause). Does NOT fire on quoted speech or factual construction
+    # like "is painted azure" (predicate adjective describing a verifiable
+    # property — handled by exclusion below).
+    # ──────────────────────────────────────────────────────────────────────────
+    # azure/turquoise/cerulean/sapphire/crystal-clear/crystalline + any noun
+    r'\b(?:azure|turquoise|cerulean|sapphire|crystal-clear|crystalline)\s+\w+',
+    # shimmering/glistening/sparkling/glinting + any noun — fabricated visual
+    r'\b(?:shimmering|glistening|sparkling|glinting|glittering)\s+\w+',
+    # sun-kissed/sun-drenched/sun-soaked etc. — model default warm-climate filler
     r'\bsun-(?:kissed|drenched|soaked|bathed|warmed|bleached)\b',
+    # verdant/lush as scene-dressing — fires when modifying a noun
+    # ("verdant gardens", "lush greenery") — never sourced from documents
+    r'\b(?:verdant|lush)\s+(?:garden|green|vegetation|foliage|landscape|hillside|valley|canopy|oasis|paradise|surroundings|tropical)',
+    # ──────────────────────────────────────────────────────────────────────────
+    # LOCAL-303 CATEGORY 2: Sensory-assertion shapes — structural patterns where
+    # the text presents a sensory experience as fact, regardless of vocabulary.
+    #
+    # The shape itself is the signal: "the [texture/scent/feel/fragrance] of X
+    # [verb] beneath/against/in your [body part/senses]", "a sensory delight",
+    # "offers a [adj] touch/feel of".
+    # ──────────────────────────────────────────────────────────────────────────
+    # "the [sensory-noun] of X ... beneath/against/under your [body-part]"
+    r'\b(?:the\s+)?(?:texture|warmth|coolness|roughness|smoothness|chill|heat)\s+of\s+.+?\b(?:beneath|against|under|between|across)\s+your\s+(?:finger|hand|palm|feet|skin|cheek|face|body)',
+    # "offers/provides a [adj] touch/feel/sensation of"
+    r'\b(?:offers?|provides?|gives?|delivers?)\s+(?:a\s+)?(?:\w+\s+)?(?:touch|feel|sensation|burst|wave|rush)\s+of\b',
+    # "a sensory delight/feast/experience/treat" — explicit sensory-claim marker
+    r'\ba\s+sensory\s+(?:delight|feast|experience|treat|journey|adventure|symphony|tapestry|overload)\b',
+    # "the fragrance/scent/aroma of X ... hangs/lingers/drifts/wafts in the air"
+    r'\b(?:the\s+)?(?:fragrance|scent|aroma|perfume|smell)\s+of\s+.+?\b(?:hangs?|lingers?|drifts?|wafts?|floats?|permeates?)\s+(?:in|through|on)\s+the\s+(?:air|breeze|atmosphere)',
+    # "invites [sensory verb]" — "invites exploration/contemplation" is fine,
+    # but we catch the atmospheric "set against the azure sky, invites" via
+    # category 1 above. This catches "invites you to touch/feel/smell/taste"
+    r'\binvites?\s+(?:you\s+to\s+)?(?:touch|feel|smell|taste|breathe|inhale|savor|savour)\b',
+    # "[noun] beneath/against/under your fingertips/palms/hands" — asserts touch
+    r'\b(?:beneath|against|under|between)\s+your\s+(?:fingertips?|palms?|hands?|fingers?|feet|toes|skin)\b',
+    # ──────────────────────────────────────────────────────────────────────────
+    # LOCAL-286 (preserved): Compound patterns that remain useful for
+    # multi-sensory fabrication scenes.
+    # ──────────────────────────────────────────────────────────────────────────
     # "rugged/craggy/jagged cliffs/terrain" + sensory context — fabricated dramatic landscape
     # Only fires when combined with another sensory element in the same sentence
     # to avoid false positives on factual geography descriptions.
@@ -1154,6 +1195,30 @@ _R7_PATTERNS = [
 
 _R7_COMPILED = [re.compile(p, re.IGNORECASE) for p in _R7_PATTERNS]
 
+# ── LOCAL-303: Artwork-description exclusion ─────────────────────────────────
+# Sentences describing what IS in a painting, sculpture, or artwork use sensory
+# adjectives factually (cerulean blue IS the color Matisse used; lush foliage IS
+# what the painting depicts). These must not fire R7.
+_R7_ARTWORK_EXCLUSION = re.compile(
+    r'\b(?:'
+    r'depicts?|depicted|depicting'
+    r'|render(?:s|ed|ing)'
+    r'|canvas|oil\s+on'
+    r'|palette|pigment'
+    r'|shades?\s+of'
+    r'|hues?\s+of'
+    r'|colors?\s+such\s+as|bold\s+colors?|vibrant\s+(?:shades?|colors?|hues?)'
+    r'|in\s+this\s+(?:piece|work|painting|composition)'
+    r'|this\s+(?:oil|painting|canvas|work|piece)'
+    r'|presents?\s+(?:a\s+)?(?:nude|figure|scene|landscape|portrait)'
+    r'|(?:use|usage)\s+of\s+(?:\w+\s+)?(?:color|colour|blue|red|yellow)'
+    r'|serves?\s+as\s+a\s+backdrop'
+    r'|symboliz(?:ed|es|ing)'
+    r"|clad\s+in"
+    r')\b',
+    re.IGNORECASE
+)
+
 
 def check_r7_hallucinated_sensory(sentence: str) -> List[Dict]:
     """R7: Detect hallucinated/absent sensory claims (D62).
@@ -1164,12 +1229,25 @@ def check_r7_hallucinated_sensory(sentence: str) -> List[Dict]:
     Does NOT fire on present-tense factual sensory descriptions without
     absence markers (e.g., "The market smells of lavender").
 
+    Does NOT fire on artwork descriptions where sensory adjectives describe
+    verifiable properties of a painting/sculpture (LOCAL-303).
+
     Severity: WARNING (not error) because regex cannot perfectly distinguish
     absent from present sensation in all cases.
     """
     findings = []
     stripped = sentence.strip()
     if not stripped:
+        return findings
+
+    # ── LOCAL-303: Artwork-description exclusion ─────────────────────────────
+    # When a sentence describes what IS depicted in a painting, sculpture, or
+    # artwork, sensory adjectives are factual (they describe the art object's
+    # actual visible properties). Skip these entirely.
+    # Markers: depicts, depicted, rendering, rendered, canvas, oil on, palette,
+    # shades of, colors such as, bold colors, this piece, in this work,
+    # presents a [figure/scene], use of [adj] color
+    if _R7_ARTWORK_EXCLUSION.search(stripped):
         return findings
 
     for pat in _R7_COMPILED:
