@@ -207,12 +207,36 @@ def _get_db_source():
 
 
 def get_database_url():
+    # [D214] An explicit AUDIOURA_DB_TARGET outranks ambient environment.
+    #
+    # This function previously consulted DATABASE_URL first and passed
+    # _default_dbname() only as the FALLBACK for DB_NAME — which inverted the
+    # priority _default_dbname()'s own docstring claims. Any module setting
+    # DB_NAME or DATABASE_URL at import time therefore silently defeated the
+    # LOCAL-296 safety switch.
+    #
+    # Measured: tests/test_t4_db_down_unit.py:17 does
+    # os.environ.setdefault('DB_NAME', 'audiotours') at module scope. pytest
+    # imports it during collection, so in a full-suite run with
+    # AUDIOURA_DB_TARGET=test the resolved database flipped back to production:
+    #
+    #   clean env, target=test   -> audiotours_test
+    #   after test_t4 import     -> audiotours        <- production
+    #
+    # The switch exists to stop tests touching production data. It must not be
+    # overridable by an env var some other module happened to set.
+    _explicit_target = _resolve_db_target()
+
     url = os.environ.get("DATABASE_URL")
-    if url:
+    if url and _explicit_target is None:
         return url
+
     host = os.environ.get("DB_HOST", DEFAULT_HOST)
     port = os.environ.get("DB_PORT", DEFAULT_PORT)
-    dbname = os.environ.get("DB_NAME", _default_dbname())
+    if _explicit_target is not None:
+        dbname = _explicit_target
+    else:
+        dbname = os.environ.get("DB_NAME", _default_dbname())
     user = os.environ.get("DB_USER", DEFAULT_USER)
     password = os.environ.get("DB_PASSWORD", DEFAULT_PASSWORD)
     return f"postgresql://{user}:{password}@{host}:{port}/{dbname}"
