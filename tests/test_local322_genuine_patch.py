@@ -55,7 +55,14 @@ def simulate_material_patch():
     if not material_ok and material_english:
         # Build the patch
         patch_parts = [f"crafted from {material_english}"]
-        patch_sentence = "This work was " + " and ".join(patch_parts) + "."
+        # [LEAD] Mirror production (generate_tour_text.py:7596-7604): three
+        # grammatical branches, not one template forced through all cases.
+        if len(patch_parts) == 2:
+            patch_sentence = f"This work, crafted from {material_english}, dates from the {period_english}."
+        elif not material_ok:
+            patch_sentence = f"This work was crafted from {material_english}."
+        else:
+            patch_sentence = f"This work dates from the {period_english}."
         
         # Insert after first sentence
         first_period_idx = description.find('. ')
@@ -103,7 +110,14 @@ def simulate_material_patch():
     
     if not material_ok and material_english:
         patch_parts = [f"crafted from {material_english}"]
-        patch_sentence = "This work was " + " and ".join(patch_parts) + "."
+        # [LEAD] Mirror production (generate_tour_text.py:7596-7604): three
+        # grammatical branches, not one template forced through all cases.
+        if len(patch_parts) == 2:
+            patch_sentence = f"This work, crafted from {material_english}, dates from the {period_english}."
+        elif not material_ok:
+            patch_sentence = f"This work was crafted from {material_english}."
+        else:
+            patch_sentence = f"This work dates from the {period_english}."
         
         first_period_idx = description.find('. ')
         if first_period_idx > 20:
@@ -152,7 +166,14 @@ def simulate_material_patch():
         if not period_ok:
             patch_parts.append(f"dating from the {period_english}")
         
-        patch_sentence = "This work was " + " and ".join(patch_parts) + "."
+        # [LEAD] Mirror production (generate_tour_text.py:7596-7604): three
+        # grammatical branches, not one template forced through all cases.
+        if len(patch_parts) == 2:
+            patch_sentence = f"This work, crafted from {material_english}, dates from the {period_english}."
+        elif not material_ok:
+            patch_sentence = f"This work was crafted from {material_english}."
+        else:
+            patch_sentence = f"This work dates from the {period_english}."
         
         first_period_idx = description.find('. ')
         if first_period_idx > 20:
@@ -170,7 +191,7 @@ def simulate_material_patch():
         assert "siècle" not in patched, "French period leaked!"
         assert "wood" in patched, "English material not in patched output!"
         assert "12th century" in patched, "English period not in patched output!"
-        assert "This work was crafted from wood and dating from the 12th century." in patched
+        assert "This work, crafted from wood, dates from the 12th century." in patched
         assert not re.search(r'This work, .*, [A-Z]', patched), "Comma splice detected!"
         print("  ✓ PASS: Combined patch is grammatical English, no French, no comma splice")
     
