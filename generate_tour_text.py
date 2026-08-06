@@ -53,6 +53,38 @@ from tour_settings import (
     MAX_REPLACEMENT_ATTEMPTS,
 )
 
+# ---------------------------------------------------------------------------
+# [LOCAL-324] Module-level helper: build the material/period patch sentence.
+# Extracted so production and tests share one implementation (no reimplementation).
+# ---------------------------------------------------------------------------
+
+def _build_material_period_patch(material_english, period_english):
+    """Build the patch sentence for missing material and/or period metadata.
+
+    Args:
+        material_english: English material name (str) if material is missing
+                          from the description, else None.
+        period_english:   English period string (str) if period is missing
+                          from the description, else None.
+
+    Returns:
+        A grammatical standalone English sentence, or empty string if neither
+        input is provided.
+
+    Three reachable cases:
+        both   -> "This work, crafted from {material}, dates from the {period}."
+        mat    -> "This work was crafted from {material}."
+        period -> "This work dates from the {period}."
+    """
+    if material_english and period_english:
+        return f"This work, crafted from {material_english}, dates from the {period_english}."
+    elif material_english:
+        return f"This work was crafted from {material_english}."
+    elif period_english:
+        return f"This work dates from the {period_english}."
+    return ""
+
+
 # PHASE 3C: neighborhood/borough -> canonical city map for address-based location guard.
 # Covers USPS city names that differ from the city users request tours in.
 _NEIGHBORHOOD_TO_CITY = {
@@ -7598,21 +7630,11 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                                     elif _arabic_century == '3': _correct_ordinal = "3rd-century"
                                     description = _wrong_ordinal.sub(_correct_ordinal, description)
                             if _patch_parts:
-                                # [LOCAL-322] Build a grammatical standalone sentence.
-                                # Old: "This work, crafted in schiste, " (fragment, comma-spliced)
-                                # Three cases, each must read as correct English:
-                                #   material only  -> "This work was crafted from schist."
-                                #   period only    -> "This work dates from the 19th century."
-                                #   both           -> "This work, crafted from schist, dates from the 19th century."
-                                if not _material_ok and _material_english and not _period_ok and _c51_period:
-                                    # Both material and period missing
-                                    _patch_sentence = f"This work, crafted from {_material_english}, dates from the {_period_english}."
-                                elif not _material_ok and _material_english:
-                                    # Material only
-                                    _patch_sentence = f"This work was crafted from {_material_english}."
-                                else:
-                                    # Period only
-                                    _patch_sentence = f"This work dates from the {_period_english}."
+                                # [LOCAL-324] Call the extracted module-level helper.
+                                _patch_sentence = _build_material_period_patch(
+                                    material_english=_material_english if (not _material_ok and _material_english) else None,
+                                    period_english=_period_english if (not _period_ok and _c51_period) else None,
+                                )
                                 # Insert after first sentence
                                 _first_period_idx = description.find('. ')
                                 if _first_period_idx > 20:

@@ -8,12 +8,17 @@ Verifies that:
 4. Unknown materials are treated as satisfied (no French emission)
 5. The period patch uses English, not raw French
 6. The period 'else' branch (era names) is language-aware
+
+LOCAL-324: Tests now import _build_material_period_patch from production
+rather than reimplementing the construction logic.
 """
 import sys
 import re
 sys.path.insert(0, '.')
 
 import pytest
+
+from generate_tour_text import _build_material_period_patch
 
 
 # ============================================================================
@@ -159,24 +164,15 @@ class TestLanguageAwareCheck:
 
 # ============================================================================
 # Test 3: Patch sentence is grammatical English
+# [LOCAL-324] Now calls the production helper directly.
 # ============================================================================
 
 class TestPatchSentence:
     """The fallback patch produces a complete English sentence."""
 
-    def _build_patch(self, material_english=None, period_english=None):
-        """Replicate the LOCAL-322 patch logic (three grammatical branches)."""
-        if material_english and period_english:
-            return f"This work, crafted from {material_english}, dates from the {period_english}."
-        elif material_english:
-            return f"This work was crafted from {material_english}."
-        elif period_english:
-            return f"This work dates from the {period_english}."
-        return ""
-
     def test_material_only_patch(self):
         """Material-only patch is a complete sentence."""
-        patch = self._build_patch(material_english="schist")
+        patch = _build_material_period_patch("schist", None)
         assert patch == "This work was crafted from schist."
         # It's a complete sentence with subject + verb + object + period
         assert patch[0].isupper()
@@ -185,13 +181,13 @@ class TestPatchSentence:
 
     def test_period_only_patch(self):
         """Period-only patch is a complete sentence."""
-        patch = self._build_patch(period_english="19th century")
+        patch = _build_material_period_patch(None, "19th century")
         assert patch == "This work dates from the 19th century."
         assert patch.endswith('.')
 
     def test_both_patch(self):
         """Material + period patch is a complete sentence."""
-        patch = self._build_patch(material_english="schist", period_english="10th century")
+        patch = _build_material_period_patch("schist", "10th century")
         assert patch == "This work, crafted from schist, dates from the 10th century."
         assert patch.endswith('.')
         # No comma-spliced fragment pattern
@@ -205,13 +201,13 @@ class TestPatchSentence:
             primary = fr_mat.split(',')[0].strip()
             en = _translate_material_to_english(primary)
             assert en is not None
-            patch = self._build_patch(material_english=en)
+            patch = _build_material_period_patch(en, None)
             assert primary not in patch, f"French term '{primary}' leaked into patch: {patch}"
 
     def test_patch_insertion_no_comma_splice(self):
         """Patch inserted after first sentence does not create a comma splice."""
         desc = "This magnificent sculpture commands attention. The intricate details reveal masterful craftsmanship."
-        patch = self._build_patch(material_english="schist")
+        patch = _build_material_period_patch("schist", None)
         # Simulate insertion
         first_period_idx = desc.find('. ')
         if first_period_idx > 20:
@@ -224,6 +220,11 @@ class TestPatchSentence:
         sentences = result.split('. ')
         assert any("This work was crafted from schist" in s for s in sentences)
 
+    def test_neither_returns_empty(self):
+        """No material, no period → empty string."""
+        patch = _build_material_period_patch(None, None)
+        assert patch == ""
+
 
 # ============================================================================
 # Test 4: Period patch uses English
@@ -235,16 +236,16 @@ class TestPeriodPatchEnglish:
     def test_period_patch_not_french(self):
         """Patch should say '10th century' not 'Xe siècle'."""
         # Simulate _period_english computation for "2nde moitié du Xe siècle"
-        c51_period = "2nde moitié du Xe siècle"
-        # The code computes: _period_english = "second half of the 10th century"
         period_english = "second half of the 10th century"
-        patch = f"This work dates from the {period_english}."
+        patch = _build_material_period_patch(None, period_english)
+        assert patch == "This work dates from the second half of the 10th century."
         assert "siècle" not in patch
         assert "10th century" in patch
 
     def test_period_patch_year(self):
         """Raw year stays as-is (no translation needed)."""
-        patch = f"This work dates from the 1879."
+        patch = _build_material_period_patch(None, "1879")
+        assert patch == "This work dates from the 1879."
         assert "1879" in patch
 
 
@@ -277,6 +278,7 @@ class TestPeriodEraBranch:
 
 # ============================================================================
 # Test 6: Reproduction of the three defective strings from the bug report
+# [LOCAL-324] Now uses the production helper to verify correct output.
 # ============================================================================
 
 class TestBugReportReproduction:
@@ -291,7 +293,8 @@ class TestBugReportReproduction:
         en = _translate_material_to_english("schiste")
         assert en == "schist"
         # The patch would be:
-        patch = f"This work was crafted from {en}."
+        patch = _build_material_period_patch(en, None)
+        assert patch == "This work was crafted from schist."
         assert "schiste" not in patch
         assert "crafted in" not in patch
         assert patch.endswith('.')
@@ -303,7 +306,7 @@ class TestBugReportReproduction:
         mat_parts = [p.strip() for p in c51_material.split(',')]
         primary_en = _translate_material_to_english(mat_parts[0])
         assert primary_en == "steel"
-        patch = f"This work was crafted from {primary_en}."
+        patch = _build_material_period_patch(primary_en, None)
         assert "acier" not in patch
         assert "cuivre" not in patch
         assert patch == "This work was crafted from steel."
@@ -312,7 +315,7 @@ class TestBugReportReproduction:
         """'This work, crafted in papier,' can never be produced."""
         en = _translate_material_to_english("papier")
         assert en == "paper"
-        patch = f"This work was crafted from {en}."
+        patch = _build_material_period_patch(en, None)
         assert "papier" not in patch
         assert patch == "This work was crafted from paper."
 
@@ -321,7 +324,7 @@ class TestBugReportReproduction:
         # The new code builds: "This work was crafted from X."
         # It's a complete sentence, never ends with ", " before a capital letter
         for fr, en in _FR_EN_MATERIAL_MAP.items():
-            patch = f"This work was crafted from {en}."
+            patch = _build_material_period_patch(en, None)
             assert not re.search(r'This work, .*, $', patch)
             assert patch.endswith('.')
 
