@@ -8532,3 +8532,42 @@ five seconds and settled it before the scan was ever trusted.
 Also worth noting because it cuts the other way: D209 and D210 were bounces the
 evidence *did* support. The discipline is not "trust the agent" or "trust the
 reviewer" — it is "check the instrument".
+
+## D216 — The 19 "credential mismatch" failures do not reproduce (2026-08-06)
+
+`TEST_FAILURE_TRIAGE.md` attributes 19 of the 26 suite failures to one cause:
+
+> *"password authentication failed for user 'admin' at localhost:5433. The
+> postgres container is running but rejects the hardcoded admin:password123
+> credentials."*
+
+LEAD tested that directly:
+
+```
+audiotours         OK  audio_tours rows=147
+audiotours_test    OK  audio_tours rows=0
+databases present: postgres, audiotours, audiotours_subscribed, audiotours_test
+```
+
+**Both databases accept `admin:password123`.** `audiotours_test` exists and has
+the schema. The stated cause does not hold now, and LEAD's own queries have been
+connecting with those credentials all night.
+
+So either the condition was **transient** during their run — a container restart
+would do it, and several tours were being generated concurrently — or the
+attribution is wrong and those 19 tests fail for another reason that merely
+surfaces as an auth error.
+
+**This is not a criticism of the triage.** The task asked for categorisation from
+one suite run, the agent reported what it saw, and it grouped 26 failures into 4
+causes honestly. The value of the document is exactly that it made a falsifiable
+claim, which could then be falsified in ninety seconds.
+
+**What it means practically:** the suite's real failure count is probably far
+below 26, and the "10 remaining real failures" figure LEAD has been quoting to
+Michael may also be wrong. Re-running to find out, rather than passing an
+unverified number to him.
+
+**Generalisable point:** a root cause asserted from a single run is a hypothesis.
+Environmental failures in particular are the ones most likely to be transient,
+and they were 23 of the 26 here.
