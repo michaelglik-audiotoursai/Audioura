@@ -7,7 +7,7 @@ Tests:
 2. UNAVAILABLE classification path (positive tier-1 exhaustion signal)
 3. Cannot-tell default → PIPELINE_LOST
 4. No gate_log → all missing default to PIPELINE_LOST
-5. FABRICATED at −1.5 × share (operator-only, weight increase)
+5. FABRICATED at −3.0 × share (operator-only, weight increase, LOCAL-309)
 6. Coverage and quality reported separately
 7. Coverage = 1.0 when all delivered (no missing stops)
 8. Achievable count excludes UNAVAILABLE stops
@@ -94,21 +94,22 @@ class TestPipelineLostClassification:
 class TestUnavailableClassification:
     """A stop genuinely absent from the world (tier-1 empty) is UNAVAILABLE."""
 
-    def test_exhausted_signal_is_unavailable(self):
-        """Gate entry with 'exhausted' flag → UNAVAILABLE."""
+    def test_exhausted_signal_without_search_is_pipeline_lost(self):
+        """[LOCAL-309] Gate 'exhausted' flag alone → PIPELINE_LOST without live search."""
         stops = [_make_stop(1, "Stop A")]
         gate_log = [
             {'stop_title': 'Stop A', 'verified': True, 'evidence': 'x', 'source': 'y'},
-            # This entry signals exhaustion: tier-1 found no more real candidates
+            # This entry signals exhaustion but without venue_name no search runs
             {'stop_title': '', 'verified': False, 'evidence': '', 'source': '', 'exhausted': True},
         ]
         ts = compute_score(stops, n_requested=2, venue_identity_facts=[], gate_log=gate_log)
 
         assert len(ts.missing_classifications) == 1
-        assert ts.missing_classifications[0] == 'UNAVAILABLE'
+        # [LOCAL-309] Without live search → PIPELINE_LOST
+        assert ts.missing_classifications[0] == 'PIPELINE_LOST'
 
-    def test_unavailable_signal_flag(self):
-        """Gate entry with 'unavailable' flag → UNAVAILABLE."""
+    def test_unavailable_signal_flag_without_search_is_pipeline_lost(self):
+        """[LOCAL-309] Gate 'unavailable' flag alone → PIPELINE_LOST without live search."""
         stops = [_make_stop(1, "Stop A")]
         gate_log = [
             {'stop_title': 'Stop A', 'verified': True, 'evidence': 'x', 'source': 'y'},
@@ -116,42 +117,54 @@ class TestUnavailableClassification:
         ]
         ts = compute_score(stops, n_requested=2, venue_identity_facts=[], gate_log=gate_log)
 
-        assert ts.missing_classifications[0] == 'UNAVAILABLE'
+        # [LOCAL-309] Without venue_name → no search → PIPELINE_LOST
+        assert ts.missing_classifications[0] == 'PIPELINE_LOST'
 
-    def test_unavailable_weight_is_minus_015(self):
-        """UNAVAILABLE costs only −0.15 × share."""
+    def test_unavailable_weight_is_zero_when_search_confirmed(self):
+        """[LOCAL-309] UNAVAILABLE costs 0.0 × share when search-confirmed."""
+        from unittest.mock import patch
         stops = [_make_stop(1, "Stop A")]
         gate_log = [
             {'stop_title': 'Stop A', 'verified': True, 'evidence': 'x', 'source': 'y'},
-            {'stop_title': '', 'verified': False, 'evidence': '', 'source': '', 'exhausted': True},
         ]
-        ts = compute_score(stops, n_requested=2, venue_identity_facts=[], gate_log=gate_log)
+        # Mock the search to return no candidates (confirms area is thin)
+        with patch('shortfall_search._search_for_candidates_wikipedia', return_value=([], "no results", "")), \
+             patch('shortfall_search._search_for_candidates_wikidata', return_value=([], "no results", "")):
+            ts = compute_score(stops, n_requested=2, venue_identity_facts=[],
+                             gate_log=gate_log, venue_name="Tiny Village, Nowhere")
 
         share = 100.0 / 2
-        # per_stop_base[1] is the UNAVAILABLE penalty
-        assert abs(ts.per_stop_base[1] - (-0.15 * share)) < 0.001
+        # per_stop_base[1] is the UNAVAILABLE penalty — now 0.0
+        assert abs(ts.per_stop_base[1] - (0.0 * share)) < 0.001
 
-    def test_unavailable_is_not_zero(self):
-        """UNAVAILABLE must not reach zero cost (spec constraint)."""
+    def test_unavailable_is_zero_when_search_confirmed(self):
+        """[LOCAL-309] UNAVAILABLE IS zero cost when search-confirmed."""
+        from unittest.mock import patch
         stops = [_make_stop(1, "Stop A")]
         gate_log = [
             {'stop_title': 'Stop A', 'verified': True, 'evidence': 'x', 'source': 'y'},
-            {'stop_title': '', 'verified': False, 'evidence': '', 'source': '', 'exhausted': True},
         ]
-        ts = compute_score(stops, n_requested=2, venue_identity_facts=[], gate_log=gate_log)
+        with patch('shortfall_search._search_for_candidates_wikipedia', return_value=([], "no results", "")), \
+             patch('shortfall_search._search_for_candidates_wikidata', return_value=([], "no results", "")):
+            ts = compute_score(stops, n_requested=2, venue_identity_facts=[],
+                             gate_log=gate_log, venue_name="Tiny Place")
 
-        # The UNAVAILABLE penalty is non-zero
-        assert ts.per_stop_base[1] < 0
+        # [LOCAL-309] UNAVAILABLE penalty IS zero
+        assert ts.per_stop_base[1] == 0.0
 
     def test_mixed_pipeline_lost_and_unavailable(self):
-        """Both classifications can appear together."""
+        """Both classifications can appear together (with live search)."""
+        from unittest.mock import patch
         stops = [_make_stop(1, "Stop A")]
         gate_log = [
             {'stop_title': 'Stop A', 'verified': True, 'evidence': 'x', 'source': 'y'},
             {'stop_title': 'Stop B', 'verified': True, 'evidence': 'x', 'source': 'y'},
-            {'stop_title': '', 'verified': False, 'evidence': '', 'source': '', 'exhausted': True},
         ]
-        ts = compute_score(stops, n_requested=3, venue_identity_facts=[], gate_log=gate_log)
+        # Mock: search finds nothing (remaining shortfall = UNAVAILABLE)
+        with patch('shortfall_search._search_for_candidates_wikipedia', return_value=([], "no results", "")), \
+             patch('shortfall_search._search_for_candidates_wikidata', return_value=([], "no results", "")):
+            ts = compute_score(stops, n_requested=3, venue_identity_facts=[],
+                             gate_log=gate_log, venue_name="Tiny Village")
 
         assert len(ts.missing_classifications) == 2
         assert 'PIPELINE_LOST' in ts.missing_classifications
@@ -194,13 +207,13 @@ class TestCannotTellDefault:
 class TestFabricatedWeight:
     """FABRICATED stays operator-only and now costs −1.5 × share."""
 
-    def test_fabricated_weight_is_minus_1_5(self):
-        """FABRICATED = −1.5 × share (more severe than PIPELINE_LOST)."""
+    def test_fabricated_weight_is_minus_3_0(self):
+        """[LOCAL-309] FABRICATED = −3.0 × share (3× worse than PIPELINE_LOST)."""
         stops = [_make_stop(1, "Fabricated Stop", classification='FABRICATED')]
         ts = compute_score(stops, n_requested=1, venue_identity_facts=[])
 
         share = 100.0 / 1
-        assert abs(ts.per_stop_base[0] - (-1.5 * share)) < 0.001
+        assert abs(ts.per_stop_base[0] - (-3.0 * share)) < 0.001
 
     def test_fabricated_costs_more_than_pipeline_lost(self):
         """Fabrication is worse than omission — must cost more."""
@@ -254,17 +267,17 @@ class TestCoverageAndQuality:
 
     def test_unavailable_adjusts_achievable(self):
         """UNAVAILABLE stops reduce the achievable count."""
+        from unittest.mock import patch
         stops = [_make_stop(i, f"Stop {i}") for i in range(1, 6)]
         gate_log = [
             {'stop_title': f'Stop {i}', 'verified': True, 'evidence': 'x', 'source': 'y'}
             for i in range(1, 6)
-        ] + [
-            # 3 unavailable → achievable = 8 - 3 = 5
-            {'stop_title': '', 'verified': False, 'evidence': '', 'source': '', 'exhausted': True},
-            {'stop_title': '', 'verified': False, 'evidence': '', 'source': '', 'exhausted': True},
-            {'stop_title': '', 'verified': False, 'evidence': '', 'source': '', 'exhausted': True},
         ]
-        ts = compute_score(stops, n_requested=8, venue_identity_facts=[], gate_log=gate_log)
+        # [LOCAL-309] Mock search to confirm area is thin → UNAVAILABLE
+        with patch('shortfall_search._search_for_candidates_wikipedia', return_value=([], "no results", "")), \
+             patch('shortfall_search._search_for_candidates_wikidata', return_value=([], "no results", "")):
+            ts = compute_score(stops, n_requested=8, venue_identity_facts=[],
+                             gate_log=gate_log, venue_name="Tiny Village")
 
         assert ts.n_achievable == 5  # 8 - 3 UNAVAILABLE
         assert abs(ts.coverage - 5.0/5.0) < 0.001  # 5 delivered / 5 achievable = 1.0
@@ -320,27 +333,28 @@ class TestScoreDifference:
 
     def test_unavailable_tour_scores_higher_than_pipeline_lost_tour(self):
         """5/8 with 3 UNAVAILABLE should score higher than 5/8 with 3 PIPELINE_LOST."""
+        from unittest.mock import patch
         stops = [_make_stop(i, f"Stop {i}") for i in range(1, 6)]
 
         # All PIPELINE_LOST (no gate_log, defaults to blaming ourselves)
         ts_lost = compute_score(stops, n_requested=8, venue_identity_facts=[])
 
-        # 3 UNAVAILABLE
+        # 3 UNAVAILABLE (confirmed by search)
         gate_log = [
             {'stop_title': f'Stop {i}', 'verified': True, 'evidence': 'x', 'source': 'y'}
             for i in range(1, 6)
-        ] + [
-            {'stop_title': '', 'verified': False, 'evidence': '', 'source': '', 'exhausted': True},
-            {'stop_title': '', 'verified': False, 'evidence': '', 'source': '', 'exhausted': True},
-            {'stop_title': '', 'verified': False, 'evidence': '', 'source': '', 'exhausted': True},
         ]
-        ts_unavail = compute_score(stops, n_requested=8, venue_identity_facts=[], gate_log=gate_log)
+        with patch('shortfall_search._search_for_candidates_wikipedia', return_value=([], "no results", "")), \
+             patch('shortfall_search._search_for_candidates_wikidata', return_value=([], "no results", "")):
+            ts_unavail = compute_score(stops, n_requested=8, venue_identity_facts=[],
+                                      gate_log=gate_log, venue_name="Tiny Village")
 
-        # UNAVAILABLE tour scores higher because penalty is only −0.15 vs −1.0
+        # UNAVAILABLE tour scores higher because penalty is 0.0 vs −1.0
         assert ts_unavail.total_score > ts_lost.total_score
 
     def test_score_difference_magnitude(self):
-        """The difference should be substantial — (1.0 - 0.15) × share × 3 missing."""
+        """[LOCAL-309] Difference: 3 × (1.0 - 0.0) × share = 3 × 1.0 × 12.5 = 37.5."""
+        from unittest.mock import patch
         stops = [_make_stop(i, f"Stop {i}") for i in range(1, 6)]
         share = 100.0 / 8
 
@@ -349,15 +363,14 @@ class TestScoreDifference:
         gate_log = [
             {'stop_title': f'Stop {i}', 'verified': True, 'evidence': 'x', 'source': 'y'}
             for i in range(1, 6)
-        ] + [
-            {'stop_title': '', 'verified': False, 'evidence': '', 'source': '', 'exhausted': True},
-            {'stop_title': '', 'verified': False, 'evidence': '', 'source': '', 'exhausted': True},
-            {'stop_title': '', 'verified': False, 'evidence': '', 'source': '', 'exhausted': True},
         ]
-        ts_unavail = compute_score(stops, n_requested=8, venue_identity_facts=[], gate_log=gate_log)
+        with patch('shortfall_search._search_for_candidates_wikipedia', return_value=([], "no results", "")), \
+             patch('shortfall_search._search_for_candidates_wikidata', return_value=([], "no results", "")):
+            ts_unavail = compute_score(stops, n_requested=8, venue_identity_facts=[],
+                                      gate_log=gate_log, venue_name="Tiny Village")
 
-        # Expected difference: 3 stops × (1.0 - 0.15) × share = 3 × 0.85 × 12.5 = 31.875
-        expected_diff = 3 * (1.0 - 0.15) * share
+        # [LOCAL-309] Expected difference: 3 stops × (1.0 - 0.0) × share = 3 × 12.5 = 37.5
+        expected_diff = 3 * 1.0 * share
         actual_diff = ts_unavail.total_score - ts_lost.total_score
         assert abs(actual_diff - expected_diff) < 0.01
 
