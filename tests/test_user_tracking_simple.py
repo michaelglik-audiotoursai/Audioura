@@ -11,6 +11,8 @@ import requests
 import json
 import time
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from test_tour_factory import TestTourFactory
 from db_connection import get_connection
@@ -21,6 +23,8 @@ _factory = TestTourFactory(auto_cleanup=True)
 API_BASE_URL = 'http://192.168.0.217:5002'
 USER_API_URL = 'http://192.168.0.217:5003'
 
+
+@pytest.mark.service
 def test_user_tracking_integration():
     """Test the complete user tracking integration"""
     print("Testing User Tracking Integration")

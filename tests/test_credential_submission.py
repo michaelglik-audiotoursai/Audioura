@@ -5,7 +5,9 @@ Test credential submission using mobile app log data
 
 import requests
 import json
+import pytest
 
+@pytest.mark.service
 def test_credential_submission():
     """Test credential submission with mobile app data"""
     

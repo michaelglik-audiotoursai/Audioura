@@ -23,6 +23,7 @@ import tempfile
 import importlib.util
 import unittest.mock
 from unittest.mock import MagicMock
+import pytest
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 SERVICE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

@@ -119,10 +119,20 @@ psycopg2.connect = _guarded_connect
 
 
 def pytest_configure(config):
-    """Register the production-write guard marker for informational purposes."""
+    """Register custom markers."""
     config.addinivalue_line(
         "markers",
         "production_write_guard: LOCAL-232 guard against production writes",
+    )
+    config.addinivalue_line(
+        "markers",
+        "service: LOCAL-302 — test drives a running Docker service over HTTP. "
+        "Cannot honour AUDIOURA_DB_TARGET because the service has its own "
+        "DATABASE_URL. Exclude with: -m 'not service'",
+    )
+    config.addinivalue_line(
+        "markers",
+        "integration: marks tests as integration tests (require services/DB)",
     )
 
 

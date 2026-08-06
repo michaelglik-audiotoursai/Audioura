@@ -6,7 +6,9 @@ Tests credential-aware processing with real Boston Globe subscription
 import requests
 import json
 import time
+import pytest
 
+@pytest.mark.service
 def test_phase2_boston_globe():
     """Test Phase 2 with Boston Globe newsletter and credentials"""
     

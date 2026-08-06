@@ -7,7 +7,9 @@ import requests
 import json
 import psycopg2
 import os
+import pytest
 
+@pytest.mark.service
 def test_phase2_workflow():
     """Test complete Phase 2 workflow"""
     

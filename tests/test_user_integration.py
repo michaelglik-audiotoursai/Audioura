@@ -11,6 +11,8 @@ import requests
 import json
 import time
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from test_tour_factory import TestTourFactory
 from db_connection import get_connection
@@ -18,6 +20,8 @@ from db_connection import get_connection
 # Factory instance — adopt tours created via HTTP so is_test=TRUE is structural
 _factory = TestTourFactory(auto_cleanup=True)
 
+
+@pytest.mark.service
 def test_user_integration():
     print("Testing User Tracking Integration")
     print("=" * 50)

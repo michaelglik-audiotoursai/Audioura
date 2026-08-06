@@ -2,7 +2,9 @@
 
 import requests
 import json
+import pytest
 
+@pytest.mark.service
 def test_guy_raz_binary_fix():
     """Test Guy Raz newsletter with binary content fix"""
     

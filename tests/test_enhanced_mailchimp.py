@@ -4,7 +4,9 @@ Test enhanced MailChimp newsletter processing
 """
 import requests
 import json
+import pytest
 
+@pytest.mark.service
 def test_enhanced_mailchimp():
     url = "https://mailchi.mp/cffaa0a1186b/friday-news-decoding-the-office-space-market-mystery-10346462?e=f2ed12d013"
     
