@@ -8696,3 +8696,38 @@ D214, D215, D217, now D219). The consistent shape: a real observation, extended
 one step to a cause that was never tested. The observation costs seconds to make
 and the extension costs nothing to check — `AUDIOURA_DB_TARGET=production` was
 one flag away the whole time.
+
+## D220 — Diagnosed the same 5 errors three times before getting it right (2026-08-06)
+
+LOCAL-301 merged cleanly: 14 passed where 3 failed, fixture cleans up after
+itself, production untouched at 29 real rows, no assertion changed. Full suite
+13 → 10 failures as specified.
+
+Errors rose 50 → 55. Chasing those five took three attempts:
+
+1. **"Wikidata is rate-limiting us"** — from a real `HTTP 429 for qid 'Q142'`
+   line in the suite log. Plausible, not yet established.
+2. **"Wikidata is blocking us outright, 403"** — from a probe LEAD wrote that
+   sent no User-Agent. Wikimedia policy 403s exactly that. **The 403 was
+   self-inflicted by the diagnostic, not observed in the system.** LEAD was one
+   step from writing a task to add User-Agents to `area_resolver` — which passes
+   headers on all 16 of its `requests` calls and never had the problem.
+3. **Correct:** `test_local294_sparql_quality.py` passes **5/5 run directly**.
+   It errors only under full-suite load, where the accumulated Wikidata queries
+   hit the 429. Flaky by construction, since those tests query Wikidata live.
+   Nothing to do with LOCAL-301.
+
+**The recurring failure has a sharper name now.** D211, D215, D217, D219 were all
+"measurement right, inference one step too far". This one is worse: **the
+diagnostic itself introduced the symptom it then reported.** A probe missing a
+User-Agent produced a 403 that exists nowhere in the codebase's behaviour.
+
+**The check that would have caught all five instances**, and did catch this one:
+*run the failing thing in isolation before theorising about why it fails.* Five
+passing tests in 14 seconds ended a diagnosis that two wrong theories had not.
+
+**Left deliberately unfixed:** the Wikidata-dependent tests are flaky under load.
+That is real but low-value to chase — they pass standalone, the production path
+is unaffected, and making them hermetic means mocking Wikidata, which would
+remove the only check that the live lookup still works. Worth Michael's view
+rather than an autonomous decision.
