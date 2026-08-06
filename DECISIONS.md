@@ -9180,3 +9180,41 @@ coupling is what the task existed to remove.
 Also flagged: `_compute_config_hash()` requires a `config` argument, so the
 stale-version guard could not be exercised externally. The submission asserts it
 works without demonstrating it.
+
+## D232 — A test whose baseline was the bug (2026-08-06)
+
+LOCAL-311 came back fixed: `evaluate()` returns 101.6 matching the direct
+scorer, 0 mismatches across all 46 tours, `algorithm_id`
+`LOCAL-311-v1@41db0d2f` with a config hash over the thresholds themselves, and a
+stale-version guard that now actually fires — they moved threshold reads from
+frozen `from X import Y` bindings to live module lookups, which is why it could
+never have fired before.
+
+**Then their own identity test failed.** `test_evaluate_produces_identical_
+scores` compared `evaluate()` against a hand-wired "old path" —
+`parse_tour → analyze_stop → classify_stop → compute_score` — that **omitted the
+`callbacks_to` cross-population**. That omission is precisely the bug the task
+was bounced for.
+
+So the baseline *was* the bug. The test passed originally because both sides were
+broken (82.81 == 82.81), and started failing the instant the production code was
+fixed. **A test that green-lights a defect and then reports the fix as a
+regression is worse than no test.**
+
+Corrected to compare against `score_tour_file`, the actual pre-existing public
+path, which cross-populates and gives 101.5625 — matching the fixed
+`evaluate()`. LEAD verified both paths independently *before* touching the test;
+this is a wrong assertion, not a convenient one.
+
+**The general shape, which has now appeared twice today** (D231 was the same
+defect in production code): the correlation cross-population is a step living in
+callers rather than in the function that needs it. LOCAL-311 fixed
+`evaluate()` but left the logic duplicated in two places rather than folding it
+into `compute_score`. LEAD's own bounce offered that as the lesser option
+("or better, inside compute_score"), so the residual is LEAD's wording, not the
+agent's shortfall. **A third caller will reintroduce it.** Worth folding in when
+the scorer is next touched.
+
+**Process note that worked:** the test gate held. The merge completed, the push
+did not, and nothing reached `origin` until the suite was green. That is the fix
+from three failed pushes earlier today doing its job.
