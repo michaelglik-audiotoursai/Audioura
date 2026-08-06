@@ -7870,3 +7870,82 @@ plainly it has to change. Leaving it as a question cost one exchange; changing
 his approved wording unilaterally would have cost more. The judgement stands, but
 the general form is: **propose the change and say why, rather than either
 silently making it or silently leaving it.**
+
+## D200 — The evaluation index now computes its own classification (2026-08-05)
+
+Michael: *"if you know how to compute the classification from the fact and
+filler signals the code already measures and discards then please incorporate it
+into the routine of index calculation."*
+
+Done, in `tour_rubric_scorer.py`. Four findings surfaced on the way, each of
+which changed the work:
+
+**1. The module had no callers, and its CLI never scored anything.** Nothing
+imports `tour_rubric_scorer`; `compute_score` is reachable only via
+`score_tour_file`, which nothing called; and `__main__` printed per-stop analysis
+and stopped before computing a score. Every number ever quoted against the 75
+gate came from a throwaway script that supplied classifications by hand. Fixed:
+the CLI now runs end to end.
+
+**2. `named_people` was not measuring people.** It matched any two consecutive
+capitalised words, filtered by eight hardcoded literals. Over 1,728 stops it
+averaged 5–7.5 matches against ~1 date, so it dominated the fact count — and its
+two most frequent matches corpus-wide were the schema labels **"Specific
+Examples" (183)** and **"Operational Details" (140)**, followed by places (French
+Riviera, Frog Pond, Mediterranean Sea). Wiring the old fact count to a
+classification would have automated noise. Now: place/institution head nouns are
+excluded, a person must sit within 90 characters of a verb of doing or a role
+noun, and names are counted distinct. 0.59 distinct names per stop, and the top
+matches are Matisse, Monet, Walt Disney, Barbarossa.
+
+**3. `parse_tour` stripped four schema labels and missed the rest**, so
+`Type/Specialty:` and `Specific Examples:` text was scored as narration. All
+schema fields now excluded via one pattern.
+
+**4. The index rewarded the defect that made a tour undeliverable.** Round 34 —
+held by LEAD hours earlier for the mangled LOCAL-269 glosses — scored **87.5**,
+the highest of the night, with Stop 2 RICH and **zero structural defects**, on
+text reading *"existentialism., and Pablo Picasso"*. Three splice artifacts are
+now structural defects: `spliced_sentence` (a full stop followed by a comma),
+`truncated_span` (a span cut after a preposition or article), `doubled_name`.
+Round 34 now scores **62.5**. Corpus-wide the new defects fire 125 / 50 / 11
+times, so the gloss damage is widespread.
+
+**Thresholds**, calibrated to the measured post-fix distribution, not intuition:
+RICH ≥3 facts, density ≥0.50, filler ≤25%; ADEQUATE ≥2 facts, density ≥0.20,
+filler ≤40%; THIN otherwise. Over 1,732 stops: **5.1% RICH, 24.7% ADEQUATE,
+70.2% THIN** — consistent with the independently measured 1.6 facts/stop museum
+finding.
+
+**Preserved:** an explicit operator classification always overrides the computed
+one (verified), every band carries an evidence string, and **FABRICATED stays
+uncomputable** — nothing here checks truth, so RICH is a statement about
+evidence density and never about accuracy.
+
+**Not done, deliberately:** the correlation bonus is untouched and still wrong —
+see D201.
+
+## D201 — The correlation bonus should be switched off, not redefined (2026-08-05)
+
+Michael asked what the open question on the stop-name bonus was. Measuring it
+properly gave a worse answer than D197 recorded.
+
+The bonus (+50%, the largest lever in the rubric) is meant to reward a narrative
+callback. It fires on **1,466 sentences** across the corpus, and the triggers are:
+
+- **shared topical vocabulary** — a stop titled "Audacious Freedom: African
+  Americans in Philadelphia, 1776-1876" shares two words with every other stop in
+  that museum, so a themed venue earns the bonus automatically for having a theme;
+- **schema labels** inside the body (now fixed by D200's parser change);
+- **the closing recap** — one sentence naming every stop triggers a callback for
+  all of them at once.
+
+That last one is self-inflicted: **the recap LEAD specified with Michael this
+afternoon (LOCAL-280) systematically inflates the correlation bonus on every
+future tour.** A feature designed today games the metric used to judge it, and
+LEAD did not see the interaction until Michael asked the question.
+
+**Decision: switch the bonus off** rather than redefine it. There is no working
+definition of a narrative callback in the code, and a term that rewards a tour
+for naming its own stops is worse than no term. It stays at zero until a real
+definition exists — SQ-S6b's theme threads are the natural home for one.

@@ -15,16 +15,71 @@ Implements the scoring rubric from TOUR_IMPROVEMENT_LOOP_asian_arts_museum.md:
 Usage:
     python tour_rubric_scorer.py /path/to/tour.txt --n 8
 
-The scorer classifies stops and reports per-stop evidence. It does NOT
-auto-classify — the operator must review and confirm/override each
-classification. This script provides the FRAMEWORK and helper analysis;
-the final classification is manual to honor the "do not game" constraint.
+[LOCAL-288] The classification is now COMPUTED from measured signals — distinct
+facts per content sentence, plus generic-filler fraction — with thresholds
+calibrated against 1,719 real stops. It was previously a hand-typed argument,
+which meant the dominant term of the index was a human judgement and the module
+had no callers at all: the CLI stopped before ever calling compute_score.
+
+The "do not game" constraint the manual design protected is preserved two ways:
+an explicit classification passed by the operator always overrides the computed
+one, and every classification carries an evidence string naming the signals that
+produced it, so a reviewer can dispute any band.
+
+FABRICATED remains uncomputable here. Nothing in this module checks whether a
+fact is true, so a stop can score RICH on evidence and be entirely invented.
+Absence of FABRICATED is never evidence of accuracy.
 """
 import re
 import sys
 import json
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
+
+
+# --- [LOCAL-288] shared patterns -------------------------------------------
+
+#: Every schema field a generated tour can emit. Lines starting with one of
+#: these are structure, not narration, and never count toward facts.
+SCHEMA_LABEL_RE = re.compile(
+    r'^(?:Address|Coordinates|Museum Information|Directions|Orientation|'
+    r'Type/Specialty|Specific Examples|Operational Details|Sources|'
+    r'Tour-Category|Description)\s*:',
+    re.IGNORECASE,
+)
+
+#: A capitalised multi-word phrase — a *candidate* person name, nothing more.
+_PROPER_PHRASE_RE = re.compile(
+    r'\b([A-Z][a-zéèêëàâùûôîïçñ]+'
+    r"(?:\s+(?:de|des|du|di|van|von|le|la|d'))?"
+    r'\s+[A-Z][a-zéèêëàâùûôîïçñ]+'
+    r'(?:\s+[A-Z][a-zéèêëàâùûôîïçñ]+)?)\b'
+)
+
+#: Head nouns that make a capitalised phrase a place, an institution or a
+#: schema label rather than a person.
+_NOT_A_PERSON_RE = re.compile(
+    r'(?i)\b(?:sea|ocean|riviera|village|hill|pond|fountain|square|street|road|'
+    r'avenue|boulevard|monument|bandstand|house|cathedral|chapel|garden|park|'
+    r'beach|island|museum|mus[eé]e|fondation|palais|port|cape|mount|tower|'
+    r'bridge|gate|hotel|castle|fort|abbey|basilica|collection|gallery|'
+    r'exhibition|exhibit|installation|examples|details|specialty|information|'
+    r'americans?|century|war|succession)\b'
+)
+
+#: A person name earns its classification only near a verb of doing or a role
+#: noun. Without one, a capitalised phrase is just a capitalised phrase.
+_PERSON_CONTEXT_RE = re.compile(
+    r'(?i)\b(?:painted|paints|wrote|writes|composed|designed|founded|built|'
+    r'established|created|sculpted|carved|lived|worked|visited|ruled|'
+    r'commanded|led|inspired|donated|bequeathed|commissioned|discovered|'
+    r'architect|painter|artist|sculptor|philosopher|playwright|novelist|poet|'
+    r'writer|composer|emperor|empress|king|queen|duke|duchess|general|'
+    r'admiral|monk|priest|patron|collector|gallerist)\b'
+)
+
+#: How far either side of a candidate name to look for that context.
+_PERSON_CONTEXT_WINDOW = 90
 
 
 @dataclass
@@ -42,6 +97,9 @@ class StopAnalysis:
     named_artworks: List[str] = field(default_factory=list)
     
     # Quality signals
+    distinct_fact_count: int = 0
+    content_sentences: int = 0
+    fact_density: float = 0.0
     has_specific_verifiable_facts: bool = False
     has_generic_filler: bool = False
     generic_filler_fraction: float = 0.0
@@ -102,22 +160,24 @@ def parse_tour(text: str) -> List[dict]:
     if current_stop:
         stops.append(current_stop)
     
-    # Extract body text (exclude Address, Coordinates, Museum Information, Directions)
+    # Extract body text — every schema field line is excluded.
+    #
+    # [LOCAL-288] The original skip list covered four labels and missed the rest,
+    # so "Type/Specialty:" and "Specific Examples:" text was being scored as
+    # narration. Measured cost: "Specific Examples" and "Operational Details"
+    # were the two most frequent "named people" in the whole corpus (183 and 140
+    # occurrences), because the label itself is two capitalised words.
     for stop in stops:
         body_lines = []
-        skip_prefixes = ('Address:', 'Coordinates:', 'Museum Information:', 'Directions:')
         for line in stop['lines']:
             stripped = line.strip()
             if not stripped:
                 continue
-            if any(stripped.startswith(p) for p in skip_prefixes):
-                continue
-            # Also skip "Orientation:" lines but keep them noted
-            if stripped.startswith('Orientation:'):
+            if SCHEMA_LABEL_RE.match(stripped):
                 continue
             body_lines.append(stripped)
         stop['body'] = '\n'.join(body_lines)
-    
+
     return stops
 
 
@@ -140,15 +200,28 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
     sa.dates_years = [d for d in sa.dates_years 
                       if not re.match(r'^\d{3}$', d) or int(d) > 100]
     
-    # Named people (proper nouns with 2+ capitalized words)
-    sa.named_people = re.findall(
-        r'\b([A-Z][a-zéèêëàâùûôîïç]+(?:\s+(?:de|des|du|di|van|von|le|la))?\s+[A-Z][a-zéèêëàâùûôîïç]+(?:\s+[A-Z][a-zéèêëàâùûôîïç]+)?)\b',
-        body
-    )
-    # Filter common non-person patterns
-    non_persons = {'Musée des', 'Arts Asiatiques', 'Kannon à', 'Prom des', 'Nice France',
-                   'United States', 'Musée des Arts', 'Imperial Palace'}
-    sa.named_people = [p for p in sa.named_people if p not in non_persons]
+    # Named people.
+    #
+    # [LOCAL-288] This was "any two consecutive capitalised words", filtered by a
+    # hand-maintained blocklist of eight literals. Measured over 1,728 stops it
+    # averaged 5–7.5 matches per stop against ~1 date, so it dominated the fact
+    # count — and its most frequent matches were the schema labels "Specific
+    # Examples" and "Operational Details", followed by places (French Riviera,
+    # Frog Pond, Mediterranean Sea). It was not measuring people.
+    #
+    # Now: a candidate must not carry a place/institution head noun, and must sit
+    # near a verb of doing or a role noun. Counted distinct, so repeating a name
+    # does not repeatedly earn credit.
+    _people = set()
+    for _m in _PROPER_PHRASE_RE.finditer(body):
+        _name = _m.group(1)
+        if _NOT_A_PERSON_RE.search(_name):
+            continue
+        _lo = max(0, _m.start() - _PERSON_CONTEXT_WINDOW)
+        _hi = min(len(body), _m.end() + _PERSON_CONTEXT_WINDOW)
+        if _PERSON_CONTEXT_RE.search(body[_lo:_hi]):
+            _people.add(_name)
+    sa.named_people = sorted(_people)
     
     # Materials and techniques
     material_patterns = [
@@ -170,9 +243,12 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
     # Named artworks (quoted titles)
     sa.named_artworks = re.findall(r'[""«]([^""»]+)[""»]', body)
     
-    # Assess verifiable facts
-    fact_count = (len(sa.dates_years) + len(sa.named_people) + 
-                  len(sa.materials_techniques) + len(sa.measurements_numbers))
+    # Assess verifiable facts.
+    # [LOCAL-288] Distinct, not occurrences — a stop that names 1888 four times
+    # has one date, not four.
+    fact_count = (len(set(sa.dates_years)) + len(sa.named_people) +
+                  len(set(sa.materials_techniques)) + len(set(sa.measurements_numbers)))
+    sa.distinct_fact_count = fact_count
     sa.has_specific_verifiable_facts = fact_count >= 3
     
     # Detect generic filler
@@ -201,6 +277,8 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
                 generic_count += 1
     
     total_sentences = len([s for s in sentences if len(s.strip()) > 15])
+    sa.content_sentences = total_sentences
+    sa.fact_density = fact_count / max(1, total_sentences)
     sa.generic_filler_fraction = generic_count / max(1, total_sentences)
     sa.has_generic_filler = sa.generic_filler_fraction > 0.4
     
@@ -211,6 +289,26 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
         sa.structural_defects.append('voice_break')
     if re.search(r"Stop \d+", body):  # Meta-reference
         sa.structural_defects.append('meta_reference')
+
+    # [LOCAL-288] Splice artifacts — text assembled by pasting spans rather than
+    # composing clauses. Added because round 34 scored 87.5 and reported ZERO
+    # structural defects while carrying "existentialism., and Pablo Picasso",
+    # a tour LEAD had already held as undeliverable. An index that cannot see
+    # the defect that blocks delivery is not measuring quality.
+    if re.search(r'\w\.\,', body):
+        # A full stop immediately followed by a comma: a whole sentence has been
+        # inserted mid-sentence. Signature of the LOCAL-269 gloss gate.
+        sa.structural_defects.append('spliced_sentence')
+    if re.search(r'(?i)\b(?:on|of|in|at|to|the|a|an|with|for|by|from|and)\.(?:\s|$)', body):
+        # A span cut mid-phrase and terminated: "...in 1964 on the."
+        sa.structural_defects.append('truncated_span')
+    for _pm in _PROPER_PHRASE_RE.finditer(body):
+        _nm = _pm.group(1)
+        if len(_nm) > 10 and body.count(_nm) > 1:
+            _first = body.find(_nm)
+            if 0 <= _first and body.find(_nm, _first + 1) - _first < 120:
+                sa.structural_defects.append('doubled_name')
+                break
     
     # Cross-stop callbacks: check if this stop references other stops' titles
     for other in all_stops:
@@ -230,6 +328,60 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
                     sa.callbacks_from.append(other['index'])
     
     return sa
+
+
+# --- [LOCAL-288] computed classification -----------------------------------
+#
+# Thresholds are calibrated against the measured distribution over 1,719 stops
+# in tours/ AFTER the signal fixes above, not chosen by intuition:
+#
+#   category    density p25   median   p75    p90     filler median / p75
+#   geo             0.00      0.12     0.33   0.67        0.17 / 0.24
+#   museum          0.00      0.10     0.22   0.33        0.21 / 0.30
+#   restaurant      0.00      0.11     0.33   0.50        0.11 / 0.17
+#
+# RICH is set at the p90 of the strongest category, so it stays genuinely hard
+# to reach. ADEQUATE sits near the overall median. Filler ceilings sit at each
+# band's corresponding percentile.
+RICH_MIN_DENSITY = 0.50
+RICH_MIN_FACTS = 3
+RICH_MAX_FILLER = 0.25
+
+ADEQUATE_MIN_DENSITY = 0.20
+ADEQUATE_MIN_FACTS = 2
+ADEQUATE_MAX_FILLER = 0.40
+
+
+def classify_stop(sa: 'StopAnalysis') -> Tuple[str, str]:
+    """Derive a classification from the measured signals.
+
+    Returns (classification, evidence).
+
+    Covers RICH / ADEQUATE / THIN only. **FABRICATED is deliberately not
+    computable here** — nothing in this module checks whether a fact is true, so
+    a stop can be scored RICH on evidence and still be entirely invented.
+    Assigning FABRICATED remains an explicit operator override, and the absence
+    of it is never proof of accuracy.
+
+    The original design made all classification manual "to honor the do-not-game
+    constraint". That constraint is preserved two ways: an explicit
+    classification always wins over this one, and the evidence string records
+    exactly which signals produced the band so a reviewer can dispute it.
+    """
+    facts = sa.distinct_fact_count
+    density = sa.fact_density
+    filler = sa.generic_filler_fraction
+
+    evidence = (
+        f"{facts} distinct facts over {sa.content_sentences} content sentences "
+        f"(density {density:.2f}), filler {filler:.0%}"
+    )
+
+    if facts >= RICH_MIN_FACTS and density >= RICH_MIN_DENSITY and filler <= RICH_MAX_FILLER:
+        return 'RICH', evidence
+    if facts >= ADEQUATE_MIN_FACTS and density >= ADEQUATE_MIN_DENSITY and filler <= ADEQUATE_MAX_FILLER:
+        return 'ADEQUATE', evidence
+    return 'THIN', evidence
 
 
 def detect_venue_identity(tour_text: str) -> List[str]:
@@ -393,15 +545,20 @@ def score_tour_file(filepath: str, n_requested: int,
         text = f.read()
     
     stops = parse_tour(text)
-    
-    # Analyze each stop
+
+    # Analyze each stop.
+    # [LOCAL-288] The classification is now COMPUTED by default. An explicit
+    # entry in `classifications` still wins — that is the operator override, and
+    # the only route to FABRICATED.
     analyses = []
     for stop in stops:
         sa = analyze_stop(stop, stops)
         if classifications and stop['index'] in classifications:
             cls, evidence = classifications[stop['index']]
             sa.classification = cls
-            sa.classification_evidence = evidence
+            sa.classification_evidence = f"OPERATOR OVERRIDE: {evidence}"
+        else:
+            sa.classification, sa.classification_evidence = classify_stop(sa)
         analyses.append(sa)
     
     # Cross-populate callbacks_to
@@ -422,28 +579,23 @@ def score_tour_file(filepath: str, n_requested: int,
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        print("Usage: python tour_rubric_scorer.py <tour_file> [--n N]")
+        print("Usage: python tour_rubric_scorer.py <tour_file> [--n N] [--quiet]")
         sys.exit(1)
-    
+
     filepath = sys.argv[1]
-    n = 8  # default
+    n = 8
     if '--n' in sys.argv:
-        idx = sys.argv.index('--n')
-        n = int(sys.argv[idx + 1])
-    
-    # Run analysis without classification (for inspection)
-    with open(filepath, 'r', encoding='utf-8') as f:
-        text = f.read()
-    
-    stops = parse_tour(text)
-    print(f"Parsed {len(stops)} stops from {filepath}")
-    print(f"Requested N={n}")
-    
-    analyses = []
-    for stop in stops:
-        sa = analyze_stop(stop, stops)
-        analyses.append(sa)
-        print_analysis(sa)
-    
-    venue_facts = detect_venue_identity(text)
-    print(f"\nVenue identity facts: {venue_facts}")
+        n = int(sys.argv[sys.argv.index('--n') + 1])
+    quiet = '--quiet' in sys.argv
+
+    # [LOCAL-288] This block used to stop after printing per-stop analysis and
+    # never call compute_score, so running the file produced no score at all.
+    ts = score_tour_file(filepath, n)
+
+    if not quiet:
+        for sa in ts.stops:
+            print_analysis(sa)
+        venue = ts.venue_identity_facts
+        print(f"\nVenue identity facts: {venue}")
+
+    print_score(ts)
