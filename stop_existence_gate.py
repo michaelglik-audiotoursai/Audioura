@@ -1465,6 +1465,24 @@ def run_existence_gate(
         print(f"    [HARVEST] Error (non-fatal): {_harv_err}")
     # ──── END LOCAL-283 ───────────────────────────────────────────────────
 
+    # ──── LOCAL-314: HARVEST DINING CORPUS ON VERIFICATION ────────────────
+    # When dining stops verify via Nominatim/Wikipedia, harvest factual
+    # passages (founding year, chef, dishes, price) into stop_corpus.
+    dining_harvest_summary = None
+    _resolved_tour_type = tour_type or os.environ.get('EXISTENCE_GATE_TOUR_TYPE', '')
+    if _resolved_tour_type in ('restaurant', 'food', 'dining', 'culinary'):
+        try:
+            from dining_corpus_harvester import harvest_dining_on_verification
+            dining_harvest_summary = harvest_dining_on_verification(verdicts, venue_name, db_conn)
+        except ImportError:
+            pass  # Module not available — skip silently
+        except RuntimeError as _rt_err:
+            # D220: 429 = search failure, not "no data"
+            print(f"    [DINING-HARVEST] RuntimeError (non-fatal): {_rt_err}")
+        except Exception as _dh_err:
+            print(f"    [DINING-HARVEST] Error (non-fatal): {_dh_err}")
+    # ──── END LOCAL-314 ───────────────────────────────────────────────────
+
     return {
         'mode': mode,
         'total_stops': len(poi_list),
@@ -1473,4 +1491,5 @@ def run_existence_gate(
         'verdicts': verdicts,
         'action': action,
         'harvest_summary': harvest_summary,
+        'dining_harvest_summary': dining_harvest_summary,
     }
