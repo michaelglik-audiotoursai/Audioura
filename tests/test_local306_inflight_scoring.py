@@ -16,9 +16,9 @@ import os
 import sys
 import time
 import json
+import pytest
 
-# Route to test database
-os.environ["AUDIOURA_DB_TARGET"] = "test"
+# LOCAL-325: Route to test database via fixture, not module-scope assignment.
 
 # Ensure imports work
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -32,6 +32,14 @@ from tour_scoring_service import (
     ensure_tour_scores_table,
     SCORER_VERSION,
 )
+
+
+@pytest.fixture(autouse=True)
+def _force_test_db(monkeypatch):
+    """Scope AUDIOURA_DB_TARGET to this module — no session-wide pollution."""
+    monkeypatch.setenv('AUDIOURA_DB_TARGET', 'test')
+    yield
+
 
 log_db_target("LOCAL-306 verification")
 

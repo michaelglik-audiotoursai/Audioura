@@ -49,8 +49,11 @@ def test_target_production_resolves_to_audiotours(monkeypatch):
 def test_invalid_target_exits_fatally(monkeypatch):
     """AUDIOURA_DB_TARGET=bogus must fail with SystemExit — no silent fallback."""
     monkeypatch.setenv("AUDIOURA_DB_TARGET", "bogus")
+    db = _import_db_connection()
     with pytest.raises(SystemExit) as exc_info:
-        _import_db_connection()
+        # LOCAL-325: Resolution is now lazy — trigger it by calling
+        # get_database_url() (or get_connection/get_db_config).
+        db.get_database_url()
     assert exc_info.value.code == 1
 
 
