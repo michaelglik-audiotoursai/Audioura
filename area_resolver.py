@@ -938,39 +938,74 @@ def verify_landmarks(poi_list: List[Dict], area: AreaResolution, landmarks: List
     }
 
 
+def _normalize_landmark_name(name: str) -> str:
+    """Normalize a landmark name for matching: accent-fold, lowercase, strip articles/prepositions.
+
+    LOCAL-290 (Fault 3 / D187 pattern): "Old Town of Menton" must match "Old Town Menton",
+    "Île Sainte-Marguerite" must match "Ile Sainte-Marguerite", "La Croisette" must match
+    "Cannes Croisette". The key operations:
+      1. Accent folding (Île→Ile, Èze→Eze, Château→Chateau)
+      2. Strip French/English articles and short prepositions
+      3. Collapse whitespace and punctuation
+    """
+    import unicodedata
+    # Accent fold
+    nfkd = unicodedata.normalize('NFKD', name)
+    folded = ''.join(c for c in nfkd if not unicodedata.combining(c))
+    # Lowercase
+    s = folded.lower().strip()
+    # Remove punctuation (hyphens→spaces, apostrophes→space to split elisions like d'Or→d Or)
+    s = s.replace("'", " ").replace("\u2019", " ").replace("-", " ")
+    s = re.sub(r'[^\w\s]', ' ', s)
+    # Strip articles and short prepositions (French + English)
+    _ARTICLES = {'the', 'a', 'an', 'le', 'la', 'les', 'l', 'de', 'du', 'des',
+                 'un', 'une', 'of', 'et', 'and', 'd', 'au', 'aux', 'en', 'sur'}
+    words = s.split()
+    content = [w for w in words if w not in _ARTICLES and len(w) > 1]
+    return ' '.join(content) if content else ' '.join(words)
+
+
 def _match_stop_to_landmark(stop_name: str, landmarks: List[Landmark]) -> Optional[Landmark]:
     """Match a GPT-proposed stop name to a discovered landmark.
-    
-    Uses normalized name comparison + fuzzy substring matching.
+
+    LOCAL-290 (Fault 3): Uses accent-folded, article-stripped normalization so that
+    "Old Town of Menton" matches "Old Town Menton" and "Île Sainte-Marguerite" matches
+    "Ile Sainte-Marguerite". This is the D187 pattern — name fragmentation that caused
+    0/7 matches against 28 discovered landmarks.
     """
+    stop_norm = _normalize_landmark_name(stop_name)
     stop_lower = stop_name.lower().strip()
-    # Remove common prefixes for matching
-    stop_clean = re.sub(r'^(the|saint|st\.?|mount|mt\.?)\s+', '', stop_lower, flags=re.IGNORECASE)
-    
+
     for lm in landmarks:
         if not lm.name:
             continue
+        lm_norm = _normalize_landmark_name(lm.name)
         lm_lower = lm.name.lower().strip()
-        lm_clean = re.sub(r'^(the|saint|st\.?|mount|mt\.?)\s+', '', lm_lower, flags=re.IGNORECASE)
-        
-        # Exact match
-        if stop_lower == lm_lower or stop_clean == lm_clean:
+
+        # Exact normalized match
+        if stop_norm == lm_norm:
             return lm
-        
-        # Substring containment (either direction)
-        if len(stop_clean) >= 4 and len(lm_clean) >= 4:
-            if stop_clean in lm_clean or lm_clean in stop_clean:
+
+        # Substring containment on normalized forms (either direction)
+        if len(stop_norm) >= 4 and len(lm_norm) >= 4:
+            if stop_norm in lm_norm or lm_norm in stop_norm:
                 return lm
-        
-        # Word-overlap score (Jaccard-style)
-        stop_words = set(stop_clean.split())
-        lm_words = set(lm_clean.split())
+
+        # Also try raw lowercase substring (handles "Cap Ferrat" in "Saint-Jean-Cap-Ferrat")
+        if len(stop_lower) >= 4 and len(lm_lower) >= 4:
+            if stop_lower in lm_lower or lm_lower in stop_lower:
+                return lm
+
+        # Word-overlap score (Jaccard-style) on normalized content words
+        stop_words = set(stop_norm.split())
+        lm_words = set(lm_norm.split())
         if stop_words and lm_words:
             overlap = len(stop_words & lm_words)
-            union = len(stop_words | lm_words)
-            if union > 0 and overlap / union >= 0.6:
+            shorter = min(len(stop_words), len(lm_words))
+            # Match if >=60% of the SHORTER name's words appear in the longer
+            if shorter > 0 and overlap / shorter >= 0.60:
                 return lm
-    
+
     return None
 
 

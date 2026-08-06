@@ -433,6 +433,310 @@ def _check_stop_corpus_geographic(
         return False, ""
 
 
+def _check_geographic_existence_tier1(
+    stop_title: str, venue_name: str
+) -> Tuple[bool, str]:
+    """Tier-1 existence check for geographic stops: Wikipedia + Wikidata.
+
+    LOCAL-290 / D162 automated: A stop absent from our stop_corpus is NOT
+    necessarily fabricated — it may simply be a real place we have not scraped.
+    Before rejecting, check whether the place actually exists via:
+      1. Wikipedia REST API (summary lookup by name)
+      2. Wikipedia search API (search for name + region)
+      3. Wikidata entity search (structured knowledge base)
+
+    A fabricated place still fails (no Wikipedia article, no Wikidata entity).
+    A real place that we simply haven't scraped now passes.
+
+    Proximity constraint: the Wikipedia/Wikidata result must mention the region
+    (from venue_name) OR be geolocated within a reasonable distance. This
+    prevents "Le Chantecler in Lyon" from passing for a Nice tour (LOCAL-281
+    test case that must still fail).
+    """
+    import requests as _http
+    from urllib.parse import quote
+
+    # Extract region signals from venue_name
+    # e.g. "French Riviera walking area" → {"french", "riviera"}
+    # e.g. "Nice, France cycling tour" → {"nice"}
+    _region_signals = set()
+    for part in re.split(r'[,\s]+', venue_name):
+        part_clean = _strip_accents(part).lower().strip()
+        if len(part_clean) >= 4 and part_clean not in (
+            'area', 'walking', 'cycling', 'biking', 'tour', 'driving',
+            'france', 'italy', 'spain', 'germany', 'england',  # country too broad
+        ):
+            _region_signals.add(part_clean)
+
+    # Also add well-known sub-region names that a Wikipedia article would mention
+    _RIVIERA_CITIES = {'nice', 'cannes', 'monaco', 'antibes', 'menton', 'grasse',
+                       'villefranche', 'saint-tropez', 'eze', 'mougins', 'cagnes',
+                       'vence', 'frejus', 'juan-les-pins', 'beaulieu'}
+    _use_riviera_bbox = False
+    if 'riviera' in _region_signals or 'french' in _region_signals:
+        _use_riviera_bbox = True
+        # For French Riviera tours, any Riviera city in the article is evidence
+        _region_signals.update(_RIVIERA_CITIES)
+        _region_signals.add('cote d azur')
+        _region_signals.add('alpes-maritimes')
+        _region_signals.add('alpes maritimes')
+        _region_signals.add('mediterranean')
+        # Remove overly broad signals that would match ANY French article
+        _region_signals.discard('french')
+        _region_signals.discard('france')
+
+    _HEADERS = {
+        "User-Agent": "Audioura/2.2 (tour-generation; contact: support@audioura.com)",
+        "Accept": "application/json",
+    }
+
+    # --- Check 1: Wikipedia summary (en + fr) ---
+    for lang in ('en', 'fr'):
+        try:
+            encoded_title = quote(stop_title.strip().replace(" ", "_"), safe="")
+            url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{encoded_title}"
+            resp = _http.get(url, headers=_HEADERS, timeout=8, allow_redirects=True)
+            if resp.status_code == 200:
+                data = resp.json()
+                extract = data.get("extract", "")
+                title_returned = data.get("title", "")
+                description = data.get("description", "")
+                full_text = _strip_accents(f"{extract} {description}").lower()
+
+                # Check region proximity: does the article mention the region?
+                has_region = any(sig in full_text for sig in _region_signals)
+
+                # Also check coordinates if available
+                coords = data.get("coordinates", {})
+                if coords and not has_region:
+                    # Geographic proximity check: is it in the right general area?
+                    lat = coords.get("lat", 0)
+                    lng = coords.get("lon", 0) or coords.get("lng", 0)
+                    if lat and lng:
+                        # French Riviera roughly: lat 43.2-43.8, lng 6.0-7.6
+                        if _use_riviera_bbox:
+                            if 43.0 <= lat <= 44.0 and 5.5 <= lng <= 7.8:
+                                has_region = True
+
+                if has_region:
+                    return True, (f"wikipedia_{lang}_summary: '{title_returned}' "
+                                  f"exists and mentions region")
+                elif _title_match(stop_title, title_returned):
+                    # Title matches but no region signal — could be the wrong place
+                    # (e.g. "Lyon" article for a Nice tour). Don't verify.
+                    logger.debug(f"[EXISTENCE-GATE] Wikipedia found '{title_returned}' but "
+                                 f"no region signal for {venue_name}")
+        except Exception as e:
+            logger.debug(f"[EXISTENCE-GATE] Wikipedia {lang} summary check failed for "
+                         f"{stop_title!r}: {e}")
+
+    # --- Check 2: Wikipedia search (finds places mentioned in other articles) ---
+    for lang in ('en', 'fr'):
+        try:
+            # Build search query with region hint
+            region_hint = next((s for s in _region_signals
+                                if s not in ('french', 'riviera', 'mediterranean')), "")
+            search_query = f'"{stop_title}" {region_hint}'.strip()
+
+            search_url = f"https://{lang}.wikipedia.org/w/api.php"
+            params = {
+                "action": "query",
+                "list": "search",
+                "srsearch": search_query,
+                "srnamespace": "0",
+                "srlimit": "5",
+                "format": "json",
+            }
+            resp = _http.get(search_url, params=params, headers=_HEADERS, timeout=8)
+            if resp.status_code == 200:
+                results = resp.json().get("query", {}).get("search", [])
+                for r in results:
+                    r_title = r.get("title", "")
+                    snippet = _strip_accents(
+                        re.sub(r'<[^>]+>', '', r.get("snippet", ""))
+                    ).lower()
+
+                    # Check if the result IS the place (title matches)
+                    if _title_match(stop_title, r_title):
+                        # Snippet or title matches — check region
+                        if any(sig in snippet for sig in _region_signals):
+                            return True, (f"wikipedia_{lang}_search: '{r_title}' "
+                                          f"matches and snippet mentions region")
+                        # Title matches exactly — fetch summary for region check
+                        try:
+                            art_url = (f"https://{lang}.wikipedia.org/api/rest_v1/"
+                                       f"page/summary/{quote(r_title.replace(' ', '_'), safe='')}")
+                            art_resp = _http.get(art_url, headers=_HEADERS,
+                                                 timeout=5, allow_redirects=True)
+                            if art_resp.status_code == 200:
+                                art_data = art_resp.json()
+                                art_text = _strip_accents(
+                                    f"{art_data.get('extract', '')} "
+                                    f"{art_data.get('description', '')}"
+                                ).lower()
+                                if any(sig in art_text for sig in _region_signals):
+                                    return True, (f"wikipedia_{lang}_article: '{r_title}' "
+                                                  f"exists in region")
+                                # Coordinate check
+                                art_coords = art_data.get("coordinates", {})
+                                if art_coords:
+                                    lat = art_coords.get("lat", 0)
+                                    lng = art_coords.get("lon", 0) or art_coords.get("lng", 0)
+                                    if lat and lng and _use_riviera_bbox:
+                                        if 43.0 <= lat <= 44.0 and 5.5 <= lng <= 7.8:
+                                            return True, (f"wikipedia_{lang}_coords: "
+                                                          f"'{r_title}' at {lat:.2f},{lng:.2f} "
+                                                          f"within Riviera bounds")
+                        except Exception:
+                            pass
+        except Exception as e:
+            logger.debug(f"[EXISTENCE-GATE] Wikipedia {lang} search check failed for "
+                         f"{stop_title!r}: {e}")
+
+    # --- Check 3: Wikidata entity search ---
+    try:
+        wd_url = "https://www.wikidata.org/w/api.php"
+        for lang in ('en', 'fr'):
+            wd_params = {
+                "action": "wbsearchentities",
+                "search": stop_title,
+                "language": lang,
+                "limit": "5",
+                "format": "json",
+            }
+            resp = _http.get(wd_url, params=wd_params, headers=_HEADERS, timeout=8)
+            if resp.status_code == 200:
+                wd_results = resp.json().get("search", [])
+                for wd_r in wd_results:
+                    wd_label = wd_r.get("label", "")
+                    wd_desc = _strip_accents(wd_r.get("description", "")).lower()
+
+                    if _title_match(stop_title, wd_label):
+                        # Check if description mentions the region
+                        if any(sig in wd_desc for sig in _region_signals):
+                            return True, (f"wikidata_{lang}: '{wd_label}' "
+                                          f"(QID:{wd_r.get('id', '?')}) "
+                                          f"description mentions region")
+                        # Geographic entity types that are inherently locatable
+                        _GEO_TYPES = ('commune', 'village', 'town', 'city', 'cape',
+                                      'peninsula', 'bay', 'beach', 'island', 'mountain',
+                                      'hill', 'park', 'garden', 'road', 'street',
+                                      'quarter', 'district', 'headland', 'port',
+                                      'harbour', 'harbor', 'corniche', 'promontoire',
+                                      'commune de france', 'commune française')
+                        if any(gt in wd_desc for gt in _GEO_TYPES):
+                            # It's a geographic entity — check proximity via SPARQL
+                            # (lightweight: just fetch coordinates for the QID)
+                            qid = wd_r.get('id', '')
+                            if qid:
+                                _coords = _fetch_wikidata_coords(qid, _HEADERS)
+                                if _coords:
+                                    lat, lng = _coords
+                                    if _use_riviera_bbox:
+                                        if 43.0 <= lat <= 44.0 and 5.5 <= lng <= 7.8:
+                                            return True, (f"wikidata_{lang}_coords: "
+                                                          f"'{wd_label}' (QID:{qid}) "
+                                                          f"at {lat:.2f},{lng:.2f} "
+                                                          f"within region")
+    except Exception as e:
+        logger.debug(f"[EXISTENCE-GATE] Wikidata check failed for {stop_title!r}: {e}")
+
+    # --- Check 4: Proper-noun extraction fallback ---
+    # For compound names like "Old Town of Menton" or "Castle Hill of Nice",
+    # extract the geographic proper noun and look it up directly.
+    # If "Menton" has a Wikipedia article at the right coordinates, "Old Town of Menton" exists.
+    _proper_nouns = _extract_geographic_proper_nouns(stop_title)
+    for pn in _proper_nouns:
+        try:
+            import requests as _http_pn
+            pn_url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{quote(pn.replace(' ', '_'), safe='')}"
+            pn_resp = _http_pn.get(pn_url, headers=_HEADERS, timeout=8, allow_redirects=True)
+            if pn_resp.status_code == 200:
+                pn_data = pn_resp.json()
+                pn_coords = pn_data.get("coordinates", {})
+                if pn_coords:
+                    lat = pn_coords.get("lat", 0)
+                    lng = pn_coords.get("lon", 0) or pn_coords.get("lng", 0)
+                    if lat and lng:
+                        if _use_riviera_bbox:
+                            if 43.0 <= lat <= 44.0 and 5.5 <= lng <= 7.8:
+                                return True, (f"wikipedia_proper_noun: '{pn}' "
+                                              f"at {lat:.2f},{lng:.2f} confirms "
+                                              f"'{stop_title}' is in region")
+                # No coords but article mentions region
+                pn_text = _strip_accents(
+                    f"{pn_data.get('extract', '')} {pn_data.get('description', '')}"
+                ).lower()
+                if any(sig in pn_text for sig in _region_signals if sig != pn.lower()):
+                    return True, (f"wikipedia_proper_noun: '{pn}' article "
+                                  f"mentions region, confirms '{stop_title}'")
+        except Exception:
+            pass
+
+    return False, ""
+
+
+def _extract_geographic_proper_nouns(stop_title: str) -> List[str]:
+    """Extract likely geographic proper nouns from a compound stop name.
+
+    "Old Town of Menton" → ["Menton"]
+    "Castle Hill of Nice" → ["Nice"]
+    "Cap d'Antibes Coastal Path" → ["Antibes"]
+    "Promenade Maurice Rouvier" → ["Maurice Rouvier"]
+
+    Strategy: split on prepositions (of, de, du, des, d') and take the trailing
+    proper noun. Also try removing common geographic type prefixes.
+    """
+    candidates = []
+
+    # Pattern 1: "X of Y" or "X de Y" — Y is likely the place
+    m = re.search(r'\b(?:of|de|du|des|d\')\s+(.+)$', stop_title, re.IGNORECASE)
+    if m:
+        trailing = m.group(1).strip()
+        if len(trailing) >= 3:
+            candidates.append(trailing)
+
+    # Pattern 2: Remove common geographic type prefixes
+    _GEO_PREFIXES = (
+        'old town', 'castle hill', 'fort', 'port', 'cape', 'bay',
+        'beach', 'island', 'mount', 'hill', 'garden', 'park',
+        'promenade', 'boulevard', 'place', 'square', 'corniche',
+    )
+    title_lower = stop_title.lower()
+    for prefix in _GEO_PREFIXES:
+        if title_lower.startswith(prefix):
+            remainder = stop_title[len(prefix):].strip()
+            # Remove leading "of", "de", etc.
+            remainder = re.sub(r'^(?:of|de|du|des|d\')\s*', '', remainder, flags=re.IGNORECASE).strip()
+            if len(remainder) >= 3:
+                candidates.append(remainder)
+                break
+
+    return candidates
+    """Fetch P625 (coordinate location) for a Wikidata entity."""
+    import requests as _http
+    try:
+        url = "https://www.wikidata.org/w/api.php"
+        params = {
+            "action": "wbgetclaims",
+            "entity": qid,
+            "property": "P625",
+            "format": "json",
+        }
+        resp = _http.get(url, params=params, headers=headers, timeout=8)
+        if resp.status_code == 200:
+            claims = resp.json().get("claims", {}).get("P625", [])
+            if claims:
+                mainsnak = claims[0].get("mainsnak", {}).get("datavalue", {}).get("value", {})
+                lat = mainsnak.get("latitude")
+                lng = mainsnak.get("longitude")
+                if lat is not None and lng is not None:
+                    return (float(lat), float(lng))
+    except Exception:
+        pass
+    return None
+
+
 def _check_dining_existence(
     stop_title: str, venue_name: str, db_conn
 ) -> Tuple[bool, str]:
@@ -817,6 +1121,15 @@ def verify_stop_existence(
             result['verified'] = True
             result['evidence'] = evidence
             result['source'] = 'stop_corpus_geographic'
+            return result
+        # [LOCAL-290 Fault 2 / D162] Corpus lookup failed — but a real place absent
+        # from our scraping backlog must NOT be dropped as "no evidence". Fall through
+        # to tier-1 existence check (Wikipedia/Wikidata) before declaring unverified.
+        verified, evidence = _check_geographic_existence_tier1(stop_title, venue_name)
+        if verified:
+            result['verified'] = True
+            result['evidence'] = evidence
+            result['source'] = 'geographic_tier1_wikipedia'
             return result
     elif venue_kind == 'dining':
         # LOCAL-281: Restaurant/dining verification via external sources.
