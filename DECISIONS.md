@@ -9035,3 +9035,38 @@ which affects a tour delivering 8/8.
 **This is Michael's call, not LEAD's.** The gate is his and the field test is
 his. What LEAD can say is that the condition he named is now met on four
 consecutive draws, measured without the term LEAD believes is unsound.
+
+## D229 — A quiet alarm is not a resolved one (2026-08-06)
+
+The `SECRET DETECTED` alert fired every ~5 minutes from 05:30 and **stopped at
+13:33Z**. Nothing was fixed. The commit carrying it (`ba6651b`) scrolled out of
+the scanner's 20-commit window — it is now **53 commits back**, pushed past by a
+morning of merges.
+
+Checked which of the two explanations it was, rather than assuming:
+
+```
+launchd tick alive      backup written 16:28:47Z, six minutes before the check
+commit position         53 commits back, window is 20
+credential present      boston_username / boston_password in the working tree
+device_key              still line 28 of the same file
+reach                   3 commits contain it; ba6651b is on origin/storied
+```
+
+So the guard is healthy and the credential is untouched. **The alarm going silent
+is the most dangerous state this could be in** — it looks identical to
+resolution, and Michael could reasonably return to a quiet `ALERTS.md` and infer
+the problem was handled.
+
+`secret_scan_cleared.txt`'s own header warns about exactly this: *"the tick scans
+the last 20 commits, so a finding stays visible for ~20 commits even after the
+tip is fixed."* The inverse is the trap — a finding **disappears** after ~20
+commits even when nothing is fixed.
+
+**Written a standing, non-expiring entry into `ALERTS.md`** stating that the item
+is unresolved, what was verified and when, and that rotation is still the only
+action that helps. Unlike the scanner's output, it does not scroll away.
+
+**Not changing the 20-commit window.** A wider window means more noise on every
+tick and does not fix the underlying issue, which is that a rolling scanner is
+the wrong instrument for tracking an unresolved finding. The standing note is.
