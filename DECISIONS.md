@@ -10342,3 +10342,61 @@ instead of `tours/LOCAL336_museum_4stop.txt`, the file the task named, so the
 drop was unattributed until LEAD traced it. LOCAL-331 and LOCAL-340 both did the
 same with `audio_tours` id=21. Task files name an artifact; submissions must
 score that artifact.
+
+## D260 — RETRACTS part of D256: the bridge is suppressed by the thin row enrichment creates
+**2026-08-07.**
+
+D256 reported "Palais Lascaris 1 fact -> 8, THIN -> RICH" as the cleanest
+result of the session. **It has regressed to 1 fact, and the cause is ours.**
+
+LOCAL-342's bridge fires only when a stop has **no** `stop_corpus` row.
+LOCAL-332's interpretive enrichment **creates** rows. Same stop, same request,
+hours apart:
+
+```
+02:xx  no row          -> bridge supplies venue_corpus (63 passages) -> RICH, 8 facts
+10:40  enrichment writes
+       'Palais Lascaris' | 'walking tour of Vieux Nice, France' | 3 passages
+                          -> bridge suppressed                     -> THIN, 1 fact
+```
+
+**A 3-passage row beat a 63-passage one**, permanently, because the row persists.
+Every enrichment run makes the bridge less useful. Two features shipped a day
+apart, each correct alone, that disable each other.
+
+**LEAD's first hypothesis was wrong and worth recording.** The regression
+appeared in the run where the existence gate was newly enabled, so LEAD
+suspected the gate. The bridge emits no log line, so its absence proved nothing
+either way. Only querying `stop_corpus` for a row created at 10:40 identified
+the real cause. **A correlation with the variable you just changed is not
+evidence** — this is the third time tonight LEAD nearly attributed a movement to
+the wrong cause (cf. LOCAL-340's museum vector, LOCAL-345's missing stop).
+
+Dispatched as LOCAL-346. Thin rows are to be merged or ranked, never deleted.
+
+## D261 — LEAD generated every tour with the existence gate silently disabled
+**2026-08-07.**
+
+Every tour LEAD produced — including the three given to Michael — ran from the
+host shell where `DATABASE_URL` is unset:
+
+```
+[venue_cache] No DATABASE_URL set (host mode) — venue cache skipped
+[LOCAL-245] EXISTENCE-GATE: DB unavailable — gate cannot run, proceeding without
+```
+
+**The stop-existence gate did not run** — the gate built after Michael's
+2-of-5 restaurant complaint, whose job is to stop us shipping places that do not
+exist. Not a product defect: `docker-compose-master.yml` sets `DATABASE_URL`, so
+containerised runs are gated.
+
+With it enabled the gate reports `LOG_ONLY — 6/7 stops verified (86%), 1 would
+be dropped`. **It observes and does not enforce**, so even gated, an unverified
+stop ships. Worth deciding whether LOG_ONLY is still the right mode.
+
+**Correct invocation for host-side generation, use it from now on:**
+```
+DATABASE_URL=postgresql://admin:password123@localhost:5433/audiotours \
+STORIED_MODE=true OPENAI_API_KEY=... python3 -c "..."
+```
+Added to `restart.sh` guidance so a future session does not repeat it.

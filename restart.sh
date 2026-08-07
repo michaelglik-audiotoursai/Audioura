@@ -76,6 +76,13 @@ except Exception as e:
 PY
 echo '```'
 echo
+echo "## Generating a tour from the host — REQUIRED env (D261)"
+echo '```'
+echo 'DATABASE_URL=postgresql://admin:password123@localhost:5433/audiotours \'
+echo 'STORIED_MODE=true OPENAI_API_KEY=... python3 -c "..."'
+echo '# without DATABASE_URL the stop-existence gate SILENTLY does not run'
+echo '```'
+echo
 echo "## Read next, in this order"
 echo '- `CLAUDE.md`            — RULE ZERO (do not stop and ask) + live-DB rules'
 echo '- `DECISIONS.md`         — tail -120; D2xx are the recent rulings'
