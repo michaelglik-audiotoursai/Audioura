@@ -9847,3 +9847,33 @@ Live scores as of this tick, honest and corpus-loaded:
 museum 8-stop        78.1   (was reported 81.2 with groundedness defaulted to 1.0)
 Old Nice restaurant  65.0   (55.0 under the THIN cap; ADEQUATE restores 65.0)
 ```
+
+## D246 — "No log file" means queued, not dead. LEAD nearly caused a double dispatch.
+**2026-08-06.**
+
+LEAD saw LOCAL-330 and LOCAL-331 marked `STARTED` with (a) no log file and
+(b) no match in `ps aux | grep "kiro-cli chat"`, concluded both were
+slot-starved zombies, and wrote `ABANDONED` lines to unstick them.
+
+**Both were alive.** They were `kiro_dispatcher.py` children (pids 76350,
+76398) blocked on `sem.acquire()` at `kiro_dispatcher.py:406`, waiting for
+LOCAL-332/333 to release one of the two concurrency slots.
+
+Two facts that make the wrong inference easy, and are worth remembering:
+
+- **The worker creates its log only after acquiring a slot.** An absent log
+  proves the task is *queued*, not that it died.
+- **A queued worker is a `python3 kiro_dispatcher.py` process, not a `kiro-cli`
+  process.** Grepping for `kiro-cli chat` cannot see it. Grep for
+  `kiro_dispatcher` as well, or check the PID recorded in the `STARTED` line —
+  it is right there in `dispatcher_pid=`.
+
+Had the ABANDONED lines stood, the next dispatcher run would have forked a
+second worker onto the same branch and worktree while the first was still
+queued — the LOCAL-314 stale-branch collision, which previously came close to
+destroying Michael's restaurant tour.
+
+Retracted in `kiro_sessions_ran.md` with a `CORRECTION` line and both tasks
+re-claimed. **Before writing an ABANDONED line, check the PID in the STARTED
+record.** `kill -0 <dispatcher_pid>` settles it in one command; nothing else is
+needed, and no other signal is sufficient.
