@@ -843,6 +843,7 @@ def _extract_subject_nouns(sentence: str) -> List[str]:
 def _check_contradiction(
     claim: Dict,
     passages: List[str],
+    stop_title: str = '',
 ) -> Optional[str]:
     """Check if any passage directly contradicts the claim.
 
@@ -860,6 +861,12 @@ def _check_contradiction(
 
     "The chapel was built in 1432." vs "The museum opened in 1990."
     have different subjects (chapel ≠ museum) → no contradiction.
+
+    [LOCAL-340] When subject extraction yields nothing (e.g. sentence starts
+    with a verb like "Established in 1926..."), the stop_title is used as a
+    fallback subject. If corpus passages for this stop mention the stop_title
+    AND a competing date, that IS a contradiction — the stop's own corpus is
+    the authoritative source for claims about the stop itself.
 
     If no subject match is found, the verdict is UNSUPPORTED, not
     CONTRADICTED — under-claiming is safer than crying wolf on our gravest
@@ -936,8 +943,24 @@ def _check_contradiction(
 
     # If we have no subject nouns AND no proper nouns, cannot determine
     # what the sentence is about → bail out safely.
+    # [LOCAL-340] UNLESS stop_title is available: when a sentence starts with
+    # a verb ("Established in 1926..."), subject extraction yields nothing.
+    # But if this is the stop's own corpus, the stop_title IS the implicit
+    # subject. Use its tokens as proper nouns for same-subject matching.
     if not claim_subject_nouns and not proper_nouns:
-        return None
+        if stop_title:
+            # Use stop_title tokens as the subject (accent-folded, lowered)
+            _stop_title_folded = _strip_accents(stop_title).lower()
+            stop_title_tokens = set(
+                t for t in re.findall(r'[a-z]+', _stop_title_folded)
+                if len(t) >= 3 and t not in _proper_noun_generics
+            )
+            if stop_title_tokens:
+                proper_nouns = stop_title_tokens
+            else:
+                return None
+        else:
+            return None
 
     for passage in passages:
         passage_tokens_set = set(_tokenize(passage))
@@ -1271,7 +1294,7 @@ def check_paragraph(
                 score = elsewhere_score
             else:
                 # Check for contradiction
-                contradiction = _check_contradiction(claim, passages)
+                contradiction = _check_contradiction(claim, passages, stop_title)
                 if contradiction:
                     verdict = CONTRADICTED
                     evidence = contradiction
@@ -1279,7 +1302,7 @@ def check_paragraph(
                     verdict = UNSUPPORTED
         else:
             # Check for contradiction
-            contradiction = _check_contradiction(claim, passages)
+            contradiction = _check_contradiction(claim, passages, stop_title)
             if contradiction:
                 verdict = CONTRADICTED
                 evidence = contradiction

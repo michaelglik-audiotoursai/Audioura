@@ -1533,6 +1533,14 @@ def _compute_groundedness_for_stop(sa: 'StopAnalysis', stop: dict, corpus_data: 
     # CONTRADICTED share: fraction of claims that are CONTRADICTED.
     # This uses the claim_check module's CONTRADICTED signal — positive evidence
     # of error, not absence of support.
+    #
+    # [LOCAL-340 bounce] The denominator must be the TOTAL extractable claims,
+    # not just the subset claim_check happens to extract. claim_check only
+    # extracts DATE/NUMBER/PROPER_NOUN_PREDICATE — a narrow set. If a stop has
+    # 2 date claims (both contradicted) but also makes 5 other factual claims
+    # (names, artworks, etc.), saying contradicted_share=1.0 is wrong: 2/7=0.29
+    # is the true proportion. Use max(groundedness total, claim_check total)
+    # as denominator so that supported non-date claims dilute the share.
     if result.total_claims > 0:
         # Use claim_check for the real CONTRADICTED verdict (same-subject + number conflict)
         try:
@@ -1546,7 +1554,14 @@ def _compute_groundedness_for_stop(sa: 'StopAnalysis', stop: dict, corpus_data: 
             cc_contradicted = cc_result['verdict_counts']['contradicted']
             total_cc_claims = len(cc_result['claims'])
             if total_cc_claims > 0 and cc_contradicted > 0:
-                sa.contradicted_share = cc_contradicted / total_cc_claims
+                # [LOCAL-340] Use the broader claim count as denominator.
+                # groundedness_check extracts persons, dates, artworks;
+                # claim_check extracts dates, numbers, proper-noun predicates.
+                # The larger set is the better approximation of "all claims
+                # the stop makes", so contradicted claims are proportioned
+                # against the full factual footprint.
+                denominator = max(result.total_claims, total_cc_claims)
+                sa.contradicted_share = cc_contradicted / denominator
         except ImportError:
             pass  # claim_check not available — no CONTRADICTED signal
 
