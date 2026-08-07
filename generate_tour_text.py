@@ -5998,6 +5998,47 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     poi['operational_details'] = ''
                 print(f"  [LOCAL-39] No visitor info sourced — Museum Information field OMITTED")
 
+        # -------- [LOCAL-353] Source operational details from OSM (restaurant tours) --------
+        # For restaurant/dining tours, query OpenStreetMap for sourceable operational
+        # facts: opening_hours, payment methods, reservation, price_range.
+        # These replace GPT-invented operational_details (which the gate correctly kills).
+        # The OSM source text is stored so the practical facts gate can verify each claim.
+        _osm_dining_source_url = ''
+        _osm_dining_source_text = ''
+        if tour_category == 'restaurant' and poi_list:
+            try:
+                from osm_dining_facts import fetch_osm_dining_facts, extract_city_from_venue_name
+                _osm_city = extract_city_from_venue_name(location)
+                if _osm_city:
+                    print(f"  [LOCAL-353] Querying OSM for dining operational details (city: {_osm_city})")
+                    _osm_source_texts = []
+                    _osm_source_urls = []
+                    for poi in poi_list:
+                        _osm_facts = fetch_osm_dining_facts(poi['name'], _osm_city)
+                        if not _osm_facts.is_empty():
+                            # Replace GPT-invented operational_details with OSM-sourced facts
+                            poi['operational_details'] = _osm_facts.format_operational_details()
+                            _osm_source_texts.append(_osm_facts.source_text)
+                            _osm_source_urls.append(_osm_facts.source_url)
+                            print(f"  [LOCAL-353] {poi['name']}: sourced → {poi['operational_details']}")
+                        else:
+                            # No OSM operational data — clear GPT invention (gate would kill it anyway)
+                            poi['operational_details'] = ''
+                            print(f"  [LOCAL-353] {poi['name']}: no sourceable facts in OSM — omitted")
+                    # Combine all OSM source texts for the gate
+                    if _osm_source_texts:
+                        _osm_dining_source_text = "\n\n".join(_osm_source_texts)
+                        _osm_dining_source_url = ", ".join(_osm_source_urls[:3])
+                        # Store for the practical facts gate downstream
+                        _visitor_info_source_url = _osm_dining_source_url
+                        _visitor_info_source_text = _osm_dining_source_text
+                else:
+                    print(f"  [LOCAL-353] Could not extract city from location — OSM lookup skipped")
+            except ImportError:
+                print(f"  [LOCAL-353] osm_dining_facts not available — operational details unchanged")
+            except Exception as _osm_err:
+                print(f"  [LOCAL-353] OSM dining facts error (non-fatal): {_osm_err}")
+
         # -------- Coordinates fallback: request for any stop missing coordinates --------
         # PHASE 3B sometimes omits coordinates for one or more stops. Request them
         # individually (parallel) so every stop gets a map pin.
