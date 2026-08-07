@@ -26,7 +26,16 @@ echo
 echo "## Production safety"
 REAL=$($PSQL "SELECT count(*) FROM audio_tours WHERE is_test IS NOT TRUE;" 2>/dev/null)
 echo '```'
-echo "audio_tours real rows: ${REAL:-UNREACHABLE}   (must be 29 — a drop is an incident, see CLAUDE.md)"
+echo "audio_tours real rows: ${REAL:-UNREACHABLE}"
+echo "  A DROP is an incident (CLAUDE.md). Growth is normal — Michael generating a tour"
+echo "  adds a row, and its translation adds another. 29 was a snapshot, never a law."
+if [ -f .continuous_dev/last_real_count.txt ]; then
+  PREV=$(cat .continuous_dev/last_real_count.txt)
+  if [ -n "$REAL" ] && [ "$REAL" -lt "$PREV" ] 2>/dev/null; then
+    echo "  *** ROW LOSS: was $PREV, now $REAL — investigate before doing anything else ***"
+  fi
+fi
+[ -n "$REAL" ] && echo "$REAL" > .continuous_dev/last_real_count.txt
 echo "cost_ledger rows:      $($PSQL 'SELECT count(*) FROM cost_ledger;' 2>/dev/null)"
 echo '```'
 if [ -f .continuous_dev/ALERTS.md ]; then
