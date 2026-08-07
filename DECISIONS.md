@@ -10589,3 +10589,33 @@ Until it exists, the honest reporting rule is: **verify stop-level fixes at the
 layer they change** (retrieval, extraction, scoring) and state plainly that
 delivered prose is unverified rather than substituting a tour-level score that
 moved for unrelated reasons.
+
+## D268 — LOCAL-352 VERIFIED in delivered prose: the story is told
+**2026-08-07, using the LOCAL-357 harness.**
+
+Michael asked for stories about people rather than credentials. Two random
+regenerations could not test it because La Merenda was never selected (D267).
+Forcing the stop settled it:
+
+```
+"At La Merenda, chef Dominique Le Stanc, a former Michelin-starred chef,
+ LEFT THE GRANDEUR OF THE NEGRESCO'S CHANTECLER to craft a different kind of
+ culinary masterpiece."
+
+recap: "La Merenda, where Dominique Le Stanc left the Negresco's Chantecler"
+```
+
+**Negresco named. Chantecler named. The action present. Zero inferred
+motivation** — the failure mode of the previous attempt ("to embrace
+simplicity") did not recur.
+
+The full chain that had to work: dedup removed six near-duplicate passages ->
+narrative-action ranking put the Negresco passage at position 2 -> it fit inside
+the unchanged 2000-char cap -> the NARRATIVE ARC RULE told the model to tell the
+sequence -> the model named the place instead of flattening it to an adjective.
+Four merges (345, 352 twice, 357) for one sentence a listener will hear.
+
+**Also noted, not yet investigated:** SCOPE-CHECK removed Le Safari as "outside
+Old Nice (Vieux Nice)". Le Safari is at Cours Saleya / 1 Place Charles Félix,
+which is in Vieux Nice. That looks like a false positive and would silently
+shrink Old Nice restaurant tours. Worth a look.
