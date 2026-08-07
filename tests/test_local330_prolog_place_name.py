@@ -214,6 +214,74 @@ class TestEdgeCases:
         assert "Hyde Park" in result
         assert "London" in result
 
+    def test_tours_france_unchanged(self):
+        """Tours (the city) must not be stripped."""
+        assert _prolog_place("Tours, France") == "Tours, France"
+
+    def test_tour_eiffel_unchanged(self):
+        """Tour Eiffel must not be stripped."""
+        assert _prolog_place("Tour Eiffel, Paris") == "Tour Eiffel, Paris"
+
+    def test_museum_island_berlin_unchanged(self):
+        """Museum Island — category word in place name, no 'tour' keyword."""
+        assert _prolog_place("Museum Island, Berlin") == "Museum Island, Berlin"
+
+    def test_safari_park_nairobi_unchanged(self):
+        """Safari Park — category word in place name, no 'tour' keyword."""
+        assert _prolog_place("Safari Park, Nairobi") == "Safari Park, Nairobi"
+
+
+# ─── LEAD bounce 2: multi-word categories (the list-free approach) ────────────
+
+class TestMultiWordCategories:
+    """
+    LEAD bounce 2026-08-06: multi-word categories must strip correctly.
+    These failed with the single-word category alternation list.
+    The fix anchors on 'tour' + preposition, not the category word.
+    """
+
+    def test_dog_sledding_tour(self):
+        result = _prolog_place("dog sledding tour in Big Lake, Alaska")
+        assert result == "Big Lake, Alaska"
+
+    def test_horse_riding_tour(self):
+        result = _prolog_place("horse riding tour of Patagonia")
+        assert result == "Patagonia"
+
+    def test_hot_air_balloon_tour(self):
+        result = _prolog_place("hot air balloon tour of Cappadocia")
+        assert result == "Cappadocia"
+
+    def test_food_and_wine_tour(self):
+        result = _prolog_place("food and wine tour of Tuscany")
+        assert result == "Tuscany"
+
+    def test_street_art_tour(self):
+        result = _prolog_place("street art tour of Lisbon")
+        assert result == "Lisbon"
+
+    def test_camelback_riding_tour_with_dash_suffix(self):
+        """Michael's real string: prefix + dash suffix."""
+        result = _prolog_place(
+            "Camelback riding tour in Abu Dhabi desert, UAE - museum Tour"
+        )
+        assert result == "Abu Dhabi desert, UAE"
+
+    def test_dog_ridding_tour_comma_separator(self):
+        """Michael's real string: comma after 'tour' as separator."""
+        result = _prolog_place(
+            "dog ridding tour, Big Lake, AK - Dog Sledding Tour"
+        )
+        assert result == "Big Lake, AK"
+
+    def test_camel_tour_with_dash_suffix(self):
+        """Michael's real string: 'tour in a ...' with preposition chain."""
+        result = _prolog_place(
+            "Camel tour in a desert of Abu Dhabi, UAE - museum Tour"
+        )
+        assert "Abu Dhabi" in result
+        assert "museum" not in result.lower()
+
 
 # ─── Integration: verify the production code wiring ───────────────────────────
 

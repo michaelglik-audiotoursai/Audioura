@@ -89,46 +89,42 @@ def _build_material_period_patch(material_english, period_english):
 # [LOCAL-330] Module-level helper: extract a clean place name from the raw
 # location/request string for the prolog location slot.
 #
-# The request string has two known shapes:
-#   1. "<category> tour in|of <place>"   (prefix form)
-#   2. "<place> <category> tour"         (suffix form, e.g. museum tours)
+# The request string has a known shape:
+#   prefix: "<anything> tour (in|of|through|around|across|along|,) <place>"
+#   suffix: "<place> <anything> tour"
 #
-# We anchor to these leading/trailing constructions. If neither matches,
-# the location is already a place — leave it alone.
+# We anchor on the word "tour" followed by a preposition (or comma). This
+# avoids a category-word list entirely (D236) — no list means no list to
+# extend, no place names corrupted by matching category words inside them
+# (Hyde Park, Central Park, Boat Quay, Garden District, etc.).
 #
-# This avoids a word blocklist (D236) which corrupts real place names that
-# contain category words (Hyde Park, Central Park, Boat Quay, Garden District).
+# "Tours, France" is safe: "Tours" is not followed by a preposition.
+# "Tour Eiffel, Paris" is safe: "Tour" is not followed by a preposition.
 # ---------------------------------------------------------------------------
-_PROLOG_CATEGORY_ALTERNATION = (
-    r'(?:self[- ]guided\s+)?'
-    r'(?:restaurant|restaurants|food|dining|culinary|eat|cafe|bistro|eatery'
-    r'|walking|walk|hiking|hike'
-    r'|cycling|cycle|bike|biking'
-    r'|museum|gallery|exhibition'
-    r'|architecture|architectural'
-    r'|pub\s+crawl|pub|crawl|shopping'
-    r'|movie|film|book|literary|novel'
-    r'|botanical|garden|park'
-    r'|guided'
-    r'|camel|camelback|horse|horseback'
-    r'|dog|dogsled|dogsledding'
-    r'|auto|car|driving|jeep|motorcycle|scooter'
-    r'|safari|segway|boat|kayak'
-    r')s?'
-)
 
-# Prefix: "restaurant tour in Old Nice" → "Old Nice"
+# Prefix: "<anything> tour in Old Nice" → "Old Nice"
+# Matches everything from the start up to and including "tour(s)" + preposition/comma.
+# The key insight: require a preposition or comma AFTER "tour" — this is what
+# distinguishes "dog sledding tour in Big Lake" from "Tours, France".
 _PROLOG_TOUR_PREFIX_RE = re.compile(
-    r'^' + _PROLOG_CATEGORY_ALTERNATION +
-    r'\s+tours?\s*'
-    r'(?:in|of|through|around|across|along)?\s*',
+    r'^.+?\btours?\s*'
+    r'(?:in|of|through|around|across|along|,)\s*',
     re.IGNORECASE,
 )
 
 # Suffix: "Musée Matisse, Nice, France museum tour" → "Musée Matisse, Nice, France"
+# Also handles dash-separated: "Big Lake, AK - Dog Sledding Tour" → "Big Lake, AK"
+# Two shapes:
+#   1. " - <anything> tour(s)" at end (dash separator — clear delimiter)
+#   2. " <word> tour(s)" at end (single word before tour, like "museum tour")
+# We limit the non-dash form to a single word to avoid eating into place names
+# like "France" in "Nice, France museum tour".
 _PROLOG_TOUR_SUFFIX_RE = re.compile(
-    r'\s+' + _PROLOG_CATEGORY_ALTERNATION +
-    r'\s+tours?$',
+    r'(?:'
+    r'\s+-\s+.+?\btours?'   # " - Dog Sledding Tour"
+    r'|'
+    r'\s+\w+\s+tours?'      # " museum tour" (single word before tour)
+    r')$',
     re.IGNORECASE,
 )
 
@@ -136,31 +132,46 @@ _PROLOG_TOUR_SUFFIX_RE = re.compile(
 def _prolog_place(location: str) -> str:
     """Derive a clean place name from a raw tour request string.
 
-    If the string starts with a recognised "<category> tour (in|of|...)"
-    prefix, strip that prefix and return the remainder as the place name.
-    If the string ends with "<category> tour" suffix, strip that suffix.
-    If neither matches, return the location unchanged — it is already a
-    usable place name.
+    The request string has a known construction:
+        "<anything> tour (in|of|through|around|across|along|,) <place>"
+    We anchor on 'tour' + preposition — no category-word list needed (D236).
+
+    If no such prefix exists, try a trailing suffix form:
+        "<place> - <words> tour" or "<place> <words> tour"
+
+    If neither matches, the location is already a place name — return unchanged.
 
     Examples:
         "restaurant tour in Old Nice (Vieux Nice), France"
             → "Old Nice (Vieux Nice), France"
+        "dog sledding tour in Big Lake, Alaska"
+            → "Big Lake, Alaska"
+        "food and wine tour of Tuscany"
+            → "Tuscany"
         "Musée Matisse, Nice, France museum tour"
             → "Musée Matisse, Nice, France"
         "Hyde Park, London"
-            → "Hyde Park, London"  (unchanged — no prefix/suffix)
-        "walking tour of Trastevere, Rome, Italy"
-            → "Trastevere, Rome, Italy"
+            → "Hyde Park, London"  (unchanged)
+        "Tours, France"
+            → "Tours, France"  (unchanged)
+        "Tour Eiffel, Paris"
+            → "Tour Eiffel, Paris"  (unchanged)
     """
     # Try prefix strip first
     stripped = _PROLOG_TOUR_PREFIX_RE.sub('', location, count=1)
     if stripped != location:
         stripped = re.sub(r'\s{2,}', ' ', stripped).strip().strip(',').strip()
-        if stripped:
-            return stripped
-        return location
+        if not stripped:
+            return location
+        # After prefix strip, also try suffix (handles "tour, Place - Category Tour")
+        further = _PROLOG_TOUR_SUFFIX_RE.sub('', stripped, count=1)
+        if further != stripped:
+            further = re.sub(r'\s{2,}', ' ', further).strip().strip(',').strip()
+            if further:
+                return further
+        return stripped
 
-    # Try suffix strip
+    # Try suffix strip (no prefix matched)
     stripped = _PROLOG_TOUR_SUFFIX_RE.sub('', location, count=1)
     if stripped != location:
         stripped = re.sub(r'\s{2,}', ' ', stripped).strip().strip(',').strip()
