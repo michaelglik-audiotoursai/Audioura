@@ -382,6 +382,9 @@ def evaluate(tour_text: str, n_requested: int, **context) -> Optional[Evaluation
             "filler": round(sa.generic_filler_fraction, 3),
             # [LOCAL-331] None means unmeasured — distinct from 0.0 and 1.0
             "groundedness": round(sa.groundedness_fraction, 3) if sa.groundedness_fraction is not None else None,
+            # [LOCAL-343] Claim count exposes sample size: how many claims
+            # the groundedness fraction is based on. 0 = nothing checkable.
+            "groundedness_n": sa.groundedness_claims_checked,
         })
 
     return Evaluation(
