@@ -1693,6 +1693,45 @@ def run_existence_gate(
             print(f"    [DINING-HARVEST] Error (non-fatal): {_dh_err}")
     # ──── END LOCAL-314 ───────────────────────────────────────────────────
 
+    # ──── LOCAL-332: INTERPRETIVE ENRICHMENT ──────────────────────────────
+    # After existence is confirmed, ask *what is interesting* about each stop
+    # rather than searching its name (which yields directory listings).
+    # This produces narrative-quality corpus with sources.
+    interpretive_summary = None
+    if os.environ.get('DISABLE_INTERPRETIVE_ENRICHMENT', '').strip() != '1':
+        _ie_venue_kind = _resolved_tour_type or 'default'
+        _ie_city = ''
+        _ie_country = ''
+        # Extract city/country from venue_name
+        if venue_name:
+            _parts = re.split(r'[,\-]', venue_name)
+            for _p in _parts:
+                _pw = _p.strip()
+                if _pw and len(_pw) >= 3 and _pw[0].isupper():
+                    _pw_lower = _pw.lower()
+                    if _pw_lower not in ('old', 'restaurant', 'tour', 'museum', 'food', 'dining', 'vieux'):
+                        if not _ie_city:
+                            _ie_city = _pw
+                        elif not _ie_country:
+                            _ie_country = _pw
+        try:
+            from interpretive_enrichment import enrich_verified_stops
+            interpretive_summary = enrich_verified_stops(
+                verdicts=verdicts,
+                venue_name=venue_name,
+                venue_kind=_ie_venue_kind,
+                city=_ie_city,
+                country=_ie_country,
+                db_conn=db_conn,
+            )
+        except ImportError:
+            pass  # Module not available — skip silently
+        except RuntimeError as _ie_rt:
+            print(f"    [INTERPRETIVE] RuntimeError (non-fatal): {_ie_rt}")
+        except Exception as _ie_err:
+            print(f"    [INTERPRETIVE] Error (non-fatal): {_ie_err}")
+    # ──── END LOCAL-332 ───────────────────────────────────────────────────
+
     return {
         'mode': mode,
         'total_stops': len(poi_list),
@@ -1703,4 +1742,5 @@ def run_existence_gate(
         'action': action,
         'harvest_summary': harvest_summary,
         'dining_harvest_summary': dining_harvest_summary,
+        'interpretive_summary': interpretive_summary,
     }
