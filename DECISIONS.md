@@ -10162,3 +10162,42 @@ exclusion only, never deletion (Michael's rule).
 (LOCAL-320), that a claim is *grounded* (LOCAL-291/331/340), and that a source
 is *high-yield* (LOCAL-328) — but never that a retrieved passage is *about the
 subject*. Existence, grounding and yield are all orthogonal to relevance.
+
+## D255 — A place is a VENUE in one tour and a STOP in another; corpus serves only one
+**2026-08-07. Explains the walking tour's 50.0.**
+
+```
+Palais Lascaris as a VENUE   11 stop_corpus rows, 63 passages,
+                             16,624 bytes of venue_corpus
+Palais Lascaris as a STOP    THIN, 1 fact
+```
+
+Sixty-three passages held, one fact written. The walking tour looks up
+`stop_title = 'Palais Lascaris'`; the material is filed under
+`venue_name = 'Palais Lascaris, Nice'` with the objects *inside* it as stop
+titles. Nothing bridges them.
+
+The other three walking stops — Cours Saleya, Nice Cathedral, Place Rossetti —
+have **no corpus row at all**, despite being among the most documented places in
+Nice. With nothing to write from, the generator produced atmosphere from
+parametric memory and invented that Nice Cathedral is Gothic (it is Baroque,
+1650-1685). That fabrication scored as *zero facts* and cost nothing.
+
+**This completes the picture LEAD has been assembling all session.** We verify
+four things and they are all orthogonal:
+
+```
+exists      LOCAL-320   is the place real?
+grounded    291/331/340 is the claim in our sources?
+yield       LOCAL-328   is the source worth reading?
+relevant    LOCAL-341   is the passage about the subject?
+```
+
+None of them asks **"is the material we already hold reachable from this
+query?"** — and the answer has been no, four times over: accents (D243), venue
+name format (LOCAL-339), duplicate rows (D253), and now venue-versus-stop keying
+(this). Every one of them presented as *missing data* when the data existed.
+
+Dispatched as LOCAL-342, with museum scores (8-stop 75.0, 4-stop 87.5) as a hard
+non-regression bound — bridging venue corpus into stop lookups is exactly the
+kind of change that could move them.
