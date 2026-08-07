@@ -67,8 +67,8 @@ _QUESTION_TEMPLATES = {
         'What is the history of {name} in {city} and who are notable patrons?',
     ],
     'museum': [
-        'What is notable about {name} in {city}, {country}?',
-        'What are the most significant works and collections at {name}?',
+        'What is notable about {name} at {venue}, {city}?',
+        'Who created {name}, what does it depict, and how did it come to {venue}?',
     ],
     'gallery': [
         'What is interesting about {name} gallery in {city}, {country}?',
@@ -94,14 +94,17 @@ def build_interpretive_questions(
     venue_kind: str,
     city: str,
     country: str = "",
+    venue_name: str = "",
 ) -> List[str]:
-    """Generate 2 interpretive questions for a venue.
+    """Generate 2 interpretive questions for a stop.
 
     Args:
-        stop_title: The name of the stop (e.g., "Le Safari")
+        stop_title: The name of the stop (e.g., "Kannon à mille bras")
         venue_kind: The type of venue (restaurant, museum, etc.)
         city: City name (e.g., "Nice")
         country: Country name (e.g., "France")
+        venue_name: The containing venue (e.g., "Musée des Arts Asiatiques").
+            For museum stops, the stop is an object INSIDE the venue.
 
     Returns:
         List of 2 question strings.
@@ -123,6 +126,20 @@ def build_interpretive_questions(
     # Use "restaurant" etc. as the kind word in the query, except for default
     kind_word = kind_key if kind_key != 'default' else ''
 
+    # For museum/gallery stops, extract just the venue short name (strip city/country suffix)
+    # e.g. "Musee des Arts Asiatiques (Asian Art Museum), Nice, France" → "Musee des Arts Asiatiques"
+    venue_short = ""
+    if venue_name:
+        # Strip parenthetical aliases and everything after first comma
+        v = re.split(r'[,]', venue_name)[0].strip()
+        v = re.sub(r'\s*\([^)]*\)\s*', '', v).strip()
+        venue_short = v
+
+    # If museum/gallery but no venue_name available, fall back to default templates
+    # (asking about an object "at Nice" is incoherent)
+    if template_key in ('museum', 'gallery') and not venue_short:
+        templates = _QUESTION_TEMPLATES['default']
+
     questions = []
     for tmpl in templates:
         q = tmpl.format(
@@ -130,6 +147,7 @@ def build_interpretive_questions(
             kind=kind_word,
             city=city,
             country=country or "",
+            venue=venue_short or city,
         )
         # Clean up double spaces
         q = re.sub(r'\s+', ' ', q).strip()
@@ -422,6 +440,7 @@ def enrich_stop_interpretive(
     venue_kind: str,
     city: str,
     country: str = "",
+    venue_name: str = "",
     verify_attributions: bool = True,
 ) -> Dict:
     """Run interpretive enrichment for a single stop.
@@ -447,7 +466,7 @@ def enrich_stop_interpretive(
         'questions_asked': [],
     }
 
-    questions = build_interpretive_questions(stop_title, venue_kind, city, country)
+    questions = build_interpretive_questions(stop_title, venue_kind, city, country, venue_name)
     result['questions_asked'] = questions
 
     seen_texts: Set[str] = set()
@@ -673,6 +692,7 @@ def enrich_verified_stops(
             venue_kind=venue_kind,
             city=city,
             country=country,
+            venue_name=venue_name,
             verify_attributions=True,
         )
 
