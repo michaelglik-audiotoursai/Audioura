@@ -109,7 +109,7 @@ class _TreatsScreenState extends State<TreatsScreen> {
           : _treats.isEmpty
               ? const Center(
                   child: Text(
-                    'No treats available',
+                    'No treats nearby yet',
                     style: TextStyle(fontSize: 18, color: Colors.grey),
                   ),
                 )
