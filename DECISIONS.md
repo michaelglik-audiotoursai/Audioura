@@ -10441,3 +10441,35 @@ second the stop-existence gate silently does not run (D261).
 stop, the gate-versus-thin-row, and now this. Every one was caught by checking
 the mechanism rather than the correlation. **Check that the run ran** before
 interpreting what it produced.
+
+## D263 — Selection dominates tour scores, and COVERED is treated as binary
+**2026-08-07. The biggest remaining lever.**
+
+Every per-stop fix this session is real and verifiable, yet tour totals swing:
+```
+restaurant   20.8 / 56.2 / 56.2 / 50.0
+walking      56.2 / 62.5 / 75.0 / 87.5
+```
+The variable is which stops get chosen. `LOCAL-212` classifies candidates
+COVERED / VENUE_ONLY / EMPTY and then treats every COVERED candidate as
+equivalent.
+
+```
+Selected: La Rossettisserie, Le Tire Bouchon, La Tapenade, Le Safari
+Dropped:  Acchiardo
+
+Acchiardo           6 passages, 2 sludge -> 4 clean   (web_search + interpretive)
+La Rossettisserie   5 passages, 4 sludge -> 1 clean   (web_search only)
+```
+
+It dropped the venue that produced our best dining prose ever (D233, "Since
+1927… socca… daube") and kept one that has yielded **0 facts in every run**.
+`corpus_source_quality.is_sludge` and LOCAL-328's yield-by-type measurements
+were both in the tree and unused by the selector.
+
+Dispatched as LOCAL-349. Constraint written into the task: **yield is a
+tie-breaker among geographically viable candidates, not the objective** — a tour
+of the four best-sourced venues in Nice is not a tour of Old Nice, and a short
+tour is worse than a thin stop (Michael's 2-of-5 complaint began this).
+
+**Fixing a stop raises that stop. Fixing selection raises every tour.**
