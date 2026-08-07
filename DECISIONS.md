@@ -10559,3 +10559,33 @@ sensory detail) is a different rule aimed at invented claims rather than empty
 ones.
 
 Dispatched as LOCAL-356.
+
+## D267 — Selection variance blocks stop-level verification; we need forced stops
+**2026-08-07.**
+
+LOCAL-352's ranking fix is verified at the retrieval layer — querying La Merenda
+returns 14 passages with the Negresco story at position 2, where it was
+previously absent. **It remains unverified in delivered prose after two
+regenerations, because neither selected La Merenda.**
+
+This is not a one-off. Across the session, verifying any stop-level fix has
+depended on the generator happening to pick that stop:
+
+```
+walking     56.2 / 62.5 / 75.0 / 87.5   different stops each run
+restaurant  20.8 / 50.0 / 56.2 / 62.5 / 68.8   different stops each run
+```
+
+Every regeneration costs ~$0.07 and 2 minutes, and lands on a random stop set.
+LEAD has three times reported a tour-level number as evidence and had to
+qualify it, and twice could not test the specific stop a fix targeted.
+
+**What is missing: a way to generate a tour with specified stops.** Not a
+product feature — a verification harness. `generate_tour_text` takes a location
+and a count; it cannot be told "use these four venues". With that, a stop-level
+fix could be tested deterministically for the price of one run.
+
+Until it exists, the honest reporting rule is: **verify stop-level fixes at the
+layer they change** (retrieval, extraction, scoring) and state plainly that
+delivered prose is unverified rather than substituting a tour-level score that
+moved for unrelated reasons.
