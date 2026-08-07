@@ -484,6 +484,21 @@ def format_passages_for_prompt(
         "If a passage names a person or event, you may include it; if it does not, leave it out."
     )
 
+    # [LOCAL-345] Body-usage directive: the passages must appear in the
+    # DESCRIPTION BODY, not only in the orientation. Without this, the LLM
+    # uses corpus words in the orientation header and then writes an entirely
+    # fabricated body from training data.
+    lines.append("")
+    lines.append(
+        "BODY USAGE RULE (LOCAL-345 — critical): Your DESCRIPTION BODY (the main narrative "
+        "paragraphs after the orientation) MUST incorporate specific facts, dates, or claims "
+        "from the passages above. The orientation alone is not sufficient — the body text is "
+        "where the listener spends most of their time. If a passage mentions a UNESCO designation, "
+        "a founding date, a named historical event, or a specific fact, that material MUST appear "
+        "in the body narrative, not just be referenced in the orientation line. A body that "
+        "contains zero material from the provided passages is a failure."
+    )
+
     # [LOCAL-203] Add role-specific guidance when roles are present
     if roles:
         has_creator = any(

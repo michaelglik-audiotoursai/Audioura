@@ -780,13 +780,24 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
     # before a countable noun ("eight arms", "eleven heads", "three centuries").
     _measurements_found = set()
     # Track 1: digit-based
+    # [LOCAL-345] Extended noun list: general countable nouns (vendors, stalls,
+    # shops, etc.) that appear in quantitative claims the scorer must detect.
+    # Previously only structural/anatomical/measurement nouns were listed,
+    # so "over 100 vendors" scored as 0 distinct facts.
     for m in re.finditer(
         r'\b(\d+(?:\.\d+)?\s*(?:m|cm|mm|km|kg|lb|ft|in|'
         r'arms?|heads?|hands?|legs?|eyes?|faces?|'
         r'storeys?|stories?|floors?|columns?|pillars?|panels?|tiers?|steps?|'
         r'strings?|years?|centuries?|decades?|meters?|metres?|'
         r'centimeters?|centimetres?|feet|foot|inches?|'
-        r'kilograms?|tons?|tonnes?|pounds?))\b',
+        r'kilograms?|tons?|tonnes?|pounds?|'
+        r'vendors?|stalls?|shops?|merchants?|artists?|'
+        r'species?|varieties?|paintings?|sculptures?|works?|pieces?|'
+        r'visitors?|tourists?|residents?|inhabitants?|'
+        r'hectares?|acres?|miles?|blocks?|'
+        r'seats?|tables?|dishes?|wines?|beers?|'
+        r'churches?|chapels?|cathedrals?|mosques?|temples?|'
+        r'islands?|beaches?|ports?|harbou?rs?))\b',
         body, re.IGNORECASE
     ):
         _measurements_found.add(m.group(0).lower().strip())
@@ -801,7 +812,14 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
         r'meters?|metres?|centimeters?|centimetres?|feet|foot|inches?|'
         r'kilograms?|tons?|tonnes?|pounds?|'
         r'stars?|medals?|sites?|awards?|prizes?|courses?|rooms?|'
-        r'restaurants?|buildings?|towers?|bridges?|doors?|windows?|arches?)'
+        r'restaurants?|buildings?|towers?|bridges?|doors?|windows?|arches?|'
+        r'vendors?|stalls?|shops?|merchants?|artists?|'
+        r'species?|varieties?|paintings?|sculptures?|works?|pieces?|'
+        r'visitors?|tourists?|residents?|inhabitants?|'
+        r'hectares?|acres?|miles?|blocks?|'
+        r'seats?|tables?|dishes?|wines?|beers?|'
+        r'churches?|chapels?|cathedrals?|mosques?|temples?|'
+        r'islands?|beaches?|ports?|harbou?rs?)'
     )
     for m in re.finditer(
         r'\b((?:one|two|three|four|five|six|seven|eight|nine|ten|'
