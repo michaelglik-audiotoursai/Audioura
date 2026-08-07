@@ -722,21 +722,25 @@ def classify_stop(sa: 'StopAnalysis') -> Tuple[str, str]:
         # penalise for a check we did not perform.
         if groundedness is not None and groundedness < RICH_MIN_GROUNDEDNESS:
             return 'ADEQUATE', evidence + f" (RICH capped by groundedness floor {RICH_MIN_GROUNDEDNESS})"
-        # [LOCAL-327] Corpus availability ceiling: a stop without corpus cannot
-        # demonstrate quality — its facts are unverified, not wrong.
-        # Capped to THIN (not ADEQUATE) because ADEQUATE also requires corpus.
+        # [LOCAL-331 bounce] Corpus availability ceiling: a stop without corpus
+        # cannot demonstrate RICH quality — its facts are unverified, not wrong.
+        # Capped to ADEQUATE (not THIN). LEAD decision: "we hold no sources" is
+        # about our corpus, not about the venue. Absence of a check is not
+        # evidence of fabrication (D162). A harsher penalty for a weaker signal
+        # (unmeasured caps two bands while measured-low caps one) contradicts
+        # LOCAL-291's established rule and Michael's ruling on scarce data.
         # Only applied when a corpus lookup was actually attempted.
         if sa.corpus_lookup_attempted and not sa.corpus_available:
-            return 'THIN', evidence + " (RICH capped to THIN: no corpus passages — facts unverified)"
+            return 'ADEQUATE', evidence + " (RICH capped to ADEQUATE: no corpus passages — facts unverified)"
         return 'RICH', evidence
     if facts >= ADEQUATE_MIN_FACTS and density >= ADEQUATE_MIN_DENSITY and filler <= ADEQUATE_MAX_FILLER:
-        # [LOCAL-327] Corpus availability ceiling for ADEQUATE: a stop without
-        # corpus passages cannot demonstrate ADEQUATE quality. The stop may be
-        # perfectly accurate — but nothing checked, so we cannot count it as
-        # demonstrated quality. Capped at THIN, never penalised below THIN.
+        # [LOCAL-331 bounce] Corpus availability ceiling for ADEQUATE: a stop
+        # without corpus passages caps at ADEQUATE, not below. LEAD decision:
+        # an unmeasured stop caps at ADEQUATE, matching LOCAL-291. We cannot
+        # penalise a stop for our own harvesting backlog.
         # Only applied when a corpus lookup was actually attempted.
         if sa.corpus_lookup_attempted and not sa.corpus_available:
-            return 'THIN', evidence + " (ADEQUATE capped: no corpus passages — facts unverified)"
+            return 'ADEQUATE', evidence + " (ADEQUATE: no corpus passages — facts unverified, cap at ADEQUATE per LEAD)"
         return 'ADEQUATE', evidence
     return 'THIN', evidence
 

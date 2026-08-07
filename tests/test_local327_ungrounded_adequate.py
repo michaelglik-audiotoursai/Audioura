@@ -52,14 +52,20 @@ def _make_stop(
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 1. Zero corpus → capped at THIN (not ADEQUATE)
+# 1. Zero corpus → capped at ADEQUATE (LEAD decision, LOCAL-331 bounce)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class TestZeroCorpusCap:
-    """A stop with zero corpus passages cannot reach ADEQUATE when lookup was attempted."""
+    """A stop with zero corpus passages caps at ADEQUATE when lookup was attempted.
+    
+    [LOCAL-331 bounce] LEAD decision: unmeasured stops cap at ADEQUATE, not THIN.
+    "We hold no sources" is about our corpus, not about the venue (D162).
+    Absence of a check is not evidence of fabrication. A stop we cannot verify
+    should not reach RICH, but should not be penalised below ADEQUATE.
+    """
 
-    def test_adequate_metrics_zero_corpus_capped_to_thin(self):
-        """Stop meets ADEQUATE criteria but has no corpus → THIN."""
+    def test_adequate_metrics_zero_corpus_stays_adequate(self):
+        """Stop meets ADEQUATE criteria but has no corpus → stays ADEQUATE."""
         sa = _make_stop(
             facts=5,
             density=0.50,
@@ -68,16 +74,16 @@ class TestZeroCorpusCap:
             corpus_lookup_attempted=True,
         )
         cls, evidence = classify_stop(sa)
-        assert cls == 'THIN', f"Expected THIN, got {cls}"
+        assert cls == 'ADEQUATE', f"Expected ADEQUATE, got {cls}"
         assert 'no corpus passages' in evidence
         assert 'unverified' in evidence
 
     def test_rich_metrics_zero_corpus_capped_to_adequate(self):
-        """Stop meets RICH criteria but has no corpus → THIN.
+        """Stop meets RICH criteria but has no corpus → ADEQUATE.
 
-        [LOCAL-327] When corpus_lookup_attempted=True and corpus_available=False,
-        RICH-qualifying stops are capped to THIN (same as ADEQUATE-qualifying
-        stops). Unverified facts cannot demonstrate quality at any band.
+        [LOCAL-331 bounce] LEAD decision: RICH is capped to ADEQUATE (not THIN).
+        An unmeasured stop cannot demonstrate RICH quality but is not penalised
+        for our own harvesting backlog.
         """
         sa = _make_stop(
             facts=6,
@@ -87,15 +93,16 @@ class TestZeroCorpusCap:
             corpus_lookup_attempted=True,
         )
         cls, evidence = classify_stop(sa)
-        assert cls == 'THIN', f"Expected THIN, got {cls}"
+        assert cls == 'ADEQUATE', f"Expected ADEQUATE, got {cls}"
         assert 'capped' in evidence
         assert 'no corpus passages' in evidence
 
-    def test_five_facts_zero_corpus_is_thin(self):
-        """The exact scenario from the task: 5 facts, 0 corpus → THIN.
+    def test_five_facts_zero_corpus_is_adequate(self):
+        """The exact scenario from the task: 5 facts, 0 corpus → ADEQUATE.
 
+        [LOCAL-331 bounce] Previously capped to THIN. LEAD changed to ADEQUATE.
         'Robe de prêtre taoïste' and 'Masque du vieillard kojô' had 5 facts
-        each with zero corpus. They should no longer reach ADEQUATE.
+        each with zero corpus. They cap at ADEQUATE now, not THIN.
         """
         sa = _make_stop(
             facts=5,
@@ -105,8 +112,8 @@ class TestZeroCorpusCap:
             corpus_lookup_attempted=True,
         )
         cls, evidence = classify_stop(sa)
-        assert cls == 'THIN'
-        assert 'ADEQUATE capped' in evidence
+        assert cls == 'ADEQUATE'
+        assert 'no corpus passages' in evidence
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -210,30 +217,34 @@ class TestNeverBelowThin:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 5. Score impact — ADEQUATE capped to THIN costs 0.25 × share
+# 5. Score impact — RICH capped to ADEQUATE costs 0.25 × share
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class TestScoreImpact:
     """Verify the numerical score impact of the ceiling."""
 
     def test_score_drops_for_unverified_stop(self):
-        """A 1-stop tour: ADEQUATE → THIN costs 25 points.
+        """A 1-stop tour: RICH → ADEQUATE costs 25 points.
 
+        RICH weight = 1.0 × share = 100.0
         ADEQUATE weight = 0.75 × share = 75.0
-        THIN weight = 0.50 × share = 50.0
         Difference = 25 points
+        
+        [LOCAL-331 bounce] Updated from ADEQUATE→THIN (25pt drop) to RICH→ADEQUATE
+        (25pt drop). The cap is now at ADEQUATE, not THIN.
         """
-        # With corpus → ADEQUATE (75 points base)
+        # With corpus → RICH (100 points base, given high enough density)
         sa_grounded = _make_stop(
-            facts=5, density=0.50, filler=0.15,
+            facts=6, density=0.70, filler=0.10,
+            groundedness=0.80,
             corpus_available=True, corpus_lookup_attempted=True,
         )
         sa_grounded.classification, sa_grounded.classification_evidence = classify_stop(sa_grounded)
         ts_grounded = compute_score([sa_grounded], n_requested=1, venue_identity_facts=[])
 
-        # Without corpus → THIN (50 points base)
+        # Without corpus → ADEQUATE (75 points base)
         sa_unverified = _make_stop(
-            facts=5, density=0.50, filler=0.15,
+            facts=6, density=0.70, filler=0.10,
             corpus_available=False, corpus_lookup_attempted=True,
         )
         sa_unverified.classification, sa_unverified.classification_evidence = classify_stop(sa_unverified)
@@ -252,7 +263,7 @@ class TestIntegrationScoreTourFile:
     """Integration test: score_tour_file with corpus_data marks stops correctly."""
 
     def test_corpus_data_triggers_ceiling(self):
-        """When corpus_data is provided, stops without entries are capped."""
+        """When corpus_data is provided, stops without entries are capped at ADEQUATE."""
         tour_text = (
             "Stop 1: Grounded Stop\n"
             "Claude Monet painted magnificent water lilies here in 1899. "
@@ -286,9 +297,9 @@ class TestIntegrationScoreTourFile:
             assert ts.stops[0].corpus_lookup_attempted is True
             assert ts.stops[1].corpus_lookup_attempted is True
             assert ts.stops[1].corpus_available is False
-            # Stop 2 should be capped (cannot reach ADEQUATE or RICH)
-            assert ts.stops[1].classification == 'THIN'
-            assert 'capped' in ts.stops[1].classification_evidence
+            # [LOCAL-331 bounce] Stop 2 capped at ADEQUATE (not THIN)
+            assert ts.stops[1].classification == 'ADEQUATE'
+            assert 'no corpus passages' in ts.stops[1].classification_evidence
         finally:
             os.unlink(filepath)
 
@@ -357,10 +368,10 @@ class TestEvaluatePathCeiling:
         evaluation = evaluate(tour_text, 2, corpus_data=corpus_data)
         assert evaluation is not None
 
-        # Stop 2 should be capped to THIN (has no corpus, lookup was attempted)
+        # [LOCAL-331 bounce] Stop 2 caps at ADEQUATE (not THIN)
         stop2 = evaluation.per_stop[1]
-        assert stop2['classification'] == 'THIN', \
-            f"Expected THIN, got {stop2['classification']}"
+        assert stop2['classification'] == 'ADEQUATE', \
+            f"Expected ADEQUATE, got {stop2['classification']}"
 
     def test_evaluate_without_conn_or_corpus_no_ceiling(self):
         """evaluate() without conn or corpus_data does NOT apply ceiling."""

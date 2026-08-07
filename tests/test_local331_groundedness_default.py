@@ -114,11 +114,12 @@ class TestClassifyStopNoneGroundedness:
 class TestLocal327InteractionWithNone:
     """LOCAL-327 caps (lookup attempted, no corpus) still work with None default."""
 
-    def test_lookup_attempted_no_corpus_caps_rich_to_thin(self):
-        """When lookup was attempted but no corpus found, RICH is capped to THIN.
+    def test_lookup_attempted_no_corpus_caps_rich_to_adequate(self):
+        """When lookup was attempted but no corpus found, RICH is capped to ADEQUATE.
         
-        This is the LOCAL-327 rule: unverified stops cannot claim RICH or ADEQUATE.
-        groundedness stays None because no passages were available to measure against.
+        [LOCAL-331 bounce] LEAD decision: unmeasured stops cap at ADEQUATE,
+        matching LOCAL-291. "We hold no sources" is about our corpus, not the
+        venue (D162). Absence of a check is not evidence of fabrication.
         """
         sa = StopAnalysis(index=1, title='Test', text='...')
         sa.distinct_fact_count = 5
@@ -129,7 +130,7 @@ class TestLocal327InteractionWithNone:
         sa.corpus_lookup_attempted = True
         sa.corpus_available = False
         cls, evidence = classify_stop(sa)
-        assert cls == 'THIN'
+        assert cls == 'ADEQUATE'
         assert 'no corpus passages' in evidence
 
     def test_no_lookup_no_cap(self):
