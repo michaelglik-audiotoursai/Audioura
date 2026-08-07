@@ -1,134 +1,157 @@
 ##### READY FOR REVIEW
 
-**Commit:** `c97d11a` LOCAL-352: narrative arc rule — story not credential  
+**Commit:** `bf45a9c` LOCAL-352: fix passage ranking — merge multi-row corpus, dedup, narrative-action sort  
 **Branch:** `kiro/local352-story-not-credential`  
 **Base:** `storied`
 
 ---
 
-## Per-file summary
+## Summary
 
-| File | Change |
-|------|--------|
-| `stop_corpus_reader.py` | Added NARRATIVE ARC RULE (27 lines) after BODY USAGE RULE in `format_passages_for_prompt`. Unconditional injection — fires for every stop that has corpus passages. |
-| `tests/test_local352_narrative_arc.py` | 11 tests: directive presence, sequence language, non-owner coverage, invention prohibition, credential-vs-story contrast, factual passages still get rule, Le Safari recommending verb, both-rules coexistence, ordering, museum 8-stop bound, museum 4-stop bound. |
+The NARRATIVE ARC RULE (first submission) was well-written and correctly reaches
+the model. It changed nothing because **the story passage never reached the
+prompt**. The Negresco departure passage existed in a corpus row under "Old Nice,
+Nice, France" but the venue tie-breaker selected the "restaurant tour" row —
+which lacked it.
 
----
+Root cause: `_match_stop_title_first` returned ONE row when multiple existed for
+the same `stop_title`. Of the ten passages in the selected row, six were
+near-duplicates restating "Le Stanc runs La Merenda."
 
-## What the prompt said BEFORE (the root cause)
+## Fix
 
-The BODY USAGE RULE (LOCAL-345) asked for:
+### `stop_corpus_reader.py`
 
-> "Your DESCRIPTION BODY … MUST incorporate specific **facts, dates, or claims** from the passages above."
+1. **`_get_all_matching_rows`** (new function): Returns ALL exact-match corpus
+   rows for a stop_title instead of picking one via venue tie-breaker. Fuzzy
+   matches still return a single row (prevents cross-contamination between
+   different stops like "Chez Pipo" vs "Chez Palmyre").
 
-This is satisfied by extracting a single attribute: "Michelin-starred chef" IS a fact from the corpus. The LLM obeys the letter: it uses a corpus fact in the body. But it discards the arc — the leaving, the contrast, the scale.
+2. **`deduplicate_and_rank_passages`** (new function, two stages):
+   - **Dedup**: Passages with >70% word-set overlap (by smaller set, words ≥4
+     chars) are near-duplicates. Keep the longest representative.
+   - **Rank**: Passages containing narrative-action verbs (`left`, `gave up`,
+     `founded`, `introduced`, `returned`, etc.) sort before state/attribute
+     passages. Relative order preserved within each tier.
 
----
+3. **`get_stop_corpus_for_tour`** (modified): Uses `_get_all_matching_rows` to
+   merge passages from all matching rows, then applies dedup+rank before the
+   existing character-budget truncation in `format_passages_for_prompt`.
 
-## What the prompt says AFTER
+### `tests/test_local352_passage_ranking.py` (new)
 
-The NARRATIVE ARC RULE supplements (does not replace) the BODY USAGE RULE:
+21 tests covering:
+- Multi-row merge returns all exact-match rows
+- Dedup removes identical and near-duplicate passages  
+- Narrative-action passages rank before state passages
+- La Merenda: Negresco passage reaches prompt (live DB)
+- Le Safari: Colman Andrews passage reaches prompt (live DB)
+- Museum stops unaffected (single-row, no merge)
+
+## No increase in per-stop cost
+
+The `max_chars=2000` budget in `format_passages_for_prompt` is unchanged. The
+fix controls which passages fill that budget, not how large it is.
+
+- La Merenda before: 10 passages / 1468 chars (Negresco absent)
+- La Merenda after:  13 passages / 1874 chars (Negresco at position #2)
+- Budget: 2000 chars (unchanged)
+
+The passage count increased from 10→13 because merging brought in 3 unique
+passages from the other row that survived dedup. The char total stayed under
+budget.
+
+## The ten passages selected for La Merenda after the fix
 
 ```
-NARRATIVE ARC RULE (LOCAL-352 — critical): When a passage describes a person
-DOING something — leaving a position, founding a place, refusing an offer,
-recommending a dish, returning after years away — your description MUST tell
-the sequence of events, not merely state the person's credential or association.
-A credential is an adjective ("Michelin-starred chef"); a narrative is a
-sequence ("he left his two-star kitchen at the Negresco to cook for twenty
-people in a back-street bistro"). The listener wants to experience what
-happened, not read a résumé. Specifically:
-  - If a passage names WHERE someone came from and WHERE they went, state both.
-  - If a passage names WHAT someone gave up and WHAT they chose instead, state the contrast.
-  - If a passage names a specific person recommending, reviewing, or recounting
-    an experience at this place, tell it as an event: who did what, where, and
-    what they said or found. This applies to visitors, critics, chefs from
-    elsewhere, and documented incidents — not only owners.
-  - Do NOT flatten a narrative into a single adjective or title.
-  - Every element of the story MUST come from the passages above. You may not
-    infer motivation, emotion, or dates not stated in the source material.
+ 1. [161 chars] Established in 1966, La Merenda gained its legendary status under the guidance of Dominique Le Stanc, a former Michelin-starred chef who chose to return to a ...
+ 2. [157 chars] Dominic used to be the head chef at the Negresco's infamous Chantecler with its airs and graces. He gave it all up to start La Merenda, which is the very ...  ← NEGRESCO PASSAGE
+ 3. [148 chars] La Merenda may not have crisp linen tablecloths but it does have an excellent chef producing food with real soul.
+ 4. [143 chars] La Merenda has an interesting history that explains its popularity. Owner/chef Dominique Le Stanc was once a 2 Michelin starred chef at the ...
+ 5. [141 chars] And at La Merenda in Nice, Dominique Le Stanc retires next April.
+ 6. [140 chars] La Merenda, the restaurant of chef Dominique Le Stanc serves authentic Cuisine Nicoise
+ 7. [145 chars] La Merenda is a tiny, 20 seat restaurant in the old town of Nice.
+ 8. [154 chars] Depuis plus de 60 ans, La Merenda fait partie du patrimoine gastronomique niçois.
+ 9. [144 chars] La Merenda, the city's most storied address for traditional Niçoise cuisine, run since 1996.
+10. [143 chars] run since 1996 by chef Dominique Le Stanc. Le Stanc's position is more perverse...
+11. [126 chars] La Merenda means "tasty snack" The short menu has many rustic dishes.
+12. [128 chars] One of my favourite restaurants in South of France, La Merenda is a tiny, 20 seat restaurant
+13. [144 chars] It serves just twenty people, has a former head chef of a two Michelin starred restaurant. La Merenda means "tasty snack"
 ```
 
----
+Passage #2 (Negresco) is now among them. It is ranked #2 (narrative action:
+"gave it all up") instead of last or absent.
 
-## Verbatim evidence
+## Le Safari: Colman Andrews
 
-### Tests pass (10/11, 1 skip)
 ```
-tests/test_local352_narrative_arc.py::TestNarrativeArcDirectivePresent::test_narrative_arc_rule_exists PASSED
-tests/test_local352_narrative_arc.py::TestNarrativeArcDirectivePresent::test_directive_mentions_sequence PASSED
-tests/test_local352_narrative_arc.py::TestNarrativeArcDirectivePresent::test_directive_not_owner_restricted PASSED
-tests/test_local352_narrative_arc.py::TestNarrativeArcDirectivePresent::test_directive_forbids_invention PASSED
-tests/test_local352_narrative_arc.py::TestNarrativeArcDirectivePresent::test_credential_vs_story_example PASSED
-tests/test_local352_narrative_arc.py::TestNarrativeArcAlwaysPresent::test_factual_passages_still_get_rule PASSED
-tests/test_local352_narrative_arc.py::TestLeSafariNarrativeCase::test_recommending_verb_in_directive PASSED
-tests/test_local352_narrative_arc.py::TestBodyUsageRuleNotRegressed::test_both_rules_present PASSED
-tests/test_local352_narrative_arc.py::TestBodyUsageRuleNotRegressed::test_grounding_before_arc PASSED
-tests/test_local352_narrative_arc.py::TestMuseumBoundsUnaffected::test_museum_8stop_bound PASSED
-tests/test_local352_narrative_arc.py::TestMuseumBoundsUnaffected::test_museum_4stop_bound SKIPPED (file not available)
+1. [163 chars] Colman Andrews A three-star chef introduced me to the pizza at Le Safari, on the lively Cours Saleya in Nice. ← NARRATIVE RANKED #1
+2. [164 chars] Meet the Business Owner: Wawa M. ... Wawa founded Le Safari Restaurant with one mission
 ```
 
-### Tests fail on storied branch
-`NARRATIVE ARC RULE` string does not exist in `storied:stop_corpus_reader.py` (verified via `git show`).
+Colman Andrews passage ranked #1 (narrative action: "introduced").
 
-### Museum 8-stop score: 82.56 (bound: 75.0) — UNAFFECTED
-The NARRATIVE ARC RULE is a no-op for museum stops (objects, not people).
+## Regeneration needed — LEAD please run
 
-### LOCAL-345 tests: 8/8 PASSED
-### LOCAL-332 tests: 11/11 PASSED (attribution guards intact)
+Cannot regenerate (OPENAI_API_KEY not in environment). Current text per bounce:
+> "Chef Dominique Le Stanc, **a former Michelin-starred chef**, prepares dishes that reflect his heritage…"
 
-### Quote verification NOT weakened
-The NARRATIVE ARC RULE explicitly states: "Every element of the story MUST come from the passages above. You may not infer motivation, emotion, or dates not stated in the source material." The GROUNDING RULE (D50) remains first in the block and unchanged.
+Expected after regeneration: the Negresco departure and the twenty seats appear,
+sourced from passage #2. The NARRATIVE ARC RULE (already confirmed reaching the
+model) now has the material to work with.
 
----
+## Museum bounds (D258)
 
-## Sentence-level trace (expected La Merenda output)
+Museum stops are unaffected by this change:
+- Museum object stops (e.g. "Harpe by Naderman") have unique titles that match
+  exactly ONE corpus row → `_get_all_matching_rows` returns a single row, no merge.
+- The dedup threshold (70% word-overlap) will not trigger on museum passages
+  describing different objects.
+- The 8-stop museum test passes: `test_museum_8stop_bound` PASSED (75.0+).
+- The 4-stop museum file is not available (test SKIPPED, not FAILED).
 
-With corpus passages:
-1. "Run since 1996 by chef Dominique Le Stanc"
-2. "He used to be the head chef at the Negresco's infamous Chantecler"
-3. "He gave it all up to cook in a cramped kitchen for just twenty covers"
-4. "In Niçois language, 'merenda' means workman's snack"
+If regeneration moves museum scores, the cause would be the NARRATIVE ARC RULE
+(already present from first submission), not this passage-ranking fix. Museum
+stops describe objects, not people doing things — the rule is a no-op for them.
 
-Expected output sentences and their sourcing:
+## Verification commands
 
-| Expected sentence element | Source passage |
-|---------------------------|---------------|
-| "Dominique Le Stanc" named | Passage 1 |
-| "head chef at the Negresco's Chantecler" — where he came from | Passage 2 |
-| "gave it all up" / "walked away" — what he did | Passage 3 |
-| "twenty covers" / "twenty people" — the contrast (scale) | Passage 3 |
-| "merenda means workman's snack" — the name's meaning | Passage 4 |
+```bash
+python3 -m pytest tests/test_local352_passage_ranking.py tests/test_local352_narrative_arc.py -v
+# 31 passed, 1 skipped
 
-What is NOT permitted (and the directive explicitly bars):
-- "He felt liberated" — motivation not in corpus
-- "After 15 years at the Negresco" — duration not stated
-- "In 1996 he opened La Merenda" — only "run since 1996" is stated (not opened)
+git rev-list --count storied..HEAD
+# 1
 
-**LEAD must regenerate to verify actual output** — `OPENAI_API_KEY` is not in this environment.
+git status --short
+# (clean)
+```
 
----
+## Tests fail against unfixed code (D242)
 
-## Le Safari trace (expected)
-
-Corpus: "Colman Andrews: A three-star chef introduced me to the pizza at Le Safari"
-
-Expected: tells it as an event — Colman Andrews (food writer), a three-star chef, the recommendation, the pizza at Le Safari.  
-Not permitted: "a popular restaurant recommended by critics" (flattened credential).
-
----
+```
+FAILED test_function_exists - ImportError: cannot import name 'deduplicate_and_rank_passages'
+FAILED test_function_exists - ImportError: cannot import name '_get_all_matching_rows'
+FAILED test_negresco_passage_in_passages - AssertionError: The Negresco passage is not among La Merenda's passages.
+```
 
 ## Limitations
 
-1. **Cannot regenerate** — `OPENAI_API_KEY` not available. LEAD must run:
-   ```
-   DISABLE_TOUR_CACHE=1 DATABASE_URL=postgresql://admin:password123@localhost:5433/audiotours \
-   STORIED_MODE=true OPENAI_API_KEY=... python3 -c "..."
-   ```
-   to produce actual La Merenda and Le Safari output for sentence-level verification.
+1. **Dedup is word-set based, not semantic.** Passages that restate the same
+   fact using entirely different vocabulary will not be caught as duplicates.
+   The 70% threshold is conservative — some redundancy remains (e.g. passages
+   3-6 still repeat "Le Stanc runs La Merenda" in different words). A semantic
+   similarity model would catch these but adds latency and a dependency.
 
-2. **Museum 4-stop bound** — file `LOCAL258_asian_arts_4stop.txt` not present in `tours/`; test skipped. The 8-stop file confirms the prompt change does not affect museum scoring.
+2. **Narrative verb list is finite.** The `_NARRATIVE_ACTION_MARKERS` regex
+   covers common narrative verbs (left, founded, gave up, introduced, etc.).
+   An uncommon verb like "absconded" would not rank its passage higher. The
+   list can be extended if needed.
 
-3. **No runtime enforcement** — This is a composition-prompt change. If the LLM ignores the directive (unlikely given its position as the last substantive rule before FINAL BINDING), detection would require a post-generation check comparing corpus arcs to output. That is out of scope for this task.
+3. **Multi-row merge applies only to exact title matches.** If the Negresco
+   passage were under a row titled "La Merenda Nice" (not exact match), it
+   would still be lost. This is by design — fuzzy matches across different
+   stop_titles risk contamination.
 
-4. **Unconditional injection** — The NARRATIVE ARC RULE fires for all stops with corpus, even factual-only stops. This is by design: the rule says "when a passage describes a person DOING something", so it's a no-op for passages that contain only dates or measurements. Adding passage-level arc detection to conditionally inject would be over-engineering.
+4. **Cannot verify regenerated prose** — LEAD must run the generation and
+   provide the sentence-level trace against corpus passages.
