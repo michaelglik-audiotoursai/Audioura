@@ -9773,3 +9773,44 @@ object would have one passage.
 is joined to `stop_corpus`. Exact matching on French titles silently reports
 absence. It has now produced two wrong analyses in one evening — one by an
 agent, one by LEAD.
+
+## D244 — Groundedness defaults to 1.00 when unchecked. Every score this session was inflated.
+**2026-08-06. LEAD measured this after the D243 retraction; it partly reverses it.**
+
+Same tour, same scorer, only difference is whether corpus is loaded:
+
+```
+evaluate(txt, 8)                              base=81.2
+    groundedness = [1.00] x 8                 <- DEFAULT. Nothing was checked.
+
+evaluate(txt, 8, conn=..., venue_name=...)    base=78.1
+    groundedness = [0.50, 0.00, 0.00, 0.00, 0.75, 0.33, 1.00, 0.29]
+```
+
+**"We did not check" and "we checked and everything matched" are the same
+value.** `score_tour_file()` never loads corpus; `evaluate()` only does when a
+caller supplies `conn` or `corpus_data` (LOCAL-327). So the default path scores
+every stop as perfectly grounded.
+
+**Every number LEAD quoted to Michael today was computed that way** — the
+71.9 -> 75.0 -> 81.2 museum progression, the 55.0 and 65.0 restaurant scores,
+the "best-of-2 = 84.4" headroom estimate. All assume perfect grounding.
+
+**This partly reverses D243.** D243 correctly retracted the "zero corpus" claim
+— no stop lacks corpus. But it concluded "nothing is currently exploiting the
+ungrounded-ADEQUATE gap," and that is wrong. Three museum stops measure **0.00
+groundedness with 4-6 passages available**: the sources exist and do not support
+what the text asserts. The gap is real; the mechanism is not missing corpus but
+unchecked corpus.
+
+Sequence of LEAD errors on this one question, recorded because the pattern
+matters more than any single wrong number:
+1. D241 — claimed passage count is anti-correlated with quality. Artifact of
+   exact-matching accented titles.
+2. D243 — retracted that, and over-corrected to "nothing is exploiting the gap".
+3. D244 — the gap is real, found only by loading corpus and re-measuring.
+
+Each error came from trusting a measurement without asking what it would show
+if the plumbing were broken. Dispatched as LOCAL-331.
+
+**Until LOCAL-331 lands, treat every reported tour score as an upper bound.**
