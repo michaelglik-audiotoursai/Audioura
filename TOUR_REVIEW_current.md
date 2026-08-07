@@ -219,3 +219,43 @@ runs are gated normally.
 I am regenerating with the gate enabled to see whether selection and scores
 change. Until then, treat every score in this document as measured on
 ungated output.
+
+---
+
+## Correction 3 — 07:20. The best walking run yet, verified properly this time.
+
+Regenerated with **the cache off and the existence gate on** (both were wrong in
+my earlier runs — D261, D262):
+
+```
+tours/LOCAL346b_walking_4stop.txt      base 87.5    4/4 stops
+  ADEQUATE  5 facts  g=1.00   Cours Saleya Market
+  ADEQUATE  6 facts  g=1.00   Nice Cathedral
+  RICH      7 facts  g=1.00   Opéra de Nice
+  RICH      8 facts  g=1.00   Castle Hill of Nice
+```
+
+**Every stop at groundedness 1.00** — every claim traced to our sources. The
+gate ran and verified 6/6.
+
+**The Nice Cathedral fabrication is closed.** It now reads:
+
+> "constructed between 1650 and 1685, showcasing **Baroque** aesthetics… The
+> bell tower, a later addition in **1757**…"
+
+Those dates match what I verified independently against public sources. Zero
+occurrences of "Gothic" in the tour.
+
+**And the honest caveat, because I got this wrong once already.** Four walking
+runs: 56.2, 62.5, 75.0, 87.5. The score tracks how much corpus the *selected*
+stops happen to have —
+
+```
+ 7 passages -> 56.2      30 passages -> 75.0
+ 9 passages -> 62.5      21 passages -> 87.5
+```
+
+Selection varies run to run, so the score does too. **87.5 is the best observed,
+not the new normal.** What has genuinely changed is the ceiling and the
+grounding: a run where all four stops trace every claim to corpus was not
+possible yesterday.
