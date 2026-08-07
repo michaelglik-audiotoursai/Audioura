@@ -10303,3 +10303,42 @@ denominator). A non-regression bound taken from a suspect measurement is not a
 bound; it pins the bug in place. **State bounds as properties, not values** —
 "stops with real claims must not lose grounding" rather than "the vector must
 read exactly this."
+
+## D259 — Fact detector and claim extractor aligned; museum 4-stop 87.5 -> 81.2
+**2026-08-07, LOCAL-344 merged.**
+
+D258 made vacuous groundedness honest. This closes its cause: the rubric counted
+facts one extractor found and verified them with another that could not see
+most of them.
+
+**Every counted fact is now checkable.** Museum 8-stop stop 7 goes
+`None -> 0.25` (4 facts, 1 grounded) — previously scored on four facts, none
+verifiable.
+
+**Scores fell, which is the correct direction:**
+```
+museum 8-stop   75.0   held
+museum 4-stop   87.5 -> 81.2
+```
+The 4-stop drop is stop 1 falling RICH -> ADEQUATE, groundedness 0.50 -> 0.38,
+under the 0.40 RICH floor. Fifteen facts are now checked instead of a subset and
+the new ones do not hold. **Making a fact checkable does not make it true** —
+this is the change working, not a regression.
+
+Two entries rose and both were investigated rather than accepted. Stop 2 of the
+8-stop went 0.00 -> 0.33 because material "schist" became checkable and the
+corpus genuinely says "The statue is made of chlorite/schist". A new check
+firing, not loose matching.
+
+Residual: 27 of 446 stops (6%) still count a fact with no claim, all of them
+false person detections. Stated, not hidden.
+
+**Michael's 87.5 is now 81.2.** He should be told the museum 4-stop figure moved
+and why — it is the third downward revision of a number he was given, and every
+one has been inflation coming out rather than quality going down.
+
+**Process note, third occurrence.** The submission reported on a Chagall tour
+instead of `tours/LOCAL336_museum_4stop.txt`, the file the task named, so the
+drop was unattributed until LEAD traced it. LOCAL-331 and LOCAL-340 both did the
+same with `audio_tours` id=21. Task files name an artifact; submissions must
+score that artifact.
