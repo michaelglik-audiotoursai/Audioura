@@ -10014,3 +10014,44 @@ it is not re-dispatched.
 Open cosmetic option for Michael, not dispatched: `treats_screen.dart:112`
 says "No treats available", which reads as permanent. "No treats nearby yet"
 would fit the download-now-listen-later case better. Two words, his call.
+
+## D251 — Between-stop policy: silence by default; services on request; not for museums
+**Michael's decision, 2026-08-06.**
+
+> *"Let's first implement the directions over silence and services such as water
+> and bathrooms and not for Museums tour. News and something else we put into
+> subscription plans when we will be working on Subscribed."*
+
+**Silence is the default between stops, not an option.** The gap is recovery
+time between dense stops, and on a bike it is when the listener most needs to
+hear traffic. Nothing fills it unless asked for.
+
+**Rejected: weaving amenities into the generated directions.** LEAD proposed it
+as the cheapest slice; Michael rejected it correctly — "water here, gifts there,
+repair shops here… on each stop — prohibitively annoying." It also violates
+D250: anything in narration is frozen at generation.
+
+**The phrasing contract, agreed:**
+```
+"Water — there's a public fountain 200 metres ahead, just past the church."
+"The next stop is 300 metres ahead — I'll tell you when you're there."
+```
+**Distance plus landmark, never left/right.** Compass bearing at walking speed
+is unreliable; a wrong "on your right" sends someone across a road for nothing.
+
+**Deferred deliberately:** "I'll remind you when you reach it." Needs background
+location, an extra iOS permission, battery budget, and App Store justification.
+Ship without it and see whether people ask.
+
+**Scope now:** water + toilets, voice-requested, spoken by device TTS over
+ducked audio, **excluded for museum tours** (indoors, GPS useless, nothing to
+route to). Dispatched as LOCAL-337 (server endpoint) and LOCAL-338 (app).
+
+**Deferred to Subscribed:** news between stops — closest of the four Michael
+listed, because `news_generator_service.py`, `words_budget_for_minutes()` and
+`plans.news_max_minutes` already exist and only need joining to a computed gap
+duration. Also deferred: extended-cut downloads.
+
+**Music: do not license it.** Let listeners run their own Spotify or Apple Music
+and duck over it. Turns a rights programme into an audio-focus behaviour, and
+they bring a catalogue we could never afford.
