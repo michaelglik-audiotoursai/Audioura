@@ -259,3 +259,41 @@ Selection varies run to run, so the score does too. **87.5 is the best observed,
 not the new normal.** What has genuinely changed is the ceiling and the
 grounding: a run where all four stops trace every claim to corpus was not
 possible yesterday.
+
+---
+
+## Final set — 07:45. All three regenerated uncached and gated.
+
+```
+walking      tours/LOCAL346b_walking_4stop.txt      87.5   all 4 stops g=1.00
+museum       tours/LOCAL347_museum_4stop.txt        81.2
+restaurant   tours/LOCAL347_restaurant_4stop.txt    56.2
+```
+
+**Gating changed nothing for museum or restaurant** — both scored exactly what
+they scored ungated. My D261 concern was a real correctness gap (we were not
+checking that stops exist) but it was not distorting these numbers. Only the
+walking tour moved, and walking's run-to-run variance is wide enough that I
+cannot attribute all of that to the gate either.
+
+**Restaurant, current:**
+```
+THIN      2 facts  g=1.00   Fenocchio
+ADEQUATE  4 facts  g=0.80   Chez Palmyre
+THIN      1 fact   g=0.00   Le Safari
+THIN      2 facts  g=1.00   Café de Turin
+```
+
+Chez Palmyre now appears as its own stop, correctly sourced — the venue whose
+history was previously misattributed to Chez Pipo.
+
+**Le Safari is a persistent, specific failure.** Across five runs it has
+produced 0–1 facts every time, and here its single claim is ungrounded
+(g=0.00). It is a real, well-known Cours Saleya restaurant that we simply hold
+nothing usable about. It is the clearest single example of the dining-corpus
+problem and the best candidate for testing whether your two-question search
+approach fixes it.
+
+**What I would not claim.** Museum at 81.2 and restaurant at 56.2 are single
+runs. Walking's spread (56.2 → 87.5) shows how much one run can differ from
+another when stop selection changes. Treat all three as one sample each.
