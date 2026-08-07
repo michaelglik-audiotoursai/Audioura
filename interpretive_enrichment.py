@@ -553,8 +553,8 @@ def store_interpretive_corpus(
     existing_passages = []
     existing_sources = []
     if row:
-        existing_passages = json.loads(row[0]) if row[0] else []
-        existing_sources = json.loads(row[1]) if row[1] else []
+        existing_passages = row[0] if isinstance(row[0], list) else (json.loads(row[0]) if row[0] else [])
+        existing_sources = row[1] if isinstance(row[1], list) else (json.loads(row[1]) if row[1] else [])
 
     # Dedup against existing text
     existing_texts = {_normalize(p.get('text', ''))[:80] for p in existing_passages}
