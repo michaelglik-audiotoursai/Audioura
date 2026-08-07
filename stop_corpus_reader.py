@@ -206,11 +206,33 @@ def get_stop_corpus_for_tour(
             if isinstance(roles_raw, str):
                 roles_raw = json.loads(roles_raw)
 
-            result[stop_name] = {
+            stop_corpus_result = {
                 'passages': passages,
                 'sources': sources_raw or [],
                 'passage_roles': roles_raw or [],
             } if passages else None
+
+            # [LOCAL-346] Merge bridge: when a stop_corpus row exists, ALSO
+            # check the venue_corpus bridge. If the bridge provides material,
+            # merge it — the venue_corpus (Wikipedia tier-1 about the building)
+            # complements enrichment (tier-3 travel blogs about the stop).
+            #
+            # Rule: merge, not choose. The bridge provides building-level
+            # context (architecture, history, significance) that the enrichment
+            # rarely duplicates. Three enrichment passages and sixty-three
+            # venue pages are not competitors — they are complementary.
+            #
+            # Safety: _bridge_venue_corpus_to_stop only matches when the stop's
+            # title IS the venue name (e.g. "Palais Lascaris" matches
+            # "Palais Lascaris, Nice"). Museum objects inside the venue
+            # (e.g. "Harpe by Naderman") will never match → museum unaffected.
+            bridged = _bridge_venue_corpus_to_stop(stop_name, venue_corpus_rows)
+            if bridged and stop_corpus_result:
+                result[stop_name] = _merge_stop_and_bridge(
+                    stop_corpus_result, bridged, stop_name
+                )
+            else:
+                result[stop_name] = stop_corpus_result
         else:
             # [LOCAL-342] Venue-as-stop bridge: when a stop has no stop_corpus
             # row, check if its title matches a venue_corpus venue_name. If so,
@@ -522,6 +544,87 @@ def format_passages_for_prompt(
             )
 
     return "\n".join(lines) + "\n"
+
+
+# ─── LOCAL-346: Merge stop_corpus + venue_corpus bridge ──────────────────────
+
+
+def _merge_stop_and_bridge(
+    stop_data: Dict,
+    bridge_data: Dict,
+    stop_name: str,
+) -> Dict:
+    """[LOCAL-346] Merge stop_corpus material with venue_corpus bridge material.
+
+    The venue_corpus bridge provides tier-1 Wikipedia content about the building
+    (architecture, history, significance). The stop_corpus enrichment provides
+    tier-3 supplementary web detail. They are complementary, not competing.
+
+    Merge strategy:
+      - Bridge passages go FIRST (richer, tier-1, building-level context).
+      - Stop_corpus passages appended (supplementary detail).
+      - Deduplication by normalized text prefix (first 100 chars).
+      - Sources merged with bridge sources first.
+      - Passage roles merged correspondingly.
+
+    This ensures the generator sees the best material first without losing
+    the enrichment content.
+    """
+    # Deduplicate: reject stop_corpus passages that substantially overlap
+    # with bridge passages (same text from different acquisition paths).
+    bridge_passages = bridge_data.get('passages', [])
+    stop_passages = stop_data.get('passages', [])
+
+    # Build fingerprint set from bridge passages for dedup
+    bridge_fingerprints = set()
+    for p in bridge_passages:
+        fp = _normalize_for_match(p)[:100]
+        bridge_fingerprints.add(fp)
+
+    # Keep only non-duplicate stop_corpus passages
+    unique_stop_passages = []
+    for p in stop_passages:
+        fp = _normalize_for_match(p)[:100]
+        if fp not in bridge_fingerprints:
+            unique_stop_passages.append(p)
+            bridge_fingerprints.add(fp)  # prevent intra-stop duplicates too
+
+    # Merge: bridge first (richer context), then unique enrichment passages
+    merged_passages = bridge_passages + unique_stop_passages
+
+    # Merge sources: bridge sources (tier-1) first, then stop sources
+    bridge_sources = bridge_data.get('sources', [])
+    stop_sources = stop_data.get('sources', [])
+    seen_urls = {s.get('url', '') for s in bridge_sources if s.get('url')}
+    unique_stop_sources = [s for s in stop_sources if s.get('url', '') not in seen_urls]
+    merged_sources = bridge_sources + unique_stop_sources
+
+    # Merge passage_roles: bridge roles first, then stop roles for unique passages
+    bridge_roles = bridge_data.get('passage_roles', [])
+    stop_roles = stop_data.get('passage_roles', [])
+    # Map stop_roles to the unique passages we kept
+    if stop_roles and len(stop_roles) == len(stop_passages):
+        unique_stop_roles = [
+            stop_roles[i] for i, p in enumerate(stop_passages)
+            if _normalize_for_match(p)[:100] not in
+            {_normalize_for_match(bp)[:100] for bp in bridge_passages}
+        ]
+    else:
+        unique_stop_roles = [{'role': 'enrichment'} for _ in unique_stop_passages]
+    merged_roles = bridge_roles + unique_stop_roles
+
+    logger.info(
+        "[LOCAL-346] Merged stop_corpus (%d passages) + venue bridge (%d passages) "
+        "→ %d total for %r (dedup removed %d)",
+        len(stop_passages), len(bridge_passages), len(merged_passages),
+        stop_name, len(stop_passages) - len(unique_stop_passages),
+    )
+
+    return {
+        'passages': merged_passages,
+        'sources': merged_sources,
+        'passage_roles': merged_roles,
+    }
 
 
 # ─── LOCAL-342: Venue-as-stop bridging ───────────────────────────────────────
