@@ -347,8 +347,8 @@ def _verify_admission(claim_lower: str, source_lower: str) -> bool:
     """
     # "Free" claims
     if re.search(r'\bfree\b|gratuit|libre', claim_lower):
-        # Source must say free/gratuit/libre...
-        _has_free = bool(re.search(r'gratuit|libre|free', source_lower))
+        # Source must say free/gratuit/libre OR use OSM fee=no tag format...
+        _has_free = bool(re.search(r'gratuit|libre|free|fee\s*=\s*no', source_lower))
         if not _has_free:
             return False
         # ...BUT if the source also contains a specific GENERAL ENTRY price,
