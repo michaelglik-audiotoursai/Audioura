@@ -67,8 +67,27 @@ city bought 1942 ✓ · opened 1970 ✓.
 **That is the first fact-check tonight to come back entirely clean.** Worth
 noting given I caught a fabrication in this same tour position last night.
 
-**Still wrong:** stop 1, Cours Saleya Market, has zero facts. One of the most
-documented places in Nice.
+**Still wrong, and worse than I first wrote:** stop 1, Cours Saleya Market, has
+zero facts — and it contains a **second confirmed fabrication**:
+
+> "**Named after the Marquis de Cours Saleya**, this market was once a hub for
+> the trading of spices, textiles, and local produce."
+
+There is no Marquis de Cours Saleya. The etymology is genuinely uncertain —
+*soleiya* ("sunny" in Niçard), the salt trade (Nice was a salt-route hub and the
+square held the salt warehouse), or the Saint-Pons abbey cellarer. The square
+was "Lou Cours" until the 19th century. I checked before writing this.
+
+**And we had the material.** Its corpus holds "2021: the city of Nice and its
+heritage sites, including the Cours Saleya market, were designated as a
+UNESCO…". The generator used that in the *orientation* and then ignored it in
+the body, inventing an etymology instead.
+
+**The invention cost nothing** — the stop scores 0 facts, identical to silence.
+This is the second such case in this tour position; last night the same tour
+called Nice Cathedral Gothic (it is Baroque). Your rule that fabrication should
+cost 3x an omission has nothing to attach to, because nothing detects it.
+Dispatched as LOCAL-345.
 
 ---
 
