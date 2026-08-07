@@ -1,93 +1,84 @@
 ##### READY FOR REVIEW
 
-## LOCAL-330: Prolog location slot carries place name, not request string
-
-**Commit:** `20bdb57` on branch `kiro/local330-prolog-phrasing`
+**Task:** LOCAL-330  
+**Branch:** `kiro/local330-prolog-phrasing`  
+**Commit:** `1d706fb`
 
 ---
 
-### Per-file summary
+## Per-file summary
 
 | File | Change |
 |------|--------|
-| `generate_tour_text.py` | Added `_prolog_place` extraction (~line 9188): strips category words, transport words, "tour", and orphaned leading prepositions from raw `location`. Used in Part 1 example shape and TOUR DATA section of the prolog prompt. Museum branch (`_is_museum_prolog`) untouched. |
-| `tests/test_local330_prolog_place_name.py` | 19 unit tests: restaurant (4), walking (2), cycling (2), animal/dog/camel/horse (3), museum non-regression (2), edge cases (4), production code sync guards (2). |
+| `generate_tour_text.py` | Replaced inline word-blocklist `_PROLOG_CATEGORY_WORDS` (~lines 9251–9279) with a module-level `_prolog_place()` function (~line 121). The function uses two anchored regexes: `_PROLOG_TOUR_PREFIX_RE` (strips `<category> tour in/of…` from start) and `_PROLOG_TOUR_SUFFIX_RE` (strips `<category> tour` from end). If neither matches, returns input unchanged. Inline call site reduced to `_prolog_place_name = _prolog_place(location)`. Local variable renamed `_prolog_place_name` to avoid shadowing the function. Museum branch (`_is_museum_prolog`) untouched. |
+| `tests/test_local330_prolog_place_name.py` | Rewritten to import `_prolog_place` directly from `generate_tour_text` (LOCAL-324 pattern — no reimplementation). 26 tests: restaurant (4), walking (2), cycling (2), animal (3), museum non-regression (2), LEAD-mandated place names (6), edge cases (5), production wiring (2). |
 
 ---
 
-### Verbatim evidence: before and after (all categories)
+## Verbatim evidence: all categories
 
 ```
-==========================================================================================
-Category         Transport  BEFORE (raw location in slot)
-                            AFTER  (_prolog_place in slot)
-==========================================================================================
-restaurant       walking    BEFORE: "...embark on a [walking] journey through [restaurant tour in Old Nice (Vieux Nice), France]."
-                            AFTER:  "...embark on a [walking] journey through [Old Nice (Vieux Nice), France]."
-
-restaurant       walking    BEFORE: "...embark on a [walking] journey through [restaurants tour in old city of Nice, France]."
-                            AFTER:  "...embark on a [walking] journey through [old city of Nice, France]."
-
-walking          walking    BEFORE: "...embark on a [walking] journey through [walking tour of Montmartre, Paris, France]."
-                            AFTER:  "...embark on a [walking] journey through [Montmartre, Paris, France]."
-
-walking          walking    BEFORE: "...embark on a [walking] journey through [walking tour in Rome, Italy]."
-                            AFTER:  "...embark on a [walking] journey through [Rome, Italy]."
-
-cycling          cycling    BEFORE: "...embark on a [cycling] journey through [cycling tour of the French Riviera]."
-                            AFTER:  "...embark on a [cycling] journey through [the French Riviera]."
-
-cycling          cycling    BEFORE: "...embark on a [cycling] journey through [bike tour in Amsterdam, Netherlands]."
-                            AFTER:  "...embark on a [cycling] journey through [Amsterdam, Netherlands]."
-
-animal/dog       riding     BEFORE: "...embark on a [riding] journey through [dogsled tour in Fairbanks, Alaska]."
-                            AFTER:  "...embark on a [riding] journey through [Fairbanks, Alaska]."
-
-animal/camel     riding     BEFORE: "...embark on a [riding] journey through [camel tour in the Sahara Desert, Morocco]."
-                            AFTER:  "...embark on a [riding] journey through [the Sahara Desert, Morocco]."
-
-animal/horse     riding     BEFORE: "...embark on a [riding] journey through [horseback tour through Patagonia, Argentina]."
-                            AFTER:  "...embark on a [riding] journey through [Patagonia, Argentina]."
-
-museum           N/A        Museum branch takes _is_museum_prolog path — no "journey through" sentence.
-                            TOUR DATA line: "Musée Matisse, Nice, France" (stripped cleanly).
-                            Part 1 instruction unchanged: "You are about to explore the [venue name] in [city]."
+=== AFTER FIX (current state) ===
+  restaurant      | 'restaurant tour in Old Nice (Vieux Nice), France'      → 'Old Nice (Vieux Nice), France'
+  walking         | 'walking tour in Paris, France'                         → 'Paris, France'
+  cycling         | 'cycling tour of the French Riviera'                    → 'the French Riviera'
+  bike            | 'bike tour in Amsterdam, Netherlands'                   → 'Amsterdam, Netherlands'
+  camel           | 'camel tour in the Sahara Desert, Morocco'              → 'the Sahara Desert, Morocco'
+  dogsled         | 'dogsled tour in Fairbanks, Alaska'                     → 'Fairbanks, Alaska'
+  horseback       | 'horseback tour through Patagonia, Argentina'           → 'Patagonia, Argentina'
+  museum          | 'Musée Matisse, Nice, France museum tour'               → 'Musée Matisse, Nice, France'
+  food            | 'food tour in Bangkok, Thailand'                        → 'Bangkok, Thailand'
+  self-guided     | 'self-guided walking tour in Edinburgh, Scotland'       → 'Edinburgh, Scotland'
 ```
 
-### Museum non-regression (LOCAL-286)
-
-The museum prolog branch (`if _is_museum_prolog:`) is completely separate and never references `{location}` or `{_prolog_place}` in its Part 1 instruction. It uses hardcoded example text: `"You are about to explore the [venue name] in [city]."` The only shared use is the TOUR DATA line, which now carries `_prolog_place` — for a museum input like `"Musée Matisse, Nice, France museum tour"` this yields `"Musée Matisse, Nice, France"` (clean).
-
-### Deliberate break → test red
+## Verbatim evidence: LEAD-mandated place names (must be UNCHANGED)
 
 ```
-> Reverted _prolog_place → location in example shape line
-> python3 -m pytest tests/test_local330_prolog_place_name.py::TestProductionCodeSync::test_production_uses_prolog_place -v
-FAILED - AssertionError: Production prolog still uses raw {location} — LOCAL-330 fix not wired
-> Restored fix → 19 passed
+  Hyde Park, London                        → 'Hyde Park, London'  ✓
+  Central Park, New York                   → 'Central Park, New York'  ✓
+  Golden Gate Park, San Francisco          → 'Golden Gate Park, San Francisco'  ✓
+  Garden District, New Orleans             → 'Garden District, New Orleans'  ✓
+  Boat Quay, Singapore                     → 'Boat Quay, Singapore'  ✓
+  Car-free Zermatt, Switzerland            → 'Car-free Zermatt, Switzerland'  ✓
 ```
 
-### Affected historical files in tours/
+## Museum opening unchanged (LOCAL-286)
 
-1 file carries the exact defect in its text:
-- `tours/LOCAL317_5stop_old_nice_restaurant.txt` — "a walking journey through a restaurants tour in old city of Nice, France"
+The museum branch (`if _is_museum_prolog:`) uses hardcoded example shape:
+```
+"You are about to explore the [venue name] in [city]."
+```
+It never references `_prolog_place_name` in its Part 1 instruction. The TOUR DATA line carries `_prolog_place_name` for metadata, which for museum input `"Musée Matisse, Nice, France museum tour"` yields `"Musée Matisse, Nice, France"` (clean).
 
-Per instructions, existing tour files are **not rewritten** (historical artifacts).
+## Deliberate break → tests go red
 
-### What was NOT changed
+Sabotaged `_prolog_place()` to `return location` (pass-through):
+```
+FAILED tests/test_local330_prolog_place_name.py::TestRestaurantCategory::test_restaurant_tour_old_nice
+FAILED tests/test_local330_prolog_place_name.py::TestRestaurantCategory::test_restaurants_tour_old_city
+FAILED tests/test_local330_prolog_place_name.py::TestRestaurantCategory::test_food_tour_bangkok
+FAILED tests/test_local330_prolog_place_name.py::TestRestaurantCategory::test_culinary_tour_lyon
+FAILED tests/test_local330_prolog_place_name.py::TestWalkingCategory::test_walking_tour_paris
+FAILED tests/test_local330_prolog_place_name.py::TestWalkingCategory::test_walking_tour_rome_neighborhoods
+FAILED tests/test_local330_prolog_place_name.py::TestCyclingCategory::test_cycling_tour_french_riviera
+FAILED tests/test_local330_prolog_place_name.py::TestCyclingCategory::test_bike_tour_amsterdam
+FAILED tests/test_local330_prolog_place_name.py::TestAnimalTransport::test_camel_tour_sahara
+FAILED tests/test_local330_prolog_place_name.py::TestAnimalTransport::test_dog_sled_tour_alaska
+FAILED tests/test_local330_prolog_place_name.py::TestAnimalTransport::test_horseback_tour_patagonia
+FAILED tests/test_local330_prolog_place_name.py::TestMuseumNotRegressed::test_museum_tour_nice
+FAILED tests/test_local330_prolog_place_name.py::TestMuseumNotRegressed::test_gallery_tour_florence
+FAILED tests/test_local330_prolog_place_name.py::TestEdgeCases::test_accented_place_preserved
+FAILED tests/test_local330_prolog_place_name.py::TestEdgeCases::test_self_guided_tour
+FAILED tests/test_local330_prolog_place_name.py::TestEdgeCases::test_walking_tour_hyde_park
+=================== 16 failed, 10 passed ===================
+```
 
-- No container rebuilds
-- No `DECISIONS.md`, `CLAUDE.md`, `BACKLOG.md`, `.continuous_dev/*` edits
-- No `audio_tours` row modifications
-- Transport wording itself unchanged ("walking" remains correct)
-- No regex removal of "walking journey" from output — the slot value is fixed at the source
+Restored → 26 passed.
 
 ---
 
-### Limitations
+## Limitations
 
-1. **LLM compliance is not tested end-to-end.** The fix ensures the *prompt template* carries a clean place name. Whether the LLM faithfully echoes it (vs. inventing its own phrasing) depends on the model — but the defective input that caused the bad output is removed.
-
-2. **Place names containing category words.** A location like "Restaurant Row, New York" would have "Restaurant" stripped, yielding "Row, New York". This is an inherent tradeoff of keyword-based stripping. In practice, users request tours *in* places, not tours *named after* category words — and the fallback preserves the full string if stripping empties it.
-
-3. **The word "park" is in the strip list.** "Hyde Park, London" becomes "Hyde, London" after stripping. This is acceptable because the TOUR DATA also includes stop names and coordinates which disambiguate for the LLM — and "park" as a category word (botanical garden/park tours) is the more common use in request strings.
+- The prefix/suffix regex does not handle multi-word categories joined by "and" (e.g. "food and wine tour in…"). Such inputs would pass through unstripped — the full request string would reach the slot. This has not been observed in production data.
+- The "the" article is preserved when it leads the place after stripping (e.g. "the French Riviera", "the Sahara Desert"). This reads naturally in "a walking journey through the French Riviera" but could be considered noise for the TOUR DATA metadata line.
+- Existing tour files in `tours/` are not rewritten (per instructions) — they retain the old phrasing as historical artifacts.
