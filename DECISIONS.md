@@ -10270,3 +10270,36 @@ Current honest scores after the night's work:
 museum 4-stop   87.5      walking (regenerated)     75.0
 museum 8-stop   75.0      restaurant (regenerated)  56.2
 ```
+
+## D258 — 59% of groundedness reporting was near-vacuous
+**2026-08-07, LOCAL-343 merged.**
+
+Across 261 scorable stops:
+
+```
+n=0     67 stops (25.7%)   reported groundedness 1.00 — nothing was checked
+n=1     88 stops (33.7%)   one claim, "100%"
+n>=2   106 stops (40.6%)
+```
+
+**Three in five groundedness figures rested on nought or one claim.** The claim
+extractor looks for dates, named people and artwork titles; restaurant and
+walking stops rarely contain those, so their perfect scores were an artifact of
+an empty denominator.
+
+D244 fixed the no-*corpus* case by defaulting to `None`. This is the
+no-*claims* case, missed at the time. Both are the same error: `1.0` conflating
+"checked and held" with "nothing to check."
+
+`n=1` is now reported as `100% (n=1)` with the sample size visible. No smoothing
+prior — inventing one hides the problem, which is exactly the instinct that
+produced the default `1.0`.
+
+**LEAD's bounce criterion was wrong twice tonight, the same way.** "Museum
+vector must not move" was set from numbers measured *before* the fix, so a
+correct fix necessarily violated it — first at stop 8 (0.29, computed from a
+contaminated row) and again at stop 7 (1.00, computed from an empty
+denominator). A non-regression bound taken from a suspect measurement is not a
+bound; it pins the bug in place. **State bounds as properties, not values** —
+"stops with real claims must not lose grounding" rather than "the vector must
+read exactly this."
