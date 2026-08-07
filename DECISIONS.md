@@ -9911,3 +9911,64 @@ sounded structural and vocabulary-free, which is what LEAD had been demanding
 all session — and it was still wrong, because it assumed a stop title names a
 place. In a museum a stop title names an object, and objects are named after
 people. A rule can be perfectly general and still encode a false premise.
+
+## D248 — SUPERSEDES D237.1: the $2.00 cap excludes translation (Storied)
+**Michael's ruling, 2026-08-06.**
+
+> *"$2.00 cap question: that is limit without translation for Storied release.
+> Subscribed release will be changing the way we handle translation: it will
+> become limited for free plans."*
+
+**D237.1 assumed $2.00 covered the whole artifact family including translation.
+That is overruled.** For Storied the cap is on **generation + TTS only**:
+
+```
+text generation   ~$0.07                    }
+TTS               ~$0.24  (neural, en)      }  under the $2.00 cap
+translation       ~$0.31 per language       }  OUTSIDE it
+```
+
+**Consequence, and it is the opposite of what LEAD warned about.** LEAD said
+the cap would bind on translation count and that a three-language tour could
+not fit. With translation excluded, the cap has **enormous** headroom: a
+typical tour costs ~$0.31 against a $2.00 ceiling, roughly **6x**. Nothing we
+generate today comes close. The cap is a runaway guard, not an operating
+constraint — which is the right shape for it.
+
+Translation cost is not unmanaged, it moves to a different mechanism:
+Subscribed will limit translation for free plans. That is plan entitlement
+(`plans` table, `entitlements.py`), not a per-tour dollar ceiling.
+
+**Effect on the build order in D237:**
+- Step 4's per-tour cap is now simple — sum generation + TTS, compare to $2.00.
+  No per-language-vs-bundle ambiguity remains.
+- The **monthly** caps ($10 unsubscribed / subscription cost) still cover
+  everything a customer consumes, translation included. Those are the limits
+  that will actually bind, and they depend on LOCAL-323's attribution work
+  (merged) being trustworthy.
+- Translation entitlement for free plans is new Subscribed scope, not covered
+  by any existing task.
+
+Also recorded: Michael on the Boston Globe rotation (`wdvrdaxe5p`) —
+*"not urgent, I will do this next week."* The task stays open at high priority;
+no further prompting.
+
+## D249 — The Treat Page is referenced in tours but has no inventory
+**2026-08-06, from Michael's question.**
+
+He asked whether the Treat Page is engaged. Measured:
+
+```
+treats table               0 rows       no inventory, no vendor links
+delivered tours (29 real)  0 mention    nothing shipped makes a promise
+generated tour files       73 carry the Treat Page line
+```
+
+He is right that no contracts exist. **Nothing delivered is affected.** But
+`_build_closing_offer` does not gate the mention on inventory, and
+`treats_screen.dart` calls `/treats-near/{lat}/{lng}`, so the next tour
+delivered would send a listener to an empty screen.
+
+The wording is already correctly hedged by LOCAL-280 ("whether there are
+savings", never "for coupons") and stays as is. Dispatched as LOCAL-335: gate
+the mention on nearby inventory, fail closed, leave the recap intact.
