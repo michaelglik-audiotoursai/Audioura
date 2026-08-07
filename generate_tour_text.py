@@ -6083,6 +6083,44 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             except Exception as _guide_err:
                 print(f"  [LOCAL-354] Guide price band error (non-fatal): {_guide_err}")
 
+        # -------- [LOCAL-355] Source operational details from OSM (non-dining tours) --------
+        # For museum, walking, and park tours: query OSM for practical visitor facts
+        # (opening_hours, fee/admission, timed entry). Same provenance model as LOCAL-353.
+        if tour_category in ('museum', 'walking') and poi_list:
+            try:
+                from osm_venue_facts import fetch_osm_venue_facts, extract_city_from_venue_name as _extract_city
+                _osm_city = _extract_city(location)
+                if _osm_city:
+                    _venue_hint = 'museum' if tour_category == 'museum' else ''
+                    print(f"  [LOCAL-355] Querying OSM for venue facts (city: {_osm_city}, hint: {_venue_hint or 'auto'})")
+                    _osm_source_texts_355 = []
+                    _osm_source_urls_355 = []
+                    for poi in poi_list:
+                        _osm_facts = fetch_osm_venue_facts(poi['name'], _osm_city, venue_hint=_venue_hint)
+                        if not _osm_facts.is_empty():
+                            # Only replace if no visitor info was already sourced (LOCAL-34/39)
+                            if not poi.get('operational_details'):
+                                poi['operational_details'] = _osm_facts.format_practical_sentence()
+                            _osm_source_texts_355.append(_osm_facts.source_text)
+                            _osm_source_urls_355.append(_osm_facts.source_url)
+                            print(f"  [LOCAL-355] {poi['name']}: sourced → {_osm_facts.format_practical_sentence()}")
+                        else:
+                            print(f"  [LOCAL-355] {poi['name']}: no practical facts in OSM")
+                    if _osm_source_texts_355:
+                        # Append to existing source text (don't overwrite LOCAL-34 website sources)
+                        _osm_355_combined = "\n\n".join(_osm_source_texts_355)
+                        if _visitor_info_source_text:
+                            _visitor_info_source_text += "\n\n" + _osm_355_combined
+                        else:
+                            _visitor_info_source_text = _osm_355_combined
+                            _visitor_info_source_url = ", ".join(_osm_source_urls_355[:3])
+                else:
+                    print(f"  [LOCAL-355] Could not extract city from location — OSM lookup skipped")
+            except ImportError:
+                print(f"  [LOCAL-355] osm_venue_facts not available — operational details unchanged")
+            except Exception as _osm_err:
+                print(f"  [LOCAL-355] OSM venue facts error (non-fatal): {_osm_err}")
+
         # -------- Coordinates fallback: request for any stop missing coordinates --------
         # PHASE 3B sometimes omits coordinates for one or more stops. Request them
         # individually (parallel) so every stop gets a map pin.
