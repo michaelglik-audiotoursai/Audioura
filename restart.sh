@@ -78,9 +78,11 @@ echo '```'
 echo
 echo "## Generating a tour from the host — REQUIRED env (D261)"
 echo '```'
+echo 'DISABLE_TOUR_CACHE=1 \'
 echo 'DATABASE_URL=postgresql://admin:password123@localhost:5433/audiotours \'
 echo 'STORIED_MODE=true OPENAI_API_KEY=... python3 -c "..."'
-echo '# without DATABASE_URL the stop-existence gate SILENTLY does not run'
+echo '# no DISABLE_TOUR_CACHE -> you may score a CACHED tour (D262)'
+echo '# no DATABASE_URL      -> stop-existence gate SILENTLY does not run (D261)'
 echo '```'
 echo
 echo "## Read next, in this order"
