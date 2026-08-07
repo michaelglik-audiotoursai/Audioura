@@ -124,7 +124,10 @@ _NOT_A_PERSON_RE = re.compile(
     r'beach|island|museum|mus[eé]e|fondation|palais|port|cape|mount|tower|'
     r'bridge|gate|hotel|castle|fort|abbey|basilica|collection|gallery|'
     r'exhibition|exhibit|installation|examples|details|specialty|information|'
-    r'americans?|century|war|succession)\b'
+    r'americans?|century|war|succession|'
+    # [LOCAL-340] "Chez X" is a restaurant/business, not a person (mirrors
+    # LOCAL-339 fix in tour_rubric_scorer.py).
+    r'chez)\b'
 )
 
 _PERSON_CONTEXT_RE = re.compile(

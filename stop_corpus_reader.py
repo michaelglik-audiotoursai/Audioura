@@ -210,12 +210,22 @@ def _match_stop_title_first(
 ) -> Optional[Dict]:
     """[LOCAL-339] Match a stop to corpus by title first, venue as tie-breaker.
 
+    [LOCAL-340] Match quality tiers: an exact/accent-folded title match ALWAYS
+    beats a fuzzy (containment/word-overlap) match, regardless of venue
+    preference. This prevents "Chez Pipo" from being grounded against
+    "Chez Palmyre" corpus when the only overlap is the word "chez".
+
     When the same stop_title exists under multiple venues, prefer the row
     from the preferred_venue. When no preferred venue matches, take the row
     with the most passages (richest corpus).
     """
-    # Find all rows that match this stop_name using _match_stop_to_corpus logic
-    candidates = []
+    # [LOCAL-340] Collect candidates in quality tiers:
+    #   exact_matches: case-insensitive or accent-folded exact title match
+    #   fuzzy_matches: containment or word-overlap matches
+    # Exact matches always take priority — fuzzy matches are only considered
+    # when no exact match exists.
+    exact_matches = []
+    fuzzy_matches = []
     stop_folded = _accent_fold(stop_name).lower().strip()
     stop_norm = _normalize_for_match(stop_name)
 
@@ -223,15 +233,15 @@ def _match_stop_title_first(
         title = row['stop_title']
         # 1. Exact case-insensitive
         if title.lower().strip() == stop_name.lower().strip():
-            candidates.append(row)
+            exact_matches.append(row)
             continue
         # 2. Accent-folded exact
         if _accent_fold(title).lower().strip() == stop_folded:
-            candidates.append(row)
+            exact_matches.append(row)
             continue
         # 3. Containment (either direction)
         if stop_name.lower() in title.lower() or title.lower() in stop_name.lower():
-            candidates.append(row)
+            fuzzy_matches.append(row)
             continue
         # 4. Normalized word overlap
         corpus_title_norm = _normalize_for_match(title)
@@ -241,7 +251,12 @@ def _match_stop_title_first(
             overlap = corpus_words & stop_words
             threshold = max(1, min(len(corpus_words), len(stop_words)) * 0.5)
             if len(overlap) >= threshold:
-                candidates.append(row)
+                fuzzy_matches.append(row)
+
+    # [LOCAL-340] Use exact matches when available; fall back to fuzzy only
+    # when no exact match exists. This is the critical fix: a stop must be
+    # grounded against ITS OWN corpus, not a similarly-named stop's corpus.
+    candidates = exact_matches if exact_matches else fuzzy_matches
 
     if not candidates:
         # Try variant map as last resort
