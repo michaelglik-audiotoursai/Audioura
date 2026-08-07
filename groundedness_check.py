@@ -147,7 +147,7 @@ _PERSON_CONTEXT_WINDOW = 90
 class FactClaim:
     """A single extractable fact from tour narration."""
     text: str          # The claim text
-    claim_type: str    # 'person', 'date', 'artwork'
+    claim_type: str    # 'person', 'date', 'artwork', 'material', 'measurement', 'period'
     sentence: str      # Source sentence
 
 
@@ -170,13 +170,19 @@ class GroundednessResult:
 def extract_fact_claims(text: str, stop_title: str = "") -> List[FactClaim]:
     """Extract checkable fact-claims from narration text.
 
+    [LOCAL-344] THE PROPERTY: anything the fact detector counts as a fact must
+    be represented in the claim set. Enforced structurally — the claim extractor
+    delegates to the same analyze_stop() that the scorer uses, then promotes
+    every detected fact to a FactClaim. This guarantees alignment without
+    enumerating categories (D236: enumeration is how we got blind spots).
+
     Extracts:
     - Named people (with context-verified person detection)
     - Specific dates/years (4-digit years, centuries)
     - Named artworks (quoted titles)
-
-    These are the "distinct dates, named people, named works" specified
-    in the task for groundedness measurement.
+    - Materials/techniques (structural + vocabulary detection)
+    - Measurements/numbers (digit + unit, spelled-out numeral + noun)
+    - Named periods (dynasties, eras, epochs, etc.)
     """
     claims = []
 
@@ -220,7 +226,7 @@ def extract_fact_claims(text: str, stop_title: str = "") -> List[FactClaim]:
             ))
 
         # Named artworks (quoted)
-        for m in re.finditer(r'[""«]([^""»]+)[""»]', sentence):
+        for m in re.finditer(r'["\u201c\u201d\u00ab]([^"\u201c\u201d\u00bb]+)["\u201c\u201d\u00bb]', sentence):
             artwork = m.group(1)
             if len(artwork) > 3:
                 claims.append(FactClaim(
@@ -228,6 +234,47 @@ def extract_fact_claims(text: str, stop_title: str = "") -> List[FactClaim]:
                     claim_type='artwork',
                     sentence=sentence,
                 ))
+
+    # ─── [LOCAL-344] Structural alignment: delegate to the fact detector ─────
+    # Run analyze_stop to get the SAME facts the scorer counts, then promote
+    # each to a FactClaim. This closes the gap that caused 55% of stops to
+    # have zero groundedness claims despite having counted facts.
+    from tour_rubric_scorer import analyze_stop as _analyze_stop
+    _stop = {'index': 0, 'title': stop_title or 'untitled', 'body': text}
+    _sa = _analyze_stop(_stop, [_stop])
+
+    # Find the sentence containing each fact for context
+    def _find_sentence(fact_text: str) -> str:
+        """Find the source sentence for a fact, for FactClaim.sentence."""
+        fact_lower = fact_text.lower()
+        for s in sentences:
+            if fact_lower in s.lower():
+                return s[:200]
+        return text[:200]
+
+    # Materials/techniques
+    for mat in _sa.materials_techniques:
+        claims.append(FactClaim(
+            text=mat,
+            claim_type='material',
+            sentence=_find_sentence(mat),
+        ))
+
+    # Measurements/numbers
+    for meas in _sa.measurements_numbers:
+        claims.append(FactClaim(
+            text=meas,
+            claim_type='measurement',
+            sentence=_find_sentence(meas),
+        ))
+
+    # Named periods
+    for per in _sa.named_periods:
+        claims.append(FactClaim(
+            text=per,
+            claim_type='period',
+            sentence=_find_sentence(per),
+        ))
 
     # Deduplicate: same claim text in the same stop counts once
     seen = set()
@@ -326,6 +373,81 @@ def check_claim_grounded(claim: FactClaim, passages: List[str]) -> Tuple[str, Op
             if found_tokens / len(artwork_tokens) >= 0.6:
                 return ('GROUNDED', f"partial match: {found_tokens}/{len(artwork_tokens)} tokens")
 
+        return ('UNGROUNDED', None)
+
+    # ─── [LOCAL-344] New claim types: material, measurement, period ───────
+    elif claim.claim_type == 'material':
+        # A material is grounded if the term appears in passages (accent-folded).
+        # Matches: "chlorite" in passages, "oil on canvas" in passages, etc.
+        claim_normalized = _normalize_text_for_search(claim.text)
+        if claim_normalized in passages_normalized:
+            for p in passages:
+                if claim_normalized in _normalize_text_for_search(p):
+                    idx = _normalize_text_for_search(p).find(claim_normalized)
+                    start = max(0, idx - 30)
+                    end = min(len(p), idx + len(claim_normalized) + 30)
+                    return ('GROUNDED', p[start:end].strip())
+            return ('GROUNDED', claim.text)
+        return ('UNGROUNDED', None)
+
+    elif claim.claim_type == 'measurement':
+        # A measurement is grounded if its significant tokens appear in passages.
+        # "three Michelin stars" → check all content words present.
+        # Also check exact substring match first.
+        claim_normalized = _normalize_text_for_search(claim.text)
+        if claim_normalized in passages_normalized:
+            for p in passages:
+                if claim_normalized in _normalize_text_for_search(p):
+                    idx = _normalize_text_for_search(p).find(claim_normalized)
+                    start = max(0, idx - 30)
+                    end = min(len(p), idx + len(claim_normalized) + 30)
+                    return ('GROUNDED', p[start:end].strip())
+            return ('GROUNDED', claim.text)
+
+        # Token-level: all significant tokens (len>2) must be present
+        tokens = [t for t in re.findall(r'[a-z0-9]+', claim_normalized) if len(t) > 2]
+        if tokens and all(t in passages_normalized for t in tokens):
+            return ('GROUNDED', f"all tokens {tokens} found in passages")
+
+        # Digit equivalence: "three" in claim ↔ "3" in passages (and vice versa)
+        _WORD_TO_DIGIT = {
+            'one': '1', 'two': '2', 'three': '3', 'four': '4', 'five': '5',
+            'six': '6', 'seven': '7', 'eight': '8', 'nine': '9', 'ten': '10',
+            'eleven': '11', 'twelve': '12', 'thirteen': '13', 'fourteen': '14',
+            'fifteen': '15', 'sixteen': '16', 'seventeen': '17',
+            'eighteen': '18', 'nineteen': '19', 'twenty': '20',
+            'thirty': '30', 'forty': '40', 'fifty': '50',
+            'sixty': '60', 'seventy': '70', 'eighty': '80', 'ninety': '90',
+            'hundred': '100', 'thousand': '1000',
+        }
+        # Try replacing spelled-out numerals with digits
+        alt_tokens = []
+        for t in tokens:
+            if t in _WORD_TO_DIGIT:
+                alt_tokens.append(_WORD_TO_DIGIT[t])
+            else:
+                alt_tokens.append(t)
+        if alt_tokens != tokens and all(t in passages_normalized for t in alt_tokens):
+            return ('GROUNDED', f"digit-equivalent tokens {alt_tokens} found")
+
+        return ('UNGROUNDED', None)
+
+    elif claim.claim_type == 'period':
+        # A period name is grounded if it appears in passages (accent-folded).
+        # "Heian" in passages, "Pala-Sena" in passages, etc.
+        claim_normalized = _normalize_text_for_search(claim.text)
+        if claim_normalized in passages_normalized:
+            for p in passages:
+                if claim_normalized in _normalize_text_for_search(p):
+                    idx = _normalize_text_for_search(p).find(claim_normalized)
+                    start = max(0, idx - 30)
+                    end = min(len(p), idx + len(claim_normalized) + 30)
+                    return ('GROUNDED', p[start:end].strip())
+            return ('GROUNDED', claim.text)
+        # Also try individual tokens for hyphenated periods (Pala-Sena → Pala, Sena)
+        period_tokens = [t for t in re.split(r'[-\s]', claim_normalized) if len(t) > 2]
+        if period_tokens and all(t in passages_normalized for t in period_tokens):
+            return ('GROUNDED', f"all period tokens {period_tokens} found")
         return ('UNGROUNDED', None)
 
     return ('UNGROUNDED', None)
