@@ -124,8 +124,23 @@ def score_tour_text(tour_text, n_requested, tour_id=None, tour_name=None,
         print("[SCORING] Skipped: empty tour_text")
         return None, None, 0.0
 
+    # [LOCAL-327] Pass DB connection so evaluate() can auto-load corpus data
+    # and apply the ungrounded-ADEQUATE ceiling in the default scoring path.
+    try:
+        conn = _get_connection()
+    except SystemExit:
+        conn = None
+
     # Use the single entry point
-    evaluation = evaluate(tour_text, n_requested)
+    evaluation = evaluate(tour_text, n_requested, conn=conn)
+
+    # Close the connection after evaluation
+    if conn:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
     if evaluation is None:
         print("[SCORING] Skipped: no stops parsed from tour_text")
         return None, None, 0.0

@@ -260,6 +260,16 @@ class StopAnalysis:
     contradicted_share: float = 0.0     # fraction of claims contradicted by corpus
     ungrounded_claims: List[str] = field(default_factory=list)  # corpus worklist
 
+    # [LOCAL-327] Whether corpus passages exist for this stop. When False,
+    # groundedness_fraction is unmeasurable (defaults to 1.0 but means nothing).
+    # A stop without corpus is unverified — it cannot demonstrate quality.
+    corpus_available: bool = False  # True only when stop_corpus has ≥1 passage
+
+    # [LOCAL-327] Whether a corpus lookup was attempted for this stop's tour.
+    # When False, corpus_available being False is meaningless (we didn't check).
+    # When True, corpus_available=False means the stop is genuinely unverified.
+    corpus_lookup_attempted: bool = False
+
 
 @dataclass 
 class TourScore:
@@ -700,8 +710,21 @@ def classify_stop(sa: 'StopAnalysis') -> Tuple[str, str]:
         # It must not reduce the score — it only caps the band.
         if groundedness < RICH_MIN_GROUNDEDNESS:
             return 'ADEQUATE', evidence + f" (RICH capped by groundedness floor {RICH_MIN_GROUNDEDNESS})"
+        # [LOCAL-327] Corpus availability ceiling: a stop without corpus cannot
+        # demonstrate quality — its facts are unverified, not wrong.
+        # Capped to THIN (not ADEQUATE) because ADEQUATE also requires corpus.
+        # Only applied when a corpus lookup was actually attempted.
+        if sa.corpus_lookup_attempted and not sa.corpus_available:
+            return 'THIN', evidence + " (RICH capped to THIN: no corpus passages — facts unverified)"
         return 'RICH', evidence
     if facts >= ADEQUATE_MIN_FACTS and density >= ADEQUATE_MIN_DENSITY and filler <= ADEQUATE_MAX_FILLER:
+        # [LOCAL-327] Corpus availability ceiling for ADEQUATE: a stop without
+        # corpus passages cannot demonstrate ADEQUATE quality. The stop may be
+        # perfectly accurate — but nothing checked, so we cannot count it as
+        # demonstrated quality. Capped at THIN, never penalised below THIN.
+        # Only applied when a corpus lookup was actually attempted.
+        if sa.corpus_lookup_attempted and not sa.corpus_available:
+            return 'THIN', evidence + " (ADEQUATE capped: no corpus passages — facts unverified)"
         return 'ADEQUATE', evidence
     return 'THIN', evidence
 
@@ -1130,6 +1153,8 @@ def score_tour_file(filepath: str, n_requested: int,
 
         # [LOCAL-291] Compute groundedness and CONTRADICTED signals from corpus.
         if corpus_data:
+            # [LOCAL-327] Mark that we attempted a corpus lookup for this stop.
+            sa.corpus_lookup_attempted = True
             _compute_groundedness_for_stop(sa, stop, corpus_data)
 
         if classifications and stop['index'] in classifications:
@@ -1165,6 +1190,8 @@ def _compute_groundedness_for_stop(sa: 'StopAnalysis', stop: dict, corpus_data: 
     by corpus passages. Name normalisation (D187) is applied.
 
     Sets sa.groundedness_fraction (0..1) and sa.contradicted_share (0..1).
+
+    [LOCAL-327] Also sets sa.corpus_available = True when passages exist.
     """
     from groundedness_check import measure_stop_groundedness
 
@@ -1174,11 +1201,16 @@ def _compute_groundedness_for_stop(sa: 'StopAnalysis', stop: dict, corpus_data: 
     if not corpus_entry:
         # No corpus for this stop — groundedness stays 1.0 (no ceiling)
         # and contradicted_share stays 0.0 (no penalty).
+        # [LOCAL-327] corpus_available remains False — stop is unverified.
         return
 
     passages = corpus_entry.get('passages', [])
     if not passages:
+        # [LOCAL-327] corpus_available remains False — no passages means unverified.
         return
+
+    # [LOCAL-327] Corpus exists with passages — mark as available.
+    sa.corpus_available = True
 
     body = stop.get('body', sa.text)
     result = measure_stop_groundedness(body, stop_title, passages)
