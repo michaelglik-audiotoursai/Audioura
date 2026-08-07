@@ -10473,3 +10473,51 @@ of the four best-sourced venues in Nice is not a tour of Old Nice, and a short
 tour is worse than a thin stop (Michael's 2-of-5 complaint began this).
 
 **Fixing a stop raises that stop. Fixing selection raises every tour.**
+
+## D264 — Michael's ruling: unverified STOPS are worse than a short tour; unverifiable CONTENT beats nothing
+**Michael, 2026-08-07.**
+
+> *"an unverified stop is worse than a short tour, but unverifiable information
+> is worse than verifiable but better than nothing."*
+
+Two rules at two levels:
+
+- **Stop level — enforce.** A stop we could not verify should be dropped rather
+  than shipped. The existence gate must move from `LOG_ONLY` to enforcing.
+- **Content level — keep.** Within a delivered stop, an ungrounded claim ranks
+  below a grounded one but is not stripped. This confirms the existing design:
+  groundedness caps RICH (LOCAL-291), unmeasured caps ADEQUATE (D245), and
+  nothing is deleted for being unverifiable.
+
+**Blocking interaction, not yet resolved.** Enforcing today would have emptied
+the Norwood tour outright — `LOG_ONLY — 0/3 stops verified, 3 would be dropped`.
+"Short tour" becomes "no tour" unless replenishment reliably backfills.
+Sequence must be:
+
+1. LOCAL-351 — US address parsing, so verification can succeed at all
+2. Confirm replenishment backfills dropped stops to the requested count
+3. Only then flip the gate to enforce
+
+Flipping the gate first would satisfy the letter of the ruling and destroy the
+product.
+
+## D265 — Routing: cost depends on when, and there is no reactive layer at all
+**2026-08-07, from Michael's questions.**
+
+Hosted routing (Google, Mapbox) at **generation** time is one call per tour —
+negligible against the ~$0.31 we already spend, and the result is baked into the
+downloaded tour. Hosted routing at **runtime** is per-user, per-re-route, and
+needs signal, so it does not serve an offline product. Self-hosted OSRM/Valhalla
+removes per-request fees but still needs network. **On-device routing
+(Valhalla/GraphHopper offline) is the only option that works with no signal**;
+its cost is bundled map tiles per region, not per request. Exact per-request
+prices not quoted here — verify before committing.
+
+**What exists today:** no routing of any kind. Turn-by-turn text is LLM prose
+frozen at generation (D250); runtime distance is `Geolocator.distanceBetween`,
+straight-line.
+
+**What Michael's "opposite direction" question exposes:** there is no reactive
+layer. Ride away from stop 1 and the distance simply grows — nothing notices,
+warns, or re-routes. Same missing piece as first-mile guidance. Both are
+features never built, not regressions.
