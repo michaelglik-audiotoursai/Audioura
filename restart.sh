@@ -65,10 +65,14 @@ import sys, os
 sys.path.insert(0, os.getcwd())
 try:
     from tour_rubric_scorer import score_tour_file
-    for f, n in [('tours/LOCAL336_museum_4stop.txt', 4),
-                 ('tours/LOCAL336_restaurant_4stop.txt', 4),
-                 ('tours/LOCAL336_walking_4stop.txt', 4),
-                 ('tours/LOCAL320_museum_8stop.txt', 8)]:
+    # Newest file per category, so this never goes stale as tours are regenerated.
+    import glob
+    def newest(pat):
+        c = sorted(glob.glob(pat), key=os.path.getmtime, reverse=True)
+        return c[0] if c else None
+    picks = [(newest('tours/*museum_4stop*.txt'), 4), (newest('tours/*walking_4stop*.txt'), 4),
+             (newest('tours/*restaurant_4stop*.txt'), 4), ('tours/LOCAL320_museum_8stop.txt', 8)]
+    for f, n in [(a, b) for a, b in picks if a]:
         if os.path.exists(f):
             print(f"{os.path.basename(f)[:34]:36s} base={score_tour_file(f, n).base_score:5.1f}")
 except Exception as e:
@@ -89,7 +93,7 @@ echo "## Read next, in this order"
 echo '- `CLAUDE.md`            — RULE ZERO (do not stop and ask) + live-DB rules'
 echo '- `DECISIONS.md`         — tail -120; D2xx are the recent rulings'
 echo '- `.continuous_dev/STATUS.md` — tail -80; last tick'
-echo '- `TOUR_REVIEW_3x4stop.md`    — current quality position, with its correction'
+echo '- `TOUR_REVIEW_current.md`     — current quality position (3x4stop.md is SUPERSEDED)'
 echo
 echo "## Standing checks that have caught something every time (D242)"
 echo '1. Break the production code — confirm a test goes red. A test that cannot fail is not evidence.'
