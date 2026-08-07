@@ -9877,3 +9877,37 @@ Retracted in `kiro_sessions_ran.md` with a `CORRECTION` line and both tasks
 re-claimed. **Before writing an ABANDONED line, check the PID in the STARTED
 record.** `kill -0 <dispatcher_pid>` settles it in one command; nothing else is
 needed, and no other signal is sufficient.
+
+## D247 — Exclude the full stop-title string, never names contained within it
+**2026-08-06. LEAD's own mis-specification, corrected after it caused a regression.**
+
+LOCAL-333's general person model over-fired, counting stop titles
+(`Chez Palmyre`, `La Merenda`) and the venue (`Arts Asiatiques`) as people.
+LEAD's bounce said: *"exclude the tour's own stop titles + venue name."*
+
+The agent implemented that faithfully and it deleted real people:
+
+```
+stop 1  'Andô Naoyuki'   lost  —  inside title "L'Armure d'Andô Naoyuki"
+stop 5  'Ulysses Grant'  lost  —  inside title "Ulysses Grant au Japon"
+```
+
+Grant carries substance in the body ("Ulysses Grant's 1879 visit to Japan").
+**Museum objects are named after people constantly** — portraits, armour,
+commissioned works — so a blanket title exclusion deletes the most valuable
+facts in our best-scoring category.
+
+**Rule:** exclude a phrase only when it **is** the whole stop title. A person
+named *within* a longer title stays, and the existing person-context test
+decides it.
+
+```
+'Chez Palmyre'   == the whole title   -> exclude (a venue reference)
+'Ulysses Grant'  ⊂  a longer title    -> keep    (a person in a named work)
+```
+
+**The lesson is about the instruction, not the agent.** "Exclude stop titles"
+sounded structural and vocabulary-free, which is what LEAD had been demanding
+all session — and it was still wrong, because it assumed a stop title names a
+place. In a museum a stop title names an object, and objects are named after
+people. A rule can be perfectly general and still encode a false premise.
