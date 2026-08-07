@@ -10055,3 +10055,38 @@ duration. Also deferred: extended-cut downloads.
 **Music: do not license it.** Let listeners run their own Spotify or Apple Music
 and duck over it. Turns a rights programme into an audio-focus behaviour, and
 they bring a catalogue we could never afford.
+
+## D252 — Restart is one word; session length is the real cost lever
+**Michael raised the usage question, 2026-08-06.**
+
+He is at **69% of a weekly limit in 3 days**, and that is with a promotional
++50% that ends 19 August — so ~104% at standard limits. Measured cause:
+
+```
+this session's transcript   38.9 MB   (2.5x the next largest; 66% of the project folder)
+```
+
+Context is resent as a conversation grows, so a long session costs more **per
+message** for the same work. `CLAUDE.md` already said the work lives in files,
+not chat — we simply were not using it.
+
+**`restart.sh` (repo root, committed) makes restart one word.** It reads live
+state — git, `audio_tours` count, in-flight queue, ABANDONED-awaiting-pickup,
+parked tasks, current scores, the five standing checks — and writes
+`RESTART.md`. `CLAUDE.md` FIRST ACTIONS now points at it.
+
+**Model split-by-task was considered and rejected.** Michael asked how to do it
+when LEAD chooses the tasks. The honest answer is that he cannot, and should
+not try:
+- The split would have to be per session, and he would have to know in advance
+  whether a session is "review" or "routine" — he does not, because the queue
+  decides.
+- Review is exactly where weaker models cost more than they save. **7 of ~12
+  submissions were bounced tonight**; approving those would have merged an
+  ILIKE artifact reported as a 96% finding, three test suites that pass with
+  the fix removed, and a pipeline laundering a fabricated Jacques Chirac quote.
+- The saving is available anyway from restarts, at no risk.
+
+**`bypassPermissions` is independent of model choice and survives restarts.**
+It lives in `.claude/settings.json`, read at session start. Michael values it
+highly; nothing in this change touches it.

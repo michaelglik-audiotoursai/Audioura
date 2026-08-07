@@ -275,6 +275,25 @@ Every task file should carry this in its PROCESS section.
 ---
 
 ### FIRST ACTIONS ON A FRESH SESSION
+
+**Michael says "Restart" — that is the whole trigger. Run this, then continue:**
+
+```bash
+cd ~/Audioura && bash restart.sh
+```
+
+It prints and writes `RESTART.md`: git state, production row counts, in-flight
+queue, bounces awaiting pickup, parked tasks, current honest tour scores, and
+the five standing checks. Everything is read from live state, never from
+memory — a fresh session has none.
+
+**Restarting is expected and cheap.** Sessions are deliberately short-lived; the
+work lives in files on disk (D252). Do not treat a restart as lost context.
+`.claude/settings.json` holds `permissions.defaultMode: bypassPermissions`,
+which is read at session start — **a restart preserves it, and it is unaffected
+by model choice.**
+
+Then, if more depth is needed:
 1. `git log --oneline -3` and `cat .continuous_dev/STATUS.md`.
 2. Say/expect **"restart continuous dev"** — the watcher loop is
    session-scoped and dies with the session. Detached `kiro-cli` worker
