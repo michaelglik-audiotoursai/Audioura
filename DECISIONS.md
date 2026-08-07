@@ -10090,3 +10090,44 @@ not try:
 **`bypassPermissions` is independent of model choice and survives restarts.**
 It lives in `.claude/settings.json`, read at session start. Michael values it
 highly; nothing in this change touches it.
+
+## D253 — Duplicate stop_corpus rows: the lookup can select the WRONG corpus
+**2026-08-07, found reviewing LOCAL-340.**
+
+D243 recorded that exact matching on French titles silently reports absence.
+It is worse than that. `stop_corpus` holds **multiple rows for the same stop**
+under different title spellings and venues:
+
+```
+stop_title                venue_name                                    passages
+L’Armure d’Andô Naoyuki   walking tour in Nice, france                     1
+L'Armure d'Ando Naoyuki   Musee des Arts Asiatiques (Asian Art Museum)     6
+```
+
+The 1-passage row is **contaminated**: its text is "The stadium was inaugurated
+on 28 January 1998" — the Allianz Riviera, harvested under a walking tour and
+filed against a museum object.
+
+The tour text uses the typographic apostrophe `’` (U+2019) and `ô`; the museum
+row uses `'` and `o`. So the lookup resolves to the contaminated row and the
+scorer reported `groundedness 0.00` for a stop that actually has six museum
+passages behind it. **Measuring correctly against the wrong data.**
+
+**Three requirements, all of them now demonstrated as necessary:**
+1. Fold `’` to `'` as well as folding accents. Accent folding alone is not
+   enough.
+2. When several rows match a stop, **choose deliberately** — prefer the row
+   whose venue matches the tour, then the row with more passages. Never take an
+   arbitrary first match.
+3. **A contaminated harvest exists in the data**, not just a matching bug. A
+   stadium passage is filed against a suit of armour. That needs its own
+   investigation; the row is deliberately preserved as evidence.
+
+Third distinct face of this bug in one session: missed corpus (accents, D243),
+missed venue (name format, LOCAL-339), now **wrong row selected**. Any code
+joining tour text to `stop_corpus` is guilty until shown otherwise.
+
+**Also recorded:** two consecutive tasks (LOCAL-331, LOCAL-340) reported a
+museum result as "unchanged" having scored **DB tour id=21** instead of the file
+the task named. Both times the file had moved. Task files must name the artifact
+and reviews must score that artifact.
