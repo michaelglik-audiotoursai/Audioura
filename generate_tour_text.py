@@ -6039,6 +6039,50 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             except Exception as _osm_err:
                 print(f"  [LOCAL-353] OSM dining facts error (non-fatal): {_osm_err}")
 
+            # -------- [LOCAL-354] Source price band from dining guides --------
+            # OSM carries payment/hours but no price for Nice restaurants.
+            # Le Fooding and Gault&Millau publish price indications.
+            # Combine into one sentence per Michael's format:
+            #   "An average dinner or lunch would cost under €50 but credit cards are not accepted"
+            try:
+                from guide_price_band import get_dining_sentence, build_price_source_text
+                print(f"  [LOCAL-354] Sourcing price bands from dining guides")
+                for poi in poi_list:
+                    # Get payment info from what OSM already found
+                    _poi_payment = ''
+                    if 'operational_details' in poi and poi['operational_details']:
+                        # Extract payment fragment if present
+                        if 'Cash only' in poi['operational_details']:
+                            _poi_payment = 'Cash only'
+                        elif 'Card payments only' in poi['operational_details']:
+                            _poi_payment = 'Card payments only'
+
+                    sentence, guide_url, guide_source = get_dining_sentence(
+                        poi['name'], _poi_payment
+                    )
+                    if sentence:
+                        # Replace operational_details with the combined sentence
+                        poi['operational_details'] = sentence
+                        # Append guide source to the gate source texts
+                        if guide_source:
+                            _osm_source_texts.append(guide_source)
+                            if guide_url:
+                                _osm_source_urls.append(guide_url)
+                        print(f"  [LOCAL-354] {poi['name']}: → {sentence}")
+                    elif not poi.get('operational_details'):
+                        print(f"  [LOCAL-354] {poi['name']}: no guide price, no OSM facts — silence")
+
+                # Rebuild combined source text with guide additions
+                if _osm_source_texts:
+                    _osm_dining_source_text = "\n\n".join(_osm_source_texts)
+                    _osm_dining_source_url = ", ".join(_osm_source_urls[:5])
+                    _visitor_info_source_url = _osm_dining_source_url
+                    _visitor_info_source_text = _osm_dining_source_text
+            except ImportError:
+                print(f"  [LOCAL-354] guide_price_band not available — price bands unchanged")
+            except Exception as _guide_err:
+                print(f"  [LOCAL-354] Guide price band error (non-fatal): {_guide_err}")
+
         # -------- Coordinates fallback: request for any stop missing coordinates --------
         # PHASE 3B sometimes omits coordinates for one or more stops. Request them
         # individually (parallel) so every stop gets a map pin.
