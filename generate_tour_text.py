@@ -3430,7 +3430,7 @@ def _check_type_prose_contradiction(poi_list: list) -> list:
     return warnings
 
 
-def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None):
+def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None):
     """
     Generate audio tour text using OpenAI API with geo coordinates.
     
@@ -3446,6 +3446,13 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         user_id: Optional user_id for cost attribution (LOCAL-323).
                  Threaded to spine_generator for per-operation ledger rows.
         job_id: Optional job correlation ID for cost_meter recording.
+        forced_stops: Optional list of stop names (LOCAL-357 verification harness).
+                 When provided, bypasses Phase 3A candidate generation entirely
+                 and uses these exact stop names in the given order.
+                 Everything downstream (corpus, enrichment, gates) runs unchanged.
+                 The output is stamped with a FORCED STOPS banner so it cannot be
+                 mistaken for a naturally-generated tour.
+                 THIS IS A VERIFICATION HARNESS — NOT A PRODUCT FEATURE.
     
     Returns:
         tuple: (tour_text, output_file, coordinates)
@@ -4146,12 +4153,41 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             import traceback
             traceback.print_exc()
 
+    # ──── [LOCAL-357] FORCED STOPS HARNESS ────────────────────────────────────
+    # When forced_stops is provided, bypass ALL candidate generation (Phase 3A,
+    # LOCAL-30 deterministic selection) and inject the exact stop list.
+    # Everything downstream (D1v2 verification, existence gate, corpus loading,
+    # enrichment, composition, QA gates) runs unchanged.
+    # THIS IS A VERIFICATION HARNESS — NOT A PRODUCT FEATURE.
+    _forced_stops_active = False
+    if forced_stops is not None and len(forced_stops) > 0:
+        _forced_stops_active = True
+        poi_list = [_new_poi(name) for name in forced_stops]
+        # Override total_stops to match the forced list length
+        total_stops = len(forced_stops)
+        print(f"\n{'=' * 70}")
+        print(f"[LOCAL-357] FORCED STOPS ACTIVE — verification harness mode")
+        print(f"  Stops forced: {forced_stops}")
+        print(f"  Count: {len(forced_stops)}")
+        print(f"  All downstream gates and corpus loading will run unchanged.")
+        print(f"{'=' * 70}")
+        # Skip selection-reason tracking (no GPT selection happened)
+        _selection_reasons = {}
+    # ──── END [LOCAL-357] FORCED STOPS ────────────────────────────────────────
+
     # -------- [LOCAL-30] DETERMINISTIC SELECTION: documented works fill first --------
     # When a museum venue has enough catalogue/SPARQL works to fill the tour,
     # use those directly as Phase 3A output. No GPT randomness, no fabrication.
     # This is the ONLY path that guarantees reproducibility.
     _deterministic_fill_used = False
-    if tour_category == 'museum' and _museum_venue_name:
+    if _forced_stops_active:
+        # [LOCAL-357] forced_stops bypasses ALL selection — mark as deterministic
+        _deterministic_fill_used = True
+        print(f"\nPHASE 3A: SKIPPED (forced stops — LOCAL-357 verification harness)")
+        print(f"OK PHASE 3A parsed {len(poi_list)} candidate POI(s):")
+        for p in poi_list:
+            print(f"   - {p['name']} [FORCED]")
+    elif tour_category == 'museum' and _museum_venue_name:
         try:
             from venue_resolver import resolve_venue, fetch_venue_works, build_canonical_titles_from_works, cache_get as _det_cache_get
             from story_miner import extract_catalogue_works_from_pages, fetch_venue_narrative_corpus
@@ -4313,11 +4349,12 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         print(f"  [LOCAL-290] Asking for {_phase3a_count} candidates (N={total_stops} + margin for gate filtering)")
 
     if _deterministic_fill_used:
-        # Skip Phase 3A entirely — poi_list already filled deterministically
-        print(f"\nPHASE 3A: SKIPPED (deterministic fill from {len(poi_list)} documented works)")
-        print(f"OK PHASE 3A parsed {len(poi_list)} candidate POI(s):")
-        for p in poi_list:
-            print(f"   - {p['name']}")
+        if not _forced_stops_active:
+            # Skip Phase 3A entirely — poi_list already filled deterministically
+            print(f"\nPHASE 3A: SKIPPED (deterministic fill from {len(poi_list)} documented works)")
+            print(f"OK PHASE 3A parsed {len(poi_list)} candidate POI(s):")
+            for p in poi_list:
+                print(f"   - {p['name']}")
         # [LOCAL-329] No selection reasons when deterministic fill is used
         _selection_reasons = {}
     else:
@@ -11165,7 +11202,7 @@ RULES:
     print(f"\nTotal API cost: ${total_cost:.4f} ({total_tokens} tokens)")
     
     # -------- [S20] Storied: store in cache after successful generation --------
-    if _storied_mode and complete_tour:
+    if _storied_mode and complete_tour and not _forced_stops_active:
         _db_url = os.environ.get("DATABASE_URL")
         if _db_url:
             try:
@@ -11190,6 +11227,18 @@ RULES:
         output_file = f"{safe_location}_{safe_tour_type}_tour_{timestamp}.txt"
     
     with open(output_file, "w", encoding="utf-8") as f:
+        # [LOCAL-357] Stamp forced-stops banner at top of output file
+        if _forced_stops_active:
+            _forced_banner = (
+                "=" * 70 + "\n"
+                "⚠️  FORCED STOPS — VERIFICATION HARNESS (LOCAL-357)\n"
+                "    This tour was generated with a forced stop list.\n"
+                "    It is NOT a naturally-selected tour and must not be\n"
+                "    scored as evidence of selection quality.\n"
+                f"    Forced: {forced_stops}\n"
+                "=" * 70 + "\n\n"
+            )
+            f.write(_forced_banner)
         f.write(complete_tour)
     
     print(f"\nTour text generated successfully!")
