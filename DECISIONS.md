@@ -9972,3 +9972,45 @@ delivered would send a listener to an empty screen.
 The wording is already correctly hedged by LOCAL-280 ("whether there are
 savings", never "for coupons") and stays as is. Dispatched as LOCAL-335: gate
 the mention on nearby inventory, fail closed, leave the recap intact.
+
+## D250 — Tour text is a durable artifact: do not gate forward-looking references at generation time
+**Michael's ruling, 2026-08-06. Overrules LEAD's LOCAL-335 and it was right.**
+
+LEAD dispatched LOCAL-335 to suppress the Treat Page mention when `treats` has
+no nearby inventory. Michael:
+
+> *"People will be able to download the tours later when Treats will be (maybe)
+> populated. If we remove this then people would not know when time comes if
+> they download the existing tours."*
+
+**Correct, and it generalises.** A tour is generated once, downloaded, and
+listened to later — possibly much later. Anything decided at generation time is
+**frozen into every downloaded copy**. Gating the mention to avoid a temporary
+empty screen would permanently silence every tour downloaded before inventory
+exists, including after vendors are signed. Permanent cost, temporary benefit.
+
+**LEAD's concern was also factually unfounded**, which is the more important
+half. The app already handles it:
+
+```
+tour narration          "the Treat Page shows WHETHER there are real savings…"
+treats_screen.dart:109  _treats.isEmpty -> "No treats available"
+```
+
+We tell the listener to check; they check; the answer is "none". LOCAL-280's
+hedged wording ("whether there are savings", never "for coupons") was written
+for exactly this and is sufficient. LEAD raised a risk without opening the
+screen the prompt leads to — the same failure as D220 (diagnosing a 403 that
+LEAD's own probe created).
+
+**Rule:** the narration is the one artifact we cannot update after delivery.
+Forward-looking references belong **in** it; their resolution belongs in the
+app, which knows the current state at open time. Do not move a runtime decision
+into generation.
+
+Task parked as `PARKED_kiro_task_LOCAL-335.md`, outside the dispatcher glob, so
+it is not re-dispatched.
+
+Open cosmetic option for Michael, not dispatched: `treats_screen.dart:112`
+says "No treats available", which reads as permanent. "No treats nearby yet"
+would fit the download-now-listen-later case better. Two words, his call.
