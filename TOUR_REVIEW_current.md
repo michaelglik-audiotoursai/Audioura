@@ -297,3 +297,47 @@ approach fixes it.
 **What I would not claim.** Museum at 81.2 and restaurant at 56.2 are single
 runs. Walking's spread (56.2 → 87.5) shows how much one run can differ from
 another when stop selection changes. Treat all three as one sample each.
+
+---
+
+## Correction 4 — 09:00. Le Safari fixed; restaurant score still selection-bound.
+
+**Le Safari has been enriched for the first time.** Five runs of 0-1 facts had a
+single cause, and it was not the corpus:
+
+```
+venue_name  "restaurant tour in Old Nice (Vieux Nice), France"
+splits on comma -> part 1 starts lowercase -> skipped
+                -> "France" assigned as the CITY
+query becomes    "Le Safari restaurant in France"
+Serper returns   an African restaurant in New Jersey
+```
+
+Those results correctly failed the fact filter. **The filter was right; the
+query was garbage.** Venues with distinctive names survived the same broken
+query — Fenocchio, Chez Palmyre, Café de Turin all did — which is why only the
+generically-named one failed, every time.
+
+Fixed:
+```
+before   Le Safari  1 fact   g=0.00   never enriched
+after    Le Safari  2 facts  g=1.00   +3 passages (2 queries)
+```
+
+**The tour still scored 50.0, down from 56.2.** Different stops were selected —
+La Rossettisserie returned and produced 0 facts again. That is the same
+selection variance seen across every category: restaurant has now run 20.8 /
+56.2 / 56.2 / 50.0, walking 56.2 / 62.5 / 75.0 / 87.5. **Individual stop fixes
+are real and visible; tour totals are dominated by which stops get chosen.**
+
+**Verification earned its keep again.** This run:
+
+```
+[INTERPRETIVE] DROPPED attributed quote for 'Le Tire Bouchon':
+               'The Chicago Tribune' — no_primary_source_found_for
+```
+
+An invented Chicago Tribune attribution, caught and dropped before it reached
+the tour. That is the third fabricated attribution stopped by this guard, after
+the Jacques Chirac quote and the Gourmet Magazine line — both of which came from
+your own Google summary.
