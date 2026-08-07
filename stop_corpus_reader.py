@@ -30,8 +30,16 @@ def _accent_fold(text: str) -> str:
     """Fold accented characters to ASCII equivalents for matching.
 
     LOCAL-277: Île/Ile, Èze/Eze, Château/Chateau, Carré/Carre etc.
+    [LOCAL-340] Also folds typographic apostrophes/quotes to ASCII.
+    U+2019 (') and U+2018 (') → U+0027 (')
+    U+201C (") and U+201D (") → U+0022 (")
+    This is the D243 "third face": L'Armure (U+2019) must match L'Armure (U+0027).
     """
     import unicodedata
+    # [LOCAL-340] Fold typographic quotes to ASCII before NFKD decomposition.
+    # These survive NFKD and would otherwise cause exact-match failures.
+    text = text.replace('\u2019', "'").replace('\u2018', "'")
+    text = text.replace('\u201C', '"').replace('\u201D', '"')
     nfkd = unicodedata.normalize('NFKD', text)
     return ''.join(c for c in nfkd if not unicodedata.combining(c))
 
