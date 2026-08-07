@@ -89,6 +89,9 @@ echo '# no DISABLE_TOUR_CACHE -> you may score a CACHED tour (D262)'
 echo '# no DATABASE_URL      -> stop-existence gate SILENTLY does not run (D261)'
 echo '```'
 echo
+echo "## Pending reminders for Michael"
+if [ -s PENDING_REMINDERS.md ]; then grep -n "^- \[ \]" PENDING_REMINDERS.md | sed 's/^/  /' | cut -c1-160; else echo "  (none)"; fi
+echo
 echo "## Read next, in this order"
 echo '- `CLAUDE.md`            — RULE ZERO (do not stop and ask) + live-DB rules'
 echo '- `DECISIONS.md`         — tail -120; D2xx are the recent rulings'
