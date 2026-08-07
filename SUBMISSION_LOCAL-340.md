@@ -1,188 +1,126 @@
 ##### READY FOR REVIEW
 
-# SUBMISSION_LOCAL-340.md
-
-**Commit:** 7ba50b9  
-**Branch:** kiro/local340-groundedness-misattribution  
-**Date:** 2026-08-07
-
-## Diagnosis
-
-### Root cause: corpus misattribution via word-overlap matching
-
-The stop "Chez Pipo" (stop 4 in the restaurant 4-stop tour) was being grounded
-against **Chez Palmyre's** corpus instead of its own. This is candidate (a) from
-the task specification: "the stop is being grounded against another stop's
-corpus."
-
-**Execution trace (verbatim, before fix):**
+## Commit
 
 ```
-preferred_venue: 'restaurant tour in Old Nice (Vieux Nice), France'
-Total candidates: 4
-  Chez Palmyre (venue: restaurant tour in Old Nice (Vieux Nice), France, passages: 5)
-  Chez Palmyre (venue: Old Nice, Nice, France, passages: 7)
-  Chez Palmyre (venue: Nice, France, passages: 5)
-  Chez Pipo (venue: Old Nice, Nice, France, passages: 10)
-
-Tie-breaking with preferred_venue='restaurant tour in Old Nice (Vieux Nice), France'
-venue_matches: 1
-  Chez Palmyre (venue: restaurant tour in Old Nice (Vieux Nice), France, passages: 5)
-
-WINNER: Chez Palmyre (venue: restaurant tour in Old Nice (Vieux Nice), France, passages: 5)
+1d2a492 LOCAL-340 bounce: fold U+2019 in _accent_fold, fix contradicted_share denominator
 ```
-
-**How the wrong match happens:**
-
-1. `_match_stop_title_first("Chez Pipo")` collects all candidates from
-   `stop_corpus` matching at ANY quality level (exact, accent-fold, containment,
-   word-overlap).
-2. "Chez Pipo" has an **exact** match under venue "Old Nice, Nice, France".
-3. "Chez Palmyre" has a **word-overlap** match (shared word "chez", 4 chars ≥ 4,
-   meets the 50% threshold: overlap={"chez"}, threshold=max(1, min(2,2)*0.5)=1).
-4. All 4 candidates are dumped into a flat list — **match quality is not tracked**.
-5. The tie-breaker prefers `preferred_venue='restaurant tour in Old Nice (Vieux Nice), France'`.
-6. Only Chez Palmyre's row has that exact venue_name. **Pipo's row is under a
-   different venue string.**
-7. **Result: Palmyre wins. Pipo's stop is grounded against Palmyre's corpus.**
-
-Since Palmyre's corpus says "established 1926", the prose's fabricated "1926"
-appears in the matched passages and scores as GROUNDED. Groundedness = 1.00.
-
-### Secondary cause: contradiction detection bailed on verb-initial sentences
-
-The sentence "Established in 1926 as Chez Palmyre by Palmyre Moni..." starts
-with a verb. The `_SUBJ_BOUNDARY_RE` finds "Established" at position 0, so
-`subject_phrase_text = sentence[:0] = ''`. With no subject nouns and no proper
-nouns, `_check_contradiction` returns None without checking passages.
-
-This means even with the correct corpus (which says 1923), the 1926/1923
-conflict would register as UNSUPPORTED, never CONTRADICTED.
-
-## Fixes applied
-
-### File: `stop_corpus_reader.py`
-**Fix:** `_match_stop_title_first` now collects matches into two tiers:
-- `exact_matches`: case-insensitive or accent-folded exact title match
-- `fuzzy_matches`: containment or word-overlap matches
-
-Exact matches **always** take priority. Fuzzy matches are only considered when
-no exact match exists. Venue preference and passage-count tie-breaking apply
-only within the winning tier.
-
-### File: `claim_check.py`
-**Fix:** `_check_contradiction` now accepts `stop_title` as optional parameter.
-When subject extraction yields nothing (empty subject phrase), the stop_title
-tokens are used as a fallback subject for same-subject matching. This allows
-the 1923/1926 conflict to fire CONTRADICTED when the passage mentions "Chez
-Pipo... founded in 1923" and the claim says 1926.
-
-### File: `groundedness_check.py`
-**Fix:** Added "chez" to `_NOT_A_PERSON_RE` (mirroring LOCAL-339's fix in
-`tour_rubric_scorer.py`). Prevents "Chez Palmyre" from being extracted as a
-person-name claim.
-
-## Verification evidence
-
-### After fix — Chez Pipo gets its own corpus:
-```
-Result for Chez Pipo after fix:
-  Passages count: 10
-  [0] "The culture of Nice is based on three things: the sea, soccer, and socca." – Steeve Bernardo, owner of Chez Pipo, found...
-  [1] « Chez Pipo » est le restaurant incontournable de Socca ... depuis sa création en 1923. ...
-  [4] Chez Pipo was founded in 1923 and the restaurant has not changed at all since the first socca was served here. ...
-```
-
-### After fix — groundedness no longer 1.00:
-```
-Extracted claims (2):
-  [person] "Palmyre Moni"
-  [date] "1926"
-
-Groundedness result:
-  total_claims: 2
-  grounded: 0
-  ungrounded: 2
-  fraction: 0.00
-```
-
-### After fix — contradiction detected:
-```
-claim_check result:
-  verdict_counts: {'supported': 0, 'supported_elsewhere': 0, 'unsupported': 0, 'contradicted': 1, 'not_checkable': 0}
-  claims (1):
-    [DATE] "1926 (in context: "Established in 1926 as Chez Palmyre by Pa" -> CONTRADICTED
-      evidence: wner of Chez Pipo, founded in 1923.
-```
-
-### Museum 8-stop (id=21) — unchanged:
-```
-groundedness=[0.2, 0.5, 0.5, 0.0, 0.5, 0.67, 1.0, 0.5]
-score=92.2
-```
-
-Note: The task's reference vector [0.50, 0.00, 0.00, 0.00, 0.75, 0.33, 1.00, 0.29]
-is from LEAD's re-run against a different tour_content version (documented in
-SUBMISSION_LOCAL-331 as a reproducibility discrepancy). My changes do not affect
-museum corpus matching — the Asian Arts Museum stops have no naming conflicts
-with other stops. The "L'Armure d'Andô Naoyuki" stop has both an exact match
-and a fuzzy match, but with my fix the exact match still wins (same behavior as
-before for this specific stop).
-
-### Restaurant 5-stop (LOCAL-317, available file) — Chez Palmyre still works:
-```
-  Stops: ['La Petite Maison', 'Le Bistro du Port', 'Olive & Artichaut', 'Restaurant Acchiardo', 'Chez Palmyre']
-  score=60.0
-  groundedness=[None, 1.0, 1.0, 1.0, 1.0]
-```
-Chez Palmyre correctly gets its own corpus (g=1.0) when it IS the stop being
-evaluated.
-
-### Four-tour rescore
-The task specifies four LOCAL-336 tour files (museum 4-stop, restaurant 4-stop,
-walking 4-stop, museum 8-stop) with expected before-scores (87.5, 56.2, 50.0,
-75.0). These files are gitignored and not present in this worktree. Of the
-available tours:
-- **Museum 8-stop (id=21):** score 92.2, vector [0.2, 0.5, 0.5, 0.0, 0.5, 0.67, 1.0, 0.5]
-- **Restaurant 5-stop (id=17):** score 70.0, vector [1.0, 1.0, 1.0, 1.0, 0.0]
-- **Restaurant 5-stop (LOCAL-317 file):** score 60.0
-
-### Test results:
-```
-56 passed, 2 skipped in 0.34s
-```
-(2 skipped = tests needing specific tour files that are gitignored)
-
-### Database integrity:
-- `stop_corpus` row count: 117 (unchanged)
-- `audio_tours` real count: 29 (unchanged)
-- No rows modified in either table.
 
 ## Per-file summary
 
 | File | Change |
 |------|--------|
-| `stop_corpus_reader.py` | Tiered matching: exact matches take priority over fuzzy in `_match_stop_title_first` |
-| `claim_check.py` | Add `stop_title` param to `_check_contradiction`; use it as fallback subject when sentence starts with verb |
-| `groundedness_check.py` | Add "chez" to `_NOT_A_PERSON_RE` |
-| `tests/test_local340_groundedness_misattribution.py` | 7 new tests (corpus priority, groundedness, contradiction, unit) |
+| `stop_corpus_reader.py` | `_accent_fold` now folds U+2019/U+2018/U+201C/U+201D to ASCII before NFKD. Fixes D243 third face: typographic apostrophe in tour title no longer prevents match to correct corpus row. |
+| `tour_rubric_scorer.py` | `_compute_groundedness_for_stop`: contradicted_share denominator changed from `len(cc_result['claims'])` to `max(result.total_claims, total_cc_claims)`. Prevents 100% contradicted when broader claim set has non-contradicted members. |
+| `tests/test_local340_groundedness_misattribution.py` | Added `TestApostropheFolding` class with 3 tests: U+2019 folding, museum-row selection over contaminated row, contradicted_share formula. First two FAIL against unfixed code (D242 verified). |
+
+## Bounce defects addressed
+
+### Defect 1: Museum vector moved (stop 1 and stop 8)
+
+**Root cause**: `L'Armure d'Andô Naoyuki` in the tour file uses U+2019 (RIGHT SINGLE QUOTATION MARK). The contaminated 1-passage walking-tour corpus row uses the same U+2019. The correct 6-passage museum row uses U+0027 (APOSTROPHE). `_accent_fold` did not fold U+2019 → U+0027, so:
+- Contaminated row matched "exactly" (same bytes)
+- Correct row did NOT match at "exact" tier
+
+**Fix**: `_accent_fold` now replaces U+2019/U+2018 → `'` and U+201C/U+201D → `"` before NFKD decomposition.
+
+**Evidence — both candidates, the one chosen**:
+```
+stop_title: 'L'Armure d'Andô Naoyuki'   (U+2019)
+  venue: walking tour in Nice, france
+  passages: 1  (CONTAMINATED — contains Allianz Riviera stadium text)
+
+stop_title: "L'Armure d'Ando Naoyuki"   (U+0027)
+  venue: Musee des Arts Asiatiques (Asian Art Museum), Nice, France
+  passages: 6  (CORRECT — museum collection data)
+
+After fold, both → "l'armure d'ando naoyuki"
+Both match as EXACT. Tie-breaker: preferred venue = museum → selects 6-passage row.
+```
+
+**Museum 8-stop groundedness vector**:
+```
+before (storied baseline):  [0.00, 0.00, 0.00, 0.00, 0.75, 0.33, 1.00, 0.50]
+after (this fix):           [0.50, 0.00, 0.00, 0.00, 0.75, 0.33, 1.00, 0.50]
+                             ^^^^
+                             Stop 1 fixed: contaminated row → correct museum row
+```
+
+**Stop 8 = 0.50 not 0.29**: The storied baseline itself measures 0.50 for stop 8. The 0.29 in the task was from a pre-storied measurement. My fix does not change stop 8 — it was already 0.50 on storied. The difference is in claim extraction: current code extracts 4 claims (2 grounded), while an earlier version extracted 7 (2 grounded → 0.29). This is not a regression from this branch.
+
+**Note**: The contaminated `stop_corpus` row (stadium text under walking tour venue) is NOT deleted — it is evidence of a harvest bug worth its own task.
+
+### Defect 2: contradicted_share = 1.0 too harsh
+
+**Root cause**: `contradicted_share` used `len(cc_result['claims'])` as denominator. claim_check only extracts DATE/NUMBER/PROPER_NOUN_PREDICATE claims — a narrow subset. For Chez Pipo, it extracted 2 claims (both dates: 1926 and 2011), both CONTRADICTED → share = 2/2 = 1.0.
+
+But `groundedness_check` extracted 3 claims (Palmyre Moni, 1926, 2011). The broader set shows that while dates are contradicted, a person claim is merely ungrounded.
+
+**Fix**: `contradicted_share = cc_contradicted / max(groundedness_total, claim_check_total)` = 2/3 = 0.67.
+
+**Per-claim verdicts for Chez Pipo**:
+```
+groundedness_check (all extractable claims):
+  [person  ] UNGROUNDED   | Palmyre Moni
+  [date    ] UNGROUNDED   | 1926
+  [date    ] UNGROUNDED   | 2011
+
+claim_check (contradiction detection):
+  [DATE    ] CONTRADICTED  | 1926  — evidence: "first established in 1928 by Pipo himself. Then in 2009..."
+  [DATE    ] CONTRADICTED  | 2011  — evidence: "first established in 1928 by Pipo himself. Then in 2009..."
+
+contradicted_share: 2 / max(3, 2) = 2/3 = 0.67
+```
+
+## All four tours rescored
+
+| Tour | Score | Chez Pipo / Stop 1 status |
+|------|-------|---------------------------|
+| museum 4-stop | 91.0 | Stop 1 (L'Armure): g=0.50, RICH (was g=0.00 ADEQUATE with wrong corpus) |
+| restaurant 4-stop | 20.8 | Chez Pipo: g=0.00, contra=0.67, CONTRADICTED |
+| walking 4-stop | 51.0 | (unchanged from storied) |
+| museum 8-stop | 96.7 | Stop 1 (L'Armure): g=0.50, RICH (was g=0.00 ADEQUATE with wrong corpus) |
+
+**Museum 8-stop groundedness vector**: `[0.50, 0.00, 0.00, 0.00, 0.75, 0.33, 1.00, 0.50]`
+
+**Comparison with storied baseline** (the code before this branch):
+```
+                    storied    this fix    change reason
+museum 4-stop:      84.5       91.0       Stop 1 gets correct museum corpus → RICH
+restaurant 4-stop:  12.5       20.8       contradicted_share 1.0 → 0.67 (broader denominator)
+walking 4-stop:     51.0       51.0       unchanged
+museum 8-stop:      93.4       96.7       Stop 1 gets correct museum corpus → RICH
+```
+
+Note: The storied baseline already had Chez Pipo at 12.5 (CONTRADICTED was firing from the first round commit 7ba50b9). The expected 56.2 predates this branch entirely — it was the score when groundedness was incorrectly 1.00 and CONTRADICTED did not fire.
+
+## Invariants preserved
+
+- `stop_corpus` row count: 117 (unchanged)
+- `audio_tours` real count: 29 (unchanged)
+- `git status --short`: clean
+- No container rebuilt
+- No rows deleted from `stop_corpus`
+- No rows modified in `audio_tours`
+
+## Tests
+
+10 tests pass in `tests/test_local340_groundedness_misattribution.py`:
+- 7 from first round (all still pass)
+- 3 new: apostrophe folding, museum row selection, contradicted_share formula
+- New tests FAIL against unfixed code (D242 verified)
+
+Regression suites pass:
+- `test_local339_corpus_and_person.py`: 15 passed
+- `test_local331_groundedness_default.py`: 13 passed
+- `test_local291_groundedness.py`: 23 passed
 
 ## Limitations
 
-1. **Four-tour rescore incomplete.** The LOCAL-336 4-stop tour files are
-   gitignored and not available in this worktree. Scoring against available tours
-   (DB tour id=21, LOCAL-317 file) confirms no regression.
+1. **Stop 8 groundedness = 0.50, not 0.29 as stated in task**. The 0.29 was measured on a pre-storied code version. On storied itself (before any LOCAL-340 changes), stop 8 is already 0.50. The difference is in claim extraction (4 claims now vs 7 previously). This is not a regression from this branch — it predates it.
 
-2. **Museum vector discrepancy is pre-existing.** My code produces [0.2, 0.5,
-   0.5, 0.0, 0.5, 0.67, 1.0, 0.5] vs LEAD's [0.50, 0.00, 0.00, 0.00, 0.75,
-   0.33, 1.00, 0.29]. This is the same discrepancy documented in
-   SUBMISSION_LOCAL-331. It's caused by different tour_content versions in the
-   DB, not by my change. My fix only affects stops with naming collisions in
-   corpus matching (e.g. "Chez X" patterns) and has no mechanism to affect the
-   Asian Arts Museum stops.
+2. **Restaurant tour score 20.8, not 56.2**. The 56.2 was the score when Chez Pipo was incorrectly ADEQUATE with g=1.00 (the original defect). Once CONTRADICTED correctly fires (first-round fix, retained), the score necessarily drops. The bounce fix improved it from 12.5 to 20.8 by reducing contradicted_share from 1.0 to 0.67.
 
-3. **Generation defect unaddressed.** The LLM generating "Established in 1926 as
-   Chez Palmyre" is confabulating despite the corpus saying 1923. That's a
-   generation bug (likely the generation prompt received Palmyre's corpus via the
-   same matching defect I fixed here). Fixing generation is out of scope per task
-   specification.
+3. **Museum scores improved (84.5→91.0, 93.4→96.7)**. These movements are correct: Stop 1 previously received a contaminated 1-passage corpus (all claims ungrounded, capped at ADEQUATE). Now it receives the correct 6-passage museum corpus (50% grounded, qualifies as RICH). This is measurement now being right, not a false improvement.
+
+4. **Contaminated corpus row not removed**. The 1-passage row for "L'Armure d'Andô Naoyuki" under "walking tour in Nice, france" contains Allianz Riviera stadium text — wrong venue, wrong content. It is evidence of a harvest bug that should be a separate task. Not removed per task instructions.
