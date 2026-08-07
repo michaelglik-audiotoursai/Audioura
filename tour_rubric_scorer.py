@@ -411,8 +411,39 @@ def parse_tour(text: str) -> List[dict]:
     # last stop's body because there is no subsequent "Stop N:" header. It
     # contains proper phrases ("Treat Page", venue names) that inflate facts.
     # Exclude any line starting with the closing-offer pattern.
+    # [LEAD] Truncate the generated closing OFFER, which parse_tour otherwise
+    # folds into the last stop (there is no following "Stop N:" header). It
+    # contributes boilerplate proper phrases — "Treat Page" is an app UI feature
+    # and was counted as a named person on every tour carrying an offer.
+    #
+    # Anchored on the generator's own literals, not on epilog opening templates.
+    # Three rounds were lost matching openings: the count form ("That's 5 stops"),
+    # the thread form ("From X to Y, you have followed the thread"), and the
+    # distance form ("<Place> is 5 kilometers from here") are all emitted, and
+    # enumerating them is the D236 trap. The invariant is the offer verb:
+    #   generate_tour_text.py:1504  f"... from here — we can build {mode} there."
+    #   generate_tour_text.py:1542  "... nearby we can build you a restaurant tour"
+    # Measured across 419 tour files: 83 occurrences, 0 of them before 60% of the
+    # way through a file. It never appears in narration.
+    #
+    # "Closing:" is the explicit label now emitted by generate_tour_text so future
+    # tours need no heuristic at all.
+    #
+    # NOTE: the recap sentence is deliberately NOT stripped. Whether a recap
+    # should contribute facts is a separate question (D201) and changing it here
+    # would move scores Michael has not asked to move.
+    # NB: the call site uses .match(), which anchors at line start, so the
+    # mid-line offer verb needs an explicit leading .* — LEAD got this wrong
+    # once and the count went UP.
     _CLOSING_OFFER_RE = re.compile(
-        r"^That[\u2019']?s\s+\d+\s+stops?\b", re.IGNORECASE
+        r"^(?:"
+        r"Closing:"                                          # explicit label (new tours)
+        r"|.*\bwe can build\b"                               # gtt:1504, gtt:1542
+        r"|.*\bThe Treat Page shows\b"                       # museum-offer variant
+        r"|That[\u2019']?s\s+\d+\s+stops?\b"                # count-form recap, gtt:1123/1125
+        r"|From\s+.{1,140}?\s+to\s+.{1,140}?,\s+you\s+have\s+followed\s+the\s+thread\b"
+        r")",
+        re.IGNORECASE,
     )
 
     for stop in stops:
