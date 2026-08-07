@@ -256,12 +256,16 @@ class StopAnalysis:
     classification_evidence: str = ""
 
     # [LOCAL-291] Groundedness — computed from corpus coverage
-    groundedness_fraction: float = 1.0  # 1.0 = fully grounded or no claims to check
+    # [LOCAL-331] None means UNMEASURED — no corpus check was performed.
+    # This is distinct from 1.0 (measured, all claims grounded) and 0.0
+    # (measured, no claims grounded). "We did not check" ≠ "we checked and
+    # everything matched."
+    groundedness_fraction: Optional[float] = None
     contradicted_share: float = 0.0     # fraction of claims contradicted by corpus
     ungrounded_claims: List[str] = field(default_factory=list)  # corpus worklist
 
     # [LOCAL-327] Whether corpus passages exist for this stop. When False,
-    # groundedness_fraction is unmeasurable (defaults to 1.0 but means nothing).
+    # groundedness_fraction is unmeasurable (stays None).
     # A stop without corpus is unverified — it cannot demonstrate quality.
     corpus_available: bool = False  # True only when stop_corpus has ≥1 passage
 
@@ -692,12 +696,18 @@ def classify_stop(sa: 'StopAnalysis') -> Tuple[str, str]:
     facts = sa.distinct_fact_count
     density = sa.fact_density
     filler = sa.generic_filler_fraction
-    groundedness = sa.groundedness_fraction
+    groundedness = sa.groundedness_fraction  # None = unmeasured
+
+    # [LOCAL-331] Format groundedness for evidence string: None → "unmeasured"
+    if groundedness is None:
+        groundedness_str = "unmeasured"
+    else:
+        groundedness_str = f"{groundedness:.0%}"
 
     evidence = (
         f"{facts} distinct facts over {sa.content_sentences} content sentences "
         f"(density {density:.2f}), filler {filler:.0%}, "
-        f"groundedness {groundedness:.0%}"
+        f"groundedness {groundedness_str}"
     )
 
     # [LOCAL-291] CONTRADICTED check — if corpus positively contradicts claims,
@@ -708,23 +718,29 @@ def classify_stop(sa: 'StopAnalysis') -> Tuple[str, str]:
     if facts >= RICH_MIN_FACTS and density >= RICH_MIN_DENSITY and filler <= RICH_MAX_FILLER:
         # [LOCAL-291] Groundedness ceiling: a stop below the floor cannot be RICH.
         # It must not reduce the score — it only caps the band.
-        if groundedness < RICH_MIN_GROUNDEDNESS:
+        # [LOCAL-331] None (unmeasured) does NOT trigger the ceiling — we cannot
+        # penalise for a check we did not perform.
+        if groundedness is not None and groundedness < RICH_MIN_GROUNDEDNESS:
             return 'ADEQUATE', evidence + f" (RICH capped by groundedness floor {RICH_MIN_GROUNDEDNESS})"
-        # [LOCAL-327] Corpus availability ceiling: a stop without corpus cannot
-        # demonstrate quality — its facts are unverified, not wrong.
-        # Capped to THIN (not ADEQUATE) because ADEQUATE also requires corpus.
+        # [LOCAL-331 bounce] Corpus availability ceiling: a stop without corpus
+        # cannot demonstrate RICH quality — its facts are unverified, not wrong.
+        # Capped to ADEQUATE (not THIN). LEAD decision: "we hold no sources" is
+        # about our corpus, not about the venue. Absence of a check is not
+        # evidence of fabrication (D162). A harsher penalty for a weaker signal
+        # (unmeasured caps two bands while measured-low caps one) contradicts
+        # LOCAL-291's established rule and Michael's ruling on scarce data.
         # Only applied when a corpus lookup was actually attempted.
         if sa.corpus_lookup_attempted and not sa.corpus_available:
-            return 'THIN', evidence + " (RICH capped to THIN: no corpus passages — facts unverified)"
+            return 'ADEQUATE', evidence + " (RICH capped to ADEQUATE: no corpus passages — facts unverified)"
         return 'RICH', evidence
     if facts >= ADEQUATE_MIN_FACTS and density >= ADEQUATE_MIN_DENSITY and filler <= ADEQUATE_MAX_FILLER:
-        # [LOCAL-327] Corpus availability ceiling for ADEQUATE: a stop without
-        # corpus passages cannot demonstrate ADEQUATE quality. The stop may be
-        # perfectly accurate — but nothing checked, so we cannot count it as
-        # demonstrated quality. Capped at THIN, never penalised below THIN.
+        # [LOCAL-331 bounce] Corpus availability ceiling for ADEQUATE: a stop
+        # without corpus passages caps at ADEQUATE, not below. LEAD decision:
+        # an unmeasured stop caps at ADEQUATE, matching LOCAL-291. We cannot
+        # penalise a stop for our own harvesting backlog.
         # Only applied when a corpus lookup was actually attempted.
         if sa.corpus_lookup_attempted and not sa.corpus_available:
-            return 'THIN', evidence + " (ADEQUATE capped: no corpus passages — facts unverified)"
+            return 'ADEQUATE', evidence + " (ADEQUATE: no corpus passages — facts unverified, cap at ADEQUATE per LEAD)"
         return 'ADEQUATE', evidence
     return 'THIN', evidence
 
@@ -1121,8 +1137,9 @@ def score_tour_file(filepath: str, n_requested: int,
                         If not provided, stops are analyzed but not classified.
         corpus_data: Optional dict of {stop_title: {passages: [...], ...}} from
                     stop_corpus_reader. When provided, groundedness and
-                    CONTRADICTED signals are computed. When absent, groundedness
-                    defaults to 1.0 (no ceiling applied).
+                    CONTRADICTED signals are computed. When absent and a DB is
+                    reachable, corpus is auto-loaded. When neither is available,
+                    groundedness is reported as unmeasured (None), not 1.0.
         gate_log: Optional list of gate verdicts for classifying missing stops
                  as PIPELINE_LOST vs UNAVAILABLE. See compute_score docstring.
         venue_name: Optional venue/area name for shortfall search (LOCAL-309).
@@ -1142,6 +1159,22 @@ def score_tour_file(filepath: str, n_requested: int,
         m = re.match(r'^Step-by-Step.*?:\s*(.+)$', first_line)
         if m:
             _effective_venue_name = m.group(1).strip()
+
+    # [LOCAL-331] Auto-load corpus from DB when corpus_data is not provided.
+    # This makes groundedness measurement the DEFAULT, not opt-in.
+    # "We did not check" must not be reported as "perfectly grounded."
+    if corpus_data is None and _effective_venue_name:
+        try:
+            from stop_corpus_reader import get_stop_corpus_for_tour
+            sys.path.insert(0, __import__('os').path.dirname(__import__('os').path.abspath(__file__)))
+            from tests.db_connection import get_connection, check_db_available
+            if check_db_available():
+                _conn = get_connection()
+                stop_names = [s['title'] for s in stops]
+                corpus_data = get_stop_corpus_for_tour(_effective_venue_name, stop_names, _conn)
+                _conn.close()
+        except (ImportError, SystemExit, Exception):
+            pass  # DB unreachable — groundedness stays unmeasured (None)
 
     # Analyze each stop.
     # [LOCAL-288] The classification is now COMPUTED by default. An explicit
@@ -1199,7 +1232,7 @@ def _compute_groundedness_for_stop(sa: 'StopAnalysis', stop: dict, corpus_data: 
     stop_title = stop.get('title', sa.title)
     corpus_entry = corpus_data.get(stop_title)
     if not corpus_entry:
-        # No corpus for this stop — groundedness stays 1.0 (no ceiling)
+        # No corpus for this stop — groundedness stays None (unmeasured)
         # and contradicted_share stays 0.0 (no penalty).
         # [LOCAL-327] corpus_available remains False — stop is unverified.
         return
