@@ -351,6 +351,73 @@ def get_quality_score_for_stop(stop_title: str, venue_name: str, conn) -> float:
     return compute_quality_score(classified)
 
 
+def get_bulk_quality_scores(stop_names: list, conn) -> dict:
+    """[LOCAL-349] Compute quality scores for multiple stops in one DB pass.
+
+    Returns {stop_name: quality_score} for all stops that have corpus rows.
+    Stops not found in the corpus get score 0.0.
+
+    Uses accent-folded title matching (same as stop_corpus_reader) to handle
+    accented venue names like "Acchiardo" vs "Acchiardo".
+
+    This is the efficient path for coverage selection: one query fetches all
+    rows, then we match each candidate stop to its best corpus row and score it.
+    """
+    import unicodedata
+
+    def _fold(text):
+        """Accent-fold + typographic quote normalization (D253, LOCAL-340)."""
+        text = text.replace('\u2019', "'").replace('\u2018', "'")
+        text = text.replace('\u201C', '"').replace('\u201D', '"')
+        nfkd = unicodedata.normalize('NFKD', text)
+        return ''.join(c for c in nfkd if not unicodedata.combining(c))
+
+    # Fetch all corpus rows (same approach as stop_corpus_reader)
+    cur = conn.cursor()
+    cur.execute("SELECT stop_title, passages_json FROM stop_corpus")
+    all_rows = cur.fetchall()
+    cur.close()
+
+    # Build a lookup: folded_title → best passages_json (richest)
+    # When multiple rows match a title, keep the one with most passages
+    title_to_passages = {}  # folded_lower_title → passages_json (raw)
+    for stop_title, passages_json_raw in all_rows:
+        folded = _fold(stop_title).lower().strip()
+        if isinstance(passages_json_raw, str):
+            try:
+                passages = json.loads(passages_json_raw)
+            except (json.JSONDecodeError, TypeError):
+                passages = []
+        else:
+            passages = passages_json_raw or []
+
+        # Keep the row with the HIGHEST quality score (LOCAL-349: passage count
+        # is anti-correlated with quality per D241 — more passages ≠ better).
+        if folded not in title_to_passages:
+            title_to_passages[folded] = passages
+        else:
+            # Compare quality scores to pick the better row
+            existing_classified = [classify_passage(p) for p in title_to_passages[folded]]
+            existing_score = compute_quality_score(existing_classified)
+            new_classified = [classify_passage(p) for p in passages]
+            new_score = compute_quality_score(new_classified)
+            if new_score > existing_score:
+                title_to_passages[folded] = passages
+
+    # Score each candidate stop
+    scores = {}
+    for name in stop_names:
+        folded = _fold(name).lower().strip()
+        passages = title_to_passages.get(folded)
+        if passages:
+            classified = [classify_passage(p) for p in passages]
+            scores[name] = compute_quality_score(classified)
+        else:
+            scores[name] = 0.0
+
+    return scores
+
+
 def filter_passages_for_generation(passages_json: list) -> list:
     """Filter passages_json for generation: remove sludge, keep useful.
 
