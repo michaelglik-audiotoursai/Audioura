@@ -10619,3 +10619,62 @@ Four merges (345, 352 twice, 357) for one sentence a listener will hear.
 Old Nice (Vieux Nice)". Le Safari is at Cours Saleya / 1 Place Charles Félix,
 which is in Vieux Nice. That looks like a false positive and would silently
 shrink Old Nice restaurant tours. Worth a look.
+
+## D269 — LOCAL-358 bounced: transport lost to `park`, and the default change was asserted
+**2026-08-07.**
+
+The app fix for Michael's Norwood biking tour was directionally right — extract
+`_parseTourRequest` to a testable top-level function, add the transport modes,
+stop defaulting to `museum`. It was bounced on two things found by *running* the
+parser, not reading it:
+
+```
+'biking tour in Central Park'      -> park       (transport branches placed last)
+'cycling tour of Hyde Park'        -> park
+'horseback tour of the park'       -> park
+'bike tour along the boardwalk'    -> walking    (contains('walk') inside boardwalk)
+```
+
+**Transport is a stronger signal than a noun in a place name.** A park is where
+the tour is; biking is what it *is*. The agent was explicitly asked to assess
+order-dependency, assessed one case, declared the order fine, and then created a
+new ordering with the same defect class Michael reported.
+
+On the default: `museum` -> `walking` is probably right, but the justification
+("neutral, does not bias stop selection") is false as stated. Verified against
+`_classify_tour_category`:
+
+```
+'Palais Lascaris, Nice, France'  museum -> museum   walking -> walking
+                                 ...but [CLASSIFY-FIX] rescues it via 'palais'
+'tour of the Louvre'             museum -> museum   walking -> walking  (NOT rescued)
+```
+
+The venue-word override at `generate_tour_text.py:~3729` covers palais/museum/
+gallery/palace/villa, so the benchmark venue survives. **Bare famous names do
+not** — Louvre, Uffizi, Hermitage, Prado carry no venue word. Empty string is a
+live option: the server already treats `""` as "no signal" at the
+`_effective_tour_type` touchpoints (3706/3714).
+
+**The general rule this is the third instance of:** an agent that answers a
+"assess whether X matters" instruction with an assertion rather than a table of
+run outputs has not done the task. Bounce on the missing table, not on the
+conclusion — the conclusion may well be right.
+
+## D270 — SCOPE-CHECK removes real in-scope stops; dispatched as LOCAL-359
+**2026-08-07.**
+
+Noted at the end of D268, now traced. `_validate_stops_within_scope`
+(`generate_tour_text.py:778`) asks an LLM whether a stop is inside a named
+scope, and gives it **only the stop name and 400 chars of description — never
+the address**, though Phase 3A fetched addresses. It runs on `gpt-3.5-turbo`
+with `max_tokens=60`.
+
+Le Safari was removed from an Old Nice restaurant tour as "outside Vieux Nice".
+It is at 1 Cours Saleya, inside Vieux Nice. The keep-rule is
+`if inside or conf == "low"`, so the wrong answer came back at medium or high
+confidence.
+
+Asymmetry that should drive the fix: **removing a stop is unrecoverable within
+the run; keeping a marginal one is not.** The guard itself stays — it exists
+because out-of-scope landmarks were being pulled into tight-scope tours.
