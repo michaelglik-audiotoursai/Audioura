@@ -1410,6 +1410,7 @@ class _MyToursScreenState extends State<MyToursScreen> {
                       await prefs.setString('current_tour_id', tour['title']);
                       await prefs.setString('current_tour_path', tour['path']);
                       await prefs.setInt('current_stop', 0);
+                      await prefs.setString('current_tour_type', tour['type'] ?? '');
                       
                       Navigator.push(
                         context,

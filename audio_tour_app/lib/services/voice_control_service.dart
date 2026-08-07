@@ -276,6 +276,15 @@ class VoiceControlService {
     } else if (cmd.contains('pause') || cmd.contains('stop')) {
       await DebugLogHelper.addDebugLog('VOICE: PAUSE command');
       onVoiceCommand?.call('pause', null, 'Pausing audio');
+    } else if (cmd.contains('water') || cmd.contains('drink') || cmd.contains('fountain')) {
+      await DebugLogHelper.addDebugLog('VOICE: WATER command - find nearby water');
+      onVoiceCommand?.call('find_water', null, 'Looking for water nearby');
+    } else if (cmd.contains('toilet') || cmd.contains('bathroom') || cmd.contains('restroom') || cmd.contains('loo')) {
+      await DebugLogHelper.addDebugLog('VOICE: TOILET command - find nearby toilet');
+      onVoiceCommand?.call('find_toilet', null, 'Looking for a toilet nearby');
+    } else if (cmd.contains('how far') || cmd.contains('distance') || cmd.contains('where am i')) {
+      await DebugLogHelper.addDebugLog('VOICE: NEXT STOP DISTANCE command');
+      onVoiceCommand?.call('next_stop_distance', null, 'Checking distance to next stop');
     } else if (cmd.isEmpty || cmd.contains('play')) {
       await DebugLogHelper.addDebugLog('VOICE: PLAY command - resume current audio');
       onVoiceCommand?.call('play', null, 'Playing audio');
