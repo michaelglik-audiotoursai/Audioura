@@ -10131,3 +10131,34 @@ joining tour text to `stop_corpus` is guilty until shown otherwise.
 museum result as "unchanged" having scored **DB tour id=21** instead of the file
 the task named. Both times the file had moved. Task files must name the artifact
 and reviews must score that artifact.
+
+## D254 — A harvest stored a Stade de France article as corpus for Japanese armour
+**2026-08-07, found tracing D253.**
+
+```
+venue "walking tour in Nice, france", 5 rows:
+  Place Masséna                legitimate
+  Russian Orthodox Cathedral   legitimate
+  Kannon à mille bras          MUSEUM OBJECT
+  Masque du vieillard Kojo     MUSEUM OBJECT
+  L’Armure d’Andô Naoyuki      MUSEUM OBJECT, sourced from
+                               en.wikipedia.org/wiki/Stade_de_France
+```
+
+Two failures. A walking tour proposed three museum objects as stops — `Kannon à
+mille bras` is a sculpture inside a museum, not somewhere you walk to. And the
+harvester then accepted an article about a stadium in Saint-Denis as corpus for
+Japanese armour in Nice. **Nothing checks that a harvested passage is about the
+stop.**
+
+The damage is live: those rows are still selected by title matching and they
+corrupt museum scoring. LEAD traced `groundedness 0.00` on a stop with six good
+passages directly to this row.
+
+Dispatched as LOCAL-341. Rows preserved as evidence — marking and read-time
+exclusion only, never deletion (Michael's rule).
+
+**The general shape, and it keeps recurring:** we verify that a thing *exists*
+(LOCAL-320), that a claim is *grounded* (LOCAL-291/331/340), and that a source
+is *high-yield* (LOCAL-328) — but never that a retrieved passage is *about the
+subject*. Existence, grounding and yield are all orthogonal to relevance.
