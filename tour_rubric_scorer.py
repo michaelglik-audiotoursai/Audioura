@@ -76,7 +76,10 @@ _NOT_A_PERSON_RE = re.compile(
     r'armure|robe|masque|danse|'
     r'city|town|district|quarter|neighborhood|neighbourhood|region|area|'
     r'market|promenade|cours|place|piazza|plaza|quai|port|harbour|harbor|'
-    r'alps|mountains?|river|lake|coast|bay|cape|valley|plateau)\b'
+    r'alps|mountains?|river|lake|coast|bay|cape|valley|plateau|'
+    # [LOCAL-339] French venue prefix — "Chez X" is always a business/restaurant,
+    # never a person. Structurally equivalent to "hotel" or "restaurant".
+    r'chez)\b'
 )
 
 #: [LOCAL-304] Expanded person context: deities "embody", "symbolize"; figures
@@ -522,9 +525,39 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
         _name = _m.group(1)
         if _NOT_A_PERSON_RE.search(_name):
             continue
+        # [LOCAL-339] Strip leading articles/prepositions and re-check against
+        # _NOT_A_PERSON_RE. "The Socca" → "Socca" is fine (no match), but this
+        # catches cases where the stripped form reveals a blocked word.
+        # Also: a two-word phrase starting with "The"/"A"/"An" is structurally
+        # a thing reference ("The Socca"), not a person name. People are not
+        # introduced with articles. Skip these entirely.
+        _LEADING_ARTICLE_OR_PREP_RE = re.compile(
+            r'^(?:The|A|An|At|In|On|By|Near|To|From|Through)\s+', re.IGNORECASE
+        )
+        _stripped_name = _LEADING_ARTICLE_OR_PREP_RE.sub('', _name)
+        if _stripped_name != _name:
+            # The candidate had a leading article/preposition
+            _name_words = _name.split()
+            # A 2-word phrase where the first word is an article/prep is never
+            # a person: "The Socca", "At Chez" (but "At Chez Pipo" is 3 words,
+            # handled by title exclusion below).
+            if len(_name_words) == 2 and re.match(r'^(?:The|A|An)$', _name_words[0], re.IGNORECASE):
+                continue
+            # Re-check stripped form against NOT_A_PERSON
+            if _NOT_A_PERSON_RE.search(_stripped_name):
+                continue
         _lo = max(0, _m.start() - _PERSON_CONTEXT_WINDOW)
         _hi = min(len(body), _m.end() + _PERSON_CONTEXT_WINDOW)
         _window = body[_lo:_hi]
+        # [LOCAL-339] Preposition guard: if a LOCATIVE preposition immediately
+        # precedes the candidate name, the name is a PLACE/OBJECT complement
+        # ("traditions of Old Nice", "streets in Old Nice"), not the subject/agent.
+        # Skip it even if a person-context word appears in the window.
+        # NOTE: "by" is NOT included because "founded by X" identifies a person.
+        # Only locative/partitive prepositions that indicate place references.
+        _pre_guard_text = body[max(0, _m.start() - 15):_m.start()]
+        if re.search(r'\b(?:of|in|at|to|from|through|across|into|onto|near|around|behind|beneath|beside|beyond|over|under|upon)\s+$', _pre_guard_text, re.IGNORECASE):
+            continue
         # Legacy vocabulary check (LOCAL-304 patterns: verbs, role nouns)
         if _PERSON_CONTEXT_RE.search(_window):
             _people.add(_name)
@@ -637,6 +670,10 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
     # Corrected rule: exclude a candidate ONLY when its text is the FULL stop
     # title (case-insensitive exact match). A name that is a proper substring
     # of a longer title is kept — the existing person-context test decides it.
+    #
+    # [LOCAL-339] Also strip leading prepositions/articles before comparing.
+    # "At Chez Pipo" → "Chez Pipo" → matches title → excluded. Without this,
+    # a captured preposition prevents the full-title match.
     import unicodedata as _ud
     def _accent_fold(s):
         """Fold accented characters for comparison (Musée -> Musee)."""
@@ -648,8 +685,24 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
     _full_titles_folded = set()
     for _other_stop in all_stops:
         _full_titles_folded.add(_accent_fold(_other_stop['title']))
-    # Remove people whose name exactly matches a full stop title
-    _people = {p for p in _people if _accent_fold(p) not in _full_titles_folded}
+
+    # [LOCAL-339] Leading preposition/article pattern for title comparison
+    _TITLE_STRIP_RE = re.compile(
+        r'^(?:The|A|An|At|In|On|By|Near|To|From|Through)\s+', re.IGNORECASE
+    )
+
+    def _matches_full_title(candidate):
+        """Check if candidate (or its stripped form) matches a full stop title."""
+        if _accent_fold(candidate) in _full_titles_folded:
+            return True
+        # Strip leading prep/article and re-check
+        stripped = _TITLE_STRIP_RE.sub('', candidate)
+        if stripped != candidate and _accent_fold(stripped) in _full_titles_folded:
+            return True
+        return False
+
+    # Remove people whose name (or stripped form) exactly matches a full stop title
+    _people = {p for p in _people if not _matches_full_title(p)}
 
     # --- [LOCAL-333 bounce] Partial name deduplication ------------------------
     # Fold shorter names into their fuller form when both appear (e.g. "Kenzo"

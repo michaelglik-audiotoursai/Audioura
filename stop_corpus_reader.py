@@ -109,6 +109,15 @@ def get_stop_corpus_for_tour(
 ) -> Dict[str, Optional[Dict]]:
     """Fetch per-stop corpus passages for all stops in a tour.
 
+    [LOCAL-339] Strategy: stop-title-first matching with venue as tie-breaker.
+
+    The same stop_title can appear under multiple venue_name values (e.g.
+    'Chez Palmyre' exists under 3 different venues). Matching by venue first
+    misses stops when the tour's venue string doesn't exactly align with the
+    corpus venue (e.g. 'restaurant tour in Old Nice (Vieux Nice), France' vs
+    'Old Nice, Nice, France'). Matching by stop_title first — with venue as
+    a preference when there are duplicates — is sounder.
+
     Args:
         venue_name: The venue name used in generation (e.g. tour location).
         stop_names: List of stop/POI names in the tour.
@@ -123,36 +132,34 @@ def get_stop_corpus_for_tour(
 
     result = {}
 
-    # First, find which venue_name(s) in stop_corpus match this tour
-    corpus_venue_name = _find_corpus_venue_name(venue_name, conn)
-    if not corpus_venue_name:
-        # No stop_corpus rows for this venue at all
-        for name in stop_names:
-            result[name] = None
-        return result
+    # [LOCAL-339] Clean the venue name using _prolog_place to strip tour-type
+    # prefixes ("restaurant tour in X" → "X"). This gives a better venue
+    # string for tie-breaking when multiple corpus rows match a stop_title.
+    from generate_tour_text import _prolog_place
+    clean_venue = _prolog_place(venue_name)
 
-    # Fetch all rows for this venue in one query
+    # [LOCAL-339] Fetch ALL stop_corpus rows that could match any of our stops.
+    # Strategy: query by stop_title (accent-folded) across all venues, then use
+    # venue affinity as a tie-breaker.
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute(
-        "SELECT stop_title, passages_json, source_pages, passage_roles FROM stop_corpus WHERE venue_name = %s",
-        (corpus_venue_name,)
+        "SELECT venue_name, stop_title, passages_json, source_pages, passage_roles FROM stop_corpus"
     )
-    corpus_rows = cur.fetchall()
+    all_corpus_rows = cur.fetchall()
     cur.close()
 
-    if not corpus_rows:
+    if not all_corpus_rows:
         for name in stop_names:
             result[name] = None
         return result
 
-    # Build lookup index
-    corpus_by_title = {}
-    for row in corpus_rows:
-        corpus_by_title[row['stop_title']] = row
+    # Determine venue affinity: find which venue_name(s) best match this tour.
+    # Used as tie-breaker, not as primary filter.
+    preferred_venue = _find_corpus_venue_name(clean_venue, conn)
 
-    # Match each stop to its corpus row
+    # Match each stop to its best corpus row (title-first, venue as tie-breaker)
     for stop_name in stop_names:
-        matched = _match_stop_to_corpus(stop_name, corpus_rows)
+        matched = _match_stop_title_first(stop_name, all_corpus_rows, preferred_venue)
         if matched:
             passages_raw = matched['passages_json']
             if isinstance(passages_raw, str):
@@ -194,6 +201,80 @@ def get_stop_corpus_for_tour(
             result[stop_name] = None
 
     return result
+
+
+def _match_stop_title_first(
+    stop_name: str,
+    all_corpus_rows: List[Dict],
+    preferred_venue: Optional[str],
+) -> Optional[Dict]:
+    """[LOCAL-339] Match a stop to corpus by title first, venue as tie-breaker.
+
+    When the same stop_title exists under multiple venues, prefer the row
+    from the preferred_venue. When no preferred venue matches, take the row
+    with the most passages (richest corpus).
+    """
+    # Find all rows that match this stop_name using _match_stop_to_corpus logic
+    candidates = []
+    stop_folded = _accent_fold(stop_name).lower().strip()
+    stop_norm = _normalize_for_match(stop_name)
+
+    for row in all_corpus_rows:
+        title = row['stop_title']
+        # 1. Exact case-insensitive
+        if title.lower().strip() == stop_name.lower().strip():
+            candidates.append(row)
+            continue
+        # 2. Accent-folded exact
+        if _accent_fold(title).lower().strip() == stop_folded:
+            candidates.append(row)
+            continue
+        # 3. Containment (either direction)
+        if stop_name.lower() in title.lower() or title.lower() in stop_name.lower():
+            candidates.append(row)
+            continue
+        # 4. Normalized word overlap
+        corpus_title_norm = _normalize_for_match(title)
+        corpus_words = set(w for w in corpus_title_norm.split() if len(w) >= 4)
+        stop_words = set(w for w in stop_norm.split() if len(w) >= 4)
+        if corpus_words and stop_words:
+            overlap = corpus_words & stop_words
+            threshold = max(1, min(len(corpus_words), len(stop_words)) * 0.5)
+            if len(overlap) >= threshold:
+                candidates.append(row)
+
+    if not candidates:
+        # Try variant map as last resort
+        variant_match = _match_via_variants(stop_name, all_corpus_rows)
+        if variant_match:
+            return variant_match
+        return None
+
+    if len(candidates) == 1:
+        return candidates[0]
+
+    # Multiple candidates — use venue as tie-breaker
+    if preferred_venue:
+        venue_matches = [r for r in candidates if r['venue_name'] == preferred_venue]
+        if venue_matches:
+            # Among venue matches, prefer the one with most passages
+            return max(venue_matches, key=lambda r: _passage_count(r))
+
+    # No venue match or no preferred venue — take richest corpus
+    return max(candidates, key=lambda r: _passage_count(r))
+
+
+def _passage_count(row: Dict) -> int:
+    """Count passages in a corpus row (for tie-breaking)."""
+    passages_raw = row.get('passages_json', '[]')
+    if isinstance(passages_raw, str):
+        try:
+            return len(json.loads(passages_raw))
+        except (json.JSONDecodeError, TypeError):
+            return 0
+    if isinstance(passages_raw, list):
+        return len(passages_raw)
+    return 0
 
 
 def _find_corpus_venue_name(venue_name: str, conn) -> Optional[str]:
