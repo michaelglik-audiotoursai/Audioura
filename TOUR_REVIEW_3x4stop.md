@@ -174,3 +174,32 @@ tours/LOCAL336_museum_4stop.txt        1,372 words
 tours/LOCAL336_restaurant_4stop.txt    1,084 words
 tours/LOCAL336_walking_4stop.txt         879 words
 ```
+
+---
+
+## ⚠️ Correction — added after publishing, 6 Aug ~23:55
+
+**The restaurant tour's 62.5 is inflated and the honest number is lower.**
+Re-examining stop 4 after writing this review:
+
+```
+named_people = ['At Chez Pipo', 'Chez Palmyre', 'Old Nice',
+                'Palmyre Moni', 'The Socca']
+```
+
+Only `Palmyre Moni` is a person. The other four — a preposition-prefixed stop
+title, another venue, a place, and a dish — are counted as facts. So the "8
+facts" that made this the tour's only RICH stop include roughly four phantoms.
+
+**And the misattribution has a second cause I got wrong above.** I wrote that
+Chez Palmyre's corpus "bled into" this stop. In fact `Chez Pipo` has **its own
+10-passage corpus row**, and the scorer never found it — the tour's venue string
+is `restaurant tour in Old Nice (Vieux Nice), France` while the corpus row is
+filed under `Old Nice, Nice, France`, so the venue-scoped lookup misses. The
+stop reports `groundedness = None` despite having ten passages available.
+
+That makes the Chez Pipo failure worse, not better: **we hold the correct
+material about Chez Pipo and used a different restaurant's story instead.**
+
+Both are dispatched as LOCAL-339. The museum (87.5) and walking (50.0) figures
+are unaffected by this — the phantom people appear on the restaurant stop.
