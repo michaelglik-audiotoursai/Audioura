@@ -291,6 +291,15 @@ def harvest_from_venue_pages(
             if not _passage_is_about_stop(candidate, stop_title):
                 continue
 
+            # LOCAL-341: Relevance gate — structural check that passage mentions the stop
+            from harvest_relevance_gate import check_passage_relevance
+            is_relevant, _rel_reason = check_passage_relevance(candidate, stop_title)
+            if not is_relevant:
+                logger.debug(
+                    f"[LOCAL-341] Relevance gate skipped passage for {stop_title!r}: {_rel_reason}"
+                )
+                continue
+
             # Must not be about the venue/museum in general
             if _is_about_venue_not_object(candidate, venue_name, stop_title):
                 continue
