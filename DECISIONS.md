@@ -10521,3 +10521,41 @@ straight-line.
 layer. Ride away from stop 1 and the distance simply grows — nothing notices,
 warns, or re-routes. Same missing piece as first-mile guidance. Both are
 features never built, not regressions.
+
+## D266 — Michael's principle: practical information over filler
+**Michael, 2026-08-07, endorsing LEAD's constraint on queue advice.**
+
+> *"I completely agree and believe this is very important to provide practical
+> information instead of 'fillers' that annoy people."*
+
+Stated about queue advice; **it generalises, and we are failing it.**
+
+LEAD measured the filler detector against real examples:
+
+```
+"the weight of centuries settles upon you… the faint strains of music
+ emanate… these artifacts speak of heritage… the past lingers here"
+   -> generic_filler_fraction 0%,  has_generic_filler False,  0 facts
+
+"a mix of laughter and clinking glasses creating a symphony of conviviality…
+ the warmth envelops you… time slows here"
+   -> generic_filler_fraction 0%,  has_generic_filler False,  0 facts
+```
+
+**The detector reports zero on pure filler.** `has_generic_filler` fires above
+0.4 and real tours peak at 0.29, so the flag has never fired in production.
+
+The only thing penalising filler today is indirect: it produces no facts, so
+the stop lands THIN. Consequences:
+
+- a stop that is 80% atmosphere with two real facts still scores ADEQUATE
+- **filler still ships either way** — a THIN stop is delivered, not withheld
+
+**The distinction that matters, and it is not "remove all atmosphere".**
+Orienting a listener is useful — "as you stand on Cours Saleya, the market
+stalls are ahead of you" tells them where to look. Padding is not. The line is
+between *orientation* and *sentences that carry nothing*, and R7 (hallucinated
+sensory detail) is a different rule aimed at invented claims rather than empty
+ones.
+
+Dispatched as LOCAL-356.
