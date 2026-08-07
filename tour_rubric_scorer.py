@@ -61,6 +61,10 @@ _PROPER_PHRASE_RE = re.compile(
 
 #: Head nouns that make a capitalised phrase a place, an institution or a
 #: schema label rather than a person.
+#: [LOCAL-333] Extended: the general structural model (appositive/verb) would
+#: otherwise match "Nice, a coastal city, offers…" and "Cours Saleya, a historic
+#: square, hosts…". These are geographic/institutional terms — a small, stable
+#: set of what is NOT a person.
 _NOT_A_PERSON_RE = re.compile(
     r'(?i)\b(?:sea|ocean|riviera|village|hill|pond|fountain|square|street|road|'
     r'avenue|boulevard|monument|bandstand|house|cathedral|chapel|garden|park|'
@@ -69,11 +73,16 @@ _NOT_A_PERSON_RE = re.compile(
     r'exhibition|exhibit|installation|examples|details|specialty|information|'
     r'americans?|century|war|succession|'
     r'statue|sculpture|painting|portrait|fresco|mural|mosaic|relief|'
-    r'armure|robe|masque|danse)\b'
+    r'armure|robe|masque|danse|'
+    r'city|town|district|quarter|neighborhood|neighbourhood|region|area|'
+    r'market|promenade|cours|place|piazza|plaza|quai|port|harbour|harbor|'
+    r'alps|mountains?|river|lake|coast|bay|cape|valley|plateau)\b'
 )
 
 #: [LOCAL-304] Expanded person context: deities "embody", "symbolize"; figures
 #: described as "son/daughter of" or with a divine/mythological role noun.
+#: NOTE: This is the VOCABULARY fallback — tried after the structural tests.
+#: [LOCAL-333] Kept as-is; domain-specific roles are NOT added here.
 _PERSON_CONTEXT_RE = re.compile(
     r'(?i)\b(?:painted|paints|wrote|writes|composed|designed|founded|built|'
     r'established|created|sculpted|carved|lived|worked|visited|ruled|'
@@ -89,6 +98,73 @@ _PERSON_CONTEXT_RE = re.compile(
 
 #: How far either side of a candidate name to look for that context.
 _PERSON_CONTEXT_WINDOW = 90
+
+# --- [LOCAL-333] Structural person detection ----------------------------------
+# Instead of enumerating domain-specific role nouns, detect the SHAPE that
+# identifies a person: appositive constructions, past-tense verbs after a name,
+# or a preceding title-noun pattern ("the chef X", "architect X").
+#
+# Pattern 1: APPOSITIVE — "Name, a/an/the [adjective*] noun-phrase, verb..."
+# Matches: "Franck Cerutti, a culinary master with three Michelin stars, introduced"
+# This fires when a comma + determiner follows the candidate name within the window.
+_APPOSITIVE_PERSON_RE = re.compile(
+    r',\s+(?:a|an|the|one)\s+[a-zéèêëàâùûôîïçñ]+'
+)
+
+# [LOCAL-333] Place/institution nouns that appear IN an appositive and indicate
+# the subject is a geographic entity, not a person.  "Nice, a coastal city" →
+# the appositive contains "city", so "Nice" is not a person.
+# This is the EXCLUSION counterpart to the structural model — a small, stable
+# set of what describes places/things (not people).
+_APPOSITIVE_PLACE_NOUN_RE = re.compile(
+    r'(?i)\b(?:city|town|village|district|quarter|neighborhood|neighbourhood|'
+    r'region|area|country|island|peninsula|archipelago|valley|coast|'
+    r'street|road|avenue|boulevard|square|piazza|plaza|promenade|cours|'
+    r'market|port|harbour|harbor|bay|cape|beach|'
+    r'building|tower|church|cathedral|chapel|basilica|mosque|temple|'
+    r'palace|castle|fort|fortress|citadel|monument|'
+    r'museum|gallery|library|theater|theatre|'
+    r'park|garden|forest|mountain|hill|river|lake|'
+    r'restaurant|café|cafe|bar|hotel|inn|shop|store|'
+    r'school|university|college|hospital|station)\b'
+)
+
+# Pattern 2: ACTIVE VERB after name — a past-tense (-ed) or present-tense
+# (-s/-es) verb within short window AFTER the name indicates the name is the
+# agent of an action. To avoid matching adjectives ("located", "situated") and
+# stative verbs, we exclude -ed words preceded by "is/was/are/were/been" and
+# exclude common non-action -s words.
+# Uses a tight post-window (60 chars) to avoid distant false matches.
+_ACTIVE_VERB_RE = re.compile(
+    r'\b([a-z]{3,}ed|[a-z]{3,}(?:es|[^s]s))\b'
+)
+# Stative/passive markers that disqualify an -ed word as person evidence
+_STATIVE_BEFORE_VERB_RE = re.compile(
+    r'\b(?:is|was|are|were|been|being|become|became)\b'
+)
+# Common -s words that are NOT active verbs (nouns, adjectives, etc.)
+_NOT_ACTIVE_VERB_S = frozenset({
+    'his', 'this', 'its', 'us', 'as', 'has', 'was', 'is',
+    'plus', 'minus', 'thus', 'across', 'towards', 'always',
+    'perhaps', 'whereas', 'besides', 'sometimes', 'less',
+    'glass', 'glasses', 'address', 'success', 'process',
+    'access', 'press', 'stress', 'dress', 'express',
+    'offers', 'visitors', 'colors', 'flavors', 'sounds',
+    'streets', 'walls', 'lights', 'doors', 'windows', 'years',
+    'diners', 'locals', 'tourists', 'tales', 'influences',
+    'facades', 'techniques', 'legacies', 'palates',
+})
+
+# Pattern 3: TITLE-NOUN preceding the name — "the chef X", "architect X",
+# "Dr. X". This is structural: any noun immediately before a capitalised name
+# that serves as a role/title. We use a minimal set of structural markers
+# (determiners/adjectives that precede role nouns) rather than enumerating roles.
+# Actually implemented below as: if the word immediately before the candidate
+# name (within 2 tokens) is a common noun preceded by a/an/the, treat it as
+# a title construction.
+_TITLE_BEFORE_NAME_RE = re.compile(
+    r'\b(?:the|a|an)\s+[a-zéèêëàâùûôîïçñ]+\s+$'
+)
 
 # --- [LOCAL-304] Structural material detection --------------------------------
 #: A proper noun or noun phrase following a "crafted from" / "carved from" /
@@ -333,6 +409,47 @@ def parse_tour(text: str) -> List[dict]:
     # narration. Measured cost: "Specific Examples" and "Operational Details"
     # were the two most frequent "named people" in the whole corpus (183 and 140
     # occurrences), because the label itself is two capitalised words.
+    #
+    # [LOCAL-333 bounce] The closing offer ("That's N stops …") is generated
+    # boilerplate appended AFTER the last stop. parse_tour folds it into the
+    # last stop's body because there is no subsequent "Stop N:" header. It
+    # contains proper phrases ("Treat Page", venue names) that inflate facts.
+    # Exclude any line starting with the closing-offer pattern.
+    # [LEAD] Truncate the generated closing OFFER, which parse_tour otherwise
+    # folds into the last stop (there is no following "Stop N:" header). It
+    # contributes boilerplate proper phrases — "Treat Page" is an app UI feature
+    # and was counted as a named person on every tour carrying an offer.
+    #
+    # Anchored on the generator's own literals, not on epilog opening templates.
+    # Three rounds were lost matching openings: the count form ("That's 5 stops"),
+    # the thread form ("From X to Y, you have followed the thread"), and the
+    # distance form ("<Place> is 5 kilometers from here") are all emitted, and
+    # enumerating them is the D236 trap. The invariant is the offer verb:
+    #   generate_tour_text.py:1504  f"... from here — we can build {mode} there."
+    #   generate_tour_text.py:1542  "... nearby we can build you a restaurant tour"
+    # Measured across 419 tour files: 83 occurrences, 0 of them before 60% of the
+    # way through a file. It never appears in narration.
+    #
+    # "Closing:" is the explicit label now emitted by generate_tour_text so future
+    # tours need no heuristic at all.
+    #
+    # NOTE: the recap sentence is deliberately NOT stripped. Whether a recap
+    # should contribute facts is a separate question (D201) and changing it here
+    # would move scores Michael has not asked to move.
+    # NB: the call site uses .match(), which anchors at line start, so the
+    # mid-line offer verb needs an explicit leading .* — LEAD got this wrong
+    # once and the count went UP.
+    _CLOSING_OFFER_RE = re.compile(
+        r"^(?:"
+        r"Closing:"                                          # explicit label (new tours)
+        r"|.*\bwe can build\b"                               # gtt:1504, gtt:1542
+        r"|.*\bThe Treat Page shows\b"                       # museum-offer variant
+        r"|That[\u2019']?s\s+\d+\s+stops?\b"                # count-form recap, gtt:1123/1125
+        r"|From\s+.{1,140}?\s+to\s+.{1,140}?,\s+you\s+have\s+followed\s+the\s+thread\b"
+        r")",
+        re.IGNORECASE,
+    )
+
     for stop in stops:
         body_lines = []
         for line in stop['lines']:
@@ -341,6 +458,9 @@ def parse_tour(text: str) -> List[dict]:
                 continue
             if SCHEMA_LABEL_RE.match(stripped):
                 continue
+            # [LOCAL-333 bounce] Strip closing offer and everything after it
+            if _CLOSING_OFFER_RE.match(stripped):
+                break
             body_lines.append(stripped)
         stop['body'] = '\n'.join(body_lines)
 
@@ -404,7 +524,64 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
             continue
         _lo = max(0, _m.start() - _PERSON_CONTEXT_WINDOW)
         _hi = min(len(body), _m.end() + _PERSON_CONTEXT_WINDOW)
-        if _PERSON_CONTEXT_RE.search(body[_lo:_hi]):
+        _window = body[_lo:_hi]
+        # Legacy vocabulary check (LOCAL-304 patterns: verbs, role nouns)
+        if _PERSON_CONTEXT_RE.search(_window):
+            _people.add(_name)
+            continue
+        # --- [LOCAL-333] Structural detection: match the SHAPE, not the word ---
+        # Check 1: APPOSITIVE — text immediately after the name contains
+        # ", a/an/the <noun>" within 60 chars. This is the construction
+        # "Franck Cerutti, a culinary master …" or "Palmyre Moni, a Tuscan
+        # restaurateur …" — the shape identifies a person regardless of which
+        # noun fills the slot.
+        # GUARD: if the appositive contains a place/institution noun, it
+        # describes a geographic entity ("Nice, a coastal city"), not a person.
+        _post_start = _m.end()
+        _post_end = min(len(body), _post_start + 60)
+        _post_text = body[_post_start:_post_end]
+        if _APPOSITIVE_PERSON_RE.match(_post_text):
+            # Extract the appositive clause (up to comma or end of window)
+            _appos_end = _post_text.find(',', 2)  # skip the leading ", "
+            _appos_clause = _post_text[:_appos_end] if _appos_end > 0 else _post_text
+            if not _APPOSITIVE_PLACE_NOUN_RE.search(_appos_clause):
+                _people.add(_name)
+                continue
+            else:
+                # [LOCAL-333 bounce r2] Appositive positively identifies this as
+                # a place/institution (e.g. "Arts Asiatiques, a modern building").
+                # Skip remaining checks — the active verb after the appositive
+                # (e.g. "houses") belongs to the building, not a person.
+                continue
+        # Check 2: ACTIVE VERB in post-window — the name is the agent of
+        # an action. We look for an -ed or -s verb within 60 chars AFTER the
+        # name, but exclude stative/passive uses ("is located", "was situated")
+        # and common non-verb -s words.
+        # GUARD: the verb must not be separated from the name by a sentence
+        # boundary or a subject pronoun — those indicate a different subject.
+        # GUARD 2: if a preposition immediately precedes the name, the name is
+        # an object of the preposition, not the subject ("through Old Nice draws").
+        _verb_window = body[_post_start:min(len(body), _post_start + 60)]
+        _verb_match = _ACTIVE_VERB_RE.search(_verb_window)
+        if _verb_match:
+            _vword = _verb_match.group(1)
+            # Skip known non-verbs
+            if _vword not in _NOT_ACTIVE_VERB_S:
+                # Check no stative marker between name-end and this verb
+                _before_verb = _verb_window[:_verb_match.start()]
+                if not _STATIVE_BEFORE_VERB_RE.search(_before_verb):
+                    # Guard: no sentence boundary or subject-change before verb
+                    if not re.search(r'[.!?]|\b(?:it|he|she|they|we|you|this|that|which|who)\b', _before_verb, re.IGNORECASE):
+                        # Guard: name not preceded by a preposition (= object, not subject)
+                        _pre_check = body[max(0, _m.start() - 15):_m.start()]
+                        if not re.search(r'\b(?:of|in|at|to|from|through|across|into|onto|near|by|with|for|about|between|among|around|behind|beneath|beside|beyond|over|under|upon)\s+$', _pre_check, re.IGNORECASE):
+                            _people.add(_name)
+                            continue
+        # Check 3: TITLE-NOUN before the name — "the chef X", "a culinary master X"
+        # Look at the text immediately before the candidate name (up to 40 chars).
+        _pre_start = max(0, _m.start() - 40)
+        _pre_text = body[_pre_start:_m.start()]
+        if _TITLE_BEFORE_NAME_RE.search(_pre_text):
             _people.add(_name)
     # Track 2: single-word capitalised names as deities/mythological figures.
     # TIGHT structural patterns only — "son/daughter of X", "X, the god/goddess",
@@ -451,6 +628,46 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
                 if not _NOT_A_PERSON_RE.search(g):
                     if g not in _period_name_words:
                         _people.add(g)
+
+    # --- [LOCAL-333 bounce r2] Exclude stop titles from people -----------------
+    # A tour's own stop titles are venue/place names, never people. But a person
+    # named WITHIN a longer title IS a person (museum objects are often named
+    # after people — "Ulysses Grant au Japon", "L'Armure d'Andô Naoyuki").
+    #
+    # Corrected rule: exclude a candidate ONLY when its text is the FULL stop
+    # title (case-insensitive exact match). A name that is a proper substring
+    # of a longer title is kept — the existing person-context test decides it.
+    import unicodedata as _ud
+    def _accent_fold(s):
+        """Fold accented characters for comparison (Musée -> Musee)."""
+        return ''.join(
+            c for c in _ud.normalize('NFD', s)
+            if _ud.category(c) != 'Mn'
+        ).lower()
+
+    _full_titles_folded = set()
+    for _other_stop in all_stops:
+        _full_titles_folded.add(_accent_fold(_other_stop['title']))
+    # Remove people whose name exactly matches a full stop title
+    _people = {p for p in _people if _accent_fold(p) not in _full_titles_folded}
+
+    # --- [LOCAL-333 bounce] Partial name deduplication ------------------------
+    # Fold shorter names into their fuller form when both appear (e.g. "Kenzo"
+    # into "Kenzo Tange"). Uses token-overlap logic from groundedness_check.py.
+    _people_list = sorted(_people)
+    _to_remove = set()
+    for i, name_a in enumerate(_people_list):
+        for j, name_b in enumerate(_people_list):
+            if i >= j:
+                continue
+            tokens_a = set(name_a.lower().split())
+            tokens_b = set(name_b.lower().split())
+            # If one is a strict subset of the other, drop the shorter one
+            if tokens_a < tokens_b or tokens_b < tokens_a:
+                shorter = name_a if len(tokens_a) < len(tokens_b) else name_b
+                _to_remove.add(shorter)
+    _people -= _to_remove
+
     sa.named_people = sorted(_people)
     
     # Materials and techniques
@@ -517,17 +734,26 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
     ):
         _measurements_found.add(m.group(0).lower().strip())
     # Track 2: spelled-out numeral + countable noun
+    # [LOCAL-333] Allow up to 2 intervening modifier words between numeral and
+    # noun — catches "three Michelin stars", "five Olympic gold medals", etc.
+    # The modifier slot accepts capitalised proper adjectives and lowercase words.
+    _NUMERAL_NOUNS = (
+        r'(?:arms?|heads?|hands?|legs?|eyes?|faces?|'
+        r'storeys?|stories?|floors?|columns?|pillars?|panels?|tiers?|steps?|'
+        r'strings?|centuries?|years?|decades?|months?|'
+        r'meters?|metres?|centimeters?|centimetres?|feet|foot|inches?|'
+        r'kilograms?|tons?|tonnes?|pounds?|'
+        r'stars?|medals?|sites?|awards?|prizes?|courses?|rooms?|'
+        r'restaurants?|buildings?|towers?|bridges?|doors?|windows?|arches?)'
+    )
     for m in re.finditer(
         r'\b((?:one|two|three|four|five|six|seven|eight|nine|ten|'
         r'eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|'
         r'eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|'
         r'eighty|ninety|hundred|thousand)'
+        r'(?:\s+[A-Za-zéèêëàâùûôîïçñ-]+){0,2}'
         r'\s+'
-        r'(?:arms?|heads?|hands?|legs?|eyes?|faces?|'
-        r'storeys?|stories?|floors?|columns?|pillars?|panels?|tiers?|steps?|'
-        r'strings?|centuries?|years?|decades?|months?|'
-        r'meters?|metres?|centimeters?|centimetres?|feet|foot|inches?|'
-        r'kilograms?|tons?|tonnes?|pounds?))\b',
+        + _NUMERAL_NOUNS + r')\b',
         body, re.IGNORECASE
     ):
         _measurements_found.add(m.group(0).lower().strip())
