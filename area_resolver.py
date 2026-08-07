@@ -375,6 +375,41 @@ def _parse_location(location_string: str) -> Tuple[str, str]:
     # Remove empty segments that result from stripping
     parts = [p for p in parts if p]
     
+    # [LOCAL-351] Detect US-format addresses by structural signals.
+    # A 2-letter uppercase token followed by a 5-digit ZIP (e.g. "MA 02062") or
+    # a bare 2-letter uppercase token that is NOT a plausible city name (when
+    # adjacent to a country segment) signals "City, ST [ZIP], [Country]" format.
+    # In this format, parts[0] is the CITY (not a neighborhood), and subsequent
+    # parts are state/country qualifiers.
+    #
+    # Pattern: segment matches "XX" or "XX NNNNN" or "XX NNNNN-NNNN"
+    _US_STATE_ZIP_RE = re.compile(r'^([A-Z]{2})(?:\s+(\d{5}(?:-\d{4})?))?$')
+    
+    if len(parts) >= 2:
+        # Check if any segment (from index 1 onward) matches the state+ZIP pattern.
+        # A ZIP code or 2-letter state code is a strong structural signal (D236):
+        # "MA 02062" cannot be a city name.
+        us_state_idx = None
+        for i in range(1, len(parts)):
+            m = _US_STATE_ZIP_RE.match(parts[i])
+            if m:
+                # Confirm it's structural: must have a ZIP, OR there must be a
+                # subsequent segment (country), OR the preceding segment looks
+                # like a city name (not a known country).
+                has_zip = m.group(2) is not None
+                has_more_parts = i < len(parts) - 1
+                if has_zip or has_more_parts:
+                    us_state_idx = i
+                    break
+        
+        if us_state_idx is not None:
+            # US-format: "City, ST ZIP, Country" or "City, ST, Country" or "City, ST ZIP"
+            # Everything before the state segment is the city name.
+            city = ', '.join(parts[:us_state_idx])
+            # The state segment and anything after are qualifiers (not used for
+            # Wikidata resolution, but the city name alone resolves correctly).
+            return "", city
+    
     if len(parts) >= 2:
         # "Beacon Hill, Boston" or "Beacon Hill, Boston, MA"
         # First part is neighborhood/area, second is city
