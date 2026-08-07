@@ -5252,9 +5252,54 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                             _cs_assessment = {'verdict': 'EMPTY'}
                         _cs_verdicts[_cs_name] = _cs_assessment['verdict']
 
-                    # Stable sort: preserve original order within each tier
-                    poi_list.sort(key=lambda p: _COVERAGE_PRIORITY.get(
-                        _cs_verdicts.get(p['name'], 'EMPTY'), 3
+                    # ──── [LOCAL-349] YIELD-BASED SUB-RANKING WITHIN COVERED TIER ────
+                    # COVERED candidates are NOT equivalent. A stop with 4 clean
+                    # passages from interpretive_enrichment (Acchiardo) vastly
+                    # outperforms one with 1 clean passage from web_search
+                    # (La Rossettisserie). Rank by expected yield using the
+                    # source-weighted quality score from LOCAL-328.
+                    #
+                    # Yield is a TIE-BREAKER among viable candidates within a
+                    # coverage tier — geography, ordering and walkability already
+                    # constrain selection (LOCAL-212 route logic) and remain the
+                    # primary structural constraint via position order.
+                    _cs_quality_scores = {}  # stop_name → quality_score
+                    try:
+                        from corpus_source_quality import get_bulk_quality_scores
+                        # Re-open connection (the reader may have closed it)
+                        _cs_yield_conn = None
+                        try:
+                            from venue_resolver import _get_db_connection as _cs_yc
+                            _cs_yield_conn = _cs_yc()
+                        except Exception:
+                            pass
+                        if not _cs_yield_conn:
+                            try:
+                                import psycopg2 as _cs_pg2
+                                _cs_yield_conn = _cs_pg2.connect(
+                                    os.environ.get('DATABASE_URL',
+                                                   'postgresql://admin:password123@localhost:5433/audiotours'),
+                                    connect_timeout=5
+                                )
+                            except Exception:
+                                pass
+                        if _cs_yield_conn:
+                            _cs_quality_scores = get_bulk_quality_scores(
+                                [p['name'] for p in poi_list], _cs_yield_conn
+                            )
+                            _cs_yield_conn.close()
+                    except (ImportError, Exception) as _cs_yield_err:
+                        print(f"  [LOCAL-349] Yield scoring unavailable: {_cs_yield_err}")
+
+                    # Sort by (coverage_tier, -quality_score).
+                    # Within each tier, higher quality_score sorts first.
+                    # When quality_scores are unavailable (all 0), original
+                    # position order is preserved (stable sort).
+                    poi_list.sort(key=lambda p: (
+                        _COVERAGE_PRIORITY.get(
+                            _cs_verdicts.get(p['name'], 'EMPTY'), 3
+                        ),
+                        -_cs_quality_scores.get(p['name'], 0.0),
                     ))
 
                     # Log the selection
@@ -5281,6 +5326,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     print(f"  [LOCAL-212] Selected: {[p['name'] + '=' + _cs_verdicts.get(p['name'], '?') for p in _cs_selected]}")
                     if _cs_dropped:
                         print(f"  [LOCAL-212] Dropped:  {[p['name'] + '=' + _cs_verdicts.get(p['name'], '?') for p in _cs_dropped]}")
+
+                    # [LOCAL-349] Log yield scores when available
+                    if _cs_quality_scores and any(v > 0 for v in _cs_quality_scores.values()):
+                        _cs_sel_scores = [(p['name'], _cs_quality_scores.get(p['name'], 0.0)) for p in _cs_selected]
+                        _cs_drop_scores = [(p['name'], _cs_quality_scores.get(p['name'], 0.0)) for p in _cs_dropped]
+                        print(f"  [LOCAL-349] Yield scores (selected): {[f'{n}={s:.1f}' for n, s in _cs_sel_scores]}")
+                        if _cs_drop_scores:
+                            print(f"  [LOCAL-349] Yield scores (dropped):  {[f'{n}={s:.1f}' for n, s in _cs_drop_scores]}")
                 else:
                     if _cs_db_failure:
                         print(f"  [LOCAL-212] Coverage selection: DB connection FAILED — falling back to position order")
