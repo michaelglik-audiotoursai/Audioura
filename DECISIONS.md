@@ -10201,3 +10201,32 @@ name format (LOCAL-339), duplicate rows (D253), and now venue-versus-stop keying
 Dispatched as LOCAL-342, with museum scores (8-stop 75.0, 4-stop 87.5) as a hard
 non-regression bound — bridging venue corpus into stop lookups is exactly the
 kind of change that could move them.
+
+## D256 — The venue-as-stop bridge: walking tours 50.0 -> 75.0
+**2026-08-07. LOCAL-342 merged; LEAD supplied the end-to-end evidence.**
+
+The agent could not regenerate (no `OPENAI_API_KEY` in its environment) and
+said so rather than claiming success. LEAD ran both arms:
+
+```
+CONTROL (pre-bridge)   50.0   THIN/0  THIN/1  THIN/1  THIN/0
+WITH bridge            75.0   THIN/0  ADEQ/3  RICH/8  ADEQ/4
+```
+
+**Palais Lascaris is in both runs: 1 fact -> 8 facts, THIN -> RICH.** That is
+the clean datapoint — the same stop, the same request, 63 previously
+unreachable passages now reachable.
+
+**Confound, stated:** the two runs selected different stops (Chapelle de la
+Miséricorde / Église Saint-Jacques versus Castle Hill / Place Rossetti), so the
+tour-level 25-point gain is not purely the bridge. Palais Lascaris is the only
+controlled comparison. Do not quote 50.0 -> 75.0 as a clean measurement.
+
+Museum unmoved: 8-stop 75.0, 4-stop 87.5. Restaurant unmoved at 20.8.
+
+**This is the largest single quality gain of the session, and it came from
+retrieval, not generation.** Four sessions of work went into making the writer
+better; the walking tour's problem was that we were holding the material and
+could not find it (D255). Worth remembering the next time a stop looks thin:
+check whether the corpus exists under another key before concluding the world
+is short of facts (D162, and now its retrieval-side twin).
