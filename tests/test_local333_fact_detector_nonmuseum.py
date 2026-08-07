@@ -444,3 +444,131 @@ class TestPreviousFixesStillWork:
         )
         sa = analyze_stop(_make_stop(text, title="Ambiance"), [_make_stop(text, title="Ambiance")])
         assert sa.distinct_fact_count == 0
+
+
+# ─── BOUNCE R2 TESTS: corrected title rule ─────────────────────────────────
+# The title exclusion was too blunt — it extracted sub-phrases from within
+# longer titles and excluded real people (Ulysses Grant, Andô Naoyuki).
+# Corrected: only exclude names that ARE the full stop title.
+
+
+class TestTitleRuleCorrected:
+    """Person names within longer titles must be KEPT."""
+
+    def test_ulysses_grant_within_longer_title(self):
+        """'Ulysses Grant' within 'Ulysses Grant au Japon' is a person, not a venue."""
+        text = (
+            "The print depicts the momentous reception of Ulysses Grant, "
+            "the President of the United States, and his wife at the "
+            "Imperial Palace in Japan. The woodblock print Ulysses Grant "
+            "au Japon stands as a testament to the power of art."
+        )
+        all_stops = [
+            _make_stop(text, index=5, title="Ulysses Grant au Japon"),
+        ]
+        sa = analyze_stop(all_stops[0], all_stops)
+        assert "Ulysses Grant" in sa.named_people, (
+            f"Person within longer title should be kept: {sa.named_people}"
+        )
+
+    def test_ando_naoyuki_within_longer_title(self):
+        """'Andô Naoyuki' within 'L'Armure d'Andô Naoyuki' is a person."""
+        text = (
+            "Andô Naoyuki, a legendary samurai, commissioned this armour "
+            "in the Edo period for ceremonial use."
+        )
+        all_stops = [
+            _make_stop(text, index=1, title="L'Armure d'Andô Naoyuki"),
+        ]
+        sa = analyze_stop(all_stops[0], all_stops)
+        assert "Andô Naoyuki" in sa.named_people, (
+            f"Person within longer title should be kept: {sa.named_people}"
+        )
+
+    def test_full_title_still_excluded(self):
+        """A name that IS the full title is still excluded (venue)."""
+        text = (
+            "Chez Palmyre, a traditional Niçoise eatery, welcomed guests "
+            "for decades with its hearty regional fare."
+        )
+        all_stops = [
+            _make_stop(text, index=1, title="Chez Palmyre"),
+        ]
+        sa = analyze_stop(all_stops[0], all_stops)
+        assert "Chez Palmyre" not in sa.named_people, (
+            f"Full title should be excluded: {sa.named_people}"
+        )
+
+    def test_la_merenda_full_title_excluded(self):
+        """'La Merenda' as the full title is excluded."""
+        text = (
+            "La Merenda, a tiny Niçoise bistro, serves no-frills regional "
+            "dishes prepared with local ingredients."
+        )
+        all_stops = [
+            _make_stop(text, index=3, title="La Merenda"),
+        ]
+        sa = analyze_stop(all_stops[0], all_stops)
+        assert "La Merenda" not in sa.named_people, (
+            f"Full title should be excluded: {sa.named_people}"
+        )
+
+
+class TestPlaceAppositivePreventsVerbDetection:
+    """When appositive identifies a place, the verb check must not override."""
+
+    def test_arts_asiatiques_building_houses(self):
+        """'Arts Asiatiques, a modern building, houses…' — 'houses' is not
+        an action by a person; the appositive identifies the subject as a building."""
+        text = (
+            "The Musee des Arts Asiatiques, a modern building, houses "
+            "the collection of Asian art from across the continent."
+        )
+        all_stops = [
+            _make_stop(text, index=1, title="Musée des Arts Asiatiques"),
+        ]
+        sa = analyze_stop(all_stops[0], all_stops)
+        assert "Arts Asiatiques" not in sa.named_people, (
+            f"Place with appositive should not be person: {sa.named_people}"
+        )
+
+    def test_old_port_harbor_hosts(self):
+        """'Old Port, a historic harbor, hosts…' — 'hosts' after place appositive."""
+        text = (
+            "The Old Port, a historic harbor, hosts fishing boats and "
+            "luxury yachts side by side in the Mediterranean sun."
+        )
+        all_stops = [
+            _make_stop(text, index=2, title="Port Area"),
+        ]
+        sa = analyze_stop(all_stops[0], all_stops)
+        assert "Old Port" not in sa.named_people, (
+            f"Place with harbor appositive: {sa.named_people}"
+        )
+
+
+class TestTreatPageZeroAcrossAllTours:
+    """'Treat Page' must appear in zero stops across all scorable tours."""
+
+    def test_treat_page_stripped_from_restaurant_tour(self):
+        """The closing offer in LOCAL318 restaurant tour is stripped."""
+        from tour_rubric_scorer import parse_tour
+        import os
+        tour_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'tours', 'LOCAL318_5stop_old_nice_restaurant.txt'
+        )
+        if not os.path.exists(tour_path):
+            import pytest
+            pytest.skip("Tour file not available")
+        with open(tour_path) as f:
+            text = f.read()
+        stops = parse_tour(text)
+        for stop in stops:
+            assert "Treat Page" not in stop['body'], (
+                f"Stop {stop['index']} still contains 'Treat Page' in body"
+            )
+            sa = analyze_stop(stop, stops)
+            assert "Treat Page" not in sa.named_people, (
+                f"Stop {stop['index']} has 'Treat Page' as person: {sa.named_people}"
+            )

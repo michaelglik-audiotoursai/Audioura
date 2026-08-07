@@ -412,7 +412,7 @@ def parse_tour(text: str) -> List[dict]:
     # contains proper phrases ("Treat Page", venue names) that inflate facts.
     # Exclude any line starting with the closing-offer pattern.
     _CLOSING_OFFER_RE = re.compile(
-        r"^That'?s\s+\d+\s+stops?\b", re.IGNORECASE
+        r"^That[\u2019']?s\s+\d+\s+stops?\b", re.IGNORECASE
     )
 
     for stop in stops:
@@ -512,6 +512,12 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
             if not _APPOSITIVE_PLACE_NOUN_RE.search(_appos_clause):
                 _people.add(_name)
                 continue
+            else:
+                # [LOCAL-333 bounce r2] Appositive positively identifies this as
+                # a place/institution (e.g. "Arts Asiatiques, a modern building").
+                # Skip remaining checks — the active verb after the appositive
+                # (e.g. "houses") belongs to the building, not a person.
+                continue
         # Check 2: ACTIVE VERB in post-window — the name is the agent of
         # an action. We look for an -ed or -s verb within 60 chars AFTER the
         # name, but exclude stative/passive uses ("is located", "was situated")
@@ -588,32 +594,27 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
                     if g not in _period_name_words:
                         _people.add(g)
 
-    # --- [LOCAL-333 bounce] Exclude stop titles from people -------------------
-    # A tour's own stop titles are venue/place names, never people. Build a set
-    # of proper-phrase fragments from all stop titles and remove any candidate
-    # that matches one. Uses accent-folded comparison to handle "Musée" vs
-    # "Musee" etc.
-    _title_phrases = set()
+    # --- [LOCAL-333 bounce r2] Exclude stop titles from people -----------------
+    # A tour's own stop titles are venue/place names, never people. But a person
+    # named WITHIN a longer title IS a person (museum objects are often named
+    # after people — "Ulysses Grant au Japon", "L'Armure d'Andô Naoyuki").
+    #
+    # Corrected rule: exclude a candidate ONLY when its text is the FULL stop
+    # title (case-insensitive exact match). A name that is a proper substring
+    # of a longer title is kept — the existing person-context test decides it.
+    import unicodedata as _ud
+    def _accent_fold(s):
+        """Fold accented characters for comparison (Musée -> Musee)."""
+        return ''.join(
+            c for c in _ud.normalize('NFD', s)
+            if _ud.category(c) != 'Mn'
+        ).lower()
+
+    _full_titles_folded = set()
     for _other_stop in all_stops:
-        _t = _other_stop['title']
-        _title_phrases.add(_t)
-        # Also extract multi-word capitalised sub-phrases that _PROPER_PHRASE_RE
-        # would match within the title (e.g. "Arts Asiatiques" from "Musée des
-        # Arts Asiatiques")
-        for _tm in _PROPER_PHRASE_RE.finditer(_t):
-            _title_phrases.add(_tm.group(1))
-        # Additionally, extract contiguous capitalised-word pairs/triples from
-        # the title that the regex might miss due to particles or accents.
-        _twords = _t.split()
-        for _wi in range(len(_twords)):
-            for _wj in range(_wi + 2, min(_wi + 4, len(_twords) + 1)):
-                _frag = ' '.join(_twords[_wi:_wj])
-                # Only add if it starts with a capital
-                if _frag[0].isupper():
-                    _title_phrases.add(_frag)
-    # Remove people that match a title phrase (case-insensitive)
-    _title_lower = {t.lower() for t in _title_phrases}
-    _people = {p for p in _people if p.lower() not in _title_lower}
+        _full_titles_folded.add(_accent_fold(_other_stop['title']))
+    # Remove people whose name exactly matches a full stop title
+    _people = {p for p in _people if _accent_fold(p) not in _full_titles_folded}
 
     # --- [LOCAL-333 bounce] Partial name deduplication ------------------------
     # Fold shorter names into their fuller form when both appear (e.g. "Kenzo"
