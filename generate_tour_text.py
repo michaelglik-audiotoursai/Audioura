@@ -85,6 +85,93 @@ def _build_material_period_patch(material_english, period_english):
     return ""
 
 
+# ---------------------------------------------------------------------------
+# [LOCAL-330] Module-level helper: extract a clean place name from the raw
+# location/request string for the prolog location slot.
+#
+# The request string has two known shapes:
+#   1. "<category> tour in|of <place>"   (prefix form)
+#   2. "<place> <category> tour"         (suffix form, e.g. museum tours)
+#
+# We anchor to these leading/trailing constructions. If neither matches,
+# the location is already a place — leave it alone.
+#
+# This avoids a word blocklist (D236) which corrupts real place names that
+# contain category words (Hyde Park, Central Park, Boat Quay, Garden District).
+# ---------------------------------------------------------------------------
+_PROLOG_CATEGORY_ALTERNATION = (
+    r'(?:self[- ]guided\s+)?'
+    r'(?:restaurant|restaurants|food|dining|culinary|eat|cafe|bistro|eatery'
+    r'|walking|walk|hiking|hike'
+    r'|cycling|cycle|bike|biking'
+    r'|museum|gallery|exhibition'
+    r'|architecture|architectural'
+    r'|pub\s+crawl|pub|crawl|shopping'
+    r'|movie|film|book|literary|novel'
+    r'|botanical|garden|park'
+    r'|guided'
+    r'|camel|camelback|horse|horseback'
+    r'|dog|dogsled|dogsledding'
+    r'|auto|car|driving|jeep|motorcycle|scooter'
+    r'|safari|segway|boat|kayak'
+    r')s?'
+)
+
+# Prefix: "restaurant tour in Old Nice" → "Old Nice"
+_PROLOG_TOUR_PREFIX_RE = re.compile(
+    r'^' + _PROLOG_CATEGORY_ALTERNATION +
+    r'\s+tours?\s*'
+    r'(?:in|of|through|around|across|along)?\s*',
+    re.IGNORECASE,
+)
+
+# Suffix: "Musée Matisse, Nice, France museum tour" → "Musée Matisse, Nice, France"
+_PROLOG_TOUR_SUFFIX_RE = re.compile(
+    r'\s+' + _PROLOG_CATEGORY_ALTERNATION +
+    r'\s+tours?$',
+    re.IGNORECASE,
+)
+
+
+def _prolog_place(location: str) -> str:
+    """Derive a clean place name from a raw tour request string.
+
+    If the string starts with a recognised "<category> tour (in|of|...)"
+    prefix, strip that prefix and return the remainder as the place name.
+    If the string ends with "<category> tour" suffix, strip that suffix.
+    If neither matches, return the location unchanged — it is already a
+    usable place name.
+
+    Examples:
+        "restaurant tour in Old Nice (Vieux Nice), France"
+            → "Old Nice (Vieux Nice), France"
+        "Musée Matisse, Nice, France museum tour"
+            → "Musée Matisse, Nice, France"
+        "Hyde Park, London"
+            → "Hyde Park, London"  (unchanged — no prefix/suffix)
+        "walking tour of Trastevere, Rome, Italy"
+            → "Trastevere, Rome, Italy"
+    """
+    # Try prefix strip first
+    stripped = _PROLOG_TOUR_PREFIX_RE.sub('', location, count=1)
+    if stripped != location:
+        stripped = re.sub(r'\s{2,}', ' ', stripped).strip().strip(',').strip()
+        if stripped:
+            return stripped
+        return location
+
+    # Try suffix strip
+    stripped = _PROLOG_TOUR_SUFFIX_RE.sub('', location, count=1)
+    if stripped != location:
+        stripped = re.sub(r'\s{2,}', ' ', stripped).strip().strip(',').strip()
+        if stripped:
+            return stripped
+        return location
+
+    # No prefix or suffix matched — location is already a place name
+    return location
+
+
 # PHASE 3C: neighborhood/borough -> canonical city map for address-based location guard.
 # Covers USPS city names that differ from the city users request tours in.
 _NEIGHBORHOOD_TO_CITY = {
@@ -9186,40 +9273,8 @@ REWRITE RULES (all mandatory):
             }.get(transport_mode, transport_mode)
 
             # [LOCAL-330] Derive a clean place name for the prolog location slot.
-            # The raw `location` parameter carries the full request string (e.g.
-            # "restaurant tour in Old Nice (Vieux Nice), France") which reads
-            # nonsensically in "a walking journey through [location]". Strip
-            # category words and "tour" to yield just the place.
-            _PROLOG_CATEGORY_WORDS = {
-                'restaurant', 'restaurants', 'food', 'dining', 'culinary',
-                'eat', 'cafe', 'bistro', 'eatery',
-                'walking', 'walk', 'hiking', 'hike',
-                'cycling', 'cycle', 'bike', 'biking',
-                'museum', 'gallery', 'exhibition',
-                'architecture', 'architectural',
-                'pub', 'crawl', 'shopping',
-                'movie', 'film', 'book', 'literary', 'novel',
-                'botanical', 'garden', 'park',
-                'self-guided', 'guided',
-                'camel', 'camelback', 'horse', 'horseback',
-                'dog', 'dogsled', 'dogsledding',
-                'auto', 'car', 'driving', 'jeep', 'motorcycle', 'scooter',
-                'safari', 'segway', 'boat', 'kayak',
-                'tour', 'tours',
-            }
-            _prolog_place = location
-            # Strip category/transport/tour words (word-boundary match)
-            _prolog_place = re.sub(
-                r'\b(' + '|'.join(re.escape(w) for w in sorted(_PROLOG_CATEGORY_WORDS, key=len, reverse=True)) + r')\b',
-                '', _prolog_place, flags=re.IGNORECASE
-            )
-            # Strip leading prepositions left orphaned (e.g. "in Old Nice")
-            _prolog_place = re.sub(r'^\s*(in|of|through|around|across|along)\s+', '', _prolog_place, flags=re.IGNORECASE)
-            # Collapse whitespace, strip punctuation debris
-            _prolog_place = re.sub(r'\s{2,}', ' ', _prolog_place).strip().strip(',').strip()
-            # If stripping emptied the string, fall back to raw location
-            if not _prolog_place:
-                _prolog_place = location
+            # Uses the module-level _prolog_place() helper (prefix-anchored strip).
+            _prolog_place_name = _prolog_place(location)
 
             # --- Part 3 data: extract sourced facts from stop_corpus ---
             _prolog_corpus_facts = {}  # stop_name → [fact strings]
@@ -9294,7 +9349,7 @@ REWRITE RULES (all mandatory):
                 _part1_instruction = (
                     f'State the tour name and mode of transport. '
                     f'Example shape: "You are about to embark on a [{_prolog_transport_display}] '
-                    f'journey through [{_prolog_place}]."'
+                    f'journey through [{_prolog_place_name}]."'
                 )
                 if len(_prolog_stop_names) >= 2 and _prolog_stop_names[0] != _prolog_stop_names[-1] and _prolog_distance_meaningful:
                     _part2_instruction = (
@@ -9324,7 +9379,7 @@ REWRITE RULES (all mandatory):
             _prolog_prompt = f"""[LOCAL-259/LOCAL-270] Write a tour prolog in EXACTLY three sequential parts. Each part has a specific purpose. Output them as one flowing paragraph (no labels, no numbering), but ensure all three parts are present in order.
 
 TOUR DATA:
-- Tour name/location: {_prolog_place}
+- Tour name/location: {_prolog_place_name}
 - Transport mode: {_prolog_transport_display}
 - Tour category: {'museum' if _is_museum_prolog else 'geographic'}
 - Stops: {', '.join(_prolog_stop_names)}
