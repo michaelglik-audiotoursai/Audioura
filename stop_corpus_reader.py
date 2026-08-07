@@ -162,9 +162,15 @@ def get_stop_corpus_for_tour(
             if isinstance(sources_raw, str):
                 sources_raw = json.loads(sources_raw)
 
+            # [LOCAL-328] Filter sludge passages at read time.
+            # This removes directory listings, keyword blobs, and search-result
+            # collages that inflate passage_count without carrying facts.
+            from corpus_source_quality import filter_passages_for_generation
+            passages_filtered = filter_passages_for_generation(passages_raw)
+
             # Extract passage texts
             passages = []
-            for p in (passages_raw or []):
+            for p in (passages_filtered or []):
                 if isinstance(p, dict):
                     text = p.get('text', '')
                 elif isinstance(p, str):
