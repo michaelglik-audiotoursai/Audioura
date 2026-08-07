@@ -165,6 +165,12 @@ def get_stop_corpus_for_tour(
     # Used as tie-breaker, not as primary filter.
     preferred_venue = _find_corpus_venue_name(clean_venue, conn)
 
+    # [LOCAL-342] Pre-fetch venue_corpus rows for venue-as-stop bridging.
+    # A place can be a VENUE in one tour (museum) and a STOP in another (walking).
+    # When stop_corpus has no row for such a stop, the venue's own pages (Wikipedia
+    # articles about the building) are valid material about the stop-as-place.
+    venue_corpus_rows = _fetch_venue_corpus_rows(conn)
+
     # Match each stop to its best corpus row (title-first, venue as tie-breaker)
     for stop_name in stop_names:
         matched = _match_stop_title_first(stop_name, all_corpus_rows, preferred_venue)
@@ -206,7 +212,12 @@ def get_stop_corpus_for_tour(
                 'passage_roles': roles_raw or [],
             } if passages else None
         else:
-            result[stop_name] = None
+            # [LOCAL-342] Venue-as-stop bridge: when a stop has no stop_corpus
+            # row, check if its title matches a venue_corpus venue_name. If so,
+            # the venue's own pages (about the building/place) are usable as
+            # material for this stop — filtered for relevance.
+            bridged = _bridge_venue_corpus_to_stop(stop_name, venue_corpus_rows)
+            result[stop_name] = bridged
 
     return result
 
@@ -496,3 +507,235 @@ def format_passages_for_prompt(
             )
 
     return "\n".join(lines) + "\n"
+
+
+# ─── LOCAL-342: Venue-as-stop bridging ───────────────────────────────────────
+#
+# A place that is a VENUE in one tour (e.g. "Palais Lascaris, Nice" as a museum
+# tour) can be a STOP in another (e.g. "Palais Lascaris" as a walking tour stop).
+# The venue_corpus holds Wikipedia pages about the building itself — valid
+# material for a walking-tour listener standing outside.
+#
+# Critical constraint: NOT all venue_corpus content is about the venue-as-place.
+# The stop_corpus rows filed under that venue are about objects INSIDE it
+# (instruments, paintings). Those are already handled by normal stop_corpus
+# matching and must not be confused with venue-level material.
+#
+# The bridge:
+#   1. Match stop title to venue_corpus.venue_name (accent-folded, city-suffix tolerant)
+#   2. Extract pages_json text (Wikipedia articles about the building)
+#   3. Split into paragraph-sized passages
+#   4. Filter: reject passages that are about individual objects inside (catalogue
+#      entries) — keep only content about the building, history, architecture
+
+
+def _fetch_venue_corpus_rows(conn) -> List[Dict]:
+    """Fetch all venue_corpus rows (venue_name + pages_json) for bridging.
+
+    Returns list of {venue_name, pages_json} dicts.
+    Only fetches rows where pages_json is an array (has page content).
+    """
+    import psycopg2.extras
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        "SELECT venue_name, pages_json FROM venue_corpus "
+        "WHERE jsonb_typeof(pages_json) = 'array'"
+    )
+    rows = cur.fetchall()
+    cur.close()
+    return rows
+
+
+def _venue_name_matches_stop(stop_name: str, venue_name: str) -> bool:
+    """Check if a stop title matches a venue_corpus venue_name.
+
+    Handles:
+      - Exact match (case-insensitive, accent-folded)
+      - City-suffix stripping: "Palais Lascaris, Nice" → "Palais Lascaris"
+      - Typographic apostrophe folding (D253)
+
+    Does NOT match:
+      - Partial word overlap (too loose)
+      - "walking area" suffixed venue names (those are geographic areas, not buildings)
+    """
+    # Reject "walking area" venues — they are tour-type labels, not specific buildings
+    if 'walking area' in venue_name.lower():
+        return False
+
+    stop_folded = _accent_fold(stop_name).lower().strip()
+    venue_folded = _accent_fold(venue_name).lower().strip()
+
+    # Direct match
+    if stop_folded == venue_folded:
+        return True
+
+    # Strip city suffix from venue: "Palais Lascaris, Nice" → "Palais Lascaris"
+    # Also handles "Musee Picasso, Antibes, France" → "Musee Picasso"
+    venue_parts = venue_folded.split(',')
+    venue_base = venue_parts[0].strip()
+    if stop_folded == venue_base:
+        return True
+
+    # Stop might have a city suffix too: "Nice Cathedral" matching "Nice Cathedral, Nice"
+    stop_parts = stop_folded.split(',')
+    stop_base = stop_parts[0].strip()
+    if stop_base == venue_base:
+        return True
+
+    return False
+
+
+def _split_into_passages(text: str, max_passage_len: int = 800) -> List[str]:
+    """Split a page text into paragraph-sized passages.
+
+    Uses double-newlines (paragraph breaks) as the primary split.
+    Merges very short paragraphs with the next one.
+    Splits very long paragraphs at sentence boundaries.
+    """
+    # Split on section headers (== ... ==) and double newlines
+    raw_paragraphs = re.split(r'\n\s*\n|\n\s*==\s*', text)
+    passages = []
+    buffer = ""
+
+    for para in raw_paragraphs:
+        para = para.strip()
+        # Remove wiki markup header closers
+        para = re.sub(r'\s*==\s*$', '', para).strip()
+        if not para:
+            continue
+
+        if len(buffer) + len(para) + 1 <= max_passage_len:
+            buffer = (buffer + "\n" + para).strip() if buffer else para
+        else:
+            if buffer:
+                passages.append(buffer)
+            # If this paragraph is itself too long, split at sentences
+            if len(para) > max_passage_len:
+                sentences = re.split(r'(?<=[.!?])\s+', para)
+                chunk = ""
+                for sent in sentences:
+                    if len(chunk) + len(sent) + 1 <= max_passage_len:
+                        chunk = (chunk + " " + sent).strip() if chunk else sent
+                    else:
+                        if chunk:
+                            passages.append(chunk)
+                        chunk = sent
+                buffer = chunk
+            else:
+                buffer = para
+
+    if buffer:
+        passages.append(buffer)
+
+    return passages
+
+
+def _is_object_catalogue_passage(passage: str) -> bool:
+    """Detect if a passage is about a specific object inside the venue.
+
+    Returns True for catalogue-style entries about instruments, paintings,
+    sculptures — content that describes individual items, not the building.
+
+    Conservative: only rejects passages that are clearly about a single object,
+    not passages that mention objects in the context of the building's collection.
+    """
+    passage_lower = passage.lower()
+
+    # Catalogue patterns: "made by X in Y", instrument/artwork descriptions
+    # that are about a specific item rather than the venue
+    _object_indicators = [
+        # Specific maker attribution patterns
+        r'\b(made|crafted|built|created|painted|sculpted)\s+by\s+[A-Z]',
+        # Instrument dimensions/materials (catalogue entries)
+        r'\b(length|height|width)\s*:\s*\d+\s*(cm|mm|inches)',
+        # Accession/inventory numbers
+        r'\b(inv\.|accession|catalogue)\s*(no\.?|number|#)\s*[\d]',
+    ]
+
+    for pattern in _object_indicators:
+        if re.search(pattern, passage, re.IGNORECASE):
+            # Only reject if the passage is SHORT (a pure catalogue entry).
+            # Longer passages mentioning a maker in context of the building's
+            # history are fine.
+            if len(passage) < 200:
+                return True
+
+    return False
+
+
+def _bridge_venue_corpus_to_stop(
+    stop_name: str,
+    venue_corpus_rows: List[Dict],
+) -> Optional[Dict]:
+    """[LOCAL-342] Bridge venue_corpus pages into a stop's material.
+
+    When a stop has no stop_corpus row but its title matches a venue_corpus
+    venue_name, the venue's own pages (Wikipedia articles about the building)
+    are valid material for a walking-tour stop.
+
+    Returns {passages: [...], sources: [...], passage_roles: [...]} or None.
+    """
+    matched_venue = None
+    for vc_row in venue_corpus_rows:
+        if _venue_name_matches_stop(stop_name, vc_row['venue_name']):
+            matched_venue = vc_row
+            break
+
+    if not matched_venue:
+        return None
+
+    pages_json = matched_venue['pages_json']
+    if isinstance(pages_json, str):
+        pages_json = json.loads(pages_json)
+
+    if not isinstance(pages_json, list) or not pages_json:
+        return None
+
+    # Extract passages from venue pages, filtering for relevance
+    all_passages = []
+    sources = []
+
+    for page in pages_json:
+        if not isinstance(page, dict):
+            continue
+        text = page.get('text', '')
+        url = page.get('url', '')
+        title = page.get('title', '')
+
+        if not text or len(text) < 50:
+            continue
+
+        # Split into passage-sized chunks
+        page_passages = _split_into_passages(text)
+
+        for p in page_passages:
+            # Filter: reject object catalogue entries
+            if _is_object_catalogue_passage(p):
+                continue
+            # Reject very short fragments
+            if len(p) < 40:
+                continue
+            all_passages.append(p)
+
+        if url:
+            sources.append({
+                'url': url,
+                'tier': 1,  # Wikipedia = tier 1
+                'title': title or f'Venue page: {matched_venue["venue_name"]}',
+                'type': 'venue_corpus_bridge',
+                'tier_reason': 'LOCAL-342: venue_corpus bridge (Wikipedia about the building)',
+            })
+
+    if not all_passages:
+        return None
+
+    logger.info(
+        "[LOCAL-342] Venue-as-stop bridge: %r matched venue %r — %d passages from %d pages",
+        stop_name, matched_venue['venue_name'], len(all_passages), len(pages_json)
+    )
+
+    return {
+        'passages': all_passages,
+        'sources': sources,
+        'passage_roles': [{'role': 'about_venue_as_stop'} for _ in all_passages],
+    }
