@@ -85,6 +85,104 @@ def _build_material_period_patch(material_english, period_english):
     return ""
 
 
+# ---------------------------------------------------------------------------
+# [LOCAL-330] Module-level helper: extract a clean place name from the raw
+# location/request string for the prolog location slot.
+#
+# The request string has a known shape:
+#   prefix: "<anything> tour (in|of|through|around|across|along|,) <place>"
+#   suffix: "<place> <anything> tour"
+#
+# We anchor on the word "tour" followed by a preposition (or comma). This
+# avoids a category-word list entirely (D236) — no list means no list to
+# extend, no place names corrupted by matching category words inside them
+# (Hyde Park, Central Park, Boat Quay, Garden District, etc.).
+#
+# "Tours, France" is safe: "Tours" is not followed by a preposition.
+# "Tour Eiffel, Paris" is safe: "Tour" is not followed by a preposition.
+# ---------------------------------------------------------------------------
+
+# Prefix: "<anything> tour in Old Nice" → "Old Nice"
+# Matches everything from the start up to and including "tour(s)" + preposition/comma.
+# The key insight: require a preposition or comma AFTER "tour" — this is what
+# distinguishes "dog sledding tour in Big Lake" from "Tours, France".
+_PROLOG_TOUR_PREFIX_RE = re.compile(
+    r'^.+?\btours?\s*'
+    r'(?:in|of|through|around|across|along|,)\s*',
+    re.IGNORECASE,
+)
+
+# Suffix: "Musée Matisse, Nice, France museum tour" → "Musée Matisse, Nice, France"
+# Also handles dash-separated: "Big Lake, AK - Dog Sledding Tour" → "Big Lake, AK"
+# Two shapes:
+#   1. " - <anything> tour(s)" at end (dash separator — clear delimiter)
+#   2. " <word> tour(s)" at end (single word before tour, like "museum tour")
+# We limit the non-dash form to a single word to avoid eating into place names
+# like "France" in "Nice, France museum tour".
+_PROLOG_TOUR_SUFFIX_RE = re.compile(
+    r'(?:'
+    r'\s+-\s+.+?\btours?'   # " - Dog Sledding Tour"
+    r'|'
+    r'\s+\w+\s+tours?'      # " museum tour" (single word before tour)
+    r')$',
+    re.IGNORECASE,
+)
+
+
+def _prolog_place(location: str) -> str:
+    """Derive a clean place name from a raw tour request string.
+
+    The request string has a known construction:
+        "<anything> tour (in|of|through|around|across|along|,) <place>"
+    We anchor on 'tour' + preposition — no category-word list needed (D236).
+
+    If no such prefix exists, try a trailing suffix form:
+        "<place> - <words> tour" or "<place> <words> tour"
+
+    If neither matches, the location is already a place name — return unchanged.
+
+    Examples:
+        "restaurant tour in Old Nice (Vieux Nice), France"
+            → "Old Nice (Vieux Nice), France"
+        "dog sledding tour in Big Lake, Alaska"
+            → "Big Lake, Alaska"
+        "food and wine tour of Tuscany"
+            → "Tuscany"
+        "Musée Matisse, Nice, France museum tour"
+            → "Musée Matisse, Nice, France"
+        "Hyde Park, London"
+            → "Hyde Park, London"  (unchanged)
+        "Tours, France"
+            → "Tours, France"  (unchanged)
+        "Tour Eiffel, Paris"
+            → "Tour Eiffel, Paris"  (unchanged)
+    """
+    # Try prefix strip first
+    stripped = _PROLOG_TOUR_PREFIX_RE.sub('', location, count=1)
+    if stripped != location:
+        stripped = re.sub(r'\s{2,}', ' ', stripped).strip().strip(',').strip()
+        if not stripped:
+            return location
+        # After prefix strip, also try suffix (handles "tour, Place - Category Tour")
+        further = _PROLOG_TOUR_SUFFIX_RE.sub('', stripped, count=1)
+        if further != stripped:
+            further = re.sub(r'\s{2,}', ' ', further).strip().strip(',').strip()
+            if further:
+                return further
+        return stripped
+
+    # Try suffix strip (no prefix matched)
+    stripped = _PROLOG_TOUR_SUFFIX_RE.sub('', location, count=1)
+    if stripped != location:
+        stripped = re.sub(r'\s{2,}', ' ', stripped).strip().strip(',').strip()
+        if stripped:
+            return stripped
+        return location
+
+    # No prefix or suffix matched — location is already a place name
+    return location
+
+
 # PHASE 3C: neighborhood/borough -> canonical city map for address-based location guard.
 # Covers USPS city names that differ from the city users request tours in.
 _NEIGHBORHOOD_TO_CITY = {
@@ -9185,6 +9283,10 @@ REWRITE RULES (all mandatory):
                 'animal': 'riding', 'country_scale': 'road trip'
             }.get(transport_mode, transport_mode)
 
+            # [LOCAL-330] Derive a clean place name for the prolog location slot.
+            # Uses the module-level _prolog_place() helper (prefix-anchored strip).
+            _prolog_place_name = _prolog_place(location)
+
             # --- Part 3 data: extract sourced facts from stop_corpus ---
             _prolog_corpus_facts = {}  # stop_name → [fact strings]
             if _stop_corpus_data:
@@ -9258,7 +9360,7 @@ REWRITE RULES (all mandatory):
                 _part1_instruction = (
                     f'State the tour name and mode of transport. '
                     f'Example shape: "You are about to embark on a [{_prolog_transport_display}] '
-                    f'journey through [{location}]."'
+                    f'journey through [{_prolog_place_name}]."'
                 )
                 if len(_prolog_stop_names) >= 2 and _prolog_stop_names[0] != _prolog_stop_names[-1] and _prolog_distance_meaningful:
                     _part2_instruction = (
@@ -9288,7 +9390,7 @@ REWRITE RULES (all mandatory):
             _prolog_prompt = f"""[LOCAL-259/LOCAL-270] Write a tour prolog in EXACTLY three sequential parts. Each part has a specific purpose. Output them as one flowing paragraph (no labels, no numbering), but ensure all three parts are present in order.
 
 TOUR DATA:
-- Tour name/location: {location}
+- Tour name/location: {_prolog_place_name}
 - Transport mode: {_prolog_transport_display}
 - Tour category: {'museum' if _is_museum_prolog else 'geographic'}
 - Stops: {', '.join(_prolog_stop_names)}
