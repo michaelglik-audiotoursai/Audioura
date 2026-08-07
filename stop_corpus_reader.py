@@ -521,6 +521,46 @@ def format_passages_for_prompt(
         "contains zero material from the provided passages is a failure."
     )
 
+    # [LOCAL-352] Narrative arc directive: when corpus contains a person doing
+    # something — leaving, founding, refusing, recommending, returning — the
+    # stop must tell what happened, not merely that the person is associated.
+    # Without this, "a chef who left the Negresco to cook for twenty people"
+    # collapses to "a former Michelin-starred chef" — a credential, not a story.
+    lines.append("")
+    lines.append(
+        "NARRATIVE ARC RULE (LOCAL-352 — critical): When a passage describes a person "
+        "DOING something — leaving a position, founding a place, refusing an offer, "
+        "recommending a dish, returning after years away — your description MUST tell "
+        "the sequence of events, not merely state the person's credential or association. "
+        "A credential is an adjective (\"Michelin-starred chef\"); a narrative is a "
+        "sequence (\"he left his two-star kitchen at the Negresco to cook for twenty "
+        "people in a back-street bistro\"). The listener wants to experience what "
+        "happened, not read a résumé. Specifically:"
+    )
+    lines.append(
+        "  - If a passage names WHERE someone came from and WHERE they went, state both."
+    )
+    lines.append(
+        "  - If a passage names WHAT someone gave up and WHAT they chose instead, "
+        "state the contrast."
+    )
+    lines.append(
+        "  - If a passage names a specific person recommending, reviewing, or "
+        "recounting an experience at this place, tell it as an event: who did what, "
+        "where, and what they said or found. This applies to visitors, critics, "
+        "chefs from elsewhere, and documented incidents — not only owners."
+    )
+    lines.append(
+        "  - Do NOT flatten a narrative into a single adjective or title. "
+        "\"Former head chef of the Negresco\" is a title; \"walked away from the "
+        "Negresco's two Michelin stars to serve twenty people at a place whose name "
+        "means workman's snack\" is a story. Tell the story."
+    )
+    lines.append(
+        "  - Every element of the story MUST come from the passages above. You may "
+        "not infer motivation, emotion, or dates not stated in the source material."
+    )
+
     # [LOCAL-203] Add role-specific guidance when roles are present
     if roles:
         has_creator = any(
