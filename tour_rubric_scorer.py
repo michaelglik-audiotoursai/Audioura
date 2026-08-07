@@ -340,6 +340,10 @@ class StopAnalysis:
     # (measured, no claims grounded). "We did not check" ≠ "we checked and
     # everything matched."
     groundedness_fraction: Optional[float] = None
+    # [LOCAL-343] Number of claims the groundedness fraction is based on.
+    # Exposes sample size: 1.0 on n=1 is different from 1.0 on n=12.
+    # 0 means corpus existed but no extractable claims were found (vacuous).
+    groundedness_claims_checked: int = 0
     contradicted_share: float = 0.0     # fraction of claims contradicted by corpus
     ungrounded_claims: List[str] = field(default_factory=list)  # corpus worklist
 
@@ -981,7 +985,10 @@ def classify_stop(sa: 'StopAnalysis') -> Tuple[str, str]:
     if groundedness is None:
         groundedness_str = "unmeasured"
     else:
-        groundedness_str = f"{groundedness:.0%}"
+        # [LOCAL-343] Include sample size (n=X) so readers can distinguish
+        # 1.0 on 1 claim from 1.0 on 12 claims.
+        n = sa.groundedness_claims_checked
+        groundedness_str = f"{groundedness:.0%} (n={n})"
 
     evidence = (
         f"{facts} distinct facts over {sa.content_sentences} content sentences "
@@ -1527,6 +1534,10 @@ def _compute_groundedness_for_stop(sa: 'StopAnalysis', stop: dict, corpus_data: 
     body = stop.get('body', sa.text)
     result = measure_stop_groundedness(body, stop_title, passages)
 
+    # [LOCAL-343] Record claim count for sample-size visibility.
+    sa.groundedness_claims_checked = result.total_claims
+    # groundedness_fraction: None when total_claims==0 (nothing checkable),
+    # a float when claims were actually checked.
     sa.groundedness_fraction = result.groundedness_fraction
     sa.ungrounded_claims = [c['claim_text'] for c in result.corpus_worklist]
 

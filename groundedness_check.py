@@ -159,7 +159,9 @@ class GroundednessResult:
     grounded_claims: int
     ungrounded_claims: int
     contradicted_claims: int
-    groundedness_fraction: float
+    # [LOCAL-343] None when total_claims == 0: nothing was checkable, so
+    # groundedness is unmeasured — not vacuously 1.0.
+    groundedness_fraction: Optional[float]
     claims_detail: List[Dict] = field(default_factory=list)
     # The ungrounded claims as a worklist
     corpus_worklist: List[Dict] = field(default_factory=list)
@@ -377,7 +379,10 @@ def measure_stop_groundedness(
             })
 
     total = grounded + ungrounded + contradicted
-    fraction = grounded / total if total > 0 else 1.0
+    # [LOCAL-343] Zero claims → None (unmeasured), NOT 1.0.
+    # "Nothing to check" is not "everything checked and verified."
+    # A vacuous 1.0 would let a stop pass quality gates it never cleared.
+    fraction = grounded / total if total > 0 else None
 
     return GroundednessResult(
         stop_title=stop_title,
@@ -442,7 +447,8 @@ def measure_tour_groundedness(
         total_contradicted += result.contradicted_claims
         full_worklist.extend(result.corpus_worklist)
 
-    overall_fraction = total_grounded / total_claims if total_claims > 0 else 1.0
+    # [LOCAL-343] Same principle at aggregate level: zero total claims → None.
+    overall_fraction = total_grounded / total_claims if total_claims > 0 else None
 
     return {
         'stops': results,
