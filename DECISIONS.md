@@ -10400,3 +10400,44 @@ DATABASE_URL=postgresql://admin:password123@localhost:5433/audiotours \
 STORIED_MODE=true OPENAI_API_KEY=... python3 -c "..."
 ```
 Added to `restart.sh` guidance so a future session does not repeat it.
+
+## D262 — A cache hit produced a log LEAD nearly built a theory on
+**2026-08-07.**
+
+Verifying LOCAL-346, LEAD regenerated the walking tour and found Palais Lascaris
+still THIN with 1 fact despite the reader now returning 30 passages. From a log
+showing no `stop_corpus` activity, LEAD inferred that the load is guarded by
+`if _storied_spine:` and that a failed spine skips corpus entirely — and was
+about to dispatch on it.
+
+**The run never happened.** The log is 24 lines and ends:
+
+```
+CACHE HIT: walking tour of Vieux Nice, France / walking / 4
+```
+
+The scored file was a cached copy of an earlier tour. Every conclusion drawn
+from it was about output produced before the fix existed.
+
+The tell was there in plain sight: 24 log lines against 523 for a real run.
+LEAD read the content of the log and never asked why it was twenty times too
+short.
+
+**Audited all seven recent generation logs: only this one was a cache hit.**
+The LOCAL-342 control/treatment pair and the LOCAL-345 verification were real
+generations, so those results stand. `DISABLE_TOUR_CACHE=1` bypasses it;
+identical location/type/stop-count across runs will otherwise hit cache — which
+is precisely the shape of a before/after comparison.
+
+**Required for any before/after generation from now on:**
+```
+DISABLE_TOUR_CACHE=1 DATABASE_URL=postgresql://admin:password123@localhost:5433/audiotours \
+STORIED_MODE=true OPENAI_API_KEY=... python3 -c "..."
+```
+Without the first flag you may compare a tour against itself; without the
+second the stop-existence gate silently does not run (D261).
+
+**Fourth wrong attribution in one session** — the museum vector, the missing
+stop, the gate-versus-thin-row, and now this. Every one was caught by checking
+the mechanism rather than the correlation. **Check that the run ran** before
+interpreting what it produced.
