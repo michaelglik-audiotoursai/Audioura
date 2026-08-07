@@ -114,6 +114,16 @@ _APPOSITIVE_PERSON_RE = re.compile(
     r',\s+(?:a|an|the|one)\s+[a-zéèêëàâùûôîïçñ]+'
 )
 
+# [LOCAL-350] Pattern 1b: RELATIVE CLAUSE — "Name, who <verb>..."
+# A non-restrictive relative clause is structurally equivalent to an appositive:
+# the antecedent (the name) IS the agent of the verb after "who".
+# "Madalin Acchiardo, who opened the restaurant" → Madalin Acchiardo is a person.
+# Guard: the verb after "who" must not be stative ("who is located") and the
+# clause must not contain a place noun that would make it a geographic entity.
+_RELATIVE_CLAUSE_PERSON_RE = re.compile(
+    r',\s+who\s+[a-zéèêëàâùûôîïçñ]+'
+)
+
 # [LOCAL-333] Place/institution nouns that appear IN an appositive and indicate
 # the subject is a geographic entity, not a person.  "Nice, a coastal city" →
 # the appositive contains "city", so "Nice" is not a person.
@@ -590,6 +600,22 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
                 # Skip remaining checks — the active verb after the appositive
                 # (e.g. "houses") belongs to the building, not a person.
                 continue
+        # [LOCAL-350] Check 1b: RELATIVE CLAUSE — ", who <verb>" after the name.
+        # Non-restrictive relative clause: the antecedent is the person performing
+        # the action. "Madalin Acchiardo, who opened the restaurant" — Madalin is
+        # the agent of "opened".
+        # GUARD: stative verbs ("who is", "who was") do not identify a person.
+        if _RELATIVE_CLAUSE_PERSON_RE.match(_post_text):
+            # Extract the verb after "who" to check it's not stative
+            _rel_clause = _post_text[:60]
+            _who_verb_m = re.match(r',\s+who\s+(\w+)', _rel_clause)
+            if _who_verb_m:
+                _who_verb = _who_verb_m.group(1).lower()
+                # Stative/copula verbs don't identify a person
+                if _who_verb not in ('is', 'was', 'are', 'were', 'has', 'had',
+                                     'being', 'been', 'becomes', 'became'):
+                    _people.add(_name)
+                    continue
         # Check 2: ACTIVE VERB in post-window — the name is the agent of
         # an action. We look for an -ed or -s verb within 60 chars AFTER the
         # name, but exclude stative/passive uses ("is located", "was situated")
@@ -664,6 +690,44 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
             if g and g.lower() not in _SINGLE_WORD_EXCLUSIONS:
                 if not _NOT_A_PERSON_RE.search(g):
                     if g not in _period_name_words:
+                        _people.add(g)
+
+    # [LOCAL-350] Track 4: single-word names preceded by an identity/familial
+    # role noun OR the word "named". Structural patterns:
+    #   "husband X" / "wife X" / "widow X" / "son X" / "daughter X"
+    #   "brother X" / "sister X" / "father X" / "mother X" / "uncle X" / "aunt X"
+    # These identify a person by relationship.
+    # Guard: the name must not be in _SINGLE_WORD_EXCLUSIONS or _NOT_A_PERSON_RE.
+    # This is the general model per LOCAL-333: role noun + name is the SHAPE,
+    # not a vocabulary list of domains.
+    _NAMED_PERSON_SINGLE_RE = re.compile(
+        r'\b(?:husband|wife|widow|widower|son|daughter|brother|sister|'
+        r'father|mother|uncle|aunt|nephew|niece|cousin|grandfather|grandmother|'
+        r'partner|fiancé|fiancée|fiance|fiancee)\s+'
+        r'([A-Z][a-zéèêëàâùûôîïçñ\u2019]{2,})\b'
+    )
+    for _m in _NAMED_PERSON_SINGLE_RE.finditer(body):
+        g = _m.group(1)
+        if g.lower() not in _SINGLE_WORD_EXCLUSIONS:
+            if not _NOT_A_PERSON_RE.search(g):
+                if g not in _period_name_words:
+                    _people.add(g)
+    # [LOCAL-350] Track 4b: "named X" where X is a single-word person name.
+    # GUARD: "was/is/been named X" is stative — it names a place/thing, not
+    # a person. Only fire when "named" is NOT preceded by a copula/passive.
+    # Valid: "a widow named Giuseppe", "chef named Marco"
+    # Invalid: "was named Nice", "is named Saleya"
+    _NAMED_KEYWORD_RE = re.compile(
+        r'\bnamed\s+([A-Z][a-zéèêëàâùûôîïçñ\u2019]{2,})\b'
+    )
+    for _m in _NAMED_KEYWORD_RE.finditer(body):
+        g = _m.group(1)
+        if g.lower() not in _SINGLE_WORD_EXCLUSIONS:
+            if not _NOT_A_PERSON_RE.search(g):
+                if g not in _period_name_words:
+                    # Check that "named" is NOT preceded by a copula/passive
+                    _pre_named = body[max(0, _m.start() - 20):_m.start()]
+                    if not re.search(r'\b(?:was|is|were|are|been|being|became|become)\s+$', _pre_named, re.IGNORECASE):
                         _people.add(g)
 
     # --- [LOCAL-333 bounce r2] Exclude stop titles from people -----------------
