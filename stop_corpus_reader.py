@@ -26,6 +26,163 @@ def _normalize_for_match(text: str) -> str:
     return re.sub(r'[^a-z0-9\s]', '', text.lower()).strip()
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# [LOCAL-352] Passage deduplication and narrative-action ranking.
+#
+# Problem: when multiple corpus rows exist for the same stop_title (under
+# different venue_names), only one row was selected. Even within a single row,
+# near-duplicate passages restate the same fact and crowd out unique narrative
+# content — a 2000-char budget fills with "Le Stanc runs La Merenda" six times
+# while the one passage describing what he LEFT to come here never reaches the
+# model.
+#
+# Solution:
+#   1. Merge passages from ALL exact-match rows for the same stop_title.
+#   2. Deduplicate: passages whose normalized text overlaps > 70% by word set
+#      are near-duplicates. Keep the longest.
+#   3. Rank: passages containing narrative-action verbs (left, founded, refused,
+#      gave up, introduced, returned) rank above purely descriptive/state
+#      passages. This matches the NARRATIVE ARC RULE signal.
+#
+# The cap stays at max_chars=2000 in format_passages_for_prompt — this change
+# ensures the BEST passages fill that budget, not just the first stored ones.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Verbs/phrases that signal a person DOING something (narrative action),
+# as opposed to stating a credential or attribute.
+_NARRATIVE_ACTION_MARKERS = re.compile(
+    r'\b('
+    r'gave (it all )?up|left|walked away|abandoned|resigned|quit|'
+    r'founded|opened|started|established|created|launched|'
+    r'refused|rejected|turned down|declined|'
+    r'introduced|recommended|brought|'
+    r'returned|came back|went back|'
+    r'chose|decided|moved|transformed|converted|'
+    r'discovered|revealed|described|recounted|'
+    r'he gave|she gave|who gave'
+    r')\b',
+    re.IGNORECASE,
+)
+
+
+def _passage_has_narrative_action(text: str) -> bool:
+    """Return True if passage describes a person doing something (event/arc)."""
+    return bool(_NARRATIVE_ACTION_MARKERS.search(text))
+
+
+def _word_set(text: str) -> set:
+    """Extract set of meaningful words (4+ chars) from normalized text."""
+    norm = _normalize_for_match(text)
+    return {w for w in norm.split() if len(w) >= 4}
+
+
+def _deduplicate_passages(passages: List[str], roles: List) -> tuple:
+    """Remove near-duplicate passages, keeping the longest representative.
+
+    Two passages are near-duplicates if their 4+-char word sets overlap by
+    more than 70% (Jaccard-like: |intersection| / |smaller set| > 0.7).
+
+    Returns (deduplicated_passages, deduplicated_roles).
+    """
+    if len(passages) <= 1:
+        return passages, roles
+
+    # Build word-set representations
+    word_sets = [_word_set(p) for p in passages]
+
+    # Greedy dedup: iterate longest-first, mark shorter near-dupes for removal
+    indexed = sorted(range(len(passages)), key=lambda i: -len(passages[i]))
+    kept_indices = []
+    removed = set()
+
+    for idx in indexed:
+        if idx in removed:
+            continue
+        kept_indices.append(idx)
+        ws = word_sets[idx]
+        if not ws:
+            continue
+        # Check remaining candidates for overlap
+        for other_idx in indexed:
+            if other_idx in removed or other_idx == idx:
+                continue
+            if other_idx in set(kept_indices):
+                continue
+            other_ws = word_sets[other_idx]
+            if not other_ws:
+                continue
+            overlap = len(ws & other_ws)
+            smaller = min(len(ws), len(other_ws))
+            if smaller > 0 and overlap / smaller > 0.7:
+                removed.add(other_idx)
+
+    # Restore original order among survivors
+    kept_indices.sort()
+    deduped_passages = [passages[i] for i in kept_indices]
+    deduped_roles = [roles[i] if i < len(roles) else None for i in kept_indices]
+
+    if len(passages) != len(deduped_passages):
+        logger.info(
+            "[LOCAL-352] Deduplication: %d passages → %d (removed %d near-duplicates)",
+            len(passages), len(deduped_passages), len(passages) - len(deduped_passages),
+        )
+
+    return deduped_passages, deduped_roles
+
+
+def _rank_passages_by_narrative(passages: List[str], roles: List) -> tuple:
+    """Rank passages so narrative-action passages appear before state passages.
+
+    Within each tier (narrative / non-narrative), original order is preserved.
+    This ensures the character budget in format_passages_for_prompt is filled
+    with story-bearing passages first.
+
+    Returns (ranked_passages, ranked_roles).
+    """
+    narrative_indices = []
+    state_indices = []
+
+    for i, p in enumerate(passages):
+        if _passage_has_narrative_action(p):
+            narrative_indices.append(i)
+        else:
+            state_indices.append(i)
+
+    ranked_order = narrative_indices + state_indices
+    ranked_passages = [passages[i] for i in ranked_order]
+    ranked_roles = [roles[i] if i < len(roles) else None for i in ranked_order]
+
+    if narrative_indices:
+        logger.info(
+            "[LOCAL-352] Narrative ranking: %d narrative-action passages ranked first "
+            "out of %d total",
+            len(narrative_indices), len(passages),
+        )
+
+    return ranked_passages, ranked_roles
+
+
+def deduplicate_and_rank_passages(passages: List[str], roles: List = None) -> tuple:
+    """[LOCAL-352] Public entry point: deduplicate then rank by narrative action.
+
+    Args:
+        passages: List of passage text strings.
+        roles: Corresponding passage_roles list (may be shorter or None).
+
+    Returns:
+        (ranked_passages, ranked_roles) — deduplicated and narrative-ranked.
+    """
+    if roles is None:
+        roles = []
+    # Pad roles to match passages length
+    while len(roles) < len(passages):
+        roles.append(None)
+
+    deduped, deduped_roles = _deduplicate_passages(passages, roles)
+    ranked, ranked_roles = _rank_passages_by_narrative(deduped, deduped_roles)
+    return ranked, ranked_roles
+
+
 def _accent_fold(text: str) -> str:
     """Fold accented characters to ASCII equivalents for matching.
 
@@ -173,44 +330,76 @@ def get_stop_corpus_for_tour(
 
     # Match each stop to its best corpus row (title-first, venue as tie-breaker)
     for stop_name in stop_names:
-        matched = _match_stop_title_first(stop_name, all_corpus_rows, preferred_venue)
-        if matched:
-            passages_raw = matched['passages_json']
-            if isinstance(passages_raw, str):
-                passages_raw = json.loads(passages_raw)
+        # [LOCAL-352] Merge ALL exact-match rows for this stop_title, then
+        # deduplicate and rank. Previously, _match_stop_title_first picked ONE
+        # row (the preferred venue's or the richest), losing passages from
+        # other rows. La Merenda had the Negresco passage in row A but the
+        # matcher picked row B — the story was never seen by the model.
+        all_matched = _get_all_matching_rows(stop_name, all_corpus_rows, preferred_venue)
 
-            sources_raw = matched.get('source_pages', [])
-            if isinstance(sources_raw, str):
-                sources_raw = json.loads(sources_raw)
-
-            # [LOCAL-328] Filter sludge passages at read time.
-            # This removes directory listings, keyword blobs, and search-result
-            # collages that inflate passage_count without carrying facts.
+        if all_matched:
             from corpus_source_quality import filter_passages_for_generation
-            passages_filtered = filter_passages_for_generation(passages_raw)
 
-            # Extract passage texts
-            passages = []
-            for p in (passages_filtered or []):
-                if isinstance(p, dict):
-                    text = p.get('text', '')
-                elif isinstance(p, str):
-                    text = p
-                else:
-                    text = str(p)
-                if text:
-                    passages.append(text)
+            # Merge passages, sources, and roles from all matching rows
+            all_passages = []
+            all_sources = []
+            all_roles = []
 
-            # [LOCAL-203] Include passage_roles for role-aware coverage
-            roles_raw = matched.get('passage_roles')
-            if isinstance(roles_raw, str):
-                roles_raw = json.loads(roles_raw)
+            for matched in all_matched:
+                passages_raw = matched['passages_json']
+                if isinstance(passages_raw, str):
+                    passages_raw = json.loads(passages_raw)
+
+                sources_raw = matched.get('source_pages', [])
+                if isinstance(sources_raw, str):
+                    sources_raw = json.loads(sources_raw)
+
+                roles_raw = matched.get('passage_roles')
+                if isinstance(roles_raw, str):
+                    roles_raw = json.loads(roles_raw) if roles_raw else []
+
+                # [LOCAL-328] Filter sludge passages at read time.
+                passages_filtered = filter_passages_for_generation(passages_raw)
+
+                # Extract passage texts
+                for i, p in enumerate(passages_filtered or []):
+                    if isinstance(p, dict):
+                        text = p.get('text', '')
+                    elif isinstance(p, str):
+                        text = p
+                    else:
+                        text = str(p)
+                    if text:
+                        all_passages.append(text)
+                        role = (roles_raw[i] if roles_raw and i < len(roles_raw)
+                                else None)
+                        all_roles.append(role)
+
+                # Merge sources (dedup by URL)
+                seen_urls = {s.get('url', '') for s in all_sources if isinstance(s, dict)}
+                for s in (sources_raw or []):
+                    if isinstance(s, dict):
+                        if s.get('url', '') not in seen_urls:
+                            all_sources.append(s)
+                            seen_urls.add(s.get('url', ''))
+                    elif isinstance(s, str) and s not in seen_urls:
+                        all_sources.append(s)
+                        seen_urls.add(s)
+
+            # [LOCAL-352] Deduplicate and rank: remove near-duplicate passages
+            # that restate the same fact, then rank narrative-action passages
+            # above state/attribute passages so the character budget fills with
+            # story-bearing content first.
+            if all_passages:
+                all_passages, all_roles = deduplicate_and_rank_passages(
+                    all_passages, all_roles
+                )
 
             stop_corpus_result = {
-                'passages': passages,
-                'sources': sources_raw or [],
-                'passage_roles': roles_raw or [],
-            } if passages else None
+                'passages': all_passages,
+                'sources': all_sources,
+                'passage_roles': all_roles,
+            } if all_passages else None
 
             # [LOCAL-346] Merge bridge: when a stop_corpus row exists, ALSO
             # check the venue_corpus bridge. If the bridge provides material,
@@ -240,6 +429,90 @@ def get_stop_corpus_for_tour(
             # material for this stop — filtered for relevance.
             bridged = _bridge_venue_corpus_to_stop(stop_name, venue_corpus_rows)
             result[stop_name] = bridged
+
+    return result
+
+
+def _get_all_matching_rows(
+    stop_name: str,
+    all_corpus_rows: List[Dict],
+    preferred_venue: Optional[str],
+) -> List[Dict]:
+    """[LOCAL-352] Get ALL matching corpus rows for a stop, not just one.
+
+    When multiple rows exist for the same stop_title (under different venue
+    names), we want ALL their passages merged and deduplicated. Previously,
+    _match_stop_title_first picked the single "best" row, losing passages
+    that only existed in the other row.
+
+    Returns a list of matching rows (exact matches first; fuzzy as fallback).
+    Ordered with preferred-venue row first (it provides the primary sources
+    metadata), then others sorted by passage count descending.
+    """
+    exact_matches = []
+    fuzzy_matches = []
+    stop_folded = _accent_fold(stop_name).lower().strip()
+    stop_norm = _normalize_for_match(stop_name)
+
+    for row in all_corpus_rows:
+        title = row['stop_title']
+        # 1. Exact case-insensitive
+        if title.lower().strip() == stop_name.lower().strip():
+            exact_matches.append(row)
+            continue
+        # 2. Accent-folded exact
+        if _accent_fold(title).lower().strip() == stop_folded:
+            exact_matches.append(row)
+            continue
+        # 3. Containment (either direction)
+        if stop_name.lower() in title.lower() or title.lower() in stop_name.lower():
+            fuzzy_matches.append(row)
+            continue
+        # 4. Normalized word overlap
+        corpus_title_norm = _normalize_for_match(title)
+        corpus_words = set(w for w in corpus_title_norm.split() if len(w) >= 4)
+        stop_words = set(w for w in stop_norm.split() if len(w) >= 4)
+        if corpus_words and stop_words:
+            overlap = corpus_words & stop_words
+            threshold = max(1, min(len(corpus_words), len(stop_words)) * 0.5)
+            if len(overlap) >= threshold:
+                fuzzy_matches.append(row)
+
+    # Exact matches take priority; fall back to fuzzy only when no exact match
+    candidates = exact_matches if exact_matches else fuzzy_matches
+
+    if not candidates:
+        # Try variant map as last resort
+        variant_match = _match_via_variants(stop_name, all_corpus_rows)
+        if variant_match:
+            return [variant_match]
+        return []
+
+    # For fuzzy matches, still pick only the BEST one (avoid cross-contamination
+    # between different stops like "Chez Pipo" and "Chez Palmyre")
+    if not exact_matches and fuzzy_matches:
+        if preferred_venue:
+            venue_matches = [r for r in fuzzy_matches if r['venue_name'] == preferred_venue]
+            if venue_matches:
+                return [max(venue_matches, key=lambda r: _passage_count(r))]
+        return [max(fuzzy_matches, key=lambda r: _passage_count(r))]
+
+    # For exact matches, return ALL rows — they are genuinely the same stop
+    # under different venue names. Order: preferred venue first, then by richness.
+    if preferred_venue:
+        preferred = [r for r in candidates if r['venue_name'] == preferred_venue]
+        others = [r for r in candidates if r['venue_name'] != preferred_venue]
+        others.sort(key=lambda r: -_passage_count(r))
+        result = preferred + others
+    else:
+        result = sorted(candidates, key=lambda r: -_passage_count(r))
+
+    if len(result) > 1:
+        logger.info(
+            "[LOCAL-352] Merging %d corpus rows for %r (venues: %s)",
+            len(result), stop_name,
+            ", ".join(r['venue_name'] for r in result),
+        )
 
     return result
 
