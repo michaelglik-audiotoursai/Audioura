@@ -103,6 +103,13 @@ _ADMISSION_PATTERN = re.compile(
     re.IGNORECASE
 )
 
+# [LOCAL-354] Price band pattern: "An average dinner or lunch would cost under €50"
+_PRICE_BAND_PATTERN = re.compile(
+    r'(?:average\s+)?(?:dinner|lunch|meal)\s+(?:or\s+(?:dinner|lunch)\s+)?'
+    r'(?:would\s+)?cost\s+(?:under|less\s+than|about|around)\s*€\s*\d+',
+    re.IGNORECASE
+)
+
 _OPEN_DAILY_PATTERN = re.compile(
     r'open\s+daily|ouvert\s+tous\s+les\s+jours',
     re.IGNORECASE
@@ -166,6 +173,12 @@ def _parse_info_text_into_claims(info_text: str) -> List[PracticalClaim]:
         elif _HOURS_24H_PATTERN.search(sentence):
             claims.append(PracticalClaim(
                 claim_type='hours',
+                value=sentence,
+            ))
+        # [LOCAL-354] Price band claims: "An average dinner or lunch would cost under €50"
+        elif _PRICE_BAND_PATTERN.search(sentence):
+            claims.append(PracticalClaim(
+                claim_type='price_band',
                 value=sentence,
             ))
         elif _ADMISSION_PATTERN.search(sentence):
@@ -235,6 +248,9 @@ def verify_claim_against_source(claim: PracticalClaim, source_text: str) -> bool
         return _verify_payment(claim_lower, source_lower)
     elif claim.claim_type == 'reservation':
         return _verify_reservation(claim_lower, source_lower)
+    # [LOCAL-354] Price band verification
+    elif claim.claim_type == 'price_band':
+        return _verify_price_band(claim_lower, source_lower)
     else:
         # Unknown claim type — cannot verify
         return False
@@ -434,6 +450,56 @@ def _verify_reservation(claim_lower: str, source_lower: str) -> bool:
         return 'reservation = no' in source_lower or 'reservation=no' in source_lower
 
     return False
+
+
+# [LOCAL-354] Price band verification
+def _verify_price_band(claim_lower: str, source_lower: str) -> bool:
+    """Verify a price band claim against the guide source text.
+
+    The claim says "cost under €X". The source must contain:
+    1. A guide name (Le Fooding, Gault&Millau, Michelin)
+    2. A price range whose high end is BELOW the claimed threshold
+    3. The word "threshold" with the claimed amount (from our source_text_for_gate)
+
+    This prevents fabricated price claims from passing.
+    """
+    # Extract the threshold from the claim: "under €50" → 50
+    threshold_match = re.search(r'under\s*€\s*(\d+)', claim_lower)
+    if not threshold_match:
+        return False
+    claimed_threshold = int(threshold_match.group(1))
+
+    # Source must identify itself as a guide
+    has_guide_provenance = any(
+        guide in source_lower
+        for guide in ('le fooding', 'gault&millau', 'gault millau', 'michelin')
+    )
+    if not has_guide_provenance:
+        return False
+
+    # Source must contain a price range with numbers
+    # Look for "range: €X-Y" or "X to Y" or "€X-Y"
+    range_match = re.search(
+        r'(?:range|price|carte|indicative)[^€\d]{0,30}€?\s*(\d+)\s*[-–to]+\s*€?\s*(\d+)',
+        source_lower
+    )
+    if not range_match:
+        return False
+
+    source_high = float(range_match.group(2))
+
+    # The claimed threshold must be ABOVE the source's high end
+    # (conservative: "under €50" is valid if guide says high=43)
+    if claimed_threshold <= source_high:
+        return False
+
+    # Source must explicitly state this threshold
+    # (prevents someone from claiming "under €100" for a €43 restaurant)
+    threshold_in_source = f"threshold: under €{claimed_threshold}" in source_lower
+    if not threshold_in_source:
+        return False
+
+    return True
 
 
 # ---------------------------------------------------------------------------
