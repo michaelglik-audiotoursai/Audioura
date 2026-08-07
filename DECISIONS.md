@@ -9722,3 +9722,54 @@ callers — the `story_element_extractor.py` pattern again):
 
 Four occurrences this session (LOCAL-322, 325, 327, 328). All four were caught
 by one of those three checks, and none by reading the submission.
+
+## D243 — RETRACTION of D241's correlation claim. LEAD made the same error it bounced.
+**2026-08-06. Correcting something told to Michael.**
+
+D241 reported that corpus passage COUNT is **anti-correlated** with tour
+quality (THIN 4.2 passages, RICH 3.7) and that two museum stops reached
+ADEQUATE on **zero** corpus. Michael was told both. **Both are wrong.**
+
+The lookup behind them matched `lower(stop_title)` exactly. `stop_corpus`
+stores **unaccented** titles:
+
+```
+tour text          stop_corpus                  exact match   accent-folded
+Robe de prêtre…    'Robe de pretre taoiste'         0              4
+Masque … kojô      'Masque du vieillard kojo'       0              5
+Kannon à mille…    'Kannon a mille bras'            1              6
+```
+
+Redone with accent folding across the same four tours, 26 stops:
+
+```
+THIN      n=10   mean 4.6 passages   zero-corpus stops: 0
+ADEQUATE  n=10   mean 4.5            zero-corpus stops: 0
+RICH      n= 6   mean 5.3            zero-corpus stops: 0
+```
+
+**The anti-correlation does not exist.** Passage count is a *weak* signal
+(RICH slightly higher), not an inverted one. **No stop in our scored corpus has
+zero corpus**, so the premise LEAD wrote into LOCAL-327 — confident facts with
+no sourcing — does not occur in the data.
+
+**This is the exact error LEAD bounced LOCAL-327 for**, one tick earlier, and
+LEAD had already seen the evidence: the D241 join returned 1 passage for
+`L'Armure d'Andô Naoyuki` (real: 6) and LEAD noted the stop was "RICH on one
+passage" as a headline counterexample without asking why a catalogued museum
+object would have one passage.
+
+**What survives:**
+- **LOCAL-328's yield finding.** `museum_official` 5.7 facts/passage vs
+  `web_search` 1.7. It measured `passages_json` directly and never touched
+  title matching, so it is unaffected. Source type matters; volume does not.
+- **LOCAL-329's selection finding.** Only 1 of 8 documented Old Nice
+  restaurants was in our tour. Based on name overlap, not passage counts.
+  Unaffected.
+- **The design fact** that groundedness caps RICH but never ADEQUATE. True,
+  but no longer urgent — nothing is currently exploiting it.
+
+**Rule, generalised:** accent-folded comparison is mandatory anywhere tour text
+is joined to `stop_corpus`. Exact matching on French titles silently reports
+absence. It has now produced two wrong analyses in one evening — one by an
+agent, one by LEAD.
