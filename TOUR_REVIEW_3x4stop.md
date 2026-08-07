@@ -1,3 +1,17 @@
+# ⛔ SUPERSEDED — see `TOUR_REVIEW_current.md`
+
+Every number below has moved and two of the three tours were regenerated.
+Kept for the record of what was claimed and when.
+
+```
+was          now
+museum 87.5  81.2   (stop 1 lost RICH once all 15 facts became checkable)
+restaurant 62.5  56.2   (regenerated; the CONTRADICTED stop did not recur)
+walking    50.0  75.0   (venue-as-stop corpus bridge)
+```
+
+---
+
 # My review — three 4-stop tours
 
 Generated 6 August 2026, ~23:40, on `storied` @ `872c562` — after tonight's
