@@ -10230,3 +10230,43 @@ better; the walking tour's problem was that we were holding the material and
 could not find it (D255). Worth remembering the next time a stop looks thin:
 check whether the corpus exists under another key before concluding the world
 is short of facts (D162, and now its retrieval-side twin).
+
+## D257 — The Chez Pipo misattribution did not reproduce after the retrieval fixes
+**2026-08-07. LEAD ran the test; the result is suggestive, not conclusive.**
+
+LEAD checked whether the generator still writes another venue's story. First,
+retrieval:
+
+```
+get_stop_corpus_for_tour(..., ['Chez Pipo'], conn)
+  -> "…owner of Chez Pipo, founded in 1923."
+     "« Chez Pipo » … depuis sa création en 1923. il est situé rue Bavastro"
+     "Chez Pipo was founded in 1923 and the restaurant has not changed…"
+```
+
+**Clean.** No Chez Palmyre. LOCAL-339/340/341/342 fixed the word-overlap
+matching that had been pulling it in.
+
+Then a fresh 4-stop Old Nice restaurant tour:
+
+```
+LOCAL336 (before)  20.8   one stop CONTRADICTED by its own corpus
+LOCAL343 (after)   56.2   contradicted_share 0.0 on all four stops
+```
+
+**Two limits, stated plainly.** The selection changed again — Chez Pipo is not
+in the new tour — so this is not a controlled comparison. And a bug that does
+not recur in one run is not a bug proven fixed.
+
+**The honest reading:** the misattribution was most likely a *consequence* of
+contaminated retrieval rather than an independent generation defect, and the
+retrieval work has probably removed its cause. LEAD is not opening a
+generation-side task on that basis, but is not calling it closed either. If a
+future tour attributes one venue's history to another, this entry is the place
+to start.
+
+Current honest scores after the night's work:
+```
+museum 4-stop   87.5      walking (regenerated)     75.0
+museum 8-stop   75.0      restaurant (regenerated)  56.2
+```
