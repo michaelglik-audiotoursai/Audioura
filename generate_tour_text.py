@@ -10621,7 +10621,10 @@ RULES:
                     sentence_budget=_offer_budget
                 )
                 if _closing_offer:
-                    epilog += _closing_offer
+                    # [LEAD] Explicit label so the scorer need not guess at
+                    # recap templates. Follows the existing Address:/Directions:/
+                    # Sources: convention and is stripped by SCHEMA_LABEL_RE.
+                    epilog += "Closing: " + _closing_offer.lstrip()
                 
                 poi_content += epilog
                 
