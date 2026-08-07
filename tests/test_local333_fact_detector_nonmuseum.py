@@ -214,3 +214,233 @@ class TestStopOneFactCountNonZero:
             f"People={sa.named_people}, Dates={sa.dates_years}, "
             f"Numbers={sa.measurements_numbers}"
         )
+
+
+# ─── BOUNCE FIX TESTS: false positive elimination ────────────────────────────
+# These target the three false-positive classes identified in the LEAD bounce:
+# 1. "Treat Page" — closing offer boilerplate folded into last stop
+# 2. Stop titles counted as people (Chez Palmyre, La Voglia, Le Safari, etc.)
+# 3. Partial name deduplication (Kenzo vs Kenzo Tange)
+
+
+class TestClosingOfferExcluded:
+    """Closing offer boilerplate must not contribute facts to any stop."""
+
+    def test_treat_page_not_a_person(self):
+        """'Treat Page' from the closing offer must not appear as a person."""
+        from tour_rubric_scorer import parse_tour
+        tour_text = (
+            "Stop 5: La Voglia\n\n"
+            "La Voglia showcases a blend of Italian culinary passion. "
+            "Chef Marco created a unique menu.\n\n"
+            "That's 5 stops — Acchiardo, established in 1927 by Madalin "
+            "Acchiardo in Niçoise tradition and Le Safari, where Franck "
+            "Cerutti first introduced pizzas to Nice. If you would like to "
+            "eat nearby we can build you a restaurant tour, and the Treat "
+            "Page shows whether there are real savings at local shops and "
+            "restaurants around here.\n"
+        )
+        stops = parse_tour(tour_text)
+        assert len(stops) == 1
+        # The closing offer must be stripped from the body
+        assert "Treat Page" not in stops[0]['body'], (
+            f"Closing offer was not stripped. Body: {stops[0]['body'][:200]}"
+        )
+
+    def test_closing_offer_people_not_counted(self):
+        """People mentioned only in the closing offer must not appear in facts."""
+        from tour_rubric_scorer import parse_tour
+        tour_text = (
+            "Stop 3: Final Stop\n\n"
+            "The view from here is spectacular. You can see the bay.\n\n"
+            "That's 3 stops and 2 kilometres — Nicole Rubi for Niçoise "
+            "cuisine and Le Bistro du Port, a family-run establishment. "
+            "If you would like to eat nearby we can build you a restaurant "
+            "tour, and the Treat Page shows whether there are real savings.\n"
+        )
+        stops = parse_tour(tour_text)
+        sa = analyze_stop(stops[0], stops)
+        assert "Nicole Rubi" not in sa.named_people, (
+            f"Closing-offer person leaked: {sa.named_people}"
+        )
+        assert "Treat Page" not in sa.named_people, (
+            f"Treat Page leaked: {sa.named_people}"
+        )
+
+
+class TestStopTitlesNotPeople:
+    """A tour's own stop titles and venue names must not be detected as people."""
+
+    def test_la_voglia_is_stop_title(self):
+        """'La Voglia' is a stop title in this tour — not a person."""
+        text = (
+            "La Voglia, a cozy Italian restaurant, serves fresh pasta daily. "
+            "The warmth of the place invites lingering over espresso."
+        )
+        all_stops = [
+            _make_stop("intro text", index=1, title="La Rossettisserie"),
+            _make_stop("other text", index=2, title="Acchiardo"),
+            _make_stop(text, index=3, title="La Voglia"),
+        ]
+        sa = analyze_stop(all_stops[2], all_stops)
+        assert "La Voglia" not in sa.named_people, (
+            f"Stop title 'La Voglia' detected as person: {sa.named_people}"
+        )
+
+    def test_le_safari_is_stop_title(self):
+        """'Le Safari' referenced in another stop — it's a stop title, not a person."""
+        text = (
+            "As you leave Le Safari, the memories of fresh seafood linger. "
+            "Le Safari, a Mediterranean gem, offered the finest catch."
+        )
+        all_stops = [
+            _make_stop(text, index=5, title="La Voglia"),
+            _make_stop("safari text", index=4, title="Le Safari"),
+        ]
+        sa = analyze_stop(all_stops[0], all_stops)
+        assert "Le Safari" not in sa.named_people, (
+            f"Stop title 'Le Safari' detected as person: {sa.named_people}"
+        )
+
+    def test_chez_palmyre_is_stop_title(self):
+        """'Chez Palmyre' as a stop title should not be a person."""
+        text = (
+            "Chez Palmyre, a traditional Niçoise eatery, welcomed guests "
+            "for decades with its hearty regional fare."
+        )
+        all_stops = [
+            _make_stop(text, index=1, title="Chez Palmyre"),
+        ]
+        sa = analyze_stop(all_stops[0], all_stops)
+        assert "Chez Palmyre" not in sa.named_people, (
+            f"Stop title 'Chez Palmyre' detected as person: {sa.named_people}"
+        )
+
+    def test_arts_asiatiques_is_stop_title(self):
+        """'Arts Asiatiques' as part of museum title must not be a person."""
+        text = (
+            "The Musee des Arts Asiatiques, a modern building, houses "
+            "the collection of Asian art from across the continent."
+        )
+        all_stops = [
+            _make_stop(text, index=1, title="Musée des Arts Asiatiques"),
+        ]
+        sa = analyze_stop(all_stops[0], all_stops)
+        assert "Arts Asiatiques" not in sa.named_people, (
+            f"'Arts Asiatiques' (venue name) detected as person: {sa.named_people}"
+        )
+
+    def test_real_person_still_detected_alongside_title(self):
+        """A real person in the same stop as a title reference must still be found."""
+        text = (
+            "Palmyre Moni, a Tuscan restaurateur, founded Chez Palmyre "
+            "in 1926 bringing Italian flavors to this Niçoise street."
+        )
+        all_stops = [
+            _make_stop(text, index=3, title="Chez Palmyre"),
+        ]
+        sa = analyze_stop(all_stops[0], all_stops)
+        assert "Palmyre Moni" in sa.named_people, (
+            f"Real person missed: {sa.named_people}"
+        )
+        assert "Chez Palmyre" not in sa.named_people, (
+            f"Stop title leaked: {sa.named_people}"
+        )
+
+
+class TestPartialNameDeduplication:
+    """Partial names must be folded into their fuller form."""
+
+    def test_kenzo_folded_into_kenzo_tange(self):
+        """'Kenzo' alone should be folded into 'Kenzo Tange' when both appear."""
+        text = (
+            "Kenzo Tange, a renowned architect, designed this building. "
+            "The vision of Kenzo shaped modern Japanese architecture."
+        )
+        all_stops = [
+            _make_stop(text, index=3, title="Architecture Hall"),
+        ]
+        sa = analyze_stop(all_stops[0], all_stops)
+        # Kenzo Tange should be present (the full name)
+        assert "Kenzo Tange" in sa.named_people, (
+            f"'Kenzo Tange' not found: {sa.named_people}"
+        )
+        # 'Kenzo' alone should NOT appear separately
+        kenzo_alone = [p for p in sa.named_people if p == "Kenzo"]
+        assert not kenzo_alone, (
+            f"Partial name 'Kenzo' not folded into 'Kenzo Tange': {sa.named_people}"
+        )
+
+    def test_chef_dominique_le_truncation(self):
+        """'Chef Dominique Le' is a truncated extraction — should be deduplicated
+        against 'Dominique Le Stanc' if both appear."""
+        text = (
+            "Dominique Le Stanc, a celebrated chef, transformed the menu. "
+            "The artistry of Chef Dominique Le Stanc earned critical acclaim."
+        )
+        all_stops = [
+            _make_stop(text, index=3, title="La Merenda"),
+        ]
+        sa = analyze_stop(all_stops[0], all_stops)
+        # Should not have both "Dominique Le" and "Dominique Le Stanc"
+        people_lower = [p.lower() for p in sa.named_people]
+        # Count distinct entries that contain "dominique"
+        dominique_entries = [p for p in sa.named_people if "Dominique" in p]
+        assert len(dominique_entries) <= 1, (
+            f"Partial name not deduplicated: {dominique_entries}"
+        )
+
+
+class TestPreviousFixesStillWork:
+    """Regression: the five cases from the original task must still pass."""
+
+    def test_franck_cerutti_appositive(self):
+        """The original diagnosed case: appositive detection."""
+        text = (
+            "Franck Cerutti, a culinary master with three Michelin stars, "
+            "introduced the delectable pizzas to Nice's food scene."
+        )
+        sa = analyze_stop(_make_stop(text), [_make_stop(text)])
+        assert "Franck Cerutti" in sa.named_people
+
+    def test_nice_not_a_person(self):
+        """'Nice, a coastal city' — the appositive guard blocks it."""
+        text = (
+            "Nice, a coastal city, offers visitors sun-drenched beaches "
+            "and a vibrant cultural scene year-round."
+        )
+        sa = analyze_stop(_make_stop(text, title="Nice"), [_make_stop(text, title="Nice")])
+        assert "Nice" not in sa.named_people
+
+    def test_cours_saleya_not_a_person(self):
+        """'Cours Saleya, a historic square' — blocked by place noun guard."""
+        text = (
+            "Cours Saleya, a historic square, hosts the daily flower market "
+            "where locals and visitors mingle among colorful stalls."
+        )
+        sa = analyze_stop(_make_stop(text, title="Market"), [_make_stop(text, title="Market")])
+        # "Cours Saleya" contains "square" (via _NOT_A_PERSON_RE) — blocked
+        # Actually _NOT_A_PERSON_RE checks the name itself; "Cours Saleya" has
+        # neither "square" nor other blockers. But the appositive place guard
+        # catches "historic square" in the clause.
+        people_names = [p.lower() for p in sa.named_people]
+        assert "cours saleya" not in people_names
+
+    def test_toyohara_chikanobu_detected(self):
+        """Museum person with appositive still detected."""
+        text = (
+            "Toyohara Chikanobu, an ukiyo-e printmaker, depicted the "
+            "Meiji court in vibrant woodblock prints."
+        )
+        sa = analyze_stop(_make_stop(text, title="Prints"), [_make_stop(text, title="Prints")])
+        assert "Toyohara Chikanobu" in sa.named_people
+
+    def test_clinking_glasses_still_zero(self):
+        """Atmospheric filler: zero facts."""
+        text = (
+            "A mix of laughter and clinking glasses creating a symphony of "
+            "conviviality fills the evening air as diners gather beneath "
+            "the warm glow of overhead lights."
+        )
+        sa = analyze_stop(_make_stop(text, title="Ambiance"), [_make_stop(text, title="Ambiance")])
+        assert sa.distinct_fact_count == 0

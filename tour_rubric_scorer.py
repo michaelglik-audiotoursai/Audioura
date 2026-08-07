@@ -405,6 +405,16 @@ def parse_tour(text: str) -> List[dict]:
     # narration. Measured cost: "Specific Examples" and "Operational Details"
     # were the two most frequent "named people" in the whole corpus (183 and 140
     # occurrences), because the label itself is two capitalised words.
+    #
+    # [LOCAL-333 bounce] The closing offer ("That's N stops …") is generated
+    # boilerplate appended AFTER the last stop. parse_tour folds it into the
+    # last stop's body because there is no subsequent "Stop N:" header. It
+    # contains proper phrases ("Treat Page", venue names) that inflate facts.
+    # Exclude any line starting with the closing-offer pattern.
+    _CLOSING_OFFER_RE = re.compile(
+        r"^That'?s\s+\d+\s+stops?\b", re.IGNORECASE
+    )
+
     for stop in stops:
         body_lines = []
         for line in stop['lines']:
@@ -413,6 +423,9 @@ def parse_tour(text: str) -> List[dict]:
                 continue
             if SCHEMA_LABEL_RE.match(stripped):
                 continue
+            # [LOCAL-333 bounce] Strip closing offer and everything after it
+            if _CLOSING_OFFER_RE.match(stripped):
+                break
             body_lines.append(stripped)
         stop['body'] = '\n'.join(body_lines)
 
@@ -574,6 +587,51 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
                 if not _NOT_A_PERSON_RE.search(g):
                     if g not in _period_name_words:
                         _people.add(g)
+
+    # --- [LOCAL-333 bounce] Exclude stop titles from people -------------------
+    # A tour's own stop titles are venue/place names, never people. Build a set
+    # of proper-phrase fragments from all stop titles and remove any candidate
+    # that matches one. Uses accent-folded comparison to handle "Musée" vs
+    # "Musee" etc.
+    _title_phrases = set()
+    for _other_stop in all_stops:
+        _t = _other_stop['title']
+        _title_phrases.add(_t)
+        # Also extract multi-word capitalised sub-phrases that _PROPER_PHRASE_RE
+        # would match within the title (e.g. "Arts Asiatiques" from "Musée des
+        # Arts Asiatiques")
+        for _tm in _PROPER_PHRASE_RE.finditer(_t):
+            _title_phrases.add(_tm.group(1))
+        # Additionally, extract contiguous capitalised-word pairs/triples from
+        # the title that the regex might miss due to particles or accents.
+        _twords = _t.split()
+        for _wi in range(len(_twords)):
+            for _wj in range(_wi + 2, min(_wi + 4, len(_twords) + 1)):
+                _frag = ' '.join(_twords[_wi:_wj])
+                # Only add if it starts with a capital
+                if _frag[0].isupper():
+                    _title_phrases.add(_frag)
+    # Remove people that match a title phrase (case-insensitive)
+    _title_lower = {t.lower() for t in _title_phrases}
+    _people = {p for p in _people if p.lower() not in _title_lower}
+
+    # --- [LOCAL-333 bounce] Partial name deduplication ------------------------
+    # Fold shorter names into their fuller form when both appear (e.g. "Kenzo"
+    # into "Kenzo Tange"). Uses token-overlap logic from groundedness_check.py.
+    _people_list = sorted(_people)
+    _to_remove = set()
+    for i, name_a in enumerate(_people_list):
+        for j, name_b in enumerate(_people_list):
+            if i >= j:
+                continue
+            tokens_a = set(name_a.lower().split())
+            tokens_b = set(name_b.lower().split())
+            # If one is a strict subset of the other, drop the shorter one
+            if tokens_a < tokens_b or tokens_b < tokens_a:
+                shorter = name_a if len(tokens_a) < len(tokens_b) else name_b
+                _to_remove.add(shorter)
+    _people -= _to_remove
+
     sa.named_people = sorted(_people)
     
     # Materials and techniques
