@@ -1714,6 +1714,31 @@ def run_existence_gate(
                             _ie_city = _pw
                         elif not _ie_country:
                             _ie_country = _pw
+            # LOCAL-348: If city looks like a country (no comma-separated city found),
+            # try to extract it from descriptive phrases like "tour in Old Nice (Vieux Nice)".
+            _KNOWN_COUNTRIES = {'france', 'italy', 'spain', 'germany', 'japan', 'usa',
+                                'uk', 'england', 'greece', 'portugal', 'netherlands',
+                                'belgium', 'austria', 'switzerland', 'australia'}
+            if _ie_city.lower() in _KNOWN_COUNTRIES or not _ie_city:
+                # Promote current city to country if it's a country name
+                if _ie_city and _ie_city.lower() in _KNOWN_COUNTRIES and not _ie_country:
+                    _ie_country = _ie_city
+                    _ie_city = ''
+                # Try "in <City>" pattern within descriptive parts
+                _in_match = re.search(
+                    r'\bin\s+(?:Old\s+|Vieux\s+)?([A-Z][a-zA-Z\u00C0-\u017F]+(?:\s+[A-Z][a-zA-Z\u00C0-\u017F]+)?)',
+                    venue_name
+                )
+                if _in_match:
+                    _ie_city = _in_match.group(1)
+                # Also try "of <City>" pattern (e.g. "walking tour of Vieux Nice")
+                if not _ie_city:
+                    _of_match = re.search(
+                        r'\bof\s+(?:Old\s+|Vieux\s+)?([A-Z][a-zA-Z\u00C0-\u017F]+(?:\s+[A-Z][a-zA-Z\u00C0-\u017F]+)?)',
+                        venue_name
+                    )
+                    if _of_match:
+                        _ie_city = _of_match.group(1)
         try:
             from interpretive_enrichment import enrich_verified_stops
             interpretive_summary = enrich_verified_stops(
