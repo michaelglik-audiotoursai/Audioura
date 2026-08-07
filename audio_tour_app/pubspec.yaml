@@ -25,6 +25,7 @@ dependencies:
   url_launcher: ^6.2.2
   flutter_volume_controller: ^1.3.2
   speech_to_text: ^7.0.0
+  flutter_tts: ^4.2.0
   flutter_sound: ^9.2.13
   file_picker: ^8.0.0+1
   flutter_secure_storage: ^9.2.2
