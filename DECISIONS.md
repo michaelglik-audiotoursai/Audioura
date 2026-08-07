@@ -9814,3 +9814,36 @@ Each error came from trusting a measurement without asking what it would show
 if the plumbing were broken. Dispatched as LOCAL-331.
 
 **Until LOCAL-331 lands, treat every reported tour score as an upper bound.**
+
+## D245 — Unmeasured groundedness caps at ADEQUATE, not THIN
+**2026-08-06. LEAD's call, made rather than deferred (RULE ZERO).**
+
+LOCAL-331 correctly changed the groundedness default from `1.0` to `None`
+(D244), then capped any unmeasured stop **RICH -> THIN**, two bands.
+
+That is wrong on three counts and the decision is **ADEQUATE**:
+
+1. **D162, sixth occurrence.** "We hold no corpus for this stop" is evidence
+   about our harvesting, not about the venue. It cannot demote a stop as though
+   its claims were disproved.
+2. **Inconsistent with LOCAL-291.** A *measured*-low groundedness caps RICH to
+   ADEQUATE — one band. Capping *unmeasured* two bands penalises the weaker
+   signal harder.
+3. **Contrary to Michael's ruling** (2026-08-06): *"if … Internet has less
+   reliable data for some esoteric tours, I maybe willing to make its influence
+   on score smaller."* Scarce data should count for less, not more.
+
+Nor should unmeasured be free: a stop we cannot verify must not reach RICH.
+ADEQUATE is the middle that matches the existing rule.
+
+**Concrete cost of getting this wrong:** the Old Nice restaurant tour fell
+65.0 -> 55.0, driven by La Merenda, Fenocchio and Lou Pilha Leva — venues
+LOCAL-329 selected *tonight* and whose corpus has not been harvested yet. We
+would have been scoring ourselves down for our own backlog, immediately after
+fixing the selection that found them.
+
+Live scores as of this tick, honest and corpus-loaded:
+```
+museum 8-stop        78.1   (was reported 81.2 with groundedness defaulted to 1.0)
+Old Nice restaurant  65.0   (55.0 under the THIN cap; ADEQUATE restores 65.0)
+```
