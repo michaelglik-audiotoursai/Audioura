@@ -204,6 +204,36 @@ without Michael prompting it. If usage credits run out, schedule a wakeup
 far enough ahead that they have reset, and resume from the files on disk —
 never wait to be re-invoked by a human.
 
+**THE ONE EXCEPTION — Michael asks for a break** (2026-08-08, his words:
+*"should stay in effect (good rule) unless I ask you to take a break like
+now"*). When he says he is stepping away, going to sleep, or not available
+until a stated time:
+
+- **Arm nothing.** No `ScheduleWakeup`, no `CronCreate`. If a loop is already
+  armed, stop it (`ScheduleWakeup stop` / `CronDelete`).
+- **Leave the dispatcher queue empty**, or `touch .continuous_dev/PAUSE`.
+  An unclaimed `new_kiro_session_is_required_*.md` file is claimed by the
+  launchd tick within 5 minutes and spends OpenAI money unattended — that is
+  the only thing on this machine that bills while nobody is watching.
+- **Finish nothing new.** In-flight submissions stay unreviewed on their
+  branches; they are files on disk and do not decay (D252).
+- **Tell him to `/clear`.** Resuming a >150k-token conversation after the
+  1-hour cache TTL costs ~$1.50–2.00 in cache *writes* before any work
+  happens. Measured 2026-08-08: an overnight gap on one session cost $2.65,
+  of which 89% was cache re-writes, for zero lines of code. A cleared
+  session plus `restart.sh` rebuilds the same picture from disk for a few
+  thousand tokens.
+
+**Resuming is `restart`, and RULE ZERO is back in force automatically** —
+this file is read at session start, so a fresh session inherits the default
+without being told. A cleared session is inert until Michael types, so the
+break is safe by default: nothing can spend while he is away.
+
+**Weekly ceiling is now a real constraint,** separate from cost. It is a hard
+limit that resets weekly; long high-context sessions consume it fastest. When
+it is running out, the lever is *shorter LEAD sessions between dispatches*,
+not fewer dispatches — the work lives on disk, so restarting is cheap.
+
 ### ⛔ THE LIVE DATABASE IS PRODUCTION DATA
 
 **2026-08-01: tour 29 — Michael's French Riviera biking tour, which he had

@@ -10678,3 +10678,46 @@ confidence.
 Asymmetry that should drive the fix: **removing a stop is unrecoverable within
 the run; keeping a marginal one is not.** The guard itself stays — it exists
 because out-of-scope landmarks were being pulled into tight-scope tours.
+
+## D271 — RULE ZERO stands; the exception is an explicit break request
+**2026-08-08. Michael's ruling, verbatim:** *"should stay in effect (good
+rule) unless I ask you to take a break like now."*
+
+Autonomy remains the default — a session that idles waiting for approval is
+still failing at the main job. What changes is that **"Michael is away" is now
+a state LEAD must handle**, not a reason to self-schedule harder.
+
+Measured, and the reason this came up at all:
+
+```
+overnight gap on one session      +$2.65
+  cache WRITE  +237,900 tok       $2.38   (89%)
+  cache read   +300,000 tok       $0.15
+  output       +  5,300 tok       $0.13
+code changes produced             0 lines
+```
+
+**Nothing was running.** No cron, no wakeup, no Kiro process, empty queue.
+The cost was *re-entry*: a >150k-token conversation whose cached prefix
+expires after an hour and is re-written at the 2x rate on the next message.
+Roughly $1.50–2.00 per resume, before any work.
+
+So the lever is **`/clear`, not "stop"** — stopping is already the default,
+because a session costs nothing between messages. `restart.sh` rebuilds git
+state, row counts, queue, and scores from disk for a few thousand tokens
+(D252 again, now with a price attached).
+
+**Two independent money taps, and only one of them idles safely:**
+
+- *Claude* — bills only when invoked. Safe by default.
+- *The launchd dispatcher* — claims any unclaimed
+  `new_kiro_session_is_required_*.md` within 5 minutes and spends OpenAI
+  money with nobody watching. **This is the one to gate** before a break:
+  empty queue, or `touch .continuous_dev/PAUSE`.
+
+Also recorded: the **weekly usage ceiling** (82% on 2026-08-08) is a hard
+limit distinct from dollar cost, and long high-context sessions consume it
+fastest. When it binds, shorten LEAD sessions between dispatches rather than
+cutting dispatches — the queue is what produces value; the chat is not.
+
+Protocol written into `CLAUDE.md` RULE ZERO as "THE ONE EXCEPTION".
