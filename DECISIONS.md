@@ -10721,3 +10721,104 @@ fastest. When it binds, shorten LEAD sessions between dispatches rather than
 cutting dispatches — the queue is what produces value; the chat is not.
 
 Protocol written into `CLAUDE.md` RULE ZERO as "THE ONE EXCEPTION".
+
+## D272 — The reaper killed Michael's own Kiro session; it is fixed
+**2026-08-08.** Michael reported his interactive `kiro-cli --classic` dying
+mid-conversation with `zsh: killed`, then an endless EIO flood. A parallel
+Claude session diagnosed it as the Kiro auto-updater. That was wrong. It was us.
+
+```
+.continuous_dev/autonomy.log
+2026-08-09T01:40:57Z | reaped orphan kiro pid=65487 age=452s task=task_id=''
+2026-08-09T01:40:57Z | reaped orphan kiro pid=65496 age=452s task=task_id=''
+```
+
+`reap_orphans.sh` ran on the 5-minute launchd tick and SIGKILLed both. The
+`task_id=''` is the tell: their cwd was `~/Audioura`, not a worktree, so the
+script could not attribute them to any dispatch — and killed them anyway.
+
+**The logic error is worth naming.** The script asked one negative question:
+"is this process's parent a live dispatcher worker?" For an interactive
+session the answer is legitimately *no* — it has no dispatcher worker, by
+definition — and the script read *no* as *orphan*. The `kiro-cli-term` skip
+never helped: that string matches the zsh WRAPPER, not the CLI process.
+
+Replaced with two positive checks: a controlling terminal (`ttys###` means a
+human; dispatcher workers are spawned `start_new_session=True` and have none)
+and a cwd under `~/audioura-worktrees/`. Verified both directions against a
+disposable process in `~/Audioura` — old reaper killed it, fixed reaper spared
+it — and a detached process inside a worktree is still reaped.
+
+**The asymmetry that should have been in the original:** missing an orphan
+costs idle memory until reboot. Killing an interactive session destroys a
+human's work in progress. When a guard cannot tell the two apart, it must not
+fire. Same shape as D270 (SCOPE-CHECK) — a destructive action taken on an
+uncertain signal.
+
+## D273 — "Tour Generation Failed" was a 10-second poll timeout, not a content bug
+**2026-08-08.** Michael's `Picasso, Miró, Dalí: Unbound exhibition at MFA`
+failed twice in the app. The tour text was generated **successfully** both
+times; the orchestrator had already given up.
+
+`tour_orchestrator_service.py:670` polls the generator's `/status` with
+`timeout=10` and **no try/except**. One slow poll raises `ReadTimeout` out of
+`orchestrate_tour_async` and fails the job permanently. The generator is
+single-process Flask doing synchronous work — for MFA it crawled 26 pages of
+mfa.org — and cannot answer within 10 s during those stretches.
+
+$0.13 of OpenAI spend and ~15 minutes of generation discarded on both runs,
+for a *progress check* that was late. Big-corpus venues are precisely the ones
+that trip it, so this gets worse as the corpus work succeeds. Dispatched as
+LOCAL-360: a failed poll means "no news", not "job failed".
+
+**Not** the "identical tour names" collision Michael suspected. That hypothesis
+is cleared — the cache stored both runs fine and the DB insert was never
+reached.
+
+## D274 — A '?' in a title deletes the stop
+**2026-08-08.** Gauguin's *Where Do We Come From? What Are We? Where Are We
+Going?* was resolved, D1v2-VERIFIED, given a 258-word description — and then
+rendered as 7 headings for an 8-stop tour. `generate_tour_text.py:10640` treats
+any `.!?;` anywhere in a name as corruption.
+
+The guard's goal is right (catch GPT injecting a sentence into the name field);
+its proxy is wrong. Punctuation is not sentence-hood. It also hits `Whaam!`,
+`No. 14`, `St. Jerome`. And the downstream effect is silent: the tour just gets
+shorter and dies later at the orchestrator's stop-count check. Dispatched as
+LOCAL-361, with a hard rendered-headings == stop-count invariant.
+
+## D275 — The exhibition was understood and then discarded
+**2026-08-08.** Phase 1 correctly extracted `requirements: "Unbound exhibition
+at MFA"`. Nothing downstream read it. `[LOCAL-30] DETERMINISTIC BYPASS` then
+skipped Phase 3A entirely and filled the tour with the MFA's most-documented
+Wikidata works — no Picasso, no Miró, no Dalí.
+
+The bypass is a good optimisation for "tour of the MFA" and exactly wrong for
+"tour of a named show inside the MFA", because it skips the one phase that
+could have used the scope. Dispatched as LOCAL-362, with the rule that an
+unsatisfiable scope produces a **shorter, honest** tour rather than backfill.
+
+Michael's read was that the GCloud beta "did not realize I was asking about the
+current exhibition" and gave individual works by those painters. Storied did
+worse: it ignored the painters too. Worth saying plainly rather than filing it
+as parity.
+
+## D276 — LOCAL-356/358/359 merged; 358 merged with a known gap
+**2026-08-08.** 359 (SCOPE-CHECK gets the address, removal now requires high
+confidence) and 356 (structural empty-sentence metric, reporting-only) merged
+clean. Verified the 359 gate can fail: reverting the confidence line turns
+`test_medium_confidence_outside_keeps_stop` red.
+
+One thing 359's own submission missed, recorded for whoever tests it: the
+LOCAL-357 forced-stops harness creates POIs via `_new_poi(name)` with **no
+address**, and no code assigns `poi['address']` after creation. So the address
+injection is a no-op under forced stops — the proposed Le Safari regression
+test cannot exercise the fix. Production (Phase 3A, line 4482) does carry
+addresses, so the fix is real where it matters.
+
+358 merged **despite** a known gap rather than bouncing a third time: it fixes
+Michael's reported bug and is strictly better than the `museum` default it
+replaces. The gap — transport words inside place names (`Camelback Mountain` →
+camel, `San Diego Safari Park` → safari, 400 km tier) — went out as LOCAL-363.
+Bouncing again would have left the worse default in production while we
+polished; merging plus a follow-up keeps the improvement and tracks the defect.
