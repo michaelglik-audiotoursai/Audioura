@@ -31,7 +31,7 @@ MAX_DEATHS=3
 # Safety backstop: even if parentage says "orphan", we wait this long to
 # avoid killing a process whose parent just exited a moment ago and whose
 # task may still be recording its terminal status.
-MIN_AGE_SECONDS=300
+MIN_AGE_SECONDS=${MIN_AGE_SECONDS:-300}
 
 # --- Helper: compute elapsed seconds for a PID on macOS. ---
 # macOS ps lacks etimes, so we parse `lstart` and do date math.
@@ -109,16 +109,53 @@ parent_is_dispatcher_worker() {
 #
 # Safety: never kill zsh (kiro-cli-term) — those are interactive terminals.
 # Never kill the kiro_cli_desktop process.
+#
+# INCIDENT 2026-08-08 (D272): this loop SIGKILLed Michael's own interactive
+# `kiro-cli --classic` session mid-conversation — pids 65487/65496, age=452s,
+# logged as task=task_id='' because their cwd was ~/Audioura, not a worktree.
+# The "kiro-cli-term" skip never protected it: that string matches the zsh
+# WRAPPER process, not the `kiro-cli --classic` process itself. Its parent was
+# a terminal shell, so parent_is_dispatcher_worker correctly said "not a
+# worker" — and the script read "not a worker" as "orphan". It is not. An
+# interactive session has no dispatcher worker by definition.
+#
+# Two positive checks now decide, instead of one negative one:
+#   1. Controlling terminal. The dispatcher spawns workers with
+#      start_new_session=True (kiro_dispatcher.py:245), so a dispatched
+#      kiro-cli has NO tty ('??'). Anything on a ttys### is a human's session.
+#   2. Working directory. A leaked worker orphan always sits in its worktree
+#      under ~/audioura-worktrees/. Nothing else is what this script is for.
+# Missing a genuine orphan costs some idle memory until reboot. Killing an
+# interactive session destroys a human's work in progress. The asymmetry
+# decides the default: reap only what is positively identified.
 for pid in $(pgrep -f "kiro-cli" 2>/dev/null); do
   # Skip interactive terminals and the desktop app
   cmd=$(ps -o args= -p "$pid" 2>/dev/null)
   grep -q "kiro-cli-term" <<< "$cmd" && continue
   grep -q "kiro_cli_desktop" <<< "$cmd" && continue
 
+  # [1] Never kill anything attached to a terminal — that is a human's session.
+  tty=$(ps -o tty= -p "$pid" 2>/dev/null | tr -d ' ')
+  if [ -n "$tty" ] && [ "$tty" != "??" ] && [ "$tty" != "-" ]; then
+    continue
+  fi
+
   # Skip if parent is a live dispatcher worker (legitimate process)
   if parent_is_dispatcher_worker "$pid"; then
     continue
   fi
+
+  # [2] Only reap processes living in a dispatcher worktree. task_for_pid
+  # reads the same cwd; an empty/unknown task id means we cannot attribute
+  # this process to any dispatch, which is exactly the case that went wrong.
+  cwd=$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | grep '^n' | head -1 | cut -c2-)
+  case "$cwd" in
+    "$HOME"/audioura-worktrees/*) ;;
+    *)
+      echo "$(date -u +%FT%TZ) | reap SKIPPED pid=$pid — cwd not a worktree (cwd='$cwd')" >> "$LOG"
+      continue
+      ;;
+  esac
 
   # Orphan detected — check age backstop
   age=$(elapsed_seconds "$pid")
@@ -128,6 +165,11 @@ for pid in $(pgrep -f "kiro-cli" 2>/dev/null); do
 
   # Determine which task this belonged to for logging
   task=$(task_for_pid "$pid")
+
+  if [ -n "$REAP_DRY_RUN" ]; then
+    echo "DRY_RUN would reap pid=$pid age=${age}s task=$task cwd=$cwd"
+    continue
+  fi
 
   kill -9 "$pid" 2>/dev/null && \
     echo "$(date -u +%FT%TZ) | reaped orphan kiro pid=$pid age=${age}s task=$task" >> "$LOG"
