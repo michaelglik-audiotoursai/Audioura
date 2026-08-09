@@ -10594,6 +10594,9 @@ RULES:
         print(f"  [LOCAL-292] ✗ ALL stops failed generation — cannot deliver tour")
         return None, None, (None, None)
 
+    # [LOCAL-361] Track actually-rendered headers for D2 and heading-count invariant
+    _rendered_headers = []
+
     # Add each POI with its description and directions
     for i, poi in enumerate(poi_list):
         stop_num = i + 1   # always sequential; ignore whatever AI emitted
@@ -10637,7 +10640,24 @@ RULES:
             if year:
                 poi_header += f", {year}"
         # Also assert the name itself is a short noun phrase (no sentences/descriptions)
-        if len(poi_name.split()) > 15 or any(c in poi_name for c in '.!?;'):
+        # [LOCAL-361] Refined heuristic: a CORRUPT name is one where GPT injected a
+        # full sentence (has sentence-ending punctuation followed by a space and a
+        # lowercase word, e.g. ". the"). Real artwork titles may contain ?, !, ., ;
+        # (e.g. "Whaam!", "No. 14", "Where Do We Come From? What Are We?").
+        # D1v2-verified titles are exempt — the corpus already vouched for them.
+        _f3_is_verified = poi.get('verified', True)  # True or absent = verified
+        _f3_is_corrupt = False
+        if len(poi_name.split()) > 15:
+            _f3_is_corrupt = True
+        elif not _f3_is_verified:
+            # Only apply sentence-injection heuristic to unverified names
+            # Pattern: sentence-ending punct + space + lowercase word (indicates a real sentence)
+            if re.search(r'[.!?;]\s+[a-z]', poi_name):
+                _f3_is_corrupt = True
+            # Pattern: name starts with a verb phrase (GPT injection shape)
+            if re.match(r'^(This|Here|The following|In this|Welcome to)\s', poi_name, re.IGNORECASE):
+                _f3_is_corrupt = True
+        if _f3_is_corrupt:
             print(f"  [F3] ⚠️ NAME TOO LONG/CORRUPT at stop {stop_num}: '{poi_name[:80]}'")
             # Truncate to first 12 words if corrupted
             _clean_name = ' '.join(poi_name.split()[:12]).rstrip('.,;:!?')
@@ -10647,6 +10667,9 @@ RULES:
             if year:
                 poi_header += f", {year}"
         
+        # [LOCAL-361] Record the actual rendered header for D2 truth set
+        _rendered_headers.append(poi_header)
+
         # Start the POI content with all extracted information
         poi_content = poi_header + "\n\n"
         
@@ -10884,15 +10907,8 @@ RULES:
     # [D2] Strip GPT self-references to "Stop N" in description bodies
     if _storied_mode:
         import re as _d2_re
-        # Build set of REAL header lines (we know exactly which lines are headers)
-        _real_headers = set()
-        for i, poi in enumerate(poi_list):
-            _rh = f"Stop {i + 1}: {poi['name']}"
-            if poi['artist'] and poi['artist'].lower() != "unknown artist":
-                _rh += f" by {poi['artist']}"
-            if poi['year']:
-                _rh += f", {poi['year']}"
-            _real_headers.add(_rh)
+        # Build set of REAL header lines from actually-rendered headers [LOCAL-361]
+        _real_headers = set(_rendered_headers)
         
         _d2_lines = complete_tour.split('\n')
         _d2_cleaned = []
@@ -10910,6 +10926,22 @@ RULES:
                 # Replace self-referential "Stop N" with context-appropriate text
                 _d2_cleaned.append(_d2_re.sub(r'\bStop\s+\d+\b', 'this work', _line))
         complete_tour = '\n'.join(_d2_cleaned)
+
+    # [LOCAL-361] HARD INVARIANT: rendered heading count MUST equal stop count.
+    # A mismatch means a stop silently vanished — fail loudly at generation time.
+    _final_headers = re.findall(r'^Stop\s+\d+:.+$', complete_tour, re.MULTILINE)
+    _expected_stop_count = len(poi_list)
+    _actual_header_count = len(_final_headers)
+    if _actual_header_count != _expected_stop_count:
+        print(f"  [LOCAL-361] ✗ HEADING COUNT MISMATCH: "
+              f"expected={_expected_stop_count}, rendered={_actual_header_count}")
+        print(f"    Rendered headers: {_final_headers}")
+        raise ValueError(
+            f"[LOCAL-361] Stop heading count mismatch: "
+            f"expected {_expected_stop_count} stops but only {_actual_header_count} "
+            f"headings rendered. This is a generation bug — refusing to deliver a "
+            f"short tour."
+        )
 
     # -------- [S27] Storied: post-assembly de-repetition check --------
     if _storied_mode:
