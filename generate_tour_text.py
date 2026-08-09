@@ -4302,6 +4302,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # use those directly as Phase 3A output. No GPT randomness, no fabrication.
     # This is the ONLY path that guarantees reproducibility.
     _deterministic_fill_used = False
+    # [LOCAL-364] Track which path produced the stops for exhibition-scoped requests.
+    # Used downstream for honest-degradation labelling in the tour text.
+    _exhibition_stops_source = 'none'  # 'checklist', 'partial', 'creator_filter', 'none'
+    _exhibition_checklist_result = None
     if _forced_stops_active:
         # [LOCAL-357] forced_stops bypasses ALL selection — mark as deterministic
         _deterministic_fill_used = True
@@ -4310,159 +4314,297 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         for p in poi_list:
             print(f"   - {p['name']} [FORCED]")
     elif _exhibition_scope is not None:
-        # ──── [LOCAL-362] SCOPED SELECTION: filter by exhibition scope ────────
-        # Instead of taking the venue-wide most-documented works, constrain
-        # selection to works matching the scope (artist names from requirements).
-        # Falls back to GPT Phase 3A if no artist-filtered works are available.
+        # ──── [LOCAL-364] EXHIBITION CHECKLIST RETRIEVAL ──────────────────────
+        # PRIMARY PATH: Retrieve the actual exhibition object list from the
+        # venue's own site. The LOCAL-362 creator filter becomes the FALLBACK.
+        # An exhibition is a specific, curated, time-bound checklist — not the
+        # set of works by its headline artists that the venue happens to own.
+        _exhibition_checklist_result = None
+        _exhibition_stops_source = 'none'  # 'checklist', 'partial', 'creator_filter', 'none'
+
         try:
+            from exhibition_checklist import find_exhibition_checklist, ExhibitionChecklistResult
             from venue_resolver import resolve_venue, fetch_venue_works, cache_get as _det_cache_get
             from story_miner import extract_catalogue_works_from_pages
             from story_miner import _normalize as _det_norm
-            
+
             _det_city_hint = ""
-            # LOCAL-362: Use intent's venue_name for city extraction, NOT the raw location
-            # (which may contain artist names before commas)
+            # LOCAL-362: Use intent's venue_name for city extraction
             _scope_venue = _exhibition_scope['venue_name']
             if "," in _scope_venue:
                 _scope_parts = [p.strip() for p in _scope_venue.split(",")]
                 _det_city_hint = _scope_parts[1] if len(_scope_parts) >= 2 else ""
             elif "," in location:
-                # Fallback: try to find a city-like segment from location
                 _loc_parts = [p.strip() for p in location.split(",")]
-                # Skip segments that look like artist names
                 for _seg in _loc_parts[1:]:
                     _seg_lower = _seg.lower().strip()
                     if _seg_lower in ('ma', 'ny', 'ca', 'usa') or len(_seg.split()) <= 2:
-                        # Could be state abbrev or city
                         if not any(_seg.strip() == a for a in _exhibition_scope_artists):
                             _det_city_hint = _seg.strip()
                             break
-            
+
             _det_entity = resolve_venue(_scope_venue, _det_city_hint)
-            
-            if _det_entity and _det_entity.qid:
-                # Gather ALL documented works (same as deterministic path)
-                _det_documented = []
-                _det_seen_titles_norm = set()
-                
-                # Source 1: Catalogue works
-                _det_cache = _det_cache_get(_det_entity.qid) if _det_entity.qid else None
-                _det_catalogue_works = []
-                if _det_cache and _det_cache.get('pages'):
-                    _det_pages = _det_cache['pages']
-                    if isinstance(_det_pages, list):
-                        _det_catalogue_works = extract_catalogue_works_from_pages(_det_pages)
-                
-                for cw in _det_catalogue_works:
-                    _t = cw.get('title', '').strip()
-                    _tn = _det_norm(_t)
-                    if _t and _tn not in _det_seen_titles_norm:
-                        _det_documented.append({'title': _t, 'source': 'catalogue',
-                                                'creator': cw.get('artist', ''),
-                                                'material': cw.get('material', ''),
-                                                'period': cw.get('period', ''),
-                                                'origin': cw.get('origin', '')})
-                        _det_seen_titles_norm.add(_tn)
-                
-                # Source 2: SPARQL works (now includes creator via LOCAL-362)
-                _det_sparql = fetch_venue_works(_det_entity.qid, _det_entity.language)
-                _det_sparql_seen_qids = set()
-                for w in _det_sparql:
-                    _wqid = w.get('qid', '')
-                    if _wqid in _det_sparql_seen_qids:
-                        continue
-                    _det_sparql_seen_qids.add(_wqid)
-                    _t = w.get('label_local', '') or w.get('label_en', '')
-                    _tn = _det_norm(_t)
-                    if _t and _tn not in _det_seen_titles_norm:
-                        _det_documented.append({
-                            'title': _t, 'source': 'sparql',
-                            'creator': w.get('creator', ''),
-                            'creators': w.get('creators', []),
-                        })
-                        _det_seen_titles_norm.add(_tn)
-                
-                print(f"  [LOCAL-362] Total documented works at venue: {len(_det_documented)} "
-                      f"({len(_det_catalogue_works)} catalogue, {len(_det_sparql_seen_qids)} SPARQL)")
-                
-                # Filter by scope artists
-                _scope_filtered = []
-                if _exhibition_scope_artists:
-                    # Normalize artist names for matching
-                    _scope_artists_norm = []
-                    for a in _exhibition_scope_artists:
-                        # Handle accented chars: "Miró" should match "Miro"
-                        _a_nfkd = _ud362.normalize('NFKD', a.lower())
-                        _a_stripped = ''.join(c for c in _a_nfkd if not _ud362.combining(c))
-                        _scope_artists_norm.append(_a_stripped)
-                        # Also add the last name alone for matching
-                        _parts = _a_stripped.split()
-                        if len(_parts) > 1:
-                            _scope_artists_norm.append(_parts[-1])
-                    
-                    def _creator_matches_scope(work_entry: dict) -> bool:
-                        """Check if a work's creator matches any of the scope artists."""
-                        creators_to_check = []
-                        if work_entry.get('creator'):
-                            creators_to_check.append(work_entry['creator'])
-                        if work_entry.get('creators'):
-                            creators_to_check.extend(work_entry['creators'])
-                        
-                        for creator in creators_to_check:
-                            if not creator:
-                                continue
-                            _c_nfkd = _ud362.normalize('NFKD', creator.lower())
-                            _c_stripped = ''.join(c for c in _c_nfkd if not _ud362.combining(c))
-                            for _an in _scope_artists_norm:
-                                if _an in _c_stripped or _c_stripped.endswith(_an):
-                                    return True
-                        return False
-                    
-                    _scope_filtered = [d for d in _det_documented if _creator_matches_scope(d)]
-                    print(f"  [LOCAL-362] After artist-scope filter: {len(_scope_filtered)} works "
-                          f"match artists {_exhibition_scope_artists}")
-                    
-                    # Log which artists have how many matches
-                    for _artist in _exhibition_scope_artists:
-                        _a_nfkd = _ud362.normalize('NFKD', _artist.lower())
-                        _a_stripped = ''.join(c for c in _a_nfkd if not _ud362.combining(c))
-                        _artist_count = sum(1 for d in _scope_filtered 
-                                           if _a_stripped in _ud362.normalize('NFKD', (d.get('creator', '') or '').lower()))
-                        print(f"    {_artist}: {_artist_count} works")
-                
-                # Decide: use filtered if we have enough, degrade honestly if not
-                if _scope_filtered and len(_scope_filtered) >= 1:
-                    if len(_scope_filtered) < total_stops:
-                        # HONEST DEGRADATION: fewer works than requested
-                        print(f"  [LOCAL-362] HONEST DEGRADATION: only {len(_scope_filtered)} works "
-                              f"match scope, but {total_stops} requested.")
-                        print(f"    → Tour will have {len(_scope_filtered)} stops (scope-constrained).")
-                        # Reduce total_stops to what we actually have
-                        total_stops = len(_scope_filtered)
-                    
-                    # Use filtered works as selection
-                    _det_take = min(len(_scope_filtered), total_stops * 2)
-                    poi_list = [_new_poi(d['title']) for d in _scope_filtered[:_det_take]]
+
+            # ─── LOCAL-364: Try exhibition checklist FIRST ─────────────────────
+            if _det_entity and _det_entity.official_url:
+                # Extract the exhibition name from the original request
+                # The user typed something like "Picasso, Miró, Dalí: Unbound exhibition at MFA"
+                # We want the exhibition name portion
+                _exh_name_for_search = _exhibition_scope.get('requirements', '') or location
+                # If requirements contains "exhibition" keyword, use it directly
+                # Otherwise try to extract from the original location string
+                if 'exhibition' not in _exh_name_for_search.lower():
+                    _exh_name_for_search = location
+
+                print(f"\n  [LOCAL-364] ═══ EXHIBITION CHECKLIST RETRIEVAL ═══")
+                print(f"  [LOCAL-364] Exhibition search term: '{_exh_name_for_search}'")
+                print(f"  [LOCAL-364] Venue URL: {_det_entity.official_url}")
+
+                _exhibition_checklist_result = find_exhibition_checklist(
+                    venue_base_url=_det_entity.official_url,
+                    exhibition_name=_exh_name_for_search,
+                    venue_name=_scope_venue,
+                )
+
+                print(f"  [LOCAL-364] Result: {_exhibition_checklist_result}")
+
+                # Handle result
+                if _exhibition_checklist_result.is_closed:
+                    # Exhibition has closed — do NOT tour it
+                    print(f"\n  [LOCAL-364] ⚠️  EXHIBITION CLOSED — refusing to tour a dismounted show")
+                    print(f"    Exhibition: {_exhibition_checklist_result.exhibition_title}")
+                    print(f"    Closed: {_exhibition_checklist_result.closing_date}")
+                    print(f"    Reason: {_exhibition_checklist_result.reason}")
+                    # Return an error tour that explains the situation
+                    _closed_msg = (
+                        f"# Exhibition Closed\n\n"
+                        f"The exhibition \"{_exhibition_checklist_result.exhibition_title}\" "
+                        f"at {_scope_venue} closed on {_exhibition_checklist_result.closing_date}.\n\n"
+                        f"A tour of a dismounted exhibition cannot be generated because the works "
+                        f"are no longer on display. Please check the venue's website for current exhibitions."
+                    )
+                    if output_file:
+                        with open(output_file, "w", encoding="utf-8") as _cf:
+                            _cf.write(_closed_msg)
+                    _LAST_GENERATION_COST = {
+                        "total_cost": 0.0,
+                        "total_tokens": 0,
+                        "cache_hit": False,
+                        "breakdown": {"llm": 0.0, "tts": 0.0, "search": 0.0},
+                        "exhibition_closed": True,
+                    }
+                    return _closed_msg, output_file, (None, None)
+
+                elif _exhibition_checklist_result.has_works:
+                    # SUCCESS: Use the exhibition checklist as stops
+                    _checklist_works = _exhibition_checklist_result.works
+                    _exhibition_stops_source = _exhibition_checklist_result.path  # 'checklist' or 'partial'
+
+                    if len(_checklist_works) < total_stops and _exhibition_checklist_result.path == 'partial':
+                        print(f"  [LOCAL-364] Partial checklist: {len(_checklist_works)} works "
+                              f"(site shows highlights only), requested {total_stops}")
+                        # Use what we have; shortfall is honestly stated
+                        total_stops = min(total_stops, len(_checklist_works))
+                    elif len(_checklist_works) < total_stops:
+                        total_stops = len(_checklist_works)
+
+                    _det_take = min(len(_checklist_works), total_stops * 2)
+                    poi_list = [_new_poi(w['title']) for w in _checklist_works[:_det_take]]
                     _deterministic_fill_used = True
-                    
-                    print(f"  [LOCAL-362] SCOPED SELECTION: {len(poi_list)} works by "
-                          f"{', '.join(_exhibition_scope_artists)} → Phase 3A SKIPPED")
-                    print(f"   Stops proposed (scoped, artist-filtered):")
+
+                    print(f"  [LOCAL-364] ✓ CHECKLIST PATH: {len(poi_list)} works from exhibition page")
+                    print(f"    Source: {_exhibition_checklist_result.exhibition_url}")
+                    print(f"    Shape: {_exhibition_checklist_result.page_shape}")
+                    print(f"    Stops from exhibition checklist:")
                     for p in poi_list[:total_stops]:
-                        _src = next((d['source'] for d in _scope_filtered if d['title'] == p['name']), '?')
-                        _cr = next((d.get('creator', '?') for d in _scope_filtered if d['title'] == p['name']), '?')
-                        print(f"     - {p['name']} [{_src}] (creator: {_cr})")
+                        _w = next((w for w in _checklist_works if w['title'] == p['name']), {})
+                        _artist_info = f" (by {_w['artist']})" if _w.get('artist') else ''
+                        print(f"      - {p['name']}{_artist_info}")
+
+            # ─── LOCAL-364/362 FALLBACK: creator filter ────────────────────────
+            # If checklist retrieval failed (no exhibition page found, prose-only,
+            # no venue URL), fall back to LOCAL-362's creator filter.
+            # The key difference: we LABEL this fallback honestly.
+            if not _deterministic_fill_used:
+                _fallback_reason = ''
+                if _exhibition_checklist_result:
+                    _fallback_reason = _exhibition_checklist_result.reason
                 else:
-                    # No matching works found — fall through to Phase 3A
-                    # (which will use the requirements in its prompt)
-                    print(f"  [LOCAL-362] No works match scope artists in SPARQL/catalogue — "
-                          f"falling through to Phase 3A (GPT will use requirements)")
-            else:
-                print(f"  [LOCAL-362] Venue resolution failed — falling through to Phase 3A")
+                    _fallback_reason = 'No venue URL available for exhibition page crawl'
+
+                print(f"\n  [LOCAL-364] Checklist unavailable — falling back to creator filter")
+                print(f"    Reason: {_fallback_reason}")
+                _exhibition_stops_source = 'creator_filter'
+
+                if _det_entity and _det_entity.qid:
+                    # ──── LOCAL-362 CREATOR FILTER (now labelled as fallback) ──────
+                    _det_documented = []
+                    _det_seen_titles_norm = set()
+
+                    # Source 1: Catalogue works
+                    _det_cache = _det_cache_get(_det_entity.qid) if _det_entity.qid else None
+                    _det_catalogue_works = []
+                    if _det_cache and _det_cache.get('pages'):
+                        _det_pages = _det_cache['pages']
+                        if isinstance(_det_pages, list):
+                            _det_catalogue_works = extract_catalogue_works_from_pages(_det_pages)
+
+                    for cw in _det_catalogue_works:
+                        _t = cw.get('title', '').strip()
+                        _tn = _det_norm(_t)
+                        if _t and _tn not in _det_seen_titles_norm:
+                            _det_documented.append({'title': _t, 'source': 'catalogue',
+                                                    'creator': cw.get('artist', ''),
+                                                    'material': cw.get('material', ''),
+                                                    'period': cw.get('period', ''),
+                                                    'origin': cw.get('origin', '')})
+                            _det_seen_titles_norm.add(_tn)
+
+                    # Source 2: SPARQL works (includes creator via LOCAL-362)
+                    _det_sparql = fetch_venue_works(_det_entity.qid, _det_entity.language)
+                    _det_sparql_seen_qids = set()
+                    for w in _det_sparql:
+                        _wqid = w.get('qid', '')
+                        if _wqid in _det_sparql_seen_qids:
+                            continue
+                        _det_sparql_seen_qids.add(_wqid)
+                        _t = w.get('label_local', '') or w.get('label_en', '')
+                        _tn = _det_norm(_t)
+                        if _t and _tn not in _det_seen_titles_norm:
+                            _det_documented.append({
+                                'title': _t, 'source': 'sparql',
+                                'creator': w.get('creator', ''),
+                                'creators': w.get('creators', []),
+                            })
+                            _det_seen_titles_norm.add(_tn)
+
+                    print(f"  [LOCAL-362] Total documented works at venue: {len(_det_documented)} "
+                          f"({len(_det_catalogue_works)} catalogue, {len(_det_sparql_seen_qids)} SPARQL)")
+
+                    # Filter by scope artists
+                    _scope_filtered = []
+                    if _exhibition_scope_artists:
+                        _scope_artists_norm = []
+                        for a in _exhibition_scope_artists:
+                            _a_nfkd = _ud362.normalize('NFKD', a.lower())
+                            _a_stripped = ''.join(c for c in _a_nfkd if not _ud362.combining(c))
+                            _scope_artists_norm.append(_a_stripped)
+                            _parts = _a_stripped.split()
+                            if len(_parts) > 1:
+                                _scope_artists_norm.append(_parts[-1])
+
+                        def _creator_matches_scope(work_entry: dict) -> bool:
+                            """Check if a work's creator matches any of the scope artists."""
+                            creators_to_check = []
+                            if work_entry.get('creator'):
+                                creators_to_check.append(work_entry['creator'])
+                            if work_entry.get('creators'):
+                                creators_to_check.extend(work_entry['creators'])
+                            for creator in creators_to_check:
+                                if not creator:
+                                    continue
+                                _c_nfkd = _ud362.normalize('NFKD', creator.lower())
+                                _c_stripped = ''.join(c for c in _c_nfkd if not _ud362.combining(c))
+                                for _an in _scope_artists_norm:
+                                    if _an in _c_stripped or _c_stripped.endswith(_an):
+                                        return True
+                            return False
+
+                        _scope_filtered = [d for d in _det_documented if _creator_matches_scope(d)]
+                        print(f"  [LOCAL-362] After artist-scope filter: {len(_scope_filtered)} works "
+                              f"match artists {_exhibition_scope_artists}")
+
+                        for _artist in _exhibition_scope_artists:
+                            _a_nfkd = _ud362.normalize('NFKD', _artist.lower())
+                            _a_stripped = ''.join(c for c in _a_nfkd if not _ud362.combining(c))
+                            _artist_count = sum(1 for d in _scope_filtered
+                                               if _a_stripped in _ud362.normalize('NFKD', (d.get('creator', '') or '').lower()))
+                            print(f"    {_artist}: {_artist_count} works")
+
+                    # Decide: use filtered if we have enough
+                    if _scope_filtered and len(_scope_filtered) >= 1:
+                        if len(_scope_filtered) < total_stops:
+                            print(f"  [LOCAL-362] HONEST DEGRADATION: only {len(_scope_filtered)} works "
+                                  f"match scope, but {total_stops} requested.")
+                            print(f"    → Tour will have {len(_scope_filtered)} stops (scope-constrained).")
+                            total_stops = len(_scope_filtered)
+
+                        _det_take = min(len(_scope_filtered), total_stops * 2)
+                        poi_list = [_new_poi(d['title']) for d in _scope_filtered[:_det_take]]
+                        _deterministic_fill_used = True
+
+                        print(f"  [LOCAL-362] SCOPED SELECTION (FALLBACK): {len(poi_list)} works by "
+                              f"{', '.join(_exhibition_scope_artists)} → Phase 3A SKIPPED")
+                        print(f"  [LOCAL-364] ⚠️  NOTE: These are works by the exhibition's artists "
+                              f"in the venue's permanent collection — NOT necessarily works in the exhibition.")
+                        print(f"    Fallback reason: {_fallback_reason}")
+                        print(f"   Stops proposed (creator-filtered, FALLBACK path):")
+                        for p in poi_list[:total_stops]:
+                            _src = next((d['source'] for d in _scope_filtered if d['title'] == p['name']), '?')
+                            _cr = next((d.get('creator', '?') for d in _scope_filtered if d['title'] == p['name']), '?')
+                            print(f"     - {p['name']} [{_src}] (creator: {_cr})")
+                    else:
+                        print(f"  [LOCAL-362] No works match scope artists in SPARQL/catalogue — "
+                              f"falling through to Phase 3A (GPT will use requirements)")
+                else:
+                    print(f"  [LOCAL-362] Venue resolution failed — falling through to Phase 3A")
+
+        except ImportError as _imp_err:
+            # exhibition_checklist module not available — fall through gracefully
+            print(f"  [LOCAL-364] exhibition_checklist module unavailable ({_imp_err}) — "
+                  f"falling back to LOCAL-362 creator filter")
+            _exhibition_stops_source = 'creator_filter'
+            # Re-run just the LOCAL-362 path without the checklist
+            try:
+                from venue_resolver import resolve_venue, fetch_venue_works, cache_get as _det_cache_get
+                from story_miner import extract_catalogue_works_from_pages
+                from story_miner import _normalize as _det_norm
+
+                _det_city_hint = ""
+                _scope_venue = _exhibition_scope['venue_name']
+                if "," in _scope_venue:
+                    _scope_parts = [p.strip() for p in _scope_venue.split(",")]
+                    _det_city_hint = _scope_parts[1] if len(_scope_parts) >= 2 else ""
+
+                _det_entity = resolve_venue(_scope_venue, _det_city_hint)
+                if _det_entity and _det_entity.qid:
+                    _det_sparql = fetch_venue_works(_det_entity.qid, _det_entity.language)
+                    if _det_sparql and _exhibition_scope_artists:
+                        # Same creator-filter as LOCAL-362
+                        _scope_artists_norm = []
+                        for a in _exhibition_scope_artists:
+                            _a_nfkd = _ud362.normalize('NFKD', a.lower())
+                            _a_stripped = ''.join(c for c in _a_nfkd if not _ud362.combining(c))
+                            _scope_artists_norm.append(_a_stripped)
+                            _parts = _a_stripped.split()
+                            if len(_parts) > 1:
+                                _scope_artists_norm.append(_parts[-1])
+
+                        _scope_filtered = []
+                        for w in _det_sparql:
+                            _cr = w.get('creator', '')
+                            if _cr:
+                                _c_nfkd = _ud362.normalize('NFKD', _cr.lower())
+                                _c_stripped = ''.join(c for c in _c_nfkd if not _ud362.combining(c))
+                                if any(_an in _c_stripped for _an in _scope_artists_norm):
+                                    _scope_filtered.append({
+                                        'title': w.get('label_local', '') or w.get('label_en', ''),
+                                        'source': 'sparql', 'creator': _cr,
+                                    })
+                        if _scope_filtered:
+                            if len(_scope_filtered) < total_stops:
+                                total_stops = len(_scope_filtered)
+                            poi_list = [_new_poi(d['title']) for d in _scope_filtered[:total_stops * 2]]
+                            _deterministic_fill_used = True
+                            print(f"  [LOCAL-362 fallback] {len(poi_list)} works by "
+                                  f"{', '.join(_exhibition_scope_artists)}")
+            except Exception:
+                pass
         except Exception as _scope_err:
-            print(f"  [LOCAL-362] Scoped selection failed (falling through to Phase 3A): {_scope_err}")
+            print(f"  [LOCAL-364] Exhibition checklist failed (falling through to Phase 3A): {_scope_err}")
             import traceback
             traceback.print_exc()
+        # ──── END [LOCAL-364/362] ─────────────────────────────────────────────
     elif tour_category == 'museum' and _museum_venue_name:
         try:
             from venue_resolver import resolve_venue, fetch_venue_works, build_canonical_titles_from_works, cache_get as _det_cache_get
@@ -9887,7 +10029,30 @@ TOUR DATA:
 - Stop 1 coordinates: {poi_list[0].get('coordinates', 'unknown') if poi_list else 'unknown'}
 - Stop {len(poi_list)} coordinates: {poi_list[-1].get('coordinates', 'unknown') if poi_list else 'unknown'}
 - Approximate straight-line distance between first and last stop: {_prolog_distance_str if _prolog_distance_meaningful else 'N/A (single building)'}
-- Theme: {_connecting_thread}
+- Theme: {_connecting_thread}"""
+
+            # [LOCAL-364] Honest degradation: inject a note into the prolog when
+            # the exhibition checklist could not be retrieved and we fell back to
+            # the creator filter. The listener should know.
+            if _exhibition_scope is not None and _exhibition_stops_source == 'creator_filter':
+                _364_fallback_note = (
+                    f"\n- IMPORTANT NOTE FOR PROLOG: This tour was requested as an exhibition "
+                    f"tour, but the exhibition's actual checklist could not be retrieved from "
+                    f"the venue website. The stops below are works by the exhibition's artists "
+                    f"from the venue's permanent collection. Mention this honestly in Part 1: "
+                    f"'We were unable to confirm the exact works on display in the exhibition, "
+                    f"so this tour features works by the same artists from the museum's collection.'"
+                )
+                _prolog_prompt += _364_fallback_note
+            elif _exhibition_scope is not None and _exhibition_stops_source == 'partial':
+                _364_partial_note = (
+                    f"\n- NOTE: This tour draws from a partial exhibition checklist (only "
+                    f"highlighted works were published on the venue website). Mention briefly "
+                    f"that additional works may be on display."
+                )
+                _prolog_prompt += _364_partial_note
+
+            _prolog_prompt += f"""
 
 SOURCED FACTS (use ONLY these for any factual claim):
 {_corpus_facts_prompt if _corpus_facts_prompt else '  (no corpus facts available — use only general geographic/transport facts for Part 2, omit specific historical claims in Part 3)'}
