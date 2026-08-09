@@ -21,6 +21,7 @@ import '../screens/debug_log_viewer_screen.dart';
 import '../screens/tour_player_screen.dart';
 import '../screens/news_player_screen.dart';
 import '../widgets/language_selector.dart';
+import '../utils/tour_request_parser.dart';
 import 'main_screen.dart';
 
 class TourGeneratorScreen extends StatefulWidget {
@@ -107,31 +108,8 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   }
 
   Map<String, dynamic> _parseTourRequest(String request) {
-    String lowerRequest = request.toLowerCase();
-    
-    String tourType = 'museum';
-    if (lowerRequest.contains('walking') || lowerRequest.contains('walk')) {
-      tourType = 'walking';
-    } else if (lowerRequest.contains('museum')) {
-      tourType = 'museum';
-    } else if (lowerRequest.contains('park')) {
-      tourType = 'park';
-    } else if (lowerRequest.contains('exhibit')) {
-      tourType = 'exhibit';
-    }
-    
-    String location = request;
-    RegExp forMatch = RegExp(r'for\s+(.+)', caseSensitive: false);
-    Match? match = forMatch.firstMatch(request);
-    if (match != null) {
-      location = match.group(1)!.trim();
-    }
-    
-    return {
-      'location': location,
-      'tour_type': tourType,
-      // Don't set total_stops here, it will be set by the caller
-    };
+    // [LOCAL-358] Delegates to top-level utility for testability.
+    return parseTourRequest(request);
   }
 
   String _sanitizeInput(String input) {
