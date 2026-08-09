@@ -796,11 +796,24 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12):
 
     def _check_one(poi):
         name = poi.get('name', '')
+        address = (poi.get('address', '') or '').strip()
         desc = (poi.get('description', '') or '')[:400]
+
+        # [LOCAL-359] Include address in the judge prompt when available.
+        # The address is authoritative — it was returned by Phase 3A alongside the name.
+        address_line = ""
+        if address:
+            address_line = (
+                f"Address (authoritative): {address}\n"
+                f"NOTE: The address is a verified fact. If the address is clearly within "
+                f"'{scope_name}', answer true regardless of what you recall about the name.\n"
+            )
+
         prompt = (
             f"You are a geography fact-checker for location tours.\n"
             f"The tour must stay strictly within: '{scope_name}'.\n"
             f"Stop name: '{name}'\n"
+            f"{address_line}"
             f"Description snippet:\n{desc}\n\n"
             f"Question: Is this stop physically located INSIDE or within the bounds of "
             f"'{scope_name}'? A stop that is in the same town but OUTSIDE '{scope_name}' "
@@ -839,11 +852,17 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12):
             results = [f.result() for f in as_completed(futures)]
         results.sort(key=lambda x: candidates.index(x[0]))
         for poi, inside, conf, reason in results:
-            if inside or conf == "low":
+            # [LOCAL-359] Removal requires HIGH confidence. Rationale: removing a stop
+            # is destructive and unrecoverable within the run (the tour simply gets
+            # shorter). Keeping a marginal stop costs nothing — it's still a real place
+            # in the general area. The Le Safari false-positive (medium confidence,
+            # wrong answer) demonstrates that medium is not reliable enough for a
+            # destructive action. Only high-confidence "outside" verdicts justify removal.
+            if inside or conf in ("low", "medium"):
                 survivors.append(poi)
-                print(f"   OK '{poi['name']}' — inside '{scope_name}': {reason}")
+                print(f"   OK '{poi['name']}' — inside '{scope_name}': {reason} (conf={conf})")
             else:
-                print(f"   X SCOPE-CHECK REMOVED '{poi['name']}' — outside '{scope_name}': {reason}")
+                print(f"   X SCOPE-CHECK REMOVED '{poi['name']}' — outside '{scope_name}': {reason} (conf={conf})")
 
     kept = [first_stop] + survivors + tail
     return kept
