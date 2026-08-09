@@ -367,6 +367,14 @@ class StopAnalysis:
     # When True, corpus_available=False means the stop is genuinely unverified.
     corpus_lookup_attempted: bool = False
 
+    # [LOCAL-356] Empty-sentence detection — structural filler metric.
+    # A sentence is "empty" when it carries no entity, no number, no date,
+    # no attributable claim, and no navigational instruction. Unlike
+    # generic_filler_fraction (which matches 12 fixed phrases), this detects
+    # structurally information-free sentences regardless of vocabulary.
+    empty_sentence_fraction: float = 0.0
+    empty_sentence_count: int = 0
+
 
 @dataclass 
 class TourScore:
@@ -482,6 +490,145 @@ def parse_tour(text: str) -> List[dict]:
         stop['body'] = '\n'.join(body_lines)
 
     return stops
+
+
+# --- [LOCAL-356] Structural empty-sentence detection -------------------------
+# A sentence carries information if it has ANY of:
+#   1. A number, date, or year (factual anchor)
+#   2. A proper noun / named entity (specific referent)
+#   3. A navigational/orientation cue (tells the listener where to look/go)
+#   4. An attributable claim (specific verb + concrete object)
+#
+# A sentence that has NONE of these is structurally empty — it pads prose
+# without telling the listener anything actionable or verifiable.
+#
+# This is NOT a vocabulary ban. "The weight of centuries settles upon you"
+# fails because it has no entity, no number, no direction, and no claim — not
+# because "weight" or "centuries" are banned words.
+
+# Navigational/orientation signals — position the listener in space.
+# "As you stand on Cours Saleya" or "Look to your left" or "ahead of you".
+_ORIENTATION_RE = re.compile(
+    r'(?i)\b(?:'
+    # Directional/positional cues
+    r'(?:to\s+(?:your|the)\s+(?:left|right))'
+    r'|(?:ahead\s+of\s+you)'
+    r'|(?:behind\s+you)'
+    r'|(?:in\s+front\s+of\s+you)'
+    r'|(?:on\s+your\s+(?:left|right))'
+    r'|(?:facing\s+(?:you|north|south|east|west))'
+    r'|(?:(?:look|turn|face|walk|head|proceed|continue|cross|enter|exit|step)'
+    r'\s+(?:towards?|to|into|through|along|across|past|up|down|left|right|north|south|east|west))'
+    r'|(?:(?:north|south|east|west|northeast|northwest|southeast|southwest)\s+of)'
+    r'|(?:you\s+(?:will\s+)?(?:see|find|notice|spot|reach|arrive|come\s+to|pass))'
+    r'|(?:(?:stands?|sits?|lies?|looms?)\s+(?:before|beside|next\s+to|opposite|across\s+from)\s+you)'
+    r'|(?:as\s+you\s+(?:stand|walk|enter|approach|pass|cross|turn|face|look|exit|leave|arrive|reach))'
+    r'|(?:(?:the|this)\s+(?:building|structure|entrance|facade|door|gate|arch|stairs?|path|street|square|'
+    r'market|fountain|monument|statue|plaza|piazza|promenade)\s+(?:is|are)\s+'
+    r'(?:on|to|at|ahead|behind|beside|next|opposite|across))'
+    r')\b'
+)
+
+# Proper nouns: capitalised multi-word phrases (not at sentence start).
+# Single capitalised word at sentence start is ambiguous — filter those out.
+_SENTENCE_START_CAP_RE = re.compile(r'^[A-Z][a-zéèêëàâùûôîïçñ]+\s')
+
+# Concrete/specific nouns that indicate attributable claims even without dates.
+# These are things a tour stop would mention that can be verified:
+# architecture features, food items, artwork names, historical events.
+_ATTRIBUTABLE_CLAIM_RE = re.compile(
+    r'(?i)\b(?:'
+    # Named dishes, foods (verifiable menu items)
+    r'socca|ratatouille|pissaladière|salade\s+niçoise|daube|bouillabaisse|'
+    r'fougasse|tapenade|pistou|aioli|pan\s+bagnat|'
+    # Architecture/construction (verifiable physical features)
+    r'(?:(?:built|constructed|erected|completed|renovated|restored|designed|founded|'
+    r'funded|opened|established|inaugurated|demolished|destroyed|rebuilt|expanded|'
+    r'converted|transformed|dedicated|consecrated)\s+(?:in|by|during|from))'
+    r'|(?:(?:baroque|gothic|neoclassical|romanesque|art\s+deco|art\s+nouveau|renaissance)\s+'
+    r'(?:style|architecture|facade|interior|design))'
+    # Specific measurement claims
+    r'|(?:(?:meters?|metres?|feet|foot|km|miles?|hectares?|acres?)\s+(?:long|wide|tall|high|deep))'
+    r'|(?:(?:seats?|houses?|accommodates?|holds?)\s+\d)'
+    # Attribution to a person/entity (passive + by)
+    r'|(?:(?:named|dedicated|devoted)\s+(?:after|to|for))'
+    r'|(?:(?:commissioned|designed|built|painted|sculpted|composed|funded|'
+    r'founded|created|established|opened|donated|written|directed)\s+by)'
+    # Comparative/superlative claims (verifiable)
+    r'|(?:(?:the\s+)?(?:largest|smallest|oldest|newest|tallest|highest|longest|'
+    r'first|second|third|last|only)\s+(?:in|of|on)\s+)'
+    # "dates from/to" or "dating from" — temporal anchor
+    r'|(?:dat(?:es?|ing)\s+(?:from|to|back))'
+    # "home to" / "houses" (contains)
+    r'|(?:(?:home|dedicated)\s+to\s+(?:over|more|the|a|\d))'
+    r')\b'
+)
+
+
+def _is_empty_sentence(sentence: str) -> bool:
+    """Determine if a sentence carries no information (structurally empty).
+
+    Returns True if the sentence has no factual anchor, no entity reference,
+    no orientation cue, and no attributable claim.
+
+    [LOCAL-356] This is a structural test, not a vocabulary ban.
+    """
+    s = sentence.strip()
+    if len(s) < 16:
+        return False  # Too short to judge — likely a fragment
+
+    # --- Signal 1: Numbers / dates / years ---
+    # Any 3-4 digit number, any ordinal century, any measurement with digits
+    if re.search(r'\b\d{2,}\b', s):
+        return False  # Has a number — not empty
+
+    # --- Signal 2: Proper nouns (named entities) ---
+    # A capitalised word NOT at sentence start (mid-sentence proper noun)
+    # indicates a named entity. We check for capitalised words after the first.
+    words = s.split()
+    if len(words) > 1:
+        for w in words[1:]:
+            # Skip short words, contractions, and common sentence connectors
+            if len(w) < 3:
+                continue
+            # Check if word starts with uppercase and isn't ALL-CAPS
+            if w[0].isupper() and not w.isupper() and w.isalpha():
+                # Exclude common non-entity capitalised words
+                if w.lower() not in _SINGLE_WORD_EXCLUSIONS:
+                    return False  # Has a named entity — not empty
+
+    # --- Signal 3: Orientation / navigation ---
+    if _ORIENTATION_RE.search(s):
+        return False  # Has orientation cue — not empty
+
+    # --- Signal 4: Attributable claims ---
+    if _ATTRIBUTABLE_CLAIM_RE.search(s):
+        return False  # Has a verifiable claim — not empty
+
+    # --- Signal 5: Quoted titles (artworks, publications) ---
+    if re.search(r'[""«][^""»]+[""»]', s):
+        return False  # Has a named artwork/title — not empty
+
+    # --- Signal 6: Specific quantities (spelled-out numerals) ---
+    if re.search(
+        r'\b(?:one|two|three|four|five|six|seven|eight|nine|ten|'
+        r'eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|'
+        r'eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|'
+        r'eighty|ninety|hundred|thousand|million)\b',
+        s, re.IGNORECASE
+    ):
+        return False  # Has a quantity — not empty
+
+    # --- Signal 7: Named periods/dynasties (from _NAMED_PERIOD_RE) ---
+    if _NAMED_PERIOD_RE.search(s):
+        return False
+
+    # --- Signal 8: Century references ---
+    if re.search(r'\b\d{1,2}(?:st|nd|rd|th)\s+century\b', s, re.IGNORECASE):
+        return False
+
+    # If none of the signals fired, the sentence is structurally empty.
+    return True
 
 
 def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
@@ -941,7 +1088,20 @@ def analyze_stop(stop: dict, all_stops: List[dict]) -> StopAnalysis:
     sa.fact_density = fact_count / max(1, total_sentences)
     sa.generic_filler_fraction = generic_count / max(1, total_sentences)
     sa.has_generic_filler = sa.generic_filler_fraction > 0.4
-    
+
+    # [LOCAL-356] Structural empty-sentence detection.
+    # Counts sentences that carry no information (no entity, no number,
+    # no orientation, no attributable claim). Unlike generic_filler_fraction,
+    # this is structural — it does not depend on matching specific phrases.
+    empty_count = 0
+    for sent in sentences:
+        if len(sent.strip()) <= 15:
+            continue  # Skip fragments
+        if _is_empty_sentence(sent):
+            empty_count += 1
+    sa.empty_sentence_count = empty_count
+    sa.empty_sentence_fraction = empty_count / max(1, total_sentences)
+
     # Structural defects
     if re.search(r'\[.*?\]', body):  # Template placeholders
         sa.structural_defects.append('template_placeholder')
