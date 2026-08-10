@@ -3636,6 +3636,20 @@ PROVENANCE_PROHIBITION = (
 _CREDIT_LINE_MIN_WORD_OVERLAP = 0.6
 
 
+def _strip_parenthetical_translation(title: str) -> str:
+    """Strip a parenthetical translation from a title.
+
+    'Le Lézard aux plumes d\\'or (The Lizard with Golden Feathers)' → 'Le Lézard aux plumes d\\'or'
+
+    Only strips a trailing parenthetical — interior parentheses in genuine titles
+    (e.g. 'Moses (detail)') are left alone if they don't span to the end.
+    """
+    if not title:
+        return title
+    stripped = re.sub(r'\s*\([^)]+\)\s*$', '', title).strip()
+    return stripped if stripped else title
+
+
 def match_credit_line(poi_name, works, _normalize=None):
     """
     Return the museum-published credit line for `poi_name`, or '' if no confident match.
@@ -3655,39 +3669,103 @@ def match_credit_line(poi_name, works, _normalize=None):
 
     Requires an exact normalized match, or mutual prefix containment AND at least
     60% word overlap.
+
+    [LOCAL-378] Also strips parenthetical translations before comparison:
+    'Le Lézard aux plumes d'or (The Lizard with Golden Feathers)' now matches
+    'Le Lézard aux plumes d'or' in the works list. The parenthetical inflated
+    the word count and diluted the overlap below threshold.
     """
     if not poi_name or not works:
         return ''
     if _normalize is None:
         from story_miner import _normalize as _normalize
 
-    poi_norm = _normalize(poi_name)
-    if not poi_norm:
-        return ''
-    poi_words = {w for w in poi_norm.split() if len(w) >= 4}
+    # [LOCAL-378] Try matching with the parenthetical stripped first, then with the full name.
+    # This handles the common case where the tour heading carries a translation
+    # parenthetical that the works entry does not have (or vice versa).
+    poi_variants = [_strip_parenthetical_translation(poi_name)]
+    if poi_variants[0] != poi_name:
+        poi_variants.append(poi_name)
+    else:
+        # poi_name had no parenthetical — only one variant
+        pass
 
-    for work in works:
-        credit = (work.get('credit_line') or '').strip()
-        if not credit:
+    for poi_variant in poi_variants:
+        poi_norm = _normalize(poi_variant)
+        if not poi_norm:
             continue
-        title_norm = _normalize(work.get('title', ''))
-        if not title_norm:
-            continue
+        poi_words = {w for w in poi_norm.split() if len(w) >= 4}
 
-        if poi_norm == title_norm:
-            return credit
+        for work in works:
+            credit = (work.get('credit_line') or '').strip()
+            if not credit:
+                continue
+            work_title = work.get('title', '')
+            # Also strip parenthetical from the work title for symmetric matching
+            for title_variant in [_strip_parenthetical_translation(work_title), work_title]:
+                title_norm = _normalize(title_variant)
+                if not title_norm:
+                    continue
 
-        if not (poi_norm[:10] in title_norm and title_norm[:10] in poi_norm):
-            continue
+                if poi_norm == title_norm:
+                    return credit
 
-        title_words = {w for w in title_norm.split() if len(w) >= 4}
-        if not poi_words or not title_words:
-            continue
-        overlap = len(poi_words & title_words) / max(len(poi_words), len(title_words))
-        if overlap >= _CREDIT_LINE_MIN_WORD_OVERLAP:
-            return credit
+                if not (poi_norm[:10] in title_norm and title_norm[:10] in poi_norm):
+                    continue
+
+                title_words = {w for w in title_norm.split() if len(w) >= 4}
+                if not poi_words or not title_words:
+                    continue
+                overlap = len(poi_words & title_words) / max(len(poi_words), len(title_words))
+                if overlap >= _CREDIT_LINE_MIN_WORD_OVERLAP:
+                    return credit
 
     return ''
+
+
+def match_work_for_stop(poi_name, works, _normalize=None):
+    """[LOCAL-378] Return the full work dict for `poi_name`, or None if no match.
+
+    Uses the same parenthetical-aware matching logic as match_credit_line but
+    returns the entire work dict (title, artist, date, medium, credit_line, etc.)
+    so that the caller can extract medium, publisher, and other provenance data.
+    """
+    if not poi_name or not works:
+        return None
+    if _normalize is None:
+        from story_miner import _normalize as _normalize
+
+    poi_variants = [_strip_parenthetical_translation(poi_name)]
+    if poi_variants[0] != poi_name:
+        poi_variants.append(poi_name)
+
+    for poi_variant in poi_variants:
+        poi_norm = _normalize(poi_variant)
+        if not poi_norm:
+            continue
+        poi_words = {w for w in poi_norm.split() if len(w) >= 4}
+
+        for work in works:
+            work_title = work.get('title', '')
+            for title_variant in [_strip_parenthetical_translation(work_title), work_title]:
+                title_norm = _normalize(title_variant)
+                if not title_norm:
+                    continue
+
+                if poi_norm == title_norm:
+                    return work
+
+                if not (poi_norm[:10] in title_norm and title_norm[:10] in poi_norm):
+                    continue
+
+                title_words = {w for w in title_norm.split() if len(w) >= 4}
+                if not poi_words or not title_words:
+                    continue
+                overlap = len(poi_words & title_words) / max(len(poi_words), len(title_words))
+                if overlap >= _CREDIT_LINE_MIN_WORD_OVERLAP:
+                    return work
+
+    return None
 
 
 def build_provenance_block(credit_line):
@@ -8336,12 +8414,33 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
         # The narrator may use it as a factual statement (e.g., "Gift of Boris Fridman")
         # but MUST NOT infer motive, wealth, or financial condition from the donation.
         _credit_line_for_stop = ''
+        _matched_work = None
         if (tour_category == 'museum' and poi_name
                 and _exhibition_checklist_result
                 and getattr(_exhibition_checklist_result, 'works', None)):
-            _credit_line_for_stop = match_credit_line(
+            _matched_work = match_work_for_stop(
                 poi_name, _exhibition_checklist_result.works)
+            if _matched_work:
+                _credit_line_for_stop = (_matched_work.get('credit_line') or '').strip()
         description_prompt += build_provenance_block(_credit_line_for_stop)
+
+        # [LOCAL-378] MEDIUM CONSTRAINT: If the matched work has a medium field,
+        # inject it as a hard binding so the model cannot hallucinate "sculpture"
+        # when the work is actually an illustrated book, or "painting" when it is a lithograph.
+        _matched_medium = ''
+        if _matched_work and _matched_work.get('medium'):
+            _matched_medium = _matched_work['medium'].strip()
+        _provenance_block_chars = len(build_provenance_block(_credit_line_for_stop))
+        print(f"  [LOCAL-378] stop='{poi_name}' matched_work={_matched_work is not None} "
+              f"medium='{_matched_medium}' provenance_block_chars={_provenance_block_chars}")
+        if _matched_medium:
+            description_prompt += (
+                f"\nMEDIUM CONSTRAINT (LOCAL-378 — hard binding, DO NOT CONTRADICT):\n"
+                f"This work's medium is: {_matched_medium}\n"
+                f"You MUST refer to this work using its correct medium. Do NOT call it a "
+                f"'painting' if it is a book, or a 'sculpture' if it is a lithograph.\n"
+                f"Use the medium exactly as stated above when describing the work's physical form.\n"
+            )
 
         # [§4] Story element injection — per-work facts from story_elements
         # [LOCAL-29] Tightened matching: use [:10] prefix AND require >= 60% word overlap
@@ -9902,6 +10001,39 @@ REWRITE RULES (all mandatory):
                 print(f"    Guard failures detail:")
                 for gf in _urg_stats['guard_failures']:
                     print(f"      ✗ {gf['entity']}: \"{gf['gloss']}\" — {gf['reason']}")
+
+    # -------- [LOCAL-378] PHASE 5.158: Prose entity grounding gate --------
+    # Fires ONLY for exhibition-scoped museum tours. Removes all mentions of
+    # persons not grounded in the exhibition page text or artist checklist.
+    # Scope limitation (Defect 5): unscoped museum tours (Palais Lascaris, etc.)
+    # remain ungated. This is intentional and documented — do not widen.
+    if (tour_category == 'museum' and _exhibition_checklist_result
+            and getattr(_exhibition_checklist_result, 'page_text', '')):
+        print(f"\n  [LOCAL-378] PHASE 5.158: Prose entity grounding gate...")
+        try:
+            from prose_entity_grounding_gate import apply_prose_entity_grounding_gate
+            _peg_stop_names = [p.get('name', '') for p in poi_list]
+            _peg_stats = apply_prose_entity_grounding_gate(
+                poi_list,
+                _exhibition_checklist_result,
+                stop_names=_peg_stop_names,
+            )
+            print(f"  [LOCAL-378] Prose entity grounding gate summary:")
+            print(f"    Persons detected: {_peg_stats['persons_detected']}")
+            print(f"    Persons grounded: {_peg_stats['persons_grounded']}")
+            print(f"    Persons ungrounded: {_peg_stats['persons_ungrounded']}")
+            print(f"    Sentences dropped: {_peg_stats['sentences_dropped']}")
+            print(f"    Stops affected: {_peg_stats['stops_affected']}")
+            if _peg_stats['ungrounded_names']:
+                print(f"    Ungrounded: {_peg_stats['ungrounded_names']}")
+        except ImportError as _peg_err:
+            print(f"  [LOCAL-378] WARNING: prose_entity_grounding_gate not importable — gate skipped ({_peg_err})")
+        except Exception as _peg_err:
+            print(f"  [LOCAL-378] ERROR: prose entity grounding gate failed (non-fatal): {_peg_err}")
+    else:
+        if tour_category == 'museum':
+            print(f"\n  [LOCAL-378] Prose entity grounding gate SKIPPED "
+                  f"(no exhibition scope — unscoped museum tours are not gated)")
 
     # -------- [LOCAL-229] PHASE 5.16: CONTRADICTED claim block --------
     # D100 (Michael, 2026-08-04): "We should not publish if we are reasonably sure
