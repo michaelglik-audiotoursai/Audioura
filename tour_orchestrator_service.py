@@ -664,10 +664,36 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         coordinates = None
         poll_count = 0
         tour_file = None
+        _consecutive_poll_failures_1 = 0
+        _MAX_CONSECUTIVE_POLL_FAILURES = 6  # ~1 minute of unreachable generator
+        _POLL_TIMEOUT = 30  # seconds; status endpoint is trivial, this measures event-loop busy-ness
+        _poll_failure_start_1 = None
         while True:
             poll_count += 1
             print(f"Checking tour text generator status: {datetime.now().isoformat()} (Poll #{poll_count})")
-            status_response = _authenticated_request("GET", f"{TOUR_GENERATOR_URL}/status/{job_id_1}", timeout=10)
+            try:
+                status_response = _authenticated_request("GET", f"{TOUR_GENERATOR_URL}/status/{job_id_1}", timeout=_POLL_TIMEOUT)
+            except (requests.Timeout, requests.ConnectionError) as poll_err:
+                _consecutive_poll_failures_1 += 1
+                if _poll_failure_start_1 is None:
+                    _poll_failure_start_1 = datetime.now()
+                print(
+                    f"[POLL-RESILIENCE] Text-gen status poll #{poll_count} failed "
+                    f"({type(poll_err).__name__}), consecutive failures: "
+                    f"{_consecutive_poll_failures_1}/{_MAX_CONSECUTIVE_POLL_FAILURES}"
+                )
+                if _consecutive_poll_failures_1 >= _MAX_CONSECUTIVE_POLL_FAILURES:
+                    elapsed = (datetime.now() - _poll_failure_start_1).total_seconds()
+                    raise Exception(
+                        f"Text-generation status polling failed: "
+                        f"{_consecutive_poll_failures_1} consecutive poll failures "
+                        f"over {elapsed:.0f}s. Last error: {poll_err}"
+                    )
+                time.sleep(10)
+                continue
+            # Successful network round-trip — reset consecutive failure counter
+            _consecutive_poll_failures_1 = 0
+            _poll_failure_start_1 = None
             print(f"Status response: {status_response.status_code}")
             
             if status_response.status_code == 200:
@@ -730,8 +756,32 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         
         # Wait for modernized processing to complete
         ACTIVE_JOBS[job_id]["progress"] = "Waiting for modernized processing..."
+        _consecutive_poll_failures_2 = 0
+        _poll_failure_start_2 = None
         while True:
-            modernized_status_response = _authenticated_request("GET", f"{MODERNIZED_URL}/status/{modernized_job_id}", timeout=10)
+            try:
+                modernized_status_response = _authenticated_request("GET", f"{MODERNIZED_URL}/status/{modernized_job_id}", timeout=_POLL_TIMEOUT)
+            except (requests.Timeout, requests.ConnectionError) as poll_err:
+                _consecutive_poll_failures_2 += 1
+                if _poll_failure_start_2 is None:
+                    _poll_failure_start_2 = datetime.now()
+                print(
+                    f"[POLL-RESILIENCE] Modernized status poll failed "
+                    f"({type(poll_err).__name__}), consecutive failures: "
+                    f"{_consecutive_poll_failures_2}/{_MAX_CONSECUTIVE_POLL_FAILURES}"
+                )
+                if _consecutive_poll_failures_2 >= _MAX_CONSECUTIVE_POLL_FAILURES:
+                    elapsed = (datetime.now() - _poll_failure_start_2).total_seconds()
+                    raise Exception(
+                        f"Modernized-service status polling failed: "
+                        f"{_consecutive_poll_failures_2} consecutive poll failures "
+                        f"over {elapsed:.0f}s. Last error: {poll_err}"
+                    )
+                time.sleep(5)
+                continue
+            # Successful network round-trip — reset consecutive failure counter
+            _consecutive_poll_failures_2 = 0
+            _poll_failure_start_2 = None
             
             if modernized_status_response.status_code == 200:
                 modernized_status_data = modernized_status_response.json()
@@ -949,7 +999,6 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             except Exception as scoring_err:
                 # Scoring failure MUST NOT block delivery (LOCAL-306 rule)
                 print(f"[SCORING] Non-fatal error during in-flight scoring: {scoring_err}")
-                import traceback
                 traceback.print_exc()
 
         # [LOCAL-307] Quality guardrails: diagnose shortfalls, decide retry or message.
@@ -995,7 +1044,6 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             except Exception as guardrail_err:
                 # Guardrail failure MUST NOT block delivery
                 print(f"[GUARDRAILS] Non-fatal error: {guardrail_err}")
-                import traceback
                 traceback.print_exc()
 
         # [LOCAL-312] Update per-user quality index (private, for review solicitation).
