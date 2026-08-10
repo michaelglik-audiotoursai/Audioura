@@ -1,6 +1,6 @@
 === EXACT PROMPT SENT TO OPENAI (PHASE 3A) ===
-You are a knowledgeable local guide for restaurant tour in Old Town, Nice, France.
-List exactly 8 specific, real, well-known restaurants relevant to: restaurant tour in Old Town, Nice, France.
+You are a knowledgeable local guide for restaurant tour in Old Nice (Vieux Nice), France.
+List exactly 7 specific, real, well-known restaurants relevant to: restaurant tour in Old Nice (Vieux Nice), France.
 
 Requirements:
 - Use REAL, SPECIFIC names of actual establishments or landmarks.
@@ -9,29 +9,31 @@ Requirements:
 
 CRITICAL CONSTRAINT — THIS IS A RESTAURANT/DINING TOUR:
 - Every stop MUST be a named, real, currently-operating eating establishment (restaurant, bistro, brasserie, café, trattoria, tavern, or similar).
-- Each stop must have a verifiable street address in or near Old Town, Nice, France.
+- Each stop must have a verifiable street address in or near Old Nice (Vieux Nice).
 - Do NOT include museums, galleries, parks, monuments, or any non-dining venue.
 - Do NOT include fictional or closed restaurants.
-- Prefer well-known, established restaurants that a visitor could actually dine at.
+- Prefer restaurants that are NOTABLE and DOCUMENTED — venues that people write about because they have a distinctive story (founding year, named chef, signature dish, culinary tradition, architectural feature, historical event).
+- For each restaurant, include a 'reason' field explaining WHY it is notable. The reason must cite a SPECIFIC fact: a year, a named person, a named dish, a documented tradition, or a verifiable event. Do NOT use vague phrases like 'popular', 'top-ranked', 'well-known', or 'appears in many lists'.
 - Include a mix of styles/price ranges unless the request specifies otherwise.
 
-GEOGRAPHIC SCOPE — ALL stops MUST be located within: Old Town, Nice, France.
-- Do NOT include well-known landmarks elsewhere in the city just because they are famous — if it is outside Old Town, Nice, France, it does not belong.
+GEOGRAPHIC SCOPE — ALL stops MUST be located within: Old Nice (Vieux Nice).
+- Do NOT include well-known landmarks elsewhere in the city just because they are famous — if it is outside Old Nice (Vieux Nice), it does not belong.
 
 
 Return ONLY a JSON array, no other text, no markdown fences:
-[{"name": "...", "address": "..."}, ...]
+[{"name": "...", "address": "...", "reason": "Founded in 1927 by the Acchiardo family; known for handmade ravioli and slow-cooked daube niçoise"}, ...]
 
 === OPENAI RESPONSE ===
-[{"name": "La Rossettisserie", "address": "2 Rue Rossetti, 06300 Nice, France"},
-{"name": "Le Safari", "address": "1 Rue Saint-François de Paule, 06300 Nice, France"},
-{"name": "Fenocchio", "address": "2 Place Rossetti, 06300 Nice, France"},
-{"name": "Le Tire Bouchon", "address": "5 Rue Sainte-Reparate, 06300 Nice, France"},
-{"name": "Chez Pipo", "address": "13 Rue Bavastro, 06300 Nice, France"},
-{"name": "Le Vieux Four", "address": "5 Rue de la Poissonnerie, 06300 Nice, France"},
-{"name": "Le Bistrot d'Antoine", "address": "27 Rue de la Préfecture, 06300 Nice, France"},
-{"name": "Le Gésu", "address": "1 Place du Jésus, 06300 Nice, France"}]
+[
+{"name": "La Rossettisserie", "address": "2 Rue Rossetti, 06300 Nice, France", "reason": "Famous for their delicious rotisserie chicken and cozy ambiance"},
+{"name": "Le Safari", "address": "1 Rue du Pont Vieux, 06300 Nice, France", "reason": "Established in 1967, known for traditional French cuisine and charming outdoor seating"},
+{"name": "La Voglia", "address": "10 Rue de la Préfecture, 06300 Nice, France", "reason": "Celebrated for their authentic Italian pizzas cooked in a wood-fired oven"},
+{"name": "Le Tire Bouchon", "address": "5 Rue Sainte Réparate, 06300 Nice, France", "reason": "Renowned for its extensive wine list and classic French dishes"},
+{"name": "Chez Palmyre", "address": "5 Rue Droite, 06300 Nice, France", "reason": "Family-owned since 1926, famous for traditional Niçoise cuisine and friendly service"},
+{"name": "La Tapenade", "address": "4 Rue Sainte Reparate, 06300 Nice, France", "reason": "Specializes in Mediterranean dishes with a focus on fresh local ingredients"},
+{"name": "Le Bistrot d'Antoine", "address": "27 Rue de la Préfecture, 06300 Nice, France", "reason": "Led by Chef Antoine who creates innovative Provencal dishes with a modern twist"}
+]
 
 === ANALYSIS ===
-Requested stops: 5
-See full chain log: /app/api_call_chain_20260806_170722.txt
+Requested stops: 4
+See full chain log: /app/api_call_chain_20260807_123449.txt

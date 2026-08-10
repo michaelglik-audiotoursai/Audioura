@@ -1218,3 +1218,85 @@ caught something every time I have run it.
 Related: `tests/test_local291_groundedness.py` had been **uncollectable since
 LOCAL-309** — 23 tests silently not running for days. A green suite says nothing
 about files that never parsed.
+
+Me: Current usage is  Session                                                                                                      
+   Total cost:            $5.58
+   Total duration (API):  7m 51s
+   Total duration (wall): 18h 46m 16s
+   Total code changes:    120 lines added, 0 lines removed
+   Usage by model:
+          claude-opus-5:  60 input, 31.0k output, 2.0m cache read, 380.2k cache write ($5.58)
+       claude-haiku-4-5:  546 input, 21 output, 0 cache read, 0 cache write ($0.0007)
+
+   Current session
+                                                      0% used
+
+   Current week (all models)
+   █████████████████████████████████████████          82% used
+   Resets Aug 10 at 11:59pm (America/New_York)                                                                           +50% weekly limits promo through Aug 19 · clau.de/cc-50-promo
+
+   What's contributing to your limits usage?                                                                                  Approximate, based on local sessions on this machine — does not include other devices or claude.ai
+   Last 24h · these are independent characteristics of your usage, not a breakdown
+
+   96% of your usage was at >150k context
+    Longer sessions are more expensive even when cached. /compact mid-task, /clear when switching to new tasks.                  
+   Skills                  % of usage
+   /claude-api                     2%                                                                                                                                                                                                                              d to day · w to week  -- I just wanted to know at the time when I am nto available, can I ask you to stop your activities so no money is spent?  Like today, I only can start working in late evening.  Can you stop after finishing and I will wake you up when available?
+
+   Claude: Committed at 4b5936f. RULE ZERO stays as the default; the break exception is now written into it, so a fresh session inherits both.
+
+Yes — /clear now, type restart tonight. That works exactly as you described, and it's safe for a reason worth knowing: a cleared session is inert until you type. Nothing can spend while you're away. And because CLAUDE.md is read at session start, RULE ZERO is back in force the moment you restart — you don't have to tell me to resume autonomy, only to pause it.
+
+State right now, verified — safe to walk away:
+
+cron / wakeup loops     none armed
+kiro-cli processes      0
+dispatcher queue        empty  ← the only thing that bills unattended
+launchd job             loaded but idle (nothing to claim)
+
+No PAUSE sentinel needed while the queue is empty. If I'd left a task file sitting there, launchd would have claimed it within 5 minutes and spent OpenAI money overnight — that's the tap to watch, and it's closed.
+
+Waiting for you tonight, unreviewed and unharmed on their branches: LOCAL-356 (filler detection), LOCAL-358 (app tour_type — the round-2 bounce you redirected toward server-side classification), and LOCAL-359 (SCOPE-CHECK address).
+
+One correction to what I said earlier: I'd suggested amending RULE ZERO to "go quiet when he leaves." You were right to push back — that would have inverted the default. What I wrote instead keeps autonomy as the standing behavior and makes the break something you switch on, which is the version that doesn't slowly erode the queue.
+
+Current usage:  Settings  Status   Config   Usage   Stats                                                                                                                                                                                                                 Session                                                                                                                    
+ Total cost:            $9.75
+ Total duration (API):  15m 47s
+ Total duration (wall): 12h 18m 35s
+ Total code changes:    662 lines added, 25 lines removed                                                                        Usage by model:                                                                                                                      claude-opus-5:  165 input, 65.0k output, 12.2m cache read, 203.8k cache write ($9.75)
+     claude-haiku-4-5:  733 input, 19 output, 0 cache read, 0 cache write ($0.0008)
+
+ Current session
+ ████████████                                       24% used
+ Resets 2:39am (America/New_York)                                                                                                                                                                                                                      Current week (all models)
+ ██████████████████████████████████████████▌        85% used
+ Resets Aug 10 at 11:59pm (America/New_York)                                                                                     +50% weekly limits promo through Aug 19 · clau.de/cc-50-promo                                                                                                                                                                                                   What's contributing to your limits usage?
+ Approximate, based on local sessions on this machine — does not include other devices or claude.ai
+                                                                                                                                 Last 24h · these are independent characteristics of your usage, not a breakdown                                                                                                                                                                              72% of your usage was at >150k context
+  Longer sessions are more expensive even when cached. /compact mid-task, /clear when switching to new tasks.                                                                                                                                                                                                                                Skills, subagents, plugins, and MCP servers                                                                                No attribution data yet · accumulates as you use Claude
+
+ d to day · w to week
+
+---
+Last conversation with Claude:
+CronList
+No scheduled jobs
+
+Everything is safe for the night. PAUSE is armed, no cron jobs or wakeups are scheduled, and nothing of mine will run while you sleep. LOCAL-364's worker is finishing its last few minutes — that spend is already committed and small.
+
+On the weekly limit — I can't verify your billing setup from here, so treat this as "check it, don't trust me." What I can tell you: on Claude Code subscription plans, hitting the weekly limit normally stops work until the reset — it does not silently start drawing credits. Usage beyond the limit is opt-in and has to be explicitly enabled. So the likely answer is "shut down until Monday night's reset," not "quietly bills you." But the environment I'm running in does have an overage state, so I'd rather you confirm than take my word: run /status in Claude Code, or check the usage page in your account settings. Two minutes tomorrow, and you'll know instead of guessing.
+
+Plan around the pessimistic case: you have ~15% for two days. That's enough if sessions stay short.
+
+Best time to /clear is right now — as soon as you've read this. A session costs nothing sitting idle; the expense is re-entry. This conversation is long, and resuming it after the cache expires costs $1.50–2.00 in cache re-writes before a single line of work happens (D271 — measured $2.65 for one overnight gap, 89% of it cache writes, zero code produced). Clearing now and typing restart tomorrow rebuilds the whole picture from disk for a few thousand tokens.
+
+Tomorrow's first move, so you don't have to remember any of it:
+
+1. restart — rebuilds git state, row counts, queue, scores
+2. rm ~/Audioura/.continuous_dev/PAUSE — or just say "resume continuous dev"
+3. Five submissions are waiting for review: 360, 361, 362, 363, 364
+
+Those are files on disk. They don't decay, and reviewing them is the cheap part — the expensive part was generating them, and that's already paid for.
+
+Sleep well.
