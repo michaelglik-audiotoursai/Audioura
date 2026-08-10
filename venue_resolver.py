@@ -283,14 +283,16 @@ def resolve_venue(venue_string: str, city: str = "") -> Optional[VenueEntity]:
 def fetch_venue_works(venue_qid: str, language: str = "en") -> List[Dict]:
     """Fetch canonical works for a venue via SPARQL (P195/P276).
     
-    Returns list of {qid, label_en, label_local, aliases} for each work.
+    Returns list of {qid, label_en, label_local, aliases, creator, creator_qid} for each work.
     Gets labels in BOTH English and the local language for cross-language matching.
+    Includes P170 (creator) for exhibition-scoped filtering (LOCAL-362).
     """
     query = f"""
-    SELECT ?work ?workLabel ?workAltLabel ?workLabel_en WHERE {{
+    SELECT ?work ?workLabel ?workAltLabel ?workLabel_en ?creatorLabel ?creator WHERE {{
       {{ ?work wdt:P195 wd:{venue_qid}. }}
       UNION
       {{ ?work wdt:P276 wd:{venue_qid}. }}
+      OPTIONAL {{ ?work wdt:P170 ?creator. }}
       OPTIONAL {{ ?work rdfs:label ?workLabel_en. FILTER(LANG(?workLabel_en) = "en") }}
       SERVICE wikibase:label {{ bd:serviceParam wikibase:language "{language},en". }}
     }}
@@ -312,20 +314,39 @@ def fetch_venue_works(venue_qid: str, language: str = "en") -> List[Dict]:
         results = data.get("results", {}).get("bindings", [])
         
         works = []
+        _seen_qids = set()
         for r in results:
             work_uri = r.get("work", {}).get("value", "")
             work_qid = work_uri.split("/")[-1] if work_uri else ""
             label = r.get("workLabel", {}).get("value", "")
             label_en = r.get("workLabel_en", {}).get("value", "") or label
             alt_label = r.get("workAltLabel", {}).get("value", "")
+            creator_label = r.get("creatorLabel", {}).get("value", "")
+            creator_uri = r.get("creator", {}).get("value", "")
+            creator_qid = creator_uri.split("/")[-1] if creator_uri else ""
             
+            # Deduplicate: same work may appear multiple times with different creators
+            # (works with multiple creators) — keep first occurrence but merge creator info
             if work_qid and label and not label.startswith("Q"):  # Skip unresolved QIDs
-                works.append({
+                if work_qid in _seen_qids:
+                    # Merge creator into existing entry
+                    for existing in works:
+                        if existing['qid'] == work_qid and creator_label:
+                            if creator_label not in existing.get('creators', []):
+                                existing.setdefault('creators', []).append(creator_label)
+                            break
+                    continue
+                _seen_qids.add(work_qid)
+                entry = {
                     "qid": work_qid,
                     "label_en": label_en,
                     "label_local": label,
                     "aliases": [a.strip() for a in alt_label.split(",") if a.strip()] if alt_label else [],
-                })
+                    "creator": creator_label if creator_label and not creator_label.startswith("Q") else "",
+                    "creator_qid": creator_qid if creator_label and not creator_label.startswith("Q") else "",
+                    "creators": [creator_label] if creator_label and not creator_label.startswith("Q") else [],
+                }
+                works.append(entry)
         
         print(f"  [venue_resolver] SPARQL: {len(works)} works found for {venue_qid}")
         return works
@@ -894,6 +915,9 @@ def _infer_artist_from_name(venue_name: str) -> str:
     E.g. "musée Marc-Chagall" → "Marc Chagall"
          "Musée Matisse" → "Matisse"
     Returns empty string if no artist name can be inferred (e.g. "Uffizi Gallery").
+    
+    LOCAL-362: Reject candidates that are clearly NOT artist names — e.g. residual
+    geographic words or institutional fragments like "Fine Boston".
     """
     # Strip common institutional words
     _STRIP_WORDS = {
@@ -903,11 +927,36 @@ def _infer_artist_from_name(venue_name: str) -> str:
         'moderne', 'modern', 'contemporain', 'contemporary', 'beaux',
     }
     
+    # LOCAL-362: Words that should never appear in an inferred artist name.
+    # These are geographic, institutional, or descriptive words that indicate
+    # the venue name is NOT an artist-named museum.
+    _REJECT_WORDS = {
+        # Geographic
+        'boston', 'new', 'york', 'paris', 'london', 'nice', 'rome', 'berlin',
+        'chicago', 'los', 'angeles', 'san', 'francisco', 'washington',
+        'philadelphia', 'houston', 'dallas', 'atlanta', 'denver', 'seattle',
+        'miami', 'orleans', 'diego', 'francisco', 'antonio', 'jose',
+        # US states
+        'massachusetts', 'california', 'texas', 'florida', 'virginia',
+        # Institutional/descriptive remnants
+        'fine', 'applied', 'decorative', 'natural', 'history', 'science',
+        'american', 'european', 'asian', 'african', 'ancient', 'medieval',
+        'folk', 'craft', 'design', 'photography', 'film', 'children',
+        'heritage', 'memorial', 'institute', 'institution', 'society',
+        'university', 'college', 'school', 'academy', 'library',
+        'city', 'state', 'county', 'district', 'region', 'province',
+    }
+    
     words = re.sub(r'[-–]', ' ', venue_name).split()
     name_words = [w for w in words if w.lower().rstrip("'") not in _STRIP_WORDS and len(w) > 1]
     
     if not name_words:
         return ""
+    
+    # LOCAL-362: Reject if ANY remaining word is in the reject list
+    for w in name_words:
+        if w.lower() in _REJECT_WORDS:
+            return ""
     
     # Check if remaining words look like a person name (capitalized, 1-3 words)
     name_candidate = " ".join(name_words)
