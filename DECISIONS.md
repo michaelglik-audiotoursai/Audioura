@@ -11295,3 +11295,65 @@ be promoted from reporting to enforcing. It cannot be decided yet — the remain
 empties have not been characterised, and gating on a metric whose residual
 population is unknown would reject good tours. Needs a task that first classifies
 what is left.
+
+## D289 — Michael's product ruling: rarely refuse; supplement with story, never with invented works
+**2026-08-10.** Asked whether a 1–3 stop exhibition tour is worth delivering,
+Michael ruled clearly:
+
+> *"If our customer asked for a tour, we should produce the best we can. It is
+> very rare when we should reject the requests... MFA in Boston is very known;
+> refusal of the tour creation would look like our failure, so we should produce
+> the tour. We need to add more stories if there are not enough information about
+> exhibits."*
+
+This changes the default. D275 established honest degradation — a shorter tour
+rather than backfill — and LEAD had been treating "clean fail" as the acceptable
+floor. Michael's position is that refusal is a *product* failure, and at a
+famous institution it reads as our incompetence rather than as integrity.
+
+**The rule, and the line inside it.** Refusal is reserved for genuinely obscure
+places where nothing exists. Everywhere else we deliver. When there are too few
+objects, the tour is filled with **story, not with objects**:
+
+- ALLOWED: the exhibition's own theme (the bound-versus-unbound dispute the show
+  is named for), the form itself (what a livre d'artiste is and why it mattered),
+  provenance and the donor (D283 tiering), the venue's relationship to the work.
+- FORBIDDEN, unchanged: inventing works, or backfilling from the permanent
+  collection and presenting it as the exhibition (D275/D284). Every object named
+  must survive page grounding.
+
+So "add more stories" is not a relaxation of grounding — it is a redistribution.
+Fewer object-stops, more grounded context per stop. That is precisely what
+LOCAL-369's Thread A and Thread B were built for, and this ruling promotes them
+from enhancement to the primary fallback for thin exhibitions.
+
+**Consequence for the clean-fail path:** LOCAL-372 already reserves clean fail
+for finding nothing. That stands, but the bar for "nothing" is now higher — a
+venue page that yields one work plus rich prose is not nothing.
+
+## D290 — Push storied now rather than after the exhibition path is finished
+**2026-08-10.** Michael offered both options and asked for LEAD's view. Pushing.
+
+Reasons:
+
+- **63 unpushed commits is itself the risk.** The blob grows with every tick, and
+  a single machine holds the only copy of a day's work.
+- **The Windows machine is fully blocked** — CLAUDE.md: nothing reaches Windows
+  until `storied` is pushed. Parallel development has been stalled all day.
+- **The gate that justified holding was satisfied long ago.** It was Michael's
+  iPhone field test of the *dog sledding* tour, round 11. What is unpushed now is
+  60+ commits of quality and infrastructure work, unrelated to that gate.
+- **Push is reversible** (`git revert`) and RULE ZERO lists it as not requiring a
+  gate. Holding it is the unusual action, not pushing it.
+- **origin is currently worse.** It carries the old code with all five MFA
+  failures and the swallowed-error bug (D278) that made every failed generation
+  opaque and permanently consumed the user's quota.
+
+Against: the exhibition path is still in flux. But it only engages for scoped
+requests, and unscoped generation is verified working live.
+
+**Condition LEAD imposed on itself before pushing:** LOCAL-372 changed
+`theme_word_match`, which runs for *every* museum tour, not only exhibitions.
+Michael's own concern — "verify that other tours are not broken" — is correct and
+specific, so an unscoped live regeneration must pass before the push. Suite-green
+does not substitute (D284).
