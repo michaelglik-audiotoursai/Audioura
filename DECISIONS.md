@@ -11603,3 +11603,51 @@ participle left where a sentence was cut. A cleaner that manufactures the defect
 
 **Bounced as LOCAL-378**, off `storied`, salvaging the 33 tests and the gate
 skeleton. Tour text preserved at `TOUR_MFA_UNBOUND_376_BOUNCED.txt`.
+
+## D298 — The provenance block is the whole mechanism: where it is emitted the prose is true, where it is not the prose invents
+**2026-08-10.** LOCAL-378 not merged, but it converted a mystery into a
+one-variable rule. Its own diagnostic logging, which LEAD required before any
+change, produced the finding:
+
+```
+stop 1  matched_work=True  medium='Illustrated book with 40 color lithographs…'  provenance_block_chars=355
+stop 2  matched_work=True  medium='Illustrations'                                provenance_block_chars=0
+stop 3  matched_work=True  medium=''                                             provenance_block_chars=0
+```
+
+Stop 1 delivered **"the illustrated book with 40 color lithographs"** — correct
+medium, no fabrication. Stops 2 and 3 delivered "rendered in luminous gold" and a
+**ceiling installation you stand beneath and look up at**, for a 1955 Juan Gris
+book. `ceiling` = 2 hits.
+
+**One variable predicts it: `provenance_block_chars > 0`.** The block is
+suppressed when `medium` is thin or empty, so the two stops that most needed a
+constraint got none. An absent constraint is not neutral — the model fills the
+gap from parametric memory, which is exactly how "Le Corbusier" arrived in the
+first place.
+
+**The generalisable rule: a guard that silently no-ops on missing data is worse
+than no guard, because it is trusted.** Where a constraint cannot be stated
+positively, state the negative — "medium unknown, do not describe physical form
+or placement" — rather than emitting nothing.
+
+**LOCAL-378's real contribution was the diagnosis.** D297 hypothesised that
+D286-strict matching failed on the parenthetical translation in
+`Le Lézard aux plumes d'or (The Lizard with Golden Feathers)`. Confirmed: overlap
+computed at **33%** against a 60% threshold. Requiring the log *before* the fix
+was worth it — the matcher was repaired without loosening D286, which exists
+because prefix matching cross-contaminated adjacent titles (D286/LOCAL-29).
+
+**Removing fabrication is not the same as telling the truth.** No wrong artist
+survives — and no *right* one is named either: `Miró`, `Dalí`, `Freud`, `Gris`,
+`Reverdy` are 0 hits in prose. Stops collapsed to 73 and 67 words, the second a
+single sentence. Against D289 that is its own product failure: we stopped lying
+by going quiet. The remedy is more true material, not looser grounding.
+
+**Not merged because of a user-visible regression:** the closing says
+`That's 2 stops` for a 3-stop tour. Both prior runs were `declared=3 actual=3`.
+Merging would have put that in `storied`.
+
+**LOCAL-379 branches off `kiro/local378-prose-grounding-r2`, not `storied`** — the
+parenthetical fix, the diagnostics and the module-scoped gate are all worth
+keeping, and re-deriving them would waste a round.
