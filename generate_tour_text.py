@@ -8168,6 +8168,31 @@ These rules apply to the NARRATION paragraphs only. Navigation/orientation direc
     # PHASE 5: Generate detailed descriptions for each POI (parallelized)
     print(f"\nPHASE 5: Generating detailed descriptions for each POI (parallel)...")
 
+    # -------- [LOCAL-382/LOCAL-387] Exhibition thesis / venue purpose framing detection --------
+    # Moved here (from post-assembly) so _framing_case is bound before _generate_description
+    # closure captures it. Without this, museum tours crash with NameError.
+    _framing_case = 'none'
+    _framing_source_phrase = '-'
+    _framing_page_text = ''
+    if tour_category == 'museum':
+        try:
+            from exhibition_thesis import detect_framing_case, build_exhibition_thesis_prolog_block, build_exhibition_thesis_stop_block
+            _venue_text_for_framing = ''
+            if _story_corpus_result and _story_corpus_result.get('combined_text'):
+                _venue_text_for_framing = _story_corpus_result['combined_text']
+            _framing_case, _framing_source_phrase = detect_framing_case(
+                exhibition_checklist_result=_exhibition_checklist_result,
+                exhibition_scope=_exhibition_scope,
+                venue_combined_text=_venue_text_for_framing,
+            )
+            if _framing_case == 'exhibition':
+                _framing_page_text = getattr(_exhibition_checklist_result, 'page_text', '') or ''
+            print(f"\n  [LOCAL-382] framing={_framing_case} source='{_framing_source_phrase[:80]}'")
+        except ImportError as _ft_err:
+            print(f"  [LOCAL-382] exhibition_thesis module unavailable ({_ft_err}) — framing=none")
+        except Exception as _ft_err:
+            print(f"  [LOCAL-382] Framing detection error (non-fatal): {_ft_err} — framing=none")
+
     # [LOCAL-26] Helper: detect when GPT echoed back a template placeholder instead of content
     # [LOCAL-295] Refactored: returns a classification tuple instead of bare bool.
     #   ("placeholder", reason)  — true placeholder echo, should retry/reject
@@ -10731,28 +10756,9 @@ REWRITE RULES (all mandatory):
         except Exception as _vi_err:
             print(f"  [LOCAL-11] Venue-identity mining error (non-fatal): {_vi_err}")
 
-    # -------- [LOCAL-382] Exhibition thesis / venue purpose framing detection --------
-    _framing_case = 'none'
-    _framing_source_phrase = '-'
-    _framing_page_text = ''
-    if tour_category == 'museum':
-        try:
-            from exhibition_thesis import detect_framing_case, build_exhibition_thesis_prolog_block, build_exhibition_thesis_stop_block
-            _venue_text_for_framing = ''
-            if _story_corpus_result and _story_corpus_result.get('combined_text'):
-                _venue_text_for_framing = _story_corpus_result['combined_text']
-            _framing_case, _framing_source_phrase = detect_framing_case(
-                exhibition_checklist_result=_exhibition_checklist_result,
-                exhibition_scope=_exhibition_scope,
-                venue_combined_text=_venue_text_for_framing,
-            )
-            if _framing_case == 'exhibition':
-                _framing_page_text = getattr(_exhibition_checklist_result, 'page_text', '') or ''
-            print(f"\n  [LOCAL-382] framing={_framing_case} source='{_framing_source_phrase[:80]}'")
-        except ImportError as _ft_err:
-            print(f"  [LOCAL-382] exhibition_thesis module unavailable ({_ft_err}) — framing=none")
-        except Exception as _ft_err:
-            print(f"  [LOCAL-382] Framing detection error (non-fatal): {_ft_err} — framing=none")
+    # [LOCAL-387] Framing detection moved to Phase 5 preamble (before _generate_description
+    # closure) — see line ~8171. Variables _framing_case, _framing_source_phrase,
+    # _framing_page_text are already bound.
 
     # -------- [PROLOG] Storied: prepend journey prolog --------
     if _storied_mode and _storied_spine:
