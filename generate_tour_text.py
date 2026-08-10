@@ -4348,7 +4348,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     _deterministic_fill_used = False
     # [LOCAL-364] Track which path produced the stops for exhibition-scoped requests.
     # Used downstream for honest-degradation labelling in the tour text.
-    _exhibition_stops_source = 'none'  # 'checklist', 'partial', 'creator_filter', 'none'
+    _exhibition_stops_source = 'none'  # 'checklist', 'partial', 'prose_llm', 'creator_filter', 'none'
     _exhibition_checklist_result = None
     if _forced_stops_active:
         # [LOCAL-357] forced_stops bypasses ALL selection — mark as deterministic
@@ -4364,7 +4364,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # An exhibition is a specific, curated, time-bound checklist — not the
         # set of works by its headline artists that the venue happens to own.
         _exhibition_checklist_result = None
-        _exhibition_stops_source = 'none'  # 'checklist', 'partial', 'creator_filter', 'none'
+        _exhibition_stops_source = 'none'  # 'checklist', 'partial', 'prose_llm', 'creator_filter', 'none'
 
         try:
             from exhibition_checklist import find_exhibition_checklist, ExhibitionChecklistResult
@@ -4442,7 +4442,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 elif _exhibition_checklist_result.has_works:
                     # SUCCESS: Use the exhibition checklist as stops
                     _checklist_works = _exhibition_checklist_result.works
-                    _exhibition_stops_source = _exhibition_checklist_result.path  # 'checklist' or 'partial'
+                    _exhibition_stops_source = _exhibition_checklist_result.path  # 'checklist', 'partial', or 'prose_llm'
 
                     if len(_checklist_works) < total_stops and _exhibition_checklist_result.path == 'partial':
                         print(f"  [LOCAL-364] Partial checklist: {len(_checklist_works)} works "
@@ -4456,10 +4456,11 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     poi_list = [_new_poi(w['title']) for w in _checklist_works[:_det_take]]
                     _deterministic_fill_used = True
 
-                    print(f"  [LOCAL-364] ✓ CHECKLIST PATH: {len(poi_list)} works from exhibition page")
+                    _path_label = _exhibition_checklist_result.path.upper()
+                    print(f"  [LOCAL-364/368] ✓ {_path_label} PATH: {len(poi_list)} works from exhibition page")
                     print(f"    Source: {_exhibition_checklist_result.exhibition_url}")
                     print(f"    Shape: {_exhibition_checklist_result.page_shape}")
-                    print(f"    Stops from exhibition checklist:")
+                    print(f"    Stops from exhibition {_path_label.lower()}:")
                     for p in poi_list[:total_stops]:
                         _w = next((w for w in _checklist_works if w['title'] == p['name']), {})
                         _artist_info = f" (by {_w['artist']})" if _w.get('artist') else ''
