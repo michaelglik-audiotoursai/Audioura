@@ -34,7 +34,8 @@ logger = logging.getLogger(__name__)
 EXHIBITION_CACHE_TTL_DAYS = 3
 
 # ─── Exhibition URL path patterns to discover ─────────────────────────────────
-_EXHIBITION_PATH_SEEDS = [
+# English seeds (default/fallback)
+_EXHIBITION_PATH_SEEDS_EN = [
     '/exhibitions',
     '/exhibition',
     '/whats-on',
@@ -45,6 +46,18 @@ _EXHIBITION_PATH_SEEDS = [
     '/visit/exhibitions',
     '/programs/exhibitions',
 ]
+
+# Language-specific seeds: tried first when venue language is known
+_EXHIBITION_PATH_SEEDS_BY_LANG = {
+    'fr': ['/expositions', '/fr/expositions', '/fr/en-ce-moment'],
+    'de': ['/ausstellungen', '/de/ausstellungen', '/aktuell/ausstellungen'],
+    'es': ['/exposiciones', '/es/exposiciones'],
+    'it': ['/mostre', '/it/mostre', '/it/esposizioni'],
+    'nl': ['/tentoonstellingen', '/nl/tentoonstellingen'],
+}
+
+# Combined for backward compatibility — used when no venue language is known
+_EXHIBITION_PATH_SEEDS = _EXHIBITION_PATH_SEEDS_EN
 
 _EXHIBITION_LINK_PATTERNS = re.compile(
     r'(?:exhibition|whats.on|on.view|expositions?|current.shows?|now.on.view)',
@@ -84,17 +97,90 @@ _DATE_FORMATS = [
     '%Y-%m-%d',       # 2024-10-05
 ]
 
+# ─── Non-English month name tables ────────────────────────────────────────────
+# Map lower-case month names/abbreviations to month numbers.
+# Used to pre-translate before strptime so we can parse "5 octobre 2024" etc.
+_NON_ENGLISH_MONTHS = {
+    # French
+    'janvier': 1, 'février': 2, 'fevrier': 2, 'mars': 3, 'avril': 4,
+    'mai': 5, 'juin': 6, 'juillet': 7, 'août': 8, 'aout': 8,
+    'septembre': 9, 'octobre': 10, 'novembre': 11, 'décembre': 12, 'decembre': 12,
+    'janv': 1, 'févr': 2, 'fevr': 2, 'avr': 4, 'juil': 7,
+    'sept': 9, 'oct': 10, 'nov': 11, 'déc': 12, 'dec': 12,
+    # German
+    'januar': 1, 'februar': 2, 'märz': 3, 'marz': 3, 'april': 4,
+    'juni': 6, 'juli': 7, 'august': 8, 'oktober': 10, 'dezember': 12,
+    'jan': 1, 'feb': 2, 'mär': 3, 'mar': 3, 'apr': 4, 'jun': 6,
+    'jul': 7, 'aug': 8, 'okt': 10, 'dez': 12,
+    # Spanish
+    'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5,
+    'junio': 6, 'julio': 7, 'agosto': 8, 'septiembre': 9,
+    'octubre': 10, 'noviembre': 11, 'diciembre': 12,
+    # Italian
+    'gennaio': 1, 'febbraio': 2, 'aprile': 4, 'maggio': 5,
+    'giugno': 6, 'luglio': 7, 'settembre': 9, 'ottobre': 10,
+    'dicembre': 12,
+}
+
+# Reverse map for replacement: month number → English month name for strptime
+_MONTH_NUMBER_TO_ENGLISH = {
+    1: 'January', 2: 'February', 3: 'March', 4: 'April',
+    5: 'May', 6: 'June', 7: 'July', 8: 'August',
+    9: 'September', 10: 'October', 11: 'November', 12: 'December',
+}
+
 
 def _parse_date_flexible(text: str) -> Optional[date]:
-    """Try multiple date formats, return date or None."""
+    """Try multiple date formats, return date or None.
+    
+    Handles non-English month names (fr/de/es/it) by translating them
+    to English before applying strptime.
+    """
     text = text.strip().replace(',', ', ').replace('  ', ' ').strip()
     # Normalize dots in abbreviated months: "Oct." → "Oct"
     text = re.sub(r'(\w{3})\.', r'\1', text)
+
+    # Try English formats first (fast path)
     for fmt in _DATE_FORMATS:
         try:
             return datetime.strptime(text, fmt).date()
         except ValueError:
             continue
+
+    # Try non-English month replacement
+    # Sort by length descending so "octubre" matches before "oct"
+    text_lower = text.lower()
+    for month_name, month_num in sorted(_NON_ENGLISH_MONTHS.items(), key=lambda x: -len(x[0])):
+        # Word-boundary match to avoid "oct" matching inside "octubre"
+        if re.search(r'\b' + re.escape(month_name) + r'\b', text_lower):
+            # Replace the non-English month with its English equivalent
+            english_month = _MONTH_NUMBER_TO_ENGLISH[month_num]
+            # Case-insensitive replace preserving surrounding text
+            translated = re.sub(
+                re.escape(month_name), english_month, text_lower, count=1
+            )
+            # Capitalize properly for strptime
+            translated = translated.strip()
+            for fmt in _DATE_FORMATS:
+                try:
+                    return datetime.strptime(translated, fmt.lower().replace('%b', '%B')).date()
+                except ValueError:
+                    pass
+            # Try with title-cased month (strptime expects "October" not "october")
+            translated_titled = re.sub(
+                re.escape(month_name),
+                english_month,
+                text,
+                flags=re.IGNORECASE,
+                count=1,
+            )
+            for fmt in _DATE_FORMATS:
+                try:
+                    return datetime.strptime(translated_titled, fmt).date()
+                except ValueError:
+                    continue
+            break  # Only try the first matching month name
+
     return None
 
 
@@ -178,14 +264,124 @@ def _normalize_for_match(text: str) -> str:
     return re.sub(r'\s+', ' ', stripped).strip()
 
 
-def _title_similarity(requested: str, published: str) -> float:
-    """Compute word-overlap similarity between requested and published exhibition titles.
+# ─── Title similarity: stop words, proper-noun detection, confusable pairs ────
+
+_STOP_WORDS = frozenset({
+    'the', 'a', 'an', 'at', 'in', 'of', 'and', 'or', 'to', 'for',
+    'on', 'from', 'with', 'by', 'is', 'are', 'was', 'were', 'be',
+    'le', 'la', 'les', 'de', 'du', 'des', 'un', 'une',  # French
+    'der', 'die', 'das', 'und', 'von', 'im', 'am',       # German
+    'el', 'los', 'las', 'del', 'en', 'con', 'por',       # Spanish
+    'il', 'lo', 'gli', 'della', 'delle', 'nel',           # Italian
+})
+
+# Pairs of artist names that are edit-distance 1 apart but must NOT match.
+# Each entry is a frozenset of the two normalized names.
+_CONFUSABLE_PAIRS = [
+    frozenset({'monet', 'manet'}),
+    frozenset({'degas', 'degan'}),
+    frozenset({'ernst', 'erost'}),
+]
+
+
+def _is_name_like(token: str, original_text: str) -> bool:
+    """Heuristic: is this token a proper-noun / name-like in context?
     
-    Returns a score between 0 and 1. Handles:
-    - Word-order differences
-    - Subtitles/colons
-    - Extra punctuation
-    - Partial matches (user might omit the subtitle)
+    A token is name-like if:
+    - It appears capitalised in the original text (not at sentence start), OR
+    - It is not in our stop/common-word set and len >= 4
+    """
+    if token in _STOP_WORDS:
+        return False
+    if len(token) <= 2:
+        return False
+    # Check if the original text contains this word capitalised
+    # (case-insensitive search in original, then check actual case)
+    import unicodedata
+    orig_nfkd = unicodedata.normalize('NFKD', original_text)
+    orig_stripped = ''.join(c for c in orig_nfkd if not unicodedata.combining(c))
+    # Find all word occurrences in the original
+    for m in re.finditer(r'\b' + re.escape(token) + r'\b', orig_stripped, re.IGNORECASE):
+        word_in_orig = original_text[m.start():m.end()] if m.end() <= len(original_text) else ''
+        if word_in_orig and word_in_orig[0].isupper():
+            return True
+    # Fallback: if the token isn't a common English word and is long enough, treat as name-like
+    return len(token) >= 4 and token not in _STOP_WORDS
+
+
+def _is_confusable_pair(a: str, b: str) -> bool:
+    """Check if two tokens are a known confusable pair (e.g. Monet/Manet)."""
+    pair = frozenset({a, b})
+    return pair in _CONFUSABLE_PAIRS
+
+
+def _levenshtein(s1: str, s2: str) -> int:
+    """Compute Levenshtein edit distance between two strings."""
+    if len(s1) < len(s2):
+        return _levenshtein(s2, s1)
+    if len(s2) == 0:
+        return len(s1)
+    prev_row = list(range(len(s2) + 1))
+    for i, c1 in enumerate(s1):
+        curr_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = prev_row[j + 1] + 1
+            deletions = curr_row[j] + 1
+            substitutions = prev_row[j] + (c1 != c2)
+            curr_row.append(min(insertions, deletions, substitutions))
+        prev_row = curr_row
+    return prev_row[-1]
+
+
+def _fuzzy_token_match(req_token: str, pub_token: str) -> bool:
+    """Check if two tokens match allowing bounded edit distance.
+    
+    Rules:
+    - Exact match or prefix match: always matches
+    - Confusable pair (Monet/Manet): NEVER matches
+    - Edit distance ≤ 1 for tokens ≤ 6 chars
+    - Edit distance ≤ 2 for tokens > 6 chars
+    """
+    if req_token == pub_token:
+        return True
+    if req_token.startswith(pub_token) or pub_token.startswith(req_token):
+        return True
+    # Block confusable pairs
+    if _is_confusable_pair(req_token, pub_token):
+        return False
+    # Bounded edit distance
+    max_dist = 1 if max(len(req_token), len(pub_token)) <= 6 else 2
+    return _levenshtein(req_token, pub_token) <= max_dist
+
+
+def _title_similarity(requested: str, published: str) -> float:
+    """Compute similarity between requested and published exhibition titles.
+    
+    Returns a score between 0 and 1. The score incorporates:
+    
+    1. Token matching with fuzzy edit-distance tolerance (handles misspellings)
+    2. Order-awareness: tokens matching in the same sequence score higher
+       (uses longest common subsequence over matched tokens)
+    3. Proper-noun weighting: capitalised, non-dictionary tokens (likely artist
+       names) contribute 2× weight vs generic words. Three name-like tokens
+       matching in order is near-conclusive.
+    
+    Confidence thresholds (used by find_exhibition_checklist):
+    - >= 0.75: high confidence, accept match
+    - >= 0.35: possible match, accept if best candidate
+    - < 0.35: reject
+    
+    Weighting rationale:
+    - Name-like tokens get weight 2.0 because matching "Picasso Miró Dalí" is
+      far more informative than matching "the art of painting". A proper noun
+      is unlikely to appear by coincidence in the wrong exhibition title.
+    - Generic tokens get weight 1.0 — they still contribute but cannot alone
+      drive a high score.
+    - Order bonus: up to 15% of the base score is added when tokens appear in
+      the original sequence. This ensures "Dali Miro Picasso" (wrong order)
+      scores materially below "Picasso Miro Dali" (correct order) but doesn't
+      zero-out a genuinely shuffled subtitle. A symmetric ±15% range means
+      fully reversed order loses ~10% while perfect order gains ~15%.
     """
     req_norm = _normalize_for_match(requested)
     pub_norm = _normalize_for_match(published)
@@ -199,29 +395,77 @@ def _title_similarity(requested: str, published: str) -> float:
         longer = max(len(req_norm.split()), len(pub_norm.split()))
         return shorter / longer if longer > 0 else 0.0
 
-    # Word-level Jaccard with prefix matching
-    req_words = set(req_norm.split())
-    pub_words = set(pub_norm.split())
+    # Tokenize and filter
+    req_words_raw = req_norm.split()
+    pub_words_raw = pub_norm.split()
 
-    # Remove very short words and common stop words
-    _stop = {'the', 'a', 'an', 'at', 'in', 'of', 'and', 'or', 'to', 'for'}
-    req_words = {w for w in req_words if len(w) > 2 and w not in _stop}
-    pub_words = {w for w in pub_words if len(w) > 2 and w not in _stop}
+    req_words = [w for w in req_words_raw if len(w) > 2 and w not in _STOP_WORDS]
+    pub_words = [w for w in pub_words_raw if len(w) > 2 and w not in _STOP_WORDS]
 
     if not req_words or not pub_words:
         return 0.0
 
-    # Count matches (allowing prefix matching for truncated words)
-    matches = 0
-    for rw in req_words:
-        for pw in pub_words:
-            if rw == pw or rw.startswith(pw) or pw.startswith(rw):
-                matches += 1
-                break
+    # Determine token weights (name-like = 2.0, generic = 1.0)
+    def _weight(token: str) -> float:
+        """Weight for a token: 2.0 if name-like, 1.0 otherwise."""
+        if _is_name_like(token, published) or _is_name_like(token, requested):
+            return 2.0
+        return 1.0
 
-    # Jaccard-like: matches / union size
-    union_size = len(req_words | pub_words)
-    return matches / union_size if union_size > 0 else 0.0
+    # ─── Match each request token against published tokens ─────────────────
+    # Track which pub_words were matched and the order mapping
+    matched_req_indices = []  # indices in pub_words for each matched req token
+    matched_weights = []
+    total_req_weight = sum(_weight(w) for w in req_words)
+
+    for i, rw in enumerate(req_words):
+        best_pub_idx = -1
+        for j, pw in enumerate(pub_words):
+            if _fuzzy_token_match(rw, pw):
+                best_pub_idx = j
+                break  # first match (preserves order bias in iteration)
+        if best_pub_idx >= 0:
+            matched_req_indices.append(best_pub_idx)
+            matched_weights.append(_weight(rw))
+
+    if not matched_req_indices:
+        return 0.0
+
+    # ─── Base score: weighted fraction of matched tokens ────────────────────
+    matched_weight_sum = sum(matched_weights)
+    # Denominator: union-style — total weight of all unique tokens from both sides
+    all_tokens = set(req_words) | set(pub_words)
+    total_union_weight = sum(_weight(t) for t in all_tokens)
+    base_score = matched_weight_sum / total_union_weight if total_union_weight > 0 else 0.0
+
+    # ─── Order bonus: LCS over matched pub indices ──────────────────────────
+    # Longest increasing subsequence of matched_req_indices gives us the
+    # longest run that preserves the published order.
+    def _lis_length(seq):
+        """Length of longest increasing subsequence (patience sorting)."""
+        if not seq:
+            return 0
+        import bisect
+        tails = []
+        for val in seq:
+            pos = bisect.bisect_left(tails, val)
+            if pos == len(tails):
+                tails.append(val)
+            else:
+                tails[pos] = val
+        return len(tails)
+
+    lis_len = _lis_length(matched_req_indices)
+    order_ratio = lis_len / len(matched_req_indices) if matched_req_indices else 0.0
+
+    # Order component: symmetric ±15% of base score.
+    # Perfect order (ratio=1.0) → +15% bonus.
+    # Fully reversed (ratio=1/n → ~0.33 for 3 tokens) → ~-10% penalty.
+    # The break-even point is order_ratio=0.5.
+    order_adjustment = 0.30 * (order_ratio - 0.5) * base_score  # range: -0.15 to +0.15 * base
+
+    final_score = base_score + order_adjustment
+    return max(0.0, min(1.0, final_score))
 
 
 # ─── Work extraction from exhibition pages ───────────────────────────────────
@@ -657,12 +901,14 @@ def find_exhibition_checklist(
     venue_base_url: str,
     exhibition_name: str,
     venue_name: str = '',
+    venue_language: str = 'en',
 ) -> ExhibitionChecklistResult:
     """Find and extract the checklist for a named exhibition at a venue.
     
     Strategy:
     0. [LOCAL-366] Try structured API if the venue has one (AIC api.artic.edu)
     1. Try known exhibition path seeds on the venue domain
+       (ordered by venue_language — try local-language paths first)
     2. Find the exhibition listing page
     3. Match the requested exhibition name (fuzzy)
     4. Navigate to the exhibition detail page
@@ -673,6 +919,7 @@ def find_exhibition_checklist(
         venue_base_url: The venue's website base URL (from Wikidata P856)
         exhibition_name: The exhibition name as typed by the user
         venue_name: Optional venue name for better logging
+        venue_language: ISO 639-1 language code from VenueEntity.language (default 'en')
         
     Returns:
         ExhibitionChecklistResult with works (if found) and metadata
@@ -702,8 +949,22 @@ def find_exhibition_checklist(
     # ─── Step 1: Find exhibition listing pages ───────────────────────────────
     exhibition_listing_pages = []
 
+    # Build ordered seed list: language-specific first, then English fallback
+    _lang = (venue_language or 'en').lower()[:2]
+    _ordered_seeds = []
+    if _lang in _EXHIBITION_PATH_SEEDS_BY_LANG:
+        _ordered_seeds.extend(_EXHIBITION_PATH_SEEDS_BY_LANG[_lang])
+    _ordered_seeds.extend(_EXHIBITION_PATH_SEEDS_EN)
+    # Deduplicate while preserving order
+    _seen_seeds = set()
+    _deduped_seeds = []
+    for s in _ordered_seeds:
+        if s not in _seen_seeds:
+            _seen_seeds.add(s)
+            _deduped_seeds.append(s)
+
     # Try seed paths
-    for seed_path in _EXHIBITION_PATH_SEEDS:
+    for seed_path in _deduped_seeds:
         seed_url = f"{base_domain}{seed_path}"
         text, links = _fetch_page(seed_url)
         if text and len(text) > 100:
