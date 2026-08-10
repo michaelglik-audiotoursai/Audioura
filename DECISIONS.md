@@ -10960,3 +10960,33 @@ famous Spanish modernists appear together in countless articles. So: the venue's
 own domain is top tier and needs no corroboration; any other source must contain
 the exact phrase in order **and** in exhibition context. Dispatched as LOCAL-368,
 with a negative control required.
+
+## D281 — The dispatcher's recorded branch is not the branch the work is on
+**2026-08-10.** Merging LOCAL-365 by the name in `kiro_sessions_ran.md` returned
+`Already up to date`. The work was not merged and nothing said so.
+
+The log records `branch=kiro/local-365`, a name the dispatcher derives from the
+task filename. The agent worked on `kiro/local365-closed-exhibition-signal` —
+the name the task file's PROCESS section told it to use. Both branches exist.
+The dispatcher's one is a stale pointer at whatever `storied` was at dispatch
+time, so merging it is a **silent no-op that reports success**.
+
+```
+kiro/local-365                        -> 3b640ec (= storied HEAD, ahead=0)
+kiro/local365-closed-exhibition-signal -> 84081d8 (ahead=2)   <- the actual work
+```
+
+Same for 366 and 367. This has been latent for as long as task files have
+specified branch names, and it is exactly the failure D242's "verify by effect"
+exists to catch — `Already up to date` looks like a clean result.
+
+**The check, from now on:** never merge the name from the session log. Resolve
+the branch by content —
+
+    for b in $(git branch --list "kiro/local<NN>*" --format="%(refname:short)"); do
+      echo "$b ahead=$(git rev-list --count storied..$b)"
+    done
+
+and merge the one with `ahead>0`. A merge that reports `Already up to date` for a
+task whose worktree contains commits is a bug in the merge command, not a
+finished task.
