@@ -935,6 +935,46 @@ def _extract_opening_date(text: str) -> Optional[date]:
 # LOCAL-368: LLM prose extraction — extract works from exhibition page prose
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# [LOCAL-372] Navigation/footer lines that dilute page text. Filter these before
+# sending to the LLM so actual exhibition content survives the truncation window.
+_NAV_LINE_PATTERNS = re.compile(
+    r'^(?:Log\s*(?:In|Out)|View\s+Cart|Get\s+Tickets|Join\s+Today|'
+    r'Time\s+Remaining|Edit\s+Account|Manage\s+(?:Interests|Memberships)|'
+    r'Upcoming\s+Events|Video\s+Content|UserId\s+Member|'
+    r'Sign\s+up\s+for|Footer|Main\s+navigation|Connect\s+with\s+Us|'
+    r'Visit\s+Us|Corporate\s+Membership|Gifts\s+of\s+(?:Art|Securities)|'
+    r'Donor-Advised\s+Funds|Planned\s+Giving|Volunteer|'
+    r'[A-Z][a-z]+\s+Membership$)',
+    re.IGNORECASE,
+)
+
+
+def _filter_nav_from_page_text(text: str) -> str:
+    """Remove navigation/footer/menu lines from page text before LLM extraction.
+    
+    [LOCAL-372] The _fetch_page output includes <li> items that are often nav links.
+    These push real exhibition content past the 5000-char truncation window.
+    Filter short lines that match known nav patterns.
+    
+    Lifted to module scope for testability.
+    """
+    lines = text.split('\n')
+    filtered = []
+    for line in lines:
+        stripped = line.strip()
+        # Skip empty lines  
+        if not stripped:
+            continue
+        # Skip very short lines that look like nav labels (< 30 chars, match pattern)
+        if len(stripped) < 40 and _NAV_LINE_PATTERNS.match(stripped):
+            continue
+        # Skip lines that are just a number + "items" pattern (cart indicators)
+        if re.match(r'^(?:View\s+Cart\s+)?\d+$', stripped):
+            continue
+        filtered.append(stripped)
+    return '\n'.join(filtered)
+
+
 _PROSE_LLM_SYSTEM_PROMPT = """\
 You are an exhibition checklist extractor. Given the visible text from a museum \
 exhibition page, extract every artwork/work mentioned with its metadata. Return \
@@ -971,10 +1011,12 @@ def prose_llm_extract_works(page_text: str, exhibition_name: str = '') -> List[D
         return []
 
     # Trim to essential content — strip navigation/footer noise
-    # The page_text from _fetch_page already has headings + captions + paragraphs
-    # but may include nav. Keep only the core (first 4000 chars after any
-    # "About" section or the exhibition title).
-    text_for_llm = page_text.strip()
+    # [LOCAL-372] The full_text from _fetch_page includes list items, many of which
+    # are navigation (e.g. "Log In", "View Cart", "Get Tickets"). Filter these before
+    # truncating so that actual exhibition content survives the 5000-char window.
+    text_for_llm = _filter_nav_from_page_text(page_text.strip())
+    logger.info(f"prose_llm_extract_works: page_text={len(page_text)} chars, "
+                f"after nav filter={len(text_for_llm)} chars")
     if len(text_for_llm) > 5000:
         text_for_llm = text_for_llm[:5000]
 

@@ -46,6 +46,8 @@ from poi_inclusion_exceptions import should_include_in_restaurant_tour, should_i
 from enhanced_prompt_generator import generate_enhanced_prompt
 from datetime import datetime
 import re
+import unicodedata  # [LOCAL-372 LEAD] module scope — a function-scope import here
+                    # would shadow the name for the whole function (D278)
 from collections import Counter
 from math import radians, sin, cos, asin, sqrt
 from tour_settings import (
@@ -1979,7 +1981,108 @@ class VerificationResult:
     qid: str = ''
 
 
-def _verify_works_v2(poi_list, venue_name):
+# ═══════════════════════════════════════════════════════════════════════════════
+# LOCAL-372: Lifted helpers for theme-word filter (testable at module scope)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def theme_word_match(work_lower: str, theme_words) -> str:
+    """Check if any theme word matches `work_lower` on a word boundary.
+    
+    Returns the matching theme word, or '' if none matched.
+    Uses whitespace/punctuation boundaries but treats apostrophes as part of a word
+    (so 'or' does not match inside "d'or", and 'art' does not match inside "l'art").
+    
+    [LOCAL-372] Lifted to module scope for testability.
+    """
+    import re as _re_tw
+    for tw in theme_words:
+        # Use a custom boundary pattern: the theme word must be surrounded by
+        # whitespace, start/end of string, or punctuation OTHER THAN apostrophe/hyphen.
+        # This prevents French contractions (d'or, l'art) from false-matching.
+        _escaped = _re_tw.escape(tw)
+        # Lookbehind: start of string OR whitespace OR punctuation (not ' or -)
+        # Lookahead: end of string OR whitespace OR punctuation (not ' or -)
+        _pattern = (r'(?:^|(?<=[\s,;:.!?()\[\]{}"/]))'
+                    + _escaped +
+                    r'(?:$|(?=[\s,;:.!?()\[\]{}"/]))')
+        if _re_tw.search(_pattern, work_lower):
+            return tw
+    return ''
+
+
+# Keywords indicating an exhibition is about books, prints, or illustrated volumes.
+# When these appear in the exhibition requirements/name, theme-word drops are suppressed.
+_BOOK_EXHIBITION_KEYWORDS = frozenset([
+    'livre', 'livres', 'book', 'books', 'unbound',
+    'print', 'prints', 'illustrated', 'illustration', 'illustrations',
+    'lithograph', 'lithographs', 'etching', 'etchings',
+    'artist book', 'artists book', "artist's book", "artists' books",
+    "livres d'artiste", "livre d'artiste",
+    'woodcut', 'woodcuts', 'engraving', 'engravings',
+])
+
+
+def _is_book_exhibition_scope(exhibition_scope) -> bool:
+    """Determine if the exhibition scope concerns books/prints/illustrated volumes.
+    
+    When True, theme-word drops are suppressed because in such exhibitions,
+    book-related words ARE legitimate artwork descriptors.
+    
+    [LOCAL-372] Lifted to module scope for testability.
+    """
+    if not exhibition_scope:
+        return False
+    _requirements = (exhibition_scope.get('requirements', '') or '').lower()
+    if not _requirements:
+        return False
+    # Check if any book-exhibition keyword appears in requirements
+    for kw in _BOOK_EXHIBITION_KEYWORDS:
+        if kw in _requirements:
+            return True
+    return False
+
+
+def title_appears_in_page(title, page_text, min_word_overlap=0.7):
+    """
+    [LOCAL-372 LEAD] Is `title` actually present in the venue page it came from?
+
+    LOCAL-372 skips D1v2 for exhibition-sourced stops, and the reasoning is right:
+    D1v2 verifies against the venue's SPARQL/canonical titles, which describe the
+    PERMANENT collection, so it will always reject works from a temporary show —
+    that is what deleted 'Le Lézard aux plumes d'or'.
+
+    But "skip verification" is not the same as "verify against the right source".
+    As submitted, an exhibition stop had no grounding check at all: a title the
+    extraction LLM invented would be delivered unchallenged, in the one path whose
+    whole premise is that the venue's own page is authoritative.
+
+    So verify against that page. Tolerant of reformatting — accents folded,
+    punctuation dropped, case ignored — but requires most significant words of the
+    title to be present, which an invented title will not satisfy.
+    """
+    if not title or not page_text:
+        return False
+
+    def _fold(s):
+        n = unicodedata.normalize('NFKD', s.lower())
+        n = ''.join(c for c in n if not unicodedata.combining(c))
+        return re.sub(r'\s+', ' ', re.sub(r'[^\w\s]', ' ', n)).strip()
+
+    t_norm, p_norm = _fold(title), _fold(page_text)
+    if not t_norm:
+        return False
+    if t_norm in p_norm:
+        return True
+
+    words = [w for w in t_norm.split() if len(w) >= 4]
+    if not words:
+        # Very short title — require exact normalized containment, already failed.
+        return False
+    present = sum(1 for w in words if w in p_norm)
+    return (present / len(words)) >= min_word_overlap
+
+
+def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
     """[D1 v2] In-collection verification using story_miner canonical title matching.
     
     Uses venue_resolver for entity resolution (Generic Grounding Step 0+1) and
@@ -1989,6 +2092,13 @@ def _verify_works_v2(poi_list, venue_name):
     - SPARQL works query (P195/P276) — highest precision
     - Official site extraction (from P856)
     - Wikipedia extraction (EN + local language)
+    
+    Args:
+        poi_list: List of POI dicts to verify.
+        venue_name: Full venue name string for entity resolution.
+        exhibition_scope: Optional dict from _exhibition_scope (has 'requirements', 'artists', etc.)
+                          When the exhibition is about books/prints/illustrated volumes, the
+                          theme-word filter is exempted (LOCAL-372).
     
     Returns (verified_pois, evidence_log, venue_corpus, story_corpus_result) or None.
     """
@@ -2436,11 +2546,22 @@ def _verify_works_v2(poi_list, venue_name):
             continue
         
         # Step 2: Check if it's a theme word / cycle name (should not be a stop)
+        # [LOCAL-372] Word-boundary matching: `tw in _work_lower` is plain containment
+        # which matches substrings (e.g. 'or' inside "d'or"). Use \b word boundaries.
+        # Also: exempt when exhibition is about books/prints/illustrated volumes —
+        # in that domain, book-words ARE the artworks.
         _work_lower = work_name.lower()
-        if any(tw in _work_lower for tw in corpus_result['theme_words']):
-            print(f"  [D1v2] DROPPED '{work_name}' — theme/book word, not a work title")
-            evidence_log[work_name] = {"status": "DROPPED", "reason": "theme word"}
-            continue
+        _theme_word_matched = theme_word_match(_work_lower, corpus_result['theme_words'])
+        if _theme_word_matched:
+            # [LOCAL-372] Scope-aware exemption: if exhibition is about books/prints,
+            # book-related theme words should not disqualify works.
+            if _is_book_exhibition_scope(exhibition_scope):
+                print(f"  [D1v2] EXEMPT '{work_name}' — theme word '{_theme_word_matched}' "
+                      f"matched but exhibition is book/print-scoped (LOCAL-372)")
+            else:
+                print(f"  [D1v2] DROPPED '{work_name}' — theme/book word '{_theme_word_matched}', not a work title")
+                evidence_log[work_name] = {"status": "DROPPED", "reason": f"theme word: '{_theme_word_matched}'"}
+                continue
         if any(cn.lower() in _work_lower or _work_lower in cn.lower() 
                for cn in cycle_names):
             print(f"  [D1v2] DROPPED '{work_name}' — cycle/collection name (prolog material)")
@@ -2475,6 +2596,14 @@ def _verify_works_v2(poi_list, venue_name):
     # 0 verified = unresolvable, 1-2 = thin, 3-7 = medium, 8+ = rich
     # For thin tier (1-2 works): return them — caller decides behavior
     if len(verified_pois) == 0:
+        # [LOCAL-372] Loud warning when filtering removed ALL candidates
+        _dropped_entries = [k for k, v in evidence_log.items() if v.get('status') == 'DROPPED']
+        if _dropped_entries:
+            print(f"  [D1v2] ⚠️  ALL {len(_dropped_entries)} candidate(s) were DROPPED — "
+                  f"every work was filtered out, producing unresolvable from non-empty input")
+            for _dk in _dropped_entries:
+                _dr = evidence_log[_dk].get('reason', '?')
+                print(f"    DROPPED: '{_dk}' — {_dr}")
         print(f"  [D1v2] 0 works verified — tier: unresolvable")
         _has_site = len(corpus_result.get('combined_text', '')) > 1000
         _has_wiki = bool(corpus_result.get('pages'))
@@ -5097,86 +5226,120 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         _story_corpus_result = None
         _d1v2_result = None  # [LOCAL-72] Initialize for non-museum paths (prevents NameError in three_class_retrieval)
         if tour_category == 'museum' and _museum_venue_name:
-            # Try new story_miner-based verification (T0a/T1)
-            # Pass full location string so D1v2 can parse city for venue disambiguation
-            _d1v2_venue_arg = _museum_venue_name
-            if ',' not in _d1v2_venue_arg and ',' in _location_normalized:
-                # Append city/state from location if venue name alone lacks it
-                _d1v2_venue_arg = _location_normalized
-            _d1v2_result = _verify_works_v2(poi_list, _d1v2_venue_arg)
-            if isinstance(_d1v2_result, VerificationResult):
-                _verification_tier = _d1v2_result.tier
-                global _LAST_VERIFICATION_TIER
+            global _LAST_VERIFICATION_TIER
+            # [LOCAL-372] Skip D1v2 verification when stops come from the venue's own
+            # exhibition page. These works are already grounded by their source — 
+            # verifying them against SPARQL/Wikidata would reject exhibition-specific
+            # works that aren't individually catalogued in the museum's permanent collection.
+            if _deterministic_fill_used and _exhibition_stops_source in ('checklist', 'partial', 'prose_llm'):
+                print(f"  [D1/LOCAL-372] SKIP D1v2 — stops sourced from exhibition {_exhibition_stops_source} "
+                      f"(D1v2 checks the PERMANENT collection; a temporary show is not in it)")
+                # [LOCAL-372 LEAD] Skipping D1v2 is right, but these stops still need
+                # grounding — just against the source that IS authoritative here. Verify
+                # each title actually appears on the venue page it was extracted from,
+                # otherwise an invented title ships unchallenged.
+                _exh_page_text = getattr(_exhibition_checklist_result, 'page_text', '') or ''
+                if _exh_page_text:
+                    _grounded, _ungrounded = [], []
+                    for _p in poi_list:
+                        if title_appears_in_page(_p.get('name', ''), _exh_page_text):
+                            _grounded.append(_p)
+                        else:
+                            _ungrounded.append(_p.get('name', ''))
+                    if _ungrounded:
+                        print(f"  [D1/LOCAL-372] DROPPED {len(_ungrounded)} stop(s) absent from the "
+                              f"exhibition page (not extracted from it — likely invented):")
+                        for _u in _ungrounded:
+                            print(f"      - {_u}")
+                    poi_list = _grounded
+                    if not poi_list:
+                        print(f"  [D1/LOCAL-372] No exhibition stop survived page grounding — clean fail")
+                else:
+                    print(f"  [D1/LOCAL-372] WARNING: no page_text captured — exhibition stops "
+                          f"are ungrounded this run")
+                print(f"  [D1/LOCAL-372] {len(poi_list)} exhibition stop(s) grounded against the venue page")
+                _verification_tier = 'exhibit_museum'
                 _LAST_VERIFICATION_TIER = _verification_tier
-                if _d1v2_result.tier == 'unresolvable':
-                    # Clean fail with structured error
-                    print(f"  [D1] Tier: unresolvable — clean fail (entity={_d1v2_result.entity_resolved}, sparql={_d1v2_result.sparql_count})")
-                    _LAST_CLEAN_FAIL_EVIDENCE = {
-                        "error_type": "thin_evidence",
-                        "entity_resolved": _d1v2_result.entity_resolved,
-                        "qid": _d1v2_result.qid,
-                        "sparql_works": _d1v2_result.sparql_count,
-                        "site_reachable": _d1v2_result.site_reachable,
-                        "wikipedia_available": _d1v2_result.wiki_available,
-                        "tier": "unresolvable",
-                    }
-                    return None, None, (None, None)
-                # Extract fields from VerificationResult
-                _pre_d1v2_candidates = list(poi_list)  # Save original GPT candidates before filtering
-                poi_list = _d1v2_result.pois
-                _d1_evidence_log = _d1v2_result.evidence_log
-                _d1_venue_corpus = _d1v2_result.combined_text
-                _story_corpus_result = _d1v2_result.corpus_result
-                print(f"  [D1] Tier: {_verification_tier} ({len(poi_list)} verified works)")
-                
-                # [PALAIS-FIX] For thin tier with sparse Wikidata: restore GPT candidates
-                # The venue IS real (Wikidata-resolved) but its artwork catalog is incomplete.
-                # Keep GPT-proposed works in degraded mode rather than zero-stop-rejecting.
-                # NOTE: This legacy path only applies when REQUIRE_LISTING_VERIFICATION=true.
-                # When false, the unified fill logic below handles ALL tiers.
-                _require_listing_verification = os.environ.get('REQUIRE_LISTING_VERIFICATION', 'false').lower() in ('true', '1', 'yes')
-                if _require_listing_verification and _verification_tier == 'thin' and len(poi_list) < 3 and len(_pre_d1v2_candidates) >= 3:
-                    # D1: Only restore candidates whose evidence-log status is "DROPPED / no canonical match"
-                    # NEVER restore REJECTED candidates (positive evidence they hang at another venue)
-                    _verified_names = set(p['name'].lower() for p in poi_list)
-                    # D2: Also exclude by evidence-log keys (handles canonical-rename variants)
-                    _evidence_keys_normalized = set(_normalize_name(k) for k in _d1_evidence_log.keys()
-                                                   if _d1_evidence_log[k].get('status') == 'VERIFIED')
-                    _unverified = []
-                    for p in _pre_d1v2_candidates:
-                        _cand_name = p['name']
-                        _cand_norm = _normalize_name(_cand_name)
-                        # Skip if already in verified list (exact or normalized match)
-                        if _cand_name.lower() in _verified_names or _cand_norm in _evidence_keys_normalized:
-                            continue
-                        # D1: Skip if evidence-log shows REJECTED (located at other venue)
-                        _ev_entry = _d1_evidence_log.get(_cand_name, {})
-                        if isinstance(_ev_entry, dict) and _ev_entry.get('status') == 'REJECTED':
-                            continue
-                        # D3: Tag as unverified for narration hedging + stop_metrics
-                        p['verified'] = False
-                        _unverified.append(p)
-                    # Cap at 5 unverified additions
-                    _restored = _unverified[:5]
-                    poi_list = list(poi_list) + _restored
-                    # D3: Accurate log line — print actual restored count, not pre-filter count
-                    print(f"  [D1] THIN tier degraded mode: restored {len(_restored)} unverified GPT candidates "
-                          f"(filtered from {len(_pre_d1v2_candidates)} total, "
-                          f"Wikidata catalog too sparse for strict filtering)")
             else:
-                # _verify_works_v2 returned None or unexpected type — fail-closed (unresolvable)
-                print(f"  [D1] D1v2 returned unexpected result — demoting to unresolvable (fail-closed)")
-                _LAST_CLEAN_FAIL_EVIDENCE.clear()
-                _LAST_CLEAN_FAIL_EVIDENCE.update({
-                    "error_type": "thin_evidence",
-                    "entity_resolved": False,
-                    "qid": "",
-                    "sparql_works": 0,
-                    "site_reachable": False,
-                    "wikipedia_available": False,
-                    "tier": "unresolvable",
-                })
-                return None, None, (None, None)
+                # Try new story_miner-based verification (T0a/T1)
+                # Pass full location string so D1v2 can parse city for venue disambiguation
+                _d1v2_venue_arg = _museum_venue_name
+                if ',' not in _d1v2_venue_arg and ',' in _location_normalized:
+                    # Append city/state from location if venue name alone lacks it
+                    _d1v2_venue_arg = _location_normalized
+                _d1v2_result = _verify_works_v2(poi_list, _d1v2_venue_arg, exhibition_scope=_exhibition_scope)
+                if isinstance(_d1v2_result, VerificationResult):
+                    _verification_tier = _d1v2_result.tier
+                    _LAST_VERIFICATION_TIER = _verification_tier
+                    if _d1v2_result.tier == 'unresolvable':
+                        # Clean fail with structured error
+                        print(f"  [D1] Tier: unresolvable — clean fail (entity={_d1v2_result.entity_resolved}, sparql={_d1v2_result.sparql_count})")
+                        _LAST_CLEAN_FAIL_EVIDENCE = {
+                            "error_type": "thin_evidence",
+                            "entity_resolved": _d1v2_result.entity_resolved,
+                            "qid": _d1v2_result.qid,
+                            "sparql_works": _d1v2_result.sparql_count,
+                            "site_reachable": _d1v2_result.site_reachable,
+                            "wikipedia_available": _d1v2_result.wiki_available,
+                            "tier": "unresolvable",
+                        }
+                        return None, None, (None, None)
+                    # Extract fields from VerificationResult
+                    _pre_d1v2_candidates = list(poi_list)  # Save original GPT candidates before filtering
+                    poi_list = _d1v2_result.pois
+                    _d1_evidence_log = _d1v2_result.evidence_log
+                    _d1_venue_corpus = _d1v2_result.combined_text
+                    _story_corpus_result = _d1v2_result.corpus_result
+                    print(f"  [D1] Tier: {_verification_tier} ({len(poi_list)} verified works)")
+                    
+                    # [PALAIS-FIX] For thin tier with sparse Wikidata: restore GPT candidates
+                    # The venue IS real (Wikidata-resolved) but its artwork catalog is incomplete.
+                    # Keep GPT-proposed works in degraded mode rather than zero-stop-rejecting.
+                    # NOTE: This legacy path only applies when REQUIRE_LISTING_VERIFICATION=true.
+                    # When false, the unified fill logic below handles ALL tiers.
+                    _require_listing_verification = os.environ.get('REQUIRE_LISTING_VERIFICATION', 'false').lower() in ('true', '1', 'yes')
+                    if _require_listing_verification and _verification_tier == 'thin' and len(poi_list) < 3 and len(_pre_d1v2_candidates) >= 3:
+                        # D1: Only restore candidates whose evidence-log status is "DROPPED / no canonical match"
+                        # NEVER restore REJECTED candidates (positive evidence they hang at another venue)
+                        _verified_names = set(p['name'].lower() for p in poi_list)
+                        # D2: Also exclude by evidence-log keys (handles canonical-rename variants)
+                        _evidence_keys_normalized = set(_normalize_name(k) for k in _d1_evidence_log.keys()
+                                                       if _d1_evidence_log[k].get('status') == 'VERIFIED')
+                        _unverified = []
+                        for p in _pre_d1v2_candidates:
+                            _cand_name = p['name']
+                            _cand_norm = _normalize_name(_cand_name)
+                            # Skip if already in verified list (exact or normalized match)
+                            if _cand_name.lower() in _verified_names or _cand_norm in _evidence_keys_normalized:
+                                continue
+                            # D1: Skip if evidence-log shows REJECTED (located at other venue)
+                            _ev_entry = _d1_evidence_log.get(_cand_name, {})
+                            if isinstance(_ev_entry, dict) and _ev_entry.get('status') == 'REJECTED':
+                                continue
+                            # D3: Tag as unverified for narration hedging + stop_metrics
+                            p['verified'] = False
+                            _unverified.append(p)
+                        # Cap at 5 unverified additions
+                        _restored = _unverified[:5]
+                        poi_list = list(poi_list) + _restored
+                        # D3: Accurate log line — print actual restored count, not pre-filter count
+                        print(f"  [D1] THIN tier degraded mode: restored {len(_restored)} unverified GPT candidates "
+                              f"(filtered from {len(_pre_d1v2_candidates)} total, "
+                              f"Wikidata catalog too sparse for strict filtering)")
+                else:
+                    # _verify_works_v2 returned None or unexpected type — fail-closed (unresolvable)
+                    print(f"  [D1] D1v2 returned unexpected result — demoting to unresolvable (fail-closed)")
+                    _LAST_CLEAN_FAIL_EVIDENCE.clear()
+                    _LAST_CLEAN_FAIL_EVIDENCE.update({
+                        "error_type": "thin_evidence",
+                        "entity_resolved": False,
+                        "qid": "",
+                        "sparql_works": 0,
+                        "site_reachable": False,
+                        "wikipedia_available": False,
+                        "tier": "unresolvable",
+                    })
+                    return None, None, (None, None)
 
             # -------- [R4] Bounded replenishment loop (runs FIRST, before any fill) --------
             # [LOCAL-19 FIX] R4 now runs BEFORE UNIFIED-FILL so it sees only verified
