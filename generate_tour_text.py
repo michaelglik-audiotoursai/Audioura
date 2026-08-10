@@ -10287,11 +10287,12 @@ REWRITE RULES (all mandatory):
     # -------- [LOCAL-378] PHASE 5.158: Prose entity grounding gate --------
     # Fires ONLY for exhibition-scoped museum tours. Removes all mentions of
     # persons not grounded in the exhibition page text or artist checklist.
+    # [LOCAL-385] Now scans ALL fields in GATED_PROSE_FIELDS (description + orientation).
     # Scope limitation (Defect 5): unscoped museum tours (Palais Lascaris, etc.)
     # remain ungated. This is intentional and documented — do not widen.
     if (tour_category == 'museum' and _exhibition_checklist_result
             and getattr(_exhibition_checklist_result, 'page_text', '')):
-        print(f"\n  [LOCAL-378] PHASE 5.158: Prose entity grounding gate...")
+        print(f"\n  [LOCAL-385] PHASE 5.158: Prose entity grounding gate (scans all prose fields)...")
         try:
             from prose_entity_grounding_gate import apply_prose_entity_grounding_gate
             _peg_stop_names = [p.get('name', '') for p in poi_list]
@@ -10300,7 +10301,7 @@ REWRITE RULES (all mandatory):
                 _exhibition_checklist_result,
                 stop_names=_peg_stop_names,
             )
-            print(f"  [LOCAL-378] Prose entity grounding gate summary:")
+            print(f"  [LOCAL-385] Prose entity grounding gate summary:")
             print(f"    Persons detected: {_peg_stats['persons_detected']}")
             print(f"    Persons grounded: {_peg_stats['persons_grounded']}")
             print(f"    Persons ungrounded: {_peg_stats['persons_ungrounded']}")
@@ -10309,12 +10310,12 @@ REWRITE RULES (all mandatory):
             if _peg_stats['ungrounded_names']:
                 print(f"    Ungrounded: {_peg_stats['ungrounded_names']}")
         except ImportError as _peg_err:
-            print(f"  [LOCAL-378] WARNING: prose_entity_grounding_gate not importable — gate skipped ({_peg_err})")
+            print(f"  [LOCAL-385] WARNING: prose_entity_grounding_gate not importable — gate skipped ({_peg_err})")
         except Exception as _peg_err:
-            print(f"  [LOCAL-378] ERROR: prose entity grounding gate failed (non-fatal): {_peg_err}")
+            print(f"  [LOCAL-385] ERROR: prose entity grounding gate failed (non-fatal): {_peg_err}")
     else:
         if tour_category == 'museum':
-            print(f"\n  [LOCAL-378] Prose entity grounding gate SKIPPED "
+            print(f"\n  [LOCAL-385] Prose entity grounding gate SKIPPED "
                   f"(no exhibition scope — unscoped museum tours are not gated)")
 
     # -------- [LOCAL-384] PHASE 5.159: Form-claim gate --------
@@ -10322,33 +10323,36 @@ REWRITE RULES (all mandatory):
     # Plafond" → "ceiling mural"). Five prompt-level rounds failed. This gate
     # enforces at the output level: scan delivered text for physical form and
     # placement claims, check against the known medium, remove unsupported claims.
+    # [LOCAL-385] Now scans ALL fields in GATED_PROSE_FIELDS (description + orientation).
     # Same scope as the person gate: exhibition-scoped museum tours only.
     if (tour_category == 'museum' and _exhibition_checklist_result
             and getattr(_exhibition_checklist_result, 'works', None)):
-        print(f"\n  [LOCAL-384] PHASE 5.159: Form-claim gate...")
+        print(f"\n  [LOCAL-385] PHASE 5.159: Form-claim gate (scans all prose fields)...")
         try:
             from prose_entity_grounding_gate import apply_form_claim_gate
             _fcg_stats = apply_form_claim_gate(
                 poi_list,
                 _exhibition_checklist_result,
             )
-            print(f"  [LOCAL-384] Form-claim gate summary:")
+            print(f"  [LOCAL-385] Form-claim gate summary:")
             print(f"    Claims detected: {_fcg_stats['claims_detected']}")
             print(f"    Claims kept (compatible): {_fcg_stats['claims_kept']}")
             print(f"    Claims removed: {_fcg_stats['claims_removed']}")
+            print(f"    Metaphor-exempt (kept): {_fcg_stats['claims_metaphor_exempt']}")
             print(f"    Sentences dropped: {_fcg_stats['sentences_dropped']}")
             print(f"    Stops affected: {_fcg_stats['stops_affected']}")
             if _fcg_stats['removal_log']:
                 for _rl in _fcg_stats['removal_log']:
-                    print(f"    [LOCAL-384] stop='{_rl['stop']}' term='{_rl['term']}' "
-                          f"medium='{_rl['medium']}' dropped: \"{_rl['sentence'][:80]}\"")
+                    print(f"    [LOCAL-385] field={_rl['field']} stop='{_rl['stop']}' "
+                          f"term='{_rl['term']}' medium='{_rl['medium']}' "
+                          f"dropped: \"{_rl['sentence'][:80]}\"")
         except ImportError as _fcg_err:
-            print(f"  [LOCAL-384] WARNING: form-claim gate not importable — gate skipped ({_fcg_err})")
+            print(f"  [LOCAL-385] WARNING: form-claim gate not importable — gate skipped ({_fcg_err})")
         except Exception as _fcg_err:
-            print(f"  [LOCAL-384] ERROR: form-claim gate failed (non-fatal): {_fcg_err}")
+            print(f"  [LOCAL-385] ERROR: form-claim gate failed (non-fatal): {_fcg_err}")
     else:
         if tour_category == 'museum':
-            print(f"\n  [LOCAL-384] Form-claim gate SKIPPED "
+            print(f"\n  [LOCAL-385] Form-claim gate SKIPPED "
                   f"(no exhibition scope — unscoped museum tours are not gated)")
 
     # -------- [LOCAL-229] PHASE 5.16: CONTRADICTED claim block --------

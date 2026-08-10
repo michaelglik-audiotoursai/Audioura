@@ -22,9 +22,25 @@ Design invariants:
   - No LLM calls. Entirely deterministic.
   - The gate never adds text, only removes.
   - Removal granularity: whole sentences on sentence boundaries.
+
+LOCAL-385 additions:
+  - GATED_PROSE_FIELDS: single source of truth for which POI fields both gates scan.
+  - Both gates iterate all fields in GATED_PROSE_FIELDS (description, orientation).
+  - Log messages include the field name: field=orientation, field=description.
+  - Form-claim gate: metaphorical uses ("a visual tapestry") are exempt.
+  - Empty orientation after removal triggers omission (field cleared).
 """
 import re
 from typing import Dict, List, Optional, Set, Tuple
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# [LOCAL-385] GATED PROSE FIELDS — defined ONCE, consumed by BOTH gates.
+# ═══════════════════════════════════════════════════════════════════════════════
+# These are the POI dict keys that contain model-generated prose and therefore
+# must be scanned by all truthfulness gates. Structured fields (Address,
+# Coordinates, stop headings) are NOT included.
+GATED_PROSE_FIELDS = ('description', 'orientation')
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -317,14 +333,15 @@ def apply_prose_entity_grounding_gate(
     exhibition_checklist_result,
     stop_names: Optional[List[str]] = None,
 ) -> Dict:
-    """Apply the prose entity grounding gate to all stop descriptions.
+    """Apply the prose entity grounding gate to all stop prose fields.
 
-    For each stop, extract person names from the description, check them against
-    the exhibition page text and the declared artist names from the checklist.
-    Remove all mentions of ungrounded persons.
+    [LOCAL-385] Scans every field in GATED_PROSE_FIELDS (description AND
+    orientation). For each stop, extract person names from the prose, check them
+    against the exhibition page text and the declared artist names from the
+    checklist. Remove all mentions of ungrounded persons.
 
     Args:
-        poi_list: List of POI dicts (mutated in place — descriptions are rewritten).
+        poi_list: List of POI dicts (mutated in place — prose fields are rewritten).
         exhibition_checklist_result: ExhibitionChecklistResult with page_text and works.
         stop_names: List of stop names (excluded from person detection).
 
@@ -338,7 +355,7 @@ def apply_prose_entity_grounding_gate(
         'sentences_dropped': 0,
         'stops_affected': 0,
         'ungrounded_names': [],
-        'drop_log': [],  # [{stop, person, dropped_sentences}]
+        'drop_log': [],  # [{stop, person, field, dropped_sentences}]
     }
 
     page_text = getattr(exhibition_checklist_result, 'page_text', '') or ''
@@ -360,23 +377,24 @@ def apply_prose_entity_grounding_gate(
                 if len(w) > 3:
                     stop_name_set.add(w.lower())
 
-    # First pass: collect ALL ungrounded persons across all stops
+    # First pass: collect ALL ungrounded persons across all stops and ALL prose fields
     # (a person ungrounded in one stop is ungrounded everywhere)
     all_persons: Set[str] = set()
     ungrounded_persons: Set[str] = set()
 
     for poi in poi_list:
-        desc = poi.get('description', '') or ''
-        if not desc or desc.startswith('['):
-            continue
-
-        persons = extract_person_names(desc)
-        for person in persons:
-            # Skip if person's surname is a stop name word
-            surname = _surname_from_full_name(person)
-            if surname and surname.lower() in stop_name_set:
+        for field_key in GATED_PROSE_FIELDS:
+            text = poi.get(field_key, '') or ''
+            if not text or text.startswith('['):
                 continue
-            all_persons.add(person)
+
+            persons = extract_person_names(text)
+            for person in persons:
+                # Skip if person's surname is a stop name word
+                surname = _surname_from_full_name(person)
+                if surname and surname.lower() in stop_name_set:
+                    continue
+                all_persons.add(person)
 
     stats['persons_detected'] = len(all_persons)
 
@@ -388,42 +406,57 @@ def apply_prose_entity_grounding_gate(
             ungrounded_persons.add(person)
             stats['persons_ungrounded'] += 1
             stats['ungrounded_names'].append(person)
-            print(f"  [LOCAL-378] ungrounded person '{person}' — will remove all mentions")
+            print(f"  [LOCAL-385] ungrounded person '{person}' — will remove all mentions")
 
     if not ungrounded_persons:
         return stats
 
-    # Second pass: remove all mentions of ungrounded persons from all stops
+    # Second pass: remove all mentions of ungrounded persons from all stops,
+    # scanning every field in GATED_PROSE_FIELDS
     for poi in poi_list:
-        desc = poi.get('description', '') or ''
-        if not desc or desc.startswith('['):
-            continue
-
         stop_name = poi.get('name', '?')
-        original_desc = desc
-        stop_drops = []
+        stop_touched = False
 
-        for person in ungrounded_persons:
-            desc, dropped = remove_person_from_text(desc, person)
-            if dropped:
-                stop_drops.extend(dropped)
-                for d in dropped:
-                    print(f"  [LOCAL-378] stop='{stop_name[:30]}' dropped for "
-                          f"'{person}': \"{d[:80]}...\"" if len(d) > 80
-                          else f"  [LOCAL-378] stop='{stop_name[:30]}' dropped for "
-                          f"'{person}': \"{d}\"")
+        for field_key in GATED_PROSE_FIELDS:
+            text = poi.get(field_key, '') or ''
+            if not text or text.startswith('['):
+                continue
 
-        if desc != original_desc:
-            poi['description'] = desc
+            original_text = text
+            field_drops = []
+
+            for person in ungrounded_persons:
+                text, dropped = remove_person_from_text(text, person)
+                if dropped:
+                    field_drops.extend(dropped)
+                    for d in dropped:
+                        print(f"  [LOCAL-385] field={field_key} stop='{stop_name[:30]}' "
+                              f"ungrounded person '{person}' — dropping sentence"
+                              + (f": \"{d[:80]}...\"" if len(d) > 80 else f": \"{d}\""))
+
+            if text != original_text:
+                # [LOCAL-385] If orientation is emptied, clear it entirely rather
+                # than ship a fragment
+                cleaned = text.strip()
+                if field_key == 'orientation' and not cleaned:
+                    poi[field_key] = ''
+                    print(f"  [LOCAL-385] field=orientation stop='{stop_name[:30]}' "
+                          f"emptied after person removal — omitting orientation")
+                else:
+                    poi[field_key] = cleaned
+                stop_touched = True
+                stats['sentences_dropped'] += len(field_drops)
+                stats['drop_log'].append({
+                    'stop': stop_name,
+                    'field': field_key,
+                    'persons': [p for p in ungrounded_persons
+                                if any(_mentions_person(d, p, _surname_from_full_name(p))
+                                       for d in field_drops)],
+                    'dropped_sentences': field_drops,
+                })
+
+        if stop_touched:
             stats['stops_affected'] += 1
-            stats['sentences_dropped'] += len(stop_drops)
-            stats['drop_log'].append({
-                'stop': stop_name,
-                'persons': [p for p in ungrounded_persons
-                            if any(_mentions_person(d, p, _surname_from_full_name(p))
-                                   for d in stop_drops)],
-                'dropped_sentences': stop_drops,
-            })
 
     return stats
 
@@ -441,7 +474,9 @@ def apply_prose_entity_grounding_gate(
 #   - medium KNOWN and INCOMPATIBLE → remove the sentence
 #   - medium EMPTY/UNKNOWN → any form claim is unsupported → remove
 #   - medium KNOWN and COMPATIBLE → keep (e.g. a real fresco in a palace)
+#   - [LOCAL-385] Metaphorical use ("a visual tapestry") is EXEMPT
 #
+# [LOCAL-385] This gate now scans ALL fields in GATED_PROSE_FIELDS.
 # This gate runs alongside the person gate, AFTER all generation and repair.
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -477,6 +512,106 @@ _FORM_SPATIAL_RE = re.compile(
     r'(' + '|'.join(re.escape(p) for p in sorted(_FORM_SPATIAL_PHRASES, key=len, reverse=True)) + r')',
     re.IGNORECASE
 )
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# [LOCAL-385] METAPHOR EXEMPTION
+# ═══════════════════════════════════════════════════════════════════════════════
+# A form term used metaphorically ("a visual tapestry", "a symphony of colour")
+# is NOT a claim that the work IS that physical form. Only REFERENTIAL uses
+# matter — "this ceiling mural", "the sculpture before you".
+#
+# Heuristic: if the form term is preceded by a metaphor qualifier (adjective that
+# signals figurative use), the sentence is exempt. Also exempt when the term
+# appears as part of a compound metaphor pattern.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Metaphor qualifiers: adjectives/patterns that signal figurative use of a form term
+_METAPHOR_QUALIFIER_RE = re.compile(
+    r'\b(?:visual|sonic|auditory|emotional|musical|verbal|literary|poetic|'
+    r'intellectual|cultural|historical|rich|vivid|intricate|complex|'
+    r'sensory|dynamic|living|woven|elaborate)\s+(?=' +
+    '|'.join(re.escape(t) for t in sorted(_ALL_FORM_SINGLE_TERMS, key=len, reverse=True)) +
+    r')\b',
+    re.IGNORECASE
+)
+
+# Full metaphor patterns: "a tapestry of X", "symphony of X" — figurative
+_METAPHOR_COMPOUND_RE = re.compile(
+    r'\b(?:a|the|this|creates?\s+a|weaves?\s+a|forms?\s+a|becomes?\s+a|like\s+a)\s+'
+    r'(?:visual|sonic|auditory|rich|vivid|intricate|sensory|living|woven|elaborate)?\s*'
+    r'(?:' + '|'.join(re.escape(t) for t in sorted(_ALL_FORM_SINGLE_TERMS, key=len, reverse=True)) + r')'
+    r'\s+of\s+',
+    re.IGNORECASE
+)
+
+
+def _is_metaphorical_use(sentence: str, term: str) -> bool:
+    """Check if a form term is used metaphorically rather than referentially.
+
+    Returns True if the term is a metaphor (should be KEPT), False if it's a
+    literal claim about the work's physical form (subject to gate rules).
+
+    A term is metaphorical when:
+      - Preceded by a metaphor qualifier: "a visual tapestry", "rich mosaic"
+      - Part of a compound metaphor: "a tapestry of emotions", "a mosaic of styles"
+      - NOT preceded by referential indicators: "this", "the", demonstratives
+        pointing to the work itself
+
+    [LOCAL-385] D304: removing metaphor makes prose worse for no truthfulness gain.
+    """
+    term_lower = term.lower()
+
+    # Check for qualifier pattern: "visual tapestry", "rich mosaic"
+    if _METAPHOR_QUALIFIER_RE.search(sentence):
+        return True
+
+    # Check compound metaphor: "a tapestry of emotions/colours/..."
+    if _METAPHOR_COMPOUND_RE.search(sentence):
+        return True
+
+    # Check if preceded by "a [adj] <term>" (indefinite article = metaphorical)
+    # vs "this <term>" / "the <term> before you" (referential)
+    _indefinite_metaphor = re.compile(
+        r'\ba\s+(?:\w+\s+)?' + re.escape(term_lower) + r'\b',
+        re.IGNORECASE
+    )
+    _referential_pattern = re.compile(
+        r'\b(?:this|that|the|its)\s+(?:\w+\s+){0,2}' + re.escape(term_lower) + r'\b',
+        re.IGNORECASE
+    )
+
+    has_referential = bool(_referential_pattern.search(sentence))
+    has_indefinite = bool(_indefinite_metaphor.search(sentence))
+
+    # If there's a referential use, it's a claim about the work → not metaphorical
+    if has_referential:
+        return False
+
+    # "creates a tapestry", "weaves a tapestry" — action + indefinite = metaphor
+    _action_metaphor = re.compile(
+        r'\b(?:creates?|weaves?|forms?|paints?|builds?|crafts?|becomes?)\s+'
+        r'(?:a\s+)?(?:\w+\s+)?' + re.escape(term_lower) + r'\b',
+        re.IGNORECASE
+    )
+    if _action_metaphor.search(sentence):
+        return True
+
+    # If the indefinite article is present without a referential one,
+    # and the sentence doesn't also say "this is a <term>" or "offers a <term>",
+    # it's likely metaphorical
+    if has_indefinite and not has_referential:
+        # But check for "offers a <term>", "presents a <term>" — these could be
+        # describing what the work IS
+        _offers_pattern = re.compile(
+            r'\b(?:offers?|presents?|features?|showcases?|displays?|reveals?)\s+'
+            r'(?:a\s+)?(?:\w+\s+)?' + re.escape(term_lower) + r'\b',
+            re.IGNORECASE
+        )
+        if _offers_pattern.search(sentence):
+            return False
+        return True
+
+    return False
 
 
 def _medium_compatible_with_term(medium: str, term: str) -> bool:
@@ -534,16 +669,24 @@ def _sentence_has_form_claim(sentence: str) -> Optional[str]:
     """Check if a sentence contains a physical form or placement claim.
 
     Returns the offending term/phrase if found, or None if clean.
+    [LOCAL-385] Now checks metaphor exemption — returns None if the term is
+    used metaphorically.
     """
     # Check spatial phrases first (multi-word, higher signal)
     m = _FORM_SPATIAL_RE.search(sentence)
     if m:
-        return m.group(1)
+        phrase = m.group(1)
+        # Spatial phrases are never metaphorical — they're always instructions
+        return phrase
 
     # Check single-word form terms
     m = _FORM_SINGLE_TERM_RE.search(sentence)
     if m:
-        return m.group(1)
+        term = m.group(1)
+        # [LOCAL-385] Exempt metaphorical uses
+        if _is_metaphorical_use(sentence, term):
+            return None
+        return term
 
     return None
 
@@ -552,17 +695,22 @@ def apply_form_claim_gate(
     poi_list: List[Dict],
     exhibition_checklist_result,
 ) -> Dict:
-    """[LOCAL-384] Apply the form-claim gate to all stop descriptions.
+    """[LOCAL-384/385] Apply the form-claim gate to all stop prose fields.
 
-    For each stop, scan the delivered text for physical form and placement claims.
-    Check each claim against the work's known medium. Remove sentences containing
-    unsupported or incompatible claims.
+    [LOCAL-385] Scans every field in GATED_PROSE_FIELDS (description AND
+    orientation). For each stop, scan the delivered text for physical form and
+    placement claims. Check each claim against the work's known medium. Remove
+    sentences containing unsupported or incompatible claims.
+
+    Metaphorical uses ("a visual tapestry", "creates a tapestry of colour")
+    are exempt — D304 states removing metaphor costs prose quality with no
+    truthfulness gain.
 
     This gate fires ONLY for exhibition-scoped museum tours (same scope as the
     person gate). Unscoped museum tours (e.g. Palais Lascaris) are NOT gated.
 
     Args:
-        poi_list: List of POI dicts (mutated in place — descriptions are rewritten).
+        poi_list: List of POI dicts (mutated in place — prose fields are rewritten).
         exhibition_checklist_result: ExhibitionChecklistResult with works list.
 
     Returns:
@@ -572,9 +720,10 @@ def apply_form_claim_gate(
         'claims_detected': 0,
         'claims_removed': 0,
         'claims_kept': 0,
+        'claims_metaphor_exempt': 0,
         'sentences_dropped': 0,
         'stops_affected': 0,
-        'removal_log': [],  # [{stop, term, medium, sentence}]
+        'removal_log': [],  # [{stop, field, term, medium, sentence}]
     }
 
     works = getattr(exhibition_checklist_result, 'works', None) or []
@@ -584,10 +733,6 @@ def apply_form_claim_gate(
     from generate_tour_text import match_work_for_stop
 
     for poi in poi_list:
-        desc = poi.get('description', '') or ''
-        if not desc or desc.startswith('['):
-            continue
-
         poi_name = poi.get('name', '') or ''
         stop_name = poi_name[:50]  # for logging
 
@@ -595,50 +740,70 @@ def apply_form_claim_gate(
         matched_work = match_work_for_stop(poi_name, works) if poi_name and works else None
         medium = (matched_work.get('medium') or '').strip() if matched_work else ''
 
-        # Split into sentences and check each
-        sentences = _split_sentences(desc)
-        kept = []
-        dropped_this_stop = []
+        stop_touched = False
 
-        for sentence in sentences:
-            claim_term = _sentence_has_form_claim(sentence)
-            if claim_term is None:
-                # No form claim in this sentence — keep
-                kept.append(sentence)
+        for field_key in GATED_PROSE_FIELDS:
+            text = poi.get(field_key, '') or ''
+            if not text or text.startswith('['):
                 continue
 
-            stats['claims_detected'] += 1
+            # Split into sentences and check each
+            sentences = _split_sentences(text)
+            kept = []
+            dropped_this_field = []
 
-            if medium and _medium_compatible_with_term(medium, claim_term):
-                # Medium known and compatible — keep
-                stats['claims_kept'] += 1
-                kept.append(sentence)
-            else:
-                # Medium empty/unknown OR medium incompatible — remove
-                reason = f"medium '{medium}'" if medium else "medium UNKNOWN"
-                stats['claims_removed'] += 1
-                dropped_this_stop.append(sentence)
-                stats['removal_log'].append({
-                    'stop': stop_name,
-                    'term': claim_term,
-                    'medium': medium or 'UNKNOWN',
-                    'sentence': sentence,
-                })
-                print(f"  [LOCAL-384] unsupported form claim '{claim_term}' for "
-                      f"medium '{medium or 'UNKNOWN'}' — dropping sentence")
+            for sentence in sentences:
+                claim_term = _sentence_has_form_claim(sentence)
+                if claim_term is None:
+                    # No form claim in this sentence (or metaphor exempt) — keep
+                    kept.append(sentence)
+                    continue
 
-        if dropped_this_stop:
-            # Second pass: remove fragments left by deletions
-            final_kept = []
-            for sent in kept:
-                if _is_fragment(sent):
-                    dropped_this_stop.append(sent)
-                    stats['sentences_dropped'] += 1
+                stats['claims_detected'] += 1
+
+                if medium and _medium_compatible_with_term(medium, claim_term):
+                    # Medium known and compatible — keep
+                    stats['claims_kept'] += 1
+                    kept.append(sentence)
                 else:
-                    final_kept.append(sent)
+                    # Medium empty/unknown OR medium incompatible — remove
+                    stats['claims_removed'] += 1
+                    dropped_this_field.append(sentence)
+                    stats['removal_log'].append({
+                        'stop': stop_name,
+                        'field': field_key,
+                        'term': claim_term,
+                        'medium': medium or 'UNKNOWN',
+                        'sentence': sentence,
+                    })
+                    print(f"  [LOCAL-385] field={field_key} unsupported form claim "
+                          f"'{claim_term}' for medium '{medium or 'UNKNOWN'}' — "
+                          f"dropping sentence")
 
-            stats['sentences_dropped'] += len(dropped_this_stop)
+            if dropped_this_field:
+                # Second pass: remove fragments left by deletions
+                final_kept = []
+                for sent in kept:
+                    if _is_fragment(sent):
+                        dropped_this_field.append(sent)
+                        stats['sentences_dropped'] += 1
+                    else:
+                        final_kept.append(sent)
+
+                stats['sentences_dropped'] += len(dropped_this_field)
+                stop_touched = True
+
+                new_text = ' '.join(final_kept).strip()
+
+                # [LOCAL-385] If orientation is emptied, clear rather than ship broken
+                if field_key == 'orientation' and not new_text:
+                    poi[field_key] = ''
+                    print(f"  [LOCAL-385] field=orientation stop='{stop_name[:30]}' "
+                          f"emptied after form-claim removal — omitting orientation")
+                else:
+                    poi[field_key] = new_text
+
+        if stop_touched:
             stats['stops_affected'] += 1
-            poi['description'] = ' '.join(final_kept)
 
     return stats
