@@ -11651,3 +11651,46 @@ Merging would have put that in `storied`.
 **LOCAL-379 branches off `kiro/local378-prose-grounding-r2`, not `storied`** — the
 parenthetical fix, the diagnostics and the module-scoped gate are all worth
 keeping, and re-deriving them would waste a round.
+
+## D299 — LOCAL-379 merged: the tour finally says something true about the objects
+**2026-08-10.** Merged (brings LOCAL-378 with it). Delivered MFA text, verbatim:
+
+> "Crafted by **Joan Miró** in 1971, this **illustrated book** features **40 color
+> lithographs** bound in **publisher's vellum**."
+
+Correct artist, medium, date, binding — every field from the credit line that was
+sitting parsed and unused three rounds ago. Stop 2 gives Dalí's illustrations and
+Freud's theories, correctly framed.
+
+Measured against the delivered text, not the report:
+
+| | D291 (first gen) | D298 (378) | **D299 (379)** |
+|---|---|---|---|
+| fabricated persons | Rousseau, Corbusier | none | **none** |
+| correct artists named | none | none | **Miró, Dalí, Freud, Gris** |
+| medium stated correctly | no | stop 1 only | **stops 1–2** |
+| stop count declared/actual | 3/3 | **2/3** | **3/3** |
+| words per stop | 220/102/172 | 73/67/192 | **148/198/258** |
+
+**D298's rule held and then stopped being sufficient.** Emitting the work
+identity block for all three stops was necessary — and stop 3, whose source
+`medium` is empty, still invented "vibrant glass panels" and "stained glass"
+despite a 422-char block. **Silence in a constraint reads as permission.** Where
+a fact is unknown the constraint must say so explicitly, not omit the line.
+
+**The second gap is structural, not model behaviour:** stop 1's *body* says
+"illustrated book" while its *Orientation* says "this captivating sculpture".
+Orientation is generated on a separate path that never received the block. A
+constraint applied to one generation path is not applied to the tour.
+
+**A verification lesson against LEAD itself.** My acceptance check searched for
+`Look up` and reported 0 while the tour shipped `look up and notice`. A
+case-sensitive check on prose is not a check. LOCAL-380 now requires
+case-insensitive matching, and I found this only by reading the text rather than
+trusting my own grep — the same rule D242 states for agent reports applies to
+LEAD's own tooling.
+
+**Merged with a known residual** rather than held for perfection: it is a strict
+improvement on every axis over what `storied` carried, it introduces no
+regression (378's stop-count bug is fixed), and D289 favours delivering. Residual
+dispatched as LOCAL-380.
