@@ -160,8 +160,12 @@ bool _hasActivityContext(String lowerRequest, Match modeMatch) {
 
   // Mode word is AFTER the spatial preposition -- it is in the place-name zone.
   // Only allow if preceded by by/on/via (e.g. "tour of X on horseback").
+  // [LOCAL-363 LEAD] An indefinite article may intervene ("on a scooter",
+  // "on an e-bike"). "the" is deliberately excluded: "on the boardwalk" and
+  // "on the Horse Guards Parade" are place names, which is the bug this
+  // guard exists to prevent.
   final textBefore = lowerRequest.substring(0, matchStart);
-  final byOnViaPattern = RegExp(r'\b(by|on|via)\s+$');
+  final byOnViaPattern = RegExp(r'\b(by|on|via)\s+(?:an?\s+)?$');
   if (byOnViaPattern.hasMatch(textBefore)) {
     return true;
   }
