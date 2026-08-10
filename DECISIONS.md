@@ -11357,3 +11357,28 @@ requests, and unscoped generation is verified working live.
 Michael's own concern — "verify that other tours are not broken" — is correct and
 specific, so an unscoped live regeneration must pass before the push. Suite-green
 does not substitute (D284).
+
+## D291 — The MFA exhibition tour generated, and it is about the exhibition
+**2026-08-10.** After 370 and 372, the scoped path completes end to end for the
+first time:
+
+```
+path=prose_llm, works=1
+[D1/LOCAL-372] 1 exhibition stop(s) grounded against the venue page
+Honest stop count: 1 (no venue-wide backfill — D275)
+Stop 1: Le Lézard aux plumes d'or (The Lizard with Golden Feathers)
+```
+
+Correct detail page, a real work from the show, grounded against the page it came
+from, and no venue-wide backfill. Six defects deep (D273/274/275/284/287), the
+request Michael brought in now returns his exhibition rather than Ancient Nubia.
+
+**Still one stop, not three.** LOCAL-372's nav-filter fix was validated on the
+committed fixture, where all three works fall inside the extraction window. The
+live page still yields one — so fixture and live fetch differ in a way that
+matters, and the fix was proven against the wrong artifact. That is LOCAL-373,
+and it is a reminder that a committed fixture is a snapshot, not the source.
+
+**Not shown to Michael yet.** Under his standard — only review fully generated
+tours — a one-stop tour of a three-work page is not finished work. Showing it
+would repeat the mistake he corrected earlier today.
