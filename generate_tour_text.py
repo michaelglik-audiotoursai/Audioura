@@ -908,12 +908,19 @@ def _build_closing_recap(poi_list, ranked_facts_for_recap, api_key=None):
         return 2 * 6371.0 * asin(sqrt(h))
 
     # --- Count delivered stops (only those with real descriptions) ---
+    # [LOCAL-379] Defect 3 fix: n_delivered (the count stated in "That's N stops")
+    # must equal the number of Stop N: headings actually present in the tour.
+    # A stop with a heading and thin content (e.g. post-grounding-gate) is still
+    # a delivered stop. Only truly failed/empty stops are excluded.
     delivered = []
+    content_rich = []  # Stops with enough content for recap highlight extraction
     for p in poi_list:
         desc = p.get('description', '')
         if (desc and not desc.startswith('[') and
-            'GENERATION_FAILED' not in desc and len(desc.split()) >= 30):
+            'GENERATION_FAILED' not in desc):
             delivered.append(p)
+            if len(desc.split()) >= 30:
+                content_rich.append(p)
 
     n_delivered = len(delivered)
     if n_delivered < 2:
@@ -3777,6 +3784,51 @@ def build_provenance_block(credit_line):
         f"  {credit_line.strip()}\n"
         f"{PROVENANCE_PROHIBITION}\n"
     )
+
+
+def build_work_identity_block(matched_work):
+    """[LOCAL-379] Build a WORK IDENTITY block from any available fields on matched_work.
+
+    Emits whenever at least ONE of artist, date, medium, publisher, or credit_line
+    is available. If medium is empty, explicitly prohibits spatial/medium claims.
+    Returns '' only when matched_work is None or has no usable fields at all.
+    """
+    if not matched_work:
+        return ''
+
+    artist = (matched_work.get('artist') or '').strip()
+    date = (matched_work.get('date') or '').strip()
+    medium = (matched_work.get('medium') or '').strip()
+    publisher = (matched_work.get('publisher') or '').strip()
+    credit_line = (matched_work.get('credit_line') or '').strip()
+
+    # Bail if nothing useful is available
+    if not any([artist, date, medium, publisher, credit_line]):
+        return ''
+
+    lines = ["\nWORK IDENTITY (LOCAL-379 — grounded facts from exhibition checklist):"]
+
+    if artist:
+        lines.append(f"  Artist: {artist}")
+    if date:
+        lines.append(f"  Date: {date}")
+    if medium:
+        lines.append(f"  Medium: {medium}")
+    else:
+        lines.append("  Medium: UNKNOWN — do NOT describe physical form, placement, "
+                     "or spatial relationship. Do NOT say 'painting', 'sculpture', "
+                     "'ceiling', 'installation', 'mural', or assert any medium.")
+    if publisher:
+        lines.append(f"  Publisher: {publisher}")
+    if credit_line:
+        lines.append(f"  Credit line: {credit_line}")
+
+    lines.append("")  # trailing newline separator
+    lines.append("You MUST name the artist in your description. If a collaborator or "
+                 "author is given, name them too. These are grounded facts — use them.")
+    lines.append("")
+
+    return '\n'.join(lines)
 
 def r4_scope_cap(exhibition_scope, poi_list_len, total_stops):
     """
@@ -8424,23 +8476,18 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 _credit_line_for_stop = (_matched_work.get('credit_line') or '').strip()
         description_prompt += build_provenance_block(_credit_line_for_stop)
 
-        # [LOCAL-378] MEDIUM CONSTRAINT: If the matched work has a medium field,
-        # inject it as a hard binding so the model cannot hallucinate "sculpture"
-        # when the work is actually an illustrated book, or "painting" when it is a lithograph.
+        # [LOCAL-379] WORK IDENTITY BLOCK: Inject artist, date, medium, publisher
+        # whenever ANY field is available — not only when medium is non-empty.
+        # This fixes Defect 1 (block suppressed for thin/empty medium) and
+        # Defect 2 (correct artist never named in prose).
         _matched_medium = ''
         if _matched_work and _matched_work.get('medium'):
             _matched_medium = _matched_work['medium'].strip()
-        _provenance_block_chars = len(build_provenance_block(_credit_line_for_stop))
-        print(f"  [LOCAL-378] stop='{poi_name}' matched_work={_matched_work is not None} "
-              f"medium='{_matched_medium}' provenance_block_chars={_provenance_block_chars}")
-        if _matched_medium:
-            description_prompt += (
-                f"\nMEDIUM CONSTRAINT (LOCAL-378 — hard binding, DO NOT CONTRADICT):\n"
-                f"This work's medium is: {_matched_medium}\n"
-                f"You MUST refer to this work using its correct medium. Do NOT call it a "
-                f"'painting' if it is a book, or a 'sculpture' if it is a lithograph.\n"
-                f"Use the medium exactly as stated above when describing the work's physical form.\n"
-            )
+        _work_identity_block = build_work_identity_block(_matched_work)
+        _provenance_block_chars = len(_work_identity_block)
+        print(f"  [LOCAL-379] stop='{poi_name}' matched_work={_matched_work is not None} "
+              f"medium='{_matched_medium}' work_identity_chars={_provenance_block_chars}")
+        description_prompt += _work_identity_block
 
         # [§4] Story element injection — per-work facts from story_elements
         # [LOCAL-29] Tightened matching: use [:10] prefix AND require >= 60% word overlap
@@ -8683,10 +8730,14 @@ NOTE: "The Biblical Message" (Message Biblique) is the name of the COMPLETE CYCL
         # [LOCAL-44] Length scales with substance: short stops stay short, rich stops may run longer.
         # [LOCAL-98] Catalogue metadata (period/material) IS substance — a stop with these
         # must never get the 120-word "be SHORT" instruction that competes with binding.
+        # [LOCAL-379] A matched work with a WORK IDENTITY block IS substance — the model
+        # has artist, date, medium to write about. Do not constrain to 120 words.
         _confirmed_count = len(fact_sheet.get('confirmed_facts', [])) if fact_sheet else 0
         _had_corpus = fact_sheet.get('had_corpus_context', False) if fact_sheet else False
         _has_catalogue_metadata = bool(_c51_period or _c51_material)
-        _specificity_short = (_confirmed_count < 2 and not _had_corpus and not _has_catalogue_metadata)
+        _has_work_identity = bool(_work_identity_block)
+        _specificity_short = (_confirmed_count < 2 and not _had_corpus
+                              and not _has_catalogue_metadata and not _has_work_identity)
 
         if _specificity_short:
             _word_target = "120"
