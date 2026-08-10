@@ -999,7 +999,6 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             except Exception as scoring_err:
                 # Scoring failure MUST NOT block delivery (LOCAL-306 rule)
                 print(f"[SCORING] Non-fatal error during in-flight scoring: {scoring_err}")
-                import traceback
                 traceback.print_exc()
 
         # [LOCAL-307] Quality guardrails: diagnose shortfalls, decide retry or message.
@@ -1045,7 +1044,6 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             except Exception as guardrail_err:
                 # Guardrail failure MUST NOT block delivery
                 print(f"[GUARDRAILS] Non-fatal error: {guardrail_err}")
-                import traceback
                 traceback.print_exc()
 
         # [LOCAL-312] Update per-user quality index (private, for review solicitation).
