@@ -11152,3 +11152,54 @@ tested without it.
 evidence for a retrieval pipeline. From now on a change to the exhibition path
 is reviewed against a live end-to-end generation and the delivered stop
 headings, not against its suites.
+
+## D285 — The mirror pattern recurs even when the task file forbids it by name
+**2026-08-10.** LOCAL-369's task file carried the D277 anti-mirror section
+verbatim: no inline re-implementation, no `inspect.getsource` string assertions.
+The submission contained one anyway:
+
+    assert 'Do NOT infer or assert' in inspect.getsource(generate_tour_text)
+
+That passes for any tree where the phrase appears anywhere — in a comment, in
+dead code, or in a block that is never emitted.
+
+**The instruction was not the fix, and this is now the second demonstration.**
+The pattern recurs because the thing under test is genuinely unreachable: a
+prompt fragment built inline inside a 7,900-line function. An agent told "no
+mirrors" and handed unreachable code will produce a mirror anyway, because the
+alternative is reporting that it could not test its work.
+
+So the standing remedy stands and should be applied first, not after a bounce:
+**lift the logic to module scope so it can be called.** `build_provenance_block()`
+and `PROVENANCE_PROHIBITION` now exist for exactly that reason, joining
+`f3_name_is_corrupt`, `missing_stop_headers` and `match_credit_line`. Making the
+prohibition a module constant also stops the test and the prompt drifting apart,
+which a source-grep test cannot detect by construction.
+
+## D286 — A 10-character prefix nearly credited gifts to the wrong objects
+**2026-08-10.** LOCAL-369 matched a museum credit line to a stop with
+
+    poi_norm[:10] in title_norm or title_norm[:10] in poi_norm
+
+the same loose rule LOCAL-29 had already replaced elsewhere, whose comment reads
+"to prevent cross-contamination between adjacent entries with similar short
+prefixes". Measured against real title pairs, every one collides:
+
+    'The Lizard with Golden Feathers' / 'The Lizard King'
+    'Adoration of the Shepherds'      / 'Adoration of the Magi'
+    'Au Soleil du Plafond'            / 'Au Soleil Couchant'
+
+**Severity is what matters here, not frequency.** Elsewhere a mis-matched fact
+is noise. In a provenance feature it states that a named, sometimes living
+person donated an object they did not donate — a false claim about a real
+individual, delivered in the confident register of narration, which is precisely
+the harm D283's tiering exists to prevent. Adoration of the Shepherds and
+Adoration of the Magi hang in the same museums.
+
+Now requires exact normalized equality, or mutual prefix containment **and**
+>=60% word overlap. Restoring the loose rule turns 3 tests red.
+
+**Generalisation:** match strictness should scale with the consequence of a false
+positive, not be uniform across the codebase. A fact attached to the wrong stop
+is a quality bug; an attribution attached to the wrong person is a different
+category, and the same threshold should not serve both.
