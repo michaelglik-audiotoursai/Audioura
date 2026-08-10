@@ -11382,3 +11382,81 @@ and it is a reminder that a committed fixture is a snapshot, not the source.
 **Not shown to Michael yet.** Under his standard — only review fully generated
 tours — a one-stop tour of a three-work page is not finished work. Showing it
 would repeat the mistake he corrected earlier today.
+
+## D292 — LOCAL-373 merged: the live page now yields all three works
+**2026-08-10.** The last retrieval gap in the MFA chain is closed. Live run,
+`Picasso, Miró, Dalí: Unbound exhibition at MFA, Boston, MA`, 8 requested:
+
+```
+[LOCAL-364] Result: path=prose_llm, works=3, title='Picasso, Miró, Dalí: Unbound'
+[D1/LOCAL-372] 3 exhibition stop(s) grounded against the venue page
+[LOCAL-370] R4 replenishment SUPPRESSED (exhibition-scoped request)
+Honest stop count: 3 (no venue-wide backfill — D275)
+Stop 1: Le Lézard aux plumes d'or (The Lizard with Golden Feathers)
+Stop 2: Moses and Monotheism
+Stop 3: Au Soleil du Plafond
+```
+
+Three root causes, all in `exhibition_checklist._fetch_page` /
+`_filter_nav_from_page_text`:
+
+1. **`<p[^>]*>` matched `<picture>`, `<pre>`, `<path>`** — 'icture' is all
+   `[^>]`, so the match ran from `<picture>` to the next `</p>`, manufacturing
+   the concatenated `'Picasso, Miró, Dalí: UnboundThrough January 24, 2027'`
+   title seen live. Now `<p(?:\s[^>]*)?>`.
+2. **No deduplication** — responsive sites emit nav twice (mobile + desktop);
+   155 `<li>` items were 83 unique. The duplicates crowded real content out of
+   the 5000-char window.
+3. **Footers were unbounded** — 2195 chars, 44% of the window, of "Getting
+   Here"/"Dining"/"Collections Search" that `_NAV_LINE_PATTERNS` can never
+   fully enumerate. Now bounded by street-address/© detection.
+
+The window went 5088 chars (truncated, 44% noise) → 2183 chars of clean content.
+
+**The generalisable finding is #3's shape.** Two rounds were spent extending a
+pattern list to catch nav lines one form at a time. The fix that worked
+recognised that footers have a *boundary* — everything after an address or a
+copyright line is site chrome — and cut there. When a filter's exception list
+keeps growing, look for the structural boundary instead of the next pattern.
+
+**Also recorded: LOCAL-372's fix was validated against the wrong artifact.** It
+was proven on the committed fixture, where all three works fall inside the
+window; the live page still yielded one. A committed fixture is a snapshot, not
+the source — when a fix is about *retrieval*, fixture-green is not evidence.
+
+**LEAD verification (D284):** MFA 1 → 3 stops live; unscoped Palais Lascaris
+4/4 stops unchanged; full suite vs storied baseline 12 failed/2130 passed vs
+14 failed/2112 passed — fewer failures, +18 passes, residual failures all in
+`test_local294_sparql_quality`, untouched by this diff.
+
+## D293 — D277 recurs a sixth time, in a new disguise: the inlined regex
+**2026-08-10.** The D242 revert check caught 3 of LOCAL-373's 16 tests passing
+against a **reverted** production file. They inline a copy of the regex into the
+test body rather than calling `_fetch_page`:
+
+```python
+for p_match in re.finditer(r'<p(?:\s[^>]*)?>(.+?)</p>', html, re.DOTALL):
+```
+
+That asserts a string literal in the test file behaves correctly. It is
+uncoupled from production entirely. One of them,
+`test_picture_false_match_was_the_old_bug`, asserts the OLD regex is buggy — it
+is permanently green by construction and can never detect a regression.
+
+**This is the fifth distinct disguise** (helper mirrors, `inspect.getsource`
+string assertions, re-implemented predicates, module-scope copies, now inlined
+regexes). The prohibition-by-name in task files has now failed six times. What
+has never failed is the structural remedy: make the logic reachable at module
+scope and require the revert check to turn it red.
+
+**So the acceptance criterion changes.** From now on a task file asserting a fix
+must state the *expected red count on revert*, and LEAD runs the revert itself
+rather than reading the claim. LOCAL-373's submission truthfully reported "8 of
+16 fail on revert" — the number was right and the number was the problem, and it
+took running it to see that 8 green was the finding, not the reassurance.
+
+**Merged anyway, deliberately.** The production code is correct — LEAD verified
+the regex fix by effect through `_fetch_page`, and the live run is the real
+evidence. Mirrors are future-regression risk, not present breakage, and holding
+a verified fix hostage to test debt would stall the chain. Debt tracked as
+LOCAL-374.
