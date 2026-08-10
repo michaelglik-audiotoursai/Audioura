@@ -10317,6 +10317,40 @@ REWRITE RULES (all mandatory):
             print(f"\n  [LOCAL-378] Prose entity grounding gate SKIPPED "
                   f"(no exhibition scope — unscoped museum tours are not gated)")
 
+    # -------- [LOCAL-384] PHASE 5.159: Form-claim gate --------
+    # The model repeatedly infers physical form from titles (e.g. "Au Soleil du
+    # Plafond" → "ceiling mural"). Five prompt-level rounds failed. This gate
+    # enforces at the output level: scan delivered text for physical form and
+    # placement claims, check against the known medium, remove unsupported claims.
+    # Same scope as the person gate: exhibition-scoped museum tours only.
+    if (tour_category == 'museum' and _exhibition_checklist_result
+            and getattr(_exhibition_checklist_result, 'works', None)):
+        print(f"\n  [LOCAL-384] PHASE 5.159: Form-claim gate...")
+        try:
+            from prose_entity_grounding_gate import apply_form_claim_gate
+            _fcg_stats = apply_form_claim_gate(
+                poi_list,
+                _exhibition_checklist_result,
+            )
+            print(f"  [LOCAL-384] Form-claim gate summary:")
+            print(f"    Claims detected: {_fcg_stats['claims_detected']}")
+            print(f"    Claims kept (compatible): {_fcg_stats['claims_kept']}")
+            print(f"    Claims removed: {_fcg_stats['claims_removed']}")
+            print(f"    Sentences dropped: {_fcg_stats['sentences_dropped']}")
+            print(f"    Stops affected: {_fcg_stats['stops_affected']}")
+            if _fcg_stats['removal_log']:
+                for _rl in _fcg_stats['removal_log']:
+                    print(f"    [LOCAL-384] stop='{_rl['stop']}' term='{_rl['term']}' "
+                          f"medium='{_rl['medium']}' dropped: \"{_rl['sentence'][:80]}\"")
+        except ImportError as _fcg_err:
+            print(f"  [LOCAL-384] WARNING: form-claim gate not importable — gate skipped ({_fcg_err})")
+        except Exception as _fcg_err:
+            print(f"  [LOCAL-384] ERROR: form-claim gate failed (non-fatal): {_fcg_err}")
+    else:
+        if tour_category == 'museum':
+            print(f"\n  [LOCAL-384] Form-claim gate SKIPPED "
+                  f"(no exhibition scope — unscoped museum tours are not gated)")
+
     # -------- [LOCAL-229] PHASE 5.16: CONTRADICTED claim block --------
     # D100 (Michael, 2026-08-04): "We should not publish if we are reasonably sure
     # that the data is incorrect." If any sentence group contains a CONTRADICTED

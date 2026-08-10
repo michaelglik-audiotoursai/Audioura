@@ -426,3 +426,219 @@ def apply_prose_entity_grounding_gate(
             })
 
     return stats
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# [LOCAL-384] FORM-CLAIM GATE
+# ═══════════════════════════════════════════════════════════════════════════════
+# The model repeatedly infers physical form from titles (e.g. "Au Soleil du
+# Plafond" → "ceiling mural"). Five prompt-level rounds failed to stop it.
+# This gate enforces at the output level: scan delivered text for physical
+# form and placement claims, check against the known medium, remove sentences
+# containing unsupported claims.
+#
+# Rules:
+#   - medium KNOWN and INCOMPATIBLE → remove the sentence
+#   - medium EMPTY/UNKNOWN → any form claim is unsupported → remove
+#   - medium KNOWN and COMPATIBLE → keep (e.g. a real fresco in a palace)
+#
+# This gate runs alongside the person gate, AFTER all generation and repair.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Architectural surfaces — claims about WHERE or WHAT the work is physically
+_FORM_SURFACE_TERMS = frozenset([
+    'ceiling', 'wall', 'floor', 'vault', 'dome', 'canopy',
+])
+
+# Object-type claims — assertions about WHAT the work IS
+_FORM_OBJECT_TERMS = frozenset([
+    'mural', 'painting', 'sculpture', 'installation', 'panel', 'glass',
+    'mosaic', 'fresco', 'tapestry', 'stained glass',
+])
+
+# Spatial instruction phrases — telling the visitor WHERE to look/stand
+_FORM_SPATIAL_PHRASES = [
+    'look up', 'gaze up', 'above you', 'stand beneath', 'overhead',
+    'directly under', 'positioned above', 'looms above', 'rises above',
+    'stretches across the ceiling', 'adorns the ceiling', 'painted on the ceiling',
+    'mounted on the wall', 'hangs on the wall', 'affixed to the wall',
+]
+
+# Combined single-word terms for quick word-boundary regex scan
+_ALL_FORM_SINGLE_TERMS = _FORM_SURFACE_TERMS | _FORM_OBJECT_TERMS
+
+# Build regex patterns (case-insensitive)
+_FORM_SINGLE_TERM_RE = re.compile(
+    r'\b(' + '|'.join(re.escape(t) for t in sorted(_ALL_FORM_SINGLE_TERMS, key=len, reverse=True)) + r')\b',
+    re.IGNORECASE
+)
+
+_FORM_SPATIAL_RE = re.compile(
+    r'(' + '|'.join(re.escape(p) for p in sorted(_FORM_SPATIAL_PHRASES, key=len, reverse=True)) + r')',
+    re.IGNORECASE
+)
+
+
+def _medium_compatible_with_term(medium: str, term: str) -> bool:
+    """Check if a form/surface/spatial term is compatible with the known medium.
+
+    A term is compatible if the medium itself references that term or a related
+    concept.  E.g. medium="fresco" is compatible with "ceiling", "wall", "mural".
+    Medium="oil on canvas" is compatible with "painting" but not "ceiling".
+    Medium="ceiling fresco" is compatible with everything spatial.
+
+    Returns True if the claim is legitimate given the medium.
+    """
+    if not medium:
+        return False  # empty medium → nothing is compatible
+
+    medium_lower = medium.lower()
+    term_lower = term.lower()
+
+    # Direct containment: if the medium literally says "ceiling", then "ceiling" is fine
+    if term_lower in medium_lower:
+        return True
+
+    # Semantic compatibility groups: if medium mentions any member of the group,
+    # all group members are compatible
+    _COMPAT_GROUPS = [
+        # Architectural/fresco group — if medium is a fresco or architectural element,
+        # spatial claims are legitimate
+        {'fresco', 'ceiling', 'wall', 'mural', 'vault', 'dome', 'canopy',
+         'look up', 'gaze up', 'above you', 'stand beneath', 'overhead',
+         'directly under', 'positioned above', 'looms above', 'rises above',
+         'stretches across the ceiling', 'adorns the ceiling', 'painted on the ceiling'},
+        # Painting group
+        {'painting', 'oil', 'canvas', 'watercolor', 'acrylic', 'tempera', 'gouache'},
+        # Sculpture group
+        {'sculpture', 'bronze', 'marble', 'stone', 'carving', 'cast', 'statue'},
+        # Glass group
+        {'glass', 'stained glass', 'panel', 'window', 'mosaic'},
+        # Wall-mounted group
+        {'tapestry', 'mounted on the wall', 'hangs on the wall', 'affixed to the wall', 'wall'},
+        # Installation group
+        {'installation', 'mixed media', 'multimedia', 'video', 'light'},
+    ]
+
+    for group in _COMPAT_GROUPS:
+        # If medium references any member of this group AND the term is in the group
+        medium_in_group = any(member in medium_lower for member in group)
+        term_in_group = term_lower in group
+        if medium_in_group and term_in_group:
+            return True
+
+    return False
+
+
+def _sentence_has_form_claim(sentence: str) -> Optional[str]:
+    """Check if a sentence contains a physical form or placement claim.
+
+    Returns the offending term/phrase if found, or None if clean.
+    """
+    # Check spatial phrases first (multi-word, higher signal)
+    m = _FORM_SPATIAL_RE.search(sentence)
+    if m:
+        return m.group(1)
+
+    # Check single-word form terms
+    m = _FORM_SINGLE_TERM_RE.search(sentence)
+    if m:
+        return m.group(1)
+
+    return None
+
+
+def apply_form_claim_gate(
+    poi_list: List[Dict],
+    exhibition_checklist_result,
+) -> Dict:
+    """[LOCAL-384] Apply the form-claim gate to all stop descriptions.
+
+    For each stop, scan the delivered text for physical form and placement claims.
+    Check each claim against the work's known medium. Remove sentences containing
+    unsupported or incompatible claims.
+
+    This gate fires ONLY for exhibition-scoped museum tours (same scope as the
+    person gate). Unscoped museum tours (e.g. Palais Lascaris) are NOT gated.
+
+    Args:
+        poi_list: List of POI dicts (mutated in place — descriptions are rewritten).
+        exhibition_checklist_result: ExhibitionChecklistResult with works list.
+
+    Returns:
+        Stats dict with counts of detections, drops, etc.
+    """
+    stats = {
+        'claims_detected': 0,
+        'claims_removed': 0,
+        'claims_kept': 0,
+        'sentences_dropped': 0,
+        'stops_affected': 0,
+        'removal_log': [],  # [{stop, term, medium, sentence}]
+    }
+
+    works = getattr(exhibition_checklist_result, 'works', None) or []
+
+    # Build a map of stop_name → medium from checklist works
+    # We need to match each POI to its work to get the medium
+    from generate_tour_text import match_work_for_stop
+
+    for poi in poi_list:
+        desc = poi.get('description', '') or ''
+        if not desc or desc.startswith('['):
+            continue
+
+        poi_name = poi.get('name', '') or ''
+        stop_name = poi_name[:50]  # for logging
+
+        # Find the matched work for this stop to get its medium
+        matched_work = match_work_for_stop(poi_name, works) if poi_name and works else None
+        medium = (matched_work.get('medium') or '').strip() if matched_work else ''
+
+        # Split into sentences and check each
+        sentences = _split_sentences(desc)
+        kept = []
+        dropped_this_stop = []
+
+        for sentence in sentences:
+            claim_term = _sentence_has_form_claim(sentence)
+            if claim_term is None:
+                # No form claim in this sentence — keep
+                kept.append(sentence)
+                continue
+
+            stats['claims_detected'] += 1
+
+            if medium and _medium_compatible_with_term(medium, claim_term):
+                # Medium known and compatible — keep
+                stats['claims_kept'] += 1
+                kept.append(sentence)
+            else:
+                # Medium empty/unknown OR medium incompatible — remove
+                reason = f"medium '{medium}'" if medium else "medium UNKNOWN"
+                stats['claims_removed'] += 1
+                dropped_this_stop.append(sentence)
+                stats['removal_log'].append({
+                    'stop': stop_name,
+                    'term': claim_term,
+                    'medium': medium or 'UNKNOWN',
+                    'sentence': sentence,
+                })
+                print(f"  [LOCAL-384] unsupported form claim '{claim_term}' for "
+                      f"medium '{medium or 'UNKNOWN'}' — dropping sentence")
+
+        if dropped_this_stop:
+            # Second pass: remove fragments left by deletions
+            final_kept = []
+            for sent in kept:
+                if _is_fragment(sent):
+                    dropped_this_stop.append(sent)
+                    stats['sentences_dropped'] += 1
+                else:
+                    final_kept.append(sent)
+
+            stats['sentences_dropped'] += len(dropped_this_stop)
+            stats['stops_affected'] += 1
+            poi['description'] = ' '.join(final_kept)
+
+    return stats
