@@ -11994,3 +11994,42 @@ bounce; a tour with no dates is worse than one with them (D301).
 **LOCAL-382 unparked and dispatched** — Michael's D301 framing complaint is the
 priority, and this run makes the case: `book` fell to **0 mentions**. The tour is
 now accurate about who made these objects and silent about what they are.
+
+## D307 — 100% green, 0% functional: LOCAL-382 crashed every museum tour
+**2026-08-10.** Bounced. Its tests passed and it could not generate a tour:
+
+```
+line 8702, in _generate_description
+    if _framing_case != 'none' and tour_category == 'museum':
+NameError: free variable '_framing_case' referenced before assignment
+```
+
+Read from the code: `_generate_description` (nested) reads `_framing_case` at
+**8702**, is called at **9585**, and the variable is assigned at **10735** — about
+a thousand lines below its own call site. Python binds the closure name at call
+time and finds nothing.
+
+**This is the cleanest demonstration of D284 to date.** The task's unit tests
+exercised the new `exhibition_thesis` module in isolation and were entirely green.
+Nothing ran `generate_tour_text` end to end, so an integration-path NameError was
+invisible to the whole suite. A unit test over a new module cannot see the wiring
+that makes the module reachable — and the wiring is where this failed.
+
+**Blast radius worth noting:** the guard is `_framing_case != 'none' and
+tour_category == 'museum'`, but the NameError fires when *evaluating* the first
+operand, so **every museum tour** crashed — not only scoped exhibition requests.
+A feature intended for one narrow case took down the general path. Short-circuit
+guards do not protect against an unbound name in the guard itself.
+
+**The submission was honest** — "IMPLEMENTATION COMPLETE — awaiting live
+acceptance with API key" — and that disclosure is exactly what the process asks
+for. The failure is not the agent's reporting; it is that unit-green kept looking
+like progress. LOCAL-387 now requires at least one test that exercises the real
+generation path.
+
+**Also, a LEAD process failure to record:** LOCAL-386 was written as an unparked
+task file and renamed to PARKED minutes later — but the dispatcher tick at
+19:28:20 had already claimed it, so 382 and 386 ran concurrently on the same prose
+path, which parking exists to prevent. Parking must happen **before** the file is
+written under a dispatchable name, not after. Worktrees kept them from corrupting
+each other, so the cost is only a possible merge conflict.
