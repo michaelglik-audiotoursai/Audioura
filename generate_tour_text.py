@@ -3449,6 +3449,50 @@ def _check_type_prose_contradiction(poi_list: list) -> list:
     return warnings
 
 
+# [LOCAL-361] F3 name guard and the stop-heading invariant live at module scope so
+# they can be tested directly. Testing a copy of this logic is not evidence — the
+# original submission's 25 cases all passed against a reverted generate_tour_text.py.
+
+# GPT injections typically open with one of these; real artwork titles do not.
+_F3_INJECTION_OPENERS = re.compile(r'^(This|Here|The following|In this|Welcome to)\s', re.IGNORECASE)
+# A sentence-ending mark followed by a lowercase word is running prose, not a title.
+# Real titles capitalize after punctuation: "What Are We? Where Are We Going?"
+_F3_SENTENCE_SHAPE = re.compile(r'[.!?;]\s+[a-z]')
+_F3_MAX_TITLE_WORDS = 15
+
+
+def f3_name_is_corrupt(poi_name, verified=True):
+    """
+    True when `poi_name` looks like GPT injected prose into the name field.
+
+    Punctuation alone is NOT corruption (D274) — "Whaam!", "No. 14",
+    "St. Jerome in His Study" and Gauguin's "Where Do We Come From? What Are We?
+    Where Are We Going?" are all real titles that the old `any(c in name for c in
+    '.!?;')` check deleted.
+
+    D1v2-verified names are exempt from the shape heuristics: the corpus already
+    vouched for them. The length ceiling still applies to everything, since an
+    over-long name breaks TTS and rendering regardless of provenance.
+    """
+    if len(poi_name.split()) > _F3_MAX_TITLE_WORDS:
+        return True
+    if verified:
+        return False
+    return bool(_F3_SENTENCE_SHAPE.search(poi_name) or _F3_INJECTION_OPENERS.match(poi_name))
+
+
+def missing_stop_headers(complete_tour, rendered_headers):
+    """
+    Return the rendered stop headers absent from the assembled tour.
+
+    Checks survival of the headers actually emitted rather than counting
+    `^Stop \\d+:` lines. Counting is wrong in two directions: a description body
+    whose line opens "Stop 3: ..." inflates the count (D2 only rewrites those in
+    storied mode), and a count can match while the wrong header went missing.
+    """
+    return [h for h in rendered_headers if h not in complete_tour]
+
+
 def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None):
     """
     Generate audio tour text using OpenAI API with geo coordinates.
@@ -10594,6 +10638,9 @@ RULES:
         print(f"  [LOCAL-292] ✗ ALL stops failed generation — cannot deliver tour")
         return None, None, (None, None)
 
+    # [LOCAL-361] Track actually-rendered headers for D2 and heading-count invariant
+    _rendered_headers = []
+
     # Add each POI with its description and directions
     for i, poi in enumerate(poi_list):
         stop_num = i + 1   # always sequential; ignore whatever AI emitted
@@ -10637,7 +10684,13 @@ RULES:
             if year:
                 poi_header += f", {year}"
         # Also assert the name itself is a short noun phrase (no sentences/descriptions)
-        if len(poi_name.split()) > 15 or any(c in poi_name for c in '.!?;'):
+        # [LOCAL-361] Refined heuristic: a CORRUPT name is one where GPT injected a
+        # full sentence (has sentence-ending punctuation followed by a space and a
+        # lowercase word, e.g. ". the"). Real artwork titles may contain ?, !, ., ;
+        # (e.g. "Whaam!", "No. 14", "Where Do We Come From? What Are We?").
+        # D1v2-verified titles are exempt — the corpus already vouched for them.
+        _f3_is_verified = poi.get('verified', True)  # True or absent = verified (D1v2 default)
+        if f3_name_is_corrupt(poi_name, _f3_is_verified):
             print(f"  [F3] ⚠️ NAME TOO LONG/CORRUPT at stop {stop_num}: '{poi_name[:80]}'")
             # Truncate to first 12 words if corrupted
             _clean_name = ' '.join(poi_name.split()[:12]).rstrip('.,;:!?')
@@ -10647,6 +10700,9 @@ RULES:
             if year:
                 poi_header += f", {year}"
         
+        # [LOCAL-361] Record the actual rendered header for D2 truth set
+        _rendered_headers.append(poi_header)
+
         # Start the POI content with all extracted information
         poi_content = poi_header + "\n\n"
         
@@ -10884,15 +10940,8 @@ RULES:
     # [D2] Strip GPT self-references to "Stop N" in description bodies
     if _storied_mode:
         import re as _d2_re
-        # Build set of REAL header lines (we know exactly which lines are headers)
-        _real_headers = set()
-        for i, poi in enumerate(poi_list):
-            _rh = f"Stop {i + 1}: {poi['name']}"
-            if poi['artist'] and poi['artist'].lower() != "unknown artist":
-                _rh += f" by {poi['artist']}"
-            if poi['year']:
-                _rh += f", {poi['year']}"
-            _real_headers.add(_rh)
+        # Build set of REAL header lines from actually-rendered headers [LOCAL-361]
+        _real_headers = set(_rendered_headers)
         
         _d2_lines = complete_tour.split('\n')
         _d2_cleaned = []
@@ -10910,6 +10959,20 @@ RULES:
                 # Replace self-referential "Stop N" with context-appropriate text
                 _d2_cleaned.append(_d2_re.sub(r'\bStop\s+\d+\b', 'this work', _line))
         complete_tour = '\n'.join(_d2_cleaned)
+
+    # [LOCAL-361] HARD INVARIANT: rendered heading count MUST equal stop count.
+    # A mismatch means a stop silently vanished — fail loudly at generation time.
+    _lost_headers = missing_stop_headers(complete_tour, _rendered_headers)
+    if _lost_headers:
+        print(f"  [LOCAL-361] ✗ STOP HEADING LOST: {len(_lost_headers)} of "
+              f"{len(_rendered_headers)} rendered headers absent from the tour")
+        for _lh in _lost_headers:
+            print(f"    missing: {_lh}")
+        raise ValueError(
+            f"[LOCAL-361] {len(_lost_headers)} of {len(poi_list)} stop headings "
+            f"vanished after rendering: {_lost_headers}. This is a generation bug "
+            f"— refusing to deliver a short tour."
+        )
 
     # -------- [S27] Storied: post-assembly de-repetition check --------
     if _storied_mode:
