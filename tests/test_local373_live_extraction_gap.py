@@ -15,8 +15,8 @@ and _filter_nav_from_page_text. Three root causes fixed:
    Fix: detect footer boundary (street address / copyright line) and stop.
 """
 import os
-import re
 import sys
+from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -25,54 +25,110 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from exhibition_checklist import _filter_nav_from_page_text, _fetch_page
 
 
+def _mock_fetch(html):
+    """Helper: call _fetch_page with mocked requests.get returning the given HTML."""
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.text = html
+    with patch('exhibition_checklist.requests.get', return_value=mock_resp):
+        text, links = _fetch_page('https://example.com/test')
+    return text, links
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Fix 1: <p> regex no longer matches <picture>/<pre>/<path>
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 class TestParagraphRegexPictureExclusion:
-    """<p> extraction must not match <picture>, <pre>, <path> etc."""
+    """<p> extraction must not match <picture>, <pre>, <path> etc.
+
+    All tests drive the real _fetch_page through mocked requests.get.
+    The old regex <p[^>]*> matched <picture> (since 'icture' chars are [^>]),
+    causing it to span from <picture> to the nearest </p>, concatenating
+    everything in between. These tests detect that concatenation.
+    """
 
     def test_picture_tag_not_matched_as_paragraph(self):
-        """<picture>.....</p> must NOT produce a false paragraph."""
+        """<picture> followed by a <p> must not concatenate their text content.
+
+        The old regex matched <picture> and spanned to </p>, concatenating
+        any text between the two elements into the paragraph content.
+        """
+        # Text "Exhibition Card Label" sits between </picture> and <p> — old
+        # regex would concatenate it with the paragraph text.
         html = (
             '<picture><source srcset="img.jpg"><img alt="test"></picture>'
-            '<p class="info">Picasso, Miró: UnboundThrough Jan 2027</p>'
+            'Exhibition Card Label'
+            '<p class="info">Picasso, Miró: Unbound — Through Jan 2027</p>'
         )
-        # Use the same regex as _fetch_page (fixed version)
-        paragraphs = []
-        for p_match in re.finditer(r'<p(?:\s[^>]*)?>(.+?)</p>', html, re.DOTALL):
-            clean = re.sub(r'<[^>]+>', '', p_match.group(1)).strip()
-            if len(clean) > 5:
-                paragraphs.append(clean)
+        text, _ = _mock_fetch(html)
 
-        # Only the real <p> should match
-        assert len(paragraphs) == 1
-        assert paragraphs[0] == "Picasso, Miró: UnboundThrough Jan 2027"
+        # The <p> content must be present
+        assert "Picasso, Miró: Unbound" in text
+        # The text between </picture> and <p> must NOT be concatenated into
+        # the paragraph output (old regex would include "Exhibition Card Label")
+        assert "Exhibition Card Label" not in text
 
-    def test_picture_false_match_was_the_old_bug(self):
-        """Old regex <p[^>]*> matches <picture> — demonstrate the bug."""
+    def test_picture_does_not_produce_concatenation(self):
+        """Listing page: <picture>...<h2>Title</h2><p>TitleDate</p> must not
+        produce a paragraph containing the title text twice.
+
+        The old regex spanned from <picture> through <h2> to </p>, producing
+        'TitleTitle + Date' after tag stripping. The fix must produce only the
+        <p> content.
+        """
         html = (
-            '<picture><source srcset="img.jpg"></picture>'
-            '<p class="info">Title</p>'
+            '<div class="card">'
+            '<picture><source srcset="img.jpg"><img src="img.jpg"></picture>'
+            '<h2>Picasso, Miró, Dalí: Unbound</h2>'
+            '<p class="info">Picasso, Miró, Dalí: UnboundThrough January 24, 2027</p>'
+            '</div>'
         )
-        # OLD regex matches <picture> because 'icture' chars are all [^>]
-        old_matches = re.findall(r'<p[^>]*>(.*?)</p>', html, re.DOTALL)
-        # It would match from <picture> to </p> — spanning picture+p
-        assert len(old_matches) == 1
-        # The match includes content from BOTH elements (the bug)
-        assert 'Title' in old_matches[0]
+        text, _ = _mock_fetch(html)
+
+        # Count how many times 'Unbound' appears. The heading produces one
+        # instance, and the paragraph produces one instance. The old regex
+        # would produce a THIRD instance (concatenated heading+paragraph text
+        # in a single paragraph match).
+        # With the fix: heading line + paragraph line = 2 occurrences.
+        assert text.count("Unbound") == 2, (
+            f"Expected 'Unbound' exactly 2 times (heading + paragraph), "
+            f"got {text.count('Unbound')}. Text:\n{text}"
+        )
 
     def test_pre_tag_not_matched(self):
-        """<pre> should not match as <p>."""
-        html = '<pre>code block</pre><p>Real paragraph content here.</p>'
-        paragraphs = []
-        for p_match in re.finditer(r'<p(?:\s[^>]*)?>(.+?)</p>', html, re.DOTALL):
-            clean = re.sub(r'<[^>]+>', '', p_match.group(1)).strip()
-            if len(clean) > 5:
-                paragraphs.append(clean)
-        assert len(paragraphs) == 1
-        assert paragraphs[0] == "Real paragraph content here."
+        """<pre> should not match as <p> — its content must not appear in output.
+
+        The old regex matched <pre> (since 're' are valid [^>] chars after <p),
+        spanning from <pre> to the nearest </p> and concatenating content.
+        """
+        html = (
+            '<pre>code block content that is long enough to be extracted</pre>'
+            '<p>Real paragraph content here that is long enough.</p>'
+        )
+        text, _ = _mock_fetch(html)
+
+        assert "Real paragraph content" in text
+        # Old regex would concatenate <pre> content into the paragraph match
+        assert "code block" not in text
+
+    def test_path_svg_tag_not_matched(self):
+        """<path> in SVG should not contribute content to paragraph extraction.
+
+        Old regex matched <path d="..."> (since 'ath d="..."' are [^>] chars),
+        and spanned to the next </p>.
+        """
+        html = (
+            '<svg><path d="M10 10 H 90 V 90 H 10 Z"></path></svg>'
+            'SVG label text here'
+            '<p>Actual paragraph with real exhibition content here.</p>'
+        )
+        text, _ = _mock_fetch(html)
+
+        assert "Actual paragraph with real exhibition" in text
+        # Old regex would span from <path> to </p>, including "SVG label text"
+        assert "SVG label text" not in text
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -85,19 +141,12 @@ class TestFetchPageDeduplication:
 
     def test_duplicate_paragraphs_removed(self):
         """Same <p> content appearing twice (e.g. two slides) → only one in output."""
-        from unittest.mock import patch, MagicMock
-
         html = (
             '<p>Joan Miró, Le Lézard aux plumes d\'or (detail), 1971.</p>'
             '<p>Joan Miró, Le Lézard aux plumes d\'or (detail), 1971.</p>'
             '<p>A different paragraph with enough content here.</p>'
         )
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.text = html
-
-        with patch('exhibition_checklist.requests.get', return_value=mock_resp):
-            text, _ = _fetch_page('https://example.com/test')
+        text, _ = _mock_fetch(html)
 
         # Credit line appears only once
         assert text.count("Le Lézard") == 1
@@ -105,19 +154,12 @@ class TestFetchPageDeduplication:
 
     def test_duplicate_list_items_removed(self):
         """Responsive nav menus duplicated → only unique items kept."""
-        from unittest.mock import patch, MagicMock
-
         html = (
             '<li>Getting Here</li><li>Dining</li><li>Groups</li>'
             '<li>Getting Here</li><li>Dining</li><li>Groups</li>'
             '<li>Unique Exhibition Item Here</li>'
         )
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.text = html
-
-        with patch('exhibition_checklist.requests.get', return_value=mock_resp):
-            text, _ = _fetch_page('https://example.com/test')
+        text, _ = _mock_fetch(html)
 
         assert text.count("Getting Here") == 1
         assert text.count("Dining") == 1
@@ -125,19 +167,12 @@ class TestFetchPageDeduplication:
 
     def test_duplicate_img_alts_removed(self):
         """Same image alt repeated for responsive srcsets → only one kept."""
-        from unittest.mock import patch, MagicMock
-
         html = (
             '<img alt="Abstract drawing, red and blue, by Miró">'
             '<img alt="Abstract drawing, red and blue, by Miró">'
             '<img alt="Different artwork, oil on canvas, by Dalí">'
         )
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.text = html
-
-        with patch('exhibition_checklist.requests.get', return_value=mock_resp):
-            text, _ = _fetch_page('https://example.com/test')
+        text, _ = _mock_fetch(html)
 
         assert text.count("Abstract drawing") == 1
         assert "Different artwork" in text
@@ -235,64 +270,26 @@ class TestFooterBoundaryDetection:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Integration: fixture and live produce the same text
+# Integration: fixture produces correct text through _fetch_page
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 class TestFixtureAndLiveAlignment:
-    """The MFA fixture must produce the same extraction text as the live page."""
+    """The MFA fixture must produce correct extraction through the real _fetch_page."""
 
-    def _extract_text_from_html(self, html):
-        """Replicate _fetch_page logic locally (same as the module, for offline test)."""
-        headings = []
-        for h_match in re.finditer(r'<h[1-4][^>]*>(.*?)</h[1-4]>', html, re.DOTALL):
-            clean = re.sub(r'<[^>]+>', '', h_match.group(1)).strip()
-            if clean and len(clean) < 200:
-                headings.append(clean)
-
-        figcaptions = []
-        for fig_match in re.finditer(r'<figcaption[^>]*>(.*?)</figcaption>', html, re.DOTALL):
-            clean = re.sub(r'<[^>]+>', '', fig_match.group(1)).strip()
-            if clean and len(clean) > 5:
-                figcaptions.append(clean)
-
-        img_alts = []
-        _seen_alts = set()
-        for img_match in re.finditer(r'<img[^>]*alt="([^"]{10,200})"', html):
-            alt = img_match.group(1).strip()
-            if (',' in alt or ' by ' in alt.lower()) and alt not in _seen_alts:
-                _seen_alts.add(alt)
-                img_alts.append(alt)
-
-        paragraphs = []
-        _seen_paragraphs = set()
-        for p_match in re.finditer(r'<p(?:\s[^>]*)?>(.+?)</p>', html, re.DOTALL):
-            clean = re.sub(r'<[^>]+>', '', p_match.group(1)).strip()
-            clean = re.sub(r'&nbsp;', ' ', clean)
-            clean = re.sub(r'&[a-z]+;', ' ', clean)
-            if len(clean) > 20 and clean not in _seen_paragraphs:
-                _seen_paragraphs.add(clean)
-                paragraphs.append(clean)
-
-        list_items = []
-        _seen_items = set()
-        for li_match in re.finditer(r'<li[^>]*>(.*?)</li>', html, re.DOTALL):
-            clean = re.sub(r'<[^>]+>', '', li_match.group(1)).strip()
-            if len(clean) > 5 and len(clean) < 200 and clean not in _seen_items:
-                _seen_items.add(clean)
-                list_items.append(clean)
-
-        return '\n'.join(headings + figcaptions + img_alts + paragraphs + list_items)
-
-    def test_fixture_all_three_works_in_window(self):
-        """After fixes, all three works must be in the 5000-char window from fixture."""
+    def _fetch_fixture(self):
+        """Load the MFA fixture HTML and run it through the real _fetch_page."""
         fixture_path = os.path.join(
             os.path.dirname(__file__), 'fixtures', 'mfa_picasso_miro_dali_unbound.html'
         )
         with open(fixture_path, encoding='utf-8') as f:
             html = f.read()
+        text, links = _mock_fetch(html)
+        return text, links
 
-        text = self._extract_text_from_html(html)
+    def test_fixture_all_three_works_in_window(self):
+        """After fixes, all three works must be in the 5000-char window from fixture."""
+        text, _ = self._fetch_fixture()
         filtered = _filter_nav_from_page_text(text.strip())
         window = filtered[:5000]
 
@@ -303,13 +300,7 @@ class TestFixtureAndLiveAlignment:
 
     def test_fixture_no_footer_nav_in_window(self):
         """Footer navigation must be stripped from the fixture output."""
-        fixture_path = os.path.join(
-            os.path.dirname(__file__), 'fixtures', 'mfa_picasso_miro_dali_unbound.html'
-        )
-        with open(fixture_path, encoding='utf-8') as f:
-            html = f.read()
-
-        text = self._extract_text_from_html(html)
+        text, _ = self._fetch_fixture()
         filtered = _filter_nav_from_page_text(text.strip())
 
         # Footer nav items must not appear
@@ -320,25 +311,13 @@ class TestFixtureAndLiveAlignment:
 
     def test_fixture_no_duplicate_credit_lines(self):
         """Credit line must appear only once (dedup)."""
-        fixture_path = os.path.join(
-            os.path.dirname(__file__), 'fixtures', 'mfa_picasso_miro_dali_unbound.html'
-        )
-        with open(fixture_path, encoding='utf-8') as f:
-            html = f.read()
-
-        text = self._extract_text_from_html(html)
+        text, _ = self._fetch_fixture()
         # Credit line deduplicated (use partial match to handle apostrophe variants)
         assert text.count("Le Lézard aux plumes d") == 1
 
     def test_fixture_window_under_5000_chars(self):
         """With dedup + footer removal, filtered text is well under 5000 — no truncation."""
-        fixture_path = os.path.join(
-            os.path.dirname(__file__), 'fixtures', 'mfa_picasso_miro_dali_unbound.html'
-        )
-        with open(fixture_path, encoding='utf-8') as f:
-            html = f.read()
-
-        text = self._extract_text_from_html(html)
+        text, _ = self._fetch_fixture()
         filtered = _filter_nav_from_page_text(text.strip())
 
         # Must be under 5000 chars — the 5000 truncation is not needed
@@ -349,9 +328,10 @@ class TestFixtureAndLiveAlignment:
 
     def test_no_concatenated_title_on_listing_page(self):
         """The <p> regex fix eliminates the concatenated title from listing pages.
-        
-        Before: <picture>...<p class='info'>TitleThrough Date</p> produced
-        'Picasso, Miró, Dalí: UnboundThrough January 24, 2027' as a paragraph.
+
+        Before: <picture>...<h2>Title</h2><p class='info'>TitleDate</p> matched
+        from <picture> to </p>, producing 'TitleTitleDate' after tag stripping.
+        The fix ensures only real <p> tags match.
         """
         # Simulate the listing page HTML structure that caused the bug
         html = (
@@ -360,20 +340,13 @@ class TestFixtureAndLiveAlignment:
             'Picasso, Miró, Dalí: Unbound</a></h2>'
             '<p class="info">Picasso, Miró, Dalí: UnboundThrough January 24, 2027</p>'
         )
-        paragraphs = []
-        for p_match in re.finditer(r'<p(?:\s[^>]*)?>(.+?)</p>', html, re.DOTALL):
-            clean = re.sub(r'<[^>]+>', '', p_match.group(1)).strip()
-            if len(clean) > 5:
-                paragraphs.append(clean)
+        text, _ = _mock_fetch(html)
 
-        # The <p class="info"> IS a real match, but only ONE match (not spanning picture)
-        assert len(paragraphs) == 1
-        # Verify the old regex would have matched differently
-        old_matches = []
-        for p_match in re.finditer(r'<p[^>]*>(.*?)</p>', html, re.DOTALL):
-            clean = re.sub(r'<[^>]+>', '', p_match.group(1)).strip()
-            if len(clean) > 5:
-                old_matches.append(clean)
-        # Old regex matches from <picture> to </p> — may produce different text
-        # depending on exact HTML structure
-        assert len(old_matches) >= 1
+        # The heading extracts "Picasso, Miró, Dalí: Unbound" (1 occurrence).
+        # The paragraph extracts the <p> content (1 occurrence of "Unbound").
+        # The old regex would span from <picture> to </p>, capturing the heading
+        # text + paragraph text together, creating a THIRD "Unbound".
+        assert text.count("Unbound") == 2, (
+            f"Expected 'Unbound' exactly 2 times (heading + paragraph), "
+            f"got {text.count('Unbound')}. Old regex would produce 3. Text:\n{text}"
+        )
