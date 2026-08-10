@@ -11737,3 +11737,61 @@ Orientation path, fixing 379's "sculpture" in Orientation. Cherry-pick all of it
 stop 2 fell from 198 to **77 words**, under the floor. A tightening that
 suppresses grounded material that was already correct is not a net gain, and
 `ceiling` is precisely the failure Michael originally reported.
+
+## D301 — Michael's product ruling: grounded and dull is still a failure. Storied means stories.
+**2026-08-10.** After reading the generated MFA tour, Michael named three problems
+and they reframe the whole 376–381 chain.
+
+**1. The general description omits the exhibition's premise.** He judged the
+*structure* good — introduction, works, forward reference, first stop — but:
+
+> "We said nothing about the exhibit narration: why someone put the collection
+> together, what entity it is showing."
+
+He asked Google the same question and Google answered better. That is the bar,
+and we failed it.
+
+**2. The works are described outside the exhibition's intent.**
+
+> "We are pointing listeners to 'the meticulous attention to detail in rendering
+> the reptile's intricate plumage' completely forgetting about the main point:
+> **these are a new art: illustrated books.**"
+
+We describe the picture inside the book as though it were a painting on a wall.
+The show's entire claim is that the *book* is the artwork — image, text,
+typography, paper, binding as one object.
+
+**3. No stories.**
+
+> "Listeners are not intrigued by the artists, diners, curators, MFA, nothing.
+> This is Storied release, and no stories demonstrate our failure… without
+> stories, the tour does not worth much, and people will not pay for it."
+
+**The finding that makes this actionable: every bit of it is already on the page
+we fetch, and we discard it.** The MFA's own "About" text says livres d'artiste
+"had no precedent", "revolutionized the book as an art form", were "deeply
+collaborative ventures" where "authors, publishers, designers, and printmakers
+played essential roles", that they are "rarely on view", and that visitors can
+"explore how images, words, and typography intersect". The page also gives the
+publisher (Louis Broder), the printer (Mourlot Frères), the donor (Gift of Boris
+Fridman), the gallery (Torf Gallery 184) and the sponsors. Everything Michael
+praised in Google's answer is in a paragraph already inside `page_text`.
+
+**So this is not a retrieval problem and not a sourcing problem. We fetch the
+thesis and use only the checklist of object titles.**
+
+**Correction to LEAD's own framing.** Rounds 376–381 optimised one axis:
+truthfulness. That was necessary — the tour was asserting Rousseau and Le
+Corbusier — but LEAD treated "no fabrications" as the finish line when it is the
+floor. D289 already said refusal is a product failure; D301 extends it: *accuracy
+without story is the same failure in a quieter form.* Both properties are
+required, and story may never be bought with grounding.
+
+**Dispatched:** LOCAL-382 (exhibition thesis drives the general description *and*
+per-stop framing; supersedes and deletes the weaker parked LOCAL-377) and
+LOCAL-383 (stories, with the page's own named people as the material). Both
+parked behind LOCAL-381, which is in flight on the same prose path.
+
+**Standing rule this establishes for acceptance criteria:** a tour task is not
+complete when nothing in it is false. It is complete when a listener would want to
+keep listening *and* nothing in it is false.
