@@ -11554,3 +11554,52 @@ output was verified directly against the committed data, and the classification 
 the actual deliverable — was recounted independently. The test weakness is
 recorded, not paid down, because nothing downstream rests on it yet. If the
 helper ever backs an enforcing gate, this becomes blocking.
+
+## D297 — LOCAL-376 bounced: the gate catches the rare form of a name and misses the common one
+**2026-08-10.** First attempt at prose-entity grounding. Not merged. The live run
+is the whole story — the submission honestly said "unproven, handing to LEAD",
+and had LEAD trusted the 33 green tests this would have shipped.
+
+```
+[LOCAL-376] ungrounded person 'Xavier Lalanne' — dropping sentence
+[LOCAL-376] ungrounded person 'Henri Matisse' — dropping sentence
+```
+Delivered text: `Lalanne` **4 hits**, `Matisse` **1 hit**.
+
+**The gate announced the drop and the names shipped.** Mechanism: the person
+regex matches multi-word capitalised names, so it caught `Xavier Lalanne` once
+and missed the four following `Lalanne's`. **Prose names a person in full once
+and by surname thereafter** — so a full-name-only matcher catches the rare form
+and misses the dominant one by construction. Any future entity gate must expand a
+rejected full name to its surname and remove every mention.
+
+**Rousseau and Corbusier were gone — and that proved nothing.** Different run,
+different inventions: this time a sculptor (Lalanne) and Matisse. Checking for
+*the previous run's* fabrications is not a test for fabrication. The acceptance
+must be positive — the *correct* artists present and the medium stated — not
+merely the absence of yesterday's wrong names. LEAD's own task file made this
+mistake and it is corrected in LOCAL-378.
+
+**Part A was reachable and still had no effect, which is the more interesting
+failure.** `match_work_metadata` and `build_provenance_block` are called from the
+stop-prompt path (`generate_tour_text.py:8608`/`:8615`), the MEDIUM CONSTRAINT
+text exists — and the delivered tour called an illustrated book a "sculpture", a
+"painting", and a ceiling you "stand beneath". Publisher, printer, donor,
+co-author: zero mentions. Leading hypothesis, to be confirmed by logging before
+anything is changed: D286-strict matching fails on the heading
+`Le Lézard aux plumes d'or (The Lizard with Golden Feathers)` because of the
+parenthetical translation, so no block is emitted at all.
+
+**This is standing check #2 in a new form.** "Is there a production caller" was
+satisfied — and the code still did nothing, because the caller's *argument*
+silently resolved to None. Reachability is necessary and not sufficient; the next
+question is whether the data arriving at the call site is what the code expects.
+
+**Two regressions the gate introduced**, both from dropping sentences bluntly:
+`The Treat Page` was classified as a person and its sentence removed, and stop 1
+shipped `Gifted "Le Lézard aux plumes d'or" stands as a beacon…` — a dangling
+participle left where a sentence was cut. A cleaner that manufactures the defect
+`empty_sentence_count` measures is the D288 pattern again.
+
+**Bounced as LOCAL-378**, off `storied`, salvaging the 33 tests and the gate
+skeleton. Tour text preserved at `TOUR_MFA_UNBOUND_376_BOUNCED.txt`.
