@@ -10822,3 +10822,92 @@ replaces. The gap — transport words inside place names (`Camelback Mountain` �
 camel, `San Diego Safari Park` → safari, 400 km tier) — went out as LOCAL-363.
 Bouncing again would have left the worse default in production while we
 polished; merging plus a follow-up keeps the improvement and tracks the defect.
+
+## D277 — Four of five submissions tested a copy of the code, not the code
+**2026-08-10.** Reviewing 360/361/362/363/364 after the break, the same defect
+appeared in most of them: the tests re-implement the logic they claim to verify.
+
+- **360** — `tests/test_poll_resilience.py` defines
+  `_simulate_text_gen_poll_loop()`, a hand-written copy of the polling loop.
+  All 10 cases pass with `tour_orchestrator_service.py` fully reverted. Measured,
+  not inferred.
+- **361** — `_f3_verdict()` is labelled "mirrors generate_tour_text.py". The
+  remaining cases are `inspect.getsource` string assertions
+  (`assert '_real_headers = set(_rendered_headers)' in source`), which a rename
+  breaks and a logic error passes. All 25 passed against a reverted tree.
+- **363** — the exception. Real Dart tests against the real parser, and the
+  submission included its own red-before/green-after run.
+
+The shape is consistent: when a function is hard to reach — buried in a 7,900-line
+`generate_tour_text`, or behind Flask and a DB — the agent copies it out rather
+than reporting that it could not test it. The copy then passes forever.
+
+**The fix is structural, not procedural.** Asking for "real tests" invites a
+better-disguised mirror. Instead, lift the logic to module scope so it can be
+called: `f3_name_is_corrupt()` and `missing_stop_headers()` now exist for exactly
+that reason, and the rewritten 361 suite goes red on 15 of 25 when the old guard
+is restored. Standing check #1 stays the gate — revert the production line, watch
+a test fail, and only then believe it.
+
+## D278 — Every orchestrator error was being swallowed by a shadowed import
+**2026-08-10.** Found while writing a real test for LOCAL-360, not by looking
+for it. `orchestrate_tour_async` imports `traceback` at function scope in two
+non-fatal handlers, which makes the name local for the *entire* function. The
+main `except` block runs first and dies on `UnboundLocalError` at
+
+    print(f"Traceback: {traceback.format_exc()}")
+
+before ever reaching the two lines under it:
+
+    ACTIVE_JOBS[job_id]["status"] = "error"
+    ACTIVE_JOBS[job_id]["error"] = str(e)
+
+So every failed generation lost its real error, left the job wedged in
+`processing`, and skipped the quota-rollback `DELETE FROM tour_requests` — a
+failed tour permanently consumed the user's quota. Pre-existing on `storied`,
+not introduced by 360. Both redundant imports removed.
+
+This is why the MFA failure was opaque (D273): the poll timeout was the cause,
+but the handler that would have said so crashed. `generate_tour_text.py` avoids
+the same trap by aliasing every in-function import (`_d2_re`, `_re98`), which is
+a convention worth keeping.
+
+## D279 — The exhibition work landed; the exhibition case did not
+**2026-08-10.** 362 and 364 merged. What is genuinely fixed: a scoped request is
+detected, the venue-wide deterministic bypass is suppressed for it, SPARQL now
+carries P170 creators, and a closed show is refused rather than toured.
+
+**What is not fixed is the request that started this.** Measured live:
+
+- Wikidata holds 128 works for the MFA (Q49133), 124 with creators, and
+  **zero by Picasso, Miro, or Dali**. The creator filter cannot match what is
+  not there.
+- `mfa.org` publishes the exhibition page — 364 finds it at 0.80 title match —
+  but renders the checklist in JS, so static extraction returns nothing.
+
+Both fallbacks fire honestly and are labelled, but the result is a GPT Phase 3A
+tour that merely has the requirements text in its prompt. Better than D275's
+"ignored the painters too", and short of "tour the show".
+
+**Merged anyway, on the D276 precedent:** the unscoped path is proven unchanged
+(live Palais Lascaris 4-stop takes the deterministic bypass, 4/4 D1v2-verified
+stops, scores 75.0), so this is strictly-added capability that will pay off at
+venues publishing static checklists. The remaining gap is a data-acquisition
+problem — JS rendering and Wikidata coverage — not a logic one, and no amount of
+reviewing this branch closes it.
+
+**Also verified, because it was the real risk:** scope detection keys on
+`bool(intent['requirements'])`, and `requirements` is an open-ended GPT field
+("any specific criteria mentioned"). Had it been commonly populated, every
+museum tour would have silently lost the deterministic bypass. Live
+`analyze_tour_intent` returns `None` for 'Museum of Fine Arts, Boston', 'Tour
+inside the MFA Boston', 'Palais Lascaris, Nice, France' and 'Asian Arts Museum,
+Nice', and the exhibition string only for the exhibition request. The trigger
+discriminates. This was asserted in the submission and is now measured.
+
+**Open defect, recorded not fixed:** the closed-show path returns its apology as
+the tour *text*, which downstream reads as success. Nothing outside the module
+reads the `exhibition_closed` flag it sets, so a closed exhibition would be
+persisted as a tour row and sent to TTS. Narrow (needs a scoped request plus a
+site-published past closing date) and still better than an opaque failure, but
+it should become a real failure signal.
