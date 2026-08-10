@@ -4408,6 +4408,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                     venue_base_url=_det_entity.official_url,
                     exhibition_name=_exh_name_for_search,
                     venue_name=_scope_venue,
+                    venue_language=_det_entity.language,
                 )
 
                 print(f"  [LOCAL-364] Result: {_exhibition_checklist_result}")
