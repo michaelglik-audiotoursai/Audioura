@@ -4414,30 +4414,29 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
 
                 # Handle result
                 if _exhibition_checklist_result.is_closed:
-                    # Exhibition has closed — do NOT tour it
-                    print(f"\n  [LOCAL-364] ⚠️  EXHIBITION CLOSED — refusing to tour a dismounted show")
+                    # Exhibition has closed — do NOT tour it (LOCAL-365)
+                    # Signal failure via None return + structured evidence in
+                    # _LAST_CLEAN_FAIL_EVIDENCE so the service layer can surface
+                    # a typed error without creating a tour row or invoking TTS.
+                    print(f"\n  [LOCAL-365] ⚠️  EXHIBITION CLOSED — refusing to tour a dismounted show")
                     print(f"    Exhibition: {_exhibition_checklist_result.exhibition_title}")
                     print(f"    Closed: {_exhibition_checklist_result.closing_date}")
                     print(f"    Reason: {_exhibition_checklist_result.reason}")
-                    # Return an error tour that explains the situation
-                    _closed_msg = (
-                        f"# Exhibition Closed\n\n"
-                        f"The exhibition \"{_exhibition_checklist_result.exhibition_title}\" "
-                        f"at {_scope_venue} closed on {_exhibition_checklist_result.closing_date}.\n\n"
-                        f"A tour of a dismounted exhibition cannot be generated because the works "
-                        f"are no longer on display. Please check the venue's website for current exhibitions."
-                    )
-                    if output_file:
-                        with open(output_file, "w", encoding="utf-8") as _cf:
-                            _cf.write(_closed_msg)
+                    global _LAST_CLEAN_FAIL_EVIDENCE
+                    _LAST_CLEAN_FAIL_EVIDENCE = {
+                        "error_type": "exhibition_closed",
+                        "exhibition_title": _exhibition_checklist_result.exhibition_title,
+                        "closing_date": str(_exhibition_checklist_result.closing_date),
+                        "venue": _scope_venue,
+                        "reason": _exhibition_checklist_result.reason,
+                    }
                     _LAST_GENERATION_COST = {
                         "total_cost": 0.0,
                         "total_tokens": 0,
                         "cache_hit": False,
                         "breakdown": {"llm": 0.0, "tts": 0.0, "search": 0.0},
-                        "exhibition_closed": True,
                     }
-                    return _closed_msg, output_file, (None, None)
+                    return None, None, (None, None)
 
                 elif _exhibition_checklist_result.has_works:
                     # SUCCESS: Use the exhibition checklist as stops
@@ -4981,7 +4980,6 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 if _d1v2_result.tier == 'unresolvable':
                     # Clean fail with structured error
                     print(f"  [D1] Tier: unresolvable — clean fail (entity={_d1v2_result.entity_resolved}, sparql={_d1v2_result.sparql_count})")
-                    global _LAST_CLEAN_FAIL_EVIDENCE
                     _LAST_CLEAN_FAIL_EVIDENCE = {
                         "error_type": "thin_evidence",
                         "entity_resolved": _d1v2_result.entity_resolved,
