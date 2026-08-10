@@ -11889,3 +11889,52 @@ failed. Dispatched as LOCAL-384.
 77 in 380, against a 120 floor). Its identity block is the smallest of the three
 (269 chars). The honest remedy is LOCAL-382's exhibition framing supplying
 substance, not padding — 384 is told to report the cause, not fix it by volume.
+
+## D304 — The gate was right and pointed at half the stop. Fabrication moved to Orientation.
+**2026-08-10.** LOCAL-384 bounced, and D303's thesis is **confirmed, not refuted**.
+
+The form-claim gate worked exactly as designed and said so:
+
+```
+[LOCAL-384] unsupported form claim 'tapestry' for medium 'Illustrations' — dropping sentence
+[LOCAL-384] unsupported form claim 'gaze up'  for medium 'UNKNOWN'       — dropping sentence
+```
+
+And the tour still shipped, in stop 3's **Orientation**:
+
+> "Created by the contemporary artist **Marc Chagall**, this **ceiling mural**…"
+
+A *new* fabricated artist, on a work by Gris and Reverdy — and `Gris`/`Reverdy`
+vanished from that stop.
+
+**Mechanism, read from the code rather than inferred:** both gates iterate
+`poi.get('description')` (`prose_entity_grounding_gate.py:369`). **Orientation is
+a separate field and neither gate ever sees it.** The two claims they *did* catch
+were both in descriptions. Enforcement works; its scope was wrong.
+
+**This retro-explains D299's residual.** 379 shipped "this captivating
+**sculpture**" in Orientation while its body correctly said "illustrated book".
+LOCAL-380 fixed the *prompt* for the Orientation path. Nobody fixed the *gates*,
+so Orientation has been an unguarded channel this entire chain — and once the body
+was policed, that is exactly where the fabrication went.
+
+**The generalisable rule: a guard defines a boundary, and content migrates to the
+unguarded side.** Every previous round policed the body harder and the body got
+cleaner; the invention simply relocated. When a defect "moves" after a fix, look
+for the region the fix does not cover rather than assuming the fix failed.
+
+**Concrete remedy, beyond fixing the scope:** the list of prose fields must be
+defined **once** and consumed by both gates. Two gates independently deciding what
+to scan is precisely how this hole opened, and adding a third gate later would
+reopen it.
+
+**A false positive worth fixing, same class as `The Treat Page`:** `'tapestry'`
+was dropped from "Dalí's use of precise lines and bold colors creates a visual
+**tapestry**" — a metaphor, not a claim the object is a textile. A form term must
+be used *referentially about the work* to count. Removing metaphor costs prose
+quality and buys no truthfulness — and under D301, prose quality is not optional.
+
+**Not all bad:** word counts were healthy for the first time in three rounds
+(231/119/237, all ≥ the 120 floor), stop count 3/3, and `installation`, `glass`,
+`sculpture`, `Rousseau`, `Corbusier`, `Lalanne`, `Matisse` were all zero.
+Dispatched as LOCAL-385 with the whole gate kept and only its scope corrected.
