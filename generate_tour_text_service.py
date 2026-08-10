@@ -177,7 +177,16 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                         "error_type": _LAST_CLEAN_FAIL_EVIDENCE.get("error_type", "generation_failed"),
                         "evidence_summary": _LAST_CLEAN_FAIL_EVIDENCE,
                     }
-                    _error_msg = "This venue could not be verified with enough works to generate a quality tour."
+                    # [LOCAL-365] Closed exhibitions get a distinct, informative message
+                    if _LAST_CLEAN_FAIL_EVIDENCE.get("error_type") == "exhibition_closed":
+                        _exh_title = _LAST_CLEAN_FAIL_EVIDENCE.get("exhibition_title", "Unknown")
+                        _exh_date = _LAST_CLEAN_FAIL_EVIDENCE.get("closing_date", "unknown date")
+                        _error_msg = (
+                            f'The exhibition "{_exh_title}" closed on {_exh_date}. '
+                            f'A tour cannot be generated for a dismounted show.'
+                        )
+                    else:
+                        _error_msg = "This venue could not be verified with enough works to generate a quality tour."
                     import generate_tour_text as _gtt
                     _gtt._LAST_CLEAN_FAIL_EVIDENCE = {}  # Reset for next request
             except ImportError as _cfe_err:
