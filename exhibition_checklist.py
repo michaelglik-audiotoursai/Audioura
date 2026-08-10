@@ -1,4 +1,4 @@
-"""exhibition_checklist.py — LOCAL-364: Retrieve exhibition checklists from venue sites.
+"""exhibition_checklist.py — LOCAL-364/368: Retrieve exhibition checklists from venue sites.
 
 When a user requests a tour of a NAMED EXHIBITION at a venue, the correct answer
 is the works in THAT exhibition — not all works by the headline artists. This
@@ -13,12 +13,21 @@ Design choices:
   whose text/href matches exhibition patterns.
 - Title matching is fuzzy: handles punctuation, subtitle, and word-order
   differences between what the user typed and what the venue publishes.
-- If the exhibition page publishes no works or only prose, returns an empty
-  checklist with a reason, and the caller falls back to the creator filter.
+- LOCAL-368: When the exhibition page publishes only prose (not structured
+  Title/Artist/Year rows), an LLM extracts works from the prose. This is the
+  `prose_llm` path — cheaper than a headless browser and correct for pages
+  like the MFA's "Picasso, Miró, Dalí: Unbound" which names works in flowing
+  paragraphs and image captions.
+- LOCAL-368: Non-venue sources require a phrase-uniqueness gate: the exact
+  exhibition phrase in order + exhibition-context words nearby. The venue's own
+  domain is top tier and needs no corroboration.
 """
 
+import json
+import os
 import re
 import logging
+import unicodedata
 from datetime import datetime, date
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse
@@ -254,7 +263,6 @@ def _fetch_page(url: str, timeout: int = 15) -> Tuple[str, List[Tuple[str, str]]
 
 def _normalize_for_match(text: str) -> str:
     """Normalize text for fuzzy title matching: lowercase, strip punct, collapse space."""
-    import unicodedata
     # Decompose accents
     nfkd = unicodedata.normalize('NFKD', text.lower())
     stripped = ''.join(c for c in nfkd if not unicodedata.combining(c))
@@ -740,6 +748,297 @@ def _extract_opening_date(text: str) -> Optional[date]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# LOCAL-368: LLM prose extraction — extract works from exhibition page prose
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_PROSE_LLM_SYSTEM_PROMPT = """\
+You are an exhibition checklist extractor. Given the visible text from a museum \
+exhibition page, extract every artwork/work mentioned with its metadata. Return \
+ONLY a JSON array. Each element has these fields (omit any not stated on the page):
+- "title": the work's title (string, required)
+- "artist": the artist who created the work (string)
+- "date": date or year of creation (string)
+- "medium": materials or technique (string)
+- "publisher": publisher name if stated (string)
+- "credit_line": provenance/gift/bequest (string)
+
+Rules:
+- Extract ONLY what the page text explicitly states. Do NOT complete from your own knowledge.
+- An artist named without a specific work title is NOT a work — skip it.
+- Titles in italics (marked with * or _) are work titles.
+- Do not invent titles, dates, or media not present in the text.
+- Return [] if no specific works are identifiable.
+"""
+
+
+def prose_llm_extract_works(page_text: str, exhibition_name: str = '') -> List[Dict]:
+    """Use an LLM to extract works from exhibition page prose/captions.
+
+    LOCAL-368: When _WORK_LINE_PATTERNS fail (prose-only pages), this function
+    sends the page text to GPT to extract structured work metadata. The input
+    is typically 1-3K characters — no chunking needed.
+
+    Returns list of dicts with at minimum 'title' and optionally artist/date/medium/etc.
+    Returns empty list on failure (network error, no API key, empty extraction).
+    """
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        logger.warning("prose_llm_extract_works: OPENAI_API_KEY not set")
+        return []
+
+    # Trim to essential content — strip navigation/footer noise
+    # The page_text from _fetch_page already has headings + captions + paragraphs
+    # but may include nav. Keep only the core (first 4000 chars after any
+    # "About" section or the exhibition title).
+    text_for_llm = page_text.strip()
+    if len(text_for_llm) > 5000:
+        text_for_llm = text_for_llm[:5000]
+
+    if not text_for_llm or len(text_for_llm) < 50:
+        return []
+
+    user_prompt = (
+        f"Exhibition: {exhibition_name}\n\n"
+        f"Page text:\n{text_for_llm}\n\n"
+        "Extract all artworks/works mentioned with their metadata. "
+        "Return ONLY a JSON array."
+    )
+
+    try:
+        model = os.environ.get("PROSE_LLM_MODEL", os.environ.get("TOUR_LLM_MODEL", "gpt-4o-mini"))
+        response = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": _PROSE_LLM_SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "temperature": 0.0,
+                "max_tokens": 1500,
+            },
+            timeout=30,
+        )
+        if response.status_code != 200:
+            logger.warning(f"prose_llm_extract_works: API returned {response.status_code}")
+            return []
+
+        content = response.json()['choices'][0]['message']['content'].strip()
+        # Strip markdown code fences if present
+        if content.startswith('```'):
+            content = re.sub(r'^```(?:json)?\s*', '', content)
+            content = re.sub(r'\s*```$', '', content)
+
+        works = json.loads(content)
+        if not isinstance(works, list):
+            return []
+
+        # Validate: each entry must have at least a title
+        valid_works = []
+        for w in works:
+            if isinstance(w, dict) and w.get('title') and len(w['title'].strip()) > 2:
+                clean = {'title': w['title'].strip()}
+                if w.get('artist'):
+                    clean['artist'] = w['artist'].strip()
+                if w.get('date'):
+                    clean['date'] = str(w['date']).strip()
+                if w.get('medium'):
+                    clean['medium'] = w['medium'].strip()
+                if w.get('publisher'):
+                    clean['publisher'] = w['publisher'].strip()
+                if w.get('credit_line'):
+                    clean['credit_line'] = w['credit_line'].strip()
+                valid_works.append(clean)
+
+        logger.info(f"prose_llm_extract_works: extracted {len(valid_works)} works from prose")
+        return valid_works
+
+    except (requests.RequestException, json.JSONDecodeError, KeyError, IndexError) as e:
+        logger.warning(f"prose_llm_extract_works: failed: {e}")
+        return []
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LOCAL-368: Phrase-uniqueness gate for non-venue sources
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Exhibition-context words that must appear near the matched phrase.
+# Window: the phrase and these context words must co-occur within 500 characters.
+# These words MUST be specific to exhibition/display contexts — generic words
+# like "through" or "show" (which also means "demonstrate") cause false positives.
+_EXHIBITION_CONTEXT_WORDS = re.compile(
+    r'\b(?:exhibition|exhibit(?:ed|ing)?|on\s+view|on\s+display|'
+    r'gallery\s+\d|retrospective|'
+    r'curator|curated\s+by|currently\s+showing|featured\s+in|'
+    r'installed\s+in|opens?\s+(?:on|in|this)|closes?\s+(?:on|in|this)|'
+    r'runs?\s+through|on\s+view\s+through|'
+    r'now\s+(?:on\s+view|showing|open))\b',
+    re.IGNORECASE
+)
+
+_PHRASE_GATE_WINDOW = 500  # characters — used only to slice the inspection window
+
+# [LEAD 2026-08-10] The gate requires a grammatical relationship, not proximity.
+# Within this many characters of the phrase, either an exhibition noun must
+# introduce it or an exhibition verb must take it as subject.
+_PHRASE_GATE_ADJACENCY = 60  # characters
+
+# "<phrase> opens August 1" / "<phrase> runs through January" / "<phrase> is on view"
+_EXHIBITION_VERB_FOLLOWS = re.compile(
+    r'^\W{0,3}(?:will\s+)?(?:opens?|opened|runs?|ran|closes?|closed|'
+    r'continues?|features?|showcases?|presents?|brings?\s+together|'
+    r'is\s+(?:on\s+view|open|showing)|remains?\s+on\s+view|'
+    r'goes?\s+on\s+view)\b',
+    re.IGNORECASE
+)
+
+# "the exhibition <phrase>" / "a show titled <phrase>" / "exhibition: <phrase>"
+_EXHIBITION_NOUN_PRECEDES = re.compile(
+    r'\b(?:exhibition|exhibit|show|retrospective|installation)\b'
+    r'(?:\s+(?:titled|called|named|entitled))?\s*[:,\-—]?\s*'
+    r'(?:the\s+|a\s+|an\s+)?\W{0,3}$',
+    re.IGNORECASE
+)
+
+
+def _fold_accents_preserving_length(text: str) -> str:
+    """
+    Lowercase and fold accents WITHOUT changing string length.
+
+    [LEAD 2026-08-10] The phrase gate needs offsets that are valid in the original
+    text so it can inspect what immediately precedes and follows a match. The
+    ordinary normalizer strips punctuation and so shifts every subsequent offset.
+    Here each character maps to exactly one character: 'é' -> 'e', 'ó' -> 'o'.
+    Characters that decompose to nothing usable are left as-is.
+    """
+    out = []
+    for ch in text.lower():
+        decomposed = unicodedata.normalize('NFKD', ch)
+        base = ''.join(c for c in decomposed if not unicodedata.combining(c))
+        out.append(base[0] if len(base) >= 1 else ch)
+    return ''.join(out)
+
+
+def _normalize_for_phrase_gate(text: str) -> str:
+    """Normalize text for phrase matching: fold accents, lowercase, strip punctuation."""
+    nfkd = unicodedata.normalize('NFKD', text.lower())
+    stripped = ''.join(c for c in nfkd if not unicodedata.combining(c))
+    # Remove punctuation, keep spaces
+    stripped = re.sub(r'[^\w\s]', ' ', stripped)
+    return re.sub(r'\s+', ' ', stripped).strip()
+
+
+def phrase_uniqueness_gate(
+    source_text: str,
+    exhibition_phrase: str,
+    is_venue_domain: bool = False,
+) -> Tuple[bool, str]:
+    """LOCAL-368: Michael's phrase-uniqueness test for non-venue sources.
+
+    Rules:
+    - The venue's own domain is top tier and always passes (is_venue_domain=True).
+    - For any other source, BOTH conditions must hold:
+      1. The exact requested phrase appears in the source text (word order preserved,
+         accents folded, punctuation ignored).
+      2. The phrase appears in exhibition context — within 500 characters of words
+         like exhibition/exhibit/on view/show/gallery/retrospective/collection/etc.,
+         or the phrase itself is in a heading.
+
+    Co-occurrence of the same artists in prose WITHOUT that context is a coincidence
+    and must NOT be accepted.
+
+    Args:
+        source_text: The text content of the external source
+        exhibition_phrase: The exhibition name as typed by the user
+        is_venue_domain: True if this source is on the venue's own website
+
+    Returns:
+        (passes, reason): bool and explanation string
+    """
+    if is_venue_domain:
+        return True, "venue domain — top tier, no corroboration needed"
+
+    if not source_text or not exhibition_phrase:
+        return False, "empty source text or empty exhibition phrase"
+
+    # Normalize both
+    source_norm = _normalize_for_phrase_gate(source_text)
+    phrase_norm = _normalize_for_phrase_gate(exhibition_phrase)
+
+    if not phrase_norm:
+        return False, "exhibition phrase is empty after normalization"
+
+    # Condition 1: exact phrase (order-preserved) appears in source
+    if phrase_norm not in source_norm:
+        return False, (f"phrase '{exhibition_phrase}' not found in source "
+                      f"(order-preserved, accent-folded)")
+
+    # Condition 2: phrase appears in exhibition context
+    # Find all occurrences of the phrase in the ORIGINAL source text
+    # (not normalized — we need positions for the context window)
+    source_lower = source_text.lower()
+    phrase_lower = _normalize_for_phrase_gate(exhibition_phrase)
+
+    # Search in normalized source for position, then check context in original
+    phrase_pos = source_norm.find(phrase_norm)
+    if phrase_pos == -1:
+        return False, "phrase position not found (unexpected)"
+
+    # [LEAD 2026-08-10] Locate the phrase in the ORIGINAL text, not by reusing the
+    # normalized offset. Normalization strips punctuation and folds accents, so the
+    # two strings have different lengths — "Picasso, Miró, Dalí: Unbound" loses four
+    # characters — and the original code's "map back approximately" silently sliced
+    # the wrong span. That misalignment made the adjacency checks read the wrong text.
+    _tokens = [t for t in phrase_norm.split() if t]
+    _phrase_re = re.compile(
+        r'\W*'.join(re.escape(t) for t in _tokens),
+        re.IGNORECASE | re.UNICODE
+    )
+    _m = _phrase_re.search(_fold_accents_preserving_length(source_text))
+    if not _m:
+        return False, "phrase position not found in original text (unexpected)"
+
+    _p_start, _p_end = _m.start(), _m.end()
+    orig_window_start = max(0, _p_start - _PHRASE_GATE_WINDOW)
+    orig_window_end = min(len(source_text), _p_end + _PHRASE_GATE_WINDOW)
+    orig_window = source_text[orig_window_start:orig_window_end]
+
+    # [LEAD 2026-08-10] Proximity alone is too weak. A 500-character window is
+    # roughly a paragraph, and almost any art-history text about these painters
+    # mentions "exhibition" somewhere in it. The measured false positive:
+    #
+    #   "Picasso, Miro, Dali: Unbound by convention, these three revolutionized
+    #    modern art. Each later received a major museum exhibition in Paris..."
+    #
+    # The phrase is running prose there ("Unbound by convention"), and
+    # "exhibition" is incidental. Michael's point was that the source must treat
+    # the phrase as the NAME OF A THING, so require a grammatical relationship,
+    # not mere co-presence: an exhibition noun immediately before the phrase, or
+    # an exhibition verb immediately after it.
+    _tail = source_text[_p_end:_p_end + _PHRASE_GATE_ADJACENCY]
+    _head = source_text[max(0, _p_start - _PHRASE_GATE_ADJACENCY):_p_start]
+
+    if _EXHIBITION_VERB_FOLLOWS.match(_tail):
+        return True, "phrase is the subject of an exhibition verb — treated as a name"
+    if _EXHIBITION_NOUN_PRECEDES.search(_head):
+        return True, "phrase is introduced by an exhibition noun — treated as a name"
+
+    # A heading is a name by position: a short line with no sentence punctuation.
+    for line in source_text.split('\n'):
+        line_stripped = line.strip()
+        if (len(line_stripped) < 150 and
+            '.' not in line_stripped and
+            _normalize_for_phrase_gate(line_stripped).find(phrase_norm) != -1):
+            return True, "phrase found in heading-like context"
+
+    return False, (f"phrase '{exhibition_phrase}' appears in the source but is not "
+                  f"used as an exhibition name (no exhibition noun within "
+                  f"{_PHRASE_GATE_ADJACENCY} chars before it, no exhibition verb "
+                  f"after it, not a heading) — likely coincidental co-occurrence")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Main API
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -753,7 +1052,7 @@ class ExhibitionChecklistResult:
         self.opening_date: Optional[date] = None
         self.closing_date: Optional[date] = None
         self.is_closed: bool = False          # True if show has closed
-        self.path: str = 'none'               # 'checklist', 'partial', 'fallback', 'closed', 'none'
+        self.path: str = 'none'               # 'checklist', 'partial', 'prose_llm', 'fallback', 'closed', 'none'
         self.reason: str = ''                 # Human-readable explanation
         self.page_shape: str = ''             # Which extraction shape was used
 
@@ -1086,11 +1385,31 @@ def find_exhibition_checklist(
         if len(works) > 10:
             print(f"    ... and {len(works) - 10} more")
     else:
-        # Prose-only page — no extractable works
-        result.path = 'fallback'
-        result.page_shape = 'prose_only'
-        result.reason = (f'Exhibition page at {best_match_url} contains only prose — '
-                        f'no individual works could be extracted')
-        print(f"  [LOCAL-364] Exhibition page is prose-only — no checklist extractable")
+        # ─── LOCAL-368: Prose-only page — try LLM extraction before fallback ──
+        print(f"  [LOCAL-368] Line-pattern extraction found no works — trying LLM prose extraction")
+        llm_works = prose_llm_extract_works(detail_text, exhibition_name)
+
+        if llm_works:
+            result.works = llm_works
+            result.path = 'prose_llm'
+            result.page_shape = 'prose_llm_extraction'
+            result.reason = (f'Extracted {len(llm_works)} works from exhibition prose via LLM '
+                           f'(page at {best_match_url} has no structured checklist)')
+            print(f"  [LOCAL-368] ✓ PROSE LLM PATH: {len(llm_works)} works extracted from prose")
+            print(f"    Source: {result.exhibition_url}")
+            for w in llm_works[:10]:
+                _artist_info = f" by {w['artist']}" if w.get('artist') else ''
+                _date_info = f" ({w['date']})" if w.get('date') else ''
+                print(f"    - {w['title']}{_artist_info}{_date_info}")
+            if len(llm_works) > 10:
+                print(f"    ... and {len(llm_works) - 10} more")
+        else:
+            # True prose-only: even LLM found nothing extractable
+            result.path = 'fallback'
+            result.page_shape = 'prose_only'
+            result.reason = (f'Exhibition page at {best_match_url} contains only prose — '
+                            f'no individual works could be extracted (regex and LLM both failed)')
+            print(f"  [LOCAL-364] Exhibition page is prose-only — no checklist extractable "
+                  f"(LLM extraction also returned empty)")
 
     return result
