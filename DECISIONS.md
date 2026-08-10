@@ -11938,3 +11938,59 @@ quality and buys no truthfulness — and under D301, prose quality is not option
 (231/119/237, all ≥ the 120 floor), stop count 3/3, and `installation`, `glass`,
 `sculpture`, `Rousseau`, `Corbusier`, `Lalanne`, `Matisse` were all zero.
 Dispatched as LOCAL-385 with the whole gate kept and only its scope corrected.
+
+## D305 — LOCAL-385 merged: the zero-check is clean, and the gate boundary was the whole problem
+**2026-08-10.** Merged (brings 380, 381, 384). D304's diagnosis was right and the
+fix was a scope correction, not new logic.
+
+`GATED_PROSE_FIELDS` is now defined **once** and consumed by both gates, so
+Orientation is no longer an unguarded channel. Live MFA run, checked
+case-insensitively across the whole tour including Orientation:
+
+**Zero-check ALL CLEAR for the first time** — `ceiling`, `mural`, `installation`,
+`canopy`, `vault`, `dome`, `overhead`, `sculpture`, `painting`, `glass`,
+`stand beneath`, `look up`, `gaze up`, `above you`, `Chagall`, `Rousseau`,
+`Corbusier`, `Lalanne`, `Matisse`: all 0.
+
+**And the right names are there:** Miró on stop 1, Dalí and Freud on stop 2, Gris
+and Reverdy on stop 3 — the last two having vanished in 384. Words 309/168/176,
+stop count 3/3. Control case clean: Palais Lascaris 4/4 with nothing legitimate
+stripped, bounds 81.2/75.0, 16 red on a logic-only revert.
+
+**The gate visibly earned its keep**, dropping "Originating from the Boston
+Athenæum, the Museum of Fine Arts…" — a claim that is *true in the world* and
+absent from the source. That is the policy behaving correctly, and worth stating
+plainly: grounding rejects unsourced truths, not merely falsehoods.
+
+**Six rounds to learn one thing.** D291→D305 fought the same fabrication through
+prompts (five rounds, all lost) and then through gates (two rounds, won). The
+decisive move was D303's switch from instructing to enforcing, and the decisive
+correction was D304's discovery that the enforcement covered half the stop. Every
+prompt-side round was wasted motion in hindsight; the codebase already contained
+the working pattern.
+
+## D306 — Numbers are claims, and neither gate reads numbers
+**2026-08-10.** In the same clean run, one fabrication survived:
+
+> "With **over 1.2 million visitors annually**, the Museum of Fine Arts…"
+
+Not on the page. It passed because the person gate matches names and the form gate
+matches form vocabulary — **a statistic is neither**. The Boston Athenæum claim in
+the same paragraph was caught; the same class of ungrounded assertion survived
+purely by being expressed as a number.
+
+**The pattern across D304 and D306 is one pattern:** each gate defines a shape it
+recognises, and invention flows to shapes no gate recognises. First it moved to an
+unguarded *field*; now to an unguarded *claim type*. Expect the next one to move
+again — the durable answer is eventually a positive test (does the source support
+this?) rather than an accumulation of negative detectors.
+
+**LOCAL-386 written and PARKED** behind LOCAL-382 to avoid a prose-path collision.
+It must exempt figures already grounded via the credit line — "1971", "40 color
+lithographs" are grounded by construction, and the Palais control case requires
+instrument dates (1780/1884/1696/1581) to survive. A gate that strips those is a
+bounce; a tour with no dates is worse than one with them (D301).
+
+**LOCAL-382 unparked and dispatched** — Michael's D301 framing complaint is the
+priority, and this run makes the case: `book` fell to **0 mentions**. The tour is
+now accurate about who made these objects and silent about what they are.
