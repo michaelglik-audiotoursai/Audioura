@@ -11460,3 +11460,34 @@ the regex fix by effect through `_fetch_page`, and the live run is the real
 evidence. Mirrors are future-regression risk, not present breakage, and holding
 a verified fix hostage to test debt would stall the chain. Debt tracked as
 LOCAL-374.
+
+## D294 — The mirror debt is paid, and the revert count is now the acceptance criterion that works
+**2026-08-10.** LOCAL-374 merged. Reverting `exhibition_checklist.py` to pre-373
+now turns **15 of 17 tests red, up from 8 of 16**. LEAD ran the revert
+independently and reproduced the submission's numbers exactly.
+
+The rewrite did what D293 predicted would work: drive the real `_fetch_page`
+through a mocked `requests.get` instead of inlining a copy of the regex. The
+test file no longer imports `re` at all — a neat structural proof that no
+production pattern is duplicated in it.
+
+**Two tests still survive the revert, and both should.** One is a negative
+control (an address inside the first 500 chars must NOT trigger the footer
+boundary — true in both trees by design). The other asserts the three artwork
+names are present in the fixture window at all, which is content presence, not
+regex behaviour. A test that is *supposed* to be green in both trees is not a
+mirror; the distinction is whether the assertion could ever have been made true
+by the bug.
+
+**What made this round different from the previous six.** D277 was restated as a
+prohibition in task file after task file — "no mirrors, no `inspect.getsource`" —
+and was violated six times, in five disguises. LOCAL-374 stated a *number*
+instead: reverting must turn at least 12 of 16 red. That is checkable by
+execution rather than by reading, it cannot be satisfied by a test that does not
+touch production, and LEAD verifies it by running it rather than by trusting the
+report.
+
+**Adopt it generally.** Any task file claiming a behavioural fix must state the
+expected red-on-revert count, and LEAD runs the revert itself. A prohibition
+describes what not to write; a revert count describes what the tests must be
+able to detect. Only the second one is falsifiable.
