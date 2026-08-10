@@ -11203,3 +11203,53 @@ Now requires exact normalized equality, or mutual prefix containment **and**
 positive, not be uniform across the codebase. A fact attached to the wrong stop
 is a quality bug; an attribution attached to the wrong person is a different
 category, and the same threshold should not serve both.
+
+## D287 — LOCAL-370 worked; the next failure was waiting behind it
+**2026-08-10.** After merging 370 the exhibition request was regenerated live.
+The retrieval chain now behaves exactly as designed:
+
+```
+search term: 'Picasso, Miró, Dalí: Unbound exhibition at MFA, Boston, MA'   (fix 1)
+matched:     'Picasso, Miró, Dalí: Unbound…'  score 0.46                    (fix 2)
+URL:         mfa.org/exhibition/picasso-miro-dali-unbound                   (fix 2)
+path:        prose_llm                                                      (fix 3)
+R4:          asking for 2 candidates (2× total_stops=1, not 8)              (fix 4)
+```
+
+All four fixes demonstrably fired. **And no tour was produced:**
+
+```
+[D1v2] DROPPED 'Le Lézard aux plumes d'or (The Lizard with Golden Feathers)'
+       — theme/book word, not a work title
+[D1v2] 0 works verified — tier: unresolvable
+```
+
+`generate_tour_text.py:2439` is `any(tw in _work_lower for tw in theme_words)` —
+substring containment, no word boundary. Same defect class as LOCAL-358's
+`contains('walk')` matching inside *boardwalk*, which was already fixed once in
+the app parser and evidently not looked for elsewhere.
+
+**The irony is the point.** The guard exists to drop book and theme words on the
+assumption that books are not artworks. This exhibition is *livres d'artiste*:
+every object in it is a book. A heuristic encoding "books aren't art" cannot
+survive a show whose subject is artists' books, and no amount of tuning the word
+list fixes that — the assumption itself is scope-dependent.
+
+**Second finding:** the live run extracted **1** work where the same extractor
+against the committed fixture returned **3** the same day. Cause unknown;
+dispatched with instructions to report `len(page_text)` for both paths rather
+than guess.
+
+**Third, and the reason this is a decision and not a bug report:** LEAD could not
+determine which theme word caused the drop. The log does not say, and the cached
+`theme_words` for Q49133 is empty because the list is mined at runtime. **A guard
+that deletes a candidate must name what triggered it** — otherwise the failure is
+two steps from its cause and review degenerates into guessing. That diagnostic is
+now a required deliverable in LOCAL-372.
+
+**The pattern across D284 and this entry is worth stating plainly.** Each fix
+exposes the next failure, and every one of them was invisible to a green suite.
+Five distinct defects in one request path, found only by generating the tour and
+reading the log. Michael's instruction — *"we should only review fully generated
+tours"* — is the correct standard, and it is now enforced in the task template:
+paste live delivered stop headings, not suite output.
