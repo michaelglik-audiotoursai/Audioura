@@ -21,11 +21,21 @@ import pytest
 import requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# Must be set before import; guarantees the failure-path DELETE cannot connect.
-os.environ["DB_HOST"] = "invalid.test.localdomain"
 os.environ.setdefault("DATABASE_URL", "postgresql://u:p@invalid.test.localdomain/none")
 
 import tour_orchestrator_service as tos  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _unreachable_db(monkeypatch):
+    """
+    Point the failure-path DELETE at a host that cannot resolve.
+
+    Scoped via monkeypatch rather than set at module import: DB_HOST is read
+    with os.getenv() at call time, and a module-level assignment leaked into
+    every other suite in the same pytest session.
+    """
+    monkeypatch.setenv("DB_HOST", "invalid.test.localdomain")
 
 # Raised by the fake transport on the first call AFTER the text-gen poll loop.
 # Seeing this in the recorded error proves the loop was survived.
