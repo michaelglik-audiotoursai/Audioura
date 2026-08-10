@@ -1819,6 +1819,35 @@ def _compute_groundedness_for_stop(sa: 'StopAnalysis', stop: dict, corpus_data: 
             pass  # claim_check not available — no CONTRADICTED signal
 
 
+# ─── [LOCAL-375] Flagged-sentence extraction helper ──────────────────────────
+# Reachable from production code (used by run_local375_classify_empty_sentences
+# and any future enforcing gate). Returns the list of sentences from a tour
+# stop body that _is_empty_sentence flags.
+
+
+def get_flagged_empty_sentences(body: str) -> List[str]:
+    """Return all sentences in *body* that _is_empty_sentence flags.
+
+    This is the canonical entry point for extracting flagged sentences from a
+    stop body — the same splitting and length filter as analyze_stop applies.
+
+    Args:
+        body: The parsed stop body text (output of parse_tour's stop['body']).
+
+    Returns:
+        List of flagged sentence strings (verbatim, stripped).
+    """
+    sentences = re.split(r'(?<=[.!?])\s+', body)
+    flagged = []
+    for sent in sentences:
+        s = sent.strip()
+        if len(s) <= 15:
+            continue
+        if _is_empty_sentence(s):
+            flagged.append(s)
+    return flagged
+
+
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         print("Usage: python tour_rubric_scorer.py <tour_file> [--n N] [--quiet]")
