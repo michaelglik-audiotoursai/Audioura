@@ -3786,11 +3786,165 @@ def build_provenance_block(credit_line):
     )
 
 
+def recover_medium_from_page_text(work_title, page_text):
+    """[LOCAL-380] Attempt to recover a medium/form from exhibition page prose.
+
+    When the structured `medium` field is empty but the page prose describes the
+    work's physical form (e.g. "livre d'artiste", "illustrated book"), extract it.
+
+    Returns the recovered medium string, or '' if nothing found.
+    """
+    if not work_title or not page_text:
+        return ''
+
+    # Normalise title for search
+    title_lower = work_title.lower().strip()
+    page_lower = page_text.lower()
+
+    # Find the title in the page text (or a significant fragment of it)
+    title_pos = page_lower.find(title_lower)
+    if title_pos == -1:
+        # Try first significant words (at least 3 chars each)
+        title_words = [w for w in title_lower.split() if len(w) >= 3]
+        if len(title_words) >= 2:
+            # Search for first two significant words together
+            fragment = ' '.join(title_words[:3])
+            title_pos = page_lower.find(fragment)
+    if title_pos == -1:
+        return ''
+
+    # Extract a window around the title mention (300 chars before and after)
+    window_start = max(0, title_pos - 300)
+    window_end = min(len(page_text), title_pos + len(title_lower) + 300)
+    window = page_text[window_start:window_end]
+
+    # Look for medium/form indicators in the window
+    _MEDIUM_PATTERNS = [
+        # "livre d'artiste" or "livres d'artiste"
+        re.compile(r"livres?\s+d['']\s*artiste", re.IGNORECASE),
+        # "illustrated book" / "artist's book"
+        re.compile(r"(?:illustrated|artist'?s?)\s+book", re.IGNORECASE),
+        # "book with N [color] lithographs/etchings/prints"
+        re.compile(r"book\s+(?:with|featuring|of)\s+\d+\s+\w*\s*(?:lithograph|etching|print|woodcut|engraving)s?", re.IGNORECASE),
+        # "color lithographs" / "original lithographs"
+        re.compile(r"\d+\s+(?:color|colour|original)?\s*(?:lithograph|etching|print|woodcut|engraving)s?", re.IGNORECASE),
+        # "portfolio of prints"
+        re.compile(r"portfolio\s+(?:of|with)\s+\w+\s*(?:lithograph|etching|print|engraving)s?", re.IGNORECASE),
+    ]
+
+    for pat in _MEDIUM_PATTERNS:
+        m = pat.search(window)
+        if m:
+            return m.group(0).strip()
+
+    return ''
+
+
+def extract_collaborator_from_page_text(work_title, artist, page_text):
+    """[LOCAL-380] Extract a collaborating writer/poet from exhibition page prose.
+
+    Museum pages often name both the visual artist and the literary collaborator
+    for illustrated books (e.g. "Juan Gris and French poet Pierre Reverdy's
+    Au Soleil du Plafond"). When the page names a co-author/collaborator near
+    the work title, return their name.
+
+    Returns the collaborator name string, or '' if not found.
+    """
+    if not work_title or not page_text:
+        return ''
+
+    title_lower = work_title.lower().strip()
+    page_lower = page_text.lower()
+
+    # Find the title in the page text
+    title_pos = page_lower.find(title_lower)
+    if title_pos == -1:
+        title_words = [w for w in title_lower.split() if len(w) >= 3]
+        if len(title_words) >= 2:
+            fragment = ' '.join(title_words[:3])
+            title_pos = page_lower.find(fragment)
+    if title_pos == -1:
+        return ''
+
+    # Extract a window around the title (400 chars before, 200 after)
+    window_start = max(0, title_pos - 400)
+    window_end = min(len(page_text), title_pos + len(title_lower) + 200)
+    window = page_text[window_start:window_end]
+
+    # Patterns for collaborator mentions near the title
+    _COLLAB_PATTERNS = [
+        # "Artist and [adjective] [role] Name's Title" or "Artist and Name's Title"
+        re.compile(
+            r'(?:' + re.escape((artist or '').split()[-1] if artist else '') + r')'
+            r'\s+and\s+(?:\w+\s+)?(?:poet|writer|author|novelist)?\s*'
+            r'([A-Z][a-z\u00e0-\u00ff]+(?:\s+[A-Z][a-z\u00e0-\u00ff]+)+)',
+            re.UNICODE
+        ) if artist else None,
+        # "with text by Name" / "with poems by Name"
+        re.compile(
+            r'with\s+(?:text|poems?|prose|writing)\s+by\s+'
+            r'([A-Z][a-z\u00e0-\u00ff]+(?:\s+[A-Z][a-z\u00e0-\u00ff]+)+)',
+            re.UNICODE
+        ),
+        # "Name and Artist's Title" (collaborator listed first)
+        re.compile(
+            r'([A-Z][a-z\u00e0-\u00ff]+(?:\s+[A-Z][a-z\u00e0-\u00ff]+)+)\s+and\s+'
+            r'(?:' + re.escape((artist or '').split()[-1] if artist else '') + r')',
+            re.UNICODE
+        ) if artist else None,
+    ]
+
+    for pat in _COLLAB_PATTERNS:
+        if pat is None:
+            continue
+        m = pat.search(window)
+        if m:
+            name = m.group(1).strip()
+            # Reject if the "collaborator" is the artist themselves
+            if artist and name.lower() == artist.lower():
+                continue
+            # Reject if it looks like a place name or institution
+            _reject_words = {'museum', 'gallery', 'fine', 'arts', 'institute',
+                             'university', 'library', 'press', 'edition'}
+            name_words_lower = {w.lower() for w in name.split()}
+            if name_words_lower & _reject_words:
+                continue
+            return name
+
+    return ''
+
+
+# [LOCAL-381] Words in titles that the model may misread as describing the
+# physical form or placement of the artwork.  When any of these appear in the
+# title, the work identity block adds a positive disambiguation clause.
+_TITLE_MISLEADING_WORDS = frozenset([
+    'plafond', 'ceiling', 'mur', 'wall', 'fenêtre', 'fenetre', 'window',
+    'soleil', 'sun', 'dome', 'voûte', 'voute', 'vault', 'toit', 'roof',
+    'colonne', 'column', 'porte', 'door', 'sol', 'floor', 'ciel', 'sky',
+])
+
+
+def _title_has_misleading_words(title):
+    """[LOCAL-381] Return True if title contains words that could be misread as
+    describing the object's physical form or architectural placement."""
+    if not title:
+        return False
+    # Tokenize: split on whitespace and punctuation, lowercase
+    words = set(re.findall(r"[a-zà-ÿ]+", title.lower()))
+    return bool(words & _TITLE_MISLEADING_WORDS)
+
+
 def build_work_identity_block(matched_work):
-    """[LOCAL-379] Build a WORK IDENTITY block from any available fields on matched_work.
+    """[LOCAL-379/381] Build a WORK IDENTITY block from any available fields.
 
     Emits whenever at least ONE of artist, date, medium, publisher, or credit_line
     is available. If medium is empty, explicitly prohibits spatial/medium claims.
+
+    [LOCAL-381] When the title contains words suggesting architecture or placement
+    (e.g. "plafond", "ceiling"), adds a positive title disambiguation: the title
+    is a title (poetic/metaphorical), NOT a description of the object's form.
+    The work identity positively asserts what the object IS when medium is known.
+
     Returns '' only when matched_work is None or has no usable fields at all.
     """
     if not matched_work:
@@ -3801,6 +3955,8 @@ def build_work_identity_block(matched_work):
     medium = (matched_work.get('medium') or '').strip()
     publisher = (matched_work.get('publisher') or '').strip()
     credit_line = (matched_work.get('credit_line') or '').strip()
+    collaborator = (matched_work.get('collaborator') or '').strip()
+    title = (matched_work.get('title') or '').strip()
 
     # Bail if nothing useful is available
     if not any([artist, date, medium, publisher, credit_line]):
@@ -3810,6 +3966,8 @@ def build_work_identity_block(matched_work):
 
     if artist:
         lines.append(f"  Artist: {artist}")
+    if collaborator:
+        lines.append(f"  Collaborator: {collaborator}")
     if date:
         lines.append(f"  Date: {date}")
     if medium:
@@ -3817,15 +3975,44 @@ def build_work_identity_block(matched_work):
     else:
         lines.append("  Medium: UNKNOWN — do NOT describe physical form, placement, "
                      "or spatial relationship. Do NOT say 'painting', 'sculpture', "
-                     "'ceiling', 'installation', 'mural', or assert any medium.")
+                     "'ceiling', 'installation', 'mural', 'glass', or assert any medium. "
+                     "Do NOT tell the visitor where to stand or look. "
+                     "Do NOT use phrases like 'look up', 'stand beneath', "
+                     "'positioned above you', or describe the work's physical orientation. "
+                     "The work's physical form is unknown — prefer stating what IS known "
+                     "(artist, date, collaborator, publisher) at greater length.")
     if publisher:
         lines.append(f"  Publisher: {publisher}")
     if credit_line:
         lines.append(f"  Credit line: {credit_line}")
 
+    # [LOCAL-381] Title disambiguation — positive assertion that the title is a
+    # title, not a description of the object's form or location.
+    _title_misleads = _title_has_misleading_words(title)
+    if _title_misleads:
+        lines.append("")
+        lines.append(
+            f"  TITLE NOTE: \"{title}\" is the TITLE of this work — a poetic or "
+            f"metaphorical name. It does NOT describe the object's physical form, "
+            f"material, or placement in the gallery. Words in the title that "
+            f"suggest architecture or location (ceiling, wall, sun, sky, etc.) "
+            f"refer to the work's SUBJECT or IMAGERY, never its physical medium. "
+            f"This object is NOT a ceiling, NOT an installation, NOT a mural, "
+            f"NOT glass — it is {'a ' + medium if medium else 'a book/printed work (livre d artiste)'}."
+        )
+
     lines.append("")  # trailing newline separator
     lines.append("You MUST name the artist in your description. If a collaborator or "
                  "author is given, name them too. These are grounded facts — use them.")
+    if not medium:
+        lines.append("ORIENTATION CONSTRAINT: Since the medium/form is unknown, your "
+                     "Orientation section must NOT give spatial directions (where to stand, "
+                     "where to look, what is above/below/beside). Instead, simply name the "
+                     "work and introduce what is known about it (artist, date, context).")
+        lines.append("MINIMUM LENGTH: You have grounded facts (artist, date, collaborator, "
+                     "publisher). Write at LEAST 120 words using these facts — discuss the "
+                     "artist's career, the collaboration, the historical context. Do NOT "
+                     "cut the description short.")
     lines.append("")
 
     return '\n'.join(lines)
@@ -4712,6 +4899,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     if _forced_stops_active:
         # [LOCAL-357] forced_stops bypasses ALL selection — mark as deterministic
         _deterministic_fill_used = True
+        _exhibition_stops_source = 'checklist'
         print(f"\nPHASE 3A: SKIPPED (forced stops — LOCAL-357 verification harness)")
         print(f"OK PHASE 3A parsed {len(poi_list)} candidate POI(s):")
         for p in poi_list:
@@ -8476,16 +8664,37 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 _credit_line_for_stop = (_matched_work.get('credit_line') or '').strip()
         description_prompt += build_provenance_block(_credit_line_for_stop)
 
-        # [LOCAL-379] WORK IDENTITY BLOCK: Inject artist, date, medium, publisher
+        # [LOCAL-379/381] WORK IDENTITY BLOCK: Inject artist, date, medium, publisher
         # whenever ANY field is available — not only when medium is non-empty.
         # This fixes Defect 1 (block suppressed for thin/empty medium) and
         # Defect 2 (correct artist never named in prose).
+        # [LOCAL-380/381] When medium is empty, attempt recovery from page prose.
+        # Also extract collaborator from page prose when available.
         _matched_medium = ''
-        if _matched_work and _matched_work.get('medium'):
-            _matched_medium = _matched_work['medium'].strip()
+        if _matched_work:
+            if not (_matched_work.get('medium') or '').strip():
+                # [LOCAL-380] Attempt medium recovery from exhibition page prose
+                _page_text_for_recovery = getattr(_exhibition_checklist_result, 'page_text', '') or ''
+                _recovered_medium = recover_medium_from_page_text(
+                    _matched_work.get('title', ''), _page_text_for_recovery)
+                if _recovered_medium:
+                    _matched_work['medium'] = _recovered_medium
+                    print(f"  [LOCAL-380] Recovered medium from page prose: '{_recovered_medium}'")
+            # [LOCAL-380] Extract collaborator from page prose
+            if not (_matched_work.get('collaborator') or '').strip():
+                _page_text_for_collab = getattr(_exhibition_checklist_result, 'page_text', '') or ''
+                _recovered_collab = extract_collaborator_from_page_text(
+                    _matched_work.get('title', ''),
+                    _matched_work.get('artist', ''),
+                    _page_text_for_collab)
+                if _recovered_collab:
+                    _matched_work['collaborator'] = _recovered_collab
+                    print(f"  [LOCAL-380] Recovered collaborator from page prose: '{_recovered_collab}'")
+            if (_matched_work.get('medium') or '').strip():
+                _matched_medium = _matched_work['medium'].strip()
         _work_identity_block = build_work_identity_block(_matched_work)
         _provenance_block_chars = len(_work_identity_block)
-        print(f"  [LOCAL-379] stop='{poi_name}' matched_work={_matched_work is not None} "
+        print(f"  [LOCAL-381] stop='{poi_name}' matched_work={_matched_work is not None} "
               f"medium='{_matched_medium}' work_identity_chars={_provenance_block_chars}")
         description_prompt += _work_identity_block
 
@@ -8760,9 +8969,31 @@ NOTE: "The Biblical Message" (Message Biblique) is the name of the COMPLETE CYCL
             _word_target = "280"
             _word_target_instruction = ""
 
+        # [LOCAL-381] Build orientation instruction that respects medium constraint.
+        # When medium is unknown AND the title contains misleading architectural words,
+        # the orientation must NOT give spatial directions — prevents the model from
+        # re-inferring "ceiling" from "Plafond" in the title.
+        _orientation_has_misleading_title = (
+            _matched_work is not None
+            and not _matched_medium
+            and _title_has_misleading_words(_matched_work.get('title', ''))
+        )
+        if _orientation_has_misleading_title:
+            _orientation_instruction = (
+                "Orientation: (introduce the work by naming it and stating what is "
+                "known — artist, date, collaborator — but do NOT describe physical "
+                "form, do NOT say where to stand or look, do NOT describe placement "
+                "or spatial orientation of the work)"
+            )
+        else:
+            _orientation_instruction = (
+                "Orientation: (write a brief orientation text explaining the best "
+                "viewing position here)"
+            )
+
         description_prompt += f"""
 Format your response as follows:
-Orientation: (write a brief orientation text explaining the best viewing position here)
+{_orientation_instruction}
 
 Then write the description directly — a flowing, {_word_target}-word narrative about the exhibit. Do NOT wrap it in brackets, placeholders, or formatting markers. Just write the prose.
 
@@ -10056,11 +10287,12 @@ REWRITE RULES (all mandatory):
     # -------- [LOCAL-378] PHASE 5.158: Prose entity grounding gate --------
     # Fires ONLY for exhibition-scoped museum tours. Removes all mentions of
     # persons not grounded in the exhibition page text or artist checklist.
+    # [LOCAL-385] Now scans ALL fields in GATED_PROSE_FIELDS (description + orientation).
     # Scope limitation (Defect 5): unscoped museum tours (Palais Lascaris, etc.)
     # remain ungated. This is intentional and documented — do not widen.
     if (tour_category == 'museum' and _exhibition_checklist_result
             and getattr(_exhibition_checklist_result, 'page_text', '')):
-        print(f"\n  [LOCAL-378] PHASE 5.158: Prose entity grounding gate...")
+        print(f"\n  [LOCAL-385] PHASE 5.158: Prose entity grounding gate (scans all prose fields)...")
         try:
             from prose_entity_grounding_gate import apply_prose_entity_grounding_gate
             _peg_stop_names = [p.get('name', '') for p in poi_list]
@@ -10069,7 +10301,7 @@ REWRITE RULES (all mandatory):
                 _exhibition_checklist_result,
                 stop_names=_peg_stop_names,
             )
-            print(f"  [LOCAL-378] Prose entity grounding gate summary:")
+            print(f"  [LOCAL-385] Prose entity grounding gate summary:")
             print(f"    Persons detected: {_peg_stats['persons_detected']}")
             print(f"    Persons grounded: {_peg_stats['persons_grounded']}")
             print(f"    Persons ungrounded: {_peg_stats['persons_ungrounded']}")
@@ -10078,12 +10310,49 @@ REWRITE RULES (all mandatory):
             if _peg_stats['ungrounded_names']:
                 print(f"    Ungrounded: {_peg_stats['ungrounded_names']}")
         except ImportError as _peg_err:
-            print(f"  [LOCAL-378] WARNING: prose_entity_grounding_gate not importable — gate skipped ({_peg_err})")
+            print(f"  [LOCAL-385] WARNING: prose_entity_grounding_gate not importable — gate skipped ({_peg_err})")
         except Exception as _peg_err:
-            print(f"  [LOCAL-378] ERROR: prose entity grounding gate failed (non-fatal): {_peg_err}")
+            print(f"  [LOCAL-385] ERROR: prose entity grounding gate failed (non-fatal): {_peg_err}")
     else:
         if tour_category == 'museum':
-            print(f"\n  [LOCAL-378] Prose entity grounding gate SKIPPED "
+            print(f"\n  [LOCAL-385] Prose entity grounding gate SKIPPED "
+                  f"(no exhibition scope — unscoped museum tours are not gated)")
+
+    # -------- [LOCAL-384] PHASE 5.159: Form-claim gate --------
+    # The model repeatedly infers physical form from titles (e.g. "Au Soleil du
+    # Plafond" → "ceiling mural"). Five prompt-level rounds failed. This gate
+    # enforces at the output level: scan delivered text for physical form and
+    # placement claims, check against the known medium, remove unsupported claims.
+    # [LOCAL-385] Now scans ALL fields in GATED_PROSE_FIELDS (description + orientation).
+    # Same scope as the person gate: exhibition-scoped museum tours only.
+    if (tour_category == 'museum' and _exhibition_checklist_result
+            and getattr(_exhibition_checklist_result, 'works', None)):
+        print(f"\n  [LOCAL-385] PHASE 5.159: Form-claim gate (scans all prose fields)...")
+        try:
+            from prose_entity_grounding_gate import apply_form_claim_gate
+            _fcg_stats = apply_form_claim_gate(
+                poi_list,
+                _exhibition_checklist_result,
+            )
+            print(f"  [LOCAL-385] Form-claim gate summary:")
+            print(f"    Claims detected: {_fcg_stats['claims_detected']}")
+            print(f"    Claims kept (compatible): {_fcg_stats['claims_kept']}")
+            print(f"    Claims removed: {_fcg_stats['claims_removed']}")
+            print(f"    Metaphor-exempt (kept): {_fcg_stats['claims_metaphor_exempt']}")
+            print(f"    Sentences dropped: {_fcg_stats['sentences_dropped']}")
+            print(f"    Stops affected: {_fcg_stats['stops_affected']}")
+            if _fcg_stats['removal_log']:
+                for _rl in _fcg_stats['removal_log']:
+                    print(f"    [LOCAL-385] field={_rl['field']} stop='{_rl['stop']}' "
+                          f"term='{_rl['term']}' medium='{_rl['medium']}' "
+                          f"dropped: \"{_rl['sentence'][:80]}\"")
+        except ImportError as _fcg_err:
+            print(f"  [LOCAL-385] WARNING: form-claim gate not importable — gate skipped ({_fcg_err})")
+        except Exception as _fcg_err:
+            print(f"  [LOCAL-385] ERROR: form-claim gate failed (non-fatal): {_fcg_err}")
+    else:
+        if tour_category == 'museum':
+            print(f"\n  [LOCAL-385] Form-claim gate SKIPPED "
                   f"(no exhibition scope — unscoped museum tours are not gated)")
 
     # -------- [LOCAL-229] PHASE 5.16: CONTRADICTED claim block --------
