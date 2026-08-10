@@ -7037,6 +7037,44 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 except Exception as _se_err:
                     print(f"  [§3] Story element extraction error: {_se_err}")
 
+            # [LOCAL-369] Thread A: For scoped exhibitions, feed the exhibition's own
+            # prose into story element extraction. The venue corpus (story_miner) captures
+            # the permanent collection; an exhibition has its own framing text that
+            # contains the cross-stop themes worth discovering.
+            if (_exhibition_scope is not None and _exhibition_checklist_result
+                    and getattr(_exhibition_checklist_result, 'page_text', '')):
+                try:
+                    from story_element_extractor import extract_story_elements_from_pages
+                    _exh_page_text = _exhibition_checklist_result.page_text
+                    _exh_pages = [{
+                        'url': _exhibition_checklist_result.exhibition_url or 'exhibition_page',
+                        'text': _exh_page_text,
+                        'title': _exhibition_checklist_result.exhibition_title or '',
+                    }]
+                    _exh_elements = extract_story_elements_from_pages(
+                        pages=_exh_pages,
+                        venue_name=_venue_name,
+                        api_key=api_key,
+                        max_pages=1,
+                    )
+                    if _exh_elements:
+                        # Merge exhibition elements into story_elements, deduplicating by text
+                        _existing_texts = {e.get('text', '')[:80] for e in _story_elements}
+                        _added = 0
+                        for _ee in _exh_elements:
+                            if _ee.get('text', '')[:80] not in _existing_texts:
+                                _story_elements.append(_ee)
+                                _existing_texts.add(_ee.get('text', '')[:80])
+                                _added += 1
+                        print(f"  [LOCAL-369] Exhibition prose → {_added} new story elements "
+                              f"(total now {len(_story_elements)})")
+                    else:
+                        print(f"  [LOCAL-369] Exhibition prose yielded no story elements")
+                except ImportError:
+                    print(f"  [LOCAL-369] story_element_extractor not available for exhibition prose")
+                except Exception as _exh_err:
+                    print(f"  [LOCAL-369] Exhibition prose extraction error (non-fatal): {_exh_err}")
+
             # [LOCAL-37] Three-class retrieval: tag elements + fetch category context
             _three_class_results = {}  # poi_name → retrieval result
             try:
@@ -7987,6 +8025,33 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 if _binding_block.strip():
                     description_prompt += _binding_block
         
+        # [LOCAL-369] Thread B: Inject credit_line as a grounded provenance fact.
+        # The credit line is a published, museum-asserted datum from the exhibition checklist.
+        # The narrator may use it as a factual statement (e.g., "Gift of Boris Fridman")
+        # but MUST NOT infer motive, wealth, or financial condition from the donation.
+        _credit_line_for_stop = ''
+        if (tour_category == 'museum' and poi_name
+                and _exhibition_checklist_result
+                and getattr(_exhibition_checklist_result, 'works', None)):
+            from story_miner import _normalize as _cl_norm
+            _poi_norm_cl = _cl_norm(poi_name)
+            for _cl_work in _exhibition_checklist_result.works:
+                if _cl_work.get('credit_line'):
+                    _cl_title_norm = _cl_norm(_cl_work.get('title', ''))
+                    if (_poi_norm_cl[:10] in _cl_title_norm
+                            or _cl_title_norm[:10] in _poi_norm_cl
+                            or _poi_norm_cl == _cl_title_norm):
+                        _credit_line_for_stop = _cl_work['credit_line']
+                        break
+        if _credit_line_for_stop:
+            description_prompt += f"""
+PROVENANCE (museum-published credit line — you may state this fact):
+  {_credit_line_for_stop}
+PROHIBITION: Do NOT infer or assert the donor's motive, wealth, financial condition,
+or any biographical predicate not contained in retrieved text. Stating "Gift of [name]"
+is the documented fact; "donated because…" or "could no longer afford…" is fabrication.
+"""
+
         # [§4] Story element injection — per-work facts from story_elements
         # [LOCAL-29] Tightened matching: use [:10] prefix AND require >= 60% word overlap
         # to prevent cross-contamination between adjacent entries with similar short prefixes.
