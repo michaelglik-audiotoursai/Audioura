@@ -11837,3 +11837,55 @@ new feature to **not** engage.
 
 **Recorded as a standing habit:** when a task adds behaviour derived from one
 venue, its acceptance must include a venue where that behaviour must not appear.
+
+## D303 — Five prompt-level attempts lost to one word in a title. Switch to enforcement.
+**2026-08-10.** LOCAL-381 bounced. The pattern is now unambiguous and is the most
+useful thing learned today.
+
+*Au Soleil du Plafond* — a 1955 Juan Gris / Pierre Reverdy **book** — across five
+rounds:
+
+| Round | Countermeasure | Output |
+|---|---|---|
+| D291 | none | "Le Corbusier's **ceiling mural**" |
+| D298 | emit WORK IDENTITY block | "contemporary **ceiling installation**" |
+| D299 | block on every stop (422 chars) | "vibrant **glass panels**" overhead |
+| D300 | explicit negative for empty medium | "transforms the **ceiling** into a canvas" |
+| D303 | positive identity assertion (**1720 chars**) | `ceiling` ×3, `look up` ×1 |
+
+Each round the instruction got stronger and more explicit. Each round the model
+complied with the letter and re-derived the same claim from the **title**.
+*Plafond* is French for ceiling, and a title is the most available cue in the
+prompt.
+
+**The conclusion is not "write a better prompt".** It is that a prompt is
+advisory and this is the fifth demonstration. The remedy is the one that already
+works in this codebase: `prose_entity_grounding_gate.py` never asks the model to
+avoid ungrounded persons — it inspects the delivered text and removes them, and
+`Rousseau`/`Corbusier`/`Lalanne`/`Matisse` have been zero for three straight
+rounds as a result.
+
+**So: gate physical-form claims the same way.** Architectural surfaces, object
+types and spatial instructions get checked against the known medium; incompatible
+or unsupported claims lose their sentence. Unknown medium means no form claim may
+be made at all — we may not assert what we do not know.
+
+**This is D277/D296 promoted from test hygiene to product architecture.** There,
+the lesson was that forbidding mirrors in a task file failed six times while
+lifting logic to module scope worked immediately. Same shape: *the instruction is
+not the remedy; the structure is.* LEAD spent five rounds re-learning it one layer
+up.
+
+**The control case matters as much as the fix (D302).** A real ceiling fresco must
+remain describable — Palais Lascaris is the acceptance case where this gate must
+**not** fire. A gate that mutes legitimate description is a bounce.
+
+**What 381 got right and must survive:** `Freud` restored to stop 2,
+`installation`/`glass`/`sculpture` at zero, stop count 3/3, collaborator recovery
+and Orientation-path block from 380 both working. Only `ceiling` and `look up`
+failed. Dispatched as LOCAL-384.
+
+**Also unresolved: stop 2 has been the thinnest stop every round** (84 words here,
+77 in 380, against a 120 floor). Its identity block is the smallest of the three
+(269 chars). The honest remedy is LOCAL-382's exhibition framing supplying
+substance, not padding — 384 is told to report the cause, not fix it by volume.
