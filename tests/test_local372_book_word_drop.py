@@ -184,3 +184,64 @@ class TestFilterNavFromPageText:
         # Content preserved
         assert "Picasso" in result
         assert "Joan Miró" in result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LEAD review (2026-08-10) — the D1v2 bypass must not mean "no grounding".
+#
+# Skipping D1v2 for exhibition stops is correct: it verifies against the venue's
+# PERMANENT collection, which a temporary show is not in — that is what deleted
+# 'Le Lézard aux plumes d'or'. But as submitted, exhibition stops had NO check at
+# all, so a title invented by the extraction LLM would ship unchallenged in the
+# one path whose premise is that the venue's page is authoritative.
+#
+# Grounding now runs against that page instead.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+import re as _re
+import html as _html
+from pathlib import Path as _Path
+
+
+def _mfa_page_text():
+    p = _Path(__file__).parent / 'fixtures' / 'mfa_picasso_miro_dali_unbound.html'
+    raw = p.read_text(encoding='utf-8', errors='replace')
+    raw = _re.sub(r'(?is)<(script|style|noscript)[^>]*>.*?</\1>', ' ', raw)
+    return _html.unescape(_re.sub(r'(?s)<[^>]+>', ' ', raw))
+
+
+class TestExhibitionStopsAreGroundedInThePage:
+
+    @pytest.mark.parametrize("title", [
+        "Le Lézard aux plumes d'or (The Lizard with Golden Feathers)",
+        "Moses and Monotheism",
+        "Au Soleil du Plafond",
+    ])
+    def test_real_works_from_the_page_pass(self, title):
+        from generate_tour_text import title_appears_in_page
+        assert title_appears_in_page(title, _mfa_page_text()) is True
+
+    @pytest.mark.parametrize("title", [
+        "Guernica",
+        "The Persistence of Memory",
+        "Les Demoiselles d'Avignon",
+        "Woman with a Flower Hat",
+    ])
+    def test_invented_works_by_the_same_artists_are_rejected(self, title):
+        """
+        The dangerous case: famous works by Picasso, Miró and Dalí that are NOT in
+        this show. An LLM completing from memory would produce exactly these.
+        """
+        from generate_tour_text import title_appears_in_page
+        assert title_appears_in_page(title, _mfa_page_text()) is False
+
+    def test_accent_and_punctuation_reformatting_tolerated(self):
+        """The extractor may normalise the title; that must not fail grounding."""
+        from generate_tour_text import title_appears_in_page
+        page = _mfa_page_text()
+        assert title_appears_in_page("Le Lezard aux plumes d or", page) is True
+
+    def test_empty_inputs_are_not_grounded(self):
+        from generate_tour_text import title_appears_in_page
+        assert title_appears_in_page('', 'anything') is False
+        assert title_appears_in_page('Something', '') is False

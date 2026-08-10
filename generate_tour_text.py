@@ -46,6 +46,8 @@ from poi_inclusion_exceptions import should_include_in_restaurant_tour, should_i
 from enhanced_prompt_generator import generate_enhanced_prompt
 from datetime import datetime
 import re
+import unicodedata  # [LOCAL-372 LEAD] module scope — a function-scope import here
+                    # would shadow the name for the whole function (D278)
 from collections import Counter
 from math import radians, sin, cos, asin, sqrt
 from tour_settings import (
@@ -2038,6 +2040,46 @@ def _is_book_exhibition_scope(exhibition_scope) -> bool:
         if kw in _requirements:
             return True
     return False
+
+
+def title_appears_in_page(title, page_text, min_word_overlap=0.7):
+    """
+    [LOCAL-372 LEAD] Is `title` actually present in the venue page it came from?
+
+    LOCAL-372 skips D1v2 for exhibition-sourced stops, and the reasoning is right:
+    D1v2 verifies against the venue's SPARQL/canonical titles, which describe the
+    PERMANENT collection, so it will always reject works from a temporary show —
+    that is what deleted 'Le Lézard aux plumes d'or'.
+
+    But "skip verification" is not the same as "verify against the right source".
+    As submitted, an exhibition stop had no grounding check at all: a title the
+    extraction LLM invented would be delivered unchallenged, in the one path whose
+    whole premise is that the venue's own page is authoritative.
+
+    So verify against that page. Tolerant of reformatting — accents folded,
+    punctuation dropped, case ignored — but requires most significant words of the
+    title to be present, which an invented title will not satisfy.
+    """
+    if not title or not page_text:
+        return False
+
+    def _fold(s):
+        n = unicodedata.normalize('NFKD', s.lower())
+        n = ''.join(c for c in n if not unicodedata.combining(c))
+        return re.sub(r'\s+', ' ', re.sub(r'[^\w\s]', ' ', n)).strip()
+
+    t_norm, p_norm = _fold(title), _fold(page_text)
+    if not t_norm:
+        return False
+    if t_norm in p_norm:
+        return True
+
+    words = [w for w in t_norm.split() if len(w) >= 4]
+    if not words:
+        # Very short title — require exact normalized containment, already failed.
+        return False
+    present = sum(1 for w in words if w in p_norm)
+    return (present / len(words)) >= min_word_overlap
 
 
 def _verify_works_v2(poi_list, venue_name, exhibition_scope=None):
@@ -5191,7 +5233,31 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             # works that aren't individually catalogued in the museum's permanent collection.
             if _deterministic_fill_used and _exhibition_stops_source in ('checklist', 'partial', 'prose_llm'):
                 print(f"  [D1/LOCAL-372] SKIP D1v2 — stops sourced from exhibition {_exhibition_stops_source} "
-                      f"(already grounded by venue page, {len(poi_list)} works)")
+                      f"(D1v2 checks the PERMANENT collection; a temporary show is not in it)")
+                # [LOCAL-372 LEAD] Skipping D1v2 is right, but these stops still need
+                # grounding — just against the source that IS authoritative here. Verify
+                # each title actually appears on the venue page it was extracted from,
+                # otherwise an invented title ships unchallenged.
+                _exh_page_text = getattr(_exhibition_checklist_result, 'page_text', '') or ''
+                if _exh_page_text:
+                    _grounded, _ungrounded = [], []
+                    for _p in poi_list:
+                        if title_appears_in_page(_p.get('name', ''), _exh_page_text):
+                            _grounded.append(_p)
+                        else:
+                            _ungrounded.append(_p.get('name', ''))
+                    if _ungrounded:
+                        print(f"  [D1/LOCAL-372] DROPPED {len(_ungrounded)} stop(s) absent from the "
+                              f"exhibition page (not extracted from it — likely invented):")
+                        for _u in _ungrounded:
+                            print(f"      - {_u}")
+                    poi_list = _grounded
+                    if not poi_list:
+                        print(f"  [D1/LOCAL-372] No exhibition stop survived page grounding — clean fail")
+                else:
+                    print(f"  [D1/LOCAL-372] WARNING: no page_text captured — exhibition stops "
+                          f"are ungrounded this run")
+                print(f"  [D1/LOCAL-372] {len(poi_list)} exhibition stop(s) grounded against the venue page")
                 _verification_tier = 'exhibit_museum'
                 _LAST_VERIFICATION_TIER = _verification_tier
             else:
