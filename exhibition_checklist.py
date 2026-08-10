@@ -219,12 +219,18 @@ def _fetch_page(url: str, timeout: int = 15) -> Tuple[str, List[Tuple[str, str]]
             links.append((link_text, href))
 
     # Extract paragraph text
+    # [LOCAL-373] Use <p> or <p + whitespace to avoid matching <picture>, <pre>,
+    # <path>, etc. The old regex <p[^>]*> matched <picture> because 'icture' chars
+    # are all [^>]. This produced false paragraph content (e.g. concatenated
+    # titles from <picture>...<p class="info">Title + Date</p> spans).
     paragraphs = []
-    for p_match in re.finditer(r'<p[^>]*>(.*?)</p>', html, re.DOTALL):
+    _seen_paragraphs = set()
+    for p_match in re.finditer(r'<p(?:\s[^>]*)?>(.+?)</p>', html, re.DOTALL):
         clean = re.sub(r'<[^>]+>', '', p_match.group(1)).strip()
         clean = re.sub(r'&nbsp;', ' ', clean)
         clean = re.sub(r'&[a-z]+;', ' ', clean)
-        if len(clean) > 20:
+        if len(clean) > 20 and clean not in _seen_paragraphs:
+            _seen_paragraphs.add(clean)
             paragraphs.append(clean)
 
     # Extract headings (h1-h4)
@@ -243,17 +249,23 @@ def _fetch_page(url: str, timeout: int = 15) -> Tuple[str, List[Tuple[str, str]]
 
     # Extract image alt text that looks like artwork descriptions
     img_alts = []
+    _seen_alts = set()
     for img_match in re.finditer(r'<img[^>]*alt="([^"]{10,200})"', html):
         alt = img_match.group(1).strip()
         # Keep alts that look like artwork descriptions (contain comma or "by")
-        if ',' in alt or ' by ' in alt.lower():
+        if (',' in alt or ' by ' in alt.lower()) and alt not in _seen_alts:
+            _seen_alts.add(alt)
             img_alts.append(alt)
 
     # Also extract list items (some exhibitions list works in <li> or <ul>)
+    # [LOCAL-373] Deduplicate: responsive sites repeat nav menus (mobile + desktop),
+    # which can double the list item count and push real content out of the window.
     list_items = []
+    _seen_items = set()
     for li_match in re.finditer(r'<li[^>]*>(.*?)</li>', html, re.DOTALL):
         clean = re.sub(r'<[^>]+>', '', li_match.group(1)).strip()
-        if len(clean) > 5 and len(clean) < 200:
+        if len(clean) > 5 and len(clean) < 200 and clean not in _seen_items:
+            _seen_items.add(clean)
             list_items.append(clean)
 
     # Combine: headings first, then figure captions, img alts, paragraphs, list items
@@ -948,6 +960,15 @@ _NAV_LINE_PATTERNS = re.compile(
     re.IGNORECASE,
 )
 
+# [LOCAL-373] Footer boundary detection: lines that signal the start of site-wide
+# footer/address blocks. Everything after these is navigation noise, not content.
+_FOOTER_BOUNDARY_PATTERNS = re.compile(
+    r'^(?:\d{1,5}\s+[A-Z][a-z]+\s+(?:Avenue|Street|Boulevard|Road|Drive|Way|Place|Lane)'  # street address
+    r'|©\s*\d{4}'  # copyright line
+    r'|All\s+[Rr]ights\s+[Rr]eserved'
+    r')',
+)
+
 
 def _filter_nav_from_page_text(text: str) -> str:
     """Remove navigation/footer/menu lines from page text before LLM extraction.
@@ -956,22 +977,33 @@ def _filter_nav_from_page_text(text: str) -> str:
     These push real exhibition content past the 5000-char truncation window.
     Filter short lines that match known nav patterns.
     
+    [LOCAL-373] Also detect footer boundaries (street addresses, copyright lines)
+    and discard everything after them. Museum sites append hundreds of short
+    footer/nav lines that survive pattern matching but are never exhibition content.
+    
     Lifted to module scope for testability.
     """
     lines = text.split('\n')
     filtered = []
+    collected_chars = 0
     for line in lines:
         stripped = line.strip()
         # Skip empty lines  
         if not stripped:
             continue
-        # Skip very short lines that look like nav labels (< 30 chars, match pattern)
+        # [LOCAL-373] Detect footer boundary — stop collecting content.
+        # Only trigger after we've collected at least 500 chars of real content,
+        # to avoid false positives on pages that mention addresses early.
+        if collected_chars > 500 and _FOOTER_BOUNDARY_PATTERNS.match(stripped):
+            break
+        # Skip very short lines that look like nav labels (< 40 chars, match pattern)
         if len(stripped) < 40 and _NAV_LINE_PATTERNS.match(stripped):
             continue
         # Skip lines that are just a number + "items" pattern (cart indicators)
         if re.match(r'^(?:View\s+Cart\s+)?\d+$', stripped):
             continue
         filtered.append(stripped)
+        collected_chars += len(stripped)
     return '\n'.join(filtered)
 
 
