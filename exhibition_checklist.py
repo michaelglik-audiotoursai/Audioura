@@ -272,6 +272,28 @@ def _normalize_for_match(text: str) -> str:
     return re.sub(r'\s+', ' ', stripped).strip()
 
 
+# ─── [LOCAL-370] Generic listing-page titles that must never match ────────────
+# These are page headings on exhibition INDEX pages. Matching against them means
+# the matcher accepted the listing page itself as the exhibition detail page.
+_GENERIC_LISTING_TITLES = frozenset({
+    'exhibitions', 'exhibition', "what's on", 'whats on', 'on view',
+    'current exhibitions', 'past exhibitions', 'upcoming exhibitions',
+    'upcoming', 'now on view', 'current', 'past', 'archive',
+    # French
+    'expositions', 'exposition', 'en ce moment', 'expositions en cours',
+    'expositions passées', 'expositions passees', 'à venir', 'a venir',
+    # German
+    'ausstellungen', 'ausstellung', 'aktuelle ausstellungen',
+    'vergangene ausstellungen', 'kommende ausstellungen',
+    # Spanish
+    'exposiciones', 'exposición', 'exposicion', 'actuales', 'pasadas',
+    # Italian
+    'mostre', 'mostra', 'in corso', 'passate', 'prossime',
+    # Dutch
+    'tentoonstellingen', 'tentoonstelling',
+})
+
+
 # ─── Title similarity: stop words, proper-noun detection, confusable pairs ────
 
 _STOP_WORDS = frozenset({
@@ -397,6 +419,13 @@ def _title_similarity(requested: str, published: str) -> float:
     if req_norm == pub_norm:
         return 1.0
 
+    # [LOCAL-370] Reject generic listing-page titles outright.
+    # "Exhibitions", "What's On", etc. are page headings on index pages, never
+    # actual exhibition names. Matching against them means the listing page
+    # itself was mistaken for the exhibition detail page.
+    if pub_norm in _GENERIC_LISTING_TITLES:
+        return 0.0
+
     # Check if one contains the other (user typed a prefix/suffix)
     if req_norm in pub_norm or pub_norm in req_norm:
         shorter = min(len(req_norm.split()), len(pub_norm.split()))
@@ -439,6 +468,17 @@ def _title_similarity(requested: str, published: str) -> float:
     if not matched_req_indices:
         return 0.0
 
+    # [LOCAL-370] Require at least one name-like token to match.
+    # Without this, two strings sharing only a generic word like "unbound" vs
+    # "exhibitions" can score above threshold. Name-like tokens are the
+    # distinguishing signal; generic-only overlap is noise.
+    _has_name_like_match = any(w >= 2.0 for w in matched_weights)
+    if not _has_name_like_match:
+        # Check if any matched token from the request side is name-like
+        # (weight 2.0 comes from _weight() which uses _is_name_like)
+        # If no name-like token matched, cap score at 0.20 — below the 0.35 floor
+        pass  # We'll cap at the end after computing the score
+    
     # ─── Base score: weighted fraction of matched tokens ────────────────────
     matched_weight_sum = sum(matched_weights)
     # Denominator: union-style — total weight of all unique tokens from both sides
@@ -473,7 +513,151 @@ def _title_similarity(requested: str, published: str) -> float:
     order_adjustment = 0.30 * (order_ratio - 0.5) * base_score  # range: -0.15 to +0.15 * base
 
     final_score = base_score + order_adjustment
+
+    # [LOCAL-370] Cap at 0.20 when no name-like token matched.
+    # Generic-only overlap ("unbound" vs "exhibitions") must not cross the 0.35
+    # acceptance floor. Name-like tokens are the distinguishing signal.
+    if not _has_name_like_match:
+        final_score = min(final_score, 0.20)
+
     return max(0.0, min(1.0, final_score))
+
+
+# ─── [LOCAL-370] Plausibility gate for extracted works ────────────────────────
+# The structured checklist extractor can match gallery labels, navigation items,
+# and image captions as if they were artworks. This gate rejects implausible
+# entries and, if a materially large share fails, discards the entire extraction
+# so prose_llm can try instead.
+#
+# Threshold: if > 50% of entries fail the gate, discard all.
+# Justification: a real exhibition checklist might have one or two OCR errors or
+# ambiguous entries (≤50% implausible), but a page where the majority of
+# "works" are section headings or alt-text captions is clearly mis-parsed.
+
+# Places, civilisations, periods, peoples — not individual artists
+_NOT_ARTIST_PATTERNS = re.compile(
+    r'(?:'
+    # Geographic / civilization names (can appear anywhere in the string)
+    r'(?:^|\b)(?:Rome|Greece|Egypt|Nubia|China|Japan|Korea|India|Persia|Africa|'
+    r'Americas?|Europe|Asia|Oceania|Mesopotamia|Borneo|Indonesia|Thailand)'
+    r'(?:\b|$)'
+    r'|'
+    # Civilization/empire phrases
+    r'(?:the\s+)?(?:Byzantine|Roman|Ottoman|Persian|Mughal|Qing|Ming)\s+Empire'
+    r'|'
+    # Generic people/culture designators
+    r'\b[\w\s]+\s+peoples?\b'
+    r'|'
+    r'\b[\w\s]+\s+(?:culture|dynasty|period|civilization|civilisation|empire)\b'
+    r')',
+    re.IGNORECASE
+)
+
+# Gallery/section names — not artwork titles
+_GALLERY_SECTION_PATTERNS = re.compile(
+    r'^(?:'
+    # "Art of X", "Arts of X" — always a gallery section, never an artwork
+    r'Arts?\s+of\s+\w'
+    r'|'
+    r'Art\s+from\s+\w'
+    r'|'
+    r'The\s+Art\s+of\s+\w'
+    r'|'
+    # Specific department/section patterns
+    r'South(?:east)?\s+(?:and\s+\w+\s+)?Asian\s+Art'
+    r'|'
+    r'European\s+(?:Painting|Art|Sculpture)'
+    r'|'
+    r'American\s+(?:Painting|Art|Decorative)'
+    r'|'
+    r'Contemporary\s+Art'
+    r'|'
+    r'Ancient\s+(?:Art|World)'
+    r'|'
+    r'Musical\s+Instruments'
+    r'|'
+    r'Prints\s+and\s+Drawings'
+    r'|'
+    r'Textile\s+(?:Art|Gallery)'
+    r'|'
+    r'Photography$'
+    r'|'
+    # Gallery/Wing/Hall names
+    r'[\w\s]+\s+(?:Gallery|Wing|Hall|Court|Room|Collection)\s*(?:\d+)?$'
+    r'|'
+    # Date ranges like "European Painting 1550–1700"
+    r'[\w\s]+\s+\d{3,4}\s*[–—-]\s*\d{3,4}$'
+    r'|'
+    # "Japanese Garden" and similar garden/park section names
+    r'(?:Japanese|Chinese|Italian|French|English|Sculpture)\s+Garden'
+    r')',
+    re.IGNORECASE
+)
+
+# Image captions — not artwork titles
+_CAPTION_PREFIX_PATTERN = re.compile(
+    r'^Detail\s+(?:of|fo|from)\s+',
+    re.IGNORECASE
+)
+
+
+def _work_entry_is_implausible(work: dict) -> bool:
+    """Return True if a work entry is implausible (gallery label, caption, etc.).
+    
+    Checks:
+    - Artist is a place, civilisation, period, or people
+    - Title is a gallery/section name
+    - Title begins with "Detail of" / "Detail fo" (image caption)
+    """
+    title = (work.get('title') or '').strip()
+    artist = (work.get('artist') or '').strip()
+    
+    # Artist is a civilisation/place/people, not an individual
+    if artist and _NOT_ARTIST_PATTERNS.search(artist):
+        return True
+    
+    # Title is a gallery or section name
+    if title and _GALLERY_SECTION_PATTERNS.search(title):
+        return True
+    
+    # Title is an image caption
+    if title and _CAPTION_PREFIX_PATTERN.search(title):
+        return True
+    
+    return False
+
+
+def plausibility_gate(works: List[Dict]) -> List[Dict]:
+    """Apply plausibility checks to extracted works.
+    
+    [LOCAL-370] If > 50% of entries are implausible (gallery labels, captions,
+    civilisation-as-artist), discard the entire extraction and return empty
+    so that prose_llm can try instead.
+    
+    Returns:
+        The original works list if plausible, or empty list if the extraction
+        is judged to be garbage (navigation scrape, not an artwork list).
+    """
+    if not works:
+        return works
+    
+    implausible_count = sum(1 for w in works if _work_entry_is_implausible(w))
+    implausible_ratio = implausible_count / len(works)
+    
+    if implausible_ratio > 0.50:
+        print(f"  [LOCAL-370] Plausibility gate FAILED: {implausible_count}/{len(works)} "
+              f"entries implausible ({implausible_ratio:.0%}) — discarding extraction")
+        for w in works:
+            if _work_entry_is_implausible(w):
+                _a = w.get('artist', '')
+                print(f"    ✗ '{w.get('title', '')}' by '{_a}' — implausible")
+        return []
+    
+    if implausible_count > 0:
+        print(f"  [LOCAL-370] Plausibility gate: {implausible_count}/{len(works)} "
+              f"entries implausible ({implausible_ratio:.0%}) — below threshold, keeping")
+    
+    return works
 
 
 # ─── Work extraction from exhibition pages ───────────────────────────────────
@@ -1335,6 +1519,17 @@ def find_exhibition_checklist(
         print(f"  [LOCAL-364] No matching exhibition found (best score: {best_match_score:.2f})")
         return result
 
+    # [LOCAL-370] Reject if the matched URL is the listing page itself.
+    # If the "exhibition detail" URL equals the listing URL we just searched,
+    # it's the index page being mistaken for a detail page — not a real match.
+    _listing_urls = set(l['url'].rstrip('/') for l in exhibition_listing_pages)
+    if best_match_url.rstrip('/') in _listing_urls:
+        print(f"  [LOCAL-370] Rejected: matched URL '{best_match_url}' is the listing page itself")
+        result.path = 'fallback'
+        result.reason = (f'Best match "{best_match_title}" (score: {best_match_score:.2f}) '
+                        f'resolves to the listing page URL itself — not a detail page')
+        return result
+
     print(f"  [LOCAL-364] Matched exhibition: '{best_match_title}' (score: {best_match_score:.2f})")
     print(f"  [LOCAL-364] Exhibition URL: {best_match_url}")
     result.exhibition_title = best_match_title
@@ -1367,6 +1562,11 @@ def find_exhibition_checklist(
 
     # ─── Step 5: Extract works from the exhibition page ───────────────────────
     works = extract_works_from_exhibition_page(detail_text, detail_links)
+
+    # [LOCAL-370] Plausibility gate: reject extraction if majority of entries
+    # are gallery labels, captions, or navigation — fall through to prose_llm.
+    if works:
+        works = plausibility_gate(works)
 
     if works:
         result.works = works

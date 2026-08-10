@@ -391,13 +391,30 @@ class TestFindExhibitionChecklistProseLlm:
             'choices': [{'message': {'content': json.dumps(pinned_llm_response)}}]
         }
 
-        # Mock the HTTP requests: first for page fetch (exhibition listing + detail),
-        # second for LLM extraction
+        # [LOCAL-370] Updated: listing page returns a minimal index with a link to
+        # the detail page, and the detail page returns the actual MFA HTML.
+        # This properly simulates the two-step navigation (listing → detail).
+        _listing_html = (
+            '<html><head><title>Exhibitions | MFA</title></head><body>'
+            '<h1>Exhibitions</h1>'
+            '<p>Explore current and upcoming exhibitions at the Museum of Fine Arts, Boston. '
+            'From ancient art to contemporary installations, discover world-class shows.</p>'
+            '<a href="/exhibition/picasso-miro-dali-unbound">Picasso, Miró, Dalí: Unbound</a>'
+            '<a href="/exhibition/monet-and-boston">Monet and Boston: Lasting Impression</a>'
+            '<a href="/exhibition/ancient-nubia-now">Ancient Nubia Now</a>'
+            '</body></html>'
+        )
+
         def mock_requests_get(url, **kwargs):
-            """Mock both the listing page and the detail page fetches."""
+            """Mock listing page and detail page fetches separately."""
             mock_get_resp = MagicMock()
-            if '/exhibition' in url.lower():
-                # Return the MFA HTML for the exhibition page
+            if url.rstrip('/').endswith('/exhibitions'):
+                # Listing page — minimal index with links
+                mock_get_resp.status_code = 200
+                mock_get_resp.text = _listing_html
+                return mock_get_resp
+            elif '/exhibition/' in url.lower():
+                # Detail page — real MFA HTML
                 mock_get_resp.status_code = 200
                 mock_get_resp.text = mfa_html
                 return mock_get_resp
