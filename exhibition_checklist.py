@@ -1055,6 +1055,7 @@ class ExhibitionChecklistResult:
         self.path: str = 'none'               # 'checklist', 'partial', 'prose_llm', 'fallback', 'closed', 'none'
         self.reason: str = ''                 # Human-readable explanation
         self.page_shape: str = ''             # Which extraction shape was used
+        self.page_text: str = ''              # [LOCAL-369] Exhibition page prose text for thread discovery
 
     @property
     def has_works(self) -> bool:
@@ -1346,6 +1347,9 @@ def find_exhibition_checklist(
         result.path = 'fallback'
         result.reason = f'Exhibition page at {best_match_url} returned no content'
         return result
+
+    # [LOCAL-369] Store exhibition prose for downstream thread discovery
+    result.page_text = detail_text
 
     # ─── Step 4: Check dates — is the exhibition still open? ──────────────────
     closing_date = _extract_closing_date(detail_text)
