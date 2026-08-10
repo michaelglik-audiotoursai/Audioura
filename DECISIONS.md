@@ -10990,3 +10990,55 @@ the branch by content —
 and merge the one with `ahead>0`. A merge that reports `Already up to date` for a
 task whose worktree contains commits is a bug in the merge command, not a
 finished task.
+
+## D282 — Michael's four exhibition-visit threads: two built, two held for grounding
+**2026-08-10.** Michael attended *Picasso, Miró, Dalí: Unbound* with his wife and
+two friends and reported what the group actually discussed, explicitly leaving
+the judgement to LEAD: *"it does not mean you should: please make your own
+judgement."*
+
+His framing is the product thesis: **these stories will not be on the wall
+labels, because wall labels are dedicated to the objects.** A tour that re-reads
+the labels has no reason to exist. That is the strongest argument yet for why
+tour content should not be a summary of the venue's own signage.
+
+**Taken (LOCAL-369, parked behind LOCAL-368):**
+
+- **The title is an argument.** *Unbound* refers to a real period dispute over
+  whether an illustrated book should be sold bound or as loose sheets. That is a
+  theme thread in the SQ-S6b sense and it connects every object in the show. The
+  machinery already exists and is wired — `theme_thread_discoverer` is called
+  from `generate_tour_text.py:7101`, `spine_generator` does promise/payoff — so
+  this is a corpus-routing job, not a new subsystem.
+- **The credit line is a story we already fetch and discard.** The MFA page says
+  "Gift of Boris Fridman" in the prose LEAD extracted. Nothing in the pipeline
+  captures a credit line — grepped, no `credit_line` field exists. It is
+  published, stable, museum-asserted, and it carries a human fact.
+
+**Held, and the reason matters more than the decision:**
+
+- publishing cost then, inflation-adjusted to now
+- auction value now (the group found a Dalí *Moses and Monotheism* around
+  $30,000 depending on condition and print order)
+
+These were the group's most engaging threads and they are the two that would
+damage the system if built naively. They are **specific numbers**, and the whole
+D1v2/groundedness programme exists to stop specific numbers arriving from an
+LLM's memory. An inflation adjustment compounds it — a calculation on top of a
+recalled figure. And one auction result is not "the price": comparable copies
+vary by condition, edition and sale, so a point estimate misleads even when the
+figure is real.
+
+They become buildable with **retrieval instead of recall** — a real price source,
+a stated observation date, and a range. Same shape as LOCAL-366/368.
+
+**The generalisation is the actual deliverable.** These are not four MFA facts,
+they are four questions that transfer to any venue: what does the title mean,
+who gave this and why, what did it cost to make, what is it worth now. LOCAL-369
+is specified as archetypes with nothing about this exhibition hardcoded.
+
+**One boundary written into the task.** Narrate the gift, never the giver.
+"Given by Boris Fridman" is grounded; how he made his money, that his company
+still operates, that he is generous to American museums — all unsourced claims
+about a living private individual, and prohibited however good the coffee
+conversation was. A negative control is a required deliverable.
