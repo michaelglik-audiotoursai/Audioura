@@ -633,7 +633,47 @@ _EXHIBITION_CONTEXT_WORDS = re.compile(
     re.IGNORECASE
 )
 
-_PHRASE_GATE_WINDOW = 500  # characters
+_PHRASE_GATE_WINDOW = 500  # characters — used only to slice the inspection window
+
+# [LEAD 2026-08-10] The gate requires a grammatical relationship, not proximity.
+# Within this many characters of the phrase, either an exhibition noun must
+# introduce it or an exhibition verb must take it as subject.
+_PHRASE_GATE_ADJACENCY = 60  # characters
+
+# "<phrase> opens August 1" / "<phrase> runs through January" / "<phrase> is on view"
+_EXHIBITION_VERB_FOLLOWS = re.compile(
+    r'^\W{0,3}(?:will\s+)?(?:opens?|opened|runs?|ran|closes?|closed|'
+    r'continues?|features?|showcases?|presents?|brings?\s+together|'
+    r'is\s+(?:on\s+view|open|showing)|remains?\s+on\s+view|'
+    r'goes?\s+on\s+view)\b',
+    re.IGNORECASE
+)
+
+# "the exhibition <phrase>" / "a show titled <phrase>" / "exhibition: <phrase>"
+_EXHIBITION_NOUN_PRECEDES = re.compile(
+    r'\b(?:exhibition|exhibit|show|retrospective|installation)\b'
+    r'(?:\s+(?:titled|called|named|entitled))?\s*[:,\-—]?\s*'
+    r'(?:the\s+|a\s+|an\s+)?\W{0,3}$',
+    re.IGNORECASE
+)
+
+
+def _fold_accents_preserving_length(text: str) -> str:
+    """
+    Lowercase and fold accents WITHOUT changing string length.
+
+    [LEAD 2026-08-10] The phrase gate needs offsets that are valid in the original
+    text so it can inspect what immediately precedes and follows a match. The
+    ordinary normalizer strips punctuation and so shifts every subsequent offset.
+    Here each character maps to exactly one character: 'é' -> 'e', 'ó' -> 'o'.
+    Characters that decompose to nothing usable are left as-is.
+    """
+    out = []
+    for ch in text.lower():
+        decomposed = unicodedata.normalize('NFKD', ch)
+        base = ''.join(c for c in decomposed if not unicodedata.combining(c))
+        out.append(base[0] if len(base) >= 1 else ch)
+    return ''.join(out)
 
 
 def _normalize_for_phrase_gate(text: str) -> str:
@@ -701,21 +741,46 @@ def phrase_uniqueness_gate(
     if phrase_pos == -1:
         return False, "phrase position not found (unexpected)"
 
-    # Check a window around each occurrence
-    window_start = max(0, phrase_pos - _PHRASE_GATE_WINDOW)
-    window_end = min(len(source_norm), phrase_pos + len(phrase_norm) + _PHRASE_GATE_WINDOW)
-    window_text = source_norm[window_start:window_end]
+    # [LEAD 2026-08-10] Locate the phrase in the ORIGINAL text, not by reusing the
+    # normalized offset. Normalization strips punctuation and folds accents, so the
+    # two strings have different lengths — "Picasso, Miró, Dalí: Unbound" loses four
+    # characters — and the original code's "map back approximately" silently sliced
+    # the wrong span. That misalignment made the adjacency checks read the wrong text.
+    _tokens = [t for t in phrase_norm.split() if t]
+    _phrase_re = re.compile(
+        r'\W*'.join(re.escape(t) for t in _tokens),
+        re.IGNORECASE | re.UNICODE
+    )
+    _m = _phrase_re.search(_fold_accents_preserving_length(source_text))
+    if not _m:
+        return False, "phrase position not found in original text (unexpected)"
 
-    # Also check the original text window for context words (handles mixed case)
-    # Map normalized position back to original approximately
-    orig_window_start = max(0, phrase_pos - _PHRASE_GATE_WINDOW)
-    orig_window_end = min(len(source_text), phrase_pos + len(phrase_norm) + _PHRASE_GATE_WINDOW)
+    _p_start, _p_end = _m.start(), _m.end()
+    orig_window_start = max(0, _p_start - _PHRASE_GATE_WINDOW)
+    orig_window_end = min(len(source_text), _p_end + _PHRASE_GATE_WINDOW)
     orig_window = source_text[orig_window_start:orig_window_end]
 
-    if _EXHIBITION_CONTEXT_WORDS.search(orig_window):
-        return True, "phrase found in exhibition context"
+    # [LEAD 2026-08-10] Proximity alone is too weak. A 500-character window is
+    # roughly a paragraph, and almost any art-history text about these painters
+    # mentions "exhibition" somewhere in it. The measured false positive:
+    #
+    #   "Picasso, Miro, Dali: Unbound by convention, these three revolutionized
+    #    modern art. Each later received a major museum exhibition in Paris..."
+    #
+    # The phrase is running prose there ("Unbound by convention"), and
+    # "exhibition" is incidental. Michael's point was that the source must treat
+    # the phrase as the NAME OF A THING, so require a grammatical relationship,
+    # not mere co-presence: an exhibition noun immediately before the phrase, or
+    # an exhibition verb immediately after it.
+    _tail = source_text[_p_end:_p_end + _PHRASE_GATE_ADJACENCY]
+    _head = source_text[max(0, _p_start - _PHRASE_GATE_ADJACENCY):_p_start]
 
-    # Also accept if the phrase is in what looks like a heading (short line, no period)
+    if _EXHIBITION_VERB_FOLLOWS.match(_tail):
+        return True, "phrase is the subject of an exhibition verb — treated as a name"
+    if _EXHIBITION_NOUN_PRECEDES.search(_head):
+        return True, "phrase is introduced by an exhibition noun — treated as a name"
+
+    # A heading is a name by position: a short line with no sentence punctuation.
     for line in source_text.split('\n'):
         line_stripped = line.strip()
         if (len(line_stripped) < 150 and
@@ -723,9 +788,10 @@ def phrase_uniqueness_gate(
             _normalize_for_phrase_gate(line_stripped).find(phrase_norm) != -1):
             return True, "phrase found in heading-like context"
 
-    return False, (f"phrase '{exhibition_phrase}' found in source but NOT in "
-                  f"exhibition context (no exhibition/show/gallery words within "
-                  f"{_PHRASE_GATE_WINDOW} chars)")
+    return False, (f"phrase '{exhibition_phrase}' appears in the source but is not "
+                  f"used as an exhibition name (no exhibition noun within "
+                  f"{_PHRASE_GATE_ADJACENCY} chars before it, no exhibition verb "
+                  f"after it, not a heading) — likely coincidental co-occurrence")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

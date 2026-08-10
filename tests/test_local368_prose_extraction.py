@@ -490,3 +490,77 @@ class TestCreatorFilterLabelling:
         result.works = [{'title': 'Test Work'}]
         assert result.has_works
         assert result.path == 'prose_llm'
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LEAD review cases (2026-08-10) — the gate must require a grammatical
+# relationship, not proximity.
+#
+# The submitted gate accepted this, measured during review:
+#   "Picasso, Miro, Dali: Unbound by convention, these three revolutionized
+#    modern art. Each later received a major museum exhibition in Paris..."
+# The phrase is running prose and "exhibition" is incidental, but it fell inside
+# the 500-character window. The submission's own negative control passed only
+# because it contained no exhibition word at all.
+#
+# Fixing it also exposed an offset bug: phrase_pos indexes the NORMALIZED text
+# (punctuation stripped) and was being used to slice the ORIGINAL, so the
+# adjacency checks read the wrong span.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+PHRASE = 'Picasso, Miró, Dalí: Unbound'
+
+
+class TestPhraseGateRequiresNameUsage:
+    """Co-occurrence plus a nearby topic word is not an exhibition source."""
+
+    @pytest.mark.parametrize("source", [
+        # The measured false positive: prose + incidental "exhibition".
+        "Picasso, Miro, Dali: Unbound by convention, these three revolutionized "
+        "modern art. Each later received a major museum exhibition in Paris "
+        "during the 1980s.",
+        # Same shape, no context word anywhere.
+        "Spanish modernism produced giants. Picasso, Miro, Dali: Unbound by "
+        "convention, these three revolutionized painting.",
+    ])
+    def test_prose_usage_rejected(self, source):
+        passes, reason = phrase_uniqueness_gate(source, PHRASE, False)
+        assert passes is False, f"should reject coincidental prose: {reason}"
+
+    @pytest.mark.parametrize("source", [
+        "The MFA announces a new exhibition. Picasso, Miro, Dali: Unbound opens August 1.",
+        "Reviewed this week: the exhibition Picasso, Miró, Dalí: Unbound, now on view in Gallery 184.",
+        "Picasso, Miro, Dali: Unbound runs through January 24, 2027 at the museum.",
+        "Picasso, Miro, Dali: Unbound is on view in the Torf Gallery.",
+        "A show titled Picasso, Miró, Dalí: Unbound gathers rare illustrated books.",
+        "Picasso, Miro, Dali: Unbound\nAn extraordinary group of livres d artiste.",
+    ])
+    def test_name_usage_accepted(self, source):
+        passes, reason = phrase_uniqueness_gate(source, PHRASE, False)
+        assert passes is True, f"should accept exhibition-name usage: {reason}"
+
+    def test_wrong_order_still_rejected(self):
+        passes, _ = phrase_uniqueness_gate(
+            "Now on view: an exhibition of Dali, Miro, Picasso: Unbound at a gallery.",
+            PHRASE, False)
+        assert passes is False
+
+    def test_venue_domain_still_exempt(self):
+        passes, _ = phrase_uniqueness_gate("nothing relevant here", PHRASE, True)
+        assert passes is True
+
+
+class TestAccentFoldPreservesOffsets:
+    """The offset bug that made the adjacency checks read the wrong span."""
+
+    def test_fold_does_not_change_length(self):
+        from exhibition_checklist import _fold_accents_preserving_length
+        for s in ["Picasso, Miró, Dalí: Unbound", "Le Lézard aux plumes d'or", "Mourlot Frères"]:
+            assert len(_fold_accents_preserving_length(s)) == len(s), s
+
+    def test_accented_phrase_finds_following_verb(self):
+        """With accents in the phrase, the verb after it must still be seen."""
+        passes, reason = phrase_uniqueness_gate(
+            "Picasso, Miró, Dalí: Unbound opens this August at the museum.",
+            PHRASE, False)
+        assert passes is True, reason
