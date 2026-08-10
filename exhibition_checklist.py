@@ -522,6 +522,137 @@ class ExhibitionChecklistResult:
                 f"title='{self.exhibition_title}', url='{self.exhibition_url}')")
 
 
+def _try_aic_api(exhibition_name: str, venue_name: str) -> Optional[ExhibitionChecklistResult]:
+    """Try the Art Institute of Chicago's public API for exhibition checklists.
+    
+    The AIC exposes a CC0-licensed REST API at api.artic.edu that returns
+    exhibition metadata including artwork_ids and artwork_titles. When the
+    venue is the Art Institute of Chicago, we query this API directly instead
+    of scraping HTML.
+    
+    Returns ExhibitionChecklistResult if AIC venue is detected AND the API returns
+    a matching exhibition with artworks. Returns None otherwise.
+    """
+    # Only fire for the Art Institute of Chicago
+    _AIC_INDICATORS = (
+        'art institute of chicago',
+        'art institute, chicago',
+        'artic.edu',
+    )
+    venue_lower = venue_name.lower()
+    if not any(ind in venue_lower for ind in _AIC_INDICATORS):
+        return None
+
+    print(f"  [LOCAL-366] AIC API: venue matched Art Institute of Chicago")
+
+    try:
+        # Search for matching exhibition by title
+        # AIC's /exhibitions endpoint supports Elasticsearch via ?q= or /search
+        search_url = (
+            "https://api.artic.edu/api/v1/exhibitions/search"
+            f"?q={requests.utils.quote(exhibition_name)}"
+            "&fields=id,title,status,artwork_ids,artwork_titles,aic_start_at,aic_end_at,web_url"
+            "&limit=10"
+        )
+        print(f"  [LOCAL-366] AIC API search: {search_url}")
+        resp = requests.get(search_url, timeout=15)
+        if resp.status_code != 200:
+            print(f"  [LOCAL-366] AIC API search returned {resp.status_code}")
+            return None
+
+        search_data = resp.json().get('data', [])
+        if not search_data:
+            print(f"  [LOCAL-366] AIC API: no exhibitions matched '{exhibition_name}'")
+            return None
+
+        # Find the best title match
+        best_match = None
+        best_score = 0.0
+        for exh in search_data:
+            score = _title_similarity(exhibition_name, exh.get('title', ''))
+            if score > best_score:
+                best_score = score
+                best_match = exh
+
+        if not best_match or best_score < 0.35:
+            print(f"  [LOCAL-366] AIC API: best match score {best_score:.2f} < 0.35 threshold")
+            return None
+
+        print(f"  [LOCAL-366] AIC API matched: '{best_match['title']}' (score: {best_score:.2f})")
+
+        result = ExhibitionChecklistResult()
+        result.exhibition_title = best_match['title']
+        result.exhibition_url = best_match.get('web_url', f"https://www.artic.edu/exhibitions/{best_match['id']}")
+
+        # Parse dates
+        if best_match.get('aic_start_at'):
+            try:
+                result.opening_date = datetime.fromisoformat(best_match['aic_start_at'].replace('Z', '+00:00')).date()
+            except (ValueError, TypeError):
+                pass
+        if best_match.get('aic_end_at'):
+            try:
+                result.closing_date = datetime.fromisoformat(best_match['aic_end_at'].replace('Z', '+00:00')).date()
+            except (ValueError, TypeError):
+                pass
+
+        # Check if closed
+        if result.closing_date and result.closing_date < date.today():
+            result.is_closed = True
+            result.path = 'closed'
+            result.reason = (f'Exhibition "{best_match["title"]}" closed on {result.closing_date}. '
+                           f'A tour of a dismounted exhibition is not useful.')
+            print(f"  [LOCAL-366] AIC API: exhibition CLOSED on {result.closing_date}")
+            return result
+
+        # Get artwork titles — the API returns them directly on the exhibition
+        artwork_titles = best_match.get('artwork_titles', [])
+        artwork_ids = best_match.get('artwork_ids', [])
+
+        if not artwork_ids:
+            print(f"  [LOCAL-366] AIC API: exhibition has no artwork_ids (checklist not populated)")
+            return None
+
+        # Fetch full artwork details (title + artist) in batches
+        works = []
+        for i in range(0, len(artwork_ids), 20):
+            batch = artwork_ids[i:i+20]
+            ids_str = ','.join(str(x) for x in batch)
+            art_url = f"https://api.artic.edu/api/v1/artworks?ids={ids_str}&fields=id,title,artist_title,date_display"
+            art_resp = requests.get(art_url, timeout=15)
+            if art_resp.status_code == 200:
+                for aw in art_resp.json().get('data', []):
+                    works.append({
+                        'title': aw.get('title', ''),
+                        'artist': aw.get('artist_title', ''),
+                        'date': aw.get('date_display', ''),
+                    })
+
+        if not works:
+            # Fallback: use artwork_titles from the exhibition response (no artist info)
+            works = [{'title': t} for t in artwork_titles if t]
+
+        if works:
+            result.works = works
+            result.path = 'checklist'
+            result.page_shape = 'api_structured'
+            result.reason = f'Retrieved {len(works)} works from AIC public API (CC0 licensed)'
+            print(f"  [LOCAL-366] AIC API: SUCCESS — {len(works)} works retrieved")
+            for w in works[:10]:
+                _artist_info = f" by {w['artist']}" if w.get('artist') else ''
+                print(f"    - {w['title']}{_artist_info}")
+            if len(works) > 10:
+                print(f"    ... and {len(works) - 10} more")
+            return result
+        else:
+            print(f"  [LOCAL-366] AIC API: artwork fetch returned empty")
+            return None
+
+    except Exception as e:
+        print(f"  [LOCAL-366] AIC API error: {e}")
+        return None
+
+
 def find_exhibition_checklist(
     venue_base_url: str,
     exhibition_name: str,
@@ -530,6 +661,7 @@ def find_exhibition_checklist(
     """Find and extract the checklist for a named exhibition at a venue.
     
     Strategy:
+    0. [LOCAL-366] Try structured API if the venue has one (AIC api.artic.edu)
     1. Try known exhibition path seeds on the venue domain
     2. Find the exhibition listing page
     3. Match the requested exhibition name (fuzzy)
@@ -545,6 +677,15 @@ def find_exhibition_checklist(
     Returns:
         ExhibitionChecklistResult with works (if found) and metadata
     """
+    # ──── [LOCAL-366] TRY STRUCTURED API FIRST ────────────────────────────────
+    # Some venues expose a public REST API with exhibition checklists.
+    # This is always preferred over HTML scraping because it returns structured
+    # data (artwork IDs, titles, artist names, dates) without parsing ambiguity.
+    _api_result = _try_aic_api(exhibition_name, venue_name)
+    if _api_result is not None:
+        return _api_result
+    # ──── END [LOCAL-366] ─────────────────────────────────────────────────────
+
     result = ExhibitionChecklistResult()
 
     if not venue_base_url:
