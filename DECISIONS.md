@@ -11694,3 +11694,46 @@ LEAD's own tooling.
 improvement on every axis over what `storied` carried, it introduces no
 regression (378's stop-count bug is fixed), and D289 favours delivering. Residual
 dispatched as LOCAL-380.
+
+## D300 — "Au Soleil du Plafond" means "In the Sun of the Ceiling", and that is why four rounds failed on it
+**2026-08-10.** LOCAL-380 bounced. The finding is the point.
+
+One work has now produced, across four rounds: a Le Corbusier **ceiling mural**
+(D291), a contemporary **ceiling installation** (D298), **glass panels** overhead
+(D299), and now "gaze up at the display **above you**… this modern
+**installation** transforms the **ceiling** into a radiant canvas" (D300).
+
+Each round removed the previous wording. Each round the model produced a new one.
+
+**The title is the source.** *Plafond* is French for **ceiling**. The model is not
+defying the constraint — it is treating the title as evidence about the object,
+and the title appears to say the object is on a ceiling. It is in fact a **1955
+livre d'artiste by Juan Gris with poet Pierre Reverdy**; "Au Soleil du Plafond"
+is a poetic title, not a location.
+
+**Therefore a denylist cannot work here, and three rounds of denylist confirm it.**
+`ceiling`, `mural`, `installation`, `glass` have each been suppressed in turn and
+the inference simply re-emerged in the next available vocabulary. `canopy`,
+`vault`, `dome`, `overhead` all remain unused and available.
+
+**The remedy is a positive identity assertion, not another prohibition:** state
+what the object *is* (a book), and state that a title is a title — where a title
+contains a word denoting architecture, placement or material, that word describes
+the work's subject or poetics, never its physical form. LOCAL-381.
+
+**This generalises past this tour.** Any pipeline that hands a model a *name* and
+asks for description will get the name mined for implied facts. The defence is
+supplying identity, not forbidding vocabulary — the same shape as D298 (silence
+reads as permission) one level up: an *absent* identity is filled from the most
+available cue, and the title is always the most available cue.
+
+**What 380 got right and must be salvaged:** it recovered the collaborator from
+page prose — `[LOCAL-380] Recovered collaborator from page prose: 'Pierre
+Reverdy'` — and stop 3 correctly read "Created by Juan Gris in collaboration with
+Pierre Reverdy in 1955". It also eliminated `glass` and carried the block into the
+Orientation path, fixing 379's "sculpture" in Orientation. Cherry-pick all of it.
+
+**Why it was still bounced:** `Freud` was present in 379 and absent in 380, and
+stop 2 fell from 198 to **77 words**, under the floor. A tightening that
+suppresses grounded material that was already correct is not a net gain, and
+`ceiling` is precisely the failure Michael originally reported.
