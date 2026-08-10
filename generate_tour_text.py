@@ -3493,6 +3493,85 @@ def missing_stop_headers(complete_tour, rendered_headers):
     return [h for h in rendered_headers if h not in complete_tour]
 
 
+# [LOCAL-369] Credit-line provenance. At module scope so it can be tested directly —
+# the original submission verified the prohibition with an inspect.getsource string
+# assertion, which passes against any tree where the words happen to appear (D277).
+
+# The prohibition is a constant so the test and the prompt cannot drift apart.
+PROVENANCE_PROHIBITION = (
+    "PROHIBITION: Do NOT infer or assert the donor's motive, wealth, financial condition,\n"
+    "or any biographical predicate not contained in retrieved text. Stating \"Gift of [name]\"\n"
+    "is the documented fact; \"donated because…\" or \"could no longer afford…\" is fabrication."
+)
+
+_CREDIT_LINE_MIN_WORD_OVERLAP = 0.6
+
+
+def match_credit_line(poi_name, works, _normalize=None):
+    """
+    Return the museum-published credit line for `poi_name`, or '' if no confident match.
+
+    Deliberately stricter than the surrounding fact-matching. A false match here
+    does not merely attach an irrelevant fact — it credits someone's gift to an
+    object they did not give.
+
+    The submitted version matched on a bare 10-character normalized prefix, the
+    pattern LOCAL-29 had already tightened elsewhere "to prevent cross-contamination
+    between adjacent entries with similar short prefixes". Measured collisions under
+    that rule, all real title pairs:
+
+        'The Lizard with Golden Feathers' vs 'The Lizard King'
+        'Adoration of the Shepherds'      vs 'Adoration of the Magi'
+        'Au Soleil du Plafond'            vs 'Au Soleil Couchant'
+
+    Requires an exact normalized match, or mutual prefix containment AND at least
+    60% word overlap.
+    """
+    if not poi_name or not works:
+        return ''
+    if _normalize is None:
+        from story_miner import _normalize as _normalize
+
+    poi_norm = _normalize(poi_name)
+    if not poi_norm:
+        return ''
+    poi_words = {w for w in poi_norm.split() if len(w) >= 4}
+
+    for work in works:
+        credit = (work.get('credit_line') or '').strip()
+        if not credit:
+            continue
+        title_norm = _normalize(work.get('title', ''))
+        if not title_norm:
+            continue
+
+        if poi_norm == title_norm:
+            return credit
+
+        if not (poi_norm[:10] in title_norm and title_norm[:10] in poi_norm):
+            continue
+
+        title_words = {w for w in title_norm.split() if len(w) >= 4}
+        if not poi_words or not title_words:
+            continue
+        overlap = len(poi_words & title_words) / max(len(poi_words), len(title_words))
+        if overlap >= _CREDIT_LINE_MIN_WORD_OVERLAP:
+            return credit
+
+    return ''
+
+
+def build_provenance_block(credit_line):
+    """Prompt injection carrying a credit line plus the prohibition. '' when absent."""
+    if not credit_line or not credit_line.strip():
+        return ''
+    return (
+        "\nPROVENANCE (museum-published credit line — you may state this fact):\n"
+        f"  {credit_line.strip()}\n"
+        f"{PROVENANCE_PROHIBITION}\n"
+    )
+
+
 def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None):
     """
     Generate audio tour text using OpenAI API with geo coordinates.
@@ -8033,24 +8112,9 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
         if (tour_category == 'museum' and poi_name
                 and _exhibition_checklist_result
                 and getattr(_exhibition_checklist_result, 'works', None)):
-            from story_miner import _normalize as _cl_norm
-            _poi_norm_cl = _cl_norm(poi_name)
-            for _cl_work in _exhibition_checklist_result.works:
-                if _cl_work.get('credit_line'):
-                    _cl_title_norm = _cl_norm(_cl_work.get('title', ''))
-                    if (_poi_norm_cl[:10] in _cl_title_norm
-                            or _cl_title_norm[:10] in _poi_norm_cl
-                            or _poi_norm_cl == _cl_title_norm):
-                        _credit_line_for_stop = _cl_work['credit_line']
-                        break
-        if _credit_line_for_stop:
-            description_prompt += f"""
-PROVENANCE (museum-published credit line — you may state this fact):
-  {_credit_line_for_stop}
-PROHIBITION: Do NOT infer or assert the donor's motive, wealth, financial condition,
-or any biographical predicate not contained in retrieved text. Stating "Gift of [name]"
-is the documented fact; "donated because…" or "could no longer afford…" is fabrication.
-"""
+            _credit_line_for_stop = match_credit_line(
+                poi_name, _exhibition_checklist_result.works)
+        description_prompt += build_provenance_block(_credit_line_for_stop)
 
         # [§4] Story element injection — per-work facts from story_elements
         # [LOCAL-29] Tightened matching: use [:10] prefix AND require >= 60% word overlap

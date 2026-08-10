@@ -320,25 +320,28 @@ class TestNoUnsourcedBiographicalPredicate:
         r'\b(?:left him poorer|made him richer|cost him)\b',
     ]
 
-    def test_prompt_prohibition_present(self):
-        """The description prompt must contain the explicit prohibition.
-
-        This verifies the prohibition text is syntactically correct in
-        the generate_tour_text.py source.
+    def test_prohibition_is_in_the_block_the_code_emits(self):
         """
-        import generate_tour_text
-        import inspect
-        source = inspect.getsource(generate_tour_text)
-        # The prohibition text must be in the source
-        assert 'Do NOT infer or assert' in source, (
-            "The prohibition against inferring donor motive/wealth must be in generate_tour_text.py"
-        )
-        assert 'financial condition' in source, (
-            "The prohibition must explicitly mention 'financial condition'"
-        )
-        assert 'fabrication' in source, (
-            "The prohibition must label unsourced claims as 'fabrication'"
-        )
+        Call the real builder instead of grepping the module source.
+
+        The original version asserted `'Do NOT infer or assert' in
+        inspect.getsource(generate_tour_text)`, which passes for any tree where
+        those words appear anywhere — including in a comment, and including when
+        the block is never emitted (D277).
+        """
+        from generate_tour_text import build_provenance_block
+        block = build_provenance_block('Gift of Boris Fridman')
+        assert 'Gift of Boris Fridman' in block
+        assert 'Do NOT infer or assert' in block
+        assert 'financial condition' in block
+        assert 'fabrication' in block
+
+    def test_no_block_without_a_credit_line(self):
+        """Absent or blank credit line must inject nothing at all."""
+        from generate_tour_text import build_provenance_block
+        assert build_provenance_block('') == ''
+        assert build_provenance_block(None) == ''
+        assert build_provenance_block('   ') == ''
 
     def test_prompt_allows_documented_gift_statement(self):
         """The prompt allows stating 'Gift of Boris Fridman' (documented fact)."""
@@ -410,3 +413,55 @@ class TestUnscopedUnchanged:
         assert _credit_line_for_stop == '', (
             "Without exhibition_checklist_result, no credit_line should be injected"
         )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LEAD review cases (2026-08-10) — credit-line matching must not misattribute.
+#
+# The submitted matcher used a bare 10-character normalized prefix, the pattern
+# LOCAL-29 had already tightened elsewhere. Measured collisions, all real pairs:
+#   'The Lizard with Golden Feathers' / 'The Lizard King'
+#   'Adoration of the Shepherds'      / 'Adoration of the Magi'
+#   'Au Soleil du Plafond'            / 'Au Soleil Couchant'
+# A false match credits a gift to an object the donor did not give.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestCreditLineMatchingIsStrict:
+
+    WORKS = [
+        {'title': 'The Lizard with Golden Feathers', 'credit_line': 'Gift of Boris Fridman'},
+        {'title': 'Adoration of the Shepherds', 'credit_line': 'Bequest of A. Donor'},
+        {'title': 'Au Soleil du Plafond', 'credit_line': 'Gift of the Reverdy Estate'},
+    ]
+
+    def test_exact_title_matches(self):
+        from generate_tour_text import match_credit_line
+        assert match_credit_line('The Lizard with Golden Feathers', self.WORKS) == 'Gift of Boris Fridman'
+        assert match_credit_line('Au Soleil du Plafond', self.WORKS) == 'Gift of the Reverdy Estate'
+
+    @pytest.mark.parametrize("confusable", [
+        'The Lizard King',
+        'Adoration of the Magi',
+        'Au Soleil Couchant',
+    ])
+    def test_prefix_confusable_does_not_match(self, confusable):
+        """These all share a 10-char prefix with a credited work and must NOT match."""
+        from generate_tour_text import match_credit_line
+        assert match_credit_line(confusable, self.WORKS) == '', (
+            f"'{confusable}' must not inherit another work's credit line"
+        )
+
+    def test_unrelated_title_matches_nothing(self):
+        from generate_tour_text import match_credit_line
+        assert match_credit_line('Water Lilies', self.WORKS) == ''
+
+    def test_work_without_credit_line_is_skipped(self):
+        from generate_tour_text import match_credit_line
+        works = [{'title': 'Water Lilies'}, {'title': 'Water Lilies', 'credit_line': ''}]
+        assert match_credit_line('Water Lilies', works) == ''
+
+    def test_empty_inputs_are_safe(self):
+        from generate_tour_text import match_credit_line
+        assert match_credit_line('', self.WORKS) == ''
+        assert match_credit_line('Anything', []) == ''
+        assert match_credit_line('Anything', None) == ''
