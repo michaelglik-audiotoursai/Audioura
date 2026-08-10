@@ -134,9 +134,29 @@ class TestExhibitionPageTextStored:
             'choices': [{'message': {'content': json.dumps(pinned_llm_response)}}]
         }
 
+        # [LOCAL-370] The listing and the detail page must be distinguishable.
+        # This mock previously returned the detail HTML for any URL containing
+        # '/exhibition', including the listing itself, so the resolved detail URL
+        # equalled the listing URL — which LOCAL-370 now correctly refuses. Same
+        # correction LOCAL-370 applied to the LOCAL-368 suite.
+        # Needs >100 chars of visible text or listing discovery skips the page.
+        _listing_html = (
+            '<html><head><title>Exhibitions | MFA</title></head><body>'
+            '<h1>Exhibitions</h1>'
+            '<p>Explore current and upcoming exhibitions at the Museum of Fine Arts, Boston. '
+            'From ancient art to contemporary installations, discover world-class shows.</p>'
+            '<a href="/exhibition/picasso-miro-dali-unbound">Picasso, Miró, Dalí: Unbound</a>'
+            '<a href="/exhibition/monet-and-boston">Monet and Boston: Lasting Impression</a>'
+            '</body></html>'
+        )
+
         def mock_requests_get(url, **kwargs):
             mock_get_resp = MagicMock()
-            if '/exhibition' in url.lower():
+            if url.rstrip('/').endswith('/exhibitions'):
+                mock_get_resp.status_code = 200
+                mock_get_resp.text = _listing_html
+                return mock_get_resp
+            if '/exhibition/' in url.lower():
                 mock_get_resp.status_code = 200
                 mock_get_resp.text = mfa_html
                 return mock_get_resp
