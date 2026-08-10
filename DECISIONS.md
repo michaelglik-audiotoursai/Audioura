@@ -10911,3 +10911,52 @@ reads the `exhibition_closed` flag it sets, so a closed exhibition would be
 persisted as a tour row and sent to TTS. Narrow (needs a scoped request plus a
 site-published past closing date) and still better than an opaque failure, but
 it should become a real failure signal.
+
+## D280 — The exhibition's works were in the page all along; two task specs looked past them
+**2026-08-10.** Michael pushed back on LEAD's claim that the MFA page "yields no
+works": *"What page that yields no work at all? Did you say that you found the
+exhibit early and then dismissed it because there were not enough evidence in
+the other sources?"*
+
+He was right to. LEAD had conflated "no extractable **works**" with "nothing",
+and the record needed correcting: the exhibition was **found and never
+dismissed**. 364 matched the title at 0.80 and reached the correct detail page.
+
+Extracting the visible text from that same saved HTML — 2,746 characters —
+produces named works with catalogue metadata: Miró's *Le Lézard aux plumes d'or*
+(Broder/Mourlot, Paris, 1971, 40 colour lithographs, Gift of Boris Fridman),
+Dalí's 1974 *Moses and Monotheism* illustrations, Gris and Reverdy's *Au Soleil
+du Plafond* (1955), and the gallery number. **None of it was JS-hidden.**
+`_WORK_LINE_PATTERNS` are line-oriented regexes expecting `Title, Artist, Year`
+rows; the content is flowing prose and captions, so the extractor saw nothing and
+returned `prose_only`.
+
+**Two specs in a row then looked straight past it.** 364 gave up at
+`prose_only`. LOCAL-366's spec — written by LEAD — sent the agent after Drupal
+JSON:API, `/api/`, and `collections.mfa.org`, and explicitly forbade a headless
+browser. It did that work well (banner-only view; `/api/player.js` is Tessitura
+ticketing; JSON:API 404; collections subdomain 403) and concluded the MFA case
+is "unsolvable without a headless browser". That conclusion is wrong, and the
+spec caused it. Both the agent and LEAD were looking for *structured* data and
+neither considered reading the prose that was already served.
+
+**The lesson is about the shape of the question.** "Where is the structured
+checklist?" has no answer here. "What does this page actually say?" answers
+immediately. A negative result from a well-executed search is only as good as the
+routes the spec enumerated — D242's "read the code; do not pattern-match it",
+applied to a web page.
+
+**Second finding, from the prose:** the show is *livres d'artiste* — artist's
+books. So the LOCAL-362 creator filter is not merely empty for this case, it is
+conceptually wrong. Had Wikidata held Picasso/Miró/Dalí works at Q49133, the
+fallback would have returned **paintings from the permanent collection** and
+presented them as the exhibition. A creator match is not an exhibition match, and
+that fallback must be labelled wherever it reaches a user.
+
+**Michael's trust rule, adopted.** A multi-word name matching in the same order
+is far stronger evidence than a single name, and a source that discusses those
+names *as an exhibition* differs from one where they merely co-occur — three
+famous Spanish modernists appear together in countless articles. So: the venue's
+own domain is top tier and needs no corroboration; any other source must contain
+the exact phrase in order **and** in exhibition context. Dispatched as LOCAL-368,
+with a negative control required.
