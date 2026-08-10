@@ -11795,3 +11795,45 @@ parked behind LOCAL-381, which is in flight on the same prose path.
 **Standing rule this establishes for acceptance criteria:** a tour task is not
 complete when nothing in it is false. It is complete when a listener would want to
 keep listening *and* nothing in it is false.
+
+## D302 — The framing thesis is conditional: exhibition, venue purpose, or none
+**2026-08-10.** Michael, correcting LOCAL-382/383 before they were dispatched:
+
+> "When the tour is about an exhibition a curator created, then we must say about
+> the exhibition and then find our stops' meaning in the exhibition's goals. That
+> is not true when a listener asks us to generate a tour in a general art museum —
+> **unless** we find the museum was created for a specific cause/reason, then this
+> reason can become a similar theme as the curated exhibition."
+
+As written, LOCAL-382 would have forced exhibition framing onto every museum tour
+— including Palais Lascaris, which has no curator's thesis. That would have
+manufactured a curatorial intent nobody had, in the name of fixing fabrication.
+
+**Three cases, and the code must distinguish them:**
+
+| Case | Thesis | Stops derive meaning from |
+|---|---|---|
+| **exhibition** — scoped request with a checklist result | the curatorial premise from the exhibition page | the exhibition's goals |
+| **venue_purpose** — a *stated* founding purpose, bequest, dedication or mission | that purpose | why the institution exists |
+| **none** — general museum, no stated thesis | none; do not invent one | the objects themselves, as today |
+
+**Case 2 is the generalisation and it is common** — single-artist museums, house
+museums with a bequest, collections assembled for a cause. It plays the same
+structural role as a curator's premise.
+
+**The detection rule is the load-bearing part.** The purpose must be a *stated*
+one, quotable from the venue's own page, on the same grounding terms as
+everything else. Absence is a valid outcome, not a failure to search harder.
+Synthesising a purpose from the venue's *name* or from parametric knowledge is
+forbidden — that is D300 one level up, and D300 is what turned "Plafond" into a
+ceiling.
+
+**Why this matters beyond framing:** every capability added to fix a bad tour is a
+capability that can fire on a tour that was fine. LEAD wrote 382 from a single
+failing example and generalised the remedy to all museums without asking where it
+should *stop*. The acceptance criteria now carry two control cases — Palais
+Lascaris and a large encyclopedic museum — where the correct behaviour is for the
+new feature to **not** engage.
+
+**Recorded as a standing habit:** when a task adds behaviour derived from one
+venue, its acceptance must include a venue where that behaviour must not appear.

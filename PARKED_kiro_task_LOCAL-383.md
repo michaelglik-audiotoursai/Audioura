@@ -61,6 +61,24 @@ From `tests/fixtures/mfa_picasso_miro_dali_unbound.html`:
   than padding. D289 forbids filling with invented objects; it also means a thin
   stop is a signal, not a licence to embellish.
 
+## The story must serve the framing case LOCAL-382 established
+
+382 classifies every tour as `framing=exhibition | venue_purpose | none`. Stories
+attach differently in each, and the same page material means different things:
+
+- **`exhibition`** — the story serves the curatorial premise. Mourlot Frères
+  matters *because* the show's claim is that printers and publishers were
+  essential collaborators, not because a printer is inherently interesting.
+- **`venue_purpose`** — the story serves why the institution exists. A founder, a
+  bequest, the reason a collection was assembled.
+- **`none`** — stories attach to the **objects and their people**, with no
+  invented institutional narrative. A general museum tour still deserves stories;
+  it simply has no thesis to hang them on.
+
+**Never manufacture a curatorial or institutional motive to give a story a
+spine.** If the page does not say why something was assembled, the story is about
+the people and circumstances the page *does* name.
+
 ## Hard constraint — everything rounds 376–382 won must survive
 
 No fabricated persons. Correct artists named. Correct medium. Book framing. Stop

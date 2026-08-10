@@ -87,10 +87,51 @@ For each stop, the prose must engage at least two of:
 **Forbidden:** describing the depicted image as though the object were a painting,
 with no reference to it being a book. That is the exact failure Michael named.
 
+## Part C — WHEN this applies. Do not force a thesis onto a venue that has none.
+
+**Michael's ruling, 2026-08-10.** The framing above is conditional, and getting
+the condition wrong would damage ordinary museum tours:
+
+> "When the tour is about an exhibition a curator created, then we must say about
+> the exhibition and then find our stops' meaning in the exhibition's goals. That
+> is not true when a listener asks us to generate a tour in a general art museum —
+> **unless** we find the museum was created for a specific cause/reason, then this
+> reason can become a similar theme as the curated exhibition."
+
+So there are **three cases** and the code must distinguish them:
+
+| Case | Framing thesis | Stops derive meaning from |
+|---|---|---|
+| **1. Curated exhibition** (scoped request, `_exhibition_checklist_result`) | the exhibition's curatorial premise, from its own page | the exhibition's goals |
+| **2. Venue with a stated founding purpose or mission** — a single-artist museum, a collection assembled for a cause, a house museum with a bequest | that founding purpose | the venue's reason for existing |
+| **3. General museum with no stated thesis** | **none — do not invent one** | the objects themselves, as today |
+
+**Case 2 is common and must be detected, not assumed.** Palais Lascaris is a
+Baroque palace holding a musical-instrument collection; Musée Matisse exists for
+one artist. A venue page that states why the institution or collection exists —
+a founder, a bequest, a mission, a dedication — supplies the same role the
+exhibition premise plays in case 1.
+
+**Detection rule:** the thesis must be a *stated* purpose found in the venue's own
+page text, on the same grounding terms as everything else. Phrases like "founded
+in… to…", "bequeathed", "dedicated to", "the collection was assembled to",
+"mission". **If no such statement is found, case 3 applies and the tour proceeds
+exactly as it does today.** Absence of a thesis is a valid outcome, not a failure
+to search harder.
+
+**Never synthesise a purpose from the venue's name, its collection's subject, or
+parametric knowledge.** That is D300 one level up — inferring identity from a
+name is precisely how "Plafond" became a ceiling.
+
+Log which case fired: `[LOCAL-382] framing=exhibition|venue_purpose|none
+source='<verbatim page phrase or ->'`.
+
 ## Do NOT
 
 - Do not fetch Google, Wikipedia, or any new source for this task. The page has
   it. If a *later* task needs multi-source, that is LOCAL-23's lineage, not this.
+- **Do not apply exhibition framing to a general museum tour.** A forced thesis is
+  worse than none — it invents a curatorial intent nobody had.
 - Do not invent works (D275/D289) or loosen grounding (D284, LOCAL-379's gate).
 - Do not lose what rounds 376–381 won: no fabricated persons, correct artists
   named, correct medium, stop count honest, ≥120 words per stop.
@@ -115,8 +156,18 @@ printer, its binding/plate count, or the image/word/typography relationship.
 stop 3; `book` in ≥2 stops; every stop ≥120 words; `That's N stops` == heading
 count.
 
-Then unscoped `Palais Lascaris, Nice, France` at 4 → 4/4 real instruments; bounds
-`score_tour_file(f,4)`=**81.2**, `score_tour_file(f,8)`=**75.0**.
+**Then the two control cases — these are acceptance, not afterthoughts:**
+
+1. **`Palais Lascaris, Nice, France` at 4** → still 4/4 real instruments. Report
+   which framing case fired and the verbatim page phrase that triggered it. If it
+   is `venue_purpose`, the phrase must be quotable from the venue page; if it is
+   `none`, the tour must read as it does today. **A fabricated curatorial premise
+   here is an automatic bounce.**
+2. **One general museum with no stated thesis** — pick a large encyclopedic venue
+   and generate 4 stops. Expected `framing=none`, and the output must not contain
+   invented language about why the museum exists or what it "sets out to show".
+
+Bounds: `score_tour_file(f,4)`=**81.2**, `score_tour_file(f,8)`=**75.0**.
 
 Env: `DISABLE_TOUR_CACHE=1`,
 `DATABASE_URL=postgresql://admin:password123@localhost:5433/audiotours`,
