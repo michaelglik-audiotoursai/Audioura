@@ -1558,6 +1558,103 @@ def _as_you_mid_handler(m):
     return f"From this vantage point, you can admire {tail}"
 
 
+# ─── LOCAL-371 helpers ────────────────────────────────────────────────────────
+
+# Words that indicate the subject is a vista/landscape/view — appropriate for
+# "stretches out before you".
+_VISTA_SUBJECT_WORDS = re.compile(
+    r'\b(?:view|views|vista|vistas|panorama|panoramas|landscape|landscapes|'
+    r'coastline|coastlines|horizon|horizons|scenery|seascape|seascapes|'
+    r'skyline|skylines|bay|ocean|sea|waters|valley|valleys|hillside|hillsides|'
+    r'mountain|mountains|plain|plains|expanse|terrain|shore|shoreline|'
+    r'cliff|cliffs|meadow|meadows|field|fields|waterfront|riverbank|'
+    r'countryside|rolling\s+hills|azure\s+waters|turquoise\s+waters|'
+    r'Mediterranean|stretch(?:es)?\s+of\s+(?:sand|beach|coast))\b',
+    re.IGNORECASE
+)
+
+
+def _tail_is_vista_subject(tail: str) -> bool:
+    """Return True if the subject noun phrase refers to a vista/landscape/view.
+
+    Used by _take_in_handler Case 3 to decide whether "stretches out before you"
+    is an appropriate predicate. Returns False for objects, artifacts, instruments,
+    artworks, etc.
+    """
+    # Check the head of the noun phrase (first ~8 words, before any prepositional
+    # phrase). This avoids matching "the guitar of the Mediterranean coast" as a vista.
+    head = tail.split(',')[0]  # Strip trailing participial modifiers
+    # Take only the head noun phrase (before "of/with/for/in" PPs)
+    head_match = re.match(r'^(?:The|A|An|This|That)?\s*(.+?)(?:\s+(?:of|with|for|in|from|at|on|by)\s+|$)', head, re.IGNORECASE)
+    head_words = head_match.group(1) if head_match else head[:60]
+    return bool(_VISTA_SUBJECT_WORDS.search(head_words))
+
+
+def _take_in_tail_is_unrepairable(tail: str) -> bool:
+    """Return True if the tail is already broken and cannot be repaired by
+    appending a predicate.
+
+    LOCAL-371: Detects two patterns:
+    1. Comma-led participial pile: "X, marking/noting/making/representing..."
+       This signals the tail was already mangled before it reached Case 3.
+    2. Missing clean head noun: the tail lacks a determiner + noun structure
+       and instead starts with a bare prepositional phrase or adverbial.
+
+    When True, _take_in_handler returns None (deletion) so the sentence becomes
+    visible to the deletion pass rather than shipping as confident nonsense.
+    """
+    # Pattern 1: Comma followed by a present participle (participial pile).
+    # "this guitar for its influence, marking a crucial moment" — the comma +
+    # participle signals that this is not a clean noun phrase; it's a fragment
+    # with a dangling modifier.
+    if re.search(
+        r',\s*(?:marking|noting|making|representing|signifying|highlighting|'
+        r'demonstrating|illustrating|showcasing|suggesting|indicating|'
+        r'reflecting|revealing|symbolizing|embodying|capturing|evoking|'
+        r'creating|offering|providing|serving|forming|constituting|'
+        r'establishing|defining|transforming|shaping)\b',
+        tail, re.IGNORECASE
+    ):
+        return True
+
+    # Pattern 2: "X for its/their Y" without a clean subject — signals a mangled
+    # purpose clause left over from a rewrite, not a self-standing NP.
+    # "this guitar for its influence on future string instruments" is not a
+    # sentence-ready noun phrase.
+    if re.search(r'\bfor\s+(?:its|their|his|her)\s+\w+', tail, re.IGNORECASE):
+        # But allow "the garden for its rare orchids" if it starts with a clean head
+        # Only reject if there's no obvious subject-predicate boundary
+        head = tail.split(' for ')[0].strip()
+        # If the head before "for" is short and has no verb, this is a dangling purpose clause
+        words_in_head = head.split()
+        if len(words_in_head) <= 5:
+            return True
+
+    # Pattern 2b: "X with an understanding/appreciation/sense of Y" — a mangled
+    # abstract clause that cannot be a physical object's attribute.
+    # "this remarkable piece with an understanding of its historical context"
+    if re.search(
+        r'\bwith\s+(?:an?\s+)?(?:understanding|appreciation|sense|knowledge|'
+        r'awareness|recognition|grasp|notion|feeling)\s+of\b',
+        tail, re.IGNORECASE
+    ):
+        return True
+
+    # Pattern 3: Lacks any determiner at all and doesn't start with a proper noun.
+    # A repairable NP starts with the/a/an/this/that or a capitalized proper noun.
+    if not re.match(r'^(?:the|a|an|this|that|these|those)\b', tail, re.IGNORECASE):
+        # Check if it's a proper noun (capitalized word that isn't a common adjective)
+        first_word = tail.split()[0] if tail.split() else ''
+        if not (first_word and first_word[0].isupper() and first_word.lower() not in {
+            'beautiful', 'stunning', 'magnificent', 'breathtaking', 'remarkable',
+            'impressive', 'elegant', 'exquisite', 'intricate', 'ornate', 'ancient',
+            'historic', 'famous', 'notable', 'grand', 'majestic', 'unique'
+        }):
+            return True
+
+    return False
+
+
 def _take_in_handler(m):
     """Handle 'Take in / Admire / Observe the X' — LOCAL-256 fragment fix.
 
@@ -1606,6 +1703,18 @@ def _take_in_handler(m):
     # "the breathtaking views of the azure waters" → "The breathtaking views of the azure waters stretch out before you."
     # LOCAL-271: AVOID doubling if the tail already contains "stretching/stretches out before you"
     # LOCAL-274: Don't capitalize interior words — "vibrant" stays lowercase after "The"
+
+    # LOCAL-371: REFUSE if tail is already broken (comma-led participial pile,
+    # or missing a clean head noun). Appending a predicate to damaged input
+    # produces a confidently broken sentence rather than a detectably broken one.
+    # A repair that cannot decline to fire is not a repair.
+    if _take_in_tail_is_unrepairable(tail):
+        import logging
+        logging.getLogger(__name__).warning(
+            "LOCAL-371: _take_in_handler Case 3 declining unrepairable tail: %r", tail
+        )
+        return None  # Signal deletion — let the empty-sentence pass handle shortfall
+
     if not re.match(r'^(?:the|a|an|this|that)\b', tail, re.IGNORECASE):
         # No determiner — prepend "The" (tail stays as-is, lowercase is correct)
         tail = f"The {tail}"
@@ -1632,7 +1741,16 @@ def _take_in_handler(m):
             tail_fixed, count=1, flags=re.IGNORECASE
         )
         return f"{tail_fixed}."
-    return f"{tail_clean} stretches out before you."
+
+    # LOCAL-371: Choose predicate based on subject type.
+    # "stretches out before you" is only appropriate for vistas/landscapes/views.
+    # For objects/artifacts, use "is displayed here". If uncertain, decline.
+    if _tail_is_vista_subject(tail_clean):
+        return f"{tail_clean} stretches out before you."
+    else:
+        # Object/artifact — "is displayed here" is universally appropriate
+        # for museum items (instruments, books, busts, sculptures, etc.)
+        return f"{tail_clean} is displayed here."
 
 
 def _look_for_handler(m):
