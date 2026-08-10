@@ -3449,6 +3449,50 @@ def _check_type_prose_contradiction(poi_list: list) -> list:
     return warnings
 
 
+# [LOCAL-361] F3 name guard and the stop-heading invariant live at module scope so
+# they can be tested directly. Testing a copy of this logic is not evidence — the
+# original submission's 25 cases all passed against a reverted generate_tour_text.py.
+
+# GPT injections typically open with one of these; real artwork titles do not.
+_F3_INJECTION_OPENERS = re.compile(r'^(This|Here|The following|In this|Welcome to)\s', re.IGNORECASE)
+# A sentence-ending mark followed by a lowercase word is running prose, not a title.
+# Real titles capitalize after punctuation: "What Are We? Where Are We Going?"
+_F3_SENTENCE_SHAPE = re.compile(r'[.!?;]\s+[a-z]')
+_F3_MAX_TITLE_WORDS = 15
+
+
+def f3_name_is_corrupt(poi_name, verified=True):
+    """
+    True when `poi_name` looks like GPT injected prose into the name field.
+
+    Punctuation alone is NOT corruption (D274) — "Whaam!", "No. 14",
+    "St. Jerome in His Study" and Gauguin's "Where Do We Come From? What Are We?
+    Where Are We Going?" are all real titles that the old `any(c in name for c in
+    '.!?;')` check deleted.
+
+    D1v2-verified names are exempt from the shape heuristics: the corpus already
+    vouched for them. The length ceiling still applies to everything, since an
+    over-long name breaks TTS and rendering regardless of provenance.
+    """
+    if len(poi_name.split()) > _F3_MAX_TITLE_WORDS:
+        return True
+    if verified:
+        return False
+    return bool(_F3_SENTENCE_SHAPE.search(poi_name) or _F3_INJECTION_OPENERS.match(poi_name))
+
+
+def missing_stop_headers(complete_tour, rendered_headers):
+    """
+    Return the rendered stop headers absent from the assembled tour.
+
+    Checks survival of the headers actually emitted rather than counting
+    `^Stop \\d+:` lines. Counting is wrong in two directions: a description body
+    whose line opens "Stop 3: ..." inflates the count (D2 only rewrites those in
+    storied mode), and a count can match while the wrong header went missing.
+    """
+    return [h for h in rendered_headers if h not in complete_tour]
+
+
 def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None):
     """
     Generate audio tour text using OpenAI API with geo coordinates.
@@ -10645,19 +10689,8 @@ RULES:
         # lowercase word, e.g. ". the"). Real artwork titles may contain ?, !, ., ;
         # (e.g. "Whaam!", "No. 14", "Where Do We Come From? What Are We?").
         # D1v2-verified titles are exempt — the corpus already vouched for them.
-        _f3_is_verified = poi.get('verified', True)  # True or absent = verified
-        _f3_is_corrupt = False
-        if len(poi_name.split()) > 15:
-            _f3_is_corrupt = True
-        elif not _f3_is_verified:
-            # Only apply sentence-injection heuristic to unverified names
-            # Pattern: sentence-ending punct + space + lowercase word (indicates a real sentence)
-            if re.search(r'[.!?;]\s+[a-z]', poi_name):
-                _f3_is_corrupt = True
-            # Pattern: name starts with a verb phrase (GPT injection shape)
-            if re.match(r'^(This|Here|The following|In this|Welcome to)\s', poi_name, re.IGNORECASE):
-                _f3_is_corrupt = True
-        if _f3_is_corrupt:
+        _f3_is_verified = poi.get('verified', True)  # True or absent = verified (D1v2 default)
+        if f3_name_is_corrupt(poi_name, _f3_is_verified):
             print(f"  [F3] ⚠️ NAME TOO LONG/CORRUPT at stop {stop_num}: '{poi_name[:80]}'")
             # Truncate to first 12 words if corrupted
             _clean_name = ' '.join(poi_name.split()[:12]).rstrip('.,;:!?')
@@ -10929,18 +10962,16 @@ RULES:
 
     # [LOCAL-361] HARD INVARIANT: rendered heading count MUST equal stop count.
     # A mismatch means a stop silently vanished — fail loudly at generation time.
-    _final_headers = re.findall(r'^Stop\s+\d+:.+$', complete_tour, re.MULTILINE)
-    _expected_stop_count = len(poi_list)
-    _actual_header_count = len(_final_headers)
-    if _actual_header_count != _expected_stop_count:
-        print(f"  [LOCAL-361] ✗ HEADING COUNT MISMATCH: "
-              f"expected={_expected_stop_count}, rendered={_actual_header_count}")
-        print(f"    Rendered headers: {_final_headers}")
+    _lost_headers = missing_stop_headers(complete_tour, _rendered_headers)
+    if _lost_headers:
+        print(f"  [LOCAL-361] ✗ STOP HEADING LOST: {len(_lost_headers)} of "
+              f"{len(_rendered_headers)} rendered headers absent from the tour")
+        for _lh in _lost_headers:
+            print(f"    missing: {_lh}")
         raise ValueError(
-            f"[LOCAL-361] Stop heading count mismatch: "
-            f"expected {_expected_stop_count} stops but only {_actual_header_count} "
-            f"headings rendered. This is a generation bug — refusing to deliver a "
-            f"short tour."
+            f"[LOCAL-361] {len(_lost_headers)} of {len(poi_list)} stop headings "
+            f"vanished after rendering: {_lost_headers}. This is a generation bug "
+            f"— refusing to deliver a short tour."
         )
 
     # -------- [S27] Storied: post-assembly de-repetition check --------
