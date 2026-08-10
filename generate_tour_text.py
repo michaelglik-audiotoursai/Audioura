@@ -3571,6 +3571,27 @@ def build_provenance_block(credit_line):
         f"{PROVENANCE_PROHIBITION}\n"
     )
 
+def r4_scope_cap(exhibition_scope, poi_list_len, total_stops):
+    """
+    [LOCAL-370] Decide whether R4 replenishment may run, and the honest stop count.
+
+    Returns (suppressed, capped_total_stops).
+
+    D275: an unsatisfiable scope must produce a SHORTER, honest tour rather than
+    backfill. LOCAL-362 suppressed the deterministic bypass for scoped requests
+    but not replenishment, so venue-wide fill returned through a different door —
+    the 2026-08-10 MFA run delivered seven venue-wide works that way (D284).
+
+    At module scope because the guard otherwise lives only in a while-loop
+    condition inside a 7,900-line function, and the submitted tests for it
+    re-implemented that condition inline and passed against a reverted tree
+    (D277/D285). This is the third recurrence; lifting is the remedy that works.
+    """
+    suppressed = exhibition_scope is not None
+    if suppressed and poi_list_len < total_stops:
+        return True, poi_list_len
+    return suppressed, total_stops
+
 
 def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None):
     """
@@ -4470,14 +4491,43 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
 
             # ─── LOCAL-364: Try exhibition checklist FIRST ─────────────────────
             if _det_entity and _det_entity.official_url:
-                # Extract the exhibition name from the original request
-                # The user typed something like "Picasso, Miró, Dalí: Unbound exhibition at MFA"
-                # We want the exhibition name portion
-                _exh_name_for_search = _exhibition_scope.get('requirements', '') or location
-                # If requirements contains "exhibition" keyword, use it directly
-                # Otherwise try to extract from the original location string
-                if 'exhibition' not in _exh_name_for_search.lower():
-                    _exh_name_for_search = location
+                # [LOCAL-370] Build search term from the FULL user phrase, not from
+                # the LLM's `requirements` field which may silently truncate artist
+                # names. The user typed something like:
+                #   "Picasso, Miró, Dalí: Unbound exhibition at MFA, Boston, MA"
+                # We strip the venue suffix (" at MFA, Boston, MA") to get:
+                #   "Picasso, Miró, Dalí: Unbound exhibition"
+                # This is always richer than `requirements` which non-deterministically
+                # may return only "Unbound exhibition".
+                _exh_name_for_search = location
+                # Strip " at <venue>" suffix using the venue_name from intent
+                _venue_name_for_strip = _exhibition_scope.get('venue_name', '')
+                if _venue_name_for_strip:
+                    # Try "at VENUE" pattern (handles "at MFA, Boston, MA")
+                    _at_pattern = re.compile(
+                        r'\s+at\s+' + re.escape(_venue_name_for_strip.split(',')[0].strip()) + r'\b.*$',
+                        re.IGNORECASE
+                    )
+                    _stripped = _at_pattern.sub('', _exh_name_for_search)
+                    if _stripped and _stripped != _exh_name_for_search:
+                        _exh_name_for_search = _stripped.strip()
+                    elif ',' in location and _venue_name_for_strip.split(',')[0].strip().lower() in location.lower():
+                        # Fallback: try splitting on the venue name occurrence
+                        _vn_lower = _venue_name_for_strip.split(',')[0].strip().lower()
+                        _loc_lower = location.lower()
+                        _idx = _loc_lower.find(_vn_lower)
+                        if _idx > 0:
+                            # Walk back to find " at " before the venue name
+                            _pre = location[:_idx].rstrip()
+                            if _pre.lower().endswith(' at'):
+                                _exh_name_for_search = _pre[:-3].strip()
+                            else:
+                                _exh_name_for_search = _pre.rstrip(',').strip()
+
+                # Fallback: if stripping left us with nothing or just whitespace,
+                # use requirements, then location
+                if not _exh_name_for_search.strip():
+                    _exh_name_for_search = _exhibition_scope.get('requirements', '') or location
 
                 print(f"\n  [LOCAL-364] ═══ EXHIBITION CHECKLIST RETRIEVAL ═══")
                 print(f"  [LOCAL-364] Exhibition search term: '{_exh_name_for_search}'")
@@ -5139,7 +5189,21 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             #   1. R4 replenishment (verified-only count → triggers correctly)
             #   2. UNIFIED-FILL (last-resort unverified padding)
             #   3. LOCAL-16 GATE (strips unverified for museum tours before Phase 5)
+            #
+            # [LOCAL-370] EXCEPTION: When _exhibition_scope is not None, R4 must NOT
+            # fire. D275 requires an unsatisfiable scope to produce a shorter, honest
+            # tour rather than backfilling from the venue-wide collection. R4 draws
+            # from the entire venue, which defeats exhibition scoping. If the scope
+            # yields 3 works, the tour has 3 stops.
             _require_listing_verification = os.environ.get('REQUIRE_LISTING_VERIFICATION', 'false').lower() in ('true', '1', 'yes')
+
+            # [LOCAL-370] Skip R4 entirely for exhibition-scoped requests
+            _r4_suppressed_by_scope, total_stops = r4_scope_cap(
+                _exhibition_scope, len(poi_list), total_stops)
+            if _r4_suppressed_by_scope:
+                print(f"\n  [LOCAL-370] R4 replenishment SUPPRESSED (exhibition-scoped request)")
+                print(f"    Scope: {_exhibition_scope.get('requirements', '')}")
+                print(f"    Honest stop count: {total_stops} (no venue-wide backfill — D275)")
 
             if _require_listing_verification:
                 # OLD BEHAVIOR: cap at verified for medium/thin, thin sparse gets capped at 5
@@ -5165,7 +5229,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             _R4_MAX_CANDIDATES = 30
             _r4_all_dropped_pois = []  # Accumulate R4-generated candidates that failed verification
             
-            while len(poi_list) < total_stops and _r4_round < _R4_MAX_ROUNDS and len(_r4_all_tried_names) < _R4_MAX_CANDIDATES:
+            while not _r4_suppressed_by_scope and len(poi_list) < total_stops and _r4_round < _R4_MAX_ROUNDS and len(_r4_all_tried_names) < _R4_MAX_CANDIDATES:
                 _r4_round += 1
                 _r4_needed = total_stops - len(poi_list)
                 _r4_ask = min(_r4_needed + 5, 15)  # Ask for extras to improve hit rate
