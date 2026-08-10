@@ -11042,3 +11042,48 @@ is specified as archetypes with nothing about this exhibition hardcoded.
 still operates, that he is generous to American museums — all unsourced claims
 about a living private individual, and prohibited however good the coffee
 conversation was. A negative control is a required deliverable.
+
+## D283 — "Narrate the gift, never the giver" was too broad; the line is sourcing, not subject
+**2026-08-10.** LEAD wrote that rule into LOCAL-369. Michael questioned it,
+explicitly as a question and not a directive: *"Humans are always fascinated by
+the stories about other humans... I just wonder how we choose the stories."*
+
+He is right and the rule is now corrected. It conflated two different things:
+
+1. **Is the claim sourced?**
+2. **Is the claim about a person?**
+
+Only (1) is a real constraint. Donor stories are frequently well documented —
+museum press releases, annual reports, published interviews, obituaries,
+collector biographies — and they are exactly the material that makes a tour
+worth hearing rather than a re-reading of the wall labels. Banning the category
+to avoid the risky part of it discards the best content in the category.
+
+**The corrected rule, tiered by subject and source:**
+
+| subject | standard |
+|---|---|
+| the institution, or a deceased person | normal grounding — retrieved, citable text |
+| a public figure acting publicly (a benefactor the museum itself profiles) | normal grounding |
+| a **living private individual** | only what they or the institution have published |
+
+**Plus one prohibition that holds regardless of who the subject is:** never infer
+motive or financial condition from the fact of a donation. "Donated in 2015" is
+documented. "Donated because he could no longer afford the insurance", "the gift
+impoverished him", "he was pressured into it" are inferences about private
+circumstances, and they are the claims that cause real harm when wrong. Several
+of Michael's own candidate questions are this shape — in scope with a citation,
+prohibited without one. Note the asymmetry: the more psychologically compelling
+such a claim is, the more damage a fabricated version does.
+
+**On his second point — how we choose which story for which listener.** The axis
+he describes (some want the gift: acquisition dates, what it cost, how large the
+gift is, where the object was before; others want the donor: motive, relationship
+with the museum) already exists in the schema and is populated:
+`stop_metrics.class_details / class_historic / class_social`, 1,107 rows, all
+three columns non-null, consumed by `swipe_preference_service.py`. Provenance is
+largely `class_social`; acquisition dates and prices are largely `class_details`.
+
+So capturing the credit line is not only a content win — it feeds a
+personalization axis that is already wired. LOCAL-369 was updated to tag output
+for that classifier and explicitly NOT to build selection.
