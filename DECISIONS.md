@@ -11253,3 +11253,45 @@ Five distinct defects in one request path, found only by generating the tour and
 reading the log. Michael's instruction — *"we should only review fully generated
 tours"* — is the correct standard, and it is now enforced in the task template:
 paste live delivered stop headings, not suite output.
+
+## D288 — The repair pass was manufacturing the sentences the scorer flagged
+**2026-08-10.** LOCAL-371 merged. `_take_in_handler` Case 3 in
+`style_validator_detector.py` appended "stretches out before you" to any noun
+phrase lacking a relative clause. Correct for a vista, nonsense for an object,
+and it fired on already-mangled input — converting detectably broken text into
+confidently broken text that TTS would read aloud.
+
+Both examples came from the **Palais Lascaris tour that scored 75.0 with correct
+D1v2-verified stops**, so this was shipping inside good tours, not only failed
+ones:
+
+> "This guitar for its influence on future string instruments, marking a crucial
+> moment in the history of guitar-making stretches out before you."
+
+Now declines unrepairable tails and routes the predicate by subject type. Sibling
+handlers audited; no other assumes a landscape.
+
+**The finding that matters beyond this bug:** the submission confirmed both
+sentences are exactly what LOCAL-356's `empty_sentence_count` flags. So the
+scorer was detecting the defect the whole time while a repair pass kept creating
+it — a measurement and a generator working against each other, with the metric
+reporting-only (D276) so nothing acted. Worth checking, whenever a metric shows a
+persistent nonzero, whether something downstream is manufacturing what it counts.
+
+**Live verification, per the D284 standard:** regenerated Palais Lascaris.
+Occurrences of the construction went **2 → 0**, 4/4 stops delivered, all correct
+instruments.
+
+**Deliberately not claimed:** the score moved 75.0 → 87.5 and the THIN stop
+disappeared, but the two runs selected slightly different stops (Sacqueboute
+replaced Guitare baroque), so this is **not** a controlled comparison and the
+gain must not be attributed to this fix. What is controlled and attributable is
+the 2 → 0. `empty_sentence_count` remains nonzero (2,4,1,5), consistent with the
+metric being structural — it flags information-free sentences regardless of
+grammaticality, so other sources of empties remain.
+
+**Open question this hands back to LEAD:** whether `empty_sentence_count` can now
+be promoted from reporting to enforcing. It cannot be decided yet — the remaining
+empties have not been characterised, and gating on a metric whose residual
+population is unknown would reject good tours. Needs a task that first classifies
+what is left.
