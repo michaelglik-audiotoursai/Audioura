@@ -8698,6 +8698,19 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
               f"medium='{_matched_medium}' work_identity_chars={_provenance_block_chars}")
         description_prompt += _work_identity_block
 
+        # [LOCAL-382] Exhibition thesis / venue purpose framing per stop
+        if _framing_case != 'none' and tour_category == 'museum':
+            try:
+                _thesis_stop_block = build_exhibition_thesis_stop_block(
+                    framing_case=_framing_case,
+                    page_text=_framing_page_text,
+                    matched_work=_matched_work,
+                )
+                if _thesis_stop_block:
+                    description_prompt += _thesis_stop_block
+            except Exception as _ts_err:
+                print(f"  [LOCAL-382] Thesis stop injection error (non-fatal): {_ts_err}")
+
         # [§4] Story element injection — per-work facts from story_elements
         # [LOCAL-29] Tightened matching: use [:10] prefix AND require >= 60% word overlap
         # to prevent cross-contamination between adjacent entries with similar short prefixes.
@@ -10718,6 +10731,29 @@ REWRITE RULES (all mandatory):
         except Exception as _vi_err:
             print(f"  [LOCAL-11] Venue-identity mining error (non-fatal): {_vi_err}")
 
+    # -------- [LOCAL-382] Exhibition thesis / venue purpose framing detection --------
+    _framing_case = 'none'
+    _framing_source_phrase = '-'
+    _framing_page_text = ''
+    if tour_category == 'museum':
+        try:
+            from exhibition_thesis import detect_framing_case, build_exhibition_thesis_prolog_block, build_exhibition_thesis_stop_block
+            _venue_text_for_framing = ''
+            if _story_corpus_result and _story_corpus_result.get('combined_text'):
+                _venue_text_for_framing = _story_corpus_result['combined_text']
+            _framing_case, _framing_source_phrase = detect_framing_case(
+                exhibition_checklist_result=_exhibition_checklist_result,
+                exhibition_scope=_exhibition_scope,
+                venue_combined_text=_venue_text_for_framing,
+            )
+            if _framing_case == 'exhibition':
+                _framing_page_text = getattr(_exhibition_checklist_result, 'page_text', '') or ''
+            print(f"\n  [LOCAL-382] framing={_framing_case} source='{_framing_source_phrase[:80]}'")
+        except ImportError as _ft_err:
+            print(f"  [LOCAL-382] exhibition_thesis module unavailable ({_ft_err}) — framing=none")
+        except Exception as _ft_err:
+            print(f"  [LOCAL-382] Framing detection error (non-fatal): {_ft_err} — framing=none")
+
     # -------- [PROLOG] Storied: prepend journey prolog --------
     if _storied_mode and _storied_spine:
         try:
@@ -10952,6 +10988,20 @@ NARRATIVE THREAD (weave into Part 3 as the central intrigue):
 {_thread_result.prolog_promise}"""
 
             _prolog_prompt += _thread_prolog_section
+
+            # [LOCAL-382] Inject exhibition thesis / venue purpose into prolog
+            if _framing_case != 'none':
+                try:
+                    _thesis_prolog_block = build_exhibition_thesis_prolog_block(
+                        framing_case=_framing_case,
+                        source_phrase=_framing_source_phrase,
+                        page_text=_framing_page_text,
+                    )
+                    if _thesis_prolog_block:
+                        _prolog_prompt += _thesis_prolog_block
+                        print(f"  [LOCAL-382] Thesis block injected into prolog ({len(_thesis_prolog_block)} chars)")
+                except Exception as _tp_err:
+                    print(f"  [LOCAL-382] Thesis prolog injection error (non-fatal): {_tp_err}")
 
             # [LOCAL-119] Prolog LLM call with retry for transient failures.
             # Transient: timeout, connection error, HTTP 429/500/502/503/504.
