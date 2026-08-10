@@ -3493,6 +3493,28 @@ def missing_stop_headers(complete_tour, rendered_headers):
     return [h for h in rendered_headers if h not in complete_tour]
 
 
+def r4_scope_cap(exhibition_scope, poi_list_len, total_stops):
+    """
+    [LOCAL-370] Decide whether R4 replenishment may run, and the honest stop count.
+
+    Returns (suppressed, capped_total_stops).
+
+    D275: an unsatisfiable scope must produce a SHORTER, honest tour rather than
+    backfill. LOCAL-362 suppressed the deterministic bypass for scoped requests
+    but not replenishment, so venue-wide fill returned through a different door —
+    the 2026-08-10 MFA run delivered seven venue-wide works that way (D284).
+
+    At module scope because the guard otherwise lives only in a while-loop
+    condition inside a 7,900-line function, and the submitted tests for it
+    re-implemented that condition inline and passed against a reverted tree
+    (D277/D285). This is the third recurrence; lifting is the remedy that works.
+    """
+    suppressed = exhibition_scope is not None
+    if suppressed and poi_list_len < total_stops:
+        return True, poi_list_len
+    return suppressed, total_stops
+
+
 def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None):
     """
     Generate audio tour text using OpenAI API with geo coordinates.
@@ -5098,14 +5120,12 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             _require_listing_verification = os.environ.get('REQUIRE_LISTING_VERIFICATION', 'false').lower() in ('true', '1', 'yes')
 
             # [LOCAL-370] Skip R4 entirely for exhibition-scoped requests
-            _r4_suppressed_by_scope = (_exhibition_scope is not None)
+            _r4_suppressed_by_scope, total_stops = r4_scope_cap(
+                _exhibition_scope, len(poi_list), total_stops)
             if _r4_suppressed_by_scope:
                 print(f"\n  [LOCAL-370] R4 replenishment SUPPRESSED (exhibition-scoped request)")
                 print(f"    Scope: {_exhibition_scope.get('requirements', '')}")
-                print(f"    Stops available: {len(poi_list)}/{total_stops}")
-                if len(poi_list) < total_stops:
-                    total_stops = len(poi_list)
-                    print(f"    → Capping total_stops to {total_stops} (honest degradation per D275)")
+                print(f"    Honest stop count: {total_stops} (no venue-wide backfill — D275)")
 
             if _require_listing_verification:
                 # OLD BEHAVIOR: cap at verified for medium/thin, thin sparse gets capped at 5

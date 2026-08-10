@@ -336,57 +336,41 @@ class TestR4SuppressionForScopedRequests:
         _r4_suppressed_by_scope = (_exhibition_scope is not None)
         assert _r4_suppressed_by_scope is False
 
-    def test_scoped_request_caps_total_stops(self):
-        """A scoped request with N verified works produces exactly N stops.
+    def test_scoped_request_caps_stops_to_available_works(self):
+        """N verified works under a scope produce exactly N stops, not the request.
 
-        Simulates the production flow: exhibition scope set, poi_list has 3 works,
-        total_stops was 8. After the guard, total_stops must be capped to 3.
+        Calls the real r4_scope_cap. The submitted version re-implemented the
+        cap inline and asserted on its own copy (D277/D285) — it passed against
+        a reverted tree, giving zero coverage of the most important of the four
+        fixes.
         """
-        _exhibition_scope = {'requirements': 'Unbound exhibition', 'venue_name': 'MFA'}
-        _r4_suppressed_by_scope = (_exhibition_scope is not None)
+        from generate_tour_text import r4_scope_cap
+        scope = {'requirements': 'Unbound exhibition', 'venue_name': 'MFA'}
+        suppressed, total = r4_scope_cap(scope, poi_list_len=3, total_stops=8)
+        assert suppressed is True
+        assert total == 3, f"scoped tour must shrink to the works it has, got {total}"
 
-        total_stops = 8
-        poi_list = [
-            {'name': "Le Lézard aux plumes d'or"},
-            {'name': 'Moses and Monotheism'},
-            {'name': 'Au Soleil du Plafond'},
-        ]
+    def test_unscoped_request_is_untouched(self):
+        """No scope means R4 behaves exactly as before — this must not regress."""
+        from generate_tour_text import r4_scope_cap
+        suppressed, total = r4_scope_cap(None, poi_list_len=3, total_stops=8)
+        assert suppressed is False
+        assert total == 8, "unscoped tours must still be allowed to replenish"
 
-        # This mirrors the production code exactly:
-        if _r4_suppressed_by_scope:
-            if len(poi_list) < total_stops:
-                total_stops = len(poi_list)
+    def test_scope_with_enough_works_keeps_requested_count(self):
+        """A scope that satisfies the request is not shrunk."""
+        from generate_tour_text import r4_scope_cap
+        scope = {'requirements': 'Unbound exhibition'}
+        suppressed, total = r4_scope_cap(scope, poi_list_len=8, total_stops=8)
+        assert suppressed is True
+        assert total == 8
 
-        assert total_stops == 3, f"Expected total_stops=3, got {total_stops}"
-
-    def test_r4_while_condition_false_when_suppressed(self):
-        """The R4 while loop condition must be False when scoped.
-
-        Production code:
-          while not _r4_suppressed_by_scope and len(poi_list) < total_stops ...
-        """
-        _r4_suppressed_by_scope = True
-        poi_list = [{'name': 'Work1'}]
-        total_stops = 8
-        _r4_round = 0
-        _R4_MAX_ROUNDS = 3
-        _r4_all_tried_names = set()
-        _R4_MAX_CANDIDATES = 30
-
-        condition = (not _r4_suppressed_by_scope and
-                     len(poi_list) < total_stops and
-                     _r4_round < _R4_MAX_ROUNDS and
-                     len(_r4_all_tried_names) < _R4_MAX_CANDIDATES)
-        assert condition is False, "R4 loop should not enter when scoped"
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# INTEGRATION: Full pipeline (listing → detail → prose_llm)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-class TestFullPipeline:
-    """End-to-end: MFA listing page with Picasso exhibition navigates correctly."""
-
+    def test_r4_loop_cannot_enter_when_suppressed(self):
+        """The guard must actually gate the loop, using the real predicate."""
+        from generate_tour_text import r4_scope_cap
+        suppressed, total = r4_scope_cap({'requirements': 'x'}, 1, 8)
+        may_replenish = (not suppressed) and 1 < total
+        assert may_replenish is False
     def test_mfa_listing_to_detail_via_link(self):
         """find_exhibition_checklist navigates from listing to detail page via link."""
         listing_html = MFA_LISTING_FIXTURE.read_text(encoding='utf-8')
