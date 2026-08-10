@@ -11087,3 +11087,68 @@ largely `class_social`; acquisition dates and prices are largely `class_details`
 So capturing the credit line is not only a content win — it feeds a
 personalization axis that is already wired. LOCAL-369 was updated to tag output
 for that classifier and explicitly NOT to build selection.
+
+## D284 — The first real scoped generation produced a tour of the wrong museum sections
+**2026-08-10.** Michael asked for the exhibition tour to be generated so he and
+LEAD could review it against his own visit. The run is the most useful thing to
+happen to this feature, because it failed in four places at once and every one
+of them was invisible to the test suites that were green.
+
+`Picasso, Miró, Dalí: Unbound exhibition at MFA, Boston, MA`, 8 stops, live,
+everything through LOCAL-368 merged. Delivered stops:
+
+```
+Stop 1: The Japanese          Stop 5: Ancient Nubia Now
+Stop 2: Adam and Eve          Stop 6: Ankhhaf (1905)
+Stop 3: Adoration of the Shepherds   Stop 7: Appeal to the Great Spirit
+Stop 4: An Italian Autumn     Stop 8: April 1957 (Celestial Blue)
+```
+
+Score 68.75, four THIN stops, and alphabetical — Adam, Adoration, An Italian,
+Ancient, Ankhhaf, Appeal, April. That ordering is the tell: it is an index
+scrape, not a curated show.
+
+**The four failures, in the order they fired:**
+
+1. **The search term lost the names.** Phase 1 returned
+   `requirements='Unbound exhibition'`. LOCAL-362 separately extracted
+   `['Picasso', 'Miró', 'Dalí']` on the same run and nothing used them.
+   Measured: `'Unbound exhibition'` vs the listing heading `'Exhibitions'` scores
+   **0.383** — over the 0.35 floor — while against the real title it scores
+   0.23, under the floor. The full phrase scores **0.0** and **1.0**
+   respectively. The correct page was rejected and the index page accepted, by
+   the same threshold, purely because the term was truncated.
+2. **The listing page matched itself** and was then treated as a detail page.
+3. **The regex extractor "succeeded" on navigation**, reporting 17 works such as
+   `"Art of Ancient Greece by Rome, and the Byzantine Empire"` and
+   `"Detail of painting by Water Lilies, by Monet"`. Because it reported
+   success, the LOCAL-368 `prose_llm` path — which LEAD had verified live the
+   same day returns the three real works — **never ran.** A confident wrong
+   answer beat a correct one.
+4. **R4 replenishment is not scope-aware.** D1v2 rejected 15 of the 16 garbage
+   entries, so the tour should have been short. R4 then backfilled seven
+   venue-wide works to reach 8/8. LOCAL-362 suppresses the *deterministic
+   bypass* for scoped requests; nothing suppresses *replenishment*, so
+   venue-wide fill returns through a different door and D275's honest
+   degradation never takes effect.
+
+**Why the tests did not catch any of it.** Every suite was green — 216 passing.
+They test components against fixtures of the *right* page. Not one exercises the
+path from a user request through page discovery to delivered stops, so a wrong
+page selected upstream is invisible to all of them. Component tests over a
+correct fixture cannot detect choosing the wrong fixture.
+
+**The generalisable lesson, and it is D242 again in a new costume:** a retrieval
+path must be able to report failure. Three of these four are the same bug —
+something returned success on garbage rather than admitting it had nothing.
+Adding a better parser does not fix that; adding a plausibility gate that can
+reject its own output does.
+
+Dispatched as LOCAL-370 with all four, the measured numbers, and a requirement
+to commit the *listing* page as a fixture — the false match cannot be regression
+tested without it.
+
+**Standing correction to how this feature gets reviewed:** unit-green is not
+evidence for a retrieval pipeline. From now on a change to the exhibition path
+is reviewed against a live end-to-end generation and the delivered stop
+headings, not against its suites.
