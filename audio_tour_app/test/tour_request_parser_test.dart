@@ -1,52 +1,33 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:audio_tour_app_dev/utils/tour_request_parser.dart';
 
-/// [LOCAL-358] Unit tests for tour request parser.
+/// [LOCAL-358 + LOCAL-363] Unit tests for tour request parser.
 ///
-/// These verify the fix for the museum-default bug: when a user typed
-/// "biking tour in Norwood MA", the app sent tour_type='museum' because
-/// 'biking' wasn't recognized and the default was 'museum'.
-///
-/// After the fix:
-/// - Transport modes (bike, camel, dog sled, horse, vehicle, safari) are
-///   recognized and checked FIRST (before place-name nouns like 'park').
-/// - Default is '' (empty string = no signal), not 'museum' or 'walking'.
-/// - Word-boundary matching prevents 'walk' matching inside 'boardwalk'.
+/// LOCAL-358 moved transport checks before place-name keywords (park/museum).
+/// LOCAL-363 adds an activity-context guard so transport words inside proper
+/// place names ("Horse Guards Parade", "Safari Park") don't hijack the type.
 void main() {
   // ====================================================================
-  // LEAD bounce round 2 — four inputs that failed in the previous commit.
-  // These MUST fail against the previous parser (transport modes were after
-  // park/walk in the else-if chain, and contains('walk') hit 'boardwalk').
+  // LOCAL-363 acceptance table — every row verbatim from the task spec
   // ====================================================================
-  group('parseTourRequest - LEAD bounce failures (transport vs place-name)', () {
-    test('biking tour in Central Park → biking (not park)', () {
+  group('parseTourRequest - LOCAL-363 acceptance table', () {
+    test('biking tour in Norwood MA → biking', () {
+      final result = parseTourRequest('biking tour in Norwood MA');
+      expect(result['tour_type'], equals('biking'));
+    });
+
+    test('biking tour in Central Park → biking', () {
       final result = parseTourRequest('biking tour in Central Park');
       expect(result['tour_type'], equals('biking'));
     });
 
-    test('cycling tour of Hyde Park → biking (not park)', () {
+    test('cycling tour of Hyde Park → biking', () {
       final result = parseTourRequest('cycling tour of Hyde Park');
       expect(result['tour_type'], equals('biking'));
     });
 
-    test('horseback tour of the park → horseback (not park)', () {
-      final result = parseTourRequest('horseback tour of the park');
-      expect(result['tour_type'], equals('horseback'));
-    });
-
-    test('bike tour along the boardwalk → biking (not walking)', () {
-      // Pre-existing substring bug: contains('walk') matched inside 'boardwalk'
+    test('bike tour along the boardwalk → biking', () {
       final result = parseTourRequest('bike tour along the boardwalk');
-      expect(result['tour_type'], equals('biking'));
-    });
-  });
-
-  // ====================================================================
-  // Original acceptance tests — the five inputs from the task.
-  // ====================================================================
-  group('parseTourRequest - task acceptance inputs', () {
-    test('biking tour in Norwood MA → biking', () {
-      final result = parseTourRequest('biking tour in Norwood MA');
       expect(result['tour_type'], equals('biking'));
     });
 
@@ -55,26 +36,64 @@ void main() {
       expect(result['tour_type'], equals('dog sledding'));
     });
 
-    test('walking tour of Vieux Nice → walking', () {
-      final result = parseTourRequest('walking tour of Vieux Nice');
-      expect(result['tour_type'], equals('walking'));
-    });
-
-    test('museum tour of the Louvre → museum', () {
-      final result = parseTourRequest('museum tour of the Louvre');
-      expect(result['tour_type'], equals('museum'));
-    });
-
     test('camel tour in Abu Dhabi → camel', () {
       final result = parseTourRequest('camel tour in Abu Dhabi');
       expect(result['tour_type'], equals('camel'));
     });
+
+    test('walking tour of Camelback Mountain, Phoenix → walking', () {
+      final result =
+          parseTourRequest('walking tour of Camelback Mountain, Phoenix');
+      expect(result['tour_type'], equals('walking'));
+    });
+
+    test('tour of Horse Guards Parade, London → empty', () {
+      final result =
+          parseTourRequest('tour of Horse Guards Parade, London');
+      expect(result['tour_type'], equals(''));
+    });
+
+    test('walking tour of the White Horse Tavern → walking', () {
+      final result =
+          parseTourRequest('walking tour of the White Horse Tavern');
+      expect(result['tour_type'], equals('walking'));
+    });
+
+    test('tour of San Diego Safari Park → empty', () {
+      final result = parseTourRequest('tour of San Diego Safari Park');
+      expect(result['tour_type'], equals(''));
+    });
+
+    test('walking tour of Scooter Alley → walking', () {
+      final result = parseTourRequest('walking tour of Scooter Alley');
+      expect(result['tour_type'], equals('walking'));
+    });
+
+    test('museum tour of the Horse Museum → museum', () {
+      final result = parseTourRequest('museum tour of the Horse Museum');
+      expect(result['tour_type'], equals('museum'));
+    });
+
+    test('walking tour of Carmel-by-the-Sea → walking', () {
+      final result = parseTourRequest('walking tour of Carmel-by-the-Sea');
+      expect(result['tour_type'], equals('walking'));
+    });
+
+    test('tour of the Louvre → empty', () {
+      final result = parseTourRequest('tour of the Louvre');
+      expect(result['tour_type'], equals(''));
+    });
+
+    test('tour of downtown Boston → empty', () {
+      final result = parseTourRequest('tour of downtown Boston');
+      expect(result['tour_type'], equals(''));
+    });
   });
 
   // ====================================================================
-  // Transport modes — comprehensive coverage
+  // LOCAL-358 preserved behavior — transport modes with explicit activity
   // ====================================================================
-  group('parseTourRequest - transport modes', () {
+  group('parseTourRequest - transport modes (activity context)', () {
     test('cycling tour of French Riviera → biking', () {
       final result = parseTourRequest('cycling tour of French Riviera');
       expect(result['tour_type'], equals('biking'));
@@ -126,7 +145,8 @@ void main() {
     });
 
     test('motorcycle tour of Pacific Coast Highway → driving', () {
-      final result = parseTourRequest('motorcycle tour of Pacific Coast Highway');
+      final result =
+          parseTourRequest('motorcycle tour of Pacific Coast Highway');
       expect(result['tour_type'], equals('driving'));
     });
 
@@ -157,7 +177,22 @@ void main() {
   });
 
   // ====================================================================
-  // Category keywords with word-boundary protection
+  // Bare transport words (no "tour") — activity position still works
+  // ====================================================================
+  group('parseTourRequest - bare transport (no activity noun)', () {
+    test('biking in Norwood MA → biking (leading activity word)', () {
+      final result = parseTourRequest('biking in Norwood MA');
+      expect(result['tour_type'], equals('biking'));
+    });
+
+    test('cycling around Paris → biking (leading activity word)', () {
+      final result = parseTourRequest('cycling around Paris');
+      expect(result['tour_type'], equals('biking'));
+    });
+  });
+
+  // ====================================================================
+  // Category keywords — weaker signal, checked after transport
   // ====================================================================
   group('parseTourRequest - categories (word-boundary)', () {
     test('walking tour of Boston → walking', () {
@@ -195,24 +230,12 @@ void main() {
   // Word-boundary prevents substring false positives
   // ====================================================================
   group('parseTourRequest - substring protection', () {
-    test('tour of Walkerville → empty (walk is substring, not word)', () {
-      // 'Walkerville' contains 'walk' but not as a word boundary
-      // However, \bwalk\b does NOT match inside 'Walkerville' since 'walker' != 'walk'
-      // Actually \bwalk\b would match at start of 'Walkerville' — let me check
-      // RegExp r'\b(walking|walk|hike|hiking)\b' — 'walk' in 'Walkerville':
-      // \bwalk\b matches 'walk' at position 0 because 'e' follows at pos 4.
-      // Wait no: 'Walkerville' lowercased = 'walkerville'. \bwalk\b matches
-      // 'walk' at the start since 'e' is a word char, NOT a boundary after 'k'.
-      // Actually \b is between 'k' and 'e'? No — \b is at position where one
-      // side is \w and other is \W. In 'walkerville', all chars are \w, so
-      // \bwalk\b matches at start (boundary before 'w') but needs boundary
-      // after 'k' — 'e' is \w so no boundary. Hence \bwalk\b does NOT match.
+    test('tour of Walkerville → empty (walk is substring)', () {
       final result = parseTourRequest('tour of Walkerville');
       expect(result['tour_type'], equals(''));
     });
 
-    test('tour along the boardwalk → empty (walk is suffix, not word)', () {
-      // 'boardwalk' — \bwalk\b: boundary before 'w'? 'd' is \w, so no boundary.
+    test('tour along the boardwalk → empty (walk is suffix)', () {
       final result = parseTourRequest('tour along the boardwalk');
       expect(result['tour_type'], equals(''));
     });
@@ -221,30 +244,40 @@ void main() {
       final result = parseTourRequest('tour of the sidewalk district');
       expect(result['tour_type'], equals(''));
     });
+
+    test('walking tour of Carmel-by-the-Sea → walking (not camel)', () {
+      // \bcamel\b does not match inside "Carmel"
+      final result = parseTourRequest('walking tour of Carmel-by-the-Sea');
+      expect(result['tour_type'], equals('walking'));
+    });
+
+    test('walking tour of Bikeman Street → walking (not biking)', () {
+      // \bbike\b does not match inside "Bikeman"
+      final result = parseTourRequest('walking tour of Bikeman Street');
+      expect(result['tour_type'], equals('walking'));
+    });
   });
 
   // ====================================================================
   // Default behavior — no signal → empty string
   // ====================================================================
   group('parseTourRequest - default (no signal)', () {
-    test('tour of downtown Boston → empty (server decides)', () {
+    test('tour of downtown Boston → empty', () {
       final result = parseTourRequest('tour of downtown Boston');
       expect(result['tour_type'], equals(''));
     });
 
-    test('Norwood MA → empty (server decides)', () {
+    test('Norwood MA → empty', () {
       final result = parseTourRequest('Norwood MA');
       expect(result['tour_type'], equals(''));
     });
 
-    test('tour of the Louvre → empty (no keyword, server intent handles)', () {
-      // The server's LLM intent analysis extracts venue_name='Louvre' and the
-      // S15 block forces tour_category=museum. The app should not guess.
+    test('tour of the Louvre → empty', () {
       final result = parseTourRequest('tour of the Louvre');
       expect(result['tour_type'], equals(''));
     });
 
-    test('tour of the Uffizi → empty (server decides)', () {
+    test('tour of the Uffizi → empty', () {
       final result = parseTourRequest('tour of the Uffizi');
       expect(result['tour_type'], equals(''));
     });
