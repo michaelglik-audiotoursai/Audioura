@@ -3786,11 +3786,147 @@ def build_provenance_block(credit_line):
     )
 
 
+def recover_medium_from_page_text(work_title, page_text):
+    """[LOCAL-380] Attempt to recover a medium/form from exhibition page prose.
+
+    When the structured `medium` field is empty but the page prose describes the
+    work's physical form (e.g. "livre d'artiste", "illustrated book"), extract it.
+
+    Returns the recovered medium string, or '' if nothing found.
+    """
+    if not work_title or not page_text:
+        return ''
+
+    # Normalise title for search
+    title_lower = work_title.lower().strip()
+    page_lower = page_text.lower()
+
+    # Find the title in the page text (or a significant fragment of it)
+    title_pos = page_lower.find(title_lower)
+    if title_pos == -1:
+        # Try first significant words (at least 3 chars each)
+        title_words = [w for w in title_lower.split() if len(w) >= 3]
+        if len(title_words) >= 2:
+            # Search for first two significant words together
+            fragment = ' '.join(title_words[:3])
+            title_pos = page_lower.find(fragment)
+    if title_pos == -1:
+        return ''
+
+    # Extract a window around the title mention (300 chars before and after)
+    window_start = max(0, title_pos - 300)
+    window_end = min(len(page_text), title_pos + len(title_lower) + 300)
+    window = page_text[window_start:window_end]
+
+    # Look for medium/form indicators in the window
+    _MEDIUM_PATTERNS = [
+        # "livre d'artiste" or "livres d'artiste"
+        re.compile(r"livres?\s+d['']artiste", re.IGNORECASE),
+        # "illustrated book" / "artist's book"
+        re.compile(r"(?:illustrated|artist'?s?)\s+book", re.IGNORECASE),
+        # "book with N [color] lithographs/etchings/prints"
+        re.compile(r"book\s+(?:with|featuring|of)\s+\d+\s+\w*\s*(?:lithograph|etching|print|woodcut|engraving)s?", re.IGNORECASE),
+        # "color lithographs" / "original lithographs"
+        re.compile(r"\d+\s+(?:color|colour|original)?\s*(?:lithograph|etching|print|woodcut|engraving)s?", re.IGNORECASE),
+        # "portfolio of prints"
+        re.compile(r"portfolio\s+(?:of|with)\s+\w+\s*(?:lithograph|etching|print|engraving)s?", re.IGNORECASE),
+    ]
+
+    for pat in _MEDIUM_PATTERNS:
+        m = pat.search(window)
+        if m:
+            return m.group(0).strip()
+
+    return ''
+
+
+def extract_collaborator_from_page_text(work_title, artist, page_text):
+    """[LOCAL-380] Extract a collaborating writer/poet from exhibition page prose.
+
+    Museum pages often name both the visual artist and the literary collaborator
+    for illustrated books (e.g. "Juan Gris and French poet Pierre Reverdy's
+    Au Soleil du Plafond"). When the page names a co-author/collaborator near
+    the work title, return their name.
+
+    Returns the collaborator name string, or '' if not found.
+    """
+    if not work_title or not page_text:
+        return ''
+
+    title_lower = work_title.lower().strip()
+    page_lower = page_text.lower()
+
+    # Find the title in the page text
+    title_pos = page_lower.find(title_lower)
+    if title_pos == -1:
+        title_words = [w for w in title_lower.split() if len(w) >= 3]
+        if len(title_words) >= 2:
+            fragment = ' '.join(title_words[:3])
+            title_pos = page_lower.find(fragment)
+    if title_pos == -1:
+        return ''
+
+    # Extract a window around the title (400 chars before, 200 after)
+    window_start = max(0, title_pos - 400)
+    window_end = min(len(page_text), title_pos + len(title_lower) + 200)
+    window = page_text[window_start:window_end]
+
+    # Patterns for collaborator mentions near the title:
+    # "Artist and [role] Collaborator's Title"
+    # "Artist and Collaborator's Title"
+    # "by Artist, with text by Collaborator"
+    # "Artist / Collaborator"
+
+    # Pattern: "X and [French/Spanish/...] [poet/writer/author] Y's <title>"
+    # or "X and Y's <title>"
+    _COLLAB_PATTERNS = [
+        # "Artist and [adjective] [role] Name's Title" or "Artist and Name's Title"
+        re.compile(
+            r'(?:' + re.escape((artist or '').split()[-1] if artist else '') + r')'
+            r'\s+and\s+(?:\w+\s+)?(?:poet|writer|author|novelist)?\s*'
+            r'([A-Z][a-zà-ÿ]+(?:\s+[A-Z][a-zà-ÿ]+)+)',
+            re.UNICODE
+        ) if artist else None,
+        # "with text by Name" / "with poems by Name"
+        re.compile(
+            r'with\s+(?:text|poems?|prose|writing)\s+by\s+'
+            r'([A-Z][a-zà-ÿ]+(?:\s+[A-Z][a-zà-ÿ]+)+)',
+            re.UNICODE
+        ),
+        # "Name and Artist's Title" (collaborator listed first)
+        re.compile(
+            r'([A-Z][a-zà-ÿ]+(?:\s+[A-Z][a-zà-ÿ]+)+)\s+and\s+'
+            r'(?:' + re.escape((artist or '').split()[-1] if artist else '') + r')',
+            re.UNICODE
+        ) if artist else None,
+    ]
+
+    for pat in _COLLAB_PATTERNS:
+        if pat is None:
+            continue
+        m = pat.search(window)
+        if m:
+            name = m.group(1).strip()
+            # Reject if the "collaborator" is the artist themselves
+            if artist and name.lower() == artist.lower():
+                continue
+            # Reject if it looks like a place name or institution
+            _reject_words = {'museum', 'gallery', 'fine', 'arts', 'institute',
+                             'university', 'library', 'press', 'edition'}
+            name_words_lower = {w.lower() for w in name.split()}
+            if name_words_lower & _reject_words:
+                continue
+            return name
+
+    return ''
+
+
 def build_work_identity_block(matched_work):
-    """[LOCAL-379] Build a WORK IDENTITY block from any available fields on matched_work.
+    """[LOCAL-379/380] Build a WORK IDENTITY block from any available fields.
 
     Emits whenever at least ONE of artist, date, medium, publisher, or credit_line
-    is available. If medium is empty, explicitly prohibits spatial/medium claims.
+    is available. If medium is empty, explicitly prohibits spatial/medium claims
+    AND spatial instructions (do not tell the visitor where to stand or look).
     Returns '' only when matched_work is None or has no usable fields at all.
     """
     if not matched_work:
@@ -3801,6 +3937,7 @@ def build_work_identity_block(matched_work):
     medium = (matched_work.get('medium') or '').strip()
     publisher = (matched_work.get('publisher') or '').strip()
     credit_line = (matched_work.get('credit_line') or '').strip()
+    collaborator = (matched_work.get('collaborator') or '').strip()
 
     # Bail if nothing useful is available
     if not any([artist, date, medium, publisher, credit_line]):
@@ -3810,6 +3947,8 @@ def build_work_identity_block(matched_work):
 
     if artist:
         lines.append(f"  Artist: {artist}")
+    if collaborator:
+        lines.append(f"  Collaborator: {collaborator}")
     if date:
         lines.append(f"  Date: {date}")
     if medium:
@@ -3817,7 +3956,12 @@ def build_work_identity_block(matched_work):
     else:
         lines.append("  Medium: UNKNOWN — do NOT describe physical form, placement, "
                      "or spatial relationship. Do NOT say 'painting', 'sculpture', "
-                     "'ceiling', 'installation', 'mural', or assert any medium.")
+                     "'ceiling', 'installation', 'mural', 'glass', or assert any medium. "
+                     "Do NOT tell the visitor where to stand or look. "
+                     "Do NOT use phrases like 'look up', 'stand beneath', "
+                     "'positioned above you', or describe the work's physical orientation. "
+                     "The work's physical form is unknown — prefer stating what IS known "
+                     "(artist, date, collaborator, publisher) at greater length.")
     if publisher:
         lines.append(f"  Publisher: {publisher}")
     if credit_line:
@@ -3826,6 +3970,11 @@ def build_work_identity_block(matched_work):
     lines.append("")  # trailing newline separator
     lines.append("You MUST name the artist in your description. If a collaborator or "
                  "author is given, name them too. These are grounded facts — use them.")
+    if not medium:
+        lines.append("ORIENTATION CONSTRAINT: Since the medium/form is unknown, your "
+                     "Orientation section must NOT give spatial directions (where to stand, "
+                     "where to look, what is above/below/beside). Instead, simply name the "
+                     "work and introduce what is known about it (artist, date, context).")
     lines.append("")
 
     return '\n'.join(lines)
@@ -8476,16 +8625,37 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 _credit_line_for_stop = (_matched_work.get('credit_line') or '').strip()
         description_prompt += build_provenance_block(_credit_line_for_stop)
 
-        # [LOCAL-379] WORK IDENTITY BLOCK: Inject artist, date, medium, publisher
+        # [LOCAL-379/380] WORK IDENTITY BLOCK: Inject artist, date, medium, publisher
         # whenever ANY field is available — not only when medium is non-empty.
         # This fixes Defect 1 (block suppressed for thin/empty medium) and
         # Defect 2 (correct artist never named in prose).
+        # [LOCAL-380] When medium is empty, attempt recovery from page prose.
+        # Also extract collaborator from page prose when available.
         _matched_medium = ''
-        if _matched_work and _matched_work.get('medium'):
-            _matched_medium = _matched_work['medium'].strip()
+        if _matched_work:
+            if not (_matched_work.get('medium') or '').strip():
+                # [LOCAL-380] Attempt medium recovery from exhibition page prose
+                _page_text_for_recovery = getattr(_exhibition_checklist_result, 'page_text', '') or ''
+                _recovered_medium = recover_medium_from_page_text(
+                    _matched_work.get('title', ''), _page_text_for_recovery)
+                if _recovered_medium:
+                    _matched_work['medium'] = _recovered_medium
+                    print(f"  [LOCAL-380] Recovered medium from page prose: '{_recovered_medium}'")
+            # [LOCAL-380] Extract collaborator from page prose
+            if not (_matched_work.get('collaborator') or '').strip():
+                _page_text_for_collab = getattr(_exhibition_checklist_result, 'page_text', '') or ''
+                _recovered_collab = extract_collaborator_from_page_text(
+                    _matched_work.get('title', ''),
+                    _matched_work.get('artist', ''),
+                    _page_text_for_collab)
+                if _recovered_collab:
+                    _matched_work['collaborator'] = _recovered_collab
+                    print(f"  [LOCAL-380] Recovered collaborator from page prose: '{_recovered_collab}'")
+            if (_matched_work.get('medium') or '').strip():
+                _matched_medium = _matched_work['medium'].strip()
         _work_identity_block = build_work_identity_block(_matched_work)
         _provenance_block_chars = len(_work_identity_block)
-        print(f"  [LOCAL-379] stop='{poi_name}' matched_work={_matched_work is not None} "
+        print(f"  [LOCAL-380] stop='{poi_name}' matched_work={_matched_work is not None} "
               f"medium='{_matched_medium}' work_identity_chars={_provenance_block_chars}")
         description_prompt += _work_identity_block
 
@@ -8760,9 +8930,25 @@ NOTE: "The Biblical Message" (Message Biblique) is the name of the COMPLETE CYCL
             _word_target = "280"
             _word_target_instruction = ""
 
+        # [LOCAL-380] Build orientation instruction that respects medium constraint.
+        # When medium is unknown, the orientation must NOT give spatial directions.
+        _orientation_medium_unknown = (_matched_work is not None and not _matched_medium)
+        if _orientation_medium_unknown:
+            _orientation_instruction = (
+                "Orientation: (introduce the work by naming it and stating what is "
+                "known — artist, date, collaborator — but do NOT describe physical "
+                "form, do NOT say where to stand or look, do NOT describe placement "
+                "or spatial orientation of the work)"
+            )
+        else:
+            _orientation_instruction = (
+                "Orientation: (write a brief orientation text explaining the best "
+                "viewing position here)"
+            )
+
         description_prompt += f"""
 Format your response as follows:
-Orientation: (write a brief orientation text explaining the best viewing position here)
+{_orientation_instruction}
 
 Then write the description directly — a flowing, {_word_target}-word narrative about the exhibit. Do NOT wrap it in brackets, placeholders, or formatting markers. Just write the prose.
 
