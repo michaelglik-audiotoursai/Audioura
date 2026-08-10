@@ -11491,3 +11491,66 @@ report.
 expected red-on-revert count, and LEAD runs the revert itself. A prohibition
 describes what not to write; a revert count describes what the tests must be
 able to detect. Only the second one is falsifiable.
+
+## D295 — What `empty_sentence_count` is actually counting, and why it still cannot enforce
+**2026-08-10.** LOCAL-375 merged. The D288 question — can the metric be promoted
+from reporting to enforcing — now has data behind it. 49 flagged sentences from
+5 live tours across 21 stops, each classified verbatim. LEAD recounted the table
+independently and reproduced the distribution exactly:
+
+| Class | Count | Share |
+|---|---|---|
+| 1 — genuinely empty (grammatical, information-free) | 30 | 61.2% |
+| 2 — broken grammar (the D288 class) | 3 | 6.1% |
+| 3 — **false positive** | 11 | 22.4% |
+| 4 — ambiguous | 5 | 10.2% |
+
+**The metric is mostly right: 67% of its hits are real defects.** That vindicates
+LOCAL-356 and confirms D288's reading — this was never noise.
+
+**But it cannot enforce yet, and the reason is specific.** The 22.4% false
+positives are not scattered; they share one shape — *visual descriptions of
+artwork* (technique, composition, depicted content) that carry real information
+but contain no mid-sentence proper noun or date, which is what the heuristic keys
+on. A museum tour is made of exactly these sentences. Enforcing today would
+penalise the register the product is supposed to produce.
+
+**LEAD's ruling: narrow the heuristic first, then enforce.** The submission
+offered two thresholds and they are in tension — ">3 per stop is SAFE" in one
+paragraph, "enforce at >5 per stop" as the specific recommendation. Neither
+should be quoted as settled. The sequencing is what matters and it is not
+arguable: a visual-description vocabulary exemption drops false positives from
+22.4% to ~4%, and only then is any threshold safe. Enforcing before that trades a
+real defect class for a real content class.
+
+**This is the same shape as D292's footer boundary.** The instinct is to pick a
+threshold that tolerates the false positives; the fix is to remove the false
+positives so the threshold can be honest. Tuning around a measurement error
+preserves it.
+
+**Deliberately not decided here:** the threshold itself. It is Michael's product
+call once the narrowing lands, and picking it now would bake in a number derived
+from a 5-tour sample.
+
+## D296 — A test that fails on ImportError is not a revert check
+**2026-08-10.** LOCAL-375 stated its expected red count as 5 — correct per D294 —
+but the mechanism was `ImportError: cannot import name`, i.e. reverting the
+helper deletes the symbol and the whole file fails to collect.
+
+That proves the symbol exists. It proves nothing about the body. A helper whose
+logic was entirely wrong would still import, and all 5 tests would still be
+"red on revert" by the stated measure.
+
+LEAD ran the stronger check instead: keep the symbol, neuter the body (flag every
+sentence rather than only empty ones). **2 of 5 go red** — that is the real
+coupling, and it is enough for a measurement helper.
+
+**Refinement to D294:** the revert must break the *logic*, not the symbol. When a
+task adds a new function, deleting it is not a revert — it is a compile error.
+State the expected red count for a body that is present but wrong.
+
+**Not a bounce.** The helper is a measurement tool that no gate depends on, its
+output was verified directly against the committed data, and the classification —
+the actual deliverable — was recounted independently. The test weakness is
+recorded, not paid down, because nothing downstream rests on it yet. If the
+helper ever backs an enforcing gate, this becomes blocking.
