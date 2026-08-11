@@ -12533,3 +12533,64 @@ unclaimed task file is claimed within 5 minutes and spends money unattended
 (CLAUDE.md). It must first establish whether the drop is real — three runs on
 current `storied` versus three on the pre-chain commit — before bisecting, and it
 must not "fix" anything by loosening a gate before the cause is known.
+
+## D321 — We pay for story search, built the engine, and never call it
+**2026-08-11.** Michael: *"I thought I paid for some Internet search and we should
+use it to a fuller extent."* He was right, and the gap is worse than
+under-utilisation — the capability is unreachable from the tour path.
+
+Traced in code:
+
+| Component | State |
+|---|---|
+| `SERP_API_KEY`, `SERP_PROVIDER=serper` in `.env` | paid, configured |
+| `work_story_searcher.py` — query synthesis + SERP + source-tier classification + caching | complete module |
+| **`search_stories_for_stop()`** — the function that runs the search | **zero production callers** (only `test_f4_cache_roundtrip.py`, `run_pilot_b6.py`) |
+| `generate_tour_text.py` | imports **`work_stories_get`** only — it *reads* the cache |
+| what fills that cache during a tour run | **nothing** |
+| `extract_story_elements_from_pages(pages=_story_corpus_result['pages'])` | extracts only from already-fetched pages; no web search |
+
+**The generator reads a story cache that nothing fills.** That is why every "story"
+in the MFA tour is a credit-line fact: the credit line is the only story-bearing
+text the pipeline ever sees.
+
+**This is the 2026-07-29 finding recurring in a new module** — CLAUDE.md records
+the complete SQ3/SQ4 engine in `story_element_extractor.py` having had zero
+production callers, with the lesson "grep for a production importer before
+believing a module does anything" (standing check #2). It was true again, one
+module over, and LEAD did not check it before writing LOCAL-396 — which is why 396
+was killed mid-run.
+
+**LEAD's error, recorded plainly:** 396 told the agent to fetch from "Wikipedia +
+the venue's own site" and explicitly forbade other sources. That brief was written
+from the assumption that no search capability existed, without running standing
+check #2 on the story path. Ten minutes of agent time and a wrong architectural
+decision, caught only because Michael pushed back. **Check what exists before
+specifying what to build.**
+
+## D322 — Michael's reframing: the page having no stories is the opportunity
+**2026-08-11.** LEAD presented "the MFA page contains no stories" as a constraint
+to work around. Michael inverted it:
+
+> "It is good that the MFA page has no stories — that means our tour will be more
+> valuable to our listeners who can either read MFA page or ask Google, but we come
+> up with something intensely interesting to our listeners."
+
+And set the bar as a comparison, not an absolute:
+
+> "We should compare ourself with Google to make sure that our listeners prefer our
+> stories than Google summary; otherwise, they will not pay for our tours if they
+> can just get gist of what we say in Google for free."
+
+**This is a better acceptance criterion than any internal metric.** "Grounded" and
+"has a story per stop" are necessary and both satisfiable by a tour nobody would
+pay for. *"Better than the free thing one search away"* is the actual product test,
+and it is checkable — LOCAL-397 must produce `STORY_VS_GOOGLE_COMPARISON.md` and
+be honest when one of our stories *is* the first Google result, because that is the
+signal to dig deeper rather than something to hide.
+
+**Dispatched as LOCAL-397** (replacing the killed 396): call the search that
+already exists, extend the grounding corpus so the gates trust what it returns —
+otherwise the feature deletes its own output, as D305 showed with the Boston
+Athenæum — verify the candidate stories rather than assuming them, ≥250 words per
+stop, and benchmark against Google.
