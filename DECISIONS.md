@@ -12690,3 +12690,59 @@ That gives a usable test for a story beat, in order:
 
 **Both halves are needed.** LOCAL-397 extends the grounding corpus so true stories
 survive; this rule stops that extension from admitting relevant-sounding trivia.
+
+## D326 — The Palais drop was variance, not regression. Verified independently.
+**2026-08-11.** LOCAL-395's verdict: **not a regression.**
+
+| | run 1 | run 2 | run 3 | mean | range |
+|---|---|---|---|---|---|
+| current `2f60210` | 68.8 | 93.8 | 81.2 | **81.2** | 68.8–93.8 |
+| baseline `d91a5c6` | 75.0 | 87.5 | 75.0 | **79.2** | 75.0–87.5 |
+
+LEAD verified rather than accepted: all six tour files exist on disk and
+independent re-scoring reproduces every number exactly. Gate removals (4–6) and
+beat retries (7–11) are comparable across both versions; the LOCAL-393 word-floor
+retry fired once and that run still landed at 68.8, inside the baseline range.
+
+**A 25-point spread on identical code** makes the single 56.2 reading a low roll,
+not a trend. D320's alarm was correct to raise and wrong in its conclusion — which
+is the right way round.
+
+**Caveat recorded rather than buried:** the agent's "pre-chain" commit `d91a5c6`
+is 18:56 on 2026-08-10, which is *mid*-chain — the chain starts at `ceb61bf`
+(14:06). So this compares the second half of the evening against current, not the
+whole evening. The variance finding stands regardless: a range of 68.8–93.8 on one
+codebase swamps the effect being looked for.
+
+**What survives from D320 anyway:** the methodological point. Scoring static
+fixtures could never have detected a generator regression, and the corrected
+practice — score the live control venue every round — is what made this question
+answerable at all.
+
+## D327 — Michael: a wrong fact corrects the story, it does not delete it
+**2026-08-11.** LEAD specified verify-or-drop for story facts. Michael corrected it:
+
+> "If a fact is incorrect, let's say it was a wrong year when someone dies or met
+> with someone else, that does not invalidate the whole story, just changes the
+> correct date; unless the date change makes the story unbelievable: like someone
+> met with someone after they died."
+
+**He is right, and verify-or-drop would have been expensive.** It throws away a
+good story over a digit, and after a day spent watching gates delete correct
+content (D305's Boston Athenæum, D311's `', in'`, D317's whole deleted stop), the
+bias to guard against is over-deletion.
+
+The rule: **verification returns a correction, not a verdict.**
+- Corpus contradicts a detail → rewrite the detail, keep the story.
+- Corpus is merely silent → drop the unsupported clause, keep the rest.
+- **Drop the story only on a coherence failure** — where the corrected fact makes
+  the relation impossible: a meeting after a death, a collaboration before a
+  birth, a gift before the object existed.
+
+Test the *relation*, not the digit. The posthumous-Gris candidate is the clean
+example: if his death verifies as 1927 against a 1955 book, the story stands; if
+he turned out to have died in 1957 the story collapses and must go; if the book
+turned out to be 1953, nothing collapses — fix the date and keep it.
+
+**This is the line between a fact-checker and a censor**, and it belongs in every
+future grounding gate, not just this one.

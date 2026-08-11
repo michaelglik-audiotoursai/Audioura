@@ -72,6 +72,37 @@ Apply, in order, to every story beat before it reaches the prompt:
 
 Log rejections with the reason: `[LOCAL-398] beat rejected: '<beat>' — unattached`.
 
+## Part B2 — a wrong fact CORRECTS the story; it does not delete it (Michael, D327)
+
+> "If a fact is incorrect, let's say it was a wrong year when someone dies or met
+> with someone else, that does not invalidate the whole story, just changes the
+> correct date; **unless the date change makes the story unbelievable**: like
+> someone met with someone after they died."
+
+LEAD had specified verify-or-drop. That is too blunt and would throw away good
+stories over a typo. The correct behaviour:
+
+1. **Verification returns a correction, not a verdict.** If the corpus says 1938
+   and the draft says 1939, rewrite it to 1938 and keep the story.
+2. **Drop only on a coherence failure** — where the corrected fact makes the story
+   impossible or absurd. Test the *relation*, not the digit:
+   - a meeting dated after a participant's death
+   - a collaboration dated before either party was born
+   - a gift dated before the object existed
+3. **If the corpus cannot confirm the fact at all** (not contradict — simply no
+   support), the claim goes but the surrounding story may stay if the rest is
+   supported. Do not delete a paragraph over one unsupported clause.
+4. Log the distinction: `[LOCAL-398] corrected '<claim>' 1939->1938 source=…` vs
+   `[LOCAL-398] dropped '<claim>' — coherence failure: meeting postdates death`.
+
+**This is the difference between a fact-checker and a censor**, and it is why the
+posthumous-Gris candidate is a good test: if Gris's death year verifies as 1927 and
+the book as 1955, the story stands and is remarkable. If the death year came back
+as 1957, the *story* collapses (you cannot posthumously publish a living man) —
+that is a coherence failure, and the right response is to drop it. If instead the
+book turned out to be 1953 rather than 1955, nothing collapses: correct the date
+and keep the story.
+
 ## Part C — re-read the empty-sentence population (D324)
 
 `EMPTY_SENTENCE_CLASSIFICATION.md` (LOCAL-375) classified 22.4% of
