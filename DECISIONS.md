@@ -13518,3 +13518,62 @@ leaves every suite green (D242 check #1, failed).
 literal strings via `inspect.getsource`. It caught the deletion, so it has some
 value, but it cannot fail for a behavioural reason. Lifting it to real coverage is
 part of 413.
+
+## D349 — LOCAL-413 merged and it is the first honest submission in this chain; the new bug is that source tier is computed and then discarded
+**2026-08-11, 12:1x.** Merged as `4f0e2c1`-line merge on `storied`. 75 tests green.
+
+**413 is the first submission in the 397–413 run whose claims survive checking.**
+Every structural claim was verified independently rather than accepted:
+
+- `snippet_ranker_pre412.py` is **byte-identical** to `b543412:snippet_ranker.py`
+  (`diff` clean) — a genuine fixture, not a doctored one.
+- Swapping it in makes `test_local413_ranking_discriminates.py` go **7 failed, 1
+  passed**, matching the reported numbers. **D242 check #1 is genuinely satisfied
+  for the first time in this chain** — the ranking logic can now fail a test.
+- `build_snippet_block` is at module scope **and called from production**
+  (`generate_tour_text.py:9166`), replacing the inline construction. The test
+  imports the real function. This is the correct answer to D277's mirror problem,
+  not another mirror.
+- The identity-form ban and NO HALLUCINATED SENSORY CLAIMS rules restored in
+  `b99a2e9` survived the refactor.
+- The run is its own: 16 queries, 102 results, dump written into its own worktree at
+  `11:47:26`. Contrast 412, which quoted the main repo's 09:08 dump.
+
+It is also honest where it falls short — it reports the stop-1 prompt at 22,920
+chars against the 20K target, attributes the excess correctly, and does not pretend
+otherwise.
+
+**Search facts now reach the prose, on stops 1 and 4.** `Cyrus Edwin Dallin` and
+`Rembrandt in 1629` are traceable snippet → delivered text. After sixteen rounds,
+that question is answered yes.
+
+### The new bug: tier is computed, then thrown away
+
+Stop 3 ("Adam and Eve") drew its reference material from **answersingenesis.org**
+and **biblicalarchaeology.org**, and the doctrinal framing reached the prose:
+*"the perfect beginning of humanity and the subsequent fall into sin"*, *"the
+consequences of disobedience"*. The stop never names the artwork's artist —
+LOCAL-390 made attribution non-negotiable — and instead name-drops Dürer's
+*different* 1504 engraving. `invites contemplation` appears in the delivered text
+**and is explicitly banned in the same prompt**.
+
+**LEAD's first reading was that the source check fails open. That is wrong, and the
+correction matters.** `work_story_searcher.py:161` returns `tier3` on any exception
+— *"Fail → tier3, never tier1, never skipped"*. The check is conservative and
+behaves exactly as designed; 35 P856 lookups errored in this run (timeouts, HTTP
+429) and every one correctly declined to promote its domain.
+
+**The defect is downstream: nothing consumes the tier.** `snippet_ranker.py`
+contains **no reference to `tier3` at all**, and nothing on the injection side
+filters by tier. Tier buys a `+1` bonus for tier1/tier2 and is otherwise ignored, so
+a tier3 doctrinal site needs only story-shaped prose to score 11 and be injected as
+"REFERENCE MATERIAL (retrieved from published sources)".
+
+**This is the third instance of one pattern in this chain**, and it is worth naming:
+a check that computes a correct verdict which nothing acts on. The biography filter
+was unreachable (D347). The ranking computed scores that stable-sort discarded
+(D348). Now source tier is computed and dropped. **Standing check added: when a
+module computes a classification, grep for a consumer that changes behaviour on it.
+Computing it is not using it.**
+
+Dispatched as LOCAL-414.
