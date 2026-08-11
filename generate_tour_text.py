@@ -8417,6 +8417,7 @@ sentences contain the specific evidence that earns them. Delete praise that isn'
 by evidence immediately before it.
 
 Do NOT use museum/gallery framing (no "exhibit", no "viewing platform", no "artwork" unless it genuinely is one).
+Do NOT use academic narration words: never write "thesis", "framing", or "premise" in your output.
 Do NOT invent specific named people or attribute quotes unless they are well-documented public figures associated with this location.
 
 AUDIO RULES (this will be heard, not read):
@@ -8879,12 +8880,27 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                         )
                 description_prompt += f"\nDOCUMENTED FACTS FOR THIS WORK (incorporate at least one):\n{_facts_text}\n"
 
-        # [LOCAL-402] Direct snippet injection — bypasses the extract/score pipeline.
+        # [LOCAL-402/403] Direct snippet injection — bypasses the extract/score pipeline.
         # When _DIRECT_SNIPPETS_PER_STOP has material for this stop, inject raw
         # search snippets as reference material with grounded-story instructions.
+        # [LOCAL-403] Lookup by name first, then by index (handles title string mismatches
+        # between the runner's canonical_title and the generation pipeline's poi_name).
         _local402_snippets_injected = False
         if _DIRECT_SNIPPETS_PER_STOP and poi_name:
             _stop_snippets = _DIRECT_SNIPPETS_PER_STOP.get(poi_name, [])
+            # [LOCAL-403] Fallback: try index-based lookup (key = "__stop_N__")
+            if not _stop_snippets:
+                _stop_snippets = _DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{idx}__", [])
+            # [LOCAL-403] Fallback: normalized fuzzy match on keys
+            if not _stop_snippets:
+                from story_miner import _normalize
+                _norm_poi = _normalize(poi_name)
+                for _skey, _sval in _DIRECT_SNIPPETS_PER_STOP.items():
+                    if _skey.startswith("__stop_"):
+                        continue
+                    if _normalize(_skey) == _norm_poi:
+                        _stop_snippets = _sval
+                        break
             if _stop_snippets:
                 _snippet_block = "\nREFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):\n"
                 for _si, _snip in enumerate(_stop_snippets[:12], 1):
