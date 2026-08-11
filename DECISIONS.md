@@ -13711,3 +13711,59 @@ measuring the wrong object.
 ever be written for 415.** A review loop keyed on terminal lines will wait forever.
 LEAD is watching the worker pid directly instead, and the eventual verdict must be
 recorded manually in `kiro_sessions_ran.md` so the ledger stays honest.
+
+## D353 — LOCAL-415 bounced: the refusal gate is a denylist, and the model changes its wording every round
+**2026-08-11, 14:2x.** Not merged. Work recovered and committed as `ad96eb3` on its
+branch; bounced to LOCAL-417.
+
+**Recovery first.** 415's worker exited at 14:22 without committing and without a
+submission doc, and its dispatcher had already died (D352), so no terminal line was
+ever emitted. The work was intact in the worktree — 4 modified files, a test suite,
+a runner, and two rounds of MFA and Palais runs. LEAD committed it as-found and
+wrote the ledger line by hand. **Nothing was lost; the work lives in files, not in
+the agent's session.**
+
+**What it achieved:** 4/4 stops, Palais control 4/4 with 0 refusals, 12 tests green,
+doctrinal framing gone, `invites contemplation` gone.
+
+**Why it is bounced.** Stop 3 delivered this to the listener:
+
+> "There are still some missing required names in your description. Ensure to
+> include each of the specified individuals with their surnames and roles in the
+> narrative. Notify me if you require further assistance with this."
+
+That is the model talking to the *pipeline*, shipped as tour content.
+
+**LEAD's own first check said this run was clean, and it was wrong.** The grep used
+414's phrase list — `I cannot provide`, `I missed out on`, `patience is appreciated`,
+`as an AI` — and returned 0. The defect was two lines further down in a phrasing
+none of those match. **A check inherited from the previous round measures the
+previous round's bug.**
+
+**The gate 415 built has the same flaw, and it is structural.**
+`_LLM_REFUSAL_PATTERNS` is a well-built denylist of *first-person* refusals: `I
+cannot provide`, `I'm sorry`, `I apologize`, `as an AI`, `given constraints`. Stop
+3's text contains no first-person pronoun and no apology — it is imperative,
+second-person, addressed to the operator. It cannot match, and no amount of adding
+phrases will fix this, because:
+
+| Round | Wording |
+|---|---|
+| 414 | "I cannot provide a response based on the given constraints and missing surnames." |
+| 415 | "There are still some missing required names in your description… Notify me if you require further assistance." |
+
+**Three rounds, three phrasings, one defect.** 415's brief explicitly said "do not
+just add the phrase to another list", and the gate is that list with better
+engineering.
+
+**The root cause is not the wording, it is that the prompt is unsatisfiable.** The
+stop demands required surnames it has not supplied — "Adam and Eve" has no artist in
+the pipeline's data — so the model reports the impossibility instead of writing.
+Detecting the report is treating a symptom. **The fix is to stop issuing a
+requirement the pipeline cannot meet:** if no surname is available for a stop, the
+required-names block must not be emitted, and the stop must be written from what
+does exist or dropped.
+
+**Standing check added:** a content gate must assert what the text **is**, not
+enumerate what it must not say. "Does this stop name its subject and state a fact
+about it" survives rephrasing; "does it contain any of these 12 strings" does not.
