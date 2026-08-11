@@ -32,6 +32,7 @@ class _AboutScreenState extends State<AboutScreen> {
   final TextEditingController _apiKeyController = TextEditingController();
   String _currentServerIp = '192.168.0.218';
   String _serverMode = 'cloud';
+  String _cloudTrack = 'beta';
   bool _usePathPrefixes = false;
   String _selectedMode = 'Tours';
 
@@ -84,6 +85,7 @@ class _AboutScreenState extends State<AboutScreen> {
       // Load saved server IP and cloud settings
       final savedIp = prefs.getString('server_ip') ?? '192.168.0.218';
       final savedServerMode = prefs.getString('server_mode') ?? 'cloud';
+      final savedCloudTrack = prefs.getString('cloud_track') ?? 'beta';
       final savedCloudBaseUrl = prefs.getString('cloud_base_url') ?? '';
       final savedUsePathPrefixes = prefs.getBool('cloud_use_path_prefixes') ?? false;
       final savedApiKey = prefs.getString('gateway_api_key') ?? '';
@@ -121,6 +123,7 @@ class _AboutScreenState extends State<AboutScreen> {
         _currentServerIp = savedIp;
         _serverIpController.text = savedIp;
         _serverMode = savedServerMode;
+        _cloudTrack = savedCloudTrack;
         _cloudBaseUrlController.text = savedCloudBaseUrl;
         _usePathPrefixes = savedUsePathPrefixes;
         _apiKeyController.text = savedApiKey;
@@ -244,11 +247,36 @@ class _AboutScreenState extends State<AboutScreen> {
                     ],
                   ),
                   // Cloud mode — no fields needed (values baked in via --dart-define)
-                  if (_serverMode == 'cloud') const Padding(
-                    padding: EdgeInsets.only(top: 8),
+                  if (_serverMode == 'cloud') Padding(
+                    padding: const EdgeInsets.only(top: 8),
                     child: Text(
-                      '✅ Cloud mode active — connected to api.audioura.com',
-                      style: TextStyle(fontSize: 12, color: Colors.green),
+                      _cloudTrack == 'storied'
+                          ? '✅ Cloud mode active — connected to Storied'
+                          : '✅ Cloud mode active — connected to Beta (api.audioura.com)',
+                      style: TextStyle(fontSize: 12, color: _cloudTrack == 'storied' ? Colors.purple : Colors.green),
+                    ),
+                  ),
+                  // Storied vs Beta comparison track — cloud mode only.
+                  if (_serverMode == 'cloud') Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Row(
+                      children: [
+                        const Text('Track:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                        const SizedBox(width: 10),
+                        ChoiceChip(
+                          label: const Text('Beta'),
+                          selected: _cloudTrack == 'beta',
+                          selectedColor: Colors.green.shade100,
+                          onSelected: (_) => _setCloudTrack('beta'),
+                        ),
+                        const SizedBox(width: 8),
+                        ChoiceChip(
+                          label: const Text('Storied'),
+                          selected: _cloudTrack == 'storied',
+                          selectedColor: Colors.purple.shade100,
+                          onSelected: (_) => _setCloudTrack('storied'),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -546,6 +574,19 @@ class _AboutScreenState extends State<AboutScreen> {
       SnackBar(
         content: Text('Switched to ${mode == 'cloud' ? 'Cloud' : 'Local WiFi'} mode'),
         backgroundColor: mode == 'cloud' ? Colors.green : Colors.blue,
+      ),
+    );
+  }
+
+  Future<void> _setCloudTrack(String track) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('cloud_track', track);
+    setState(() { _cloudTrack = track; });
+    await DebugLogHelper.addDebugLog('ABOUT: Cloud track set to: $track');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Comparing against ${track == 'storied' ? 'Storied' : 'Beta'}'),
+        backgroundColor: track == 'storied' ? Colors.purple : Colors.green,
       ),
     );
   }

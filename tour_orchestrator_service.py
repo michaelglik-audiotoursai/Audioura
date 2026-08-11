@@ -482,6 +482,22 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         """)
         has_tour_content = cur.fetchone() is not None
         print(f"tour_content column exists: {has_tour_content}")
+
+        # Track B: self-healing add, same pattern as audio_tour/lat/number_requested
+        # above — guarantees this INSERT works on any Postgres (Cloud SQL, Mac
+        # Mini local dev, a fresh checkout) regardless of whether migration/sql/007
+        # has been run against it yet.
+        cur.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'audio_tours' AND column_name = 'track'
+        """)
+        has_track = cur.fetchone() is not None
+        if not has_track:
+            print(f"Adding track column...")
+            cur.execute("ALTER TABLE audio_tours ADD COLUMN track VARCHAR(16) NOT NULL DEFAULT 'beta'")
+            conn.commit()
+            print("Added track column")
         
         # [LOCAL-156] Check if tour already exists using the SAME logic as the unique index:
         # lower(tour_name) WHERE original_tour_id IS NULL.
@@ -529,32 +545,41 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
             _is_test_mode = is_test
         else:
             _is_test_mode = os.getenv('TOUR_TEST_MODE', 'false').lower() == 'true'
+        # Track B: which deployment produced this row — 'beta' (default, current
+        # production) or 'storied' (the comparison track). Set per-deployment via
+        # env var, NOT per-request — Beta and Storied are separate Cloud Run
+        # services (TRACK_B_STORIED_VS_BETA.md), each always writing their own
+        # value. Distinct from storied_mode above, which is Track A's story-
+        # pipeline quality flag and can vary per-request within either track.
+        _track = os.getenv('TOUR_TRACK', 'beta').lower()
+        if _track not in ('beta', 'storied'):
+            _track = 'beta'
         if has_audio_tour and has_lat and has_number_requested and has_tour_content:
             cur.execute(
                 """
                 INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng,
-                    tour_content, content_language, storied_mode, stops_count, zip_filename, is_test)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    tour_content, content_language, storied_mode, stops_count, zip_filename, is_test, track)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, tour_content, 'en',
-                 os.getenv('STORIED_MODE', 'false').lower() == 'true', stops_count, zip_filename, _is_test_mode)
+                 os.getenv('STORIED_MODE', 'false').lower() == 'true', stops_count, zip_filename, _is_test_mode, _track)
             )
         elif has_audio_tour and has_lat and has_number_requested:
             cur.execute(
                 """
-                INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng, zip_filename, is_test)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested, lat, lng, zip_filename, is_test, track)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, zip_filename, _is_test_mode)
+                (tour_name, request_string, psycopg2.Binary(zip_data), 1, lat, lng, zip_filename, _is_test_mode, _track)
             )
         else:
             # Fallback if columns don't exist
             cur.execute(
                 """
-                INSERT INTO audio_tours (tour_name, request_string, is_test)
-                VALUES (%s, %s, %s)
+                INSERT INTO audio_tours (tour_name, request_string, is_test, track)
+                VALUES (%s, %s, %s, %s)
                 """,
-                (tour_name, request_string, _is_test_mode)
+                (tour_name, request_string, _is_test_mode, _track)
             )
         print(f"Inserted new tour: {tour_name} (zip={zip_filename}, is_test={_is_test_mode})")
         

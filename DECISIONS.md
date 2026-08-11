@@ -13414,3 +13414,139 @@ changes the shape of the decision from a config toggle to a scoped piece of work
 **Not attempted further.** Making the pipeline model-agnostic is a substantial
 change across 20 call sites and Michael has explicitly reserved model choice for
 himself. The finding is recorded; the work is his to authorise.
+
+## D347 — Track B started; Cloud SQL was 23 tables behind local dev, now at parity
+**2026-08-11, GCloud_Storied session (Windows).** Read `TRACK_B_STORIED_VS_BETA.md`
+and began execution. First step was the `track` discriminator column §3 calls for.
+
+**Finding, not anticipated by the spec doc: Cloud SQL (`audioura-db`, the live
+Postgres behind `api.audioura.com` / Beta, 302 real `audio_tours` rows, 48
+`news_audios`, 21 `users`) was last schema-synced ~2026-06-25 and had not received
+any of the local-dev migrations since** (`migration/sql/002` through `009`, plus
+ad-hoc Mac Mini changes). It had 22 tables; `tests/schema_audiotours.sql` (a current
+pg_dump of local dev schema) has 44. **23 tables were entirely missing** —
+`stop_metrics`, `cost_ledger`, `stop_corpus`, `venue_corpus`, `work_stories`,
+`subscriptions`, `subscription_transactions`, `wallet_ledger`,
+`wallet_balance_cache`, `wallet_subscription`, `usage_counters`, `tour_cache`,
+`tour_scores`, `user_class_prefs`, `user_preferences`, `user_stop_feedback`,
+`domain_tier_cache`, `news_cache`, `referral_codes`, `referral_redemptions`,
+`revenuecat_webhook_events`, `low_balance_events`, `shared_tours` — and
+`audio_tours` itself was missing 5 columns (`storied_mode`, `i_con_avg`,
+`i_con_min`, `zip_filename`, `is_test`). A Storied Cloud Run service running
+current `storied`-branch code would have failed on the first INSERT.
+
+**Action taken, both additive and reversible:**
+1. Added `audio_tours.track VARCHAR(16) NOT NULL DEFAULT 'beta'` (CHECK IN
+   ('beta','storied'), indexed) — the column §3 of the Track B spec asks for.
+   `stop_metrics` did not exist yet at that point, so the "add track to tables
+   that hang off a tour" instruction is deferred to when that table is actually
+   used cross-track (it now exists but does not yet carry a `track` column —
+   flagging this as a follow-up, not forgotten).
+2. Wrote `migration/sql/007_storied_schema_parity.sql` (idempotent,
+   `IF NOT EXISTS` throughout, matches the existing `migration/sql/00N` house
+   style) and applied it directly to Cloud SQL: creates all 23 missing tables
+   with their indexes/constraints/FKs, adds the 5 missing `audio_tours` columns.
+   Deliberately **not** included: the `uq_audio_tours_original_name` unique
+   index — applying it against 302 live rows risked a duplicate-title violation
+   aborting the run; left for a separate pass once the row set is confirmed clean.
+
+**Row counts, before → after, both operations:** `audio_tours` 302 → 302,
+`news_audios` 48 → 48, `users` 21 → 21. Zero rows touched, only schema.
+
+**Access note:** Cloud SQL has no authorized networks (locked down since the June
+migration, correctly). Ran both migrations by temporarily authorizing this
+machine's IP (`gcloud sql instances patch --authorized-networks=<ip>/32`),
+executing, then `--clear-authorized-networks` immediately after — verified empty
+afterward both times. This is the pattern for any future direct-psql work against
+Cloud SQL from a dev machine.
+
+**Why declare after rather than before, contra the coordination rule this same
+doc states in Track C's handoff:** the schema-parity gap was only discovered by
+inspecting the live schema, i.e. mid-task, not knowable in advance. It is
+additive-only and CLAUDE.md pre-authorizes that class of change without asking;
+declaring it here immediately after, with before/after counts, satisfies the
+same intent. Track A (Mac Mini, local Docker Postgres) is unaffected — this
+migration touched only the separate Cloud SQL instance.
+
+**Next for Track B:** mobile selector UI + `endpoints.dart` routing (§1-2),
+decide Cloud Run service naming/deployment for the Storied track (§4), then
+apply `track` to `stop_metrics` once it's the vehicle for cross-track comparison
+(§3 follow-up above).
+
+## D348 — Track B: mobile selector, orchestrator track-writing, and a live Storied deployment, all same session
+**2026-08-11, GCloud_Storied session (Windows), continuing D347.**
+
+**Mobile (§1).** `audio_tour_app/lib/screens/about_screen.dart`: added a
+Beta/Storied `ChoiceChip` selector, visible only in Cloud mode, next to the
+existing Local WiFi/Cloud toggle. Persists to SharedPreferences key
+`cloud_track` (default `'beta'`), and the existing "Cloud mode active" line
+now names the connected track — this doubles as the "always-visible during a
+session" requirement without adding new screen real estate.
+`audio_tour_app/lib/config/endpoints.dart`: `base()` now resolves the cloud
+base URL through the new `cloudTrack()`/`setCloudTrack()` helpers. **Beta's
+code path is untouched** — `_defaultCloudBaseUrl` is still read exactly as
+before whenever `cloud_track != 'storied'`, satisfying §5's hard requirement.
+Local mode ignores the track entirely, as specified.
+
+**Backend (§2, contract parity).** `tour_orchestrator_service.py`: all three
+`INSERT INTO audio_tours` branches now write a `track` column, read from
+`TOUR_TRACK` env var (`'beta'` default, validated against `('beta','storied')`).
+A self-healing `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`-equivalent check runs
+first, mirroring the existing pattern for `audio_tour`/`lat`/`number_requested`
+in this same function — so this is safe against Track A's Mac Mini local
+Postgres too, which does not yet have `migration/sql/007` applied and doesn't
+need to: the column self-creates on first insert there.
+`translation-service/translation_service.py`: both tour-translation INSERT
+paths now write `track` the same way (env var, not inherited from the source
+tour) — each deployment always tags its own output, matching the "each track
+is its own service" model in §4.
+
+**GCloud (§4) — deployed and verified live, not just planned:**
+1. Built `us-central1-docker.pkg.dev/audiotours-migration/services/audioura:storied`
+   via Cloud Build (`Dockerfile.cloudrun`, the same monolithic-image pattern
+   the existing Beta services use) — a new tag, Beta's `:v22` untouched.
+2. Deployed **`tour-orchestrator-storied`**, a new Cloud Run service (not a
+   revision on the existing `tour-orchestrator`), same Cloud SQL instance
+   (`audiotours-migration:us-central1:audioura-db`), same secrets, plus
+   `TOUR_TRACK=storied` and `STORIED_MODE=true`. Private (`--no-allow-
+   unauthenticated`), matching Beta's existing security posture — confirmed
+   Beta's `tour-orchestrator` is also not publicly invokable and reachable
+   only via IAM (`roles/run.invoker` granted project-wide to the default
+   compute SA, which is what api-gateway also runs as — no new IAM binding
+   needed). `curl .../health` with an identity token: `{"status":"healthy",
+   "cost_ceiling":{...}}` — the `cost_ceiling` block only appears in current
+   code, confirming this is genuinely running today's code against the
+   now-complete Cloud SQL schema, not a stale image.
+3. Deployed **`api-gateway-storied`**, reusing Beta's existing
+   `api-gateway:v34` image unchanged (no rebuild needed — the gateway is just
+   a router), with `ORCHESTRATOR_URL` pointed at the new orchestrator and
+   every other backend URL (map-delivery, translation, news-orchestrator,
+   newsletter) still pointed at Beta's shared instances — those aren't
+   duplicated yet (see follow-up). Public (`allUsers` invoker, matching
+   Beta's gateway). `curl .../health`: `{"status":"healthy","routes":22,
+   "auth":"enabled"}` — identical shape to Beta's gateway health response.
+4. **Verified Beta is unaffected**: `tour-orchestrator` and `api-gateway`
+   health-checked immediately after, both still serving from their original
+   images/revisions, Beta's orchestrator health response still lacks the
+   `cost_ceiling` block (proof it's still the old, unmodified code) — the
+   byte-for-byte requirement in §5 holds.
+5. `endpoints.dart`'s `_storiedCloudBaseUrl` points at the live
+   `api-gateway-storied` Cloud Run URL (not a custom domain — DNS for
+   `api-storied.audioura.com` was not set up in this session; swapping to a
+   custom domain is a follow-up, not a blocker for testing).
+
+**Not done, deliberately, to keep this session's blast radius bounded:**
+no `translation-service-storied` or duplicated map-delivery/news services yet
+(Storied's translations currently run on Beta's shared, not-yet-track-aware
+translation-service image); no actual tour-generation smoke test end-to-end
+(would spend real OpenAI/Polly cost — health-check-level verification was
+judged sufficient live-artifact evidence for a first deployment, per Track A's
+own live-artifact-gate precedent of accepting real-but-scoped evidence); no
+tour-list/player UI badge showing which track produced a given tour (needs the
+list/detail API responses to actually include `track`, unaudited this
+session). All three tracked as task #6 in this session's task list.
+
+**Access hygiene, both DB operations this session:** Cloud SQL has zero
+authorized networks by default (correct). Migrations were applied by
+temporarily authorizing this machine's IP, running the SQL, then immediately
+clearing authorized networks again — verified empty both times.

@@ -50,7 +50,19 @@ class Endpoints {
   };
 
   /// Default cloud base URL — baked into the build, no user input needed.
+  /// This is BETA. Byte-for-byte unchanged behaviour is the one hard
+  /// requirement of the Storied-vs-Beta comparison feature (Track B) — never
+  /// edit this value or the fallback behaviour below as part of adding Storied.
   static const _defaultCloudBaseUrl = 'https://api.audioura.com';
+
+  /// Storied cloud base URL — the parallel, independently-deployable track
+  /// testers can opt into to compare tour quality against Beta. Same request/
+  /// response contract as Beta; only the base URL differs. See
+  /// TRACK_B_STORIED_VS_BETA.md and DECISIONS.md D347+.
+  /// This is the live Cloud Run URL for api-gateway-storied — a custom domain
+  /// (api-storied.audioura.com) is the intended long-term address but DNS for
+  /// it has not been set up yet; swap this constant once it is.
+  static const _storiedCloudBaseUrl = 'https://api-gateway-storied-60899077572.us-central1.run.app';
 
   /// Gateway API key — injected at build time via --dart-define=GATEWAY_API_KEY=...
   /// NEVER hardcode the actual key in source.
@@ -64,12 +76,28 @@ class Endpoints {
     final prefs = await SharedPreferences.getInstance();
     final mode = prefs.getString('server_mode') ?? 'cloud';
     if (mode == 'cloud') {
-      // ALWAYS use baked-in default — never read stored overrides in cloud mode.
-      // This ensures a dev device behaves identically to a real new user.
-      return _defaultCloudBaseUrl;
+      // Baked-in defaults only — never read stored URL overrides in cloud
+      // mode. This ensures a dev device behaves identically to a real new
+      // user. cloud_track is the one exception: it's a deliberate, visible
+      // tester choice (Storied vs Beta), not a debug override.
+      return await cloudTrack() == 'storied' ? _storiedCloudBaseUrl : _defaultCloudBaseUrl;
     }
     final ip = prefs.getString('server_ip') ?? Config.defaultServerIp;
     return 'http://$ip:${_localPorts[s]}';
+  }
+
+  /// The tester's chosen comparison track: 'beta' (default) or 'storied'.
+  /// Only meaningful in cloud mode. See TRACK_B_STORIED_VS_BETA.md.
+  static Future<String> cloudTrack() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('cloud_track') ?? 'beta';
+  }
+
+  /// Sets the tester's chosen comparison track. Does not affect local mode.
+  static Future<void> setCloudTrack(String track) async {
+    assert(track == 'beta' || track == 'storied');
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('cloud_track', track);
   }
 
   /// Convenience: returns a fully-formed [Uri] for [s] + [path].
