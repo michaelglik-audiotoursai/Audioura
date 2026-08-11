@@ -51,9 +51,17 @@ class TestStarvationRescue:
         # With cap=5, tier1 junk fills all slots; tier3 is excluded by penalty
         ranked, report = rank_and_cap_snippets(snippets, artist='Lucas Cranach', work_title='Adam and Eve', cap=5)
 
-        assert report['starvation_rescued'] is True, (
-            f"Expected starvation rescue to fire — all tier1 snippets are irrelevant to 'Adam and Eve'. "
-            f"Report: {report}"
+        # [LEAD merge, D363] LOCAL-419 made this scenario stop being a starvation
+        # case: the title-relevance adjustment now demotes the irrelevant tier1 junk
+        # on merit, so the relevant tier3 wins a slot by ranking and the rescue never
+        # needs to fire. 415's actual guarantee is the OUTCOME — a title-relevant
+        # snippet reaches the output — so assert that, by whichever route.
+        # The rescue mechanism itself remains covered by
+        # test_usable_count_reflects_title_relevance, which still goes through it.
+        _titles_out = [s.get('title', '') for s in ranked]
+        assert any('Adam and Eve' in t for t in _titles_out), (
+            f"Title-relevant snippet did not reach the output by rescue OR by ranking. "
+            f"Output: {_titles_out}. Report: {report}"
         )
         assert report['usable_count'] >= 1, (
             f"Expected at least 1 usable snippet after rescue. Got {report['usable_count']}"
