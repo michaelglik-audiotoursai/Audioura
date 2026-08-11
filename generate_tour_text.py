@@ -1887,6 +1887,13 @@ _LAST_VERIFICATION_TIER = ""
 # Keys: total_cost, total_tokens, cache_hit, breakdown (dict with llm/tts/search)
 _LAST_GENERATION_COST = {"total_cost": 0.0, "total_tokens": 0, "cache_hit": False, "breakdown": {}}
 
+# [LOCAL-402] Direct snippet injection — bypasses the extract/score pipeline.
+# Populated by the runner BEFORE calling generate_tour_text().
+# Keys: stop_name (str) → list of {'title': str, 'snippet': str, 'url': str}
+# When non-empty, the per-stop prompt injects these as reference material
+# with an instruction to write one grounded story about a named person.
+_DIRECT_SNIPPETS_PER_STOP: dict = {}
+
 # [LOCAL-323] REMOVED module-level globals _CURRENT_JOB_USER_ID / _CURRENT_JOB_ID.
 # They were not thread-safe: concurrent jobs sharing the same module meant one
 # thread's write would clobber another's. Fixed by threading user_id/job_id as
@@ -8872,6 +8879,36 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                         )
                 description_prompt += f"\nDOCUMENTED FACTS FOR THIS WORK (incorporate at least one):\n{_facts_text}\n"
 
+        # [LOCAL-402] Direct snippet injection — bypasses the extract/score pipeline.
+        # When _DIRECT_SNIPPETS_PER_STOP has material for this stop, inject raw
+        # search snippets as reference material with grounded-story instructions.
+        _local402_snippets_injected = False
+        if _DIRECT_SNIPPETS_PER_STOP and poi_name:
+            _stop_snippets = _DIRECT_SNIPPETS_PER_STOP.get(poi_name, [])
+            if _stop_snippets:
+                _snippet_block = "\nREFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):\n"
+                for _si, _snip in enumerate(_stop_snippets[:12], 1):
+                    _s_title = _snip.get('title', '')[:100]
+                    _s_text = _snip.get('snippet', '')[:250]
+                    _s_url = _snip.get('url', '')
+                    _snippet_block += f"  [{_si}] {_s_title}\n      {_s_text}\n"
+                _snippet_block += """
+STORY INSTRUCTION (LOCAL-402):
+Using ONLY the reference material above, write ONE grounded story about a named person
+and something specific they did. Requirements:
+  - Name the person explicitly (never "the publisher", "the patron" — use their actual name)
+  - State what they did specifically (not vague claims about influence or importance)
+  - Do NOT assert any interaction between people unless the material confirms both were alive
+    and working together at the stated time
+  - If dates are given, use them accurately — never claim a collaboration in a year after
+    one party's death
+  - If the material does not support a specific person-story for this work, omit the story
+    rather than inventing one
+"""
+                description_prompt += _snippet_block
+                _local402_snippets_injected = True
+                print(f"  [LOCAL-402] Stop {stop_num}: injected {len(_stop_snippets)} snippets as reference material")
+
         # [B6] Scored story elements → generation wiring (per-status phrasing)
         # Reads ranked elements from work_stories cache and injects them with
         # status-appropriate instructions: documented→fact, reported→attribution,
@@ -10653,6 +10690,38 @@ REWRITE RULES (all mandatory):
             else:
                 print(f"\n  [LOCAL-389] Numeric-claim gate SKIPPED "
                       f"(no exhibition scope — unscoped museum tours are not gated)")
+
+    # -------- [LOCAL-402] PHASE 5.161: Temporal coherence gate --------
+    # Catches impossible temporal relations: interactions between people whose
+    # dates make it impossible (e.g. "Dalí collaborated with Freud" — Freud d.1939).
+    # This is DISTINCT from the person grounding gate (which checks facts, not relations)
+    # and from the form-claim gate (which checks physical assertions).
+    # Scope: ALL museum tours with STORIED_MODE=true. No exhibition scope required.
+    if _storied_mode and tour_category == 'museum':
+        print(f"\n  [LOCAL-402] PHASE 5.161: Temporal coherence gate (impossible relations)...")
+        try:
+            from temporal_coherence_gate import apply_temporal_coherence_gate
+            _tcg_snippets = _DIRECT_SNIPPETS_PER_STOP if _DIRECT_SNIPPETS_PER_STOP else None
+            _tcg_stats = apply_temporal_coherence_gate(
+                poi_list,
+                snippets_per_stop=_tcg_snippets,
+            )
+            print(f"  [LOCAL-402] Temporal coherence gate summary:")
+            print(f"    Relations checked: {_tcg_stats['relations_checked']}")
+            print(f"    Relations rejected: {_tcg_stats['relations_rejected']}")
+            print(f"    Sentences removed: {_tcg_stats['sentences_removed']}")
+            print(f"    Stops affected: {_tcg_stats['stops_affected']}")
+            if _tcg_stats['rejection_log']:
+                for _trl in _tcg_stats['rejection_log']:
+                    print(f"    [LOCAL-402] coherence reject: '{_trl['sentence'][:80]}' "
+                          f"— {_trl['reason']}")
+        except ImportError as _tcg_err:
+            print(f"  [LOCAL-402] WARNING: temporal_coherence_gate not importable — gate skipped ({_tcg_err})")
+        except Exception as _tcg_err:
+            print(f"  [LOCAL-402] ERROR: temporal coherence gate failed (non-fatal): {_tcg_err}")
+    else:
+        if _storied_mode:
+            print(f"\n  [LOCAL-402] Temporal coherence gate SKIPPED (non-museum tour)")
 
     # -------- [LOCAL-229] PHASE 5.16: CONTRADICTED claim block --------
     # D100 (Michael, 2026-08-04): "We should not publish if we are reasonably sure
