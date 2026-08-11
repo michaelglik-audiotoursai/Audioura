@@ -12033,3 +12033,39 @@ task file and renamed to PARKED minutes later — but the dispatcher tick at
 path, which parking exists to prevent. Parking must happen **before** the file is
 written under a dispatchable name, not after. Worktrees kept them from corrupting
 each other, so the cost is only a possible merge conflict.
+
+## D308 — LOCAL-387 merged: the tour now says what the exhibition is about
+**2026-08-10.** Michael's first two complaints (D301) are answered. Delivered
+opening, live:
+
+> "This immersive experience showcases the revolutionary **livre d'artiste**,
+> where **images, words, and typography intersect** in unprecedented ways.
+> Featuring extraordinary works by Spanish artists, this exhibition delves into
+> how these **deeply collaborative ventures transformed the book into a true art
+> form**."
+
+`book` went **0 → 7 mentions**, present in all three stops. Stop 1 now reads "a
+magnificent illustrated book featuring 40 color lithographs… printed on
+publisher's vellum". Zero-check still all clear; Miró, Dalí, Freud, Gris and
+Reverdy all present; words 381/220/275; stop count 3/3.
+
+**D302's conditional works, and the control case is the proof.** Palais Lascaris
+returned `framing=venue_purpose` from a genuinely quotable page phrase —
+"bequeathed to the city of Nice in the testament of 26 May 1901 and by a codicil"
+— with 4/4 real instruments and every date (1780/1884/1696/1581) intact and **no
+fabricated curatorial premise**. Michael's "unless the museum was created for a
+specific cause" case is live and detecting real bequests, not inventing them.
+
+**Four prose defects, folded into LOCAL-383 rather than given their own round:**
+prompt bleed ("Amidst the curated exhibition's thesis that…" — our scaffolding
+vocabulary reaching the listener), an unfilled placeholder ("collaboration with
+**publisher**" where Louis Broder is sitting in the parsed credit line), broken
+Orientation grammar ("Gallery space is allowing…"), and Orientation present on
+only one of three stops. Palais stop 2 also came in at 109 words against the 120
+floor.
+
+**Why folded rather than serialised:** they are all prose-quality faults, which is
+exactly 383's subject, and each extra serial round costs ~15 minutes of wall
+clock for a fix that belongs in the same edit. `Broder`, `Mourlot` and `Fridman`
+are now hard acceptance for 383 — they are the story beats sitting unused in the
+credit line.

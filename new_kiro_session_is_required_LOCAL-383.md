@@ -123,3 +123,46 @@ Expected red-on-revert count stated; revert breaks the **logic, not the symbol**
 - Write `SUBMISSION_LOCAL-383.md`.
 - Do NOT edit DECISIONS.md / CLAUDE.md / BACKLOG.md / .continuous_dev/STATUS.md.
 - Do NOT `DELETE FROM audio_tours`.
+
+---
+
+# ADDENDUM (LEAD, after LOCAL-387 merged) — prose defects you must also fix
+
+LOCAL-387 delivered the framing and is merged. Its live output
+(`TOUR_MFA_UNBOUND_387_MERGED.txt`) exposed four prose defects. They are
+story-quality problems, which makes them yours:
+
+## 1. Prompt bleed — internal vocabulary reached the listener
+> "**Amidst the curated exhibition's thesis that the book itself is the artwork**,
+> 'Le Lézard aux plumes d'or' by Joan Miró is…"
+
+"The exhibition's thesis" is our internal term for the framing block. A visitor
+should hear the *idea*, never the scaffolding. No stop may refer to a "thesis",
+"framing", "premise" or "curated exhibition's thesis" as an object.
+
+## 2. An unfilled placeholder shipped
+> "Miró's **collaboration with publisher** shines through in the book's
+> meticulous design"
+
+The publisher's name is **Louis Broder** — it is in the credit line, already
+parsed. "collaboration with publisher" is both ungrammatical and a wasted story
+beat. Where a role is named, the person must be named: **Louis Broder**
+(publisher), **Mourlot Frères** (printer), **Boris Fridman** (donor). All three
+are currently 0 mentions and all three are on the page.
+
+## 3. Broken Orientation grammar
+> "**Gallery space is allowing** the soft ambient lighting to illuminate the
+> meticulously crafted pages…"
+
+## 4. Orientation is inconsistent across stops
+Stop 2 has one; stops 1 and 3 do not. Whatever the rule is, apply it uniformly.
+
+## 5. Stop-length floor still missed on the control venue
+Palais Lascaris stop 2 came in at **109 words** against the 120 floor
+(words were 389/109/251/328). MFA stops were fine (381/220/275).
+
+**These raise the bar for LOCAL-383's acceptance:** in addition to everything
+already specified above, the delivered text must contain **`Broder`**,
+**`Mourlot`** and **`Fridman`** at least once each, contain **zero** occurrences
+of `thesis`, `framing` or `premise` as narration, and every stop in **both** the
+MFA run and the Palais control run must reach **≥120 words**.
