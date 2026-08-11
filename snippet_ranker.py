@@ -99,6 +99,12 @@ def score_snippet(snippet: Dict, artist: str = '') -> int:
 
     Returns:
       Positive score for good snippets, -999 for biography-only rejects.
+
+    LOCAL-412: Score *event* snippets (person + verb + date in narrative context)
+    above *catalogue* snippets (auction listings, dimensions, lot numbers, prices).
+    A filter that rejects nothing is not filtering — the previous scoring treated
+    "Sotheby's Lot 34, Joan Miró, published 1971, $30,000" identically to
+    "Picasso met Fernand Mourlot in October 1945 at his workshop."
     """
     text = f"{snippet.get('title', '')} {snippet.get('snippet', '')}".strip()
     if not text:
@@ -137,7 +143,108 @@ def score_snippet(snippet: Dict, artist: str = '') -> int:
         if artist_surname in text.lower():
             score += 1
 
+    # ─── LOCAL-412: Catalogue/auction penalty ───────────────────────────────
+    # Auction listings, catalogue entries, and price-sheet snippets are data,
+    # not stories. They inflate scores by having person+verb+date in metadata
+    # form. Penalize them so event/narrative snippets rank above.
+    if _is_catalogue_snippet(text):
+        score -= 4
+
+    # ─── LOCAL-412: Event/narrative bonus ───────────────────────────────────
+    # A snippet that describes a specific historical event (person did X in Y)
+    # in narrative prose gets a bonus. This is what the model needs to write
+    # a story — not dimensions and lot numbers.
+    if _is_event_snippet(text):
+        score += 5
+
     return score
+
+
+# ─── LOCAL-412: Catalogue/auction detection ───────────────────────────────────
+_CATALOGUE_SIGNALS = re.compile(
+    r'\b(?:lot\s+\d+|estimate[ds]?\s*[:$€£]|'
+    r'(?:USD|GBP|EUR)\s*[\d,]+|'
+    r'\$\s*[\d,]+|'
+    r'(?:cm|mm|inches?|in\.)\s*[×x]\s*\d|'
+    r'\d+\s*[×x]\s*\d+\s*(?:cm|mm|inches?|in\.)|'
+    r'(?:provenance|literature|exhibited|bibliography)\s*:|'
+    r'(?:Christie[\'\u2019]?s|Sotheby[\'\u2019]?s|Phillips|Bonhams|'
+    r'Artcurial|Drouot|Ketterer)\b)',
+    re.IGNORECASE
+)
+
+_PRICE_PATTERN = re.compile(
+    r'(?:\$|€|£|USD|GBP|EUR)\s*[\d,.]+(?:\s*[-–—]\s*[\d,.]+)?',
+    re.IGNORECASE
+)
+
+
+def _is_catalogue_snippet(text: str) -> bool:
+    """Detect auction/catalogue snippets: dimensions, lot numbers, prices."""
+    signals = 0
+    if _CATALOGUE_SIGNALS.search(text):
+        signals += 1
+    if _PRICE_PATTERN.search(text):
+        signals += 1
+    # Multiple dimensions pattern (e.g. "38.1 × 28.2 cm")
+    if re.search(r'\d+[.,]?\d*\s*[×x]\s*\d+[.,]?\d*', text):
+        signals += 1
+    return signals >= 1
+
+
+# ─── LOCAL-412: Event/narrative detection ─────────────────────────────────────
+# An event snippet has a person DOING something specific — not just being listed
+# as metadata. Look for: [Person] [verb-of-action] ... [date/place] in a sentence
+# that reads as prose (has connecting words, not just comma-separated fields).
+
+_EVENT_VERBS = re.compile(
+    r'\b(?:met|visited|arrived|invited|persuaded|encouraged|introduced|'
+    r'began|started|opened|moved|returned|joined|left|founded|'
+    r'convinced|asked|brought|took|went|came|worked|walked|'
+    r'discovered|experimented|transformed|decided|agreed|'
+    r'commissioned|collaborated|printed|published|created|'
+    r'donated|assembled|acquired|collected|bequeathed|gifted|'
+    r'wrote|illustrated|designed|produced|established)\b',
+    re.IGNORECASE
+)
+
+_NARRATIVE_CONNECTORS = re.compile(
+    r'\b(?:when|after|before|during|because|while|until|'
+    r'who|which|that|where|then|later|finally|'
+    r'in\s+(?:january|february|march|april|may|june|july|'
+    r'august|september|october|november|december)|'
+    r'at\s+(?:his|her|their|the)|'
+    r'in\s+\d{4})\b',
+    re.IGNORECASE
+)
+
+
+def _is_event_snippet(text: str) -> bool:
+    """Detect narrative/event snippets: person + action + temporal/spatial context.
+
+    An event snippet reads like a story: "Picasso met Mourlot in October 1945
+    at his lithography workshop." A catalogue entry reads like: "Published by
+    Mourlot, Paris, 1945. 40 lithographs."
+
+    Key difference: event snippets have narrative connectors (when, after, at his,
+    in October) that indicate prose flow, not just comma-separated metadata.
+    """
+    has_person = bool(_NAMED_PERSON.search(text))
+    has_event_verb = bool(_EVENT_VERBS.search(text))
+    has_narrative_flow = bool(_NARRATIVE_CONNECTORS.search(text))
+    has_date = bool(_YEAR_PATTERN.search(text))
+
+    # Strong event: person + event verb + narrative connector + date
+    if has_person and has_event_verb and has_narrative_flow and has_date:
+        return True
+
+    # Moderate event: person + event verb + narrative connector (no date ok)
+    if has_person and has_event_verb and has_narrative_flow:
+        # But only if NOT a catalogue snippet (avoid false positives)
+        if not _is_catalogue_snippet(text):
+            return True
+
+    return False
 
 
 def rank_and_cap_snippets(
