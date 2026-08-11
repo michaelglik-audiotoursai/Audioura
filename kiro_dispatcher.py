@@ -159,12 +159,42 @@ def check_worker_liveness():
             continue
         pid = int(pid_m.group(1))
         if not pid_is_alive(pid):
+            # [D352] The dispatcher_pid is a bookkeeping wrapper; the kiro-cli
+            # agent is the actual work, and it SURVIVES the wrapper's death.
+            # Testing the wrapper alone marked LOCAL-415 abandoned at 14:22
+            # while its agent was mid-generation, re-dispatched it, and ran a
+            # duplicate concurrently with LOCAL-417 -- ~35 minutes of live
+            # OpenAI and Serper calls spent reproducing work already in hand.
+            if worker_process_alive(task_path.name):
+                continue
             locked_append(
                 f"- ABANDONED | task={task_path.name} | at={now_iso()} | "
                 f"reason=worker_died | dead_pid={pid}"
             )
             abandoned.append(task_path.name)
     return abandoned
+
+
+def worker_process_alive(task_filename):
+    """
+    [D352] True if a kiro-cli agent for this task is still running.
+
+    The agent is forked detached and outlives its dispatcher, so liveness must
+    be asked of the agent. Matched on the task id (e.g. "LOCAL-415") because
+    the task text is embedded in the agent's command line.
+    """
+    m = TASK_FILE_RE.match(task_filename)
+    task_id = m.group(1) if m else task_filename
+    try:
+        result = subprocess.run(
+            ["pgrep", "-f", task_id],
+            capture_output=True, text=True, timeout=10,
+        )
+        return bool(result.stdout.strip())
+    except Exception:
+        # Cannot prove it is dead -> do not abandon. Re-dispatching live work
+        # is far more expensive than leaving a dead task undetected one tick.
+        return True
 
 
 def render_status(candidates, launched, paused, reboot_recovered, liveness_abandoned=None):
