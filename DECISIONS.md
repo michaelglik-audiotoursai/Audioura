@@ -12849,3 +12849,21 @@ well be the better long-term design — it carries scoring and source tiers that
 raw snippet does not. But it has had three rounds and Michael wakes to a promise.
 Shipping a story by the simpler route and keeping the richer one as a follow-up is
 the right order when one path is proven to work and the other is not.
+
+### D323 addendum — dispatcher CPU is not a liveness signal; worktree mtime is
+**2026-08-11.** LEAD flagged LOCAL-401 as possibly hung at 30 minutes on the
+strength of `%CPU 0.0` on its `dispatcher_pid`. That reading was wrong.
+
+**The dispatcher process forks the `kiro-cli` worker and then waits** — it is
+*supposed* to sit at ~0% CPU for the whole run. Its CPU tells you nothing about
+whether work is happening.
+
+The signal that actually distinguishes the two cases is **file mtime in the
+worktree**:
+- LOCAL-386, genuinely hung: last write **43 minutes** old, 0.1s CPU over 48 min.
+- LOCAL-401, healthy: last writes **5 minutes** old (`generate_tour_text.py`
+  03:57, `story_element_extractor.py` 03:58) at the same 0.0% dispatcher CPU.
+
+**Rule: before calling a task hung, check `ls -lt <worktree>` for recent writes.**
+A stale pid with fresh files is working; a live pid with stale files is stuck. CPU
+on the dispatcher is noise either way.
