@@ -12205,3 +12205,39 @@ line that proves it.
 **And a regression that would be disqualifying on its own:** `Miró` is **0** in
 the delivered text, on the stop that *is* the Miró book. Present in 387 and 383,
 gone here. D309 bounced 383 for exactly this: story may not cost attribution.
+
+## D313 — LOCAL-389 merged: the numeric gate now can't strip what it was most likely to strip
+**2026-08-10.** Merged. D311's garbage match is fixed and, more importantly, the
+class of failure LEAD feared is now structurally impossible rather than merely
+untriggered.
+
+LEAD ran the extractor directly against cases whose answers were known in advance
+(standing check #3, D242) rather than trusting a clean run:
+
+| Input | Result |
+|---|---|
+| `', in'` — the exact string 386 deleted a sentence for | `[]` |
+| "over 1.2 million visitors annually" | 4 claims — still caught |
+| "The oldest museum in the country" | superlative — still caught |
+| "Crafted by Joan Miró in 1971… 40 color lithographs" | `[]` |
+
+**The last row is the important one.** Grounded credit-line figures produce *no
+claims at all*, so the gate cannot strip them. A clean live run would only have
+shown that stripping did not happen this time; the direct probe shows it cannot
+happen. Prefer the probe.
+
+**It also settles D311's unproven suspicion honestly.** `1974` and `Freud` had
+gone 1→0 and 4→0 on the provisional merge, and LEAD explicitly declined to call
+that a regression. This round the numeric gate dropped **nothing** and those
+figures still vary between runs — confirming the earlier caution was right and the
+variance was generation noise, not the gate.
+
+**Recorded against the merge, not hidden in it:** the revert check is thin.
+Neutering `_is_recognisable_quantity` turns only 1 of 19 tests red, because the
+other 18 exercise `_extract_numeric_claims`, which the revert left intact. The
+direct verification above is the stronger evidence and is why this merged; the
+weak coupling is a known debt, not a claim of rigour.
+
+Live: no drops, zero-check ALL CLEAR, framing intact, words 316/141/202, stops
+3/3. Control (D302): Palais 4/4, `framing=venue_purpose`, dates 1780/1884/1696/
+1581 all surviving, bounds 81.2/75.0.
