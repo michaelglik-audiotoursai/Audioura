@@ -4173,6 +4173,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # [LOCAL-60] Declare global for cost exposure
     global _LAST_GENERATION_COST
     global _LAST_POI_LIST  # [LOCAL-326] needed for partial-tour early returns
+    global _DIRECT_SNIPPETS_PER_STOP  # [LOCAL-410] Allow generation path to populate search results
 
     # -------- [S20] Storied: check tour cache before generation --------
     _cache_hit = None
@@ -8270,6 +8271,120 @@ These rules apply to the NARRATION paragraphs only. Navigation/orientation direc
         except Exception as _sb_err:
             print(f"  [LOCAL-383] Story beat extraction error (non-fatal): {_sb_err}")
 
+    # -------- [LOCAL-410] Wire SERP search into generation path --------
+    # Previously, search_stories_for_stop was only called by acceptance runners
+    # which populated _DIRECT_SNIPPETS_PER_STOP before calling generate_tour_text().
+    # The real generation path (generate_tour_async) never did this — so search-sourced
+    # facts never reached the prompt. This block fixes that gap.
+    _local410_chain_log = {}  # stop_name → {queries_issued, serp_results, snippets_injected}
+    if (_storied_mode and tour_category == 'museum'
+            and not _DIRECT_SNIPPETS_PER_STOP
+            and os.environ.get('GENERATION_TIER', 'plus') != 'free'):
+        try:
+            from work_story_searcher import search_stories_for_stop, synthesize_queries
+            print(f"\n  [LOCAL-410] SERP search wiring — searching for stories on {len(poi_list)} stops...")
+            _local410_snippets = {}
+            _local410_total_queries = 0
+            _local410_total_results = 0
+
+            for _s_idx, _s_poi in enumerate(poi_list):
+                _s_name = _s_poi.get('name', '')
+                _s_artist = _s_poi.get('artist', '')
+                _s_stop_data = {
+                    'canonical_title': _s_name,
+                    'artist': _s_artist,
+                    'venue_city': location.split(',')[1].strip() if ',' in location else '',
+                    'venue_lang': 'en',
+                    'venue_name': _museum_venue_name or location.split(',')[0].strip(),
+                    'publisher': _s_poi.get('publisher', ''),
+                    'credit_line': _s_poi.get('credit_line', ''),
+                    'medium': _s_poi.get('medium', ''),
+                    'english_title': _s_poi.get('english_title', _s_name),
+                }
+                _s_result = search_stories_for_stop(
+                    _s_stop_data, tour_type='contained',
+                    generation_tier=os.environ.get('GENERATION_TIER', 'plus'),
+                )
+                _s_raw = _s_result.get('results', [])
+                _s_query_log = _s_result.get('query_log', [])
+                _s_queries_issued = len(_s_query_log)
+                _s_serp_count = len(_s_raw)
+                _local410_total_queries += _s_queries_issued
+                _local410_total_results += _s_serp_count
+
+                # Build snippet list for this stop
+                _s_snippets = []
+                for _sr in _s_raw:
+                    if _sr.get('title') or _sr.get('snippet'):
+                        _s_snippets.append({
+                            'title': _sr.get('title', ''),
+                            'snippet': _sr.get('snippet', ''),
+                            'url': _sr.get('url', ''),
+                        })
+
+                # [LOCAL-410] Inject credit_line as a leading snippet (source of Fridman etc.)
+                _s_credit = _s_poi.get('credit_line', '')
+                if not _s_credit and _exhibition_checklist_result and hasattr(_exhibition_checklist_result, 'works'):
+                    _s_matched = match_work_for_stop(_s_name, _exhibition_checklist_result.works)
+                    if _s_matched:
+                        _s_credit = _s_matched.get('credit_line', '')
+                        # Also pick up publisher if available
+                        _s_publisher = _s_matched.get('publisher', '')
+                        if _s_publisher and _s_publisher not in _s_credit:
+                            _s_credit = f"Published by {_s_publisher}. {_s_credit}".strip()
+                if _s_credit:
+                    _credit_snippet = {
+                        'title': f"Exhibition Checklist — {_s_name}",
+                        'snippet': _s_credit,
+                        'url': '',
+                    }
+                    _s_snippets.insert(0, _credit_snippet)
+                    print(f"      [credit_line] {_s_credit[:100]}")
+
+                _local410_snippets[_s_name] = _s_snippets
+                _local410_snippets[f"__stop_{_s_idx}__"] = _s_snippets
+
+                _local410_chain_log[_s_name] = {
+                    'queries_issued': _s_queries_issued,
+                    'serp_results': _s_serp_count,
+                    'snippets_injected': len(_s_snippets),
+                    'mining_status': _s_result.get('story_mining_status', 'unknown'),
+                    'query_log': _s_query_log,
+                }
+                print(f"    Stop {_s_idx+1} '{_s_name[:50]}': "
+                      f"queries={_s_queries_issued} serp_results={_s_serp_count} "
+                      f"snippets={len(_s_snippets)}")
+                # Print top 2 snippets for traceability
+                for _snip in _s_snippets[:2]:
+                    print(f"      → {_snip.get('snippet', '')[:120]}")
+
+            # Populate the module-level dict so per-stop injection picks it up
+            if _local410_snippets:
+                _DIRECT_SNIPPETS_PER_STOP = _local410_snippets
+                _total_raw = sum(len(v) for k, v in _local410_snippets.items() if not k.startswith('__'))
+                print(f"\n  [LOCAL-410] SERP search complete: {_local410_total_queries} queries, "
+                      f"{_local410_total_results} results, "
+                      f"{_total_raw} total snippets")
+                # [LOCAL-411] Report that ranking+capping will be applied at injection time
+                from snippet_ranker import SNIPPET_CAP_PER_STOP as _411_cap
+                print(f"  [LOCAL-411] Snippet ranking+capping enabled: "
+                      f"cap={_411_cap}/stop, {_total_raw} raw → max {_411_cap * len(poi_list)} injected")
+            else:
+                print(f"\n  [LOCAL-410] SERP search complete but yielded 0 snippets")
+
+            # Chain instrumentation summary
+            print(f"\n  [LOCAL-410] CHAIN INSTRUMENTATION:")
+            for _cl_name, _cl_data in _local410_chain_log.items():
+                print(f"    {_cl_name[:50]}: serp_results={_cl_data['serp_results']} "
+                      f"elements_extracted=- beats_injected=- (measured post-generation)")
+
+        except ImportError as _s410_err:
+            print(f"  [LOCAL-410] work_story_searcher import failed — SERP search DISABLED: {_s410_err}")
+        except Exception as _s410_err:
+            print(f"  [LOCAL-410] SERP search error (non-fatal, generation continues without stories): {_s410_err}")
+            import traceback
+            traceback.print_exc()
+
     # [LOCAL-26] Helper: detect when GPT echoed back a template placeholder instead of content
     # [LOCAL-295] Refactored: returns a classification tuple instead of bare bool.
     #   ("placeholder", reason)  — true placeholder echo, should retry/reject
@@ -8918,6 +9033,7 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
         # between the runner's canonical_title and the generation pipeline's poi_name).
         _local402_snippets_injected = False
         _candidate_specifics = []  # [LOCAL-407] initialized here for both-sides logging scope
+        _prompt_size_before_snippets = len(description_prompt)  # [LOCAL-411] track pre-snippet size
         if _DIRECT_SNIPPETS_PER_STOP and poi_name:
             _stop_snippets = _DIRECT_SNIPPETS_PER_STOP.get(poi_name, [])
             # [LOCAL-403] Fallback: try index-based lookup (key = "__stop_N__")
@@ -8934,8 +9050,26 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                         _stop_snippets = _sval
                         break
             if _stop_snippets:
+                # [LOCAL-411] Rank and cap snippets — top 5, not all 30.
+                # Score by story quality (named person + verb of consequence + date).
+                # Biography-only snippets are rejected outright (LOCAL-406 Part B).
+                from snippet_ranker import rank_and_cap_snippets, SNIPPET_CAP_PER_STOP
+                _ranked_snippets, _ranking_report = rank_and_cap_snippets(
+                    _stop_snippets, artist=artist
+                )
+                print(f"  [LOCAL-411] Stop {stop_num} snippet ranking: "
+                      f"input={_ranking_report['input_count']} "
+                      f"bio_rejected={_ranking_report['rejected_biography_only']} "
+                      f"cap={_ranking_report['cap_applied']} "
+                      f"output={_ranking_report['output_count']}")
+                if _ranking_report['scores']:
+                    print(f"    Top scores: {_ranking_report['scores'][:3]}")
+
+                # Replace unranked list with ranked+capped list for injection
+                _stop_snippets = _ranked_snippets
+
                 _snippet_block = "\nREFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):\n"
-                for _si, _snip in enumerate(_stop_snippets[:12], 1):
+                for _si, _snip in enumerate(_stop_snippets, 1):
                     _s_title = _snip.get('title', '')[:100]
                     _s_text = _snip.get('snippet', '')[:250]
                     _s_url = _snip.get('url', '')
@@ -8948,7 +9082,7 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 import re as _re407
                 _candidate_specifics = []
                 _all_snippet_text = ' '.join(
-                    _snip.get('snippet', '') for _snip in _stop_snippets[:12]
+                    _snip.get('snippet', '') for _snip in _stop_snippets
                 )
                 # [LOCAL-408] Also scan work identity medium — it contains verified
                 # specifics like "40 color lithographs" and "publisher's vellum" that
@@ -9538,6 +9672,18 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                 )
             else:
                 description_prompt = _facts_first_block + description_prompt
+
+        # [LOCAL-411] Report prompt size after FACTS FIRST insertion
+        _prompt_size_final = len(description_prompt)
+        if _local402_snippets_injected:
+            _snippet_added_chars = _prompt_size_final - _prompt_size_before_snippets
+            print(f"  [LOCAL-411] Stop {stop_num} prompt size: "
+                  f"before_snippets={_prompt_size_before_snippets} "
+                  f"after={_prompt_size_final} "
+                  f"(+{_snippet_added_chars} from snippets+instructions, "
+                  f"facts_first={'yes' if _facts_first_block else 'no'})")
+            if _prompt_size_final > 20000:
+                print(f"  [LOCAL-411] WARNING: prompt exceeds 20K chars ({_prompt_size_final})")
 
         description_data = {
             "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
@@ -13326,6 +13472,39 @@ RULES:
             "search": 0.0,      # Search cost tracked separately via work_story_searcher
         },
     }
+
+    # -------- [LOCAL-410] Post-generation chain instrumentation --------
+    # Print the full chain: serp_results → snippets_injected → beats_in_delivered_text
+    if _local410_chain_log and complete_tour:
+        print(f"\n{'=' * 72}")
+        print(f"  [LOCAL-410] CHAIN INSTRUMENTATION (post-generation)")
+        print(f"{'=' * 72}")
+        _stop_blocks = re.split(r'(?=^Stop\s+\d+:)', complete_tour, flags=re.MULTILINE)
+        for _cl_name, _cl_data in _local410_chain_log.items():
+            # Count how many snippet-sourced facts appear in the delivered text
+            _beats_found = 0
+            _cl_snippets = _DIRECT_SNIPPETS_PER_STOP.get(_cl_name, []) if _DIRECT_SNIPPETS_PER_STOP else []
+            for _snip in _cl_snippets[:12]:
+                _snip_text = _snip.get('snippet', '')
+                # Check if key phrases from the snippet appear in the tour
+                _snip_words = [w for w in _snip_text.split() if len(w) >= 5]
+                _distinctive_phrases = []
+                for _wi in range(0, len(_snip_words) - 2, 3):
+                    _phrase = ' '.join(_snip_words[_wi:_wi+3])
+                    _distinctive_phrases.append(_phrase)
+                for _dp in _distinctive_phrases[:5]:
+                    if _dp.lower() in complete_tour.lower():
+                        _beats_found += 1
+                        break
+            _cl_data['beats_in_delivered_text'] = _beats_found
+            print(f"    {_cl_name[:50]}: "
+                  f"serp_results={_cl_data['serp_results']} "
+                  f"snippets_injected={_cl_data['snippets_injected']} "
+                  f"beats_in_delivered_text={_beats_found}")
+        print(f"{'=' * 72}")
+
+    # Reset module-level snippets after use (don't pollute next generation)
+    _DIRECT_SNIPPETS_PER_STOP = {}
 
     return complete_tour, output_file, first_poi_coordinates
 
