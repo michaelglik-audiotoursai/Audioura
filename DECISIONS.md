@@ -13414,3 +13414,37 @@ changes the shape of the decision from a config toggle to a scoped piece of work
 **Not attempted further.** Making the pipeline model-agnostic is a substantial
 change across 20 call sites and Michael has explicitly reserved model choice for
 himself. The finding is recorded; the work is his to authorise.
+
+## D347 — LEAD's prediction for LOCAL-412, registered before its report lands
+**2026-08-11, 11:2x.** Restart. Serper credits are back (LEAD probe returned the
+Mourlot answer box live), so D342's blocker is cleared. LOCAL-412 in flight.
+
+LEAD read `snippet_ranker.py` while waiting and predicts **possibility 2, but not
+"inversion" — tie-collapse.** The scorer is a six-term additive bucket with max 11:
+named person +3, verb of consequence +3, year +2, place +1, tier +1, artist +1. A
+Sotheby's lot entry ("Pablo Picasso … printed 1971 … Mourlot, Paris") satisfies
+person, verb, year, place and artist exactly as well as a biographical-event
+snippet does. Both land on 10. `scored.sort(key=score, reverse=True)` is **stable**,
+so among a tier of equal scores the top five are simply *the first five in arrival
+order* — the ranking does no discriminating at all.
+
+There is **no negative term anywhere**: nothing penalises lot numbers, dimensions,
+estimates, prices or catalogue boilerplate. A ranker that can only add points
+cannot rank a catalogue entry below a story.
+
+`bio_rejected=0 of 31` is consistent with this and is not itself a bug:
+`_is_biography_only` requires `bio_count>=2 AND work_count==0`, and thirteen
+`_WORK_RESCUE_SIGNALS` (`lithograph`, `edition`, `collection`, `exhibited`…) match
+almost any art-search result, so the rescue clause vetoes every rejection. The
+filter is not broken; it is unreachable.
+
+**Falsifiable test:** if 412's `Top scores:` line shows the top three within one
+point of each other (e.g. all 10), tie-collapse is confirmed and the fix is a
+discriminating score — negative weights for catalogue markers, a bonus for
+person+verb+date *co-occurring in one clause* rather than anywhere in the text.
+If the top scores are well separated and the Mourlot snippet scored low, the term
+weights are wrong instead. If Mourlot is present in the five, it is possibility 1
+and the ranker is exonerated.
+
+Recorded now, before the report, so the check is a real test and not a reading of
+whatever 412 happens to say.
