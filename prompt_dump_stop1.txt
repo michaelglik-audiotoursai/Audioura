@@ -1,6 +1,6 @@
 ================================================================================
 LITERAL PROMPT SENT TO LLM — STOP 1
-Generated: 2026-08-11T11:47:26.389202
+Generated: 2026-08-11T16:40:32.240729
 Model: gpt-3.5-turbo
 Temperature: 0.7
 Max tokens: 1000
@@ -13,17 +13,22 @@ You are a knowledgeable museum guide with expertise in art, architecture, and hi
 STYLE: Channel the passion of a curator who fell in love with this piece — make the listener see what the artist felt.
 
 ━━━ NAMES THAT MUST APPEAR (your text is rejected without these) ━━━
-  • Sturgis (John Hubbard Sturgis, publisher)
-  • Rubens (Rubens, author)
-  • Tour (Guided Tour, gallery patron)
-  • Ritts (Herb Ritts, gallery patron)
+  • Fridman (Boris Fridman, donor)
+  • Broder (Louis Broder, publisher)
+  • Frères (Mourlot Frères, printer)
 ━━━ END REQUIRED NAMES ━━━
 
+━━━ CONCRETE FACTS TO USE (prefer these over general claims) ━━━
+  • material: publisher’s vellum
+  • plate count: 15 lithographs
+  • plate count: 40 color lithographs
+━━━ END CONCRETE FACTS ━━━
 
 
-Create a detailed audio description for Appeal to the Great Spirit at Museum of Fine Arts, Boston, Massachusetts, focusing on contained.
 
-Start with a brief orientation that names "Appeal to the Great Spirit" specifically (not "the exhibit" or "this piece") and tells the listener WHERE to stand or look AND WHY — what becomes visible, legible, or striking from that position that they would miss otherwise.
+Create a detailed audio description for Le Lézard aux plumes d’or (The Lizard with Golden Feathers) at Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA, focusing on contained.
+
+Start with a brief orientation that names "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)" specifically (not "the exhibit" or "this piece") and tells the listener WHERE to stand or look AND WHY — what becomes visible, legible, or striking from that position that they would miss otherwise.
 
 Then provide a detailed description of the exhibit. Include:
 - What the work physically depicts or consists of — what the visitor sees
@@ -91,21 +96,49 @@ This tone should permeate the entire description — not as a single inserted se
 DO NOT USE these phrases: the building was erected, historically important, the population of, vibrant\s+colou?rs?\s*(and|of|that), dreamlike\s+(imagery|quality|world|scene|composition), deep\s+connection\s+to, (his|her|their)\s+Jewish\s+heritage, intricate\s+details?, timeless\s+themes?, position\s+yourself\s+in\s+the\s+center, the\s+artist['']?s?\s+(unique|remarkable|extraordinary), masterpiece\s+that, a\s+testament\s+to, creative\s+genius, stir(s|ring)?\s+the\s+soul
 
 NARRATIVE SPINE CONTEXT (use to shape your description):
-- Emotional beat for this stop: awe
-- Unique angle to emphasize: This iconic sculpture embodies the spirit of American art at the turn of the 20th century, a period heavily influenced by the generosity of patrons like Francis Bartlett.
-- End with a forward-looking hook: What other treasures did Bartlett's influence bring to the museum?
+- Emotional beat for this stop: curiosity
+- Unique angle to emphasize: Discover how a surrealist artist captures the metamorphosis of a lizard into a creature of myth and legend, reflecting the tension between earthly reality and fantastical imagination.
+- End with a forward-looking hook: How might transformation redefine the very essence of belief?
 
-THEME THREAD CONTEXT (weave these cross-stop connections into your narrative):
-- Thread "The Influence of Francis Bartlett's Donations" (weight 33%): The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Don
-- Thread "Cultural Exchange Through Art Donations" (weight 33%): John Goelet donated a work titled 'Maharana Sangram Singh Enjoys the Monsoon', an Indian Rajasthani 
-- Thread "Development of the Museum's Architecture" (weight 33%): The Museum of Fine Arts was founded in 1870 and was initially located on the top floor of the Boston; The Art of the Americas Wing opened on November 20, 2010, featuring artwork from North, South, and C
+VERIFIED FACTS (incorporate these for accuracy — these are confirmed for this specific POI):
+The Museum of Fine Arts (MFA) is located in Boston, Massachusetts.; It is the 20th-largest art museum in the world by public gallery area.; The museum contains 8,161 paintings and over 450,000 works of art.; The museum was founded in 1870 and initially located on the top floor of the Boston Athenæum.
 
-CONTEXTUAL INFORMATION (use as background only — do NOT assert these as facts about this specific exhibit):
-The Appeal to the Great Spirit was created by Cyrus Edwin Dallin in 1909.; The sculpture is a monumental bronze statue located in front of the Museum of Fine Arts, Boston.; The statue portrays a Native American on horseback facing skyward with his arms spread wide in a spiritual request to the Great Spirit.
+MANDATORY INCLUSION — work this surprising detail into the description naturally:
+The Museum of Fine Arts was initially located on the top floor of the Boston Athenæum.
 
-VENUE CONTEXT (LOCAL-382): This work is part of a collection with a stated institutional
-purpose. When relevant, connect the work to the venue's reason for existing — but only
-if the connection is natural and grounded. Do NOT force a connection.
+PROVENANCE (museum-published credit line — you MUST name the donor):
+  Gift of Boris Fridman
+
+MANDATORY: Name the donor "Boris Fridman" (surname "Fridman") in your text. Do NOT write "a gift to the museum" without naming who gave it.
+PROHIBITION: Do NOT infer or assert the donor's motive, wealth, financial condition,
+or any biographical predicate not contained in retrieved text. Stating "Gift of [name]"
+is the documented fact; "donated because…" or "could no longer afford…" is fabrication.
+
+WORK IDENTITY (LOCAL-379 — grounded facts from exhibition checklist):
+  Artist: Joan Miró
+  Date: 1971
+  Medium: Illustrated book with 40 color lithographs (including wrapper front and cover); publisher’s vellum
+  Publisher: Louis Broder
+  Credit line: Gift of Boris Fridman
+
+You MUST name the artist in your description. If a collaborator or author is given, name them too. These are grounded facts — use them.
+
+EXHIBITION FRAMING (LOCAL-382 — this work is part of a curated exhibition):
+This is NOT a painting on a wall. The exhibition's thesis is that THE BOOK IS THE ARTWORK:
+image, text, typography, paper, binding, as one integrated thing.
+
+Your description MUST engage at least TWO of these dimensions:
+1. The COLLABORATION — who wrote/authored it, who published it, who printed it.
+2. The FORM — lithographs, binding, plates, paper, printing technique.
+3. How IMAGES, WORDS, AND TYPOGRAPHY intersect — the exhibition's stated subject.
+
+KNOWN COLLABORATION/FORM FACTS for this work:
+  - Publisher: Louis Broder
+  - Medium/form: Illustrated book with 40 color lithographs (including wrapper front and cover); publisher’s vellum
+
+FORBIDDEN: Describing the depicted image as though this object were a painting,
+with no reference to it being a book or printed work. That treats the work as
+something it is not and ignores the exhibition's entire premise.
 
 STORY BEAT REQUIREMENT (LOCAL-383):
 Your description MUST contain at least one sentence that NAMES A PERSON and
@@ -120,49 +153,62 @@ are IN ADDITION TO the artist — never instead of. If WORK IDENTITY says
 "Artist: Joan Miró", your text must contain "Miró".
 
 ━━━ REQUIRED CONTENT — EACH SURNAME BELOW MUST APPEAR IN YOUR TEXT ━━━
-  ✓ "Sturgis" — John Hubbard Sturgis (publisher): designed this work
-  ✓ "Rubens" — Rubens (author): authored the text that was illustrated
-  ✓ "Tour" — Guided Tour (gallery patron): the gallery where these works are displayed is named for this patron
+  ✓ "Fridman" — Boris Fridman (donor): gave this work as a gift to the museum
+  ✓ "Broder" — Louis Broder (publisher): published this work
+  ✓ "Frères" — Mourlot Frères (printer): printed this work
 Write at least one sentence per person above that names them by surname.
 If you omit any of these surnames, your response will be REJECTED and regenerated.
 ━━━ END REQUIRED CONTENT ━━━
 
 GROUNDED PEOPLE AND ACTIONS (from the exhibition page — use at least one):
-  • John Hubbard Sturgis (Publisher): designed this work
-  • Rubens (Author): authored the text that was illustrated
-  • Guided Tour (Gallery Patron): the gallery where these works are displayed is named for this patron
+  • Boris Fridman (Donor): gave this work as a gift to the museum
+  • Louis Broder (Publisher): published this work
+  • Mourlot Frères (Printer): printed this work
 
-STORY SERVES THE VENUE: The person/action you name should connect to why
-this institution exists or how this collection was assembled.
+STORY SERVES THE THESIS: The person/action you name should connect to WHY
+this exhibition exists — e.g., a printer matters because the show argues printers
+were essential collaborators, not because printers are inherently interesting.
 NEVER-PLACEHOLDER RULE (LOCAL-388): Do NOT write 'with publisher', 'with printer', 'with donor', or 'the patron'. Where a role is mentioned, NAME THE PERSON. Specifically:
-  'publisher' → use 'John Hubbard Sturgis'
-  'author' → use 'Rubens'
-  'gallery patron' → use 'Guided Tour'
+  'donor' → use 'Boris Fridman'
+  'publisher' → use 'Louis Broder'
+  'printer' → use 'Mourlot Frères'
 
 
 WHAT IS NOT A STORY: "This masterpiece challenges boundaries" is not a story.
 "Published by Louis Broder in Paris" IS a story — it names who and what they did.
 A story has: a person, a specific circumstance, a consequence.
 
-DOCUMENTED FACTS FOR THIS WORK (incorporate at least one):
-rpretive materials to our attention: please e-mail us at  [email protected]  or message us on Instagram  @americasmfa . Related Pages Cyrus Dallin’s ‘Appeal to the Great Spirit’ Please Be Seated Henry
-
 REFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):
-  [1] The Problematics of Multiculturalism at the MFA
-      The notion of moving Appeal to the Great Spirit joined controversies in several states regarding historic monuments that can traumatize people ...
-  [2] Appeal to the Great Spirit
-      Appeal to the Great Spirit is a 1908 equestrian statue by Cyrus Dallin, located in front of the Museum of Fine Arts, Boston. It portrays a Native American ...
-  [3] Cyrus Dallin's 'Appeal to the Great Spirit' | Museum of Fine Arts Boston
-      In 1912, when the MFA installed Cyrus Dallin's Appeal to the Great Spirit at its Huntington Avenue Entrance, the sculpture was a contemporary work of art.
-  [4] Appeal to the Great Spirit - Hood Museum - Dartmouth
-      Appeal to the Great Spirit. Cyrus Edwin Dallin, American, 1861 - 1944. Gorham ... Exhibition History. American Art at Dartmouth: Highlights from the Hood ...
-  [5] Appeal to the Great Spirit | Art UK
-      Appeal to the Great Spirit by Cyrus Edwin Dallin (1861–1944) and Gorham Manufacturing Company, 1913, from American Museum & Gardens.
+  [1] Joan Miró - Le lézard aux plumes d'or - Choice Contemporary
+      Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...
+  [2] Joan Miró - Le lézard aux plumes d'or
+      Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...
+  [3] Joan Miró | Le Lézard aux plumes d'or (1971, Lithographs)
+      Le Lézard aux plumes d'or (The Lizard with Golden Feathers) - Illustrated book with 15 lithographs printed in colors, on BFK Rives wove paper - Signed in ...
+  [4] Joan Miró's Broder Collection: How One Artist ...
+      In 1956, Broder began a partnership with Joan Miró alongside Atelier Mourlot, a world-famous French lithographic studio. In 1920 when Miro was ...
+  [5] Exhibition Checklist — Le Lézard aux plumes d’or (The Lizard with Golden Feathers)
+      Published by Louis Broder. Gift of Boris Fridman
 
-STORY INSTRUCTION (LOCAL-407/412):
-Use the reference material above. Include at least ONE concrete specific (number, material, literary form, verifiable fact) from snippets or CANDIDATE SPECIFICS.
+━━━ CANDIDATE SPECIFICS (extracted from the snippets above) ━━━
+  • material: publisher’s vellum
+  • plate count: 15 lithographs
+  • plate count: 40 color lithographs
+━━━ END CANDIDATE SPECIFICS ━━━
 
-PRIORITY RULE: a concrete detail ALWAYS beats a general claim. "printed on Japan paper in edition of 50" beats "revolutionized the book as an art form."
+STORY INSTRUCTION (LOCAL-407/412/419):
+Use the reference material above. Your text MUST include at least TWO of the following NAMED FIELDS if the snippets provide them:
+
+  1. DATE — the year the work was created or published (e.g. "1955", "1974")
+  2. PUBLISHER — the publisher's name (e.g. "Tériade", "Louis Broder")
+  3. PRINTER — the printer's name (e.g. "Mourlot Frères", "Crommelynck")
+  4. EDITION — the edition size or number (e.g. "edition of 220", "set of 10")
+  5. MEDIUM/TECHNIQUE — what it is made of (e.g. "lithographs on Arches wove paper", "drypoints on sheepskin")
+  6. COLLABORATOR — who wrote the text or poems (e.g. "Pierre Reverdy", "Sigmund Freud")
+
+PRIORITY RULE: a concrete detail ALWAYS beats a general claim. "published by Tériade in 1955, printed by Mourlot Frères in an edition of 220" beats "an intriguing fusion of visual and textual elements."
+
+FAILURE MODE TO AVOID: Do NOT write sentences like "reveals a deep connection" or "beckons us to question" or "stands out for its intriguing fusion" — these are EMPTY. Instead write: WHO made it, WHEN, HOW (technique), WHERE (printer/workshop), and HOW MANY (edition).
 
 Rules:
   - Name people explicitly (never "the publisher" — use their actual name)
@@ -207,72 +253,45 @@ FACTUAL INTEGRITY RULE: Do NOT invent visual specifics or biographical claims no
 Format your response as follows:
 Orientation: (write a brief orientation text explaining the best viewing position here)
 
-Then write the description directly — a flowing, 350-word narrative about the exhibit. Do NOT wrap it in brackets, placeholders, or formatting markers. Just write the prose.
+Then write the description directly — a flowing, 280-word narrative about the exhibit. Do NOT wrap it in brackets, placeholders, or formatting markers. Just write the prose.
 
 MINIMUM LENGTH: Your description (after the Orientation section) MUST be at least 120 words. If you do not have 120 words of verified content, discuss the artistic form, the collaboration, or the exhibition context to reach the floor. Never deliver fewer than 120 words.
 
 DO NOT include any section headers other than "Orientation:" - the description should flow naturally after the orientation section.
 DO NOT include directions to the next stop - these will be added separately.
 
-LENGTH CONSTRAINT: You have rich verified material for this stop. Write up to 350 words, using the extra space ONLY for additional sourced facts or explained connections — NOT for padding, praise, or instructing the listener.
-
-CRITICAL CORPUS GATE RESTRICTION (D50 enforcement — LOCAL-198):
-The corpus for this stop does NOT contain information about the specific artwork/exhibit
-"Appeal to the Great Spirit". The available text is about the venue generally.
+CORPUS GATE: EMPTY (D50 enforcement — LOCAL-209):
+There is NO verified source material for "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)" — no stop-level corpus,
+no venue-level corpus, nothing. Every specific claim you might generate about
+this place comes from your training data and CANNOT be verified.
 
 YOU MUST NOT:
-- Describe the artwork's appearance, materials, technique, or composition
-- Name the artist's practice, style, or art-historical movement
-- Claim anything about what the visitor will see at this specific stop
-- Invent details about the work from your training data
+- Assert any specific date, year, century, or historical period
+- State any measurement (depth, height, distance, area)
+- Attribute a nickname, title, or epithet to this place
+- Name specific people, architects, artists, or historical figures
+- Claim specific events happened here
+- Describe specific architectural features as fact
 
 YOU MAY ONLY:
-- Note the stop's name and its location within the venue
-- Share venue-level facts that ARE in the corpus (opening date, general collection scope)
-- Describe the physical surroundings and wayfinding
-- Acknowledge that detailed information about this specific work is limited
+- Name the stop and its general geographic context (e.g. "a coastal town east of Nice")
+- Describe what is physically visible to a cyclist arriving now (sea, buildings, streets)
+- Provide wayfinding and orientation ("look to your left", "the harbor is ahead")
+- Use hedging language ("this area is known for…", "visitors often notice…")
+- Note the atmosphere and sensory experience (sounds, smells, light)
 
-Write 80-100 words maximum. This is a venue-grounded placeholder, not a full stop narration.
-
-PER-STOP SOURCE MATERIAL for "Appeal to the Great Spirit" (from verified sources — use this as your primary factual basis):
-  Passage 1: The Appeal to the Great Spirit, created by Cyrus Edwin Dallin in 1909, is a monumental bronze sculpture installed in front of Boston's ...
-  Passage 2: The Art of the Americas department studies, presents, and cares for the paintings, sculpture, and decorative arts made throughout North, Central, and South America and the Caribbean by artists from many cultures and nations. Spanning 3,000 years, from the ancient civilizations of Mesoamerica to the modern art capitals of Mexico City and New York, these objects embody the essential human desire to create meaning and beauty through art and craft, a drive shared by artists free and enslaved, traine
-  Passage 3: Ancient Egyptian artifacts including sculptures, sarcophagi, and jewelry dating back to approximately 6500 BCE to 600 CE, which were primarily obtained through excavations conducted by George A. Reisner in Egypt and Sudan between 1905 and 1942.
-The Nubian arts, including Kerma pottery, colossal royal statues of Napatan kings, jewels, and imports from Greece and Rome, are represented in the collection of Nubian art.
-Dutch Golden Age painting, including 113 works given in 2017 by collectors Rose-M
-  Passage 4: == Community relations ==
-The MFA also has a longstanding initiative within the Community Arts program called the Community Artist Initiative Artist Project, where the museum invites a Lead Artist to spend nine months creating works with youth from twelve after-school community organizations in the Boston area. The Artist and the children create a collaborative work of art inspired by the Museum's encyclopedic collection, and the completed project is exhibited in the Edward H. Linde Gallery (168
-  Passage 5: Appeal to the Great Spirit is a 1908 equestrian statue by Cyrus Dallin, located in front of the Museum of Fine Arts, Boston. It portrays a Native American ...
-  Passage 6: In this period, an equestrian statue titled Appeal to the Great Spirit became contentious. The work of local artist Cyrus Dallin (1861–1944) ...
-  Sources:
-  [Venue page for Museum of Fine Arts, Boston] http://www.mfa.org/collections/americas (tier 1)
-  [Venue page for Museum of Fine Arts, Boston] https://en.wikipedia.org/wiki/Museum_of_Fine_Arts,_Boston (tier 1)
-  [Appeal to the Great Spirit — interpretive search] https://en.wikipedia.org/wiki/Appeal_to_the_Great_Spirit (tier 1)
-  [Appeal to the Great Spirit — interpretive search] https://artsfuse.org/286368/visual-arts-commentary-the-problematics-of-multiculturalism-at-the-mfa-on-the-dallin-front/ (tier 3)
-  [Appeal to the Great Spirit — interpretive search] https://centerofthewest.org/2016/05/11/treasures-from-our-west-appeal-to-the-great-spirit-by-cyrus-e-dallin/ (tier 3)
-  [Appeal to the Great Spirit — interpretive search] https://worldheritageusa.org/monumentstoolkit/publications/appeal-to-the-great-spirit/ (tier 3)
-  [Appeal to the Great Spirit — interpretive search] https://www.mfa.org/collections/americas/appeal-to-the-great-spirit (tier 3)
-  [Appeal to the Great Spirit — interpretive search] https://www.flickr.com/photos/wallyg/54190283288 (tier 3)
-
-GROUNDING RULE (D50 — critical): Substantiate claims ONLY from the passages above. Do NOT supplement with facts from your own training data that are not in these passages. If the passages do not mention something, do not assert it as fact. You may describe what is physically visible at the stop and provide general orientation, but specific historical claims, dates, people, and events MUST come from the passages above. If a passage names a person or event, you may include it; if it does not, leave it out.
-
-BODY USAGE RULE (LOCAL-345 — critical): Your DESCRIPTION BODY (the main narrative paragraphs after the orientation) MUST incorporate specific facts, dates, or claims from the passages above. The orientation alone is not sufficient — the body text is where the listener spends most of their time. If a passage mentions a UNESCO designation, a founding date, a named historical event, or a specific fact, that material MUST appear in the body narrative, not just be referenced in the orientation line. A body that contains zero material from the provided passages is a failure.
-
-NARRATIVE ARC RULE (LOCAL-352 — critical): When a passage describes a person DOING something — leaving a position, founding a place, refusing an offer, recommending a dish, returning after years away — your description MUST tell the sequence of events, not merely state the person's credential or association. A credential is an adjective ("Michelin-starred chef"); a narrative is a sequence ("he left his two-star kitchen at the Negresco to cook for twenty people in a back-street bistro"). The listener wants to experience what happened, not read a résumé. Specifically:
-  - If a passage names WHERE someone came from and WHERE they went, state both.
-  - If a passage names WHAT someone gave up and WHAT they chose instead, state the contrast.
-  - If a passage names a specific person recommending, reviewing, or recounting an experience at this place, tell it as an event: who did what, where, and what they said or found. This applies to visitors, critics, chefs from elsewhere, and documented incidents — not only owners.
-  - Do NOT flatten a narrative into a single adjective or title. "Former head chef of the Negresco" is a title; "walked away from the Negresco's two Michelin stars to serve twenty people at a place whose name means workman's snack" is a story. Tell the story.
-  - Every element of the story MUST come from the passages above. You may not infer motivation, emotion, or dates not stated in the source material.
+Write 60-80 words maximum. This is an orientation-only placeholder. No factual claims.
 
 
 ================================================================================
-Total user message length: 22920 chars
+Total user message length: 19224 chars
 
 --- CANDIDATE SPECIFICS STATUS ---
-candidate_specifics found: 0
-  (none extracted — snippets may be empty or regex missed)
+candidate_specifics found: 3
+  • material: publisher’s vellum
+  • plate count: 15 lithographs
+  • plate count: 40 color lithographs
 
 --- SNIPPET INJECTION STATUS ---
 _local402_snippets_injected: True
-_DIRECT_SNIPPETS_PER_STOP keys: ['Appeal to the Great Spirit', '__stop_0__', 'Ancient Nubia Now', '__stop_1__', 'Adam and Eve', '__stop_2__', 'Artist in his studio', '__stop_3__']
+_DIRECT_SNIPPETS_PER_STOP keys: ['Le Lézard aux plumes d’or (The Lizard with Golden Feathers)', '__stop_0__', 'Moses and Monotheism', '__stop_1__', 'Au Soleil du Plafond', '__stop_2__']

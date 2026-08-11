@@ -9163,16 +9163,30 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                     r'(?:numbered|edition of|limited to|signed and numbered)\s+(\d+[/]\d+|\d+)',
                     _all_snippet_text, _re407.IGNORECASE):
                     _candidate_specifics.append(f"edition/number: {_num_match.group(0).strip()}")
-                # Named materials: Japan paper, Arches, vellum, etc.
+                # [LOCAL-419] Set/suite/copy sizes: "set of 10", "suite of 11", "one of 220 copies"
+                for _set_match in _re407.finditer(
+                    r'(?:set\s+of|suite\s+of|one\s+of\s+(?:only\s+)?)\s*(\d+)',
+                    _all_snippet_text, _re407.IGNORECASE):
+                    _candidate_specifics.append(f"edition/number: {_set_match.group(0).strip()}")
+                for _copies_match in _re407.finditer(
+                    r'(\d+)\s+(?:copies|impressions)',
+                    _all_snippet_text, _re407.IGNORECASE):
+                    _candidate_specifics.append(f"edition/number: {_copies_match.group(0).strip()}")
+                # Named materials: Japan paper, Arches, vellum, sheepskin, etc.
                 for _mat_match in _re407.finditer(
-                    r'(?:on|printed on|paper:?|publisher[\'\u2019]?s?)\s+(Japan(?:\s+paper)?|Arches|vellum|Rives|wove|laid)',
+                    r'(?:on|printed on|paper:?|publisher[\'\u2019]?s?)\s+(Japan(?:\s+paper)?|Arches|vellum|Rives|wove|laid|sheepskin|parchment)',
                     _all_snippet_text, _re407.IGNORECASE):
                     _candidate_specifics.append(f"material: {_mat_match.group(0).strip()}")
-                # Plate/lithograph counts
+                # Plate/lithograph counts (including drypoints)
                 for _plate_match in _re407.finditer(
-                    r'(\d+)\s+(?:colou?r\s+)?(?:lithograph|etching|aquatint|plate|woodcut)s?',
+                    r'(\d+)\s+(?:colou?r\s+)?(?:lithograph|etching|aquatint|plate|woodcut|drypoint)s?',
                     _all_snippet_text, _re407.IGNORECASE):
                     _candidate_specifics.append(f"plate count: {_plate_match.group(0).strip()}")
+                # [LOCAL-419] Named publishers/printers from snippets
+                for _pub_match in _re407.finditer(
+                    r'(?:[Pp]ublish(?:ed|er)\s*(?:by|:)\s*|[Pp]rinter?\s*(?:by|:)\s*)([A-Z\u00C0-\u024F][a-z\u00E0-\u024F]+(?:\s+[A-Z\u00C0-\u024F][a-z\u00E0-\u024F]+){0,3})',
+                    _all_snippet_text):
+                    _candidate_specifics.append(f"publisher/printer: {_pub_match.group(1).strip()}")
                 # Literary forms: poem, prose, text, fable
                 for _form_match in _re407.finditer(
                     r'(?:based on|illustrat(?:ing|es?)|accompanying|wrote the|his own)\s+'

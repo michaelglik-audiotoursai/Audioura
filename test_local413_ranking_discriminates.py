@@ -127,13 +127,30 @@ class TestCatalogueVsNarrative:
                 )
 
     def test_catalogue_penalty_applied(self):
-        """Catalogue snippets get a score reduction vs what they'd get without penalty."""
-        cat = CATALOGUE_SNIPPETS[0]  # Sotheby's Miró lot
-        score = score_snippet(cat, artist='Joan Miró')
-        # Without the catalogue penalty, this snippet has: person(3)+verb(3)+date(2)+place(1)+tier(1)+artist(1)=11
-        # With LOCAL-412 penalty (-4), it should be ≤7
-        assert score <= 7, (
-            f"Catalogue snippet scores {score} — penalty not applied or insufficient"
+        """Catalogue snippets without production facts get penalized; those with facts get a bonus."""
+        # [LOCAL-419] A catalogue snippet that contains production facts (publisher,
+        # printer, edition size, paper type) should get a BONUS, not a penalty.
+        # Only pure auction junk (just prices and dimensions) gets penalized.
+        cat_with_facts = CATALOGUE_SNIPPETS[0]  # Sotheby's Miró lot — has "Japan paper", "numbered 24/50"
+        score_with_facts = score_snippet(cat_with_facts, artist='Joan Miró')
+        # This snippet has production facts, so it should score WELL
+        assert score_with_facts >= 8, (
+            f"Catalogue snippet with production facts scores {score_with_facts} — "
+            f"should score ≥8 with LOCAL-419 production-fact bonus"
+        )
+
+        # A pure auction snippet with ONLY price/dimensions and no production facts
+        pure_auction = {
+            'title': "Lot 99: Abstract Painting",
+            'snippet': "Abstract composition. 50 × 65 cm. Estimate €12,000-€15,000. "
+                       "Previously sold at Phillips, 2019.",
+            'url': 'https://www.artcurial.com/lot-99',
+            'tier': 'tier2',
+        }
+        score_pure = score_snippet(pure_auction, artist='Joan Miró')
+        # Pure auction junk should be penalized (low score)
+        assert score_pure <= 5, (
+            f"Pure auction snippet scores {score_pure} — penalty not applied"
         )
 
     def test_event_bonus_applied(self):
