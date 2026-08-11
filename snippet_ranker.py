@@ -94,6 +94,37 @@ def _is_biography_only(text: str) -> bool:
     return bio_count >= 2 and work_count == 0
 
 
+# ─── LOCAL-419: Production-fact detection ─────────────────────────────────────
+# These patterns identify snippets that contain the concrete production facts
+# about a livre d'artiste or printed work: publisher, printer, edition size,
+# paper type, technique. These are exactly what the tour text needs to deliver.
+_PRODUCTION_FACT_PATTERNS = [
+    re.compile(r'\b(?:publish(?:ed|er|ing)\s+by|publisher:?)\s+', re.IGNORECASE),
+    re.compile(r'\b(?:print(?:ed|er|ing)\s+by|printer:?)\s+', re.IGNORECASE),
+    re.compile(r'\b(?:edition\s+(?:of|size)|one\s+of\s+(?:only\s+)?\d+\s+copies|'
+               r'numbered\s+\d+[/]\d+|limited\s+to\s+\d+)\b', re.IGNORECASE),
+    re.compile(r'\b(?:drypoint|etching|aquatint|lithograph|woodcut|engraving)s?\s+'
+               r'(?:on|in\s+colou?rs?\s+on)\s+', re.IGNORECASE),
+    re.compile(r'\b(?:set\s+of\s+\d+|suite\s+of\s+\d+|\d+\s+(?:full\s+sheet\s+)?'
+               r'(?:lithographs?|etchings?|plates?|drypoints?))\b', re.IGNORECASE),
+    re.compile(r'\b(?:Arches|Japan(?:\s+paper)?|vellum|wove\s+paper|'
+               r'Rives|sheepskin|parchment)\b', re.IGNORECASE),
+    re.compile(r'\b(?:Tériade|Mourlot|Broder|Crommelynck|Lacourière|'
+               r'Atelier|Imprimerie)\b', re.IGNORECASE),
+]
+
+
+def _has_production_fact_content(text: str) -> bool:
+    """[LOCAL-419] Detect snippets with concrete production facts.
+
+    Returns True if the text mentions at least 2 production-fact signals:
+    publisher, printer, edition details, paper type, or named print workshop.
+    A single signal (e.g. just 'lithograph') is not enough — that's too common.
+    """
+    matches = sum(1 for pat in _PRODUCTION_FACT_PATTERNS if pat.search(text))
+    return matches >= 2
+
+
 def score_snippet(snippet: Dict, artist: str = '') -> int:
     """Score a single snippet for story quality.
 
@@ -147,15 +178,36 @@ def score_snippet(snippet: Dict, artist: str = '') -> int:
     # Auction listings, catalogue entries, and price-sheet snippets are data,
     # not stories. They inflate scores by having person+verb+date in metadata
     # form. Penalize them so event/narrative snippets rank above.
-    if _is_catalogue_snippet(text):
+    # [LOCAL-419] BUT: catalogue entries that name publisher/printer/edition
+    # are the PRIMARY source of production facts. These are exactly what the
+    # prompt needs. A catalogue snippet with "Publisher: Tériade; Printer:
+    # Mourlot Frères" is more valuable than an event narrative about a
+    # different exhibition. Apply penalty ONLY if no production facts present.
+    _is_catalogue = _is_catalogue_snippet(text)
+    _has_production_facts = _has_production_fact_content(text)
+    if _is_catalogue and not _has_production_facts:
         score -= 4
+    elif _is_catalogue and _has_production_facts:
+        # [LOCAL-419] Production-fact catalogue entries get a BONUS — these
+        # are the snippets that contain publisher, printer, edition size, medium.
+        score += 3
 
     # ─── LOCAL-412: Event/narrative bonus ───────────────────────────────────
     # A snippet that describes a specific historical event (person did X in Y)
     # in narrative prose gets a bonus. This is what the model needs to write
     # a story — not dimensions and lot numbers.
+    # [LOCAL-419] BUT: only if the event is ABOUT THE WORK, not about a
+    # different exhibition or unrelated topic. Snippets about "Dalí: Disruption
+    # and Devotion" (a different MFA exhibition) were outscoring actual facts
+    # about "Moses and Monotheism".
     if _is_event_snippet(text):
         score += 5
+
+    # [LOCAL-419] Production-fact bonus (non-catalogue snippets too)
+    # Snippets that name the publisher, printer, edition, or medium of the work
+    # get a bonus even if they aren't catalogue entries.
+    if _has_production_facts and not _is_catalogue:
+        score += 3
 
     return score
 
@@ -251,6 +303,7 @@ def rank_and_cap_snippets(
     snippets: List[Dict],
     artist: str = '',
     cap: int = None,
+    work_title: str = '',
 ) -> Tuple[List[Dict], Dict]:
     """Rank snippets by story quality and cap at top N.
 
@@ -258,6 +311,7 @@ def rank_and_cap_snippets(
       snippets: list of {'title', 'snippet', 'url', 'tier'?, ...}
       artist: artist name for bonus scoring
       cap: max snippets to return (default: SNIPPET_CAP_PER_STOP)
+      work_title: the canonical title of the work this stop is about (LOCAL-419)
 
     Returns:
       (ranked_snippets, ranking_report)
@@ -275,11 +329,28 @@ def rank_and_cap_snippets(
     scored = []
     rejected_bio = 0
 
+    # [LOCAL-419] Normalize work title for relevance check
+    _work_title_lower = work_title.lower().strip() if work_title else ''
+    # Extract key words from title (4+ chars) for partial matching
+    _title_words = {w.lower() for w in re.findall(r'\b\w{4,}\b', _work_title_lower)} if _work_title_lower else set()
+
     for snip in snippets:
         s = score_snippet(snip, artist)
         if s == -999:
             rejected_bio += 1
         else:
+            # [LOCAL-419] Title relevance adjustment: snippets that don't mention
+            # the work title at all are likely about a different topic (e.g. a
+            # different exhibition at the same venue). Penalize them.
+            if _title_words:
+                snip_text = f"{snip.get('title', '')} {snip.get('snippet', '')}".lower()
+                _title_word_hits = sum(1 for w in _title_words if w in snip_text)
+                if _title_word_hits == 0:
+                    # No title words at all → likely irrelevant
+                    s -= 5
+                elif _title_word_hits >= 2 or _work_title_lower in snip_text:
+                    # Strong title match → small bonus
+                    s += 1
             scored.append((s, snip))
 
     # Sort descending by score

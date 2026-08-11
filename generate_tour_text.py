@@ -1919,10 +1919,19 @@ def build_snippet_block(snippets, artist, specifics):
     _artist_surname = artist.split()[-1] if artist else ''
 
     block += """
-STORY INSTRUCTION (LOCAL-407/412):
-Use the reference material above. Include at least ONE concrete specific (number, material, literary form, verifiable fact) from snippets or CANDIDATE SPECIFICS.
+STORY INSTRUCTION (LOCAL-407/412/419):
+Use the reference material above. Your text MUST include at least TWO of the following NAMED FIELDS if the snippets provide them:
 
-PRIORITY RULE: a concrete detail ALWAYS beats a general claim. "printed on Japan paper in edition of 50" beats "revolutionized the book as an art form."
+  1. DATE — the year the work was created or published (e.g. "1955", "1974")
+  2. PUBLISHER — the publisher's name (e.g. "Tériade", "Louis Broder")
+  3. PRINTER — the printer's name (e.g. "Mourlot Frères", "Crommelynck")
+  4. EDITION — the edition size or number (e.g. "edition of 220", "set of 10")
+  5. MEDIUM/TECHNIQUE — what it is made of (e.g. "lithographs on Arches wove paper", "drypoints on sheepskin")
+  6. COLLABORATOR — who wrote the text or poems (e.g. "Pierre Reverdy", "Sigmund Freud")
+
+PRIORITY RULE: a concrete detail ALWAYS beats a general claim. "published by Tériade in 1955, printed by Mourlot Frères in an edition of 220" beats "an intriguing fusion of visual and textual elements."
+
+FAILURE MODE TO AVOID: Do NOT write sentences like "reveals a deep connection" or "beckons us to question" or "stands out for its intriguing fusion" — these are EMPTY. Instead write: WHO made it, WHEN, HOW (technique), WHERE (printer/workshop), and HOW MANY (edition).
 
 Rules:
   - Name people explicitly (never "the publisher" — use their actual name)
@@ -8322,16 +8331,41 @@ Exempt: navigation directions ("Turn left", "Continue past").
             for _s_idx, _s_poi in enumerate(poi_list):
                 _s_name = _s_poi.get('name', '')
                 _s_artist = _s_poi.get('artist', '')
+                # [LOCAL-419] Enrich stop data from exhibition checklist for better queries.
+                # _new_poi() only carries name/artist — publisher/credit_line/medium are empty.
+                # But the checklist works list HAS these fields. Without them, synthesize_queries
+                # can't build targeted collaborator queries (stop 1 works because its credit_line
+                # has publisher+printer; stops 2+3 get only 4 generic queries).
+                _s_publisher = _s_poi.get('publisher', '')
+                _s_credit_line = _s_poi.get('credit_line', '')
+                _s_medium = _s_poi.get('medium', '')
+                _s_english_title = _s_poi.get('english_title', _s_name)
+                if (not _s_publisher or not _s_credit_line) and _exhibition_checklist_result and hasattr(_exhibition_checklist_result, 'works'):
+                    _s_matched_work = match_work_for_stop(_s_name, _exhibition_checklist_result.works)
+                    if _s_matched_work:
+                        if not _s_publisher:
+                            _s_publisher = _s_matched_work.get('publisher', '')
+                        if not _s_credit_line:
+                            _s_credit_line = _s_matched_work.get('credit_line', '')
+                        if not _s_medium:
+                            _s_medium = _s_matched_work.get('medium', '')
+                        if not _s_artist:
+                            _s_artist = _s_matched_work.get('artist', '')
+                        if _s_english_title == _s_name:
+                            _s_english_title = _s_matched_work.get('english_title', _s_name) or _s_name
+                        print(f"    [LOCAL-419] Enriched stop {_s_idx+1} from checklist: "
+                              f"publisher='{_s_publisher[:30]}' credit_line='{_s_credit_line[:50]}' "
+                              f"medium='{_s_medium[:40]}'")
                 _s_stop_data = {
                     'canonical_title': _s_name,
                     'artist': _s_artist,
                     'venue_city': location.split(',')[1].strip() if ',' in location else '',
                     'venue_lang': 'en',
                     'venue_name': _museum_venue_name or location.split(',')[0].strip(),
-                    'publisher': _s_poi.get('publisher', ''),
-                    'credit_line': _s_poi.get('credit_line', ''),
-                    'medium': _s_poi.get('medium', ''),
-                    'english_title': _s_poi.get('english_title', _s_name),
+                    'publisher': _s_publisher,
+                    'credit_line': _s_credit_line,
+                    'medium': _s_medium,
+                    'english_title': _s_english_title,
                 }
                 _s_result = search_stories_for_stop(
                     _s_stop_data, tour_type='contained',
@@ -9097,7 +9131,7 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 # Biography-only snippets are rejected outright (LOCAL-406 Part B).
                 from snippet_ranker import rank_and_cap_snippets, SNIPPET_CAP_PER_STOP
                 _ranked_snippets, _ranking_report = rank_and_cap_snippets(
-                    _stop_snippets, artist=artist
+                    _stop_snippets, artist=artist, work_title=poi_name
                 )
                 print(f"  [LOCAL-411] Stop {stop_num} snippet ranking: "
                       f"input={_ranking_report['input_count']} "
