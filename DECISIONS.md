@@ -14058,3 +14058,75 @@ only the fallback.
 417's acceptance was invalidated by a task file that outlived the decision it was
 written under. When a case, gate or rule changes, **the in-flight task files must
 be re-issued, not just the next ones** — a re-dispatch reuses the file on disk.
+
+## D361 — LOCAL-419 merged: the ranker was penalising exactly the snippets we needed
+**2026-08-11, 17:1x.** Merged as `14cbc29`..`45780f6`, LEAD evidence `a8322a7`.
+
+**The finding, and it is the answer to "why has this not improved for so long".**
+Retrieval was never the problem. 419's snippet dump shows 18/28 snippets for stop 2
+and 21/28 for stop 3 carrying real production facts (Tériade, Mourlot, 220 copies,
+1955, Reverdy, sheepskin). The ranker was scoring **catalogue-style entries −4** —
+and catalogue entries are precisely where publisher, printer, edition and paper
+live — while giving **+5 to "event" snippets about a different exhibition entirely**.
+We were paying for the right material and then sorting it to the bottom.
+
+That inverts LOCAL-412/413's premise. The catalogue penalty was right about auction
+junk and wrong about credit lines; 419 splits them (`_has_production_fact_content`)
+and the LOCAL-413 test was correctly rewritten to assert both halves rather than
+deleted.
+
+**Verified on current storied, not on the agent's tree:** facts now reach delivered
+text (Arches paper, 11 lithographs, Mourlot Frères, sheepskin, set of 10, Freud),
+stop 3 names the `livre d'artiste` thesis, regressions identical on both trees, and
+**Palais 4/4 with dates intact** — that control was mandatory, not optional, because
+`snippet_ranker` is shared with venue tours.
+
+**Two things did not reproduce**, and selection variance is the likely cause: the
+submission's showcase stop-3 facts "Éditions Verve" and "220 impressions" were
+absent from LEAD's run. Merged anyway — the direction is right and the gain is real
+— but a single run remains weak evidence for any specific fact.
+
+**Test-binding shortfall, recorded rather than bounced.** The submission stated
+"the 4 ranking tests will fail" under the D359 call-site check. They do not. With
+`_has_production_fact_content` still defined and only its call site neutralised,
+**none of 419's own 14 tests go red** — only the pre-existing `test_local413`
+does. The production behaviour is covered, but by one inherited test, and the
+submission's claim about its own suite was false. Third round in a row where a
+submission's self-assessment overstated its test binding (D348, D359, here).
+
+## D362 — Michael's ruling: a stop without a story is a failed stop
+**2026-08-11, 17:1x.** Dispatched as LOCAL-421.
+
+Michael read the delivered Unbound tour and scored it: stop 1 **3/5, "borderline
+poor"**; stop 2 the same; stop 3 **1/5, "very poor"**. His requirement for the next
+iteration, verbatim: *"each stop to have at least one story with no less than 3
+sentences"*, **validated**, plus each stop showing how it reflects the exhibition's
+narrative.
+
+**The single most damning detail, and it is ours, not the model's.** Stop 1's donor
+is **Boris Fridman**. His name is in the exhibition page credit line — the same
+credit line that delivered Broder, Mourlot, vellum and 1971 into the text. The
+prose said *"The generous donation of this work to the museum further enriches its
+cultural significance."* `grep -c Fridman` over delivered text: **0**. We held the
+name and blurred it. Rule adopted: **any named person or house in the credit line
+must appear by name, or the stop fails.**
+
+**The distinction that matters:** naming a mystery is not telling it. Stop 2 calls
+Freud's argument "controversial" and refers to "the psychological impact of
+myth-making" without ever saying what was controversial or which myths. A fact is a
+property of an object; a story is a claim about people and consequences —
+a relationship, a decision, a dispute, a gift, a reason something was made this way.
+Rounds 397–420 built the plumbing to deliver facts. **Nothing in the pipeline has
+ever gone looking for a story**, because every query we issue is a work-title query,
+and work-title queries return catalogues.
+
+**Michael offered to supply examples he can find himself.** LEAD asked for 2–3, with
+sources, for these exact stops — not because search is impossible but because they
+become the gold standard the gate is tested against. Right now "good story" is two
+people agreeing informally; with his examples it is a test that fails loudly.
+
+**Model pin revisited, not overturned.** D354 pinned gpt-3.5 *"until retrieval stops
+being the bottleneck"*. After 419 that premise no longer plainly holds. 421 must
+report — with evidence, not by silently switching — if gpt-3.5 can hold facts but
+cannot sustain a sourced three-sentence narrative. That is Michael's call to make
+and he should get data for it.
