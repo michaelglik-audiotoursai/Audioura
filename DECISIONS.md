@@ -12867,3 +12867,45 @@ worktree**:
 **Rule: before calling a task hung, check `ls -lt <worktree>` for recent writes.**
 A stale pid with fresh files is working; a live pid with stale files is stuck. CPU
 on the dispatcher is noise either way.
+
+## D331 — Injection fixed, extraction still dead, and the impossible relation shipped again
+**2026-08-11, 04:3x.** LOCAL-401 bounced, with the clearest split yet between what
+now works and what does not.
+
+**Fixed — and this is the first real story delivered to a listener:**
+
+```
+stop='Moses and Monotheism'  serp_results=16 elements_extracted=7 beats_injected=3 beats_in_delivered_text=3
+```
+
+> "Freud's controversial hypothesis that **Moses was of Egyptian descent** shifted
+> paradigms… The reception of this work was marked by shock and intrigue."
+
+Context that cannot be seen in the vitrine, sourced and delivered. The
+injection hop and the prose path both work.
+
+**Still dead:** `serp_results=23 → elements_extracted=0` on both French-titled
+works, for the second round running. 401's accent-folding fix did not move it.
+Two rounds is enough — LOCAL-402 bypasses the extractor rather than attempting a
+third repair. Stop 2 proves everything downstream of extraction works, so
+supplying material by another route is sufficient.
+
+**And the serious one: the impossible relation shipped again.**
+
+> "**In 1974, Salvador Dalí collaborated with Freud**, who authored this profound
+> exploration…"
+
+Freud died in 1939. This is D328's failure recurring, now *worse* — the date is
+stated in the same sentence, so the text refutes itself. LOCAL-400 added a
+coherence check; it did not fire, and nothing logged a rejection.
+
+**The rule this hardens: a check that never logs is indistinguishable from a check
+that does not exist.** Every gate that has actually worked this week announces
+itself on every run — the person gate, the form gate, the chain instrumentation.
+The coherence check was added silently and its silence read as success. LOCAL-402
+must paste the rejection log line from a live run as acceptance; absence of
+fabrication is not evidence when absence of output is also possible.
+
+**Priority note for the remaining night:** a tour that invents a meeting with a
+dead man is worse than a tour with no stories. Between "more stories" and "no
+impossible relations", the second wins.
