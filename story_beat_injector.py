@@ -227,6 +227,79 @@ def extract_story_beats(page_text: str) -> List[Dict[str, str]]:
     return beats
 
 
+def attribute_beats_to_works(
+    beats: List[Dict[str, str]],
+    works: List[Dict],
+) -> List[Dict[str, str]]:
+    """[LOCAL-392] Attribute each beat to the specific work it was derived from.
+
+    For each beat, check which work's metadata (credit_line, publisher,
+    collaborator, artist, title) mentions that beat's person. Sets
+    'source_work_index' on each beat (or None if exhibition-wide).
+
+    This ensures beats are assigned ONLY to the stop whose work they come from.
+    A beat that cannot be attributed to any single work is marked as
+    exhibition_wide=True and will not be demanded of any specific stop.
+    """
+    if not beats or not works:
+        return beats
+
+    for beat in beats:
+        if beat['role'] in ('circumstance', 'stakes'):
+            beat['source_work_index'] = None
+            beat['exhibition_wide'] = True
+            continue
+
+        person_lower = beat['person'].lower()
+        surname_lower = beat['person'].split()[-1].lower() if beat['person'].split() else ''
+        source_sentence_lower = beat.get('source_sentence', '').lower()
+
+        best_match_idx = None
+        best_match_strength = 0  # higher = more confident
+
+        for idx, work in enumerate(works):
+            strength = 0
+            work_credit = (work.get('credit_line') or '').lower()
+            work_publisher = (work.get('publisher') or '').lower()
+            work_collaborator = (work.get('collaborator') or '').lower()
+            work_artist = (work.get('artist') or '').lower()
+            work_title = (work.get('title') or '').lower()
+
+            # Strong match: person appears in credit_line or publisher or collaborator
+            if work_credit and (person_lower in work_credit or surname_lower in work_credit):
+                strength = max(strength, 3)
+            if work_publisher and (person_lower in work_publisher or work_publisher in person_lower):
+                strength = max(strength, 3)
+            if work_collaborator and (person_lower in work_collaborator or work_collaborator in person_lower):
+                strength = max(strength, 3)
+
+            # Medium match: person is the artist of this work
+            if work_artist and (person_lower in work_artist or surname_lower in work_artist):
+                strength = max(strength, 2)
+
+            # Weak match: work title appears in the source sentence
+            if work_title and len(work_title) > 5 and work_title in source_sentence_lower:
+                strength = max(strength, 1)
+
+            if strength > best_match_strength:
+                best_match_strength = strength
+                best_match_idx = idx
+
+        if best_match_idx is not None and best_match_strength >= 1:
+            beat['source_work_index'] = best_match_idx
+            beat['exhibition_wide'] = False
+            # Log the derivation per LOCAL-392 requirement
+            work_title = works[best_match_idx].get('title', '(unknown)')
+            print(f"  [LOCAL-392] beat='{beat['person']}' source_work='{work_title}' -> stop {best_match_idx + 1}")
+        else:
+            # Cannot attribute to a specific work — exhibition-wide
+            beat['source_work_index'] = None
+            beat['exhibition_wide'] = True
+            print(f"  [LOCAL-392] beat='{beat['person']}' -> exhibition_wide (no single work match)")
+
+    return beats
+
+
 def _find_sentence_containing(text: str, phrase: str) -> str:
     """Find the sentence containing a phrase (case-insensitive)."""
     sentences = re.split(r'(?<=[.!?])\s+', text)
@@ -242,19 +315,20 @@ def assign_beats_to_stops(
     matched_works: Optional[List[Dict]] = None,
     framing_case: str = 'none',
 ) -> List[List[Dict[str, str]]]:
-    """Distribute story beats across stops.
+    """[LOCAL-392] Distribute story beats across stops using work-attribution.
 
-    Each stop gets at least one beat (if possible). Beats are assigned
-    based on relevance to the stop's matched work, then round-robin
-    distributes remaining beats so EVERY stop receives at least one.
+    Each beat is assigned ONLY to the stop whose work it was derived from.
+    A beat from work A is NEVER demanded of work B's stop.
 
-    [LOCAL-388] Fixed: previously all beats clustered on stop 0 because
-    the relevance pass was too greedy. Now: at most 2 beats per stop in
-    the relevance pass, then round-robin fills all bare stops, then any
-    remaining beats are spread evenly.
+    [LOCAL-392] Fixed: previously beats were matched by weak substring heuristics
+    against work metadata, causing cross-contamination. Now: beats carry a
+    source_work_index (set by attribute_beats_to_works) that definitively binds
+    them. Exhibition-wide beats (gallery patron, circumstance, stakes) are
+    distributed without being demanded as required content.
 
     Args:
-        beats: All extracted beats
+        beats: All extracted beats (should have source_work_index set by
+               attribute_beats_to_works; falls back to old logic if missing)
         stop_names: List of stop names in order
         matched_works: Optional list of matched work dicts (from exhibition checklist)
         framing_case: 'exhibition' | 'venue_purpose' | 'none'
@@ -271,45 +345,80 @@ def assign_beats_to_stops(
     person_beats = [b for b in beats if b['role'] not in ('circumstance', 'stakes')]
     context_beats = [b for b in beats if b['role'] in ('circumstance', 'stakes')]
 
-    # First pass: assign beats that match a specific stop's work
-    # [LOCAL-388] Cap at 1 relevance-matched beat per stop to prevent clustering
     assigned = [[] for _ in range(n_stops)]
     used_beat_indices = set()
 
-    if matched_works:
-        for i, work in enumerate(matched_works):
-            if i >= n_stops:
-                break
-            if not work:
-                continue
-            work_publisher = (work.get('publisher') or '').lower().strip()
-            work_collaborator = (work.get('collaborator') or '').lower().strip()
-            work_artist = (work.get('artist') or '').lower().strip()
+    # [LOCAL-392] PRIMARY PASS: assign beats by their source_work_index
+    # This is the definitive assignment — a beat belongs to its source work's stop.
+    has_attribution = any(
+        'source_work_index' in b and b.get('source_work_index') is not None
+        for b in person_beats
+    )
 
-            for j, beat in enumerate(person_beats):
-                if j in used_beat_indices:
-                    continue
-                # [LOCAL-388] Stop after 1 relevance match per stop
-                if len(assigned[i]) >= 1:
+    if has_attribution:
+        for j, beat in enumerate(person_beats):
+            src_idx = beat.get('source_work_index')
+            if src_idx is not None and 0 <= src_idx < n_stops:
+                assigned[src_idx].append(beat)
+                used_beat_indices.add(j)
+            elif beat.get('exhibition_wide'):
+                # Exhibition-wide beats: skip for now, handle in context pass
+                pass
+            # else: no attribution and not exhibition_wide — will be distributed below
+    else:
+        # [LOCAL-392] FALLBACK: legacy matching for beats without attribution
+        # (backwards compatibility for callers that don't call attribute_beats_to_works)
+        if matched_works:
+            for i, work in enumerate(matched_works):
+                if i >= n_stops:
                     break
-                person_lower = beat['person'].lower()
-                # Match if person appears in work's publisher/collaborator/artist
-                # [LOCAL-388] Guard against empty-string substring match
-                if (person_lower and (
-                    (work_publisher and person_lower in work_publisher) or
-                    (work_collaborator and person_lower in work_collaborator) or
-                    (work_artist and person_lower in work_artist) or
-                    (work_publisher and work_publisher in person_lower) or
-                    (work_collaborator and work_collaborator in person_lower)
-                )):
-                    assigned[i].append(beat)
-                    used_beat_indices.add(j)
+                if not work:
+                    continue
+                work_publisher = (work.get('publisher') or '').lower().strip()
+                work_collaborator = (work.get('collaborator') or '').lower().strip()
+                work_artist = (work.get('artist') or '').lower().strip()
 
-    # Second pass: round-robin ALL remaining person beats across ALL stops
-    # [LOCAL-388] Fixed: distribute evenly so every stop gets at least one beat
-    remaining_person = [b for j, b in enumerate(person_beats) if j not in used_beat_indices]
+                for j, beat in enumerate(person_beats):
+                    if j in used_beat_indices:
+                        continue
+                    if len(assigned[i]) >= 1:
+                        break
+                    person_lower = beat['person'].lower()
+                    if (person_lower and (
+                        (work_publisher and person_lower in work_publisher) or
+                        (work_collaborator and person_lower in work_collaborator) or
+                        (work_artist and person_lower in work_artist) or
+                        (work_publisher and work_publisher in person_lower) or
+                        (work_collaborator and work_collaborator in person_lower)
+                    )):
+                        assigned[i].append(beat)
+                        used_beat_indices.add(j)
+
+    # [LOCAL-392] SECONDARY PASS: distribute exhibition-wide beats
+    # These are NOT demanded as required content — they supplement without
+    # being tracked by the retry mechanism.
+    exhibition_wide_beats = [
+        b for j, b in enumerate(person_beats)
+        if j not in used_beat_indices and b.get('exhibition_wide')
+    ]
+    # Mark these so get_required_beat_names skips them
+    for b in exhibition_wide_beats:
+        b['exhibition_wide'] = True
+
+    if exhibition_wide_beats:
+        # Distribute to stops with fewest beats
+        for ew_beat in exhibition_wide_beats:
+            min_count = min(len(assigned[i]) for i in range(n_stops))
+            candidates = [i for i in range(n_stops) if len(assigned[i]) == min_count]
+            target = candidates[0]
+            assigned[target].append(ew_beat)
+
+    # [LOCAL-392] TERTIARY PASS: distribute remaining unattributed beats round-robin
+    remaining_person = [
+        b for j, b in enumerate(person_beats)
+        if j not in used_beat_indices and not b.get('exhibition_wide')
+    ]
     if remaining_person:
-        # First fill stops that have nothing yet
         bare_stops = [i for i in range(n_stops) if not assigned[i]]
         rr_idx = 0
         for i in bare_stops:
@@ -317,9 +426,7 @@ def assign_beats_to_stops(
                 break
             assigned[i].append(remaining_person[rr_idx])
             rr_idx += 1
-        # Then distribute any leftovers to stops with fewest beats
         while rr_idx < len(remaining_person):
-            # Find the stop with the fewest person beats
             min_count = min(
                 sum(1 for b in assigned[i] if b['role'] not in ('circumstance', 'stakes'))
                 for i in range(n_stops)
@@ -332,14 +439,12 @@ def assign_beats_to_stops(
             assigned[target].append(remaining_person[rr_idx])
             rr_idx += 1
 
-    # Third pass: ensure all stops have at least one beat
-    # Use context beats (rarity, stakes) as fallback for bare stops, then reuse person beats
+    # Ensure all stops have at least one beat (context beats as fallback)
     for i in range(n_stops):
         if not assigned[i]:
             if context_beats:
                 assigned[i].append(context_beats[i % len(context_beats)])
             elif person_beats:
-                # Last resort: reuse a person beat (round-robin from all)
                 assigned[i].append(person_beats[i % len(person_beats)])
 
     # Add context beats to first and last stops (they serve as framing)
@@ -348,7 +453,6 @@ def assign_beats_to_stops(
             if cb['role'] == 'stakes' and assigned[0]:
                 assigned[0].insert(0, cb)
             elif cb['role'] == 'circumstance' and n_stops > 1:
-                # Assign "rarely on view" to a middle stop
                 mid = n_stops // 2
                 assigned[mid].append(cb)
 
@@ -359,6 +463,8 @@ def get_required_beat_names(stop_beats: List[Dict[str, str]]) -> List[str]:
     """[LOCAL-391] Return the list of person surnames that MUST appear in the stop's output.
 
     Only person beats (not circumstance/stakes) produce required names.
+    [LOCAL-392] Exhibition-wide beats are NOT required — they supplement without
+    being demanded, since they don't belong to this stop's specific work.
     Returns surnames (last word of each person's name), deduplicated.
     """
     if not stop_beats:
@@ -367,6 +473,9 @@ def get_required_beat_names(stop_beats: List[Dict[str, str]]) -> List[str]:
     seen = set()
     for b in stop_beats:
         if b['role'] in ('circumstance', 'stakes'):
+            continue
+        # [LOCAL-392] Skip exhibition-wide beats — they are not required
+        if b.get('exhibition_wide'):
             continue
         surname = b['person'].split()[-1]
         if surname.lower() not in seen:
@@ -446,6 +555,9 @@ def build_story_beat_prompt_block(
 
     # Filter to real person beats (not context-only)
     person_beats = [b for b in stop_beats if b['role'] not in ('circumstance', 'stakes')]
+    # [LOCAL-392] Separate work-specific beats (required) from exhibition-wide (supplementary)
+    required_beats = [b for b in person_beats if not b.get('exhibition_wide')]
+    supplementary_beats = [b for b in person_beats if b.get('exhibition_wide')]
     context_beats = [b for b in stop_beats if b['role'] in ('circumstance', 'stakes')]
 
     parts = []
@@ -464,16 +576,22 @@ are IN ADDITION TO the artist — never instead of. If WORK IDENTITY says
 """)
 
     # [LOCAL-391] Explicit REQUIRED CONTENT list — structurally unavoidable.
-    # This is separate from the prose guidance below. The model must incorporate
-    # each surname listed here.
-    if person_beats:
+    # [LOCAL-392] Only work-specific beats are required; exhibition-wide beats are optional.
+    if required_beats:
         parts.append("━━━ REQUIRED CONTENT — EACH SURNAME BELOW MUST APPEAR IN YOUR TEXT ━━━")
-        for beat in person_beats[:3]:
+        for beat in required_beats[:3]:
             surname = beat['person'].split()[-1]
             parts.append(f"  ✓ \"{surname}\" — {beat['person']} ({beat['role'].replace('_', ' ')}): {beat['action']}")
         parts.append("Write at least one sentence per person above that names them by surname.")
         parts.append("If you omit any of these surnames, your response will be REJECTED and regenerated.")
         parts.append("━━━ END REQUIRED CONTENT ━━━")
+        parts.append("")
+
+    # [LOCAL-392] Exhibition-wide beats are supplementary — include if natural
+    if supplementary_beats:
+        parts.append("SUPPLEMENTARY PEOPLE (exhibition-wide — include if natural, not required):")
+        for beat in supplementary_beats[:2]:
+            parts.append(f"  ○ {beat['person']} ({beat['role'].replace('_', ' ')}): {beat['action']}")
         parts.append("")
 
     if person_beats:
@@ -507,9 +625,10 @@ are IN ADDITION TO the artist — never instead of. If WORK IDENTITY says
         )
 
     # [LOCAL-388] Explicit name-the-person rule: never leave a role as a placeholder
-    if person_beats:
+    # [LOCAL-392] Use required_beats for this rule (work-specific only)
+    if required_beats:
         _role_names = []
-        for beat in person_beats[:3]:
+        for beat in required_beats[:3]:
             _role_names.append(f"'{beat['role'].replace('_', ' ')}' → use '{beat['person']}'")
         parts.append(
             "NEVER-PLACEHOLDER RULE (LOCAL-388): Do NOT write 'with publisher', "
