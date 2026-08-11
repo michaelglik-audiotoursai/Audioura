@@ -8886,6 +8886,7 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
         # [LOCAL-403] Lookup by name first, then by index (handles title string mismatches
         # between the runner's canonical_title and the generation pipeline's poi_name).
         _local402_snippets_injected = False
+        _candidate_specifics = []  # [LOCAL-407] initialized here for both-sides logging scope
         if _DIRECT_SNIPPETS_PER_STOP and poi_name:
             _stop_snippets = _DIRECT_SNIPPETS_PER_STOP.get(poi_name, [])
             # [LOCAL-403] Fallback: try index-based lookup (key = "__stop_N__")
@@ -8908,18 +8909,93 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                     _s_text = _snip.get('snippet', '')[:250]
                     _s_url = _snip.get('url', '')
                     _snippet_block += f"  [{_si}] {_s_title}\n      {_s_text}\n"
-                _snippet_block += """
-STORY INSTRUCTION (LOCAL-402):
-Using ONLY the reference material above, write ONE grounded story about a named person
-and something specific they did. Requirements:
-  - Name the person explicitly (never "the publisher", "the patron" — use their actual name)
-  - State what they did specifically (not vague claims about influence or importance)
+
+                # [LOCAL-407] Extract candidate specifics from snippet text.
+                # These are concrete, checkable facts — numbers, named materials,
+                # named techniques, named literary forms — that the prose MUST prefer
+                # over general claims like "revolutionized" or "had no precedent".
+                import re as _re407
+                _candidate_specifics = []
+                _all_snippet_text = ' '.join(
+                    _snip.get('snippet', '') for _snip in _stop_snippets[:12]
+                )
+                # Numbers: edition sizes, plate counts, dates
+                for _num_match in _re407.finditer(
+                    r'(?:numbered|edition of|limited to|signed and numbered)\s+(\d+[/]\d+|\d+)',
+                    _all_snippet_text, _re407.IGNORECASE):
+                    _candidate_specifics.append(f"edition/number: {_num_match.group(0).strip()}")
+                # Named materials: Japan paper, Arches, vellum, etc.
+                for _mat_match in _re407.finditer(
+                    r'(?:on|printed on|paper:?)\s+(Japan(?:\s+paper)?|Arches|vellum|Rives|wove|laid)',
+                    _all_snippet_text, _re407.IGNORECASE):
+                    _candidate_specifics.append(f"material: {_mat_match.group(0).strip()}")
+                # Plate/lithograph counts
+                for _plate_match in _re407.finditer(
+                    r'(\d+)\s+(?:colou?r\s+)?(?:lithograph|etching|aquatint|plate|woodcut)s?',
+                    _all_snippet_text, _re407.IGNORECASE):
+                    _candidate_specifics.append(f"plate count: {_plate_match.group(0).strip()}")
+                # Literary forms: poem, prose, text, fable
+                for _form_match in _re407.finditer(
+                    r'(?:based on|illustrat(?:ing|es?)|accompanying|wrote the|his own)\s+'
+                    r'(poem|prose|text|fable|novel|essay|verse)',
+                    _all_snippet_text, _re407.IGNORECASE):
+                    _candidate_specifics.append(f"literary form: {_form_match.group(0).strip()}")
+                # Named literary work references
+                for _form_match2 in _re407.finditer(
+                    r"(?:Miró'?s?|artist'?s?)\s+(poem|fantasy|surrealist fantasy)",
+                    _all_snippet_text, _re407.IGNORECASE):
+                    _candidate_specifics.append(f"literary form: {_form_match2.group(0).strip()}")
+                # Dates with context
+                for _date_match in _re407.finditer(
+                    r'(\d{4}),?\s+(?:no\.?\s*\d+)',
+                    _all_snippet_text, _re407.IGNORECASE):
+                    _candidate_specifics.append(f"catalogue ref: {_date_match.group(0).strip()}")
+                # Deduplicate
+                _candidate_specifics = list(dict.fromkeys(_candidate_specifics))
+
+                if _candidate_specifics:
+                    _snippet_block += "\n━━━ CANDIDATE SPECIFICS (extracted from the snippets above) ━━━\n"
+                    for _cs in _candidate_specifics[:8]:
+                        _snippet_block += f"  • {_cs}\n"
+                    _snippet_block += "━━━ END CANDIDATE SPECIFICS ━━━\n"
+                    print(f"  [LOCAL-407] Stop {stop_num}: {len(_candidate_specifics)} candidate specifics extracted: "
+                          f"{[cs[:40] for cs in _candidate_specifics[:4]]}")
+
+                # [LOCAL-407] Artist surname enforcement — the snippet block must
+                # not displace the artist. A stop about a Miró book MUST name Miró.
+                _artist_surname = artist.split()[-1] if artist else ''
+
+                _snippet_block += f"""
+STORY INSTRUCTION (LOCAL-407):
+Using the reference material above, write a description that includes AT LEAST ONE
+concrete specific from the CANDIDATE SPECIFICS list. A concrete specific is a number,
+a named material, a named literary form, or a verifiable catalogue fact.
+
+PRIORITY RULE: A concrete detail ALWAYS beats a general claim.
+  ✗ "resulted in a work that had no precedent" — this is a slogan, not a story
+  ✗ "revolutionized the book as an art form" — this is a claim, not a fact
+  ✓ "Miró wrote the poem himself, then drew against his own words" — specific action
+  ✓ "printed on Japan paper in an edition of 50" — verifiable detail
+  ✓ "a series of 15 colour lithographs" — concrete count
+
+Additional requirements:
+  - Name people explicitly (never "the publisher", "the patron" — use their actual name)
+  - State what they did specifically (a concrete action, not "influenced" or "collaborated")
   - Do NOT assert any interaction between people unless the material confirms both were alive
     and working together at the stated time
-  - If dates are given, use them accurately — never claim a collaboration in a year after
-    one party's death
-  - If the material does not support a specific person-story for this work, omit the story
-    rather than inventing one
+  - If dates are given, use them accurately
+  - If the material does not support a specific person-story, omit rather than invent
+  - "X and Y worked together" or "X's collaboration with Y" is NOT a story — it is the
+    identity form. A story requires: who did what, with what material consequence.
+"""
+                # [LOCAL-407] Artist name is NON-NEGOTIABLE in the snippet block
+                if _artist_surname:
+                    _snippet_block += f"""
+ARTIST ATTRIBUTION (LOCAL-407 — NON-NEGOTIABLE):
+The artist for this work is {artist}. The surname "{_artist_surname}" MUST appear
+in your text. The people named in the snippets (publishers, printers, donors) are
+IN ADDITION TO the artist, never instead of. If you write about Broder or Mourlot
+without mentioning {_artist_surname}, your response will be REJECTED.
 """
                 description_prompt += _snippet_block
                 _local402_snippets_injected = True
@@ -9747,6 +9823,37 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
 
                     word_count = len(description.split())
                     print(f"Stop {stop_num} description word count: {word_count} words")
+
+                    # [LOCAL-407] Both-sides logging: which snippet facts were offered vs used.
+                    # This disciplines the pipeline — we can see exactly which concrete specifics
+                    # the model received and which it chose to include (or ignore).
+                    if _local402_snippets_injected and _candidate_specifics:
+                        _desc_lower = description.lower()
+                        _used_specifics = []
+                        _ignored_specifics = []
+                        for _cs in _candidate_specifics:
+                            # Extract the key value from "type: value" format
+                            _cs_value = _cs.split(':', 1)[-1].strip().lower()
+                            # Check if any significant fragment (>3 chars) appears
+                            _cs_tokens = [t for t in _cs_value.split() if len(t) > 3]
+                            _found = any(t in _desc_lower for t in _cs_tokens) if _cs_tokens else False
+                            if _found:
+                                _used_specifics.append(_cs)
+                            else:
+                                _ignored_specifics.append(_cs)
+                        print(f"  [LOCAL-407] Stop {stop_num} snippet-specifics audit:")
+                        print(f"    offered: {len(_candidate_specifics)}")
+                        print(f"    used:    {len(_used_specifics)} — {_used_specifics[:3]}")
+                        print(f"    ignored: {len(_ignored_specifics)} — {_ignored_specifics[:3]}")
+                    elif _local402_snippets_injected:
+                        print(f"  [LOCAL-407] Stop {stop_num}: snippets injected but no candidate specifics extracted")
+
+                    # [LOCAL-407] Artist-presence verification (fail-open log, not gate)
+                    if _local402_snippets_injected and artist:
+                        _artist_sn = artist.split()[-1].lower()
+                        if _artist_sn and _artist_sn not in description.lower():
+                            print(f"  [LOCAL-407] ⚠️ Stop {stop_num}: artist '{artist}' ABSENT from description!")
+
                     return idx, orientation, description, word_count, tokens_used, call_cost
                 else:
                     # [LOCAL-292] Retry transient failures following _PROLOG_MAX_RETRIES pattern (LOCAL-119)
