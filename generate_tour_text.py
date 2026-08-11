@@ -8198,7 +8198,7 @@ These rules apply to the NARRATION paragraphs only. Navigation/orientation direc
     _all_story_beats = []
     if _storied_mode and tour_category == 'museum':
         try:
-            from story_beat_injector import extract_story_beats, assign_beats_to_stops
+            from story_beat_injector import extract_story_beats, assign_beats_to_stops, attribute_beats_to_works
             # Use the framing page text (exhibition case) or combined corpus text
             _beat_source_text = _framing_page_text or ''
             if not _beat_source_text and _story_corpus_result:
@@ -8211,6 +8211,10 @@ These rules apply to the NARRATION paragraphs only. Navigation/orientation direc
                     _matched_works_for_beats = None
                     if hasattr(_exhibition_checklist_result, 'works') and _exhibition_checklist_result:
                         _matched_works_for_beats = getattr(_exhibition_checklist_result, 'works', None)
+                    # [LOCAL-392] Attribute beats to their source works BEFORE assignment
+                    if _matched_works_for_beats:
+                        _all_story_beats = attribute_beats_to_works(
+                            _all_story_beats, _matched_works_for_beats)
                     _story_beats_per_stop = assign_beats_to_stops(
                         _all_story_beats, _poi_names_for_beats,
                         matched_works=_matched_works_for_beats,
