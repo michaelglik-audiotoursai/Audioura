@@ -274,11 +274,24 @@ def synthesize_queries(stop: Dict, tour_type: str = 'contained') -> List[str]:
     # [LOCAL-415] Venue name for contextualized queries
     venue_name = (stop.get('venue_name') or '').strip()
 
+    # [LOCAL-423] Exhibition name for Michael's query shape (Step 2)
+    exhibition_name = (stop.get('exhibition_name') or '').strip()
+
     # [LOCAL-415] Medium detection — needed for query selection below
     _medium = (stop.get('medium') or '').lower()
     _is_book_form = any(kw in _medium for kw in ('lithograph', 'book', 'etching', 'aquatint', 'woodcut'))
     if not _is_book_form and credit_line:
         _is_book_form = any(kw in credit_line.lower() for kw in ('lithograph', 'book', 'published'))
+
+    # [LOCAL-423] Michael's query shape (Step 2):
+    # "What story can be told to visitors of {exhibition} about {work}, {credit_line}?"
+    # This framing is materially different from querying the work title alone.
+    # It targets VISITOR-FACING stories, not encyclopedic facts.
+    if exhibition_name and title:
+        _423_credit_short = credit_line[:100] if credit_line else ''
+        queries.append(f'"{title}" {artist} story visitors {exhibition_name}')
+        if _423_credit_short:
+            queries.append(f'"{title}" {_423_credit_short[:50]} history story')
 
     # ── PRIMARY: The work itself (quoted title + artist) ──
     if tour_type == 'contained':
@@ -312,8 +325,26 @@ def synthesize_queries(stop: Dict, tour_type: str = 'contained') -> List[str]:
     if donor:
         # e.g. "Boris Fridman collection livres d'artiste"
         queries.append(f'{donor} collection')
+        # [LOCAL-421] Story query: who is the donor, why did they give it
+        queries.append(f'{donor} "{title}" donation why')
     if collaborator and artist:
         queries.append(f'{collaborator} {artist}')
+        # [LOCAL-421] Story query: why this collaboration happened
+        queries.append(f'{collaborator} {artist} relationship why collaborated')
+
+    # ── [LOCAL-421] STORY-TYPED QUERIES: relationships and consequences ──
+    # These target the WHY and the CONSEQUENCE, not just the WHO and WHAT.
+    # A fact says "printed by Mourlot". A story says "Mourlot was the only
+    # printer in Paris who could handle chromolithography at this scale."
+    if artist and title:
+        # Why the artist chose this subject / collaborator
+        queries.append(f'{artist} "{title}" why created motivation')
+    if publisher and printer:
+        # Publisher–printer relationship (e.g. why Broder chose Mourlot)
+        queries.append(f'{publisher} {printer} collaboration')
+    if collaborator and not publisher:
+        # Writer–artist: why the writer's text was chosen
+        queries.append(f'"{title}" {collaborator} why chose subject')
 
     # ── FORM QUERY: livre d'artiste tied to artist ──
     # Only when medium/credit_line suggests this IS a livre d'artiste

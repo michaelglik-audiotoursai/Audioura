@@ -1942,6 +1942,50 @@ Rules:
     identity form. A story requires: who did what, with what material consequence.
   - NO HALLUCINATED SENSORY CLAIMS: never assert a sensation the listener cannot verify
     (smell, sound, temperature, texture) unless the material states it.
+
+STORY REQUIREMENT (LOCAL-421/423 — NON-NEGOTIABLE):
+Your description MUST contain at least ONE STORY of no fewer than THREE SENTENCES.
+A story = a claim about PEOPLE AND CONSEQUENCES: a relationship, a decision, a dispute,
+a gift, a reason something was made the way it was.
+
+VERIFICATION CONSTRAINT (LOCAL-423 — HARD GATE):
+Every factual claim in your story (dates, numbers, locations, attributions) will be
+verified against the reference material above. If a claim cannot be found in the
+snippets, it will be STRIPPED from the delivered text. DO NOT invent details that
+the snippets do not support — even if you believe them to be true. If the snippets
+say "a Russian collector", do NOT say "a Boston-based collector". If the snippets
+do not state a donation year, do NOT assert one. Write ONLY what the sources confirm.
+Self-contradictions (e.g. "15 lithographs" in one sentence and "40 lithographs" in
+another) cause AUTOMATIC REJECTION — pick one number and cite which snippet supports it.
+
+WHAT COUNTS AS A STORY:
+  - "Boris Fridman donated this work to the MFA in 2003. Fridman, a Boston-based collector
+    who specialized in livres d'artiste, assembled one of the largest private collections
+    of artist's books in New England. His gift brought the museum's holdings of
+    Surrealist-era printed works to a critical mass."
+  - "Dalí chose Freud's Moses and Monotheism because he considered Freud's work
+    foundational to Surrealism. Dalí had attempted to visit Freud in London in 1938
+    and sketched the dying psychoanalyst during that meeting."
+  - "Louis Broder commissioned this work from Miró as part of a deliberate campaign to
+    revive the livre d'artiste tradition after the war. Broder's editions were tiny —
+    rarely more than 150 copies — and he insisted on direct collaboration between
+    artist, poet, and printer at the same workshop."
+
+WHAT DOES NOT COUNT:
+  - A list of facts with no narrative thread (just naming publisher + printer + date)
+  - "Invites you to ponder" / "transcends boundaries" / "a testament to" (evaluation)
+  - An interpretation the writer supplies without sourcing it to a person or event
+  - Describing the image/object itself (that is ekphrasis, not story)
+
+If the reference material supports NO story, you must still try to build one from the
+entities you do have (donor, publisher, printer) — state who they were and what their
+involvement meant. If truly nothing supports even that, write only what you can verify.
+
+ENTITY NAMING RULE (LOCAL-421 — NON-NEGOTIABLE):
+Every named person in the credit line (donor, publisher, printer, collaborator) MUST
+appear BY NAME in your text. Never write "the generous donation" when the data says
+"Gift of Boris Fridman". Never write "the publisher" when you know the name. The name
+IS the story's starting point.
 """
     # [LOCAL-407] Artist name is NON-NEGOTIABLE in the snippet block
     if _artist_surname:
@@ -9993,6 +10037,42 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
 ━━━ END ARTIST ATTRIBUTION ━━━
 """
 
+        # [LOCAL-421] STORY REINFORCEMENT — recency effect: last instruction wins.
+        # gpt-3.5-turbo buries names in evaluative prose unless told exactly what shape
+        # the text must take. This block is the LAST thing in the prompt.
+        if _storied_mode and tour_category == 'museum':
+            _story_reinforcement = """
+
+━━━ FINAL STORY SHAPE (read this LAST — it overrides everything above) ━━━
+Your description MUST contain a NARRATIVE of at least THREE consecutive sentences
+that follows this shape:
+
+  SENTENCE 1: Name a person (donor/publisher/printer/collaborator) and state
+    ONE SPECIFIC THING they did — a decision, a commission, a gift.
+    Example: "Louis Broder commissioned Miró for this portfolio because Broder
+    specialized in limited editions requiring direct artist-printer collaboration."
+
+  SENTENCE 2: State the CONSEQUENCE or REASON — why it mattered, what it caused,
+    what it meant for the work.
+    Example: "Broder's editions were produced with artist, poet, and printer working
+    in the same workshop — Mourlot's atelier on Rue de Chabrol in Paris."
+
+  SENTENCE 3: Connect to a SECOND named person or to the wider story.
+    Example: "Boris Fridman, a Russian collector who assembled livres d'artiste,
+    donated this work to the MFA, adding to the museum's holdings of
+    collaborative printed works."
+
+WHAT TO AVOID:
+  - "X's collaboration... showcasing a unique fusion" (evaluation, not story)
+  - "stands as a testament to" (evaluation)
+  - "the transformative power of" (empty abstraction)
+  - "goes beyond mere artistic interpretation" (empty)
+
+Write the story FIRST, then add physical description if space allows.
+━━━ END FINAL STORY SHAPE ━━━
+"""
+            description_prompt += _story_reinforcement
+
         description_data = {
             "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
             "messages": [
@@ -10807,6 +10887,180 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                       f"beats_in_output={_vresult['beats_in_output']} dropped={_dropped_str}")
         except Exception as _v388_err:
             print(f"  [LOCAL-388] Beat verification error (non-fatal): {_v388_err}")
+
+    # [LOCAL-421] Story gate — verify each stop has ≥3 story sentences + named entities
+    if _storied_mode and tour_category == 'museum' and not _phase5_ceiling_breached:
+        try:
+            from story_gate import verify_stop_story, extract_story_sentences
+            print(f"\n  [LOCAL-421] STORY GATE: checking story requirement per stop...")
+            _l421_all_pass = True
+            for _sg_i, _sg_poi in enumerate(poi_list):
+                _sg_desc = _sg_poi.get('description', '')
+                _sg_name = _sg_poi.get('name', f'Stop {_sg_i+1}')
+                if not _sg_desc or _sg_desc.startswith('['):
+                    continue
+
+                # Get credit line for this stop
+                _sg_credit = _sg_poi.get('credit_line', '')
+                if not _sg_credit and _exhibition_checklist_result and hasattr(_exhibition_checklist_result, 'works'):
+                    _sg_matched = match_work_for_stop(_sg_name, _exhibition_checklist_result.works)
+                    if _sg_matched:
+                        _sg_credit = _sg_matched.get('credit_line', '')
+
+                _sg_result = verify_stop_story(
+                    description=_sg_desc,
+                    credit_line=_sg_credit,
+                    stop_name=_sg_name,
+                    framing_case=_framing_case,
+                    min_story_sentences=3,
+                )
+                _sg_status = "✓ PASS" if _sg_result['passed'] else "✗ FAIL"
+                print(f"    {_sg_status} stop='{_sg_name}': story_count={_sg_result['story_count']}, "
+                      f"entities_ok={_sg_result['entities_present']}, "
+                      f"thesis_ok={_sg_result['thesis_threaded']}")
+                if not _sg_result['passed']:
+                    _l421_all_pass = False
+                    for _sg_f in _sg_result['failures']:
+                        print(f"      → {_sg_f}")
+                    if _sg_result['story_sentences']:
+                        print(f"      story sentences found:")
+                        for _ss in _sg_result['story_sentences'][:3]:
+                            print(f"        \"{_ss[:100]}...\"")
+                if _sg_result['entities_missing']:
+                    print(f"      entities_missing: {_sg_result['entities_missing']}")
+
+            if _l421_all_pass:
+                print(f"  [LOCAL-421] STORY GATE: ALL STOPS PASSED")
+            else:
+                print(f"  [LOCAL-421] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)")
+        except ImportError as _sg_err:
+            print(f"  [LOCAL-421] Story gate import error (non-fatal): {_sg_err}")
+        except Exception as _sg_err:
+            print(f"  [LOCAL-421] Story gate error (non-fatal): {_sg_err}")
+
+    # [LOCAL-423] STORY VERIFICATION — Michael's Step 4: verify claims against sources.
+    # Verification GATES selection (runs after generation, before delivery).
+    # Every load-bearing claim must trace to a retrieved source.
+    # Entity disambiguation: exclude wrong-person snippets.
+    # Self-contradiction detection: "15 lithographs" + "40 lithographs" = reject.
+    _l423_verification_results = {}
+    if _storied_mode and tour_category == 'museum' and not _phase5_ceiling_breached:
+        try:
+            from story_verifier import verify_story_candidate, disambiguate_snippets
+            print(f"\n  [LOCAL-423] STORY VERIFICATION: checking claims against sources...")
+            _l423_all_pass = True
+            _l423_any_rejected = False
+
+            for _sv_i, _sv_poi in enumerate(poi_list):
+                _sv_desc = _sv_poi.get('description', '')
+                _sv_name = _sv_poi.get('name', f'Stop {_sv_i+1}')
+                if not _sv_desc or _sv_desc.startswith('['):
+                    continue
+
+                # Get credit line for this stop
+                _sv_credit = _sv_poi.get('credit_line', '')
+                if not _sv_credit and _exhibition_checklist_result and hasattr(_exhibition_checklist_result, 'works'):
+                    _sv_matched = match_work_for_stop(_sv_name, _exhibition_checklist_result.works)
+                    if _sv_matched:
+                        _sv_credit = _sv_matched.get('credit_line', '')
+
+                # Get the snippets that were used to generate this stop
+                _sv_snippets = []
+                if _DIRECT_SNIPPETS_PER_STOP:
+                    _sv_snippets = _DIRECT_SNIPPETS_PER_STOP.get(_sv_name, [])
+                    if not _sv_snippets:
+                        _sv_snippets = _DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{_sv_i}__", [])
+
+                _sv_result = verify_story_candidate(
+                    story_text=_sv_desc,
+                    snippets=_sv_snippets,
+                    credit_line=_sv_credit,
+                    stop_name=_sv_name,
+                )
+
+                # [LEAD, D369] A verifier that extracted ZERO claims has verified
+                # NOTHING. Reporting that as "all claims sourced" manufactures
+                # confidence over an unexamined story, and the line gets cited as
+                # evidence. Measured on a real 5-sentence delivered story with six
+                # checkable assertions: extract_claims() returned 0. Until claim
+                # extraction actually works (LOCAL-424), a vacuous pass is a FAIL.
+                if _sv_result['claims_extracted'] == 0:
+                    _sv_result['passed'] = False
+                    _sv_result.setdefault('rejection_reasons', []).append(
+                        'VACUOUS: 0 claims extracted — nothing was verified')
+
+                _l423_verification_results[_sv_name] = _sv_result
+                _sv_status = "✓ PASS" if _sv_result['passed'] else "✗ FAIL"
+                print(f"    {_sv_status} stop='{_sv_name}': "
+                      f"claims={_sv_result['claims_extracted']}, "
+                      f"sourced={_sv_result['claims_sourced']}, "
+                      f"unsourced={_sv_result['claims_unsourced']}, "
+                      f"contradicted={_sv_result['claims_contradicted']}")
+
+                if not _sv_result['passed']:
+                    _l423_all_pass = False
+                    _l423_any_rejected = True
+                    for _sv_reason in _sv_result['rejection_reasons'][:5]:
+                        print(f"      → {_sv_reason}")
+
+                if _sv_result['evidence']:
+                    print(f"      evidence ({len(_sv_result['evidence'])} sourced claims):")
+                    for _ev in _sv_result['evidence'][:3]:
+                        print(f"        claim='{_ev['claim_text']}' ← {_ev['source_url'][:60]}")
+
+                if _sv_result['disambiguation_excluded']:
+                    print(f"      disambiguation: excluded {len(_sv_result['disambiguation_excluded'])} snippets")
+                    for _dex in _sv_result['disambiguation_excluded']:
+                        print(f"        • '{_dex['title'][:50]}': {_dex['reason']}")
+
+            if _l423_all_pass:
+                print(f"  [LOCAL-423] STORY VERIFICATION: ALL STOPS PASSED — every extracted claim is sourced")
+            else:
+                print(f"  [LOCAL-423] STORY VERIFICATION: SOME STOPS HAVE UNSOURCED CLAIMS")
+                print(f"  [LOCAL-423] Unsourced claims will be stripped from delivered text")
+
+                # Strip unsourced claims from the delivered text
+                # (Michael's rule: "A claim with no source must not ship")
+                for _strip_name, _strip_result in _l423_verification_results.items():
+                    if _strip_result['passed']:
+                        continue
+                    # Find the corresponding POI and remove unsourced sentences
+                    for _strip_poi in poi_list:
+                        if _strip_poi.get('name') != _strip_name:
+                            continue
+                        _strip_desc = _strip_poi.get('description', '')
+                        if not _strip_desc:
+                            break
+                        # Remove sentences containing unsourced claims
+                        _sentences = re.split(r'(?<=[.!?])\s+', _strip_desc.strip())
+                        _kept = []
+                        _removed = []
+                        _unsourced_texts = {d['text'].lower() for d in _strip_result['unsourced_details']}
+                        _contradiction_texts = set()
+                        for _ct1, _ct2, _ in _strip_result['contradictions']:
+                            _contradiction_texts.add(_ct1.lower())
+                            _contradiction_texts.add(_ct2.lower())
+
+                        for _sent in _sentences:
+                            _sent_lower = _sent.lower()
+                            _has_unsourced = any(ut in _sent_lower for ut in _unsourced_texts)
+                            _has_contradiction = any(ct in _sent_lower for ct in _contradiction_texts)
+                            if _has_unsourced or _has_contradiction:
+                                _removed.append(_sent)
+                            else:
+                                _kept.append(_sent)
+
+                        if _removed:
+                            _strip_poi['description'] = ' '.join(_kept)
+                            print(f"    [LOCAL-423] Stripped {len(_removed)} sentence(s) from '{_strip_name}':")
+                            for _rm in _removed:
+                                print(f"      ✗ \"{_rm[:100]}\"")
+                        break
+
+        except ImportError as _sv_err:
+            print(f"  [LOCAL-423] Story verifier import error (non-fatal): {_sv_err}")
+        except Exception as _sv_err:
+            print(f"  [LOCAL-423] Story verifier error (non-fatal): {_sv_err}")
 
     # [LOCAL-394] 120-word floor enforcement — log stops under minimum but NEVER drop them.
     # The floor is a retry trigger inside _generate_description, not a post-generation filter.

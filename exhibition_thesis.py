@@ -294,6 +294,16 @@ Your description MUST engage at least TWO of these dimensions:
 KNOWN COLLABORATION/FORM FACTS for this work:
 {work_cues}''' if work_cues else ''}
 
+THESIS THREADING (LOCAL-421 — NON-NEGOTIABLE):
+You MUST include ONE SENTENCE that explicitly states how THIS SPECIFIC WORK advances
+the exhibition's argument. The exhibition argues that artists revolutionized the book
+as an art form through deeply collaborative ventures. Your sentence must connect THIS
+work to THAT thesis. Example shapes:
+  - "This work exemplifies the livre d'artiste ideal: [artist] and [author] worked
+    directly with [printer] to integrate image and text on a single sheet."
+  - "[Publisher]'s decision to commission [artist] for this edition advanced the
+    collaborative book form that the exhibition argues had no precedent."
+
 FORBIDDEN: Describing the depicted image as though this object were a painting,
 with no reference to it being a book or printed work. That treats the work as
 something it is not and ignores the exhibition's entire premise.
