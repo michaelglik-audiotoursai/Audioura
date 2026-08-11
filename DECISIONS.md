@@ -14130,3 +14130,57 @@ being the bottleneck"*. After 419 that premise no longer plainly holds. 421 must
 report — with evidence, not by silently switching — if gpt-3.5 can hold facts but
 cannot sustain a sourced three-sentence narrative. That is Michael's call to make
 and he should get data for it.
+
+## D363 — LOCAL-420 merged: the empty stop is gone, and the merge was a real conflict
+**2026-08-11, 17:5x.** Merged as `f200f97` (+ `73cde99`). Carries LOCAL-415 and
+LOCAL-417, neither of which had reached `storied`.
+
+**Verified live on current storied, twice.** 3 narrated stops and **zero stubs**
+both runs. Run 2 is the strong evidence: the gate-failure path fired **3 times**
+and the tour still shipped real prose every time — the failure path was exercised,
+not merely avoided. Palais control 4/4, dates intact. 93 tests green.
+
+**The merge conflict was semantic, not textual.** 419's title-relevance adjustment
+and 415's tier3-demotion counter occupy the same branch of `rank_and_cap_snippets`.
+They are independent and both are kept. Taking either side alone would have
+silently dropped a merged feature — the kind of loss that shows up three rounds
+later as a mystery.
+
+**A test asserted a mechanism that 419 made unnecessary.**
+`test_rescue_fires_when_tier1_is_junk` demanded `starvation_rescued is True`. After
+419, the irrelevant tier1 junk is demoted on merit, the title-relevant tier3 wins a
+slot by ranking, and the rescue never needs to fire — `tier3_in_output: 1`, the
+outcome 415 actually wanted. LEAD rewrote the assertion to the outcome (a
+title-relevant snippet reaches the output, by rescue **or** by ranking) after first
+confirming the rescue path is still reachable and still covered by
+`test_usable_count_reflects_title_relevance`, which goes through it and passes.
+**Deleting a mechanism's only test is how code becomes dead without anyone
+noticing** — the check before the edit is the part that matters.
+
+## D364 — Three rounds running, the tests do not touch the production call sites
+**2026-08-11, 17:5x.** Dispatched as LOCAL-422.
+
+D359's check — keep the helper, delete only its call sites — applied to the last
+two merges:
+
+| round | helpers neutralised | result |
+|---|---|---|
+| LOCAL-420 | `_is_stub_text`, `_build_material_fallback` (4 call sites) | **11 passed** — none noticed |
+| LOCAL-419 | `_has_production_fact_content` | **1 failed, 21 passed** — and the one was the *inherited* 413 test |
+
+420's submission said it had "moved helpers to module level for testability". That
+made them **importable**, not **bound** — a distinction worth naming, because it
+looks like exactly the right remediation and is not. 419's submission asserted "the
+4 ranking tests will fail"; one did, and it was not theirs.
+
+**Both fixes are real** — LEAD verified both live — so neither was bounced for this.
+But nothing would go red if either fix were reverted tomorrow, which is the
+definition of untested. This is the third consecutive round (D348, D359, D361)
+where a submission's account of its own test binding was wrong, so the fix is
+structural, not another reminder: 422 extracts the ship-or-fallback decision out of
+the per-stop generation loop into a function that can be called directly, so the
+call site is reachable from a test without a live LLM run.
+
+**Standing addition to the review checklist:** run the call-site check *before*
+reading the submission's claims about its tests. Reading them first anchors you to
+their number.
