@@ -12454,3 +12454,29 @@ well as the output.**
 would want to keep listening, and the stories are still correctly-placed
 credit-line facts rather than narrative. Closing that gap needs a second grounded
 source (LOCAL-23's lineage) and is not started.
+
+### D318 addendum — the invariant was audited after merge, and it is real
+**2026-08-10, 23:0x.** LEAD merged 394 on live verification and the control case
+without running the D296 revert check. Closing that gap afterwards rather than
+leaving it implied:
+
+The success line prints `({len(poi_list)} selected == {len(poi_list)} delivered)`
+— the same expression twice — which reads like a tautology. It is only a cosmetic
+redundancy in the *else* branch. The actual comparison is
+`if len(poi_list) != _l292_requested_stops`, where `_l292_requested_stops` is
+snapshotted at line 12139 **before** `poi_list = _l292_survivors` at 12164
+replaces the list. So the check compares post-removal against pre-removal and can
+genuinely fire.
+
+**Two things worth stating about it:**
+- It **reports**, it does not **prevent**. A future filter that drops a stop would
+  be logged loudly, not blocked. That is what D317 asked for and it is the right
+  level — but it means the guarantee is visibility, not immunity.
+- The only removal it treats as legitimate is `GENERATION_FAILED` — a stop for
+  which no description was ever produced. That is the correct exception: shipping
+  an empty shell is worse than a shorter tour, and it is the opposite case from
+  D317's, where a *populated* stop was deleted for being short.
+
+24 tests green across 393/394. **Recorded because the audit happened after the
+merge, not before** — the merge was justified by live evidence on two venues, but
+the order was wrong and the note belongs in the record.
