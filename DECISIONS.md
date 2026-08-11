@@ -13106,3 +13106,36 @@ the same trade D309 rejected when story cost attribution.
 LEAD nearly reported the title interpolation as broken. It was the probe passing
 `name` where the function expects `canonical_title`. **Check your own harness
 before blaming the code** — the same discipline demanded of every submission.
+
+## D338 — Eight rounds on stories: what was won, what was not, and the one check not yet run
+**2026-08-11, 07:2x.** LOCAL-407 bounced. It added an honest check that reported
+its own failure — `Specific Examples: False` on all three stops — restored `Gris`
+(fixing 406's regression), and still did not put a specific into the prose.
+`Fridman` went 1 → 0.
+
+**Won across 397–407, all live-verified and on `storied`:**
+- The paid Serper search, which had **zero production callers** (D321), now runs
+  and returns work-specific results (D335/D337).
+- The **temporal coherence gate**, which caught the posthumous-Gris claim live
+  — "'Gris' died in 1927, cannot have Collaborating with in 1955" — across five of
+  six grammatical forms (D332/D336).
+- Named collaborators reach the text: `Broder`, `Mourlot`, and once `Fridman`.
+- Zero fabricated persons, zero impossible relations, zero form fabrications, in
+  every merged round.
+- Palais control at its **record 93.8**.
+
+**Not won: a story.** The tour still describes rather than narrates. Every round
+moved the failure exactly one hop — search → extract → inject → use — and the last
+hop is unmoved.
+
+**The check nobody has run:** print the literal prompt sent for one stop. D335
+showed five rounds wasted filtering a bucket nobody had opened; three rounds have
+now tried to make the prose *use* specifics without confirming they are in the
+prompt at all. LOCAL-408 does nothing else until that file exists.
+
+**The honest read for Michael:** the infrastructure is real and the safety
+properties are real — the tour cannot now claim a dead man collaborated with
+anyone, and every name in it is on a page we fetched. The narrative quality he
+asked for is not there. Eight rounds bought a system that *can* tell a story and
+still doesn't. That is a worse outcome than promised and a better position than
+last night, and both halves are true.
