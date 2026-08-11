@@ -1,175 +1,115 @@
-# LEAD evaluation — MFA storied tour (LOCAL-413 live run)
+# LEAD evaluation — MFA **Unbound exhibition** tour (corrected)
 
-**Tour under review:** `~/audioura-worktrees/LOCAL-413/tours/local413_live_run.txt`
-**Generated:** 2026-08-11 11:47, live search (16 queries, 102 results), N=4
-**Evaluator:** Storied_Tours (LEAD) · written 2026-08-11 14:47
-**Purpose:** so Michael and LEAD can compare verdicts stop by stop and find out
-where we disagree.
-
----
-
-## Headline
-
-**The retrieval works. The writing does not.**
-
-Two facts in this tour provably came from the web and survived into the prose —
-`Cyrus Edwin Dallin` and `Rembrandt in 1629`. That had failed sixteen rounds
-running, and it is the one thing worth celebrating here.
-
-Everything else is weaker than it looks on first read. **Two of four stops carry
-real information. One is written from the wrong sources entirely. One is padding
-around a single fact.** And there are at least two outright fabrications that no
-gate caught.
-
-My overall verdict: **not shippable, and not close.** If I scored it against the
-gate honestly I would put it well under 75.
+**Requested string:** `Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA`
+**Stops requested:** 3
+**Generated:** 2026-08-11 15:10, current merged `storied`, live search
+**Tour file:** `~/Audioura/TOUR_MFA_UNBOUND_EVAL.txt`
+**Runner (pins the case so it cannot drift again):** `run_mfa_unbound_eval.py`
 
 ---
 
-## Stop 1 — Appeal to the Great Spirit · **the best stop**
+## First: this document previously evaluated the wrong tour
 
-**Right:** Names Cyrus Edwin Dallin in full. Bronze, monumental, in front of the
-museum — all correct and all checkable. The full middle name came from search, not
-from the model's memory; that is the retrieval chain working end to end.
+The earlier version of this file graded
+`Museum of Fine Arts, Boston, Massachusetts` at 4 stops — a **generic
+whole-museum highlights tour**. That is not the evaluation case and never was.
 
-**Wrong:**
+**Every live run from LOCAL-413 onward used the wrong subject.** 413's agent wrote
+its own runner with `gen_tour("Museum of Fine Arts, Boston, Massachusetts", …,
+total_stops=4)`. 414, 415 and 417 inherited it. LEAD reviewed all of them, wrote a
+detailed evaluation of one, and made merge and bounce decisions on all of them
+without noticing the subject had changed.
 
-- **Date conflict, unflagged.** The tour says "created … in 1909". The source
-  snippet says a *1908* equestrian statue, installed at the Huntington Avenue
-  entrance in *1912*. Three dates, and the tour asserts one without noting the
-  others.
-- **The orientation is not an orientation.** It is the entire tour introduction —
-  four stop names, the Bartlett thread, the Homeric epics — crammed in before the
-  listener has looked at anything. Standing in front of a bronze horse, they are
-  being read a table of contents.
-- **Circular sentence:** "symbolizing a spiritual connection to the Great Spirit."
-  That says the thing is named what it is named.
-- **`adds a timeless quality`** — your D324 complaint exactly. An adjective with no
-  earning clause.
-- **The interesting thing is missing.** The retrieved material mentions this
-  sculpture's place in monument controversies. That is a real story about a real
-  object in a real dispute — and the tour replaced it with "the period's
-  fascination with Native American spirituality," which is a generalisation about
-  an era, not a fact about this statue.
+That is the root of D355 and it is larger than D355 said: the agent did not only
+pick a stop count LEAD left unspecified, **it changed what the tour was about.**
 
 ---
 
-## Stop 2 — Ancient Nubia Now · **contains fabrications**
+## The finding that matters: the exhibition tour has regressed badly
 
-**Right:** The collection detail is genuine and specific — Kerma pottery, royal
-statues of Napatan kings, imports from Greece and Rome, one of the largest such
-collections outside Africa. This is the most *informative* paragraph in the tour.
+| | **10:15 today** (`TOUR_MFA_STORIED_CURRENT.txt`, pre-LOCAL-411) | **15:10 now** (current merged `storied`) |
+|---|---|---|
+| Stops delivered | **3** | **1** |
+| Stop 1 | Le Lézard aux plumes d'or (The Lizard with Golden Feathers) | **"Wednesday, September 16–Wednesday"** |
+| Stop 2 | Moses and Monotheism | — |
+| Stop 3 | Au Soleil du Plafond | — |
+| Words | ~950 | 341 |
 
-**Wrong, and seriously:**
+**Three real works became one date range.** LOCAL-411 merged at 11:02; the good
+version predates it by 47 minutes.
 
-- **"Ruth's bequest and Rajput's collection"** — I can find no basis for either.
-  "Rajput" is a North Indian community, not a donor to the MFA's Nubian holdings.
-  This reads as garbled entity extraction presented as fact.
-- **"The gallery … is named after the Guided Tour Asiatic"** — this is not a
-  person. A pipeline label has been parsed as a human being and given a gallery.
-  **This is the clearest fabrication in the tour and nothing flagged it.**
-- **Broken grammar:** "the Museum of Fine Arts, one of the largest art museums in
-  the U.S, Boston".
-- **`intricate details`** — again, unexplained. Your exact objection.
+### The two defects, precisely
 
----
+**1. The exhibition's date range is being used as an artwork title.**
 
-## Stop 3 — Adam and Eve · **the worst stop, and the reason 414/415/417 exist**
+> `Stop 1: Wednesday, September 16–Wednesday`
 
-**Wrong throughout:**
+That is the show's running-dates string ("Wednesday, September 16 – Wednesday,
+October 7") scraped from the exhibition page and promoted to a work.
 
-- **Written from creationist apologetics.** The sources ranked into this stop were
-  `answersingenesis.org` and `biblicalarchaeology.org`. The output shows it: "the
-  perfect beginning of humanity and the subsequent fall into sin", "the
-  consequences of disobedience", "innocence and temptation".
-- **It never names the artwork's artist.** A museum stop about a specific object,
-  and we do not say who made it.
-- **It name-drops the wrong artist instead** — Dürer's 1504 engraving is a
-  *different work by a different artist*, offered as if it were context.
-- **"Created in 1515" and "Pope Leo X's entrance into Florence in 1515"** are
-  asserted flatly with no traceable source.
-- **`inviting contemplation on human nature, morality, creation, and redemption`** —
-  the banned phrase, in a prompt that explicitly bans it.
+**2. The other half of that date range became the artist.**
 
-This stop is not a weak description of the object. **It is a short essay about the
-Book of Genesis that happens to mention a museum.**
+> `"Wednesday, September 16–Wednesday" **by October 7**, featured in the 2026
+> exhibition…`
+
+The pipeline is telling the listener a date made the artwork.
+
+**3. Two of three stops are simply missing.** The tour asked for 3 and delivered 1.
 
 ---
 
-## Stop 4 — Artist in his Studio · **one fact, then filler**
+## What still works
 
-**Right:** "by Rembrandt in 1629" — traceable to its snippet. Correct.
+Worth stating, because it is the thread to pull:
 
-**Wrong:** After that single fact the stop has nothing and keeps talking. "prompting
-viewers to consider the creative process", "a sacred space for artistic
-expression", "sanctuaries where they could channel their creativity", "gain a deeper
-appreciation for the artistry and craftsmanship". This is the longest stop in the
-tour and the least informative — it is atmosphere generated to reach a word count.
+- **The exhibition framing is correct and well-written.** "works by Spanish artists
+  within the livre d'artiste (artist's book) genre", "the Lois B. and Michael K.
+  Torf Gallery (Gallery 184)", "how images, words, and typography intersect" —
+  that is the real show, described accurately.
+- **Real collaborators survive:** "Juan Gris and Pierre Reverdy, a french poet
+  associated with surrealism". Grounded, exhibition-specific, correct.
 
-Also: **"the Museum Boston"** — the venue's name is broken.
-
-What is missing is what makes the painting worth standing in front of: it is a tiny
-panel, the artist is dwarfed by his own easel, and he is looking at the back of a
-canvas we cannot see. None of that is here.
+So retrieval and framing are working. **Stop *selection* is what broke.**
 
 ---
 
-## The closing
+## Prose defects (your D324 rule), on 341 words
 
-> "That's 4 stops — Adam and Eve, depicted in the Garden of Eden with symbolic
-> animals and an artist's studio, considered a sanctuary for creativity during the
-> 17th century."
+*extraordinary, captivating (×2), intricate, unique, seamless, immersive,
+unexpected*.
 
-Ungrammatical, and it summarises two stops while claiming to summarise four.
+Seven unearned evaluative adjectives in 341 words — **one every 49 words**, worse
+than the 10:15 version. "the intricate details and unique perspectives of the
+exhibit come to life" is your exact complaint: two claims, no evidence for either.
 
-**The Bartlett thread is not real.** "The Influence of Francis Bartlett's Donations"
-is announced in the introduction and stated again in the closing, and **Bartlett is
-never mentioned in any of the four stops.** A thread that appears only in the
-wrapper is a label, not a story. The Homeric epics line has the same problem — it
-comes from an unrelated retrieved page and connects to nothing.
+Also: `a french poet` (lowercase), and `beats_in_delivered_text=0` — the story
+beats the pipeline extracted reached none of the delivered text.
 
 ---
 
-## Empty-adjective count (your D324 rule)
+## My verdict
 
-Across ~1,115 words: *captivating, renowned (×2), monumental, timeless, remarkable,
-exquisite, magnificent, brilliant, poignant, beautifully, intricate (×2), grandeur,
-vividly, comprehensive, enduring*.
+**Worse than this morning, and not shippable.** The 10:15 version was a tour with
+three real works and thin prose. This is one fake work, a date credited as its
+maker, and two missing stops.
 
-**Roughly one unearned evaluative adjective every 60 words**, and almost none of
-them are followed by what earns them. This is the same signature as D324's
-measurement, not better.
-
----
-
-## Where I expect we may disagree
-
-I have graded this harshly. Two arguments against my own verdict, stated fairly:
-
-1. **Stop 2 is genuinely informative** despite its fabrications. If the two invented
-   donors were removed, it would be a decent stop. You may weigh the real content
-   more heavily than I have.
-2. **The retrieval milestone is real** and I may be underweighting it because the
-   prose is disappointing. The machinery that gets a verified fact from the open web
-   into the delivered text is now working, and that was the hard part.
-
-**Where I would not move:** the "Guided Tour Asiatic" gallery and the Genesis essay
-are not stylistic problems. They are the system stating false things confidently,
-and no amount of prose polish addresses them.
+The chain merged today (410 → 413) was validated against a generic museum tour the
+whole time. **Whatever it improved, it also broke stop selection on the real
+case, and the wrong test subject is why nobody saw it.**
 
 ---
 
-## What is already dispatched against these findings
+## What happens next
 
-| Finding | Status |
+| Action | Status |
 |---|---|
-| Stop 3 sourced from apologetics | tier gate — 414 (bounced), 415 (bounced), **417 in flight** |
-| Model meta-text shipped as content | positive-assertion gate — **417 in flight** |
-| Unearned adjectives | `PARKED_kiro_task_LOCAL-416` — re-read under your D324 rule |
-| Fabricated donors / "Guided Tour Asiatic" | **not yet dispatched — new from this evaluation** |
-| Fake narrative thread (Bartlett) | **not yet dispatched — new from this evaluation** |
-| Orientation carrying the tour intro | **not yet dispatched — new from this evaluation** |
+| Fix date-range-as-title and date-as-artist | **dispatching now — highest priority** |
+| Restore 3-stop selection on the exhibition | same task |
+| Pin the evaluation case in a committed runner | **done** — `run_mfa_unbound_eval.py` |
+| 417 (in flight) — its acceptance is on the wrong tour | let it finish; re-validate against the correct case before any merge |
+| Consider reverting 411–413 if the fix is not quick | open — the 10:15 behaviour is the better baseline |
 
-The bottom three are findings this evaluation produced that no task currently
-covers. I will write them up once 417 lands, rather than dispatch concurrently into
-the same file.
+**On the earlier findings in this file** (fabricated donors, "Guided Tour Asiatic",
+the fake Bartlett thread): those were defects of the *generic museum tour*. They
+may still be real bugs, but they are not evidence about the exhibition tour and I
+am no longer counting them against it.
