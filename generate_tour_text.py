@@ -4203,6 +4203,59 @@ def _build_material_fallback(poi_name, artist, matched_work, credit_line, candid
     return result
 
 
+def resolve_final_description(attempts, material_context):
+    """[LOCAL-422] Resolve the final description from attempt history.
+
+    This is the decision that the per-stop generation loop makes when all
+    retries are exhausted (gate failure, refusal persists, etc.):
+      1. Track the best valid description across attempts — stubs are excluded.
+      2. If a valid best exists, return it. Otherwise build a material fallback.
+
+    Args:
+        attempts: list of dicts, each with keys:
+            'description' (str): the generated text for this attempt
+            'orientation' (str): orientation text
+            'word_count' (int): word count
+            'tokens_used' (int): tokens consumed
+            'call_cost' (float): cost of the call
+        material_context: dict with keys:
+            'poi_name' (str): name of the point of interest
+            'artist' (str): artist name
+            'matched_work' (dict or None): matched work metadata
+            'credit_line' (str): credit line text
+            'candidate_specifics' (list): extracted specifics from snippets
+
+    Returns:
+        str: the final description that ships to the listener
+    """
+    # Track the best valid description — stubs excluded via _is_stub_text.
+    _best = None  # (orientation, description, word_count, tokens_used, call_cost)
+    for attempt in attempts:
+        desc = attempt.get('description', '')
+        if desc and not _is_stub_text(desc):
+            wc = len(desc.split())
+            best_wc = _best[2] if _best else 0
+            if wc > best_wc:
+                _best = (
+                    attempt.get('orientation', ''),
+                    desc,
+                    wc,
+                    attempt.get('tokens_used', 0),
+                    attempt.get('call_cost', 0.0),
+                )
+
+    # Resolution: prefer best valid attempt; else build from material.
+    if _best:
+        return _best[1]
+    return _build_material_fallback(
+        material_context['poi_name'],
+        material_context['artist'],
+        material_context.get('matched_work'),
+        material_context.get('credit_line', ''),
+        material_context.get('candidate_specifics', []),
+    )
+
+
 def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None):
     """
     Generate audio tour text using OpenAI API with geo coordinates.
@@ -9991,6 +10044,7 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
         # the best description produced rather than GENERATION_FAILED.
         _max_retries = 2
         _best_description = None  # (orientation, description, word_count, tokens_used, call_cost)
+        _attempts_for_resolution = []  # [LOCAL-422] Accumulated for resolve_final_description
         for _attempt in range(_max_retries + 1):
             try:
                 description_response = requests.post(
@@ -10078,18 +10132,18 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                             # All retries exhausted — fail loudly with diagnostic, never ship refusal
                             print(f"  [LOCAL-415] Stop {stop_num}: REFUSAL PERSISTS after {_max_retries+1} attempts — "
                                   f"using fallback (NEVER shipping model apology as tour text)")
-                            # [LOCAL-420] Never ship the stub — use best earlier attempt if one exists
-                            if _best_description:
-                                description = _best_description[1]
-                                print(f"  [LOCAL-420] Stop {stop_num}: falling back to best prior attempt "
-                                      f"({_best_description[2]} words) instead of stub")
-                            else:
-                                # [LOCAL-420] No prior attempt available — build from material on hand
-                                description = _build_material_fallback(
-                                    poi_name, artist, _matched_work,
-                                    _credit_line_for_stop, _candidate_specifics)
-                                print(f"  [LOCAL-420] Stop {stop_num}: no prior attempt — built material fallback "
-                                      f"({len(description.split())} words)")
+                            # [LOCAL-422] Use resolve_final_description — the single call site
+                            # for stub-exclusion + material-fallback decision.
+                            _material_ctx = {
+                                'poi_name': poi_name, 'artist': artist,
+                                'matched_work': _matched_work,
+                                'credit_line': _credit_line_for_stop,
+                                'candidate_specifics': _candidate_specifics,
+                            }
+                            description = resolve_final_description(
+                                _attempts_for_resolution, _material_ctx)
+                            print(f"  [LOCAL-422] Stop {stop_num}: resolved final description "
+                                  f"({len(description.split())} words)")
                             # Mark as non-refusal for downstream (it's now our honest fallback)
                             _is_refusal = False
 
@@ -10174,6 +10228,12 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                                 _best_wc = _best_description[2] if _best_description else 0
                                 if _cur_wc > _best_wc:
                                     _best_description = (orientation, description, _cur_wc, tokens_used, call_cost)
+                            # [LOCAL-422] Accumulate for resolve_final_description
+                            _attempts_for_resolution.append({
+                                'description': description, 'orientation': orientation,
+                                'word_count': len(description.split()) if description else 0,
+                                'tokens_used': tokens_used, 'call_cost': call_cost,
+                            })
                             if _attempt < _max_retries:
                                 description_data["temperature"] = min(0.7 + 0.2 * (_attempt + 1), 1.0)
                                 print(f"  [LOCAL-417] Stop {stop_num}: retrying (attempt {_attempt+1}, "
@@ -10182,18 +10242,18 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                             else:
                                 print(f"  [LOCAL-417] Stop {stop_num}: GATE FAILED after {_max_retries+1} attempts — "
                                       f"using fallback (never shipping operator-directed text)")
-                                # [LOCAL-420] Never ship the stub — use best earlier attempt if one exists
-                                if _best_description:
-                                    description = _best_description[1]
-                                    print(f"  [LOCAL-420] Stop {stop_num}: falling back to best prior attempt "
-                                          f"({_best_description[2]} words) instead of stub")
-                                else:
-                                    # [LOCAL-420] No prior attempt available — build from material on hand
-                                    description = _build_material_fallback(
-                                        poi_name, artist, _matched_work,
-                                        _credit_line_for_stop, _candidate_specifics)
-                                    print(f"  [LOCAL-420] Stop {stop_num}: no prior attempt — built material fallback "
-                                          f"({len(description.split())} words)")
+                                # [LOCAL-422] Use resolve_final_description — the single call site
+                                # for stub-exclusion + material-fallback decision.
+                                _material_ctx = {
+                                    'poi_name': poi_name, 'artist': artist,
+                                    'matched_work': _matched_work,
+                                    'credit_line': _credit_line_for_stop,
+                                    'candidate_specifics': _candidate_specifics,
+                                }
+                                description = resolve_final_description(
+                                    _attempts_for_resolution, _material_ctx)
+                                print(f"  [LOCAL-422] Stop {stop_num}: resolved final description "
+                                      f"({len(description.split())} words)")
 
                     # [LOCAL-394] Track best valid description — a stop is NEVER dropped.
                     # Save every non-placeholder description; keep the longest one.
@@ -10203,6 +10263,14 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                         _best_wc = _best_description[2] if _best_description else 0
                         if _cur_wc > _best_wc:
                             _best_description = (orientation, description, _cur_wc, tokens_used, call_cost)
+
+                    # [LOCAL-422] Accumulate for resolve_final_description
+                    if description and _leak_class != "placeholder":
+                        _attempts_for_resolution.append({
+                            'description': description, 'orientation': orientation,
+                            'word_count': len(description.split()) if description else 0,
+                            'tokens_used': tokens_used, 'call_cost': call_cost,
+                        })
 
                     # [LOCAL-393] Word-count floor: if output is real prose but below 120 words,
                     # retry ONCE asking for more detail. If still below after retry, keep it
