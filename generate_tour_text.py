@@ -1942,6 +1942,40 @@ Rules:
     identity form. A story requires: who did what, with what material consequence.
   - NO HALLUCINATED SENSORY CLAIMS: never assert a sensation the listener cannot verify
     (smell, sound, temperature, texture) unless the material states it.
+
+STORY REQUIREMENT (LOCAL-421 — NON-NEGOTIABLE):
+Your description MUST contain at least ONE STORY of no fewer than THREE SENTENCES.
+A story = a claim about PEOPLE AND CONSEQUENCES: a relationship, a decision, a dispute,
+a gift, a reason something was made the way it was.
+
+WHAT COUNTS AS A STORY:
+  - "Boris Fridman donated this work to the MFA in 2003. Fridman, a Boston-based collector
+    who specialized in livres d'artiste, assembled one of the largest private collections
+    of artist's books in New England. His gift brought the museum's holdings of
+    Surrealist-era printed works to a critical mass."
+  - "Dalí chose Freud's Moses and Monotheism because he considered Freud's work
+    foundational to Surrealism. Dalí had attempted to visit Freud in London in 1938
+    and sketched the dying psychoanalyst during that meeting."
+  - "Louis Broder commissioned this work from Miró as part of a deliberate campaign to
+    revive the livre d'artiste tradition after the war. Broder's editions were tiny —
+    rarely more than 150 copies — and he insisted on direct collaboration between
+    artist, poet, and printer at the same workshop."
+
+WHAT DOES NOT COUNT:
+  - A list of facts with no narrative thread (just naming publisher + printer + date)
+  - "Invites you to ponder" / "transcends boundaries" / "a testament to" (evaluation)
+  - An interpretation the writer supplies without sourcing it to a person or event
+  - Describing the image/object itself (that is ekphrasis, not story)
+
+If the reference material supports NO story, you must still try to build one from the
+entities you do have (donor, publisher, printer) — state who they were and what their
+involvement meant. If truly nothing supports even that, write only what you can verify.
+
+ENTITY NAMING RULE (LOCAL-421 — NON-NEGOTIABLE):
+Every named person in the credit line (donor, publisher, printer, collaborator) MUST
+appear BY NAME in your text. Never write "the generous donation" when the data says
+"Gift of Boris Fridman". Never write "the publisher" when you know the name. The name
+IS the story's starting point.
 """
     # [LOCAL-407] Artist name is NON-NEGOTIABLE in the snippet block
     if _artist_surname:
@@ -10739,6 +10773,56 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                       f"beats_in_output={_vresult['beats_in_output']} dropped={_dropped_str}")
         except Exception as _v388_err:
             print(f"  [LOCAL-388] Beat verification error (non-fatal): {_v388_err}")
+
+    # [LOCAL-421] Story gate — verify each stop has ≥3 story sentences + named entities
+    if _storied_mode and tour_category == 'museum' and not _phase5_ceiling_breached:
+        try:
+            from story_gate import verify_stop_story, extract_story_sentences
+            print(f"\n  [LOCAL-421] STORY GATE: checking story requirement per stop...")
+            _l421_all_pass = True
+            for _sg_i, _sg_poi in enumerate(poi_list):
+                _sg_desc = _sg_poi.get('description', '')
+                _sg_name = _sg_poi.get('name', f'Stop {_sg_i+1}')
+                if not _sg_desc or _sg_desc.startswith('['):
+                    continue
+
+                # Get credit line for this stop
+                _sg_credit = _sg_poi.get('credit_line', '')
+                if not _sg_credit and _exhibition_checklist_result and hasattr(_exhibition_checklist_result, 'works'):
+                    _sg_matched = match_work_for_stop(_sg_name, _exhibition_checklist_result.works)
+                    if _sg_matched:
+                        _sg_credit = _sg_matched.get('credit_line', '')
+
+                _sg_result = verify_stop_story(
+                    description=_sg_desc,
+                    credit_line=_sg_credit,
+                    stop_name=_sg_name,
+                    framing_case=_framing_case,
+                    min_story_sentences=3,
+                )
+                _sg_status = "✓ PASS" if _sg_result['passed'] else "✗ FAIL"
+                print(f"    {_sg_status} stop='{_sg_name}': story_count={_sg_result['story_count']}, "
+                      f"entities_ok={_sg_result['entities_present']}, "
+                      f"thesis_ok={_sg_result['thesis_threaded']}")
+                if not _sg_result['passed']:
+                    _l421_all_pass = False
+                    for _sg_f in _sg_result['failures']:
+                        print(f"      → {_sg_f}")
+                    if _sg_result['story_sentences']:
+                        print(f"      story sentences found:")
+                        for _ss in _sg_result['story_sentences'][:3]:
+                            print(f"        \"{_ss[:100]}...\"")
+                if _sg_result['entities_missing']:
+                    print(f"      entities_missing: {_sg_result['entities_missing']}")
+
+            if _l421_all_pass:
+                print(f"  [LOCAL-421] STORY GATE: ALL STOPS PASSED")
+            else:
+                print(f"  [LOCAL-421] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)")
+        except ImportError as _sg_err:
+            print(f"  [LOCAL-421] Story gate import error (non-fatal): {_sg_err}")
+        except Exception as _sg_err:
+            print(f"  [LOCAL-421] Story gate error (non-fatal): {_sg_err}")
 
     # [LOCAL-394] 120-word floor enforcement — log stops under minimum but NEVER drop them.
     # The floor is a retry trigger inside _generate_description, not a post-generation filter.

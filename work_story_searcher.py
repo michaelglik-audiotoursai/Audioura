@@ -312,8 +312,26 @@ def synthesize_queries(stop: Dict, tour_type: str = 'contained') -> List[str]:
     if donor:
         # e.g. "Boris Fridman collection livres d'artiste"
         queries.append(f'{donor} collection')
+        # [LOCAL-421] Story query: who is the donor, why did they give it
+        queries.append(f'{donor} "{title}" donation why')
     if collaborator and artist:
         queries.append(f'{collaborator} {artist}')
+        # [LOCAL-421] Story query: why this collaboration happened
+        queries.append(f'{collaborator} {artist} relationship why collaborated')
+
+    # ── [LOCAL-421] STORY-TYPED QUERIES: relationships and consequences ──
+    # These target the WHY and the CONSEQUENCE, not just the WHO and WHAT.
+    # A fact says "printed by Mourlot". A story says "Mourlot was the only
+    # printer in Paris who could handle chromolithography at this scale."
+    if artist and title:
+        # Why the artist chose this subject / collaborator
+        queries.append(f'{artist} "{title}" why created motivation')
+    if publisher and printer:
+        # Publisher–printer relationship (e.g. why Broder chose Mourlot)
+        queries.append(f'{publisher} {printer} collaboration')
+    if collaborator and not publisher:
+        # Writer–artist: why the writer's text was chosen
+        queries.append(f'"{title}" {collaborator} why chose subject')
 
     # ── FORM QUERY: livre d'artiste tied to artist ──
     # Only when medium/credit_line suggests this IS a livre d'artiste
