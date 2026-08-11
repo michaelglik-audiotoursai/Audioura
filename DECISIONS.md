@@ -13190,3 +13190,56 @@ decision with blast radius across every tour type, and Michael is awake — it i
 call, not a 08:00 LEAD decision. The evidence is recorded here and surfaced to him
 directly. If he wants it, `TOUR_LLM_MODEL` is a single environment variable and the
 20 call sites already read it.
+
+## D340 — We were injecting the cliché as a grounded fact, then blaming the model for using it
+**2026-08-11, 09:2x.** LOCAL-408 merged. Its prompt dump — the artifact three
+rounds of reasoning never looked at — found what no amount of downstream logic
+would have:
+
+**1. The prompt handed the model the slogan and labelled it evidence.**
+
+```
+GROUNDED CIRCUMSTANCES (from the exhibition page — weave in if natural):
+  • had no precedent and revolutionized the book as an art form
+```
+
+The model copied it verbatim, exactly as instructed. The PRIORITY RULE explaining
+that this is a slogan rather than a story sat **~200 lines later in the same
+prompt**. Rounds 404 and 407 built detectors to catch the model producing that
+phrase while the pipeline was feeding it in as a fact.
+
+**2. The required names were buried** at ~15,000 characters into a 21,390-character
+prompt, behind 60+ lines of style rules. Now a FACTS FIRST block at the top.
+
+**3. The specifics extractor missed `publisher's vellum`** because its regex used a
+straight apostrophe and the source text uses U+2019. A curly quote cost three
+rounds of "the prose won't use specifics".
+
+**Result — the best state recorded in the whole chain.** All eight names present
+and each on its own stop, including `Fridman` who had been absent for most of it;
+the injected slogan gone; concrete specifics (`vellum`, `40 color`) in the text;
+zero impossible relations; every stop above the 250-word floor. Control venue
+clean at 75.0.
+
+**The lesson, now three-for-three:** every multi-round dead end this week ended the
+moment someone printed the actual artifact — the delivered text (D312), the
+retrieved snippets (D335), the literal prompt (D339/D340). Reasoning about what the
+pipeline *should* contain produced eight rounds of wrong fixes. **Print the thing.**
+
+## D341 — SERP returns HTTP 400 inside generation and results from a direct probe
+**2026-08-11.** Recorded as an open contradiction rather than resolved, because
+both observations are LEAD's own and they disagree.
+
+408's submission: "SERP queries all fail (HTTP 400 on every query) — no external
+snippets arrive." LEAD's direct probe of `search_stories_for_stop` on the same
+branch returned four work-specific snippets including the strongest story candidate
+in the corpus — that Miró wrote the poem he then illustrated.
+
+**So the story material in the merged tour came from the credit line, not from
+search**, which explains why `poem` is still 0 in the delivered text despite being
+fetched successfully in isolation. Candidates: query strings carrying accents or
+U+2019 (which already broke the specifics regex), env not reaching the generation
+process, or budget exhaustion returning 400.
+
+Dispatched as LOCAL-409 with the same instruction that has worked three times now:
+**print the failing request and its response body before changing anything.**
