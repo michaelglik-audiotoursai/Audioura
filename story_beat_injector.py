@@ -12,9 +12,78 @@ Design principles:
   - People are extracted with their ROLE/ACTION from the page.
   - Beats are distributed across stops so each stop has at least one.
   - If the page genuinely supports nothing for a stop, say less (don't pad).
+
+[LOCAL-393] A beat's subject must be a PERSON — not a country, city, region,
+museum, or gallery. Places may appear inside a beat but never as the subject.
+Reuses _looks_like_person_name from prose_entity_grounding_gate (D304 lesson).
 """
 import re
 from typing import Dict, List, Optional, Tuple
+
+# [LOCAL-393] Import person-detection from the single source of truth (D304 lesson).
+from prose_entity_grounding_gate import _looks_like_person_name
+
+# [LOCAL-393] Known geographic place names — countries, cities, regions that regex
+# patterns may misidentify as person names (single-word or multi-word).
+# These must NEVER be beat subjects. Places may appear *inside* a beat's action
+# ("printed by Mourlot Frères in Paris") but never as the subject.
+_KNOWN_PLACE_NAMES = frozenset({
+    # Countries
+    'france', 'spain', 'italy', 'germany', 'england', 'portugal', 'netherlands',
+    'belgium', 'switzerland', 'austria', 'greece', 'russia', 'japan', 'china',
+    'brazil', 'mexico', 'canada', 'australia', 'india', 'turkey', 'egypt',
+    'morocco', 'algeria', 'tunisia', 'ireland', 'scotland', 'wales', 'poland',
+    'hungary', 'romania', 'sweden', 'norway', 'denmark', 'finland', 'iceland',
+    'croatia', 'serbia', 'cuba', 'argentina', 'chile', 'colombia', 'peru',
+    # Cities commonly found in art/museum contexts
+    'paris', 'nice', 'milan', 'rome', 'florence', 'venice', 'naples',
+    'london', 'berlin', 'vienna', 'madrid', 'barcelona', 'lisbon',
+    'amsterdam', 'brussels', 'geneva', 'zurich', 'munich', 'hamburg',
+    'nuremberg', 'almeria', 'seville', 'granada', 'toledo',
+    'new york', 'boston', 'chicago', 'los angeles', 'san francisco',
+    'philadelphia', 'washington', 'houston', 'dallas', 'miami',
+    'tokyo', 'beijing', 'shanghai', 'moscow', 'st petersburg',
+    'cairo', 'istanbul', 'athens', 'prague', 'budapest', 'warsaw',
+    'dublin', 'edinburgh', 'lyon', 'marseille', 'toulouse', 'bordeaux',
+    'strasbourg', 'montpellier', 'avignon', 'cannes', 'antibes',
+    # Regions
+    'provence', 'normandy', 'brittany', 'burgundy', 'tuscany', 'lombardy',
+    'catalonia', 'andalusia', 'bavaria', 'saxony', 'flanders', 'wallonia',
+    'riviera', 'côte d\'azur',
+    # Common institutional/geographic words that appear title-cased
+    'europe', 'america', 'africa', 'asia', 'oceania',
+})
+
+
+def _is_valid_beat_subject(candidate: str) -> bool:
+    """[LOCAL-393] Validate that a beat subject is a PERSON, not a place.
+
+    A beat's subject must be a person — not a country, city, region, museum,
+    or gallery. Uses _looks_like_person_name for multi-word candidates and
+    a place-name blocklist for single-word candidates.
+
+    Single-word candidates (surnames like 'Dalí', 'Freud') are valid UNLESS
+    they match a known place name. Multi-word candidates must pass the
+    existing person-name heuristic from prose_entity_grounding_gate.
+    """
+    if not candidate or not candidate.strip():
+        return False
+
+    clean = candidate.strip()
+    words = clean.split()
+
+    # Reject known places (case-insensitive)
+    if clean.lower() in _KNOWN_PLACE_NAMES:
+        return False
+
+    # Multi-word: delegate to the canonical person-name detector
+    if len(words) >= 2:
+        return _looks_like_person_name(clean)
+
+    # Single word: accept as surname if not a known place
+    # (already checked above)
+    return True
+
 
 # [LOCAL-391] Unfilled role pattern — 'with publisher', 'with printer', etc.
 # These must be caught and scrubbed post-generation if the person name is missing.
@@ -110,7 +179,7 @@ def extract_story_beats(page_text: str) -> List[Dict[str, str]]:
         for m in _PUBLISHED_PRINTED_BY.finditer(fragment):
             person = m.group(1).strip()
             verb = fragment[m.start():m.start()+20].split()[0].lower()
-            if person.lower() not in seen_people and len(person) > 3:
+            if person.lower() not in seen_people and _is_valid_beat_subject(person):
                 role = 'printer' if 'print' in verb else 'publisher'
                 beats.append({
                     'person': person,
@@ -124,7 +193,7 @@ def extract_story_beats(page_text: str) -> List[Dict[str, str]]:
         for m in _GIFT_OF.finditer(fragment):
             person = m.group(1).strip()
             gift_type = fragment[m.start():m.start()+10].split()[0].lower()
-            if person.lower() not in seen_people and len(person) > 3:
+            if person.lower() not in seen_people and _is_valid_beat_subject(person):
                 beats.append({
                     'person': person,
                     'action': f"gave this work as a {gift_type} to the museum",
@@ -140,7 +209,7 @@ def extract_story_beats(page_text: str) -> List[Dict[str, str]]:
             if person.lower() in ('the', 'a', 'this', 'new', 'main', 'upper', 'lower'):
                 continue
             space_type = fragment[m.end()-10:m.end()+10]
-            if person.lower() not in seen_people and len(person) > 3:
+            if person.lower() not in seen_people and _is_valid_beat_subject(person):
                 beats.append({
                     'person': person,
                     'action': "the gallery where these works are displayed is named for this patron",
@@ -154,7 +223,7 @@ def extract_story_beats(page_text: str) -> List[Dict[str, str]]:
             person1 = m.group(1).strip()
             person2 = m.group(2).strip()
             for p in (person1, person2):
-                if p.lower() not in seen_people and len(p) > 3:
+                if p.lower() not in seen_people and _is_valid_beat_subject(p):
                     other = person2 if p == person1 else person1
                     beats.append({
                         'person': p,
@@ -167,7 +236,7 @@ def extract_story_beats(page_text: str) -> List[Dict[str, str]]:
         # --- Person + action verb ---
         for m in _PERSON_ACTION.finditer(fragment):
             person = m.group(1).strip()
-            if person.lower() not in seen_people and len(person) > 3:
+            if person.lower() not in seen_people and _is_valid_beat_subject(person):
                 # Extract the action from context
                 action_start = m.start()
                 action_text = fragment[action_start:min(action_start + 120, len(fragment))]
@@ -186,7 +255,7 @@ def extract_story_beats(page_text: str) -> List[Dict[str, str]]:
             raw_person = m.group(1)  # includes the 's
             # Strip possessive suffix
             person = re.sub(r"(?:'s|\u2019s)$", '', raw_person).strip()
-            if person.lower() not in seen_people and len(person) > 3:
+            if person.lower() not in seen_people and _is_valid_beat_subject(person):
                 # Avoid common non-person possessives
                 if person.lower() in ('today', 'museum', 'gallery', 'exhibition',
                                        'artist', 'visitor', 'world', 'century',
@@ -240,6 +309,12 @@ def attribute_beats_to_works(
     This ensures beats are assigned ONLY to the stop whose work they come from.
     A beat that cannot be attributed to any single work is marked as
     exhibition_wide=True and will not be demanded of any specific stop.
+
+    [LOCAL-393] Weak title matching now uses proximity: when the source sentence
+    contains multiple work titles, only the title nearest the person name counts.
+    This prevents "Pierre Reverdy" from being attributed to "Moses and Monotheism"
+    when both titles appear in the same sentence but Reverdy is next to
+    "Au Soleil du Plafond".
     """
     if not beats or not works:
         return beats
@@ -277,9 +352,30 @@ def attribute_beats_to_works(
             if work_artist and (person_lower in work_artist or surname_lower in work_artist):
                 strength = max(strength, 2)
 
-            # Weak match: work title appears in the source sentence
+            # [LOCAL-393] Weak match: work title in source sentence, BUT only if
+            # the title is proximate to the person name. When multiple titles appear
+            # in the same sentence, we track distance so the closest title wins.
+            # This prevents cross-attribution when a sentence mentions multiple
+            # artist-work pairs (e.g., "Dalí...Moses and Monotheism; ...Reverdy...
+            # Au Soleil du Plafond").
             if work_title and len(work_title) > 5 and work_title in source_sentence_lower:
-                strength = max(strength, 1)
+                person_pos = source_sentence_lower.find(person_lower)
+                if person_pos < 0:
+                    person_pos = source_sentence_lower.find(surname_lower)
+                title_pos = source_sentence_lower.find(work_title)
+                if person_pos >= 0 and title_pos >= 0:
+                    distance = abs(person_pos - title_pos)
+                    # Use proximity-weighted weak match: closer = stronger signal.
+                    # Only count as weak match if within 150 chars, and prefer
+                    # closer matches by encoding distance in a fractional strength.
+                    if distance <= 150:
+                        # Strength 1.x where x encodes closeness (closer = higher)
+                        proximity_strength = 1.0 + (150 - distance) / 150.0  # range [1.0, 2.0)
+                        if proximity_strength > strength:
+                            strength = proximity_strength
+                else:
+                    # Can't determine proximity — still allow weak match as fallback
+                    strength = max(strength, 1)
 
             if strength > best_match_strength:
                 best_match_strength = strength

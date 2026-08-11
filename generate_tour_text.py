@@ -9337,7 +9337,11 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
         }
 
         # [LOCAL-26] Retry loop with placeholder-leak validation
+        # [LOCAL-394] Track best valid description across retries. A stop is NEVER
+        # dropped to satisfy a length or beat rule — if all retries fail, we return
+        # the best description produced rather than GENERATION_FAILED.
         _max_retries = 2
+        _best_description = None  # (orientation, description, word_count, tokens_used, call_cost)
         for _attempt in range(_max_retries + 1):
             try:
                 description_response = requests.post(
@@ -9402,6 +9406,38 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                         print(f"  [LOCAL-295]   verbatim: {repr(description[:300])}")
                         # Reset temperature in case it was bumped by a prior retry
                         description_data["temperature"] = 0.7
+
+                    # [LOCAL-394] Track best valid description — a stop is NEVER dropped.
+                    # Save every non-placeholder description; keep the longest one.
+                    if description and _leak_class != "placeholder":
+                        _cur_wc = len(description.split())
+                        _best_wc = _best_description[2] if _best_description else 0
+                        if _cur_wc > _best_wc:
+                            _best_description = (orientation, description, _cur_wc, tokens_used, call_cost)
+
+                    # [LOCAL-393] Word-count floor: if output is real prose but below 120 words,
+                    # retry ONCE asking for more detail. If still below after retry, keep it
+                    # and log — thin grounded material is an honest outcome.
+                    if description and _leak_class != "placeholder":
+                        _wc_floor_count = len(description.split())
+                        if _wc_floor_count < 120 and _attempt < _max_retries:
+                            print(f"  [LOCAL-393] Stop {stop_num}: WORD FLOOR — {_wc_floor_count} words < 120, "
+                                  f"retrying (attempt {_attempt+2}/{_max_retries+1})")
+                            # Append a reinforcement message asking to expand
+                            description_data["messages"].append({
+                                "role": "user",
+                                "content": (
+                                    f"Your response was only {_wc_floor_count} words. The MINIMUM is 120 words. "
+                                    "Expand by discussing the artistic form, historical context, or collaboration "
+                                    "details you can verify from the fact sheet. Do NOT invent details — use what "
+                                    "you know and acknowledge gaps honestly. Rewrite the full description."
+                                ),
+                            })
+                            description_data["temperature"] = min(0.7 + 0.1 * (_attempt + 1), 0.95)
+                            continue  # retry
+                        elif _wc_floor_count < 120:
+                            print(f"  [LOCAL-394] stop='{poi_name}' below_floor words={_wc_floor_count} "
+                                  f"— kept (never dropped)")
 
                     # [LOCAL-391] Required beat retry: if assigned beats are missing
                     # from the output, retry ONCE with the missing names explicitly
@@ -9673,6 +9709,12 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                         print(f"  [LOCAL-292] Stop {stop_num}: non-transient failure (HTTP {description_response.status_code}), "
                               f"retrying (attempt {_attempt + 2}/{_max_retries + 1})")
                         continue  # retry once even for non-transient (covers flaky 4xx)
+                    # [LOCAL-394] Never drop a stop — use best description if we have one
+                    if _best_description:
+                        _bo, _bd, _bwc, _bt, _bc = _best_description
+                        print(f"  [LOCAL-394] Stop {stop_num}: API failed but prior valid description exists "
+                              f"({_bwc} words) — kept (never dropped)")
+                        return idx, _bo, _bd, _bwc, _bt, _bc
                     # [LOCAL-251] Tour-type-appropriate fallback; mark as generation failure
                     _fallback_orient = "Position yourself to best view this location." if tour_category != 'museum' else "Look for this work in the galleries."
                     return idx, _fallback_orient, f"[GENERATION_FAILED:{poi_name}]", 0, 0, 0.0
@@ -9686,6 +9728,12 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                     time.sleep(_backoff)
                     continue  # retry
                 print(f"Stop {stop_num} error: {str(_net_err)}")
+                # [LOCAL-394] Never drop a stop — use best description if we have one
+                if _best_description:
+                    _bo, _bd, _bwc, _bt, _bc = _best_description
+                    print(f"  [LOCAL-394] Stop {stop_num}: network error but prior valid description exists "
+                          f"({_bwc} words) — kept (never dropped)")
+                    return idx, _bo, _bd, _bwc, _bt, _bc
                 # [LOCAL-251] Tour-type-appropriate fallback; mark as generation failure
                 _fallback_orient = "Position yourself to best view this location." if tour_category != 'museum' else "Look for this work in the galleries."
                 return idx, _fallback_orient, f"[GENERATION_FAILED:{poi_name}]", 0, 0, 0.0
@@ -9697,11 +9745,23 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                           f"retrying (attempt {_attempt + 2}/{_max_retries + 1})")
                     continue  # retry
                 print(f"Stop {stop_num} error: {str(e)}")
+                # [LOCAL-394] Never drop a stop — use best description if we have one
+                if _best_description:
+                    _bo, _bd, _bwc, _bt, _bc = _best_description
+                    print(f"  [LOCAL-394] Stop {stop_num}: error but prior valid description exists "
+                          f"({_bwc} words) — kept (never dropped)")
+                    return idx, _bo, _bd, _bwc, _bt, _bc
                 # [LOCAL-251] Tour-type-appropriate fallback; mark as generation failure
                 _fallback_orient = "Position yourself to best view this location." if tour_category != 'museum' else "Look for this work in the galleries."
                 return idx, _fallback_orient, f"[GENERATION_FAILED:{poi_name}]", 0, 0, 0.0
 
-        # Should not reach here, but safety fallback
+        # [LOCAL-394] Safety fallback — use best description if we have one (never drop a stop)
+        if _best_description:
+            _bo, _bd, _bwc, _bt, _bc = _best_description
+            print(f"  [LOCAL-394] Stop {stop_num}: loop exhausted but prior valid description exists "
+                  f"({_bwc} words) — kept (never dropped)")
+            return idx, _bo, _bd, _bwc, _bt, _bc
+        # Only reach here if no valid description was ever produced
         _fallback_orient = "Position yourself to best view this location." if tour_category != 'museum' else "Look for this work in the galleries."
         return idx, _fallback_orient, f"[GENERATION_FAILED:{poi_name}]", 0, 0, 0.0
 
@@ -9767,15 +9827,16 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
         except Exception as _v388_err:
             print(f"  [LOCAL-388] Beat verification error (non-fatal): {_v388_err}")
 
-    # [LOCAL-388] 120-word floor enforcement — retry stops that are under minimum
+    # [LOCAL-394] 120-word floor enforcement — log stops under minimum but NEVER drop them.
+    # The floor is a retry trigger inside _generate_description, not a post-generation filter.
     if _storied_mode and not _phase5_ceiling_breached:
         _WORD_FLOOR = 120
         for _fi, _fpoi in enumerate(poi_list):
             _fdesc = _fpoi.get('description', '')
             _fwc = len(_fdesc.split()) if _fdesc else 0
             if _fwc < _WORD_FLOOR and _fdesc and not _fdesc.startswith('['):
-                print(f"  [LOCAL-388] Stop {_fi+1} under floor: {_fwc} words < {_WORD_FLOOR} — "
-                      f"will accept (prompt already targets ≥120; floor is logged not gated)")
+                print(f"  [LOCAL-394] stop='{_fpoi.get('name', f'Stop {_fi+1}')}' below_floor "
+                      f"words={_fwc} — kept (never dropped)")
 
     # [LOCAL-326] If cost ceiling was breached during Phase 5, skip all post-processing
     # (Phase 5.1, 5.5, 5.6, 5.10 etc.) and assemble a partial tour immediately.
@@ -12123,6 +12184,19 @@ RULES:
     if len(poi_list) == 0:
         print(f"  [LOCAL-292] ✗ ALL stops failed generation — cannot deliver tour")
         return None, None, (None, None)
+
+    # [LOCAL-394] INVARIANT: delivered stop count must equal selected work count.
+    # A stop is never dropped to satisfy a length or beat rule. Any deviation is
+    # logged loudly. The only legitimate removal is GENERATION_FAILED (no valid
+    # description was EVER produced for that stop across all retries).
+    if len(poi_list) != _l292_requested_stops:
+        print(f"  [LOCAL-394] ⚠️  STOP COUNT INVARIANT VIOLATION: "
+              f"selected={_l292_requested_stops} delivered={len(poi_list)} "
+              f"— {_l292_requested_stops - len(poi_list)} stop(s) lost!")
+        for _l394_name in _l292_failed_stops:
+            print(f"    [LOCAL-394] LOST: '{_l394_name}'")
+    else:
+        print(f"  [LOCAL-394] Stop count invariant: OK ({len(poi_list)} selected == {len(poi_list)} delivered)")
 
     # [LOCAL-361] Track actually-rendered headers for D2 and heading-count invariant
     _rendered_headers = []
