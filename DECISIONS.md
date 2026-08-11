@@ -13280,3 +13280,31 @@ he then illustrated, the edition of 50, the Japan paper) cannot arrive.
 **Cost note for the decision:** the chain issued roughly 3–6 SERP queries per stop
 per generation, across ~15 live generations of 3–4 stops. Topping up is a business
 call with a knowable rate; the per-query cost observed earlier was ~$0.001.
+
+## D343 — Credits restored: necessary, not sufficient
+**2026-08-11, 10:0x.** Michael topped up Serper (50K credits). LEAD verified the
+API directly and the material is exactly what the chain was built for:
+
+> "**Picasso met Fernand Mourlot in October 1945** after much encouragement from
+> Georges Braque and Henri Matisse."
+
+A named person, a date, a circumstance, a consequence — invisible in the gallery.
+**And a fresh live generation contains none of it:** `1945` 0, `Fernand` 0,
+`Braque` 0, `poem` 0, `edition` 0, `Specific Examples` False on all three stops,
+and `Fridman` regressed from 1 to 0.
+
+**So D342 identified a real blocker that was not the only blocker.** Fixing it was
+right and did not deliver the feature. Worth stating plainly rather than letting
+the credit fix stand as the answer — the temptation after a satisfying root-cause
+find is to assume it was *the* cause.
+
+**One thing did work, twice, unprompted:** the temporal coherence gate caught the
+posthumous-Gris claim again in this run —
+`'Juan Gris' died in 1927, cannot have collaboration with in 1955`. That is the
+safety property Michael asked for (D327), firing on live output, in a phrasing the
+model reached for spontaneously.
+
+**Also noted:** the chain instrumentation (`serp_results / elements_extracted /
+beats_injected / beats_in_delivered_text`) did not print in this run. The
+instrument six rounds depend on is itself unreliable on this path, which is its own
+finding and is first in LOCAL-410's brief.
