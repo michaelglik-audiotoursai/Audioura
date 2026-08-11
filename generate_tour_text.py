@@ -1887,6 +1887,65 @@ _LAST_VERIFICATION_TIER = ""
 # Keys: total_cost, total_tokens, cache_hit, breakdown (dict with llm/tts/search)
 _LAST_GENERATION_COST = {"total_cost": 0.0, "total_tokens": 0, "cache_hit": False, "breakdown": {}}
 
+# ──────────────────────────────────────────────────────────────────────────────
+# [LOCAL-413] build_snippet_block — module-scope function for testability.
+# Previously this logic was inlined in the per-stop prompt assembly loop.
+# Lifted here so tests can assert on the returned string directly.
+# ──────────────────────────────────────────────────────────────────────────────
+
+def build_snippet_block(snippets, artist, specifics):
+    """Build the prompt snippet block from ranked snippets, artist, and specifics.
+
+    Parameters:
+      snippets: list of dicts with 'title', 'snippet', 'url' keys (already ranked/capped)
+      artist: full artist name (e.g. 'Joan Miró') — used for attribution rule
+      specifics: list of candidate specifics strings (e.g. ['edition/number: 24/50', ...])
+
+    Returns:
+      str: the snippet injection block ready to append to the description prompt
+    """
+    block = "\nREFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):\n"
+    for si, snip in enumerate(snippets, 1):
+        s_title = snip.get('title', '')[:100]
+        s_text = snip.get('snippet', '')[:250]
+        block += f"  [{si}] {s_title}\n      {s_text}\n"
+
+    if specifics:
+        block += "\n━━━ CANDIDATE SPECIFICS (extracted from the snippets above) ━━━\n"
+        for cs in specifics[:8]:
+            block += f"  • {cs}\n"
+        block += "━━━ END CANDIDATE SPECIFICS ━━━\n"
+
+    _artist_surname = artist.split()[-1] if artist else ''
+
+    block += """
+STORY INSTRUCTION (LOCAL-407/412):
+Use the reference material above. Include at least ONE concrete specific (number, material, literary form, verifiable fact) from snippets or CANDIDATE SPECIFICS.
+
+PRIORITY RULE: a concrete detail ALWAYS beats a general claim. "printed on Japan paper in edition of 50" beats "revolutionized the book as an art form."
+
+Rules:
+  - Name people explicitly (never "the publisher" — use their actual name)
+  - State specific actions (not "influenced" or "collaborated" — what did they DO?)
+  - Do NOT assert interactions unless the material confirms both people were alive and working together
+  - Dates must be accurate. If unsupported, omit rather than invent.
+  - "X and Y worked together" / "X's collaboration with Y" is NOT a story — it is the
+    identity form. A story requires: who did what, with what material consequence.
+  - NO HALLUCINATED SENSORY CLAIMS: never assert a sensation the listener cannot verify
+    (smell, sound, temperature, texture) unless the material states it.
+"""
+    # [LOCAL-407] Artist name is NON-NEGOTIABLE in the snippet block
+    if _artist_surname:
+        block += f"""
+ARTIST ATTRIBUTION (LOCAL-407 — NON-NEGOTIABLE):
+The artist for this work is {artist}. The surname "{_artist_surname}" MUST appear
+in your text. The people named in the snippets (publishers, printers, donors) are
+IN ADDITION TO the artist, never instead of. If you write about Broder or Mourlot
+without mentioning {_artist_surname}, your response will be REJECTED.
+"""
+    return block
+
+
 # [LOCAL-402] Direct snippet injection — bypasses the extract/score pipeline.
 # Populated by the runner BEFORE calling generate_tour_text().
 # Keys: stop_name (str) → list of {'title': str, 'snippet': str, 'url': str}
@@ -9051,13 +9110,6 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 # Replace unranked list with ranked+capped list for injection
                 _stop_snippets = _ranked_snippets
 
-                _snippet_block = "\nREFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):\n"
-                for _si, _snip in enumerate(_stop_snippets, 1):
-                    _s_title = _snip.get('title', '')[:100]
-                    _s_text = _snip.get('snippet', '')[:250]
-                    _s_url = _snip.get('url', '')
-                    _snippet_block += f"  [{_si}] {_s_title}\n      {_s_text}\n"
-
                 # [LOCAL-407] Extract candidate specifics from snippet text.
                 # These are concrete, checkable facts — numbers, named materials,
                 # named techniques, named literary forms — that the prose MUST prefer
@@ -9107,42 +9159,11 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 _candidate_specifics = list(dict.fromkeys(_candidate_specifics))
 
                 if _candidate_specifics:
-                    _snippet_block += "\n━━━ CANDIDATE SPECIFICS (extracted from the snippets above) ━━━\n"
-                    for _cs in _candidate_specifics[:8]:
-                        _snippet_block += f"  • {_cs}\n"
-                    _snippet_block += "━━━ END CANDIDATE SPECIFICS ━━━\n"
                     print(f"  [LOCAL-407] Stop {stop_num}: {len(_candidate_specifics)} candidate specifics extracted: "
                           f"{[cs[:40] for cs in _candidate_specifics[:4]]}")
 
-                # [LOCAL-407] Artist surname enforcement — the snippet block must
-                # not displace the artist. A stop about a Miró book MUST name Miró.
-                _artist_surname = artist.split()[-1] if artist else ''
-
-                _snippet_block += """
-STORY INSTRUCTION (LOCAL-407/412):
-Use the reference material above. Include at least ONE concrete specific (number, material, literary form, verifiable fact) from snippets or CANDIDATE SPECIFICS.
-
-PRIORITY RULE: a concrete detail ALWAYS beats a general claim. "printed on Japan paper in edition of 50" beats "revolutionized the book as an art form."
-
-Rules:
-  - Name people explicitly (never "the publisher" — use their actual name)
-  - State specific actions (not "influenced" or "collaborated" — what did they DO?)
-  - Do NOT assert interactions unless the material confirms both people were alive and working together
-  - Dates must be accurate. If unsupported, omit rather than invent.
-  - "X and Y worked together" / "X's collaboration with Y" is NOT a story — it is the
-    identity form. A story requires: who did what, with what material consequence.
-  - NO HALLUCINATED SENSORY CLAIMS: never assert a sensation the listener cannot verify
-    (smell, sound, temperature, texture) unless the material states it.
-"""
-                # [LOCAL-407] Artist name is NON-NEGOTIABLE in the snippet block
-                if _artist_surname:
-                    _snippet_block += f"""
-ARTIST ATTRIBUTION (LOCAL-407 — NON-NEGOTIABLE):
-The artist for this work is {artist}. The surname "{_artist_surname}" MUST appear
-in your text. The people named in the snippets (publishers, printers, donors) are
-IN ADDITION TO the artist, never instead of. If you write about Broder or Mourlot
-without mentioning {_artist_surname}, your response will be REJECTED.
-"""
+                # [LOCAL-413] Use module-scope build_snippet_block for testability
+                _snippet_block = build_snippet_block(_stop_snippets, artist, _candidate_specifics)
                 description_prompt += _snippet_block
                 _local402_snippets_injected = True
                 print(f"  [LOCAL-402] Stop {stop_num}: injected {len(_stop_snippets)} snippets as reference material")
