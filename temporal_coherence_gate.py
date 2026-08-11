@@ -32,22 +32,56 @@ from typing import Dict, List, Optional, Tuple
 # Configuration
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# [LOCAL-405] Interaction patterns — match the RELATION, not just the surface verb.
+#
+# D334: "collaboration with" sailed past the gate because we only matched
+# "collaborated with". The gate must catch verb, noun, and participle forms of
+# every interaction word. Coverage:
+#   collaborate → collaborated/collaborating/collaboration(s)
+#   partner    → partnered/partnering/partnership(s)
+#   meet       → met/meeting(s)/met with
+#   work with  → worked with/working with/worked alongside/working alongside
+#   correspond → corresponded/corresponding/correspondence
+#   dialogue   → in dialogue with/dialogue(s) with/dialogue(s) between
+#   join       → joined/joining/joint (project/work/effort/venture)
+#   alongside  → standalone adverb near two names
+#   together   → together with
+#   commission → commissioned/commissioning/commission(s) by/from
+#   co-author  → co-authored/co-authoring/co-author(s)
+#   co-create  → co-created/co-creating/co-creation(s)
+# ---------------------------------------------------------------------------
+
 # Verbs/phrases that assert MUTUAL INTERACTION (both parties alive at the time)
 _INTERACTION_PATTERNS = [
-    r'collaborated\s+with',
-    r'worked\s+with',
-    r'worked\s+alongside',
-    r'partnered\s+with',
-    r'together\s+with',
-    r'met\s+with',
-    r'\bmet\b',  # "Dalí met Freud" — simple past of meet
-    r'in\s+dialogue\s+with',
-    r'corresponded\s+with',
+    # collaborate / collaboration / collaborating
+    r'collaborat(?:ed|ing|ion|ions)\s+(?:with|between)',
+    r'collaborat(?:ed|ing|ion|ions)\s+(?:of\s+)?\w+\s+(?:with|and)',
+    # partner / partnership / partnering
+    r'partner(?:ed|ing|ship|ships)\s+(?:with|between)',
+    # meet / met / meeting(s) / met with
+    r'\bmet\s+with',
+    r'\bmet\b',
+    r'\bmeeting(?:s)?\s+(?:with|between)',
+    # work with / worked with / working with / worked alongside / working alongside
+    r'work(?:ed|ing)\s+(?:with|alongside)',
+    # correspond / correspondence / corresponding
+    r'correspond(?:ed|ing|ence|ences)\s+(?:with|between)',
+    # dialogue / in dialogue with
+    r'(?:in\s+)?dialogue(?:s)?\s+(?:with|between)',
+    # alongside (standalone — catches "X alongside Y")
     r'alongside\b',
-    r'joined\s+(with|forces)',
-    r'co-authored\s+with',
-    r'co-created\s+with',
-    r'commissioned\s+by',
+    # together with
+    r'together\s+with',
+    # join / joined / joining / joint (project/work/effort/venture)
+    r'join(?:ed|ing)\s+(?:with|forces)',
+    r'\bjoint\s+(?:project|work|effort|venture|exhibition|creation)',
+    # commission / commissioned / commissioning
+    r'commission(?:ed|ing|s)?\s+(?:by|from)',
+    # co-author / co-authored / co-authoring
+    r'co-?author(?:ed|ing|s)?\s+(?:with|by)',
+    # co-create / co-created / co-creating / co-creation
+    r'co-?creat(?:ed|ing|ion|ions)\s+(?:with|by)',
 ]
 
 _INTERACTION_RE = re.compile(
@@ -357,6 +391,14 @@ def apply_temporal_coherence_gate(
         poi_name = poi.get('name', '')
         stop_snippets = (snippets_per_stop or {}).get(poi_name, [])
 
+        # [LOCAL-405] Extract the work/stop year as contextual event_year.
+        # If the sentence doesn't carry an explicit date, the work's own date
+        # provides the temporal context (e.g. a 1974 livre d'artiste cannot
+        # describe a collaboration with someone who died in 1939).
+        _poi_year_str = poi.get('year', '') or ''
+        _poi_year_match = _YEAR_RE.search(str(_poi_year_str))
+        _poi_event_year: Optional[int] = int(_poi_year_match.group(1)) if _poi_year_match else None
+
         for field in _GATED_FIELDS:
             text = poi.get(field, '')
             if not text:
@@ -369,7 +411,10 @@ def apply_temporal_coherence_gate(
 
             for sentence in sentences:
                 stats['relations_checked'] += 1
-                rejection = check_temporal_coherence(sentence, snippets=stop_snippets)
+                rejection = check_temporal_coherence(
+                    sentence, snippets=stop_snippets,
+                    event_year=_poi_event_year,
+                )
 
                 if rejection:
                     stats['relations_rejected'] += 1
