@@ -12788,3 +12788,37 @@ timeouts. A failed tier check currently passes quietly; it must be cached and
 logged as "unknown tier" instead.
 
 Bounced as LOCAL-400, off 397's branch so the wiring survives.
+
+## D329 — The instrumentation earned its keep in one run: two hops, two different bugs
+**2026-08-11.** LOCAL-400 bounced on output and succeeded on diagnosis, which was
+its actual job. Its chain instrumentation, required by D328, produced this:
+
+```
+stop='Le Lézard aux plumes d'or'  serp_results=23  elements_extracted=0   beats_injected=0  beats_in_delivered_text=0
+stop='Moses and Monotheism'       serp_results=14  elements_extracted=12  beats_injected=0  beats_in_delivered_text=0
+stop='Au Soleil du Plafond'       serp_results=23  elements_extracted=0   beats_injected=0  beats_in_delivered_text=0
+⚠️  CHAIN FAILURE: search returned results but zero stories delivered
+```
+
+**Two distinct failures, on different hops, invisible until measured:**
+1. **Extraction yields nothing** on the two French-titled works (23 results → 0
+   elements) while working fine on the English-titled one (14 → 12). Accent and
+   apostrophe handling is the leading suspect — `Le Lézard aux plumes d'or`,
+   `Au Soleil du Plafond` — which is D243 recurring in a new component.
+2. **Injection yields nothing** on the stop where extraction succeeded (12 → 0).
+   A separate bug that would have been masked entirely by the first.
+
+Without the four-number line, both would have presented identically as "no
+stories" and cost a round each to separate. **This is the strongest case yet for
+the rule that has run through the whole week: instrument the transfer, not the
+endpoints.** D298, D304, D309, D312 and D328 were all the same lesson learned
+retrospectively; this is the first time the measurement was in place *before* the
+question was asked, and it paid immediately.
+
+**A third observation, and a trap avoided:** every stop hit the word floor and
+retried 3/3, still finishing short (217/179). That is correct under D317 — keep
+the stop, never drop it — but it also shows the model has nothing left to say once
+description runs out. The 250-word target is a *consequence* of stories arriving,
+not a lever to pull on its own. Padding to reach it is precisely what Michael
+called worthless, so LOCAL-401 is forbidden from doing so and told to re-measure
+after the real fixes.
