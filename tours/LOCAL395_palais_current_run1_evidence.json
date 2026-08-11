@@ -1,0 +1,58 @@
+{
+  "Harpe by Naderman (Paris, 1780)": {
+    "status": "VERIFIED",
+    "canonical_title": "Harpe by Naderman (Paris, 1780)",
+    "snippet": "umerous harps : the first prototypes built by Sébastien Érard, including his first single-action harp and his first double-action harp; and a harp by Naderman (Paris, 1780) which formerly belonged to the Viscountess of Beaumont;\na rare collection of clarinets;\nnumerous experimental string instruments;\nsever",
+    "method": "canonical_title_match",
+    "qid": ""
+  },
+  "Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)": {
+    "status": "VERIFIED",
+    "canonical_title": "Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)",
+    "snippet": "a, au conservatoire de Nice et aujourd'hui au palais Lascaris.\n\n\n=== Pièces importantes ===\n\nParmi les pièces les plus importantes se trouvent :\n\nune sacqueboute ténor d'Anton Schnitzer (Nuremberg, 1581)\ndes violes d'amour  de Joannes Florenus Guidanti (Bologne, 1717), de Gagliano (Naples, 1697), de Johann Sch",
+    "method": "canonical_title_match",
+    "qid": ""
+  },
+  "Basse de violon by Paolo Antonio Testore (Milan, 1696)": {
+    "status": "VERIFIED",
+    "canonical_title": "Basse de violon by Paolo Antonio Testore (Milan, 1696)",
+    "snippet": "chorn (Salzburg, 1699) and Johann Ott (Füssen, 1727);\nseveral violas da gamba including that by William Turner (London, 1652);\na bass violin by Paolo Antonio Testore (Milan, 1696);\nseveral extremely rare baroque guitars, including one by Giovanni Tesler (Ancona, 1618), one by René Voboam (Paris, c. 1650) a",
+    "method": "canonical_title_match",
+    "qid": ""
+  },
+  "Raquel": {
+    "status": "VERIFIED",
+    "canonical_title": "Raquel",
+    "snippet": "",
+    "method": "canonical_title_match",
+    "qid": "Q119617332"
+  },
+  "Guitar by Antonio de Torres (Almeria, 1884)": {
+    "status": "VERIFIED",
+    "canonical_title": "Guitar by Antonio de Torres (Almeria, 1884)",
+    "snippet": "chorn (Salzburg, 1699) and Johann Ott (Füssen, 1727);\nseveral violas da gamba including that by William Turner (London, 1652);\na bass violin by Paolo Antonio Testore (Milan, 1696);\nseveral extremely rare baroque guitars, including one by Giovanni Tesler (Ancona, 1618), one by René Voboam (Paris, c. 1650) a",
+    "method": "canonical_title_match",
+    "qid": ""
+  },
+  "Violes gambe by William Turner (Londres, 1652)": {
+    "status": "VERIFIED",
+    "canonical_title": "Violes gambe by William Turner (Londres, 1652)",
+    "snippet": "nti (Bologna, 1717), Gagliano (Naples, 1697), Johann Schorn (Salzburg, 1699) and Johann Ott (Füssen, 1727);\nseveral violas da gamba including that by William Turner (London, 1652);\na bass violin by Paolo Antonio Testore (Milan, 1696);\nseveral extremely rare baroque guitars, including one by Giovanni Tesler",
+    "method": "canonical_title_match",
+    "qid": ""
+  },
+  "Guitare baroque by Giovanni Tesler (Ancona, 1618)": {
+    "status": "VERIFIED",
+    "canonical_title": "Guitare baroque by Giovanni Tesler (Ancona, 1618)",
+    "snippet": "that by William Turner (London, 1652);\na bass violin by Paolo Antonio Testore (Milan, 1696);\nseveral extremely rare baroque guitars, including one by Giovanni Tesler (Ancona, 1618), one by René Voboam (Paris, c. 1650) and one by Jean Christophle (Avignon, 1645), which is one of the earliest surviving dated",
+    "method": "canonical_title_match",
+    "qid": ""
+  },
+  "Guitare baroque by René Voboam (Paris, 1650)": {
+    "status": "VERIFIED",
+    "canonical_title": "Guitare baroque by René Voboam (Paris, 1650)",
+    "snippet": "ons soigneusement reliées et alignées de toutes les revues musicales d'Europe voisinaient avec les éditions rares, les vitrines [exposant] les gongs, guitares hawaïennes, trompettes marines, archiluths, quintons, hautbois d'amour, œuvres de Maggini ou de Guarniéri, les quatre grands pupitres de chêne et le",
+    "method": "canonical_title_match",
+    "qid": ""
+  }
+}
