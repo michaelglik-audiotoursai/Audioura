@@ -1,0 +1,52 @@
+[
+  {
+    "type": "origin",
+    "text": "La basse de violon a été fabriquée par Paolo Antonio Testore à Milan en 1696.",
+    "source_sentence": "une basse de violon de Paolo Antonio Testore (Milan, 1696);",
+    "people": [
+      "Paolo Antonio Testore"
+    ],
+    "dates": [
+      "1696"
+    ],
+    "is_satire": false,
+    "source_url": "https://fr.wikipedia.org/wiki/Palais_Lascaris",
+    "source_domain": "fr.wikipedia.org",
+    "corroboration_status": "documented",
+    "independent_source_count": 2,
+    "syndication_log": {
+      "total_in_group": 2,
+      "independent_after_dedup": 2,
+      "sources": [
+        {
+          "domain": "fr.wikipedia.org",
+          "url": "https://fr.wikipedia.org/wiki/Palais_Lascaris"
+        },
+        {
+          "domain": "en.wikipedia.org",
+          "url": "https://en.wikipedia.org/wiki/Palais_Lascaris"
+        }
+      ],
+      "merged_from": [
+        1
+      ]
+    },
+    "_merge_log": [
+      {
+        "pair": [
+          0,
+          1
+        ],
+        "a_text": "La basse de violon a été fabriquée par Paolo Antonio Testore à Milan en 1696.",
+        "b_text": "The bass violin was created by Paolo Antonio Testore in Milan in 1696.",
+        "same_subject": true,
+        "conflicting": false,
+        "a_domain": "fr.wikipedia.org",
+        "b_domain": "en.wikipedia.org",
+        "action": "merged"
+      }
+    ],
+    "rank_score": 6.0,
+    "id": "se_001"
+  }
+]
