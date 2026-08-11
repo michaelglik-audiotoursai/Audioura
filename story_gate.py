@@ -21,19 +21,20 @@ from typing import Dict, List, Optional, Tuple
 # Patterns that indicate a sentence contains a STORY claim (people + consequence)
 _STORY_VERB_PATTERNS = re.compile(
     r'\b(?:'
-    r'donated|gave|gifted|bequeathed|commissioned|chose|selected|'
+    r'donated|gave|gifted|bequeathed|commission(?:ed|ing)?|chose|selected|'
     r'approached|invited|asked|persuaded|convinced|'
-    r'decided|refused|insisted|demanded|agreed|'
+    r'decided|decision|refused|insisted|demanded|agreed|'
     r'published|printed|produced|assembled|'
     r'founded|established|created|revived|'
     r'collaborated|partnered|worked\s+with|'
-    r'influenced|inspired|mentor|taught|introduced|'
+    r'influenced|inspired|mentor(?:ed)?|taught|introduced|'
     r'collected|acquired|purchased|bought|sold|'
     r'visited|met|sketched|wrote\s+to|corresponded|'
     r'brought|delivered|shipped|transported|'
     r'resulted\s+in|led\s+to|caused|enabled|made\s+possible|'
     r'specialized|focused|devoted|dedicated|'
     r'disputed|contested|challenged|questioned|'
+    r'recognized|ensured|commitment|'
     r'because|since|due\s+to|as\s+a\s+result|consequently|therefore'
     r')\b', re.IGNORECASE
 )

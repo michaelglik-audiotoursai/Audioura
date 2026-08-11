@@ -1,6 +1,6 @@
 ================================================================================
 LITERAL PROMPT SENT TO LLM — STOP 1
-Generated: 2026-08-11T17:57:12.942429
+Generated: 2026-08-11T18:08:56.065600
 Model: gpt-3.5-turbo
 Temperature: 0.7
 Max tokens: 1000
@@ -22,6 +22,7 @@ STYLE: Channel the passion of a curator who fell in love with this piece — mak
   • material: publisher’s vellum
   • plate count: 15 lithographs
   • plate count: 40 color lithographs
+  • publisher/printer: Louis Broder
 ━━━ END CONCRETE FACTS ━━━
 
 
@@ -96,15 +97,15 @@ This tone should permeate the entire description — not as a single inserted se
 DO NOT USE these phrases: the building was erected, historically important, the population of, vibrant\s+colou?rs?\s*(and|of|that), dreamlike\s+(imagery|quality|world|scene|composition), deep\s+connection\s+to, (his|her|their)\s+Jewish\s+heritage, intricate\s+details?, timeless\s+themes?, position\s+yourself\s+in\s+the\s+center, the\s+artist['']?s?\s+(unique|remarkable|extraordinary), masterpiece\s+that, a\s+testament\s+to, creative\s+genius, stir(s|ring)?\s+the\s+soul
 
 NARRATIVE SPINE CONTEXT (use to shape your description):
-- Emotional beat for this stop: wonder
-- Unique angle to emphasize: This sculpture by Joan Miró is a surreal exploration of nature and imagination, where the fantastical meets the real, and it's a piece that challenges our perception of the natural world.
-- End with a forward-looking hook: How does a similar sense of transformation appear in the realm of belief?
+- Emotional beat for this stop: curiosity
+- Unique angle to emphasize: This sculpture's intricate design reveals the fusion of myth and nature, sparking a dialogue about the role of fantasy in shaping cultural identity.
+- End with a forward-looking hook: How does the transformation of ideas continue to shape our understanding of the divine?
 
 VERIFIED FACTS (incorporate these for accuracy — these are confirmed for this specific POI):
-The Museum of Fine Arts was founded in 1870.; The museum was initially located on the top floor of the Boston Athenæum.
+The Museum of Fine Arts was founded in 1870 in Copley Square.
 
 MANDATORY INCLUSION — work this surprising detail into the description naturally:
-The initial collection of the Museum of Fine Arts came from the Athenæum's Art Gallery.
+The Museum of Fine Arts was initially located on the top floor of the Boston Athenæum.
 
 PROVENANCE (museum-published credit line — you MUST name the donor):
   Gift of Boris Fridman
@@ -191,19 +192,20 @@ A story has: a person, a specific circumstance, a consequence.
 REFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):
   [1] Joan Miró - Le lézard aux plumes d'or
       Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...
-  [2] Joan Miró - Le lézard aux plumes d'or - Choice Contemporary
+  [2] Joan Miró - Le lézard aux plumes d'or
       Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...
   [3] Joan Miró - Le lézard aux plumes d'or
       Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is ... created in 1971 as a vibrant fusion of poetry, printmaking, and sculptural
   [4] Joan Miró | Le Lézard aux plumes d'or (1971, Lithographs)
       Le Lézard aux plumes d'or (The Lizard with Golden Feathers) - Illustrated book with 15 lithographs printed in colors, on BFK Rives wove paper - Signed in ...
-  [5] Joan Miró's Broder Collection: How One Artist ...
-      In 1956, Broder began a partnership with Joan Miró alongside Atelier Mourlot, a world-famous French lithographic studio. In 1920 when Miro was ...
+  [5] Le Lézard aux plumes d'or (The Lizard with Golden Fe… (1971) ...
+      From Phillips, Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers) ... edition was 195), published by Louis Broder, Paris, framed. ... Lithographs.
 
 ━━━ CANDIDATE SPECIFICS (extracted from the snippets above) ━━━
   • material: publisher’s vellum
   • plate count: 15 lithographs
   • plate count: 40 color lithographs
+  • publisher/printer: Louis Broder
 ━━━ END CANDIDATE SPECIFICS ━━━
 
 STORY INSTRUCTION (LOCAL-407/412/419):
@@ -327,14 +329,44 @@ YOU MAY ONLY:
 Write 60-80 words maximum. This is an orientation-only placeholder. No factual claims.
 
 
+━━━ FINAL STORY SHAPE (read this LAST — it overrides everything above) ━━━
+Your description MUST contain a NARRATIVE of at least THREE consecutive sentences
+that follows this shape:
+
+  SENTENCE 1: Name a person (donor/publisher/printer/collaborator) and state
+    ONE SPECIFIC THING they did — a decision, a commission, a gift.
+    Example: "Louis Broder commissioned Miró for this portfolio because Broder
+    specialized in limited editions requiring direct artist-printer collaboration."
+
+  SENTENCE 2: State the CONSEQUENCE or REASON — why it mattered, what it caused,
+    what it meant for the work.
+    Example: "Broder's editions were produced with artist, poet, and printer working
+    in the same workshop — Mourlot's atelier on Rue de Chabrol in Paris."
+
+  SENTENCE 3: Connect to a SECOND named person or to the wider story.
+    Example: "Boris Fridman, a Boston collector who specialized in livres d'artiste,
+    later donated this work to the MFA, bringing the museum's holdings of
+    collaborative printed works to critical mass."
+
+WHAT TO AVOID:
+  - "X's collaboration... showcasing a unique fusion" (evaluation, not story)
+  - "stands as a testament to" (evaluation)
+  - "the transformative power of" (empty abstraction)
+  - "goes beyond mere artistic interpretation" (empty)
+
+Write the story FIRST, then add physical description if space allows.
+━━━ END FINAL STORY SHAPE ━━━
+
+
 ================================================================================
-Total user message length: 21863 chars
+Total user message length: 23262 chars
 
 --- CANDIDATE SPECIFICS STATUS ---
-candidate_specifics found: 3
+candidate_specifics found: 4
   • material: publisher’s vellum
   • plate count: 15 lithographs
   • plate count: 40 color lithographs
+  • publisher/printer: Louis Broder
 
 --- SNIPPET INJECTION STATUS ---
 _local402_snippets_injected: True

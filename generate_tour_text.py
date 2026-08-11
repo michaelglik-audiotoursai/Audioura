@@ -9974,6 +9974,42 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
 ━━━ END ARTIST ATTRIBUTION ━━━
 """
 
+        # [LOCAL-421] STORY REINFORCEMENT — recency effect: last instruction wins.
+        # gpt-3.5-turbo buries names in evaluative prose unless told exactly what shape
+        # the text must take. This block is the LAST thing in the prompt.
+        if _storied_mode and tour_category == 'museum':
+            _story_reinforcement = """
+
+━━━ FINAL STORY SHAPE (read this LAST — it overrides everything above) ━━━
+Your description MUST contain a NARRATIVE of at least THREE consecutive sentences
+that follows this shape:
+
+  SENTENCE 1: Name a person (donor/publisher/printer/collaborator) and state
+    ONE SPECIFIC THING they did — a decision, a commission, a gift.
+    Example: "Louis Broder commissioned Miró for this portfolio because Broder
+    specialized in limited editions requiring direct artist-printer collaboration."
+
+  SENTENCE 2: State the CONSEQUENCE or REASON — why it mattered, what it caused,
+    what it meant for the work.
+    Example: "Broder's editions were produced with artist, poet, and printer working
+    in the same workshop — Mourlot's atelier on Rue de Chabrol in Paris."
+
+  SENTENCE 3: Connect to a SECOND named person or to the wider story.
+    Example: "Boris Fridman, a Boston collector who specialized in livres d'artiste,
+    later donated this work to the MFA, bringing the museum's holdings of
+    collaborative printed works to critical mass."
+
+WHAT TO AVOID:
+  - "X's collaboration... showcasing a unique fusion" (evaluation, not story)
+  - "stands as a testament to" (evaluation)
+  - "the transformative power of" (empty abstraction)
+  - "goes beyond mere artistic interpretation" (empty)
+
+Write the story FIRST, then add physical description if space allows.
+━━━ END FINAL STORY SHAPE ━━━
+"""
+            description_prompt += _story_reinforcement
+
         description_data = {
             "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
             "messages": [
