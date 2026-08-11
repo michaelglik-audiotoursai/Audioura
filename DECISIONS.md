@@ -12822,3 +12822,30 @@ description runs out. The 250-word target is a *consequence* of stories arriving
 not a lever to pull on its own. Padding to reach it is precisely what Michael
 called worthless, so LOCAL-401 is forbidden from doing so and told to re-measure
 after the real fixes.
+
+## D330 — A fallback prepared, because three rounds have not put one story on the page
+**2026-08-11, 03:2x.** 397, 400 and now 401 have all targeted the same pipeline —
+`search → extract → score → select → inject → prose` — and no story has reached a
+listener yet. D329 found two of those stages failing independently in one run.
+
+**Five stages is five places a story can die silently**, and the listener does not
+care whether a fact arrived as a scored "element". So LOCAL-402 is written and
+parked: skip the middle, put the retrieved snippets (title + snippet + URL, 14–23
+per stop already available) directly into the stop prompt as sourced reference
+material, and let the existing gates validate the output.
+
+**The gates are the right safety net for this** — they are the part of the system
+that demonstrably works. `Rousseau`, `Corbusier`, `Lalanne`, `Matisse` and
+`Chagall` have all held at zero for many rounds, and 401 adds the coherence check.
+Grounding against the snippet corpus is the same mechanism 397 already built.
+
+**Dispatch rule, deliberately conditional:** 402 goes out **only** if 401's live
+run still shows `beats_in_delivered_text=0`. If 401 works, 402 is discarded
+unread. Preparing it costs nothing; discovering at 5am that the next step needs
+inventing would cost the night.
+
+**Recorded as a judgement, not a preference:** the structured element model may
+well be the better long-term design — it carries scoring and source tiers that a
+raw snippet does not. But it has had three rounds and Michael wakes to a promise.
+Shipping a story by the simpler route and keeping the richer one as a follow-up is
+the right order when one path is proven to work and the other is not.
