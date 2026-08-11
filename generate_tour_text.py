@@ -9399,6 +9399,58 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                         # Reset temperature in case it was bumped by a prior retry
                         description_data["temperature"] = 0.7
 
+                    # [LOCAL-391] Required beat retry: if assigned beats are missing
+                    # from the output, retry ONCE with the missing names explicitly
+                    # called out. If still missing after retry, log beat_unrecoverable.
+                    if (_storied_mode and _story_beats_per_stop
+                            and idx < len(_story_beats_per_stop)
+                            and _story_beats_per_stop[idx]
+                            and description and not description.startswith('[')):
+                        try:
+                            from story_beat_injector import (
+                                check_required_beats_present,
+                                build_beat_retry_prompt_supplement,
+                                scrub_unfilled_roles,
+                            )
+                            _beat_found, _beat_missing = check_required_beats_present(
+                                description, _story_beats_per_stop[idx]
+                            )
+                            # [LOCAL-391] Scrub unfilled roles ('with publisher' → person name)
+                            description, _role_subs = scrub_unfilled_roles(
+                                description, _story_beats_per_stop[idx]
+                            )
+                            if _role_subs > 0:
+                                print(f"  [LOCAL-391] Stop {stop_num}: scrubbed {_role_subs} unfilled role(s)")
+                                # Re-check after scrub (the name may now be present)
+                                _beat_found, _beat_missing = check_required_beats_present(
+                                    description, _story_beats_per_stop[idx]
+                                )
+
+                            if _beat_missing and _attempt < _max_retries:
+                                # Retry: add the missing-beat supplement to the prompt
+                                _retry_supplement = build_beat_retry_prompt_supplement(
+                                    _beat_missing, _story_beats_per_stop[idx]
+                                )
+                                # Append to messages (user role reinforcement)
+                                description_data["messages"].append({
+                                    "role": "user",
+                                    "content": _retry_supplement,
+                                })
+                                description_data["temperature"] = min(0.7 + 0.15 * (_attempt + 1), 1.0)
+                                print(f"  [LOCAL-391] Stop {stop_num}: BEAT RETRY — missing {_beat_missing}, "
+                                      f"retrying (attempt {_attempt+2}/{_max_retries+1})")
+                                continue  # retry within the _attempt loop
+                            elif _beat_missing:
+                                # Exhausted retries — log as unrecoverable
+                                for _missing_name in _beat_missing:
+                                    print(f"  [LOCAL-391] Stop {stop_num}: beat_unrecoverable "
+                                          f"name='{_missing_name}' — never fabricate, moving on")
+                            # else: all beats present, proceed normally
+                        except ImportError:
+                            pass  # story_beat_injector not available — skip
+                        except Exception as _beat_retry_err:
+                            print(f"  [LOCAL-391] Stop {stop_num}: beat retry check error (non-fatal): {_beat_retry_err}")
+
                     # [LOCAL-31] [LOCAL-98] Post-generation metadata binding validation.
                     # If the catalogue record specified a period or material, verify
                     # they actually appear in the generated description. If not:
@@ -12702,6 +12754,25 @@ RULES:
             print(f"\n  [LOCAL-260] Prolog structure validation SKIPPED (import: {_e})")
         except Exception as _e:
             print(f"\n  [LOCAL-260] Prolog structure validation error (non-fatal): {_e}")
+
+    # -------- [LOCAL-391] Final 'with publisher' scrub on assembled tour --------
+    # Catch any unfilled role phrases that survived assembly. The per-stop scrub
+    # runs during generation, but this catches edge cases from assembly/concatenation.
+    if _storied_mode and _story_beats_per_stop and not _phase5_ceiling_breached:
+        try:
+            from story_beat_injector import scrub_unfilled_roles, _UNFILLED_ROLE_PATTERN
+            # Count occurrences before scrub
+            _unfilled_before = len(_UNFILLED_ROLE_PATTERN.findall(complete_tour))
+            if _unfilled_before > 0:
+                # Build a combined beat list for all stops
+                _all_beats_combined = []
+                for _sb_list in _story_beats_per_stop:
+                    _all_beats_combined.extend(_sb_list)
+                complete_tour, _final_role_subs = scrub_unfilled_roles(complete_tour, _all_beats_combined)
+                if _final_role_subs > 0:
+                    print(f"  [LOCAL-391] Final assembly scrub: replaced {_final_role_subs} unfilled role(s)")
+        except Exception as _391_scrub_err:
+            print(f"  [LOCAL-391] Final scrub error (non-fatal): {_391_scrub_err}")
 
     # -------- [LOCAL-390] FINAL beat verification — measures the delivered text --------
     # This is the AUTHORITATIVE check. It runs against complete_tour AFTER every

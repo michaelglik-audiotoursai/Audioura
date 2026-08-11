@@ -16,6 +16,13 @@ Design principles:
 import re
 from typing import Dict, List, Optional, Tuple
 
+# [LOCAL-391] Unfilled role pattern — 'with publisher', 'with printer', etc.
+# These must be caught and scrubbed post-generation if the person name is missing.
+_UNFILLED_ROLE_PATTERN = re.compile(
+    r'\b(with|the|a)\s+(publisher|printer|donor|patron|editor|binder)\b',
+    re.IGNORECASE,
+)
+
 
 # ---------------------------------------------------------------------------
 # Person + action patterns
@@ -348,6 +355,83 @@ def assign_beats_to_stops(
     return assigned
 
 
+def get_required_beat_names(stop_beats: List[Dict[str, str]]) -> List[str]:
+    """[LOCAL-391] Return the list of person surnames that MUST appear in the stop's output.
+
+    Only person beats (not circumstance/stakes) produce required names.
+    Returns surnames (last word of each person's name), deduplicated.
+    """
+    if not stop_beats:
+        return []
+    names = []
+    seen = set()
+    for b in stop_beats:
+        if b['role'] in ('circumstance', 'stakes'):
+            continue
+        surname = b['person'].split()[-1]
+        if surname.lower() not in seen:
+            names.append(surname)
+            seen.add(surname.lower())
+    return names
+
+
+def check_required_beats_present(
+    description: str,
+    stop_beats: List[Dict[str, str]],
+) -> Tuple[List[str], List[str]]:
+    """[LOCAL-391] Check which required beat surnames are present/missing in the description.
+
+    Returns (found, missing) — both are lists of surname strings.
+    """
+    required = get_required_beat_names(stop_beats)
+    if not required or not description:
+        return ([], required if required else [])
+
+    desc_lower = description.lower()
+    found = []
+    missing = []
+    for surname in required:
+        if surname.lower() in desc_lower:
+            found.append(surname)
+        else:
+            missing.append(surname)
+    return (found, missing)
+
+
+def build_beat_retry_prompt_supplement(missing_names: List[str], stop_beats: List[Dict[str, str]]) -> str:
+    """[LOCAL-391] Build a prompt supplement for retrying a stop with missing beats.
+
+    Names the specific missing people and their actions so the model cannot
+    ignore them a second time.
+    """
+    if not missing_names:
+        return ''
+
+    missing_lower = {n.lower() for n in missing_names}
+    parts = [
+        "\n━━━ RETRY: MISSING REQUIRED CONTENT (LOCAL-391) ━━━",
+        "Your previous attempt OMITTED the following people. They MUST appear by",
+        "surname in this description. Each person below has a documented role —",
+        "write AT LEAST ONE sentence that names them and states what they did.",
+        "",
+    ]
+
+    for beat in stop_beats:
+        if beat['role'] in ('circumstance', 'stakes'):
+            continue
+        surname = beat['person'].split()[-1]
+        if surname.lower() in missing_lower:
+            parts.append(f"  ✗ MISSING: {beat['person']} — {beat['action']}")
+            parts.append(f"    You MUST write their surname \"{surname}\" in your text.")
+            parts.append("")
+
+    parts.append(
+        "Do NOT use generic role words ('the publisher', 'the donor') without the name."
+    )
+    parts.append("━━━ END RETRY REQUIREMENT ━━━\n")
+    return '\n'.join(parts)
+
+
 def build_story_beat_prompt_block(
     stop_beats: List[Dict[str, str]],
     framing_case: str = 'none',
@@ -378,6 +462,19 @@ illustrations must name Dalí. The story beat persons (publishers, printers, don
 are IN ADDITION TO the artist — never instead of. If WORK IDENTITY says
 "Artist: Joan Miró", your text must contain "Miró".
 """)
+
+    # [LOCAL-391] Explicit REQUIRED CONTENT list — structurally unavoidable.
+    # This is separate from the prose guidance below. The model must incorporate
+    # each surname listed here.
+    if person_beats:
+        parts.append("━━━ REQUIRED CONTENT — EACH SURNAME BELOW MUST APPEAR IN YOUR TEXT ━━━")
+        for beat in person_beats[:3]:
+            surname = beat['person'].split()[-1]
+            parts.append(f"  ✓ \"{surname}\" — {beat['person']} ({beat['role'].replace('_', ' ')}): {beat['action']}")
+        parts.append("Write at least one sentence per person above that names them by surname.")
+        parts.append("If you omit any of these surnames, your response will be REJECTED and regenerated.")
+        parts.append("━━━ END REQUIRED CONTENT ━━━")
+        parts.append("")
 
     if person_beats:
         parts.append("GROUNDED PEOPLE AND ACTIONS (from the exhibition page — use at least one):")
@@ -589,3 +686,78 @@ def verify_beats_in_final_tour(
         })
 
     return results
+
+
+def scrub_unfilled_roles(
+    description: str,
+    stop_beats: List[Dict[str, str]],
+) -> Tuple[str, int]:
+    """[LOCAL-391] Replace 'with publisher' etc. with the actual person name when known.
+
+    Where a role word appears without the person's name nearby, substitute the
+    full person name. If the person cannot be identified from the beats, remove
+    the clause entirely (an unfilled role is ungrammatical and wastes a beat).
+
+    Returns (scrubbed_description, substitution_count).
+    """
+    if not description or not stop_beats:
+        return (description, 0)
+
+    # Build role→person map from beats
+    role_person_map: Dict[str, str] = {}
+    for beat in stop_beats:
+        if beat['role'] in ('circumstance', 'stakes'):
+            continue
+        role = beat['role']
+        person = beat['person']
+        # Map both the role and common synonyms
+        role_person_map[role] = person
+        # Map the display word that appears in prose
+        _role_word_map = {
+            'publisher': 'publisher',
+            'printer': 'printer',
+            'donor': 'donor',
+            'gallery_patron': 'patron',
+            'collaborator': 'collaborator',
+            'illustrator': 'illustrator',
+            'author': 'author',
+            'founder': 'founder',
+            'editor': 'editor',
+            'binder': 'binder',
+        }
+        prose_word = _role_word_map.get(role, role)
+        if prose_word not in role_person_map:
+            role_person_map[prose_word] = person
+
+    sub_count = 0
+    result = description
+
+    # Pattern: "with publisher" / "with printer" / "the publisher" / "a donor"
+    # Only replace when the person's surname is NOT already in the same sentence
+    def _replace_if_unfilled(match):
+        nonlocal sub_count
+        prefix = match.group(1)  # 'with' / 'the' / 'a'
+        role_word = match.group(2).lower()  # 'publisher' / 'printer' / etc.
+
+        # Find the person for this role
+        person = role_person_map.get(role_word)
+        if not person:
+            return match.group(0)  # No known person — leave as-is
+
+        # Check if the person's surname is already in the surrounding sentence
+        surname = person.split()[-1]
+        # Get the sentence containing this match
+        start = result.rfind('.', 0, match.start())
+        end = result.find('.', match.end())
+        sentence = result[max(0, start):end if end > 0 else len(result)]
+
+        if surname.lower() in sentence.lower():
+            # Person is already named in this sentence — leave the role word
+            return match.group(0)
+
+        # Replace "with publisher" → "with Louis Broder" (naming the person)
+        sub_count += 1
+        return f"{prefix} {person}"
+
+    result = _UNFILLED_ROLE_PATTERN.sub(_replace_if_unfilled, result)
+    return (result, sub_count)
