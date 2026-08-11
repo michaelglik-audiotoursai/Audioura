@@ -8361,9 +8361,14 @@ These rules apply to the NARRATION paragraphs only. Navigation/orientation direc
             # Populate the module-level dict so per-stop injection picks it up
             if _local410_snippets:
                 _DIRECT_SNIPPETS_PER_STOP = _local410_snippets
+                _total_raw = sum(len(v) for k, v in _local410_snippets.items() if not k.startswith('__'))
                 print(f"\n  [LOCAL-410] SERP search complete: {_local410_total_queries} queries, "
                       f"{_local410_total_results} results, "
-                      f"{sum(len(v) for k, v in _local410_snippets.items() if not k.startswith('__'))} total snippets")
+                      f"{_total_raw} total snippets")
+                # [LOCAL-411] Report that ranking+capping will be applied at injection time
+                from snippet_ranker import SNIPPET_CAP_PER_STOP as _411_cap
+                print(f"  [LOCAL-411] Snippet ranking+capping enabled: "
+                      f"cap={_411_cap}/stop, {_total_raw} raw → max {_411_cap * len(poi_list)} injected")
             else:
                 print(f"\n  [LOCAL-410] SERP search complete but yielded 0 snippets")
 
@@ -9028,6 +9033,7 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
         # between the runner's canonical_title and the generation pipeline's poi_name).
         _local402_snippets_injected = False
         _candidate_specifics = []  # [LOCAL-407] initialized here for both-sides logging scope
+        _prompt_size_before_snippets = len(description_prompt)  # [LOCAL-411] track pre-snippet size
         if _DIRECT_SNIPPETS_PER_STOP and poi_name:
             _stop_snippets = _DIRECT_SNIPPETS_PER_STOP.get(poi_name, [])
             # [LOCAL-403] Fallback: try index-based lookup (key = "__stop_N__")
@@ -9044,8 +9050,26 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                         _stop_snippets = _sval
                         break
             if _stop_snippets:
+                # [LOCAL-411] Rank and cap snippets — top 5, not all 30.
+                # Score by story quality (named person + verb of consequence + date).
+                # Biography-only snippets are rejected outright (LOCAL-406 Part B).
+                from snippet_ranker import rank_and_cap_snippets, SNIPPET_CAP_PER_STOP
+                _ranked_snippets, _ranking_report = rank_and_cap_snippets(
+                    _stop_snippets, artist=artist
+                )
+                print(f"  [LOCAL-411] Stop {stop_num} snippet ranking: "
+                      f"input={_ranking_report['input_count']} "
+                      f"bio_rejected={_ranking_report['rejected_biography_only']} "
+                      f"cap={_ranking_report['cap_applied']} "
+                      f"output={_ranking_report['output_count']}")
+                if _ranking_report['scores']:
+                    print(f"    Top scores: {_ranking_report['scores'][:3]}")
+
+                # Replace unranked list with ranked+capped list for injection
+                _stop_snippets = _ranked_snippets
+
                 _snippet_block = "\nREFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):\n"
-                for _si, _snip in enumerate(_stop_snippets[:12], 1):
+                for _si, _snip in enumerate(_stop_snippets, 1):
                     _s_title = _snip.get('title', '')[:100]
                     _s_text = _snip.get('snippet', '')[:250]
                     _s_url = _snip.get('url', '')
@@ -9058,7 +9082,7 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 import re as _re407
                 _candidate_specifics = []
                 _all_snippet_text = ' '.join(
-                    _snip.get('snippet', '') for _snip in _stop_snippets[:12]
+                    _snip.get('snippet', '') for _snip in _stop_snippets
                 )
                 # [LOCAL-408] Also scan work identity medium — it contains verified
                 # specifics like "40 color lithographs" and "publisher's vellum" that
@@ -9648,6 +9672,18 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                 )
             else:
                 description_prompt = _facts_first_block + description_prompt
+
+        # [LOCAL-411] Report prompt size after FACTS FIRST insertion
+        _prompt_size_final = len(description_prompt)
+        if _local402_snippets_injected:
+            _snippet_added_chars = _prompt_size_final - _prompt_size_before_snippets
+            print(f"  [LOCAL-411] Stop {stop_num} prompt size: "
+                  f"before_snippets={_prompt_size_before_snippets} "
+                  f"after={_prompt_size_final} "
+                  f"(+{_snippet_added_chars} from snippets+instructions, "
+                  f"facts_first={'yes' if _facts_first_block else 'no'})")
+            if _prompt_size_final > 20000:
+                print(f"  [LOCAL-411] WARNING: prompt exceeds 20K chars ({_prompt_size_final})")
 
         description_data = {
             "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
