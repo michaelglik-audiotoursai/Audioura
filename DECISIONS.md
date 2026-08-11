@@ -12746,3 +12746,45 @@ turned out to be 1953, nothing collapses — fix the date and keep it.
 
 **This is the line between a fact-checker and a censor**, and it belongs in every
 future grounding gate, not just this one.
+
+## D328 — The search works, returns 18 results, and none of them reach the tour
+**2026-08-11.** LOCAL-397 bounced. It did the hard part and then delivered nothing.
+
+**What works:** `search_stories_for_stop()` is wired in and live. LEAD probed it
+directly on the branch — `results=18, total_queries=3, estimated_cost=$0.003,
+story_mining_status=ok`. The paid capability that had zero production callers
+(D321) is now reachable and returning real material.
+
+**What doesn't:** the live MFA run has the correct exhibition, the correct three
+works, and **not one story**. Eighteen search results in, zero stories out. The
+closest stop 1 manages is an appositive — "Mourlot Frères, a renowned French
+lithography workshop" — which names a thing without telling anything about it, and
+ships with broken punctuation (`workshop,' exceptional`).
+
+**The remedy is the measurement discipline that has worked all week** (D312/D314):
+instrument the whole transfer, per stop —
+`serp_results=N elements_extracted=M beats_injected=K beats_in_delivered_text=J`.
+When N=18 and J=0, the failing hop is visible immediately instead of being argued
+about. LOCAL-400 requires all four numbers.
+
+**And a fabrication shipped that D327 exists to prevent:**
+
+> "The collaboration between Dalí and Freud brings a unique perspective…"
+
+**Freud died in 1939; the illustrations are dated 1974.** There was no
+collaboration. This is precisely the *coherence failure* Michael defined — a
+relation that becomes impossible once the dates are known — and it reached the
+delivered text. Individually, "Dalí", "Freud" and both dates are attested; the
+*relation* between them is not, and nothing checked it.
+
+**The generalisable point: grounding checks facts, coherence checks relations, and
+we only had the first.** Every gate built so far asks "is this entity in the
+corpus?". None asks "can these two things be true of each other?". A pipeline that
+verifies nouns and invents verbs will produce exactly this sentence.
+
+**Also recorded:** source-tier classification is silently degrading — the run
+logged repeated `[SQ-S2] Wikidata P856 check failed … HTTP Error 429` and read
+timeouts. A failed tier check currently passes quietly; it must be cached and
+logged as "unknown tier" instead.
+
+Bounced as LOCAL-400, off 397's branch so the wiring survives.
