@@ -12594,3 +12594,29 @@ already exists, extend the grounding corpus so the gates trust what it returns �
 otherwise the feature deletes its own output, as D305 showed with the Boston
 Athenæum — verify the candidate stories rather than assuming them, ≥250 words per
 stop, and benchmark against Google.
+
+## D323 — LEAD's own `pkill -f "<TASK-ID>"` killed a second, unrelated task
+**2026-08-11.** LOCAL-395 came back `FAILED exit=-15` (SIGTERM) at 634s. Nothing
+was wrong with it. **LEAD killed it**, while intending to kill only LOCAL-396.
+
+The mechanism: `pkill -f "LOCAL-396"` matches any process whose *full command line*
+contains that string. The kiro worker carries the entire task text on its command
+line, and LEAD had written an addendum into **395** saying "this runs concurrently
+with LOCAL-396". So 395's command line contained `LOCAL-396`, and pkill took both.
+
+**Rules adopted:**
+- **Kill by PID, never by `pkill -f` on a task ID.** The dispatcher log records
+  `dispatcher_pid` for exactly this purpose; use it.
+- Cross-references between task files are useful for the agent and dangerous for
+  process management. Where one is needed, avoid the literal `LOCAL-NNN` form of a
+  *different in-flight* task, or accept that it makes the task pkill-matchable.
+
+**Recovery:** the diagnostic script (`run_local395_palais_regression.py`) was
+already written and is on disk, so nothing is lost but wall time. The task was
+re-marked `ABANDONED` — the one status `already_claimed()` deliberately treats as
+re-claimable (`kiro_dispatcher.py:86`) — rather than left `FAILED`, which the
+dispatcher treats as terminal and would never retry.
+
+**Worth noting about the log format:** `FAILED` and `ABANDONED` differ in exactly
+one way that matters — retryability. A task killed by an operator's mistake is
+abandoned, not failed, and mislabelling it silently drops the work.
