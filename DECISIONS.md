@@ -13308,3 +13308,33 @@ model reached for spontaneously.
 beats_injected / beats_in_delivered_text`) did not print in this run. The
 instrument six rounds depend on is itself unreliable on this path, which is its own
 finding and is first in LOCAL-410's brief.
+
+## D344 — Track B (Storied vs Beta) belongs in a separate session; DB stays single with a discriminator
+**2026-08-11.** Michael opened a second workstream: a **Storied vs Beta** selector
+in the mobile app's Cloud option, routing to separate GCloud services, so testers
+can compare tour quality across the two tracks. He asked whether to run it in this
+thread or a new one. Spec written to `TRACK_B_STORIED_VS_BETA.md`.
+
+**Recommendation: separate Claude session.** Not a preference — a cost and focus
+argument from his own usage panel: *94% of usage at >150k context*, *72% from
+sessions 8+ hours*. Long sessions are the expensive thing, and this thread is 20
+hours deep in `generate_tour_text.py` prose internals. Track B is mobile code,
+GCloud topology and a schema migration; the two share no context worth carrying.
+They are also genuinely independent — neither blocks the other.
+
+**Database: one Postgres, `track` discriminator, not two databases.** The product
+requirement is *comparison*, so a `WHERE track = …` beats a cross-database join.
+Column is `NOT NULL DEFAULT 'beta'` so existing rows are correct with no backfill;
+the existing `backup_tours.sh` snapshot and `*** ROW LOSS ***` alerting keep working
+unchanged. The honest cost: a Storied bug can now reach rows a Beta tester relies
+on — mitigated by the standing rule that nothing may `DELETE FROM audio_tours` and
+every write is additive. Physical separation remains available if Michael prefers
+it; it buys isolation and costs comparison ergonomics.
+
+**The one hard requirement recorded in the spec:** Beta must be byte-for-byte
+unchanged. It is the control in the comparison — any drift in Beta invalidates
+every judgement a tester makes about Storied.
+
+**Coordination rule between tracks:** Track B declares its migration in
+DECISIONS.md *before* applying it, so a Track A generation run that suddenly sees a
+new column knows why.
