@@ -13767,3 +13767,45 @@ does exist or dropped.
 **Standing check added:** a content gate must assert what the text **is**, not
 enumerate what it must not say. "Does this stop name its subject and state a fact
 about it" survives rephrasing; "does it contain any of these 12 strings" does not.
+
+## D354 — Michael: stay on gpt-3.5 until retrieval stops being the bottleneck
+**2026-08-11, 14:4x.** Michael, on the D346 model question:
+
+> "I agree with your evaluation of moving to gpt-4.0 — we will do it when retrieval
+> of information becomes the bottleneck of tours improvements, and now it is not, so
+> my decision to stay on gpt-3.5"
+
+**Decided: no model migration now.** The trigger is explicit and testable — migrate
+when retrieval quality stops being what limits the tour. Today it plainly is: stop 3
+was sourced from creationist apologetics and stop 2 invented two donors. Neither is
+a writer problem.
+
+Cost context that informed it, from our own ledger: 127 tours, $43.73 total,
+**$0.3443 average per tour, of which the LLM is ~$0.019**. gpt-4o at roughly 5×
+input / 6.7× output takes text generation to ~$0.11 per tour — irrelevant at current
+volume, ~$1,100/mo against ~$190/mo at 10k tours/month. **Cost was never the
+argument; sequencing was.** Migrating while retrieval is still the limiter would
+confound the two and we would not learn which change did what.
+
+**D346 is therefore closed as a question for Michael.** It becomes live again only
+when a round shows good grounded material reaching the prompt and the prose still
+failing to use it.
+
+## D355 — Nobody decided 4 stops; an agent's default filled a gap in LEAD's brief
+**2026-08-11, 14:4x.** Michael asked who chose 4 stops and why, twice, being
+"curious but not concerned". The honest answer is that **no one chose it.**
+
+LEAD's `new_kiro_session_is_required_LOCAL-413.md` never specifies a stop count.
+The Kiro agent wrote its own runner, `run_local413_live.py`, and put
+`total_stops=4` in it. 414 and 415 inherited 4 the same way; 412's run was 3. There
+is no decision record for any of it because there was no decision.
+
+**This is the more interesting half of D351.** That entry treated stop-count drift
+as a comparability problem. It is also a delegation problem: **an unspecified
+parameter in a task brief does not stay unspecified — an agent picks it, silently,
+and the choice then propagates through every downstream comparison as if it were
+intentional.** LEAD then drew round-to-round quality conclusions across runs of
+different sizes.
+
+The N=4 pin from D351 stands, and now it is written in the briefs rather than left
+to whoever writes the runner.
