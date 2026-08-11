@@ -12982,3 +12982,42 @@ rejects appositive-only beats explicitly, and retries once for a verb.
 **Fourth round without `Boris Fridman`**, while the text says "gifted to the
 museum". Naming the gift and not the giver has now survived every round since
 D316; it is a hard acceptance line in 404.
+
+## D334 — The coherence gate matches a verb; the fabrication came back as a noun
+**2026-08-11, 06:2x.** LOCAL-404 bounced. The gate proven in D332 rejects "Dalí
+**collaborated with** Freud". The live run shipped "Dalí's **collaboration with**
+Freud" — the same impossible claim, nominalised, straight through.
+
+| form | caught |
+|---|---|
+| `collaborated with` | yes |
+| `collaboration with` | **no** |
+
+**A detector keyed to a surface form does not detect the claim, it detects the
+spelling.** This is the fifth false-negative-or-positive of this family
+(`The Treat Page`, `visual tapestry`, `', in'`, `France`, now `collaboration with`)
+and the first where the gap let a *fabrication* through rather than deleting good
+text.
+
+**LEAD made the identical mistake in the same hour, and that is the more useful
+half.** The acceptance grep searched `collaborated with freud`, found zero, and
+reported the tour clean. The text said `collaboration with Freud`. **A zero from a
+too-narrow pattern is indistinguishable from a zero from a clean tour.** Only
+diffing 403 against 404 across several phrasings exposed it. Check for the claim,
+never for one spelling of it — and when a check returns zero, ask what else that
+zero is consistent with.
+
+**Two regressions also block it:** `Mourlot` went 3 → 0 (403 delivered it), and a
+dangling fragment shipped — "This surreal creation, a gift challenges viewers" —
+where a clause was dropped.
+
+**And a principle the appositive work got wrong:** the rejector fired correctly and
+the retries produced nothing better, so the appositive was removed and replaced
+with nothing. **Rejecting a weak beat is only an improvement if something better
+arrives.** Same as D317 (never make the tour smaller) and D327 (correct, don't
+delete) — a third instance of the same rule, now in the story path.
+
+**The honest position after five rounds:** we have description with names attached,
+not narrative. LOCAL-405 must first *look at the snippets the prompt receives*. If
+they are encyclopaedia first-lines ("X was a French publisher"), the query is the
+problem and no downstream filter will fix it.
