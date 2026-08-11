@@ -12069,3 +12069,60 @@ exactly 383's subject, and each extra serial round costs ~15 minutes of wall
 clock for a fix that belongs in the same edit. `Broder`, `Mourlot` and `Fridman`
 are now hard acceptance for 383 — they are the story beats sitting unused in the
 credit line.
+
+## D309 — Extraction succeeded, delivery failed, and the tour lost ground. LOCAL-383 bounced.
+**2026-08-10.** The story work found everything and delivered almost none of it.
+
+Its own log is the evidence, and it is unambiguous:
+
+```
+[LOCAL-383] Extracted 10 story beats, 8 named people: Boris Fridman, Dalí, Freud,
+            Juan Gris, Louis Broder, Mourlot Frères
+[LOCAL-383] Stop 1 beats: Torf, Louis Broder, Mourlot Frères
+```
+
+Every name we wanted is in that line. In the delivered text: `Broder` **1**,
+`Mourlot` **0**, `Fridman` **0**, `Torf` **0**. And only one stop was assigned
+beats at all.
+
+**A pipeline stage that succeeds and does not deliver is worse than one that
+fails**, because its log reads like success. This is the third instance of the
+same shape today — D298 (identity block emitted for one stop, not three), D304
+(gate covering one field, not all), now beats assigned to one stop, not three.
+**Each time, the mechanism was right and its coverage was partial, and the partial
+coverage was invisible without checking the delivered artifact.** The remedy that
+keeps working is to log both sides of the transfer: assigned *and* arrived.
+LOCAL-388 requires `beats_assigned=N beats_in_output=M dropped=[...]`.
+
+**It also regressed merged work, which is why it stays out:**
+
+| Check | 387 (on `storied`) | 383 |
+|---|---|---|
+| `Gris` in stop 3 | present | **missing** |
+| `Reverdy` in stop 3 | 2 | **0** |
+| `Freud` in stop 2 | present | **missing** |
+| stop 2 words | 220 | **77** |
+
+Stop 3 stopped naming its own creators — the hardest-won result of the entire
+376→387 chain. **Story is not permitted to cost attribution.** D301 said story may
+never be bought with grounding; this is the same trade in a new direction, and the
+answer is the same.
+
+**What it did fix and must be kept:** prompt bleed is gone (`thesis`/`framing`/
+`premise` all 0, where 387 leaked "Amidst the curated exhibition's thesis"),
+zero-check still all clear, and the framing survived intact (`livre d'artiste`,
+`collabor` ×5, `typography` ×2, `book` ×7).
+
+## D310 — LOCAL-386 abandoned mid-run; requeued
+**2026-08-10.** `dispatcher_pid` 9349 dead, 0 commits, no submission, last file
+write 19:33 after which it burned **0.1s of CPU across 48 minutes**. D246's
+`kill -0` check confirmed death before the ABANDONED record was written. Its
+partial work (a gate file and a test file) is on disk in the worktree and is not
+lost. Task file renamed back to a dispatchable name for a fresh run.
+
+**Worth noting against D307's process failure:** 386 was the task that got
+dispatched concurrently with 382 because parking happened after the file was
+written. It then hung. Neither event cost anything irreversible — worktrees kept
+the concurrent runs isolated, and abandonment is recoverable by design — but both
+argue for the same discipline: decide a task's dispatch state before the file
+exists under a dispatchable name.
