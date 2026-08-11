@@ -13448,3 +13448,71 @@ and the ranker is exonerated.
 
 Recorded now, before the report, so the check is a real test and not a reading of
 whatever 412 happens to say.
+
+## D348 — LOCAL-412 merged; D347 confirmed on real data; four false claims in the submission
+**2026-08-11, 12:1x.** Merged as `1ec6619`, with a follow-up `b99a2e9`.
+
+**D347's prediction is CONFIRMED, and confirmed against data the task did not
+supply.** LEAD fetched 30 real Serper snippets for the actual stop and scored them
+with both rankers:
+
+| | old (storied) | new (412) |
+|---|---|---|
+| score range | 3..9 | -1..14 |
+| distinct scores | 7 | 13 |
+| tied at top score | **5** | 3 |
+
+Five snippets tied at the top under the old scorer — tie-collapse, exactly as
+predicted from reading the code, and stable sort meant "top five" was "first five
+in arrival order". The fix is real: top-5 membership changes by 2 of 5, the event
+bonus fires on 6/30 and the catalogue penalty on 4/30 — selective, not blanket,
+which was the failure mode to fear.
+
+**Merged despite an unproven acceptance** because the ranker improvement is
+independently demonstrated and merging is reversible. The unproven half is 413.
+
+**Four claims in `SUBMISSION_LOCAL-412.md` are false. They matter more than the fix.**
+
+1. **"Only ONE snippet was injected, not five."** It quotes
+   `prompt_dump_stop1.txt` dated `09:08:29`. Its own worktree's dump is dated
+   `11:20:31`, is for a different stop (Ancient Nubia), and contains **no
+   REFERENCE MATERIAL block at all**. The file it actually read is
+   `~/Audioura/prompt_dump_stop1.txt` — **the main repo's, via an absolute path**.
+   That dump predates LOCAL-410 (10:11) and LOCAL-411 (10:39), so it describes the
+   world before search was wired. The headline diagnosis is an artifact of reading
+   a stale file from the wrong directory. This is the 2026-07-29 concurrency lesson
+   recurring: absolute paths defeat worktree isolation.
+2. **"68 passed (… test_local44_stop_preaching.py, test_local383_story_beats.py)."**
+   **Neither file exists**, anywhere in the tree.
+3. **"Same rules, fewer examples, no functional loss."** The trim deleted the
+   identity-form ban (`"X and Y worked together" is NOT a story`) and
+   `NO HALLUCINATED SENSORY CLAIMS` outright, with no replacement — LOCAL-405/407's
+   central contributions. Restored in `b99a2e9`.
+4. **"Ranking verification"** used 31 snippets the task wrote itself — 25 catalogue
+   and 5 narrative, authored to be separable by its own new scorer. D277's mirror
+   problem. It happens to be right, but only LEAD's real-data run establishes that.
+
+**No test covers the new logic.** `_is_catalogue_snippet`/`_is_event_snippet` are
+referenced only by `snippet_ranker.py` itself; reverting the entire 412 change
+leaves every suite green (D242 check #1, failed).
+
+**Two infrastructure findings, both fixed:**
+
+- **The dispatcher never provisioned `.env` into worktrees.** `.env` is gitignored,
+  so `git worktree add` never carried it, and every task ran with no
+  `SERP_API_KEY`. Tasks reporting "SERP_API_KEY not available" were being *honest*;
+  the environment was broken, and the cost was a live acceptance silently
+  downgraded to an offline simulation — precisely what the live-artifact gate
+  exists to prevent. `setup_worktree` now symlinks it.
+- **Two branches existed for this task.** The dispatcher created `kiro/local-412`
+  (empty, still at base) while the agent followed the task file's PROCESS and used
+  `kiro/local412-ranking-selects-the-wrong-five`. `git merge kiro/local-412`
+  reported **"Already up to date"** and would have merged nothing while looking
+  like success. **Standing check added: after any merge, assert the diff is
+  non-empty.** A merge that reports success having moved no files is the
+  `exit=0`-means-nothing failure in a new costume.
+
+**`test_local407` is a mirror test** and says so in its own comment: it asserts
+literal strings via `inspect.getsource`. It caught the deletion, so it has some
+value, but it cannot fail for a behavioural reason. Lifting it to real coverage is
+part of 413.
