@@ -13671,3 +13671,43 @@ to measure Michael's 75 gate and is not a substitute for a fixed comparison case
 pipeline. Nothing in the 410–415 chain has been measured at N=8 on Asian Arts, which
 is the only number Michael's field-test gate actually keys on. A clean N=8 run
 belongs immediately after 415 merges, before any claim that the gate is closer.
+
+## D352 — D246's liveness check tests the wrong process, and it would have destroyed LOCAL-415's work
+**2026-08-11, 14:2x.** Caught on a routine tick, not by a test.
+
+LOCAL-415's dispatcher (`kiro_dispatcher.py --worker`, pid 64355) **exited without
+writing a terminal line.** `kiro_sessions_ran.md` still shows only `STARTED`. By the
+literal reading of the recovery rule — a `STARTED` record with no
+`COMPLETED`/`FAILED`/`TIMEOUT` and a dead `dispatcher_pid` — 415 is ABANDONED and
+should be re-dispatched.
+
+**It is not abandoned. It is alive and working.** `pgrep -f LOCAL-415` returns the
+`kiro-cli-chat` agent at **1h02m elapsed**, actively running a live MFA regeneration
+(`rm -f tours/LOCAL415_MFA_4stop.txt && DISABLE_TOUR_CACHE=1 …` started 7 minutes
+ago), with 14 uncommitted changes in its worktree including completed MFA and
+**Palais control** runs at 13:52 and 14:13.
+
+**D246 says "before writing ABANDONED, `kill -0` the dispatcher_pid". That check is
+on the one process that can die while the work continues.** CLAUDE.md already
+records the underlying fact — *"Detached `kiro-cli` worker processes SURVIVE a
+restart; only the review loop needs re-arming"* — but D246 was written against the
+dispatcher and the two were never reconciled. The dispatcher is a bookkeeping
+wrapper; the agent is the work.
+
+**Corrected rule, superseding D246's mechanism:** liveness is
+`pgrep -f "LOCAL-NN"` for the `kiro-cli` process, **not** `kill -0 dispatcher_pid`.
+A task is abandoned only when **no worker process for it survives** and no terminal
+line exists. Check the worktree for uncommitted changes before concluding anything —
+14 modified files is not an abandoned task.
+
+**What the old rule would have cost:** re-dispatching 415 would have started a second
+agent in the same worktree while the first was mid-generation, corrupting the tree
+both were writing to, and spent another hour of live OpenAI and Serper calls
+reproducing work that was nearly finished. This is the same class of error as D348's
+"Already up to date" merge — a status signal that looks authoritative and is
+measuring the wrong object.
+
+**Consequence to handle:** because that dispatcher died, **no `COMPLETED` line will
+ever be written for 415.** A review loop keyed on terminal lines will wait forever.
+LEAD is watching the worker pid directly instead, and the eventual verdict must be
+recorded manually in `kiro_sessions_ran.md` so the ledger stays honest.
