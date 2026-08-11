@@ -1,6 +1,6 @@
 ================================================================================
 LITERAL PROMPT SENT TO LLM — STOP 1
-Generated: 2026-08-11T16:40:32.240729
+Generated: 2026-08-11T16:58:41.453036
 Model: gpt-3.5-turbo
 Temperature: 0.7
 Max tokens: 1000
@@ -13,15 +13,16 @@ You are a knowledgeable museum guide with expertise in art, architecture, and hi
 STYLE: Channel the passion of a curator who fell in love with this piece — make the listener see what the artist felt.
 
 ━━━ NAMES THAT MUST APPEAR (your text is rejected without these) ━━━
-  • Fridman (Boris Fridman, donor)
   • Broder (Louis Broder, publisher)
   • Frères (Mourlot Frères, printer)
+  • Fridman (Boris Fridman, donor)
 ━━━ END REQUIRED NAMES ━━━
 
 ━━━ CONCRETE FACTS TO USE (prefer these over general claims) ━━━
   • material: publisher’s vellum
   • plate count: 15 lithographs
   • plate count: 40 color lithographs
+  • publisher/printer: Louis Broder
 ━━━ END CONCRETE FACTS ━━━
 
 
@@ -97,14 +98,14 @@ DO NOT USE these phrases: the building was erected, historically important, the 
 
 NARRATIVE SPINE CONTEXT (use to shape your description):
 - Emotional beat for this stop: curiosity
-- Unique angle to emphasize: Discover how a surrealist artist captures the metamorphosis of a lizard into a creature of myth and legend, reflecting the tension between earthly reality and fantastical imagination.
-- End with a forward-looking hook: How might transformation redefine the very essence of belief?
+- Unique angle to emphasize: Discover how Joan Miró's surreal imagination took a simple lizard and turned it into a fantastical creature with golden feathers, embodying his playful yet profound artistic vision.
+- End with a forward-looking hook: What other transformations await as we journey through the museum?
 
 VERIFIED FACTS (incorporate these for accuracy — these are confirmed for this specific POI):
-The Museum of Fine Arts (MFA) is located in Boston, Massachusetts.; It is the 20th-largest art museum in the world by public gallery area.; The museum contains 8,161 paintings and over 450,000 works of art.; The museum was founded in 1870 and initially located on the top floor of the Boston Athenæum.
+The Museum of Fine Arts (MFA) is located in Boston, Massachusetts.; The MFA is the 20th-largest art museum in the world by public gallery area.; The MFA contains 8,161 paintings and over 450,000 works of art.; The MFA was founded in 1870 in Copley Square.; The MFA moved to its current Fenway location in 1909.
 
 MANDATORY INCLUSION — work this surprising detail into the description naturally:
-The Museum of Fine Arts was initially located on the top floor of the Boston Athenæum.
+The MFA is affiliated with the School of the Museum of Fine Arts at Tufts.
 
 PROVENANCE (museum-published credit line — you MUST name the donor):
   Gift of Boris Fridman
@@ -153,25 +154,25 @@ are IN ADDITION TO the artist — never instead of. If WORK IDENTITY says
 "Artist: Joan Miró", your text must contain "Miró".
 
 ━━━ REQUIRED CONTENT — EACH SURNAME BELOW MUST APPEAR IN YOUR TEXT ━━━
-  ✓ "Fridman" — Boris Fridman (donor): gave this work as a gift to the museum
   ✓ "Broder" — Louis Broder (publisher): published this work
   ✓ "Frères" — Mourlot Frères (printer): printed this work
+  ✓ "Fridman" — Boris Fridman (donor): gave this work as a gift to the museum
 Write at least one sentence per person above that names them by surname.
 If you omit any of these surnames, your response will be REJECTED and regenerated.
 ━━━ END REQUIRED CONTENT ━━━
 
 GROUNDED PEOPLE AND ACTIONS (from the exhibition page — use at least one):
-  • Boris Fridman (Donor): gave this work as a gift to the museum
   • Louis Broder (Publisher): published this work
   • Mourlot Frères (Printer): printed this work
+  • Boris Fridman (Donor): gave this work as a gift to the museum
 
 STORY SERVES THE THESIS: The person/action you name should connect to WHY
 this exhibition exists — e.g., a printer matters because the show argues printers
 were essential collaborators, not because printers are inherently interesting.
 NEVER-PLACEHOLDER RULE (LOCAL-388): Do NOT write 'with publisher', 'with printer', 'with donor', or 'the patron'. Where a role is mentioned, NAME THE PERSON. Specifically:
-  'donor' → use 'Boris Fridman'
   'publisher' → use 'Louis Broder'
   'printer' → use 'Mourlot Frères'
+  'donor' → use 'Boris Fridman'
 
 
 WHAT IS NOT A STORY: "This masterpiece challenges boundaries" is not a story.
@@ -179,7 +180,7 @@ WHAT IS NOT A STORY: "This masterpiece challenges boundaries" is not a story.
 A story has: a person, a specific circumstance, a consequence.
 
 REFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):
-  [1] Joan Miró - Le lézard aux plumes d'or - Choice Contemporary
+  [1] Joan Miró - Le lézard aux plumes d'or
       Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...
   [2] Joan Miró - Le lézard aux plumes d'or
       Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...
@@ -194,6 +195,7 @@ REFERENCE MATERIAL (retrieved from published sources — cite nothing these do n
   • material: publisher’s vellum
   • plate count: 15 lithographs
   • plate count: 40 color lithographs
+  • publisher/printer: Louis Broder
 ━━━ END CANDIDATE SPECIFICS ━━━
 
 STORY INSTRUCTION (LOCAL-407/412/419):
@@ -253,12 +255,14 @@ FACTUAL INTEGRITY RULE: Do NOT invent visual specifics or biographical claims no
 Format your response as follows:
 Orientation: (write a brief orientation text explaining the best viewing position here)
 
-Then write the description directly — a flowing, 280-word narrative about the exhibit. Do NOT wrap it in brackets, placeholders, or formatting markers. Just write the prose.
+Then write the description directly — a flowing, 350-word narrative about the exhibit. Do NOT wrap it in brackets, placeholders, or formatting markers. Just write the prose.
 
 MINIMUM LENGTH: Your description (after the Orientation section) MUST be at least 120 words. If you do not have 120 words of verified content, discuss the artistic form, the collaboration, or the exhibition context to reach the floor. Never deliver fewer than 120 words.
 
 DO NOT include any section headers other than "Orientation:" - the description should flow naturally after the orientation section.
 DO NOT include directions to the next stop - these will be added separately.
+
+LENGTH CONSTRAINT: You have rich verified material for this stop. Write up to 350 words, using the extra space ONLY for additional sourced facts or explained connections — NOT for padding, praise, or instructing the listener.
 
 CORPUS GATE: EMPTY (D50 enforcement — LOCAL-209):
 There is NO verified source material for "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)" — no stop-level corpus,
@@ -284,13 +288,14 @@ Write 60-80 words maximum. This is an orientation-only placeholder. No factual c
 
 
 ================================================================================
-Total user message length: 19224 chars
+Total user message length: 19501 chars
 
 --- CANDIDATE SPECIFICS STATUS ---
-candidate_specifics found: 3
+candidate_specifics found: 4
   • material: publisher’s vellum
   • plate count: 15 lithographs
   • plate count: 40 color lithographs
+  • publisher/printer: Louis Broder
 
 --- SNIPPET INJECTION STATUS ---
 _local402_snippets_injected: True

@@ -9183,10 +9183,15 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                     _all_snippet_text, _re407.IGNORECASE):
                     _candidate_specifics.append(f"plate count: {_plate_match.group(0).strip()}")
                 # [LOCAL-419] Named publishers/printers from snippets
+                # Matches: "published by X", "publisher: X", "Publisher X ;", "printed by X", "Printer X ;"
                 for _pub_match in _re407.finditer(
-                    r'(?:[Pp]ublish(?:ed|er)\s*(?:by|:)\s*|[Pp]rinter?\s*(?:by|:)\s*)([A-Z\u00C0-\u024F][a-z\u00E0-\u024F]+(?:\s+[A-Z\u00C0-\u024F][a-z\u00E0-\u024F]+){0,3})',
+                    r'(?:[Pp]ublish(?:ed|er)\s*(?:by|:| )\s*|[Pp]rint(?:ed|er)\s*(?:by|:| )\s*)'
+                    r'([A-Z\u00C0-\u024F][\w\u00C0-\u024F]+(?:\s+[\w\u00C0-\u024F]+){0,4}?)(?:\s*[;.,]|\s*$)',
                     _all_snippet_text):
-                    _candidate_specifics.append(f"publisher/printer: {_pub_match.group(1).strip()}")
+                    _pub_name = _pub_match.group(1).strip()
+                    # Skip generic words that aren't names
+                    if _pub_name.lower() not in ('the', 'a', 'an', 'by', 'in', 'on', 'paris', 'new'):
+                        _candidate_specifics.append(f"publisher/printer: {_pub_name}")
                 # Literary forms: poem, prose, text, fable
                 for _form_match in _re407.finditer(
                     r'(?:based on|illustrat(?:ing|es?)|accompanying|wrote the|his own)\s+'
