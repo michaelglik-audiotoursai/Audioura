@@ -13373,3 +13373,44 @@ requires a test asserting `search_stories_for_stop` is called on the real
 **Bounced anyway:** 86 snippets re-buries the FACTS FIRST block that D339/D340
 added, `Broder` and `Fridman` regress to 0, and no search fact reaches the prose.
 The corpus needs ranking and a cap of 3–5, not 30 per stop.
+
+## D346 — LOCAL-411 merged; and the model swap is not a one-variable change
+**2026-08-11, 11:0x.** Merged (brings 410). The production wiring D321 asked for
+and 397 never delivered is now real: `search_stories_for_stop` is called from
+`generate_tour_text` itself. 411 caps the resulting flood — 86 raw snippets to 5
+per stop, ranked, FACTS FIRST retained.
+
+Live: `Broder` restored, all attributions present, zero impossible relations,
+zero-check clear, 3 stops, words 413/203/339.
+
+**Residuals recorded rather than buried:** search-sourced facts still do not reach
+the prose (`1945`/`Fernand`/`Braque`/`poem` all 0) even with five ranked snippets
+in the prompt; `Fridman` regressed to 0; the prompt is still 23,630 chars against a
+20K target; and `bio_rejected=0` of 31 snippets means the biography filter rejected
+nothing — unverified, possibly not working.
+
+**The model experiment, run because the evidence had narrowed to it.** With
+retrieval, ranking, capping and injection all working and the prose still generic,
+the remaining variable was D339's finding that the writer is `gpt-3.5-turbo`. LEAD
+tested `TOUR_LLM_MODEL=gpt-4o` on the same pipeline.
+
+**It fails.** Generation returns 0 characters:
+
+```
+Intent analysis JSON parse error (attempt 1/2): Expecting value: line 1 column 1
+Intent analysis JSON parse error (attempt 2/2): Expecting value: line 1 column 1
+⚠️ Intent analysis failed, using fallback detection
+… CHARS: 0
+```
+
+gpt-4o returns a different response shape (the logged response begins `[`) and the
+parsers expect gpt-3.5's format.
+
+**So the model choice Michael was asked to make is not "flip an env var".** It is a
+migration: the JSON parsing, and probably the prose-extraction paths, assume the
+current model's output format. That is worth knowing *before* he decides, and it
+changes the shape of the decision from a config toggle to a scoped piece of work.
+
+**Not attempted further.** Making the pipeline model-agnostic is a substantial
+change across 20 call sites and Michael has explicitly reserved model choice for
+himself. The finding is recorded; the work is his to authorise.
