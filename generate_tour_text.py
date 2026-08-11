@@ -8593,6 +8593,73 @@ Exempt: navigation directions ("Turn left", "Continue past").
             return (True, match.group(0))
         return (False, None)
 
+    # [LOCAL-420] Stub detection — a listener must never be told the system failed.
+    _STUB_TAIL = "A detailed narration could not be generated for this stop."
+
+    def _is_stub_text(text):
+        """[LOCAL-420] Return True if text is the empty-stop stub that must never ship."""
+        if not text:
+            return False
+        return _STUB_TAIL in text
+
+    def _build_material_fallback(poi_name, artist, matched_work, credit_line, candidate_specifics):
+        """[LOCAL-420] Build a short, factual paragraph from whatever material IS on hand.
+
+        A listener must never be told the system failed. When no LLM attempt passes
+        the gate, we still have: the work title, artist, medium, credit line, and any
+        candidate specifics extracted from snippets. Build a real (if thin) narration
+        from those. The result won't pass the positive gate's "concrete fact" check
+        in most cases, but it IS real prose that a listener can hear without
+        embarrassment — unlike the stub.
+        """
+        parts = []
+
+        # Opening: name the work and artist
+        if artist and artist.strip() and artist.strip().lower() not in ('unknown', 'n/a', 'various'):
+            parts.append(f"{poi_name} is a work by {artist}.")
+        else:
+            parts.append(f"Here we have {poi_name}.")
+
+        # Medium / technique from matched_work
+        if matched_work:
+            medium = (matched_work.get('medium') or '').strip()
+            if medium:
+                parts.append(f"This piece is executed in {medium.lower()}.")
+            date = (matched_work.get('date') or '').strip()
+            if date:
+                parts.append(f"It dates to {date}.")
+            collaborator = (matched_work.get('collaborator') or '').strip()
+            if collaborator:
+                parts.append(f"It was created in collaboration with {collaborator}.")
+
+        # Credit line (provenance)
+        if credit_line:
+            # Use credit line as-is if it's short; summarize if long
+            if len(credit_line) <= 120:
+                parts.append(credit_line.rstrip('.') + '.')
+            else:
+                # Take first sentence of credit line
+                first_sent = credit_line.split('.')[0].strip()
+                if first_sent:
+                    parts.append(first_sent + '.')
+
+        # Candidate specifics from snippet extraction
+        if candidate_specifics:
+            # Pick up to 3 most informative specifics
+            _specs = []
+            for cs in candidate_specifics[:3]:
+                # Format: "material: lithograph on vellum" → "lithograph on vellum"
+                if ':' in cs:
+                    _specs.append(cs.split(':', 1)[1].strip())
+                else:
+                    _specs.append(cs.strip())
+            if _specs:
+                parts.append("Notable details include " + ", ".join(_specs) + ".")
+
+        # Ensure we have at least something beyond just the opening line
+        result = " ".join(parts)
+        return result
+
     def _generate_description(args):
         idx, poi, spine_stop, fact_sheet, story_type = args
         stop_num = idx + 1
@@ -10002,8 +10069,18 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                             # All retries exhausted — fail loudly with diagnostic, never ship refusal
                             print(f"  [LOCAL-415] Stop {stop_num}: REFUSAL PERSISTS after {_max_retries+1} attempts — "
                                   f"using fallback (NEVER shipping model apology as tour text)")
-                            description = (f"{poi_name} — located in this gallery. "
-                                           f"A detailed narration could not be generated for this stop.")
+                            # [LOCAL-420] Never ship the stub — use best earlier attempt if one exists
+                            if _best_description:
+                                description = _best_description[1]
+                                print(f"  [LOCAL-420] Stop {stop_num}: falling back to best prior attempt "
+                                      f"({_best_description[2]} words) instead of stub")
+                            else:
+                                # [LOCAL-420] No prior attempt available — build from material on hand
+                                description = _build_material_fallback(
+                                    poi_name, artist, _matched_work,
+                                    _credit_line_for_stop, _candidate_specifics)
+                                print(f"  [LOCAL-420] Stop {stop_num}: no prior attempt — built material fallback "
+                                      f"({len(description.split())} words)")
                             # Mark as non-refusal for downstream (it's now our honest fallback)
                             _is_refusal = False
 
@@ -10088,12 +10165,23 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                             else:
                                 print(f"  [LOCAL-417] Stop {stop_num}: GATE FAILED after {_max_retries+1} attempts — "
                                       f"using fallback (never shipping operator-directed text)")
-                                description = (f"{poi_name} — located in this gallery. "
-                                               f"A detailed narration could not be generated for this stop.")
+                                # [LOCAL-420] Never ship the stub — use best earlier attempt if one exists
+                                if _best_description:
+                                    description = _best_description[1]
+                                    print(f"  [LOCAL-420] Stop {stop_num}: falling back to best prior attempt "
+                                          f"({_best_description[2]} words) instead of stub")
+                                else:
+                                    # [LOCAL-420] No prior attempt available — build from material on hand
+                                    description = _build_material_fallback(
+                                        poi_name, artist, _matched_work,
+                                        _credit_line_for_stop, _candidate_specifics)
+                                    print(f"  [LOCAL-420] Stop {stop_num}: no prior attempt — built material fallback "
+                                          f"({len(description.split())} words)")
 
                     # [LOCAL-394] Track best valid description — a stop is NEVER dropped.
                     # Save every non-placeholder description; keep the longest one.
-                    if description and _leak_class != "placeholder":
+                    # [LOCAL-420] The stub must never become _best_description — exclude it.
+                    if description and _leak_class != "placeholder" and not _is_stub_text(description):
                         _cur_wc = len(description.split())
                         _best_wc = _best_description[2] if _best_description else 0
                         if _cur_wc > _best_wc:
