@@ -88,7 +88,7 @@ def _is_valid_beat_subject(candidate: str) -> bool:
 # [LOCAL-391] Unfilled role pattern — 'with publisher', 'with printer', etc.
 # These must be caught and scrubbed post-generation if the person name is missing.
 _UNFILLED_ROLE_PATTERN = re.compile(
-    r'\b(with|the|a)\s+(publisher|printer|donor|patron|editor|binder)\b',
+    r'\b(with|the|a|and)\s+(publisher|printer|donor|patron|editor|binder)\b',
     re.IGNORECASE,
 )
 
@@ -698,10 +698,27 @@ are IN ADDITION TO the artist — never instead of. If WORK IDENTITY says
         parts.append("")
 
     if context_beats:
-        parts.append("GROUNDED CIRCUMSTANCES (from the exhibition page — weave in if natural):")
+        # [LOCAL-408] Filter out sloganistic claims that the model copies verbatim.
+        # These are general evaluative claims, not specific facts — the very thing
+        # the PRIORITY RULE instructs the model to avoid.
+        _SLOGAN_PHRASES = [
+            'had no precedent',
+            'revolutionized',
+            'without precedent',
+            'groundbreaking',
+            'unprecedented',
+        ]
+        _filtered_ctx = []
         for beat in context_beats[:2]:
-            parts.append(f"  • {beat['action']}")
-        parts.append("")
+            _action_lower = beat['action'].lower()
+            if any(sp in _action_lower for sp in _SLOGAN_PHRASES):
+                continue  # Skip sloganistic claims
+            _filtered_ctx.append(beat)
+        if _filtered_ctx:
+            parts.append("GROUNDED CIRCUMSTANCES (from the exhibition page — weave in if natural):")
+            for beat in _filtered_ctx:
+                parts.append(f"  • {beat['action']}")
+            parts.append("")
 
     if framing_case == 'exhibition':
         parts.append(
