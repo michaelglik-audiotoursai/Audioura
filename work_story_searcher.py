@@ -66,6 +66,66 @@ def normalize_domain(url: str) -> str:
     return domain
 
 
+# --- [LOCAL-414] Persistent P856 result cache ---
+# Successful P856 lookups are saved to disk so that a timeout in a future run
+# does not demote a domain that was previously verified as tier1. The cache file
+# stores {domain: {tier: str, timestamp: ISO}} and entries expire after 30 days.
+_P856_CACHE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.p856_cache.json')
+_P856_CACHE_TTL_DAYS = 30
+_p856_persistent_cache: Dict[str, dict] = {}
+
+
+def _load_p856_cache():
+    """Load persistent P856 cache from disk."""
+    global _p856_persistent_cache
+    if os.path.exists(_P856_CACHE_PATH):
+        try:
+            with open(_P856_CACHE_PATH, 'r') as f:
+                _p856_persistent_cache = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            _p856_persistent_cache = {}
+    else:
+        _p856_persistent_cache = {}
+
+
+def _save_p856_cache():
+    """Persist P856 cache to disk."""
+    try:
+        with open(_P856_CACHE_PATH, 'w') as f:
+            json.dump(_p856_persistent_cache, f, indent=2)
+    except IOError:
+        pass  # Non-fatal: cache miss next run is acceptable
+
+
+def _p856_cache_get(domain: str) -> Optional[str]:
+    """Get a cached P856 result if fresh (within TTL). Returns tier or None."""
+    entry = _p856_persistent_cache.get(domain)
+    if not entry:
+        return None
+    try:
+        ts = datetime.fromisoformat(entry['timestamp'])
+        if datetime.now() - ts > timedelta(days=_P856_CACHE_TTL_DAYS):
+            return None  # Expired
+        return entry['tier']
+    except (KeyError, ValueError):
+        return None
+
+
+def _p856_cache_put(domain: str, tier: str):
+    """Store a P856 result in persistent cache. Only caches tier1 results
+    (tier3 from errors should NOT be cached — the next run should retry)."""
+    if tier == 'tier1':
+        _p856_persistent_cache[domain] = {
+            'tier': tier,
+            'timestamp': datetime.now().isoformat(),
+        }
+        _save_p856_cache()
+
+
+# Load cache on module import
+_load_p856_cache()
+
+
 # --- Source Tier Classification (R1 corrected: Reject first, then tier) ---
 def classify_domain(domain: str, domain_cache: dict = None) -> str:
     """Classify a domain into tier1/tier2/tier3/reject.
@@ -118,8 +178,17 @@ def classify_domain(domain: str, domain_cache: dict = None) -> str:
     if domain_cache and domain in domain_cache:
         return domain_cache[domain]
 
+    # [LOCAL-414] Check persistent P856 cache before hitting SPARQL
+    cached_tier = _p856_cache_get(domain)
+    if cached_tier:
+        if domain_cache is not None:
+            domain_cache[domain] = cached_tier
+        return cached_tier
+
     # Try SPARQL (P856 + P31 class constraint)
     tier = _check_wikidata_p856(domain)
+    # [LOCAL-414] Persist successful tier1 results so timeouts don't demote next run
+    _p856_cache_put(domain, tier)
     if domain_cache is not None:
         domain_cache[domain] = tier
     return tier

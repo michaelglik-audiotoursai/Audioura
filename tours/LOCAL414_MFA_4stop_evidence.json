@@ -1,0 +1,55 @@
+{
+  "Appeal to the Great Spirit": {
+    "status": "VERIFIED",
+    "canonical_title": "Appeal to the Great Spirit",
+    "snippet": "rpretive materials to our attention: please e-mail us at  [email protected]  or message us on Instagram  @americasmfa . Related Pages Cyrus Dallin’s ‘Appeal to the Great Spirit’ Please Be Seated Henry Luce Foundation Exhibitions The John Singer Sargent Archive Art Bridges Initiative Highlights Paintings o",
+    "method": "canonical_title_match",
+    "qid": "Q4780980"
+  },
+  "Adam and Eve": {
+    "status": "VERIFIED",
+    "canonical_title": "Adam and Eve",
+    "snippet": "Stanley H. Kaplan Family Foundation, Monica S. Sadler, Otis Norcross Fund, Helen and Alice Colburn Fund, the Curators Circle: Fashion Council, Nancy Adams and Scott Schoen, Seth K. Sweetser Fund, Theresa Baybutt, Emi M. and William G. Winterer, and Deborah Glasser.\n\nCredit\n    \n\n    \n            Starfi",
+    "method": "canonical_title_match",
+    "qid": "Q3898508"
+  },
+  "Ancient Nubia Now": {
+    "status": "VERIFIED",
+    "canonical_title": "Ancient Nubia Now",
+    "snippet": "eeper into the timeless epic that has captivated audiences for nearly 3,000 years—and artistic depictions often give us our best information on these ancient tales.\n\nOur gallery dedicated to the Homeric epics features works that chart the Trojan War and illustrate scenes from the Iliad and Odyssey. Make yo",
+    "method": "canonical_title_match",
+    "qid": ""
+  },
+  "April 1957 (Celestial Blue)": {
+    "status": "VERIFIED",
+    "canonical_title": "April 1957 (Celestial Blue)",
+    "snippet": "HanbokOlga KhvanTuesday, April 30, 2024  For most of my life, I haven’t felt Korean enough. Two years ago, a gnawing search for validation led me to a mail-in DNA kit. One hundred",
+    "method": "canonical_title_match",
+    "qid": "Q20538178"
+  },
+  "Artist in his studio": {
+    "status": "VERIFIED",
+    "canonical_title": "Artist in his studio",
+    "snippet": "year’s biggest films, there’s never been a better time to dig deeper into the timeless epic that has captivated audiences for nearly 3,000 years—and artistic depictions often give us our best information on these ancient tales.\n\nOur gallery dedicated to the Homeric epics features works that chart the Tro",
+    "method": "canonical_title_match",
+    "qid": "Q3905873"
+  },
+  "the Japanese": {
+    "status": "VERIFIED",
+    "canonical_title": "Madame Monet wearing a kimono",
+    "snippet": "? What Are We? Where Are We Going? among its highlights, in addition to iconic sculptures like Degas’s The Little Dancer. With 35 paintings by Claude Monet, the department boasts one the largest collections of his work outside of France.\n\nA unique opportunity for upper level members to take a deep dive i",
+    "method": "canonical_title_match",
+    "qid": "Q10322900"
+  },
+  "An Italian Autumn": {
+    "status": "VERIFIED",
+    "canonical_title": "An Italian Autumn",
+    "snippet": "s through the mid-20th century.\n\nAn early 14th-century gold-ground triptych by Duccio and his workshop is one of the highlights of the Museum’s early Italian collection, complemented by sculptural works such as Donatello’s relief Madonna of the Clouds.\n\nThe Museum possesses an outstanding collection of Net",
+    "method": "canonical_title_match",
+    "qid": "Q19900654"
+  },
+  "Madame Monet wearing a kimono": {
+    "status": "DROPPED",
+    "reason": "duplicate QID Q10322900"
+  }
+}

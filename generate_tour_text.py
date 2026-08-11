@@ -8320,6 +8320,8 @@ These rules apply to the NARRATION paragraphs only. Navigation/orientation direc
                             'title': _sr.get('title', ''),
                             'snippet': _sr.get('snippet', ''),
                             'url': _sr.get('url', ''),
+                            'tier': _sr.get('tier', ''),  # [LOCAL-414] Carry tier through to ranker
+                            'domain': _sr.get('domain', ''),
                         })
 
                 # [LOCAL-410] Inject credit_line as a leading snippet (source of Fridman etc.)
@@ -9060,8 +9062,11 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 print(f"  [LOCAL-411] Stop {stop_num} snippet ranking: "
                       f"input={_ranking_report['input_count']} "
                       f"bio_rejected={_ranking_report['rejected_biography_only']} "
+                      f"tier3_demoted={_ranking_report['tier3_demoted']} "
                       f"cap={_ranking_report['cap_applied']} "
-                      f"output={_ranking_report['output_count']}")
+                      f"output={_ranking_report['output_count']} "
+                      f"(t1t2={_ranking_report['tier1_tier2_in_output']}, "
+                      f"t3={_ranking_report['tier3_in_output']})")
                 if _ranking_report['scores']:
                     print(f"    Top scores: {_ranking_report['scores'][:3]}")
 
@@ -9303,6 +9308,7 @@ BANNED PHRASES — do NOT use any of these in your description:
 - "truly remarkable" / "a testament to" / "stands as a testament"
 - "captivating artistry" / "mesmerizing world" / "intricate details"
 - "invites you to explore/discover/reflect" / "immerse yourself in"
+- "invites contemplation" / "invites the viewer" / "invites us to"
 - "can't help but" / "feast for the eyes" / "step into a world"
 Instead, use SPECIFIC, CONCRETE language: name colors precisely (cerulean, ochre, vermilion), describe actual compositional choices, mention documented historical context.
 
@@ -9684,6 +9690,24 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                   f"facts_first={'yes' if _facts_first_block else 'no'})")
             if _prompt_size_final > 20000:
                 print(f"  [LOCAL-411] WARNING: prompt exceeds 20K chars ({_prompt_size_final})")
+
+        # [LOCAL-414] Universal artist attribution — fires for ALL museum stops
+        # when artist is known, regardless of snippet presence. Placed at the END
+        # of the prompt (recency bias) so it cannot be overridden by snippets that
+        # name a different artist's different work.
+        if tour_category == 'museum' and artist:
+            _414_artist_surname = artist.split()[-1]
+            description_prompt += f"""
+━━━ ARTIST ATTRIBUTION (LOCAL-414 — NON-NEGOTIABLE, FINAL AUTHORITY) ━━━
+The artist of THIS specific work is: {artist}
+The surname "{_414_artist_surname}" MUST appear in your text.
+
+If the reference material above mentions OTHER artists or OTHER works (by different
+artists), you may reference them only as CONTEXT — but your text MUST primarily be
+about THIS work by {artist}. Naming a different artist's different work does NOT
+satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" is absent.
+━━━ END ARTIST ATTRIBUTION ━━━
+"""
 
         description_data = {
             "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
@@ -10159,6 +10183,42 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                         _artist_sn = artist.split()[-1].lower()
                         if _artist_sn and _artist_sn not in description.lower():
                             print(f"  [LOCAL-407] ⚠️ Stop {stop_num}: artist '{artist}' ABSENT from description!")
+
+                    # [LOCAL-414] Post-generation banned-phrase scrub.
+                    # The ban is in the prompt but the LLM occasionally ignores it.
+                    # Rather than retry (expensive, same result), scrub the phrase
+                    # from the delivered text. The phrase adds no information loss.
+                    _414_BANNED_PHRASES = [
+                        'invites contemplation',
+                        'invites the viewer',
+                        'invites us to',
+                        'invites you to explore',
+                        'invites you to discover',
+                        'invites you to reflect',
+                        'a testament to',
+                        'stands as a testament',
+                        'feast for the eyes',
+                        'step into a world',
+                        'stir the soul',
+                        'pulsate with life',
+                    ]
+                    _414_banned_found = []
+                    if description:
+                        _desc_lower_414 = description.lower()
+                        for _bp in _414_BANNED_PHRASES:
+                            if _bp in _desc_lower_414:
+                                _414_banned_found.append(_bp)
+                        if _414_banned_found:
+                            # Scrub: remove sentences containing banned phrases
+                            import re as _re414
+                            for _bp in _414_banned_found:
+                                # Remove the sentence containing the banned phrase
+                                _pattern = _re414.compile(
+                                    r'[^.!?]*\b' + _re414.escape(_bp) + r'\b[^.!?]*[.!?]\s*',
+                                    _re414.IGNORECASE
+                                )
+                                description = _pattern.sub('', description).strip()
+                            print(f"  [LOCAL-414] Stop {stop_num}: SCRUBBED banned phrases from output: {_414_banned_found}")
 
                     return idx, orientation, description, word_count, tokens_used, call_cost
                 else:

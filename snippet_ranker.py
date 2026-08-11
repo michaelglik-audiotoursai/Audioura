@@ -15,6 +15,10 @@ Scoring:
   - Tier1/Tier2 domain: +1
   - Contains artist name: +1
   - Biography-only (LOCAL-406): hard reject (score = -999)
+  - [LOCAL-414] Tier3 penalty: -5 (unverified domains cannot outrank tier1/tier2
+    on story quality alone; prevents doctrinal/apologetics sites from displacing
+    institutional sources). Not a hard exclusion: tier3 material still available
+    when no tier1/tier2 exists for a stop.
 
 Returns at most SNIPPET_CAP_PER_STOP snippets, sorted by descending score.
 """
@@ -25,6 +29,14 @@ from typing import List, Dict, Tuple
 
 # Configurable cap — default 5
 SNIPPET_CAP_PER_STOP = int(os.environ.get('SNIPPET_CAP_PER_STOP', '5'))
+
+# [LOCAL-414] Tier3 penalty: unverified domains score -5 so they cannot outrank
+# tier1/tier2 material with comparable story quality. A tier1/tier2 snippet with
+# person+verb+date = 9; a tier3 snippet with the same = 3 (9-6 is too harsh,
+# 9-4 still allows a tier3 with ALL signals to tie). -5 means tier3 needs
+# *more* story signals than tier1/tier2 to win — practically impossible when
+# both have the same content, but still possible when tier3 is the ONLY source.
+TIER3_PENALTY = int(os.environ.get('SNIPPET_TIER3_PENALTY', '-5'))
 
 # Verbs of consequence — actions that indicate a story, not a description
 _VERBS_OF_CONSEQUENCE = re.compile(
@@ -130,6 +142,11 @@ def score_snippet(snippet: Dict, artist: str = '') -> int:
     tier = snippet.get('tier', '')
     if tier in ('tier1', 'tier2'):
         score += 1
+    # [LOCAL-414] Tier3 penalty: unverified domains are demoted so they cannot
+    # outrank tier1/tier2 on story quality alone. This prevents doctrinal and
+    # apologetics sites from being injected as reference material.
+    elif tier == 'tier3':
+        score += TIER3_PENALTY
 
     # Contains artist surname: +1
     if artist:
@@ -167,12 +184,15 @@ def rank_and_cap_snippets(
 
     scored = []
     rejected_bio = 0
+    tier3_demoted = 0
 
     for snip in snippets:
         s = score_snippet(snip, artist)
         if s == -999:
             rejected_bio += 1
         else:
+            if snip.get('tier') == 'tier3':
+                tier3_demoted += 1
             scored.append((s, snip))
 
     # Sort descending by score
@@ -181,13 +201,20 @@ def rank_and_cap_snippets(
     # Cap
     capped = scored[:cap]
 
+    # [LOCAL-414] Report how many tier3 snippets survived into the final output
+    tier3_in_output = sum(1 for _, snip in capped if snip.get('tier') == 'tier3')
+    tier1_tier2_in_output = sum(1 for _, snip in capped if snip.get('tier') in ('tier1', 'tier2'))
+
     report = {
         'input_count': len(snippets),
         'rejected_biography_only': rejected_bio,
+        'tier3_demoted': tier3_demoted,
+        'tier3_in_output': tier3_in_output,
+        'tier1_tier2_in_output': tier1_tier2_in_output,
         'cap_applied': cap,
         'output_count': len(capped),
         'scores': [
-            (s[1].get('title', '')[:50], s[0]) for s in capped
+            (s[1].get('title', '')[:50], s[0], s[1].get('tier', '')) for s in capped
         ],
     }
 
