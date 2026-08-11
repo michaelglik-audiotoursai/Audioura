@@ -12362,3 +12362,38 @@ attributor splits it at the wrong boundary. The delivered tour is still correct
 because Reverdy reaches stop 3 by another path, but the mis-assignment cost a
 retry and a `beat_unrecoverable`. And Palais stop 3 came in at 107 words against
 the 120 floor.
+
+## D317 — A word-count floor deleted a real stop. Correctness mechanisms must not shrink the tour.
+**2026-08-10.** LOCAL-393 bounced despite fixing both things it was asked to fix.
+
+**What it got right:** the `France`-as-a-person false positive is gone (Palais ran
+with zero beat retries, 4/4 instruments, all dates, every stop over the floor),
+and the D316 mis-attribution is fixed — `Pierre Reverdy` now resolves to
+*Au Soleil du Plafond*, and every other beat to its correct work. That was the
+piece four rounds had been circling.
+
+**What blocks it:** the MFA tour came back with **2 stops instead of 3**.
+*Le Lézard aux plumes d'or* — the Miró book — was deleted, and with it `Miró`,
+`Broder`, `Mourlot` and `Fridman`, all of which 392 had just delivered. The log
+shows stop 1 exhausting its beat retries and then vanishing; 393's new 120-word
+floor removed it rather than keeping the 100-word version it had.
+
+**The rule this establishes: a mechanism added for correctness must never make the
+tour smaller.** Every gate and retry since D303 exists to make the tour truthful.
+This is the first that made it *thinner*, and it deleted the single richest stop —
+the one carrying the publisher, printer and donor. D275's honest stop count
+forbids *inventing* stops; it does not license deleting a grounded one. A
+100-word stop about a real work beats no stop at all (D301).
+
+**Generalisable form:** a threshold should be a **retry trigger, not a filter**.
+Retry once, keep the best output, log the shortfall. Any rule that can *remove*
+content needs an explicit invariant above it — here, delivered stop count equals
+selected work count, logged loudly on deviation.
+
+**Also worth noting about the evening's arc:** this is the seventeenth decision
+since D301 and the first regression caused by a *quality* rule rather than a
+grounding one. The failure modes have moved up the stack — from inventing artists,
+to mis-attributing them, to over-policing the prose that names them correctly.
+That is progress, but it means new rules now need the same adversarial check the
+detectors did: not only "does it fire when it should" but "what does it destroy
+when it fires".
