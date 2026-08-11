@@ -135,34 +135,105 @@ class TestCandidateSpecificsExtraction:
 # ---------------------------------------------------------------------------
 
 class TestPromptBlockStructure:
-    """The snippet injection prompt block must contain the right instructions."""
+    """The snippet injection prompt block must contain the right instructions.
+
+    [LOCAL-413] Lifted from inspect.getsource mirror to direct function test.
+    Calls build_snippet_block() and asserts on the returned string.
+    """
+
+    def _sample_snippets(self):
+        """Representative snippets for block construction."""
+        return [
+            {
+                'title': "MFA Exhibition Checklist",
+                'snippet': ("Joan Miró. Le Lézard aux plumes d'or, 1971. "
+                           "Published by Louis Broder, Paris. Printed by Mourlot Frères. "
+                           "Gift of Boris Fridman."),
+                'url': 'https://www.mfa.org/test',
+            },
+            {
+                'title': "Mourlot Lithographs",
+                'snippet': ("a series of 15 colour lithographs based on Joan Miró's "
+                           "poem and surrealist fantasy"),
+                'url': 'https://example.com/mourlot',
+            },
+            {
+                'title': "Signed Edition",
+                'snippet': "Color lithograph on Japan paper, 1971. Signed and numbered 24/50",
+                'url': 'https://example.com/edition',
+            },
+        ]
+
+    def _sample_specifics(self):
+        """Representative candidate specifics."""
+        return [
+            "edition/number: Signed and numbered 24/50",
+            "material: on Japan paper",
+            "plate count: 15 colour lithographs",
+            "literary form: based on Joan Miró's poem",
+        ]
 
     def test_prompt_contains_candidate_specifics_section(self):
-        """When specifics are found, the prompt block includes CANDIDATE SPECIFICS."""
-        # Simulate: set _DIRECT_SNIPPETS_PER_STOP and verify the prompt generation
-        # by checking the module's snippet injection code path.
-        # This tests the string structure — the actual prompt building is too coupled
-        # to mock cleanly, so we check the source for the required strings.
-        import inspect
-        source = inspect.getsource(generate_tour_text)
-        assert 'CANDIDATE SPECIFICS' in source
-        assert 'PRIORITY RULE' in source
-        assert 'concrete detail ALWAYS beats a general claim' in source
+        """When specifics are provided, the block includes CANDIDATE SPECIFICS."""
+        from generate_tour_text import build_snippet_block
+        block = build_snippet_block(self._sample_snippets(), 'Joan Miró', self._sample_specifics())
+        assert 'CANDIDATE SPECIFICS' in block
+        assert '24/50' in block
+        assert 'Japan paper' in block
+
+    def test_prompt_contains_priority_rule(self):
+        """The block includes the PRIORITY RULE instruction."""
+        from generate_tour_text import build_snippet_block
+        block = build_snippet_block(self._sample_snippets(), 'Joan Miró', self._sample_specifics())
+        assert 'PRIORITY RULE' in block
+        assert 'concrete detail ALWAYS beats a general claim' in block
 
     def test_prompt_bans_identity_form(self):
         """The prompt must explicitly ban the identity form."""
-        import inspect
-        source = inspect.getsource(generate_tour_text)
-        assert 'identity form' in source.lower() or 'identity\n    form' in source.lower()
-        # Check for the specific instruction
-        assert 'X and Y worked together' in source
+        from generate_tour_text import build_snippet_block
+        block = build_snippet_block(self._sample_snippets(), 'Joan Miró', [])
+        assert 'identity form' in block.lower() or 'identity\n    form' in block.lower()
+        assert 'X and Y worked together' in block
 
     def test_artist_attribution_in_snippet_block(self):
         """The snippet block must enforce artist surname presence."""
-        import inspect
-        source = inspect.getsource(generate_tour_text)
-        assert 'ARTIST ATTRIBUTION (LOCAL-407' in source
-        assert 'NON-NEGOTIABLE' in source
+        from generate_tour_text import build_snippet_block
+        block = build_snippet_block(self._sample_snippets(), 'Joan Miró', [])
+        assert 'ARTIST ATTRIBUTION (LOCAL-407' in block
+        assert 'NON-NEGOTIABLE' in block
+        assert 'Miró' in block
+        assert '"Miró" MUST appear' in block
+
+    def test_no_artist_attribution_when_artist_empty(self):
+        """When artist is empty, no attribution block is added."""
+        from generate_tour_text import build_snippet_block
+        block = build_snippet_block(self._sample_snippets(), '', [])
+        assert 'ARTIST ATTRIBUTION' not in block
+
+    def test_snippet_content_appears_in_block(self):
+        """The snippet titles and text must appear in the reference material section."""
+        from generate_tour_text import build_snippet_block
+        snippets = self._sample_snippets()
+        block = build_snippet_block(snippets, 'Joan Miró', [])
+        assert 'REFERENCE MATERIAL' in block
+        assert 'MFA Exhibition Checklist' in block
+        assert 'Mourlot Frères' in block
+        assert '[1]' in block
+        assert '[2]' in block
+        assert '[3]' in block
+
+    def test_no_hallucinated_sensory_claims_rule(self):
+        """The block must include the NO HALLUCINATED SENSORY CLAIMS rule."""
+        from generate_tour_text import build_snippet_block
+        block = build_snippet_block(self._sample_snippets(), 'Joan Miró', [])
+        assert 'NO HALLUCINATED SENSORY CLAIMS' in block
+
+    def test_empty_specifics_omits_section(self):
+        """When no specifics, the CANDIDATE SPECIFICS extraction section is absent."""
+        from generate_tour_text import build_snippet_block
+        block = build_snippet_block(self._sample_snippets(), 'Joan Miró', [])
+        # The "━━━ CANDIDATE SPECIFICS" header should not appear
+        assert '━━━ CANDIDATE SPECIFICS' not in block
 
 
 # ---------------------------------------------------------------------------
