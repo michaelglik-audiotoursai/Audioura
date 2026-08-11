@@ -12620,3 +12620,73 @@ dispatcher treats as terminal and would never retry.
 **Worth noting about the log format:** `FAILED` and `ABANDONED` differ in exactly
 one way that matters — retryability. A task killed by an operator's mistake is
 abandoned, not failed, and mislabelling it silently drops the work.
+
+## D324 — Michael's "intricate detail" rule, and the reversal it forces on D295
+**2026-08-11.** Michael:
+
+> "We should be providing **context instead of describing what users should see** —
+> that is annoying. I hate every time when I read '**intricate detail**' here and
+> there: **why do you call something intricate and do not explain why it is so.**"
+
+Measured in the current merged tour — 812 words, **17 empty evaluative
+adjectives**, one every 48 words: `seamless` 3, `intricate` 2, `unique` 2, plus
+striking / mesmerizing / captivating / remarkable / extraordinary / whimsical /
+vibrant / boundless / thought-provoking / dynamic. Both `intricate` instances are
+exactly the complaint:
+
+> "Position yourself at the center of the exhibit to fully appreciate the
+> **intricate details**…"
+> "Stand close to observe the **intricate details** that unfold upon the pages…"
+
+**The rule: an evaluative adjective must be followed by what earns it.** "Intricate"
+is a claim, and a claim needs its evidence — 40 lithographs pulled by hand, a
+binding of publisher's vellum, a poet and a painter working to the same page. If
+the earning clause cannot be supplied from grounded material, the adjective goes.
+
+**This reverses part of D295, and the reversal matters.** LOCAL-375 classified the
+residual `empty_sentence_count` hits and found 22.4% were "false positives —
+visual descriptions of artwork that carry real information but trip the
+heuristic". LEAD concluded the metric could not enforce until that class was
+exempted.
+
+**By Michael's standard those are not false positives.** Evaluative visual
+description without explanation is precisely what he is objecting to. The metric
+was measuring the defect correctly the whole time and LEAD argued it into
+"needs narrowing" on the strength of a category that the product owner considers
+bad content.
+
+So D295's sequencing is wrong: the answer is **not** "narrow the heuristic, then
+enforce". It is closer to "enforce on the class we now know is unwanted, and let
+the earning-clause rule supply what replaces it". The population still needs
+re-reading before a threshold is picked — a sentence naming a technique *and*
+explaining it should survive — but the exemption LEAD was about to build would
+have protected the exact prose Michael dislikes.
+
+**Recorded as a caution about deference to metrics:** LEAD treated "the heuristic
+has false positives" as a fact about the heuristic. It was a fact about LEAD's
+assumption of what good prose looks like, and one sentence from the product owner
+overturned it.
+
+## D325 — Relevance is the other half of grounding
+**2026-08-11.** Michael, on the risk that fetched stories get stripped as
+ungrounded:
+
+> "I agree: **if the story is not connected with the stop, its author, the exhibit,
+> it would feel like irrelevant** and we should be sensitive to it. The story needs
+> to be interesting for the listeners because it would **widen his understanding of
+> what he is seeing and provide the context**."
+
+So the second-source corpus must not become a licence for any interesting fact.
+A story qualifies only if it connects to **this stop's work, its makers, or this
+exhibition's premise** — and its job is to widen understanding of the object in
+front of the listener, not to be a detour.
+
+That gives a usable test for a story beat, in order:
+1. Does it attach to this stop's work, maker, publisher, printer, donor, or the
+   exhibition's own subject? If no — drop it, however interesting.
+2. Does it tell the listener something they cannot see? If no — it is description,
+   not story.
+3. Is it grounded in the retrieved corpus? If no — drop it.
+
+**Both halves are needed.** LOCAL-397 extends the grounding corpus so true stories
+survive; this rule stops that extension from admitting relevant-sounding trivia.
