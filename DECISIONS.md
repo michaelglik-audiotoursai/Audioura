@@ -14333,3 +14333,82 @@ applies to extracted functions exactly as it does to modules.
 
 **Behaviour unchanged, as required:** 3 stops, zero stubs, facts still landing
 (Broder ×3, Mourlot ×3, Arches, vellum), Palais 4/4 with dates intact, 101 green.
+
+## D369 — LOCAL-423 merged; its verifier was reporting success over stories it never read
+**2026-08-11, 19:4x.** Merged as `ffb6fc8`. Follow-up parked as LOCAL-424.
+
+**What works, confirmed live by LEAD, not by report:** entity disambiguation
+correctly excludes Boris Fridman-Mintz (a linguist in Mexico) and Fridman Gallery
+(New York, founded 2013), keeping only the collector; the "Boston-based" fabrication
+and the invented 2003 donation date are gone; self-contradiction detection makes the
+15-vs-40 lithograph bug structurally impossible; Michael's visitor-framed query
+shape is wired into `work_story_searcher`.
+
+**The merge was a 3-way merge, not a cherry-pick, and that mattered.** An earlier
+cherry-pick attempt conflicted in `generate_tour_text.py`, and LEAD's own
+auto-resolution loop ran `git checkout --theirs .`, which would have silently
+discarded 422's `resolve_final_description` from the merged tree. Caught before
+committing. **A blanket `--theirs` on a code file is never a resolution** — it is a
+choice to delete one side's work without reading it. The 3-way merge resolved the
+same file cleanly, and the D363 check confirmed all three sides survived: 422's
+function (1 def, 2 production callers), 423's verifier wiring, 419's ranking.
+
+### The defect: a green light over an unexamined story
+
+```python
+extract_claims(<a real 5-sentence delivered story with six checkable assertions>)
+# -> 0
+```
+
+The live runs reported `claims=1` on one story and 0 here, while printing
+**`STORY VERIFICATION: ALL STOPS PASSED — all claims sourced`**. A verifier that
+extracts nothing verifies nothing, and that line is exactly the kind of statement
+that later gets cited as proof. This is CLAUDE.md's "green tests over orphaned
+modules prove nothing", now applied to a safety gate.
+
+**LEAD stop-gap, committed with the merge:** `claims_extracted == 0` is forced to
+FAIL with reason `VACUOUS: 0 claims extracted`, and the success line now reads
+"every extracted claim is sourced" rather than "all claims sourced". The false
+green is gone; extraction is LOCAL-424's job.
+
+**The most dangerous claim type is the one the extractor ignores entirely:**
+institutional colour like *"his gift enhances the museum's extensive collection of
+Surrealist-era printed works"* reads as atmosphere and is an assertion about a real
+museum's holdings.
+
+### And the binding gap reopened one round after it was closed
+
+Neutralising the production call site while leaving `story_verifier.py` intact:
+**18 passed**. All of them. LOCAL-422 closed this exact hole (D368) and 423 reopened
+it. 424 must use 422's pattern.
+
+**Merged anyway, deliberately.** The infrastructure is real and improves output
+measurably; the two defects are recorded, the dangerous one is neutralised in the
+merge itself, and the fix lands on a merged base rather than a diverging branch —
+423 already had to cherry-pick 422 and hit conflicts doing it.
+
+## D370 — GPT-4o for the story pass only; the global swap breaks the tour outright
+**2026-08-11, 19:3x.** Michael's decision, taken on evidence he asked for.
+
+| | story gate |
+|---|---|
+| gpt-3.5 (423's two runs) | 0–2 sentences, **FAILED** |
+| gpt-4o, story pass only | **PASSED**, `story_count=5, entities_ok=True, thesis_ok=True` |
+
+Delivered prose names Broder, Mourlot Frères and Fridman **and explains who they
+were**, then ties the stop to the exhibition's thesis explicitly. That is what D362
+asked for and gpt-3.5 never produced.
+
+**`TOUR_LLM_MODEL=gpt-4o` globally made the tour fail to generate at all.** Every
+LLM call in the pipeline reads that one variable, and gpt-4o interpreted the
+POI-discovery prompt as "find art venues in Boston" — six different museums, which
+`BLOCKER4b` correctly rejected. The upstream phases are tuned to gpt-3.5's
+literalism. **The switch must be narrow:** `TOUR_STORY_MODEL` at the per-stop
+description call, defaulting to gpt-4o, everything else unchanged.
+
+**Cost:** $0.0111/tour vs ~$0.003–0.005. 2–3× on a sub-cent line, negligible beside
+SERP. A full gpt-4 swap would have been ~30×; it was never the right experiment.
+
+**Separately, seen twice:** `prose_llm_extract_works` returned 1 work instead of 3
+on both gpt-4o runs, so both delivered a single stop. Unrelated to the story model —
+extraction variance, and it needs its own task.
