@@ -613,16 +613,88 @@ _CAPTION_PREFIX_PATTERN = re.compile(
 )
 
 
+def _is_date_like(text: str) -> bool:
+    """Return True if the text is a date, date range, weekday, or month name.
+    
+    [LOCAL-418] A title that is a date, a date range, a weekday, or a month name
+    is not a work. Examples that must return True:
+    - "Wednesday, September 16–Wednesday"
+    - "October 7"
+    - "September 16"
+    - "March 2025"
+    - "Wednesday"
+    - "2024-10-05"
+    - "January 15, 2025"
+    """
+    if not text:
+        return False
+    text_stripped = text.strip()
+    
+    # Weekday names (full and abbreviated)
+    _WEEKDAYS = {'monday', 'tuesday', 'wednesday', 'thursday', 'friday',
+                 'saturday', 'sunday', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'}
+    
+    # Month names (full and abbreviated, English)
+    _MONTHS = {'january', 'february', 'march', 'april', 'may', 'june',
+               'july', 'august', 'september', 'october', 'november', 'december',
+               'jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug', 'sep', 'sept',
+               'oct', 'nov', 'dec'}
+    
+    # Check if the entire text (lowercased, stripped) is just a weekday or month
+    text_lower = text_stripped.lower()
+    if text_lower in _WEEKDAYS or text_lower in _MONTHS:
+        return True
+    
+    # Strip all text content and check if what remains is only:
+    # weekdays, months, numbers, dashes/en-dashes, commas, and whitespace
+    # This catches: "Wednesday, September 16–Wednesday, October 7, 2026"
+    #               "September 16"
+    #               "October 7"
+    #               "March 2025"
+    #               "January 15, 2025"
+    # Remove weekday names, month names, numbers, punctuation/dashes/whitespace
+    # If nothing meaningful is left, it's a date string.
+    _ALL_DATE_WORDS = _WEEKDAYS | _MONTHS
+    
+    # Tokenize: split on whitespace and common date punctuation
+    tokens = re.split(r'[\s,;–—\-/]+', text_lower)
+    tokens = [t.strip('.') for t in tokens if t.strip('.')]
+    
+    if not tokens:
+        return True  # Empty after split — treat as date-like
+    
+    # Every token must be a date-related word or a number
+    for token in tokens:
+        if token in _ALL_DATE_WORDS:
+            continue
+        if re.match(r'^\d{1,4}$', token):
+            continue
+        # Not a date word or number — this is real text
+        return False
+    
+    return True
+
+
 def _work_entry_is_implausible(work: dict) -> bool:
     """Return True if a work entry is implausible (gallery label, caption, etc.).
     
     Checks:
     - Artist is a place, civilisation, period, or people
+    - Artist is a date or date fragment [LOCAL-418]
     - Title is a gallery/section name
     - Title begins with "Detail of" / "Detail fo" (image caption)
+    - Title is a date, date range, weekday, or month name [LOCAL-418]
     """
     title = (work.get('title') or '').strip()
     artist = (work.get('artist') or '').strip()
+    
+    # [LOCAL-418] Title is a date/date-range/weekday/month — not a work
+    if title and _is_date_like(title):
+        return True
+    
+    # [LOCAL-418] Artist is a date/date-range — not a person
+    if artist and _is_date_like(artist):
+        return True
     
     # Artist is a civilisation/place/people, not an individual
     if artist and _NOT_ARTIST_PATTERNS.search(artist):
@@ -861,6 +933,11 @@ def extract_works_from_exhibition_page(text: str, links: List[Tuple[str, str]]) 
 
         if work:
             title_norm = _normalize_for_match(work['title'])
+            # [LOCAL-418] Reject if title or artist is a date/date-range
+            if _is_date_like(work['title']):
+                continue
+            if work.get('artist') and _is_date_like(work['artist']):
+                continue
             # Reject if too short, too long, or a duplicate
             if len(title_norm) < 3 or len(title_norm) > 100:
                 continue
