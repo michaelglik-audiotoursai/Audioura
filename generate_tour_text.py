@@ -4129,6 +4129,77 @@ def r4_scope_cap(exhibition_scope, poi_list_len, total_stops):
     return suppressed, total_stops
 
 
+# [LOCAL-420] Stub detection and material fallback — module-level for testability.
+# A listener must never be told the system failed.
+_STUB_TAIL = "A detailed narration could not be generated for this stop."
+
+
+def _is_stub_text(text):
+    """[LOCAL-420] Return True if text is the empty-stop stub that must never ship."""
+    if not text:
+        return False
+    return _STUB_TAIL in text
+
+
+def _build_material_fallback(poi_name, artist, matched_work, credit_line, candidate_specifics):
+    """[LOCAL-420] Build a short, factual paragraph from whatever material IS on hand.
+
+    A listener must never be told the system failed. When no LLM attempt passes
+    the gate, we still have: the work title, artist, medium, credit line, and any
+    candidate specifics extracted from snippets. Build a real (if thin) narration
+    from those. The result won't pass the positive gate's "concrete fact" check
+    in most cases, but it IS real prose that a listener can hear without
+    embarrassment — unlike the stub.
+    """
+    parts = []
+
+    # Opening: name the work and artist
+    if artist and artist.strip() and artist.strip().lower() not in ('unknown', 'n/a', 'various'):
+        parts.append(f"{poi_name} is a work by {artist}.")
+    else:
+        parts.append(f"Here we have {poi_name}.")
+
+    # Medium / technique from matched_work
+    if matched_work:
+        medium = (matched_work.get('medium') or '').strip()
+        if medium:
+            parts.append(f"This piece is executed in {medium.lower()}.")
+        date = (matched_work.get('date') or '').strip()
+        if date:
+            parts.append(f"It dates to {date}.")
+        collaborator = (matched_work.get('collaborator') or '').strip()
+        if collaborator:
+            parts.append(f"It was created in collaboration with {collaborator}.")
+
+    # Credit line (provenance)
+    if credit_line:
+        # Use credit line as-is if it's short; summarize if long
+        if len(credit_line) <= 120:
+            parts.append(credit_line.rstrip('.') + '.')
+        else:
+            # Take first sentence of credit line
+            first_sent = credit_line.split('.')[0].strip()
+            if first_sent:
+                parts.append(first_sent + '.')
+
+    # Candidate specifics from snippet extraction
+    if candidate_specifics:
+        # Pick up to 3 most informative specifics
+        _specs = []
+        for cs in candidate_specifics[:3]:
+            # Format: "material: lithograph on vellum" → "lithograph on vellum"
+            if ':' in cs:
+                _specs.append(cs.split(':', 1)[1].strip())
+            else:
+                _specs.append(cs.strip())
+        if _specs:
+            parts.append("Notable details include " + ", ".join(_specs) + ".")
+
+    # Ensure we have at least something beyond just the opening line
+    result = " ".join(parts)
+    return result
+
+
 def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None):
     """
     Generate audio tour text using OpenAI API with geo coordinates.
@@ -8593,72 +8664,7 @@ Exempt: navigation directions ("Turn left", "Continue past").
             return (True, match.group(0))
         return (False, None)
 
-    # [LOCAL-420] Stub detection — a listener must never be told the system failed.
-    _STUB_TAIL = "A detailed narration could not be generated for this stop."
-
-    def _is_stub_text(text):
-        """[LOCAL-420] Return True if text is the empty-stop stub that must never ship."""
-        if not text:
-            return False
-        return _STUB_TAIL in text
-
-    def _build_material_fallback(poi_name, artist, matched_work, credit_line, candidate_specifics):
-        """[LOCAL-420] Build a short, factual paragraph from whatever material IS on hand.
-
-        A listener must never be told the system failed. When no LLM attempt passes
-        the gate, we still have: the work title, artist, medium, credit line, and any
-        candidate specifics extracted from snippets. Build a real (if thin) narration
-        from those. The result won't pass the positive gate's "concrete fact" check
-        in most cases, but it IS real prose that a listener can hear without
-        embarrassment — unlike the stub.
-        """
-        parts = []
-
-        # Opening: name the work and artist
-        if artist and artist.strip() and artist.strip().lower() not in ('unknown', 'n/a', 'various'):
-            parts.append(f"{poi_name} is a work by {artist}.")
-        else:
-            parts.append(f"Here we have {poi_name}.")
-
-        # Medium / technique from matched_work
-        if matched_work:
-            medium = (matched_work.get('medium') or '').strip()
-            if medium:
-                parts.append(f"This piece is executed in {medium.lower()}.")
-            date = (matched_work.get('date') or '').strip()
-            if date:
-                parts.append(f"It dates to {date}.")
-            collaborator = (matched_work.get('collaborator') or '').strip()
-            if collaborator:
-                parts.append(f"It was created in collaboration with {collaborator}.")
-
-        # Credit line (provenance)
-        if credit_line:
-            # Use credit line as-is if it's short; summarize if long
-            if len(credit_line) <= 120:
-                parts.append(credit_line.rstrip('.') + '.')
-            else:
-                # Take first sentence of credit line
-                first_sent = credit_line.split('.')[0].strip()
-                if first_sent:
-                    parts.append(first_sent + '.')
-
-        # Candidate specifics from snippet extraction
-        if candidate_specifics:
-            # Pick up to 3 most informative specifics
-            _specs = []
-            for cs in candidate_specifics[:3]:
-                # Format: "material: lithograph on vellum" → "lithograph on vellum"
-                if ':' in cs:
-                    _specs.append(cs.split(':', 1)[1].strip())
-                else:
-                    _specs.append(cs.strip())
-            if _specs:
-                parts.append("Notable details include " + ", ".join(_specs) + ".")
-
-        # Ensure we have at least something beyond just the opening line
-        result = " ".join(parts)
-        return result
+    # [LOCAL-420] Stub detection — references module-level _is_stub_text and _build_material_fallback.
 
     def _generate_description(args):
         idx, poi, spine_stop, fact_sheet, story_type = args
