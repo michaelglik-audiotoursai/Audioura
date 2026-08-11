@@ -1,0 +1,313 @@
+================================================================================
+LITERAL PROMPT SENT TO LLM — STOP 1
+Generated: 2026-08-11T09:08:29.875679
+Model: gpt-3.5-turbo
+Temperature: 0.7
+Max tokens: 1000
+================================================================================
+
+--- SYSTEM MESSAGE ---
+You are a knowledgeable museum guide with expertise in art, architecture, and history.
+
+--- USER MESSAGE ---
+STYLE: Channel the passion of a curator who fell in love with this piece — make the listener see what the artist felt.
+
+━━━ NAMES THAT MUST APPEAR (your text is rejected without these) ━━━
+  • Broder (Louis Broder, publisher)
+  • Frères (Mourlot Frères, printer)
+  • Fridman (Boris Fridman, donor)
+━━━ END REQUIRED NAMES ━━━
+
+━━━ CONCRETE FACTS TO USE (prefer these over general claims) ━━━
+  • material: publisher’s vellum
+  • plate count: 40 color lithographs
+━━━ END CONCRETE FACTS ━━━
+
+
+
+Create a detailed audio description for Le Lézard aux plumes d’or (The Lizard with Golden Feathers) at Picasso, Miró, Dalí: Unbound exhibition at MFA, Boston, MA, focusing on museum.
+
+Start with a brief orientation that names "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)" specifically (not "the exhibit" or "this piece") and tells the listener WHERE to stand or look AND WHY — what becomes visible, legible, or striking from that position that they would miss otherwise.
+
+Then provide a detailed description of the exhibit. Include:
+- What the work physically depicts or consists of — what the visitor sees
+- One specific technique, material choice, or compositional decision and WHY it matters
+- One piece of historical or cultural context that changes how the visitor understands it
+- If relevant: how this piece connects to the broader collection or museum
+
+EXPLAIN-WHAT-YOU-NAME RULE (critical):
+Every concept, motif, symbol, technique, cultural reference, or person you mention
+MUST get at least one clause of explanation. If you cannot explain it in a clause, cut it.
+- BAD: "the rich cultural heritage of Bengal" (names but explains nothing)
+- GOOD: "the Pala dynasty tradition of Bengal, where Buddhist monasteries commissioned
+  bronze casting between the 8th and 12th centuries"
+- BAD: "delicate floral motifs adorning the crown" (what do they mean?)
+- GOOD: "lotus petals on the crown — a symbol of spiritual purity in Hindu iconography,
+  also found on temple lintels across Southeast Asia"
+- BAD: "Each intricate detail tells a story of creation and rebirth"
+  (asserts meaning without delivering it)
+- GOOD: "The four arms each hold a specific object: the axe that severs attachment,
+  the rope that pulls devotees from illusion, the tusk broken as a writing implement,
+  and the sweetmeat representing the reward of a disciplined life"
+The stop's own subject (the exhibit itself) needs no gloss — the whole stop explains it.
+But a person referenced in passing (e.g. Ulysses Grant) needs one clause: "the American
+Civil War general who became president." If most visitors won't know it, explain it or cut it.
+
+NO UNSUPPORTED PRAISE: Do not end paragraphs with evaluative claims ("a truly remarkable
+achievement", "a testament to the artist's genius") unless you have just provided the
+specific evidence that earns the evaluation. If the preceding sentences do not contain
+that evidence, delete the praise — it is filler. A shorter stop that explains three things
+beats a longer one that names eight and explains none.
+
+AUDIO RULES (this will be heard, not read):
+- NEVER end with a rhetorical question. End on a statement — an image, a fact, or a thought the listener can carry forward.
+- NEVER list more than three items in a row. Listeners lose track after three.
+- Write for the EAR: short-to-medium sentences, concrete language, no parenthetical asides.
+
+NO PREACHING — NEVER INSTRUCT THE LISTENER (critical):
+- NEVER end a stop by telling the listener what to feel, notice, consider, reflect on,
+  or carry away. End on a FACT or an OBSERVATION, not an instruction.
+- BANNED CLOSINGS (do not use any variation of these):
+  "Consider what other..." / "Let the whispers of the past guide..."
+  "As you stand before this masterpiece, consider..." / "Take a moment to..."
+  "Allow yourself to..." / "Reflect on..." / "Ponder..." / "Imagine..."
+  "Let this be a reminder..." / "Carry this with you as..."
+- The listener is an adult. Do NOT tell them what they "should" feel or do.
+- A stop ends when you run out of things to SAY, not when you have issued a command.
+
+DECLARATIVE PROSE — STYLE RULES (LOCAL-188, critical):
+All narration must be declarative. These rules are enforced by automated validation.
+- NO SECOND-PERSON IMPERATIVES: Never open a sentence with a base-form verb aimed at the
+  listener. "Feel the weight", "Notice the facade", "Imagine the scene", "Explore further",
+  "Discover the connection", "Consider the contrast" — ALL BANNED.
+  Write declarative statements instead: "The weight of centuries is visible in..." not
+  "Feel the weight of centuries."
+- NO QUESTIONS: Never use a question mark. Never pose a rhetorical question.
+  "How does this manifest?" → "This manifests in..."
+- NO "AS YOU WANDER/EXPLORE/STROLL": Never use "as you" + a movement or discovery verb.
+  "As you explore the gallery" / "As you wander through" / "If you look closely" — BANNED.
+  State what IS, not what happens when the listener moves.
+- NO PRESCRIBED FEELINGS: Never tell the listener what they feel, sense, or experience.
+  "You feel the solemnity" / "You sense the history" / "You find yourself moved" — BANNED.
+  Describe the OBJECT or PLACE, not the listener's inner state.
+- NO HALLUCINATED SENSORY CLAIMS: Never assert a sensation the listener cannot actually be
+  having. "You can almost hear the echo of his brushstrokes" / "Breathe in the faint scent
+  of oil paint that still lingers" — BANNED. Historical sounds are silent. Absent smells
+  are absent. Only describe sensory facts that are TRUE RIGHT NOW at this location.
+These rules apply to the NARRATION paragraphs only. Navigation/orientation directions
+("Head south", "Turn left", "Continue past") are exempt — imperative form is correct there.
+
+NO CONDESCENSION:
+- NEVER write "To truly appreciate/understand [X], one must..." — this presupposes
+  ignorance. Instead, JUST STATE the context: "During samurai culture in 19th century
+  Japan, armor was not just practical but also a symbol of status and honor."
+- NEVER write "It is worth noting that..." or "It is important to understand that..."
+  — just state the thing directly.
+
+NO DESCRIBING THE OBVIOUS:
+- The listener is STANDING IN FRONT of the object. Do NOT describe what is plainly
+  visible ("The surface shimmers under the museum's soft lighting").
+- Description earns its place ONLY when it points at something the visitor would
+  otherwise MISS — a hidden detail, its meaning, its history, its technique.
+
+OPENING STYLE (mandatory for this stop): Open with a vivid sensory detail — a sound, smell, texture, or visual that immediately places the listener at this location.
+This instruction overrides any default opening pattern — do NOT open with a generic introduction or the same structure as other stops.
+BANNED OPENERS (never use these, regardless of which style is assigned above):
+- "Nestled in..." / "Nestled among..." / "Nestled between..."
+- "In the heart of..." / "At the heart of..."
+- "Located in..." / "Situated in..." / "Tucked away in..."
+- Any variation that opens with a generic locative clause placing the stop geographically before saying anything interesting about it.
+If your first instinct is a locative-clause opener, delete it and lead with the specific detail, question, or sensory element the style above requires instead.
+
+CATEGORY VOICE: Contemplative and precise — linger on details, share what you've noticed after hours in this room. Speak as someone who knows the collection intimately and wants to show what most visitors miss.
+This tone should permeate the entire description — not as a single inserted sentence, but as the underlying sensibility.
+
+DO NOT USE these phrases: the building was erected, historically important, the population of, vibrant\s+colou?rs?\s*(and|of|that), dreamlike\s+(imagery|quality|world|scene|composition), deep\s+connection\s+to, (his|her|their)\s+Jewish\s+heritage, intricate\s+details?, timeless\s+themes?, position\s+yourself\s+in\s+the\s+center, the\s+artist['']?s?\s+(unique|remarkable|extraordinary), masterpiece\s+that, a\s+testament\s+to, creative\s+genius, stir(s|ring)?\s+the\s+soul, touch(es|ing)?\s+(the|our|your)\s+(heart|soul), pulsate\w*\s+with\s+life, symphony\s+of\s+(emotions?|colou?rs?), tapestry\s+of\s+(dreams?|emotions?), weaves?\s+a\s+narrative, (captivating|mesmerizing)\s+(artistry|world|vision), truly\s+remarkable, can['']t\s+help\s+but, feast\s+for\s+the\s+(eyes|senses), invites\s+you\s+to\s+(explore|discover|reflect), step\s+into\s+a\s+world, rich\s+tapestry\s+of, journey\s+through\s+(time|history), stands?\s+as\s+a\s+testament, explore\s+the\s+(rich|fascinating|incredible), immerse\s+yourself\s+in, a\s+hidden\s+gem, steeped\s+in\s+history, transcends?\s+(time|boundaries), a\s+window\s+into, breathtaking\s+(view|beauty|display), let\s+(your|the)\s+(curiosity|imagination)\s+guide, beacon\s+of\s+(creativity|hope|light), gaze\s+upon\s+this, power\s+of\s+art\s+to, echoing\s+the\s+eternal\s+cycles, fully\s+immerse\s+yourself\s+in\s+the, the\s+rich\s+cultural\s+heritage\s+of, each\s+(intricate\s+)?detail\s+tells\s+a\s+story, to\s+fully\s+(appreciate|understand|immerse|experience), a\s+(stunning|exquisite|mesmerizing)\s+example\s+of, as\s+you\s+stand\s+(before|here|in\s+front)[^,]*,?\s*(consider|reflect|ponder|let), let\s+the\s+whispers?\s+of\s+the\s+past, take\s+a\s+moment\s+to\s+(appreciate|reflect|consider|absorb), allow\s+(yourself|your\s+imagination)\s+to, carry\s+(this|these|the)\s+\w+\s+with\s+you, what\s+other\s+(tales?|stories?|secrets?|treasures?|wonders?)\s+(of|await|might), to\s+truly\s+(appreciate|understand)\s+(the\s+significance|this), it\s+is\s+(worth|important)\s+(noting|to\s+note|to\s+understand), the\s+next\s+journey\s+awaits, ask\s+museum\s+staff\s+for\s+directions
+
+NARRATIVE SPINE CONTEXT (use to shape your description):
+- Emotional beat for this stop: curiosity
+- Unique angle to emphasize: Discover how Max Ernst's surrealist imagination transforms a simple creature into a mystical symbol, revealing the era's fascination with the subconscious.
+- End with a forward-looking hook: How does transformation manifest in the realm of faith and history?
+
+VERIFIED FACTS (incorporate these for accuracy — these are confirmed for this specific POI):
+The Museum of Fine Arts was founded in 1870 in Copley Square.
+
+MANDATORY INCLUSION — work this surprising detail into the description naturally:
+The initial location of the Museum of Fine Arts was on the top floor of the Boston Athenæum.
+
+PROVENANCE (museum-published credit line — you MUST name the donor):
+  Gift of Boris Fridman
+
+MANDATORY: Name the donor "Boris Fridman" (surname "Fridman") in your text. Do NOT write "a gift to the museum" without naming who gave it.
+PROHIBITION: Do NOT infer or assert the donor's motive, wealth, financial condition,
+or any biographical predicate not contained in retrieved text. Stating "Gift of [name]"
+is the documented fact; "donated because…" or "could no longer afford…" is fabrication.
+
+WORK IDENTITY (LOCAL-379 — grounded facts from exhibition checklist):
+  Artist: Joan Miró
+  Date: 1971
+  Medium: Illustrated book with 40 color lithographs (including wrapper front and cover); publisher’s vellum
+  Publisher: Louis Broder
+  Credit line: Gift of Boris Fridman
+
+You MUST name the artist in your description. If a collaborator or author is given, name them too. These are grounded facts — use them.
+
+EXHIBITION FRAMING (LOCAL-382 — this work is part of a curated exhibition):
+This is NOT a painting on a wall. The exhibition's thesis is that THE BOOK IS THE ARTWORK:
+image, text, typography, paper, binding, as one integrated thing.
+
+Your description MUST engage at least TWO of these dimensions:
+1. The COLLABORATION — who wrote/authored it, who published it, who printed it.
+2. The FORM — lithographs, binding, plates, paper, printing technique.
+3. How IMAGES, WORDS, AND TYPOGRAPHY intersect — the exhibition's stated subject.
+
+KNOWN COLLABORATION/FORM FACTS for this work:
+  - Publisher: Louis Broder
+  - Medium/form: Illustrated book with 40 color lithographs (including wrapper front and cover); publisher’s vellum
+
+FORBIDDEN: Describing the depicted image as though this object were a painting,
+with no reference to it being a book or printed work. That treats the work as
+something it is not and ignores the exhibition's entire premise.
+
+STORY BEAT REQUIREMENT (LOCAL-383):
+Your description MUST contain at least one sentence that NAMES A PERSON and
+states WHAT THEY DID — a specific action or circumstance, not a general claim.
+This SUPPLEMENTS (does not replace) any exhibition framing or thesis instructions above.
+
+ARTIST ATTRIBUTION IS NON-NEGOTIABLE (LOCAL-390):
+The Artist named in the WORK IDENTITY block above MUST appear by surname in your
+description. A stop about a Miró book must name Miró; a stop about Dalí's
+illustrations must name Dalí. The story beat persons (publishers, printers, donors)
+are IN ADDITION TO the artist — never instead of. If WORK IDENTITY says
+"Artist: Joan Miró", your text must contain "Miró".
+
+━━━ REQUIRED CONTENT — EACH SURNAME BELOW MUST APPEAR IN YOUR TEXT ━━━
+  ✓ "Broder" — Louis Broder (publisher): published this work
+  ✓ "Frères" — Mourlot Frères (printer): printed this work
+  ✓ "Fridman" — Boris Fridman (donor): gave this work as a gift to the museum
+Write at least one sentence per person above that names them by surname.
+If you omit any of these surnames, your response will be REJECTED and regenerated.
+━━━ END REQUIRED CONTENT ━━━
+
+GROUNDED PEOPLE AND ACTIONS (from the exhibition page — use at least one):
+  • Louis Broder (Publisher): published this work
+  • Mourlot Frères (Printer): printed this work
+  • Boris Fridman (Donor): gave this work as a gift to the museum
+
+STORY SERVES THE THESIS: The person/action you name should connect to WHY
+this exhibition exists — e.g., a printer matters because the show argues printers
+were essential collaborators, not because printers are inherently interesting.
+NEVER-PLACEHOLDER RULE (LOCAL-388): Do NOT write 'with publisher', 'with printer', 'with donor', or 'the patron'. Where a role is mentioned, NAME THE PERSON. Specifically:
+  'publisher' → use 'Louis Broder'
+  'printer' → use 'Mourlot Frères'
+  'donor' → use 'Boris Fridman'
+
+
+WHAT IS NOT A STORY: "This masterpiece challenges boundaries" is not a story.
+"Published by Louis Broder in Paris" IS a story — it names who and what they did.
+A story has: a person, a specific circumstance, a consequence.
+
+REFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):
+  [1] MFA Exhibition Checklist — Le Lézard aux plumes d'or
+      Joan Miró. Le Lézard aux plumes d'or (The Lizard with Golden Feathers), 1971. Published by Louis Broder, Paris. Printed by Mourlot Frères. Gift of Boris Fridman to the Museum of Fine Arts, Boston.
+
+━━━ CANDIDATE SPECIFICS (extracted from the snippets above) ━━━
+  • material: publisher’s vellum
+  • plate count: 40 color lithographs
+━━━ END CANDIDATE SPECIFICS ━━━
+
+STORY INSTRUCTION (LOCAL-407):
+Using the reference material above, write a description that includes AT LEAST ONE
+concrete specific from the CANDIDATE SPECIFICS list. A concrete specific is a number,
+a named material, a named literary form, or a verifiable catalogue fact.
+
+PRIORITY RULE: A concrete detail ALWAYS beats a general claim.
+  ✗ "resulted in a work that had no precedent" — this is a slogan, not a story
+  ✗ "revolutionized the book as an art form" — this is a claim, not a fact
+  ✓ "Miró wrote the poem himself, then drew against his own words" — specific action
+  ✓ "printed on Japan paper in an edition of 50" — verifiable detail
+  ✓ "a series of 15 colour lithographs" — concrete count
+
+Additional requirements:
+  - Name people explicitly (never "the publisher", "the patron" — use their actual name)
+  - State what they did specifically (a concrete action, not "influenced" or "collaborated")
+  - Do NOT assert any interaction between people unless the material confirms both were alive
+    and working together at the stated time
+  - If dates are given, use them accurately
+  - If the material does not support a specific person-story, omit rather than invent
+  - "X and Y worked together" or "X's collaboration with Y" is NOT a story — it is the
+    identity form. A story requires: who did what, with what material consequence.
+
+CRITICAL CONSTRAINT: This artwork/exhibit MUST be something that is physically on display at 'Museum of Fine Arts, Boston'. Describe the ARTWORK itself — its visual qualities, technique, symbolism, and story. If you know which room or hall it's in, mention that briefly. If you don't know the exact room, do NOT fabricate one — just describe the work directly.
+
+EXHIBITION VS OBJECT RULE (critical — prevents fabrication):
+A catalogue entry may be an EXHIBITION, a GALLERY, or a PROGRAMME rather than a physical object.
+Before describing brushwork, material, colour palette, or composition, CONFIRM that the subject
+is an actual physical artwork (a painting, sculpture, ceramic, textile, etc.).
+If the title names a person, an event, or uses language like "hommage à", "exposition",
+"les années...", it is likely an EXHIBITION or PROGRAMME, not a canvas or object.
+- If it IS an exhibition: describe what it covers, its scope, what visitors encounter (the
+  types of works shown, the period or theme), NOT imagined visual details of a single piece.
+- If it IS an object: describe it normally — technique, material, visual content, history.
+Example: "Pierre Matisse, un marchand d'art à New York" is a biographical EXHIBITION about
+Henri Matisse's son — describe the exhibition's subject and scope, NOT brushstrokes.
+
+THIN-CORPUS HONESTY RULE (critical — prevents fabrication):
+If you do not have verified, specific information about this particular work's visual content,
+material, or history, DO NOT INVENT details. Instead:
+- State what IS known (title, artist, period, medium if available)
+- Describe the TYPE of work and its general context
+- Acknowledge the gap honestly rather than filling it with plausible-sounding fiction
+A 120-word honest description beats a 300-word fabricated one. When your knowledge is thin,
+be SHORT and FACTUAL. The number of confirmed facts in the fact sheet below tells you how
+much material you actually have to work with.
+
+Do NOT repeat the artist's biographical background (birth year, nationality, school associations like 'École de Paris', artistic formats like 'stained glass and stage sets'). That information belongs in the tour introduction only. Here, focus EXCLUSIVELY on THIS SPECIFIC ARTWORK — what it depicts, its technique, its story, what to look for with your eyes.
+
+BANNED PHRASES — do NOT use any of these in your description:
+- "vibrant colors" / "dreamlike imagery" / "dreamlike quality"
+- "creative genius" / "artistic prowess" / "masterpiece that"
+- "stir the soul" / "touch the heart" / "pulsate with life"
+- "symphony of emotions" / "tapestry of dreams" / "weaves a narrative"
+- "truly remarkable" / "a testament to" / "stands as a testament"
+- "captivating artistry" / "mesmerizing world" / "intricate details"
+- "invites you to explore/discover/reflect" / "immerse yourself in"
+- "can't help but" / "feast for the eyes" / "step into a world"
+Instead, use SPECIFIC, CONCRETE language: name colors precisely (cerulean, ochre, vermilion), describe actual compositional choices, mention documented historical context.
+
+UNEARNED ADJECTIVES — these words are BANNED unless the same sentence or the one before it
+contains the specific evidence that earns them:
+- "vibrant" — ONLY permitted if you name the specific colors/contrasts that make it vibrant
+- "stunning" — ONLY if you describe what causes the visual impact (scale? technique? contrast?)
+- "remarkable" — ONLY if you state what distinguishes it from comparable works
+- "mesmerizing" — ONLY if you explain the optical or compositional mechanism
+- "exquisite" — ONLY if you describe the craftsmanship detail (grain, jointwork, brushstroke)
+- "breathtaking" — ONLY if you name the physical feature that produces the effect
+- "captivating" — ONLY if you explain what holds attention and why
+If you cannot provide that evidence in the same breath, delete the adjective. A bare noun
+is better than a noun preceded by an unearned superlative.
+
+FACTUAL INTEGRITY RULE: Do NOT invent visual specifics or biographical claims not in the fact sheet above. You may describe the general biblical SUBJECT (e.g. "depicts the parting of the Red Sea") but do NOT assert specific visual details as facts (colors, composition) unless grounded in the facts above. Never call a work "the artist's final masterpiece" or similar unverifiable superlatives.
+
+Format your response as follows:
+Orientation: (write a brief orientation text explaining the best viewing position here)
+
+Then write the description directly — a flowing, 280-word narrative about the exhibit. Do NOT wrap it in brackets, placeholders, or formatting markers. Just write the prose.
+
+MINIMUM LENGTH: Your description (after the Orientation section) MUST be at least 120 words. If you do not have 120 words of verified content, discuss the artistic form, the collaboration, or the exhibition context to reach the floor. Never deliver fewer than 120 words.
+
+DO NOT include any section headers other than "Orientation:" - the description should flow naturally after the orientation section.
+DO NOT include directions to the next stop - these will be added separately.
+
+
+================================================================================
+Total user message length: 21458 chars
+
+--- CANDIDATE SPECIFICS STATUS ---
+candidate_specifics found: 2
+  • material: publisher’s vellum
+  • plate count: 40 color lithographs
+
+--- SNIPPET INJECTION STATUS ---
+_local402_snippets_injected: True
+_DIRECT_SNIPPETS_PER_STOP keys: ["Le Lézard aux plumes d'or", '__stop_0__', 'Les Chants de Maldoror', '__stop_1__', 'Au Soleil du Plafond', '__stop_2__']

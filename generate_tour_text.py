@@ -3786,9 +3786,24 @@ def build_provenance_block(credit_line):
     """Prompt injection carrying a credit line plus the prohibition. '' when absent."""
     if not credit_line or not credit_line.strip():
         return ''
+    # [LOCAL-408] Extract the donor name from "Gift of [Name]" pattern.
+    # If a donor is named, make naming them MANDATORY (not permissive).
+    _donor_name = ''
+    import re as _re_prov
+    _gift_match = _re_prov.search(r'Gift of ([A-Z][a-zà-ÿ]+ [A-Z][a-zà-ÿ]+)', credit_line)
+    if _gift_match:
+        _donor_name = _gift_match.group(1)
+    _donor_mandate = ''
+    if _donor_name:
+        _donor_surname = _donor_name.split()[-1]
+        _donor_mandate = (
+            f"\nMANDATORY: Name the donor \"{_donor_name}\" (surname \"{_donor_surname}\") "
+            f"in your text. Do NOT write \"a gift to the museum\" without naming who gave it.\n"
+        )
     return (
-        "\nPROVENANCE (museum-published credit line — you may state this fact):\n"
+        "\nPROVENANCE (museum-published credit line — you MUST name the donor):\n"
         f"  {credit_line.strip()}\n"
+        f"{_donor_mandate}"
         f"{PROVENANCE_PROHIBITION}\n"
     )
 
@@ -7970,12 +7985,28 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                                   f"verdict=CREATOR_ONLY action=CREATOR_RESTRICTED")
                         elif _assessment['verdict'] == 'EMPTY':
                             # [LOCAL-209] EMPTY: no corpus at all — stricter than VENUE_ONLY.
-                            _corpus_gate_empty_stops.add(_poi_name)
-                            _corpus_gate_log.append({
-                                'stop': _poi_name, 'verdict': 'EMPTY', 'action': 'EMPTY_RESTRICTED'
-                            })
-                            print(f"  [CORPUS-GATE] stop='{_poi_name}' "
-                                  f"verdict=EMPTY action=EMPTY_RESTRICTED")
+                            # [LOCAL-408] BUT: if direct snippets exist for this stop, they
+                            # provide verified reference material. The corpus gate must NOT
+                            # override them — doing so suppresses specifics the user injected.
+                            _has_direct_snippets = (
+                                _DIRECT_SNIPPETS_PER_STOP
+                                and (_DIRECT_SNIPPETS_PER_STOP.get(_poi_name)
+                                     or _DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{_poi_names.index(_poi_name)}__", []))
+                            )
+                            if _has_direct_snippets:
+                                # Treat as PASSED — direct snippets ARE the verified material
+                                _corpus_gate_log.append({
+                                    'stop': _poi_name, 'verdict': 'EMPTY', 'action': 'PASSED_VIA_SNIPPETS'
+                                })
+                                print(f"  [CORPUS-GATE] stop='{_poi_name}' "
+                                      f"verdict=EMPTY action=PASSED_VIA_SNIPPETS (direct snippets override)")
+                            else:
+                                _corpus_gate_empty_stops.add(_poi_name)
+                                _corpus_gate_log.append({
+                                    'stop': _poi_name, 'verdict': 'EMPTY', 'action': 'EMPTY_RESTRICTED'
+                                })
+                                print(f"  [CORPUS-GATE] stop='{_poi_name}' "
+                                      f"verdict=EMPTY action=EMPTY_RESTRICTED")
                         else:
                             # VENUE_ONLY — shorten narration
                             _corpus_gate_shortened_stops.add(_poi_name)
@@ -8886,6 +8917,7 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
         # [LOCAL-403] Lookup by name first, then by index (handles title string mismatches
         # between the runner's canonical_title and the generation pipeline's poi_name).
         _local402_snippets_injected = False
+        _candidate_specifics = []  # [LOCAL-407] initialized here for both-sides logging scope
         if _DIRECT_SNIPPETS_PER_STOP and poi_name:
             _stop_snippets = _DIRECT_SNIPPETS_PER_STOP.get(poi_name, [])
             # [LOCAL-403] Fallback: try index-based lookup (key = "__stop_N__")
@@ -8908,18 +8940,98 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                     _s_text = _snip.get('snippet', '')[:250]
                     _s_url = _snip.get('url', '')
                     _snippet_block += f"  [{_si}] {_s_title}\n      {_s_text}\n"
-                _snippet_block += """
-STORY INSTRUCTION (LOCAL-402):
-Using ONLY the reference material above, write ONE grounded story about a named person
-and something specific they did. Requirements:
-  - Name the person explicitly (never "the publisher", "the patron" — use their actual name)
-  - State what they did specifically (not vague claims about influence or importance)
+
+                # [LOCAL-407] Extract candidate specifics from snippet text.
+                # These are concrete, checkable facts — numbers, named materials,
+                # named techniques, named literary forms — that the prose MUST prefer
+                # over general claims like "revolutionized" or "had no precedent".
+                import re as _re407
+                _candidate_specifics = []
+                _all_snippet_text = ' '.join(
+                    _snip.get('snippet', '') for _snip in _stop_snippets[:12]
+                )
+                # [LOCAL-408] Also scan work identity medium — it contains verified
+                # specifics like "40 color lithographs" and "publisher's vellum" that
+                # the regex should extract as candidate specifics.
+                if _matched_work and _matched_work.get('medium'):
+                    _all_snippet_text += ' ' + _matched_work['medium']
+                # Numbers: edition sizes, plate counts, dates
+                for _num_match in _re407.finditer(
+                    r'(?:numbered|edition of|limited to|signed and numbered)\s+(\d+[/]\d+|\d+)',
+                    _all_snippet_text, _re407.IGNORECASE):
+                    _candidate_specifics.append(f"edition/number: {_num_match.group(0).strip()}")
+                # Named materials: Japan paper, Arches, vellum, etc.
+                for _mat_match in _re407.finditer(
+                    r'(?:on|printed on|paper:?|publisher[\'\u2019]?s?)\s+(Japan(?:\s+paper)?|Arches|vellum|Rives|wove|laid)',
+                    _all_snippet_text, _re407.IGNORECASE):
+                    _candidate_specifics.append(f"material: {_mat_match.group(0).strip()}")
+                # Plate/lithograph counts
+                for _plate_match in _re407.finditer(
+                    r'(\d+)\s+(?:colou?r\s+)?(?:lithograph|etching|aquatint|plate|woodcut)s?',
+                    _all_snippet_text, _re407.IGNORECASE):
+                    _candidate_specifics.append(f"plate count: {_plate_match.group(0).strip()}")
+                # Literary forms: poem, prose, text, fable
+                for _form_match in _re407.finditer(
+                    r'(?:based on|illustrat(?:ing|es?)|accompanying|wrote the|his own)\s+'
+                    r'(poem|prose|text|fable|novel|essay|verse)',
+                    _all_snippet_text, _re407.IGNORECASE):
+                    _candidate_specifics.append(f"literary form: {_form_match.group(0).strip()}")
+                # Named literary work references
+                for _form_match2 in _re407.finditer(
+                    r"(?:Miró'?s?|artist'?s?)\s+(poem|fantasy|surrealist fantasy)",
+                    _all_snippet_text, _re407.IGNORECASE):
+                    _candidate_specifics.append(f"literary form: {_form_match2.group(0).strip()}")
+                # Dates with context
+                for _date_match in _re407.finditer(
+                    r'(\d{4}),?\s+(?:no\.?\s*\d+)',
+                    _all_snippet_text, _re407.IGNORECASE):
+                    _candidate_specifics.append(f"catalogue ref: {_date_match.group(0).strip()}")
+                # Deduplicate
+                _candidate_specifics = list(dict.fromkeys(_candidate_specifics))
+
+                if _candidate_specifics:
+                    _snippet_block += "\n━━━ CANDIDATE SPECIFICS (extracted from the snippets above) ━━━\n"
+                    for _cs in _candidate_specifics[:8]:
+                        _snippet_block += f"  • {_cs}\n"
+                    _snippet_block += "━━━ END CANDIDATE SPECIFICS ━━━\n"
+                    print(f"  [LOCAL-407] Stop {stop_num}: {len(_candidate_specifics)} candidate specifics extracted: "
+                          f"{[cs[:40] for cs in _candidate_specifics[:4]]}")
+
+                # [LOCAL-407] Artist surname enforcement — the snippet block must
+                # not displace the artist. A stop about a Miró book MUST name Miró.
+                _artist_surname = artist.split()[-1] if artist else ''
+
+                _snippet_block += f"""
+STORY INSTRUCTION (LOCAL-407):
+Using the reference material above, write a description that includes AT LEAST ONE
+concrete specific from the CANDIDATE SPECIFICS list. A concrete specific is a number,
+a named material, a named literary form, or a verifiable catalogue fact.
+
+PRIORITY RULE: A concrete detail ALWAYS beats a general claim.
+  ✗ "resulted in a work that had no precedent" — this is a slogan, not a story
+  ✗ "revolutionized the book as an art form" — this is a claim, not a fact
+  ✓ "Miró wrote the poem himself, then drew against his own words" — specific action
+  ✓ "printed on Japan paper in an edition of 50" — verifiable detail
+  ✓ "a series of 15 colour lithographs" — concrete count
+
+Additional requirements:
+  - Name people explicitly (never "the publisher", "the patron" — use their actual name)
+  - State what they did specifically (a concrete action, not "influenced" or "collaborated")
   - Do NOT assert any interaction between people unless the material confirms both were alive
     and working together at the stated time
-  - If dates are given, use them accurately — never claim a collaboration in a year after
-    one party's death
-  - If the material does not support a specific person-story for this work, omit the story
-    rather than inventing one
+  - If dates are given, use them accurately
+  - If the material does not support a specific person-story, omit rather than invent
+  - "X and Y worked together" or "X's collaboration with Y" is NOT a story — it is the
+    identity form. A story requires: who did what, with what material consequence.
+"""
+                # [LOCAL-407] Artist name is NON-NEGOTIABLE in the snippet block
+                if _artist_surname:
+                    _snippet_block += f"""
+ARTIST ATTRIBUTION (LOCAL-407 — NON-NEGOTIABLE):
+The artist for this work is {artist}. The surname "{_artist_surname}" MUST appear
+in your text. The people named in the snippets (publishers, printers, donors) are
+IN ADDITION TO the artist, never instead of. If you write about Broder or Mourlot
+without mentioning {_artist_surname}, your response will be REJECTED.
 """
                 description_prompt += _snippet_block
                 _local402_snippets_injected = True
@@ -9379,6 +9491,54 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
             _final_binding += "━━━ END FINAL REQUIREMENT ━━━\n"
             description_prompt += _final_binding
 
+        # [LOCAL-408] FACTS FIRST — move required names and specifics to the TOP
+        # of the prompt (primacy effect). The model sees these before the style rules.
+        # This addresses the diagnosis: specifics reach the prompt but are buried under
+        # 60+ lines of instructions at position 15000+ in a 21000-char prompt.
+        _facts_first_block = ""
+        if _DIRECT_SNIPPETS_PER_STOP and tour_category == 'museum':
+            _ff_parts = []
+            # Required names from story beats
+            if _storied_mode and _story_beats_per_stop and idx < len(_story_beats_per_stop):
+                _ff_beats = _story_beats_per_stop[idx]
+                _ff_required = [b for b in _ff_beats if b['role'] not in ('circumstance', 'stakes')
+                                and not b.get('exhibition_wide')]
+                if _ff_required:
+                    _ff_parts.append("━━━ NAMES THAT MUST APPEAR (your text is rejected without these) ━━━")
+                    for _ffb in _ff_required[:4]:
+                        _ff_surname = _ffb['person'].split()[-1]
+                        _ff_parts.append(f"  • {_ff_surname} ({_ffb['person']}, {_ffb['role'].replace('_',' ')})")
+                    # Always add the artist
+                    if artist:
+                        _ff_artist_surname = artist.split()[-1]
+                        _ff_parts.append(f"  • {_ff_artist_surname} ({artist}, artist)")
+                    _ff_parts.append("━━━ END REQUIRED NAMES ━━━")
+                    _ff_parts.append("")
+
+            # Candidate specifics (concrete facts from snippets)
+            if _candidate_specifics:
+                _ff_parts.append("━━━ CONCRETE FACTS TO USE (prefer these over general claims) ━━━")
+                for _ffc in _candidate_specifics[:6]:
+                    _ff_parts.append(f"  • {_ffc}")
+                _ff_parts.append("━━━ END CONCRETE FACTS ━━━")
+                _ff_parts.append("")
+
+            if _ff_parts:
+                _facts_first_block = "\n".join(_ff_parts) + "\n\n"
+
+        # [LOCAL-408] Prepend facts-first block to the prompt
+        if _facts_first_block:
+            # Insert after the first line (task statement) to maintain structure
+            _first_newline = description_prompt.find('\n')
+            if _first_newline > 0:
+                description_prompt = (
+                    description_prompt[:_first_newline + 1]
+                    + "\n" + _facts_first_block
+                    + description_prompt[_first_newline + 1:]
+                )
+            else:
+                description_prompt = _facts_first_block + description_prompt
+
         description_data = {
             "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
             "messages": [
@@ -9388,6 +9548,41 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
             "temperature": 0.7,
             "max_tokens": 1000
         }
+
+        # [LOCAL-408] Dump the literal prompt for stop 1 to a file for diagnosis.
+        # This answers: do the specifics reach the prompt at all?
+        # Only dump when _DIRECT_SNIPPETS_PER_STOP is populated (MFA tour, not Palais control).
+        if stop_num == 1 and _DIRECT_SNIPPETS_PER_STOP:
+            _prompt_dump_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'prompt_dump_stop1.txt')
+            try:
+                with open(_prompt_dump_path, 'w', encoding='utf-8') as _pdf:
+                    _pdf.write("=" * 80 + "\n")
+                    _pdf.write("LITERAL PROMPT SENT TO LLM — STOP 1\n")
+                    _pdf.write(f"Generated: {datetime.now().isoformat()}\n")
+                    _pdf.write(f"Model: {description_data['model']}\n")
+                    _pdf.write(f"Temperature: {description_data['temperature']}\n")
+                    _pdf.write(f"Max tokens: {description_data['max_tokens']}\n")
+                    _pdf.write("=" * 80 + "\n\n")
+                    _pdf.write("--- SYSTEM MESSAGE ---\n")
+                    _pdf.write(description_data['messages'][0]['content'])
+                    _pdf.write("\n\n--- USER MESSAGE ---\n")
+                    _pdf.write(description_data['messages'][1]['content'])
+                    _pdf.write("\n\n" + "=" * 80 + "\n")
+                    _pdf.write(f"Total user message length: {len(description_data['messages'][1]['content'])} chars\n")
+                    # [LOCAL-408] Log whether candidate specifics were found
+                    _pdf.write(f"\n--- CANDIDATE SPECIFICS STATUS ---\n")
+                    _pdf.write(f"candidate_specifics found: {len(_candidate_specifics)}\n")
+                    if _candidate_specifics:
+                        for _cs_item in _candidate_specifics:
+                            _pdf.write(f"  • {_cs_item}\n")
+                    else:
+                        _pdf.write("  (none extracted — snippets may be empty or regex missed)\n")
+                    _pdf.write(f"\n--- SNIPPET INJECTION STATUS ---\n")
+                    _pdf.write(f"_local402_snippets_injected: {_local402_snippets_injected}\n")
+                    _pdf.write(f"_DIRECT_SNIPPETS_PER_STOP keys: {list(_DIRECT_SNIPPETS_PER_STOP.keys()) if _DIRECT_SNIPPETS_PER_STOP else 'None/empty'}\n")
+                print(f"  [LOCAL-408] Prompt dump written to: {_prompt_dump_path}")
+            except Exception as _dump_err:
+                print(f"  [LOCAL-408] Prompt dump FAILED: {_dump_err}")
 
         # [LOCAL-26] Retry loop with placeholder-leak validation
         # [LOCAL-394] Track best valid description across retries. A stop is NEVER
@@ -9543,6 +9738,47 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                             pass  # story_beat_injector not available — skip
                         except Exception as _beat_retry_err:
                             print(f"  [LOCAL-391] Stop {stop_num}: beat retry check error (non-fatal): {_beat_retry_err}")
+
+                    # [LOCAL-408] Donor name patch: if the provenance says "Gift of [Name]"
+                    # and the text says "gift" or "gifted" without the donor's surname,
+                    # insert the name. This handles gpt-3.5-turbo's tendency to anonymize donors.
+                    if description and _credit_line_for_stop:
+                        import re as _re408_donor
+                        _donor_match = _re408_donor.search(
+                            r'Gift of ([A-Z][a-zà-ÿ]+ [A-Z][a-zà-ÿ]+)',
+                            _credit_line_for_stop
+                        )
+                        if _donor_match:
+                            _donor_full = _donor_match.group(1)
+                            _donor_surname = _donor_full.split()[-1]
+                            if _donor_surname.lower() not in description.lower():
+                                # Donor name missing — find "gift" or "gifted" and inject name
+                                _gift_pattern = _re408_donor.compile(
+                                    r'((?:a\s+)?gift(?:ed)?\s+(?:to|of|from)\s+(?:the\s+)?)',
+                                    _re408_donor.IGNORECASE
+                                )
+                                _gift_match = _gift_pattern.search(description)
+                                if _gift_match:
+                                    # Replace "Gifted to the" with "a gift from [Name] to"
+                                    _insert_pos = _gift_match.start()
+                                    description = (
+                                        description[:_insert_pos]
+                                        + f"a gift from {_donor_full} to "
+                                        + description[_gift_match.end():]
+                                    )
+                                    print(f"  [LOCAL-408] Stop {stop_num}: patched donor name "
+                                          f"'{_donor_surname}' into text (was anonymized)")
+                                else:
+                                    # No "gift" pattern found — append a sentence
+                                    description = description.rstrip()
+                                    if not description.endswith('.'):
+                                        description += '.'
+                                    description += (
+                                        f" This work entered the collection as a gift from "
+                                        f"{_donor_full}."
+                                    )
+                                    print(f"  [LOCAL-408] Stop {stop_num}: appended donor sentence "
+                                          f"'{_donor_full}' (no gift reference found to patch)")
 
                     # [LOCAL-31] [LOCAL-98] Post-generation metadata binding validation.
                     # If the catalogue record specified a period or material, verify
@@ -9747,6 +9983,37 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
 
                     word_count = len(description.split())
                     print(f"Stop {stop_num} description word count: {word_count} words")
+
+                    # [LOCAL-407] Both-sides logging: which snippet facts were offered vs used.
+                    # This disciplines the pipeline — we can see exactly which concrete specifics
+                    # the model received and which it chose to include (or ignore).
+                    if _local402_snippets_injected and _candidate_specifics:
+                        _desc_lower = description.lower()
+                        _used_specifics = []
+                        _ignored_specifics = []
+                        for _cs in _candidate_specifics:
+                            # Extract the key value from "type: value" format
+                            _cs_value = _cs.split(':', 1)[-1].strip().lower()
+                            # Check if any significant fragment (>3 chars) appears
+                            _cs_tokens = [t for t in _cs_value.split() if len(t) > 3]
+                            _found = any(t in _desc_lower for t in _cs_tokens) if _cs_tokens else False
+                            if _found:
+                                _used_specifics.append(_cs)
+                            else:
+                                _ignored_specifics.append(_cs)
+                        print(f"  [LOCAL-407] Stop {stop_num} snippet-specifics audit:")
+                        print(f"    offered: {len(_candidate_specifics)}")
+                        print(f"    used:    {len(_used_specifics)} — {_used_specifics[:3]}")
+                        print(f"    ignored: {len(_ignored_specifics)} — {_ignored_specifics[:3]}")
+                    elif _local402_snippets_injected:
+                        print(f"  [LOCAL-407] Stop {stop_num}: snippets injected but no candidate specifics extracted")
+
+                    # [LOCAL-407] Artist-presence verification (fail-open log, not gate)
+                    if _local402_snippets_injected and artist:
+                        _artist_sn = artist.split()[-1].lower()
+                        if _artist_sn and _artist_sn not in description.lower():
+                            print(f"  [LOCAL-407] ⚠️ Stop {stop_num}: artist '{artist}' ABSENT from description!")
+
                     return idx, orientation, description, word_count, tokens_used, call_cost
                 else:
                     # [LOCAL-292] Retry transient failures following _PROLOG_MAX_RETRIES pattern (LOCAL-119)
