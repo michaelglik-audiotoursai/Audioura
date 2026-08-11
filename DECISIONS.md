@@ -12949,3 +12949,36 @@ publisher"*, with `Louis Broder` parsed and sitting unused, `Fridman` absent. Th
 is the third appearance of a role named without its person. 403 makes
 `with publisher` = 0 a hard acceptance line, because an unfilled role is worse than
 omitting the clause.
+
+## D333 — LOCAL-403 merged: the people arrive; what they bring is a dictionary entry
+**2026-08-11, 05:4x.** Merged. The placeholder that survived three rounds is dead —
+`with publisher` 1 → 0, replaced by "the publisher **Louis Broder**, a French
+publisher and art dealer". `Broder` 0 → 1, `Mourlot` 1 → 3, zero-check clear,
+framing strongest yet (`livre d'artiste` 3, `collabor` 7, `book` 6). Control venue
+scored **93.8, the highest reading ever recorded for Palais** (band 68.8–93.8).
+
+**And the gap is now exactly one thing.** What the pipeline delivers is an
+*identification*:
+
+> "Mourlot Frères, a renowned French lithographic printing company"
+> "Louis Broder, a French publisher and art dealer"
+
+Both name a person and then state their job. **A listener learns that a printer is
+a printer.** That is a dictionary entry wearing a story's clothes, and it is
+precisely Michael's original objection — if the tour only says what is already
+obvious, why take it.
+
+**The diagnosis: the sentence has no verb that carries consequence.** "X, a
+renowned Y" has only an implied *is*. A story needs "Broder gambled on livres
+d'artiste when almost nobody bought them" — same person, same source material, a
+verb that costs something. The retrieval is already fetching this material; the
+prompt is settling for the first line of it.
+
+**So the remaining work is a selection and query problem, not a retrieval one** —
+which is a much better place to be than five rounds ago, when the search had zero
+production callers. LOCAL-404 asks the search for *actions* rather than identities,
+rejects appositive-only beats explicitly, and retries once for a verb.
+
+**Fourth round without `Boris Fridman`**, while the text says "gifted to the
+museum". Naming the gift and not the giver has now survived every round since
+D316; it is a hard acceptance line in 404.
