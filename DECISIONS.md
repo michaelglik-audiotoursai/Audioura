@@ -12161,3 +12161,47 @@ two trees". LOCAL-389 must settle it with gate-off/gate-on runs on the same tree
 rather than inferring from noise.
 
 What is proven: the garbage match, and that `40 color lithographs` survived.
+
+## D312 — A success metric that reads a pre-final artifact reports success into an empty tour
+**2026-08-10.** LOCAL-388 bounced. It fixed the distribution problem D309 named —
+beats now reach all three stops, and the both-sides log exists:
+
+```
+beats_assigned=3 beats_in_output=2 dropped=['Pierre Reverdy']
+```
+
+And in the delivered tour, `Broder` **0**, `Mourlot` **0**, `Fridman` **0**,
+`Torf` **0**. The counter is measuring an intermediate string — the prompt, or the
+raw model response before later passes — not the text the listener receives.
+
+**This is the fourth variant of one failure today**, and the through-line is now
+unmistakable:
+
+| | What was checked | What mattered |
+|---|---|---|
+| D298 | block emitted | emitted **for every stop** |
+| D304 | gate ran | gate ran **on every field** |
+| D309 | beats extracted | beats **delivered** |
+| D312 | beats counted in output | counted **in the final output** |
+
+Every one was a real mechanism, correctly built, verified against something one
+step short of the artifact. **The only check that has never lied all evening is
+reading the delivered tour text.** LEAD's own D311 error was the same shape —
+testing a branch in a worktree that predated its dependency.
+
+**So the standing rule, stated plainly:** a metric that does not read the final
+delivered artifact is not evidence, and a task may not claim delivery on the
+strength of one. LOCAL-390 must compute `beats_in_output` from the assembled tour
+after both gates, and its count must be verifiable by grepping the pasted text —
+which LEAD will do.
+
+**The cause is not yet known and must not be guessed.** Two candidates: the person
+gate is stripping `Broder`/`Mourlot`/`Fridman` because the grounding lookup for
+that stop cannot see the credit line they appear in; or the model simply never
+wrote them. The fixes are unrelated — one is a grounding-source bug, the other
+needs the beat marked as required content — so 390 must report which, with the log
+line that proves it.
+
+**And a regression that would be disqualifying on its own:** `Miró` is **0** in
+the delivered text, on the stop that *is* the Miró book. Present in 387 and 383,
+gone here. D309 bounced 383 for exactly this: story may not cost attribution.
