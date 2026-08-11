@@ -14213,3 +14213,61 @@ false positive is guaranteed, not incidental.
 that is what D246 and D352 already say, and the reason is now concrete rather than
 theoretical. When the dispatcher is gone, look for orphans by **working directory**
 (`ps -o ppid,command` and match the worktree path), not by task ID.
+
+## D366 — Michael's story algorithm is adopted; verification is inserted before selection
+**2026-08-11, 18:4x.** Dispatched as LOCAL-423. Supersedes LOCAL-421.
+
+Michael worked a complete fact→story algorithm by hand and handed over both the
+method and its output. The method is adopted essentially as given. Three parts of
+it are better than what LEAD had specified in 421:
+
+1. **The definition, with a widening ladder.** A story connects **fact → stop →
+   exhibition**, and when the exhibition yields nothing the connection widens:
+   exhibition → museum → city → country. LEAD's 421 had the triad but no fallback,
+   which is what leaves a thin stop with nothing to say.
+2. **The query is framed for a standing visitor**, not for a catalogue: *"What story
+   can be told to visitors of {exhibition} about {work}, {credit_line}?"* Ours ask
+   `"Le Lézard aux plumes d'or" Joan Miró`. That difference is the whole reason our
+   queries return auction listings.
+3. **An explicit selection rubric** — prefer information the listener cannot see;
+   require both informational and emotional content; **reject anything that tells
+   visitors what to want or feel.** The third rule is our banned-phrase list moved
+   from scrub-time to selection-time, which is strictly better.
+
+### The one change, and Michael's own example is the proof
+
+**Verification must gate selection, not follow it.** His run produced a superb
+three-sentence story: the 1967 edition scrapped and physically destroyed over a
+paper-chemistry flaw, redeemed by the 1971 printing. **Our corpus refutes it.** Of
+the 67 snippets we hold for that stop, **zero** contain "scrap", "destroy", "bleed"
+or "chemistry"; four describe 1967 sheets that plainly still exist and are for sale
+(Christie's: *"lithograph in colours, 1967, on wove paper watermark Miró, from the
+set of 18, signed in pencil"*). The mundane reading — a 1967 set of 18 and a 1971
+book of 40 — fits every source we have. The `[1, 2, 3]` markers supplied the
+appearance of sourcing without the substance.
+
+**Selection rewards drama, and invented claims have the most drama.** That is why
+the check cannot come after the pick.
+
+### LOCAL-421 succeeded at the hard part and failed at the necessary one
+
+421's agent died mid-run (D365) but its work was recovered. It **did** produce
+stories, and named Fridman, Broder and Mourlot. Then, checked against corpus:
+
+| delivered claim | support |
+|---|---|
+| "Boris Fridman, a **Boston-based** collector" | 0 — our only real source says *"a Russian collector"* |
+| "donated … in **2003**" | 0 |
+| "rarely exceeding **150 copies**" | 0 |
+| "**after the war**" | 0 |
+
+and in adjacent sentences it wrote **15 lithographs** and **40 color lithographs** —
+both numbers exist in the wild (NGS 15, MFA credit line 40) and it used both.
+
+**Entity disambiguation is a distinct requirement.** Two of our four "Fridman"
+snippets are a different person and an unrelated gallery — a linguist in Mexico and
+a New York gallery founded 2013. A name match is not an identity match.
+
+**Standing rule:** a confident, well-written falsehood about a named person is the
+worst output this pipeline can produce, because no listener can detect it. It
+outranks every formatting, gating and scoring concern currently queued.
