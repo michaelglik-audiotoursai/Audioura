@@ -13577,3 +13577,60 @@ module computes a classification, grep for a consumer that changes behaviour on 
 Computing it is not using it.**
 
 Dispatched as LOCAL-414.
+
+## D350 — LOCAL-414 BOUNCED: the tier gate starved two stops into LLM refusals, and the survival metric hid it
+**2026-08-11, 13:2x.** Not merged. Bounced as LOCAL-415.
+
+**What 414 got right, and what LEAD verified independently:**
+
+- **A root cause deeper than D349 recorded.** D349 said tier was "computed then
+  discarded". It is worse: `generate_tour_text.py` built its snippet dicts with only
+  `title`/`snippet`/`url` and **no `tier` key at all**, so `snip.get('tier','')`
+  returned `''` for every search snippet. The tier1/tier2 `+1` bonus has therefore
+  **never fired** for any search result since LOCAL-410 wired it. LEAD confirmed
+  this by reading the pre-414 append site directly. 414's one-line fix carrying
+  `tier` through is correct and must be preserved.
+- Its test suite genuinely goes **5 failed / 4 passed** against current `storied` —
+  LEAD ran it, D242 check #1 satisfied.
+- The P856 cache (tier1 results only, 30-day TTL, timeouts deliberately not cached)
+  is the right shape.
+- The doctrinal framing is gone: `fall into sin` / `disobedience` / `created by God`
+  / `invites contemplation` all **0** in delivered text.
+
+**Why it is bounced anyway: two of four stops delivered the model's refusal.**
+
+> Stop 2 (Adam and Eve): *"I missed out on some crucial information in the
+> description. I will rectify that and provide you with a complete narrative. Your
+> patience is appreciated."*
+> Stop 3 (Ancient Nubia Now): *"I cannot provide a response based on the given
+> constraints and missing surnames."*
+
+This is a clean two-tree regression, not a pre-existing fault: **the same two stops
+generated full text under 413 and refuse under 414** (`grep -c` of the refusal
+strings: 414 = 2, 413 = 0).
+
+**The mechanism is the starvation LEAD warned 414 to measure — and its metric
+missed it.** The task was told to report per-stop surviving-snippet counts, and it
+did: 5 of 5 on every stop, 0 tier3 surviving, "No stop was left with zero material."
+That number is true and irrelevant. **Counting survivors measures quantity, not
+usability.** The tier3 penalty removed the doctrinal snippets that were previously
+feeding those stops, and what remained was tier1/tier2 *junk* — the run's own
+evidence file shows "April 1957 (Celestial Blue)" verified against an essay about a
+Korean hanbok DNA kit, and "Ancient Nubia Now" against a page on the Homeric epics.
+Five unusable snippets score the same as five good ones on a count.
+
+**Rule added: a starvation check must assert usability, not cardinality.** The
+honest metric is whether the delivered stop text carries a fact traceable to a
+surviving snippet — which is exactly what 413 established was measurable.
+
+**Second defect, independent and arguably worse: nothing gates an LLM refusal.**
+`generate_tour_text.py:5557` blocks the single literal string
+`"I cannot provide real-time information"` and nothing else. Both refusals above
+sailed through every gate into delivered tour text. A tour that ships the model
+apologising to the listener is a failure mode no rubric score will catch, and it is
+cheap to detect.
+
+**Not merged rather than merged-and-fixed** because the fix needs a live run to
+validate, and merging would put a tour with two broken stops into `storied` while
+the field-test gate is the thing everything is building toward. The tier-carry fix,
+the P856 cache and the test suite are all explicitly preserved in 415's brief.
