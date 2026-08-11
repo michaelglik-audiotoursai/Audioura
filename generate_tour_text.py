@@ -8122,52 +8122,25 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     else:
         print(f"  [LOCAL-188] Style constraints ACTIVE (declarative prose rules injected)")
 
+    # [LOCAL-412] Condensed from ~1400 chars to ~700 chars each. Same rules, fewer examples.
     _STYLE_CONSTRAINT_BLOCK_MUSEUM = """
-DECLARATIVE PROSE — STYLE RULES (LOCAL-188, critical):
-All narration must be declarative. These rules are enforced by automated validation.
-- NO SECOND-PERSON IMPERATIVES: Never open a sentence with a base-form verb aimed at the
-  listener. "Feel the weight", "Notice the facade", "Imagine the scene", "Explore further",
-  "Discover the connection", "Consider the contrast" — ALL BANNED.
-  Write declarative statements instead: "The weight of centuries is visible in..." not
-  "Feel the weight of centuries."
-- NO QUESTIONS: Never use a question mark. Never pose a rhetorical question.
-  "How does this manifest?" → "This manifests in..."
-- NO "AS YOU WANDER/EXPLORE/STROLL": Never use "as you" + a movement or discovery verb.
-  "As you explore the gallery" / "As you wander through" / "If you look closely" — BANNED.
-  State what IS, not what happens when the listener moves.
-- NO PRESCRIBED FEELINGS: Never tell the listener what they feel, sense, or experience.
-  "You feel the solemnity" / "You sense the history" / "You find yourself moved" — BANNED.
-  Describe the OBJECT or PLACE, not the listener's inner state.
-- NO HALLUCINATED SENSORY CLAIMS: Never assert a sensation the listener cannot actually be
-  having. "You can almost hear the echo of his brushstrokes" / "Breathe in the faint scent
-  of oil paint that still lingers" — BANNED. Historical sounds are silent. Absent smells
-  are absent. Only describe sensory facts that are TRUE RIGHT NOW at this location.
-These rules apply to the NARRATION paragraphs only. Navigation/orientation directions
-("Head south", "Turn left", "Continue past") are exempt — imperative form is correct there.
+DECLARATIVE PROSE (LOCAL-188 — enforced by validation):
+- NO IMPERATIVES aimed at listener: "Feel the weight", "Notice", "Imagine", "Discover" → BANNED. Write "The weight is visible in..." instead.
+- NO QUESTIONS. No question marks. "How does this manifest?" → "This manifests in..."
+- NO "as you explore/wander/stroll". State what IS, not what the listener does.
+- NO PRESCRIBED FEELINGS: "You feel the solemnity" → BANNED. Describe the object, not the listener.
+- NO HALLUCINATED SENSES: "You can almost hear..." → BANNED. Only current sensory facts.
+Exempt: navigation directions ("Turn left", "Continue past").
 """
 
     _STYLE_CONSTRAINT_BLOCK_OUTDOOR = """
-DECLARATIVE PROSE — STYLE RULES (LOCAL-188, critical):
-All narration must be declarative. These rules are enforced by automated validation.
-- NO SECOND-PERSON IMPERATIVES: Never open a sentence with a base-form verb aimed at the
-  listener. "Feel the weight", "Notice the facade", "Imagine the scene", "Explore further",
-  "Discover the connection", "Consider the contrast" — ALL BANNED.
-  Write declarative statements instead: "The weight of centuries is visible in..." not
-  "Feel the weight of centuries."
-- NO QUESTIONS: Never use a question mark. Never pose a rhetorical question.
-  "How does this manifest?" → "This manifests in..."
-- NO "AS YOU WANDER/EXPLORE/STROLL": Never use "as you" + a movement or discovery verb.
-  "As you explore the area" / "As you wander through" / "If you look closely" — BANNED.
-  State what IS, not what happens when the listener moves.
-- NO PRESCRIBED FEELINGS: Never tell the listener what they feel, sense, or experience.
-  "You feel the solemnity" / "You sense the history" / "You find yourself moved" — BANNED.
-  Describe the OBJECT or PLACE, not the listener's inner state.
-- NO HALLUCINATED SENSORY CLAIMS: Never assert a sensation the listener cannot actually be
-  having. "You can almost hear the echo of his brushstrokes" / "Breathe in the faint scent
-  of oil paint that still lingers" — BANNED. Historical sounds are silent. Absent smells
-  are absent. Only describe sensory facts that are TRUE RIGHT NOW at this location.
-These rules apply to the NARRATION paragraphs only. Navigation/orientation directions
-("Head south", "Turn left", "Continue past") are exempt — imperative form is correct there.
+DECLARATIVE PROSE (LOCAL-188 — enforced by validation):
+- NO IMPERATIVES aimed at listener: "Feel the weight", "Notice", "Imagine", "Discover" → BANNED. Write "The weight is visible in..." instead.
+- NO QUESTIONS. No question marks. "How does this manifest?" → "This manifests in..."
+- NO "as you explore/wander/stroll". State what IS, not what the listener does.
+- NO PRESCRIBED FEELINGS: "You feel the solemnity" → BANNED. Describe the object, not the listener.
+- NO HALLUCINATED SENSES: "You can almost hear..." → BANNED. Only current sensory facts.
+Exempt: navigation directions ("Turn left", "Continue past").
 """
 
     # [LOCAL-326] Phase-boundary cost checkpoint: before Phase 5.
@@ -8311,6 +8284,28 @@ These rules apply to the NARRATION paragraphs only. Navigation/orientation direc
                 _s_serp_count = len(_s_raw)
                 _local410_total_queries += _s_queries_issued
                 _local410_total_results += _s_serp_count
+
+                # [LOCAL-412] When cache hits, search returns results=[] but
+                # cached_elements contains mined story facts. Convert them to
+                # snippet-like dicts so the injection/ranking pipeline can use them.
+                _s_cached_elements = _s_result.get('cached_elements', [])
+                if not _s_raw and _s_cached_elements:
+                    print(f"    [LOCAL-412] Stop {_s_idx+1}: cache hit — "
+                          f"converting {len(_s_cached_elements)} cached elements to snippets")
+                    for _ce in _s_cached_elements:
+                        _ce_text = _ce.get('text', '')
+                        _ce_sentence = _ce.get('source_sentence', '')
+                        # Prefer source_sentence (grounded), fall back to text (synthesized)
+                        _ce_snippet_text = _ce_sentence if _ce_sentence else _ce_text
+                        if _ce_snippet_text:
+                            _s_raw.append({
+                                'title': f"[{_ce.get('type', 'fact')}] {', '.join(_ce.get('people', []))[:60]}",
+                                'snippet': _ce_snippet_text[:300],
+                                'url': _ce.get('source_url', ''),
+                                'domain': _ce.get('source_domain', ''),
+                                'tier': 'tier1',  # Cached elements were already T1/T2 vetted
+                            })
+                    _s_serp_count = len(_s_raw)
 
                 # Build snippet list for this stop
                 _s_snippets = []
@@ -8501,28 +8496,12 @@ AUDIO RULES (this will be heard, not read):
 - Write for the EAR: short-to-medium sentences, concrete language, no parenthetical asides.
 
 NO PREACHING — NEVER INSTRUCT THE LISTENER (critical):
-- NEVER end a stop by telling the listener what to feel, notice, consider, reflect on,
-  or carry away. End on a FACT or an OBSERVATION, not an instruction.
-- BANNED CLOSINGS (do not use any variation of these):
-  "Consider what other..." / "Let the whispers of the past guide..."
-  "As you stand before this masterpiece, consider..." / "Take a moment to..."
-  "Allow yourself to..." / "Reflect on..." / "Ponder..." / "Imagine..."
-  "Let this be a reminder..." / "Carry this with you as..."
-- The listener is an adult. Do NOT tell them what they "should" feel or do.
-- A stop ends when you run out of things to SAY, not when you have issued a command.
+- NEVER end by telling the listener to consider, reflect, imagine, or feel something.
+  End on a FACT or OBSERVATION. The listener is an adult — no commands, no "Take a moment to..."
 {_STYLE_CONSTRAINT_BLOCK_MUSEUM if not _style_constraints_disabled else ""}
-NO CONDESCENSION:
-- NEVER write "To truly appreciate/understand [X], one must..." — this presupposes
-  ignorance. Instead, JUST STATE the context: "During samurai culture in 19th century
-  Japan, armor was not just practical but also a symbol of status and honor."
-- NEVER write "It is worth noting that..." or "It is important to understand that..."
-  — just state the thing directly.
-
-NO DESCRIBING THE OBVIOUS:
-- The listener is STANDING IN FRONT of the object. Do NOT describe what is plainly
-  visible ("The surface shimmers under the museum's soft lighting").
-- Description earns its place ONLY when it points at something the visitor would
-  otherwise MISS — a hidden detail, its meaning, its history, its technique.
+NO CONDESCENSION / NO DESCRIBING THE OBVIOUS:
+- Never "To truly appreciate..." or "It is worth noting..." — just state the thing.
+- The listener is in front of the object. Describe what they'd MISS, not what's obvious.
 """
         else:
             _mode_context = f" (traveling by {transport_mode})" if transport_mode != 'on_foot' else ""
@@ -8748,7 +8727,11 @@ events tied to this specific stop. Do NOT invent specific names, dates, or incid
                         _import_logger.error("[S24] MISSING: derepetition_guard (FORBIDDEN_PHRASES) — global phrase filtering DISABLED for stop descriptions")
                         _global_phrases = []
                     _all_forbidden = _type_forbidden + _global_phrases
+                    # [LOCAL-412] Cap at 15 phrases to keep prompt under 20K.
+                    # The full 50+ regex list was 2114 chars — the model doesn't
+                    # parse regex anyway. Keep only the most common offenders.
                     if _all_forbidden:
+                        _all_forbidden = _all_forbidden[:15]
                         description_prompt += f"\nDO NOT USE these phrases: {', '.join(_all_forbidden)}\n"
             except Exception as _st_err:
                 print(f"  [S24] Story-type injection error (stop {stop_num}): {_st_err}")
@@ -9135,28 +9118,17 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 # not displace the artist. A stop about a Miró book MUST name Miró.
                 _artist_surname = artist.split()[-1] if artist else ''
 
-                _snippet_block += f"""
-STORY INSTRUCTION (LOCAL-407):
-Using the reference material above, write a description that includes AT LEAST ONE
-concrete specific from the CANDIDATE SPECIFICS list. A concrete specific is a number,
-a named material, a named literary form, or a verifiable catalogue fact.
+                _snippet_block += """
+STORY INSTRUCTION (LOCAL-407/412):
+Use the reference material above. Include at least ONE concrete specific (number, material, literary form, verifiable fact) from snippets or CANDIDATE SPECIFICS.
 
-PRIORITY RULE: A concrete detail ALWAYS beats a general claim.
-  ✗ "resulted in a work that had no precedent" — this is a slogan, not a story
-  ✗ "revolutionized the book as an art form" — this is a claim, not a fact
-  ✓ "Miró wrote the poem himself, then drew against his own words" — specific action
-  ✓ "printed on Japan paper in an edition of 50" — verifiable detail
-  ✓ "a series of 15 colour lithographs" — concrete count
+PRIORITY: Concrete details beat general claims. "printed on Japan paper in edition of 50" beats "revolutionized the book as an art form."
 
-Additional requirements:
-  - Name people explicitly (never "the publisher", "the patron" — use their actual name)
-  - State what they did specifically (a concrete action, not "influenced" or "collaborated")
-  - Do NOT assert any interaction between people unless the material confirms both were alive
-    and working together at the stated time
-  - If dates are given, use them accurately
-  - If the material does not support a specific person-story, omit rather than invent
-  - "X and Y worked together" or "X's collaboration with Y" is NOT a story — it is the
-    identity form. A story requires: who did what, with what material consequence.
+Rules:
+  - Name people explicitly (never "the publisher" — use their actual name)
+  - State specific actions (not "influenced" or "collaborated" — what did they DO?)
+  - Do NOT assert interactions unless the material confirms both people were alive and working together
+  - Dates must be accurate. If unsupported, omit rather than invent.
 """
                 # [LOCAL-407] Artist name is NON-NEGOTIABLE in the snippet block
                 if _artist_surname:
@@ -9294,29 +9266,11 @@ much material you actually have to work with.
 Do NOT repeat the artist's biographical background (birth year, nationality, school associations like 'École de Paris', artistic formats like 'stained glass and stage sets'). That information belongs in the tour introduction only. Here, focus EXCLUSIVELY on THIS SPECIFIC ARTWORK — what it depicts, its technique, its story, what to look for with your eyes.
 """
             # [Cycle 4] Ban forbidden cliché phrases that GPT overuses
+            # [LOCAL-412] Consolidated: removed verbose BANNED PHRASES and UNEARNED ADJECTIVES
+            # blocks (~1600 chars). The regex DO NOT USE line + DECLARATIVE PROSE rules already
+            # cover this. Replaced with a short, high-signal instruction.
             description_prompt += """
-BANNED PHRASES — do NOT use any of these in your description:
-- "vibrant colors" / "dreamlike imagery" / "dreamlike quality"
-- "creative genius" / "artistic prowess" / "masterpiece that"
-- "stir the soul" / "touch the heart" / "pulsate with life"
-- "symphony of emotions" / "tapestry of dreams" / "weaves a narrative"
-- "truly remarkable" / "a testament to" / "stands as a testament"
-- "captivating artistry" / "mesmerizing world" / "intricate details"
-- "invites you to explore/discover/reflect" / "immerse yourself in"
-- "can't help but" / "feast for the eyes" / "step into a world"
-Instead, use SPECIFIC, CONCRETE language: name colors precisely (cerulean, ochre, vermilion), describe actual compositional choices, mention documented historical context.
-
-UNEARNED ADJECTIVES — these words are BANNED unless the same sentence or the one before it
-contains the specific evidence that earns them:
-- "vibrant" — ONLY permitted if you name the specific colors/contrasts that make it vibrant
-- "stunning" — ONLY if you describe what causes the visual impact (scale? technique? contrast?)
-- "remarkable" — ONLY if you state what distinguishes it from comparable works
-- "mesmerizing" — ONLY if you explain the optical or compositional mechanism
-- "exquisite" — ONLY if you describe the craftsmanship detail (grain, jointwork, brushstroke)
-- "breathtaking" — ONLY if you name the physical feature that produces the effect
-- "captivating" — ONLY if you explain what holds attention and why
-If you cannot provide that evidence in the same breath, delete the adjective. A bare noun
-is better than a noun preceded by an unearned superlative.
+STYLE CONSTRAINT: No unearned praise. Every evaluative word (remarkable, stunning, captivating, breathtaking, exquisite, mesmerizing, vibrant) requires the specific evidence that earns it in the same or preceding sentence. If you cannot supply the evidence, delete the adjective. Prefer concrete nouns over decorated ones.
 """
             description_prompt += """
 FACTUAL INTEGRITY RULE: Do NOT invent visual specifics or biographical claims not in the fact sheet above. You may describe the general biblical SUBJECT (e.g. "depicts the parting of the Red Sea") but do NOT assert specific visual details as facts (colors, composition) unless grounded in the facts above. Never call a work "the artist's final masterpiece" or similar unverifiable superlatives.
