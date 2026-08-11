@@ -1,6 +1,6 @@
 ================================================================================
 LITERAL PROMPT SENT TO LLM — STOP 1
-Generated: 2026-08-11T18:08:56.065600
+Generated: 2026-08-11T18:29:42.334803
 Model: gpt-3.5-turbo
 Temperature: 0.7
 Max tokens: 1000
@@ -13,16 +13,15 @@ You are a knowledgeable museum guide with expertise in art, architecture, and hi
 STYLE: Channel the passion of a curator who fell in love with this piece — make the listener see what the artist felt.
 
 ━━━ NAMES THAT MUST APPEAR (your text is rejected without these) ━━━
-  • Fridman (Boris Fridman, donor)
   • Broder (Louis Broder, publisher)
   • Frères (Mourlot Frères, printer)
+  • Fridman (Boris Fridman, donor)
 ━━━ END REQUIRED NAMES ━━━
 
 ━━━ CONCRETE FACTS TO USE (prefer these over general claims) ━━━
   • material: publisher’s vellum
   • plate count: 15 lithographs
   • plate count: 40 color lithographs
-  • publisher/printer: Louis Broder
 ━━━ END CONCRETE FACTS ━━━
 
 
@@ -98,14 +97,14 @@ DO NOT USE these phrases: the building was erected, historically important, the 
 
 NARRATIVE SPINE CONTEXT (use to shape your description):
 - Emotional beat for this stop: curiosity
-- Unique angle to emphasize: This sculpture's intricate design reveals the fusion of myth and nature, sparking a dialogue about the role of fantasy in shaping cultural identity.
-- End with a forward-looking hook: How does the transformation of ideas continue to shape our understanding of the divine?
+- Unique angle to emphasize: This piece challenges the viewer's perception of nature by infusing fantasy with reality, as a lizard is adorned with impossible golden feathers, representing the artist's exploration of metamorphosis and illusion.
+- End with a forward-looking hook: How does this transformation theme evolve when applied to more abstract concepts like belief and identity?
 
 VERIFIED FACTS (incorporate these for accuracy — these are confirmed for this specific POI):
 The Museum of Fine Arts was founded in 1870 in Copley Square.
 
 MANDATORY INCLUSION — work this surprising detail into the description naturally:
-The Museum of Fine Arts was initially located on the top floor of the Boston Athenæum.
+The initial location of the Museum of Fine Arts was on the top floor of the Boston Athenæum.
 
 PROVENANCE (museum-published credit line — you MUST name the donor):
   Gift of Boris Fridman
@@ -164,25 +163,25 @@ are IN ADDITION TO the artist — never instead of. If WORK IDENTITY says
 "Artist: Joan Miró", your text must contain "Miró".
 
 ━━━ REQUIRED CONTENT — EACH SURNAME BELOW MUST APPEAR IN YOUR TEXT ━━━
-  ✓ "Fridman" — Boris Fridman (donor): gave this work as a gift to the museum
   ✓ "Broder" — Louis Broder (publisher): published this work
   ✓ "Frères" — Mourlot Frères (printer): printed this work
+  ✓ "Fridman" — Boris Fridman (donor): gave this work as a gift to the museum
 Write at least one sentence per person above that names them by surname.
 If you omit any of these surnames, your response will be REJECTED and regenerated.
 ━━━ END REQUIRED CONTENT ━━━
 
 GROUNDED PEOPLE AND ACTIONS (from the exhibition page — use at least one):
-  • Boris Fridman (Donor): gave this work as a gift to the museum
   • Louis Broder (Publisher): published this work
   • Mourlot Frères (Printer): printed this work
+  • Boris Fridman (Donor): gave this work as a gift to the museum
 
 STORY SERVES THE THESIS: The person/action you name should connect to WHY
 this exhibition exists — e.g., a printer matters because the show argues printers
 were essential collaborators, not because printers are inherently interesting.
 NEVER-PLACEHOLDER RULE (LOCAL-388): Do NOT write 'with publisher', 'with printer', 'with donor', or 'the patron'. Where a role is mentioned, NAME THE PERSON. Specifically:
-  'donor' → use 'Boris Fridman'
   'publisher' → use 'Louis Broder'
   'printer' → use 'Mourlot Frères'
+  'donor' → use 'Boris Fridman'
 
 
 WHAT IS NOT A STORY: "This masterpiece challenges boundaries" is not a story.
@@ -190,22 +189,21 @@ WHAT IS NOT A STORY: "This masterpiece challenges boundaries" is not a story.
 A story has: a person, a specific circumstance, a consequence.
 
 REFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):
-  [1] Joan Miró - Le lézard aux plumes d'or
+  [1] Joan Miró - Le lézard aux plumes d'or - Choice Contemporary
       Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...
   [2] Joan Miró - Le lézard aux plumes d'or
       Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...
-  [3] Joan Miró - Le lézard aux plumes d'or
+  [3] Joan Miró - Le lézard aux plumes d'or - Choice Contemporary
       Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is ... created in 1971 as a vibrant fusion of poetry, printmaking, and sculptural
   [4] Joan Miró | Le Lézard aux plumes d'or (1971, Lithographs)
       Le Lézard aux plumes d'or (The Lizard with Golden Feathers) - Illustrated book with 15 lithographs printed in colors, on BFK Rives wove paper - Signed in ...
-  [5] Le Lézard aux plumes d'or (The Lizard with Golden Fe… (1971) ...
-      From Phillips, Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers) ... edition was 195), published by Louis Broder, Paris, framed. ... Lithographs.
+  [5] Joan Miró's Broder Collection: How One Artist Revolutionized Lithography
+      In 1956, Broder began a partnership with Joan Miró alongside Atelier Mourlot, a world-famous French lithographic studio. In 1920 when Miro was ...
 
 ━━━ CANDIDATE SPECIFICS (extracted from the snippets above) ━━━
   • material: publisher’s vellum
   • plate count: 15 lithographs
   • plate count: 40 color lithographs
-  • publisher/printer: Louis Broder
 ━━━ END CANDIDATE SPECIFICS ━━━
 
 STORY INSTRUCTION (LOCAL-407/412/419):
@@ -359,14 +357,13 @@ Write the story FIRST, then add physical description if space allows.
 
 
 ================================================================================
-Total user message length: 23262 chars
+Total user message length: 23313 chars
 
 --- CANDIDATE SPECIFICS STATUS ---
-candidate_specifics found: 4
+candidate_specifics found: 3
   • material: publisher’s vellum
   • plate count: 15 lithographs
   • plate count: 40 color lithographs
-  • publisher/printer: Louis Broder
 
 --- SNIPPET INJECTION STATUS ---
 _local402_snippets_injected: True
