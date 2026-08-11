@@ -9178,6 +9178,7 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
         _local402_snippets_injected = False
         _candidate_specifics = []  # [LOCAL-407] initialized here for both-sides logging scope
         _all_snippet_text = ''  # [LOCAL-417] initialized here so required-names gate can check it
+        _417_suppressed_beat_names = set()  # [LOCAL-417] names suppressed from required-names (no snippet evidence)
         _prompt_size_before_snippets = len(description_prompt)  # [LOCAL-411] track pre-snippet size
         if _DIRECT_SNIPPETS_PER_STOP and poi_name:
             _stop_snippets = _DIRECT_SNIPPETS_PER_STOP.get(poi_name, [])
@@ -9787,6 +9788,8 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                 if _ff_suppressed:
                     print(f"  [LOCAL-417] Stop {stop_num}: SUPPRESSED {len(_ff_suppressed)} required names "
                           f"(no snippet evidence): {[b['person'] for b in _ff_suppressed]}")
+                    # [LOCAL-417] Track suppressed names so beat retry doesn't demand them
+                    _417_suppressed_beat_names = set(b['person'].split()[-1] for b in _ff_suppressed)
                 if _ff_verified:
                     _ff_parts.append("━━━ NAMES THAT MUST APPEAR (your text is rejected without these) ━━━")
                     for _ffb in _ff_verified[:4]:
@@ -10043,9 +10046,12 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                         _417_has_fact = bool(re.search(
                             r'\b(?:1[0-9]{3}|20[0-2][0-9])\b'  # year (1000-2029)
                             r'|\b\d+\s*(?:cm|inches|feet|meters|ft|in)\b'  # measurement
+                            r'|\b\d{2,}[,.]?\d*\s*(?:works?|objects?|pieces?|items?|artifacts?)\b'  # collection count
                             r'|\b(?:oil on canvas|bronze|marble|lithograph|watercolor|fresco|'
                             r'tempera|etching|woodcut|ceramic|terracotta|limestone|granite)\b'  # material
-                            r'|\b(?:donated|acquired|commissioned|exhibited|installed)\s+(?:in|by)\b',  # provenance verb
+                            r'|\b(?:donated|acquired|commissioned|exhibited|installed|founded|opened'
+                            r'|built|constructed|designed|crafted|created)\s+(?:in|by|for)\b'  # provenance/creation verb
+                            r'|\b(?:17th|18th|19th|20th|21st)\s+century\b',  # century reference
                             description, re.IGNORECASE
                         ))
                         if not _417_has_fact:
@@ -10119,6 +10125,10 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                     # [LOCAL-391] Required beat retry: if assigned beats are missing
                     # from the output, retry ONCE with the missing names explicitly
                     # called out. If still missing after retry, log beat_unrecoverable.
+                    # [LOCAL-417] ONLY check beats whose names were NOT suppressed
+                    # (i.e., only those the prompt actually demanded). Suppressed names
+                    # have no snippet evidence — retrying for them is pointless and wastes
+                    # the model's context on unsatisfiable constraints.
                     if (_storied_mode and _story_beats_per_stop
                             and idx < len(_story_beats_per_stop)
                             and _story_beats_per_stop[idx]
@@ -10132,6 +10142,12 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                             _beat_found, _beat_missing = check_required_beats_present(
                                 description, _story_beats_per_stop[idx]
                             )
+                            # [LOCAL-417] Filter out suppressed names — never retry for them
+                            if _417_suppressed_beat_names and _beat_missing:
+                                _beat_missing = [
+                                    name for name in _beat_missing
+                                    if name not in _417_suppressed_beat_names
+                                ]
                             # [LOCAL-391] Scrub unfilled roles ('with publisher' → person name)
                             description, _role_subs = scrub_unfilled_roles(
                                 description, _story_beats_per_stop[idx]
@@ -10142,6 +10158,12 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                                 _beat_found, _beat_missing = check_required_beats_present(
                                     description, _story_beats_per_stop[idx]
                                 )
+                                # [LOCAL-417] Re-filter suppressed names after re-check
+                                if _417_suppressed_beat_names and _beat_missing:
+                                    _beat_missing = [
+                                        name for name in _beat_missing
+                                        if name not in _417_suppressed_beat_names
+                                    ]
 
                             if _beat_missing and _attempt < _max_retries:
                                 # Retry: add the missing-beat supplement to the prompt

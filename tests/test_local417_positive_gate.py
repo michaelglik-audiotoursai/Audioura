@@ -43,9 +43,12 @@ class TestPositiveGate:
         _417_has_fact = bool(re.search(
             r'\b(?:1[0-9]{3}|20[0-2][0-9])\b'
             r'|\b\d+\s*(?:cm|inches|feet|meters|ft|in)\b'
+            r'|\b\d{2,}[,.]?\d*\s*(?:works?|objects?|pieces?|items?|artifacts?)\b'
             r'|\b(?:oil on canvas|bronze|marble|lithograph|watercolor|fresco|'
             r'tempera|etching|woodcut|ceramic|terracotta|limestone|granite)\b'
-            r'|\b(?:donated|acquired|commissioned|exhibited|installed)\s+(?:in|by)\b',
+            r'|\b(?:donated|acquired|commissioned|exhibited|installed|founded|opened'
+            r'|built|constructed|designed|crafted|created)\s+(?:in|by|for)\b'
+            r'|\b(?:17th|18th|19th|20th|21st)\s+century\b',
             description, re.IGNORECASE
         ))
         if not _417_has_fact:
