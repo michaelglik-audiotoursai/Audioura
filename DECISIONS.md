@@ -14301,3 +14301,35 @@ across 1967 and 1971 and the record cannot agree on how many plates there are.
 That is very likely *why* the invented disaster is persuasive: it reconciles a real
 multiplicity with a drama nothing supports. **The attested disagreement is the
 story, and it survives a visitor checking it on the way home.**
+
+## D368 — LOCAL-422 merged: the first submission in four rounds whose test-binding claim survived checking
+**2026-08-11, 19:0x.** Merged as `d5e952d` (+ `3021794`).
+
+D364 said the fix had to be structural rather than another reminder. It was. 422
+extracted `resolve_final_description(attempts, material_context)` out of the
+per-stop generation loop, so the ship-or-fallback decision can be called directly
+with no network, and wired it in at **both** former stub sites.
+
+**LEAD reproduced all three neutralisations independently rather than reading the
+submission's numbers** (D364's own rule: run the check before reading their claims):
+
+| helper neutralised at its call site | result |
+|---|---|
+| `_is_stub_text` → `if desc:` | **2 failed** |
+| `_build_material_fallback` → `return ''` | **4 failed** |
+| `_has_production_fact_content` → `False` | **3 failed** |
+
+Restored: 8 passed. Every claim in the submission checked out — the first time in
+four rounds (D348, D359, D361, D364 all recorded the opposite).
+
+**The check that mattered most was the one the task did not ask for.** A function
+can be perfectly bound to its helpers and still be an island if nothing calls *it*.
+`grep -n resolve_final_description` shows the definition at 4206 and live callers at
+**10143** and **10253**, inside the real loop, with an `_attempts_for_resolution`
+accumulator feeding them — and the live run printed
+`[LOCAL-422] resolved final description` once, so the path executed for real.
+D242 #2 (grep for a production importer before believing a module does anything)
+applies to extracted functions exactly as it does to modules.
+
+**Behaviour unchanged, as required:** 3 stops, zero stubs, facts still landing
+(Broder ×3, Mourlot ×3, Arches, vellum), Palais 4/4 with dates intact, 101 green.
