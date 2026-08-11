@@ -4129,6 +4129,80 @@ def r4_scope_cap(exhibition_scope, poi_list_len, total_stops):
     return suppressed, total_stops
 
 
+# [LOCAL-420] Stub detection and material fallback — module-level for testability.
+# A listener must never be told the system failed.
+_STUB_TAIL = "A detailed narration could not be generated for this stop."
+
+
+def _is_stub_text(text):
+    """[LOCAL-420] Return True if text is the empty-stop stub that must never ship."""
+    if not text:
+        return False
+    return _STUB_TAIL in text
+
+
+def _build_material_fallback(poi_name, artist, matched_work, credit_line, candidate_specifics):
+    """[LOCAL-420] Build a short, factual paragraph from whatever material IS on hand.
+
+    A listener must never be told the system failed. When no LLM attempt passes
+    the gate, we still have: the work title, artist, medium, credit line, and any
+    candidate specifics extracted from snippets. Build a real (if thin) narration
+    from those. The result won't pass the positive gate's "concrete fact" check
+    in most cases, but it IS real prose that a listener can hear without
+    embarrassment — unlike the stub.
+    """
+    parts = []
+
+    # Opening: name the work and artist
+    if artist and artist.strip() and artist.strip().lower() not in ('unknown', 'n/a', 'various'):
+        parts.append(f"{poi_name} is a work by {artist}.")
+    else:
+        parts.append(f"Here we have {poi_name}.")
+
+    # Medium / technique from matched_work
+    if matched_work:
+        medium = (matched_work.get('medium') or '').strip()
+        if medium:
+            parts.append(f"This piece is executed in {medium.lower()}.")
+        date = (matched_work.get('date') or '').strip()
+        if date:
+            parts.append(f"It dates to {date}.")
+        collaborator = (matched_work.get('collaborator') or '').strip()
+        if collaborator:
+            parts.append(f"It was created in collaboration with {collaborator}.")
+
+    # Credit line (provenance)
+    if credit_line:
+        # Use credit line as-is if it's short; summarize if long
+        if len(credit_line) <= 120:
+            parts.append(credit_line.rstrip('.') + '.')
+        else:
+            # Take first sentence of credit line
+            first_sent = credit_line.split('.')[0].strip()
+            if first_sent:
+                parts.append(first_sent + '.')
+
+    # Candidate specifics from snippet extraction
+    if candidate_specifics:
+        # Pick up to 3 most informative specifics
+        _specs = []
+        for cs in candidate_specifics[:3]:
+            # Format: "material: lithograph on vellum" → "lithograph on vellum"
+            if ':' in cs:
+                val = cs.split(':', 1)[1].strip()
+            else:
+                val = cs.strip()
+            # [LOCAL-420] Filter out broken specifics (too short or clearly not a fact)
+            if val and len(val) > 3 and ' ' in val:
+                _specs.append(val)
+        if _specs:
+            parts.append("Notable details include " + ", ".join(_specs) + ".")
+
+    # Ensure we have at least something beyond just the opening line
+    result = " ".join(parts)
+    return result
+
+
 def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None):
     """
     Generate audio tour text using OpenAI API with geo coordinates.
@@ -8408,6 +8482,8 @@ Exempt: navigation directions ("Turn left", "Continue past").
                             'title': _sr.get('title', ''),
                             'snippet': _sr.get('snippet', ''),
                             'url': _sr.get('url', ''),
+                            'tier': _sr.get('tier', ''),  # [LOCAL-414] Carry tier through to ranker
+                            'domain': _sr.get('domain', ''),
                         })
 
                 # [LOCAL-410] Inject credit_line as a leading snippet (source of Fridman etc.)
@@ -8524,6 +8600,74 @@ Exempt: navigation directions ("Turn left", "Continue past").
         """Return True only for genuine placeholder echoes (not short-but-valid prose)."""
         classification, _ = _classify_placeholder_leak(text)
         return classification == "placeholder"
+
+    # [LOCAL-415] LLM refusal detector — catches meta-responses where the model
+    # apologises to the listener, references its own constraints, or refuses to
+    # produce content. These must NEVER ship as tour text.
+    _LLM_REFUSAL_PATTERNS = [
+        # Direct refusals
+        r'\bI cannot provide\b',
+        r'\bI can\'t provide\b',
+        r'\bI\'m unable to\b',
+        r'\bI am unable to\b',
+        r'\bI\'m sorry,?\s+(?:but\s+)?I\b',
+        r'\bI apologize\b',
+        r'\bI apologise\b',
+        # Self-referential meta-commentary
+        r'\bas an AI\b',
+        r'\bas a language model\b',
+        r'\bmy training data\b',
+        r'\bmy knowledge cutoff\b',
+        r'\bgiven constraints\b',
+        r'\bgiven the (?:given |)constraints\b',
+        r'\bmissing surnames\b',
+        # Model talking to the user about its own process
+        r'\bI missed out on\b',
+        r'\bI will rectify\b',
+        r'\byour patience is appreciated\b',
+        r'\bpatience is appreciated\b',
+        r'\blet me (?:re)?try\b',
+        r'\bI\'ll rectify\b',
+        r'\bI need (?:more|additional) (?:information|context|details)\b',
+        # Constraint acknowledgment
+        r'\bbased on the given constraints\b',
+        r'\bcannot (?:fulfill|complete|generate)\b',
+        r'\bunable to (?:fulfill|complete|generate)\b',
+        # Apologising to the listener (not a character in the tour)
+        r'\bI (?:apologize|apologise) for (?:the|any)\b',
+        r'\bplease (?:bear with|be patient)\b',
+        # [LOCAL-415] Additional patterns found in live testing
+        r'\bthere was an issue with your request\b',
+        r'\bplease provide the necessary\b',
+        r'\bplease provide (?:more|the) (?:details|information|context)\b',
+        r'\bI (?:don\'t|do not) have (?:enough|sufficient)\b',
+        r'\binsufficient (?:information|data|context)\b',
+        # Model addressing user about missing requirements
+        r'\bmissing required names?\b',
+        r'\bensure to include\b',
+        r'\bnotify me if you require\b',
+        r'\brequire further assistance\b',
+        r'\bif you (?:could|can) provide\b',
+        r'\bI (?:cannot|can\'t) (?:proceed|continue)\b',
+        r'\bmistake in the (?:initial )?instructions\b',
+    ]
+    _LLM_REFUSAL_RE = re.compile('|'.join(_LLM_REFUSAL_PATTERNS), re.IGNORECASE)
+
+    def _detect_llm_refusal(text):
+        """[LOCAL-415] Detect LLM meta-response / refusal in generated text.
+
+        Returns:
+            (True, matched_pattern_text) if refusal detected
+            (False, None) if text appears to be genuine content
+        """
+        if not text or not text.strip():
+            return (False, None)
+        match = _LLM_REFUSAL_RE.search(text)
+        if match:
+            return (True, match.group(0))
+        return (False, None)
+
+    # [LOCAL-420] Stub detection — references module-level _is_stub_text and _build_material_fallback.
 
     def _generate_description(args):
         idx, poi, spine_stop, fact_sheet, story_type = args
@@ -9109,6 +9253,8 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
         # between the runner's canonical_title and the generation pipeline's poi_name).
         _local402_snippets_injected = False
         _candidate_specifics = []  # [LOCAL-407] initialized here for both-sides logging scope
+        _all_snippet_text = ''  # [LOCAL-417] initialized here so required-names gate can check it
+        _417_suppressed_beat_names = set()  # [LOCAL-417] names suppressed from required-names (no snippet evidence)
         _prompt_size_before_snippets = len(description_prompt)  # [LOCAL-411] track pre-snippet size
         if _DIRECT_SNIPPETS_PER_STOP and poi_name:
             _stop_snippets = _DIRECT_SNIPPETS_PER_STOP.get(poi_name, [])
@@ -9136,8 +9282,13 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 print(f"  [LOCAL-411] Stop {stop_num} snippet ranking: "
                       f"input={_ranking_report['input_count']} "
                       f"bio_rejected={_ranking_report['rejected_biography_only']} "
+                      f"tier3_demoted={_ranking_report['tier3_demoted']} "
                       f"cap={_ranking_report['cap_applied']} "
-                      f"output={_ranking_report['output_count']}")
+                      f"output={_ranking_report['output_count']} "
+                      f"usable={_ranking_report['usable_count']} "
+                      f"(t1t2={_ranking_report['tier1_tier2_in_output']}, "
+                      f"t3={_ranking_report['tier3_in_output']}"
+                      f"{', RESCUED' if _ranking_report['starvation_rescued'] else ''})")
                 if _ranking_report['scores']:
                     print(f"    Top scores: {_ranking_report['scores'][:3]}")
 
@@ -9348,7 +9499,30 @@ Do NOT repeat the artist's biographical background (birth year, nationality, sch
             # blocks (~1600 chars). The regex DO NOT USE line + DECLARATIVE PROSE rules already
             # cover this. Replaced with a short, high-signal instruction.
             description_prompt += """
-STYLE CONSTRAINT: No unearned praise. Every evaluative word (remarkable, stunning, captivating, breathtaking, exquisite, mesmerizing, vibrant) requires the specific evidence that earns it in the same or preceding sentence. If you cannot supply the evidence, delete the adjective. Prefer concrete nouns over decorated ones.
+BANNED PHRASES — do NOT use any of these in your description:
+- "vibrant colors" / "dreamlike imagery" / "dreamlike quality"
+- "creative genius" / "artistic prowess" / "masterpiece that"
+- "stir the soul" / "touch the heart" / "pulsate with life"
+- "symphony of emotions" / "tapestry of dreams" / "weaves a narrative"
+- "truly remarkable" / "a testament to" / "stands as a testament"
+- "captivating artistry" / "mesmerizing world" / "intricate details"
+- "invites you to explore/discover/reflect" / "immerse yourself in"
+- "invites contemplation" / "invites the viewer" / "invites us to"
+- "can't help but" / "feast for the eyes" / "step into a world"
+- "created by God" / "fall into sin" / "disobedience" / "the fall of humanity"
+Instead, use SPECIFIC, CONCRETE language: name colors precisely (cerulean, ochre, vermilion), describe actual compositional choices, mention documented historical context.
+
+UNEARNED ADJECTIVES — these words are BANNED unless the same sentence or the one before it
+contains the specific evidence that earns them:
+- "vibrant" — ONLY permitted if you name the specific colors/contrasts that make it vibrant
+- "stunning" — ONLY if you describe what causes the visual impact (scale? technique? contrast?)
+- "remarkable" — ONLY if you state what distinguishes it from comparable works
+- "mesmerizing" — ONLY if you explain the optical or compositional mechanism
+- "exquisite" — ONLY if you describe the craftsmanship detail (grain, jointwork, brushstroke)
+- "breathtaking" — ONLY if you name the physical feature that produces the effect
+- "captivating" — ONLY if you explain what holds attention and why
+If you cannot provide that evidence in the same breath, delete the adjective. A bare noun
+is better than a noun preceded by an unearned superlative.
 """
             description_prompt += """
 FACTUAL INTEGRITY RULE: Do NOT invent visual specifics or biographical claims not in the fact sheet above. You may describe the general biblical SUBJECT (e.g. "depicts the parting of the Red Sea") but do NOT assert specific visual details as facts (colors, composition) unless grounded in the facts above. Never call a work "the artist's final masterpiece" or similar unverifiable superlatives.
@@ -9661,23 +9835,54 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
         # of the prompt (primacy effect). The model sees these before the style rules.
         # This addresses the diagnosis: specifics reach the prompt but are buried under
         # 60+ lines of instructions at position 15000+ in a 21000-char prompt.
+        #
+        # [LOCAL-417] CRITICAL FIX: Only demand names the pipeline actually supplied.
+        # If a person from story beats does not appear in any snippet text for this
+        # stop, we MUST NOT tell the model their name is required — that creates an
+        # unsatisfiable constraint and the model reports the impossibility instead of
+        # writing prose. The denylist cannot catch every rephrasing of "I can't do
+        # what you asked"; the fix is to never ask for what we didn't provide.
         _facts_first_block = ""
         if _DIRECT_SNIPPETS_PER_STOP and tour_category == 'museum':
             _ff_parts = []
-            # Required names from story beats
+            # Required names from story beats — ONLY those with snippet evidence
             if _storied_mode and _story_beats_per_stop and idx < len(_story_beats_per_stop):
                 _ff_beats = _story_beats_per_stop[idx]
                 _ff_required = [b for b in _ff_beats if b['role'] not in ('circumstance', 'stakes')
                                 and not b.get('exhibition_wide')]
-                if _ff_required:
+                # [LOCAL-417] Filter: only demand names that appear in the snippet text
+                # for this stop. A name the pipeline never supplied cannot be required.
+                _snippet_text_lower = _all_snippet_text.lower() if _all_snippet_text else ''
+                _ff_verified = []
+                _ff_suppressed = []
+                for _ffb in _ff_required:
+                    _ff_surname = _ffb['person'].split()[-1]
+                    # Check if the person's surname appears anywhere in snippet text
+                    if _snippet_text_lower and _ff_surname.lower() in _snippet_text_lower:
+                        _ff_verified.append(_ffb)
+                    else:
+                        _ff_suppressed.append(_ffb)
+                if _ff_suppressed:
+                    print(f"  [LOCAL-417] Stop {stop_num}: SUPPRESSED {len(_ff_suppressed)} required names "
+                          f"(no snippet evidence): {[b['person'] for b in _ff_suppressed]}")
+                    # [LOCAL-417] Track suppressed names so beat retry doesn't demand them
+                    _417_suppressed_beat_names = set(b['person'].split()[-1] for b in _ff_suppressed)
+                if _ff_verified:
                     _ff_parts.append("━━━ NAMES THAT MUST APPEAR (your text is rejected without these) ━━━")
-                    for _ffb in _ff_required[:4]:
+                    for _ffb in _ff_verified[:4]:
                         _ff_surname = _ffb['person'].split()[-1]
                         _ff_parts.append(f"  • {_ff_surname} ({_ffb['person']}, {_ffb['role'].replace('_',' ')})")
-                    # Always add the artist
+                    # Add the artist only if artist is known
                     if artist:
                         _ff_artist_surname = artist.split()[-1]
                         _ff_parts.append(f"  • {_ff_artist_surname} ({artist}, artist)")
+                    _ff_parts.append("━━━ END REQUIRED NAMES ━━━")
+                    _ff_parts.append("")
+                elif artist:
+                    # No story-beat names verified, but artist is known — still require artist
+                    _ff_artist_surname = artist.split()[-1]
+                    _ff_parts.append("━━━ NAMES THAT MUST APPEAR (your text is rejected without these) ━━━")
+                    _ff_parts.append(f"  • {_ff_artist_surname} ({artist}, artist)")
                     _ff_parts.append("━━━ END REQUIRED NAMES ━━━")
                     _ff_parts.append("")
 
@@ -9716,6 +9921,24 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                   f"facts_first={'yes' if _facts_first_block else 'no'})")
             if _prompt_size_final > 20000:
                 print(f"  [LOCAL-411] WARNING: prompt exceeds 20K chars ({_prompt_size_final})")
+
+        # [LOCAL-414] Universal artist attribution — fires for ALL museum stops
+        # when artist is known, regardless of snippet presence. Placed at the END
+        # of the prompt (recency bias) so it cannot be overridden by snippets that
+        # name a different artist's different work.
+        if tour_category == 'museum' and artist:
+            _414_artist_surname = artist.split()[-1]
+            description_prompt += f"""
+━━━ ARTIST ATTRIBUTION (LOCAL-414 — NON-NEGOTIABLE, FINAL AUTHORITY) ━━━
+The artist of THIS specific work is: {artist}
+The surname "{_414_artist_surname}" MUST appear in your text.
+
+If the reference material above mentions OTHER artists or OTHER works (by different
+artists), you may reference them only as CONTEXT — but your text MUST primarily be
+about THIS work by {artist}. Naming a different artist's different work does NOT
+satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" is absent.
+━━━ END ARTIST ATTRIBUTION ━━━
+"""
 
         description_data = {
             "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
@@ -9825,6 +10048,51 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                             # All retries exhausted — produce honest short description, never ship placeholder
                             print(f"  [LOCAL-26] Stop {stop_num}: placeholder leak persists after {_max_retries+1} attempts, using fallback")
                             description = f"{poi_name} — an exhibit at this venue. Detailed information was not available at generation time."
+
+                    # [LOCAL-415] LLM refusal gate — detect meta-responses (model apologising,
+                    # referencing constraints, refusing to generate). These must NEVER ship.
+                    _is_refusal, _refusal_match = _detect_llm_refusal(description)
+                    if _is_refusal and _leak_class != "placeholder":
+                        _rejected_wc = len(description.split()) if description else 0
+                        print(f"  [LOCAL-415] Stop {stop_num}: LLM REFUSAL DETECTED — matched: '{_refusal_match}'")
+                        print(f"  [LOCAL-415]   verbatim ({_rejected_wc} words): {repr(description[:300])}")
+                        if _attempt < _max_retries:
+                            # Retry with higher temperature and explicit "do not apologize" reinforcement
+                            description_data["temperature"] = min(0.7 + 0.2 * (_attempt + 1), 1.0)
+                            # [LOCAL-415] Add a system-level override to prevent refusal on retry
+                            if len(description_data.get("messages", [])) > 0:
+                                description_data["messages"].append({
+                                    "role": "user",
+                                    "content": (
+                                        "Your previous response was a refusal/apology instead of content. "
+                                        "You MUST produce a description of the artwork/exhibit using the "
+                                        "reference material provided. Do NOT apologize, do NOT reference "
+                                        "constraints, do NOT address the listener about your own limitations. "
+                                        "Write the tour narration directly."
+                                    ),
+                                })
+                            print(f"  [LOCAL-415] Stop {stop_num}: refusal detected (attempt {_attempt+1}), "
+                                  f"retrying with anti-refusal reinforcement (temp={description_data['temperature']:.2f})...")
+                            continue  # retry
+                        else:
+                            # All retries exhausted — fail loudly with diagnostic, never ship refusal
+                            print(f"  [LOCAL-415] Stop {stop_num}: REFUSAL PERSISTS after {_max_retries+1} attempts — "
+                                  f"using fallback (NEVER shipping model apology as tour text)")
+                            # [LOCAL-420] Never ship the stub — use best earlier attempt if one exists
+                            if _best_description:
+                                description = _best_description[1]
+                                print(f"  [LOCAL-420] Stop {stop_num}: falling back to best prior attempt "
+                                      f"({_best_description[2]} words) instead of stub")
+                            else:
+                                # [LOCAL-420] No prior attempt available — build from material on hand
+                                description = _build_material_fallback(
+                                    poi_name, artist, _matched_work,
+                                    _credit_line_for_stop, _candidate_specifics)
+                                print(f"  [LOCAL-420] Stop {stop_num}: no prior attempt — built material fallback "
+                                      f"({len(description.split())} words)")
+                            # Mark as non-refusal for downstream (it's now our honest fallback)
+                            _is_refusal = False
+
                     elif _leak_class == "short_valid":
                         # [LOCAL-295] Short but valid prose — keep it. Do NOT retry identically.
                         # This is thin corpus, not a generation failure.
@@ -9833,9 +10101,104 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                         # Reset temperature in case it was bumped by a prior retry
                         description_data["temperature"] = 0.7
 
+                    # [LOCAL-417] POSITIVE ASSERTION GATE (D353): assert what the text IS,
+                    # not what it must not say. A stop must:
+                    #   1. Name its own subject (the work/exhibit the stop is about)
+                    #   2. State at least one concrete fact about it
+                    #   3. Address the listener, never the operator — no second-person
+                    #      instructions about "your description", no "notify me", no
+                    #      references to requirements or constraints
+                    # This survives rephrasing; a string denylist does not.
+                    # Runs AFTER refusal gate and placeholder gate — only on text that
+                    # passed those checks and isn't already a fallback.
+                    if (description and _leak_class != "placeholder" and not _is_refusal
+                            and not description.startswith(f"{poi_name} — located in this gallery")
+                            and not description.startswith(f"{poi_name} — an exhibit")):
+                        _417_gate_pass = True
+                        _417_gate_failures = []
+
+                        # Check 1: text names its subject (work title or a significant word from it)
+                        _417_desc_lower = description.lower()
+                        _417_poi_lower = poi_name.lower()
+                        _417_poi_words = [w for w in re.findall(r'\b[a-z]{3,}\b', _417_poi_lower)
+                                          if w not in ('the', 'and', 'for', 'from', 'with', 'that', 'this')]
+                        _417_subject_named = (_417_poi_lower in _417_desc_lower or
+                                             any(w in _417_desc_lower for w in _417_poi_words))
+                        if not _417_subject_named:
+                            _417_gate_pass = False
+                            _417_gate_failures.append(f"subject not named (expected '{poi_name}' or significant word)")
+
+                        # Check 2: at least one concrete fact (a date, number, proper noun
+                        # beyond the title, or specific material/technique)
+                        _417_has_fact = bool(re.search(
+                            r'\b(?:1[0-9]{3}|20[0-2][0-9])\b'  # year (1000-2029)
+                            r'|\b\d+\s*(?:cm|inches|feet|meters|ft|in)\b'  # measurement
+                            r'|\b\d{2,}[,.]?\d*\s*(?:works?|objects?|pieces?|items?|artifacts?)\b'  # collection count
+                            r'|\b(?:oil on canvas|bronze|marble|lithograph|watercolor|fresco|'
+                            r'tempera|etching|woodcut|ceramic|terracotta|limestone|granite)\b'  # material
+                            r'|\b(?:donated|acquired|commissioned|exhibited|installed|founded|opened'
+                            r'|built|constructed|designed|crafted|created)\s+(?:in|by|for)\b'  # provenance/creation verb
+                            r'|\b(?:17th|18th|19th|20th|21st)[\s-]+century\b',  # century reference (with hyphen)
+                            description, re.IGNORECASE
+                        ))
+                        if not _417_has_fact:
+                            _417_gate_pass = False
+                            _417_gate_failures.append("no concrete fact (date, measurement, material, or provenance)")
+
+                        # Check 3: addresses listener, not operator — no operator-directed language
+                        _417_operator_patterns = re.compile(
+                            r'\byour (?:description|text|narrative|response|prompt|request)\b'
+                            r'|\bnotify me\b'
+                            r'|\brequire(?:s|d)? further assistance\b'
+                            r'|\bensure to include\b'
+                            r'|\bmissing required\b'
+                            r'|\bspecified individuals\b'
+                            r'|\byour (?:instructions?|requirements?|constraints?)\b'
+                            r'|\bprovide (?:more|the|additional) (?:details?|information|context)\b'
+                            r'|\bin your (?:narrative|description|text)\b',
+                            re.IGNORECASE
+                        )
+                        _417_operator_match = _417_operator_patterns.search(description)
+                        if _417_operator_match:
+                            _417_gate_pass = False
+                            _417_gate_failures.append(f"operator-directed language: '{_417_operator_match.group(0)}'")
+
+                        if not _417_gate_pass:
+                            print(f"  [LOCAL-417] Stop {stop_num}: POSITIVE GATE FAILED — {_417_gate_failures}")
+                            print(f"  [LOCAL-417]   verbatim: {repr(description[:300])}")
+                            # [LOCAL-420] Save gate-rejected text as _best_description candidate.
+                            # It failed the gate but it IS real prose — better than a stub or
+                            # material fallback. Track it so we can fall back to it on final failure.
+                            if description and not _is_stub_text(description):
+                                _cur_wc = len(description.split())
+                                _best_wc = _best_description[2] if _best_description else 0
+                                if _cur_wc > _best_wc:
+                                    _best_description = (orientation, description, _cur_wc, tokens_used, call_cost)
+                            if _attempt < _max_retries:
+                                description_data["temperature"] = min(0.7 + 0.2 * (_attempt + 1), 1.0)
+                                print(f"  [LOCAL-417] Stop {stop_num}: retrying (attempt {_attempt+1}, "
+                                      f"temp={description_data['temperature']:.2f})...")
+                                continue  # retry
+                            else:
+                                print(f"  [LOCAL-417] Stop {stop_num}: GATE FAILED after {_max_retries+1} attempts — "
+                                      f"using fallback (never shipping operator-directed text)")
+                                # [LOCAL-420] Never ship the stub — use best earlier attempt if one exists
+                                if _best_description:
+                                    description = _best_description[1]
+                                    print(f"  [LOCAL-420] Stop {stop_num}: falling back to best prior attempt "
+                                          f"({_best_description[2]} words) instead of stub")
+                                else:
+                                    # [LOCAL-420] No prior attempt available — build from material on hand
+                                    description = _build_material_fallback(
+                                        poi_name, artist, _matched_work,
+                                        _credit_line_for_stop, _candidate_specifics)
+                                    print(f"  [LOCAL-420] Stop {stop_num}: no prior attempt — built material fallback "
+                                          f"({len(description.split())} words)")
+
                     # [LOCAL-394] Track best valid description — a stop is NEVER dropped.
                     # Save every non-placeholder description; keep the longest one.
-                    if description and _leak_class != "placeholder":
+                    # [LOCAL-420] The stub must never become _best_description — exclude it.
+                    if description and _leak_class != "placeholder" and not _is_stub_text(description):
                         _cur_wc = len(description.split())
                         _best_wc = _best_description[2] if _best_description else 0
                         if _cur_wc > _best_wc:
@@ -9868,6 +10231,10 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                     # [LOCAL-391] Required beat retry: if assigned beats are missing
                     # from the output, retry ONCE with the missing names explicitly
                     # called out. If still missing after retry, log beat_unrecoverable.
+                    # [LOCAL-417] ONLY check beats whose names were NOT suppressed
+                    # (i.e., only those the prompt actually demanded). Suppressed names
+                    # have no snippet evidence — retrying for them is pointless and wastes
+                    # the model's context on unsatisfiable constraints.
                     if (_storied_mode and _story_beats_per_stop
                             and idx < len(_story_beats_per_stop)
                             and _story_beats_per_stop[idx]
@@ -9881,6 +10248,12 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                             _beat_found, _beat_missing = check_required_beats_present(
                                 description, _story_beats_per_stop[idx]
                             )
+                            # [LOCAL-417] Filter out suppressed names — never retry for them
+                            if _417_suppressed_beat_names and _beat_missing:
+                                _beat_missing = [
+                                    name for name in _beat_missing
+                                    if name not in _417_suppressed_beat_names
+                                ]
                             # [LOCAL-391] Scrub unfilled roles ('with publisher' → person name)
                             description, _role_subs = scrub_unfilled_roles(
                                 description, _story_beats_per_stop[idx]
@@ -9891,6 +10264,12 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                                 _beat_found, _beat_missing = check_required_beats_present(
                                     description, _story_beats_per_stop[idx]
                                 )
+                                # [LOCAL-417] Re-filter suppressed names after re-check
+                                if _417_suppressed_beat_names and _beat_missing:
+                                    _beat_missing = [
+                                        name for name in _beat_missing
+                                        if name not in _417_suppressed_beat_names
+                                    ]
 
                             if _beat_missing and _attempt < _max_retries:
                                 # Retry: add the missing-beat supplement to the prompt
@@ -10191,6 +10570,42 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                         _artist_sn = artist.split()[-1].lower()
                         if _artist_sn and _artist_sn not in description.lower():
                             print(f"  [LOCAL-407] ⚠️ Stop {stop_num}: artist '{artist}' ABSENT from description!")
+
+                    # [LOCAL-414] Post-generation banned-phrase scrub.
+                    # The ban is in the prompt but the LLM occasionally ignores it.
+                    # Rather than retry (expensive, same result), scrub the phrase
+                    # from the delivered text. The phrase adds no information loss.
+                    _414_BANNED_PHRASES = [
+                        'invites contemplation',
+                        'invites the viewer',
+                        'invites us to',
+                        'invites you to explore',
+                        'invites you to discover',
+                        'invites you to reflect',
+                        'a testament to',
+                        'stands as a testament',
+                        'feast for the eyes',
+                        'step into a world',
+                        'stir the soul',
+                        'pulsate with life',
+                    ]
+                    _414_banned_found = []
+                    if description:
+                        _desc_lower_414 = description.lower()
+                        for _bp in _414_BANNED_PHRASES:
+                            if _bp in _desc_lower_414:
+                                _414_banned_found.append(_bp)
+                        if _414_banned_found:
+                            # Scrub: remove sentences containing banned phrases
+                            import re as _re414
+                            for _bp in _414_banned_found:
+                                # Remove the sentence containing the banned phrase
+                                _pattern = _re414.compile(
+                                    r'[^.!?]*\b' + _re414.escape(_bp) + r'\b[^.!?]*[.!?]\s*',
+                                    _re414.IGNORECASE
+                                )
+                                description = _pattern.sub('', description).strip()
+                            print(f"  [LOCAL-414] Stop {stop_num}: SCRUBBED banned phrases from output: {_414_banned_found}")
 
                     return idx, orientation, description, word_count, tokens_used, call_cost
                 else:
