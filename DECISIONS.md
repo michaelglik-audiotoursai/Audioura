@@ -13864,3 +13864,72 @@ still the right target, so 417 continues.
 
 Merge order once 417 lands: compare its delivered tour against 415's `d8f6996`
 and take the better, rather than assuming the later branch dominates.
+
+## D357 — The exhibition tour is broken at extraction, and LEAD's "the chain regressed it" claim was wrong
+**2026-08-11, 15:2x.** Correcting D-nothing — correcting a claim LEAD made to Michael
+in chat 20 minutes earlier, including a suggestion to revert 411–413.
+
+### The verified bug
+
+Requesting `Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA` with 3 stops
+delivers **one** stop, titled:
+
+> `Stop 1: Wednesday, September 16–Wednesday`
+
+— the exhibition's running-dates string — attributed to:
+
+> `"Wednesday, September 16–Wednesday" **by October 7**`
+
+— the other half of that date range, credited as the artist.
+
+**Reproduced deterministically:** two consecutive live runs, identical output. Not
+selection variance, which `TOUR_REVIEW_current.md` warns dominates scores.
+
+**Isolated to the extractor.** Calling it directly:
+
+```
+page chars: 4311
+extracted works: 1
+   RAW  - 'Wednesday, September 16–Wednesday'
+after plausibility_gate: 1
+   KEPT - 'Wednesday, September 16–Wednesday'
+```
+
+**And the page is fine.** Its text contains, in full:
+
+> "Joan Miró, Le Lézard aux plumes d'or (The Lizard with Golden Feathers) (detail),
+> published by Louis Broder, printed by Mourlot Frères, Paris, 1971. Illustrated
+> book with 40 color lithographs …; publisher's vellum. Gift of Boris Fridman."
+
+That is precisely the credit line rounds 397–412 were built around. **The extractor
+walks past it and takes a date range.** `plausibility_gate` — whose entire purpose
+is rejecting implausible work entries — passes it through.
+
+### What LEAD got wrong
+
+LEAD told Michael the 410–413 chain regressed the exhibition tour, comparing against
+`TOUR_MFA_STORIED_CURRENT.txt` (10:15, three real works) and offering to revert
+411–413.
+
+**`exhibition_checklist.py` has not changed since 2026-08-10 14:30.** Today's merges
+touched snippet ranking and injection in `generate_tour_text.py` only. The extractor
+returns 1 work **with the tour cache enabled and disabled alike**, so neither the
+merges nor a cache expiry explains it.
+
+**A before/after difference is not a regression until the change is located.** LEAD
+had two artifacts and a time ordering and asserted causation from that alone —
+D242's own rule ("regression is a claim about two trees") applied to tours and
+ignored. The revert suggestion would have thrown away four merges for a bug they did
+not cause.
+
+**Unresolved and stated as unresolved:** what produced the three-work 10:15 version.
+The likeliest explanation is an acceptance runner that pre-populated works rather
+than extracting live — the D345 pattern, where a runner supplies what production
+cannot. That is a hypothesis, not a finding.
+
+### Why this outranks everything else queued
+
+Every round from 397 to 417 has been polishing prose, ranking and gating on top of a
+checklist that yields one fake work. **The exhibition tour cannot be evaluated at
+all until extraction works**, so 418 goes to the front and 417's acceptance is
+re-validated against the correct case before any merge.
