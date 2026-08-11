@@ -1,6 +1,6 @@
 ================================================================================
 LITERAL PROMPT SENT TO LLM — STOP 1
-Generated: 2026-08-11T14:21:15.135749
+Generated: 2026-08-11T17:57:12.942429
 Model: gpt-3.5-turbo
 Temperature: 0.7
 Max tokens: 1000
@@ -13,23 +13,28 @@ You are a knowledgeable museum guide with expertise in art, architecture, and hi
 STYLE: Channel the passion of a curator who fell in love with this piece — make the listener see what the artist felt.
 
 ━━━ NAMES THAT MUST APPEAR (your text is rejected without these) ━━━
-  • British (British, illustrator)
-  • Mesoamerica (Ancient Mesoamerica, gallery patron)
-  • Moody (Moody, author)
-  • Ritts (Herb Ritts, gallery patron)
+  • Fridman (Boris Fridman, donor)
+  • Broder (Louis Broder, publisher)
+  • Frères (Mourlot Frères, printer)
 ━━━ END REQUIRED NAMES ━━━
 
+━━━ CONCRETE FACTS TO USE (prefer these over general claims) ━━━
+  • material: publisher’s vellum
+  • plate count: 15 lithographs
+  • plate count: 40 color lithographs
+━━━ END CONCRETE FACTS ━━━
 
 
-Create a detailed audio description for Ancient Nubia Now at Museum of Fine Arts, Boston, MA, focusing on museum.
 
-Start with a brief orientation that names "Ancient Nubia Now" specifically (not "the exhibit" or "this piece") and tells the listener WHERE to stand or look AND WHY — what becomes visible, legible, or striking from that position that they would miss otherwise.
+Create a detailed audio description for Le Lézard aux plumes d’or (The Lizard with Golden Feathers) at Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA, focusing on contained.
+
+Start with a brief orientation that names "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)" specifically (not "the exhibit" or "this piece") and tells the listener WHERE to stand or look AND WHY — what becomes visible, legible, or striking from that position that they would miss otherwise.
 
 Then provide a detailed description of the exhibit. Include:
 - What the work physically depicts or consists of — what the visitor sees
 - One specific technique, material choice, or compositional decision and WHY it matters
 - One piece of historical or cultural context that changes how the visitor understands it
-- If relevant: how this piece connects to the broader collection or museum
+- If relevant: how this piece connects to the broader collection or contained
 
 EXPLAIN-WHAT-YOU-NAME RULE (critical):
 Every concept, motif, symbol, technique, cultural reference, or person you mention
@@ -91,24 +96,59 @@ This tone should permeate the entire description — not as a single inserted se
 DO NOT USE these phrases: the building was erected, historically important, the population of, vibrant\s+colou?rs?\s*(and|of|that), dreamlike\s+(imagery|quality|world|scene|composition), deep\s+connection\s+to, (his|her|their)\s+Jewish\s+heritage, intricate\s+details?, timeless\s+themes?, position\s+yourself\s+in\s+the\s+center, the\s+artist['']?s?\s+(unique|remarkable|extraordinary), masterpiece\s+that, a\s+testament\s+to, creative\s+genius, stir(s|ring)?\s+the\s+soul
 
 NARRATIVE SPINE CONTEXT (use to shape your description):
-- Emotional beat for this stop: curiosity
-- Unique angle to emphasize: Explore the role of Francis Bartlett's donations in acquiring artifacts from Ancient Nubia, revealing the museum's dedication to diverse historical narratives.
-- End with a forward-looking hook: What other treasures have the Bartlett donations helped to procure?
-
-THEME THREAD CONTEXT (weave these cross-stop connections into your narrative):
-- Thread "The Influence of Francis Bartlett Donations" (weight 33%): The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1; The Museum purchased a sarcophagus or large urn with cover using funds from the Francis Bartlett Don
-- Thread "The Role of Donations in Expanding the Collection" (weight 33%): John Goelet donated the artwork titled 'Maharana Sangram Singh Enjoys the Monsoon'.
-- Thread "21st Century Contributions to the MFA" (weight 33%): In 2010, the new Art of the Americas Wing opened with free admission to the public.; The Art of the Americas Wing was recognized for its high architectural achievement by the award of t
+- Emotional beat for this stop: wonder
+- Unique angle to emphasize: This sculpture by Joan Miró is a surreal exploration of nature and imagination, where the fantastical meets the real, and it's a piece that challenges our perception of the natural world.
+- End with a forward-looking hook: How does a similar sense of transformation appear in the realm of belief?
 
 VERIFIED FACTS (incorporate these for accuracy — these are confirmed for this specific POI):
-The Museum of Fine Arts, Boston, has a collection of ancient Nubian art.; The collection includes more than 65,000 works of art such as sculpture, jewelry, coffins, mummies, coins, weapons, architecture, vases, carved gems, musical instruments, and mosaics.; The Nubians built more pyramids than the Egyptians.; The Nubian art collection at the Museum of Fine Arts, Boston, is the largest and most important outside of Khartoum.; The core of the Nubian art collection at the Museum of Fine Arts, Boston, was formed between 1913 and 1932.
+The Museum of Fine Arts was founded in 1870.; The museum was initially located on the top floor of the Boston Athenæum.
 
 MANDATORY INCLUSION — work this surprising detail into the description naturally:
-The Nubians built more pyramids than the Egyptians.
+The initial collection of the Museum of Fine Arts came from the Athenæum's Art Gallery.
 
-VENUE CONTEXT (LOCAL-382): This work is part of a collection with a stated institutional
-purpose. When relevant, connect the work to the venue's reason for existing — but only
-if the connection is natural and grounded. Do NOT force a connection.
+PROVENANCE (museum-published credit line — you MUST name the donor):
+  Gift of Boris Fridman
+
+MANDATORY: Name the donor "Boris Fridman" (surname "Fridman") in your text. Do NOT write "a gift to the museum" without naming who gave it.
+PROHIBITION: Do NOT infer or assert the donor's motive, wealth, financial condition,
+or any biographical predicate not contained in retrieved text. Stating "Gift of [name]"
+is the documented fact; "donated because…" or "could no longer afford…" is fabrication.
+
+WORK IDENTITY (LOCAL-379 — grounded facts from exhibition checklist):
+  Artist: Joan Miró
+  Date: 1971
+  Medium: Illustrated book with 40 color lithographs (including wrapper front and cover); publisher’s vellum
+  Publisher: Louis Broder
+  Credit line: Gift of Boris Fridman
+
+You MUST name the artist in your description. If a collaborator or author is given, name them too. These are grounded facts — use them.
+
+EXHIBITION FRAMING (LOCAL-382 — this work is part of a curated exhibition):
+This is NOT a painting on a wall. The exhibition's thesis is that THE BOOK IS THE ARTWORK:
+image, text, typography, paper, binding, as one integrated thing.
+
+Your description MUST engage at least TWO of these dimensions:
+1. The COLLABORATION — who wrote/authored it, who published it, who printed it.
+2. The FORM — lithographs, binding, plates, paper, printing technique.
+3. How IMAGES, WORDS, AND TYPOGRAPHY intersect — the exhibition's stated subject.
+
+KNOWN COLLABORATION/FORM FACTS for this work:
+  - Publisher: Louis Broder
+  - Medium/form: Illustrated book with 40 color lithographs (including wrapper front and cover); publisher’s vellum
+
+THESIS THREADING (LOCAL-421 — NON-NEGOTIABLE):
+You MUST include ONE SENTENCE that explicitly states how THIS SPECIFIC WORK advances
+the exhibition's argument. The exhibition argues that artists revolutionized the book
+as an art form through deeply collaborative ventures. Your sentence must connect THIS
+work to THAT thesis. Example shapes:
+  - "This work exemplifies the livre d'artiste ideal: [artist] and [author] worked
+    directly with [printer] to integrate image and text on a single sheet."
+  - "[Publisher]'s decision to commission [artist] for this edition advanced the
+    collaborative book form that the exhibition argues had no precedent."
+
+FORBIDDEN: Describing the depicted image as though this object were a painting,
+with no reference to it being a book or printed work. That treats the work as
+something it is not and ignores the exhibition's entire premise.
 
 STORY BEAT REQUIREMENT (LOCAL-383):
 Your description MUST contain at least one sentence that NAMES A PERSON and
@@ -123,51 +163,62 @@ are IN ADDITION TO the artist — never instead of. If WORK IDENTITY says
 "Artist: Joan Miró", your text must contain "Miró".
 
 ━━━ REQUIRED CONTENT — EACH SURNAME BELOW MUST APPEAR IN YOUR TEXT ━━━
-  ✓ "British" — British (illustrator): British illustrated books, prints and drawings from the late 19th century The Rothschild Collection, including over 130
-  ✓ "Mesoamerica" — Ancient Mesoamerica (gallery patron): the gallery where these works are displayed is named for this patron
-  ✓ "Moody" — Moody (author): authored the text that was illustrated
+  ✓ "Fridman" — Boris Fridman (donor): gave this work as a gift to the museum
+  ✓ "Broder" — Louis Broder (publisher): published this work
+  ✓ "Frères" — Mourlot Frères (printer): printed this work
 Write at least one sentence per person above that names them by surname.
 If you omit any of these surnames, your response will be REJECTED and regenerated.
 ━━━ END REQUIRED CONTENT ━━━
 
 GROUNDED PEOPLE AND ACTIONS (from the exhibition page — use at least one):
-  • British (Illustrator): British illustrated books, prints and drawings from the late 19th century The Rothschild Collection, including over 130
-  • Ancient Mesoamerica (Gallery Patron): the gallery where these works are displayed is named for this patron
-  • Moody (Author): authored the text that was illustrated
+  • Boris Fridman (Donor): gave this work as a gift to the museum
+  • Louis Broder (Publisher): published this work
+  • Mourlot Frères (Printer): printed this work
 
-STORY SERVES THE VENUE: The person/action you name should connect to why
-this institution exists or how this collection was assembled.
+STORY SERVES THE THESIS: The person/action you name should connect to WHY
+this exhibition exists — e.g., a printer matters because the show argues printers
+were essential collaborators, not because printers are inherently interesting.
 NEVER-PLACEHOLDER RULE (LOCAL-388): Do NOT write 'with publisher', 'with printer', 'with donor', or 'the patron'. Where a role is mentioned, NAME THE PERSON. Specifically:
-  'illustrator' → use 'British'
-  'gallery patron' → use 'Ancient Mesoamerica'
-  'author' → use 'Moody'
+  'donor' → use 'Boris Fridman'
+  'publisher' → use 'Louis Broder'
+  'printer' → use 'Mourlot Frères'
 
 
 WHAT IS NOT A STORY: "This masterpiece challenges boundaries" is not a story.
 "Published by Louis Broder in Paris" IS a story — it names who and what they did.
 A story has: a person, a specific circumstance, a consequence.
 
-DOCUMENTED FACTS FOR THIS WORK (incorporate at least one):
-eeper into the timeless epic that has captivated audiences for nearly 3,000 years—and artistic depictions often give us our best information on these ancient tales.
-
-Our gallery dedicated to the Homer
-
 REFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):
-  [1] About the MFA | Museum of Fine Arts Boston
-      The original MFA was founded in 1870. MFA's participation in and contributions to Boston's civic, cultural, and economic life
-  [2] Museum of Fine Arts, Boston - Wikipedia
-      In 2018, the museum received the largest and most significant gift of Chinese paintings and calligraphy in its history: the Wan-go H. C. Weng … the gift spans ...
-  [3] Exhibition: Ancient Nubia Now
-      Through a majestic display of art and objects, “Ancient Nubia Now” confronts past misinterpretations and offers new ways of understanding Nubia's history and ...
-  [4] Exhibition: Ancient Nubia Now
-      Through a majestic display of art and objects, “Ancient Nubia Now” confronts past misinterpretations and offers new ways of understanding Nubia's history and ...
-  [5] Exhibiting Ancient Africa at the Museum of Fine Arts, Boston
-      The exhibition “Ancient Nubia Now” (2019–2020) was a visually spectacular display that was in one sense a fairly traditional introduction to the history and ...
+  [1] Joan Miró - Le lézard aux plumes d'or
+      Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...
+  [2] Joan Miró - Le lézard aux plumes d'or - Choice Contemporary
+      Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...
+  [3] Joan Miró - Le lézard aux plumes d'or
+      Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is ... created in 1971 as a vibrant fusion of poetry, printmaking, and sculptural
+  [4] Joan Miró | Le Lézard aux plumes d'or (1971, Lithographs)
+      Le Lézard aux plumes d'or (The Lizard with Golden Feathers) - Illustrated book with 15 lithographs printed in colors, on BFK Rives wove paper - Signed in ...
+  [5] Joan Miró's Broder Collection: How One Artist ...
+      In 1956, Broder began a partnership with Joan Miró alongside Atelier Mourlot, a world-famous French lithographic studio. In 1920 when Miro was ...
 
-STORY INSTRUCTION (LOCAL-407/412):
-Use the reference material above. Include at least ONE concrete specific (number, material, literary form, verifiable fact) from snippets or CANDIDATE SPECIFICS.
+━━━ CANDIDATE SPECIFICS (extracted from the snippets above) ━━━
+  • material: publisher’s vellum
+  • plate count: 15 lithographs
+  • plate count: 40 color lithographs
+━━━ END CANDIDATE SPECIFICS ━━━
 
-PRIORITY RULE: a concrete detail ALWAYS beats a general claim. "printed on Japan paper in edition of 50" beats "revolutionized the book as an art form."
+STORY INSTRUCTION (LOCAL-407/412/419):
+Use the reference material above. Your text MUST include at least TWO of the following NAMED FIELDS if the snippets provide them:
+
+  1. DATE — the year the work was created or published (e.g. "1955", "1974")
+  2. PUBLISHER — the publisher's name (e.g. "Tériade", "Louis Broder")
+  3. PRINTER — the printer's name (e.g. "Mourlot Frères", "Crommelynck")
+  4. EDITION — the edition size or number (e.g. "edition of 220", "set of 10")
+  5. MEDIUM/TECHNIQUE — what it is made of (e.g. "lithographs on Arches wove paper", "drypoints on sheepskin")
+  6. COLLABORATOR — who wrote the text or poems (e.g. "Pierre Reverdy", "Sigmund Freud")
+
+PRIORITY RULE: a concrete detail ALWAYS beats a general claim. "published by Tériade in 1955, printed by Mourlot Frères in an edition of 220" beats "an intriguing fusion of visual and textual elements."
+
+FAILURE MODE TO AVOID: Do NOT write sentences like "reveals a deep connection" or "beckons us to question" or "stands out for its intriguing fusion" — these are EMPTY. Instead write: WHO made it, WHEN, HOW (technique), WHERE (printer/workshop), and HOW MANY (edition).
 
 Rules:
   - Name people explicitly (never "the publisher" — use their actual name)
@@ -178,6 +229,40 @@ Rules:
     identity form. A story requires: who did what, with what material consequence.
   - NO HALLUCINATED SENSORY CLAIMS: never assert a sensation the listener cannot verify
     (smell, sound, temperature, texture) unless the material states it.
+
+STORY REQUIREMENT (LOCAL-421 — NON-NEGOTIABLE):
+Your description MUST contain at least ONE STORY of no fewer than THREE SENTENCES.
+A story = a claim about PEOPLE AND CONSEQUENCES: a relationship, a decision, a dispute,
+a gift, a reason something was made the way it was.
+
+WHAT COUNTS AS A STORY:
+  - "Boris Fridman donated this work to the MFA in 2003. Fridman, a Boston-based collector
+    who specialized in livres d'artiste, assembled one of the largest private collections
+    of artist's books in New England. His gift brought the museum's holdings of
+    Surrealist-era printed works to a critical mass."
+  - "Dalí chose Freud's Moses and Monotheism because he considered Freud's work
+    foundational to Surrealism. Dalí had attempted to visit Freud in London in 1938
+    and sketched the dying psychoanalyst during that meeting."
+  - "Louis Broder commissioned this work from Miró as part of a deliberate campaign to
+    revive the livre d'artiste tradition after the war. Broder's editions were tiny —
+    rarely more than 150 copies — and he insisted on direct collaboration between
+    artist, poet, and printer at the same workshop."
+
+WHAT DOES NOT COUNT:
+  - A list of facts with no narrative thread (just naming publisher + printer + date)
+  - "Invites you to ponder" / "transcends boundaries" / "a testament to" (evaluation)
+  - An interpretation the writer supplies without sourcing it to a person or event
+  - Describing the image/object itself (that is ekphrasis, not story)
+
+If the reference material supports NO story, you must still try to build one from the
+entities you do have (donor, publisher, printer) — state who they were and what their
+involvement meant. If truly nothing supports even that, write only what you can verify.
+
+ENTITY NAMING RULE (LOCAL-421 — NON-NEGOTIABLE):
+Every named person in the credit line (donor, publisher, printer, collaborator) MUST
+appear BY NAME in your text. Never write "the generous donation" when the data says
+"Gift of Boris Fridman". Never write "the publisher" when you know the name. The name
+IS the story's starting point.
 
 CRITICAL CONSTRAINT: This artwork/exhibit MUST be something that is physically on display at 'Museum of Fine Arts, Boston'. Describe the ARTWORK itself — its visual qualities, technique, symbolism, and story. If you know which room or hall it's in, mention that briefly. If you don't know the exact room, do NOT fabricate one — just describe the work directly.
 
@@ -205,98 +290,52 @@ much material you actually have to work with.
 
 Do NOT repeat the artist's biographical background (birth year, nationality, school associations like 'École de Paris', artistic formats like 'stained glass and stage sets'). That information belongs in the tour introduction only. Here, focus EXCLUSIVELY on THIS SPECIFIC ARTWORK — what it depicts, its technique, its story, what to look for with your eyes.
 
-BANNED PHRASES — do NOT use any of these in your description:
-- "vibrant colors" / "dreamlike imagery" / "dreamlike quality"
-- "creative genius" / "artistic prowess" / "masterpiece that"
-- "stir the soul" / "touch the heart" / "pulsate with life"
-- "symphony of emotions" / "tapestry of dreams" / "weaves a narrative"
-- "truly remarkable" / "a testament to" / "stands as a testament"
-- "captivating artistry" / "mesmerizing world" / "intricate details"
-- "invites you to explore/discover/reflect" / "immerse yourself in"
-- "invites contemplation" / "invites the viewer" / "invites us to"
-- "can't help but" / "feast for the eyes" / "step into a world"
-Instead, use SPECIFIC, CONCRETE language: name colors precisely (cerulean, ochre, vermilion), describe actual compositional choices, mention documented historical context.
-
-UNEARNED ADJECTIVES — these words are BANNED unless the same sentence or the one before it
-contains the specific evidence that earns them:
-- "vibrant" — ONLY permitted if you name the specific colors/contrasts that make it vibrant
-- "stunning" — ONLY if you describe what causes the visual impact (scale? technique? contrast?)
-- "remarkable" — ONLY if you state what distinguishes it from comparable works
-- "mesmerizing" — ONLY if you explain the optical or compositional mechanism
-- "exquisite" — ONLY if you describe the craftsmanship detail (grain, jointwork, brushstroke)
-- "breathtaking" — ONLY if you name the physical feature that produces the effect
-- "captivating" — ONLY if you explain what holds attention and why
-If you cannot provide that evidence in the same breath, delete the adjective. A bare noun
-is better than a noun preceded by an unearned superlative.
+STYLE CONSTRAINT: No unearned praise. Every evaluative word (remarkable, stunning, captivating, breathtaking, exquisite, mesmerizing, vibrant) requires the specific evidence that earns it in the same or preceding sentence. If you cannot supply the evidence, delete the adjective. Prefer concrete nouns over decorated ones.
 
 FACTUAL INTEGRITY RULE: Do NOT invent visual specifics or biographical claims not in the fact sheet above. You may describe the general biblical SUBJECT (e.g. "depicts the parting of the Red Sea") but do NOT assert specific visual details as facts (colors, composition) unless grounded in the facts above. Never call a work "the artist's final masterpiece" or similar unverifiable superlatives.
 
 Format your response as follows:
 Orientation: (write a brief orientation text explaining the best viewing position here)
 
-Then write the description directly — a flowing, 350-word narrative about the exhibit. Do NOT wrap it in brackets, placeholders, or formatting markers. Just write the prose.
+Then write the description directly — a flowing, 280-word narrative about the exhibit. Do NOT wrap it in brackets, placeholders, or formatting markers. Just write the prose.
 
 MINIMUM LENGTH: Your description (after the Orientation section) MUST be at least 120 words. If you do not have 120 words of verified content, discuss the artistic form, the collaboration, or the exhibition context to reach the floor. Never deliver fewer than 120 words.
 
 DO NOT include any section headers other than "Orientation:" - the description should flow naturally after the orientation section.
 DO NOT include directions to the next stop - these will be added separately.
 
-LENGTH CONSTRAINT: You have rich verified material for this stop. Write up to 350 words, using the extra space ONLY for additional sourced facts or explained connections — NOT for padding, praise, or instructing the listener.
-
-CRITICAL CORPUS GATE RESTRICTION (D50 enforcement — LOCAL-198):
-The corpus for this stop does NOT contain information about the specific artwork/exhibit
-"Ancient Nubia Now". The available text is about the venue generally.
+CORPUS GATE: EMPTY (D50 enforcement — LOCAL-209):
+There is NO verified source material for "Le Lézard aux plumes d’or (The Lizard with Golden Feathers)" — no stop-level corpus,
+no venue-level corpus, nothing. Every specific claim you might generate about
+this place comes from your training data and CANNOT be verified.
 
 YOU MUST NOT:
-- Describe the artwork's appearance, materials, technique, or composition
-- Name the artist's practice, style, or art-historical movement
-- Claim anything about what the visitor will see at this specific stop
-- Invent details about the work from your training data
+- Assert any specific date, year, century, or historical period
+- State any measurement (depth, height, distance, area)
+- Attribute a nickname, title, or epithet to this place
+- Name specific people, architects, artists, or historical figures
+- Claim specific events happened here
+- Describe specific architectural features as fact
 
 YOU MAY ONLY:
-- Note the stop's name and its location within the venue
-- Share venue-level facts that ARE in the corpus (opening date, general collection scope)
-- Describe the physical surroundings and wayfinding
-- Acknowledge that detailed information about this specific work is limited
+- Name the stop and its general geographic context (e.g. "a coastal town east of Nice")
+- Describe what is physically visible to a cyclist arriving now (sea, buildings, streets)
+- Provide wayfinding and orientation ("look to your left", "the harbor is ahead")
+- Use hedging language ("this area is known for…", "visitors often notice…")
+- Note the atmosphere and sensory experience (sounds, smells, light)
 
-Write 80-100 words maximum. This is a venue-grounded placeholder, not a full stop narration.
-
-PER-STOP SOURCE MATERIAL for "Ancient Nubia Now" (from verified sources — use this as your primary factual basis):
-  Passage 1: The Nubians built major cities, temples, palaces, and more pyramids than the Egyptians. Their artists and craftspeople created magnificent jewelry, pottery, ...
-  Passage 2: With more than 65,000 works of art including sculpture, jewelry, coffins, mummies, coins, weapons, architecture, vases, carved gems, musical instruments, and mosaics, the Art of Ancient Egypt, Nubia, and the Near East department houses one of the world’s premiere encyclopedic collections of antiquities. The objects range in date from about 6500 BCE to 600 CE and were acquired mainly through excavations in Egypt and Sudan led by George A. Reisner between 1905 and 1942.
-  Passage 3: The collection of Nubian art—the largest and most important outside of Khartoum—includes Kerma pottery, colossal royal statues of Napatan kings, and exquisite jewels, as well as imports from Greece and Rome. The 2019 exhibition “Ancient Nubia Now” looked at highlights from the collection in an attempt to rewrite past misinterpretations about Nubia’s history and artistic achievements and offer insights into Nubia’s relevance today.
-  Passage 4: == Special exhibitions ==
-The Museum of Fine Arts, Boston, hosts special exhibitions consisting of items borrowed from other museums. These limited time events extend for several months and there are typically three exhibitions taking place concurrently since at least 1996. The collection topics of the special exhibits are divided into 13 categories: Africa and Oceania; Americas; Ancient Egypt, Nubia and the near East; Ancient Greece and Rome; Asia; Contemporary Art; Europe; Jewelry; Judaica; Mu
-  Passage 5: All of the objects in the exhibition are drawn from the MFA's collection of ancient Nubian art, the core of which was formed between 1913 and 1932, when the ...
-  Passage 6: by G Emberling · 2020 · Cited by 6 — Presenting some 400 works of ancient Nubian art, it was curated by Denise Doxey, Rita Freed, and Law- closure of that gallery.
-  Passage 7: by G Emberling · 2020 · Cited by 6 — “Ancient Nubia Now” was on view at the MFA from 13 August 2019 through 20 …
-  Sources:
-  [Venue page for Museum of Fine Arts, Boston] http://www.mfa.org/collections/ancient-egypt-nubia-and-the-near-east (tier 1)
-  [Venue page for Museum of Fine Arts, Boston] https://en.wikipedia.org/wiki/Museum_of_Fine_Arts,_Boston (tier 1)
-  [Ancient Nubia Now — interpretive search] https://ajaonline.org/wp-content/uploads/2020/05/1243_Emberling.pdf (tier 3)
-  [Ancient Nubia Now — interpretive search] https://patrons.org.es/ancient-nubia-now/ (tier 3)
-  [Ancient Nubia Now — interpretive search] https://high.org/exhibition/ancient-nubia/ (tier 3)
-  [Ancient Nubia Now — interpretive search] https://gregcookland.com/wonderland/2020/01/17/nubia/ (tier 3)
-
-GROUNDING RULE (D50 — critical): Substantiate claims ONLY from the passages above. Do NOT supplement with facts from your own training data that are not in these passages. If the passages do not mention something, do not assert it as fact. You may describe what is physically visible at the stop and provide general orientation, but specific historical claims, dates, people, and events MUST come from the passages above. If a passage names a person or event, you may include it; if it does not, leave it out.
-
-BODY USAGE RULE (LOCAL-345 — critical): Your DESCRIPTION BODY (the main narrative paragraphs after the orientation) MUST incorporate specific facts, dates, or claims from the passages above. The orientation alone is not sufficient — the body text is where the listener spends most of their time. If a passage mentions a UNESCO designation, a founding date, a named historical event, or a specific fact, that material MUST appear in the body narrative, not just be referenced in the orientation line. A body that contains zero material from the provided passages is a failure.
-
-NARRATIVE ARC RULE (LOCAL-352 — critical): When a passage describes a person DOING something — leaving a position, founding a place, refusing an offer, recommending a dish, returning after years away — your description MUST tell the sequence of events, not merely state the person's credential or association. A credential is an adjective ("Michelin-starred chef"); a narrative is a sequence ("he left his two-star kitchen at the Negresco to cook for twenty people in a back-street bistro"). The listener wants to experience what happened, not read a résumé. Specifically:
-  - If a passage names WHERE someone came from and WHERE they went, state both.
-  - If a passage names WHAT someone gave up and WHAT they chose instead, state the contrast.
-  - If a passage names a specific person recommending, reviewing, or recounting an experience at this place, tell it as an event: who did what, where, and what they said or found. This applies to visitors, critics, chefs from elsewhere, and documented incidents — not only owners.
-  - Do NOT flatten a narrative into a single adjective or title. "Former head chef of the Negresco" is a title; "walked away from the Negresco's two Michelin stars to serve twenty people at a place whose name means workman's snack" is a story. Tell the story.
-  - Every element of the story MUST come from the passages above. You may not infer motivation, emotion, or dates not stated in the source material.
+Write 60-80 words maximum. This is an orientation-only placeholder. No factual claims.
 
 
 ================================================================================
-Total user message length: 24510 chars
+Total user message length: 21863 chars
 
 --- CANDIDATE SPECIFICS STATUS ---
-candidate_specifics found: 0
-  (none extracted — snippets may be empty or regex missed)
+candidate_specifics found: 3
+  • material: publisher’s vellum
+  • plate count: 15 lithographs
+  • plate count: 40 color lithographs
 
 --- SNIPPET INJECTION STATUS ---
 _local402_snippets_injected: True
-_DIRECT_SNIPPETS_PER_STOP keys: ['Ancient Nubia Now', '__stop_0__', 'Appeal to the Great Spirit', '__stop_1__', 'Adam and Eve', '__stop_2__', 'Artist in his studio', '__stop_3__']
+_DIRECT_SNIPPETS_PER_STOP keys: ['Le Lézard aux plumes d’or (The Lizard with Golden Feathers)', '__stop_0__', 'Moses and Monotheism', '__stop_1__', 'Au Soleil du Plafond', '__stop_2__']
