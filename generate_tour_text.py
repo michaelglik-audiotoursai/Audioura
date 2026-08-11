@@ -8193,6 +8193,41 @@ These rules apply to the NARRATION paragraphs only. Navigation/orientation direc
         except Exception as _ft_err:
             print(f"  [LOCAL-382] Framing detection error (non-fatal): {_ft_err} — framing=none")
 
+    # -------- [LOCAL-383] Story beat extraction — mine people + actions from page text --------
+    _story_beats_per_stop = None
+    _all_story_beats = []
+    if _storied_mode and tour_category == 'museum':
+        try:
+            from story_beat_injector import extract_story_beats, assign_beats_to_stops
+            # Use the framing page text (exhibition case) or combined corpus text
+            _beat_source_text = _framing_page_text or ''
+            if not _beat_source_text and _story_corpus_result:
+                _beat_source_text = _story_corpus_result.get('combined_text', '')
+            if _beat_source_text:
+                _all_story_beats = extract_story_beats(_beat_source_text)
+                if _all_story_beats:
+                    _poi_names_for_beats = [p['name'] for p in poi_list]
+                    # Get matched works from exhibition checklist if available
+                    _matched_works_for_beats = None
+                    if hasattr(_exhibition_checklist_result, 'works') and _exhibition_checklist_result:
+                        _matched_works_for_beats = getattr(_exhibition_checklist_result, 'works', None)
+                    _story_beats_per_stop = assign_beats_to_stops(
+                        _all_story_beats, _poi_names_for_beats,
+                        matched_works=_matched_works_for_beats,
+                        framing_case=_framing_case,
+                    )
+                    _beat_people = set(b['person'] for b in _all_story_beats if b['role'] not in ('circumstance', 'stakes'))
+                    print(f"\n  [LOCAL-383] Extracted {len(_all_story_beats)} story beats, "
+                          f"{len(_beat_people)} named people: {', '.join(sorted(_beat_people)[:6])}")
+                else:
+                    print(f"\n  [LOCAL-383] No story beats found in page text ({len(_beat_source_text)} chars)")
+            else:
+                print(f"\n  [LOCAL-383] No page text available for story beat extraction")
+        except ImportError as _sb_err:
+            _import_logger.error(f"[LOCAL-383] MISSING: story_beat_injector — story beats DISABLED: {_sb_err}")
+        except Exception as _sb_err:
+            print(f"  [LOCAL-383] Story beat extraction error (non-fatal): {_sb_err}")
+
     # [LOCAL-26] Helper: detect when GPT echoed back a template placeholder instead of content
     # [LOCAL-295] Refactored: returns a classification tuple instead of bare bool.
     #   ("placeholder", reason)  — true placeholder echo, should retry/reject
@@ -8735,6 +8770,24 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                     description_prompt += _thesis_stop_block
             except Exception as _ts_err:
                 print(f"  [LOCAL-382] Thesis stop injection error (non-fatal): {_ts_err}")
+
+        # [LOCAL-383] Story beat injection — per-stop people + actions
+        if _storied_mode and _story_beats_per_stop and idx < len(_story_beats_per_stop):
+            try:
+                from story_beat_injector import build_story_beat_prompt_block
+                _stop_beats = _story_beats_per_stop[idx]
+                _beat_block = build_story_beat_prompt_block(
+                    _stop_beats, framing_case=_framing_case,
+                )
+                if _beat_block:
+                    description_prompt += _beat_block
+                    _beat_people_this_stop = [b['person'] for b in _stop_beats if b['role'] not in ('circumstance', 'stakes')]
+                    if _beat_people_this_stop:
+                        print(f"  [LOCAL-383] Stop {stop_num} beats: {', '.join(_beat_people_this_stop[:3])}")
+            except ImportError:
+                pass  # Already logged at extraction time
+            except Exception as _sb_stop_err:
+                print(f"  [LOCAL-383] Story beat injection error stop {stop_num} (non-fatal): {_sb_stop_err}")
 
         # [§4] Story element injection — per-work facts from story_elements
         # [LOCAL-29] Tightened matching: use [:10] prefix AND require >= 60% word overlap
