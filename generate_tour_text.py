@@ -4189,9 +4189,12 @@ def _build_material_fallback(poi_name, artist, matched_work, credit_line, candid
         for cs in candidate_specifics[:3]:
             # Format: "material: lithograph on vellum" → "lithograph on vellum"
             if ':' in cs:
-                _specs.append(cs.split(':', 1)[1].strip())
+                val = cs.split(':', 1)[1].strip()
             else:
-                _specs.append(cs.strip())
+                val = cs.strip()
+            # [LOCAL-420] Filter out broken specifics (too short or clearly not a fact)
+            if val and len(val) > 3 and ' ' in val:
+                _specs.append(val)
         if _specs:
             parts.append("Notable details include " + ", ".join(_specs) + ".")
 
