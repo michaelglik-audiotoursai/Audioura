@@ -360,6 +360,22 @@ def setup_worktree(task_id, branch, base):
     else:
         cmd = ["git", "worktree", "add", "-b", branch, str(path), base]
     subprocess.run(cmd, cwd=str(WATCH_DIR), capture_output=True, text=True, check=True)
+
+    # [LOCAL-412 review] Link .env into the worktree.
+    # .env is gitignored, so `git worktree add` never brings it across and every
+    # task landed in a tree with no OPENAI_API_KEY / SERP_API_KEY. Tasks then
+    # honestly reported "SERP_API_KEY not available" and downgraded a live
+    # acceptance run to an offline simulation -- which is exactly the evidence
+    # the live-artifact gate exists to prevent. A symlink (not a copy) keeps one
+    # source of truth and stops secrets proliferating into ~30 worktrees.
+    env_src = WATCH_DIR / ".env"
+    env_dst = path / ".env"
+    if env_src.exists() and not env_dst.exists():
+        try:
+            env_dst.symlink_to(env_src)
+        except OSError as e:
+            print(f"[dispatcher] WARNING: could not link .env into {path}: {e}")
+
     return path
 
 

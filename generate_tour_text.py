@@ -9122,13 +9122,17 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
 STORY INSTRUCTION (LOCAL-407/412):
 Use the reference material above. Include at least ONE concrete specific (number, material, literary form, verifiable fact) from snippets or CANDIDATE SPECIFICS.
 
-PRIORITY: Concrete details beat general claims. "printed on Japan paper in edition of 50" beats "revolutionized the book as an art form."
+PRIORITY RULE: a concrete detail ALWAYS beats a general claim. "printed on Japan paper in edition of 50" beats "revolutionized the book as an art form."
 
 Rules:
   - Name people explicitly (never "the publisher" — use their actual name)
   - State specific actions (not "influenced" or "collaborated" — what did they DO?)
   - Do NOT assert interactions unless the material confirms both people were alive and working together
   - Dates must be accurate. If unsupported, omit rather than invent.
+  - "X and Y worked together" / "X's collaboration with Y" is NOT a story — it is the
+    identity form. A story requires: who did what, with what material consequence.
+  - NO HALLUCINATED SENSORY CLAIMS: never assert a sensation the listener cannot verify
+    (smell, sound, temperature, texture) unless the material states it.
 """
                 # [LOCAL-407] Artist name is NON-NEGOTIABLE in the snippet block
                 if _artist_surname:
