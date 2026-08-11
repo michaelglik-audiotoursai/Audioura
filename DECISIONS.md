@@ -14184,3 +14184,32 @@ call site is reachable from a test without a live LLM run.
 **Standing addition to the review checklist:** run the call-site check *before*
 reading the submission's claims about its tests. Reading them first anchors you to
 their number.
+
+## D365 — LOCAL-421's agent died leaving a live run orphaned; and `pgrep -f LOCAL-NNN` lies now
+**2026-08-11, 18:3x.** No verdict on 421 yet — deliberately.
+
+**State found.** 421's dispatcher (48153) has exited and its `kiro-cli` agent is
+gone from the process table, but **an acceptance run it launched is still executing**
+— pid 87158, **PPID 1** (reparented to init), started 18:20:01, running
+`run_mfa_unbound_eval.py` inside `~/audioura-worktrees/LOCAL-421`. Three commits
+are on the branch, `SUBMISSION_LOCAL-421.md` does not exist, and three files are
+dirty in the worktree.
+
+**Not graded, and not marked ABANDONED.** Grading now would be D356 exactly — LEAD
+grading a mid-flight artifact. Writing ABANDONED now would be wrong in the other
+direction: a process is still mutating the worktree, and D352's rule is that the
+agent's death is not the same as the work's death. The right move is to wait for
+pid 87158 to exit, then recover the D352 way — commit what is there as-found, write
+the ledger line by hand, and review the result on its merits.
+
+**New trap, found by falling into it: `pgrep -f "LOCAL-421"` returned LOCAL-422's
+agent.** Task prompts are passed as the process argv, and 422's prompt quotes
+LOCAL-421 by name (my own cross-reference in the task file). Any liveness check
+that greps the process table for a task ID will now match every *other* task whose
+prompt mentions it. Since LEAD started cross-referencing task files by ID, this
+false positive is guaranteed, not incidental.
+
+**Use the ledger's `dispatcher_pid` and `pgrep -P <pid>`, never a name grep** —
+that is what D246 and D352 already say, and the reason is now concrete rather than
+theoretical. When the dispatcher is gone, look for orphans by **working directory**
+(`ps -o ppid,command` and match the worktree path), not by task ID.
