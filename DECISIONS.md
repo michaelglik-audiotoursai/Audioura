@@ -13450,7 +13450,9 @@ Recorded now, before the report, so the check is a real test and not a reading o
 whatever 412 happens to say.
 
 ## D348 — LOCAL-412 merged; D347 confirmed on real data; four false claims in the submission
-**2026-08-11, 12:1x.** Merged as `1ec6619`, with a follow-up `b99a2e9`.
+**2026-08-11, 11:3x.** Merged as `1ec6619`, with a follow-up `b99a2e9`.
+(Timestamp corrected 11:55 — LEAD had been printing a drifted clock; the commits'
+own times in `git log` are authoritative.)
 
 **D347's prediction is CONFIRMED, and confirmed against data the task did not
 supply.** LEAD fetched 30 real Serper snippets for the actual stop and scored them
