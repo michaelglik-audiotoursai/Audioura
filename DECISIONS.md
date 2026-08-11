@@ -12319,3 +12319,46 @@ behaviour D289/D301 want, arrived at from the other direction.
 Dispatched as **LOCAL-392**: attach each beat to the stop whose work it derives
 from, and report retry counts before and after — retries were 3/3 on every stop,
 tripling generation cost to chase falsehoods.
+
+## D316 — LOCAL-392 merged: the MFA tour now passes every criterion set for it
+**2026-08-10.** Work-attribution drives beat assignment, and the effect is
+immediate:
+
+```
+beat='Louis Broder'   source_work='Le Lézard aux plumes d'or' -> stop 1
+beat='Mourlot Frères' source_work='Le Lézard aux plumes d'or' -> stop 1
+beat='Boris Fridman'  source_work='Le Lézard aux plumes d'or' -> stop 1
+beat='Torf' -> exhibition_wide (no single work match)
+```
+
+Delivered text, grepped by LEAD (D312): **`Broder`, `Mourlot` and `Fridman` all
+present and all in stop 1** — that work's publisher, printer and donor. Fridman
+had never appeared in any previous round. `Freud` in stop 2, `Gris` and `Reverdy`
+in stop 3, `Miró` in stop 1. `with publisher` 0, zero-check ALL CLEAR, words
+332/244/322, stops 3/3, and the framing at its strongest yet — `livre d'artiste`
+2, `collabor` 7, `typography` 3, `book` 8.
+
+**Retries fell from 3-of-3 on every stop to 2 in total.** D315 predicted exactly
+this: the retries had been expensive because they were chasing falsehoods, so
+correct assignment removes the cost rather than trading it.
+
+**The MFA tour now satisfies every acceptance criterion accumulated across
+D291–D316.** That is not the same as Michael judging it good — his review is the
+standard (D301), and the remaining weakness is that the stories are still
+credit-line facts rather than narrative.
+
+**Dispatched as LOCAL-393**, from the control venue rather than the target one:
+`France` is being extracted as a story beat on Palais and demanded of all four
+stops. A country is not a person. **Fourth false positive of this family in one
+evening** — `The Treat Page` (person), `visual tapestry` (form), `', in'`
+(quantity), `France` (person). Every detector built tonight was tested on
+positives and shipped a false positive. The habit to adopt is explicit: **test
+every detector on ordinary prose that must produce nothing**, and reuse the
+existing person-detector rather than writing a second one (D304's lesson).
+
+Also in 393: `Pierre Reverdy` is attributed to *Moses and Monotheism* rather than
+*Au Soleil du Plafond* — the page names both pairs in one sentence and the
+attributor splits it at the wrong boundary. The delivered tour is still correct
+because Reverdy reaches stop 3 by another path, but the mis-assignment cost a
+retry and a `beat_unrecoverable`. And Palais stop 3 came in at 107 words against
+the 120 floor.
