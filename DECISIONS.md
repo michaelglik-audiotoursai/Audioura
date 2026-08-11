@@ -13999,3 +13999,62 @@ credit line (Broder, Mourlot, 40 lithographs, 1971 — no SERP call needed), and
 stops 2 and 3 are generic art-writing with one date between them. **LOCAL-419**
 takes that: dump the 54 snippets those two stops received and establish whether
 this is retrieval or injection before fixing either.
+
+## D360 — LOCAL-417 bounced: "never ship a refusal" ships an empty stop instead
+**2026-08-11, 16:4x.** 417 not merged. Follow-up dispatched as LOCAL-420.
+
+### The measurement
+
+417's own acceptance ran on `Museum of Fine Arts, Boston, MA` at 4 stops — the
+wrong case again (D355/D357). Its task file was written at 14:27, before the case
+was corrected at 15:2x, and the re-dispatch at 15:47 reused the same file. Its
+"MFA 4/4 PASS" is a real result about the wrong tour.
+
+LEAD cherry-picked 417 (and the LOCAL-415 work it carries, which is not on
+`storied`) onto current `storied` and ran the correct case twice, against two
+baseline runs:
+
+| tree | run 1 | run 2 |
+|---|---|---|
+| `storied` (with 418) | 3 stops narrated, 4955 chars | 3 stops narrated, 4773 chars |
+| `storied` + 415 + 417 | **stop 2 is a stub**, 3809 | **stop 3 is a stub**, 4680 |
+
+> `Moses and Monotheism — located in this gallery. A detailed narration could not
+> be generated for this stop.`
+
+Two runs, two stubs, a different stop each time; baseline clean 2/2 on the same
+case. **This is a two-tree comparison, not a before/after** — the thing D242 asks
+for and D357 caught LEAD skipping.
+
+### Why it is a bounce and not a merge
+
+**It is the exact string 417's own submission quotes as a LOCAL-415 failure.**
+417 built a positive gate to catch that text, then wired its own failure path to
+emit it.
+
+The gate is not wrong. It fails on `no concrete fact (date, measurement, material,
+or provenance)` and it is telling the truth — those stops have no facts, which is
+precisely LOCAL-419's finding (24–30 snippets each, nothing usable). Retrying
+three times at rising temperature cannot invent a fact that was never retrieved.
+The defect is the remedy: on final failure both fallback sites overwrite
+`description` with a stub, and the `_best_description` bookkeeping (LOCAL-394,
+"a stop is NEVER dropped") sits immediately below and can then store the stub as
+the best attempt.
+
+**The rule behind "never ship a refusal" is that a listener must never be told the
+system failed.** Shipping "a detailed narration could not be generated" satisfies
+the letter and breaks the rule. Stop 1 of the same tour shows the alternative:
+with no usable snippet at all it writes from the exhibition page's credit line.
+
+### Kept, not reverted
+
+Name suppression (the unsatisfiable required-names block is genuinely gone), the
+beat-retry fix, the century-regex hyphen fix, the banned-phrase list, and the
+positive gate itself are all good. LOCAL-420 carries 415+417 forward and fixes
+only the fallback.
+
+### Process note
+
+417's acceptance was invalidated by a task file that outlived the decision it was
+written under. When a case, gate or rule changes, **the in-flight task files must
+be re-issued, not just the next ones** — a re-dispatch reuses the file on disk.
