@@ -9177,6 +9177,7 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
         # between the runner's canonical_title and the generation pipeline's poi_name).
         _local402_snippets_injected = False
         _candidate_specifics = []  # [LOCAL-407] initialized here for both-sides logging scope
+        _all_snippet_text = ''  # [LOCAL-417] initialized here so required-names gate can check it
         _prompt_size_before_snippets = len(description_prompt)  # [LOCAL-411] track pre-snippet size
         if _DIRECT_SNIPPETS_PER_STOP and poi_name:
             _stop_snippets = _DIRECT_SNIPPETS_PER_STOP.get(poi_name, [])
@@ -9756,23 +9757,52 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
         # of the prompt (primacy effect). The model sees these before the style rules.
         # This addresses the diagnosis: specifics reach the prompt but are buried under
         # 60+ lines of instructions at position 15000+ in a 21000-char prompt.
+        #
+        # [LOCAL-417] CRITICAL FIX: Only demand names the pipeline actually supplied.
+        # If a person from story beats does not appear in any snippet text for this
+        # stop, we MUST NOT tell the model their name is required — that creates an
+        # unsatisfiable constraint and the model reports the impossibility instead of
+        # writing prose. The denylist cannot catch every rephrasing of "I can't do
+        # what you asked"; the fix is to never ask for what we didn't provide.
         _facts_first_block = ""
         if _DIRECT_SNIPPETS_PER_STOP and tour_category == 'museum':
             _ff_parts = []
-            # Required names from story beats
+            # Required names from story beats — ONLY those with snippet evidence
             if _storied_mode and _story_beats_per_stop and idx < len(_story_beats_per_stop):
                 _ff_beats = _story_beats_per_stop[idx]
                 _ff_required = [b for b in _ff_beats if b['role'] not in ('circumstance', 'stakes')
                                 and not b.get('exhibition_wide')]
-                if _ff_required:
+                # [LOCAL-417] Filter: only demand names that appear in the snippet text
+                # for this stop. A name the pipeline never supplied cannot be required.
+                _snippet_text_lower = _all_snippet_text.lower() if _all_snippet_text else ''
+                _ff_verified = []
+                _ff_suppressed = []
+                for _ffb in _ff_required:
+                    _ff_surname = _ffb['person'].split()[-1]
+                    # Check if the person's surname appears anywhere in snippet text
+                    if _snippet_text_lower and _ff_surname.lower() in _snippet_text_lower:
+                        _ff_verified.append(_ffb)
+                    else:
+                        _ff_suppressed.append(_ffb)
+                if _ff_suppressed:
+                    print(f"  [LOCAL-417] Stop {stop_num}: SUPPRESSED {len(_ff_suppressed)} required names "
+                          f"(no snippet evidence): {[b['person'] for b in _ff_suppressed]}")
+                if _ff_verified:
                     _ff_parts.append("━━━ NAMES THAT MUST APPEAR (your text is rejected without these) ━━━")
-                    for _ffb in _ff_required[:4]:
+                    for _ffb in _ff_verified[:4]:
                         _ff_surname = _ffb['person'].split()[-1]
                         _ff_parts.append(f"  • {_ff_surname} ({_ffb['person']}, {_ffb['role'].replace('_',' ')})")
-                    # Always add the artist
+                    # Add the artist only if artist is known
                     if artist:
                         _ff_artist_surname = artist.split()[-1]
                         _ff_parts.append(f"  • {_ff_artist_surname} ({artist}, artist)")
+                    _ff_parts.append("━━━ END REQUIRED NAMES ━━━")
+                    _ff_parts.append("")
+                elif artist:
+                    # No story-beat names verified, but artist is known — still require artist
+                    _ff_artist_surname = artist.split()[-1]
+                    _ff_parts.append("━━━ NAMES THAT MUST APPEAR (your text is rejected without these) ━━━")
+                    _ff_parts.append(f"  • {_ff_artist_surname} ({artist}, artist)")
                     _ff_parts.append("━━━ END REQUIRED NAMES ━━━")
                     _ff_parts.append("")
 
@@ -9980,6 +10010,79 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                         print(f"  [LOCAL-295]   verbatim: {repr(description[:300])}")
                         # Reset temperature in case it was bumped by a prior retry
                         description_data["temperature"] = 0.7
+
+                    # [LOCAL-417] POSITIVE ASSERTION GATE (D353): assert what the text IS,
+                    # not what it must not say. A stop must:
+                    #   1. Name its own subject (the work/exhibit the stop is about)
+                    #   2. State at least one concrete fact about it
+                    #   3. Address the listener, never the operator — no second-person
+                    #      instructions about "your description", no "notify me", no
+                    #      references to requirements or constraints
+                    # This survives rephrasing; a string denylist does not.
+                    # Runs AFTER refusal gate and placeholder gate — only on text that
+                    # passed those checks and isn't already a fallback.
+                    if (description and _leak_class != "placeholder" and not _is_refusal
+                            and not description.startswith(f"{poi_name} — located in this gallery")
+                            and not description.startswith(f"{poi_name} — an exhibit")):
+                        _417_gate_pass = True
+                        _417_gate_failures = []
+
+                        # Check 1: text names its subject (work title or a significant word from it)
+                        _417_desc_lower = description.lower()
+                        _417_poi_lower = poi_name.lower()
+                        _417_poi_words = [w for w in re.findall(r'\b[a-z]{3,}\b', _417_poi_lower)
+                                          if w not in ('the', 'and', 'for', 'from', 'with', 'that', 'this')]
+                        _417_subject_named = (_417_poi_lower in _417_desc_lower or
+                                             any(w in _417_desc_lower for w in _417_poi_words))
+                        if not _417_subject_named:
+                            _417_gate_pass = False
+                            _417_gate_failures.append(f"subject not named (expected '{poi_name}' or significant word)")
+
+                        # Check 2: at least one concrete fact (a date, number, proper noun
+                        # beyond the title, or specific material/technique)
+                        _417_has_fact = bool(re.search(
+                            r'\b(?:1[0-9]{3}|20[0-2][0-9])\b'  # year (1000-2029)
+                            r'|\b\d+\s*(?:cm|inches|feet|meters|ft|in)\b'  # measurement
+                            r'|\b(?:oil on canvas|bronze|marble|lithograph|watercolor|fresco|'
+                            r'tempera|etching|woodcut|ceramic|terracotta|limestone|granite)\b'  # material
+                            r'|\b(?:donated|acquired|commissioned|exhibited|installed)\s+(?:in|by)\b',  # provenance verb
+                            description, re.IGNORECASE
+                        ))
+                        if not _417_has_fact:
+                            _417_gate_pass = False
+                            _417_gate_failures.append("no concrete fact (date, measurement, material, or provenance)")
+
+                        # Check 3: addresses listener, not operator — no operator-directed language
+                        _417_operator_patterns = re.compile(
+                            r'\byour (?:description|text|narrative|response|prompt|request)\b'
+                            r'|\bnotify me\b'
+                            r'|\brequire(?:s|d)? further assistance\b'
+                            r'|\bensure to include\b'
+                            r'|\bmissing required\b'
+                            r'|\bspecified individuals\b'
+                            r'|\byour (?:instructions?|requirements?|constraints?)\b'
+                            r'|\bprovide (?:more|the|additional) (?:details?|information|context)\b'
+                            r'|\bin your (?:narrative|description|text)\b',
+                            re.IGNORECASE
+                        )
+                        _417_operator_match = _417_operator_patterns.search(description)
+                        if _417_operator_match:
+                            _417_gate_pass = False
+                            _417_gate_failures.append(f"operator-directed language: '{_417_operator_match.group(0)}'")
+
+                        if not _417_gate_pass:
+                            print(f"  [LOCAL-417] Stop {stop_num}: POSITIVE GATE FAILED — {_417_gate_failures}")
+                            print(f"  [LOCAL-417]   verbatim: {repr(description[:300])}")
+                            if _attempt < _max_retries:
+                                description_data["temperature"] = min(0.7 + 0.2 * (_attempt + 1), 1.0)
+                                print(f"  [LOCAL-417] Stop {stop_num}: retrying (attempt {_attempt+1}, "
+                                      f"temp={description_data['temperature']:.2f})...")
+                                continue  # retry
+                            else:
+                                print(f"  [LOCAL-417] Stop {stop_num}: GATE FAILED after {_max_retries+1} attempts — "
+                                      f"using fallback (never shipping operator-directed text)")
+                                description = (f"{poi_name} — located in this gallery. "
+                                               f"A detailed narration could not be generated for this stop.")
 
                     # [LOCAL-394] Track best valid description — a stop is NEVER dropped.
                     # Save every non-placeholder description; keep the longest one.
