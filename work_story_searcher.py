@@ -176,65 +176,163 @@ def _strip_trailing_numeral(title: str) -> Optional[str]:
     return None
 
 
-def synthesize_queries(stop: Dict, tour_type: str = 'contained') -> List[str]:
-    """Generate deterministic base queries for a stop.
+def _is_biography_only(snippet_text: str, snippet_title: str = '') -> bool:
+    """[LOCAL-406] Detect generic artist biography snippets.
 
-    Parameters: stop dict with keys: canonical_title, local_title, artist, venue_city, venue_lang
-    Returns: list of query strings (2-6 per stop)
+    A snippet is biography-only if it is dominated by birth/death, nationality,
+    and "was a <profession>" patterns WITHOUT mentioning an event tied to the work,
+    collaborators, or the livre d'artiste form.
+
+    Returns True if the snippet should be rejected for story purposes.
+    """
+    text = f"{snippet_title} {snippet_text}".lower()
+
+    # Biography signals
+    _BIO_SIGNALS = [
+        r'\bborn\b.*\d{4}',
+        r'\(\d{4}\s*[-–—]\s*\d{4}\)',
+        r'\bwas\s+(?:a|an)\s+(?:spanish|catalan|french|italian|german|american|dutch|'
+        r'belgian|swiss|austrian|russian|mexican|brazilian|british|'
+        r'painter|sculptor|printmaker|artist|lithographer|ceramicist|'
+        r'surrealist|cubist|abstract)\b',
+        r'\bnationality\b',
+        r'\bgrew\s+up\b',
+        r'\bfamily\s+of\b',
+        r'\bchildhood\b',
+        r'\bearly\s+(?:life|years|career)\b',
+    ]
+
+    bio_signal_count = sum(1 for pat in _BIO_SIGNALS if re.search(pat, text))
+
+    # Work/collaborator signals that RESCUE a biography snippet
+    _WORK_SIGNALS = [
+        r'\blivre[s]?\s+d[\'\u2019]artiste\b',
+        r'\blithograph(?:s|y|ie)?\b',
+        r'\bpublish(?:ed|er|ing)\b',
+        r'\bprint(?:ed|er|ing|s)\b',
+        r'\bedition\b',
+        r'\bworkshop\b',
+        r'\batelier\b',
+        r'\bcollection\b',
+        r'\bdonat(?:ed|ion|or)\b',
+        r'\bcommission(?:ed)?\b',
+        r'\bcollaborat(?:ed|ion|or)\b',
+        r'\bpatron(?:age)?\b',
+        r'\bexhibit(?:ed|ion)\b',
+    ]
+
+    work_signal_count = sum(1 for pat in _WORK_SIGNALS if re.search(pat, text))
+
+    # Reject if: ≥2 biography signals AND 0 work signals
+    if bio_signal_count >= 2 and work_signal_count == 0:
+        return True
+
+    return False
+
+
+def synthesize_queries(stop: Dict, tour_type: str = 'contained') -> List[str]:
+    """[LOCAL-406] Generate deterministic base queries for a stop.
+
+    Parameters: stop dict with keys: canonical_title, local_title, artist,
+        venue_city, venue_lang, publisher, collaborator, credit_line
+    Returns: list of query strings — targeted at the WORK and its collaborators,
+        not just the artist biography.
+
+    Design (D335-D336): queries must be built around the work and the people
+    who made it happen. Four targeted queries beat twenty generic ones.
     """
     title = stop.get('canonical_title', '')
     local_title = stop.get('local_title', '')
     artist = stop.get('artist', '')
     city = stop.get('venue_city', '')
     lang = stop.get('venue_lang', 'en')
+    publisher = (stop.get('publisher') or '').strip()
+    collaborator = (stop.get('collaborator') or '').strip()
+    credit_line = (stop.get('credit_line') or '').strip()
+
+    # [LOCAL-406] Extract donor and printer from credit_line if not explicit
+    donor = (stop.get('donor') or '').strip()
+    printer = (stop.get('printer') or '').strip()
+
+    if not donor and credit_line:
+        # "Gift of Boris Fridman" → "Boris Fridman"
+        _donor_match = re.search(
+            r'(?:gift\s+of|donated\s+by|bequest\s+of|given\s+by)\s+(.+?)(?:\s+to\b|[,;.]|$)',
+            credit_line, re.IGNORECASE)
+        if _donor_match:
+            donor = _donor_match.group(1).strip()
+
+    if not printer and credit_line:
+        _printer_match = re.search(
+            r'(?:printed\s+by|imprimé\s+par)\s+(.+?)(?:[,;.]|\s+(?:for|pour)\b|$)',
+            credit_line, re.IGNORECASE)
+        if _printer_match:
+            printer = _printer_match.group(1).strip()
 
     queries = []
-    if tour_type == 'contained':
-        # Museum/contained tours: query by work title + artist
-        queries.append(f'"{title}" {artist} story behind')
-        queries.append(f'"{title}" {artist} history making')
-        if artist:
-            queries.append(f'"{title}" {artist} controversy')
-    else:
-        # Distributed/walking tours: query by POI + city
-        queries.append(f'"{title}" {city} history story behind')
-        queries.append(f'"{title}" {city} who walked here famous visitors')
-        queries.append(f'"{title}" {city} controversy')
 
-    # W4: Query granularity — also query the series/cycle-level title (strip trailing numerals)
+    # ── PRIMARY: The work itself (quoted title + artist) ──
+    if tour_type == 'contained':
+        queries.append(f'"{title}" {artist}')
+        queries.append(f'"{title}" history')
+        queries.append(f'"{title}" edition lithographs')
+    else:
+        queries.append(f'"{title}" {city} history')
+        queries.append(f'"{title}" {city} story behind')
+
+    # ── COLLABORATOR QUERIES: publisher–artist, printer, donor ──
+    if publisher and artist:
+        # e.g. "Louis Broder Miró"
+        queries.append(f'{publisher} {artist}')
+    if printer:
+        # e.g. "Mourlot Frères workshop history"
+        queries.append(f'{printer} workshop history')
+    if donor:
+        # e.g. "Boris Fridman collection livres d'artiste"
+        queries.append(f'{donor} collection')
+    if collaborator and artist:
+        queries.append(f'{collaborator} {artist}')
+
+    # ── FORM QUERY: livre d'artiste tied to artist ──
+    # Only when medium/credit_line suggests this IS a livre d'artiste
+    _medium = (stop.get('medium') or '').lower()
+    _is_book_form = any(kw in _medium for kw in ('lithograph', 'book', 'etching', 'aquatint', 'woodcut'))
+    if not _is_book_form and credit_line:
+        _is_book_form = any(kw in credit_line.lower() for kw in ('lithograph', 'book', 'published'))
+    if _is_book_form and artist:
+        queries.append(f'livre d\'artiste {artist}')
+
+    # W4: Query granularity — also query the series/cycle-level title
     series_title = _strip_trailing_numeral(title)
     if series_title:
         if tour_type == 'contained':
-            queries.append(f'"{series_title}" {artist} story behind')
+            queries.append(f'"{series_title}" {artist} history')
         else:
-            queries.append(f'"{series_title}" {city} history story behind')
+            queries.append(f'"{series_title}" {city} history')
 
     # W5: Title language split — query BOTH canonical and local_title if different
     if local_title and local_title.strip().lower() != title.strip().lower():
         if tour_type == 'contained':
-            queries.append(f'"{local_title}" {artist} story behind')
+            queries.append(f'"{local_title}" {artist}')
         else:
-            queries.append(f'"{local_title}" {city} history story behind')
+            queries.append(f'"{local_title}" {city} history')
 
-    # Q3: English title query — when english_title is present and differs from canonical,
-    # add a query on it (the form winning sources often use, e.g. "Song of Songs")
+    # Q3: English title query
     english_title = stop.get('english_title', '')
     if english_title and english_title.strip().lower() != title.strip().lower():
         if tour_type == 'contained':
-            queries.append(f'"{english_title}" {artist} story behind')
+            queries.append(f'"{english_title}" {artist}')
         else:
-            queries.append(f'"{english_title}" {city} history story behind')
+            queries.append(f'"{english_title}" {city} history')
 
-    # E1: Composed English-series query (LEAD-identified lever, RS6)
-    # When english_title stripped of numerals produces a DIFFERENT (shorter) form,
-    # add the English series-level query: "Song of Songs" Marc Chagall story behind
+    # E1: Composed English-series query
     if english_title:
         english_series = _strip_trailing_numeral(english_title)
         if english_series and english_series.strip().lower() != english_title.strip().lower():
             if tour_type == 'contained':
-                queries.append(f'"{english_series}" {artist} story behind')
+                queries.append(f'"{english_series}" {artist}')
             else:
-                queries.append(f'"{english_series}" {city} history story behind')
+                queries.append(f'"{english_series}" {city} history')
 
     # Localization: add query in venue language if not English
     if lang and lang != 'en':
@@ -243,11 +341,8 @@ def synthesize_queries(stop: Dict, tour_type: str = 'contained') -> List[str]:
         queries.append(f'"{title}" {artist} {story_term}')
 
     # W9: Collection/venue-level provenance queries
-    # When a work belongs to a named museum/collection, add queries targeting the collection
-    # provenance (the donation fact lives on collection-pages, not object-pages)
     venue_name = stop.get('venue_name', '')
     if venue_name and tour_type == 'contained':
-        # Generate collection-level queries (EN + venue lang)
         queries.append(f'{venue_name} {artist} donation history')
         if lang and lang != 'en':
             _LANG_DONATION = {'fr': 'donation', 'it': 'donazione', 'es': 'donación', 'de': 'Schenkung'}
@@ -531,6 +626,10 @@ def search_stories_for_stop(stop: Dict, tour_type: str = 'contained',
             r['domain'] = domain
             r['tier'] = tier_class
             if tier_class != 'reject':
+                # [LOCAL-406] Reject biography-only snippets
+                if _is_biography_only(r.get('snippet', ''), r.get('title', '')):
+                    print(f"  [LOCAL-406] snippet rejected: biography-only '{r.get('title', '')[:60]}'")
+                    continue
                 all_results.append(r)
 
     # SQ-S1 refinement round (F5): if T1/T2 yield < 2, try refined queries
@@ -552,6 +651,10 @@ def search_stories_for_stop(stop: Dict, tour_type: str = 'contained',
                 r['domain'] = domain
                 r['tier'] = tier_class
                 if tier_class != 'reject':
+                    # [LOCAL-406] Reject biography-only snippets
+                    if _is_biography_only(r.get('snippet', ''), r.get('title', '')):
+                        print(f"  [LOCAL-406] snippet rejected: biography-only '{r.get('title', '')[:60]}'")
+                        continue
                     all_results.append(r)
 
     # Determine mining status (R5)

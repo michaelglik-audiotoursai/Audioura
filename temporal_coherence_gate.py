@@ -64,7 +64,7 @@ _INTERACTION_PATTERNS = [
     r'\bmet\b',
     r'\bmeeting(?:s)?\s+(?:with|between)',
     # work with / worked with / working with / worked alongside / working alongside
-    r'work(?:ed|ing)\s+(?:with|alongside)',
+    r'work(?:ed|ing)\s+(?:with|alongside|together)',
     # correspond / correspondence / corresponding
     r'correspond(?:ed|ing|ence|ences)\s+(?:with|between)',
     # dialogue / in dialogue with
