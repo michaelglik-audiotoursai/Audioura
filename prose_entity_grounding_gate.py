@@ -332,6 +332,7 @@ def apply_prose_entity_grounding_gate(
     poi_list: List[Dict],
     exhibition_checklist_result,
     stop_names: Optional[List[str]] = None,
+    pre_grounded_names: Optional[List[str]] = None,
 ) -> Dict:
     """Apply the prose entity grounding gate to all stop prose fields.
 
@@ -340,10 +341,15 @@ def apply_prose_entity_grounding_gate(
     against the exhibition page text and the declared artist names from the
     checklist. Remove all mentions of ungrounded persons.
 
+    [LOCAL-390] pre_grounded_names: persons extracted from the page text by
+    story beat extraction. These are grounded by definition (they came from
+    the same source as the page text) and must not be stripped.
+
     Args:
         poi_list: List of POI dicts (mutated in place — prose fields are rewritten).
         exhibition_checklist_result: ExhibitionChecklistResult with page_text and works.
         stop_names: List of stop names (excluded from person detection).
+        pre_grounded_names: List of person names known to be grounded (from story beats).
 
     Returns:
         Stats dict with counts of detections, drops, etc.
@@ -367,6 +373,18 @@ def apply_prose_entity_grounding_gate(
         artist = (work.get('artist') or '').strip()
         if artist:
             artist_names.add(artist)
+
+    # [LOCAL-390] Build set of pre-grounded person names (from story beat extraction).
+    # These names came from the exhibition page text itself, so they are grounded
+    # by definition and must not be stripped by this gate.
+    _pre_grounded_set: Set[str] = set()
+    if pre_grounded_names:
+        for pgn in pre_grounded_names:
+            _pre_grounded_set.add(pgn.lower())
+            # Also add surname for matching
+            _pg_surname = _surname_from_full_name(pgn)
+            if _pg_surname:
+                _pre_grounded_set.add(_pg_surname.lower())
 
     # Also consider stop names (the works on display) as context
     stop_name_set = set()
@@ -400,6 +418,12 @@ def apply_prose_entity_grounding_gate(
 
     # Check each person against the grounding corpus
     for person in all_persons:
+        # [LOCAL-390] Pre-grounded names (from story beat extraction) bypass the check
+        if _pre_grounded_set and (person.lower() in _pre_grounded_set
+                                   or _surname_from_full_name(person).lower() in _pre_grounded_set):
+            stats['persons_grounded'] += 1
+            print(f"  [LOCAL-390] person '{person}' pre-grounded (story beat source) — keeping")
+            continue
         if check_person_grounded(person, page_text, artist_names):
             stats['persons_grounded'] += 1
         else:

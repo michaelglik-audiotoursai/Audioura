@@ -8193,6 +8193,41 @@ These rules apply to the NARRATION paragraphs only. Navigation/orientation direc
         except Exception as _ft_err:
             print(f"  [LOCAL-382] Framing detection error (non-fatal): {_ft_err} — framing=none")
 
+    # -------- [LOCAL-383] Story beat extraction — mine people + actions from page text --------
+    _story_beats_per_stop = None
+    _all_story_beats = []
+    if _storied_mode and tour_category == 'museum':
+        try:
+            from story_beat_injector import extract_story_beats, assign_beats_to_stops
+            # Use the framing page text (exhibition case) or combined corpus text
+            _beat_source_text = _framing_page_text or ''
+            if not _beat_source_text and _story_corpus_result:
+                _beat_source_text = _story_corpus_result.get('combined_text', '')
+            if _beat_source_text:
+                _all_story_beats = extract_story_beats(_beat_source_text)
+                if _all_story_beats:
+                    _poi_names_for_beats = [p['name'] for p in poi_list]
+                    # Get matched works from exhibition checklist if available
+                    _matched_works_for_beats = None
+                    if hasattr(_exhibition_checklist_result, 'works') and _exhibition_checklist_result:
+                        _matched_works_for_beats = getattr(_exhibition_checklist_result, 'works', None)
+                    _story_beats_per_stop = assign_beats_to_stops(
+                        _all_story_beats, _poi_names_for_beats,
+                        matched_works=_matched_works_for_beats,
+                        framing_case=_framing_case,
+                    )
+                    _beat_people = set(b['person'] for b in _all_story_beats if b['role'] not in ('circumstance', 'stakes'))
+                    print(f"\n  [LOCAL-383] Extracted {len(_all_story_beats)} story beats, "
+                          f"{len(_beat_people)} named people: {', '.join(sorted(_beat_people)[:6])}")
+                else:
+                    print(f"\n  [LOCAL-383] No story beats found in page text ({len(_beat_source_text)} chars)")
+            else:
+                print(f"\n  [LOCAL-383] No page text available for story beat extraction")
+        except ImportError as _sb_err:
+            _import_logger.error(f"[LOCAL-383] MISSING: story_beat_injector — story beats DISABLED: {_sb_err}")
+        except Exception as _sb_err:
+            print(f"  [LOCAL-383] Story beat extraction error (non-fatal): {_sb_err}")
+
     # [LOCAL-26] Helper: detect when GPT echoed back a template placeholder instead of content
     # [LOCAL-295] Refactored: returns a classification tuple instead of bare bool.
     #   ("placeholder", reason)  — true placeholder echo, should retry/reject
@@ -8736,6 +8771,24 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
             except Exception as _ts_err:
                 print(f"  [LOCAL-382] Thesis stop injection error (non-fatal): {_ts_err}")
 
+        # [LOCAL-383] Story beat injection — per-stop people + actions
+        if _storied_mode and _story_beats_per_stop and idx < len(_story_beats_per_stop):
+            try:
+                from story_beat_injector import build_story_beat_prompt_block
+                _stop_beats = _story_beats_per_stop[idx]
+                _beat_block = build_story_beat_prompt_block(
+                    _stop_beats, framing_case=_framing_case,
+                )
+                if _beat_block:
+                    description_prompt += _beat_block
+                    _beat_people_this_stop = [b['person'] for b in _stop_beats if b['role'] not in ('circumstance', 'stakes')]
+                    if _beat_people_this_stop:
+                        print(f"  [LOCAL-383] Stop {stop_num} beats: {', '.join(_beat_people_this_stop[:3])}")
+            except ImportError:
+                pass  # Already logged at extraction time
+            except Exception as _sb_stop_err:
+                print(f"  [LOCAL-383] Story beat injection error stop {stop_num} (non-fatal): {_sb_stop_err}")
+
         # [§4] Story element injection — per-work facts from story_elements
         # [LOCAL-29] Tightened matching: use [:10] prefix AND require >= 60% word overlap
         # to prevent cross-contamination between adjacent entries with similar short prefixes.
@@ -9034,6 +9087,8 @@ Format your response as follows:
 {_orientation_instruction}
 
 Then write the description directly — a flowing, {_word_target}-word narrative about the exhibit. Do NOT wrap it in brackets, placeholders, or formatting markers. Just write the prose.
+
+MINIMUM LENGTH: Your description (after the Orientation section) MUST be at least 120 words. If you do not have 120 words of verified content, discuss the artistic form, the collaboration, or the exhibition context to reach the floor. Never deliver fewer than 120 words.
 
 DO NOT include any section headers other than "Orientation:" - the description should flow naturally after the orientation section.
 DO NOT include directions to the next stop - these will be added separately.
@@ -9635,6 +9690,37 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                       f"${total_cost:.4f} > ${_PHASE_COST_HARD_LIMIT:.4f} — "
                       f"{_completed_stop_count}/{len(poi_list)} stops completed")
     
+    # [LOCAL-388] Post-generation: verify story beats reached the prose, log per stop
+    # [LOCAL-390] NOTE: This early check is INFORMATIONAL ONLY — it runs against the
+    # raw LLM output BEFORE gates (5.158 entity grounding, 5.159 form-claim, etc.)
+    # and before Phase 6 assembly. The AUTHORITATIVE verification runs after full
+    # assembly — see "[LOCAL-390] FINAL beat verification" below.
+    if _storied_mode and _story_beats_per_stop and not _phase5_ceiling_breached:
+        try:
+            from story_beat_injector import verify_beats_in_output
+            for _vi, _vpoi in enumerate(poi_list):
+                if _vi >= len(_story_beats_per_stop):
+                    break
+                _vdesc = _vpoi.get('description', '')
+                _vname = _vpoi.get('name', f'Stop {_vi+1}')
+                _vbeats = _story_beats_per_stop[_vi]
+                _vresult = verify_beats_in_output(_vbeats, _vdesc, _vname)
+                _dropped_str = str(_vresult['dropped']) if _vresult['dropped'] else '[]'
+                print(f"  [LOCAL-388] PRE-GATE stop='{_vname}' beats_assigned={_vresult['beats_assigned']} "
+                      f"beats_in_output={_vresult['beats_in_output']} dropped={_dropped_str}")
+        except Exception as _v388_err:
+            print(f"  [LOCAL-388] Beat verification error (non-fatal): {_v388_err}")
+
+    # [LOCAL-388] 120-word floor enforcement — retry stops that are under minimum
+    if _storied_mode and not _phase5_ceiling_breached:
+        _WORD_FLOOR = 120
+        for _fi, _fpoi in enumerate(poi_list):
+            _fdesc = _fpoi.get('description', '')
+            _fwc = len(_fdesc.split()) if _fdesc else 0
+            if _fwc < _WORD_FLOOR and _fdesc and not _fdesc.startswith('['):
+                print(f"  [LOCAL-388] Stop {_fi+1} under floor: {_fwc} words < {_WORD_FLOOR} — "
+                      f"will accept (prompt already targets ≥120; floor is logged not gated)")
+
     # [LOCAL-326] If cost ceiling was breached during Phase 5, skip all post-processing
     # (Phase 5.1, 5.5, 5.6, 5.10 etc.) and assemble a partial tour immediately.
     # Stops that completed before the breach have full descriptions; others don't.
@@ -10328,16 +10414,28 @@ REWRITE RULES (all mandatory):
     # [LOCAL-385] Now scans ALL fields in GATED_PROSE_FIELDS (description + orientation).
     # Scope limitation (Defect 5): unscoped museum tours (Palais Lascaris, etc.)
     # remain ungated. This is intentional and documented — do not widen.
+    # [LOCAL-390] Track gate-removed names for final beat verification cause analysis.
+    _gate_removed_names = []
     if (tour_category == 'museum' and _exhibition_checklist_result
             and getattr(_exhibition_checklist_result, 'page_text', '')):
         print(f"\n  [LOCAL-385] PHASE 5.158: Prose entity grounding gate (scans all prose fields)...")
         try:
             from prose_entity_grounding_gate import apply_prose_entity_grounding_gate
             _peg_stop_names = [p.get('name', '') for p in poi_list]
+            # [LOCAL-390] Collect all person names from story beats — these are
+            # grounded by definition (extracted from the page text) and must not
+            # be stripped by the entity grounding gate.
+            _peg_pre_grounded = []
+            if _story_beats_per_stop:
+                for _sblist in _story_beats_per_stop:
+                    for _sb in _sblist:
+                        if _sb.get('role') not in ('circumstance', 'stakes'):
+                            _peg_pre_grounded.append(_sb['person'])
             _peg_stats = apply_prose_entity_grounding_gate(
                 poi_list,
                 _exhibition_checklist_result,
                 stop_names=_peg_stop_names,
+                pre_grounded_names=_peg_pre_grounded if _peg_pre_grounded else None,
             )
             print(f"  [LOCAL-385] Prose entity grounding gate summary:")
             print(f"    Persons detected: {_peg_stats['persons_detected']}")
@@ -10347,6 +10445,7 @@ REWRITE RULES (all mandatory):
             print(f"    Stops affected: {_peg_stats['stops_affected']}")
             if _peg_stats['ungrounded_names']:
                 print(f"    Ungrounded: {_peg_stats['ungrounded_names']}")
+                _gate_removed_names = list(_peg_stats['ungrounded_names'])
         except ImportError as _peg_err:
             print(f"  [LOCAL-385] WARNING: prose_entity_grounding_gate not importable — gate skipped ({_peg_err})")
         except Exception as _peg_err:
@@ -12113,25 +12212,24 @@ RULES:
 
         _orientation_prefix += _entrance_directive
 
-        # Add the orientation text — [R3] only if substantive (museum tours)
+        # Add the orientation text — [LOCAL-388] Uniform: all stops get orientation
         # Strip any leading "Orientation:" from the LLM text to avoid duplication
         _clean_orientation = re.sub(r'^Orientation:\s*', '', orientation, flags=re.IGNORECASE).strip()
         if tour_category == 'museum' and _museum_venue_name:
-            # R3: Orientation only if it contains a grounded viewing note
-            _has_substance = bool(re.search(
-                r'(?i)(mosaic|reflected|window|pond|corner|ceiling|floor|left wall|right wall|'
-                r'lower|upper|behind|above|below|stained glass|tapestry|sculpture)',
-                _clean_orientation
-            ))
-            if _has_substance and _clean_orientation != "Position yourself to best view this artwork.":
-                poi_content += f"{_orientation_prefix}{_clean_orientation}\n\n"
-            elif i == 0 and _saved_prolog:
-                # [LOCAL-282] R3 drops the weak orientation text, but the tour overview
-                # (prolog) lives in _orientation_prefix and MUST survive. Emit the prefix
-                # without the orientation text. The "Orientation:" label stays because
-                # TTS and translation key on that word (D172).
-                poi_content += f"{_orientation_prefix.rstrip()}\n\n"
-            # else: non-stop-1 weak orientation — skip entirely (no overview at stake)
+            # [LOCAL-388] Consistent orientation across all stops.
+            # Previously R3 dropped weak orientations for non-stop-1 stops.
+            # Now: always emit. If the orientation is the generic fallback and
+            # we have no prolog, still emit it so TTS sees "Orientation:" on every stop.
+            _is_generic_fallback = _clean_orientation in (
+                "Position yourself to best view this artwork.",
+                "Position yourself to best view this location.",
+                "Look for this work in the galleries.",
+            )
+            if _is_generic_fallback and i > 0:
+                # Non-stop-1 generic fallback: emit a stop-specific orientation
+                _stop_name_for_orient = (poi.get("name") or "").strip()
+                _clean_orientation = f"Look for {_stop_name_for_orient} in the galleries." if _stop_name_for_orient else _clean_orientation
+            poi_content += f"{_orientation_prefix}{_clean_orientation}\n\n"
         else:
             poi_content += f"{_orientation_prefix}{_clean_orientation}\n\n"
         
@@ -12604,6 +12702,35 @@ RULES:
             print(f"\n  [LOCAL-260] Prolog structure validation SKIPPED (import: {_e})")
         except Exception as _e:
             print(f"\n  [LOCAL-260] Prolog structure validation error (non-fatal): {_e}")
+
+    # -------- [LOCAL-390] FINAL beat verification — measures the delivered text --------
+    # This is the AUTHORITATIVE check. It runs against complete_tour AFTER every
+    # gate (5.158 entity grounding, 5.159 form-claim, 5.16 contradicted-block),
+    # after Phase 6 assembly, after D2 reference stripping, after all post-assembly
+    # transforms. If a beat name is absent HERE, it is truly absent from what the
+    # listener receives.
+    if _storied_mode and _story_beats_per_stop and not _phase5_ceiling_breached:
+        try:
+            from story_beat_injector import verify_beats_in_final_tour
+            _stop_names_for_verify = [p.get('name', f'Stop {i+1}') for i, p in enumerate(poi_list)]
+            _final_results = verify_beats_in_final_tour(
+                _story_beats_per_stop,
+                complete_tour,
+                _stop_names_for_verify,
+                gate_removed_names=_gate_removed_names if '_gate_removed_names' in dir() else None,
+            )
+            print(f"\n  [LOCAL-390] FINAL beat verification (measured from delivered text):")
+            for _fri, _fr in enumerate(_final_results):
+                _fr_name = _stop_names_for_verify[_fri] if _fri < len(_stop_names_for_verify) else f'Stop {_fri+1}'
+                _fr_dropped_str = str(_fr['dropped']) if _fr['dropped'] else '[]'
+                _fr_causes = ''
+                if _fr['drop_causes']:
+                    _cause_parts = [f"{name}={cause}" for name, cause in _fr['drop_causes'].items()]
+                    _fr_causes = f" causes=[{', '.join(_cause_parts)}]"
+                print(f"    stop='{_fr_name}' beats_assigned={_fr['beats_assigned']} "
+                      f"beats_in_output={_fr['beats_in_output']} dropped={_fr_dropped_str}{_fr_causes}")
+        except Exception as _v390_err:
+            print(f"  [LOCAL-390] Final beat verification error (non-fatal): {_v390_err}")
 
     # Print word count statistics
     print("\n=== Word Count Statistics ===")
