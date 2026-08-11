@@ -1,15 +1,43 @@
 Step-by-Step Audio Guided Tour: Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA - Museum Tour
 Tour-Category: museum
 
-Stop 1: Wednesday, September 16–Wednesday
+Stop 1: Le Lézard aux plumes d’or (The Lizard with Golden Feathers)
 
-Coordinates: 42.3394, -71.0941
+Address: 465 Huntington Ave, Boston, MA 02115
 
-Orientation: You are about to explore the Picasso, Miro, Dali: Unbound exhibition at MFA in Boston, showcasing extraordinary works by Spanish artists within the livre d'artiste (artist's book) genre. These works, with no precedent, revolutionized the book as an art form through deeply collaborative ventures, rarely on view. In the Lois B. and Michael K. Torf Gallery (Gallery 184), the exhibition delves into how images, words, and typography intersect in these captivating pieces. As you immerse yourself in this artistic realm, be prepared to uncover the unseen narratives captured within the art of a single day, with additional works possibly on display. Your first stop is Wednesday, September 16–Wednesday. Position yourself in the center of the room to fully appreciate the immersive experience of "Wednesday, September 16–Wednesday" at the Picasso, Miro, Dali: Unbound exhibition at the Museum of Fine Arts, Boston. From this vantage point, the intricate details and unique perspectives of the exhibit come to life, offering a glimpse into the creative minds of the artists.
+Coordinates: 42.3396, -71.0871
 
-"Wednesday, September 16–Wednesday" by October 7, featured in the 2026 exhibition, challenges traditional art forms by integrating image, text, typography, and paper into a cohesive whole. This work encapsulates the essence of a single day interpreted by various artists throughout different years, offering a captivating exploration of time and creativity. The collaboration between the artist and collaborators like Juan Gris and Pierre Reverdy, a french poet associated with surrealism, elevates the significance of the piece, showcasing the seamless integration of visual and literary arts. As part of the larger exhibition focusing on the book as the artwork, "Wednesday, September 16–Wednesday" invites viewers to delve into the intersection of image and text, revealing unexpected connections and narratives.
+Orientation: The Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA invites you to delve into the extraordinary world of livre d'artiste, where images, words, and typography intersect to revolutionize the book as an art form. These deeply collaborative ventures, rarely on view, have no precedent, showcasing the power of art to transcend the ordinary and create new mythologies. Within the Lois B. and Michael K. Torf Gallery (Gallery 184), you will encounter three remarkable works by Spanish artists: Le Lézard aux plumes d’or (The Lizard with Golden Feathers), Moses and Monotheism, and Au Soleil du Plafond. At Le Lézard aux plumes d’or, the lithography medium adds depth to the artwork. In Moses and Monotheism, Dalí and Freud challenge us to reflect on culture and religion. Your first stop is Le Lézard aux plumes d’or (The Lizard with Golden Feathers). The vivid colors and intricate details come to life from this viewpoint, allowing you to fully immerse yourself in the surreal world depicted by the artist.
+
+Upon viewing "Le Lézard aux plumes d’or," you enter a realm where reality and imagination blend seamlessly. Created in 1971, this masterpiece is an entire illustrated book with 40 color lithographs, including a striking cover featuring publisher’s vellum material. Each lithograph showcases Miró's expertise in color and form, offering a visual feast for the eyes. Miró's exploration of surrealism is evident in the whimsical depiction of a lizard adorned with golden feathers, a symbol of transformation and the fantastical. The vibrant hues and fluid lines guide your eyes across the composition, inviting you to delve deeper into the artist's creative vision. The choice of lithography as the medium adds a layer of depth and texture to the artwork, enhancing the overall viewing experience. Louis Broder, the publisher, played a pivotal role in bringing Miró's artistic vision to life, while Mourlot Frères, the printer, ensured the precision and quality of each lithograph. The generous donation of this work to the museum further enriches its cultural significance. The vibrant colors and intricate details of this enchanting artwork reveal myriad interpretations and narratives.
+
+
+Directions: Continue through Museum of Fine Arts, Boston — next is Moses and Monotheism.
 
 
 
-Closing: The Treat Page shows whether there are real savings at local shops and restaurants around here. We can also generate news articles for you to listen to on the way back.
+Stop 2: Moses and Monotheism
+
+Address: 465 Huntington Ave, Boston, MA 02115
+
+Orientation: Position yourself directly in front of Salvador Dalí's 1974 illustrations for Sigmund Freud's "Moses and Monotheism".
+
+As you stand before Dalí's illustrations, you are greeted by a convergence of art and literature. The pages come alive with Dalí's surrealist style, depicting scenes that challenge traditional interpretations of history and myth. Each stroke of Dalí's pen reveals a deep connection to Freud's controversial narrative, exploring the psychological impact of myth-making. The medium of illustration allows for a unique intersection of image and text, emphasizing the collaborative nature of this artistic endeavor. One cannot help but be drawn into the world of Moses and Monotheism, where Dalí's visual storytelling transcends the boundaries of conventional art forms. Through this work, Dalí and Freud beckon us to question the constructs of culture and religion, provoking introspection and contemplation on the enduring power of myth in shaping human consciousness.
+
+
+Directions: Your final stop in Museum of Fine Arts, Boston: Au Soleil du Plafond.
+
+
+
+Stop 3: Au Soleil du Plafond
+
+Address: 465 Huntington Ave, Boston, MA 02115
+
+Orientation: As you stand amidst the vibrant energy of the Picasso, Miro, Dali: Unbound exhibition at the Museum of Fine Arts in Boston, a hidden gem awaits your discovery. Direct your gaze towards "Au Soleil du Plafond," a captivating creation that transcends boundaries.
+
+Nestled among the other works, "Au Soleil du Plafond" stands out not for its size or grandeur, but for its intriguing fusion of visual and textual elements. Each page of this book reveals a harmonious blend of lithographs and handwritten text, showcasing the artistic synergy between Gris and Reverdy. The fusion of color, form, and language in "Au Soleil du Plafond" invites you to delve deeper into the rich tapestry of modern art and literature, blurring the lines between visual and literary expression.
+
+
+
+That's 3 stops — Le Lézard aux plumes d’or showcases lithography's depth and texture and Moses and Monotheism prompts reflection on culture and religion's constructs. Closing: The Treat Page shows whether there are real savings at local shops and restaurants around here. We can also generate news articles for you to listen to on the way back.
 
