@@ -3,7 +3,7 @@
 Part of Story Quality pipeline. Deterministic query generation + bounded SERP search
 + source reputation classification. Never fails the tour — degrades gracefully.
 """
-import json, os, re, time, unicodedata, urllib.request, urllib.parse
+import json, os, re, time, unicodedata, urllib.request, urllib.parse, urllib.error
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -516,14 +516,15 @@ def synthesize_fact_targeted_queries(stop: Dict, reported_elements: List[Dict]) 
 # --- SERP Execution ---
 def _serp_search(query: str) -> Tuple[List[Dict], float]:
     """Execute a single SERP query via Serper.dev. Returns (results, latency_ms).
-    On failure → ([], latency_ms) + logged."""
+    On failure → ([], latency_ms) + logged with full request/response detail."""
     if not SERP_API_KEY:
         print(f"  [SQ-S2] No SERP_API_KEY — skipping query")
         return [], 0.0
 
     start = time.time()
+    payload = {"q": query, "num": 8}
     try:
-        data = json.dumps({"q": query, "num": 8}).encode()
+        data = json.dumps(payload, ensure_ascii=False).encode('utf-8')
         req = urllib.request.Request(
             "https://google.serper.dev/search",
             data=data,
@@ -537,9 +538,22 @@ def _serp_search(query: str) -> Tuple[List[Dict], float]:
             results = [{'title': r.get('title', ''), 'url': r.get('link', ''), 'snippet': r.get('snippet', '')}
                       for r in organic]
             return results, latency
+    except urllib.error.HTTPError as e:
+        latency = (time.time() - start) * 1000
+        # [LOCAL-409] Print full request and response body for diagnosis
+        response_body = ''
+        try:
+            response_body = e.read().decode('utf-8', errors='replace')
+        except Exception:
+            response_body = '<unreadable>'
+        print(f"  [SQ-S2] SERP HTTP {e.code}: {e.reason}")
+        print(f"  [SQ-S2]   request payload: {json.dumps(payload, ensure_ascii=False)}")
+        print(f"  [SQ-S2]   response body:   {response_body[:500]}")
+        return [], latency
     except Exception as e:
         latency = (time.time() - start) * 1000
-        print(f"  [SQ-S2] SERP query failed: {e} (query: {query[:50]})")
+        print(f"  [SQ-S2] SERP query failed: {type(e).__name__}: {e}")
+        print(f"  [SQ-S2]   request payload: {json.dumps(payload, ensure_ascii=False)}")
         return [], latency
 
 
