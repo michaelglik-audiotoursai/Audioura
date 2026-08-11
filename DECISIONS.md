@@ -14271,3 +14271,33 @@ a New York gallery founded 2013. A name match is not an identity match.
 **Standing rule:** a confident, well-written falsehood about a named person is the
 worst output this pipeline can produce, because no listener can detect it. It
 outranks every formatting, gating and scoring concern currently queued.
+
+## D367 — A sourced conflict is a story; an unsourced one is a research task
+**2026-08-11, 19:0x.** Michael's amendment to D366. Folded into LOCAL-423.
+
+LEAD's D366 said the unattested 1967-destruction story should be discarded. Michael
+pushed back: a contradiction is *more* interesting than either side alone, so
+complement the story rather than dropping it. He is right about the principle and
+LEAD's verb was wrong — but the ordering matters:
+
+- **Two sourced claims disagree** → build the story on the disagreement. Best case.
+- **An unsourced claim disagrees with a sourced one** → targeted re-query for that
+  claim. Attested now? Case one. Still unattested? Drop that claim alone.
+- **Never assert an unattested claim and then contradict it** — that manufactures
+  both halves of the tension. The reveal only works when both halves are real.
+
+**LEAD also over-claimed and corrects it here:** absence from our 67 snippets means
+*unattested*, not *false*. D366 said "our corpus refutes it"; it does not refute it,
+it fails to attest it and holds facts awkward for it.
+
+**And the sourced version turns out to be the better story.** Le Lézard carries
+three distinct Mourlot catalogue numbers in our corpus — `M. 525` (Christie's, "set
+of 18", 1967), `M.794` (martinlawrence.com), `Mourlot 831` (mourloteditions.com,
+Broder, pulled before lettering) — plus "series of 15" (NGS), "40 color lithographs"
+(MFA credit line), "Edition of 80" on parchment (Artsy), and 15 again (Toledo
+Museum). Every line sourced. The work exists in several distinguishable states
+across 1967 and 1971 and the record cannot agree on how many plates there are.
+
+That is very likely *why* the invented disaster is persuasive: it reconciles a real
+multiplicity with a drama nothing supports. **The attested disagreement is the
+story, and it survives a visitor checking it on the way home.**
