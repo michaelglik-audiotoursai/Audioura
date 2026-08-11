@@ -12279,3 +12279,43 @@ Telling it *to include* something cannot be solved that way — enforcement cann
 insert content. So the remedy differs by direction: prohibitions become gates;
 requirements become explicit required-content lists plus a single regeneration
 retry, with `beat_unrecoverable` logged rather than a fabricated substitute.
+
+## D315 — `never_written` was the model refusing a false association, not a model failure
+**2026-08-10.** LOCAL-391 merged, and its retry logging overturned D314's reading
+of the cause.
+
+391 delivered what it was asked: `Broder` 0 → **2**, `Mourlot Frères` present,
+`with publisher` 1 → **0**, all attributions correct, zero-check clear, words
+423/217/239, and the no-fabrication rule honoured —
+`beat_unrecoverable name='Reverdy' — never fabricate, moving on`.
+
+But the retry lines show what the counters could not:
+
+| Person | Belongs to | Was demanded of |
+|---|---|---|
+| Pierre Reverdy | stop 3 (Gris **with Reverdy**) | **stop 1**, the Miró book |
+| Sigmund Freud | stop 2 (Dalí illustrating **Freud**) | **stop 3** |
+| Mourlot Frères, Boris Fridman | stop 1 (printer/donor of the **Miró**) | **stop 2** |
+
+**Every demand was aimed at the wrong stop, and the model was right to refuse.**
+D314 recorded the cause as `never_written` and read that as the model ignoring an
+instruction. It was the model declining to assert something false. Three retries
+per stop were spent pushing it toward claims that would have been wrong had it
+complied — and the one name still missing, `Fridman`, was demanded of a stop he
+has no connection to, so he appeared nowhere.
+
+**The correction to make explicitly: a metric can be honest and still be read
+wrong.** 390's instrumentation was correct — the beats genuinely were never
+written — but the inference "therefore the model ignored a valid instruction"
+skipped a step. The right question was whether the *instruction* was valid, and
+one glance at which name was demanded of which stop answered it. Instrument the
+input as well as the output.
+
+**There is also a quiet good-news finding:** the model resisted three rounds of
+pressure to state a false association, and the `beat_unrecoverable` path let it.
+The no-fabrication rule and the model's own judgement agreed. That is the
+behaviour D289/D301 want, arrived at from the other direction.
+
+Dispatched as **LOCAL-392**: attach each beat to the stop whose work it derives
+from, and report retry counts before and after — retries were 3/3 on every stop,
+tripling generation cost to chase falsehoods.
