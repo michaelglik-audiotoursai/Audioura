@@ -15,6 +15,10 @@ Scoring:
   - Tier1/Tier2 domain: +1
   - Contains artist name: +1
   - Biography-only (LOCAL-406): hard reject (score = -999)
+  - [LOCAL-414] Tier3 penalty: -5 (unverified domains cannot outrank tier1/tier2
+    on story quality alone; prevents doctrinal/apologetics sites from displacing
+    institutional sources). Not a hard exclusion: tier3 material still available
+    when no tier1/tier2 exists for a stop.
 
 Returns at most SNIPPET_CAP_PER_STOP snippets, sorted by descending score.
 """
@@ -25,6 +29,14 @@ from typing import List, Dict, Tuple
 
 # Configurable cap — default 5
 SNIPPET_CAP_PER_STOP = int(os.environ.get('SNIPPET_CAP_PER_STOP', '5'))
+
+# [LOCAL-414] Tier3 penalty: unverified domains score -5 so they cannot outrank
+# tier1/tier2 material with comparable story quality. A tier1/tier2 snippet with
+# person+verb+date = 9; a tier3 snippet with the same = 3 (9-6 is too harsh,
+# 9-4 still allows a tier3 with ALL signals to tie). -5 means tier3 needs
+# *more* story signals than tier1/tier2 to win — practically impossible when
+# both have the same content, but still possible when tier3 is the ONLY source.
+TIER3_PENALTY = int(os.environ.get('SNIPPET_TIER3_PENALTY', '-5'))
 
 # Verbs of consequence — actions that indicate a story, not a description
 _VERBS_OF_CONSEQUENCE = re.compile(
@@ -167,6 +179,11 @@ def score_snippet(snippet: Dict, artist: str = '') -> int:
     tier = snippet.get('tier', '')
     if tier in ('tier1', 'tier2'):
         score += 1
+    # [LOCAL-414] Tier3 penalty: unverified domains are demoted so they cannot
+    # outrank tier1/tier2 on story quality alone. This prevents doctrinal and
+    # apologetics sites from being injected as reference material.
+    elif tier == 'tier3':
+        score += TIER3_PENALTY
 
     # Contains artist surname: +1
     if artist:
@@ -299,6 +316,39 @@ def _is_event_snippet(text: str) -> bool:
     return False
 
 
+def _snippet_is_title_relevant(snippet: Dict, work_title: str) -> bool:
+    """[LOCAL-415] Check if a snippet is plausibly about the given work.
+
+    A snippet is "usable" for a stop if its text relates to the work title.
+    Tier1/tier2 snippets about completely unrelated topics (Korean hanboks,
+    Homeric epics) count as survivors but produce starved stops because the
+    LLM cannot write about the work from irrelevant material.
+
+    This is a lightweight heuristic, not a semantic classifier:
+    - Any word from the work title (3+ chars) appearing in snippet text
+    - Or snippet URL/domain matching the venue (mfa.org, etc.)
+    """
+    if not work_title or not snippet:
+        return True  # Can't assess — assume relevant
+
+    text = f"{snippet.get('title', '')} {snippet.get('snippet', '')}".lower()
+    title_lower = work_title.lower()
+
+    # Extract significant words from the work title (3+ chars, not stopwords)
+    _stopwords = {'the', 'and', 'for', 'from', 'with', 'that', 'this', 'are', 'was', 'now'}
+    title_words = [w for w in re.findall(r'\b[a-z]{3,}\b', title_lower) if w not in _stopwords]
+
+    if not title_words:
+        return True  # Title too short to assess
+
+    # If ANY significant title word appears in snippet text, it's relevant
+    for word in title_words:
+        if word in text:
+            return True
+
+    return False
+
+
 def rank_and_cap_snippets(
     snippets: List[Dict],
     artist: str = '',
@@ -311,7 +361,8 @@ def rank_and_cap_snippets(
       snippets: list of {'title', 'snippet', 'url', 'tier'?, ...}
       artist: artist name for bonus scoring
       cap: max snippets to return (default: SNIPPET_CAP_PER_STOP)
-      work_title: the canonical title of the work this stop is about (LOCAL-419)
+      work_title: the canonical title of the work this stop is about
+                  (LOCAL-419 relevance scoring; LOCAL-415 usability check)
 
     Returns:
       (ranked_snippets, ranking_report)
@@ -320,7 +371,9 @@ def rank_and_cap_snippets(
         'rejected_biography_only': int,
         'cap_applied': int,
         'output_count': int,
-        'scores': [(snippet_title_prefix, score), ...]  # for tracing
+        'usable_count': int,           # [LOCAL-415] how many are title-relevant
+        'starvation_rescued': bool,    # [LOCAL-415] whether tier3 was let through
+        'scores': [(snippet_title_prefix, score, tier), ...]  # for tracing
       }
     """
     if cap is None:
@@ -328,6 +381,7 @@ def rank_and_cap_snippets(
 
     scored = []
     rejected_bio = 0
+    tier3_demoted = 0
 
     # [LOCAL-419] Normalize work title for relevance check
     _work_title_lower = work_title.lower().strip() if work_title else ''
@@ -351,21 +405,73 @@ def rank_and_cap_snippets(
                 elif _title_word_hits >= 2 or _work_title_lower in snip_text:
                     # Strong title match → small bonus
                     s += 1
+            # [LOCAL-415] Count tier3 demotions for the usability metric. Independent
+            # of the relevance adjustment above — both apply. (LEAD merge, D363)
+            if snip.get('tier') == 'tier3':
+                tier3_demoted += 1
             scored.append((s, snip))
 
-    # Sort descending by score
-    scored.sort(key=lambda x: x[0], reverse=True)
+    # Sort descending by score, with tier1/tier2 winning ties over tier3
+    scored.sort(key=lambda x: (x[0], 0 if x[1].get('tier') == 'tier3' else 1), reverse=True)
 
     # Cap
     capped = scored[:cap]
 
+    # [LOCAL-415] Usability check: how many surviving snippets are title-relevant?
+    starvation_rescued = False
+    usable_count = 0
+    if work_title:
+        usable_count = sum(
+            1 for _, snip in capped
+            if _snippet_is_title_relevant(snip, work_title)
+        )
+
+        # STARVATION RESCUE: if NO surviving snippet is title-relevant but there
+        # ARE tier3 snippets that ARE relevant, let the best one through.
+        # This prevents the tier gate from starving stops into LLM refusals.
+        if usable_count == 0 and capped:
+            # Find tier3 snippets that were scored (including penalized ones beyond cap)
+            _all_tier3_relevant = [
+                (s, snip) for s, snip in scored
+                if snip.get('tier') == 'tier3' and _snippet_is_title_relevant(snip, work_title)
+            ]
+            if _all_tier3_relevant:
+                # Re-score without the tier3 penalty to find the truly best one
+                _best_tier3 = max(_all_tier3_relevant, key=lambda x: x[0] - TIER3_PENALTY + TIER3_PENALTY)
+                # Actually we need the original score + penalty removed:
+                # The score already has the penalty applied, so add it back to get raw score
+                _best_snip = _best_tier3[1]
+                _raw_score = _best_tier3[0] - TIER3_PENALTY  # remove penalty to get base score
+                # Replace the worst snippet in capped with this relevant tier3
+                # (or append if under cap)
+                if len(capped) >= cap:
+                    # Replace the last (lowest-scoring) entry
+                    capped[-1] = (_raw_score, _best_snip)
+                else:
+                    capped.append((_raw_score, _best_snip))
+                starvation_rescued = True
+                usable_count = 1  # At least the rescued one
+                print(f"    [LOCAL-415] STARVATION RESCUE: tier3 snippet '{_best_snip.get('title', '')[:50]}' "
+                      f"let through (score {_raw_score}) — only title-relevant material for this stop")
+    else:
+        usable_count = len(capped)  # Can't assess without title
+
+    # [LOCAL-414] Report how many tier3 snippets survived into the final output
+    tier3_in_output = sum(1 for _, snip in capped if snip.get('tier') == 'tier3')
+    tier1_tier2_in_output = sum(1 for _, snip in capped if snip.get('tier') in ('tier1', 'tier2'))
+
     report = {
         'input_count': len(snippets),
         'rejected_biography_only': rejected_bio,
+        'tier3_demoted': tier3_demoted,
+        'tier3_in_output': tier3_in_output,
+        'tier1_tier2_in_output': tier1_tier2_in_output,
         'cap_applied': cap,
         'output_count': len(capped),
+        'usable_count': usable_count,
+        'starvation_rescued': starvation_rescued,
         'scores': [
-            (s[1].get('title', '')[:50], s[0]) for s in capped
+            (s[1].get('title', '')[:50], s[0], s[1].get('tier', '')) for s in capped
         ],
     }
 

@@ -271,11 +271,33 @@ def synthesize_queries(stop: Dict, tour_type: str = 'contained') -> List[str]:
 
     queries = []
 
+    # [LOCAL-415] Venue name for contextualized queries
+    venue_name = (stop.get('venue_name') or '').strip()
+
+    # [LOCAL-415] Medium detection — needed for query selection below
+    _medium = (stop.get('medium') or '').lower()
+    _is_book_form = any(kw in _medium for kw in ('lithograph', 'book', 'etching', 'aquatint', 'woodcut'))
+    if not _is_book_form and credit_line:
+        _is_book_form = any(kw in credit_line.lower() for kw in ('lithograph', 'book', 'published'))
+
     # ── PRIMARY: The work itself (quoted title + artist) ──
     if tour_type == 'contained':
-        queries.append(f'"{title}" {artist}')
-        queries.append(f'"{title}" history')
-        queries.append(f'"{title}" edition lithographs')
+        if artist:
+            queries.append(f'"{title}" {artist}')
+            queries.append(f'"{title}" history')
+        else:
+            # [LOCAL-415] No artist: contextualize with venue to avoid generic results
+            # "Adam and Eve" alone returns biblical content; "Adam and Eve" Museum of Fine Arts
+            # returns the actual artwork/exhibition.
+            if venue_name:
+                queries.append(f'"{title}" {venue_name}')
+                queries.append(f'"{title}" {venue_name} history')
+            else:
+                queries.append(f'"{title}" art museum')
+                queries.append(f'"{title}" exhibition history')
+        # [LOCAL-415] Only add "edition lithographs" query when medium suggests prints
+        if _is_book_form:
+            queries.append(f'"{title}" edition lithographs')
     else:
         queries.append(f'"{title}" {city} history')
         queries.append(f'"{title}" {city} story behind')
@@ -295,10 +317,7 @@ def synthesize_queries(stop: Dict, tour_type: str = 'contained') -> List[str]:
 
     # ── FORM QUERY: livre d'artiste tied to artist ──
     # Only when medium/credit_line suggests this IS a livre d'artiste
-    _medium = (stop.get('medium') or '').lower()
-    _is_book_form = any(kw in _medium for kw in ('lithograph', 'book', 'etching', 'aquatint', 'woodcut'))
-    if not _is_book_form and credit_line:
-        _is_book_form = any(kw in credit_line.lower() for kw in ('lithograph', 'book', 'published'))
+    # (_medium and _is_book_form already computed above for query selection)
     if _is_book_form and artist:
         queries.append(f'livre d\'artiste {artist}')
 

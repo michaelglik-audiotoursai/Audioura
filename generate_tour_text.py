@@ -8408,6 +8408,8 @@ Exempt: navigation directions ("Turn left", "Continue past").
                             'title': _sr.get('title', ''),
                             'snippet': _sr.get('snippet', ''),
                             'url': _sr.get('url', ''),
+                            'tier': _sr.get('tier', ''),  # [LOCAL-414] Carry tier through to ranker
+                            'domain': _sr.get('domain', ''),
                         })
 
                 # [LOCAL-410] Inject credit_line as a leading snippet (source of Fridman etc.)
@@ -8524,6 +8526,72 @@ Exempt: navigation directions ("Turn left", "Continue past").
         """Return True only for genuine placeholder echoes (not short-but-valid prose)."""
         classification, _ = _classify_placeholder_leak(text)
         return classification == "placeholder"
+
+    # [LOCAL-415] LLM refusal detector — catches meta-responses where the model
+    # apologises to the listener, references its own constraints, or refuses to
+    # produce content. These must NEVER ship as tour text.
+    _LLM_REFUSAL_PATTERNS = [
+        # Direct refusals
+        r'\bI cannot provide\b',
+        r'\bI can\'t provide\b',
+        r'\bI\'m unable to\b',
+        r'\bI am unable to\b',
+        r'\bI\'m sorry,?\s+(?:but\s+)?I\b',
+        r'\bI apologize\b',
+        r'\bI apologise\b',
+        # Self-referential meta-commentary
+        r'\bas an AI\b',
+        r'\bas a language model\b',
+        r'\bmy training data\b',
+        r'\bmy knowledge cutoff\b',
+        r'\bgiven constraints\b',
+        r'\bgiven the (?:given |)constraints\b',
+        r'\bmissing surnames\b',
+        # Model talking to the user about its own process
+        r'\bI missed out on\b',
+        r'\bI will rectify\b',
+        r'\byour patience is appreciated\b',
+        r'\bpatience is appreciated\b',
+        r'\blet me (?:re)?try\b',
+        r'\bI\'ll rectify\b',
+        r'\bI need (?:more|additional) (?:information|context|details)\b',
+        # Constraint acknowledgment
+        r'\bbased on the given constraints\b',
+        r'\bcannot (?:fulfill|complete|generate)\b',
+        r'\bunable to (?:fulfill|complete|generate)\b',
+        # Apologising to the listener (not a character in the tour)
+        r'\bI (?:apologize|apologise) for (?:the|any)\b',
+        r'\bplease (?:bear with|be patient)\b',
+        # [LOCAL-415] Additional patterns found in live testing
+        r'\bthere was an issue with your request\b',
+        r'\bplease provide the necessary\b',
+        r'\bplease provide (?:more|the) (?:details|information|context)\b',
+        r'\bI (?:don\'t|do not) have (?:enough|sufficient)\b',
+        r'\binsufficient (?:information|data|context)\b',
+        # Model addressing user about missing requirements
+        r'\bmissing required names?\b',
+        r'\bensure to include\b',
+        r'\bnotify me if you require\b',
+        r'\brequire further assistance\b',
+        r'\bif you (?:could|can) provide\b',
+        r'\bI (?:cannot|can\'t) (?:proceed|continue)\b',
+        r'\bmistake in the (?:initial )?instructions\b',
+    ]
+    _LLM_REFUSAL_RE = re.compile('|'.join(_LLM_REFUSAL_PATTERNS), re.IGNORECASE)
+
+    def _detect_llm_refusal(text):
+        """[LOCAL-415] Detect LLM meta-response / refusal in generated text.
+
+        Returns:
+            (True, matched_pattern_text) if refusal detected
+            (False, None) if text appears to be genuine content
+        """
+        if not text or not text.strip():
+            return (False, None)
+        match = _LLM_REFUSAL_RE.search(text)
+        if match:
+            return (True, match.group(0))
+        return (False, None)
 
     def _generate_description(args):
         idx, poi, spine_stop, fact_sheet, story_type = args
@@ -9136,8 +9204,13 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 print(f"  [LOCAL-411] Stop {stop_num} snippet ranking: "
                       f"input={_ranking_report['input_count']} "
                       f"bio_rejected={_ranking_report['rejected_biography_only']} "
+                      f"tier3_demoted={_ranking_report['tier3_demoted']} "
                       f"cap={_ranking_report['cap_applied']} "
-                      f"output={_ranking_report['output_count']}")
+                      f"output={_ranking_report['output_count']} "
+                      f"usable={_ranking_report['usable_count']} "
+                      f"(t1t2={_ranking_report['tier1_tier2_in_output']}, "
+                      f"t3={_ranking_report['tier3_in_output']}"
+                      f"{', RESCUED' if _ranking_report['starvation_rescued'] else ''})")
                 if _ranking_report['scores']:
                     print(f"    Top scores: {_ranking_report['scores'][:3]}")
 
@@ -9348,7 +9421,29 @@ Do NOT repeat the artist's biographical background (birth year, nationality, sch
             # blocks (~1600 chars). The regex DO NOT USE line + DECLARATIVE PROSE rules already
             # cover this. Replaced with a short, high-signal instruction.
             description_prompt += """
-STYLE CONSTRAINT: No unearned praise. Every evaluative word (remarkable, stunning, captivating, breathtaking, exquisite, mesmerizing, vibrant) requires the specific evidence that earns it in the same or preceding sentence. If you cannot supply the evidence, delete the adjective. Prefer concrete nouns over decorated ones.
+BANNED PHRASES — do NOT use any of these in your description:
+- "vibrant colors" / "dreamlike imagery" / "dreamlike quality"
+- "creative genius" / "artistic prowess" / "masterpiece that"
+- "stir the soul" / "touch the heart" / "pulsate with life"
+- "symphony of emotions" / "tapestry of dreams" / "weaves a narrative"
+- "truly remarkable" / "a testament to" / "stands as a testament"
+- "captivating artistry" / "mesmerizing world" / "intricate details"
+- "invites you to explore/discover/reflect" / "immerse yourself in"
+- "invites contemplation" / "invites the viewer" / "invites us to"
+- "can't help but" / "feast for the eyes" / "step into a world"
+Instead, use SPECIFIC, CONCRETE language: name colors precisely (cerulean, ochre, vermilion), describe actual compositional choices, mention documented historical context.
+
+UNEARNED ADJECTIVES — these words are BANNED unless the same sentence or the one before it
+contains the specific evidence that earns them:
+- "vibrant" — ONLY permitted if you name the specific colors/contrasts that make it vibrant
+- "stunning" — ONLY if you describe what causes the visual impact (scale? technique? contrast?)
+- "remarkable" — ONLY if you state what distinguishes it from comparable works
+- "mesmerizing" — ONLY if you explain the optical or compositional mechanism
+- "exquisite" — ONLY if you describe the craftsmanship detail (grain, jointwork, brushstroke)
+- "breathtaking" — ONLY if you name the physical feature that produces the effect
+- "captivating" — ONLY if you explain what holds attention and why
+If you cannot provide that evidence in the same breath, delete the adjective. A bare noun
+is better than a noun preceded by an unearned superlative.
 """
             description_prompt += """
 FACTUAL INTEGRITY RULE: Do NOT invent visual specifics or biographical claims not in the fact sheet above. You may describe the general biblical SUBJECT (e.g. "depicts the parting of the Red Sea") but do NOT assert specific visual details as facts (colors, composition) unless grounded in the facts above. Never call a work "the artist's final masterpiece" or similar unverifiable superlatives.
@@ -9717,6 +9812,24 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
             if _prompt_size_final > 20000:
                 print(f"  [LOCAL-411] WARNING: prompt exceeds 20K chars ({_prompt_size_final})")
 
+        # [LOCAL-414] Universal artist attribution — fires for ALL museum stops
+        # when artist is known, regardless of snippet presence. Placed at the END
+        # of the prompt (recency bias) so it cannot be overridden by snippets that
+        # name a different artist's different work.
+        if tour_category == 'museum' and artist:
+            _414_artist_surname = artist.split()[-1]
+            description_prompt += f"""
+━━━ ARTIST ATTRIBUTION (LOCAL-414 — NON-NEGOTIABLE, FINAL AUTHORITY) ━━━
+The artist of THIS specific work is: {artist}
+The surname "{_414_artist_surname}" MUST appear in your text.
+
+If the reference material above mentions OTHER artists or OTHER works (by different
+artists), you may reference them only as CONTEXT — but your text MUST primarily be
+about THIS work by {artist}. Naming a different artist's different work does NOT
+satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" is absent.
+━━━ END ARTIST ATTRIBUTION ━━━
+"""
+
         description_data = {
             "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
             "messages": [
@@ -9825,6 +9938,41 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                             # All retries exhausted — produce honest short description, never ship placeholder
                             print(f"  [LOCAL-26] Stop {stop_num}: placeholder leak persists after {_max_retries+1} attempts, using fallback")
                             description = f"{poi_name} — an exhibit at this venue. Detailed information was not available at generation time."
+
+                    # [LOCAL-415] LLM refusal gate — detect meta-responses (model apologising,
+                    # referencing constraints, refusing to generate). These must NEVER ship.
+                    _is_refusal, _refusal_match = _detect_llm_refusal(description)
+                    if _is_refusal and _leak_class != "placeholder":
+                        _rejected_wc = len(description.split()) if description else 0
+                        print(f"  [LOCAL-415] Stop {stop_num}: LLM REFUSAL DETECTED — matched: '{_refusal_match}'")
+                        print(f"  [LOCAL-415]   verbatim ({_rejected_wc} words): {repr(description[:300])}")
+                        if _attempt < _max_retries:
+                            # Retry with higher temperature and explicit "do not apologize" reinforcement
+                            description_data["temperature"] = min(0.7 + 0.2 * (_attempt + 1), 1.0)
+                            # [LOCAL-415] Add a system-level override to prevent refusal on retry
+                            if len(description_data.get("messages", [])) > 0:
+                                description_data["messages"].append({
+                                    "role": "user",
+                                    "content": (
+                                        "Your previous response was a refusal/apology instead of content. "
+                                        "You MUST produce a description of the artwork/exhibit using the "
+                                        "reference material provided. Do NOT apologize, do NOT reference "
+                                        "constraints, do NOT address the listener about your own limitations. "
+                                        "Write the tour narration directly."
+                                    ),
+                                })
+                            print(f"  [LOCAL-415] Stop {stop_num}: refusal detected (attempt {_attempt+1}), "
+                                  f"retrying with anti-refusal reinforcement (temp={description_data['temperature']:.2f})...")
+                            continue  # retry
+                        else:
+                            # All retries exhausted — fail loudly with diagnostic, never ship refusal
+                            print(f"  [LOCAL-415] Stop {stop_num}: REFUSAL PERSISTS after {_max_retries+1} attempts — "
+                                  f"using fallback (NEVER shipping model apology as tour text)")
+                            description = (f"{poi_name} — located in this gallery. "
+                                           f"A detailed narration could not be generated for this stop.")
+                            # Mark as non-refusal for downstream (it's now our honest fallback)
+                            _is_refusal = False
+
                     elif _leak_class == "short_valid":
                         # [LOCAL-295] Short but valid prose — keep it. Do NOT retry identically.
                         # This is thin corpus, not a generation failure.
@@ -10191,6 +10339,42 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                         _artist_sn = artist.split()[-1].lower()
                         if _artist_sn and _artist_sn not in description.lower():
                             print(f"  [LOCAL-407] ⚠️ Stop {stop_num}: artist '{artist}' ABSENT from description!")
+
+                    # [LOCAL-414] Post-generation banned-phrase scrub.
+                    # The ban is in the prompt but the LLM occasionally ignores it.
+                    # Rather than retry (expensive, same result), scrub the phrase
+                    # from the delivered text. The phrase adds no information loss.
+                    _414_BANNED_PHRASES = [
+                        'invites contemplation',
+                        'invites the viewer',
+                        'invites us to',
+                        'invites you to explore',
+                        'invites you to discover',
+                        'invites you to reflect',
+                        'a testament to',
+                        'stands as a testament',
+                        'feast for the eyes',
+                        'step into a world',
+                        'stir the soul',
+                        'pulsate with life',
+                    ]
+                    _414_banned_found = []
+                    if description:
+                        _desc_lower_414 = description.lower()
+                        for _bp in _414_BANNED_PHRASES:
+                            if _bp in _desc_lower_414:
+                                _414_banned_found.append(_bp)
+                        if _414_banned_found:
+                            # Scrub: remove sentences containing banned phrases
+                            import re as _re414
+                            for _bp in _414_banned_found:
+                                # Remove the sentence containing the banned phrase
+                                _pattern = _re414.compile(
+                                    r'[^.!?]*\b' + _re414.escape(_bp) + r'\b[^.!?]*[.!?]\s*',
+                                    _re414.IGNORECASE
+                                )
+                                description = _pattern.sub('', description).strip()
+                            print(f"  [LOCAL-414] Stop {stop_num}: SCRUBBED banned phrases from output: {_414_banned_found}")
 
                     return idx, orientation, description, word_count, tokens_used, call_cost
                 else:
