@@ -10005,9 +10005,9 @@ that follows this shape:
     in the same workshop — Mourlot's atelier on Rue de Chabrol in Paris."
 
   SENTENCE 3: Connect to a SECOND named person or to the wider story.
-    Example: "Boris Fridman, a Boston collector who specialized in livres d'artiste,
-    later donated this work to the MFA, bringing the museum's holdings of
-    collaborative printed works to critical mass."
+    Example: "Boris Fridman, a Russian collector who assembled livres d'artiste,
+    donated this work to the MFA, adding to the museum's holdings of
+    collaborative printed works."
 
 WHAT TO AVOID:
   - "X's collaboration... showcasing a unique fusion" (evaluation, not story)
