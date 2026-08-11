@@ -13021,3 +13021,56 @@ delete) — a third instance of the same rule, now in the story path.
 not narrative. LOCAL-405 must first *look at the snippets the prompt receives*. If
 they are encyclopaedia first-lines ("X was a French publisher"), the query is the
 problem and no downstream filter will fix it.
+
+## D335 — Five rounds of filtering the wrong bucket: we were searching for the artist's biography
+**2026-08-11, 06:4x.** LEAD dumped the snippets the prompt actually receives —
+the check LOCAL-405 was told to do and that should have been done three rounds
+earlier. Stop 1, live:
+
+```
+"Joan Miro | Biography, Art, Paintings, Sculpture, Style ..."
+"Joan Miró (1893–1983)"  — born April 20 1893, family of watchmakers
+"7 Fun Facts about Joan Miro" — at 82 he started painting with his finger
+"Biography Joan Miró" — born in Barcelona in 1893
+```
+
+**Every result is generic artist biography.** Nothing about the work, Louis Broder,
+Mourlot Frères, Boris Fridman, or livres d'artiste.
+
+**This explains rounds 397–405 in one observation.** No appositive detector, story
+selector or retry loop can produce "Broder gambled on livres d'artiste" from four
+encyclopaedia entries about Miró's childhood. The material was never fetched. Every
+round since 397 refined the filtering of a bucket that contained nothing worth
+filtering.
+
+**The lesson, and it is the same one that has recurred all week in different
+clothes:** look at the actual artifact before building logic on top of it. D312
+said verify the delivered text; this is the same rule pointed *upstream* — verify
+the delivered *input*. LEAD demanded five rounds of downstream fixes without once
+printing what the prompt received, which is exactly the "instrument the transfer"
+failure applied to the first hop instead of the last.
+
+**LOCAL-406 rewrites `synthesize_queries`** to search the work and its people —
+`"Le Lézard aux plumes d'or" history`, `Louis Broder Miró`, `Mourlot Frères
+workshop`, `Boris Fridman collection` — rather than the artist, and to reject
+biography-only snippets for story purposes. Its acceptance is the snippet dump
+itself: if the new snippets still read as biography, the fix has not worked and
+nothing downstream will rescue it.
+
+## D336 — LOCAL-405 merged: the gate caught the posthumous-Gris claim live
+**2026-08-11.** Merged. The coherence gate went from matching one spelling to five
+of six relation forms, and in the live run it caught the exact case Michael named
+as the test:
+
+```
+coherence reject: 'Collaborating with Pierre Reverdy in 1955, Gris created a
+masterpiece' — 'Gris' died in 1927, cannot have Collaborating with in 1955
+```
+
+The model attempted the impossible claim in a grammatical form that did not exist
+yesterday, and was stopped. Delivered text: **0 impossible-relation forms**,
+`Broder` 2, `Mourlot` 1, 3 stops, zero-check clear.
+
+**`"X and Y worked together"` still escapes** — one form of six, recorded and
+handed to 406. Stating the residual precisely matters more than claiming the gate
+is complete.
