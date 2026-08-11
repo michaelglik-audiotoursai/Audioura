@@ -13338,3 +13338,38 @@ every judgement a tester makes about Storied.
 **Coordination rule between tracks:** Track B declares its migration in
 DECISIONS.md *before* applying it, so a Track A generation run that suddenly sees a
 new column knows why.
+
+## D345 — The search was never wired into production. Six rounds of LEAD verification were invalid.
+**2026-08-11, 10:3x.** LOCAL-410's trace found it, and LEAD confirmed it directly:
+`search_stories_for_stop` appears **nowhere** in `generate_tour_text.py`. The only
+things populating `_DIRECT_SNIPPETS_PER_STOP` are test files and
+`run_local406_acceptance.py`.
+
+**D321 was never fixed.** LOCAL-397 was merged on the claim that it wired the paid
+search into generation; it wired it into an *acceptance runner*, which pre-populated
+a module-level dict before calling `generate_tour_text()`. The production path left
+that dict empty and the snippet block was never appended to any prompt.
+
+**Consequence, stated plainly: every live verification LEAD ran from 397 through
+409 exercised a path with no search at all.** LEAD then spent six rounds reading
+"no story material in the output" as a downstream selection failure — building
+appositive detectors, specificity enforcers and prompt reordering on top of a
+retrieval step that was not running. D335's "we were filtering the wrong bucket"
+was correct and did not go far enough: there was no bucket.
+
+**Why the standing checks did not catch it.** D242 check #2 is "grep for a
+production importer before believing a module does anything" — LEAD ran that for
+`work_story_searcher` at D321 and never re-ran it after 397 claimed the fix. **A
+check that was run once, before the change, is not evidence about the change.** The
+log line `[LOCAL-397] Story search: wiring paid SERP for 3 stops` appeared in live
+output and LEAD treated it as proof the call happened; it was a print statement.
+
+**Rule added: for any task whose purpose is "make X reachable", the acceptance must
+include the grep proving X is reachable, re-run after the merge.** LOCAL-411 now
+requires a test asserting `search_stories_for_stop` is called on the real
+`generate_tour_text` path — the absence of exactly that test is why this survived.
+
+**410's wiring works** — 12 queries, 85 results, 86 snippets, live in production.
+**Bounced anyway:** 86 snippets re-buries the FACTS FIRST block that D339/D340
+added, `Broder` and `Fridman` regress to 0, and no search fact reaches the prose.
+The corpus needs ranking and a cap of 3–5, not 30 per stop.
