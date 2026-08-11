@@ -12126,3 +12126,38 @@ written. It then hung. Neither event cost anything irreversible — worktrees ke
 the concurrent runs isolated, and abandonment is recoverable by design — but both
 argue for the same discipline: decide a task's dispatch state before the file
 exists under a dispatchable name.
+
+## D311 — The numeric gate deleted a sentence for the "quantity" `', in'`
+**2026-08-10.** LOCAL-386 merged provisionally, tested live, reverted. Not merged.
+
+```
+[LOCAL-386] field=orientation ungrounded quantity ', in' — dropping sentence
+```
+
+`', in'` is not a quantity. The extractor produced a garbage token and removed a
+real Orientation sentence on its authority.
+
+**Third false positive of the same family in one evening** — `The Treat Page`
+classified as a person (D297), `visual tapestry` as a form claim (D304), `', in'`
+as a number. Every gate added today has shipped with a detector that fires on
+something it should not. The pattern is that each detector is written to *catch*
+its target and tested on positives, with no adversarial pass over ordinary prose.
+**A detector's false-positive behaviour is not a detail; it is half its
+specification** — and under D301, prose quality is not optional, so a wrong drop
+costs the product directly.
+
+**A LEAD verification lesson, recorded because it nearly produced a wrong verdict:**
+386 branched before 387 merged, so its worktree had no framing and *could not*
+test whether credit-line figures survive the gate. Testing it in its own worktree
+would have proven nothing about the case that matters. Merging provisionally onto
+`storied`, running live, and resetting is the cheap way to test a real
+combination — `git reset --hard HEAD~1` makes it free.
+
+**And a caution against over-claiming:** on the merged tree, `1974` went 1 → 0 and
+`Freud` 4 → 0 versus 387's run. **That is not established as the gate's doing.**
+Only one sentence was dropped and it contained neither. Single live generations
+vary, and a one-run difference is not a regression — "regression is a claim about
+two trees". LOCAL-389 must settle it with gate-off/gate-on runs on the same tree
+rather than inferring from noise.
+
+What is proven: the garbage match, and that `40 color lithographs` survived.
