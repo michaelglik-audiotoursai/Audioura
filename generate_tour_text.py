@@ -9403,6 +9403,30 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                         # Reset temperature in case it was bumped by a prior retry
                         description_data["temperature"] = 0.7
 
+                    # [LOCAL-393] Word-count floor: if output is real prose but below 120 words,
+                    # retry ONCE asking for more detail. If still below after retry, keep it
+                    # and log — thin grounded material is an honest outcome.
+                    if description and _leak_class != "placeholder":
+                        _wc_floor_count = len(description.split())
+                        if _wc_floor_count < 120 and _attempt < _max_retries:
+                            print(f"  [LOCAL-393] Stop {stop_num}: WORD FLOOR — {_wc_floor_count} words < 120, "
+                                  f"retrying (attempt {_attempt+2}/{_max_retries+1})")
+                            # Append a reinforcement message asking to expand
+                            description_data["messages"].append({
+                                "role": "user",
+                                "content": (
+                                    f"Your response was only {_wc_floor_count} words. The MINIMUM is 120 words. "
+                                    "Expand by discussing the artistic form, historical context, or collaboration "
+                                    "details you can verify from the fact sheet. Do NOT invent details — use what "
+                                    "you know and acknowledge gaps honestly. Rewrite the full description."
+                                ),
+                            })
+                            description_data["temperature"] = min(0.7 + 0.1 * (_attempt + 1), 0.95)
+                            continue  # retry
+                        elif _wc_floor_count < 120:
+                            print(f"  [LOCAL-393] Stop {stop_num}: word floor unmet after retries "
+                                  f"({_wc_floor_count} words) — grounded material is thin, keeping honest output")
+
                     # [LOCAL-391] Required beat retry: if assigned beats are missing
                     # from the output, retry ONCE with the missing names explicitly
                     # called out. If still missing after retry, log beat_unrecoverable.
