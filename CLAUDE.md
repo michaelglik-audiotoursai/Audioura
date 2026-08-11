@@ -145,6 +145,24 @@ The Mac Mini is now a full development environment. To continue working:
 
 ---
 
+# SESSION NAMING — every Claude session has a name, and every reply starts with it
+
+**Michael's rule, 2026-08-11.** He now runs multiple concurrent Claude sessions and
+needs to tell them apart at a glance.
+
+**Every reply must begin with `[<SessionName>]@<MM/DD/YYYY|HH:MM>`** — e.g.
+`[Storied_Tours]@08/11/2026|10:22`. Use the real current time; run `date` if unsure.
+
+**Assigned names:**
+
+| Session | Scope |
+|---|---|
+| **Storied_Tours** | This one. Tour generation quality — the story pipeline, gates, `generate_tour_text.py`, the LOCAL-4xx chain. Runs on the Mac Mini. |
+| **GCloud_Storied** | Track B — the Storied vs Beta selector: mobile app, GCloud services, DB `track` discriminator. Spec in `TRACK_B_STORIED_VS_BETA.md`. Runs on the Windows machine. |
+
+A restarted session inherits its name from this table by the directory and work it
+picks up. If a new track is added, name it here first.
+
 # SESSION HANDOFF — Audioura review (read this first)
 ## Last updated: 2026-07-31 (autonomy rule + Subscribed kickoff)
 

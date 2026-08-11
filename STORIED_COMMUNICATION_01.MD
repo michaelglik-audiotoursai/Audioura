@@ -1322,3 +1322,84 @@ Three things I'd want you to see with clear eyes, because I don't think it's fin
 And the honest limit on your third complaint. The names are now correct and correctly placed, but they're still facts, not stories. "Printer Mourlot Frères, a renowned French lithographic printing company" is the closest the tour comes, and it's an appositive, not a story. Nobody yet learns why Mourlot mattered, what Fridman collected and why he gave it away, or what was at stake in a painter and a poet building a book together. That material isn't on the MFA page — it needs a second grounded source, which is real work and hasn't been started.
 
 So: I'd show this to someone now without embarrassment, which wasn't true twelve hours ago. I wouldn't yet call it a tour someone would pay for.
+
+at 08/11/2026 09:46 ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   Settings  Status   Config   Usage   Stats
+
+   Session
+
+ Total cost:            $159.77
+ Total duration (API):  1h 58m 56s
+ Total duration (wall): 19h 28m 59s
+   Total code changes:    2027 lines added, 2 lines removed
+   Usage by model:
+          claude-opus-5:  6.8k input, 450.8k output, 245.2m cache read, 3.4m cache write ($159.77)
+     claude-haiku-4-5:  895 input, 14 output, 0 cache read, 0 cache write ($0.0010)
+
+ Current session
+ █████                                              10% used
+ Resets 11:50am (America/New_York)
+
+   Current week (all models)
+   ████                                               8% used
+ Resets Aug 18 at 12am (America/New_York)
+ +50% weekly limits promo through Aug 19 · clau.de/cc-50-promo
+
+ What's contributing to your limits usage?
+ Approximate, based on local sessions on this machine — does not include other devices or claude.ai                                                                                                                                                       Last 24h · these are independent characteristics of your usage, not a breakdown
+
+ 94% of your usage was at >150k context
+  Longer sessions are more expensive even when cached. /compact mid-task, /clear when switching to new tasks.                                                                                                                                                                                                                                  71% of your usage came from sessions active for 8+ hours
+  These are often background/loop sessions. Continuous usage can add up quickly so make sure it is intentional.                                                                                                                                                                                                                              Skills, subagents, plugins, and MCP servers                                                                                    No attribution data yet · accumulates as you use Claude
+
+ d to day · w to week                                                                                                           
+ Usage credits
+ ████████████████████████████████████▎              72% used                                                                   $18.17 / $25.00 spent · Resets Sep 1 (America/New_York)
+ ---
+ 1. Please record $+4let+99 with michael.glik@audioura.co for serp as it is NOT the password but some encrypted guess work for
+  me to remember.  
+2. I want to give you a second track of executions.  I need to have an ability to to let testyers in Storied
+  as well as to Beta.  For that the following work needs to get done.  On Mobile app side for Cloud option there should be a new
+  select box: Storied vs. Beta (Beta is what we have now and it is the only option now and Storied is what we will have once we
+  finish this release aka Storied so my testers and myself can compare the tours quality generated on Beta and Storied.  That
+  should define for Audioura on both Android and iPhone what address to send this information to GCloud.  On GCloud we should
+  have repository -- it would be nice if we can use one repo meaning PostGre DBMS was inclussive with Beta requests and Storied
+  requests, if not then we will have to double it.  And then we will have to double the machinary on GCloud to except and
+  process the requests.  Please suggest before you deploy if the best way to accomplish that would be via a different Claude
+  thread or you can handle both. 
+  3. Is the new methodology aka Storied MFA tour version has been generated and when it is please
+  make sure I can see it on VS Code and provide your own evaluation to make sure we are on the same page.  I will have to to
+  other work so Please do things in Contiues Development mode. 
+  4. Please identify when there is going to be a good time to do
+  /clear + restart so that we would nto use more Claude tokens as necessary.  Just FYI we are doing great per sossion per 6
+  hours but not that great on the weekly bases.  The current usage is  Settings  Status   Config   Usage   Stats
+
+ Session
+
+ Total cost:            $166.93
+   Total duration (API):  2h 2m 34s
+   Total duration (wall): 19h 56m 47s
+   Total code changes:    2054 lines added, 2 lines removed
+ Usage by model:                                                                                                                  claude-opus-5:  7.4k input, 463.3k output, 258.5m cache read, 3.5m cache write ($166.93)
+     claude-haiku-4-5:  895 input, 14 output, 0 cache read, 0 cache write ($0.0010)
+                                                                                                                               Current session                                                                                                                 ███████                                            14% used                                                                   Resets 11:49am (America/New_York)
+
+ Current week (all models)                                                                                                        ████                                               8% used                                                              Resets Aug 17 at 11:59pm (America/New_York)
+ +50% weekly limits promo through Aug 19 · clau.de/cc-50-promo
+
+ What's contributing to your limits usage?
+ Approximate, based on local sessions on this machine — does not include other devices or claude.ai                             
+ Last 24h · these are independent characteristics of your usage, not a breakdown
+                                                                                                                                  94% of your usage was at >150k context
+  Longer sessions are more expensive even when cached. /compact mid-task, /clear when switching to new tasks.
+
+ 72% of your usage came from sessions active for 8+ hours
+  These are often background/loop sessions. Continuous usage can add up quickly so make sure it is intentional.
+
+   Skills, subagents, plugins, and MCP servers
+   No attribution data yet · accumulates as you use Claude
+
+   d to day · w to week
+
+   Usage credits
+ ████████████████████████████████████▎              72% used                                                                      $18.17 / $25.00 spent · Resets Sep 1 (America/New_York)
