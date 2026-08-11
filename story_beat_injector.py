@@ -238,7 +238,13 @@ def assign_beats_to_stops(
     """Distribute story beats across stops.
 
     Each stop gets at least one beat (if possible). Beats are assigned
-    based on relevance to the stop's matched work, then round-robin.
+    based on relevance to the stop's matched work, then round-robin
+    distributes remaining beats so EVERY stop receives at least one.
+
+    [LOCAL-388] Fixed: previously all beats clustered on stop 0 because
+    the relevance pass was too greedy. Now: at most 2 beats per stop in
+    the relevance pass, then round-robin fills all bare stops, then any
+    remaining beats are spread evenly.
 
     Args:
         beats: All extracted beats
@@ -259,48 +265,74 @@ def assign_beats_to_stops(
     context_beats = [b for b in beats if b['role'] in ('circumstance', 'stakes')]
 
     # First pass: assign beats that match a specific stop's work
+    # [LOCAL-388] Cap at 1 relevance-matched beat per stop to prevent clustering
     assigned = [[] for _ in range(n_stops)]
     used_beat_indices = set()
 
     if matched_works:
         for i, work in enumerate(matched_works):
+            if i >= n_stops:
+                break
             if not work:
                 continue
-            work_publisher = (work.get('publisher') or '').lower()
-            work_collaborator = (work.get('collaborator') or '').lower()
-            work_artist = (work.get('artist') or '').lower()
+            work_publisher = (work.get('publisher') or '').lower().strip()
+            work_collaborator = (work.get('collaborator') or '').lower().strip()
+            work_artist = (work.get('artist') or '').lower().strip()
 
             for j, beat in enumerate(person_beats):
                 if j in used_beat_indices:
                     continue
+                # [LOCAL-388] Stop after 1 relevance match per stop
+                if len(assigned[i]) >= 1:
+                    break
                 person_lower = beat['person'].lower()
                 # Match if person appears in work's publisher/collaborator/artist
+                # [LOCAL-388] Guard against empty-string substring match
                 if (person_lower and (
-                    person_lower in work_publisher or
-                    person_lower in work_collaborator or
-                    person_lower in work_artist or
-                    work_publisher in person_lower or
-                    work_collaborator in person_lower
+                    (work_publisher and person_lower in work_publisher) or
+                    (work_collaborator and person_lower in work_collaborator) or
+                    (work_artist and person_lower in work_artist) or
+                    (work_publisher and work_publisher in person_lower) or
+                    (work_collaborator and work_collaborator in person_lower)
                 )):
                     assigned[i].append(beat)
                     used_beat_indices.add(j)
 
-    # Second pass: round-robin remaining person beats to stops lacking them
+    # Second pass: round-robin ALL remaining person beats across ALL stops
+    # [LOCAL-388] Fixed: distribute evenly so every stop gets at least one beat
     remaining_person = [b for j, b in enumerate(person_beats) if j not in used_beat_indices]
-    remaining_idx = 0
-    for i in range(n_stops):
-        if not assigned[i] and remaining_person:
-            assigned[i].append(remaining_person[remaining_idx % len(remaining_person)])
-            remaining_idx += 1
+    if remaining_person:
+        # First fill stops that have nothing yet
+        bare_stops = [i for i in range(n_stops) if not assigned[i]]
+        rr_idx = 0
+        for i in bare_stops:
+            if rr_idx >= len(remaining_person):
+                break
+            assigned[i].append(remaining_person[rr_idx])
+            rr_idx += 1
+        # Then distribute any leftovers to stops with fewest beats
+        while rr_idx < len(remaining_person):
+            # Find the stop with the fewest person beats
+            min_count = min(
+                sum(1 for b in assigned[i] if b['role'] not in ('circumstance', 'stakes'))
+                for i in range(n_stops)
+            )
+            candidates = [
+                i for i in range(n_stops)
+                if sum(1 for b in assigned[i] if b['role'] not in ('circumstance', 'stakes')) == min_count
+            ]
+            target = candidates[rr_idx % len(candidates)]
+            assigned[target].append(remaining_person[rr_idx])
+            rr_idx += 1
 
     # Third pass: ensure all stops have at least one beat
-    # Use context beats (rarity, stakes) as fallback for bare stops
+    # Use context beats (rarity, stakes) as fallback for bare stops, then reuse person beats
     for i in range(n_stops):
         if not assigned[i]:
             if context_beats:
                 assigned[i].append(context_beats[i % len(context_beats)])
             elif person_beats:
-                # Last resort: reuse a person beat
+                # Last resort: reuse a person beat (round-robin from all)
                 assigned[i].append(person_beats[i % len(person_beats)])
 
     # Add context beats to first and last stops (they serve as framing)
@@ -337,6 +369,8 @@ def build_story_beat_prompt_block(
 STORY BEAT REQUIREMENT (LOCAL-383):
 Your description MUST contain at least one sentence that NAMES A PERSON and
 states WHAT THEY DID — a specific action or circumstance, not a general claim.
+This SUPPLEMENTS (does not replace) any exhibition framing or thesis instructions above.
+The artists and collaborators named in EXHIBITION FRAMING must still appear.
 """)
 
     if person_beats:
@@ -369,6 +403,18 @@ states WHAT THEY DID — a specific action or circumstance, not a general claim.
             "something specific about this work or its history. No invented institutional narrative."
         )
 
+    # [LOCAL-388] Explicit name-the-person rule: never leave a role as a placeholder
+    if person_beats:
+        _role_names = []
+        for beat in person_beats[:3]:
+            _role_names.append(f"'{beat['role'].replace('_', ' ')}' → use '{beat['person']}'")
+        parts.append(
+            "NEVER-PLACEHOLDER RULE (LOCAL-388): Do NOT write 'with publisher', "
+            "'with printer', 'with donor', or 'the patron'. Where a role is mentioned, "
+            "NAME THE PERSON. Specifically:\n  " + "\n  ".join(_role_names)
+        )
+        parts.append("")
+
     parts.append("""
 WHAT IS NOT A STORY: "This masterpiece challenges boundaries" is not a story.
 "Published by Louis Broder in Paris" IS a story — it names who and what they did.
@@ -376,3 +422,49 @@ A story has: a person, a specific circumstance, a consequence.
 """)
 
     return '\n'.join(parts)
+
+
+def verify_beats_in_output(
+    stop_beats: List[Dict[str, str]],
+    output_text: str,
+    stop_name: str,
+) -> Dict[str, object]:
+    """[LOCAL-388] Verify which assigned beats actually appear in the output prose.
+
+    Returns dict with:
+      - beats_assigned: int
+      - beats_in_output: int
+      - dropped: list of person names that were assigned but not found
+      - found: list of person names that were found in output
+
+    Matching is case-insensitive surname match.
+    """
+    if not stop_beats or not output_text:
+        return {
+            'beats_assigned': len(stop_beats) if stop_beats else 0,
+            'beats_in_output': 0,
+            'dropped': [b['person'] for b in (stop_beats or []) if b['role'] not in ('circumstance', 'stakes')],
+            'found': [],
+        }
+
+    output_lower = output_text.lower()
+    person_beats = [b for b in stop_beats if b['role'] not in ('circumstance', 'stakes')]
+    found = []
+    dropped = []
+
+    for beat in person_beats:
+        person = beat['person']
+        # Check surname (last word) — case-insensitive
+        surname = person.split()[-1].lower()
+        # Also check full name
+        if surname in output_lower or person.lower() in output_lower:
+            found.append(person)
+        else:
+            dropped.append(person)
+
+    return {
+        'beats_assigned': len(person_beats),
+        'beats_in_output': len(found),
+        'dropped': dropped,
+        'found': found,
+    }
