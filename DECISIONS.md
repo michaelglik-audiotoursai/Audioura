@@ -12241,3 +12241,41 @@ weak coupling is a known debt, not a claim of rigour.
 Live: no drops, zero-check ALL CLEAR, framing intact, words 316/141/202, stops
 3/3. Control (D302): Palais 4/4, `framing=venue_purpose`, dates 1780/1884/1696/
 1581 all surviving, bounds 81.2/75.0.
+
+## D314 — LOCAL-390 merged: the measurement is honest, and it named the cause
+**2026-08-10.** Merged (brings 383 and 388). D312's demand was that the metric read
+the delivered artifact; it now does, and the first thing it produced was the
+answer to the question LEAD had refused to guess:
+
+```
+dropped=['Louis Broder','Torf'] causes=[Louis Broder=never_written, Torf=never_written]
+```
+
+**No gate was stripping them. The model never wrote them.** The competing
+hypothesis — that the person gate could not see the credit line — is also closed,
+because the gate now logs `person 'Mourlot Frères' pre-grounded (story beat
+source) — keeping`. Both candidate causes were resolved by instrumenting the
+transfer rather than by argument.
+
+**A measurement that reads the right artifact pays for itself immediately.** Four
+rounds tonight (D298, D304, D309, D312) failed because something was verified one
+step short of the delivered text. The first round that measured the delivered text
+diagnosed a root cause in a single run.
+
+**Merged as a strict improvement, with the residual named:**
+- `Miró` **restored** to stop 1 — the regression that bounced 388
+- `Mourlot Frères` delivered (2 mentions); all attributions present (Miró 3,
+  Dalí 5, Freud 3, Gris 1, Reverdy 2)
+- framing strengthened: `livre d'artiste` 2, `collabor` 8, `typography` 3,
+  `book` 5; zero-check ALL CLEAR; words 295/172/321; stops 3/3
+- Control: Palais 4/4, `framing=venue_purpose`, all four dates surviving, clean
+
+**Not met, and dispatched as LOCAL-391:** `Broder` and `Fridman` are still
+`never_written`, and `with publisher` reappeared once.
+
+**The interesting part is that D303 now points both ways.** Telling the model *not*
+to do something lost five rounds and was solved by enforcing after generation.
+Telling it *to include* something cannot be solved that way — enforcement cannot
+insert content. So the remedy differs by direction: prohibitions become gates;
+requirements become explicit required-content lists plus a single regeneration
+retry, with `beat_unrecoverable` logged rather than a fabricated substitute.
