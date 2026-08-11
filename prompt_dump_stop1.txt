@@ -1,6 +1,6 @@
 ================================================================================
 LITERAL PROMPT SENT TO LLM — STOP 1
-Generated: 2026-08-11T18:29:42.334803
+Generated: 2026-08-11T19:14:13.315887
 Model: gpt-3.5-turbo
 Temperature: 0.7
 Max tokens: 1000
@@ -13,15 +13,14 @@ You are a knowledgeable museum guide with expertise in art, architecture, and hi
 STYLE: Channel the passion of a curator who fell in love with this piece — make the listener see what the artist felt.
 
 ━━━ NAMES THAT MUST APPEAR (your text is rejected without these) ━━━
-  • Broder (Louis Broder, publisher)
-  • Frères (Mourlot Frères, printer)
   • Fridman (Boris Fridman, donor)
+  • Broder (Louis Broder, publisher)
 ━━━ END REQUIRED NAMES ━━━
 
 ━━━ CONCRETE FACTS TO USE (prefer these over general claims) ━━━
   • material: publisher’s vellum
-  • plate count: 15 lithographs
   • plate count: 40 color lithographs
+  • publisher/printer: Louis Broder
 ━━━ END CONCRETE FACTS ━━━
 
 
@@ -96,15 +95,15 @@ This tone should permeate the entire description — not as a single inserted se
 DO NOT USE these phrases: the building was erected, historically important, the population of, vibrant\s+colou?rs?\s*(and|of|that), dreamlike\s+(imagery|quality|world|scene|composition), deep\s+connection\s+to, (his|her|their)\s+Jewish\s+heritage, intricate\s+details?, timeless\s+themes?, position\s+yourself\s+in\s+the\s+center, the\s+artist['']?s?\s+(unique|remarkable|extraordinary), masterpiece\s+that, a\s+testament\s+to, creative\s+genius, stir(s|ring)?\s+the\s+soul
 
 NARRATIVE SPINE CONTEXT (use to shape your description):
-- Emotional beat for this stop: curiosity
-- Unique angle to emphasize: This piece challenges the viewer's perception of nature by infusing fantasy with reality, as a lizard is adorned with impossible golden feathers, representing the artist's exploration of metamorphosis and illusion.
-- End with a forward-looking hook: How does this transformation theme evolve when applied to more abstract concepts like belief and identity?
+- Emotional beat for this stop: wonder
+- Unique angle to emphasize: Explore how the fusion of mythology and nature is captured in the intricate design of this Art Nouveau masterpiece by René Lalique, revealing a fascination with transformation and fantasy.
+- End with a forward-looking hook: What ancient stories might this lizard share with the prophets of old?
 
 VERIFIED FACTS (incorporate these for accuracy — these are confirmed for this specific POI):
-The Museum of Fine Arts was founded in 1870 in Copley Square.
+The Museum of Fine Arts was founded in 1870.; The museum was initially located on the top floor of the Boston Athenæum.
 
 MANDATORY INCLUSION — work this surprising detail into the description naturally:
-The initial location of the Museum of Fine Arts was on the top floor of the Boston Athenæum.
+The initial collection of the Museum of Fine Arts came from the Athenæum's Art Gallery.
 
 PROVENANCE (museum-published credit line — you MUST name the donor):
   Gift of Boris Fridman
@@ -163,25 +162,25 @@ are IN ADDITION TO the artist — never instead of. If WORK IDENTITY says
 "Artist: Joan Miró", your text must contain "Miró".
 
 ━━━ REQUIRED CONTENT — EACH SURNAME BELOW MUST APPEAR IN YOUR TEXT ━━━
+  ✓ "Fridman" — Boris Fridman (donor): gave this work as a gift to the museum
   ✓ "Broder" — Louis Broder (publisher): published this work
   ✓ "Frères" — Mourlot Frères (printer): printed this work
-  ✓ "Fridman" — Boris Fridman (donor): gave this work as a gift to the museum
 Write at least one sentence per person above that names them by surname.
 If you omit any of these surnames, your response will be REJECTED and regenerated.
 ━━━ END REQUIRED CONTENT ━━━
 
 GROUNDED PEOPLE AND ACTIONS (from the exhibition page — use at least one):
+  • Boris Fridman (Donor): gave this work as a gift to the museum
   • Louis Broder (Publisher): published this work
   • Mourlot Frères (Printer): printed this work
-  • Boris Fridman (Donor): gave this work as a gift to the museum
 
 STORY SERVES THE THESIS: The person/action you name should connect to WHY
 this exhibition exists — e.g., a printer matters because the show argues printers
 were essential collaborators, not because printers are inherently interesting.
 NEVER-PLACEHOLDER RULE (LOCAL-388): Do NOT write 'with publisher', 'with printer', 'with donor', or 'the patron'. Where a role is mentioned, NAME THE PERSON. Specifically:
+  'donor' → use 'Boris Fridman'
   'publisher' → use 'Louis Broder'
   'printer' → use 'Mourlot Frères'
-  'donor' → use 'Boris Fridman'
 
 
 WHAT IS NOT A STORY: "This masterpiece challenges boundaries" is not a story.
@@ -189,21 +188,21 @@ WHAT IS NOT A STORY: "This masterpiece challenges boundaries" is not a story.
 A story has: a person, a specific circumstance, a consequence.
 
 REFERENCE MATERIAL (retrieved from published sources — cite nothing these do not support):
-  [1] Joan Miró - Le lézard aux plumes d'or - Choice Contemporary
-      Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...
-  [2] Joan Miró - Le lézard aux plumes d'or
-      Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is one of the artist's most celebrated illustrated portfolios, created in 1971 as a ...
-  [3] Joan Miró - Le lézard aux plumes d'or - Choice Contemporary
-      Joan Miró's Le lézard aux plumes d'or (The Lizard with Golden Feathers) is ... created in 1971 as a vibrant fusion of poetry, printmaking, and sculptural
-  [4] Joan Miró | Le Lézard aux plumes d'or (1971, Lithographs)
-      Le Lézard aux plumes d'or (The Lizard with Golden Feathers) - Illustrated book with 15 lithographs printed in colors, on BFK Rives wove paper - Signed in ...
-  [5] Joan Miró's Broder Collection: How One Artist Revolutionized Lithography
-      In 1956, Broder began a partnership with Joan Miró alongside Atelier Mourlot, a world-famous French lithographic studio. In 1920 when Miro was ...
+  [1] Exhibition Checklist — Le Lézard aux plumes d’or (The Lizard with Golden Feathers)
+      Published by Louis Broder. Gift of Boris Fridman
+  [2] Joan Miró. Cover front from Le Lézard aux plumes d'or ...
+      Joan Miró. Cover front from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty lithographs ...
+  [3] Joan Miró. Plate (folio 20) from Le Lézard aux plumes d'or ...
+      Joan Miró. Plate (folio 20) from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty ...
+  [4] Joan Miró. Le Lézard aux plumes d'or ( The Lizard with ...
+      Joan Miró. Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Illustrated book with forty lithographs (including wrapper front and cover).
+  [5] Joan Miró. Plate (folio 31 verso) from Le Lézard aux plumes d'or ... - MoMA
+      Joan Miró. Plate (folio 31 verso) from Le Lézard aux plumes d'or (The Lizard with Golden Feathers). 1971. Lithograph from an illustrated book with forty ...
 
 ━━━ CANDIDATE SPECIFICS (extracted from the snippets above) ━━━
   • material: publisher’s vellum
-  • plate count: 15 lithographs
   • plate count: 40 color lithographs
+  • publisher/printer: Louis Broder
 ━━━ END CANDIDATE SPECIFICS ━━━
 
 STORY INSTRUCTION (LOCAL-407/412/419):
@@ -230,10 +229,20 @@ Rules:
   - NO HALLUCINATED SENSORY CLAIMS: never assert a sensation the listener cannot verify
     (smell, sound, temperature, texture) unless the material states it.
 
-STORY REQUIREMENT (LOCAL-421 — NON-NEGOTIABLE):
+STORY REQUIREMENT (LOCAL-421/423 — NON-NEGOTIABLE):
 Your description MUST contain at least ONE STORY of no fewer than THREE SENTENCES.
 A story = a claim about PEOPLE AND CONSEQUENCES: a relationship, a decision, a dispute,
 a gift, a reason something was made the way it was.
+
+VERIFICATION CONSTRAINT (LOCAL-423 — HARD GATE):
+Every factual claim in your story (dates, numbers, locations, attributions) will be
+verified against the reference material above. If a claim cannot be found in the
+snippets, it will be STRIPPED from the delivered text. DO NOT invent details that
+the snippets do not support — even if you believe them to be true. If the snippets
+say "a Russian collector", do NOT say "a Boston-based collector". If the snippets
+do not state a donation year, do NOT assert one. Write ONLY what the sources confirm.
+Self-contradictions (e.g. "15 lithographs" in one sentence and "40 lithographs" in
+another) cause AUTOMATIC REJECTION — pick one number and cite which snippet supports it.
 
 WHAT COUNTS AS A STORY:
   - "Boris Fridman donated this work to the MFA in 2003. Fridman, a Boston-based collector
@@ -290,7 +299,30 @@ much material you actually have to work with.
 
 Do NOT repeat the artist's biographical background (birth year, nationality, school associations like 'École de Paris', artistic formats like 'stained glass and stage sets'). That information belongs in the tour introduction only. Here, focus EXCLUSIVELY on THIS SPECIFIC ARTWORK — what it depicts, its technique, its story, what to look for with your eyes.
 
-STYLE CONSTRAINT: No unearned praise. Every evaluative word (remarkable, stunning, captivating, breathtaking, exquisite, mesmerizing, vibrant) requires the specific evidence that earns it in the same or preceding sentence. If you cannot supply the evidence, delete the adjective. Prefer concrete nouns over decorated ones.
+BANNED PHRASES — do NOT use any of these in your description:
+- "vibrant colors" / "dreamlike imagery" / "dreamlike quality"
+- "creative genius" / "artistic prowess" / "masterpiece that"
+- "stir the soul" / "touch the heart" / "pulsate with life"
+- "symphony of emotions" / "tapestry of dreams" / "weaves a narrative"
+- "truly remarkable" / "a testament to" / "stands as a testament"
+- "captivating artistry" / "mesmerizing world" / "intricate details"
+- "invites you to explore/discover/reflect" / "immerse yourself in"
+- "invites contemplation" / "invites the viewer" / "invites us to"
+- "can't help but" / "feast for the eyes" / "step into a world"
+- "created by God" / "fall into sin" / "disobedience" / "the fall of humanity"
+Instead, use SPECIFIC, CONCRETE language: name colors precisely (cerulean, ochre, vermilion), describe actual compositional choices, mention documented historical context.
+
+UNEARNED ADJECTIVES — these words are BANNED unless the same sentence or the one before it
+contains the specific evidence that earns them:
+- "vibrant" — ONLY permitted if you name the specific colors/contrasts that make it vibrant
+- "stunning" — ONLY if you describe what causes the visual impact (scale? technique? contrast?)
+- "remarkable" — ONLY if you state what distinguishes it from comparable works
+- "mesmerizing" — ONLY if you explain the optical or compositional mechanism
+- "exquisite" — ONLY if you describe the craftsmanship detail (grain, jointwork, brushstroke)
+- "breathtaking" — ONLY if you name the physical feature that produces the effect
+- "captivating" — ONLY if you explain what holds attention and why
+If you cannot provide that evidence in the same breath, delete the adjective. A bare noun
+is better than a noun preceded by an unearned superlative.
 
 FACTUAL INTEGRITY RULE: Do NOT invent visual specifics or biographical claims not in the fact sheet above. You may describe the general biblical SUBJECT (e.g. "depicts the parting of the Red Sea") but do NOT assert specific visual details as facts (colors, composition) unless grounded in the facts above. Never call a work "the artist's final masterpiece" or similar unverifiable superlatives.
 
@@ -342,9 +374,9 @@ that follows this shape:
     in the same workshop — Mourlot's atelier on Rue de Chabrol in Paris."
 
   SENTENCE 3: Connect to a SECOND named person or to the wider story.
-    Example: "Boris Fridman, a Boston collector who specialized in livres d'artiste,
-    later donated this work to the MFA, bringing the museum's holdings of
-    collaborative printed works to critical mass."
+    Example: "Boris Fridman, a Russian collector who assembled livres d'artiste,
+    donated this work to the MFA, adding to the museum's holdings of
+    collaborative printed works."
 
 WHAT TO AVOID:
   - "X's collaboration... showcasing a unique fusion" (evaluation, not story)
@@ -357,13 +389,13 @@ Write the story FIRST, then add physical description if space allows.
 
 
 ================================================================================
-Total user message length: 23313 chars
+Total user message length: 25367 chars
 
 --- CANDIDATE SPECIFICS STATUS ---
 candidate_specifics found: 3
   • material: publisher’s vellum
-  • plate count: 15 lithographs
   • plate count: 40 color lithographs
+  • publisher/printer: Louis Broder
 
 --- SNIPPET INJECTION STATUS ---
 _local402_snippets_injected: True
