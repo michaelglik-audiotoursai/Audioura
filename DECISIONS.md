@@ -13634,3 +13634,40 @@ cheap to detect.
 validate, and merging would put a tour with two broken stops into `storied` while
 the field-test gate is the thing everything is building toward. The tier-carry fix,
 the P856 cache and the test suite are all explicitly preserved in 415's brief.
+
+## D351 — Two corrections from Michael's status review: a question that was never his, and stop count drifting between rounds
+**2026-08-11, 14:1x.** Both surfaced when Michael asked for status rather than from
+any test.
+
+**1. `empty_sentence_count` was reported to him as a pending decision three times
+today. It is not his decision and has not been since D324.** D295 left the threshold
+to him *conditional on* LEAD first exempting a class it had labelled false positives
+— evaluative visual description that trips the heuristic. D324 is Michael's ruling
+that this class is bad content, so the "false positives" are real hits and the
+exemption would have protected the prose he objects to. The remaining work is
+re-reading the population under his standard; only then is a threshold a real
+choice. Parked as `PARKED_kiro_task_LOCAL-416.md`, to be dispatched when 415 merges
+(both edit `generate_tour_text.py`).
+
+**The failure worth naming is not the analysis, it is the carrying.** LEAD kept a
+resolved item on a "standing items for Michael" list and repeated it at three
+consecutive status points without re-reading the decision behind it. A standing item
+should be re-derived from `DECISIONS.md` before it is reported, not copied forward
+from the last summary. Copying forward is how a stale question survives long enough
+to look like a real one.
+
+**2. Stop count has been drifting between rounds and LEAD used the runs to compare
+quality anyway.** 412's live run was 3 stops; 413's runner hardcodes
+`total_stops=4`; 414's was 4. Each task writes its own runner script, so nothing
+held it constant. Michael noticed and was untroubled — but the comparisons LEAD drew
+across those rounds ("stop 3 is worse than last round") were not like-for-like.
+
+**Rule: every acceptance run in this chain uses N=4 on the MFA venue** until the
+chain closes, and the task brief states it. The separate N=8 Asian Arts run exists
+to measure Michael's 75 gate and is not a substitute for a fixed comparison case.
+
+**And the gate number is stale.** The scores in `restart.sh`'s briefing (81.2 museum
+4-stop, 75.0 museum 8-stop) come from older fixture files, not from the current
+pipeline. Nothing in the 410–415 chain has been measured at N=8 on Asian Arts, which
+is the only number Michael's field-test gate actually keys on. A clean N=8 run
+belongs immediately after 415 merges, before any claim that the gate is closer.
