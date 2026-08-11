@@ -807,3 +807,544 @@ def apply_form_claim_gate(
             stats['stops_affected'] += 1
 
     return stats
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# [LOCAL-386/389] NUMERIC-CLAIM GATE
+# ═══════════════════════════════════════════════════════════════════════════════
+# An ungrounded statistic ("over 1.2 million visitors annually") passed both
+# the person gate and the form-claim gate because neither inspects numeric claims.
+# A statistic is a claim just like a person name. This gate:
+#
+#   1. Scans all GATED_PROSE_FIELDS for quantitative claims:
+#      - Visitor/attendance counts ("1.2 million visitors")
+#      - Superlatives ("the oldest", "the largest", "the first")
+#      - "over N", "more than N", "nearly N", "approximately N"
+#      - Percentages ("45%", "nearly half")
+#      - Dimensions/measurements with units ("30 feet high")
+#      - Large round numbers that imply statistics
+#
+#   2. Exempts numbers grounded by the work identity block (credit line, date,
+#      medium — e.g. "1971", "40 color lithographs"). These are grounded by
+#      construction and must NOT be stripped.
+#
+#   3. For non-exempt claims, checks if the number appears in the exhibition
+#      page_text (the grounding corpus), format-tolerantly:
+#      "1.2 million" ≈ "1,200,000" ≈ "1200000"
+#
+#   4. Ungrounded claims → drop the sentence, reuse _split_sentences / _is_fragment.
+#
+# [LOCAL-389] Precision fix: a claim MUST be a recognisable quantity — a numeral,
+# a spelled number, or a superlative anchored to what it quantifies. If the
+# extractor cannot identify what is being quantified, it does NOT fire.
+# Specifically:
+#   - The dimension regex requires at least one digit (\d[\d,]* not [\d,]+)
+#   - Bare "in" removed from unit list (too many false positives with English
+#     preposition); only "inches"/"inch"/"in." accepted
+#   - Post-extraction validation: non-superlative claims must contain ≥1 digit
+#   - Enhanced logging: matched text + surrounding clause for auditability
+#
+# Scope: same as the other gates — exhibition-scoped museum tours only.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+# Patterns that signal a quantitative claim requiring grounding.
+# We detect the claim at sentence level, not word level.
+
+# "over/more than/nearly/approximately/almost/about + number"
+_NUMERIC_QUALIFIER_RE = re.compile(
+    r'\b(?:over|more\s+than|nearly|approximately|almost|about|around|close\s+to|'
+    r'up\s+to|at\s+least|fewer\s+than|less\s+than)\s+'
+    r'(\d[\d,]*(?:\.\d+)?(?:\s*(?:million|billion|thousand|hundred))?)',
+    re.IGNORECASE
+)
+
+# Large numbers with magnitude words: "1.2 million", "500 thousand", "3 billion"
+_MAGNITUDE_NUMBER_RE = re.compile(
+    r'\b(\d[\d,]*(?:\.\d+)?)\s+(million|billion|thousand|hundred)\b',
+    re.IGNORECASE
+)
+
+# Visitor/attendance explicit patterns: "N visitors", "N people", "attracts N"
+_VISITOR_PATTERN_RE = re.compile(
+    r'\b(\d[\d,]*(?:\.\d+)?(?:\s*(?:million|billion|thousand))?)\s+'
+    r'(?:visitors?|people|guests?|patrons?|attendees?|tourists?)\b'
+    r'|\battracts?\s+(\d[\d,]*(?:\.\d+)?(?:\s*(?:million|billion|thousand))?)\b'
+    r'|\b(?:visited\s+by|welcomes?|draws?|receives?)\s+'
+    r'(\d[\d,]*(?:\.\d+)?(?:\s*(?:million|billion|thousand))?)\b',
+    re.IGNORECASE
+)
+
+# Superlative claims: "the oldest", "the largest", "the first", "the most"
+_SUPERLATIVE_RE = re.compile(
+    r'\bthe\s+(?:oldest|youngest|largest|smallest|biggest|tallest|shortest|longest|'
+    r'first|second|third|most\s+\w+|least\s+\w+|busiest|wealthiest|richest|'
+    r'greatest|finest|rarest|earliest|newest|highest|lowest)\b',
+    re.IGNORECASE
+)
+
+# Percentages: "45%", "nearly 50 percent"
+_PERCENTAGE_RE = re.compile(
+    r'\b\d+(?:\.\d+)?\s*(?:%|percent)\b',
+    re.IGNORECASE
+)
+
+# [LOCAL-389] Dimensions with units — requires at least one digit before unit.
+# "in" removed as bare unit (English preposition false-positive); only "inches"/"inch"/"in." accepted.
+_DIMENSION_RE = re.compile(
+    r'\b(\d[\d,]*(?:\.\d+)?)\s+'
+    r'(?:feet|foot|ft|meters?|metres?|inches?|inch|in\.|centimeters?|cm|'
+    r'miles?|mi|kilometers?|km|acres?|hectares?|'
+    r'square\s+(?:feet|meters?|metres?|miles?|km)|'
+    r'stories|floors?|pounds?|lbs?|kg|tons?|tonnes?)\b',
+    re.IGNORECASE
+)
+
+# "annually", "per year", "each year", "a year" following a number
+_ANNUAL_STAT_RE = re.compile(
+    r'\b(\d[\d,]*(?:\.\d+)?(?:\s*(?:million|billion|thousand))?)\s*'
+    r'(?:\w+\s+)?(?:annually|per\s+year|each\s+year|a\s+year|every\s+year)\b',
+    re.IGNORECASE
+)
+
+
+def _is_recognisable_quantity(claim: Dict) -> bool:
+    """[LOCAL-389] Validate that a claim represents a recognisable quantity.
+
+    A recognisable quantity is:
+      - A superlative ("the oldest", "the largest") — always valid
+      - Any text containing at least one ASCII digit (0-9)
+
+    This rejects garbage matches like ', in' where the regex matched punctuation
+    or whitespace but no actual number. Silence is correct when the parse fails.
+    """
+    if claim.get('type') == 'superlative':
+        return True
+    # Non-superlative claims MUST contain at least one digit
+    text = claim.get('text', '')
+    return any(c.isdigit() for c in text)
+
+
+def _extract_numeric_claims(sentence: str) -> List[Dict]:
+    """Extract quantitative claims from a sentence.
+
+    Returns a list of dicts: [{'type': <claim_type>, 'text': <matched_text>,
+    'number_raw': <the raw number string>, 'context': <surrounding clause>}]
+
+    A sentence can have multiple claims. Each claim needs independent grounding.
+
+    [LOCAL-389] Post-extraction validation: rejects any match that is not a
+    recognisable quantity (no digit and not a superlative).
+    """
+    claims = []
+    seen_spans = set()
+
+    def _add_claim(match, claim_type):
+        span = (match.start(), match.end())
+        if span not in seen_spans:
+            seen_spans.add(span)
+            candidate = {
+                'type': claim_type,
+                'text': match.group(0).strip(),
+                'number_raw': match.group(1) if match.lastindex and match.group(1) else match.group(0).strip(),
+                'context': _extract_context(sentence, match.start(), match.end()),
+            }
+            # [LOCAL-389] Reject non-quantities
+            if _is_recognisable_quantity(candidate):
+                claims.append(candidate)
+
+    # Qualified numbers: "over 1.2 million"
+    for m in _NUMERIC_QUALIFIER_RE.finditer(sentence):
+        _add_claim(m, 'qualified_number')
+
+    # Visitor/attendance patterns
+    for m in _VISITOR_PATTERN_RE.finditer(sentence):
+        span = (m.start(), m.end())
+        if span not in seen_spans:
+            seen_spans.add(span)
+            # Get whichever group matched
+            num = m.group(1) or m.group(2) or m.group(3) or ''
+            candidate = {
+                'type': 'visitor_count',
+                'text': m.group(0).strip(),
+                'number_raw': num,
+                'context': _extract_context(sentence, m.start(), m.end()),
+            }
+            if _is_recognisable_quantity(candidate):
+                claims.append(candidate)
+
+    # Magnitude numbers: "1.2 million"
+    for m in _MAGNITUDE_NUMBER_RE.finditer(sentence):
+        span = (m.start(), m.end())
+        if span not in seen_spans:
+            seen_spans.add(span)
+            candidate = {
+                'type': 'magnitude_number',
+                'text': m.group(0).strip(),
+                'number_raw': m.group(1),
+                'context': _extract_context(sentence, m.start(), m.end()),
+            }
+            if _is_recognisable_quantity(candidate):
+                claims.append(candidate)
+
+    # Superlatives: "the oldest museum"
+    for m in _SUPERLATIVE_RE.finditer(sentence):
+        _add_claim(m, 'superlative')
+
+    # Percentages
+    for m in _PERCENTAGE_RE.finditer(sentence):
+        _add_claim(m, 'percentage')
+
+    # Dimensions with units
+    for m in _DIMENSION_RE.finditer(sentence):
+        _add_claim(m, 'dimension')
+
+    # Annual statistics: "N visitors annually"
+    for m in _ANNUAL_STAT_RE.finditer(sentence):
+        span = (m.start(), m.end())
+        if span not in seen_spans:
+            seen_spans.add(span)
+            candidate = {
+                'type': 'annual_stat',
+                'text': m.group(0).strip(),
+                'number_raw': m.group(1),
+                'context': _extract_context(sentence, m.start(), m.end()),
+            }
+            if _is_recognisable_quantity(candidate):
+                claims.append(candidate)
+
+    return claims
+
+
+def _extract_context(sentence: str, start: int, end: int, window: int = 40) -> str:
+    """[LOCAL-389] Extract the matched text with its surrounding clause.
+
+    Returns up to `window` chars before and after the match, with the match
+    itself bracketed for visibility in logs.
+    """
+    ctx_start = max(0, start - window)
+    ctx_end = min(len(sentence), end + window)
+    before = sentence[ctx_start:start]
+    matched = sentence[start:end]
+    after = sentence[end:ctx_end]
+    # Trim to word boundaries for readability
+    if ctx_start > 0:
+        before = '…' + before.lstrip()
+    if ctx_end < len(sentence):
+        after = after.rstrip() + '…'
+    return f"{before}[{matched}]{after}"
+
+
+def _normalize_number_for_comparison(raw: str) -> List[str]:
+    """Generate format variants of a number for grounding checks.
+
+    "1.2 million" → ["1200000", "1,200,000", "1.2 million"]
+    "500" → ["500"]
+    Returns a list of string variants that should be searched in the page text.
+    Only produces variants that are >= 3 characters to avoid false substring matches.
+    """
+    variants = set()
+    cleaned = raw.strip()
+    variants.add(cleaned.lower())
+
+    # Parse the numeric value
+    magnitude_match = re.match(
+        r'^(\d[\d,]*(?:\.\d+)?)\s*(million|billion|thousand|hundred)?$',
+        cleaned, re.IGNORECASE
+    )
+    if magnitude_match:
+        num_str = magnitude_match.group(1).replace(',', '')
+        magnitude = (magnitude_match.group(2) or '').lower()
+
+        try:
+            num_val = float(num_str)
+        except ValueError:
+            return list(variants)
+
+        multipliers = {
+            'million': 1_000_000,
+            'billion': 1_000_000_000,
+            'thousand': 1_000,
+            'hundred': 100,
+            '': 1,
+        }
+        multiplier = multipliers.get(magnitude, 1)
+        full_val = num_val * multiplier
+
+        # Integer form (only if the expanded value is meaningful)
+        if full_val == int(full_val):
+            int_val = int(full_val)
+            int_str = str(int_val)
+            if len(int_str) >= 3:  # Avoid tiny numbers as substrings
+                variants.add(int_str)
+                # With commas: 1,200,000
+                variants.add(f'{int_val:,}')
+
+        # With magnitude words (always useful — multi-word, low false-positive)
+        if full_val >= 1_000_000_000:
+            b_val = full_val / 1_000_000_000
+            if b_val == int(b_val):
+                variants.add(f'{int(b_val)} billion')
+            else:
+                variants.add(f'{b_val:.1f} billion')
+                variants.add(f'{b_val:.2f} billion')
+        if full_val >= 1_000_000:
+            m_val = full_val / 1_000_000
+            if m_val == int(m_val):
+                variants.add(f'{int(m_val)} million')
+            else:
+                variants.add(f'{m_val:.1f} million')
+                variants.add(f'{m_val:.2f} million')
+        if full_val >= 1_000:
+            k_val = full_val / 1_000
+            if k_val == int(k_val):
+                variants.add(f'{int(k_val)} thousand')
+                variants.add(f'{int(k_val)},000')
+
+        # Also add the bare numeric string without commas (if 3+ chars)
+        if len(num_str) >= 3:
+            variants.add(num_str)
+
+    # Filter out variants that are too short (< 3 chars) to be safe for substring search
+    return [v for v in variants if len(v) >= 3]
+
+
+def _number_grounded_in_text(claim: Dict, text: str) -> bool:
+    """Check if a numeric claim can be found in the grounding text.
+
+    Uses format-tolerant matching: "1.2 million" matches "1,200,000" etc.
+    For superlatives, checks if the superlative phrase appears in the text.
+    Uses word-boundary matching for short variants to avoid false substring hits.
+    """
+    if not text:
+        return False
+
+    text_lower = text.lower()
+
+    # Superlatives: check if the exact phrase appears in page text
+    if claim['type'] == 'superlative':
+        claim_text_lower = claim['text'].lower()
+        return claim_text_lower in text_lower
+
+    # For numeric claims: try all format variants
+    number_raw = claim.get('number_raw', '')
+    if number_raw:
+        variants = _normalize_number_for_comparison(number_raw)
+        for variant in variants:
+            v_lower = variant.lower()
+            # Word-boundary match for short variants
+            if len(v_lower) <= 4:
+                pattern = r'\b' + re.escape(v_lower) + r'\b'
+                if re.search(pattern, text_lower):
+                    return True
+            else:
+                if v_lower in text_lower:
+                    return True
+
+    # Also try the full claim text as a literal
+    claim_text_lower = claim['text'].lower()
+    if len(claim_text_lower) <= 4:
+        pattern = r'\b' + re.escape(claim_text_lower) + r'\b'
+        if re.search(pattern, text_lower):
+            return True
+    else:
+        if claim_text_lower in text_lower:
+            return True
+
+    return False
+
+
+def _claim_grounded_in_identity_block(claim: Dict, matched_work: Optional[Dict]) -> bool:
+    """Check if a numeric claim came from the work identity block (grounded by construction).
+
+    Numbers that appear in the credit line, date field, or medium field of the
+    matched work are grounded — they were injected by rounds 376–385 and must
+    NOT be stripped.
+
+    Examples:
+      - "1971" in date field → grounded
+      - "40 color lithographs" in medium → "40" is grounded
+      - "1581" in title from stop_titles → grounded (Palais Lascaris dates)
+    """
+    if not matched_work:
+        return False
+
+    # Gather all identity block text for grounding
+    identity_texts = []
+    for key in ('date', 'medium', 'credit_line', 'title', 'artist', 'publisher', 'collaborator'):
+        val = (matched_work.get(key) or '').strip()
+        if val:
+            identity_texts.append(val)
+
+    if not identity_texts:
+        return False
+
+    identity_blob = ' '.join(identity_texts).lower()
+
+    # For superlatives, check literal presence in identity block
+    if claim['type'] == 'superlative':
+        return claim['text'].lower() in identity_blob
+
+    # For numeric claims: check the number_raw and variants
+    number_raw = claim.get('number_raw', '')
+    if number_raw:
+        variants = _normalize_number_for_comparison(number_raw)
+        for variant in variants:
+            v_lower = variant.lower()
+            # Use word-boundary match for short variants to avoid false positives
+            # (e.g. "1.2" should not match inside "1971")
+            if len(v_lower) <= 4:
+                pattern = r'\b' + re.escape(v_lower) + r'\b'
+                if re.search(pattern, identity_blob):
+                    return True
+            else:
+                if v_lower in identity_blob:
+                    return True
+
+    # Also try the full claim text literally (word-boundary for short)
+    claim_lower = claim['text'].lower()
+    if len(claim_lower) <= 4:
+        pattern = r'\b' + re.escape(claim_lower) + r'\b'
+        if re.search(pattern, identity_blob):
+            return True
+    else:
+        if claim_lower in identity_blob:
+            return True
+
+    return False
+
+
+def apply_numeric_claim_gate(
+    poi_list: List[Dict],
+    exhibition_checklist_result,
+) -> Dict:
+    """[LOCAL-386/389] Apply the numeric-claim gate to all stop prose fields.
+
+    Scans every field in GATED_PROSE_FIELDS. For each sentence, extracts
+    quantitative claims (visitor counts, superlatives, dimensions, percentages,
+    "over N" patterns). A claim survives only if:
+      1. It appears in the work's identity block (date, medium, credit_line) — grounded
+         by construction from rounds 376–385, OR
+      2. It appears in the exhibition page_text (the grounding corpus), format-tolerantly.
+
+    Otherwise the sentence is dropped and cleaned up (fragment removal).
+
+    [LOCAL-389] Enhanced precision: rejects non-recognisable-quantity matches,
+    logs matched text with surrounding clause.
+
+    Args:
+        poi_list: List of POI dicts (mutated in place).
+        exhibition_checklist_result: ExhibitionChecklistResult with page_text and works.
+
+    Returns:
+        Stats dict with counts.
+    """
+    stats = {
+        'claims_detected': 0,
+        'claims_grounded_identity': 0,
+        'claims_grounded_page': 0,
+        'claims_ungrounded': 0,
+        'sentences_dropped': 0,
+        'stops_affected': 0,
+        'drop_log': [],  # [{stop, field, claim_text, claim_context, sentence}]
+    }
+
+    page_text = getattr(exhibition_checklist_result, 'page_text', '') or ''
+    works = getattr(exhibition_checklist_result, 'works', None) or []
+
+    from generate_tour_text import match_work_for_stop
+
+    for poi in poi_list:
+        poi_name = poi.get('name', '') or ''
+        stop_name = poi_name[:50]
+
+        # Match this stop to its work dict for identity block data
+        matched_work = match_work_for_stop(poi_name, works) if poi_name and works else None
+
+        stop_touched = False
+
+        for field_key in GATED_PROSE_FIELDS:
+            text = poi.get(field_key, '') or ''
+            if not text or text.startswith('['):
+                continue
+
+            sentences = _split_sentences(text)
+            kept = []
+            dropped_this_field = []
+
+            for sentence in sentences:
+                claims = _extract_numeric_claims(sentence)
+                if not claims:
+                    # No quantitative claims — keep
+                    kept.append(sentence)
+                    continue
+
+                # Check each claim: ALL claims in a sentence must be grounded
+                # for the sentence to survive. One ungrounded claim → drop.
+                sentence_grounded = True
+                ungrounded_claim = None
+
+                for claim in claims:
+                    stats['claims_detected'] += 1
+
+                    # Check identity block first (grounded by construction)
+                    if _claim_grounded_in_identity_block(claim, matched_work):
+                        stats['claims_grounded_identity'] += 1
+                        continue
+
+                    # Check page text
+                    if _number_grounded_in_text(claim, page_text):
+                        stats['claims_grounded_page'] += 1
+                        continue
+
+                    # Ungrounded
+                    stats['claims_ungrounded'] += 1
+                    sentence_grounded = False
+                    ungrounded_claim = claim
+                    break  # One ungrounded claim is enough to drop the sentence
+
+                if sentence_grounded:
+                    kept.append(sentence)
+                else:
+                    dropped_this_field.append(sentence)
+                    claim_desc = ungrounded_claim['text'] if ungrounded_claim else '?'
+                    claim_ctx = ungrounded_claim.get('context', '') if ungrounded_claim else ''
+                    print(f"  [LOCAL-389] field={field_key} ungrounded quantity "
+                          f"'{claim_desc}' — dropping sentence")
+                    print(f"  [LOCAL-389] field={field_key} stop='{stop_name}' claim='{claim_desc}' "
+                          f"context='{claim_ctx}'")
+                    print(f"             dropped: \"{sentence[:100]}\"")
+                    stats['drop_log'].append({
+                        'stop': stop_name,
+                        'field': field_key,
+                        'claim_text': claim_desc,
+                        'claim_context': claim_ctx,
+                        'sentence': sentence[:120],
+                    })
+
+            if dropped_this_field:
+                # Fragment cleanup (reusing 378's logic)
+                final_kept = []
+                for sent in kept:
+                    if _is_fragment(sent):
+                        dropped_this_field.append(sent)
+                    else:
+                        final_kept.append(sent)
+
+                stats['sentences_dropped'] += len(dropped_this_field)
+                stop_touched = True
+
+                new_text = ' '.join(final_kept).strip()
+
+                # If orientation is emptied, clear rather than ship broken
+                if field_key == 'orientation' and not new_text:
+                    poi[field_key] = ''
+                    print(f"  [LOCAL-389] field=orientation stop='{stop_name[:30]}' "
+                          f"emptied after numeric-claim removal — omitting orientation")
+                else:
+                    poi[field_key] = new_text
+
+        if stop_touched:
+            stats['stops_affected'] += 1
+
+    return stats

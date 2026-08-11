@@ -10393,6 +10393,51 @@ REWRITE RULES (all mandatory):
             print(f"\n  [LOCAL-385] Form-claim gate SKIPPED "
                   f"(no exhibition scope — unscoped museum tours are not gated)")
 
+    # -------- [LOCAL-386/389] PHASE 5.160: Numeric-claim gate --------
+    # An ungrounded statistic ("over 1.2 million visitors annually") passed both
+    # the person gate and the form-claim gate because neither inspects numeric claims.
+    # This gate scans all GATED_PROSE_FIELDS for quantitative claims (statistics,
+    # superlatives, dimensions, percentages) and drops sentences whose numbers are
+    # not in the exhibition page_text OR the work identity block (credit line, date,
+    # medium). Same scope as the other gates: exhibition-scoped museum tours only.
+    # [LOCAL-389] Precision: rejects garbage matches (', in' etc.) — a claim must
+    # be a recognisable quantity with at least one digit (or a superlative).
+    if (tour_category == 'museum' and _exhibition_checklist_result
+            and getattr(_exhibition_checklist_result, 'page_text', '')
+            and not os.environ.get('DISABLE_NUMERIC_CLAIM_GATE')):
+        print(f"\n  [LOCAL-389] PHASE 5.160: Numeric-claim gate (scans all prose fields)...")
+        try:
+            from prose_entity_grounding_gate import apply_numeric_claim_gate
+            _ncg_stats = apply_numeric_claim_gate(
+                poi_list,
+                _exhibition_checklist_result,
+            )
+            print(f"  [LOCAL-389] Numeric-claim gate summary:")
+            print(f"    Claims detected: {_ncg_stats['claims_detected']}")
+            print(f"    Grounded (identity block): {_ncg_stats['claims_grounded_identity']}")
+            print(f"    Grounded (page text): {_ncg_stats['claims_grounded_page']}")
+            print(f"    Ungrounded (dropped): {_ncg_stats['claims_ungrounded']}")
+            print(f"    Sentences dropped: {_ncg_stats['sentences_dropped']}")
+            print(f"    Stops affected: {_ncg_stats['stops_affected']}")
+            if _ncg_stats['drop_log']:
+                for _dl in _ncg_stats['drop_log']:
+                    print(f"    [LOCAL-389] field={_dl['field']} stop='{_dl['stop']}' "
+                          f"claim='{_dl['claim_text']}' "
+                          f"context='{_dl.get('claim_context', '')}' "
+                          f"dropped: \"{_dl['sentence'][:80]}\"")
+        except ImportError as _ncg_err:
+            print(f"  [LOCAL-389] WARNING: numeric-claim gate not importable — gate skipped ({_ncg_err})")
+        except Exception as _ncg_err:
+            print(f"  [LOCAL-389] ERROR: numeric-claim gate failed (non-fatal): {_ncg_err}")
+    else:
+        if tour_category == 'museum':
+            if os.environ.get('DISABLE_NUMERIC_CLAIM_GATE'):
+                print(f"\n  [LOCAL-389] Numeric-claim gate DISABLED "
+                      f"(DISABLE_NUMERIC_CLAIM_GATE=1)")
+            else:
+                print(f"\n  [LOCAL-389] Numeric-claim gate SKIPPED "
+                      f"(no exhibition scope — unscoped museum tours are not gated)")
+
     # -------- [LOCAL-229] PHASE 5.16: CONTRADICTED claim block --------
     # D100 (Michael, 2026-08-04): "We should not publish if we are reasonably sure
     # that the data is incorrect." If any sentence group contains a CONTRADICTED
