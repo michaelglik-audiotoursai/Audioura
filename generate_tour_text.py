@@ -9433,6 +9433,7 @@ BANNED PHRASES — do NOT use any of these in your description:
 - "invites you to explore/discover/reflect" / "immerse yourself in"
 - "invites contemplation" / "invites the viewer" / "invites us to"
 - "can't help but" / "feast for the eyes" / "step into a world"
+- "created by God" / "fall into sin" / "disobedience" / "the fall of humanity"
 Instead, use SPECIFIC, CONCRETE language: name colors precisely (cerulean, ochre, vermilion), describe actual compositional choices, mention documented historical context.
 
 UNEARNED ADJECTIVES — these words are BANNED unless the same sentence or the one before it
@@ -10051,7 +10052,7 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                             r'tempera|etching|woodcut|ceramic|terracotta|limestone|granite)\b'  # material
                             r'|\b(?:donated|acquired|commissioned|exhibited|installed|founded|opened'
                             r'|built|constructed|designed|crafted|created)\s+(?:in|by|for)\b'  # provenance/creation verb
-                            r'|\b(?:17th|18th|19th|20th|21st)\s+century\b',  # century reference
+                            r'|\b(?:17th|18th|19th|20th|21st)[\s-]+century\b',  # century reference (with hyphen)
                             description, re.IGNORECASE
                         ))
                         if not _417_has_fact:

@@ -78,7 +78,7 @@ def run_positive_gate(description, poi_name):
         r'tempera|etching|woodcut|ceramic|terracotta|limestone|granite)\b'
         r'|\b(?:donated|acquired|commissioned|exhibited|installed|founded|opened'
         r'|built|constructed|designed|crafted|created)\s+(?:in|by|for)\b'
-        r'|\b(?:17th|18th|19th|20th|21st)\s+century\b',
+        r'|\b(?:17th|18th|19th|20th|21st)[\s-]+century\b',
         description, re.IGNORECASE
     ))
     if not _has_fact:
