@@ -9504,6 +9504,8 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                                 check_required_beats_present,
                                 build_beat_retry_prompt_supplement,
                                 scrub_unfilled_roles,
+                                detect_appositive_only_beats,
+                                build_appositive_retry_prompt,
                             )
                             _beat_found, _beat_missing = check_required_beats_present(
                                 description, _story_beats_per_stop[idx]
@@ -9538,7 +9540,28 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                                 for _missing_name in _beat_missing:
                                     print(f"  [LOCAL-391] Stop {stop_num}: beat_unrecoverable "
                                           f"name='{_missing_name}' — never fabricate, moving on")
-                            # else: all beats present, proceed normally
+
+                            # [LOCAL-404] Appositive-only rejection: all names present
+                            # but content is just "Name, a ROLE" without a story verb.
+                            # Retry ONCE asking specifically for an action.
+                            if not _beat_missing and _attempt < _max_retries:
+                                _appositive_only = detect_appositive_only_beats(
+                                    description, _story_beats_per_stop[idx]
+                                )
+                                if _appositive_only:
+                                    _appositive_prompt = build_appositive_retry_prompt(
+                                        _appositive_only, _story_beats_per_stop[idx]
+                                    )
+                                    description_data["messages"].append({
+                                        "role": "user",
+                                        "content": _appositive_prompt,
+                                    })
+                                    description_data["temperature"] = min(0.7 + 0.15 * (_attempt + 1), 1.0)
+                                    print(f"  [LOCAL-404] Stop {stop_num}: APPOSITIVE RETRY — "
+                                          f"{_appositive_only} have no story verb, "
+                                          f"retrying (attempt {_attempt+2}/{_max_retries+1})")
+                                    continue  # retry within the _attempt loop
+                            # else: all beats present AND have story verbs, proceed
                         except ImportError:
                             pass  # story_beat_injector not available — skip
                         except Exception as _beat_retry_err:

@@ -603,6 +603,224 @@ def check_required_beats_present(
     return (found, missing)
 
 
+# [LOCAL-404] Appositive-only pattern detection.
+# A sentence that merely identifies someone by role is NOT a story.
+# Pattern: "Name, a/an/the ROLE" or "Name, ROLE of THING"
+# Example failures: "Mourlot Frères, a renowned French lithographic printing company"
+#                   "Louis Broder, a French publisher and art dealer"
+# What we need: a verb that carries consequence ("Broder gambled on livres d'artiste")
+_APPOSITIVE_ONLY_RE = re.compile(
+    r'([A-Z][a-zà-ÿ]+(?:\s+[A-Z][a-zà-ÿ]+){0,3})'  # Person name
+    r',\s+'
+    r'(?:a|an|the)\s+'  # article
+    r'(?:renowned\s+|famous\s+|celebrated\s+|noted\s+|prominent\s+|leading\s+|'
+    r'French\s+|German\s+|Italian\s+|Spanish\s+|American\s+|British\s+)*'  # optional adjectives
+    r'(?:publisher|printer|printmaker|printing\s+company|art\s+dealer|'
+    r'lithograph(?:ic|er)|editor|bookseller|collector|patron|philanthropist|'
+    r'designer|bookbinder|gallerist|engraver|typographer|publisher\s+and\s+art\s+dealer)',
+    re.UNICODE,
+)
+
+# A CONSEQUENTIAL verb makes a sentence a story, not an appositive.
+# These are verbs that carry action/consequence — not "is", "was", "been".
+_CONSEQUENTIAL_VERB_RE = re.compile(
+    r'\b(?:worked|gambled|assembled|spent|pulled|risked|established|revolutionized|'
+    r'founded|persuaded|convinced|insisted|refused|chose|discovered|invented|'
+    r'transformed|built|created|produced|collaborated|partnered|devised|'
+    r'commissioned|negotiated|apprenticed|trained|mentored|introduced|'
+    r'pioneered|rejected|challenged|broke|defied|sacrificed|devoted|'
+    r'dedicated|abandoned|returned|travelled|traveled|visited|invited|'
+    r'gathered|collected|acquired|purchased|sold|exhibited|displayed|'
+    r'launched|opened|closed|destroyed|restored|preserved|donated|gave|'
+    r'bequeathed|entrusted|championed|supported|financed|funded|backed)\b',
+    re.IGNORECASE,
+)
+
+
+def detect_appositive_only_beats(description: str, stop_beats: List[Dict[str, str]]) -> List[str]:
+    """[LOCAL-404] Detect beat people whose ONLY mention is an appositive (role identification).
+
+    A beat person passes if at least one sentence mentioning them contains a
+    consequential verb where THEY are the agent (subject). A beat person fails if
+    every mention is of the form "Name, a/the ROLE" with no action they perform.
+
+    Key insight: "Miró's collaboration with Broder, the publisher, revolutionized..."
+    does NOT count as Broder's story — "revolutionized" is the work's verb, not Broder's.
+    Broder needs his OWN verb: "Broder gambled on livres d'artiste..."
+
+    Returns list of surnames that are appositive-only (need retry).
+    """
+    if not description or not stop_beats:
+        return []
+
+    required = get_required_beat_names(stop_beats)
+    if not required:
+        return []
+
+    appositive_only = []
+    # Split into sentences
+    sentences = re.split(r'(?<=[.!?])\s+', description)
+
+    for surname in required:
+        surname_lower = surname.lower()
+        # Find all sentences mentioning this person
+        person_sentences = [s for s in sentences if surname_lower in s.lower()]
+        if not person_sentences:
+            continue  # Missing entirely — handled by check_required_beats_present
+
+        # Check if ANY sentence has a consequential verb WHERE THE PERSON IS THE AGENT
+        has_story = False
+        for sent in person_sentences:
+            if _person_has_consequential_action(sent, surname):
+                has_story = True
+                break
+
+        if not has_story:
+            appositive_only.append(surname)
+            print(f"  [LOCAL-404] beat rejected: appositive-only '{surname}' "
+                  f"— no consequential verb found")
+
+    return appositive_only
+
+
+def _person_has_consequential_action(sentence: str, surname: str) -> bool:
+    """Check if the person is the AGENT of a consequential verb in this sentence.
+
+    Passes:
+      "Broder gambled on livres d'artiste" (Broder = subject of gambled)
+      "At Mourlot, Miró worked the stones" (Miró = subject of worked, close to Mourlot)
+      "Fridman spent decades assembling" (Fridman = subject of spent)
+
+    Fails:
+      "collaboration with Broder, the publisher, resulted in..." (result is the work's verb)
+      "printed by Mourlot Frères, a printing company" (passive identification)
+      "The gift [from Fridman] introduced this book" (gift = subject, not Fridman)
+    """
+    surname_lower = surname.lower()
+    sent_lower = sentence.lower()
+
+    # Quick check: is there ANY consequential verb?
+    if not _CONSEQUENTIAL_VERB_RE.search(sentence):
+        return False
+
+    # Check if person is in a "with X, the/a ROLE" prepositional phrase
+    # Also catches compound: "with A, the X, and B, the Y"
+    # If so, verbs in the sentence are NOT the person's action
+    prep_pattern = re.compile(
+        r'\b(?:with|by)\s+(?:\w+\s+){0,3}' + re.escape(surname) + r'\s*,\s*(?:a|an|the)\s+',
+        re.IGNORECASE,
+    )
+    # Also check compound prep phrase: "with X ... and Person, the/a ROLE"
+    compound_prep_pattern = re.compile(
+        r'\b(?:with|by)\s+.{0,80}\band\s+(?:\w+\s+){0,3}' + re.escape(surname) + r'\s*,\s*(?:a|an|the)\s+',
+        re.IGNORECASE | re.DOTALL,
+    )
+    in_prep_phrase = prep_pattern.search(sentence) or compound_prep_pattern.search(sentence)
+    if in_prep_phrase:
+        # Person is in a prepositional phrase with appositive — not the subject.
+        # But check if there's ALSO a clause where they ARE the subject
+        # Split on semicolons/em-dashes for multi-clause sentences
+        clauses = re.split(r'[;—–]', sentence)
+        for clause in clauses:
+            if surname_lower not in clause.lower():
+                continue
+            # Check BOTH simple and compound prep patterns
+            if prep_pattern.search(clause) or compound_prep_pattern.search(clause):
+                continue  # Still in the prep phrase
+            # Person in a different clause — check for verb
+            if _CONSEQUENTIAL_VERB_RE.search(clause):
+                return True
+        return False
+
+    # Check for passive "X by Person" (e.g. "published by Broder")
+    passive_pattern = re.compile(
+        r'\b(?:published|printed|edited|designed|bound|gifted|donated)\s+by\s+(?:\w+\s+){0,2}'
+        + re.escape(surname),
+        re.IGNORECASE,
+    )
+    if passive_pattern.search(sentence):
+        # "published by X" without further action — just identifies role
+        # Check if there's MORE after the person's name that shows action
+        person_pos = sent_lower.find(surname_lower)
+        after_person = sentence[person_pos + len(surname):]
+        # Strip the appositive clause if present
+        after_person = re.sub(r'^\s*,\s*(?:a|an|the)\s+[^,]+,?', '', after_person)
+        if _CONSEQUENTIAL_VERB_RE.search(after_person):
+            return True
+        return False
+
+    # Person appears without prep/passive framing AND there's a consequential verb
+    # Check proximity: verb should be within ~80 chars of the person's name
+    person_pos = sent_lower.find(surname_lower)
+    if person_pos < 0:
+        return False
+
+    # Find the nearest consequential verb
+    for m in _CONSEQUENTIAL_VERB_RE.finditer(sentence):
+        verb_pos = m.start()
+        distance = abs(verb_pos - person_pos)
+        # Verb within reasonable proximity AND not in a subordinate clause about someone else
+        if distance < 100:
+            # Make sure no OTHER proper noun is between person and verb as likely subject
+            between_start = min(person_pos, verb_pos)
+            between_end = max(person_pos, verb_pos)
+            between_text = sentence[between_start:between_end]
+            # If the person's name is before the verb, they're likely the subject
+            if person_pos < verb_pos:
+                return True
+            # If verb is before person, check it's not about something else entirely
+            # (e.g. "The work revolutionized... collaboration with Broder")
+            # Only count if person is very close to the verb
+            if distance < 30:
+                return True
+
+    return False
+
+
+def build_appositive_retry_prompt(appositive_names: List[str], stop_beats: List[Dict[str, str]]) -> str:
+    """[LOCAL-404] Build prompt supplement when beats are appositive-only (no story).
+
+    Asks specifically for WHAT THE PERSON DID — an action with a consequence,
+    not just their job title.
+    """
+    if not appositive_names:
+        return ''
+
+    appositive_lower = {n.lower() for n in appositive_names}
+    parts = [
+        "\n━━━ RETRY: APPOSITIVE-ONLY — NOT A STORY (LOCAL-404) ━━━",
+        "Your previous attempt ONLY IDENTIFIED these people by role (\"X, a publisher\").",
+        "An appositive is NOT a story. A story needs a VERB THAT CARRIES CONSEQUENCE.",
+        "",
+        "BAD (what you wrote — appositive only, no action):",
+        "  \"Mourlot Frères, a renowned French lithographic printing company\"",
+        "",
+        "GOOD (what we need — a person DOING something with consequence):",
+        "  \"At Mourlot Frères, Miró worked the stones himself alongside the printers\"",
+        "  \"Broder gambled on livres d'artiste when almost no one bought them\"",
+        "  \"Fridman spent decades assembling these books before giving them away\"",
+        "",
+        "REWRITE these people with an ACTION (what they did, not what they are):",
+    ]
+
+    for beat in stop_beats:
+        if beat['role'] in ('circumstance', 'stakes'):
+            continue
+        surname = beat['person'].split()[-1]
+        if surname.lower() in appositive_lower:
+            parts.append(f"  ✗ {beat['person']} — write what they DID, not their job title.")
+            parts.append(f"    Their role ({beat['role']}) is already known. Tell what HAPPENED.")
+            parts.append("")
+
+    parts.append(
+        "If the corpus does not support a specific action for a person, state their role "
+        "ONCE BRIEFLY and spend the words on something else. A short honest mention beats "
+        "a padded appositive."
+    )
+    parts.append("━━━ END APPOSITIVE RETRY ━━━\n")
+    return '\n'.join(parts)
+
+
 def build_beat_retry_prompt_supplement(missing_names: List[str], stop_beats: List[Dict[str, str]]) -> str:
     """[LOCAL-391] Build a prompt supplement for retrying a stop with missing beats.
 
@@ -734,9 +952,26 @@ are IN ADDITION TO the artist — never instead of. If WORK IDENTITY says
         parts.append("")
 
     parts.append("""
-WHAT IS NOT A STORY: "This masterpiece challenges boundaries" is not a story.
-"Published by Louis Broder in Paris" IS a story — it names who and what they did.
-A story has: a person, a specific circumstance, a consequence.
+WHAT IS NOT A STORY (LOCAL-404 — CRITICAL):
+An APPOSITIVE IS NOT A STORY. If the only thing you write about a person is their
+job title in a comma-separated clause, that is a dictionary entry, not narration.
+
+REJECTED (appositive-only — will trigger automatic retry):
+  ✗ "Mourlot Frères, a renowned French lithographic printing company"
+  ✗ "Louis Broder, a French publisher and art dealer"
+  ✗ "Boris Fridman, a collector and philanthropist"
+
+ACCEPTED (a person DOES something with consequence):
+  ✓ "At Mourlot Frères, Miró worked the stones himself alongside the printers —
+     the same workshop where Picasso and Matisse also pulled their plates"
+  ✓ "Broder gambled on livres d'artiste when almost no one bought them,
+     publishing editions of a few hundred"
+  ✓ "Boris Fridman spent decades assembling these books before giving them away"
+
+RULE: Every required person must appear in a sentence with a VERB THAT CARRIES
+CONSEQUENCE — not "is", "was", or a bare role identification. If you cannot
+find what someone DID, state their role ONCE BRIEFLY (five words max) and use
+the remaining word budget on something you CAN ground.
 """)
 
     return '\n'.join(parts)

@@ -257,6 +257,51 @@ def synthesize_queries(stop: Dict, tour_type: str = 'contained') -> List[str]:
     return queries
 
 
+def synthesize_person_action_queries(person_beats: list) -> list:
+    """[LOCAL-404] Generate action-targeted queries for people found in story beats.
+
+    The beat system discovers WHO is involved; this function asks the search for
+    WHAT THEY DID — aiming at events, collaborations, and workshop histories rather
+    than biographical identity.
+
+    Args:
+        person_beats: list of beat dicts with at least 'person' and 'role' keys.
+
+    Returns:
+        List of query strings targeting actions and consequences, not identity.
+    """
+    queries = []
+    seen = set()
+    for beat in person_beats:
+        if beat.get('role') in ('circumstance', 'stakes'):
+            continue
+        person = beat.get('person', '').strip()
+        if not person or person.startswith('('):
+            continue
+        person_lower = person.lower()
+        if person_lower in seen:
+            continue
+        seen.add(person_lower)
+
+        role = beat.get('role', '')
+        # Action-targeted queries: what they DID, not who they ARE
+        if role in ('publisher', 'printer'):
+            queries.append(f'"{person}" workshop artists collaboration')
+            queries.append(f'"{person}" history printed published editions')
+        elif role == 'donor':
+            queries.append(f'"{person}" collection assembled donated')
+            queries.append(f'"{person}" collector career art')
+        elif role in ('collaborator', 'illustrator', 'author'):
+            queries.append(f'"{person}" collaboration working process')
+            queries.append(f'"{person}" partnership artistic career')
+        elif role == 'gallery_patron':
+            queries.append(f'"{person}" philanthropist donated gallery')
+        else:
+            queries.append(f'"{person}" career achievements history')
+
+    return queries
+
+
 def synthesize_class_targeted_queries(stop: Dict, tour_type: str = 'contained',
                                        category: str = '') -> Dict[str, List[str]]:
     """[LOCAL-37] Generate queries targeted at each of the three classes.
@@ -501,6 +546,14 @@ def search_stories_for_stop(stop: Dict, tour_type: str = 'contained',
         }
 
     queries = synthesize_queries(stop, tour_type)
+
+    # [LOCAL-404] Add person-action queries if beats were discovered in page text.
+    # These target what people DID (workshop history, collaboration, editions)
+    # rather than biographical identity. Appended after base queries.
+    _person_beats = stop.get('_person_beats', [])
+    if _person_beats:
+        action_queries = synthesize_person_action_queries(_person_beats)
+        queries.extend(action_queries)
 
     all_results = []
     query_log = []
