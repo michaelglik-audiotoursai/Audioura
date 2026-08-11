@@ -13809,3 +13809,58 @@ different sizes.
 
 The N=4 pin from D351 stands, and now it is written in the briefs rather than left
 to whoever writes the runner.
+
+## D356 — The dispatcher had D352's bug in code, and LEAD bounced 415 on mid-flight output
+**2026-08-11, 14:5x.** Two errors, one of them LEAD's.
+
+### The automation had the same bug D352 described in prose
+
+D352 recorded that liveness must be asked of the `kiro-cli` agent, not the
+`dispatcher_pid`, and corrected LEAD's *review procedure*. **It did not occur to
+LEAD that the dispatcher itself makes the identical check.**
+`check_worker_liveness()` tested `pid_is_alive(dispatcher_pid)` on every tick.
+
+So at 14:22:19 — while LEAD was writing D352 about this exact hazard — the tick
+marked LOCAL-415 ABANDONED and re-dispatched it. **The duplicate ran ~35 minutes
+concurrently with LOCAL-417**, on live OpenAI and Serper calls, reproducing work
+already committed as `ad96eb3`.
+
+Fixed: `worker_process_alive()` asks `pgrep -f LOCAL-NN` and the abandon path
+defers to it. Verified by effect — `True` for in-flight 417, `False` for a
+nonexistent task — and it fails safe: if liveness cannot be determined, nothing is
+abandoned.
+
+**The lesson is about where a finding gets applied.** Writing the rule in
+`DECISIONS.md` felt like fixing it. The same faulty assumption was sitting in
+executable code one file away, and prose does not patch code.
+
+### LEAD bounced 415 on output from a run that had not finished
+
+The 14:06 MFA artifact LEAD evaluated came from a worker that exited at 14:22
+**without committing and without a submission doc** — it was mid-iteration, not
+done. LEAD read it as final and bounced on it.
+
+**The duplicate run, working from the same brief, does not have the defect LEAD
+bounced for.** Its completed MFA tour has 4/4 stops and **zero meta-text** under a
+broad check (`your description`, `Notify me`, `required names`, `further
+assistance`) rather than the inherited phrase list.
+
+**D353's substance survives; its verdict was premature.** The denylist analysis is
+still correct and worth keeping, and the root cause it names — an unsatisfiable
+required-names block — is what produced the meta-text in the unfinished run.
+
+**But the bounce should not have been written from an incomplete artifact.** Rule:
+**an artifact from a task with no terminal line and no submission doc is a work in
+progress, and must not be graded.** The absence of a commit was the signal, and
+LEAD had already noticed it — then evaluated the output anyway.
+
+### Where this leaves the work
+
+415's completed run still **fails the thing 417 exists to fix**: the "Adam and Eve"
+stop never names its own artwork's artist. It surveys Dürer's 1504 engraving and
+Klimt's 1917–18 painting — two other works by two other artists — and calls that
+the stop. 417's positive-assertion gate ("the stop names its own subject") is
+still the right target, so 417 continues.
+
+Merge order once 417 lands: compare its delivered tour against 415's `d8f6996`
+and take the better, rather than assuming the later branch dominates.
