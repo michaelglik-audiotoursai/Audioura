@@ -12397,3 +12397,60 @@ to mis-attributing them, to over-policing the prose that names them correctly.
 That is progress, but it means new rules now need the same adversarial check the
 detectors did: not only "does it fire when it should" but "what does it destroy
 when it fires".
+
+## D318 — LOCAL-394 merged: the invariant is explicit, and the evening's chain closes
+**2026-08-10.** Merged (brings 393). The stop-count invariant D317 asked for is now
+stated in code and logged on every run:
+
+```
+[LOCAL-394] Stop count invariant: OK (3 selected == 3 delivered)   MFA
+[LOCAL-394] Stop count invariant: OK (4 selected == 4 delivered)   Palais
+```
+
+That is the durable part. The bug was one threshold behaving as a filter; the
+remedy is an invariant that makes any future filter visible the moment it fires.
+**A rule that can remove content needs a stated invariant above it** — otherwise
+the removal looks like normal operation.
+
+Delivered MFA text: 3 stops with *Le Lézard aux plumes d'or* restored; **Miró,
+Broder, Mourlot and Fridman all in that stop** — its artist, publisher, printer
+and donor; Freud in the Moses stop; Gris and Reverdy in the Soleil stop;
+zero-check all clear; words 361/146/281; framing at `livre d'artiste` 2,
+`collabor` 6, `typography` 2, `book` 7. Control: Palais 4/4, `framing=venue_purpose`
+from the 1901 bequest, all four dates, every stop over the floor, bounds 81.2/75.0.
+
+**Residual, recorded not hidden:** `with publisher` reappeared once. The publisher
+is named elsewhere in the same stop, so it is a phrasing wart rather than a missing
+fact — not worth a round at this hour.
+
+## D319 — What the D291→D318 chain actually cost, and the four rules worth keeping
+**2026-08-10, end of session.** Twenty-eight decisions from "the tour returns
+Ancient Nubia" to a three-stop grounded exhibition tour. The transferable lessons,
+in the order they were learned the hard way:
+
+1. **The instruction is not the remedy; the structure is.** Five prompt rounds lost
+   to the word *Plafond* in a title (D303). Two gate rounds won. The same shape had
+   already appeared six times in test hygiene (D277/D296) before anyone applied it
+   to the product.
+2. **Verify the delivered artifact, never a stage before it.** Four separate
+   failures — block emitted but not for every stop (D298), gate run but not on
+   every field (D304), beats extracted but not delivered (D309), beats counted but
+   in the wrong string (D312). Each mechanism was correct and each verification was
+   one step short. Reading the delivered tour is the only check that never lied.
+3. **A detector's false-positive behaviour is half its specification** (D311).
+   Four detectors shipped tonight, four false positives: `The Treat Page` as a
+   person, `visual tapestry` as a form claim, `', in'` as a quantity, `France` as
+   a person. All were tested on positives only.
+4. **A correctness mechanism must never make the product smaller** (D317). The last
+   regression of the evening deleted the richest stop in the name of a word count.
+
+**And one about reading evidence rather than collecting it:** D314 recorded
+`never_written` and concluded the model was ignoring instructions. D315 found the
+instructions were wrong — beats were being demanded of stops they had nothing to do
+with, and the model was refusing to assert falsehoods. **Instrument the input as
+well as the output.**
+
+**Not claimed:** that the tour is good. Michael's standard (D301) is that a listener
+would want to keep listening, and the stories are still correctly-placed
+credit-line facts rather than narrative. Closing that gap needs a second grounded
+source (LOCAL-23's lineage) and is not started.
