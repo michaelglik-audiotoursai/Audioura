@@ -13933,3 +13933,69 @@ Every round from 397 to 417 has been polishing prose, ranking and gating on top 
 checklist that yields one fake work. **The exhibition tour cannot be evaluated at
 all until extraction works**, so 418 goes to the front and 417's acceptance is
 re-validated against the correct case before any merge.
+
+## D358 — Agents were branching from `origin/storied`, which is stale by design
+**2026-08-11, 16:2x.** Found while reviewing LOCAL-418.
+
+LOCAL-418's branch reflog reads `branch: Created from origin/storied`. Its
+merge-base is `b543412` — **18 commits behind local `storied`**. Every line of that
+task's work, including its live acceptance run, was made on a tree that had never
+seen the 410–415 chain.
+
+**`origin/storied` is stale by design and gets worse daily.** Local `storied` is
+held unpushed behind Michael's iPhone field-test gate. The gap was 18 commits
+today. Nothing in the task file, the dispatcher, or the review checklist noticed.
+
+**The symptom that gave it away was not the diff — it was a file appearing.**
+418 added `run_mfa_unbound_eval.py`, a file already committed to `storied` in
+`423ea13`. An agent re-creating a file that already exists means it is not looking
+at the tree you think it is. (Its copy turned out byte-identical, so no case drift
+this time — verified with `diff`.)
+
+**Also: the dispatcher's `branch=` field is a guess.** It records the branch it
+created (`kiro/local-418`); the agent then makes its own (`kiro/local418-…`). The
+recorded branch had `e9fb43b` and no work on it; the real work was elsewhere. A
+COMPLETED line's branch field is not evidence — resolve the worktree's actual HEAD.
+
+**Fixed in code, verified by effect:** every dispatched prompt now opens with the
+resolved base sha and an explicit "never branch from `origin/anything`"; the
+completion line records the real branch and `base@sha` and emits
+`*** STALE BASE: work is N commits behind ***` when the work does not descend from
+the base. Test: fires on LOCAL-418 (18 behind) and LOCAL-417 (5 behind), silent on
+a correctly-based tree.
+
+**Standing check, added to the review list:** before reviewing any submission,
+`git merge-base --is-ancestor storied <branch>`. If it fails, the evidence was
+produced on a different tree than the one you are merging into — cherry-pick onto
+current `storied` and re-run the acceptance yourself before believing any of it.
+
+## D359 — LOCAL-418 merged: extraction fixed, and re-verified on the tree it merges into
+**2026-08-11, 16:2x.** Merged as `55687b9` + `d6274df`; LEAD evidence in
+`LEAD_VERIFY_LOCAL-418.txt` (`ca000bd`).
+
+The fix: `_is_date_like` rejects a date, date range, weekday or month as a work
+title or as an artist, at the extractor's validation block and in
+`plausibility_gate`. With the fake work gone the pipeline stops taking the
+`highlights_only` path and falls through to `prose_llm_extract_works`, which reads
+the page correctly.
+
+**Because the base was stale (D358), the agent's own evidence proved nothing about
+`storied`.** LEAD cherry-picked onto current `storied` and re-ran everything:
+3 real works delivered (Le Lézard aux plumes d'or / Moses and Monotheism / Au
+Soleil du Plafond), no date leak, regressions byte-identical on both trees
+(the 37 `tests/` collection errors are pre-existing — confirmed on baseline).
+
+**D242 #1 done properly, and the weak form is worth naming.** Deleting the whole
+change made the test file fail to *import* — that is not a red test, it is an
+absent module, and it would have passed a mirror just as happily. Keeping
+`_is_date_like` defined and removing **only its two production call sites** turned
+exactly the 4 behavioural tests red (29 still passing). That is what binds a test
+to production. Use this shape from now on: revert the *call sites*, not the helper.
+
+**What the fix bought, measured honestly:** the exhibition tour is now evaluable,
+and the first evaluation is unflattering — 85 SERP snippets across three stops
+delivered zero verbatim beats, stop 1 is carried entirely by the exhibition page's
+credit line (Broder, Mourlot, 40 lithographs, 1971 — no SERP call needed), and
+stops 2 and 3 are generic art-writing with one date between them. **LOCAL-419**
+takes that: dump the 54 snippets those two stops received and establish whether
+this is retrieval or injection before fixing either.
