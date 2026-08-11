@@ -370,7 +370,13 @@ STORY BEAT REQUIREMENT (LOCAL-383):
 Your description MUST contain at least one sentence that NAMES A PERSON and
 states WHAT THEY DID — a specific action or circumstance, not a general claim.
 This SUPPLEMENTS (does not replace) any exhibition framing or thesis instructions above.
-The artists and collaborators named in EXHIBITION FRAMING must still appear.
+
+ARTIST ATTRIBUTION IS NON-NEGOTIABLE (LOCAL-390):
+The Artist named in the WORK IDENTITY block above MUST appear by surname in your
+description. A stop about a Miró book must name Miró; a stop about Dalí's
+illustrations must name Dalí. The story beat persons (publishers, printers, donors)
+are IN ADDITION TO the artist — never instead of. If WORK IDENTITY says
+"Artist: Joan Miró", your text must contain "Miró".
 """)
 
     if person_beats:
@@ -468,3 +474,118 @@ def verify_beats_in_output(
         'dropped': dropped,
         'found': found,
     }
+
+
+def _split_tour_into_stop_blocks(complete_tour: str) -> List[str]:
+    """[LOCAL-390] Split a fully assembled tour into per-stop text blocks.
+
+    Uses the 'Stop N:' header pattern to delimit blocks. Returns a list
+    of strings, one per stop, containing ONLY the text for that stop
+    (header through the next header or end of tour).
+    """
+    # Match "Stop N:" at line start (the rendered headers)
+    stop_header_pattern = re.compile(r'^(Stop\s+\d+:)', re.MULTILINE)
+    splits = stop_header_pattern.split(complete_tour)
+
+    # splits = [preamble, 'Stop 1:', block1, 'Stop 2:', block2, ...]
+    blocks = []
+    i = 1  # skip preamble (index 0)
+    while i < len(splits) - 1:
+        header = splits[i]
+        body = splits[i + 1]
+        blocks.append(header + body)
+        i += 2
+
+    return blocks
+
+
+def verify_beats_in_final_tour(
+    story_beats_per_stop: List[List[Dict[str, str]]],
+    complete_tour: str,
+    stop_names: List[str],
+    gate_removed_names: Optional[List[str]] = None,
+) -> List[Dict[str, object]]:
+    """[LOCAL-390] Verify beats against the FINAL assembled tour text.
+
+    This is the authoritative verification. It measures the delivered artifact,
+    not an intermediate stage.
+
+    Args:
+        story_beats_per_stop: Beat lists per stop (from assign_beats_to_stops)
+        complete_tour: The fully assembled, post-gate, post-transform tour text
+        stop_names: List of stop names in order
+        gate_removed_names: Names known to have been removed by the grounding gate
+
+    Returns:
+        List of result dicts, one per stop:
+          - beats_assigned: int
+          - beats_in_output: int
+          - dropped: list of person names absent from final text
+          - found: list of person names present in final text
+          - drop_causes: dict mapping dropped name → cause string
+    """
+    if not story_beats_per_stop or not complete_tour:
+        return []
+
+    gate_removed_set = set()
+    if gate_removed_names:
+        for name in gate_removed_names:
+            gate_removed_set.add(name.lower())
+            # Also track surname
+            surname = name.split()[-1].lower() if name.split() else ''
+            if surname:
+                gate_removed_set.add(surname)
+
+    stop_blocks = _split_tour_into_stop_blocks(complete_tour)
+    results = []
+
+    for idx, stop_beats in enumerate(story_beats_per_stop):
+        stop_name = stop_names[idx] if idx < len(stop_names) else f'Stop {idx+1}'
+
+        # Get the final text for this stop
+        if idx < len(stop_blocks):
+            final_text = stop_blocks[idx]
+        else:
+            final_text = ''
+
+        # Also check the entire tour (a name might appear in a different stop)
+        person_beats = [b for b in stop_beats if b['role'] not in ('circumstance', 'stakes')]
+
+        if not person_beats:
+            results.append({
+                'beats_assigned': 0,
+                'beats_in_output': 0,
+                'dropped': [],
+                'found': [],
+                'drop_causes': {},
+            })
+            continue
+
+        final_lower = final_text.lower()
+        found = []
+        dropped = []
+        drop_causes = {}
+
+        for beat in person_beats:
+            person = beat['person']
+            surname = person.split()[-1].lower()
+            # Case-insensitive check against THIS stop's final text
+            if surname in final_lower or person.lower() in final_lower:
+                found.append(person)
+            else:
+                dropped.append(person)
+                # Determine cause
+                if person.lower() in gate_removed_set or surname in gate_removed_set:
+                    drop_causes[person] = 'gate_removed'
+                else:
+                    drop_causes[person] = 'never_written'
+
+        results.append({
+            'beats_assigned': len(person_beats),
+            'beats_in_output': len(found),
+            'dropped': dropped,
+            'found': found,
+            'drop_causes': drop_causes,
+        })
+
+    return results

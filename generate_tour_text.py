@@ -9691,6 +9691,10 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                       f"{_completed_stop_count}/{len(poi_list)} stops completed")
     
     # [LOCAL-388] Post-generation: verify story beats reached the prose, log per stop
+    # [LOCAL-390] NOTE: This early check is INFORMATIONAL ONLY — it runs against the
+    # raw LLM output BEFORE gates (5.158 entity grounding, 5.159 form-claim, etc.)
+    # and before Phase 6 assembly. The AUTHORITATIVE verification runs after full
+    # assembly — see "[LOCAL-390] FINAL beat verification" below.
     if _storied_mode and _story_beats_per_stop and not _phase5_ceiling_breached:
         try:
             from story_beat_injector import verify_beats_in_output
@@ -9702,7 +9706,7 @@ NARRATIVE TONE: Write this description with a {_persona_tone} tone — emphasize
                 _vbeats = _story_beats_per_stop[_vi]
                 _vresult = verify_beats_in_output(_vbeats, _vdesc, _vname)
                 _dropped_str = str(_vresult['dropped']) if _vresult['dropped'] else '[]'
-                print(f"  [LOCAL-388] stop='{_vname}' beats_assigned={_vresult['beats_assigned']} "
+                print(f"  [LOCAL-388] PRE-GATE stop='{_vname}' beats_assigned={_vresult['beats_assigned']} "
                       f"beats_in_output={_vresult['beats_in_output']} dropped={_dropped_str}")
         except Exception as _v388_err:
             print(f"  [LOCAL-388] Beat verification error (non-fatal): {_v388_err}")
@@ -10410,16 +10414,28 @@ REWRITE RULES (all mandatory):
     # [LOCAL-385] Now scans ALL fields in GATED_PROSE_FIELDS (description + orientation).
     # Scope limitation (Defect 5): unscoped museum tours (Palais Lascaris, etc.)
     # remain ungated. This is intentional and documented — do not widen.
+    # [LOCAL-390] Track gate-removed names for final beat verification cause analysis.
+    _gate_removed_names = []
     if (tour_category == 'museum' and _exhibition_checklist_result
             and getattr(_exhibition_checklist_result, 'page_text', '')):
         print(f"\n  [LOCAL-385] PHASE 5.158: Prose entity grounding gate (scans all prose fields)...")
         try:
             from prose_entity_grounding_gate import apply_prose_entity_grounding_gate
             _peg_stop_names = [p.get('name', '') for p in poi_list]
+            # [LOCAL-390] Collect all person names from story beats — these are
+            # grounded by definition (extracted from the page text) and must not
+            # be stripped by the entity grounding gate.
+            _peg_pre_grounded = []
+            if _story_beats_per_stop:
+                for _sblist in _story_beats_per_stop:
+                    for _sb in _sblist:
+                        if _sb.get('role') not in ('circumstance', 'stakes'):
+                            _peg_pre_grounded.append(_sb['person'])
             _peg_stats = apply_prose_entity_grounding_gate(
                 poi_list,
                 _exhibition_checklist_result,
                 stop_names=_peg_stop_names,
+                pre_grounded_names=_peg_pre_grounded if _peg_pre_grounded else None,
             )
             print(f"  [LOCAL-385] Prose entity grounding gate summary:")
             print(f"    Persons detected: {_peg_stats['persons_detected']}")
@@ -10429,6 +10445,7 @@ REWRITE RULES (all mandatory):
             print(f"    Stops affected: {_peg_stats['stops_affected']}")
             if _peg_stats['ungrounded_names']:
                 print(f"    Ungrounded: {_peg_stats['ungrounded_names']}")
+                _gate_removed_names = list(_peg_stats['ungrounded_names'])
         except ImportError as _peg_err:
             print(f"  [LOCAL-385] WARNING: prose_entity_grounding_gate not importable — gate skipped ({_peg_err})")
         except Exception as _peg_err:
@@ -12640,6 +12657,35 @@ RULES:
             print(f"\n  [LOCAL-260] Prolog structure validation SKIPPED (import: {_e})")
         except Exception as _e:
             print(f"\n  [LOCAL-260] Prolog structure validation error (non-fatal): {_e}")
+
+    # -------- [LOCAL-390] FINAL beat verification — measures the delivered text --------
+    # This is the AUTHORITATIVE check. It runs against complete_tour AFTER every
+    # gate (5.158 entity grounding, 5.159 form-claim, 5.16 contradicted-block),
+    # after Phase 6 assembly, after D2 reference stripping, after all post-assembly
+    # transforms. If a beat name is absent HERE, it is truly absent from what the
+    # listener receives.
+    if _storied_mode and _story_beats_per_stop and not _phase5_ceiling_breached:
+        try:
+            from story_beat_injector import verify_beats_in_final_tour
+            _stop_names_for_verify = [p.get('name', f'Stop {i+1}') for i, p in enumerate(poi_list)]
+            _final_results = verify_beats_in_final_tour(
+                _story_beats_per_stop,
+                complete_tour,
+                _stop_names_for_verify,
+                gate_removed_names=_gate_removed_names if '_gate_removed_names' in dir() else None,
+            )
+            print(f"\n  [LOCAL-390] FINAL beat verification (measured from delivered text):")
+            for _fri, _fr in enumerate(_final_results):
+                _fr_name = _stop_names_for_verify[_fri] if _fri < len(_stop_names_for_verify) else f'Stop {_fri+1}'
+                _fr_dropped_str = str(_fr['dropped']) if _fr['dropped'] else '[]'
+                _fr_causes = ''
+                if _fr['drop_causes']:
+                    _cause_parts = [f"{name}={cause}" for name, cause in _fr['drop_causes'].items()]
+                    _fr_causes = f" causes=[{', '.join(_cause_parts)}]"
+                print(f"    stop='{_fr_name}' beats_assigned={_fr['beats_assigned']} "
+                      f"beats_in_output={_fr['beats_in_output']} dropped={_fr_dropped_str}{_fr_causes}")
+        except Exception as _v390_err:
+            print(f"  [LOCAL-390] Final beat verification error (non-fatal): {_v390_err}")
 
     # Print word count statistics
     print("\n=== Word Count Statistics ===")
