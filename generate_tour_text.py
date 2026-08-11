@@ -10166,6 +10166,14 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                         if not _417_gate_pass:
                             print(f"  [LOCAL-417] Stop {stop_num}: POSITIVE GATE FAILED — {_417_gate_failures}")
                             print(f"  [LOCAL-417]   verbatim: {repr(description[:300])}")
+                            # [LOCAL-420] Save gate-rejected text as _best_description candidate.
+                            # It failed the gate but it IS real prose — better than a stub or
+                            # material fallback. Track it so we can fall back to it on final failure.
+                            if description and not _is_stub_text(description):
+                                _cur_wc = len(description.split())
+                                _best_wc = _best_description[2] if _best_description else 0
+                                if _cur_wc > _best_wc:
+                                    _best_description = (orientation, description, _cur_wc, tokens_used, call_cost)
                             if _attempt < _max_retries:
                                 description_data["temperature"] = min(0.7 + 0.2 * (_attempt + 1), 1.0)
                                 print(f"  [LOCAL-417] Stop {stop_num}: retrying (attempt {_attempt+1}, "
