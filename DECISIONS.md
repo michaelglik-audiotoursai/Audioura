@@ -12909,3 +12909,43 @@ fabrication is not evidence when absence of output is also possible.
 **Priority note for the remaining night:** a tour that invents a meeting with a
 dead man is worse than a tour with no stories. Between "more stories" and "no
 impossible relations", the second wins.
+
+## D332 — LOCAL-402 merged: the dead-man bug is structurally fixed
+**2026-08-11, 05:0x.** Merged (brings 397/400/401). The safety property Michael's
+D327 asked for now exists as a module, and LEAD proved it rather than inferring it
+from a clean run (D242 check 1):
+
+```
+check_temporal_coherence("In 1974, Salvador Dali collaborated with Freud…")
+  → "'Freud' died in 1939, cannot have collaborated with in 1974"
+check_temporal_coherence("In 1974, Salvador Dali illustrated Freud's book")
+  → None   (kept)
+```
+
+**That distinction is the whole point** — it rejects the impossible relation and
+keeps the true one about the same two people, which is D327's correction-not-
+deletion rule made mechanical. `temporal_coherence_gate.py` is its own module,
+announces itself every run, and logs its rejection count, answering D331 where a
+silent check was indistinguishable from no check.
+
+Live: the fabrication that shipped in 397 and 401 is gone. Control venue is the
+healthiest it has been — Palais 4/4, all dates, **base score 81.2**, top of the
+variance band.
+
+**Merged with stories still missing on 2 of 3 stops**, deliberately: by LEAD's own
+stated priority (D331), "no impossible relations" outranks "more stories", and the
+gate is a permanent safety property while the story gap is a delivery bug. Holding
+a proven safety fix hostage to an unrelated feature would be the wrong trade at any
+hour, and especially at 05:00 with a chain still running.
+
+**The remaining gap is now narrow and well-lit:** extraction returns 0 elements
+from 23 results on the two *French-titled* works, three rounds running, while the
+English-titled stop 2 extracts fine and delivers 3 beats. LOCAL-403 is told not to
+attempt a fourth extractor repair — find what stop 2 does differently and make the
+other two do it.
+
+**And the placeholder returned:** *"the innovative collaboration between Miró and
+publisher"*, with `Louis Broder` parsed and sitting unused, `Fridman` absent. This
+is the third appearance of a role named without its person. 403 makes
+`with publisher` = 0 a hard acceptance line, because an unfilled role is worse than
+omitting the clause.
