@@ -362,6 +362,55 @@ def validate_base_branch(base, cwd):
     return True, None
 
 
+def resolve_base_sha(base, cwd):
+    """Return the sha the base branch points at right now, or '' if unknown."""
+    r = subprocess.run(
+        ["git", "rev-parse", "--short", base],
+        cwd=str(cwd), capture_output=True, text=True,
+    )
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def base_preamble(base, base_sha):
+    """
+    Prepended to every dispatched prompt.
+
+    [LOCAL-418 review, D358] LOCAL-418 branched from `origin/storied` and so did
+    its work on a tree **18 commits stale** -- it never saw the 410-415 chain,
+    and it re-created `run_mfa_unbound_eval.py` from scratch because the
+    committed one did not exist at its base. The task file said "branch off
+    `storied`", the agent resolved that to `origin/storied`, and nothing
+    complained.
+
+    `origin/storied` is stale BY DESIGN: local `storied` is held unpushed behind
+    Michael's iPhone field-test gate, so the remote falls further behind every
+    day. An agent that branches from origin is silently working in the past.
+
+    The worktree the agent is handed is ALREADY on the correct commit, so the
+    right move is always to branch from HEAD.
+    """
+    return (
+        "# BASE — read before your first git command\n"
+        "\n"
+        f"Your worktree is already checked out at the correct base: **{base} = {base_sha}**.\n"
+        "\n"
+        "Create your branch from **HEAD**:\n"
+        "\n"
+        "    git checkout -b <branch-name>\n"
+        "\n"
+        "**Never branch from `origin/anything`.** `origin/storied` is many commits\n"
+        "behind local `storied` — local is held unpushed behind a field-test gate.\n"
+        "Branching from origin silently puts your work on a stale tree, and every\n"
+        "live run you make there measures old code (D358).\n"
+        "\n"
+        f"Verify before you commit: `git merge-base --is-ancestor {base_sha} HEAD`\n"
+        "must exit 0. If it does not, you are on the wrong base — fix it first.\n"
+        "\n"
+        "---\n"
+        "\n"
+    )
+
+
 def setup_worktree(task_id, branch, base):
     """
     Isolates one task's work in its own git worktree + branch, checked out
@@ -436,6 +485,8 @@ def worker(task_path_str):
         )
         return
 
+    base_sha = resolve_base_sha(base, WATCH_DIR)
+
     try:
         worktree_path = setup_worktree(task_id, branch, base)
     except subprocess.CalledProcessError as e:
@@ -453,7 +504,8 @@ def worker(task_path_str):
     try:
         start_time = time.monotonic()
         start_iso = now_iso()
-        cmd = ["kiro-cli", "chat", "--trust-all-tools", "--no-interactive", prompt]
+        full_prompt = base_preamble(base, base_sha) + prompt
+        cmd = ["kiro-cli", "chat", "--trust-all-tools", "--no-interactive", full_prompt]
 
         try:
             result = subprocess.run(
@@ -478,13 +530,34 @@ def worker(task_path_str):
 
     session_id = None
     if status == "COMPLETED":
-        session_id = find_session_id(prompt.strip(), worktree_path)
+        session_id = find_session_id(full_prompt.strip(), worktree_path)
+
+    # [D358] Report the base the work ACTUALLY sits on, not the one we asked for.
+    # LOCAL-418's line said base=storied while its commits hung off origin/storied,
+    # 18 commits back. The branch field is likewise a guess -- the agent names its
+    # own branch -- so record what the worktree really has.
+    real_branch = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+        cwd=str(worktree_path), capture_output=True, text=True,
+    ).stdout.strip() or branch
+    stale = ""
+    if base_sha:
+        on_base = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", base_sha, "HEAD"],
+            cwd=str(worktree_path), capture_output=True, text=True,
+        ).returncode
+        if on_base != 0:
+            behind = subprocess.run(
+                ["git", "rev-list", "--count", f"HEAD..{base}"],
+                cwd=str(worktree_path), capture_output=True, text=True,
+            ).stdout.strip() or "?"
+            stale = f" | *** STALE BASE: work is {behind} commits behind {base} ***"
 
     locked_append(
         f"- {status:<10}| task={task_filename} | id=T{task_id} | "
-        f"branch={branch} | base={base} | worktree={worktree_path} | "
+        f"branch={real_branch} | base={base}@{base_sha or '?'} | worktree={worktree_path} | "
         f"session={session_id or 'unknown'} | started={start_iso} | "
-        f"duration={duration_s}s | exit={exit_code} | log={session_log_path}"
+        f"duration={duration_s}s | exit={exit_code} | log={session_log_path}{stale}"
     )
 
 
