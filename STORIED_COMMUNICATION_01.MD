@@ -1300,3 +1300,25 @@ Tomorrow's first move, so you don't have to remember any of it:
 Those are files on disk. They don't decay, and reviewing them is the cheap part — the expensive part was generating them, and that's already paid for.
 
 Sleep well.
+
+It's open in VS Code — TOUR_MFA_UNBOUND_394_MERGED.txt. Short answer: the factual problems are fixed, the framing problem is fixed, the story problem is half fixed.
+
+What you asked for and got. The opening now carries the exhibition's premise — "the rare livre d'artiste (artist's book) art form, known for revolutionizing the book as an artistic medium through deeply collaborative ventures, exploring the intersection of images, words, and typography." That's the MFA's own thesis, from their page.
+
+And stop 1 is now the sentence I'd point you to first:
+
+▎ "Through this collaboration with publisher Louis Broder and printer Mourlot Frères, a renowned French lithographic printing company, Miró revolutionized the concept of a book as a unified artwork. Gifted to the Museum by Boris Fridman, this surrealist masterpiece had no precedent…"
+
+Artist, publisher, printer, donor — all real, all from the credit line, all on the right stop. This morning the same stop said Rousseau painted it.
+
+Stop 2 correctly gives Dalí's 1974 illustrations for Freud. Stop 3 correctly gives Juan Gris with Pierre Reverdy, 1955, framed as a livre d'artiste rather than a ceiling.
+
+Three things I'd want you to see with clear eyes, because I don't think it's finished:
+
+1. Stop 3's Orientation still says "your gaze is drawn upward." The word ceiling is gone, the glass and mural are gone, but the residue of that inference survives in a phrase no gate catches. It's a book in a case; you don't look up at it.
+2. Stop 2 is thin — three sentences, and the shortest of the three. It has the correct facts and nothing more.
+3. "Position yourself at the center of the exhibit" in stop 1, immediately after the Orientation already told you where you are. There's some duplication in the scaffolding.
+
+And the honest limit on your third complaint. The names are now correct and correctly placed, but they're still facts, not stories. "Printer Mourlot Frères, a renowned French lithographic printing company" is the closest the tour comes, and it's an appositive, not a story. Nobody yet learns why Mourlot mattered, what Fridman collected and why he gave it away, or what was at stake in a painter and a poet building a book together. That material isn't on the MFA page — it needs a second grounded source, which is real work and hasn't been started.
+
+So: I'd show this to someone now without embarrassment, which wasn't true twelve hours ago. I wouldn't yet call it a tour someone would pay for.

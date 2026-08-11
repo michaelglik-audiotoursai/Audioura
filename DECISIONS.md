@@ -12480,3 +12480,56 @@ genuinely fire.
 24 tests green across 393/394. **Recorded because the audit happened after the
 merge, not before** — the merge was justified by live evidence on two venues, but
 the order was wrong and the note belongs in the record.
+
+## D320 — The control venue lost 25 points tonight, and LEAD's regression check could not have seen it
+**2026-08-11, 01:3x.** Michael asked whether other tours were getting worse. They
+were, and the way this was missed matters more than the number.
+
+**Palais Lascaris, unscoped, n=4, scored across tonight's live runs:**
+
+| run | base |
+|---|---|
+| palais373 (evening start) | **81.2** |
+| 379 / 385 | 68.8 |
+| 387 / 389 / 390 | 75.0 |
+| 391 | **81.2** |
+| 392 | 75.0 |
+| 393 | 62.5 |
+| **394 (current `storied`)** | **56.2** |
+
+```
+palais391  per_stop_base=[18.75, 18.75, 18.75, 25.0]  quality=0.75
+palais394  per_stop_base=[18.75, 12.50, 12.50, 12.50] quality=0.5625
+```
+
+Three of four stops dropped a quality tier. **The tour is still correct — 4/4
+stops, all dates, nothing fabricated — and it is worse.** Scores vary run to run
+(68.8–81.2 earlier), so this is a strong signal rather than a proven regression;
+62.5 and 56.2 are nonetheless both below the entire earlier range.
+
+**MFA over the same period went 50.0 → 58.3**, with 66.7 on two runs. So the
+exhibition tour improved slightly while the general museum tour declined.
+
+**The methodological failure, which is the real finding.** LEAD verified "museum
+bounds 81.2 (n=4) / 75.0 (n=8)" on every single round tonight and reported them as
+holding. **Those are static fixture files.** Scoring `tours/LOCAL347_museum_4stop
+.txt` tests the scorer against fixed text; it cannot detect a generation
+regression, and it never moved all night — which should itself have been the tell.
+
+**A check that cannot fail is not a check.** That is D242's standing rule, and
+LEAD spent the evening applying it rigorously to agents' tests while running a
+vacuous one of its own. The live Palais generation was already happening on every
+round as the D302 control; scoring its output would have cost nothing and caught
+this at LOCAL-393.
+
+**Corrected practice, effective now:** the control-venue **live output** is scored
+and reported every round. Fixture scores may still be quoted, but must be labelled
+as scorer stability, never as regression evidence. `restart.sh`'s "honest tour
+scores" block needs the same correction — it presents four fixture numbers under a
+heading that invites reading them as current quality.
+
+**Parked as LOCAL-395**, not dispatched, because Michael is stepping away and an
+unclaimed task file is claimed within 5 minutes and spends money unattended
+(CLAUDE.md). It must first establish whether the drop is real — three runs on
+current `storied` versus three on the pre-chain commit — before bisecting, and it
+must not "fix" anything by loosening a gate before the cause is known.
