@@ -13074,3 +13074,35 @@ yesterday, and was stopped. Delivered text: **0 impossible-relation forms**,
 **`"X and Y worked together"` still escapes** — one form of six, recorded and
 handed to 406. Stating the residual precisely matters more than claiming the gate
 is complete.
+
+## D337 — The query fix worked. The prose still won't use what it fetched.
+**2026-08-11, 07:0x.** LOCAL-406 bounced, having fixed the root cause D335
+identified. LEAD verified the queries and snippets directly:
+
+```
+"Le Lezard aux plumes d'or" Joan Miro | "…" history | Louis Broder Joan Miro
+  → "a series of 15 colour lithographs based on Joan Miró's POEM and surrealist fantasy"
+  → "Color lithograph on Japan paper, 1971. Signed and numbered 24/50"
+```
+
+**The snippets are about the object at last**, and `Boris Fridman` reached the
+delivered text for the first time in five rounds.
+
+**And none of the specifics were used.** `poem` = 0, `50` = 0, `japan` = 0. The
+prose still says "resulted in a work that had no precedent and revolutionized the
+book as an art form" — a slogan — while "Miró wrote the poem himself, then drew
+against his own words" sat one layer away, fetched and ignored.
+
+**The failure has moved one hop at a time, all night, and this is the last one:**
+search → extract → inject → *use*. Every previous round fixed a transfer; this one
+is about preference. Given a specific and a generality, the prose picks the
+generality, because nothing tells it not to.
+
+**Blocked on a regression:** `Gris` went 3 → 0. Stop 3 is *Au Soleil du Plafond* by
+Juan Gris and his name is absent. A donor gained is not worth an artist lost —
+the same trade D309 rejected when story cost attribution.
+
+**LEAD error worth recording:** the first snippet probe returned `"" Joan Miro` and
+LEAD nearly reported the title interpolation as broken. It was the probe passing
+`name` where the function expects `canonical_title`. **Check your own harness
+before blaming the code** — the same discipline demanded of every submission.
