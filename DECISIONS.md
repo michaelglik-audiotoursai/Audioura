@@ -13243,3 +13243,40 @@ process, or budget exhaustion returning 400.
 
 Dispatched as LOCAL-409 with the same instruction that has worked three times now:
 **print the failing request and its response body before changing anything.**
+
+## D342 — The Serper account ran out of credits. That is the whole of D341.
+**2026-08-11, 09:4x.** LOCAL-409 merged. Its real contribution is that
+`_serp_search` now prints the request payload and the server's response body
+instead of swallowing `HTTPError` into an opaque `str(e)`. With that in place the
+cause took one command:
+
+```
+HTTP 400 {"message":"Not enough credits","statusCode":400}
+```
+
+**The paid search account is out of credits.** Not query encoding, not accented
+titles, not U+2019, not auth — all of which were plausible and all of which were
+wrong. The submission itself guessed "transient auth/rate issue"; LEAD tested the
+key directly against the API and got the actual message.
+
+**This resolves D341's "contradiction", and the resolution is a correction to how
+LEAD framed it.** Two observations were recorded as irreconcilable: a direct probe
+returning 23 results, and generation returning none. Both were true. Credits were
+being consumed *between* them, by the overnight chain itself. It was a timeline,
+not a code difference — and LEAD reached for "something differs between the two
+call paths" when the simpler answer was "the world changed in between."
+
+**The transferable point:** when two honest observations of the same system
+disagree, check whether an external resource changed between them before
+hypothesising a code path difference. Especially when the system spends money.
+
+**Operational consequence, and it needs Michael:** the overnight chain (rounds
+397–409) consumed the Serper balance. Until it is topped up, the story pipeline
+cannot fetch anything — every improvement merged tonight is real but starved of
+input. The credit-line material still works, which is why the merged tour still
+names Broder, Mourlot and Fridman; the search-only material (Miró writing the poem
+he then illustrated, the edition of 50, the Japan paper) cannot arrive.
+
+**Cost note for the decision:** the chain issued roughly 3–6 SERP queries per stop
+per generation, across ~15 live generations of 3–4 stops. Topping up is a business
+call with a knowable rate; the per-query cost observed earlier was ~$0.001.
