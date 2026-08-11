@@ -1943,10 +1943,20 @@ Rules:
   - NO HALLUCINATED SENSORY CLAIMS: never assert a sensation the listener cannot verify
     (smell, sound, temperature, texture) unless the material states it.
 
-STORY REQUIREMENT (LOCAL-421 — NON-NEGOTIABLE):
+STORY REQUIREMENT (LOCAL-421/423 — NON-NEGOTIABLE):
 Your description MUST contain at least ONE STORY of no fewer than THREE SENTENCES.
 A story = a claim about PEOPLE AND CONSEQUENCES: a relationship, a decision, a dispute,
 a gift, a reason something was made the way it was.
+
+VERIFICATION CONSTRAINT (LOCAL-423 — HARD GATE):
+Every factual claim in your story (dates, numbers, locations, attributions) will be
+verified against the reference material above. If a claim cannot be found in the
+snippets, it will be STRIPPED from the delivered text. DO NOT invent details that
+the snippets do not support — even if you believe them to be true. If the snippets
+say "a Russian collector", do NOT say "a Boston-based collector". If the snippets
+do not state a donation year, do NOT assert one. Write ONLY what the sources confirm.
+Self-contradictions (e.g. "15 lithographs" in one sentence and "40 lithographs" in
+another) cause AUTOMATIC REJECTION — pick one number and cite which snippet supports it.
 
 WHAT COUNTS AS A STORY:
   - "Boris Fridman donated this work to the MFA in 2003. Fridman, a Boston-based collector
@@ -10859,6 +10869,119 @@ Write the story FIRST, then add physical description if space allows.
             print(f"  [LOCAL-421] Story gate import error (non-fatal): {_sg_err}")
         except Exception as _sg_err:
             print(f"  [LOCAL-421] Story gate error (non-fatal): {_sg_err}")
+
+    # [LOCAL-423] STORY VERIFICATION — Michael's Step 4: verify claims against sources.
+    # Verification GATES selection (runs after generation, before delivery).
+    # Every load-bearing claim must trace to a retrieved source.
+    # Entity disambiguation: exclude wrong-person snippets.
+    # Self-contradiction detection: "15 lithographs" + "40 lithographs" = reject.
+    _l423_verification_results = {}
+    if _storied_mode and tour_category == 'museum' and not _phase5_ceiling_breached:
+        try:
+            from story_verifier import verify_story_candidate, disambiguate_snippets
+            print(f"\n  [LOCAL-423] STORY VERIFICATION: checking claims against sources...")
+            _l423_all_pass = True
+            _l423_any_rejected = False
+
+            for _sv_i, _sv_poi in enumerate(poi_list):
+                _sv_desc = _sv_poi.get('description', '')
+                _sv_name = _sv_poi.get('name', f'Stop {_sv_i+1}')
+                if not _sv_desc or _sv_desc.startswith('['):
+                    continue
+
+                # Get credit line for this stop
+                _sv_credit = _sv_poi.get('credit_line', '')
+                if not _sv_credit and _exhibition_checklist_result and hasattr(_exhibition_checklist_result, 'works'):
+                    _sv_matched = match_work_for_stop(_sv_name, _exhibition_checklist_result.works)
+                    if _sv_matched:
+                        _sv_credit = _sv_matched.get('credit_line', '')
+
+                # Get the snippets that were used to generate this stop
+                _sv_snippets = []
+                if _DIRECT_SNIPPETS_PER_STOP:
+                    _sv_snippets = _DIRECT_SNIPPETS_PER_STOP.get(_sv_name, [])
+                    if not _sv_snippets:
+                        _sv_snippets = _DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{_sv_i}__", [])
+
+                _sv_result = verify_story_candidate(
+                    story_text=_sv_desc,
+                    snippets=_sv_snippets,
+                    credit_line=_sv_credit,
+                    stop_name=_sv_name,
+                )
+
+                _l423_verification_results[_sv_name] = _sv_result
+                _sv_status = "✓ PASS" if _sv_result['passed'] else "✗ FAIL"
+                print(f"    {_sv_status} stop='{_sv_name}': "
+                      f"claims={_sv_result['claims_extracted']}, "
+                      f"sourced={_sv_result['claims_sourced']}, "
+                      f"unsourced={_sv_result['claims_unsourced']}, "
+                      f"contradicted={_sv_result['claims_contradicted']}")
+
+                if not _sv_result['passed']:
+                    _l423_all_pass = False
+                    _l423_any_rejected = True
+                    for _sv_reason in _sv_result['rejection_reasons'][:5]:
+                        print(f"      → {_sv_reason}")
+
+                if _sv_result['evidence']:
+                    print(f"      evidence ({len(_sv_result['evidence'])} sourced claims):")
+                    for _ev in _sv_result['evidence'][:3]:
+                        print(f"        claim='{_ev['claim_text']}' ← {_ev['source_url'][:60]}")
+
+                if _sv_result['disambiguation_excluded']:
+                    print(f"      disambiguation: excluded {len(_sv_result['disambiguation_excluded'])} snippets")
+                    for _dex in _sv_result['disambiguation_excluded']:
+                        print(f"        • '{_dex['title'][:50]}': {_dex['reason']}")
+
+            if _l423_all_pass:
+                print(f"  [LOCAL-423] STORY VERIFICATION: ALL STOPS PASSED — all claims sourced")
+            else:
+                print(f"  [LOCAL-423] STORY VERIFICATION: SOME STOPS HAVE UNSOURCED CLAIMS")
+                print(f"  [LOCAL-423] Unsourced claims will be stripped from delivered text")
+
+                # Strip unsourced claims from the delivered text
+                # (Michael's rule: "A claim with no source must not ship")
+                for _strip_name, _strip_result in _l423_verification_results.items():
+                    if _strip_result['passed']:
+                        continue
+                    # Find the corresponding POI and remove unsourced sentences
+                    for _strip_poi in poi_list:
+                        if _strip_poi.get('name') != _strip_name:
+                            continue
+                        _strip_desc = _strip_poi.get('description', '')
+                        if not _strip_desc:
+                            break
+                        # Remove sentences containing unsourced claims
+                        _sentences = re.split(r'(?<=[.!?])\s+', _strip_desc.strip())
+                        _kept = []
+                        _removed = []
+                        _unsourced_texts = {d['text'].lower() for d in _strip_result['unsourced_details']}
+                        _contradiction_texts = set()
+                        for _ct1, _ct2, _ in _strip_result['contradictions']:
+                            _contradiction_texts.add(_ct1.lower())
+                            _contradiction_texts.add(_ct2.lower())
+
+                        for _sent in _sentences:
+                            _sent_lower = _sent.lower()
+                            _has_unsourced = any(ut in _sent_lower for ut in _unsourced_texts)
+                            _has_contradiction = any(ct in _sent_lower for ct in _contradiction_texts)
+                            if _has_unsourced or _has_contradiction:
+                                _removed.append(_sent)
+                            else:
+                                _kept.append(_sent)
+
+                        if _removed:
+                            _strip_poi['description'] = ' '.join(_kept)
+                            print(f"    [LOCAL-423] Stripped {len(_removed)} sentence(s) from '{_strip_name}':")
+                            for _rm in _removed:
+                                print(f"      ✗ \"{_rm[:100]}\"")
+                        break
+
+        except ImportError as _sv_err:
+            print(f"  [LOCAL-423] Story verifier import error (non-fatal): {_sv_err}")
+        except Exception as _sv_err:
+            print(f"  [LOCAL-423] Story verifier error (non-fatal): {_sv_err}")
 
     # [LOCAL-394] 120-word floor enforcement — log stops under minimum but NEVER drop them.
     # The floor is a retry trigger inside _generate_description, not a post-generation filter.
