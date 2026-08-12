@@ -14,15 +14,31 @@ if _MODULE_DIR not in _sys.path:
     _sys.path.insert(0, _MODULE_DIR)
 
 
-def _tour_llm_cost(tokens: int) -> float:
+def story_pass_model() -> str:
+    """The model for the per-stop description call — the story pass only.
+
+    D370: gpt-3.5 cannot sustain a sourced story (0-2 story sentences, gate
+    FAILED); gpt-4o passes it. But setting TOUR_LLM_MODEL=gpt-4o globally makes
+    the tour fail to generate outright — every phase reads that one variable,
+    and gpt-4o read the POI-discovery prompt as "find art venues in Boston",
+    six museums, which BLOCKER4b correctly rejected. The upstream phases are
+    tuned to gpt-3.5's literalism, so the switch has to be exactly this narrow.
+    """
+    return os.environ.get("TOUR_STORY_MODEL", "gpt-4o")
+
+
+def _tour_llm_cost(tokens: int, model: str = None) -> float:
     """Cost of a call at the model actually in use.
 
     LOCAL-197 moved rates into cost_rates.py; LOCAL-194 made the model runtime
     config. Both matter here: pricing a gpt-4o-mini call at gpt-3.5-turbo rates
     overstates our cost ~7x, and Subscribed charges the user 5x that number.
+
+    D370 added `model`: the story pass runs on a different model from the rest
+    of the pipeline, so its caller must pass the model it actually called.
     """
     return _llm_cost(total_tokens=tokens,
-                     model=os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"))
+                     model=model or os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"))
 
 import sys
 import json
@@ -10074,7 +10090,7 @@ Write the story FIRST, then add physical description if space allows.
             description_prompt += _story_reinforcement
 
         description_data = {
-            "model": os.environ.get("TOUR_LLM_MODEL", "gpt-3.5-turbo"),
+            "model": story_pass_model(),  # D370 — story pass only, not the pipeline default
             "messages": [
                 {"role": "system", "content": "You are a knowledgeable museum guide with expertise in art, architecture, and history."},
                 {"role": "user", "content": description_prompt}
@@ -10139,8 +10155,12 @@ Write the story FIRST, then add physical description if space allows.
                     description_text = description_result["choices"][0]["message"]["content"]
 
                     tokens_used = description_result["usage"]["total_tokens"]
-                    call_cost = _tour_llm_cost(tokens_used)
-                    print(f"Stop {stop_num} API call cost: ${call_cost:.4f} ({tokens_used} tokens)")
+                    # D370: price at the model this call actually used, not the
+                    # pipeline default — otherwise a gpt-4o story pass is billed
+                    # at gpt-3.5 rates and Subscribed charges 5x that understatement.
+                    call_cost = _tour_llm_cost(tokens_used, model=description_data["model"])
+                    print(f"Stop {stop_num} API call cost: ${call_cost:.4f} "
+                          f"({tokens_used} tokens, model={description_data['model']})")
 
                     parts = description_text.split("Orientation:", 1)
                     if len(parts) > 1:
