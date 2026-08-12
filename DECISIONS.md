@@ -14687,3 +14687,40 @@ count, because the denominators are not comparable.
 runs of this suite can differ in denominator through added files and renames alone,
 and a count comparison would have read "+1 failure" as a regression while hiding that
 nothing previously green had broken.
+
+## D379 — the 1-hour dispatcher cap kills a worker without recording a terminal state (2026-08-12)
+
+**LOCAL-428 died twice tonight and neither death was the work's fault.** The second:
+started 00:46:15, worker pid gone by 01:54, ~67 minutes elapsed against
+`MAX_RUNTIME_SECONDS = 60*60`. **No `TIMEOUT` record was written** — the log's last
+line for the task was still `STARTED`.
+
+That combination is a trap. `last_status_for()` treats `STARTED`, `COMPLETED`,
+`FAILED` and `TIMEOUT` all as *claimed*, and only `ABANDONED` makes a task eligible
+again. A worker that dies at the cap without writing its record leaves the task
+**permanently claimed and silently dropped** — no error, no queue entry, nothing to
+notice except a pid that stopped existing. Only D246's `kill -0` check surfaces it.
+
+**Rule: a `STARTED` line whose pid is dead and which has no terminal record is an
+ABANDONED task, and LEAD must write that record.** Check it every tick; it is the one
+failure mode the dispatcher cannot report on its own.
+
+**What burned the hour is worth fixing in the task files, not the dispatcher.** The
+run produced three `test_suite_report_*.json` files — 01:10, 01:31, 01:53 — i.e. it
+spent most of its hour re-running the full suite, which takes ~20 minutes a pass. A
+task file that says "no NEW failures against 203/238" invites exactly that. **Give
+tasks the baseline instead of asking them to measure it**, and let LEAD own the suite
+comparison (D378's method: names, not counts).
+
+**No work was lost, and the pattern that saved it is now proven twice:**
+`setup_worktree` returns an existing path untouched, so both killed attempts left
+their trees intact and the second resumed on top of the first. Tests went 6/2 → 8/8
+across the two deaths.
+
+**LEAD finished it rather than re-dispatching a third hour.** Verified independently:
+neutralising `check_part4_attribution` in place reds 2 tests, neutralising
+`should_inject_venue_snippet` reds 2 different tests, and against LEAD's own fixtures
+(not the agent's) the prompt's worked example returns `[]` while D373's real
+misattribution returns `FAIL: date '1974' attributed to 'Au Soleil du Plafond'`.
+Committed as `8d76ac2` on branch `LOCAL-428`; task file parked so the dispatcher
+cannot re-claim it. Palais control is the only acceptance item outstanding.
