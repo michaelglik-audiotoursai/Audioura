@@ -15949,3 +15949,50 @@ type still `str`; flag on → 9/9 green. Regression green at `c7c7534`:
 
 Precedent is D400/D402/D404: unproven wiring does not ride the default path. **LOCAL-448
 dispatched** to fix all three and earn the flag on; LEAD flips it, not the task.
+
+## D409 — LOCAL-448 BOUNCED: it removed a 10s stall and installed a 20s one, ungated
+**2026-08-12, LEAD.**
+
+Defects 1 and 2 are fixed correctly and stand. Exact accent-folded matching only —
+LEAD's three examples (`The Dream of Saint Ursula by Carpaccio`, `Adam and Eve by
+Albrecht Durer`, `Le Panier district of Marseille`) all return `None`. The `tests/`
+import is gone, replaced by the `psycopg2` + env-var pattern the other services use,
+with a WARNING on connection failure. Both verified in the container by the task.
+
+**Standing check 2 was run and cleared.** `fetch_wikipedia_summary_with_provenance` has
+no direct production caller — but `fetch_wikipedia_summary` delegates to it, and that
+has 15 production call sites across `rag_retriever.py`, `story_miner.py` and
+`generate_tour_text.py`. The chain is live, not orphaned.
+
+**Defect 3 is where it went wrong.** Wayback was removed — right — and replaced with
+`_fetch_via_action_api(topic)` on the `wikimedia_cold`, 429 and `requests.Timeout`
+branches. That function loops `['en.wikipedia.org', 'fr.wikipedia.org']` at `timeout=10`
+each. When Wikimedia is down that is 20s, and the first host it tries is the one
+`dead_host_breaker` just marked cold. `is_host_cold`'s own docstring says *"Call this
+BEFORE any network request. If True, short-circuit immediately."* The cold branch now
+does the opposite.
+
+**Measured on both trees** (D242: a regression is a claim about two trees), flag unset,
+`requests.get` patched to sleep its full timeout then raise:
+
+| path | `storied` @ 26b6955 | LOCAL-448 @ 8c442fc |
+|---|---|---|
+| first timeout, not yet cold | 5.0s, 1 call | 25.0s, 3 calls |
+| host already cold | **0.0s, 0 calls** | **20.0s, 2 calls** |
+
+~160s of dead wait on an 8-stop tour, against the ~77s Wayback figure the submission
+itself used to argue for removing Wayback. **And it is ungated:** `_l447_enabled()`
+guards `_fetch_from_stop_corpus`, but all three failure branches are outside it — so
+this rides the default path, which is what D408 gated LOCAL-447 to prevent.
+
+`L447_RETRIEVAL_CHAIN` stays OFF. The task's recommendation to default it ON is not
+refuted on DB-first grounds, but the flag cannot go on while an ungated failure path
+costs 20s per stop.
+
+**LOCAL-449 dispatched**, based on `LOCAL-448-db-first-correctness` so the good work
+carries: cold → return `{}` with zero calls; timeout → `mark_host_cold` then `{}`; and
+`_fetch_via_action_api` must check the breaker per host inside its own loop, since its
+other call sites can all currently spend 20s on a host known to be dead. 429 may keep
+the action-API fallback — it is a rate limit, not a dead host, and that was pre-447
+behaviour — subject to the per-host check. Acceptance is the repro run on both trees
+plus a test that goes red when the cold check is neutralised.
