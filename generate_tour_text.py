@@ -12829,7 +12829,7 @@ REWRITE RULES (all mandatory):
     # -------- [LOCAL-444] PHASE 5.20: Obligation audit --------
     # Post-draft per-stop obligation audit. Runs gpt-4o-mini per stop to identify
     # unfulfilled obligations (pointers that are never dereferenced).
-    # Gated by L444_OBLIGATION_AUDIT env (default ON for audit, OFF for repair loop).
+    # Gated by L444_OBLIGATION_AUDIT env (default OFF, see D404; repair loop also OFF).
     # [LEAD D404] Default flipped to OFF. LEAD measured the audit at mean 4.06s/stop
     # live (3 calls: 3.50/5.81/2.86s) = ~24s added on a 6-stop tour, ~32s on 8 —
     # serial, on the default path, while D395/D402 are actively fighting wall time.

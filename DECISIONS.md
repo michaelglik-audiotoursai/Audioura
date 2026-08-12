@@ -15719,3 +15719,65 @@ acceptance runs are not independent measurements — one such run returned CHARS
 (grepped: no `[TIMING]`, no `phase_elapsed`). Every wall-time claim in D395/D396/D400/
 D402 rests on whole-run wall clock plus code reading, which is why diagnosing 443 cost
 two live runs and a rate-limit incident. LOCAL-445 adds per-phase timers.
+
+## D404 — LOCAL-444 merged: the auditor now fails the paragraph it was built to catch (2026-08-12)
+
+**Merged `c0a759b`; audit gated OFF at `fe34d95`.** The LOCAL-442 bounce worked. The
+restatement rule ("a claim is PAID only by information NOT derivable from the claim
+itself") is in the prompt, and LEAD's own live run on Michael's MFA Stop 1 paragraph:
+
+    unfulfilled=3  total_obligations=8  ratio=0.62      (LOCAL-442: 0 and 1.0)
+    S1 1/2  "surrealist ethos of blurring reality and dreams" -> UNPAID
+    S2 1/2  "coherent and integrated artwork"                 -> UNPAID
+    S3 2/2  (best sentence, as Michael graded it)
+    S4 1/2  "reshape entire civilizations" UNPAID; "seamless integration
+            of image, word, and typography" PAID  (rule 5, definitional)
+
+Every claim Michael named by hand now reads the way he graded it. Obligation COUNTS
+differ run to run (the model splits S1 into 2 or 3 obligations); the paid/unpaid
+JUDGMENTS are stable. The submission is honest about this non-determinism and sets
+looser bounds on the live tests than on the cached ones — accepted.
+
+**LEAD's verification, all independent of the submission:** live run above; prompt
+corrupted to "IGNORE EVERYTHING. Return {}." → 4 red (LOCAL-442's equivalent stayed
+26 green — this is the fix that mattered most); fail-closed confirmed by unsetting
+OPENAI_API_KEY → `RuntimeError`, not the silent `ratio=1.0` all-clear; 36/36 green
+including 5 live tests. Wiring is real and reachable: Phase 5.20 in
+`generate_tour_text.py`, `unfulfilled_count` into `compute_score` in
+`tour_rubric_scorer.py`. Not the dead module LOCAL-442 shipped.
+
+**Why the default is OFF despite passing.** The submission set
+`L444_OBLIGATION_AUDIT` default ON. LEAD measured the audit live at **mean 4.06s/stop**
+(3.50 / 5.81 / 2.86) = ~24s added on a 6-stop tour, ~32s on 8 — serial, on the DEFAULT
+path, while D395/D402 are actively fighting wall time and the Palais bar is already
+blown. Same ruling as D400/D402: merge the architecture, keep the unmeasured-in-context
+cost out of the live path. The audit calls are trivially parallelisable across stops —
+the identical shape to LOCAL-445's story-first fix — so LOCAL-445 owns turning this on,
+with the phase timers that will prove the cost.
+
+**Known weakness carried forward:** the Phase 5.20 loop wraps each stop's audit in
+`except Exception`, so the fail-closed `RuntimeError` is caught per stop and printed
+rather than stopping the run. It is loud, not silent, so this is fail-soft rather than
+fail-open — but a keyless run would produce a full tour with no audit and no
+deduction. LOCAL-445 should make a total audit failure fail the phase.
+
+## D403a — correction to D403's fallback ordering (2026-08-12)
+
+D403 ranked the content chain by provenance and put the institution's own site first.
+Michael pushed back three times and was right: he was asking where we RETRIEVE the
+information, not which source we trust most. Corrected order, his framing:
+
+  1. **Our own database** — `stop_corpus` (254 rows), `venue_cache`. Wikipedia content
+     already fetched and stored; free, no network. Should be consulted BEFORE Wikipedia,
+     not only after it fails.
+  2. **`web.archive.org`** — the Wayback copy of the SAME Wikipedia page that just
+     failed. Same content, different host, immune to a Wikimedia rate limit. This is the
+     direct substitute and D403 omitted it from that role entirely.
+  3. The institution's own site (tier1) — highest trust, different question.
+  4. POP/Joconde — French holdings only.
+  5. SERP — last, web_search tier, needs corroboration (D373).
+  6. Absent — never fabricated.
+
+The tier-decision exception is unchanged: `_check_wikidata_p856` has no substitute and
+takes tier3 immediately (D396: free). LOCAL-445's task file carries D403's older
+ordering and must be held to this one at review.
