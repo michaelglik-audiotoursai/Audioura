@@ -32,7 +32,7 @@ to keep it up — see the entry for Q1 below. That rule is now in `CLAUDE.md`.
 | File | Holds | Who writes | In git? |
 |---|---|---|---|
 | **`STORIED_COMMUNICATION_02.MD`** (this) | the conversation — questions and final answers, in order | LEAD, and Michael | yes |
-| **`ANSWERS.MD`** | an indexed Q&A reference — each real question numbered, linkable, newest first | LEAD | **no — untracked** |
+| **`ANSWERS.md`** | an indexed Q&A reference — each real question numbered, linkable, newest first | LEAD | yes (last commit 2026-08-06) |
 | **`DECISIONS.md`** | binding rulings with the evidence behind them (D1…D413) | LEAD only | yes |
 
 **Michael's understanding was right, with two corrections.** He said this file
@@ -64,9 +64,11 @@ either file, so when a session restarted — which happens constantly by design 
 stop; it was a habit that lived only in one session's context and died with it.
 Fixed by adding the rule to `CLAUDE.md`, which every session reads at startup.
 
-**One thing to fix separately: `ANSWERS.MD` is not in git.** It is untracked — not
-ignored, just never added. A fresh clone of the repo does not have it, and nothing
-backs it up. `STORIED_COMMUNICATION_01.MD` is tracked. Committing it.
+**Both files are in git and safe.** LEAD briefly reported `ANSWERS.md` as untracked —
+that was wrong. The check spelled it `ANSWERS.MD`; the real file is `ANSWERS.md`, and
+macOS finds it either way while git does not. It is tracked, last committed 2026-08-06.
+Worth remembering: on this machine a filename check can pass in the shell and fail in
+git for no reason but case.
 
 **Naming:** Michael wrote "STORED_COMMUNICATIONS_02". The existing file is
 `STORIED_COMMUNICATION_01.MD` — singular, "STORIED". Matched that convention so the
