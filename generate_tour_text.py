@@ -7022,12 +7022,28 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # Three modes: off / log_only / enforce.
         # In enforce mode, unverified stops are removed from poi_list before
         # narration. The tour may be shorter — this is logged explicitly.
+        #
+        # [LOCAL-436] EXEMPTION: Checklist-derived stops (exhibition page works)
+        # are exempt from the existence gate. They are already grounded against
+        # the venue's own page by LOCAL-372 — a stricter check than the gate's
+        # independent-web-evidence requirement. A livre d'artiste on loan for a
+        # temporary exhibition has no Wikipedia article, no OSM node, and no
+        # Wikidata entry, but it IS on the venue's own exhibition page. Two
+        # verifiers asserting different things about the same stops is a
+        # contradiction that makes enforce mode undeliverable for exhibitions.
         _seg_requested_stops = total_stops  # [LOCAL-290] Save original request count for replenishment
+        _seg_checklist_exempt = (
+            _deterministic_fill_used
+            and _exhibition_stops_source in ('checklist', 'partial', 'prose_llm')
+        )
+        if _seg_checklist_exempt:
+            print(f"  [LOCAL-436] EXISTENCE-GATE: EXEMPT — stops sourced from exhibition "
+                  f"{_exhibition_stops_source} (already grounded against venue page by LOCAL-372)")
         try:
             from stop_existence_gate import get_gate_mode, run_existence_gate, verify_stop_existence
 
             _seg_mode = get_gate_mode()
-            if _seg_mode != 'off':
+            if _seg_mode != 'off' and not _seg_checklist_exempt:
                 # Get DB connection (same pattern as LOCAL-212)
                 _seg_conn = None
                 try:
@@ -7076,7 +7092,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 else:
                     print(f"  [LOCAL-245] EXISTENCE-GATE: DB unavailable — gate cannot run, proceeding without")
             else:
-                print(f"  [LOCAL-245] EXISTENCE-GATE: OFF (STOP_EXISTENCE_GATE_MODE=off)")
+                if _seg_checklist_exempt:
+                    pass  # Already logged above
+                else:
+                    print(f"  [LOCAL-245] EXISTENCE-GATE: OFF (STOP_EXISTENCE_GATE_MODE=off)")
         except ImportError as _seg_err:
             print(f"  [LOCAL-245] EXISTENCE-GATE: import failed ({_seg_err}) — proceeding without")
         except Exception as _seg_err:
