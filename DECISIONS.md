@@ -14879,3 +14879,48 @@ two spurious regression hunts in a single night.
 denominator 243 → 247 on the four test files those tasks added.
 
 **Quote 211/247 from here**, and say which 36.
+
+## D384 — the story retry fires and lands one sentence short (2026-08-12)
+
+**Merged `cc057ca`.** LOCAL-431 was asked to earn the right to turn the story gate on,
+and correctly reported **"not yet"** — the outcome the task named as acceptable. It did
+not lower `min_story_sentences`, did not loosen the classifier, and left blocking behind
+`L421_GATE_BLOCKS` (default off). An honest negative result, which is what the
+live-artifact gate exists to make sayable.
+
+**Its diagnosis is the durable part.** The thin stops are not a classifier problem. The
+model satisfies the beat check — the surname is present — without building a story
+sentence: *"Dalí's surrealistic style shines through"*, *"transcends the physical
+boundaries"*. Entities resolve and the thesis threads; only `story_count` fails. The
+classifier is correctly rejecting evaluative prose.
+
+**LEAD ran the Palais control live, because the submission did not.** It reported the
+control by reading the committed 08-11 artifact — but LOCAL-431 changed *generation*
+(it adds an LLM retry when a stop has <3 story sentences), so that artifact was produced
+by code without the change in it. This is LOCAL-427's "structurally unaffected" error in
+a new shape, and it is now a standing rule: **a generation-path change is validated by a
+live run, never by a pre-existing artifact.**
+
+**The live run paid for itself — it produced the finding the submission could not:**
+
+| stop | 08-11 artifact | live on LOCAL-431 |
+|---|---|---|
+| Harpe by Naderman (1780) | 3 ✓ | 3 ✓ |
+| Basse de violon by Testore (1696) | 0 ✗ | **2** ✗ |
+| Sacqueboute ténor by Schnitzer (1581) | 0 ✗ | 0 ✗ |
+
+Gate verdict is unchanged at 1/4, and a count comparison would have called the retry a
+failure. The shape says otherwise: **the retry fires and under-delivers by one
+sentence.** Basse went 0 → 2 on the same stop. That is a solvable gap, not a dead end,
+and it is the opposite conclusion from what the headline number supports. Control itself
+passed: 4/4 stops, 1780/1652/1581/1696 intact, 4/4 coordinates.
+
+**One real weakening merged, and queued for repair.** `check_thesis_threaded` now
+returns `True` unconditionally for `framing_case == 'venue_purpose'`. The complaint was
+legitimate — `_THESIS_KEYWORDS` are livre-d'artiste specific and false-fail a musical
+instrument museum, the D376 pattern. The remedy is not: LEAD's control confirms Palais
+runs as `venue_purpose`, so for that whole class the component is dead code — it cannot
+fail, so it cannot report. The docstring promised a "lighter check"; **"always True" is
+not lighter, it is absent.** Bounded for now because `story_count` still gates and the
+gate does not block, so it merged rather than bounced — LOCAL-432 builds the
+venue-appropriate check against the purpose sentence that is already detected and logged.
