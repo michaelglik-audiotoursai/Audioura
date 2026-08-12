@@ -15129,3 +15129,49 @@ End to end, unpinned, on merged `storied`, from the same location string LOCAL-4
 reported as producing nothing 5 times out of 5. **"MFA Unbound cannot be generated" is
 settled as false**, and the D381/D382 archive path is confirmed working in a full
 delivery rather than only in a fetch test.
+
+## D389 — the fence fix is kept; both of its measurements are harness artifacts (2026-08-12)
+
+**Merged `8225d46`.** `strip_llm_json_fences()` is at module scope, called before
+`json.loads` in the intent path, logs the raw response on failure, and **reds 7 tests
+when neutralised in place**. It is a small defensive fix and it stays. `DECISIONS.md`
+showed as `18 --` in the diffstat; that is a branch-point artifact — the branch predates
+D388's addendum and never touched the file. `git diff --stat storied..HEAD` misleads
+whenever `storied` has moved; compare against the merge base.
+
+**Rejected #1: "15/15 fenced, 100%, deterministic".** `run_local435_intent_fencing.py`
+does **not** call `analyze_tour_intent`. It POSTs to `api.openai.com` with its own
+system message and its own `build_intent_prompt()`. **That is a mirror (D277)** — it
+measures a reimplementation of the prompt, not the production call. The rate is real
+about that script and says nothing about the pipeline. LEAD's production run at 08:16,
+*without* the fence fix, reached `path=prose_llm, works=3` and delivered three stops —
+which cannot happen if production's intent call fenced 100% of the time. The submission
+used its mirror's result to declare D388's "intermittent" wrong; it is the mirror that is
+wrong.
+
+**Rejected #2: "MFA 0/5 tours — the EXISTENCE-GATE drops all 3 stops".** The runs set
+`STOP_EXISTENCE_GATE_MODE=enforce`. **Production default is LOG_ONLY** — LEAD's
+successful run logged `Stop-existence gate mode: LOG_ONLY` and delivered a tour from the
+same input. So 0/5 describes enforce mode, a configuration the task chose, not shipping
+behaviour. The submission half-saw this, guessing LEAD's run "likely used a different
+gate mode", and reported the number as a pipeline property anyway.
+
+**Confirmed and kept: BLOCKER4b fired 0/5**, corroborating D388 and settling it —
+BLOCKER4b is **not** a property of the MFA route. Its appearance in LOCAL-434 was
+downstream of that session's intent failure.
+
+**Fourth instance tonight of one error, and the variations are worth naming:** a measured
+number that describes the measuring apparatus. D385 (n=1 as proof), D388 (n=5 in one
+window as proof of impossibility), D387 (a stale pin bypassing the code under test), and
+now two at once — a mirrored prompt, and a non-default env var. Every one produced a
+confident, wrong conclusion from a real number. **The number is almost always right; what
+it is a number *about* is where these fail.** Standing check for task files: before
+believing a measurement, establish which code path produced it.
+
+**The real find, and it is genuinely valuable.** Under enforce mode the pipeline logs
+`[LOCAL-16 GATE] All 3 stops are D1v2-verified ✓` and the existence gate then drops all
+three. **Two verification systems disagree on the same stops**, and if enforce is ever
+made the default, exhibition tours become undeliverable — the exact class of tour the
+whole LOCAL-42x chain was built to produce. That contradiction is real regardless of the
+current default, and the submission was right to flag it as unproven and hand it up.
+LOCAL-436 resolves it.
