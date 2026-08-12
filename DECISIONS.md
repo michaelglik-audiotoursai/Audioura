@@ -14490,3 +14490,49 @@ The per-call figure was right; the per-tour figure assumed one call per stop.
 the most expensive call in the pipeline is the dominant term, not the base price.
 Still small in absolute terms, but $0.19 is a different conversation from $0.011
 once translations multiply it. Not reverting; recording the true number.
+
+## D373 — the pipeline now finds the exhibition by itself, and the tour got worse
+
+**2026-08-11, 23:2x.** First genuine end-to-end run on merged `storied` (`db12462`),
+no pinning, no fixture. The D371 chain works: name extracted → URL found by search →
+429 detected and retried → third-party fallback → 3 works → `path=prose_llm`. Michael
+asked for the Unbound exhibition with 3 stops; the pipeline produced it unaided.
+
+**And the delivered text is worse than the pinned run of an hour earlier.** Because
+mfa.org is 429ing, the works came from `airmail.news`, which is thinner than the
+museum's own page — so LOCAL-423's verifier, now that LOCAL-424 made it actually
+extract claims, **stripped the best material as unsourced**:
+
+```
+[LOCAL-423] Stripped 2 sentence(s) from 'Le Lézard aux plumes d'or':
+  ✗ "The book was published by Louis Broder, who was renowned for his commitment to the livre d'artiste"
+[LOCAL-423] Stripped 2 sentence(s) from 'Moses and Monotheism':
+  ✗ "Salvador Dalí ... created these illustrations in 1974"
+```
+
+Every one of those sentences is **true and present on the MFA page**. The verifier is
+behaving correctly — it cannot see a source it was never given. Two fixes that were
+each individually right combined to remove the tour's best content.
+
+**Generalisable, and the reason this is worth a decision entry:** verification
+strength is bounded by source quality, so improving the verifier *lowers* delivered
+quality whenever the source is weaker than the claims. Discovery and verification
+must be tuned together. A fallback source is not a free win — it changes what can
+survive verification. **This is what makes LOCAL-426 top priority, not a cleanup
+task.**
+
+**Remaining defects in the delivered text, for the record:**
+- Stop 1 credits **Robert Desnos** as the collaborating poet on *Le Lézard aux plumes
+  d'or*. Unverified and probably a conflation — Desnos worked with Miró on *Les
+  Pénalités de l'Enfer* (1974). Needs checking, and it survived the verifier.
+- Stop 1's orientation says Moses and Monotheism is at "the upcoming stop **Au Soleil
+  du Plafond**". Moses is stop **3**.
+- Stop 2's orientation opens "Reverdy, a pivotal figure..." — no positioning
+  instruction, no antecedent for "their", and drifts to the Boston Athenæum.
+- "published in 1939 by The Hogarth Press" is right for Freud's text and wrong for
+  the object on the wall, which is Dalí's 1974 illustrated edition. Seen twice now.
+- Stops 2 and 3 still carry no Coordinates.
+- Story gate FAILED (story_count 1 and 0) and delivery proceeded — still
+  `informational — does not block delivery`.
+
+**Cost:** 3 gpt-4o story calls, $0.0791 (vs $0.188 on the pinned run, which retried).
