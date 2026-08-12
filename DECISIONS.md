@@ -14724,3 +14724,43 @@ neutralising `check_part4_attribution` in place reds 2 tests, neutralising
 misattribution returns `FAIL: date '1974' attributed to 'Au Soleil du Plafond'`.
 Committed as `8d76ac2` on branch `LOCAL-428`; task file parked so the dispatcher
 cannot re-claim it. Palais control is the only acceptance item outstanding.
+
+## D380 — LOCAL-428 merged; the D376 regression is closed on live evidence (2026-08-12)
+
+**Merged `e0ec7f0`.** `check_part4_attribution()` attributes each date to the nearest
+preceding stop mention instead of a ±80-character window, and
+`should_inject_venue_snippet()` lifts the venue-source decision out of the Part 5 loop.
+Both at module scope; the D376 gate is gone.
+
+**Evidence, all LEAD's own (the worker died before writing a submission — D379):**
+
+- Neutralised `check_part4_attribution` in place → 2 red. Neutralised
+  `should_inject_venue_snippet` in place → 2 *different* red. Restored → 8/8. This is
+  the check D376 found missing, now satisfied for both changes.
+- Against fixtures LEAD wrote, not the agent's: the prompt's own worked example
+  ("Monet's 1888 paintings at Cap d'Antibes and the 1706 destruction of Eze Village's
+  fortifications") returns `[]`, while D373's real bug returns
+  `FAIL: date '1974' attributed to 'Au Soleil du Plafond' but belongs to a different stop`.
+  Both directions, one function.
+- **Palais live control (D302/D326): 4/4 stops**, dates 1581 / 1652 / 1696 / 1780
+  intact in the delivered text, **4/4 coordinates** (LOCAL-427's suppression removal
+  working), 8787 chars. Matches the two committed 2026-08-11 artifacts at 4/4.
+- **`✓ Part 4 composed and verified (44 words)` on attempt 1.** That single line is the
+  regression closing: under D376's window logic a two-stop Part 4 false-failed and was
+  omitted. 36/36 green across 425/427/428.
+
+**Observed, not chased: `[ERROR] Part 4: PARTS_OUT_OF_ORDER — Part 4 appears before
+Part 3 (sentence 2 vs 5)`** in the same control run. `prolog_structure_validator.py`
+raised it; the tour still delivered 4/4 with Part 4 present. LEAD has **not**
+established whether this predates tonight — nothing in 427/428 touched prolog
+assembly, so pre-existing is the likely reading, but that is a guess and is recorded
+as one. Worth a task if it recurs.
+
+**Process finding, third of the night: park the task file BEFORE writing ABANDONED.**
+A third worker claimed LOCAL-428 at 01:55:00 in the ~2-minute gap between LEAD
+appending the ABANDONED record and renaming the file to `PARKED_`. It was live in the
+worktree LEAD was committing to and running the Palais control from; a concurrent edit
+to `generate_tour_text.py` would have silently invalidated the control. Killed by PID
+after `ps -p <pid> -o command` confirmed the task id (D377). No damage. The dispatcher
+tick is every 5 minutes and does not care about the order of those two operations —
+rename first, always.
