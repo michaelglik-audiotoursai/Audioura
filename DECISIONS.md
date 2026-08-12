@@ -14972,3 +14972,50 @@ retry looked like a regression on one sample and was noise; the underlying varia
 the real result, and it only appeared because the control was run twice.
 
 Controls passed both times: 4/4 stops, 1780/1652/1581/1696 intact, 4/4 coordinates.
+
+## D386 — the story gate would reject 100% of Palais tours; and do not calibrate a gate to current output (2026-08-12)
+
+**Merged `933f1d3`.** LOCAL-433 measured what three tasks had been arguing about from
+single runs. Five live Palais runs, per-stop `story_count`, raw data committed as
+`local433_variance_palais.json`. **LEAD recomputed every figure independently from that
+JSON — all reproduce exactly.** No production code was touched: harness, tests and data
+only. Neutralising `compute_statistics` reds 8 tests.
+
+| stop | series | mean | sd | clears 3 |
+|---|---|---|---|---|
+| Harpe (1780) | 0,2,1,1,0 | 0.80 | 0.84 | **0/5** |
+| Sacqueboute (1581) | 0,2,1,1,2 | 1.20 | 0.84 | **0/5** |
+| Violes gambe (1652) | 3,3,1,1,0 | 1.60 | 1.34 | 2/5 |
+| Basse de violon (1696) | 0,0,2,3,2 | 1.40 | 1.34 | 1/5 |
+
+Totals per run 3/7/5/6/4; gate verdicts 1/4, 1/4, 0/4, 1/4, 0/4.
+**All-stops-pass: 0 of 5.**
+
+**`L421_GATE_BLOCKS` cannot be flipped as designed.** Two of four stops never reach 3 in
+any run, and no observed count *exceeds* 3 — the threshold is not a bar the content
+nearly clears, it is above the ceiling. Mean is ~1.25 against a threshold of 3 with
+sd ≈ 1.1. Flipping the flag would make Palais Lascaris permanently undeliverable. D385's
+"blocking would be non-deterministic" was too kind: it would be deterministic refusal.
+
+The submission's recommendation — gate on a tour-level aggregate rather than every stop —
+is sound in structure. A sum of four noisy variables has a lower coefficient of variation
+than any one of them, and it is the right shape for a gate over a metric this noisy.
+
+**But its threshold reasoning is rejected, and this is the durable ruling.** It proposes
+"a threshold at the 20th percentile of current production (≥4 total)", chosen because it
+passes 4 of the 5 runs just measured. **A gate calibrated to current output cannot ever
+fail current output.** It defines whatever the pipeline does today as acceptable, and
+would have certified every tour in this table — including run 1, which delivered three
+story sentences across an entire four-stop tour. That is the LOCAL-423 false green
+arriving through arithmetic instead of through a weakened classifier, and D376 covers it:
+the task forbade "choosing a threshold to fit the data you measured", and this is that.
+
+**A threshold has to come from what a listener needs, not from what the generator
+currently emits.** Whatever number is chosen must be defensible against a tour nobody
+would want to ship. Deciding it is not a measurement task, and it is not blocked on more
+data — it is blocked on someone stating what a good stop sounds like.
+
+**MFA Unbound is unmeasured, honestly reported.** mfa.org still 429s, and the pinned-page
+path does not reach the checklist integration before BLOCKER4b rejects the Phase 3A stops
+as address-scattered. Infrastructure, not refusal. One venue is a thin basis for a
+product-wide gate decision, so this stays open.
