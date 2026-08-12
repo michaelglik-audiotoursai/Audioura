@@ -40,6 +40,14 @@ services:
       - BASE_URL=http://localhost:5000
       - REFERRAL_BASE_URL=http://localhost:5000
       - DATABASE_URL=postgresql://admin:password123@postgres-2:5432/audiotours
+      # db_connection.py deliberately prefers these over DATABASE_URL (see its
+      # docstring). Without them it falls back to its host default localhost:5433,
+      # which is the HOST port mapping and is closed inside the container. D410.
+      - DB_HOST=postgres-2
+      - DB_PORT=5432
+      - DB_NAME=audiotours
+      - DB_USER=admin
+      - DB_PASSWORD=password123
       - PYTHONUNBUFFERED=1
       - VENUE_CACHE_TTL_DAYS=${VENUE_CACHE_TTL_DAYS:-30}
       - VENUE_CACHE_NEGATIVE_TTL_DAYS=${VENUE_CACHE_NEGATIVE_TTL_DAYS:-5}

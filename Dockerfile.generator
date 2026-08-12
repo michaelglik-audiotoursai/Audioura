@@ -5,6 +5,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY *.py /app/
 COPY *.json /app/
 COPY templates/ /app/templates/
+# Shared helpers that live under tests/ but are imported by PRODUCTION modules
+# (style_validator_detector.py:33-34). Without these the container dies with
+# ModuleNotFoundError mid-generation — see D410. Copied to /app so the plain
+# `from db_connection import ...` resolves; the tests/ sys.path.insert above
+# them is a no-op here because /app/tests does not exist.
+COPY tests/db_connection.py tests/stop_anchor_detector_v2.py /app/
 
 # Build-time manifest: record checksums of all Python sources + git SHA
 ARG GIT_SHA=unknown

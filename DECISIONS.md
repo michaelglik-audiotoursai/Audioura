@@ -15996,3 +15996,62 @@ other call sites can all currently spend 20s on a host known to be dead. 429 may
 the action-API fallback — it is a rate limit, not a dead host, and that was pre-447
 behaviour — subject to the per-host check. Acceptance is the repro run on both trees
 plus a test that goes red when the cold check is neutralised.
+
+## D410 — The tour pipeline was fine; the deployment was three years of drift
+**2026-08-12, LEAD.** Michael reported a total failure generating
+"Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA" at N=3, and asked whether
+we should start reverting check-ins. We should not. The repo was never the problem.
+
+**Finding 1 — the running container was not our code.** `/app/generate_tour_text.py` was
+**6,796 lines** against the repo's **15,011**, with **zero `LOCAL-4xx` markers** — it
+predated the entire LOCAL-4xx chain. `/health` said `build_time 2026-08-03`,
+`code_sha unknown`; the image was built Aug 3 but from a context that never picked the
+repo up. No code volume mount on the service (only `./tours`), so this was baked in.
+Anything generated through the app or port 5000 ran pre-LOCAL-4xx code with no
+exhibition checklist, no story chain, no LOCAL-423 claim-stripping, no LOCAL-429
+Cloudflare handling. For a scoped exhibition request that code has no path at all.
+
+**Finding 2 — a `tests/` import that kills the container mid-run.**
+`style_validator_detector.py:32-34` does `sys.path.insert(..., 'tests')` then
+`from db_connection import get_connection` / `stop_anchor_detector_v2`.
+`Dockerfile.generator` copies `*.py`, `*.json`, `templates/` — never `tests/`. In the
+container this is **not** swallowed: `_build_closing_recap` (`generate_tour_text.py:14427`
+→ `:1192`) raises `ModuleNotFoundError` and kills the whole run **at 138s**, after every
+expensive phase is paid for. On the host it works, because `tests/` is on disk. Same
+code, different filesystem — which is why LEAD's host runs have been green throughout.
+This is the third instance of the D408 defect-2 pattern; the other two were silent, this
+one is fatal. Fix: `Dockerfile.generator` now copies the two shared helpers to `/app`.
+
+**Finding 3 — `db_connection.py` defaults to the HOST port from inside the container.**
+Its defaults are `localhost:5433` (the host mapping), and it deliberately prefers
+`DB_HOST`/`DB_PORT` over `DATABASE_URL` (its own docstring says why). The tour-generator
+service in `docker-compose-master.yml` set `DATABASE_URL` but none of the individual
+vars — the orchestrator service sets them, the generator did not. Result: hundreds of
+connection-refused lines from inside the container. Fix: added `DB_HOST=postgres-2`,
+`DB_PORT=5432`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` to that service.
+
+**Finding 4 — `beats_in_delivered_text` is a broken gauge, and LEAD has been reading it.**
+It reports 0 on every stop of every run. `generate_tour_text.py:14958` counts **three
+consecutive ≥5-letter words copied verbatim** from a SERP snippet into the tour — it
+measures plagiarism, not delivery. Prose that paraphrases well scores 0 by construction.
+Independently disproved twice in the same run: `[LOCAL-388] PRE-GATE` reports
+`beats_in_output=3/3, 3/3, 2/2, dropped=[]`, and LEAD's own accent-folded check found
+**8 of 9** named beats in the delivered text (Torf, Juan Gris, Pierre Reverdy, Dalí,
+Freud, Louis Broder, Boris Fridman, Tériade; only Mourlot Frères absent). Two gauges on
+one pipe disagree and 388 is the correct one. Any prior conclusion resting on
+`beats_in_delivered_text=0` is void.
+
+**Result after the fixes.** Container run: `SUCCESS 5651 chars in 156.9s`, **75.0 base**
+at N=3 — the same path the app uses. Host run for comparison: 5232 chars, 170.4s, 66.7
+base. The grounding gates did real work in both: LOCAL-423 stripped an unsourced Boston
+Athenæum claim, and the entity check rejected "Fridman Gallery (NYC, 2013)" as unrelated
+to the collector Boris Fridman.
+
+**Bonus — D405's open item is now measured.** `story_first=40.9s` on the container run.
+The ≤40s claim has been unproven since D405; it is essentially at the threshold, on a
+3-stop tour. Not yet proven at N=8.
+
+**Standing rule added:** `/health` must expose a real `code_sha`, and it must be checked
+against `git rev-parse HEAD` before any field test. `code_sha: unknown` on a running
+service means the deployment is unverifiable and any result from it is void. This one
+sat unnoticed for over a week.
