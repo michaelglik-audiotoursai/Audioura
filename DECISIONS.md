@@ -14764,3 +14764,51 @@ to `generate_tour_text.py` would have silently invalidated the control. Killed b
 after `ps -p <pid> -o command` confirmed the task id (D377). No damage. The dispatcher
 tick is every 5 minutes and does not care about the order of those two operations —
 rename first, always.
+
+## D381 — mfa.org was never rate-limiting us; D373 is closed via the archive (2026-08-12)
+
+**Merged `6024acb`.** LOCAL-429 answered the question LOCAL-427 and LOCAL-428 had both
+been answering wrongly.
+
+**The 429 was never a rate limit.** LEAD reproduced it independently: both our
+`Audioura/2.2 ExhibitionChecker` UA and a current Chrome UA get `HTTP/2 429` with
+`cf-mitigated: challenge`, `server: cloudflare`, and **no `Retry-After`**. It is a
+Cloudflare managed JS challenge (Turnstile). **No amount of backoff could ever have
+succeeded**, and every hour spent retrying was spent against a door that does not open
+for any HTTP client. `robots.txt` sits behind the same challenge. This retires the
+"try again from a cold session" hypothesis carried since D373 — it was never about
+volume or politeness.
+
+The lesson generalises: **a status code is not a diagnosis.** 429 read as "slow down"
+for three tasks; one `curl -I` read the headers and turned it into "you will never get
+in this way". Read the response, not the number.
+
+**The fix: `_fetch_from_wayback()`.** On `cf-mitigated: challenge`, skip the retry
+budget entirely and fetch the page from `web.archive.org`. The MFA's own text, served
+by someone who is not blocking us.
+
+**D373's measurable goal is now fully met.** Delivered text carries **Boris Fridman**
+(1), **Louis Broder** (2) and **Mourlot Frères** (3), and all three are corroborated in
+the archived page committed as `fixtures/mfa_unbound_exhibition_page.html`. Fridman was
+the half that had been missing since D373 — he was only ever on the venue's page.
+
+**`PARTS_OUT_OF_ORDER` was pre-existing, and the validator was the thing that was
+wrong.** It fires on the committed `..._141344.txt` artifact and not on `..._135237.txt`,
+both predating tonight. A sentence primarily serving Part 2 that also names stops was
+being allowed to establish Part 4's structural position through the `raw_p4_indices`
+fallback. Now raw indices already claimed by an earlier part are excluded.
+**The guard was not blinded:** `tests/test_local260_prolog_structure.py`, which asserts
+that genuinely swapped parts still produce `PARTS_OUT_OF_ORDER`, still passes.
+
+**Verification, LEAD's own:** neutralising the ordering fix in place reds
+`test_palais_artifact_no_false_positive`; neutralising `_fetch_from_wayback` reds
+`test_extracts_paragraphs_and_headings`. 51/51 green across 260/427/428/429. Palais
+control 4/4 with 1618/1645/1696 intact.
+
+**Merged with one gap, raised as LOCAL-430 rather than bounced:** the fetch asks for
+`web/2/{url}` and never inspects which snapshot it got. LEAD checked the live redirect
+— `20260812064828`, hours old — so tonight is sound, **but by luck rather than design.**
+Against a venue last crawled in 2019 the same path narrates a long-closed exhibition
+with nothing anywhere saying so. Exhibitions are the one content type where a stale
+archive is wrong rather than merely old. Bouncing would have discarded a verified fix
+that closes D373; the gap is additive and is now queued.
