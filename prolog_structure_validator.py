@@ -338,21 +338,38 @@ def validate_prolog_structure(
     
     # Check order: use PRIMARY assignments only. The FIRST occurrence of each
     # primarily-assigned part must be in sequence 1→2→3→4.
+    # [LOCAL-429] For the ordering check, raw indices are used as fallback ONLY
+    # when a sentence qualifies for Part N raw AND is not primarily assigned to
+    # an earlier part. A sentence primarily serving P2 that also names stops
+    # (raw P4) does not establish Part 4's structural position.
+    _earlier_primary = set()  # indices already claimed by earlier parts
     first_indices = {}
     if part1_indices:
         first_indices[1] = min(part1_indices)
+        _earlier_primary.update(part1_indices)
     if part2_indices:
         first_indices[2] = min(part2_indices)
+        _earlier_primary.update(part2_indices)
     elif raw_p2_indices:
-        first_indices[2] = min(raw_p2_indices)
+        # Only use raw indices not already claimed by Part 1
+        _unclaimed_p2 = [i for i in raw_p2_indices if i not in _earlier_primary]
+        if _unclaimed_p2:
+            first_indices[2] = min(_unclaimed_p2)
+            _earlier_primary.update(_unclaimed_p2)
     if part3_indices:
         first_indices[3] = min(part3_indices)
+        _earlier_primary.update(part3_indices)
     elif raw_p3_indices:
-        first_indices[3] = min(raw_p3_indices)
+        _unclaimed_p3 = [i for i in raw_p3_indices if i not in _earlier_primary]
+        if _unclaimed_p3:
+            first_indices[3] = min(_unclaimed_p3)
+            _earlier_primary.update(_unclaimed_p3)
     if part4_indices:
         first_indices[4] = min(part4_indices)
     elif raw_p4_indices:
-        first_indices[4] = min(raw_p4_indices)
+        _unclaimed_p4 = [i for i in raw_p4_indices if i not in _earlier_primary]
+        if _unclaimed_p4:
+            first_indices[4] = min(_unclaimed_p4)
     
     present_parts_ordered = sorted(first_indices.keys())
     for i in range(len(present_parts_ordered) - 1):
