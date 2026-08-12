@@ -231,10 +231,17 @@ def check_thesis_threaded(description: str, framing_case: str = 'exhibition') ->
     """Check if the exhibition thesis is threaded into the stop description.
 
     For exhibition framing: at least one reference to the art form / collaboration / form.
-    For venue_purpose: lighter check.
+    For venue_purpose: always passes — the venue's purpose IS the thesis and is
+        injected by exhibition_thesis.py's stop block. The story gate checks story
+        content, not venue-purpose phrasing. Enforcing _THESIS_KEYWORDS (which are
+        livre d'artiste-specific) against a music museum or sculpture garden is a
+        false failure. [LOCAL-431]
     For 'none': always passes.
     """
     if framing_case == 'none':
+        return True
+
+    if framing_case == 'venue_purpose':
         return True
 
     if not description:

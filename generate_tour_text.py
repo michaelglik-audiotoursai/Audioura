@@ -10672,6 +10672,58 @@ Write the story FIRST, then add physical description if space allows.
                         except Exception as _beat_retry_err:
                             print(f"  [LOCAL-391] Stop {stop_num}: beat retry check error (non-fatal): {_beat_retry_err}")
 
+                    # [LOCAL-431] Story sentence count enforcement: if the description has
+                    # fewer than 3 story sentences (named person + story verb + consequence),
+                    # retry with an explicit demand for narrative structure. The gate at
+                    # line ~11143 runs AFTER assembly and is informational; this retry runs
+                    # DURING generation and gives the LLM a second chance to write stories.
+                    # Explicitly forbidden: lowering min_story_sentences or loosening the
+                    # classifier (D376). This retry asks the model to restructure, not to
+                    # weaken the bar.
+                    if (_storied_mode and tour_category == 'museum'
+                            and description and not description.startswith('[')
+                            and _attempt < _max_retries):
+                        try:
+                            from story_gate import extract_story_sentences
+                            _l431_story_sents = extract_story_sentences(description)
+                            _l431_story_count = len(_l431_story_sents)
+                            if _l431_story_count < 3:
+                                # Build a retry supplement that names the gap and shows the shape
+                                _l431_needed = 3 - _l431_story_count
+                                _l431_retry_msg = (
+                                    f"STORY SENTENCE DEFICIT: your text has only {_l431_story_count} "
+                                    f"story sentence(s) — need at least 3.\n\n"
+                                    "A story sentence = a named person (full name or surname) + a STORY VERB "
+                                    "(commissioned, donated, chose, published, founded, insisted, collaborated, "
+                                    "established, specialized, assembled, refused, persuaded, visited, met) + "
+                                    "a material consequence.\n\n"
+                                    "WHAT FAILS:\n"
+                                    "  • \"Dalí's surrealistic style shines through\" — no story verb, no consequence\n"
+                                    "  • \"invites you to consider the intersection\" — no person, no action\n"
+                                    "  • \"transcends the physical boundaries\" — evaluative, not narrative\n"
+                                    "  • \"a testament to their collaboration\" — no named person, no specific action\n\n"
+                                    "WHAT PASSES:\n"
+                                    "  • \"Dalí chose Freud's text because he considered Freud foundational to Surrealism.\"\n"
+                                    "  • \"Broder commissioned this work from Miró as part of a campaign to revive the livre d'artiste.\"\n"
+                                    "  • \"Tériade commissioned Gris to illustrate the poems, resulting in 11 lithographs.\"\n\n"
+                                    f"Rewrite the FULL description with at least {_l431_needed} MORE sentences "
+                                    "of the PASSES form. Each must name a person and state what they did. "
+                                    "Keep all existing verified facts. Replace evaluative claims with narrative ones."
+                                )
+                                description_data["messages"].append({
+                                    "role": "user",
+                                    "content": _l431_retry_msg,
+                                })
+                                description_data["temperature"] = min(0.7 + 0.1 * (_attempt + 1), 0.95)
+                                print(f"  [LOCAL-431] Stop {stop_num}: STORY RETRY — "
+                                      f"story_count={_l431_story_count} < 3, "
+                                      f"retrying (attempt {_attempt+2}/{_max_retries+1})")
+                                continue  # retry within the _attempt loop
+                        except ImportError:
+                            pass  # story_gate not available
+                        except Exception as _l431_err:
+                            print(f"  [LOCAL-431] Stop {stop_num}: story retry error (non-fatal): {_l431_err}")
+
                     # [LOCAL-408] Donor name patch: if the provenance says "Gift of [Name]"
                     # and the text says "gift" or "gifted" without the donor's surname,
                     # insert the name. This handles gpt-3.5-turbo's tendency to anonymize donors.
