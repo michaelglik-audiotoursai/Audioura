@@ -54,6 +54,14 @@ _KNOWN_PLACE_NAMES = frozenset({
     'europe', 'america', 'africa', 'asia', 'oceania',
 })
 
+# [LOCAL-432] Non-person entities that match person-name patterns but are not people
+_KNOWN_NON_PERSON_NAMES = frozenset({
+    'wikipedia', 'wikimedia', 'wikidata', 'britannica', 'encyclopedia',
+    'museum', 'gallery', 'collection', 'exhibition', 'catalogue',
+    'historic', 'journal', 'society', 'university', 'institute',
+    'department', 'ministry', 'foundation', 'association',
+})
+
 
 def _is_valid_beat_subject(candidate: str) -> bool:
     """[LOCAL-393] Validate that a beat subject is a PERSON, not a place.
@@ -74,6 +82,10 @@ def _is_valid_beat_subject(candidate: str) -> bool:
 
     # Reject known places (case-insensitive)
     if clean.lower() in _KNOWN_PLACE_NAMES:
+        return False
+
+    # [LOCAL-432] Reject known non-person entities (websites, institutions)
+    if clean.lower() in _KNOWN_NON_PERSON_NAMES:
         return False
 
     # Multi-word: delegate to the canonical person-name detector
@@ -97,10 +109,20 @@ _UNFILLED_ROLE_PATTERN = re.compile(
 # Person + action patterns
 # ---------------------------------------------------------------------------
 
-# Pattern: "published by PERSON" / "printed by PERSON"
+# Pattern: "published by PERSON" / "printed by PERSON" / "made by PERSON"
+# [LOCAL-432] Extended to include crafted/made/built — instrument makers, luthiers
 _PUBLISHED_PRINTED_BY = re.compile(
-    r'(?:published|printed|edited|designed|bound)\s+by\s+'
+    r'(?:published|printed|edited|designed|bound|made|crafted|built|constructed)\s+by\s+'
     r'([A-Z][a-zà-ÿ]+(?:\s+[A-Z][a-zà-ÿ]+){0,3}(?:\s+(?:Frères|Bros|& Co|Press|Éditions))?)',
+    re.UNICODE,
+)
+
+# [LOCAL-432] Pattern: "[instrument/work] by PERSON (City, Year)" — attribution without
+# explicit verb. Matches "a tenor sackbut by Anton Schnitzer (Nuremberg, 1581)".
+_WORK_BY_MAKER = re.compile(
+    r'(?:an?\s+)?(?:[a-zà-ÿ][a-zà-ÿ\s\-]{2,35}?)\s+by\s+'
+    r'([A-Z][a-zà-ÿ]+(?:\s+[A-Z][a-zà-ÿ]+){0,3})'
+    r'\s*\([A-ZÀ-Ü][a-zà-ÿ]+(?:\s+[a-zà-ÿ]+)?,?\s*\d{4}\s*\)',
     re.UNICODE,
 )
 
@@ -175,17 +197,34 @@ def extract_story_beats(page_text: str) -> List[Dict[str, str]]:
     all_fragments = [f for f in all_fragments if len(f) < 500 and '\n' not in f]
 
     for fragment in all_fragments:
-        # --- Published/Printed by ---
+        # --- Published/Printed/Made by ---
         for m in _PUBLISHED_PRINTED_BY.finditer(fragment):
             person = m.group(1).strip()
             verb = fragment[m.start():m.start()+20].split()[0].lower()
             if person.lower() not in seen_people and _is_valid_beat_subject(person):
-                role = 'printer' if 'print' in verb else 'publisher'
+                role = 'printer' if 'print' in verb else ('maker' if verb in ('made', 'crafted', 'built', 'constructed') else 'publisher')
+                action = f"{verb} this work" if role != 'maker' else f"crafted this instrument"
                 beats.append({
                     'person': person,
-                    'action': f"{verb} this work",
+                    'action': action,
                     'source_sentence': fragment.strip(),
                     'role': role,
+                })
+                seen_people.add(person.lower())
+
+        # --- [LOCAL-432] Work by Maker (City, Year) --- instrument/art attribution
+        for m in _WORK_BY_MAKER.finditer(fragment):
+            person = m.group(1).strip()
+            if person.lower() not in seen_people and _is_valid_beat_subject(person):
+                # Extract the year from the parenthetical for the action
+                import re as _re_maker
+                _year_m = _re_maker.search(r'\(.*?(\d{4})', fragment[m.start():m.end()])
+                _year_str = _year_m.group(1) if _year_m else ''
+                beats.append({
+                    'person': person,
+                    'action': f"crafted this instrument{' in ' + _year_str if _year_str else ''}",
+                    'source_sentence': fragment.strip(),
+                    'role': 'maker',
                 })
                 seen_people.add(person.lower())
 

@@ -227,22 +227,32 @@ _THESIS_KEYWORDS = [
 ]
 
 
-def check_thesis_threaded(description: str, framing_case: str = 'exhibition') -> bool:
-    """Check if the exhibition thesis is threaded into the stop description.
+def check_thesis_threaded(
+    description: str,
+    framing_case: str = 'exhibition',
+    venue_purpose: str = '',
+) -> bool:
+    """Check if the exhibition/venue thesis is threaded into the stop description.
 
     For exhibition framing: at least one reference to the art form / collaboration / form.
-    For venue_purpose: always passes — the venue's purpose IS the thesis and is
-        injected by exhibition_thesis.py's stop block. The story gate checks story
-        content, not venue-purpose phrasing. Enforcing _THESIS_KEYWORDS (which are
-        livre d'artiste-specific) against a music museum or sculpture garden is a
-        false failure. [LOCAL-431]
+    For venue_purpose: [LOCAL-432] lighter check — the description must connect to
+        the venue's stated purpose. Extracts key content terms (people, actions,
+        domain nouns) from the venue purpose sentence and requires at least one
+        to appear. A stop that completely ignores why the venue exists fails.
+        Does NOT enforce livre-d'artiste keywords (those are exhibition-specific).
     For 'none': always passes.
+
+    Args:
+        description: the stop's generated text
+        framing_case: 'exhibition' | 'venue_purpose' | 'none'
+        venue_purpose: the venue's detected purpose phrase (from extract_venue_purpose).
+            Required for venue_purpose framing to produce a meaningful check.
     """
     if framing_case == 'none':
         return True
 
     if framing_case == 'venue_purpose':
-        return True
+        return _check_venue_purpose_threaded(description, venue_purpose)
 
     if not description:
         return False
@@ -250,6 +260,89 @@ def check_thesis_threaded(description: str, framing_case: str = 'exhibition') ->
     for pattern in _THESIS_KEYWORDS:
         if re.search(pattern, description, re.IGNORECASE):
             return True
+
+    return False
+
+
+def _check_venue_purpose_threaded(description: str, venue_purpose: str) -> bool:
+    """[LOCAL-432] Check that a stop connects to the venue's stated purpose.
+
+    Extracts meaningful terms from the venue purpose sentence:
+      - Person surnames (bequestor, founder, collector)
+      - Domain nouns (instruments, paintings, sculptures)
+      - Key action words (bequeathed, founded, assembled, collected)
+
+    Requires at least ONE of these terms to appear in the description.
+    This is deliberately lighter than the exhibition check — the venue
+    purpose is context, not thesis — but NOT absent. A stop that completely
+    ignores the venue's reason for existing should be reportable.
+
+    Uses stem-based matching: "instruments" in the purpose matches
+    "instrument" in the description (both share stem "instrument").
+    """
+    if not description:
+        return False
+
+    # If no venue purpose was detected, pass unconditionally (cannot check what
+    # was never found). This preserves the LOCAL-431 behaviour for venues where
+    # extract_venue_purpose returns ''.
+    if not venue_purpose:
+        return True
+
+    desc_lower = description.lower()
+
+    # Extract person surnames from venue purpose (capitalized multi-word names)
+    _surnames = []
+    for m in re.finditer(r'\b([A-Z][a-zà-ÿ]+)\b', venue_purpose):
+        word = m.group(1)
+        # Skip common non-name words that happen to be capitalized (start of sentence)
+        if word.lower() in ('the', 'this', 'that', 'its', 'his', 'her', 'and', 'for',
+                            'was', 'were', 'has', 'had', 'are', 'may', 'not'):
+            continue
+        _surnames.append(word.lower())
+
+    # Extract domain nouns — terms that identify the type of collection
+    _DOMAIN_NOUNS = re.compile(
+        r'\b(instruments?|musical|music|paintings?|sculptures?|collection|antiquit|'
+        r'art|ceramics?|furniture|tapestri|porcelain|textiles?|'
+        r'natural\s+history|archaeological|ethnograph)\w*\b',
+        re.IGNORECASE
+    )
+    _domain_terms = [m.group(0).lower() for m in _DOMAIN_NOUNS.finditer(venue_purpose)]
+
+    # Extract key action words that signal WHY the venue exists
+    _PURPOSE_ACTIONS = re.compile(
+        r'\b(bequeath\w*|found\w*|establish\w*|assembl\w*|collect\w*|'
+        r'donat\w*|preserv\w*|conserv\w*|dedicat\w*|devot\w*|'
+        r'testament|hous\w*|display)\b',
+        re.IGNORECASE
+    )
+    _action_terms = [m.group(0).lower() for m in _PURPOSE_ACTIONS.finditer(venue_purpose)]
+
+    # Combine all terms
+    all_terms = set(_surnames + _domain_terms + _action_terms)
+
+    # Remove overly generic terms that would pass anything
+    _TOO_GENERIC = {'the', 'and', 'for', 'was', 'city', 'in', 'of', 'to', 'a', 'nice'}
+    all_terms -= _TOO_GENERIC
+
+    if not all_terms:
+        # No meaningful terms extracted — cannot check, pass
+        return True
+
+    # Stem-based matching: derive a minimum 4-char stem from each term.
+    # "instruments" → "instrument", "collector" → "collect", "bequeathed" → "bequeath"
+    # Then check if the stem appears anywhere in the description.
+    for term in all_terms:
+        # For short terms (<=5 chars), require exact word match
+        if len(term) <= 5:
+            if re.search(r'\b' + re.escape(term) + r'\b', desc_lower):
+                return True
+        else:
+            # Use the first min(len, stem_len) chars as a stem — at least 5 chars
+            stem = term[:max(5, len(term) - 3)] if len(term) > 7 else term[:max(4, len(term) - 2)]
+            if stem in desc_lower:
+                return True
 
     return False
 
@@ -264,6 +357,7 @@ def verify_stop_story(
     stop_name: str = '',
     framing_case: str = 'exhibition',
     min_story_sentences: int = 3,
+    venue_purpose: str = '',
 ) -> Dict:
     """Verify that a stop meets the LOCAL-421 story requirement.
 
@@ -298,12 +392,17 @@ def verify_stop_story(
         )
 
     # 3. Thesis threading
-    thesis_ok = check_thesis_threaded(description, framing_case)
+    thesis_ok = check_thesis_threaded(description, framing_case, venue_purpose=venue_purpose)
     if not thesis_ok:
-        failures.append(
-            "thesis_missing: no reference to exhibition's art form "
-            "(livre d'artiste, artist's book, collaboration, printed work)"
-        )
+        if framing_case == 'venue_purpose':
+            failures.append(
+                "thesis_missing: description does not connect to venue's stated purpose"
+            )
+        else:
+            failures.append(
+                "thesis_missing: no reference to exhibition's art form "
+                "(livre d'artiste, artist's book, collaboration, printed work)"
+            )
 
     return {
         'passed': len(failures) == 0,
@@ -322,6 +421,7 @@ def verify_tour_stories(
     credit_lines: Optional[Dict[str, str]] = None,
     framing_case: str = 'exhibition',
     min_story_sentences: int = 3,
+    venue_purpose: str = '',
 ) -> Dict:
     """Verify story requirement across all stops in a tour.
 
@@ -330,6 +430,7 @@ def verify_tour_stories(
         credit_lines: dict of stop_name → credit_line
         framing_case: 'exhibition' | 'venue_purpose' | 'none'
         min_story_sentences: minimum story sentences per stop
+        venue_purpose: the venue's detected purpose phrase (for venue_purpose framing)
 
     Returns dict with:
         all_passed: bool
@@ -370,6 +471,7 @@ def verify_tour_stories(
             stop_name=stop_name,
             framing_case=framing_case,
             min_story_sentences=min_story_sentences,
+            venue_purpose=venue_purpose,
         )
         result['stop_name'] = stop_name
         results.append(result)
