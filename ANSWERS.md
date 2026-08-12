@@ -16,6 +16,10 @@ the terminal scroll.**
 
 ## Contents
 
+- [Q24 — Are the docker services working correctly now? Were they broken before?](#q24)
+- [Q23 — Are we ready to continue working on the Storied release? **Answered: yes, pushed**](#q23)
+- [Q22 — Explain "the fleet can't be verified by asking it"](#q22)
+- [Q21 — Why did my tour generation fail completely?](#q21)
 - [Q20 — Status while you were away, 2026-08-04 (LEAD-raised: 2 credentials need rotating)](#q20)
 - [Q19 — Should the billing layer move to `storied`? **Answered: No**](#q19)
 - [Q18 — Translation pricing: what is $2.71 for, can it be cheaper?](#q18)
@@ -36,6 +40,103 @@ the terminal scroll.**
 - [Q3 — What does the $0.53 translation cost consist of?](#q3)
 - [Q2 — Why am I suddenly getting permission requests from Kiro?](#q2)
 - [Q1 — What has been done over the three days?](#q1)
+
+---
+
+<a name="q24"></a>
+## Q24 — "Are the docker services working correctly now? Were they broken before?" (asked 2026-08-12, ~17:10 EDT)
+
+**Yes to both.** Two more services were stale beyond the one that broke your tour, and
+three "unhealthy" flags turned out to be false alarms.
+
+- **`tour-editing-phase2`** was running the *same* pre-LOCAL-4xx generator code that
+  broke your tour. It pins `image: audioura-tour-generator:latest` with no build of its
+  own, so rebuilding the image did not touch it — a container keeps its old image until
+  recreated.
+- **`tour-orchestrator`** 1,865 lines vs the repo's 2,017; **`tour-generation-modernized-1`**
+  539 vs 554. Both rebuilt.
+- **`map-delivery`, `tour-processor`, `voice-control`** have shown `unhealthy` with a
+  failing streak of **23,594** — because their healthcheck runs `curl`, which is not
+  installed in those images. All three answer `HTTP 200` fine.
+
+All 12 comparable services now match the repo; all 8 health endpoints return 200.
+Detail: **D412**. The fix for the underlying blindness is dispatched as **LOCAL-452**.
+
+---
+
+<a name="q23"></a>
+## Q23 — "Are we ready to continue working on the Storied release?" (asked 2026-08-12, ~17:25 EDT)
+
+**Yes — and as of 18:0x the release is pushed.**
+
+Your gate (2026-07-29): the iPhone field test proceeds once the internal score reaches
+**75 at N=8 on the Asian Arts Museum**. Regenerated on current code in the rebuilt
+container: **81.2**, up from the previous 75.0, with real margin instead of none.
+
+```
+tours/LOCAL320_museum_8stop_GATE_ce61b01.txt
+Musée des Arts Asiatiques, Nice · 8 stops · 15,309 chars · 500s
+base score 81.2 · container code_sha ce61b01 · now committed
+```
+
+`storied` pushed to origin: `55b2753..aef068e`. That included merging Track B's work
+from the Windows machine, where both machines had independently allocated **D347** —
+Track A keeps D347–D414, Track B renumbered to D415/D416, and Track B now allocates from
+D500 up.
+
+**Next: the iPhone field test.**
+
+---
+
+<a name="q22"></a>
+## Q22 — "Explain 'the fleet can't be verified by asking it; it has to be diffed'" (asked 2026-08-12, ~17:30 EDT)
+
+**20 of 21 services cannot tell you what code they are running.** Only
+`Dockerfile.generator` accepts a `GIT_SHA` build arg, writes `/app/.git_sha`, and reports
+it via `/health`. Every other service answers `unknown` or has no such file.
+
+That is why stale code hid for over a week. `docker ps` said `Up 8 days`, `/health` said
+`healthy`, and `code_sha: unknown` reads like a missing label, not a warning — while the
+container ran 6,796 lines against the repo's 15,011.
+
+Checking it required, per service: read the build context from `docker-compose-master.yml`,
+find the real source file that context copies, and `md5` it against the container's copy.
+That audit produced **five false positives** on its first pass, because a `find` by
+basename matched the wrong `app.py` for five services that build from their own
+subdirectories. An audit that is easy to get wrong is not a control.
+
+**Dispatched as LOCAL-452:** `GIT_SHA` in all 20 remaining Dockerfiles, `code_sha` in
+every `/health`, a `verify_fleet.sh` that prints service / reported sha / HEAD /
+MATCH-STALE in one command, and a fix for the three `curl` healthchecks. Detail: **D410**,
+**D412**.
+
+---
+
+<a name="q21"></a>
+## Q21 — "Why did my tour generation fail completely?" (asked 2026-08-12, ~16:35 EDT)
+
+**The pipeline was fine. The deployment was three years of drift.** Three separate
+faults, all fixed at `742b355`:
+
+1. **The container was not running your code** — 6,796 lines vs the repo's 15,011, with
+   zero `LOCAL-4xx` markers. Anything generated through the app or port 5000 ran
+   pre-LOCAL-4xx code with no exhibition checklist and no story chain.
+2. **A `tests/` import that kills the container mid-run.**
+   `style_validator_detector.py:33` imports `db_connection` from `tests/`, which
+   `Dockerfile.generator` never copies. It blows up **at 138 seconds**, after every
+   expensive phase is paid for. On the host it works, because `tests/` is on disk — same
+   code, different filesystem, which is why LEAD's runs kept passing and yours did not.
+3. **`db_connection.py` defaults to `localhost:5433` from inside the container** — the
+   host's port mapping, closed there.
+
+Result after the fixes: `SUCCESS 5651 chars in 156.9s`, 75.0 base at N=3, through the
+same path your app uses.
+
+**One thing worth knowing:** `beats_in_delivered_text=0`, which appears on every stop of
+every run, is a **broken gauge** — it counts three consecutive ≥5-letter words copied
+*verbatim* from a search snippet, so good prose scores 0 by construction. `LOCAL-388`
+measures the same thing correctly and reported 8/8. Any conclusion resting on that
+counter is void. Detail: **D410**.
 
 ---
 
