@@ -4316,6 +4316,36 @@ def resolve_final_description(attempts, material_context):
     )
 
 
+def verify_stop_claims(story_text: str, snippets: list, credit_line: str = '',
+                       stop_name: str = '') -> dict:
+    """Verify a single stop's claims against its source snippets.
+
+    This is the production decision function — the same logic that runs inside
+    generate_tour_text after story generation. It:
+      1. Calls verify_story_candidate (from story_verifier)
+      2. Applies D369's vacuous-check: 0 claims extracted → forced FAIL
+      3. Returns the verification result dict
+
+    Extracted as a standalone function so tests can bind to it directly.
+    """
+    from story_verifier import verify_story_candidate
+
+    result = verify_story_candidate(
+        story_text=story_text,
+        snippets=snippets,
+        credit_line=credit_line,
+        stop_name=stop_name,
+    )
+
+    # [LEAD, D369] A verifier that extracted ZERO claims has verified NOTHING.
+    if result['claims_extracted'] == 0:
+        result['passed'] = False
+        result.setdefault('rejection_reasons', []).append(
+            'VACUOUS: 0 claims extracted — nothing was verified')
+
+    return result
+
+
 def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None):
     """
     Generate audio tour text using OpenAI API with geo coordinates.
@@ -10991,23 +11021,12 @@ Write the story FIRST, then add physical description if space allows.
                     if not _sv_snippets:
                         _sv_snippets = _DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{_sv_i}__", [])
 
-                _sv_result = verify_story_candidate(
+                _sv_result = verify_stop_claims(
                     story_text=_sv_desc,
                     snippets=_sv_snippets,
                     credit_line=_sv_credit,
                     stop_name=_sv_name,
                 )
-
-                # [LEAD, D369] A verifier that extracted ZERO claims has verified
-                # NOTHING. Reporting that as "all claims sourced" manufactures
-                # confidence over an unexamined story, and the line gets cited as
-                # evidence. Measured on a real 5-sentence delivered story with six
-                # checkable assertions: extract_claims() returned 0. Until claim
-                # extraction actually works (LOCAL-424), a vacuous pass is a FAIL.
-                if _sv_result['claims_extracted'] == 0:
-                    _sv_result['passed'] = False
-                    _sv_result.setdefault('rejection_reasons', []).append(
-                        'VACUOUS: 0 claims extracted — nothing was verified')
 
                 _l423_verification_results[_sv_name] = _sv_result
                 _sv_status = "✓ PASS" if _sv_result['passed'] else "✗ FAIL"

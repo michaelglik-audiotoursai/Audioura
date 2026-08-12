@@ -1,0 +1,20 @@
+{
+  "The Daughters of Edward Darley Boit": {
+    "status": "VERIFIED",
+    "canonical_title": "John Singer Sargent’s  The Daughters of Edward Darley Boit",
+    "snippet": "ationhood. Level Two showcases cross-cultural influences in 19th-century decorative arts, sculpture, and painting—including John Singer Sargent’s The Daughters of Edward Darley Boit (1882)—and considers the ways artists grappled with the trauma of the Civil War. Level Three explores 20th-century art, highlig",
+    "method": "canonical_title_match",
+    "qid": ""
+  },
+  "The Boating Party": {
+    "status": "DROPPED",
+    "reason": "no canonical match"
+  },
+  "The Fog Warning": {
+    "status": "VERIFIED",
+    "canonical_title": "The Fog Warning",
+    "snippet": "rgeted by employees and told \"No food, no drink, and no watermelon\", which is considered a racial slur in the US. A museum spokesperson said that the warning was actually \"no water bottles\", but conceded that there was no way of definitively proving what was actually said. Regardless, all museum staff deal",
+    "method": "canonical_title_match",
+    "qid": "Q12162390"
+  }
+}

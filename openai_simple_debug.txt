@@ -18,14 +18,21 @@ CRITICAL CONSTRAINT — THIS IS A SINGLE-VENUE MUSEUM TOUR (WORKS-FIRST):
 - NEVER list nearby museums or cultural institutions as stops — they are OUTSIDE this venue.
 - Prefer the museum's most iconic/signature pieces that visitors specifically come to see.
 
+KNOWN WORKS AT THIS VENUE (use these as guidance — include some from this list):
+  #1; #1 Super Cry Baby; #10; #19 Cadences; #2; #3; 1, 2, 3!; 14.2.95/ 15.2.95/1 6.2.95/ 17.2.95/ 09.3.95/ 28.4.95/ 30.4.95/ 01.5.95/ 02.5.95/ 03.5.95/ 4.5.95/ 15.5.95/ 16.5.95/ 17.5.95/ 18.5.95/ 19.5.95/ 20.5.95/ 21.5.95/ 24.6.95/ 25.6.95/ 27.6.95/ 28.6.95; 2,841,792 Berlin Dream; 64 Pounds of Grey; 6:30 AM; A Bejeweled Lady
+Each work should appear ONLY ONCE in your list — do NOT list the same work under multiple names.
+
+
 Return ONLY a JSON array, no other text, no markdown fences:
 [{"name": "...", "address": "..."}, ...]
 
 === OPENAI RESPONSE ===
-[{"name": "The Boating Party", "address": "Museum of Fine Arts, Boston, 465 Huntington Ave, Boston, MA 02115, USA"},
-{"name": "The Daughters of Edward Darley Boit", "address": "Museum of Fine Arts, Boston, 465 Huntington Ave, Boston, MA 02115, USA"},
-{"name": "The Fog Warning", "address": "Museum of Fine Arts, Boston, 465 Huntington Ave, Boston, MA 02115, USA"}]
+[
+{"name": "The Daughters of Edward Darley Boit", "address": "Museum of Fine Arts, Boston, 465 Huntington Ave, Boston, MA 02115"},
+{"name": "The Boating Party", "address": "Museum of Fine Arts, Boston, 465 Huntington Ave, Boston, MA 02115"},
+{"name": "The Fog Warning", "address": "Museum of Fine Arts, Boston, 465 Huntington Ave, Boston, MA 02115"}
+]
 
 === ANALYSIS ===
 Requested stops: 3
-See full chain log: /app/api_call_chain_20260811_181045.txt
+See full chain log: /app/api_call_chain_20260811_225821.txt

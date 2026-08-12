@@ -1,0 +1,93 @@
+{
+  "mode": "threaded",
+  "threads": [
+    {
+      "name": "The Influence of Francis Bartlett's Donations",
+      "description": "This theme explores how the donations by Francis Bartlett have contributed to the Museum's collection, specifically focusing on the acquisition of significant artifacts. The narrative begins with the purchase of a two-handled jar and a bronze statue using Bartlett's funds, highlighting his impact on the museum's early 20th-century acquisitions. The story turns with the addition of a sarcophagus or large urn, demonstrating the continued influence of his donations over time. The payoff is the understanding of Bartlett's lasting legacy within the museum's collection.",
+      "supporting_elements": [
+        "se_004",
+        "se_005",
+        "se_006"
+      ],
+      "stops_covered": [
+        0,
+        1
+      ],
+      "grounded_on": [
+        "se_004",
+        "se_005",
+        "se_006"
+      ],
+      "coverage": 1.0,
+      "evidence_strength": 0.6,
+      "distinctiveness": 1.0,
+      "arc_potential": 0.7,
+      "total_score": 0.84,
+      "weight": 1.0
+    }
+  ],
+  "organizing_principle": "",
+  "per_stop_thread_context": [
+    {
+      "threads_active": [
+        {
+          "name": "The Influence of Francis Bartlett's Donations",
+          "weight": 1.0,
+          "elements_here": [
+            "se_004",
+            "se_005",
+            "se_006"
+          ],
+          "element_summaries": [
+            "The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1",
+            "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Don",
+            "The Museum purchased a sarcophagus or large urn with cover using funds from the Francis Bartlett Don"
+          ]
+        }
+      ],
+      "thread_angle": "[The Influence of Francis Bartlett's Donations] (weight 1.00): The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1; The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Don",
+      "callbacks": []
+    },
+    {
+      "threads_active": [
+        {
+          "name": "The Influence of Francis Bartlett's Donations",
+          "weight": 1.0,
+          "elements_here": [
+            "se_004",
+            "se_005",
+            "se_006"
+          ],
+          "element_summaries": [
+            "The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1",
+            "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Don",
+            "The Museum purchased a sarcophagus or large urn with cover using funds from the Francis Bartlett Don"
+          ]
+        }
+      ],
+      "thread_angle": "[The Influence of Francis Bartlett's Donations] (weight 1.00): The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1; The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Don",
+      "callbacks": [
+        {
+          "from_stop": 0,
+          "element_id": "se_004",
+          "element_text": "The Museum purchased a two-handled jar (amphora) using funds from the Francis Bartlett Donation of 1900.",
+          "thread_name": "The Influence of Francis Bartlett's Donations"
+        },
+        {
+          "from_stop": 0,
+          "element_id": "se_005",
+          "element_text": "The Museum purchased a bronze statue of Mantiklos 'Apollo' using funds from the Francis Bartlett Donation of 1900.",
+          "thread_name": "The Influence of Francis Bartlett's Donations"
+        },
+        {
+          "from_stop": 0,
+          "element_id": "se_006",
+          "element_text": "The Museum purchased a sarcophagus or large urn with cover using funds from the Francis Bartlett Donation of 1912.",
+          "thread_name": "The Influence of Francis Bartlett's Donations"
+        }
+      ]
+    }
+  ],
+  "prolog_promise": "This tour traces the story of The Influence of Francis Bartlett's Donations. This theme explores how the donations by Francis Bartlett have contributed to the Museum's collection, specifically focusing on the acquisition of significant artifacts. The narrative begins with the ",
+  "epilog_payoff": "From John Singer Sargent’s  The Daughters of Edward Darley Boit to The Fog Warning, you have followed the thread of The Influence of Francis Bartlett's Donations."
+}
