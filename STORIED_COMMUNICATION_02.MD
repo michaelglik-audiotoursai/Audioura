@@ -154,3 +154,96 @@ The release is not blocked on engineering. It is blocked on one 3-minute regener
 and your decision to call the gate met.
 
 ---
+
+## Q4 — "Are the docker services working correctly now? Were they broken before?"
+
+**Yes to both.** I had only proven it for `tour-generator`, so I audited all 21 services
+by comparing each container's entrypoint against its own build context.
+
+Two more were stale. **`tour-editing-phase2`** was running the *same* pre-LOCAL-4xx
+generator code that broke your tour — it pins `image: audioura-tour-generator:latest` with
+no build of its own, so rebuilding the image never touched it; a container keeps its old
+image until recreated. **`tour-orchestrator`** was 1,865 lines against the repo's 2,017,
+and **`tour-generation-modernized-1`** 539 against 554. All rebuilt.
+
+The three `unhealthy` flags are false alarms: `map-delivery`, `tour-processor` and
+`voice-control` run `curl` in their healthcheck and curl is not installed in those images.
+Failing streak **23,594**, all three answering `HTTP 200` fine.
+
+My first sweep also produced five false positives by matching the wrong `app.py` — five
+services build from their own subdirectories. Recorded as **D412**, and later partly
+**corrected by D419** (see Q6).
+
+---
+
+## Q5 — "Dispatch the fleet task. Regenerate LOCAL320 and if it holds at 75+, push storied."
+
+**Gate met with margin, and `storied` is pushed.** Regenerated on current code in the
+rebuilt container: **81.2** at N=8, up from 75.0. Committed as
+`tours/LOCAL320_museum_8stop_GATE_ce61b01.txt` so the score is tied to a nameable code
+state — the old artifact was untracked, which was one of my three caveats.
+
+The push was not clean and you should know why: **origin had a commit we did not** —
+Track B from the Windows machine. Merging it conflicted in `DECISIONS.md` because **both
+machines had independently allocated D347**. Track A keeps D347–D414; Track B renumbered
+to D415/D416, content untouched; and Track B now allocates from **D500 up**, written into
+the file. Two machines appending to one file cannot share a counter.
+
+---
+
+## Q6 — "Explain 'the fleet can't be verified by asking it.'" — and my correction
+
+**I was wrong about the cause, and the correction matters more than the original claim.**
+
+What I told you: only `Dockerfile.generator` takes a `GIT_SHA` build arg, so no other
+service can report what code it runs. **False.** 19 Dockerfiles already had
+`ARG GIT_SHA` + `.git_sha`, and compose already passed the arg, a week before any of
+today's work. I probed with `cat /app/.git_sha || echo "(no .git_sha)"`, read the output
+`unknown` as "no mechanism", when it meant "built without GIT_SHA exported".
+
+The real gaps are narrower: a plain `docker-compose build` stamps every image `unknown`,
+only the generator surfaces the sha in `/health`, and nothing aggregates it. **D419.**
+
+That was the second measurement of mine overturned in one day (D413 was the first, on the
+retrieval ordering). Both were caught by re-running my own number — the standing check
+that says to do exactly that.
+
+---
+
+## Q7 — "Kiro CLI is asking to access data from other apps. Is it yours? Should I allow it?"
+
+**It is the executor I dispatch tasks to — and my recommendation was to deny.**
+
+Nothing queued needs it; the one running worker had nothing open outside the repo. The
+grant is persistent rather than per-session, Kiro runs `--trust-all-tools` so it never
+asks before acting, and this repo still has an unrotated credential in pushed git history
+(D223). Denying fails loudly and diagnosably; allowing fails silently and permanently.
+
+Precedent: the 2026-08-06 Downloads/Documents prompts, traced to overnight Kiro sessions
+running whole-home `find` commands hunting a `python3` binary not on PATH. Fixed by
+stating `/usr/bin/python3` as fact in every task file since LOCAL-300. In `ANSWERS.md`.
+
+**Honest limit:** macOS protects `TCC.db`, so I cannot prove which action triggered the
+prompt.
+
+---
+
+## Incidents worth remembering from 2026-08-12
+
+**A task worktree seized port 5000 for about an hour.** LOCAL-454 ran `docker-compose up`
+from `~/audioura-worktrees/LOCAL-454`; compose names its project after the directory, so
+it became `local-454` and its `ports: "5000:5000"` **removed** the canonical
+`audioura-tour-generator-1`. Worktree isolation covers files — not host ports, container
+names, or images. Restored and verified at HEAD; the guard is LOCAL-455's job (D419/D420).
+
+**Writing ABANDONED without parking the task file causes a re-dispatch.** I marked
+LOCAL-452 abandoned and the dispatcher immediately re-claimed it on a premise already
+corrected. The two acts must happen together. Killing the dispatcher is also not enough —
+the detached `kiro-cli-chat` worker survives and must be found by working directory
+(D420).
+
+**Two tasks were stopped mid-flight and salvaged by hand** (LOCAL-452 at 62 min, LOCAL-454
+at 37 min), both with an hour of uncommitted work. Task files now say: commit as soon as
+anything works — partial and committed beats complete and lost.
+
+---
