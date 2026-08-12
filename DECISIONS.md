@@ -14924,3 +14924,51 @@ fail, so it cannot report. The docstring promised a "lighter check"; **"always T
 not lighter, it is absent.** Bounded for now because `story_count` still gates and the
 gate does not block, so it merged rather than bounced — LOCAL-432 builds the
 venue-appropriate check against the purpose sentence that is already detected and logged.
+
+## D385 — story_count is noisy per run; the gate cannot block on a single sample (2026-08-12)
+
+**Merged `080bd72`.** LOCAL-432 fixed both items D384 raised, and both are genuinely
+bound: neutralising `_check_venue_purpose_threaded` reds 3 tests, neutralising the maker
+pattern at its call site reds `test_extracts_maker_from_by_attribution`.
+
+- **`_WORK_BY_MAKER` is a real find.** Beat extraction had no rule for
+  `"[instrument] by [Maker] (City, Year)"` — the construction this entire corpus uses to
+  attribute its works. `_PUBLISHED_PRINTED_BY` matched published/printed/edited, and
+  `_PERSON_ACTION` needs `[Person] [verb]`, so `"a tenor sackbut by Anton Schnitzer
+  (Nuremberg, 1581)"` yielded no usable beat. It also blocklists "Wikipedia", which had
+  been extracted as a person.
+- **`_check_venue_purpose_threaded` replaces D384's dead code** with a check built from
+  the venue's own detected purpose sentence rather than a fixed keyword list, and it can
+  fail — tests both directions.
+
+**The durable finding is not in either task, and it changes what "turn the gate on"
+means.** LEAD ran the Palais control twice on the branch, because LOCAL-432's single run
+showed Harpe collapsing 3 → 0 and that looked like a regression:
+
+| stop | LOCAL-431 live | LOCAL-432 run A | LOCAL-432 run B |
+|---|---|---|---|
+| Harpe (1780) | 3 | 0 | 2 |
+| Violes gambe (1652) | 2 | 1 | 2 |
+| Sacqueboute (1581) | 0 | 3 | 2 |
+| Basse de violon (1696) | 2 | 1 | 1 |
+| **total** | **7** | **5** | **7** |
+| **gate** | **1/4** | **1/4** | **0/4** |
+
+Harpe recovered, so the retry prompt did not regress it. But **the same stop, same code,
+same venue swings by up to 3 story sentences between runs**, and the gate verdict went
+*down* to 0/4 on the run with the higher total. Two consequences:
+
+1. **No single run can establish that the gate would pass.** LOCAL-431's and LOCAL-432's
+   "unproven, handing to LEAD" were both correct, and any future claim of "3/3 reachable"
+   from one run should be rejected on this ground alone.
+2. **A blocking gate would refuse tours non-deterministically** — the same venue
+   delivering on one request and being refused on the next, with no input changed. That
+   is a product property nobody had flagged, and it is a stronger argument against
+   flipping `L421_GATE_BLOCKS` than the current pass rate is.
+
+**Method note, third variant tonight:** D378 and D383 said compare names not counts;
+D384 said read the shape not the headline. This one is *n*=1 is not a measurement. The
+retry looked like a regression on one sample and was noise; the underlying variance was
+the real result, and it only appeared because the control was run twice.
+
+Controls passed both times: 4/4 stops, 1780/1652/1581/1696 intact, 4/4 coordinates.
