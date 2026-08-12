@@ -16150,3 +16150,58 @@ inside the container, cold short-circuit present, Wayback absent from the chain.
 `unknown` or has no `.git_sha` at all, because only `Dockerfile.generator` takes the
 `GIT_SHA` build arg. Until that spreads, the fleet cannot be verified by asking it —
 only by diffing it, as done here. Worth a task.
+
+## D413 — LOCAL-450 merged; and D411's measurement was wrong, so its instruction was too
+**2026-08-12, LEAD.**
+
+**LOCAL-450 is merged at the LEAD-verified level.** Floors hold (`repro449.py`: cold host
+0.0s / 0 calls, first timeout 5.0s / 1 call). D242 check 1 binds both ways — neutralising
+the DB fallback → **6 red**; restoring DB-first ordering → **1 red**
+(`TestLiveWinsWhenHealthy`). Container run: with Wikimedia forced cold, the chain now
+serves **10,285 chars from `stop_corpus` with 0 network calls** — the dead end LOCAL-449
+created is a served stop. Regression green: sq4_merge, palais_fix_lead_fixture,
+local12_fact_retrieval, the 447/448/449 suites (38 passed) plus 14 new.
+
+**D411's conclusion is wrong and is corrected here.** D411 compared
+`_fetch_from_stop_corpus` against `_fetch_via_action_api` — two *components* — and
+concluded live beats the DB, so the order should invert. The chain does not call the
+action API in the common case: enrichment fires only when the REST summary is under 500
+chars. Measured at the **chain** level, flag ON, both trees:
+
+| title | DB-first (pre-450) | live-first (450) |
+|---|---|---|
+| Île Sainte-Marguerite | 1,134 | **13,500** |
+| Musée Picasso | **10,285** | 688 |
+| Port Grimaud | **1,158** | 554 |
+
+Live-first wins hugely on one title and loses badly on two — Musée Picasso **−93%**,
+Port Grimaud **−52%**. D411 asserted a 92% loss from DB-first on the strength of the
+Île row alone; the other two rows say the opposite. **Neither ordering is right**: a
+fixed order cannot know which source holds more for a given title.
+
+This is standing check 3 (CLAUDE.md: re-run the agent's own number against a case whose
+answer you already know) applied to LEAD's own number, and it caught a bad instruction
+that had already been dispatched and executed. LOCAL-450 built what it was told to build,
+correctly; the specification was the defect.
+
+**Why merging is still right.** With `L447_RETRIEVAL_CHAIN` OFF — the default —
+`_fetch_from_stop_corpus` returns `None` immediately, so the ordering never runs. LEAD
+verified both trees are byte-identical with the flag off on all three titles: 13,500 /
+688 / 554. The merge cannot move production behaviour. What it does add unconditionally
+is the cold-branch DB consult, which is strictly better than returning `{}`.
+
+**Known gap carried forward.** The 404, non-200 and empty-extract branches still return
+`{}` without consulting the DB. The 404 case was in LOCAL-450's spec and is the most
+valuable one — a live 404 on a title present in `stop_corpus` is usually a name-form
+mismatch, i.e. **D243**. The submission did not mention these branches at all.
+
+**LOCAL-451 dispatched:** replace ordering with content-based selection — fetch live,
+read the DB, return the richer, log the loser's length so the choice is auditable — and
+close the 404 / non-200 / empty branches. Length is accepted as a first-cut proxy with
+the caveat stated in the task: 10k chars of boilerplate is worse than 700 chars of clean
+prose, and length cannot tell them apart. Flag-OFF byte-identity is now an explicit
+acceptance criterion, checked by LEAD.
+
+**Also standing, unanswered twice:** n=3 is a thin basis for this decision. LOCAL-450 was
+asked to widen the sample and did not respond; LOCAL-451 is asked again, with an explicit
+instruction to say why in one sentence rather than ignore it.
