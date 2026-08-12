@@ -14,6 +14,139 @@ if _MODULE_DIR not in _sys.path:
     _sys.path.insert(0, _MODULE_DIR)
 
 
+def check_part4_attribution(part4_text: str, stop_data: list) -> list:
+    """Check that Part 4's '<fact> at <stop name>' attributions are correct.
+
+    Part 4 is 1–2 sentences naming one fact from each of ≥2 stops, using the
+    pattern "<fact> at <stop name>".  The correct scope is the attribution
+    clause terminated by a preposition + stop name — NOT a fixed character
+    window.
+
+    Algorithm:
+      1. Find every "at/of/in <stop name>" pattern in the text — these are
+         explicit attribution markers that bind preceding facts to a location.
+      2. Stop names appearing WITHOUT a preceding preposition are treated as
+         fact content (e.g. "Moses and Monotheism" is a work title, not a
+         location attribution).
+      3. Each date is attributed to the NEXT attribution marker after it
+         (since the Part 4 pattern is "<fact with date> at <stop>").  Dates
+         after the last marker are attributed to that last marker's stop.
+      4. For each date, verify it exists in the attributed stop's description.
+         If it belongs to a different stop, report a misattribution.
+
+    Returns a list of error strings (empty means pass).
+    """
+    import re as _re
+    if not part4_text or not stop_data:
+        return []
+
+    _p4_lower = part4_text.lower()
+
+    # Step 1: find "at/of/in <stop_name>" attribution markers
+    _attribution_markers = []  # list of (prep_start, stop_name_end, stop_dict)
+    for _s in stop_data:
+        _sn_lower = _s['name'].lower()
+        _pattern = r'\b(at|of|in)\s+' + _re.escape(_sn_lower)
+        for _m in _re.finditer(_pattern, _p4_lower):
+            _attribution_markers.append((_m.start(), _m.end(), _s))
+
+    # Fallback: if no preposition-based markers found, locate stop names directly
+    if not _attribution_markers:
+        for _s in stop_data:
+            _sn_lower = _s['name'].lower()
+            _pos = _p4_lower.find(_sn_lower)
+            if _pos != -1:
+                _attribution_markers.append((_pos, _pos + len(_sn_lower), _s))
+
+    if len(_attribution_markers) < 1:
+        return []
+
+    _attribution_markers.sort(key=lambda x: x[0])
+
+    # Step 2: find all 4-digit year dates
+    _all_dates = [(m.start(), m.group()) for m in _re.finditer(r'\b(\d{4})\b', _p4_lower)]
+
+    _errors = []
+    for _date_pos, _date_val in _all_dates:
+        # Skip dates that fall inside a stop-name mention (part of the name itself)
+        _inside_name = False
+        for _mk_start, _mk_end, _ in _attribution_markers:
+            if _mk_start <= _date_pos <= _mk_end:
+                _inside_name = True
+                break
+        if _inside_name:
+            continue
+
+        # Attribute to the NEXT marker after the date (pattern: "<fact> at <stop>")
+        _attributed_stop = None
+        for _mk_start, _mk_end, _mk_stop in _attribution_markers:
+            if _mk_start > _date_pos:
+                _attributed_stop = _mk_stop
+                break
+        if _attributed_stop is None:
+            # Date after all markers — attribute to last stop
+            _attributed_stop = _attribution_markers[-1][2]
+
+        # Verify: the date must appear in the attributed stop's description
+        _attr_desc_lower = _attributed_stop['description'].lower()
+        if _date_val not in _attr_desc_lower:
+            # Is it in a DIFFERENT stop's description? (misattribution)
+            _other_has_it = any(
+                _date_val in other['description'].lower()
+                for other in stop_data
+                if other['name'] != _attributed_stop['name']
+            )
+            if _other_has_it:
+                _errors.append(
+                    f"FAIL: date '{_date_val}' attributed to "
+                    f"'{_attributed_stop['name']}' but belongs to a different stop")
+
+    return _errors
+
+
+def should_inject_venue_snippet(exhibition_checklist_result, stop_name: str = '') -> dict:
+    """Decide whether the venue's own page text should lead the verification snippet list.
+
+    When the source is the venue itself (not a third-party review site), the
+    venue page IS the authoritative source and its text should be the first
+    verification snippet so claims grounded in it survive verification.
+
+    Args:
+        exhibition_checklist_result: The result object from find_exhibition_checklist.
+            Must have: is_third_party (bool), page_text (str), content_url/exhibition_url (str).
+        stop_name: Name of the stop (for logging/diagnostics).
+
+    Returns:
+        dict with keys:
+            'inject': bool — whether to inject the venue snippet
+            'snippet': dict|None — the snippet dict ready to prepend, or None
+            'reason': str — why injection was or was not chosen
+    """
+    if not exhibition_checklist_result:
+        return {'inject': False, 'snippet': None, 'reason': 'no exhibition_checklist_result'}
+
+    if getattr(exhibition_checklist_result, 'is_third_party', False):
+        return {'inject': False, 'snippet': None,
+                'reason': 'source is third-party, not venue'}
+
+    _page_text = getattr(exhibition_checklist_result, 'page_text', '') or ''
+    if not _page_text or len(_page_text) <= 50:
+        return {'inject': False, 'snippet': None,
+                'reason': f'page_text too short ({len(_page_text)} chars)'}
+
+    _url = (getattr(exhibition_checklist_result, 'content_url', '') or
+            getattr(exhibition_checklist_result, 'exhibition_url', '') or '')
+
+    _snippet = {
+        'title': f"Venue Exhibition Page — {stop_name}" if stop_name else "Venue Exhibition Page",
+        'snippet': _page_text[:5000],
+        'url': _url,
+    }
+
+    return {'inject': True, 'snippet': _snippet,
+            'reason': f'venue source, {len(_page_text)} chars from {_url}'}
+
+
 def story_pass_model() -> str:
     """The model for the per-stop description call — the story pass only.
 
@@ -11059,24 +11192,15 @@ Write the story FIRST, then add physical description if space allows.
                     if not _sv_snippets:
                         _sv_snippets = _DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{_sv_i}__", [])
 
-                # [LOCAL-427] Inject venue page text as a verification snippet when
-                # the source is the venue itself (not a third-party). The venue page
-                # IS the authoritative source — claims grounded in it should survive.
-                if (_exhibition_checklist_result
-                        and not getattr(_exhibition_checklist_result, 'is_third_party', False)):
-                    _venue_page_text = getattr(_exhibition_checklist_result, 'page_text', '') or ''
-                    _venue_content_url = getattr(_exhibition_checklist_result, 'content_url', '') or \
-                                         getattr(_exhibition_checklist_result, 'exhibition_url', '')
-                    if _venue_page_text and len(_venue_page_text) > 50:
-                        # Insert at the front — venue source is highest priority
-                        _sv_snippets = [{
-                            'title': f"Venue Exhibition Page — {_sv_name}",
-                            'snippet': _venue_page_text[:5000],
-                            'url': _venue_content_url,
-                        }] + list(_sv_snippets)
-                        if _sv_i == 0:
-                            print(f"    [LOCAL-427] Venue page text injected as verification source "
-                                  f"({len(_venue_page_text)} chars from {_venue_content_url})")
+                # [LOCAL-427/428] Inject venue page text as a verification snippet when
+                # the source is the venue itself (not a third-party). Decision logic
+                # is now at module scope as should_inject_venue_snippet() — testable.
+                _venue_inject = should_inject_venue_snippet(_exhibition_checklist_result, _sv_name)
+                if _venue_inject['inject']:
+                    _sv_snippets = [_venue_inject['snippet']] + list(_sv_snippets)
+                    if _sv_i == 0:
+                        print(f"    [LOCAL-427] Venue page text injected as verification source "
+                              f"({_venue_inject['reason']})")
 
                 _sv_result = verify_stop_claims(
                     story_text=_sv_desc,
@@ -13416,56 +13540,14 @@ RULES:
                                     f"FAIL: vague language detected in Part 4")
                                 break
 
-                        # [LOCAL-427] Cross-reference validation: when Part 4 says
-                        # "<fact> at <stop name>", verify the fact is in THAT stop's
-                        # description, not a different stop. Catches the bug where
-                        # "Moses and Monotheism" content is attributed to "Au Soleil du Plafond".
-                        # [LOCAL-428] DISABLED at merge. The ±80-char window below
-                        # false-fails the Part 4 the prompt itself asks for: a 1-2
-                        # sentence connective naming one date from each of two stops
-                        # puts BOTH dates inside BOTH windows, so each date looks
-                        # misattributed. Failure omits Part 4 entirely (see the
-                        # `_p4_success` else-branch) — i.e. this deletes exactly the
-                        # cross-stop callbacks the rubric pays +50% for. Re-enable
-                        # only with sentence-scoped clause splitting and a test that
-                        # goes red when it is neutralised. See D376.
-                        for _p4s in ([] if True else _p4_stop_data):
-                            _sn_lower = _p4s['name'].lower()
-                            # Find position of stop name in Part 4 text
-                            _sn_pos = _p4_lower.find(_sn_lower)
-                            if _sn_pos == -1:
-                                # Try significant sub-parts
-                                _sig_parts = [p for p in _sn_lower.split() if len(p) > 4
-                                              and p not in ('saint', 'sainte', 'ville')]
-                                for sp in _sig_parts:
-                                    _sn_pos = _p4_lower.find(sp)
-                                    if _sn_pos != -1:
-                                        break
-                            if _sn_pos == -1:
-                                continue  # Stop not mentioned in Part 4
-
-                            # Extract the clause around this stop name (±80 chars)
-                            _clause_start = max(0, _sn_pos - 80)
-                            _clause_end = min(len(_p4_lower), _sn_pos + len(_sn_lower) + 80)
-                            _clause = _p4_lower[_clause_start:_clause_end]
-
-                            # Check dates in this clause belong to this stop
-                            _clause_dates = re.findall(r'\b(\d{4})\b', _clause)
-                            _this_stop_desc_lower = _p4s['description'].lower()
-                            for _cd in _clause_dates:
-                                if _cd not in _this_stop_desc_lower:
-                                    # Date is near this stop's name but not in this stop's content
-                                    # Check if it's in another stop's content (misattribution)
-                                    _other_has_it = any(
-                                        _cd in other['description'].lower()
-                                        for other in _p4_stop_data
-                                        if other['name'] != _p4s['name']
-                                    )
-                                    if _other_has_it:
-                                        _p4_verified = False
-                                        _p4_verification_log.append(
-                                            f"FAIL: date '{_cd}' attributed to "
-                                            f"'{_p4s['name']}' but belongs to a different stop")
+                        # [LOCAL-428] Cross-reference validation via clause-scoped
+                        # attribution. Replaces the broken ±80-char window from
+                        # LOCAL-427 (see D376). Now at module scope as
+                        # check_part4_attribution() — testable and correct.
+                        _p4_xref_errors = check_part4_attribution(_p4_text, _p4_stop_data)
+                        for _xref_err in _p4_xref_errors:
+                            _p4_verified = False
+                            _p4_verification_log.append(_xref_err)
 
                         if _p4_verified:
                             _p4_success = True
