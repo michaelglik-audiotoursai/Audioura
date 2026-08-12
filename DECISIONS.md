@@ -15304,3 +15304,55 @@ introduces the budget as a named module constant, initialised from the measured 
 web_search 0.5). Per-STORY score does not exist but all ingredients do: source
 provenance, verification outcome, specificity (person+date+consequence). LOCAL-438
 builds it plus the packing selector; beat-supply enrichment is a separate follow-up.
+
+## D393 — story quality is trust × interest, and our gate fails Michael's best story (2026-08-12)
+
+**Michael challenged the quality evaluation with a hand-built story** for Le Lézard aux
+plumes d'or (the destroyed 1967 edition / 1971 triumph narrative, built by his 4-step
+process: fact→stop→exhibition connection, story-seeking query, candidate evaluation,
+size adaptation). **LEAD ran his final 3-sentence story through the real gate:**
+
+```
+story sentences counted: 1 of 3 → FAIL
+  entities_blurred: Boris Fridman, Mourlot Frères not named in text
+  thesis_missing: no livre d'artiste / collaboration keyword
+```
+
+The best story anyone has produced for this stop fails our gate. Three defects:
+
+1. **The story-verb vocabulary is blind to struggle.** "Miró recreated the work on new
+   plates, while printers spent years perfecting the paper chemistry" was NOT counted —
+   person+action+consequence, but "recreated"/"perfecting" are not in the verb list,
+   which is tuned to publishing acts. Michael's story is built from struggle verbs
+   (destroyed, scrapped, recreated, salvaged) — the emotional core is exactly what the
+   classifier cannot see. (Sentence 3, "stands as a symbol of resilience", was correctly
+   rejected — evaluative, not story.)
+2. **`entities_blurred` punishes editorial judgment.** His summary dropped the
+   credit-line names for concision — correct storytelling, flagged as a failure.
+3. **The exhibition thesis check is still a keyword list** — the same disease LOCAL-432
+   cured on the venue_purpose side.
+
+**And the LOCAL-438 score composition as specced would rank his story LAST:** its source
+is web search (provenance weight 0.5) vs a dry catalogue line at 3.0. Provenance measures
+trustworthiness; LEAD had let it stand in for interestingness. Different axes.
+
+**Michael's evaluation criteria, now binding:**
+- PRO: emotional content (tension/resolution arc)
+- PRO: new information beyond what the visitor can see standing at the stop
+- CON: telling visitors what they should want or feel
+- Candidates are compared for interestingness; size is adapted (expand via follow-up
+  query if too small, summarize to ~3 sentences if too large — the D392 packing partner)
+
+**The synthesis: quality = verification (hard gate) × interest (score).** A story must
+be TRUE first — his 1967-scrap narrative came from a Google AI answer with opaque
+citations, and LEAD cannot confirm it; the Desnos incident (D373) is the standing warning
+that emotionally satisfying narratives get fabricated. So verification stays a hard gate
+via fetched sources (the LOCAL-423/424 machinery), and provenance weights rank only among
+VERIFIED stories. Interest is scored on Michael's axes and is what ranks them.
+
+**Plan:** LOCAL-438 (packing, in flight) lands first — its selector and worked example
+are unaffected. LOCAL-439 then: widen the story-verb vocabulary, fix entities_blurred,
+replace the exhibition thesis keyword list, split the score into trust × interest.
+**Acceptance fixture: Michael's 3-sentence Miró story counts 2 story sentences and the
+gate's other two failures do not fire.** His 4-step generation pipeline is a follow-on
+task after 439.
