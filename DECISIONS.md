@@ -15781,3 +15781,54 @@ information, not which source we trust most. Corrected order, his framing:
 The tier-decision exception is unchanged: `_check_wikidata_p856` has no substitute and
 takes tier3 immediately (D396: free). LOCAL-445's task file carries D403's older
 ordering and must be held to this one at review.
+
+## D405 — LOCAL-445 merged: the loop is parallel, the phases are timed, dead hosts stay dead (2026-08-12)
+
+**Merged.** Three parts, all verified independently by LEAD:
+
+- **Across-stop parallelism.** `story_first_pipeline_batch()` replaces the serial
+  `for _sf_idx, _sf_poi in enumerate(poi_list)` loop with a pool under a single
+  tour-level `STORY_FIRST_TOUR_BUDGET_SECONDS = 40.0`; the 25s per-stop budget survives
+  as an inner guard. This is the D402 defect fixed at its actual location.
+- **Phase timing.** `phase_timer.py`, 13 call sites in `generate_tour_text.py`. The
+  codebase had NO phase instrumentation — every wall-time claim in D395/D396/D400/D402
+  was whole-run wall clock plus code reading, which is what made diagnosing LOCAL-443
+  cost two live runs and a rate-limit incident.
+- **Dead-host breaker** (D403). `dead_host_breaker.py`: first timeout or 429 marks the
+  host cold for the run; later calls short-circuit with no network. Wikimedia hosts are
+  bucketed as one logical host, so a 429 on `en.wikipedia.org` also cools
+  `query.wikidata.org` — failing over between them was always a wasted round trip.
+  Wired into `work_story_searcher._check_wikidata_p856` and
+  `venue_resolver._search_entities`, the two paths that previously had no fallback.
+
+**LEAD verification:** 19/19 green; `mark_host_cold` neutralised to a no-op → **7 red**
+(including `test_p856_no_network_after_cold` and `test_wikimedia_429_makes_all_wikimedia_cold`),
+so the tests bind to production, not a mirror. Wiring confirmed reachable at both call
+sites. `L440_STORY_FIRST` and `L444_OBLIGATION_AUDIT` both still default false after the
+merge.
+
+**Unproven and stated as such:** no live Palais run confirming story-first ≤40s. The
+budget enforces it mechanically and the phase timer will now prove it, but the number is
+not measured. Also unmeasured, and it is LEAD's own error to carry: **the content
+fallback chain's Wayback step has never been pointed at a Wikipedia page.** LOCAL-429/430
+built that path for museum sites behind Cloudflare. LEAD recommended it to Michael as
+"the direct substitute" for a failed Wikipedia fetch on no evidence. Recorded honestly in
+D403a; the breaker only supplies the `is_host_cold()` predicate — the chain itself is
+still not implemented at the fetch call sites.
+
+## D406 — Michael's LLM-as-Wikimedia-substitute question goes to measurement, not deployment (2026-08-12)
+
+Michael: an LLM asked for facts it remembers from Wikimedia may return faster and more
+reliably when Wikimedia is failing — check it. Dispatched as LOCAL-446, framed strictly
+as measurement: 40-entity ground truth harvested live from Wikimedia first, then
+gpt-4o-mini and gpt-4o probed against it, reporting correct/wrong/**abstained**
+separately, with **confident-and-wrong rate as the headline number**.
+
+The tension is explicit in the task file: LLM parametric memory is precisely the
+fabrication source D373 exists to exclude, and LOCAL-442 failed by letting a model
+certify its own restatement. So the task is written adversarially — "fast but wrong 30%
+of the time, therefore unusable" is called out as a complete and expected answer, and
+prompt-tuning until the numbers look good is forbidden. Nothing is wired into
+`generate_tour_text.py` by this task. The only shape LEAD would later consider merging:
+LLM output enters at web_search tier or below, never asserted without corroboration from
+a fetched source, labelled in provenance as model-memory.
