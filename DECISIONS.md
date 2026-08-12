@@ -14852,3 +14852,30 @@ Broder**, **Mourlot Frères**, with `ARCHIVED SOURCE` logged. Palais control 4/4
 the case where the new check must *not* reject good content. A staleness bound is
 exactly the kind of guard that silently deletes a working source; this one is pinned
 open as well as closed.
+
+## D383 — post-430 suite is 211/247; run_local293/294 are a known-flaky pair (2026-08-12)
+
+Fresh full run on `d0bb9a4`: **211 passed / 36 failed of 247**. Compared by failure
+**name** against D378's post-427 list of 36 (D378's method — names, never counts):
+
+- newly failing: `tests/run_local294_verification.py`
+- newly passing: `tests/run_local293_verification.py`
+- every other one of the 36 is unchanged
+
+**They traded places, and neither is a regression.** `run_local294_verification.py`
+returned exit 0, then 1, then 0, 0, 0 across five standalone runs — non-deterministic
+by demonstration, not by argument. It contains **zero references** to
+`exhibition_checklist`, `wayback`, or `prolog_structure` — none of what 429 or 430
+touched. Its soft-failure line is `FAILED: Could not resolve area`; both scripts depend
+on live geocoding / Wikidata SPARQL that intermittently times out. D378 recorded the
+mirror-image event for 293 (failed once in-suite, passed 3/3 standalone).
+
+**Treat `run_local293_verification.py` and `run_local294_verification.py` as one
+known-flaky family.** A future tick seeing either flip should re-run it standalone a
+few times and move on, not open a task. Chasing them individually would have produced
+two spurious regression hunts in a single night.
+
+**No regression from LOCAL-429 or LOCAL-430.** Passed count rose 207 → 211 and the
+denominator 243 → 247 on the four test files those tasks added.
+
+**Quote 211/247 from here**, and say which 36.
