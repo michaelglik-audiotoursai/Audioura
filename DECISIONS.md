@@ -16107,3 +16107,46 @@ front of a path that usually succeeds.
 consulting the DB before returning `{}` — still zero network calls, so LOCAL-449's floors
 (cold 0 calls, timeout 5.0s/1, 429 1 call) survive as the acceptance bar. `repro449.py`
 is committed at the repo root and is the instrument.
+
+## D412 — Docker fleet audit: two more stale containers, three false alarms
+**2026-08-12, LEAD.** Michael asked whether the docker services are working now and
+whether they were broken before. D410 only proved it for `tour-generator`, so LEAD
+audited all 21 services by comparing each container's entrypoint file against its
+**own build context** from `docker-compose-master.yml`.
+
+**Method note, and a caught mistake.** The first sweep resolved every service whose CMD
+is `app.py` to the repo-root `./app.py` and reported six DIVERGED. That was wrong —
+`user-api-2`, `tour-update`, `coordinates-fromai`, `map-delivery` and `voice-control`
+each build from their own subdirectory, and `treats` copies `treats_service.py` to
+`app.py`. Resolved against the real contexts, all six MATCH. This is CLAUDE.md's "read
+the code, do not pattern-match it" — a `find`-by-basename produced five false positives.
+
+**Genuinely stale (all now rebuilt and verified MATCH):**
+- `tour-editing-phase2` — pinned to `image: audioura-tour-generator:latest` with no build
+  of its own, and its container was created 2026-08-03. It was running **the same
+  6,796-line pre-LOCAL-4xx generator code that broke Michael's tour** (image id
+  `77920c473574`, now tagged `prerebuild-20260812`). A service that shares an image but
+  is never recreated silently keeps the old one; rebuilding the image is not enough.
+- `tour-orchestrator` — 1,865 lines vs the repo's 2,017.
+- `tour-generation-modernized-1` — 539 vs 554.
+
+**False alarms.** `map-delivery`, `tour-processor` and `voice-control` have shown
+`unhealthy` with a failing streak of **23,594**. The cause is not the service: their
+healthcheck runs `curl`, which is not installed in those images —
+`exec: "curl": executable file not found in $PATH`. All three answer `HTTP 200` on
+`/health` when probed from the host. The healthcheck has been wrong since the images were
+built and tells us nothing either way. Left as-is; fixing it is cosmetic and belongs in a
+task, not a hotfix.
+
+**Everything else matched already:** translation-service, tour-processor, user-api-2,
+tour-update, coordinates-fromai, map-delivery, voice-control, treats.
+
+**The D410 standing rule caught its first case immediately.** After merging LOCAL-449 the
+generator reported `code_sha 50379d1` against HEAD `ce61b01` — a deployment one merge
+behind. Rebuilt; now `code_sha ce61b01`, `manifest_ok: true`, all production imports OK
+inside the container, cold short-circuit present, Wayback absent from the chain.
+
+**Only `tour-generator` carries a real `code_sha`.** Every other service reports
+`unknown` or has no `.git_sha` at all, because only `Dockerfile.generator` takes the
+`GIT_SHA` build arg. Until that spreads, the fleet cannot be verified by asking it —
+only by diffing it, as done here. Worth a task.
