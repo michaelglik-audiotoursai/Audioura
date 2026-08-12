@@ -193,20 +193,231 @@ def _parse_date_flexible(text: str) -> Optional[date]:
     return None
 
 
-def _fetch_page(url: str, timeout: int = 15) -> Tuple[str, List[Tuple[str, str]]]:
-    """Fetch a page and return (text, links). Reuses story_miner pattern."""
+# ─── [LOCAL-425] Exhibition name extraction ────────────────────────────────────
+def extract_exhibition_name(location: str) -> str:
+    """Extract the exhibition name from a location string.
+
+    Handles patterns like:
+        "Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA"
+        → "Picasso, Miro, Dali: Unbound"
+
+    The 'exhibition' keyword is the delimiter — everything before it (minus
+    trailing ' at <venue>') is the exhibition name. If no 'exhibition' keyword
+    is found, returns the input unchanged.
+
+    This is at module scope so tests can call it directly (D277).
+    """
+    # Pattern: "<name> exhibition at <venue>, <city>"
+    # First, try to find "exhibition" as a word boundary
+    m = re.search(r'\bexhibition\b', location, re.IGNORECASE)
+    if m:
+        # Everything before "exhibition" is the exhibition name
+        name = location[:m.start()].strip()
+        # Strip trailing "the" if it's there alone
+        name = re.sub(r'\s+the\s*$', '', name, flags=re.IGNORECASE)
+        if name:
+            return name.strip()
+
+    # Fallback: try "at <Venue>" pattern to strip venue suffix
+    at_match = re.search(r'\s+at\s+[A-Z]', location)
+    if at_match:
+        return location[:at_match.start()].strip()
+
+    return location
+
+
+def _search_exhibition_url(exhibition_name: str, venue_base_url: str) -> str:
+    """Use Serper web search to find the direct URL of an exhibition page.
+
+    Strategy: query "<exhibition_name> site:<venue_domain>" to get the venue's
+    own page for this exhibition. Returns the first organic hit URL that is on
+    the same domain, or '' if search fails.
+
+    This is at module scope so tests can call it directly (D277).
+    """
+    import json as _json
+    import urllib.request
+    import urllib.error
+
+    SERP_API_KEY = os.environ.get('SERP_API_KEY', '')
+    if not SERP_API_KEY:
+        print(f"  [LOCAL-425] No SERP_API_KEY — cannot search for exhibition URL")
+        return ''
+
+    parsed = urlparse(venue_base_url)
+    domain = parsed.netloc  # e.g. "www.mfa.org"
+
+    # Build a focused query
+    query = f'{exhibition_name} site:{domain}'
+    print(f"  [LOCAL-425] Searching: {query}")
+
+    payload = {"q": query, "num": 5}
     try:
-        resp = requests.get(
-            url,
-            headers={'User-Agent': 'Audioura/2.2 ExhibitionChecker'},
-            timeout=timeout,
-            allow_redirects=True,
+        data = _json.dumps(payload, ensure_ascii=False).encode('utf-8')
+        req = urllib.request.Request(
+            "https://google.serper.dev/search",
+            data=data,
+            headers={"X-API-KEY": SERP_API_KEY, "Content-Type": "application/json"},
+            method="POST",
         )
-        if resp.status_code != 200:
-            return '', []
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = _json.loads(resp.read().decode())
+            organic = body.get("organic", [])
+            for hit in organic:
+                url = hit.get('link', '')
+                if not url:
+                    continue
+                hit_domain = urlparse(url).netloc
+                # Must be on the venue's domain
+                if hit_domain == domain or hit_domain.endswith('.' + domain.lstrip('www.')):
+                    print(f"  [LOCAL-425] Search hit: {url} — {hit.get('title', '')}")
+                    return url
+            # No on-domain hit
+            print(f"  [LOCAL-425] No on-domain results from search")
+            return ''
     except Exception as e:
-        logger.debug(f"exhibition_checklist: fetch failed for {url}: {e}")
-        return '', []
+        print(f"  [LOCAL-425] Exhibition URL search failed: {type(e).__name__}: {e}")
+        return ''
+
+
+def _search_exhibition_works_from_web(
+    exhibition_name: str, venue_name: str, venue_base_url: str = ''
+) -> Tuple[List[Dict], str]:
+    """Search for exhibition works from third-party sources when the venue site is down.
+
+    Uses Serper to find press releases, reviews, or art news sites that list the
+    works in this exhibition. Fetches the most promising page and runs
+    prose_llm_extract_works on it.
+
+    Returns (works_list, source_url) where source_url is the page that supplied
+    the works. Returns ([], '') if nothing found.
+
+    This is at module scope so tests can call it directly (D277).
+    """
+    import json as _json
+    import urllib.request
+    import urllib.error
+
+    SERP_API_KEY = os.environ.get('SERP_API_KEY', '')
+    if not SERP_API_KEY:
+        return [], ''
+
+    # Search for exhibition works from any source
+    query = f'"{exhibition_name}" works OR checklist OR objects {venue_name}'
+    print(f"  [LOCAL-425] Searching for exhibition works: {query}")
+
+    payload = {"q": query, "num": 8}
+    try:
+        data = _json.dumps(payload, ensure_ascii=False).encode('utf-8')
+        req = urllib.request.Request(
+            "https://google.serper.dev/search",
+            data=data,
+            headers={"X-API-KEY": SERP_API_KEY, "Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = _json.loads(resp.read().decode())
+            organic = body.get("organic", [])
+    except Exception as e:
+        print(f"  [LOCAL-425] Works search failed: {type(e).__name__}: {e}")
+        return [], ''
+
+    if not organic:
+        return [], ''
+
+    # Skip the venue's own domain (likely 429) and shopping/store pages
+    parsed_venue = urlparse(venue_base_url) if venue_base_url else None
+    venue_domain = parsed_venue.netloc if parsed_venue else ''
+    # Also skip the bare domain minus www
+    _venue_base_domain = venue_domain.lstrip('www.') if venue_domain else ''
+
+    _SKIP_PATTERNS = re.compile(
+        r'(?:shop\.|store\.|/shop/|/store/|/product|/cart|amazon\.com|ebay\.com)',
+        re.IGNORECASE
+    )
+
+    # Try fetching the top results (skip the venue's own domain since it's down)
+    for hit in organic[:5]:
+        url = hit.get('link', '')
+        if not url:
+            continue
+        hit_domain = urlparse(url).netloc
+        # Skip venue's own domain (it's rate-limiting)
+        if _venue_base_domain and (
+            hit_domain == venue_domain or
+            hit_domain.endswith('.' + _venue_base_domain) or
+            _venue_base_domain in hit_domain
+        ):
+            print(f"  [LOCAL-425] Skipping (venue domain, likely 429): {url}")
+            continue
+        # Skip shopping sites
+        if _SKIP_PATTERNS.search(url) or _SKIP_PATTERNS.search(hit_domain):
+            print(f"  [LOCAL-425] Skipping (shopping/store site): {url}")
+            continue
+        print(f"  [LOCAL-425] Trying third-party source: {url}")
+        page_text, _ = _fetch_page(url)
+        if page_text and len(page_text) > 200:
+            # Try LLM extraction on this page
+            works = prose_llm_extract_works(page_text, exhibition_name)
+            if works and len(works) >= 2:
+                print(f"  [LOCAL-425] ✓ Extracted {len(works)} works from {url}")
+                return works, url
+            elif works:
+                print(f"  [LOCAL-425] Only {len(works)} work(s) from {url} — trying next")
+
+    return [], ''
+
+
+def _fetch_page(url: str, timeout: int = 15) -> Tuple[str, List[Tuple[str, str]]]:
+    """Fetch a page and return (text, links). Reuses story_miner pattern.
+
+    [LOCAL-425] Distinguishes transient failures (429, 5xx) from genuine absence
+    (404). Retries up to 2 times with exponential backoff for rate-limits and
+    server errors. Honors Retry-After header when present.
+    """
+    import time as _time_mod
+
+    max_retries = 1
+    for attempt in range(max_retries + 1):
+        try:
+            resp = requests.get(
+                url,
+                headers={'User-Agent': 'Audioura/2.2 ExhibitionChecker'},
+                timeout=timeout,
+                allow_redirects=True,
+            )
+            if resp.status_code == 200:
+                break  # success — fall through to parsing
+            elif resp.status_code == 429 or resp.status_code >= 500:
+                # Transient failure — retry with backoff
+                retry_after = resp.headers.get('Retry-After')
+                if retry_after:
+                    try:
+                        wait = min(float(retry_after), 10.0)
+                    except (ValueError, TypeError):
+                        wait = 2.0 * (attempt + 1)
+                else:
+                    wait = 2.0 * (attempt + 1)
+                logger.info(
+                    f"exhibition_checklist: {resp.status_code} from {url} "
+                    f"(attempt {attempt+1}/{max_retries+1}), waiting {wait:.1f}s"
+                )
+                print(f"  [LOCAL-425] HTTP {resp.status_code} from {url} — "
+                      f"{'retrying' if attempt < max_retries else 'giving up'} "
+                      f"(attempt {attempt+1}/{max_retries+1})")
+                if attempt < max_retries:
+                    _time_mod.sleep(wait)
+                    continue
+                else:
+                    # Exhausted retries
+                    return '', []
+            else:
+                # 404, 403, other client errors — not retryable
+                logger.debug(f"exhibition_checklist: HTTP {resp.status_code} for {url}")
+                return '', []
+        except Exception as e:
+            logger.debug(f"exhibition_checklist: fetch failed for {url}: {e}")
+            return '', []
 
     html = resp.text
 
@@ -1581,6 +1792,11 @@ def find_exhibition_checklist(
 
     print(f"  [LOCAL-364] Searching for exhibition '{exhibition_name}' on {base_domain}")
 
+    # [LOCAL-425] These may be set by web search fallback before Step 2
+    best_match_url = ''
+    best_match_score = 0.0
+    best_match_title = ''
+
     # ─── Step 1: Find exhibition listing pages ───────────────────────────────
     exhibition_listing_pages = []
 
@@ -1599,7 +1815,13 @@ def find_exhibition_checklist(
             _deduped_seeds.append(s)
 
     # Try seed paths
+    # [LOCAL-425] Add inter-request delay to avoid self-inflicted rate limits.
+    # If the FIRST seed returns 429, all seeds on this domain will too — abort early.
+    import time as _time_mod_seeds
+    _got_rate_limited = False
     for seed_path in _deduped_seeds:
+        if _got_rate_limited:
+            break  # Don't hammer a rate-limiting server
         seed_url = f"{base_domain}{seed_path}"
         text, links = _fetch_page(seed_url)
         if text and len(text) > 100:
@@ -1608,9 +1830,14 @@ def find_exhibition_checklist(
             })
             print(f"  [LOCAL-364] Found exhibition listing: {seed_url} ({len(text)} chars)")
             break  # Use the first hit
+        elif not text:
+            # _fetch_page returns '' for both 429 and 404 after retries.
+            # If it logged a 429, we know the domain is rate-limiting.
+            _got_rate_limited = True
+        _time_mod_seeds.sleep(0.5)  # Be polite between requests
 
     # If no seed worked, try to find exhibition links from the venue home page
-    if not exhibition_listing_pages:
+    if not exhibition_listing_pages and not _got_rate_limited:
         home_text, home_links = _fetch_page(venue_base_url)
         if home_links:
             for link_text, href in home_links:
@@ -1627,42 +1854,92 @@ def find_exhibition_checklist(
                             break
 
     if not exhibition_listing_pages:
+        # ──── [LOCAL-425] WEB SEARCH FALLBACK ─────────────────────────────────
+        # When path-seed crawling fails (429 rate limit, no listing page found),
+        # use a Serper web search to find the exhibition's direct URL. This is
+        # the same approach as subject_validate_expand.py — a single SERP query
+        # costs $0.001 and returns the venue's own page as the first hit.
+        _search_url = _search_exhibition_url(exhibition_name, venue_base_url)
+        if _search_url:
+            print(f"  [LOCAL-425] Web search found exhibition URL: {_search_url}")
+            # Fetch the page directly
+            _search_text, _search_links = _fetch_page(_search_url)
+            if _search_text and len(_search_text) > 100:
+                exhibition_listing_pages.append({
+                    'url': _search_url, 'text': _search_text, 'links': _search_links
+                })
+                # We have the DETAIL page directly — skip Step 2 matching and go
+                # straight to extraction. Set best_match directly.
+                best_match_url = _search_url
+                best_match_title = exhibition_name
+                best_match_score = 1.0
+                print(f"  [LOCAL-425] Direct exhibition detail page via web search ({len(_search_text)} chars)")
+            else:
+                # Venue page unreachable (likely 429) — try third-party sources
+                print(f"  [LOCAL-425] Venue page unreachable — trying third-party sources for works")
+                _third_party_works, _third_party_url = _search_exhibition_works_from_web(
+                    exhibition_name, venue_name, venue_base_url
+                )
+                if _third_party_works:
+                    result.works = _third_party_works
+                    result.path = 'prose_llm'
+                    result.page_shape = 'third_party_extraction'
+                    result.exhibition_url = _search_url  # The venue URL (for provenance)
+                    result.exhibition_title = exhibition_name
+                    result.reason = (
+                        f'Extracted {len(_third_party_works)} works from third-party source '
+                        f'{_third_party_url} (venue page at {_search_url} returned 429). '
+                        f'Venue URL confirmed via Serper search.'
+                    )
+                    print(f"  [LOCAL-425] ✓ THIRD-PARTY PATH: {len(_third_party_works)} works")
+                    print(f"    Venue URL (confirmed): {_search_url}")
+                    print(f"    Content source: {_third_party_url}")
+                    for w in _third_party_works[:10]:
+                        _a = f" by {w['artist']}" if w.get('artist') else ''
+                        print(f"    - {w['title']}{_a}")
+                    return result
+                else:
+                    print(f"  [LOCAL-425] No third-party sources found — falling back")
+
+    if not exhibition_listing_pages:
         result.path = 'fallback'
-        result.reason = f'No exhibition section found on {base_domain}'
+        result.reason = f'No exhibition section found on {base_domain} (path seeds and web search both failed)'
         print(f"  [LOCAL-364] No exhibition listing found on venue site")
         return result
 
     # ─── Step 2: Find the matching exhibition ─────────────────────────────────
-    best_match_url = ''
-    best_match_score = 0.0
-    best_match_title = ''
+    # [LOCAL-425] Skip Step 2 if web search already gave us a direct URL
+    if not best_match_url:
+        best_match_url = ''
+        best_match_score = 0.0
+        best_match_title = ''
 
-    for listing in exhibition_listing_pages:
-        # Check the listing page text for exhibition titles
-        # Look in links first (they often have the exhibition name as link text)
-        for link_text, href in listing['links']:
-            if not link_text or len(link_text) < 4:
-                continue
-            score = _title_similarity(exhibition_name, link_text)
-            if score > best_match_score and score >= 0.35:
-                full_url = urljoin(listing['url'], href)
-                if urlparse(full_url).netloc == parsed_base.netloc:
+        for listing in exhibition_listing_pages:
+            # Check the listing page text for exhibition titles
+            # Look in links first (they often have the exhibition name as link text)
+            for link_text, href in listing['links']:
+                if not link_text or len(link_text) < 4:
+                    continue
+                score = _title_similarity(exhibition_name, link_text)
+                if score > best_match_score and score >= 0.35:
+                    full_url = urljoin(listing['url'], href)
+                    if urlparse(full_url).netloc == parsed_base.netloc:
+                        best_match_score = score
+                        best_match_url = full_url
+                        best_match_title = link_text
+
+            # Also check headings in the listing text
+            for line in listing['text'].split('\n'):
+                line = line.strip()
+                if not line or len(line) < 4 or len(line) > 200:
+                    continue
+                score = _title_similarity(exhibition_name, line)
+                if score > best_match_score and score >= 0.35:
                     best_match_score = score
-                    best_match_url = full_url
-                    best_match_title = link_text
-
-        # Also check headings in the listing text
-        for line in listing['text'].split('\n'):
-            line = line.strip()
-            if not line or len(line) < 4 or len(line) > 200:
-                continue
-            score = _title_similarity(exhibition_name, line)
-            if score > best_match_score and score >= 0.35:
-                best_match_score = score
-                best_match_title = line
-                # We don't have a separate URL for this — it's on the listing page
-                if not best_match_url:
-                    best_match_url = listing['url']
+                    best_match_title = line
+                    # We don't have a separate URL for this — it's on the listing page
+                    if not best_match_url:
+                        best_match_url = listing['url']
 
     if not best_match_url:
         result.path = 'fallback'
