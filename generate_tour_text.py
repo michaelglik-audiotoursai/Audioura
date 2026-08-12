@@ -4712,7 +4712,12 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         else:
             print(f"  [S20] DATABASE_URL not set — cache skipped")
 
+    # [LOCAL-445-B] Phase timing instrumentation
+    from phase_timer import PhaseTimer
+    _phase_timer = PhaseTimer()
+
     # PHASE 1: Analyze user intent with AI
+    _phase_timer.start('intent')
     print(f"\nPHASE 1: Analyzing tour intent with AI...")
     # BUG 2 FIX: Mobile app hardcodes tour_type="museum" for ALL requests.
     # Check whether LOCATION ALONE encodes the real category (e.g. "restaurant tour
@@ -4869,6 +4874,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             tour_category = 'museum'
     
     # PHASE 2: Detect tour type and get appropriate template
+    _phase_timer.start('poi_selection')
     # NOTE: tour_category already set above — do NOT call _classify_tour_category again here
     # (that was the bug: it overwrote the venue_name-based 'museum' decision with 'walking').
     # [LOCAL-46 Bug B] Display the transport mode as the detected category when applicable.
@@ -5433,6 +5439,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             print(f"   - {p['name']} [FORCED]")
     elif _exhibition_scope is not None:
         # ──── [LOCAL-364] EXHIBITION CHECKLIST RETRIEVAL ──────────────────────
+        _phase_timer.start('exhibition_checklist')
         # PRIMARY PATH: Retrieve the actual exhibition object list from the
         # venue's own site. The LOCAL-362 creator filter becomes the FALLBACK.
         # An exhibition is a specific, curated, time-bound checklist — not the
@@ -8190,6 +8197,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         return merged
 
     # -------- [S11] Storied: generate spine + fact sheets when STORIED_MODE=true --------
+    _phase_timer.start('fact_sheets')
     _storied_spine = None
     _storied_fact_sheets = None
     _saved_prolog = ""  # [R2] Prolog text to be folded into Stop 1 (no standalone Introduction block)
@@ -8755,6 +8763,7 @@ Exempt: navigation directions ("Turn left", "Continue past").
         return _partial_tour, output_file, first_poi_coordinates
 
     # PHASE 5: Generate detailed descriptions for each POI (parallelized)
+    _phase_timer.start('narration')
     print(f"\nPHASE 5: Generating detailed descriptions for each POI (parallel)...")
 
     # -------- [LOCAL-382/LOCAL-387] Exhibition thesis / venue purpose framing detection --------
@@ -8822,6 +8831,7 @@ Exempt: navigation directions ("Turn left", "Continue past").
             print(f"  [LOCAL-383] Story beat extraction error (non-fatal): {_sb_err}")
 
     # -------- [LOCAL-410] Wire SERP search into generation path --------
+    _phase_timer.start('external_lookups')
     # Previously, search_stories_for_stop was only called by acceptance runners
     # which populated _DIRECT_SNIPPETS_PER_STOP before calling generate_tour_text().
     # The real generation path (generate_tour_async) never did this — so search-sourced
@@ -8984,10 +8994,14 @@ Exempt: navigation directions ("Turn left", "Continue past").
             import traceback
             traceback.print_exc()
 
-    # -------- [LOCAL-440] Story-first pipeline: seek + verify + size-adapt --------
+    # -------- [LOCAL-440/445] Story-first pipeline: seek + verify + size-adapt --------
+    _phase_timer.start('story_first')
     # Michael's 4-step process (D393): for each stop, BEFORE narration, seek stories
     # specifically (not just facts), verify them against sources, adapt size, then
-    # hand to the LOCAL-438 packer. Story-seeking runs concurrent under a per-stop budget.
+    # hand to the LOCAL-438 packer.
+    # LOCAL-445: Runs all stops CONCURRENTLY (thread pool) under a single tour-level
+    # budget (STORY_FIRST_TOUR_BUDGET_SECONDS=40s), replacing the serial loop that
+    # admitted 150s+ of added wall time.
     _local440_results = {}  # stop_name → pipeline result dict
     _local440_total_cost = 0.0
     _local440_total_elapsed = 0.0
@@ -8999,9 +9013,12 @@ Exempt: navigation directions ("Turn left", "Continue past").
     if (_storied_mode and tour_category == 'museum' and _l440_env_enabled
             and os.environ.get('GENERATION_TIER', 'plus') != 'free'):
         try:
-            from story_first import story_first_pipeline, is_story_seeking_enabled
+            from story_first import story_first_pipeline_batch, is_story_seeking_enabled
             if is_story_seeking_enabled():
-                print(f"\n  [LOCAL-440] Story-first pipeline — processing {len(poi_list)} stops...")
+                print(f"\n  [LOCAL-445] Story-first pipeline — processing {len(poi_list)} stops (parallel)...")
+
+                # Build stop entries for the batch
+                _sf_stop_entries = []
                 for _sf_idx, _sf_poi in enumerate(poi_list):
                     _sf_name = _sf_poi.get('name', '')
                     _sf_stop_data = {
@@ -9030,16 +9047,31 @@ Exempt: navigation directions ("Turn left", "Continue past").
                         _sf_snippets = (_DIRECT_SNIPPETS_PER_STOP.get(_sf_name, [])
                                         or _DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{_sf_idx}__", []))
 
-                    _sf_result = story_first_pipeline(
-                        _sf_stop_data,
-                        fact_sheet='',  # Fact sheet from spine (if available)
-                        snippets=_sf_snippets,
-                        credit_line=_sf_stop_data.get('credit_line', ''),
-                        existing_search_results=_sf_snippets,
-                    )
-                    _local440_results[_sf_name] = _sf_result
-                    _local440_total_cost += _sf_result.get('cost_usd', 0.0)
-                    _local440_total_elapsed += _sf_result.get('elapsed_seconds', 0.0)
+                    _sf_stop_entries.append({
+                        'name': _sf_name,
+                        'stop_data': _sf_stop_data,
+                        'snippets': _sf_snippets,
+                        'credit_line': _sf_stop_data.get('credit_line', ''),
+                        'existing_search_results': _sf_snippets,
+                        '_idx': _sf_idx,  # for snippet injection below
+                    })
+
+                # [LOCAL-445] Run all stops concurrently under tour-level budget
+                _local440_results = story_first_pipeline_batch(_sf_stop_entries)
+                _local440_total_cost = sum(r.get('cost_usd', 0.0)
+                                           for r in _local440_results.values())
+                _local440_total_elapsed = max(
+                    (r.get('elapsed_seconds', 0.0) for r in _local440_results.values()),
+                    default=0.0
+                )
+
+                # Post-process: merge results into caches (serial, fast)
+                for _sf_entry in _sf_stop_entries:
+                    _sf_name = _sf_entry['name']
+                    _sf_idx = _sf_entry['_idx']
+                    _sf_result = _local440_results.get(_sf_name)
+                    if not _sf_result:
+                        continue
 
                     _sf_stories = _sf_result.get('stories', [])
                     print(f"    Stop {_sf_idx+1} '{_sf_name[:40]}': "
@@ -9051,15 +9083,12 @@ Exempt: navigation directions ("Turn left", "Continue past").
                     # so the LOCAL-438 packer can include them in selection
                     if _sf_stories:
                         from work_story_searcher import normalize_work_key, work_stories_get
-                        _sf_wk = normalize_work_key(_sf_name, _sf_stop_data.get('artist', ''))
+                        _sf_wk = normalize_work_key(_sf_name, _sf_entry['stop_data'].get('artist', ''))
                         _sf_cached = work_stories_get(_sf_wk)
                         if _sf_cached and _sf_cached.get('elements'):
-                            # Append story-first results to existing cached elements
                             _sf_cached['elements'].extend(_sf_stories)
                         else:
-                            # No existing cache — store directly
-                            # (The packer integration at S25/line ~8644 will pick these up)
-                            pass
+                            pass  # Packer integration at S25/line ~8644 picks these up
                         # Also inject into _DIRECT_SNIPPETS_PER_STOP for Phase 5 prompt
                         for _sf_story in _sf_stories:
                             _sf_snippet = {
@@ -9076,11 +9105,11 @@ Exempt: navigation directions ("Turn left", "Continue past").
                             else:
                                 _DIRECT_SNIPPETS_PER_STOP[_sf_name] = [_sf_snippet]
 
-                print(f"\n  [LOCAL-440] Story-first complete: "
-                      f"total_elapsed={_local440_total_elapsed:.1f}s, "
-                      f"total_cost=${_local440_total_cost:.4f}")
                 _verified_total = sum(r.get('verified_count', 0) for r in _local440_results.values())
-                print(f"  [LOCAL-440] Verified stories found: {_verified_total} across {len(poi_list)} stops")
+                print(f"\n  [LOCAL-445] Story-first complete: "
+                      f"wall_elapsed={_local440_total_elapsed:.1f}s, "
+                      f"total_cost=${_local440_total_cost:.4f}, "
+                      f"verified_stories={_verified_total} across {len(poi_list)} stops")
             else:
                 print(f"\n  [LOCAL-440] Story-seeking DISABLED — fallback to current behaviour")
         except ImportError as _sf440_err:
@@ -12880,6 +12909,7 @@ REWRITE RULES (all mandatory):
         print(f"\n  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false")
 
     # PHASE 6: Assemble the complete tour
+    _phase_timer.start('packing')
     print(f"\nPHASE 6: Assembling the complete tour...")
     
     # Create a better title that doesn't duplicate information
@@ -14950,6 +14980,11 @@ RULES:
 
     # Reset module-level snippets after use (don't pollute next generation)
     _DIRECT_SNIPPETS_PER_STOP = {}
+
+    # [LOCAL-445-B] Final timing summary
+    _phase_timer.start('verification')  # End packing, start verification marker
+    _phase_timer.end('verification')  # Immediately end (verification is interspersed above)
+    _phase_timer.summary()
 
     return complete_tour, output_file, first_poi_coordinates
 

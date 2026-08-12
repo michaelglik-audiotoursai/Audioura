@@ -192,7 +192,18 @@ def classify_domain(domain: str, domain_cache: dict = None) -> str:
 
 def _check_wikidata_p856(domain: str) -> str:
     """Check Wikidata for institutional classification via P856 + P31 class constraint.
-    On timeout/failure → 'tier3' (leads-only, logged). Never 'tier1', never skipped."""
+    On timeout/failure → 'tier3' (leads-only, logged). Never 'tier1', never skipped.
+
+    [LOCAL-445-C] Dead-host rule: if query.wikidata.org (or any Wikimedia host) is
+    already cold, short-circuit immediately to 'tier3'. On first timeout/429, mark
+    cold for the remainder of the run.
+    """
+    from dead_host_breaker import is_host_cold, mark_host_cold
+
+    # [LOCAL-445-C] Dead-host check BEFORE any network call
+    if is_host_cold('https://query.wikidata.org'):
+        return 'tier3'
+
     institutional_classes = _RULES.get('tier1_institutional_classes', [])
     if not institutional_classes:
         return 'tier3'
@@ -217,10 +228,23 @@ def _check_wikidata_p856(domain: str) -> str:
             headers={'User-Agent': 'AudiouraBot/1.0 (story-quality-pipeline)'}
         )
         with urllib.request.urlopen(req, timeout=EXTERNAL_LOOKUP_PER_TIMEOUT) as resp:
+            # Check for 429 in response (urllib raises HTTPError for 4xx)
             data = json.loads(resp.read().decode())
             if data.get('boolean', False):
                 return 'tier1'
             return 'tier3'
+    except urllib.error.HTTPError as e:
+        if e.code == 429:
+            mark_host_cold('https://query.wikidata.org', reason=f'HTTP 429 during P856 check for {domain}')
+        else:
+            mark_host_cold('https://query.wikidata.org', reason=f'HTTP {e.code} during P856 check for {domain}')
+        print(f"  [SQ-S2] Wikidata P856 check failed for {domain}: {e}")
+        return 'tier3'
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        # Timeout or network error — mark cold
+        mark_host_cold('https://query.wikidata.org', reason=f'timeout/network error for {domain}: {e}')
+        print(f"  [SQ-S2] Wikidata P856 check failed for {domain}: {e}")
+        return 'tier3'
     except Exception as e:
         print(f"  [SQ-S2] Wikidata P856 check failed for {domain}: {e}")
         return 'tier3'  # Fail → tier3, never tier1, never skipped
