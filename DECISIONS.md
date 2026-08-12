@@ -15514,3 +15514,49 @@ self-detection wrote the ABANDONED record correctly this time (the D379 gap was 
 
 **Remaining for Michael's ≤2 min (D395):** per-stop narration is now the dominant cost
 (~336s serial). Falls to the post-LOCAL-440 parallelism task.
+
+## D397 — LOCAL-439 merged: the gate judges stories via gpt-4o-mini; superseded tests aligned (2026-08-12)
+
+**Merged `63d8811`.** Story-unit gate (D394): per-stop requirement is ≥1 verified
+story-unit of ≥3 sentences, classified by gpt-4o-mini at temperature=0 with SHA-256
+verdict caching (~$0.001/stop). Interest scoring additive: trust 0–5 (provenance-derived,
+never asked of the LLM) + emotional 0–4 + new-info 0–3 − deduction 0–2. entities check
+moved to stop-text level (donor names no longer demanded, D393); exhibition thesis
+keyword list retired.
+
+**Review evidence:** LEAD re-ran all acceptance fixtures live — verdicts matched the
+submission exactly (Miró True 3/2/0; atmospheric False ded=1; feel-telling False ded=2).
+LEAD's own neutralisation: always-True classifier → 11 red, restored → 31 green. Full
+suite 216/254; newly-failing names vs D383's 36: only test_local431 (3 asserts on the
+removed per-sentence tally) and test_local432 (failures[0] index brittleness — the kept
+venue_purpose check itself works). Zero unexplained regressions.
+
+**Aligned at `9ecb901`:** LOCAL-421/431/432 test assertions updated to D394 semantics.
+Live finding recorded in the test file: the LOCAL-421-era "good" Stop 1 fixture FAILS
+the real D394 gate — fact-rich but arc-less. The raised bar is deliberate; that fixture
+now tests plumbing via preloaded verdicts only.
+
+**Suite baseline moves to 218/254** (216 + the two aligned files), by-name method
+unchanged. run_293/294 flaky family unchanged. NOTE: run_tests.py runs pytest-style
+root files via `python3` where they exit 0 without running — test_local421 is invisible
+to the suite denominator's honesty; same blind spot existed in every prior baseline.
+
+## D398 — Michael's obligation ledger: every sentence's promises must be paid (2026-08-12)
+
+Michael, twice, explicitly: assess EVERY sentence so that "suggestions" and
+"mentionings" are explained and followed later — he sees unpaid pointers "all the time".
+Canonical case: "position yourself to fully appreciate the interplay of color and form"
+(TOUR_MFA_UNBOUND_20260812.txt Stop 1) — the model's response to our earlier "in front
+needs a why" complaint was to keep the instruction and delete the content.
+
+**Accepted as the generalization** of feel-telling/empty-positioning/atmospheric-filler:
+one defect class, "a sentence that writes a pointer and never dereferences it." Design:
+per-stop obligation ledger, ONE gpt-4o-mini call returning per-sentence
+{obligation: directive|reference|promise|significance, fulfilled, where}; a tour-level
+call for cross-stop promises. Generation side: revise-or-DELETE, grounding only from the
+fact sheet — never invent the missing payload (the anti-fabrication rule is load-bearing,
+D373). Score side: unfulfilled count becomes a deduction so the index tracks emptiness.
+D394's story-unit gate is untouched — existence of a story and payment of pointers are
+complementary checks. Spec: PARKED_kiro_task_LOCAL-442.md, dispatches after LOCAL-440
+(same prompt surfaces). Michael is hand-building the ground-truth ledger for MFA Stop 1
+sentence-by-sentence in session; his table becomes fixture data for 442.
