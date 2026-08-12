@@ -15060,3 +15060,54 @@ finding about the venue.
 **Consequence:** MFA Unbound variance is *not* blocked on infrastructure. BLOCKER4b's
 address-scatter rejection may itself be an artefact of the pin bypassing normal stop
 discovery. LOCAL-434 measures it through the real pipeline.
+
+## D388 — LOCAL-434's MFA finding does not reproduce; the pin audit stands (2026-08-12)
+
+**Merged `f6d5be8` for the cleanup, and rejected its headline finding.**
+
+**What is right and kept.** The stale-pin audit did exactly what D387 asked.
+`run_mfa_unbound_pinned.py` and `run_local433_mfa_unbound_variance.py` are **deleted** —
+both carried the false "mfa.org returns 429 so we must pin" premise and both bypassed
+`find_exhibition_checklist`, which is how D386's wrong finding was manufactured.
+`run_local252_corpus_depth.py` was correctly **kept**: its `WIKI_DELAY = 3.0` is about
+the MediaWiki API, a different endpoint with a live rate limit and no bypass. Deletions
+are recoverable from history. Neutralising `compute_gate_verdicts` reds 4 tests.
+
+**What is rejected.** The submission reports **0/5 runs producing a tour**, with a
+cascade — GPT-4o returns markdown-fenced JSON → `json.loads` fails → intent is None →
+venue_name never extracted → exhibition checklist never invoked → Phase 3A returns six
+scattered Boston venues → BLOCKER4b fires — and concludes **"BLOCKER4b is REAL, not an
+artefact of the pin."**
+
+LEAD ran the identical location string,
+`"Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA"`, on merged `storied`:
+
+```
+[LOCAL-364] Result: ExhibitionChecklistResult(path=prose_llm, works=3, title='Pi...
+BLOCKER4b occurrences: 0
+```
+
+**It reaches the checklist and BLOCKER4b stays silent.** `mfa_unbound_LOCAL430.txt`,
+committed at ~06:00 from the same string, shows the same thing — `path=prose_llm,
+works=3`, no BLOCKER4b, and a delivered tour naming Fridman, Broder and Mourlot. The
+pipeline demonstrably reaches content generation on this input.
+
+**So the diagnosis is probably real and the conclusion is wrong.** Markdown-fenced JSON
+almost certainly does break the intent parser — that is a specific, checkable mechanism
+nobody would invent — but it cannot be a hard blocker, because the same input succeeded
+before and after. It is *intermittent*, which makes it more dangerous than a hard block,
+not less: an intermittent intent failure silently drops the venue constraint and yields a
+scattered city tour that BLOCKER4b then rejects, so the user sees a refusal whose cause
+is invisible.
+
+**The pattern, third time tonight and the reason this keeps happening:** a run fails
+five times in one window, and the window is mistaken for the world. D385 was the same
+error inverted — `n=1` treated as proof of success; here `n=5` inside one session is
+treated as proof of impossibility. **Neither direction survives a second observer, and
+LEAD only caught this one by re-running the agent's own case (standing check #3).** The
+submission's own evidence contained the contradiction: it cites D381/D382's Wayback path
+as "works and is verified", while claiming the venue cannot be reached.
+
+**Consequence:** MFA variance is still unmeasured, and BLOCKER4b's status on this route is
+**undetermined**, not "real". LOCAL-435 measures it properly and fixes the fence-stripping
+that is the one solid thing this task found.
