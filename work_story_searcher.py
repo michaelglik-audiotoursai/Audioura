@@ -4,6 +4,7 @@ Part of Story Quality pipeline. Deterministic query generation + bounded SERP se
 + source reputation classification. Never fails the tour — degrades gracefully.
 """
 import json, os, re, time, unicodedata, urllib.request, urllib.parse, urllib.error
+import concurrent.futures
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -14,6 +15,14 @@ SERP_API_KEY = os.environ.get('SERP_API_KEY', '')
 SERP_PROVIDER = os.environ.get('SERP_PROVIDER', 'serper')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 CORPUS_VERSION = 1
+
+# --- LOCAL-441: Concurrent lookup configuration ---
+EXTERNAL_LOOKUP_BATCH_BUDGET_SECONDS = 20.0  # Wall-budget for a batch of P856 lookups
+EXTERNAL_LOOKUP_POOL_SIZE = 10  # Thread pool size for concurrent lookups
+EXTERNAL_LOOKUP_PER_TIMEOUT = 8  # Per-lookup timeout (seconds), unchanged from original
+
+# Module-level domain tier cache — persists across calls within the same process/run
+_MODULE_DOMAIN_CACHE: Dict[str, str] = {}
 
 # Load rules
 with open(RULES_PATH, 'r') as f:
@@ -67,6 +76,54 @@ def normalize_domain(url: str) -> str:
 
 
 # --- Source Tier Classification (R1 corrected: Reject first, then tier) ---
+def _classify_domain_quick(domain: str) -> Optional[str]:
+    """[LOCAL-441] Fast-path classification without P856 network call.
+
+    Returns the tier if determinable from rules alone, or None if P856 is needed.
+    Same logic as classify_domain steps 1-4, extracted for batch pre-classification.
+    """
+    domain = normalize_domain(domain) if '/' in domain else domain.lower()
+
+    # Step 1: Reject check FIRST (R1b)
+    if domain in _RULES.get('reject_photo_hosts', []):
+        return 'reject'
+    if domain in _RULES.get('reject_satire_domains', []):
+        return 'reject'
+    _commerce_patterns = ['shop.', 'store.', 'buy.', 'prints.', 'poster']
+    if any(p in domain for p in _commerce_patterns):
+        return 'reject'
+
+    # Step 1b: Platform/UGC hosts → reject (F2: before P856)
+    if domain in _RULES.get('reject_platforms', []):
+        return 'reject'
+    for platform in _RULES.get('reject_platforms', []):
+        if domain.endswith('.' + platform):
+            return 'reject'
+
+    # Step 2: Wikipedia/mirrors → tier1
+    if domain in ('en.wikipedia.org', 'wikipedia.org', 'britannica.com'):
+        return 'tier1'
+    if domain in _RULES.get('wikipedia_mirrors', []):
+        return 'tier1'
+
+    # Step 3: Tier 2 news/journalism check
+    if domain in _RULES.get('tier2_news_domains', []):
+        return 'tier2'
+
+    # Step 4: TLD-based institutional signals
+    if domain.endswith('.edu') or domain.endswith('.gov') or domain.endswith('.museum'):
+        return 'tier1'
+    if domain.endswith('.gouv.fr') or domain.endswith('.ac.uk'):
+        return 'tier1'
+
+    # Step 4b: Institutional domain seed
+    if domain in _RULES.get('institutional_domain_seed', []):
+        return 'tier1'
+
+    # Cannot determine without P856 lookup
+    return None
+
+
 def classify_domain(domain: str, domain_cache: dict = None) -> str:
     """Classify a domain into tier1/tier2/tier3/reject.
 
@@ -118,10 +175,18 @@ def classify_domain(domain: str, domain_cache: dict = None) -> str:
     if domain_cache and domain in domain_cache:
         return domain_cache[domain]
 
+    # [LOCAL-441] Check module-level cache (persists across calls within a run)
+    if domain in _MODULE_DOMAIN_CACHE:
+        result = _MODULE_DOMAIN_CACHE[domain]
+        if domain_cache is not None:
+            domain_cache[domain] = result
+        return result
+
     # Try SPARQL (P856 + P31 class constraint)
     tier = _check_wikidata_p856(domain)
     if domain_cache is not None:
         domain_cache[domain] = tier
+    _MODULE_DOMAIN_CACHE[domain] = tier  # [LOCAL-441] Persist for future calls
     return tier
 
 
@@ -151,7 +216,7 @@ def _check_wikidata_p856(domain: str) -> str:
             f"https://query.wikidata.org/sparql?{encoded}",
             headers={'User-Agent': 'AudiouraBot/1.0 (story-quality-pipeline)'}
         )
-        with urllib.request.urlopen(req, timeout=8) as resp:
+        with urllib.request.urlopen(req, timeout=EXTERNAL_LOOKUP_PER_TIMEOUT) as resp:
             data = json.loads(resp.read().decode())
             if data.get('boolean', False):
                 return 'tier1'
@@ -159,6 +224,79 @@ def _check_wikidata_p856(domain: str) -> str:
     except Exception as e:
         print(f"  [SQ-S2] Wikidata P856 check failed for {domain}: {e}")
         return 'tier3'  # Fail → tier3, never tier1, never skipped
+
+
+def batch_check_wikidata_p856(domains: List[str], budget_seconds: float = None,
+                               pool_size: int = None) -> Dict[str, str]:
+    """[LOCAL-441] Concurrently check multiple domains against Wikidata P856.
+
+    Runs lookups in parallel with a global wall-budget. When the budget expires,
+    unanswered lookups are treated as tier3 (same as timeout today).
+
+    Args:
+        domains: list of unique domains to check (already filtered for cache hits)
+        budget_seconds: wall-clock budget for the whole batch (default: module constant)
+        pool_size: thread pool size (default: module constant)
+
+    Returns:
+        dict mapping domain → tier result ('tier1' or 'tier3')
+    """
+    if budget_seconds is None:
+        budget_seconds = EXTERNAL_LOOKUP_BATCH_BUDGET_SECONDS
+    if pool_size is None:
+        pool_size = EXTERNAL_LOOKUP_POOL_SIZE
+
+    if not domains:
+        return {}
+
+    results: Dict[str, str] = {}
+    batch_start = time.time()
+
+    print(f"  [LOCAL-441] Batch P856 check: {len(domains)} domains, "
+          f"budget={budget_seconds}s, pool={pool_size}")
+
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=pool_size)
+    try:
+        future_to_domain = {
+            executor.submit(_check_wikidata_p856, domain): domain
+            for domain in domains
+        }
+
+        # Wait with the global budget as the timeout
+        remaining = budget_seconds - (time.time() - batch_start)
+        done, not_done = concurrent.futures.wait(
+            future_to_domain.keys(),
+            timeout=max(0, remaining),
+            return_when=concurrent.futures.ALL_COMPLETED
+        )
+
+        # Collect completed results
+        for future in done:
+            domain = future_to_domain[future]
+            try:
+                results[domain] = future.result(timeout=0)
+            except Exception as e:
+                print(f"  [LOCAL-441] P856 exception for {domain}: {e}")
+                results[domain] = 'tier3'
+
+        # Budget-expired lookups → tier3 (same treatment as timeout)
+        for future in not_done:
+            domain = future_to_domain[future]
+            print(f"  [LOCAL-441] P856 budget-expired for {domain} → tier3")
+            results[domain] = 'tier3'
+            future.cancel()
+    finally:
+        # shutdown(wait=False, cancel_futures=True) — don't block on still-running threads
+        executor.shutdown(wait=False, cancel_futures=True)
+
+    elapsed = time.time() - batch_start
+    resolved = sum(1 for v in results.values() if v == 'tier1')
+    expired = len(not_done)
+    print(f"  [LOCAL-441] Batch complete: {elapsed:.1f}s, "
+          f"{resolved} tier1, {len(results) - resolved} tier3, "
+          f"{expired} budget-expired")
+
+    return results
 
 
 # --- Query Synthesis (SQ-S1) ---
@@ -665,7 +803,10 @@ def search_stories_for_stop(stop: Dict, tour_type: str = 'contained',
     query_log = []
     total_queries = 0
     serp_failures = 0
-    domain_cache = {}  # Per-tour domain tier cache
+    domain_cache = dict(_MODULE_DOMAIN_CACHE)  # Start with module-level cache (per-host across runs)
+
+    # [LOCAL-441] Phase 1: Execute all SERP queries, collect raw results
+    raw_serp_results = []  # list of (result_dict, query_index)
 
     for query in queries:
         if total_queries >= effective_cap:
@@ -683,18 +824,40 @@ def search_stories_for_stop(stop: Dict, tour_type: str = 'contained',
         if not results:
             serp_failures += 1
 
-        # Classify each result
         for r in results:
-            domain = normalize_domain(r['url'])
-            tier_class = classify_domain(domain, domain_cache)
-            r['domain'] = domain
-            r['tier'] = tier_class
-            if tier_class != 'reject':
-                # [LOCAL-406] Reject biography-only snippets
-                if _is_biography_only(r.get('snippet', ''), r.get('title', '')):
-                    print(f"  [LOCAL-406] snippet rejected: biography-only '{r.get('title', '')[:60]}'")
-                    continue
-                all_results.append(r)
+            r['domain'] = normalize_domain(r['url'])
+            raw_serp_results.append(r)
+
+    # [LOCAL-441] Phase 2: Identify domains needing P856 lookup (not resolvable from rules/cache)
+    domains_needing_p856 = set()
+    for r in raw_serp_results:
+        domain = r['domain']
+        if domain in domain_cache:
+            continue  # Already resolved
+        # Check if resolvable without P856 (reject, tier1, tier2 rules)
+        quick_tier = _classify_domain_quick(domain)
+        if quick_tier is not None:
+            domain_cache[domain] = quick_tier
+        else:
+            domains_needing_p856.add(domain)
+
+    # [LOCAL-441] Phase 3: Batch concurrent P856 lookups with wall-budget
+    if domains_needing_p856:
+        p856_results = batch_check_wikidata_p856(list(domains_needing_p856))
+        domain_cache.update(p856_results)
+        _MODULE_DOMAIN_CACHE.update(p856_results)  # Persist for future calls in this run
+
+    # [LOCAL-441] Phase 4: Classify all results using the now-populated cache
+    for r in raw_serp_results:
+        domain = r['domain']
+        tier_class = domain_cache.get(domain, 'tier3')
+        r['tier'] = tier_class
+        if tier_class != 'reject':
+            # [LOCAL-406] Reject biography-only snippets
+            if _is_biography_only(r.get('snippet', ''), r.get('title', '')):
+                print(f"  [LOCAL-406] snippet rejected: biography-only '{r.get('title', '')[:60]}'")
+                continue
+            all_results.append(r)
 
     # SQ-S1 refinement round (F5): if T1/T2 yield < 2, try refined queries
     t1_t2_count = sum(1 for r in all_results if r.get('tier') in ('tier1', 'tier2'))
@@ -711,8 +874,18 @@ def search_stories_for_stop(stop: Dict, tour_type: str = 'contained',
                 serp_failures += 1
             for r in results:
                 domain = normalize_domain(r['url'])
-                tier_class = classify_domain(domain, domain_cache)
                 r['domain'] = domain
+                # Use cache or quick-classify; only P856 if truly unknown
+                if domain not in domain_cache:
+                    quick_tier = _classify_domain_quick(domain)
+                    if quick_tier is not None:
+                        domain_cache[domain] = quick_tier
+                    else:
+                        # Single lookup — acceptable here as refinement is rare
+                        tier_result = _check_wikidata_p856(domain)
+                        domain_cache[domain] = tier_result
+                        _MODULE_DOMAIN_CACHE[domain] = tier_result
+                tier_class = domain_cache.get(domain, 'tier3')
                 r['tier'] = tier_class
                 if tier_class != 'reject':
                     # [LOCAL-406] Reject biography-only snippets
