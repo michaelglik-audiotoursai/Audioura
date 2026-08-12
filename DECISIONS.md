@@ -16493,3 +16493,63 @@ constraint stays; it is simply not the guarantee.
 **Five live runs are now accepted where the task asked for ten.** LOCAL-453 argued that a
 structural binding needs fewer runs than a probabilistic one. The argument is sound — it
 just described code that did not exist yet. With a validator in place it becomes true.
+
+## D419 — D412 was wrong about GIT_SHA, LOCAL-452 died mid-run, and a worktree stole port 5000
+**2026-08-12, LEAD.** Three findings from one tick, and the first is a correction to LEAD.
+
+### D412's central claim was false
+
+D412 said *"only `Dockerfile.generator` takes the `GIT_SHA` build arg."* It does not. At
+`55b2753` — a week ago, before any of today's work — `Dockerfile.orchestrator`,
+`Dockerfile.modernized`, `Dockerfile.treats`, `Dockerfile.polly-tts`,
+`translation-service/Dockerfile` and `user-tracking/Dockerfile` all already carried:
+
+```dockerfile
+ARG GIT_SHA=unknown
+RUN echo "${GIT_SHA}" > /app/.git_sha
+```
+
+and compose already passed `args: GIT_SHA: ${GIT_SHA:-unknown}`. **19 Dockerfiles have
+it.** The infrastructure was there the whole time.
+
+How the wrong conclusion was reached: LEAD probed with
+`cat /app/.git_sha || echo "(no .git_sha)"` and read the output `unknown` as "no
+provenance mechanism". It actually meant the file exists and the image was built without
+`GIT_SHA` in the environment, so the default applied. Proof it works: after today's
+rebuild with `GIT_SHA` exported, `audioura-tour-orchestrator-1` holds `ce61b01`.
+
+**The real gaps are narrower and different:** (a) a plain `docker-compose build` with
+`GIT_SHA` unset stamps every image `unknown`, so provenance depends on the operator
+remembering; (b) only `tour-generator` surfaces `.git_sha` in `/health`; (c) nothing
+aggregates it. That is second time today a LEAD measurement has been overturned by
+checking it (D413 was the first) — standing check 3 earns its place.
+
+**LOCAL-452 worked around the bad premise silently.** It modified 20 *service* files to
+expose `code_sha` and touched **zero** Dockerfiles, because they needed nothing. That was
+the right call. It should have said the task file was wrong; a task that notices its
+instructions are mistaken must report it, and that is now in the re-dispatch.
+
+### LOCAL-452 died at ~62 minutes with nothing committed
+
+`kill -0 86465` confirms the pid is gone; there is no COMPLETED/FAILED record and no log
+under `kiro_session_logs/`. Its worktree held 20 modified files plus `verify_fleet.sh`,
+uncommitted. **LEAD committed that work as `5ba4179` on the branch, labelled UNVERIFIED**,
+so a re-dispatch builds on it instead of redoing an hour of mechanical edits. Nothing in
+it has been tested, rebuilt, or run.
+
+### A task worktree took over port 5000
+
+`audioura-tour-generator-1` is **gone** — not stopped, removed. Port 5000 is served by
+`local-454-tour-generator-1`, created 18:54 by LOCAL-454 running compose from
+`~/audioura-worktrees/LOCAL-454`. Compose derives its project name from the directory, so
+the worktree became project `local-454` and its `ports: "5000:5000"` displaced the
+canonical container. `/health` on 5000 now reports `code_sha: unknown` — a task's
+throwaway build is answering the port the iPhone app uses.
+
+This is a concurrency hazard the dispatch protocol never anticipated: worktree isolation
+covers files, not host ports or container names. Any task that runs `docker-compose up`
+silently seizes the fleet.
+
+**LEAD is letting LOCAL-454 finish** rather than killing it mid-acceptance — it is ~17
+minutes in and its five live runs are the entire point of the task. The canonical
+generator is restored immediately after. The structural fix goes in LOCAL-455.
