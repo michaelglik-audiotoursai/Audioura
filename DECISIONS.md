@@ -14448,3 +14448,45 @@ Binding: `test_d370_story_pass_model.py`, 7 tests. The two call-site tests parse
 `timeout` binary, so every invocation failed to launch and all 52 files were
 reported as failing. That sweep result was meaningless. `run_tests.py` is the
 runner that exists for this; use it.
+
+## D371 — the Unbound tour's real blocker is URL discovery, and a 429 that reads as "not found"
+
+**2026-08-11, 23:0x.** Michael asked for the Unbound tour with 3 stops. A live run
+with `DISABLE_TOUR_CACHE=1` produced **no text at all** — `tier: unresolvable`.
+Measured chain, in order:
+
+1. `find_exhibition_checklist` → `path=fallback, works=0`. It walks
+   `_EXHIBITION_PATH_SEEDS` against the venue domain. **One Serper query returns
+   `mfa.org/exhibition/picasso-miro-dali-unbound` as the first organic hit.** We
+   never ask.
+2. **mfa.org is returning HTTP 429.** Verified directly, two user agents.
+   `_fetch_page` swallows it and returns 0 chars, so the log says *"No exhibition
+   listing found on venue site"* — **a rate-limit is indistinguishable from a 404.**
+   That conflation is the single most misleading line in the pipeline.
+3. Creator filter: `0 works match artists ['Picasso','Miro','Dali']` of 125
+   documented MFA works. Wikidata/catalogue simply lack them.
+4. Phase 3A then asks for *"the museum's most iconic/signature pieces"* — the
+   exhibition is **absent from the prompt** — and returns Indian miniatures, which
+   D1v2 correctly drops.
+
+**`prose_llm_extract_works` is not at fault and is never reached.** Given the real
+page it returns exactly the right three with artists and dates. The page is 4207
+chars, all three titles inside the first 1600 — the 5000-char truncation LOCAL-425
+was originally dispatched to fix is irrelevant. **That task was killed at 22:44 and
+rewritten.** Cost of the wrong premise: ~18 agent-minutes.
+
+**Generalisable:** a fetch helper that returns falsy on every failure makes every
+downstream diagnosis wrong. Distinguish 429/5xx from 404 or the caller will report
+absence for something that exists.
+
+## D372 — D370's cost estimate was 17x low, because gate retries multiply the story pass
+
+Measured on the 23:0x run: **6 gpt-4o story calls, $0.188**. D370 recorded
+$0.0111/tour from a run whose stops passed first time. LOCAL-417's positive gate
+failed stop 3 three times, and each retry is a full gpt-4o call at ~$0.031.
+
+The per-call figure was right; the per-tour figure assumed one call per stop.
+**Retry budgets have to be in any model-cost estimate** — a 3x retry allowance on
+the most expensive call in the pipeline is the dominant term, not the base price.
+Still small in absolute terms, but $0.19 is a different conversation from $0.011
+once translations multiply it. Not reverting; recording the true number.
