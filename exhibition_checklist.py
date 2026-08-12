@@ -280,6 +280,116 @@ def _search_exhibition_url(exhibition_name: str, venue_base_url: str) -> str:
         return ''
 
 
+# ─── [LOCAL-426] Third-party source quality gate ──────────────────────────────
+# Not every domain is a usable source for exhibition works. Arts publications,
+# wire services, museum press offices, and established cultural media are
+# acceptable. Content farms, SEO aggregators, and user-generated platforms
+# (Reddit, Medium, Quora) are not — they may re-state works inaccurately,
+# hallucinate attributions, or simply compile unverified lists.
+#
+# Policy: scored heuristic with an allowlist of known-good domain patterns
+# and a blocklist of known-bad patterns. Domains matching neither are accepted
+# only if the URL path contains arts/exhibition keywords (benefit of doubt for
+# niche regional publications).
+#
+# This function is at module scope so tests can call it directly (D242 #1, D277).
+
+# Known-good domains: arts publications, press agencies, cultural media
+_USABLE_DOMAIN_PATTERNS = re.compile(
+    r'(?:'
+    # Major arts publications
+    r'artnet\.com|artnews\.com|artforum\.com|theartnewspaper\.com|'
+    r'hyperallergic\.com|frieze\.com|apollo-magazine\.com|'
+    r'artsy\.net|ocula\.com|artreview\.com|art-agenda\.com|'
+    # Arts/culture coverage
+    r'airmail\.news|airmail\.com|'  # Airmail arts intel
+    r'cultured\.com|colossal\.com|juxtapoz\.com|'
+    # Newspapers (arts sections)
+    r'nytimes\.com|theguardian\.com|washingtonpost\.com|latimes\.com|'
+    r'bostonglobe\.com|ft\.com|telegraph\.co\.uk|independent\.co\.uk|'
+    r'chicagotribune\.com|sfchronicle\.com|dailymail\.co\.uk|'
+    r'lemonde\.fr|elpais\.com|corriere\.it|faz\.net|'
+    # Wire services
+    r'apnews\.com|reuters\.com|france24\.com|bbc\.co\.uk|bbc\.com|'
+    # Museum/institution sites (not the venue itself — those are separate)
+    r'musee|museum|gallery|galerie|institut|'
+    # Culture/travel with arts verticals
+    r'timeout\.com|smithsonianmag\.com|vanityfair\.com|newyorker\.com|'
+    r'architectural-digest|observer\.com|dazeddigital\.com|'
+    r'wallpaper\.com|designboom\.com|dezeen\.com|'
+    # Press release services (official museum press)
+    r'prnewswire\.com|businesswire\.com|globenewswire\.com|'
+    # Academic/reference
+    r'jstor\.org|academia\.edu|arxiv\.org|'
+    # Regional arts/culture sites
+    r'artdaily\.com|artdaily\.org|thisiscolossal\.com'
+    r')',
+    re.IGNORECASE
+)
+
+# Known-bad domains: content farms, UGC, SEO aggregators
+_BLOCKED_DOMAIN_PATTERNS = re.compile(
+    r'(?:'
+    r'reddit\.com|medium\.com|quora\.com|'
+    r'pinterest\.com|instagram\.com|facebook\.com|twitter\.com|x\.com|'
+    r'tiktok\.com|youtube\.com|'
+    r'buzzfeed\.com|boredpanda\.com|listverse\.com|'
+    r'ehow\.com|wikihow\.com|about\.com|liveabout\.com|'
+    r'tripadvisor\.com|yelp\.com|'
+    r'ebay\.com|amazon\.com|etsy\.com|'
+    r'fandom\.com|wikipedia\.org|'  # Reference, not a source for exhibition works
+    r'blogspot\.com|wordpress\.com|tumblr\.com|'
+    r'hubpages\.com|squidoo\.com|'
+    r'slideshare\.net|scribd\.com'
+    r')',
+    re.IGNORECASE
+)
+
+# URL path keywords that indicate arts/exhibition content on unknown domains
+_ARTS_PATH_KEYWORDS = re.compile(
+    r'(?:/|^)(?:exhibition|exhibit|art(?:s|ists?)?|gallery|museum|culture|'
+    r'painting|sculpture|collection|'
+    r'exposition|ausstellung|mostra|exposicion)(?:/|$)',
+    re.IGNORECASE
+)
+
+
+def is_usable_exhibition_source(url: str) -> Tuple[bool, str]:
+    """[LOCAL-426] Determine if a URL is a usable source for exhibition works.
+
+    Policy:
+    - Known arts publications, newspapers, wire services → accept
+    - Known content farms, UGC platforms, SEO aggregators → reject
+    - Unknown domains with arts/exhibition keywords in URL path → accept
+    - Unknown domains without arts keywords → reject
+
+    Returns (is_usable, reason) for logging and test visibility.
+
+    This function is at module scope so tests can call it directly (D242 #1, D277).
+    """
+    if not url:
+        return False, "empty URL"
+
+    parsed = urlparse(url)
+    domain = parsed.netloc.lower()
+    path = parsed.path.lower()
+
+    # Check blocklist first (takes precedence)
+    if _BLOCKED_DOMAIN_PATTERNS.search(domain):
+        return False, f"blocked domain: {domain} (content farm / UGC / aggregator)"
+
+    # Check allowlist
+    if _USABLE_DOMAIN_PATTERNS.search(domain):
+        return True, f"allowed domain: {domain} (arts publication / newspaper / wire service)"
+
+    # Unknown domain — check URL path for arts keywords
+    if _ARTS_PATH_KEYWORDS.search(path):
+        return True, f"unknown domain {domain} but URL path contains arts keywords"
+
+    # Unknown domain, no arts signals — reject
+    return False, f"unknown domain: {domain} — no arts/exhibition signal in URL path"
+
+
 def _search_exhibition_works_from_web(
     exhibition_name: str, venue_name: str, venue_base_url: str = ''
 ) -> Tuple[List[Dict], str]:
@@ -288,6 +398,11 @@ def _search_exhibition_works_from_web(
     Uses Serper to find press releases, reviews, or art news sites that list the
     works in this exhibition. Fetches the most promising page and runs
     prose_llm_extract_works on it.
+
+    [LOCAL-426] Only accepts sources from domains classified as usable by
+    is_usable_exhibition_source(). Arts publications, press agencies, and
+    established cultural media are accepted. Content farms, SEO aggregators,
+    and user-generated sites are rejected.
 
     Returns (works_list, source_url) where source_url is the page that supplied
     the works. Returns ([], '') if nothing found.
@@ -354,7 +469,14 @@ def _search_exhibition_works_from_web(
         if _SKIP_PATTERNS.search(url) or _SKIP_PATTERNS.search(hit_domain):
             print(f"  [LOCAL-425] Skipping (shopping/store site): {url}")
             continue
-        print(f"  [LOCAL-425] Trying third-party source: {url}")
+        # [LOCAL-426] Source quality gate: only accept arts publications and
+        # established cultural media. Content farms, UGC, and SEO aggregators
+        # are not reliable for exhibition work attributions.
+        _source_usable, _source_reason = is_usable_exhibition_source(url)
+        if not _source_usable:
+            print(f"  [LOCAL-426] Skipping (source quality gate): {url} — {_source_reason}")
+            continue
+        print(f"  [LOCAL-425] Trying third-party source: {url} ({_source_reason})")
         page_text, _ = _fetch_page(url)
         if page_text and len(page_text) > 200:
             # Try LLM extraction on this page
@@ -1592,9 +1714,12 @@ class ExhibitionChecklistResult:
     """Result of an exhibition checklist retrieval attempt."""
 
     def __init__(self):
-        self.works: List[Dict] = []           # Extracted works [{title, artist?, date?}]
+        self.works: List[Dict] = []           # Extracted works [{title, artist?, date?, source_url?}]
         self.exhibition_title: str = ''       # Official title as published
-        self.exhibition_url: str = ''         # URL where checklist was found
+        self.exhibition_url: str = ''         # URL of the exhibition on the venue site
+        self.content_url: str = ''            # [LOCAL-426] URL the works text was actually fetched from
+                                              # Equals exhibition_url when venue serves content directly.
+                                              # Differs when a third-party source supplied the text.
         self.opening_date: Optional[date] = None
         self.closing_date: Optional[date] = None
         self.is_closed: bool = False          # True if show has closed
@@ -1602,14 +1727,17 @@ class ExhibitionChecklistResult:
         self.reason: str = ''                 # Human-readable explanation
         self.page_shape: str = ''             # Which extraction shape was used
         self.page_text: str = ''              # [LOCAL-369] Exhibition page prose text for thread discovery
+        self.is_third_party: bool = False     # [LOCAL-426] True when works came from a non-venue source
 
     @property
     def has_works(self) -> bool:
         return len(self.works) > 0
 
     def __repr__(self):
+        _url_display = self.content_url or self.exhibition_url
         return (f"ExhibitionChecklistResult(path={self.path}, works={len(self.works)}, "
-                f"title='{self.exhibition_title}', url='{self.exhibition_url}')")
+                f"title='{self.exhibition_title}', url='{_url_display}'"
+                f"{', THIRD-PARTY' if self.is_third_party else ''})")
 
 
 def _try_aic_api(exhibition_name: str, venue_name: str) -> Optional[ExhibitionChecklistResult]:
@@ -1881,10 +2009,16 @@ def find_exhibition_checklist(
                     exhibition_name, venue_name, venue_base_url
                 )
                 if _third_party_works:
+                    # [LOCAL-426] Attach source_url to each work so provenance
+                    # travels per-work, not just per-result.
+                    for _w in _third_party_works:
+                        _w['source_url'] = _third_party_url
                     result.works = _third_party_works
                     result.path = 'prose_llm'
                     result.page_shape = 'third_party_extraction'
-                    result.exhibition_url = _search_url  # The venue URL (for provenance)
+                    result.exhibition_url = _search_url  # The venue URL (for reference)
+                    result.content_url = _third_party_url  # [LOCAL-426] Where text actually came from
+                    result.is_third_party = True  # [LOCAL-426] Flag for downstream verifiers
                     result.exhibition_title = exhibition_name
                     result.reason = (
                         f'Extracted {len(_third_party_works)} works from third-party source '
