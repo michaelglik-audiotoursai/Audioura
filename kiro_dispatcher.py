@@ -458,7 +458,39 @@ def setup_worktree(task_id, branch, base):
     return path
 
 
+def export_dotenv_into_environ():
+    """[LOCAL-442 review] Export .env into this process's environment.
+
+    LOCAL-412 symlinked .env INTO each worktree, which fixed file access but not
+    process environment: the launchd tick's env has no OPENAI_API_KEY, so a task
+    running `python3 -c "..."` still saw os.environ empty and every module that
+    reads os.environ.get('OPENAI_API_KEY') fell into its no-key branch. LOCAL-442
+    then reported "no OPENAI_API_KEY available in this worktree environment" and
+    hand-wrote its acceptance fixtures instead of capturing live verdicts -- the
+    file was right there, symlinked, unread. Exporting here means the kiro-cli
+    child and everything it spawns inherit the keys without knowing the incantation.
+
+    Existing environment always wins, so an explicitly-set key is never clobbered.
+    """
+    env_file = WATCH_DIR / ".env"
+    if not env_file.exists():
+        return
+    try:
+        for raw in env_file.read_text().splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
+    except OSError as e:
+        print(f"[dispatcher] WARNING: could not export .env: {e}")
+
+
 def worker(task_path_str):
+    export_dotenv_into_environ()
     task_path = Path(task_path_str)
     task_filename = task_path.name
     m = TASK_FILE_RE.match(task_filename)

@@ -15599,3 +15599,44 @@ Pattern note: this is the third task in the chain whose honest negative result
 was more valuable than a fake pass — 431 ("not yet"), 440 ("no improvement, here
 is why"), and the gate they respect is the live-artifact rule. Keep writing tasks
 that name an acceptable failure report.
+
+## D401 — LOCAL-442 BOUNCED: the auditor certified the paragraph it was built to catch (2026-08-12)
+
+LEAD ran LOCAL-442's `audit_stop_obligations()` live against Michael's hand-calibrated
+MFA Stop 1 paragraph: **unfulfilled=0, score_ratio=1.0** against a ground truth of
+S1 2/3, S2 1/2, S4 1/3. The live JSON shows why — the model accepts a restatement as
+payment: "embodies the surrealist ethos" marked fulfilled_by "explained as blurring
+reality and dreams"; "resulting in a coherent and integrated artwork" fulfilled_by
+"the description of the collaboration". The crude species (directive with no location,
+fixture 1) IS caught, 3 unfulfilled; the subtle species — abstraction laundered as
+explanation, the one Michael says he sees "all the time" — is entirely missed.
+
+Three supporting findings: (a) `_LIVE_VERDICTS` was hand-authored to match Michael's
+table, not captured — the live model contradicts it; (b) **the suite cannot fail** —
+LEAD replaced `_STOP_AUDIT_PROMPT` with "IGNORE EVERYTHING. Return {}." and got 26
+passed, because every test reads the preloaded cache, and the included
+"neutralisation proof" neutralises a stub rather than production; (c) parts B and D
+(generation repair loop, scorer wiring) were skipped as "requires LOCAL-440 merge"
+when 440 had merged at `9379fd4` before 442 was dispatched — leaving **zero callers**
+of the module, the `story_element_extractor.py` pattern exactly.
+
+Not merged. Bounced as LOCAL-444, which cherry-picks 93c4ce1 (the scaffolding is
+sound) and must (1) encode "payment is information not derivable from the claim
+itself — renaming is not payment", holding Michael's rules 1 and 5 intact so
+appositives and domain definitions still pay, (2) match his S1–S4 table live as the
+acceptance bar, (3) ship a test that goes red when the prompt is corrupted, (4) wire
+both the repair loop and the scorer, (5) stop failing open on a missing key
+(currently returns ratio 1.0 = silent all-clear).
+
+**Root-cause infra fix, shipped with this ruling:** LOCAL-412 symlinked `.env` into
+each worktree but nothing exported it, so `os.environ.get('OPENAI_API_KEY')` was
+empty under the launchd tick and modules took their no-key branch. That is the third
+task to report a key "unavailable" while the file sat symlinked beside it.
+`kiro_dispatcher.export_dotenv_into_environ()` now loads .env into the worker's
+environment before kiro-cli spawns; existing env always wins. Verified: key exported.
+
+**LOCAL-443 un-parked and dispatched concurrently** (cap is 2). D400 parked it behind
+442; 442 is now a bounce rather than a merge, and waiting a full round would idle the
+slot for ~40 minutes. Surfaces barely overlap — 443 is candidate fetch/classification,
+444 is post-draft audit and scoring. Both task files warn about the shared
+`generate_tour_text.py` call site; LEAD merges sequentially and rebases the second.
