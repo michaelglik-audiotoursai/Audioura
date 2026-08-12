@@ -11213,6 +11213,54 @@ Write the story FIRST, then add physical description if space allows.
                 print(f"  [LOCAL-421] STORY GATE: ALL STOPS PASSED")
             else:
                 print(f"  [LOCAL-421] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)")
+                # [LOCAL-431] Blocking wiring: when _L421_GATE_BLOCKS is True,
+                # a story gate failure refuses delivery through LOCAL-365's
+                # clean-fail path. Currently LOG_ONLY because neither MFA nor
+                # Palais passes yet (1/3 and 1/4 respectively). LEAD flips this
+                # when a live run demonstrates 3/3 or 4/4 on real content.
+                _L421_GATE_BLOCKS = os.environ.get("L421_GATE_BLOCKS", "false").lower() == "true"
+                if _L421_GATE_BLOCKS:
+                    # Collect per-stop failure evidence
+                    _l431_failed_stops = []
+                    for _sg_i2, _sg_poi2 in enumerate(poi_list):
+                        _sg_desc2 = _sg_poi2.get('description', '')
+                        _sg_name2 = _sg_poi2.get('name', f'Stop {_sg_i2+1}')
+                        if not _sg_desc2 or _sg_desc2.startswith('['):
+                            continue
+                        _sg_credit2 = _sg_poi2.get('credit_line', '')
+                        _sg_result2 = verify_stop_story(
+                            description=_sg_desc2, credit_line=_sg_credit2,
+                            stop_name=_sg_name2, framing_case=_framing_case,
+                            min_story_sentences=3,
+                        )
+                        if not _sg_result2['passed']:
+                            _l431_failed_stops.append({
+                                'stop_name': _sg_name2,
+                                'story_count': _sg_result2['story_count'],
+                                'failures': _sg_result2['failures'],
+                            })
+                    print(f"\n  [LOCAL-431] ⚠️  STORY GATE BLOCKING — refusing delivery")
+                    for _fs in _l431_failed_stops:
+                        print(f"    FAIL: {_fs['stop_name']}: story_count={_fs['story_count']}")
+                        for _ff in _fs['failures']:
+                            print(f"      → {_ff}")
+                    _LAST_CLEAN_FAIL_EVIDENCE.clear()
+                    _LAST_CLEAN_FAIL_EVIDENCE.update({
+                        "error_type": "story_gate_failed",
+                        "failed_stops": _l431_failed_stops,
+                        "reason": (
+                            f"{len(_l431_failed_stops)} stop(s) have fewer than 3 story sentences. "
+                            "Each stop must contain at least 3 sentences naming a person and "
+                            "stating what they did (a decision, commission, gift, or consequence)."
+                        ),
+                    })
+                    _LAST_GENERATION_COST = {
+                        "total_cost": 0.0,
+                        "total_tokens": 0,
+                        "cache_hit": False,
+                        "breakdown": {"llm": 0.0, "tts": 0.0, "search": 0.0},
+                    }
+                    return None, None, (None, None)
         except ImportError as _sg_err:
             print(f"  [LOCAL-421] Story gate import error (non-fatal): {_sg_err}")
         except Exception as _sg_err:

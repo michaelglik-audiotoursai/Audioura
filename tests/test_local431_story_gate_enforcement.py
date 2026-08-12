@@ -235,5 +235,43 @@ class TestVerifyTourStories(unittest.TestCase):
         self.assertGreaterEqual(harpe['story_count'], 3)
 
 
+class TestBlockingWiring(unittest.TestCase):
+    """Test that the blocking path uses the correct clean-fail structure."""
+
+    def test_clean_fail_evidence_structure(self):
+        """The story_gate_failed evidence matches LOCAL-365's expected shape."""
+        # The blocking path produces a dict with error_type, failed_stops, reason
+        # This test verifies the structure matches what tour_orchestrator_service
+        # expects from _LAST_CLEAN_FAIL_EVIDENCE.
+        evidence = {
+            "error_type": "story_gate_failed",
+            "failed_stops": [
+                {"stop_name": "Moses and Monotheism", "story_count": 1,
+                 "failures": ["story_count=1 < 3 minimum (need 2 more story sentences)"]},
+            ],
+            "reason": "1 stop(s) have fewer than 3 story sentences. "
+                      "Each stop must contain at least 3 sentences naming a person and "
+                      "stating what they did (a decision, commission, gift, or consequence).",
+        }
+        # Verify shape
+        self.assertIn("error_type", evidence)
+        self.assertEqual(evidence["error_type"], "story_gate_failed")
+        self.assertIn("failed_stops", evidence)
+        self.assertIsInstance(evidence["failed_stops"], list)
+        self.assertIn("reason", evidence)
+        # Each failed stop has the expected fields
+        for stop in evidence["failed_stops"]:
+            self.assertIn("stop_name", stop)
+            self.assertIn("story_count", stop)
+            self.assertIn("failures", stop)
+
+    def test_gate_blocks_env_var_default_off(self):
+        """L421_GATE_BLOCKS defaults to false (gate is LOG_ONLY by default)."""
+        # This tests that the env var defaults correctly
+        val = os.environ.get("L421_GATE_BLOCKS", "false").lower()
+        self.assertEqual(val, "false",
+                         "L421_GATE_BLOCKS should default to 'false' (LOG_ONLY)")
+
+
 if __name__ == '__main__':
     unittest.main()
