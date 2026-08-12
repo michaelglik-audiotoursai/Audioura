@@ -85,7 +85,7 @@ class TestColdBranchServesFromDB(unittest.TestCase):
 
 
 class TestLiveWinsWhenHealthy(unittest.TestCase):
-    """When Wikimedia is healthy, live content is served — DB is not consulted."""
+    """When Wikimedia is healthy and live is richer, live content is served."""
 
     def setUp(self):
         import dead_host_breaker
@@ -95,8 +95,14 @@ class TestLiveWinsWhenHealthy(unittest.TestCase):
         import dead_host_breaker
         dead_host_breaker.reset_cold_hosts()
 
-    def test_live_served_db_not_consulted(self):
-        """Healthy Wikimedia → live content served, _fetch_from_stop_corpus not called."""
+    def test_live_served_when_richer(self):
+        """Healthy Wikimedia + live richer → live content served.
+
+        LOCAL-450: Original assertion was "DB not consulted". LOCAL-451 changes
+        to content-based selection — DB IS consulted for comparison, but live
+        wins when it has more content. Updated assertion: source is
+        'wikipedia_live' and content comes from live.
+        """
         from rag_retriever import fetch_wikipedia_summary_with_provenance
 
         mock_resp = MagicMock()
@@ -105,12 +111,12 @@ class TestLiveWinsWhenHealthy(unittest.TestCase):
             'extract': 'Rich Wikipedia content about the island with extensive detail. ' * 20
         }
 
+        # DB returns shorter content — live should win on length
         with patch('rag_retriever.requests.get', return_value=mock_resp):
-            with patch('rag_retriever._fetch_from_stop_corpus') as mock_db:
+            with patch('rag_retriever._fetch_from_stop_corpus', return_value='Short DB'):
                 result = fetch_wikipedia_summary_with_provenance('Île Sainte-Marguerite')
 
         self.assertEqual(result['source'], 'wikipedia_live')
-        mock_db.assert_not_called()
 
 
 class TestD242NeutraliseFallback(unittest.TestCase):
