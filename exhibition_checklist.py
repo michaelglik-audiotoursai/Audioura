@@ -577,14 +577,58 @@ def _search_exhibition_works_from_web(
     return [], ''
 
 
+# ─── [LOCAL-430] Wayback staleness bound ──────────────────────────────────────
+# Exhibition pages are time-bounded: a snapshot older than this many days is
+# refused. Reasoning: major exhibitions typically run 3–6 months; a 90-day-old
+# snapshot of a page that described an active show is very likely still describing
+# the same show. Beyond 90 days the risk of narrating a dismounted exhibition
+# (or one whose works have rotated) outweighs the value of having *any* source.
+# 90 days is generous because: (a) the pipeline already checks run dates when
+# the page carries them (Step 4), so a closed show is caught even if the snapshot
+# is recent; (b) "no source" is an honest outcome the pipeline handles — a stale
+# archive is worse than no archive.
+WAYBACK_MAX_STALENESS_DAYS = 90
+
+# [LOCAL-430] Module-level store for the last successful Wayback fetch metadata.
+# Set by _fetch_from_wayback, read by find_exhibition_checklist to attach to the result.
+_last_wayback_metadata: Optional[Dict] = None
+
+
+def _parse_wayback_timestamp(url_or_ts: str) -> Optional[datetime]:
+    """[LOCAL-430] Parse a Wayback Machine timestamp (YYYYMMDDHHmmss) from a URL or raw string.
+
+    The Wayback Machine encodes snapshot timestamps in the URL path:
+      /web/20260812064828/https://www.mfa.org/...
+    This extracts the 14-digit timestamp and returns a datetime, or None if unparseable.
+    """
+    m = re.search(r'/web/(\d{14})/', url_or_ts)
+    if not m:
+        # Try raw 14-digit timestamp string
+        m = re.match(r'^(\d{14})$', url_or_ts.strip())
+    if not m:
+        return None
+    try:
+        return datetime.strptime(m.group(1), '%Y%m%d%H%M%S')
+    except ValueError:
+        return None
+
+
 def _fetch_from_wayback(url: str, timeout: int = 20) -> Tuple[str, List[Tuple[str, str]]]:
     """[LOCAL-429] Fetch a page from the Wayback Machine when the live site is
     behind a Cloudflare challenge that no headless-free client can pass.
 
+    [LOCAL-430] Now also:
+    - Parses the snapshot timestamp from the redirect URL
+    - Enforces WAYBACK_MAX_STALENESS_DAYS — refuses snapshots older than the bound
+    - Stores metadata in _last_wayback_metadata for the caller to attach to the result
+
     Uses the Wayback CDX API to find the most recent snapshot, then fetches the
     raw archived page. Returns (text, links) in the same format as _fetch_page,
-    or ('', []) if no snapshot exists.
+    or ('', []) if no snapshot exists or is too stale.
     """
+    global _last_wayback_metadata
+    _last_wayback_metadata = None
+
     from urllib.parse import quote as _url_quote
 
     wayback_url = f"https://web.archive.org/web/2/{url}"
@@ -598,6 +642,34 @@ def _fetch_from_wayback(url: str, timeout: int = 20) -> Tuple[str, List[Tuple[st
         if resp.status_code != 200:
             print(f"  [LOCAL-429] Wayback Machine returned {resp.status_code} for {url}")
             return '', []
+
+        # [LOCAL-430] Parse snapshot timestamp from the final URL after redirect.
+        # web.archive.org/web/2/{url} redirects to /web/{14-digit-ts}/{url}
+        _final_url = resp.url if isinstance(resp.url, str) else str(getattr(resp, 'url', ''))
+        snapshot_ts = _parse_wayback_timestamp(_final_url)
+        snapshot_ts_str = ''
+        if snapshot_ts:
+            snapshot_ts_str = snapshot_ts.strftime('%Y%m%d%H%M%S')
+            age_days = (datetime.utcnow() - snapshot_ts).days
+            print(f"  [LOCAL-430] Wayback snapshot timestamp: {snapshot_ts_str} "
+                  f"(age: {age_days} days)")
+            logger.info(f"exhibition_checklist: Wayback snapshot for {url} is "
+                       f"{snapshot_ts_str}, age {age_days} days")
+
+            # Enforce staleness bound
+            if age_days > WAYBACK_MAX_STALENESS_DAYS:
+                print(f"  [LOCAL-430] ✗ Snapshot too stale ({age_days} days > "
+                      f"{WAYBACK_MAX_STALENESS_DAYS} day limit) — refusing")
+                logger.info(f"exhibition_checklist: Refusing stale Wayback snapshot "
+                           f"for {url}: {age_days} days old (limit: "
+                           f"{WAYBACK_MAX_STALENESS_DAYS})")
+                return '', []
+        else:
+            # Could not parse timestamp — log but continue (defensive; don't
+            # break the existing path that works)
+            print(f"  [LOCAL-430] ⚠ Could not parse snapshot timestamp from: {resp.url}")
+            logger.warning(f"exhibition_checklist: Could not parse Wayback timestamp "
+                          f"from URL: {resp.url}")
 
         html = resp.text
         if not html or len(html) < 200:
@@ -650,6 +722,14 @@ def _fetch_from_wayback(url: str, timeout: int = 20) -> Tuple[str, List[Tuple[st
         if text:
             print(f"  [LOCAL-429] ✓ Wayback Machine success: {url} ({len(text)} chars)")
             logger.info(f"exhibition_checklist: Wayback Machine provided {len(text)} chars for {url}")
+            # [LOCAL-430] Store metadata for the caller
+            _last_wayback_metadata = {
+                'snapshot_timestamp': snapshot_ts_str,
+                'snapshot_datetime': snapshot_ts,
+                'age_days': (datetime.utcnow() - snapshot_ts).days if snapshot_ts else None,
+                'original_url': url,
+                'wayback_url': resp.url,
+            }
         else:
             print(f"  [LOCAL-429] Wayback Machine page had no extractable text for {url}")
 
@@ -1970,6 +2050,9 @@ class ExhibitionChecklistResult:
         self.page_shape: str = ''             # Which extraction shape was used
         self.page_text: str = ''              # [LOCAL-369] Exhibition page prose text for thread discovery
         self.is_third_party: bool = False     # [LOCAL-426] True when works came from a non-venue source
+        self.is_from_archive: bool = False     # [LOCAL-430] True when content came from web.archive.org
+        self.wayback_snapshot_timestamp: str = ''  # [LOCAL-430] Wayback snapshot ts (YYYYMMDDHHmmss)
+        self.wayback_age_days: Optional[int] = None  # [LOCAL-430] Age of the snapshot in days
 
     @property
     def has_works(self) -> bool:
@@ -1977,9 +2060,14 @@ class ExhibitionChecklistResult:
 
     def __repr__(self):
         _url_display = self.content_url or self.exhibition_url
+        _prov = ''
+        if self.is_third_party:
+            _prov = ', THIRD-PARTY'
+        elif self.is_from_archive:
+            _prov = f', ARCHIVED (snapshot: {self.wayback_snapshot_timestamp})'
         return (f"ExhibitionChecklistResult(path={self.path}, works={len(self.works)}, "
                 f"title='{self.exhibition_title}', url='{_url_display}'"
-                f"{', THIRD-PARTY' if self.is_third_party else ''})")
+                f"{_prov})")
 
 
 def _try_aic_api(exhibition_name: str, venue_name: str) -> Optional[ExhibitionChecklistResult]:
@@ -2397,6 +2485,17 @@ def find_exhibition_checklist(
     # which URL sourced the page text.
     if not result.content_url:
         result.content_url = best_match_url
+
+    # [LOCAL-430] Attach archive provenance if the detail came from Wayback
+    if _last_wayback_metadata and _last_wayback_metadata.get('original_url') == best_match_url:
+        result.is_from_archive = True
+        result.wayback_snapshot_timestamp = _last_wayback_metadata.get('snapshot_timestamp', '')
+        result.wayback_age_days = _last_wayback_metadata.get('age_days')
+        print(f"  [LOCAL-430] ARCHIVED SOURCE — snapshot {result.wayback_snapshot_timestamp}, "
+              f"age {result.wayback_age_days} days")
+        logger.info(f"exhibition_checklist: Result for '{exhibition_name}' sourced from "
+                   f"archive (snapshot: {result.wayback_snapshot_timestamp}, "
+                   f"age: {result.wayback_age_days} days)")
 
     # ─── Step 4: Check dates — is the exhibition still open? ──────────────────
     closing_date = _extract_closing_date(detail_text)
