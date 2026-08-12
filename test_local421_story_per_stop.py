@@ -162,20 +162,21 @@ class TestEntityNaming:
     """Bind to: story_gate.check_named_entities_present (called from verify_stop_story)."""
 
     def test_fridman_present(self):
-        """Boris Fridman must be named when credit line says 'Gift of Boris Fridman'."""
+        """D393: donor names are NOT demanded — a story dropping 'Fridman' for
+        concision is correct storytelling. Only the artist is required."""
         ok, found, missing = check_named_entities_present(
             STOP1_GOOD_DESCRIPTION, STOP1_CREDIT_LINE
         )
         assert ok, f"Missing entities: {missing}"
-        assert any("Fridman" in f for f in found)
 
-    def test_fridman_blurred_fails(self):
-        """'The generous donation' instead of naming Fridman must FAIL."""
+    def test_fridman_blurred_ok(self):
+        """D393: blurring the donor ('the generous donation') is acceptable.
+        Superseded LOCAL-421 behaviour demanded the donor by name."""
         ok, found, missing = check_named_entities_present(
             STOP1_BAD_DESCRIPTION, STOP1_CREDIT_LINE
         )
-        assert not ok, "Should fail: Fridman is blurred into 'the generous donation'"
-        assert any("Fridman" in m for m in missing)
+        assert ok, f"Donor blurring must not fail under D393: {missing}"
+        assert not any("Fridman" in m for m in missing)
 
     def test_publisher_named_stop3(self):
         """The publisher of Au Soleil du Plafond must be named."""
@@ -203,10 +204,33 @@ class TestEntityNaming:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class TestStoryGate:
-    """Bind to: story_gate.verify_stop_story (called from generate_tour_text.py:10381)."""
+    """Bind to: story_gate.verify_stop_story (D394: story-UNIT semantics).
+
+    Classification correctness against live gpt-4o-mini verdicts is covered by
+    tests/test_local439_story_gate.py. Here we preload the verdict cache to test
+    the gate plumbing deterministically offline (LOCAL-439 pattern).
+    NOTE (live verdict, 2026-08-12): STOP1_GOOD_DESCRIPTION — the LOCAL-421-era
+    'good' fixture — FAILS the real D394 gate (fact-rich but arc-less). The raised
+    bar is deliberate; the preloaded True verdict below tests plumbing only.
+    """
+
+    def _preload(self, description, is_story):
+        from story_gate import extract_candidate_story_units, load_verdict_cache
+        verdict = {
+            'is_story': is_story, 'reason': 'test preload',
+            'emotional_content': 3 if is_story else 0,
+            'new_information': 2 if is_story else 0,
+            'deduction': 0, 'cost_usd': 0.0, 'from_cache': False,
+        }
+        import hashlib
+        cache = {}
+        for unit in extract_candidate_story_units(description):
+            cache[hashlib.sha256(unit.encode('utf-8')).hexdigest()] = verdict
+        load_verdict_cache(cache)
 
     def test_good_description_passes(self):
-        """A well-storied description passes the gate."""
+        """With a passing story-unit verdict, the gate passes the stop."""
+        self._preload(STOP1_GOOD_DESCRIPTION, is_story=True)
         result = verify_stop_story(
             description=STOP1_GOOD_DESCRIPTION,
             credit_line=STOP1_CREDIT_LINE,
@@ -214,19 +238,20 @@ class TestStoryGate:
             framing_case='exhibition',
         )
         assert result['passed'], f"Should pass. Failures: {result['failures']}"
-        assert result['story_count'] >= 3
+        assert result['story_count'] >= 1
         assert result['entities_present']
         assert result['thesis_threaded']
 
     def test_bad_description_fails(self):
-        """Michael's marked-wrong stop 1 (3/5, 'borderline poor 2/5') fails."""
+        """Michael's marked-wrong stop 1: no story-unit → gate fails (live-confirmed)."""
+        self._preload(STOP1_BAD_DESCRIPTION, is_story=False)
         result = verify_stop_story(
             description=STOP1_BAD_DESCRIPTION,
             credit_line=STOP1_CREDIT_LINE,
             stop_name="Stop 1",
             framing_case='exhibition',
         )
-        assert not result['passed'], "Should fail: Fridman blurred, too few stories"
+        assert not result['passed'], "Should fail: no verified story-unit (D394)"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

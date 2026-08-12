@@ -156,7 +156,9 @@ class TestVenuePurposeInVerifyStopStory(unittest.TestCase):
             venue_purpose=PALAIS_VENUE_PURPOSE,
         )
         self.assertFalse(result['thesis_threaded'])
-        self.assertIn('thesis_missing', result['failures'][0])
+        # D394: the story-unit failure may precede thesis_missing in the list
+        self.assertTrue(any('thesis_missing' in f for f in result['failures']),
+                        f"thesis_missing not in failures: {result['failures']}")
 
     def test_venue_purpose_pass_in_verify_stop_story(self):
         """verify_stop_story passes thesis for venue_purpose when connected."""

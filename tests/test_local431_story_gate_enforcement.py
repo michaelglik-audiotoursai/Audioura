@@ -153,14 +153,15 @@ class TestStorySentenceClassification(unittest.TestCase):
         self.assertEqual(result['story_count'], 0)
 
     def test_good_stop_passes_at_3(self):
-        """A stop with 3+ story sentences passes."""
+        """D394: a stop with at least one verified story-UNIT passes
+        (story_count now counts units, not sentences)."""
         result = verify_stop_story(
             description=MFA_STOP2_WITH_STORY,
             framing_case='exhibition',
             min_story_sentences=3,
         )
         self.assertTrue(result['passed'], f"Should pass: story_count={result['story_count']}")
-        self.assertGreaterEqual(result['story_count'], 3)
+        self.assertGreaterEqual(result['story_count'], 1)
 
 
 class TestStoryRetryIntegration(unittest.TestCase):
@@ -209,9 +210,12 @@ class TestVerifyTourStories(unittest.TestCase):
         result = verify_tour_stories(text, framing_case='exhibition', min_story_sentences=3)
         # Verify we get 3 stops
         self.assertEqual(len(result['stop_results']), 3)
-        # At least one stop should have some story sentences
-        total_stories = sum(r['story_count'] for r in result['stop_results'])
-        self.assertGreater(total_stories, 0, "Expected at least some story sentences")
+        # D394: story_count counts story-UNITS and requires live LLM classification;
+        # counts are asserted in run_local439_acceptance.py against live verdicts.
+        # Offline we assert structure only.
+        for r in result['stop_results']:
+            self.assertIn('story_unit_count', r)
+            self.assertIsInstance(r['failures'], list)
 
     def test_palais_tour_file_counts(self):
         """Palais Lascaris tour file: Stop 1 should pass with venue_purpose."""
@@ -232,7 +236,8 @@ class TestVerifyTourStories(unittest.TestCase):
         self.assertTrue(harpe['passed'],
                         f"Harpe should pass: story_count={harpe['story_count']}, "
                         f"failures={harpe['failures']}")
-        self.assertGreaterEqual(harpe['story_count'], 3)
+        # D394: at least one verified story-unit (was: >=3 story sentences)
+        self.assertGreaterEqual(harpe['story_count'], 1)
 
 
 class TestBlockingWiring(unittest.TestCase):
