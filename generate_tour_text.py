@@ -8991,7 +8991,12 @@ Exempt: navigation directions ("Turn left", "Continue past").
     _local440_results = {}  # stop_name → pipeline result dict
     _local440_total_cost = 0.0
     _local440_total_elapsed = 0.0
-    if (_storied_mode and tour_category == 'museum'
+    # [LEAD D400] L440_STORY_FIRST gates the live path OFF by default: the pipeline
+    # regressed Palais wall time 336s -> 535s (per-candidate gpt-4o-mini classification)
+    # for no gate improvement. LOCAL-443 (full-page fetch + candidate pre-filter) earns
+    # the right to flip this on. Acceptance runs set L440_STORY_FIRST=true explicitly.
+    _l440_env_enabled = os.environ.get('L440_STORY_FIRST', 'false').lower() == 'true'
+    if (_storied_mode and tour_category == 'museum' and _l440_env_enabled
             and os.environ.get('GENERATION_TIER', 'plus') != 'free'):
         try:
             from story_first import story_first_pipeline, is_story_seeking_enabled
