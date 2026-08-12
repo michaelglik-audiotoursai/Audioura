@@ -14,6 +14,30 @@ if _MODULE_DIR not in _sys.path:
     _sys.path.insert(0, _MODULE_DIR)
 
 
+# ──── [LOCAL-437] MODULE-SCOPE PREDICATE: checklist exemption from existence gate ────
+# This predicate is the SINGLE source of truth for whether exhibition-sourced
+# stops bypass the existence gate. Tests IMPORT this — do not re-type it.
+def should_exempt_from_existence_gate(deterministic_fill_used: bool, exhibition_stops_source: str) -> bool:
+    """Return True if stops should be exempt from the LOCAL-245 existence gate.
+
+    The existence gate (LOCAL-245) verifies stops against independent web evidence
+    (Wikipedia, Wikidata, OSM). For temporary exhibition works (livres d'artiste on
+    loan), no such evidence exists — they are on the venue's own page and nowhere else.
+
+    Checklist-derived stops are already grounded against the venue's exhibition page
+    by LOCAL-372 (title_appears_in_page). That is a stricter, source-specific check
+    for this class of work. The existence gate's independent-web requirement does not
+    apply to them.
+
+    The exemption covers: 'checklist', 'partial', 'prose_llm' sources.
+    It does NOT cover: 'creator_filter', 'none', or non-deterministic paths.
+    """
+    return (
+        deterministic_fill_used
+        and exhibition_stops_source in ('checklist', 'partial', 'prose_llm')
+    )
+
+
 def check_part4_attribution(part4_text: str, stop_data: list) -> list:
     """Check that Part 4's '<fact> at <stop name>' attributions are correct.
 
@@ -7022,12 +7046,24 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         # Three modes: off / log_only / enforce.
         # In enforce mode, unverified stops are removed from poi_list before
         # narration. The tour may be shorter — this is logged explicitly.
+        #
+        # [LOCAL-437] EXEMPTION: Checklist-derived stops (exhibition page works)
+        # are exempt from the existence gate. They are already grounded against
+        # the venue's own page by LOCAL-372 — a stricter check than the gate's
+        # independent-web-evidence requirement. Uses the module-scope predicate
+        # should_exempt_from_existence_gate() which is imported by the test.
         _seg_requested_stops = total_stops  # [LOCAL-290] Save original request count for replenishment
+        _seg_checklist_exempt = should_exempt_from_existence_gate(
+            _deterministic_fill_used, _exhibition_stops_source
+        )
+        if _seg_checklist_exempt:
+            print(f"  [LOCAL-437] EXISTENCE-GATE: EXEMPT — stops sourced from exhibition "
+                  f"{_exhibition_stops_source} (already grounded against venue page by LOCAL-372)")
         try:
             from stop_existence_gate import get_gate_mode, run_existence_gate, verify_stop_existence
 
             _seg_mode = get_gate_mode()
-            if _seg_mode != 'off':
+            if _seg_mode != 'off' and not _seg_checklist_exempt:
                 # Get DB connection (same pattern as LOCAL-212)
                 _seg_conn = None
                 try:
@@ -7076,7 +7112,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                 else:
                     print(f"  [LOCAL-245] EXISTENCE-GATE: DB unavailable — gate cannot run, proceeding without")
             else:
-                print(f"  [LOCAL-245] EXISTENCE-GATE: OFF (STOP_EXISTENCE_GATE_MODE=off)")
+                if _seg_checklist_exempt:
+                    pass  # Already logged above at [LOCAL-437]
+                else:
+                    print(f"  [LOCAL-245] EXISTENCE-GATE: OFF (STOP_EXISTENCE_GATE_MODE=off)")
         except ImportError as _seg_err:
             print(f"  [LOCAL-245] EXISTENCE-GATE: import failed ({_seg_err}) — proceeding without")
         except Exception as _seg_err:
