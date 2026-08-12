@@ -15560,3 +15560,17 @@ D394's story-unit gate is untouched — existence of a story and payment of poin
 complementary checks. Spec: PARKED_kiro_task_LOCAL-442.md, dispatches after LOCAL-440
 (same prompt surfaces). Michael is hand-building the ground-truth ledger for MFA Stop 1
 sentence-by-sentence in session; his table becomes fixture data for 442.
+
+## D399 — Michael's controversy rule: disputed is a presentation mode, not just a penalty (2026-08-12)
+
+Today "disputed" corroboration only scores lower. Michael's ruling: a story whose
+sources genuinely disagree may be told AS the dispute, with attribution — "events
+here, but other sources say these are not..." — because controversy is itself
+interesting (feeds the emotional-content axis). Guardrail: the dispute must be
+verified on BOTH sides (two real fetched sources that disagree); one unverifiable
+claim hedged as "some say" is NOT a dispute and still drops. Verified-false drops,
+or narrates the correction when the error is the story. Legend-tier presentable as
+labeled legend. Recorded into PARKED_kiro_task_LOCAL-442.md; LOCAL-440's candidate
+evaluation will be held to it at review. Companion to D373 (Desnos): "the most
+satisfying payloads are the most fabricated" — the controversy rule widens what is
+TELLABLE without widening what is ASSERTABLE.
