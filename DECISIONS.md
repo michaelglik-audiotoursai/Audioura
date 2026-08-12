@@ -15488,3 +15488,29 @@ pipeline does not think for ten minutes; it sleeps through dead servers one at a
 2. Per-stop parallel narration after LOCAL-440 restructures the generation loop.
 3. Noted: app users mostly hit DB/cache; this cost is first-generation only. The ≤2 min
    target still stands for fresh generation.
+
+## D396 — LOCAL-441 merged: the tour stopped napping (2026-08-12)
+
+**Merged `3d31df0`.** External P856 lookups now run concurrently
+(`batch_check_wikidata_p856`, pool 10) under `EXTERNAL_LOOKUP_BATCH_BUDGET_SECONDS =
+20.0`, with a module-level per-domain cache. Budget-expired lookups take the exact
+timeout semantics that already existed (tier3/leads-only) — WHEN we give up changed,
+WHAT we accept did not (D376 guarded).
+
+**Measured, live:** lookup phase 5–9.5 min → **~16s**; full Palais generation **595s →
+336s**. All 26 domains still resolved tier3 (Wikidata still not answering) — identical
+outcomes, minus the nap. Control 4/4, dates 1780/1652/1581/1696, budget-conform word
+counts, LOG_ONLY.
+
+**Binding verified by LEAD:** neutralised to serial in place → 3 timing tests red and
+the suite itself balloons 15s → 151s, which is the failure mode demonstrating the claim.
+Restored → 12/12.
+
+**Process note:** attempt 1 (17 min) did all the work including the live run and died
+as `worker_died`; attempt 2 completed in 67s by resuming the intact worktree —
+`setup_worktree` reuse (D379) now has three saves to its name. The dispatcher's
+self-detection wrote the ABANDONED record correctly this time (the D379 gap was the
+1-hour cap specifically).
+
+**Remaining for Michael's ≤2 min (D395):** per-stop narration is now the dominant cost
+(~336s serial). Falls to the post-LOCAL-440 parallelism task.
