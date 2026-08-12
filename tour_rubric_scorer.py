@@ -375,6 +375,9 @@ class StopAnalysis:
     empty_sentence_fraction: float = 0.0
     empty_sentence_count: int = 0
 
+    # [LOCAL-444] Obligation audit result (attached post-draft if audit enabled)
+    unfulfilled_count: Optional[int] = None  # None = audit not run
+
 
 @dataclass 
 class TourScore:
@@ -402,6 +405,10 @@ class TourScore:
     n_achievable: int = 0          # stops in area passing genuine existence check
     missing_classifications: List[str] = field(default_factory=list)  # per missing stop: 'PIPELINE_LOST' or 'UNAVAILABLE'
     shortfall_evidence: List[dict] = field(default_factory=list)  # [LOCAL-309] evidence for each classification
+
+    # [LOCAL-444] Obligation deduction
+    obligation_deduction_total: float = 0.0
+    per_stop_obligation_deduction: List[float] = field(default_factory=list)
 
 
 def parse_tour(text: str) -> List[dict]:
@@ -1505,7 +1512,23 @@ def compute_score(stops: List[StopAnalysis], n_requested: int,
             ts.per_stop_structural.append(0.0)
     
     ts.structural_surcharge = sum(ts.per_stop_structural)
-    
+
+    # ─── [LOCAL-444] Obligation deduction: unfulfilled_count per stop ────────
+    # -0.5 per unfulfilled obligation, capped at -3.0/stop.
+    # Requires obligation audit results to be attached to StopAnalysis.
+    # If audit was not run (no unfulfilled_count attribute), skip gracefully.
+    ts.obligation_deduction_total = 0.0
+    ts.per_stop_obligation_deduction = []
+    for stop in stops:
+        unf = getattr(stop, 'unfulfilled_count', None)
+        if unf is not None and unf > 0:
+            from sentence_obligations import obligation_deduction
+            deduction = obligation_deduction(unf)
+            ts.per_stop_obligation_deduction.append(-deduction)
+            ts.obligation_deduction_total -= deduction
+        else:
+            ts.per_stop_obligation_deduction.append(0.0)
+
     # Cross-stop correlation bonus: +50% of affected stops' value
     stops_with_callbacks = set()
     for stop in stops:
@@ -1527,7 +1550,8 @@ def compute_score(stops: List[StopAnalysis], n_requested: int,
     ts.venue_identity_bonus = 0.10 * max(0.0, ts.base_score) * identity_fraction
     
     # Total
-    ts.total_score = (ts.base_score + ts.structural_surcharge + 
+    ts.total_score = (ts.base_score + ts.structural_surcharge +
+                      ts.obligation_deduction_total +
                       ts.correlation_bonus + ts.venue_identity_bonus)
 
     # ─── [LOCAL-305] Coverage and quality, reported separately ────────────────

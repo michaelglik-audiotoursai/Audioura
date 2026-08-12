@@ -12826,6 +12826,54 @@ REWRITE RULES (all mandatory):
             p['description'] = ' '.join(_sentences).strip()
     print(f"  [LOCAL-44] Stripped {_preaching_count} preaching closer(s)")
 
+    # -------- [LOCAL-444] PHASE 5.20: Obligation audit --------
+    # Post-draft per-stop obligation audit. Runs gpt-4o-mini per stop to identify
+    # unfulfilled obligations (pointers that are never dereferenced).
+    # Gated by L444_OBLIGATION_AUDIT env (default ON for audit, OFF for repair loop).
+    _obligation_audit_enabled = os.environ.get('L444_OBLIGATION_AUDIT', 'true').lower() != 'false'
+    _obligation_repair_enabled = os.environ.get('L444_OBLIGATION_REPAIR', 'false').lower() == 'true'
+
+    if _obligation_audit_enabled:
+        print(f"\n  [LOCAL-444] PHASE 5.20: Obligation audit (per-stop)...")
+        try:
+            from sentence_obligations import audit_stop_obligations, reset_audit_cost, get_audit_cost
+            reset_audit_cost()
+            _obl_audit_results = []
+            _obl_total_unfulfilled = 0
+
+            for _si, _poi in enumerate(poi_list):
+                _desc = _poi.get('description', '')
+                if not _desc or _desc.startswith('['):
+                    _obl_audit_results.append(None)
+                    continue
+
+                _stop_name = _poi.get('name', f'Stop {_si + 1}')
+                try:
+                    _obl_result = audit_stop_obligations(_desc)
+                    _obl_audit_results.append(_obl_result)
+                    _unf = _obl_result['unfulfilled_count']
+                    _obl_total_unfulfilled += _unf
+                    if _unf > 0:
+                        print(f"    Stop {_si+1} ({_stop_name}): {_unf} unfulfilled / {_obl_result['total_obligations']} total")
+                except Exception as _obl_err:
+                    print(f"    Stop {_si+1} ({_stop_name}): audit error — {_obl_err}")
+                    _obl_audit_results.append(None)
+
+            print(f"  [LOCAL-444] Obligation audit complete: {_obl_total_unfulfilled} total unfulfilled, cost=${get_audit_cost():.4f}")
+
+            # Store results on poi_list for downstream (scorer reads unfulfilled_count)
+            for _si, _poi in enumerate(poi_list):
+                if _si < len(_obl_audit_results) and _obl_audit_results[_si] is not None:
+                    _poi['_obligation_audit'] = _obl_audit_results[_si]
+                    _poi['_unfulfilled_count'] = _obl_audit_results[_si]['unfulfilled_count']
+
+        except ImportError as _obl_import_err:
+            print(f"  [LOCAL-444] Obligation audit SKIPPED (import error: {_obl_import_err})")
+        except Exception as _obl_err:
+            print(f"  [LOCAL-444] Obligation audit FAILED: {_obl_err}")
+    else:
+        print(f"\n  [LOCAL-444] Obligation audit DISABLED by L444_OBLIGATION_AUDIT=false")
+
     # PHASE 6: Assemble the complete tour
     print(f"\nPHASE 6: Assembling the complete tour...")
     
