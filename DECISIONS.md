@@ -14812,3 +14812,43 @@ Against a venue last crawled in 2019 the same path narrates a long-closed exhibi
 with nothing anywhere saying so. Exhibitions are the one content type where a stale
 archive is wrong rather than merely old. Bouncing would have discarded a verified fix
 that closes D373; the gap is additive and is now queued.
+
+## D382 — the archive snapshot now has to prove it is recent (2026-08-12)
+
+**Merged `225449a`.** LOCAL-430 closes the gap D381 merged over: `_fetch_from_wayback()`
+asked for `web/2/{url}` and never inspected which snapshot came back.
+
+- **Timestamp parsed** from the Wayback redirect (`/web/{14-digit}/{url}`) at module
+  scope as `_parse_wayback_timestamp()`.
+- **`WAYBACK_MAX_STALENESS_DAYS = 90`**, with the reasoning written down: a major show
+  runs 3–6 months, so 30 days would reject valid snapshots of a still-running exhibition
+  the archive simply had not re-crawled, and 180 would readily narrate a dismounted one.
+  Tests sit on both sides — 89 accepted, 91 rejected.
+- **Archive provenance is a third category, not a reuse of an existing flag.**
+  `is_from_archive` / `wayback_snapshot_timestamp` / `wayback_age_days` ride alongside
+  LOCAL-426's `is_third_party`, which stays False for archived content — it is the
+  venue's own words, served by a different host. Overloading the third-party flag would
+  have wrongly demoted them.
+
+**Snapshots actually observed today:** exhibition detail `20260812064828` (0 days),
+exhibitions listing `20260729153204` (13 days). Both well inside the bound, so the
+tonight-is-sound-by-luck problem is now sound by construction.
+
+**The claim LEAD checked hardest, because the whole staleness argument leans on it:**
+the submission justified 90 days partly on "run dates are already checked, so this is
+only a safety net for pages without them". That is true and not a story —
+`_extract_closing_date` exists at `exhibition_checklist.py:1646`, sets `is_closed`, and
+`generate_tour_text.py:5444` refuses to tour a dismounted show through LOCAL-365's
+clean-fail path. Standing check #2 (grep for the production caller before believing a
+module does anything) is what turns a plausible sentence into a verified one.
+
+**Verification, LEAD's own:** neutralising `WAYBACK_MAX_STALENESS_DAYS` → 3 red;
+neutralising `_parse_wayback_timestamp` → 8 red; restore → 13/13. 69/69 green across
+260/426/427/428/429/430. Delivered MFA text still carries **Boris Fridman**, **Louis
+Broder**, **Mourlot Frères**, with `ARCHIVED SOURCE` logged. Palais control 4/4 with
+1581/1652/1696/1780 and 4/4 coordinates.
+
+**D376 satisfied explicitly:** the suite includes `test_mfa_today_snapshot_passes` —
+the case where the new check must *not* reject good content. A staleness bound is
+exactly the kind of guard that silently deletes a working source; this one is pinned
+open as well as closed.
