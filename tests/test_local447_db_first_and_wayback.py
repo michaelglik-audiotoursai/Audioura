@@ -11,6 +11,10 @@ Tests:
 import json
 import os
 import sys
+import os
+# LEAD (D408): the LOCAL-447 chain is OFF by default in production. These tests
+# exercise the feature, so they enable it explicitly.
+os.environ['L447_RETRIEVAL_CHAIN'] = 'true'
 import unittest
 from unittest.mock import patch, MagicMock
 

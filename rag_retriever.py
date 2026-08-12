@@ -10,6 +10,7 @@ LOCAL-447: Wayback fallback — when Wikimedia is cold (per dead_host_breaker), 
 to fetch the archived Wikipedia article from web.archive.org. Content sourced from the
 archive is labelled with provenance (is_from_archive, wayback_snapshot_timestamp).
 """
+import os
 import requests
 import logging
 import re
@@ -19,6 +20,29 @@ from urllib.parse import quote
 from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+
+# ─── LOCAL-447 chain gate (LEAD, D408) ───────────────────────────────────────
+#
+# The LOCAL-447 retrieval chain is OFF by default. Both new paths are unsafe as
+# merged and LEAD verified each failure by running it:
+#
+#   DB-first  — the containment match (`title in topic or topic in title`) serves
+#               the WRONG stop's corpus. Live proof: asking for "The Dream of Saint
+#               Ursula by Carpaccio" returned the Musée international d'Art naïf
+#               Anatole Jakovsky, logged as a success, 0 network calls, no warning.
+#               It is also silently dead in the container — it imports
+#               db_connection from tests/, which Dockerfile.generator never copies.
+#   Wayback   — LOCAL-447's own measurement rejected it: 7% coverage, median 9.6s
+#               (over the 5s budget), both hits the wrong article. Wiring it puts a
+#               ~10s stall back on the exact failure path LOCAL-445 made instant.
+#
+# LOCAL-448 fixes both; this flag is how it gets turned on. Same precedent as
+# D400/D402/D404 — unproven wiring does not ride on the default path.
+
+def _l447_enabled() -> bool:
+    """True when the LOCAL-447 retrieval chain is explicitly enabled."""
+    return os.environ.get('L447_RETRIEVAL_CHAIN', '').strip().lower() in ('1', 'true', 'yes')
 
 
 # ─── Accent folding (D243) ───────────────────────────────────────────────────
@@ -43,6 +67,9 @@ def _fetch_from_stop_corpus(topic: str) -> Optional[str]:
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'tests'))
         from db_connection import get_connection
     except Exception:
+        return None
+
+    if not _l447_enabled():
         return None
 
     topic_folded = _strip_accents(topic).lower().strip()
@@ -142,6 +169,9 @@ def _fetch_from_wayback_wikipedia(topic: str, timeout: float = 12.0) -> Optional
     (median 9.6s). This path exists only as a last resort when Wikimedia is down,
     not as a reliable substitute.
     """
+    if not _l447_enabled():
+        return None
+
     encoded = quote(topic.strip().replace(' ', '_'), safe='')
     article_url = f"https://en.wikipedia.org/wiki/{encoded}"
     wayback_url = f"https://web.archive.org/web/2/{article_url}"
@@ -292,6 +322,14 @@ def fetch_wikipedia_summary_with_provenance(topic: str, sentences: int = 5) -> d
             except Exception:
                 pass
             logger.warning(f"Wikipedia: 429 for '{topic}', marked cold, trying Wayback")
+            if not _l447_enabled():
+                # Pre-LOCAL-447 behaviour: 429 fell through to the action API.
+                action_result = _fetch_via_action_api(topic)
+                if action_result:
+                    return {'text': action_result, 'source': 'wikipedia_live',
+                            'is_from_archive': False, 'wayback_snapshot_timestamp': '',
+                            'snapshot_age_days': None}
+                return {}
             wayback_result = _fetch_from_wayback_wikipedia(topic)
             if wayback_result:
                 return {
