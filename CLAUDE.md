@@ -163,6 +163,31 @@ needs to tell them apart at a glance.
 A restarted session inherits its name from this table by the directory and work it
 picks up. If a new track is added, name it here first.
 
+# THE CONVERSATION FILES — append before moving on, or they die again
+
+Three files, three jobs. **Read `STORIED_COMMUNICATION_02.MD` at session start.**
+
+| File | Holds |
+|---|---|
+| `STORIED_COMMUNICATION_02.MD` | the conversation — Michael's questions verbatim, LEAD's final answers, chronological. Michael writes here too. |
+| `ANSWERS.MD` | the same answers, indexed and numbered for lookup months later. Includes LEAD-raised items, not only Michael's questions. |
+| `DECISIONS.md` | binding rulings plus the evidence. LEAD only. Tasks must never edit it. |
+
+**The rule: when Michael asks a real question, append the exchange to
+`STORIED_COMMUNICATION_02.MD` before starting the next task.** Not at the end of the
+session — sessions are killed, cleared, and restarted constantly by design (D252), and
+anything held only in context is lost.
+
+**Volume 01 died precisely because this rule was not written down here.** It lived in one
+session's head, that session ended, and the next one had no way to know the practice
+existed. It is not verbose-by-default that killed it; it is that nothing on disk asked
+for it.
+
+**Keep entries short.** Questions and conclusions only — no tool output, no intermediate
+status, no reasoning trace. If an entry takes more than a minute to read, it belongs in
+`DECISIONS.md` with a pointer from here. Volume 01 reached 81 KB by ignoring this and
+became unsearchable.
+
 # SESSION HANDOFF — Audioura review (read this first)
 ## Last updated: 2026-07-31 (autonomy rule + Subscribed kickoff)
 
