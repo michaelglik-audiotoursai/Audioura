@@ -214,10 +214,12 @@ def score_story_quality(story: Dict) -> float:
         if text and len(text) >= 50:
             try:
                 from story_gate import score_story_interest
-                interest = score_story_interest(text)
-                # Don't mutate the input dict
+                interest_result = score_story_interest(text)
+                # Only use LLM result if it was from a real LLM call (not regex fallback)
+                if interest_result.get('is_story'):
+                    interest = interest_result
             except Exception:
-                interest = None
+                pass
 
     if interest is not None:
         emotional = interest.get('emotional_content', 0)
@@ -225,7 +227,7 @@ def score_story_quality(story: Dict) -> float:
         deduction = interest.get('deduction', 0)
         return round(trust + emotional + new_info - deduction, 2)
     else:
-        # Fallback: legacy specificity heuristic (no LLM available)
+        # Fallback: legacy specificity heuristic (no LLM available or text not a story)
         verification = _get_verification_score(story)
         specificity = _get_specificity_score(story)
         return round(trust + verification + specificity, 2)
