@@ -15218,3 +15218,27 @@ is precisely what the task asked to be proven both directions.
 
 **Standing note.** The exemption widens what ships unverified; that is exactly the change
 that must be bound tightest. LOCAL-437 redoes it.
+
+### D390 addendum — the real Palais Lascaris control, run by LEAD (2026-08-12 09:53)
+
+LOCAL-436's control was unusable (wrong venue), so LEAD ran it on the bounced branch
+under the mode the change actually affects:
+
+```
+Stop-existence gate mode: ENFORCE
+Stop 1: Harpe by Naderman (Paris, 1780)
+Stop 2: Sacqueboute ténor by Anton Schnitzer (Nuremberg, 1581)
+Stop 3: Violes gambe by William Turner (Londres, 1652)
+Stop 4: Basse de violon by Paolo Antonio Testore (Milan, 1696)
+```
+
+**4/4 stops, dates 1581/1652/1696/1780 intact, 4/4 coordinates, 7542 chars.** No
+`LOCAL-436 EXEMPT` line — Palais stops are SPARQL+GPT derived, not checklist-derived, so
+they take the gate normally and pass it. **The exemption does not touch the control
+venue**, which is what a control is for.
+
+This removes defect 2 as a *substantive* worry: there is no collateral damage on Palais.
+It does not un-bounce LOCAL-436 — defects 1 and 3 are about whether the change is bound
+and whether it can admit a fabrication, and neither is answered by a clean control.
+LOCAL-437 still has to bind the predicate and run the `prose_llm` fabrication case.
+Recorded so LOCAL-437 need not spend a live run re-establishing it.
