@@ -336,13 +336,11 @@ def fetch_wikipedia_summary_with_provenance(topic: str, sentences: int = 5) -> d
         wikimedia_cold = False
 
     if wikimedia_cold:
-        # Wikimedia is cold — skip REST, try action API directly
-        logger.info(f"Wikipedia: Wikimedia is cold, trying action API for '{topic}'")
-        action_result = _fetch_via_action_api(topic)
-        if action_result:
-            return {'text': action_result, 'source': 'wikipedia_live',
-                    'is_from_archive': False, 'wayback_snapshot_timestamp': '',
-                    'snapshot_age_days': None}
+        # LOCAL-449: Cold means STOP. The breaker contract says short-circuit
+        # immediately with zero network calls. Calling _fetch_via_action_api here
+        # would hit the same dead host (en/fr.wikipedia.org share the Wikimedia
+        # rate-limit bucket) — that's 20s of dead wait on the default path.
+        logger.info(f"Wikipedia: Wikimedia is cold, short-circuiting for '{topic}'")
         return {}
 
     try:
@@ -416,12 +414,9 @@ def fetch_wikipedia_summary_with_provenance(topic: str, sentences: int = 5) -> d
             mark_host_cold('en.wikipedia.org', 'timeout')
         except Exception:
             pass
-        # Fall through to action API instead of Wayback
-        action_result = _fetch_via_action_api(topic)
-        if action_result:
-            return {'text': action_result, 'source': 'wikipedia_live',
-                    'is_from_archive': False, 'wayback_snapshot_timestamp': '',
-                    'snapshot_age_days': None}
+        # LOCAL-449: A timeout means the host is dead. We just marked it cold —
+        # calling _fetch_via_action_api would hit the same dead Wikimedia bucket
+        # (en/fr.wikipedia.org). Short-circuit immediately.
         return {}
     except requests.RequestException as e:
         logger.warning(f"Wikipedia: request error for '{topic}': {e}")
@@ -529,13 +524,22 @@ def _fetch_via_action_api(topic: str) -> str:
     
     Returns the complete article extract — much richer than the REST summary endpoint.
     Also tries French Wikipedia for French museums.
+    
+    LOCAL-449: Consults dead_host_breaker per-host inside the loop. All Wikimedia
+    hosts share one rate-limit bucket, so if any is cold, all are skipped.
     """
     import requests as _req
+    from dead_host_breaker import is_host_cold, mark_host_cold
     if not topic or not topic.strip():
         return ""
     
     # Try English Wikipedia first (full text, no char limit)
     for wiki_host in ['en.wikipedia.org', 'fr.wikipedia.org']:
+        # LOCAL-449 fix #3: consult breaker per-host before making any request.
+        # The Wikimedia bucket rule means a cold en.wikipedia.org covers fr. too.
+        if is_host_cold(wiki_host):
+            logger.info(f"Wikipedia action API: {wiki_host} is cold, skipping")
+            continue
         try:
             response = _req.get(
                 f"https://{wiki_host}/w/api.php",
@@ -553,6 +557,10 @@ def _fetch_via_action_api(topic: str) -> str:
                 },
                 timeout=10,
             )
+            
+            if response.status_code == 429:
+                mark_host_cold(wiki_host, '429 rate limit in action API')
+                continue
             
             if response.status_code != 200:
                 continue
@@ -576,6 +584,9 @@ def _fetch_via_action_api(topic: str) -> str:
                     if extract and len(extract) > 200:
                         logger.info(f"Wikipedia ({wiki_host}): full article for '{topic}' = {len(extract)} chars")
                         return extract
+        except _req.Timeout:
+            mark_host_cold(wiki_host, 'timeout in action API')
+            continue
         except Exception as e:
             logger.warning(f"Wikipedia action API error ({wiki_host}) for '{topic}': {e}")
             continue

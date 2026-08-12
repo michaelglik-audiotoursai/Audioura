@@ -154,18 +154,20 @@ class TestWaybackRemoved(unittest.TestCase):
         self.assertEqual(result['source'], 'wikipedia_live')
 
     def test_wayback_not_called_when_wikimedia_cold(self):
-        """LOCAL-448: Wayback NOT invoked even when Wikimedia is cold."""
+        """LOCAL-448/449: Wayback NOT invoked even when Wikimedia is cold.
+        LOCAL-449: Cold means STOP — no action API either, returns {}."""
         from rag_retriever import fetch_wikipedia_summary_with_provenance
 
         with patch('rag_retriever._fetch_from_stop_corpus', return_value=None):
             with patch('dead_host_breaker.is_host_cold', return_value=True):
                 with patch('rag_retriever._fetch_from_wayback_wikipedia') as mock_wb:
-                    with patch('rag_retriever._fetch_via_action_api', return_value='Action result'):
+                    with patch('rag_retriever._fetch_via_action_api') as mock_action:
                         result = fetch_wikipedia_summary_with_provenance('Some Artist')
 
         mock_wb.assert_not_called()
-        # Falls through to action API instead
-        self.assertEqual(result.get('source'), 'wikipedia_live')
+        # LOCAL-449: Cold means stop — no action API, returns empty
+        mock_action.assert_not_called()
+        self.assertEqual(result, {})
 
     def test_wayback_not_called_on_429(self):
         """LOCAL-448: Wayback NOT invoked on 429 — falls to action API."""

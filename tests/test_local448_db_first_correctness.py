@@ -211,12 +211,13 @@ class TestDefect3WaybackRemoved(unittest.TestCase):
         with patch('rag_retriever._fetch_from_stop_corpus', return_value=None):
             with patch('dead_host_breaker.is_host_cold', return_value=True):
                 with patch('rag_retriever._fetch_from_wayback_wikipedia') as mock_wb:
-                    with patch('rag_retriever._fetch_via_action_api', return_value='Action API result'):
+                    with patch('rag_retriever._fetch_via_action_api') as mock_action:
                         result = fetch_wikipedia_summary_with_provenance('Some Topic')
 
         mock_wb.assert_not_called()
-        # Should fall through to action API instead
-        self.assertEqual(result.get('source'), 'wikipedia_live')
+        # LOCAL-449: Cold means STOP — no action API call, returns empty dict
+        mock_action.assert_not_called()
+        self.assertEqual(result, {})
 
     def test_wayback_never_called_on_429(self):
         """On 429, the chain falls to action API, NOT Wayback."""
@@ -240,16 +241,24 @@ class TestDefect3WaybackRemoved(unittest.TestCase):
         mock_wb.assert_not_called()
 
     def test_wayback_never_called_on_timeout(self):
-        """On timeout, the chain falls to action API, NOT Wayback."""
+        """On timeout, the chain marks cold and returns {} — NOT Wayback, NOT action API."""
         from rag_retriever import fetch_wikipedia_summary_with_provenance
+        try:
+            import dead_host_breaker
+            dead_host_breaker.reset_cold_hosts()
+        except Exception:
+            pass
 
         with patch('rag_retriever._fetch_from_stop_corpus', return_value=None):
             with patch('rag_retriever.requests.get', side_effect=__import__('requests').Timeout):
                 with patch('rag_retriever._fetch_from_wayback_wikipedia') as mock_wb:
-                    with patch('rag_retriever._fetch_via_action_api', return_value='Fallback'):
+                    with patch('rag_retriever._fetch_via_action_api') as mock_action:
                         result = fetch_wikipedia_summary_with_provenance('Test Topic')
 
         mock_wb.assert_not_called()
+        # LOCAL-449: timeout marks cold and returns {} — no action API call
+        mock_action.assert_not_called()
+        self.assertEqual(result, {})
 
     def test_no_archive_source_in_chain(self):
         """The production chain never returns source='wayback_archive'."""
