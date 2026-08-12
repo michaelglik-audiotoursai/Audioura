@@ -15640,3 +15640,82 @@ environment before kiro-cli spawns; existing env always wins. Verified: key expo
 slot for ~40 minutes. Surfaces barely overlap — 443 is candidate fetch/classification,
 444 is post-draft audit and scoring. Both task files warn about the shared
 `generate_tour_text.py` call site; LEAD merges sequentially and rebases the second.
+
+## D402 — LOCAL-443 merged GATED OFF: it fixed the wrong loop (2026-08-12)
+
+**Merged `git log -1`; `L440_STORY_FIRST` stays false.** LOCAL-443 built full-page
+fetch, a zero-cost candidate pre-filter, and concurrent classification. The submission
+skipped BOTH live acceptance runs, citing "blocked on LOCAL-442 merging" — 442 had
+been bounced, not merged, and 443 was dispatched deliberately concurrent with it. That
+is the second submission in a row to park its evidence behind a blocker that had
+already cleared; LOCAL-445's PROCESS section now requires verifying the claim
+(`git log --oneline -5 storied`).
+
+**LEAD ran the acceptance:** Palais, `L440_STORY_FIRST=true`, D261/D262 env —
+**523.9s, 10153 chars, vs the 336s bar: FAIL.** LOCAL-440's regression was 535s, so
+443 reclaimed 11 seconds of ~199.
+
+**Cause, from the code not the clock:** the call site loops stops SERIALLY with a
+per-stop `PIPELINE_WALL_BUDGET_SECONDS = 25.0`, so six stops admit up to 150s on top
+of the ~336s baseline — bracketing what was measured. 443 parallelised work INSIDE a
+stop and never touched the loop ACROSS stops. The comment above that loop claims
+story-seeking "runs concurrent under a per-stop budget"; only the second half is true.
+
+**Merged anyway, gated off, on D400's precedent:** the code is sound and its tests
+bind to production — LEAD no-op'd `prefilter_candidates` (5 red) and
+`_extract_page_text` (2 red), so these are not the D277 mirrors. Blast radius is
+provably nil: the diff touches ONLY `story_first.py` plus a new test file;
+`generate_tour_text.py` is untouched, and `story_first` has exactly one production
+importer, inside the gated block at line 9002.
+
+**Suite delta explicitly unresolved and confounded.** 443 branch 34 failed/2666
+passed/55 errors vs storied 34 failed/2671 passed/52 errors — identical failure count,
++3 errors. LEAD ran both 20-minute suites CONCURRENTLY against one live Postgres and
+externally rate-limited APIs, so the counts are not independent measurements. The
+delta cannot originate in the diff (see blast radius above) and
+`tests/test_local440_story_first.py` is 25/25 on both trees. A clean serial comparison
+is in LOCAL-445's acceptance.
+
+**Known defect carried forward, not a bounce:** `_verdict_cache_lock` guards only the
+cache READ, so two threads that both miss still both pay for `classify_story_unit`.
+Its comment claims it "prevents redundant LLM calls" — it does not. Cosmetic today;
+load-bearing once LOCAL-445 makes stops concurrent.
+
+## D403 — Michael's dead-host rule: never retry a host that already failed this run (2026-08-12)
+
+Michael, after reading D396's arithmetic: if a Wikimedia call is slow, do not retry —
+switch. LEAD's refinements, all accepted in session:
+
+**The trigger is the FIRST timeout or 429 on a host, not a duration.** A duration rule
+lands in the wrong place: `FETCH_RETRY_BUDGET_SECONDS = 30.0` governs page fetches in
+`exhibition_checklist`, but the lookup path that caused the 5–9.5 minute stall D396
+fixed uses `EXTERNAL_LOOKUP_PER_TIMEOUT = 8`. "More than 30 seconds" would never fire
+where it matters most. Mark the host cold for the rest of the run; subsequent calls
+short-circuit with no network request.
+
+**What happens next depends on whether the result gets asserted to a listener:**
+
+1. *Tier/identity decisions* — canonically `_check_wikidata_p856`, a SPARQL ASK. **No
+   substitute site exists.** SERP cannot answer "does Wikidata assert this domain as
+   this institution's P856", and a fuzzy substitute risks promoting a domain to tier1,
+   which that function's docstring forbids. Take the existing failure value (tier3)
+   immediately. D396 measured this as free: 26/26 domains resolved tier3 before AND
+   after LOCAL-441, identical tours.
+2. *Content fetches* — local first (`stop_corpus`, 254 rows; `venue_cache`, TTLs weeks
+   long), then external in TRUST order: institution's own site (tier1) → POP/Joconde
+   (`pop.culture.gouv.fr`, tier2, French holdings) → Wayback (`web.archive.org`,
+   different host, staleness-bounded by LOCAL-430) → SERP snippet (web_search tier
+   ~0.83/5, needs corroboration per D373) → absent. **SERP is LAST, not first** —
+   ordering by speed would systematically downgrade provenance.
+
+**Do not fail over between Wikimedia hostnames.** `en.wikipedia.org`,
+`fr.wikipedia.org`, `query.wikidata.org` and the REST `page/summary` endpoint share one
+per-IP bucket; LEAD observed six `_search_entities` calls and the REST summary 429
+within the same second. Corollary for LEAD's own runs: back-to-back full-tour
+acceptance runs are not independent measurements — one such run returned CHARS=0 at
+13.7s today and was worthless as evidence.
+
+**Codebase gap this exposed:** there is NO phase-timing instrumentation anywhere
+(grepped: no `[TIMING]`, no `phase_elapsed`). Every wall-time claim in D395/D396/D400/
+D402 rests on whole-run wall clock plus code reading, which is why diagnosing 443 cost
+two live runs and a rate-limit incident. LOCAL-445 adds per-phase timers.
