@@ -10672,6 +10672,58 @@ Write the story FIRST, then add physical description if space allows.
                         except Exception as _beat_retry_err:
                             print(f"  [LOCAL-391] Stop {stop_num}: beat retry check error (non-fatal): {_beat_retry_err}")
 
+                    # [LOCAL-431] Story sentence count enforcement: if the description has
+                    # fewer than 3 story sentences (named person + story verb + consequence),
+                    # retry with an explicit demand for narrative structure. The gate at
+                    # line ~11143 runs AFTER assembly and is informational; this retry runs
+                    # DURING generation and gives the LLM a second chance to write stories.
+                    # Explicitly forbidden: lowering min_story_sentences or loosening the
+                    # classifier (D376). This retry asks the model to restructure, not to
+                    # weaken the bar.
+                    if (_storied_mode and tour_category == 'museum'
+                            and description and not description.startswith('[')
+                            and _attempt < _max_retries):
+                        try:
+                            from story_gate import extract_story_sentences
+                            _l431_story_sents = extract_story_sentences(description)
+                            _l431_story_count = len(_l431_story_sents)
+                            if _l431_story_count < 3:
+                                # Build a retry supplement that names the gap and shows the shape
+                                _l431_needed = 3 - _l431_story_count
+                                _l431_retry_msg = (
+                                    f"STORY SENTENCE DEFICIT: your text has only {_l431_story_count} "
+                                    f"story sentence(s) — need at least 3.\n\n"
+                                    "A story sentence = a named person (full name or surname) + a STORY VERB "
+                                    "(commissioned, donated, chose, published, founded, insisted, collaborated, "
+                                    "established, specialized, assembled, refused, persuaded, visited, met) + "
+                                    "a material consequence.\n\n"
+                                    "WHAT FAILS:\n"
+                                    "  • \"Dalí's surrealistic style shines through\" — no story verb, no consequence\n"
+                                    "  • \"invites you to consider the intersection\" — no person, no action\n"
+                                    "  • \"transcends the physical boundaries\" — evaluative, not narrative\n"
+                                    "  • \"a testament to their collaboration\" — no named person, no specific action\n\n"
+                                    "WHAT PASSES:\n"
+                                    "  • \"Dalí chose Freud's text because he considered Freud foundational to Surrealism.\"\n"
+                                    "  • \"Broder commissioned this work from Miró as part of a campaign to revive the livre d'artiste.\"\n"
+                                    "  • \"Tériade commissioned Gris to illustrate the poems, resulting in 11 lithographs.\"\n\n"
+                                    f"Rewrite the FULL description with at least {_l431_needed} MORE sentences "
+                                    "of the PASSES form. Each must name a person and state what they did. "
+                                    "Keep all existing verified facts. Replace evaluative claims with narrative ones."
+                                )
+                                description_data["messages"].append({
+                                    "role": "user",
+                                    "content": _l431_retry_msg,
+                                })
+                                description_data["temperature"] = min(0.7 + 0.1 * (_attempt + 1), 0.95)
+                                print(f"  [LOCAL-431] Stop {stop_num}: STORY RETRY — "
+                                      f"story_count={_l431_story_count} < 3, "
+                                      f"retrying (attempt {_attempt+2}/{_max_retries+1})")
+                                continue  # retry within the _attempt loop
+                        except ImportError:
+                            pass  # story_gate not available
+                        except Exception as _l431_err:
+                            print(f"  [LOCAL-431] Stop {stop_num}: story retry error (non-fatal): {_l431_err}")
+
                     # [LOCAL-408] Donor name patch: if the provenance says "Gift of [Name]"
                     # and the text says "gift" or "gifted" without the donor's surname,
                     # insert the name. This handles gpt-3.5-turbo's tendency to anonymize donors.
@@ -11161,6 +11213,54 @@ Write the story FIRST, then add physical description if space allows.
                 print(f"  [LOCAL-421] STORY GATE: ALL STOPS PASSED")
             else:
                 print(f"  [LOCAL-421] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)")
+                # [LOCAL-431] Blocking wiring: when _L421_GATE_BLOCKS is True,
+                # a story gate failure refuses delivery through LOCAL-365's
+                # clean-fail path. Currently LOG_ONLY because neither MFA nor
+                # Palais passes yet (1/3 and 1/4 respectively). LEAD flips this
+                # when a live run demonstrates 3/3 or 4/4 on real content.
+                _L421_GATE_BLOCKS = os.environ.get("L421_GATE_BLOCKS", "false").lower() == "true"
+                if _L421_GATE_BLOCKS:
+                    # Collect per-stop failure evidence
+                    _l431_failed_stops = []
+                    for _sg_i2, _sg_poi2 in enumerate(poi_list):
+                        _sg_desc2 = _sg_poi2.get('description', '')
+                        _sg_name2 = _sg_poi2.get('name', f'Stop {_sg_i2+1}')
+                        if not _sg_desc2 or _sg_desc2.startswith('['):
+                            continue
+                        _sg_credit2 = _sg_poi2.get('credit_line', '')
+                        _sg_result2 = verify_stop_story(
+                            description=_sg_desc2, credit_line=_sg_credit2,
+                            stop_name=_sg_name2, framing_case=_framing_case,
+                            min_story_sentences=3,
+                        )
+                        if not _sg_result2['passed']:
+                            _l431_failed_stops.append({
+                                'stop_name': _sg_name2,
+                                'story_count': _sg_result2['story_count'],
+                                'failures': _sg_result2['failures'],
+                            })
+                    print(f"\n  [LOCAL-431] ⚠️  STORY GATE BLOCKING — refusing delivery")
+                    for _fs in _l431_failed_stops:
+                        print(f"    FAIL: {_fs['stop_name']}: story_count={_fs['story_count']}")
+                        for _ff in _fs['failures']:
+                            print(f"      → {_ff}")
+                    _LAST_CLEAN_FAIL_EVIDENCE.clear()
+                    _LAST_CLEAN_FAIL_EVIDENCE.update({
+                        "error_type": "story_gate_failed",
+                        "failed_stops": _l431_failed_stops,
+                        "reason": (
+                            f"{len(_l431_failed_stops)} stop(s) have fewer than 3 story sentences. "
+                            "Each stop must contain at least 3 sentences naming a person and "
+                            "stating what they did (a decision, commission, gift, or consequence)."
+                        ),
+                    })
+                    _LAST_GENERATION_COST = {
+                        "total_cost": 0.0,
+                        "total_tokens": 0,
+                        "cache_hit": False,
+                        "breakdown": {"llm": 0.0, "tts": 0.0, "search": 0.0},
+                    }
+                    return None, None, (None, None)
         except ImportError as _sg_err:
             print(f"  [LOCAL-421] Story gate import error (non-fatal): {_sg_err}")
         except Exception as _sg_err:
