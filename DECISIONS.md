@@ -16055,3 +16055,55 @@ The ≤40s claim has been unproven since D405; it is essentially at the threshol
 against `git rev-parse HEAD` before any field test. `code_sha: unknown` on a running
 service means the deployment is unverifiable and any result from it is void. This one
 sat unnoticed for over a week.
+
+## D411 — LOCAL-449 MERGED; and the measurement that says "DB-first" is the wrong order
+**2026-08-12, LEAD.**
+
+**LOCAL-449 is correct and merged.** Verified by running it, not by reading the report:
+
+- LEAD's repro on both trees, flag unset: cold host **0.0s / 0 calls** (was 20.0s / 2 on
+  LOCAL-448); first timeout **5.0s / 1 call** (was 25.0s / 3). Both match the storied
+  baseline exactly. The D409 regression is gone.
+- The 429 path is now **better than baseline**: 1 network call vs 3, because
+  `mark_host_cold` fires before `_fetch_via_action_api`, whose new per-host breaker check
+  then skips both hosts. The submission argues for keeping the call structure on
+  conceptual grounds (a 429 is "can't call again now", not "no response") and so that the
+  path reopens if the Wikimedia bucket ever splits. Accepted.
+- **D242 check 1 binds twice.** Neutralising the cold short-circuit → 3 red.
+  Neutralising the per-host breaker check in `_fetch_via_action_api` → 3 red. Real paths,
+  not patched stand-ins — the opposite of the LOCAL-447 Wayback tests at D408.
+- Container run: DB-first serves `Île Sainte-Marguerite` (1134), `Musée Picasso` (10285),
+  `Port Grimaud` (1158) from `/app` with 0 network calls, and all three LEAD wrong-corpus
+  examples return `None`.
+- Regression green: sq4_merge, palais_fix_lead_fixture, local12_fact_retrieval, plus the
+  447/448 suites (24 passed).
+
+**`L447_RETRIEVAL_CHAIN` stays OFF, and now for a new reason.** Not defects — LOCAL-448
+and LOCAL-449 fixed all three from D408. LEAD compared what `stop_corpus` returns against
+what live returns, for every Wikipedia-sourced title in the table:
+
+| title | stop_corpus | live | DB/live | live latency |
+|---|---|---|---|---|
+| Île Sainte-Marguerite | 1,134 | 13,500 | **8%** | 0.3s |
+| Musée Picasso | 10,285 | 512 | 2009% | 0.5s |
+| Port Grimaud | 1,158 | 1,333 | 87% | 0.4s |
+
+The two paths are not equivalent in either direction. Île Sainte-Marguerite loses **92%**
+of its material to the DB path — and no test catches that, because generation still
+succeeds; the tour is merely thinner. Against a pipeline whose original diagnosis was
+"zero per-stop source material", serving a stop one twelfth of what is available is a
+quality regression bought for **0.3–0.5s**, which is what a healthy Wikimedia costs.
+
+D403a step 1 ("own DB first") was never measured, only assumed — the same way D403a step
+2 (Wayback) was assumed until LOCAL-447 measured it and it died. Step 1 now gets the same
+treatment.
+
+**Where the DB does pay is the case LOCAL-449 just created.** The cold branch returns
+`{}` — right against a dead host, but it walks past a local copy needing no network. That
+is the real use for `stop_corpus`, and it is unreachable today because DB-first sits in
+front of a path that usually succeeds.
+
+**LOCAL-450 dispatched:** invert to live-first, DB-as-fallback, with the cold branch
+consulting the DB before returning `{}` — still zero network calls, so LOCAL-449's floors
+(cold 0 calls, timeout 5.0s/1, 429 1 call) survive as the acceptance bar. `repro449.py`
+is committed at the repo root and is the instrument.
