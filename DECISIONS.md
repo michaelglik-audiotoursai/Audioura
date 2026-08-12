@@ -15456,3 +15456,9 @@ sourced story pass — weak prior for judging one.
 **Confirmed as LOCAL-439 fixtures (Michael's points 1–2):** the 3-sentence Miró story
 passes as one unit; resolution sentences are valid inside a unit; the per-sentence tally
 is removed, not patched.
+
+### D393/D394 addendum closure — Michael confirmed gpt-4o-mini (2026-08-12, 11:1x)
+
+Michael, on seeing the pricing: "you are right and I was wrong. Please use the cheapest
+4.0." **gpt-4o-mini is confirmed** as the story-classification and interest-scoring
+model. No open question remains on the LOCAL-439 spec.
