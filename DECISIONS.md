@@ -14586,3 +14586,50 @@ The 35 are dominated by `tests/run_local*` live-generation and A/B scripts that 
 services or spend money; `run_tests.py` includes them in the count but not in its
 exit status. **A green exit is not a green suite here** — anyone quoting a number
 should quote 203/238 and say which 35.
+
+## D376 — a verification check that deletes good content is worse than no check (2026-08-12)
+
+**LOCAL-427 merged at `62f126c`; one of its three changes gated off at `c000810`.**
+
+What was right: `exhibition_checklist._fetch_page` now retries with exponential
+backoff + jitter, honours `Retry-After`, works to a 30s time budget rather than a
+fixed attempt count, keeps a 1.5s per-host polite delay and a 1h per-host page cache.
+Config at module scope, imported by the tests, and **neutralising the retry in place
+(`if remaining <= wait:` → `if True:`) turns 3 tests red.** That is real evidence.
+
+What was wrong: the Part 4 cross-reference validator. It located each stop name, took
+a **±80-character window**, and failed if any 4-digit year in that window was absent
+from that stop's own description. Part 4 is 1–2 sentences, max 50 words, and the
+prompt *requires* one fact from each of ≥2 stops — so both dates sit inside both
+windows and each is reported misattributed to the other stop. Checked against the
+prompt's own worked example ("Monet's 1888 paintings at Cap d'Antibes and the 1706
+destruction of Eze Village's fortifications"): both windows spanned the entire
+sentence, both stops failed. **A Part 4 failure omits Part 4 entirely** — so the
+check deletes precisely the cross-stop callbacks the rubric pays +50% for, the one
+route CLAUDE.md records to 75 at N=8. Gated with `([] if True else _p4_stop_data)`,
+code kept, LOCAL-428 redoes it sentence-scoped at module scope.
+
+**The generalisable finding — D277 has a third form.** The submission offered
+neutralisation evidence for the venue-snippet injection: "WITHOUT venue snippet:
+passed=False". True, and irrelevant. It exercised `verify_stop_claims` *given* a
+snippet list; the change is the code that *builds* that list. LEAD neutralised the
+injection itself in place — `if (False and _exhibition_checklist_result ...)` — and
+**all 68 tests still passed.** Testing the consumer of a change is not coverage of
+the change. Add to the standing checks: neutralise the changed lines, not a function
+downstream of them.
+
+**Second finding: "structurally unaffected" is not a control.** The submission skipped
+the mandatory Palais control on the argument that Palais does not use
+`exhibition_checklist`. True but beside the point — 427 also changed Part 4
+composition and museum coordinate emission in `generate_tour_text.py`, and the Palais
+tour goes through both. A control exists because reasoning about blast radius is
+exactly what keeps being wrong. Run it.
+
+**Still open:** no live run has yet sourced works from mfa.org (persistent 429 across
+9 attempts / 60s of backoff — the backoff is working, the server is not serving). The
+page cache cannot help until we get one 200. Broder and Mourlot Frères now survive
+verification; **Boris Fridman is still stripped** because airmail.news lacks the
+credit line that mfa.org carries. Half of D373's measurable goal is met.
+
+Coordinates: the single-building museum suppression is removed, all stops now emit
+coordinates. Untested but unconditional and trivially inspectable; accepted.
