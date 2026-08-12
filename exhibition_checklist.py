@@ -2317,11 +2317,63 @@ def find_exhibition_checklist(
                         best_match_url = listing['url']
 
     if not best_match_url:
-        result.path = 'fallback'
-        result.reason = (f'Exhibition "{exhibition_name}" not found in venue exhibition listings '
-                        f'(best similarity score: {best_match_score:.2f})')
-        print(f"  [LOCAL-364] No matching exhibition found (best score: {best_match_score:.2f})")
-        return result
+        # [LOCAL-429] If we got here from a Wayback-served listing page (Cloudflare
+        # challenge), the cached exhibition listing may be stale — try the web search
+        # fallback before giving up, same as LOCAL-425 would if no listing existed.
+        _search_url = _search_exhibition_url(exhibition_name, venue_base_url)
+        if _search_url:
+            print(f"  [LOCAL-429] No match in Wayback listing — web search found: {_search_url}")
+            _search_text, _search_links = _fetch_page(_search_url)
+            if _search_text and len(_search_text) > 100:
+                best_match_url = _search_url
+                best_match_title = exhibition_name
+                best_match_score = 1.0
+                print(f"  [LOCAL-429] Direct exhibition detail page via web search ({len(_search_text)} chars)")
+                # Add to listing pages so later code can reference it
+                exhibition_listing_pages.append({
+                    'url': _search_url, 'text': _search_text, 'links': _search_links
+                })
+            else:
+                # The direct URL also needs Wayback
+                _wb_text, _wb_links = _fetch_from_wayback(_search_url)
+                if _wb_text and len(_wb_text) > 100:
+                    best_match_url = _search_url
+                    best_match_title = exhibition_name
+                    best_match_score = 1.0
+                    # Cache it so the detail fetch below hits cache
+                    _cache_put(_search_url, _wb_text, _wb_links)
+                    exhibition_listing_pages.append({
+                        'url': _search_url, 'text': _wb_text, 'links': _wb_links
+                    })
+                    print(f"  [LOCAL-429] Exhibition detail from Wayback ({len(_wb_text)} chars)")
+                else:
+                    # Try third-party as final resort
+                    _third_party_works, _third_party_url = _search_exhibition_works_from_web(
+                        exhibition_name, venue_name, venue_base_url
+                    )
+                    if _third_party_works:
+                        for _w in _third_party_works:
+                            _w['source_url'] = _third_party_url
+                        result.works = _third_party_works
+                        result.path = 'prose_llm'
+                        result.page_shape = 'third_party_extraction'
+                        result.exhibition_url = _search_url
+                        result.content_url = _third_party_url
+                        result.is_third_party = True
+                        result.exhibition_title = exhibition_name
+                        result.reason = (
+                            f'Extracted {len(_third_party_works)} works from third-party source '
+                            f'{_third_party_url} (venue page Cloudflare-challenged). '
+                        )
+                        print(f"  [LOCAL-429] ✓ THIRD-PARTY PATH: {len(_third_party_works)} works")
+                        return result
+
+        if not best_match_url:
+            result.path = 'fallback'
+            result.reason = (f'Exhibition "{exhibition_name}" not found in venue exhibition listings '
+                            f'(best similarity score: {best_match_score:.2f})')
+            print(f"  [LOCAL-364] No matching exhibition found (best score: {best_match_score:.2f})")
+            return result
 
     # [LOCAL-370] Reject if the matched URL is the listing page itself.
     # If the "exhibition detail" URL equals the listing URL we just searched,
