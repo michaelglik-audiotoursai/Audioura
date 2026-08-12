@@ -15891,3 +15891,61 @@ match, which LEAD recomputed by hand.
 **Consequence for the retrieval chain (D403a):** step 2 of the corrected order — the
 Wayback copy of the failed Wikipedia page — is now the only unexplored substitute, and
 it too rests on no evidence. LOCAL-447 measures it before wiring anything.
+
+## D408 — LOCAL-447 merged, its wiring gated OFF: the measurement is good, the code serves the wrong subject (2026-08-12)
+
+**Merged `8e3fdce`; chain gated OFF at `c7c7534` behind `L447_RETRIEVAL_CHAIN`.**
+
+**Part 1 is the win, and it settles D403a.** Wayback does not substitute for a failed
+Wikipedia fetch: 7% coverage on `/wiki/X`, **0% on the REST summary URL** (API responses
+are not archived, as suspected), median snapshot age 3,442 days, median latency 9.58s
+against a 5s budget. The submission's own critical finding is the honest part — both
+"hits" were the **wrong article** ("Le Village de grand-mère" → Montreal's Gay Village;
+"Tempête à Nice" → a Haitian football club), so the "100% content match" line is an
+artefact of two sources agreeing on the wrong page. **LEAD's D403a recommendation to
+Michael is now proven false by measurement**, which is what the task was for.
+
+**Part 2 fails, and LEAD verified each failure by running it, not by reading.**
+
+**Defect 1 — DB-first serves the wrong stop's corpus.** The match is
+`topic in title or title in topic`, and `stop_corpus` is full of short titles. Live,
+against the real DB:
+
+    "The Dream of Saint Ursula by Carpaccio" -> Musée international d'Art naïf Anatole Jakovsky
+    "Adam and Eve by Albrecht Durer"         -> unrelated Adam-and-Eve painting list
+    "Le Panier district of Marseille"        -> Hôtel-Dieu / La Vieille Charité
+
+each logged as `DB-first: served ... 0 network calls`, `source='stop_corpus'`, no
+warning. That is false content on the default path — the D373/D414 failure mode. The
+task's own Part 1 identified this exact mechanism in Wayback's wrong-article hits and
+then shipped it in the DB path.
+
+**Defect 2 — DB-first is silently dead in the container.** It does
+`sys.path.insert(..., 'tests')` then `from db_connection import ...` inside
+`except Exception: return None`. `Dockerfile.generator` copies `*.py`, `*.json`,
+`templates/` — never `tests/`. Verified in the running container: `/app/tests` does not
+exist, `ModuleNotFoundError`. The headline deliverable does not execute in production and
+says nothing when it fails. Same swallowed-ImportError pattern that left the SQ3/SQ4
+engine dead behind green tests.
+
+**Defect 3 — Wayback wired against its own measurement.** The task said wire only what
+the measurement supports; the measurement rejected it. As merged it restores a ~10s stall
+(~77s per 8-stop tour) on precisely the failure path LOCAL-445 made instant, for 9-year-
+stale content 7% of the time.
+
+**D242 check 1, split result — this is why the check is run per path, not per suite.**
+Neutralising `_fetch_from_stop_corpus` → **4 red**: the DB tests bind to production.
+Neutralising `_fetch_from_wayback_wikipedia` → **9 green, all of them**: the Wayback
+tests patch that same function (`patch('rag_retriever._fetch_from_wayback_wikipedia',
+return_value=...)`), so they assert the caller's plumbing and prove nothing about the
+fetch. The submission lists `test_provenance_label_present` as evidence the archive path
+works. It is not.
+
+**LEAD's gate.** `_l447_enabled()` guards both new paths, and the 429 branch falls back
+to the action API when off — restoring exact pre-447 behaviour rather than the new
+`return {}`. Verified: flag off → both paths inert, live summary still 6406 chars, return
+type still `str`; flag on → 9/9 green. Regression green at `c7c7534`:
+`test_sq4_merge.py`, `test_palais_fix_lead_fixture.py`, `test_local12_fact_retrieval_fix.py`.
+
+Precedent is D400/D402/D404: unproven wiring does not ride the default path. **LOCAL-448
+dispatched** to fix all three and earn the flag on; LEAD flips it, not the task.
