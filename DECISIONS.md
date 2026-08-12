@@ -15430,3 +15430,29 @@ remains the hard gate; a web-search-discovered story corroborated against a muse
 Wikipedia source carries the corroborating source's weight. Without this, "trust first"
 would let any dry catalogue line permanently outrank any story not born on the venue
 page, defeating story selection entirely — the discovery channel is not the evidence.
+
+### D393/D394 third addendum — additive scoring with ranged axes; model pricing fact (Michael + LEAD, 2026-08-12)
+
+**Michael's scoring design, adopted:** additive, with priority encoded in range sizes —
+**trust 0–5, emotional content 0–4, new-information-beyond-the-visible 0–3**, summed.
+His worked example: trust-only story = 5+0+0 = 5; trust-3 story with max emotion and
+novelty = 3+4+3 = 10 → the rounded story wins. This supersedes any lexicographic
+reading of "trust first": priority lives in the ranges, no axis is a veto. Verification
+remains the hard gate beneath the score — trust 0–5 ranks only stories whose claims
+survived corroboration; unverifiable stories are excluded, not scored low. The
+feel-telling penalty (second addendum) applies as a deduction. Existing provenance
+weights (3.0/2.5/2.0/0.5) rescale onto the 0–5 trust axis from the best corroborating
+source.
+
+**Classifier model — factual correction to Michael's premise, decision recorded for his
+review:** Michael directed gpt-3.5 over "4.0" as the cheaper choice. Per the repo's own
+`cost_rates.py`: gpt-4o-mini $0.15/$0.60 per 1M vs gpt-3.5-turbo $0.50/$1.50 per 1M —
+**4o-mini is ~3× cheaper**, and 3.5-turbo was delisted from OpenAI's active pricing
+~July 2026. His criterion is "cheapest good enough"; that is gpt-4o-mini on both axes.
+**Decision: gpt-4o-mini stands** (D394 addendum unchanged). Michael overturns if he
+prefers 3.5 knowing the prices. Also D370 measured gpt-3.5 as unable to sustain a
+sourced story pass — weak prior for judging one.
+
+**Confirmed as LOCAL-439 fixtures (Michael's points 1–2):** the 3-sentence Miró story
+passes as one unit; resolution sentences are valid inside a unit; the per-sentence tally
+is removed, not patched.
