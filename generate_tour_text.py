@@ -11059,6 +11059,25 @@ Write the story FIRST, then add physical description if space allows.
                     if not _sv_snippets:
                         _sv_snippets = _DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{_sv_i}__", [])
 
+                # [LOCAL-427] Inject venue page text as a verification snippet when
+                # the source is the venue itself (not a third-party). The venue page
+                # IS the authoritative source — claims grounded in it should survive.
+                if (_exhibition_checklist_result
+                        and not getattr(_exhibition_checklist_result, 'is_third_party', False)):
+                    _venue_page_text = getattr(_exhibition_checklist_result, 'page_text', '') or ''
+                    _venue_content_url = getattr(_exhibition_checklist_result, 'content_url', '') or \
+                                         getattr(_exhibition_checklist_result, 'exhibition_url', '')
+                    if _venue_page_text and len(_venue_page_text) > 50:
+                        # Insert at the front — venue source is highest priority
+                        _sv_snippets = [{
+                            'title': f"Venue Exhibition Page — {_sv_name}",
+                            'snippet': _venue_page_text[:5000],
+                            'url': _venue_content_url,
+                        }] + list(_sv_snippets)
+                        if _sv_i == 0:
+                            print(f"    [LOCAL-427] Venue page text injected as verification source "
+                                  f"({len(_venue_page_text)} chars from {_venue_content_url})")
+
                 _sv_result = verify_stop_claims(
                     story_text=_sv_desc,
                     snippets=_sv_snippets,
@@ -13258,7 +13277,7 @@ Return ONLY the JSON array. Do not alter the fact text — copy it exactly as pr
                 # LLM call to compose Part 4 — with one retry on verification failure
                 _p4_prompt = f"""Write 1-2 sentences connecting a tour introduction to its upcoming stops. Name SPECIFIC content from at least two different stops, using the stop names.
 
-STOP NAMES: {', '.join(s['name'] for s in _p4_stop_data)}
+STOP NAMES (in tour order): {', '.join(f'Stop {s["index"]+1}: {s["name"]}' for s in _p4_stop_data)}
 
 DELIVERED STOP CONTENT (these are the ONLY facts you may reference — do NOT invent or add ANY fact not listed here):
 {_p4_stops_text}
@@ -13266,6 +13285,8 @@ DELIVERED STOP CONTENT (these are the ONLY facts you may reference — do NOT in
 RULES:
 - Pick exactly ONE specific fact (a date, person, or event) from at least 2 DIFFERENT stops
 - ALWAYS include the stop name next to its fact — format: "<fact> at <stop name>"
+- When referencing a stop, use its EXACT name from the list above — do NOT swap stop names
+- A fact about Moses and Monotheism must be attributed to the stop named "Moses and Monotheism", not to a different stop
 - Example: "In the stops ahead, you will encounter Monet's 1888 paintings at Cap d'Antibes and the 1706 destruction of Eze Village's fortifications."
 - Second-person present tense
 - 1-2 sentences ONLY (max 50 words)
@@ -13394,6 +13415,48 @@ RULES:
                                 _p4_verification_log.append(
                                     f"FAIL: vague language detected in Part 4")
                                 break
+
+                        # [LOCAL-427] Cross-reference validation: when Part 4 says
+                        # "<fact> at <stop name>", verify the fact is in THAT stop's
+                        # description, not a different stop. Catches the bug where
+                        # "Moses and Monotheism" content is attributed to "Au Soleil du Plafond".
+                        for _p4s in _p4_stop_data:
+                            _sn_lower = _p4s['name'].lower()
+                            # Find position of stop name in Part 4 text
+                            _sn_pos = _p4_lower.find(_sn_lower)
+                            if _sn_pos == -1:
+                                # Try significant sub-parts
+                                _sig_parts = [p for p in _sn_lower.split() if len(p) > 4
+                                              and p not in ('saint', 'sainte', 'ville')]
+                                for sp in _sig_parts:
+                                    _sn_pos = _p4_lower.find(sp)
+                                    if _sn_pos != -1:
+                                        break
+                            if _sn_pos == -1:
+                                continue  # Stop not mentioned in Part 4
+
+                            # Extract the clause around this stop name (±80 chars)
+                            _clause_start = max(0, _sn_pos - 80)
+                            _clause_end = min(len(_p4_lower), _sn_pos + len(_sn_lower) + 80)
+                            _clause = _p4_lower[_clause_start:_clause_end]
+
+                            # Check dates in this clause belong to this stop
+                            _clause_dates = re.findall(r'\b(\d{4})\b', _clause)
+                            _this_stop_desc_lower = _p4s['description'].lower()
+                            for _cd in _clause_dates:
+                                if _cd not in _this_stop_desc_lower:
+                                    # Date is near this stop's name but not in this stop's content
+                                    # Check if it's in another stop's content (misattribution)
+                                    _other_has_it = any(
+                                        _cd in other['description'].lower()
+                                        for other in _p4_stop_data
+                                        if other['name'] != _p4s['name']
+                                    )
+                                    if _other_has_it:
+                                        _p4_verified = False
+                                        _p4_verification_log.append(
+                                            f"FAIL: date '{_cd}' attributed to "
+                                            f"'{_p4s['name']}' but belongs to a different stop")
 
                         if _p4_verified:
                             _p4_success = True
@@ -13619,11 +13682,10 @@ RULES:
         # Museum tours with DIFFERENT coordinates per stop: every stop (multiple buildings)
         # All other tours: every stop (different geo locations need map pins)
         if tour_category == 'museum':
-            # Check if stops have different coordinates (multi-building "museum" like libraries)
-            all_coords = [p.get("coordinates") for p in poi_list if p.get("coordinates")]
-            unique_coords = set(all_coords)
-            is_single_building = len(unique_coords) <= 1
-            coords_eligible = (i == 0) if is_single_building else True
+            # [LOCAL-427] All stops get coordinates, even in a single-building museum.
+            # The mobile app needs a pin for each stop; omitting coordinates for
+            # stops 2+ caused D373's "no Coordinates" defect.
+            coords_eligible = True
         else:
             coords_eligible = True
         if coords_eligible and poi.get("coordinates"):

@@ -33,8 +33,95 @@ from typing import Dict, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse
 
 import requests
+import threading
 
 logger = logging.getLogger(__name__)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# [LOCAL-427] Per-host page cache + polite fetch with exponential backoff
+# ═══════════════════════════════════════════════════════════════════════════════
+# A 429 is "come back later", not "does not exist". We:
+#   1. Cache fetched pages in memory (per-host, keyed by URL) so repeated runs
+#      within the same process don't re-hit the venue at all.
+#   2. Use true exponential backoff with jitter and a time budget (not attempt count).
+#   3. Honour Retry-After headers.
+#   4. Enforce a polite inter-request delay per host.
+
+import time as _time_mod
+import random as _random_mod
+from collections import defaultdict as _defaultdict
+
+# Per-host page cache: {url: (text, links, timestamp)}
+_PAGE_CACHE: dict = {}
+_PAGE_CACHE_LOCK = threading.Lock()
+
+# Per-host last-request timestamp for polite delay
+_HOST_LAST_REQUEST: dict = {}  # {host: monotonic_time}
+_HOST_LAST_REQUEST_LOCK = threading.Lock()
+
+# Configuration — module scope, testable directly
+FETCH_RETRY_BUDGET_SECONDS = 30.0      # Total time budget for retrying a single URL
+FETCH_INITIAL_BACKOFF_SECONDS = 2.0    # First retry wait
+FETCH_MAX_BACKOFF_SECONDS = 15.0       # Cap on any single wait
+FETCH_JITTER_FRACTION = 0.3            # ±30% jitter on each wait
+FETCH_POLITE_DELAY_SECONDS = 1.5       # Minimum gap between requests to same host
+PAGE_CACHE_TTL_SECONDS = 3600.0        # 1 hour — within a session, pages don't change
+
+
+def _get_host(url: str) -> str:
+    """Extract the host (netloc) from a URL."""
+    return urlparse(url).netloc
+
+
+def _polite_wait(host: str) -> None:
+    """Ensure at least FETCH_POLITE_DELAY_SECONDS between requests to the same host."""
+    with _HOST_LAST_REQUEST_LOCK:
+        last = _HOST_LAST_REQUEST.get(host, 0.0)
+    elapsed = _time_mod.monotonic() - last
+    remaining = FETCH_POLITE_DELAY_SECONDS - elapsed
+    if remaining > 0:
+        _time_mod.sleep(remaining)
+
+
+def _record_request(host: str) -> None:
+    """Record that we just made a request to this host."""
+    with _HOST_LAST_REQUEST_LOCK:
+        _HOST_LAST_REQUEST[host] = _time_mod.monotonic()
+
+
+def _cache_get(url: str):
+    """Return cached (text, links) or None if not cached / expired."""
+    with _PAGE_CACHE_LOCK:
+        entry = _PAGE_CACHE.get(url)
+        if entry is None:
+            return None
+        text, links, ts = entry
+        if (_time_mod.monotonic() - ts) > PAGE_CACHE_TTL_SECONDS:
+            del _PAGE_CACHE[url]
+            return None
+        return text, links
+
+
+def _cache_put(url: str, text: str, links: list) -> None:
+    """Store a fetch result in the page cache."""
+    with _PAGE_CACHE_LOCK:
+        _PAGE_CACHE[url] = (text, links, _time_mod.monotonic())
+
+
+def clear_page_cache() -> None:
+    """Clear the per-host page cache. Exposed for testing."""
+    with _PAGE_CACHE_LOCK:
+        _PAGE_CACHE.clear()
+
+
+def get_page_cache_stats() -> dict:
+    """Return cache statistics. Exposed for testing and diagnostics."""
+    with _PAGE_CACHE_LOCK:
+        return {
+            'entries': len(_PAGE_CACHE),
+            'urls': list(_PAGE_CACHE.keys()),
+        }
+
 
 # ─── TTL ──────────────────────────────────────────────────────────────────────
 # Exhibition data must NOT use the 30-day venue_cache TTL.  Exhibitions rotate
@@ -493,14 +580,33 @@ def _search_exhibition_works_from_web(
 def _fetch_page(url: str, timeout: int = 15) -> Tuple[str, List[Tuple[str, str]]]:
     """Fetch a page and return (text, links). Reuses story_miner pattern.
 
-    [LOCAL-425] Distinguishes transient failures (429, 5xx) from genuine absence
-    (404). Retries up to 2 times with exponential backoff for rate-limits and
-    server errors. Honors Retry-After header when present.
-    """
-    import time as _time_mod
+    [LOCAL-427] Persistent retry with exponential backoff, jitter, and a time
+    budget measured in seconds (not a fixed attempt count). Honours Retry-After.
+    Uses per-host page cache to avoid re-hitting rate-limited servers.
 
-    max_retries = 1
-    for attempt in range(max_retries + 1):
+    A 429 is "come back later" — we actually come back later now.
+    """
+    # ─── Cache check ──────────────────────────────────────────────────────
+    cached = _cache_get(url)
+    if cached is not None:
+        text, links = cached
+        if text:
+            logger.debug(f"exhibition_checklist: cache HIT for {url} ({len(text)} chars)")
+            print(f"  [LOCAL-427] Cache HIT: {url} ({len(text)} chars)")
+        return text, links
+
+    # ─── Persistent backoff loop ──────────────────────────────────────────
+    host = _get_host(url)
+    deadline = _time_mod.monotonic() + FETCH_RETRY_BUDGET_SECONDS
+    backoff = FETCH_INITIAL_BACKOFF_SECONDS
+    attempt = 0
+    last_status = 0
+
+    while True:
+        attempt += 1
+        _polite_wait(host)
+        _record_request(host)
+
         try:
             resp = requests.get(
                 url,
@@ -508,37 +614,69 @@ def _fetch_page(url: str, timeout: int = 15) -> Tuple[str, List[Tuple[str, str]]
                 timeout=timeout,
                 allow_redirects=True,
             )
+            last_status = resp.status_code
+
             if resp.status_code == 200:
+                print(f"  [LOCAL-427] HTTP 200 from {url} (attempt {attempt})")
                 break  # success — fall through to parsing
+
             elif resp.status_code == 429 or resp.status_code >= 500:
-                # Transient failure — retry with backoff
+                # Transient failure — compute wait with Retry-After priority
                 retry_after = resp.headers.get('Retry-After')
                 if retry_after:
                     try:
-                        wait = min(float(retry_after), 10.0)
+                        wait = min(float(retry_after), FETCH_MAX_BACKOFF_SECONDS)
                     except (ValueError, TypeError):
-                        wait = 2.0 * (attempt + 1)
+                        wait = backoff
                 else:
-                    wait = 2.0 * (attempt + 1)
-                logger.info(
-                    f"exhibition_checklist: {resp.status_code} from {url} "
-                    f"(attempt {attempt+1}/{max_retries+1}), waiting {wait:.1f}s"
-                )
-                print(f"  [LOCAL-425] HTTP {resp.status_code} from {url} — "
-                      f"{'retrying' if attempt < max_retries else 'giving up'} "
-                      f"(attempt {attempt+1}/{max_retries+1})")
-                if attempt < max_retries:
-                    _time_mod.sleep(wait)
-                    continue
-                else:
-                    # Exhausted retries
+                    wait = backoff
+
+                # Add jitter
+                jitter = wait * FETCH_JITTER_FRACTION * (2 * _random_mod.random() - 1)
+                wait = max(0.5, wait + jitter)
+
+                remaining = deadline - _time_mod.monotonic()
+                if remaining <= wait:
+                    # Out of time budget
+                    print(f"  [LOCAL-427] HTTP {resp.status_code} from {url} — "
+                          f"budget exhausted after {attempt} attempt(s), "
+                          f"{FETCH_RETRY_BUDGET_SECONDS:.0f}s elapsed")
+                    logger.info(
+                        f"exhibition_checklist: {resp.status_code} from {url} "
+                        f"— budget exhausted ({attempt} attempts over "
+                        f"{FETCH_RETRY_BUDGET_SECONDS:.0f}s)")
+                    # Cache the failure so we don't retry within this session
+                    _cache_put(url, '', [])
                     return '', []
+
+                print(f"  [LOCAL-427] HTTP {resp.status_code} from {url} — "
+                      f"retrying in {wait:.1f}s (attempt {attempt}, "
+                      f"{remaining:.0f}s budget remaining)")
+                _time_mod.sleep(wait)
+                # Exponential increase for next iteration
+                backoff = min(backoff * 2, FETCH_MAX_BACKOFF_SECONDS)
+                continue
+
             else:
                 # 404, 403, other client errors — not retryable
                 logger.debug(f"exhibition_checklist: HTTP {resp.status_code} for {url}")
+                _cache_put(url, '', [])
                 return '', []
+
+        except requests.exceptions.Timeout:
+            remaining = deadline - _time_mod.monotonic()
+            if remaining <= backoff:
+                print(f"  [LOCAL-427] Timeout from {url} — budget exhausted ({attempt} attempts)")
+                _cache_put(url, '', [])
+                return '', []
+            print(f"  [LOCAL-427] Timeout from {url} — retrying in {backoff:.1f}s")
+            _time_mod.sleep(backoff)
+            backoff = min(backoff * 2, FETCH_MAX_BACKOFF_SECONDS)
+            continue
+
         except Exception as e:
             logger.debug(f"exhibition_checklist: fetch failed for {url}: {e}")
+            _cache_put(url, '', [])
             return '', []
 
     html = resp.text
@@ -603,6 +741,9 @@ def _fetch_page(url: str, timeout: int = 15) -> Tuple[str, List[Tuple[str, str]]
 
     # Combine: headings first, then figure captions, img alts, paragraphs, list items
     full_text = '\n'.join(headings + figcaptions + img_alts + paragraphs + list_items)
+
+    # [LOCAL-427] Cache the successful result
+    _cache_put(url, full_text, links)
     return full_text, links
 
 
@@ -1943,9 +2084,9 @@ def find_exhibition_checklist(
             _deduped_seeds.append(s)
 
     # Try seed paths
-    # [LOCAL-425] Add inter-request delay to avoid self-inflicted rate limits.
-    # If the FIRST seed returns 429, all seeds on this domain will too — abort early.
-    import time as _time_mod_seeds
+    # [LOCAL-427] _fetch_page now handles backoff internally (30s budget per URL).
+    # If the first seed returns empty, the host is genuinely rate-limiting us past
+    # our budget — no point trying more seeds on the same domain.
     _got_rate_limited = False
     for seed_path in _deduped_seeds:
         if _got_rate_limited:
@@ -1959,10 +2100,9 @@ def find_exhibition_checklist(
             print(f"  [LOCAL-364] Found exhibition listing: {seed_url} ({len(text)} chars)")
             break  # Use the first hit
         elif not text:
-            # _fetch_page returns '' for both 429 and 404 after retries.
-            # If it logged a 429, we know the domain is rate-limiting.
+            # _fetch_page already retried for 30s. If it still failed, the host
+            # is rate-limiting beyond our budget.
             _got_rate_limited = True
-        _time_mod_seeds.sleep(0.5)  # Be polite between requests
 
     # If no seed worked, try to find exhibition links from the venue home page
     if not exhibition_listing_pages and not _got_rate_limited:
@@ -2107,6 +2247,10 @@ def find_exhibition_checklist(
 
     # [LOCAL-369] Store exhibition prose for downstream thread discovery
     result.page_text = detail_text
+    # [LOCAL-427] Set content_url for venue path too — verifier needs to know
+    # which URL sourced the page text.
+    if not result.content_url:
+        result.content_url = best_match_url
 
     # ─── Step 4: Check dates — is the exhibition still open? ──────────────────
     closing_date = _extract_closing_date(detail_text)
