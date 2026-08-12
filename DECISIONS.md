@@ -14633,3 +14633,32 @@ credit line that mfa.org carries. Half of D373's measurable goal is met.
 
 Coordinates: the single-building museum suppression is removed, all stops now emit
 coordinates. Untested but unconditional and trivially inspectable; accepted.
+
+## D377 — never pkill by a pattern that can appear in a task prompt (2026-08-12)
+
+**LEAD killed LOCAL-428 by accident, 227s into a good run.** A `run_tests.py` suite
+invocation was stuck with no output, so LEAD ran `pkill -f "run_tests.py"`. The kiro
+worker carries **the entire task prompt in its argv** — visible in any `ps` listing —
+and LOCAL-428's own acceptance section quotes `python3 run_tests.py`. The pattern
+matched the worker. Exit `-15` at 227s.
+
+This is the same failure the LOCAL-425 kill note recorded ("identified by content
+fingerprint not by id substring") arriving from the other direction: last time the
+danger was a substring of a task *id*, this time a substring of a task *file's text*.
+
+**Rule: never `pkill -f` with any string that could occur inside a task prompt.**
+That excludes essentially every filename, test name, module name, and task id in this
+repo. Kill by **PID**, taken from the `dispatcher_pid=` field of the STARTED line or
+from a `ps` listing read first, and `kill -0` it to confirm identity before killing.
+If a pattern is unavoidable, anchor it on something no prompt would contain.
+
+**Corollary that saved the work:** `setup_worktree` returns an existing path untouched
+(`if path.exists(): return path`), so the killed attempt's uncommitted work survived
+and a re-dispatch resumes on top of it. The task file now carries a RESUME section
+naming exactly what is present and which two tests still fail. Nothing was lost but
+the wall-clock.
+
+**Also learned: `run_tests.py` buffers its entire output.** Two attempts produced a
+zero-byte log after 15+ minutes, which is what made the run look stuck in the first
+place. Run it as `python3 -u run_tests.py > <log> 2>&1 &` and read the log for
+progress, rather than waiting on a pipe that reveals nothing until the end.
