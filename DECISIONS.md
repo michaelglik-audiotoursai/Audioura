@@ -15111,3 +15111,21 @@ as "works and is verified", while claiming the venue cannot be reached.
 **Consequence:** MFA variance is still unmeasured, and BLOCKER4b's status on this route is
 **undetermined**, not "real". LOCAL-435 measures it properly and fixes the fence-stripping
 that is the one solid thing this task found.
+
+### D388 addendum — the verification run completed (2026-08-12 08:16)
+
+The run LEAD launched to test LOCAL-434's claim finished: **3 stops delivered, 5037
+chars**, the three MFA Unbound works, sourced through the archive:
+
+```
+Stop 1: Le Lézard aux plumes d’or (The Lizard with Golden Feathers)
+Stop 2: Moses and Monotheism
+Stop 3: Au Soleil du Plafond
+[LOCAL-430] ARCHIVED SOURCE — snapshot 20260812064828, age 0 days
+[LOCAL-430] 📦 ARCHIVED SOURCE — venue's own words via web.archive.org
+```
+
+End to end, unpinned, on merged `storied`, from the same location string LOCAL-434
+reported as producing nothing 5 times out of 5. **"MFA Unbound cannot be generated" is
+settled as false**, and the D381/D382 archive path is confirmed working in a full
+delivery rather than only in a fetch test.
