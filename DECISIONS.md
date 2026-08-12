@@ -15356,3 +15356,37 @@ replace the exhibition thesis keyword list, split the score into trust × intere
 **Acceptance fixture: Michael's 3-sentence Miró story counts 2 story sentences and the
 gate's other two failures do not fire.** His 4-step generation pipeline is a follow-on
 task after 439.
+
+## D394 — Michael's correction: 3 is the story's sentence count, not a per-sentence tally (2026-08-12)
+
+**Michael corrected D393's framing.** The "minimum 3 sentences" requirement means **a
+story is a unit of at least 3 sentences** — not "the stop text must contain ≥3 sentences
+that each individually pass the story classifier". His Miró story is exactly 3 sentences
+and therefore meets his requirement by construction; the gate reported `story_count=1`
+because it tallies classifier-passing sentences across the stop, which is a different
+metric than the one he set.
+
+**The sentence-tally design is a LOCAL-421-era proxy** from when stops contained zero
+narrative and the goal was to force any person+action content at all. It judges
+sentences in isolation, which structurally misjudges a story: an arc has setup, struggle,
+resolution — and the resolution sentence ("The final 1971 masterpiece stands as a symbol
+of...") legitimately contains no new person+action. Under the old metric the *conclusion
+of a story* scores as a failure.
+
+**The gate is redefined (binding, supersedes the D393 phrasing):**
+- Unit of evaluation: the **story**, not the sentence.
+- A story is **≥3 sentences** (Michael's size floor; expand with a follow-up query if
+  smaller, summarize if larger — his step 4, and the D392 packing partner).
+- Per-stop requirement: **at least one verified story-unit**, with packing filling the
+  remaining word budget (D392).
+- The classifier operates at unit level: a genuine story has a named person, real
+  actions, and an arc; 3 sentences of atmospheric filler do not become a story by being
+  adjacent. A resolution sentence is valid *inside* a unit and does not count *as* one
+  alone.
+- Sentence-level fixes from D393 still apply inside the unit check: the verb vocabulary
+  must include struggle verbs (destroyed/scrapped/recreated/salvaged), else sentence 2 of
+  Michael's story stays invisible even under unit evaluation. entities_blurred and the
+  exhibition keyword-list thesis check are still defects.
+
+**Acceptance fixture for LOCAL-439 (updated):** Michael's 3-sentence Miró story passes
+as ONE story-unit; the three-sentence atmospheric filler case fails as zero units.
