@@ -16205,3 +16205,57 @@ acceptance criterion, checked by LEAD.
 **Also standing, unanswered twice:** n=3 is a thin basis for this decision. LOCAL-450 was
 asked to widen the sample and did not respond; LOCAL-451 is asked again, with an explicit
 instruction to say why in one sentence rather than ignore it.
+
+## D414 — LOCAL-451 merged: selection beats ordering, and the argument is stronger than the sample
+**2026-08-12, LEAD.** D413 said neither DB-first nor live-first is right. LOCAL-451
+replaces the order with a choice, and LEAD verified it by measurement rather than report.
+
+**Chain table, flag ON, measured by LEAD on both trees:**
+
+| title | DB-first (pre-450) | live-first (450) | selection (451) |
+|---|---|---|---|
+| Île Sainte-Marguerite | 1,134 | 13,500 | **13,500** live |
+| Musée Picasso | 10,285 | 688 | **10,285** stop_corpus |
+| Port Grimaud | 1,158 | 554 | **1,158** stop_corpus |
+
+Every row equals the better of the two prior orderings. No row regressed. The Musée
+Picasso row recovers the 93% loss D413 identified, and Port Grimaud the 52%.
+
+**Flag OFF is byte-identical to storied** on all three titles (13,500 / 688 / 554) — the
+acceptance criterion D413 set, checked by LEAD, not taken on report. The happy path has
+an explicit `if not _l447_enabled(): return live` guard before the DB is ever consulted.
+
+**LOCAL-449's floors hold:** cold host 0.0s / 0 network calls; first timeout 5.0s / 1 call.
+
+**D242 check 1 binds both ways.** Neutralising the selection comparison (`if db_len >
+live_len` → `if False`) → **10 red**. Neutralising the 404 DB consult → **2 red**,
+including a test named for that neutralisation. Real paths.
+
+**Container:** `Musée Picasso` → `stop_corpus wins (db=10285 > live=688, delta=+9597)`;
+`Île Sainte-Marguerite` → `wikipedia_live wins (live=13500 >= db=1134, delta=+12366)`.
+Both decisions logged with the losing length, so the choice is auditable after the fact.
+
+**The gaps LOCAL-450 left are closed:** 404, non-200, empty-extract and parse-error
+branches all consult the DB before returning `{}`. The 404 case is the D243 one — a live
+404 on a title that is in `stop_corpus` is usually a name-form mismatch.
+
+**On n=3, asked three times and now answered well.** The submission declines to widen the
+sample and argues it does not need to: selection's correctness does not depend on which
+titles happen to be richer where, because `max(a,b) ≥ a` and `max(a,b) ≥ b`. That is
+right, and it is a better answer than more rows would have been. The three titles are
+evidence the gap exists; the design closes it categorically. LEAD accepts this and
+withdraws the standing complaint.
+
+**Length remains a proxy, and the caveat stands.** 10k chars of boilerplate would beat
+700 chars of clean prose. The submission notes the corpus is filtered to
+Wikipedia-sourced prose, so it has no evidence the problem exists today, and names
+`prose_density_score()` as the one-function change if it ever does. Accepted as a first
+cut on that basis.
+
+**`L447_RETRIEVAL_CHAIN` stays OFF for now — a timing decision, not a quality one.**
+The condition LEAD set in D413 is met: selection is strictly additive, never worse than
+live alone, so the reason the flag has been off since D408 is gone. It is not being
+flipped tonight because the field-test gate artifact (LOCAL320, 8 stops, Musée des Arts
+Asiatiques) is being regenerated right now with the flag OFF. Changing retrieval
+behaviour between the gate measurement and the push would mean shipping something the
+gate never measured. **The flag goes ON immediately after the release gate is settled.**
