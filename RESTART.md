@@ -1,11 +1,11 @@
-# RESTART briefing — generated 2026-08-10 14:17 EDT
+# RESTART briefing — generated 2026-08-12 16:27 EDT
 
 ## Git
 ```
 branch   storied
-HEAD     ceb61bf D291: the MFA exhibition tour generates and is about the exhibition
-unpushed 1 commits
-dirty    5 files
+HEAD     26b6955 D408: LOCAL-447 merge record — Wayback rejected by measurement, wiring gated off
+unpushed 194 commits
+dirty    17 files
 ```
 
 ## Production safety
@@ -13,7 +13,7 @@ dirty    5 files
 audio_tours real rows: 31
   A DROP is an incident (CLAUDE.md). Growth is normal — Michael generating a tour
   adds a row, and its translation adds another. 29 was a snapshot, never a law.
-cost_ledger rows:      307
+cost_ledger rows:      515
 ```
 ALERTS.md: 17 alert line(s) in the last 40 — read it if non-zero.
 
@@ -22,12 +22,12 @@ ALERTS.md: 17 alert line(s) in the last 40 — read it if non-zero.
 in flight:
 
 last 6 dispatcher events:
-   - COMPLETED | task=new_kiro_session_is_required_LOCAL-370.md | id=TLOCAL-370 | branch=kiro/local-370 | base=storied | 
-   - STARTED   | task=new_kiro_session_is_required_LOCAL-371.md | at=2026-08-10T13:16:20-04:00 | base=storied | dispatche
-   - COMPLETED | task=new_kiro_session_is_required_LOCAL-371.md | id=TLOCAL-371 | branch=kiro/local-371 | base=storied | 
-   - STARTED   | task=new_kiro_session_is_required_LOCAL-372.md | at=2026-08-10T13:33:26-04:00 | base=storied | dispatche
-   - COMPLETED | task=new_kiro_session_is_required_LOCAL-372.md | id=TLOCAL-372 | branch=kiro/local-372 | base=storied | 
-   - STARTED   | task=new_kiro_session_is_required_LOCAL-373.md | at=2026-08-10T14:07:38-04:00 | base=storied | dispatche
+   - STARTED   | task=new_kiro_session_is_required_LOCAL-446.md | at=2026-08-12T14:56:52-04:00 | base=storied | dispatche
+   - COMPLETED | task=new_kiro_session_is_required_LOCAL-446.md | id=TLOCAL-446 | branch=LOCAL-446-llm-wikimedia-substitu
+   - STARTED   | task=new_kiro_session_is_required_LOCAL-447.md | at=2026-08-12T15:36:29-04:00 | base=storied | dispatche
+   - COMPLETED | task=new_kiro_session_is_required_LOCAL-447.md | id=TLOCAL-447 | branch=LOCAL-447-wayback-wikipedia-chai
+   - STARTED   | task=new_kiro_session_is_required_LOCAL-448.md | at=2026-08-12T15:59:33-04:00 | base=storied | dispatche
+   - COMPLETED | task=new_kiro_session_is_required_LOCAL-448.md | id=TLOCAL-448 | branch=LOCAL-448-db-first-correctness |
 ```
 
 ## Re-dispatchable (last status ABANDONED — a bounce awaiting pickup)
@@ -35,6 +35,10 @@ last 6 dispatcher events:
 
 ## Parked (deliberately outside the dispatcher glob — do NOT re-dispatch)
   - PARKED_kiro_task_LOCAL-335.md
+  - PARKED_kiro_task_LOCAL-398.md
+  - PARKED_kiro_task_LOCAL-399.md
+  - PARKED_kiro_task_LOCAL-416.md
+  - PARKED_kiro_task_LOCAL-428.md
 
 ## Honest tour scores (corpus-loaded scorer, recompute — do not quote from memory)
 ```

@@ -1,38 +1,71 @@
 === EXACT PROMPT SENT TO OPENAI (PHASE 3A) ===
-You are a knowledgeable local guide for Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA.
-List exactly 6 specific, real, well-known museum exhibits relevant to: contained Picasso, Miro, Dali: Unbound exhibition at MFA, Boston, MA.
+You are a knowledgeable local guide for Old Nice, Nice, France.
+List exactly 8 specific, real, well-known restaurant stops relevant to: Old Nice, Nice, France.
 
 Requirements:
 - Use REAL, SPECIFIC names of actual establishments or landmarks.
 - NEVER use generic placeholders like 'Restaurant 1', 'Stop 1', 'Location A'.
 - Include a complete street address with ZIP code where applicable.
 
-CRITICAL CONSTRAINT — THIS IS A SINGLE-VENUE MUSEUM TOUR (WORKS-FIRST):
-- List the 3 most famous, notable, or significant ARTWORKS, PAINTINGS, SCULPTURES, or PERMANENT EXHIBITS at 'Museum of Fine Arts, Boston'.
-- Each stop MUST be named after the ARTWORK or EXHIBIT itself — NOT a room name.
-  Good examples: 'Song of Songs' (painting series), 'The Creation of the World' (mosaic), 'Jerusalem Windows' (stained glass studies)
-  Bad examples: 'East Wing Gallery', 'Room 3', 'The Main Hall'
-- For each work, if you know which room/gallery/hall it is displayed in, include that as a note in the address field (e.g. 'Concert Hall, Avenue Docteur Ménard...'). If you do NOT know the room, just use the museum's street address.
-- Do NOT suggest any other museums, institutions, or locations outside this building.
-- Do NOT fabricate artwork names — only include works you are confident exist at this museum.
-- NEVER list nearby museums or cultural institutions as stops — they are OUTSIDE this venue.
-- Prefer the museum's most iconic/signature pieces that visitors specifically come to see.
-
-KNOWN WORKS AT THIS VENUE (use these as guidance — include some from this list):
-  #1; #1 Super Cry Baby; #10; #19 Cadences; #2; #3; 1, 2, 3!; 14.2.95/ 15.2.95/1 6.2.95/ 17.2.95/ 09.3.95/ 28.4.95/ 30.4.95/ 01.5.95/ 02.5.95/ 03.5.95/ 4.5.95/ 15.5.95/ 16.5.95/ 17.5.95/ 18.5.95/ 19.5.95/ 20.5.95/ 21.5.95/ 24.6.95/ 25.6.95/ 27.6.95/ 28.6.95; 2,841,792 Berlin Dream; 64 Pounds of Grey; 6:30 AM; A Bejeweled Lady
-Each work should appear ONLY ONCE in your list — do NOT list the same work under multiple names.
+CRITICAL CONSTRAINT — THIS IS A RESTAURANT/DINING TOUR:
+- Every stop MUST be a named, real, currently-operating eating establishment (restaurant, bistro, brasserie, café, trattoria, tavern, or similar).
+- Each stop must have a verifiable street address in or near Old Nice, Nice, France.
+- Do NOT include museums, galleries, parks, monuments, or any non-dining venue.
+- Do NOT include fictional or closed restaurants.
+- Prefer restaurants that are NOTABLE and DOCUMENTED — venues that people write about because they have a distinctive story (founding year, named chef, signature dish, culinary tradition, architectural feature, historical event).
+- For each restaurant, include a 'reason' field explaining WHY it is notable. The reason must cite a SPECIFIC fact: a year, a named person, a named dish, a documented tradition, or a verifiable event. Do NOT use vague phrases like 'popular', 'top-ranked', 'well-known', or 'appears in many lists'.
+- Include a mix of styles/price ranges unless the request specifies otherwise.
 
 
 Return ONLY a JSON array, no other text, no markdown fences:
-[{"name": "...", "address": "..."}, ...]
+[{"name": "...", "address": "...", "reason": "Founded in 1927 by the Acchiardo family; known for handmade ravioli and slow-cooked daube niçoise"}, ...]
 
 === OPENAI RESPONSE ===
+```json
 [
-{"name": "The Daughters of Edward Darley Boit", "address": "Museum of Fine Arts, Boston, 465 Huntington Ave, Boston, MA 02115"},
-{"name": "The Boating Party", "address": "Museum of Fine Arts, Boston, 465 Huntington Ave, Boston, MA 02115"},
-{"name": "The Fog Warning", "address": "Museum of Fine Arts, Boston, 465 Huntington Ave, Boston, MA 02115"}
+    {
+        "name": "Restaurant Acchiardo",
+        "address": "38 Rue Droite, 06300 Nice, France",
+        "reason": "Founded in 1927 by the Acchiardo family; known for handmade ravioli and slow-cooked daube niçoise"
+    },
+    {
+        "name": "La Rossettisserie",
+        "address": "8 Rue Mascoïnat, 06300 Nice, France",
+        "reason": "Specializes in traditional French roasts and has been a staple in Old Nice since the early 2000s"
+    },
+    {
+        "name": "Le Safari",
+        "address": "1 Cours Saleya, 06300 Nice, France",
+        "reason": "Famous for its location on the Cours Saleya and its bouillabaisse, a classic Provençal fish stew"
+    },
+    {
+        "name": "Chez Palmyre",
+        "address": "5 Rue Droite, 06300 Nice, France",
+        "reason": "Opened in 1926, known for its authentic Niçoise cuisine and intimate setting"
+    },
+    {
+        "name": "Bistrot d'Antoine",
+        "address": "27 Rue de la Préfecture, 06300 Nice, France",
+        "reason": "Renowned for its modern take on traditional French dishes and its cozy, welcoming atmosphere"
+    },
+    {
+        "name": "Le Panier",
+        "address": "18 Rue du Pont Vieux, 06300 Nice, France",
+        "reason": "Celebrated for its fresh seafood and Provençal specialties, located in the heart of Old Nice"
+    },
+    {
+        "name": "L'Escalinada",
+        "address": "22 Rue Pairolière, 06300 Nice, France",
+        "reason": "Known for its traditional Niçoise dishes like socca and pissaladière, served in a rustic setting"
+    },
+    {
+        "name": "Le Tire Bouchon",
+        "address": "19 Rue de la Préfecture, 06300 Nice, France",
+        "reason": "Features a menu of classic French cuisine with a focus on local ingredients and an extensive wine list"
+    }
 ]
+```
 
 === ANALYSIS ===
-Requested stops: 3
-See full chain log: /app/api_call_chain_20260811_225821.txt
+Requested stops: 5
+See full chain log: /app/api_call_chain_20260812_043354.txt

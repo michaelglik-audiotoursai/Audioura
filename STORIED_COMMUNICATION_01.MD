@@ -1403,3 +1403,115 @@ at 08/11/2026 09:46 ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
 
    Usage credits
  ████████████████████████████████████▎              72% used                                                                      $18.17 / $25.00 spent · Resets Sep 1 (America/New_York)
+
+ At 08/11/2026 19:32:  Settings  Status   Config   Usage   Stats                                                                                     
+   Session
+
+   Total cost:            $27.95
+   Total duration (API):  38m 59s                                                                                               Total duration (wall): 3h 41m 28s                                                                                            Total code changes:    762 lines added, 16 lines removed
+   Usage by model:
+        claude-opus-5:  7.0k input, 150.6k output, 42.5m cache read, 291.7k cache write ($27.95)
+       claude-haiku-4-5:  517 input, 11 output, 0 cache read, 0 cache write ($0.0006)
+
+   Current session
+ █████████████▌                                     27% used
+   Resets 9:50pm (America/New_York)
+
+   Current week (all models)
+ ██████████                                         20% used
+   Resets Aug 18 at 12am (America/New_York)
+   +50% weekly limits promo through Aug 19 · clau.de/cc-50-promo
+
+ What's contributing to your limits usage?                                                                                       Approximate, based on local sessions on this machine — does not include other devices or claude.ai
+
+ Last 24h · these are independent characteristics of your usage, not a breakdown
+
+   93% of your usage was at >150k context
+    Longer sessions are more expensive even when cached. /compact mid-task, /clear when switching to new tasks.
+
+   73% of your usage came from sessions active for 8+ hours
+    These are often background/loop sessions. Continuous usage can add up quickly so make sure it is intentional.                                                                                               
+   Skills, subagents, plugins, and MCP servers
+   No attribution data yet · accumulates as you use Claude
+                                                                                                                   to day · w to week                                                                                                        
+   Usage credits
+   ████████████████████████████████████▎              72% used
+   $18.17 / $25.00 spent · Resets Sep 1 (America/New_York)
+doing /clear now
+In the morning: 08/12/2026 09:42  Settings  Status   Config   Usage   Stats
+
+   Session
+
+   Total cost:            $41.55
+   Total duration (API):  46m 23s
+   Total duration (wall): 9h 41m 27s
+   Total code changes:    1107 lines added, 0 lines removed
+ Usage by model:
+        claude-opus-5:  4.3k input, 170.0k output, 68.0m cache read, 327.6k cache write ($41.55)
+
+   Current session
+   ████                                               8% used
+   Resets 12:49pm (America/New_York)
+
+   Current week (all models)
+   ██████████████▍                                    29% used                                                                      Resets Aug 17 at 11:59pm (America/New_York)
+   +50% weekly limits promo through Aug 19 · clau.de/cc-50-promo
+
+   What's contributing to your limits usage?
+   Approximate, based on local sessions on this machine — does not include other devices or claude.ai
+
+ Last 24h · these are independent characteristics of your usage, not a breakdown
+
+ 80% of your usage was at >150k context
+  Longer sessions are more expensive even when cached. /compact mid-task, /clear when switching to new tasks.
+
+   26% of your usage came from sessions active for 8+ hours
+    These are often background/loop sessions. Continuous usage can add up quickly so make sure it is intentional.
+
+   Skills, subagents, plugins, and MCP servers
+ No attribution data yet · accumulates as you use Claude
+
+ d to day · w to week                                                                                             
+ Here I changed the model to be fable and that is very expensive.  Generated on 
+   Usage credits
+   ████████████████████████████████████▎              72% used
+   $18.17 / $25.00 spent · Resets Sep 1 (America/New_York)
+   Settings  Status   Config   Usage   Stats                                                                                 
+   Session
+
+   Total cost:            $103.97
+   Total duration (API):  1h 19m 46s
+   Total duration (wall): 11h 59m 56s
+   Total code changes:    1650 lines added, 0 lines removed
+   Usage by model:
+        claude-opus-5:  5.9k input, 186.6k output, 77.2m cache read, 352.4k cache write ($46.80)
+     claude-haiku-4-5:  527 input, 12 output, 0 cache read, 0 cache write ($0.0006)
+       claude-fable-5:  5.8k input, 75.0k output, 38.3m cache read, 753.0k cache write ($57.17)
+
+ Current session                                                                                                                 ██████▌                                            13% used                                                                     Resets 12:50pm (America/New_York)                                                                                  
+ Current week (all models)
+ ███████████████                                    30% used                                                                   Resets Aug 18 at 12am (America/New_York)                                                                                        +50% weekly limits promo through Aug 19 · clau.de/cc-50-promo
+
+ What's contributing to your limits usage?                                                                                    Approximate, based on local sessions on this machine — does not include other devices or claude.ai
+
+ Last 24h · these are independent characteristics of your usage, not a breakdown
+
+   86% of your usage was at >150k context
+    Longer sessions are more expensive even when cached. /compact mid-task, /clear when switching to new tasks.
+
+ 54% of your usage came from sessions active for 8+ hours
+  These are often background/loop sessions. Continuous usage can add up quickly so make sure it is intentional.
+
+ Skills, subagents, plugins, and MCP servers
+ No attribution data yet · accumulates as you use Claude
+
+ d to day · w to week                                                                                                          
+ Usage credits
+ █████████████████████████████████████▍             74% used                                                                      $74.86 / $100.00 spent · Resets Sep 1 (America/New_York)
+/clear
+Tomorrow's first move, so you don't have to remember any of it:
+
+1. restart — rebuilds git state, row counts, queue, scores
+2. rm ~/Audioura/.continuous_dev/PAUSE — or just say "resume continuous dev"
+3. Five submissions are waiting for review: 360, 361, 362, 363, 364
+
