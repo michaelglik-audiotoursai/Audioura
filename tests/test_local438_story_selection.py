@@ -175,20 +175,23 @@ class TestScoreStoryQuality:
     def test_excellent_story_scores_high(self):
         story = _make_story(80, 'excellent', 'test')
         score = score_story_quality(story)
-        # museum_official(3.0) + documented(2.0) + specificity(3.0) = 8.0
-        assert score == 8.0, f"Expected 8.0, got {score}"
+        # LOCAL-439: trust = museum_official(3.0) * 5/3 = 5.0
+        # + fallback verification(2.0) + specificity(3.0) = 10.0
+        assert score == 10.0, f"Expected 10.0, got {score}"
 
     def test_good_story_scores_medium(self):
         story = _make_story(50, 'good', 'test')
         score = score_story_quality(story)
-        # external_verified(2.0) + reported(1.0) + specificity(1.0, has people only) = 4.0
-        assert score == 4.0, f"Expected 4.0, got {score}"
+        # LOCAL-439: trust = external_verified(2.0) * 5/3 = 3.33
+        # + fallback verification(1.0) + specificity(1.0) = 5.33
+        assert score == 5.33, f"Expected 5.33, got {score}"
 
     def test_bad_but_legitimate_scores_low(self):
         story = _make_story(20, 'bad_but_legitimate', 'test')
         score = score_story_quality(story)
-        # web_search(0.5) + legend(0.5) + specificity(0.0) = 1.0
-        assert score == 1.0, f"Expected 1.0, got {score}"
+        # LOCAL-439: trust = web_search(0.5) * 5/3 = 0.83
+        # + fallback verification(0.5) + specificity(0.0) = 1.33
+        assert score == 1.33, f"Expected 1.33, got {score}"
 
     def test_score_deterministic(self):
         """Same story always gets the same score."""

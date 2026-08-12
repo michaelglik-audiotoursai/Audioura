@@ -11347,8 +11347,9 @@ Write the story FIRST, then add physical description if space allows.
     # [LOCAL-421] Story gate — verify each stop has ≥3 story sentences + named entities
     if _storied_mode and tour_category == 'museum' and not _phase5_ceiling_breached:
         try:
-            from story_gate import verify_stop_story, extract_story_sentences
-            print(f"\n  [LOCAL-421] STORY GATE: checking story requirement per stop...")
+            from story_gate import verify_stop_story, extract_story_sentences, get_classification_cost, reset_classification_cost
+            reset_classification_cost()
+            print(f"\n  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...")
             _l421_all_pass = True
             for _sg_i, _sg_poi in enumerate(poi_list):
                 _sg_desc = _sg_poi.get('description', '')
@@ -11368,32 +11369,35 @@ Write the story FIRST, then add physical description if space allows.
                     credit_line=_sg_credit,
                     stop_name=_sg_name,
                     framing_case=_framing_case,
-                    min_story_sentences=3,
+                    venue_purpose=_framing_source_phrase if _framing_case == 'venue_purpose' else '',
                 )
                 _sg_status = "✓ PASS" if _sg_result['passed'] else "✗ FAIL"
-                print(f"    {_sg_status} stop='{_sg_name}': story_count={_sg_result['story_count']}, "
+                print(f"    {_sg_status} stop='{_sg_name}': story_units={_sg_result['story_unit_count']}, "
                       f"entities_ok={_sg_result['entities_present']}, "
                       f"thesis_ok={_sg_result['thesis_threaded']}")
                 if not _sg_result['passed']:
                     _l421_all_pass = False
                     for _sg_f in _sg_result['failures']:
                         print(f"      → {_sg_f}")
-                    if _sg_result['story_sentences']:
-                        print(f"      story sentences found:")
-                        for _ss in _sg_result['story_sentences'][:3]:
-                            print(f"        \"{_ss[:100]}...\"")
+                if _sg_result.get('interest_scores'):
+                    for _is in _sg_result['interest_scores']:
+                        print(f"      interest: emotional={_is['emotional_content']}, new_info={_is['new_information']}, "
+                              f"deduction={_is['deduction']}, total={_is['interest_score']}")
                 if _sg_result['entities_missing']:
                     print(f"      entities_missing: {_sg_result['entities_missing']}")
 
+            _sg_cost = get_classification_cost()
+            if _sg_cost['total_cost_usd'] > 0:
+                print(f"  [LOCAL-439] Classification cost: ${_sg_cost['total_cost_usd']:.6f} "
+                      f"(input={_sg_cost['input_tokens']}, output={_sg_cost['output_tokens']})")
+
             if _l421_all_pass:
-                print(f"  [LOCAL-421] STORY GATE: ALL STOPS PASSED")
+                print(f"  [LOCAL-439] STORY GATE: ALL STOPS PASSED")
             else:
-                print(f"  [LOCAL-421] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)")
+                print(f"  [LOCAL-439] STORY GATE: SOME STOPS FAILED (informational — does not block delivery)")
                 # [LOCAL-431] Blocking wiring: when _L421_GATE_BLOCKS is True,
                 # a story gate failure refuses delivery through LOCAL-365's
-                # clean-fail path. Currently LOG_ONLY because neither MFA nor
-                # Palais passes yet (1/3 and 1/4 respectively). LEAD flips this
-                # when a live run demonstrates 3/3 or 4/4 on real content.
+                # clean-fail path. Gate stays informational per LOCAL-439 spec.
                 _L421_GATE_BLOCKS = os.environ.get("L421_GATE_BLOCKS", "false").lower() == "true"
                 if _L421_GATE_BLOCKS:
                     # Collect per-stop failure evidence
@@ -11407,17 +11411,17 @@ Write the story FIRST, then add physical description if space allows.
                         _sg_result2 = verify_stop_story(
                             description=_sg_desc2, credit_line=_sg_credit2,
                             stop_name=_sg_name2, framing_case=_framing_case,
-                            min_story_sentences=3,
+                            venue_purpose=_framing_source_phrase if _framing_case == 'venue_purpose' else '',
                         )
                         if not _sg_result2['passed']:
                             _l431_failed_stops.append({
                                 'stop_name': _sg_name2,
-                                'story_count': _sg_result2['story_count'],
+                                'story_unit_count': _sg_result2['story_unit_count'],
                                 'failures': _sg_result2['failures'],
                             })
                     print(f"\n  [LOCAL-431] ⚠️  STORY GATE BLOCKING — refusing delivery")
                     for _fs in _l431_failed_stops:
-                        print(f"    FAIL: {_fs['stop_name']}: story_count={_fs['story_count']}")
+                        print(f"    FAIL: {_fs['stop_name']}: story_units={_fs['story_unit_count']}")
                         for _ff in _fs['failures']:
                             print(f"      → {_ff}")
                     _LAST_CLEAN_FAIL_EVIDENCE.clear()
@@ -11425,9 +11429,9 @@ Write the story FIRST, then add physical description if space allows.
                         "error_type": "story_gate_failed",
                         "failed_stops": _l431_failed_stops,
                         "reason": (
-                            f"{len(_l431_failed_stops)} stop(s) have fewer than 3 story sentences. "
-                            "Each stop must contain at least 3 sentences naming a person and "
-                            "stating what they did (a decision, commission, gift, or consequence)."
+                            f"{len(_l431_failed_stops)} stop(s) have no verified story-unit. "
+                            "Each stop must contain at least one story-unit of ≥3 sentences "
+                            "with a named person, real actions, and an arc (D394)."
                         ),
                     })
                     _LAST_GENERATION_COST = {
@@ -11438,9 +11442,9 @@ Write the story FIRST, then add physical description if space allows.
                     }
                     return None, None, (None, None)
         except ImportError as _sg_err:
-            print(f"  [LOCAL-421] Story gate import error (non-fatal): {_sg_err}")
+            print(f"  [LOCAL-439] Story gate import error (non-fatal): {_sg_err}")
         except Exception as _sg_err:
-            print(f"  [LOCAL-421] Story gate error (non-fatal): {_sg_err}")
+            print(f"  [LOCAL-439] Story gate error (non-fatal): {_sg_err}")
 
     # [LOCAL-423] STORY VERIFICATION — Michael's Step 4: verify claims against sources.
     # Verification GATES selection (runs after generation, before delivery).
